@@ -1,0 +1,164 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+pip-wheel-metadata/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual environments
+venv/
+env/
+ENV/
+env.bak/
+venv.bak/
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Testing
+.tox/
+.nox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.log
+.pytest_cache/
+htmlcov/
+
+# Type checking
+.mypy_cache/
+.dmypy.json
+dmypy.json
+.pytype/
+
+# Linting
+.ruff_cache/
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Data directories
+data/
+logs/
+*.lmdb
+*.lmdb-lock
+
+# Models
+models/
+*.bin
+*.pt
+*.pth
+*.onnx
+
+# Reports (keep structure, ignore content)
+reports/**/output/
+reports/**/*.log
+reports/**/*.tmp
+
+# Temporary files
+*.tmp
+*.temp
+.tmp/
+.temp/
+
+# Docker
+.docker/
+docker-compose.override.yml
+
+# Documentation builds
+docs/_build/
+docs/_static/
+docs/_templates/
+site/
+
+# Jupyter
+.ipynb_checkpoints/
+*.ipynb
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# Pre-commit
+.pre-commit-config.yaml
+
+# Backup files
+*.bak
+*.backup
+*~
+
+# Keep these directories but ignore contents
+!.gitkeep
+!reports/.gitkeep
+!data/.gitkeep
+!logs/.gitkeep
+/reports
+/plans
+/legacy
+
+# Output directories
+/output/
+
+# Root-level temporary/generated files (should not be at root)
+=*
+nul
+*.analysis.txt
+*_dump.txt
+*_results.txt
+faiss_version.txt
+TESTING_REMINDER.md
+/temp_*.py
+/*.bat
+
+# Test results and logs
+tests/results/
+tests/*.txt
+tests/*.log
+tests/logs/
+
+# Production environment (contains secrets)
+.env.production
+
+# Claude AI context
+.claude/
+
+# Repo hygiene reports (untracked working dir)
+/reports_repo_hygiene/
+
+# Backups directory
+/backups/
