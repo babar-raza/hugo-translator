@@ -1,0 +1,26 @@
+site_id: test.example.com
+content_roots:
+  - /content/test
+default_source_lang: en
+target_langs:
+  - es
+  - de
+  - fr
+
+frontmatter:
+  title:
+    mode: translate
+  description:
+    mode: translate
+  draft:
+    mode: passthrough
+
+body:
+  translate_markdown: true
+  preserve_blocks:
+    - block_code
+    - codespan
+  preserve_patterns:
+    - ^\{\{<.*>\}\}$
+  placeholder_syntax:
+    - \{\{<.*>\}\}
