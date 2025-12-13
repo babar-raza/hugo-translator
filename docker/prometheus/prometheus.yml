@@ -1,0 +1,44 @@
+# Prometheus Configuration for Hugo Translation System
+
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    cluster: 'hugo-translator'
+    environment: 'production'
+
+# Alertmanager configuration (optional)
+# alerting:
+#   alertmanagers:
+#     - static_configs:
+#         - targets:
+#           - alertmanager:9093
+
+# Load alerting rules
+rule_files:
+  - 'alert_rules.yml'
+
+# Scrape configurations
+scrape_configs:
+  # Prometheus self-monitoring
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+
+  # Pushgateway for batch jobs
+  - job_name: 'pushgateway'
+    honor_labels: true
+    static_configs:
+      - targets: ['pushgateway:9091']
+        labels:
+          service: 'translation_system'
+
+  # Orchestrator metrics (if exposed directly)
+  # - job_name: 'orchestrator'
+  #   static_configs:
+  #     - targets: ['orchestrator:9090']
+
+  # Workers metrics (if exposed directly)
+  # - job_name: 'workers'
+  #   static_configs:
+  #     - targets: ['worker-cpu-1:9090', 'worker-gpu-1:9090']

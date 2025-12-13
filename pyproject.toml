@@ -1,0 +1,171 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "hugo-translation-system"
+version = "0.1.0"
+description = "Multi-site Hugo translation system with semantic TM and MCP orchestration"
+readme = "README.md"
+requires-python = ">=3.10"
+license = {text = "MIT"}
+authors = [
+    {name = "Translation System Team"}
+]
+keywords = ["hugo", "translation", "i18n", "mcp", "translation-memory"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+]
+
+dependencies = [
+    "pydantic>=2.5.0",
+    "pyyaml>=6.0",
+    "ruamel.yaml>=0.18.0",
+    "jsonschema>=4.20.0",
+    "python-frontmatter>=1.0.0",
+    "markdown-it-py>=3.0.0",
+    "lmdb>=1.4.0",
+    "sentence-transformers>=2.2.0",
+    "faiss-cpu>=1.7.0",
+    "transformers>=4.35.0",
+    "torch>=2.1.0",
+    "watchdog>=3.0.0",
+    "mcp>=0.9.0",
+    "structlog>=23.2.0",
+    "python-dotenv>=1.0.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.4.0",
+    "pytest-cov>=4.1.0",
+    "pytest-asyncio>=0.21.0",
+    "pytest-mock>=3.12.0",
+    "black>=23.12.0",
+    "ruff>=0.1.8",
+    "mypy>=1.7.0",
+    "pre-commit>=3.6.0",
+    "ipython>=8.18.0",
+    "ipdb>=0.13.13",
+]
+gpu = [
+    "faiss-gpu>=1.7.0",
+    "ctranslate2>=3.20.0",
+]
+docs = [
+    "sphinx>=7.2.0",
+    "sphinx-rtd-theme>=2.0.0",
+    "sphinx-autodoc-typehints>=1.25.0",
+]
+
+[project.scripts]
+translate-hugo = "src.cli:main"
+
+[tool.setuptools]
+packages = ["src"]
+
+[tool.black]
+line-length = 100
+target-version = ["py310", "py311", "py312"]
+include = '\.pyi?$'
+extend-exclude = '''
+/(
+  # directories
+  \.eggs
+  | \.git
+  | \.hg
+  | \.mypy_cache
+  | \.tox
+  | \.venv
+  | build
+  | dist
+  | legacy
+)/
+'''
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+select = [
+    "E",   # pycodestyle errors
+    "W",   # pycodestyle warnings
+    "F",   # pyflakes
+    "I",   # isort
+    "B",   # flake8-bugbear
+    "C4",  # flake8-comprehensions
+    "UP",  # pyupgrade
+]
+ignore = [
+    "E501",  # line too long (handled by black)
+    "B008",  # do not perform function calls in argument defaults
+    "C901",  # too complex
+]
+
+[tool.ruff.per-file-ignores]
+"__init__.py" = ["F401"]
+
+[tool.mypy]
+python_version = "3.10"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+check_untyped_defs = true
+disallow_untyped_decorators = false
+no_implicit_optional = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+warn_no_return = true
+strict_equality = true
+
+[[tool.mypy.overrides]]
+module = [
+    "frontmatter.*",
+    "markdown_it.*",
+    "lmdb.*",
+    "sentence_transformers.*",
+    "faiss.*",
+    "transformers.*",
+    "watchdog.*",
+    "mcp.*",
+]
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+minversion = "7.0"
+addopts = "-ra -q --strict-markers --cov=src --cov-report=term-missing --cov-report=html"
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+markers = [
+    "unit: Unit tests",
+    "integration: Integration tests",
+    "slow: Slow tests (model loading, etc.)",
+    "gpu: Tests requiring GPU",
+]
+
+[tool.coverage.run]
+source = ["src"]
+omit = [
+    "*/tests/*",
+    "*/__init__.py",
+]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "if __name__ == .__main__.:",
+    "raise AssertionError",
+    "raise NotImplementedError",
+    "if TYPE_CHECKING:",
+    "if typing.TYPE_CHECKING:",
+    "@abstractmethod",
+]

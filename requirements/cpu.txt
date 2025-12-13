@@ -1,0 +1,5 @@
+-r base.txt
+
+# CPU-optimized inference
+ctranslate2>=3.20.0
+onnxruntime>=1.16.0

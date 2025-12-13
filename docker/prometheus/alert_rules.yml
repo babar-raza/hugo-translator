@@ -1,0 +1,233 @@
+# Alert Rules for Hugo Translation System
+
+groups:
+  - name: translation_system_alerts
+    interval: 30s
+    rules:
+      # Translation failures
+      - alert: HighTranslationFailureRate
+        expr: rate(translation_errors_total[5m]) > 0.1
+        for: 5m
+        labels:
+          severity: warning
+          component: translation_engine
+        annotations:
+          summary: "High translation failure rate detected"
+          description: "Translation failure rate is {{ $value | humanize }} errors/sec (threshold: 0.1/sec)"
+          runbook_url: "https://docs/runbooks/TROUBLESHOOTING.md#high-translation-failure-rate"
+
+      # Critical translation failures
+      - alert: CriticalTranslationFailureRate
+        expr: rate(translation_errors_total[5m]) > 1.0
+        for: 2m
+        labels:
+          severity: critical
+          component: translation_engine
+        annotations:
+          summary: "CRITICAL: Very high translation failure rate"
+          description: "Translation failure rate is {{ $value | humanize }} errors/sec (threshold: 1.0/sec)"
+          runbook_url: "https://docs/runbooks/TROUBLESHOOTING.md#critical-translation-failures"
+
+      # TM hit rate
+      - alert: LowTMHitRate
+        expr: (sum(rate(tm_hits_l1[5m])) + sum(rate(tm_hits_l2[5m])) + sum(rate(tm_hits_l3[5m]))) / sum(rate(tm_lookups_total[5m])) < 0.3
+        for: 10m
+        labels:
+          severity: info
+          component: translation_memory
+        annotations:
+          summary: "Low TM hit rate"
+          description: "TM hit rate is {{ $value | humanizePercentage }}, expected >30%. Consider building or updating TM index."
+          runbook_url: "https://docs/runbooks/TROUBLESHOOTING.md#low-tm-hit-rate"
+
+      # Very low TM hit rate
+      - alert: VeryLowTMHitRate
+        expr: (sum(rate(tm_hits_l1[5m])) + sum(rate(tm_hits_l2[5m])) + sum(rate(tm_hits_l3[5m]))) / sum(rate(tm_lookups_total[5m])) < 0.1
+        for: 5m
+        labels:
+          severity: warning
+          component: translation_memory
+        annotations:
+          summary: "Very low TM hit rate"
+          description: "TM hit rate is {{ $value | humanizePercentage }}, expected >30%. TM may be corrupted or not loaded."
+          runbook_url: "https://docs/runbooks/TROUBLESHOOTING.md#very-low-tm-hit-rate"
+
+      # TM errors
+      - alert: TMErrorRate
+        expr: rate(tm_errors_total[5m]) > 0.05
+        for: 5m
+        labels:
+          severity: warning
+          component: translation_memory
+        annotations:
+          summary: "High TM error rate"
+          description: "TM error rate is {{ $value | humanize }} errors/sec. Check TM database health."
+          runbook_url: "https://docs/runbooks/TROUBLESHOOTING.md#tm-errors"
+
+      # Model errors
+      - alert: ModelErrorRate
+        expr: rate(model_errors_total[5m]) > 0.1
+        for: 5m
+        labels:
+          severity: warning
+          component: model_runtime
+        annotations:
+          summary: "High model error rate"
+          description: "Model error rate is {{ $value | humanize }} errors/sec. Models may need reloading."
+          runbook_url: "https://docs/runbooks/TROUBLESHOOTING.md#model-errors"
+
+      # Worker health
+      - alert: WorkerDown
+        expr: up{job="translation_workers"} == 0
+        for: 2m
+        labels:
+          severity: critical
+          component: worker
+        annotations:
+          summary: "Translation worker is down"
+          description: "Worker {{ $labels.instance }} has been down for 2 minutes"
+          runbook_url: "https://docs/runbooks/TROUBLESHOOTING.md#worker-down"
+
+      # Queue depth
+      - alert: HighQueueDepth
+        expr: queue_depth > 1000
+        for: 15m
+        labels:
+          severity: warning
+          component: orchestrator
+        annotations:
+          summary: "High job queue depth"
+          description: "Queue has {{ $value }} pending jobs (threshold: 1000). Consider adding workers."
+          runbook_url: "https://docs/runbooks/TROUBLESHOOTING.md#high-queue-depth"
+
+      # Critical queue depth
+      - alert: CriticalQueueDepth
+        expr: queue_depth > 5000
+        for: 5m
+        labels:
+          severity: critical
+          component: orchestrator
+        annotations:
+          summary: "CRITICAL: Very high job queue depth"
+          description: "Queue has {{ $value }} pending jobs (threshold: 5000). System may be overwhelmed."
+          runbook_url: "https://docs/runbooks/TROUBLESHOOTING.md#critical-queue-depth"
+
+      # Model memory usage
+      - alert: HighModelMemoryUsage
+        expr: model_memory_usage_bytes > 8589934592  # 8GB
+        for: 5m
+        labels:
+          severity: warning
+          component: model_runtime
+        annotations:
+          summary: "High model memory usage"
+          description: "Model using {{ $value | humanize1024 }}B of memory (threshold: 8GB)"
+          runbook_url: "https://docs/runbooks/TROUBLESHOOTING.md#high-model-memory"
+
+      # Memory usage
+      - alert: HighMemoryUsage
+        expr: memory_usage_percent > 80
+        for: 10m
+        labels:
+          severity: warning
+          component: system
+        annotations:
+          summary: "High system memory usage"
+          description: "Memory usage is {{ $value }}% (threshold: 80%)"
+          runbook_url: "https://docs/runbooks/TROUBLESHOOTING.md#high-memory-usage"
+
+      # Critical memory usage
+      - alert: CriticalMemoryUsage
+        expr: memory_usage_percent > 95
+        for: 2m
+        labels:
+          severity: critical
+          component: system
+        annotations:
+          summary: "CRITICAL: Very high memory usage"
+          description: "Memory usage is {{ $value }}% (threshold: 95%). OOM killer may activate."
+          runbook_url: "https://docs/runbooks/TROUBLESHOOTING.md#critical-memory-usage"
+
+      # Disk space
+      - alert: LowDiskSpace
+        expr: disk_usage_percent > 85
+        for: 5m
+        labels:
+          severity: warning
+          component: system
+        annotations:
+          summary: "Low disk space"
+          description: "Disk usage is {{ $value }}% (threshold: 85%)"
+          runbook_url: "https://docs/runbooks/TROUBLESHOOTING.md#low-disk-space"
+
+      # Critical disk space
+      - alert: CriticalDiskSpace
+        expr: disk_usage_percent > 95
+        for: 2m
+        labels:
+          severity: critical
+          component: system
+        annotations:
+          summary: "CRITICAL: Very low disk space"
+          description: "Disk usage is {{ $value }}% (threshold: 95%). System may fail soon."
+          runbook_url: "https://docs/runbooks/DISASTER_RECOVERY.md#disk-space-crisis"
+
+      # Slow translation
+      - alert: SlowTranslationPerformance
+        expr: histogram_quantile(0.95, rate(translation_duration_seconds_bucket[5m])) > 10
+        for: 10m
+        labels:
+          severity: warning
+          component: translation_engine
+        annotations:
+          summary: "Slow translation performance"
+          description: "95th percentile translation time is {{ $value | humanizeDuration }} (threshold: 10s)"
+          runbook_url: "https://docs/runbooks/TROUBLESHOOTING.md#slow-translations"
+
+      # Very slow translation
+      - alert: VerySlowTranslationPerformance
+        expr: histogram_quantile(0.95, rate(translation_duration_seconds_bucket[5m])) > 30
+        for: 5m
+        labels:
+          severity: critical
+          component: translation_engine
+        annotations:
+          summary: "CRITICAL: Very slow translation performance"
+          description: "95th percentile translation time is {{ $value | humanizeDuration }} (threshold: 30s)"
+          runbook_url: "https://docs/runbooks/TROUBLESHOOTING.md#very-slow-translations"
+
+      # Validation failures
+      - alert: HighValidationFailureRate
+        expr: rate(validation_failures_total[5m]) / rate(validation_checks_total[5m]) > 0.1
+        for: 5m
+        labels:
+          severity: warning
+          component: validation
+        annotations:
+          summary: "High validation failure rate"
+          description: "Validation failure rate is {{ $value | humanizePercentage }}. Translations may have quality issues."
+          runbook_url: "https://docs/runbooks/TROUBLESHOOTING.md#validation-failures"
+
+      # L1 cache size
+      - alert: L1CacheFull
+        expr: tm_cache_size > 9500
+        for: 5m
+        labels:
+          severity: info
+          component: translation_memory
+        annotations:
+          summary: "L1 cache near capacity"
+          description: "L1 cache has {{ $value }} entries (limit: 10000). Eviction may increase."
+          runbook_url: "https://docs/runbooks/DAILY_OPERATIONS.md#cache-management"
+
+      # TM L2 database size
+      - alert: L2DatabaseLarge
+        expr: tm_l2_size_bytes > 10737418240  # 10GB
+        for: 1h
+        labels:
+          severity: info
+          component: translation_memory
+        annotations:
+          summary: "L2 TM database is large"
+          description: "L2 database size is {{ $value | humanize1024 }}B. Consider maintenance."
+          runbook_url: "https://docs/runbooks/DAILY_OPERATIONS.md#tm-maintenance"

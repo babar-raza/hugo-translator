@@ -1,0 +1,217 @@
+version: '3.8'
+
+services:
+  # Translation Orchestrator
+  orchestrator:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: hugo-translator-orchestrator:latest
+    container_name: translator-orchestrator
+    env_file:
+      - .env.production
+    environment:
+      - MODE=auto
+      - CONFIG_PATH=/app/config
+      - PYTHONPATH=/app
+      - PYTHONUNBUFFERED=1
+    volumes:
+      - ./config:/app/config:ro
+      - content_data:/data/content
+      - tm_data:/data/tm
+      - model_cache:/data/models
+      - artifacts:/data/artifacts
+      - logs:/data/logs
+    networks:
+      - translator_net
+    healthcheck:
+      test: ["CMD", "python", "-c", "import sys; from pathlib import Path; sys.exit(0 if Path('/app/src').exists() else 1)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # CPU Worker
+  worker-cpu-1:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: hugo-translator-worker:latest
+    container_name: translator-worker-cpu-1
+    env_file:
+      - .env.production
+    environment:
+      - WORKER_ID=cpu-1
+      - DEVICE=cpu
+      - PYTHONPATH=/app
+      - PYTHONUNBUFFERED=1
+    volumes:
+      - ./config:/app/config:ro
+      - content_data:/data/content:ro
+      - tm_data:/data/tm
+      - model_cache:/data/models
+      - logs:/data/logs
+    networks:
+      - translator_net
+    depends_on:
+      orchestrator:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import sys; from pathlib import Path; sys.exit(0 if Path('/app/src/workers').exists() else 1)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # GPU Worker (optional - requires NVIDIA GPU and nvidia-docker)
+  worker-gpu-1:
+    build:
+      context: .
+      dockerfile: Dockerfile.gpu
+    image: hugo-translator-worker-gpu:latest
+    container_name: translator-worker-gpu-1
+    env_file:
+      - .env.production
+    environment:
+      - WORKER_ID=gpu-1
+      - DEVICE=cuda:0
+      - CUDA_VISIBLE_DEVICES=0
+      - PYTHONPATH=/app
+      - PYTHONUNBUFFERED=1
+    volumes:
+      - ./config:/app/config:ro
+      - content_data:/data/content:ro
+      - tm_data:/data/tm
+      - model_cache:/data/models
+      - logs:/data/logs
+    networks:
+      - translator_net
+    depends_on:
+      orchestrator:
+        condition: service_healthy
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    healthcheck:
+      test: ["CMD", "python", "-c", "import sys; from pathlib import Path; sys.exit(0 if Path('/app/src/workers').exists() else 1)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    profiles:
+      - gpu
+
+  # Prometheus - Metrics collection and alerting
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: translator-prometheus
+    volumes:
+      - ./docker/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./docker/prometheus/alert_rules.yml:/etc/prometheus/alert_rules.yml:ro
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--storage.tsdb.retention.time=30d'
+      - '--web.console.libraries=/usr/share/prometheus/console_libraries'
+      - '--web.console.templates=/usr/share/prometheus/consoles'
+    ports:
+      - "9090:9090"
+    networks:
+      - translator_net
+    restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "5m"
+        max-file: "2"
+
+  # Pushgateway - For batch job metrics
+  pushgateway:
+    image: prom/pushgateway:latest
+    container_name: translator-pushgateway
+    ports:
+      - "9091:9091"
+    networks:
+      - translator_net
+    restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "5m"
+        max-file: "2"
+
+  # Grafana - Metrics visualization (optional)
+  grafana:
+    image: grafana/grafana:latest
+    container_name: translator-grafana
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_USERS_ALLOW_SIGN_UP=false
+      - GF_PATHS_PROVISIONING=/etc/grafana/provisioning
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./docker/grafana/provisioning/datasources:/etc/grafana/provisioning/datasources:ro
+      - ./docker/grafana/provisioning/dashboards:/etc/grafana/provisioning/dashboards:ro
+      - ./docker/grafana/dashboards:/etc/grafana/provisioning/dashboards:ro
+    ports:
+      - "3000:3000"
+    networks:
+      - translator_net
+    depends_on:
+      - prometheus
+    restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "5m"
+        max-file: "2"
+    profiles:
+      - monitoring
+
+# Named volumes for data persistence
+volumes:
+  content_data:
+    driver: local
+  tm_data:
+    driver: local
+  model_cache:
+    driver: local
+  artifacts:
+    driver: local
+  logs:
+    driver: local
+  prometheus_data:
+    driver: local
+  grafana_data:
+    driver: local
+
+# Network for inter-container communication
+networks:
+  translator_net:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.28.0.0/16
