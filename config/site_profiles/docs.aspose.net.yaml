@@ -1,0 +1,110 @@
+site_id: docs.aspose.net
+content_roots:
+- /content/docs
+default_source_lang: en
+target_langs:
+- de
+- es
+- fr
+- ja
+- ko
+- ru
+- zh
+- ar
+- it
+- pt
+frontmatter:
+  title:
+    mode: translate
+    strategy: null
+  description:
+    mode: translate
+    strategy: null
+  draft:
+    mode: passthrough
+    strategy: null
+  date:
+    mode: passthrough
+    strategy: null
+  type:
+    mode: passthrough
+    strategy: null
+  layout:
+    mode: passthrough
+    strategy: null
+  url:
+    mode: passthrough
+    strategy: null
+  slug:
+    mode: passthrough
+    strategy: null
+body:
+  translate_markdown: true
+  preserve_blocks:
+  - block_code
+  - codespan
+  preserve_patterns:
+  - ^\{\{<.*>\}\}
+  - ^\{\{%.*?%\}\}
+  placeholder_syntax:
+  - \{\{<.*?>\}\}
+  - \{\{%.*?%\}\}
+output_layout:
+  per_language_folders: true
+  pattern: '{lang}/{path}'
+tm_prefs:
+  use_semantic_tm: true
+  fallback_exact_only: false
+  min_similarity_score: 0.8
+
+# Validation Configuration
+# Controls validation behavior for translation quality assurance
+# Documentation uses normal mode for balanced quality and flexibility
+validation:
+  enabled: true
+  validation_mode: normal  # Balanced validation for documentation
+
+  # Validator-specific settings
+  validators:
+    completeness:
+      enabled: true
+    language_consistency:
+      enabled: true
+      confidence_threshold: 0.85
+    shortcode_preservation:
+      enabled: true
+    frontmatter_protection:
+      enabled: true
+    terminology_preservation:
+      enabled: true
+      validation_mode: strict  # Strict terminology for technical docs
+    file_placement:
+      enabled: true
+
+  # Post-write validation (file placement checks)
+  post_write_validation: true
+
+# Terminology Configuration
+# Defines site-specific terminology preservation rules
+terminology:
+  enabled: true
+  preserve_mode: BOTH  # Options: PROTECT (pre-translation), VALIDATE (post-translation), BOTH, NONE
+  inherit_global: true  # Inherit global terminology rules from terminology.yaml
+
+  # Site-specific terminology for documentation
+  custom_terms:
+    - term: "Getting Started"
+      category: content_type
+      case_sensitive: false
+      preserve_mode: validate
+      severity: warning
+    - term: "API"
+      category: technical_term
+      case_sensitive: true
+      preserve_mode: both
+      severity: error
+    - term: "SDK"
+      category: technical_term
+      case_sensitive: true
+      preserve_mode: both
+      severity: error

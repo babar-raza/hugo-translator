@@ -1,0 +1,170 @@
+site_id: products.aspose.net
+content_roots:
+- /content/products
+default_source_lang: en
+target_langs:
+- de
+- es
+- fr
+- ja
+- ko
+- ru
+- zh
+- ar
+- it
+- pt
+frontmatter:
+  banner.title:
+    mode: translate
+    strategy: null
+  banner.content:
+    mode: translate
+    strategy: null
+  plugin_description:
+    mode: translate
+    strategy: null
+  head_title:
+    mode: translate
+    strategy: null
+  head_description:
+    mode: translate
+    strategy: null
+  title:
+    mode: translate
+    strategy: null
+  description:
+    mode: translate
+    strategy: null
+  overview.title:
+    mode: translate
+    strategy: null
+  overview.content:
+    mode: translate
+    strategy: null
+  content.block.title_left:
+    mode: translate
+    strategy: null
+  content.block.content_left:
+    mode: translate
+    strategy: null
+  content.block.title_right:
+    mode: translate
+    strategy: null
+  content.block.content_right:
+    mode: translate
+    strategy: null
+  body.block.title_left:
+    mode: translate
+    strategy: null
+  body.block.content_left:
+    mode: translate
+    strategy: null
+  body.block.title_right:
+    mode: translate
+    strategy: null
+  body.block.content_right:
+    mode: translate
+    strategy: null
+  single.block.content:
+    mode: translate
+    strategy: null
+  single.block.title:
+    mode: translate
+    strategy: null
+  faq.list.question:
+    mode: translate
+    strategy: null
+  faq.list.answer:
+    mode: translate
+    strategy: null
+  testimonialswrapper.tmessage:
+    mode: passthrough
+    strategy: null
+  testimonialswrapper.title:
+    mode: translate
+    strategy: null
+  testimonialswrapper.subtitle:
+    mode: translate
+    strategy: null
+  app.title:
+    mode: translate
+    strategy: null
+  draft:
+    mode: passthrough
+    strategy: null
+  date:
+    mode: passthrough
+    strategy: null
+  type:
+    mode: passthrough
+    strategy: null
+  layout:
+    mode: passthrough
+    strategy: null
+  url:
+    mode: passthrough
+    strategy: null
+  slug:
+    mode: passthrough
+    strategy: null
+body:
+  translate_markdown: true
+  preserve_blocks: []
+  preserve_patterns:
+  - '\[[^\]]+\]\([^)]+\)'  # Protect complete markdown links [text](url)
+  placeholder_syntax:
+  - \{\{<.*?>\}\}
+  - \{\{%.*?%\}\}
+output_layout:
+  per_language_folders: true
+  pattern: '{lang}/{path}'
+tm_prefs:
+  use_semantic_tm: true
+  fallback_exact_only: false
+  min_similarity_score: 0.8
+
+# Validation Configuration
+# Controls validation behavior for translation quality assurance
+validation:
+  enabled: true
+  validation_mode: normal  # Options: strict, normal, lenient, off
+
+  # Validator-specific settings
+  validators:
+    completeness:
+      enabled: true
+    language_consistency:
+      enabled: true
+      confidence_threshold: 0.85
+    shortcode_preservation:
+      enabled: true
+    frontmatter_protection:
+      enabled: true
+    terminology_preservation:
+      enabled: true
+      validation_mode: strict
+    file_placement:
+      enabled: true
+
+  # Post-write validation (file placement checks)
+  post_write_validation: true
+
+# Terminology Configuration
+# Defines site-specific terminology preservation rules
+terminology:
+  enabled: true
+  preserve_mode: BOTH  # Options: PROTECT (pre-translation), VALIDATE (post-translation), BOTH, NONE
+  inherit_global: true  # Inherit global terminology rules from terminology.yaml
+
+  # Site-specific terminology for product pages
+  custom_terms:
+    - term: "Product Page"
+      category: content_type
+      case_sensitive: false
+      preserve_mode: validate
+      severity: warning
+    - term: "LINQ Engine"
+      category: plugin_name
+      case_sensitive: true
+      preserve_mode: both
+      severity: error

@@ -1,0 +1,63 @@
+site_id: websites.aspose.net
+content_roots:
+- /content/websites
+default_source_lang: en
+target_langs:
+- de
+- es
+- fr
+- ja
+- ko
+- ru
+- zh
+- ar
+- it
+- pt
+frontmatter:
+  title:
+    mode: translate
+    strategy: null
+  description:
+    mode: translate
+    strategy: null
+  corporate_header:
+    mode: translate
+    strategy: null
+  sections.description:
+    mode: translate
+    strategy: null
+  sections.links.text:
+    mode: translate
+    strategy: null
+  draft:
+    mode: passthrough
+    strategy: null
+  date:
+    mode: passthrough
+    strategy: null
+  type:
+    mode: passthrough
+    strategy: null
+  layout:
+    mode: passthrough
+    strategy: null
+  url:
+    mode: passthrough
+    strategy: null
+  slug:
+    mode: passthrough
+    strategy: null
+body:
+  translate_markdown: true
+  preserve_blocks: []
+  preserve_patterns: []
+  placeholder_syntax:
+  - \{\{<.*?>\}\}
+  - \{\{%.*?%\}\}
+output_layout:
+  per_language_folders: true
+  pattern: '{lang}/{path}'
+tm_prefs:
+  use_semantic_tm: true
+  fallback_exact_only: false
+  min_similarity_score: 0.8

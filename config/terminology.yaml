@@ -1,0 +1,79 @@
+# Terminology Protection Configuration
+# This file defines terms and patterns that must be preserved during translation
+# to maintain technical accuracy and brand consistency.
+
+version: "1.0"
+
+# Global terminology rules applied to all sites
+global:
+  # Exact matches: Terms that must match exactly (with case sensitivity)
+  exact_matches:
+    # Company name - must always remain "Aspose"
+    - term: "Aspose"
+      category: company_name
+      case_sensitive: true
+      preserve_mode: both  # Options: protect (prevent translation), validate (check after), both, none
+      severity: error  # Options: error (critical), warning (alert), info (log only)
+
+    # Platform/technology names
+    - term: ".NET"
+      category: platform
+      case_sensitive: true
+      preserve_mode: both
+      severity: error
+
+    - term: "Java"
+      category: platform
+      case_sensitive: true
+      preserve_mode: both
+      severity: error
+
+    - term: "Python"
+      category: platform
+      case_sensitive: true
+      preserve_mode: both
+      severity: error
+
+  # Pattern-based matches: Regular expressions for dynamic terminology
+  patterns:
+    # Aspose product families (e.g., Aspose.Words, Aspose.Cells, Aspose.PDF)
+    - pattern: "Aspose\\.[A-Z][a-z]+"
+      category: product_family
+      description: "Aspose product families (Aspose.Words, Aspose.Cells, etc.)"
+      preserve_mode: protect  # Prevent translation of product names
+      severity: error
+
+    # LINQ Engine plugin name
+    - pattern: "\\bLINQ Engine\\b"
+      category: plugin_name
+      description: "LINQ Engine plugin"
+      preserve_mode: both
+      severity: error
+
+# Site-specific terminology overrides
+# These extend or override global rules for specific sites
+site_overrides:
+  # Reference documentation site has additional API terminology requirements
+  reference.aspose.net:
+    inherit_global: true  # Inherit all global rules
+    patterns:
+      # PascalCase identifiers (C# class/method names)
+      - pattern: "\\b[A-Z][a-z]+(?:[A-Z][a-z]+)+\\b"
+        category: pascal_case_identifier
+        description: "PascalCase API identifiers"
+        preserve_mode: protect
+        severity: error
+
+      # UPPER_CASE constants
+      - pattern: "\\b[A-Z_]+\\b"
+        category: constant_name
+        description: "UPPER_CASE constants"
+        preserve_mode: protect
+        severity: warning
+
+# Auto-discovery settings for terminology extraction
+# (Disabled for initial phase - will be enabled in future iterations)
+auto_discovery:
+  enabled: false  # Enable automatic terminology discovery from source content
+  min_frequency: 3  # Minimum occurrences to consider as terminology
+  confidence_threshold: 0.8  # Minimum confidence score to auto-add term

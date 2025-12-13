@@ -1,0 +1,160 @@
+# Global Configuration Defaults for Hugo Translation System
+
+system:
+  name: "Hugo Translation System"
+  version: "1.0.0"
+  environment: "production"  # development, staging, production
+
+# Default TM preferences (overridable per site)
+tm_defaults:
+  use_semantic_tm: true
+  semantic_threshold: 0.80
+  fallback_exact_only: false
+  l1_cache_size: 10000
+  l2_max_size_mb: 1024
+  l3_embedding_model: "sentence-transformers/paraphrase-multilingual-mpnet-base-v2"
+  l3_index_type: "IVFFlat"  # Flat, IVFFlat, HNSW
+
+# Default model preferences
+model_defaults:
+  fallback_model: "m2m100_418m"
+  device: "auto"  # auto, cpu, cuda, mps
+  batch_size: 32
+  cache_models: true
+  max_cached_models: 2
+
+# Hardware/GPU configuration
+hardware:
+  enable_gpu: true  # Enable GPU acceleration if available
+  max_gpu_memory_mb: 6144  # Max GPU memory per process (6GB, adjust based on your VRAM)
+  gpu_device_id: -1  # -1 = auto-select best GPU, 0+ = specific device
+  allow_cpu_fallback: true  # Fall back to CPU if GPU fails
+  clear_cache_after_batch: true  # Clear GPU cache after each batch
+
+# Orchestrator defaults
+orchestrator:
+  mode: "auto"  # auto, manual
+  max_workers: 4
+  job_queue_backend: "memory"  # memory, redis
+  sweep_interval_hours: 24
+  file_watcher_debounce_seconds: 2.0
+  enable_file_watcher: true
+  enable_sweep_scheduler: true
+
+# Performance settings
+performance:
+  parallel_translation: true
+  max_parallel_files: 8
+  model_cache_size: 2
+  enable_batch_optimization: true
+
+# Observability defaults
+observability:
+  log_level: "INFO"  # DEBUG, INFO, WARNING, ERROR, CRITICAL
+  log_format: "json"  # text, json
+  flow_artifact_detail: "summary"  # none, summary, sampled, full
+  flow_artifact_sample_rate: 0.05  # 5% when sampled
+  metrics_enabled: true
+  metrics_port: 9090
+  metrics_pushgateway: ""  # URL of Prometheus Pushgateway (optional)
+
+# Telemetry settings
+telemetry:
+  validation_metrics: true  # Track validation metrics (decisions, retries, rejection rates)
+
+# Output Layout (defaults for all sites)
+default_output_layout:
+  per_language_folders: true
+  pattern: "{lang}/{path}"
+
+# Paths (can be overridden by environment variables)
+paths:
+  config_dir: "./config"
+  content_root: "./content"
+  output_dir: "./output"
+  model_cache_dir: "./data/models"
+  tm_data_dir: "./data/tm"
+  l3_index_dir: "l3_faiss"  # Relative to tm_data_dir; can override with L3_INDEX_PATH env var
+  artifacts_dir: "./data/artifacts"
+  logs_dir: "./data/logs"
+  backup_dir: "./backups"
+
+# Validation settings (top-level kill switch and config reference)
+validation:
+  enabled: true  # Global kill switch for validation pipeline
+  config_file: "config/validation.yaml"  # Path to detailed validation configuration
+  mode: "normal"  # Default validation mode: strict, normal, lenient (can be overridden per site)
+  rules:
+    - placeholder_integrity
+    - yaml_validity
+    - structure_preservation
+    - link_validity
+  strict_mode: false  # Fail translation on validation errors
+
+# Terminology settings (top-level configuration reference)
+terminology:
+  enabled: true  # Global kill switch for terminology preservation
+  config_file: "config/terminology.yaml"  # Path to terminology configuration
+  preserve_mode: "BOTH"  # Default preservation mode: PROTECT, VALIDATE, BOTH, NONE (can be overridden per term)
+
+# Security settings
+security:
+  enable_input_validation: true
+  max_file_size_mb: 10
+  allowed_extensions:
+    - ".md"
+    - ".markdown"
+  sanitize_output: true
+
+# Feature flags
+features:
+  enable_parallel_processing: true
+  enable_semantic_tm: true
+  enable_model_benchmarking: false
+  enable_auto_model_selection: true
+  enable_quality_scoring: false
+
+# L4 LLM-based adaptation (Optional)
+l4_llm:
+  enabled: false  # Set to true to enable LLM-based fuzzy match adaptation
+  provider: "ollama"  # ollama, openai, anthropic
+  model: "llama2"  # Model name
+  api_key: null  # API key for cloud providers (optional)
+  base_url: "http://localhost:11434"  # Base URL for Ollama
+  min_similarity: 0.75  # Only adapt matches above this threshold
+  max_similarity: 0.95  # Don't adapt matches above this (already good)
+  timeout_seconds: 30
+  max_latency_ms: 500  # Maximum acceptable latency for adaptation
+  cache_adaptations: true  # Cache LLM adaptations in L2
+
+# Validation defaults
+validation_defaults:
+  mode: "normal"  # Validation mode: strict, normal, lenient
+
+  # Decision rules for validation pipeline
+  decision_rules:
+    reject_on_error_count: 3
+    max_retry_attempts: 2
+    accept_warnings: true
+
+  # Post-write validation configuration
+  post_write:
+    enabled: true  # Enable post-write file validation
+    delete_on_failure: false  # Delete invalid files on validation failure
+    halt_on_failure: false  # Stop processing on validation failure
+
+  # Validator enablement and configuration
+  validators:
+    completeness:
+      enabled: true
+    language_consistency:
+      enabled: true
+      confidence_threshold: 0.85
+    shortcode_preservation:
+      enabled: true
+    frontmatter_protection:
+      enabled: true
+    terminology_preservation:
+      enabled: true
+    file_placement:
+      enabled: true

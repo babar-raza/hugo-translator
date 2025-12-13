@@ -1,0 +1,138 @@
+site_id: reference.aspose.net
+content_roots:
+- /content/reference
+default_source_lang: en
+target_langs:
+- de
+- es
+- fr
+- ja
+- ko
+- ru
+- zh
+- ar
+- it
+- pt
+frontmatter:
+  description:
+    mode: translate
+    strategy: null
+  summary:
+    mode: translate
+    strategy: null
+  draft:
+    mode: passthrough
+    strategy: null
+  date:
+    mode: passthrough
+    strategy: null
+  type:
+    mode: passthrough
+    strategy: null
+  layout:
+    mode: passthrough
+    strategy: null
+  url:
+    mode: passthrough
+    strategy: null
+  slug:
+    mode: passthrough
+    strategy: null
+body:
+  translate_markdown: true
+  preserve_blocks:
+  - block_code
+  - codespan
+  - link
+  preserve_patterns:
+  - ^\{\{<.*>\}\}
+  - ^[A-Z][a-z0-9]+(?:[A-Z][a-z0-9]+)*$
+  - ^[A-Z]{2,}$
+  - ^<.*>
+  - ^[A-Z][A-Za-z0-9_]*\s*\(.*\)$
+  placeholder_syntax:
+  - \{\{<.*?>\}\}
+  - \{\{%.*?%\}\}
+output_layout:
+  per_language_folders: true
+  pattern: '{lang}/{path}'
+tm_prefs:
+  use_semantic_tm: true
+  fallback_exact_only: false
+  min_similarity_score: 0.8
+
+# Validation Configuration
+# Controls validation behavior for translation quality assurance
+# API Reference documentation requires strict validation for accuracy
+validation:
+  enabled: true
+  validation_mode: strict  # Strict mode for API reference documentation
+
+  # Validator-specific settings
+  validators:
+    completeness:
+      enabled: true
+    language_consistency:
+      enabled: true
+      confidence_threshold: 0.90  # Higher threshold for API docs
+    shortcode_preservation:
+      enabled: true
+    frontmatter_protection:
+      enabled: true
+    terminology_preservation:
+      enabled: true
+      validation_mode: strict  # Strict terminology validation
+    file_placement:
+      enabled: true
+
+  # Post-write validation (file placement checks)
+  post_write_validation: true
+
+# Terminology Configuration
+# Defines site-specific terminology preservation rules
+# API Reference has extensive terminology requirements
+terminology:
+  enabled: true
+  preserve_mode: BOTH  # Options: PROTECT (pre-translation), VALIDATE (post-translation), BOTH, NONE
+  inherit_global: true  # Inherit global terminology rules from terminology.yaml
+
+  # Site-specific terminology for API reference documentation
+  custom_terms:
+    - term: "API"
+      category: technical_term
+      case_sensitive: true
+      preserve_mode: both
+      severity: error
+    - term: "Method"
+      category: api_term
+      case_sensitive: false
+      preserve_mode: validate
+      severity: warning
+    - term: "Property"
+      category: api_term
+      case_sensitive: false
+      preserve_mode: validate
+      severity: warning
+    - term: "Namespace"
+      category: api_term
+      case_sensitive: false
+      preserve_mode: validate
+      severity: warning
+    - term: "Class"
+      category: api_term
+      case_sensitive: false
+      preserve_mode: validate
+      severity: warning
+
+  # Additional pattern-based rules for API identifiers
+  patterns:
+    - pattern: "\\b[A-Z][a-z]+(?:[A-Z][a-z]+)+\\b"
+      category: pascal_case_identifier
+      description: "PascalCase API identifiers (class/method names)"
+      preserve_mode: protect
+      severity: error
+    - pattern: "\\b[A-Z_]+\\b"
+      category: constant_name
+      description: "UPPER_CASE constants"
+      preserve_mode: protect
+      severity: warning

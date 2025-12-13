@@ -1,0 +1,144 @@
+# Example Site Profile for Hugo Translation System
+# This demonstrates all available configuration options
+
+site_id: "example.com"
+
+# Content directories to watch and translate
+content_roots:
+  - "/path/to/hugo/content"
+
+# Default source language (all content is assumed to be in this language)
+default_source_lang: "en"
+
+# Target languages for translation
+target_langs:
+  - "fr"  # French
+  - "es"  # Spanish
+  - "de"  # German
+  - "ja"  # Japanese
+
+# Frontmatter translation rules
+frontmatter:
+  # Translate the title
+  title:
+    mode: "translate"
+    
+  # Translate the description
+  description:
+    mode: "translate"
+    
+  # Keep date unchanged
+  date:
+    mode: "keep"
+    
+  # Keep draft status unchanged
+  draft:
+    mode: "keep"
+    
+  # Keep tags unchanged (or use "translate" to translate tag names)
+  tags:
+    mode: "keep"
+    
+  # Keep categories unchanged
+  categories:
+    mode: "keep"
+    
+  # Translate custom excerpt field
+  excerpt:
+    mode: "translate"
+
+# Body translation rules
+body:
+  # Enable markdown translation
+  translate_markdown: true
+  
+  # Preserve code blocks (don't translate)
+  preserve_blocks:
+    - "block_code"
+    - "codespan"
+    - "html_block"
+  
+  # Translate image alt text
+  translate_image_alt: true
+  
+  # Translate link titles
+  translate_link_titles: true
+
+# Output configuration
+output_layout:
+  # Use per-language folders (e.g., content/fr/, content/es/)
+  per_language_folders: true
+  
+  # Output path pattern
+  # Variables: {lang}, {relative_path}, {filename}, {ext}
+  pattern: "/{lang}/{relative_path}"
+  
+  # Preserve directory structure
+  preserve_structure: true
+
+# Translation Memory preferences
+tm_preferences:
+  # Minimum confidence for L3 semantic matches (0.0-1.0)
+  semantic_threshold: 0.85
+  
+  # Enable semantic search (L3) if available
+  use_semantic: true
+  
+  # Context matching for disambiguation
+  use_context: true
+
+# Model selection
+model:
+  # Default model for all language pairs
+  default: "m2m100_418m"
+  
+  # Override model for specific language pairs
+  overrides:
+    # Use larger model for English to Japanese
+    en-ja: "m2m100_1.2b"
+    
+    # Use NLLB for English to French
+    en-fr: "nllb_600m"
+
+# Quality validation
+validation:
+  # Enable placeholder validation
+  check_placeholders: true
+  
+  # Enable link validation
+  check_links: true
+  
+  # Enable YAML structure validation
+  check_yaml_structure: true
+  
+  # Fail on validation errors (or just warn)
+  fail_on_error: false
+
+# Performance settings
+performance:
+  # Maximum segments to translate in one batch
+  batch_size: 50
+  
+  # Enable caching of translations
+  enable_cache: true
+
+# Logging
+logging:
+  # Log level: DEBUG, INFO, WARNING, ERROR
+  level: "INFO"
+  
+  # Enable flow artifacts for this site
+  flow_artifacts: true
+  
+  # Flow artifact detail level: NONE, SUMMARY, SAMPLED, FULL
+  artifact_detail: "SUMMARY"
+
+# Custom metadata to add to translated files
+metadata:
+  # Add translation metadata to frontmatter
+  add_translation_info: true
+  
+  # Custom fields to add
+  custom_fields:
+    translated_by: "Hugo Translation System"
+    translation_engine: "m2m100"

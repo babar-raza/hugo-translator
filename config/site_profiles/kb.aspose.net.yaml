@@ -1,0 +1,97 @@
+site_id: kb.aspose.net
+content_roots:
+- /content/kb
+default_source_lang: en
+target_langs:
+- de
+- es
+- fr
+- ja
+- ko
+- ru
+- zh
+- ar
+- it
+- pt
+frontmatter:
+  title:
+    mode: translate
+    strategy: null
+  description:
+    mode: translate
+    strategy: null
+  summary:
+    mode: translate
+    strategy: null
+  subtitle:
+    mode: translate
+    strategy: null
+  step1:
+    mode: translate
+    strategy: null
+  step2:
+    mode: translate
+    strategy: null
+  step3:
+    mode: translate
+    strategy: null
+  step4:
+    mode: translate
+    strategy: null
+  step5:
+    mode: translate
+    strategy: null
+  step6:
+    mode: translate
+    strategy: null
+  step7:
+    mode: translate
+    strategy: null
+  step8:
+    mode: translate
+    strategy: null
+  step9:
+    mode: translate
+    strategy: null
+  step10:
+    mode: translate
+    strategy: null
+  keywords:
+    mode: translate
+    strategy: null
+  draft:
+    mode: passthrough
+    strategy: null
+  date:
+    mode: passthrough
+    strategy: null
+  type:
+    mode: passthrough
+    strategy: null
+  layout:
+    mode: passthrough
+    strategy: null
+  url:
+    mode: passthrough
+    strategy: null
+  slug:
+    mode: passthrough
+    strategy: null
+body:
+  translate_markdown: true
+  preserve_blocks:
+  - block_code
+  - codespan
+  preserve_patterns:
+  - ^\{\{<.*?>\}\}
+  - ^\{\{%.*?%\}\}
+  placeholder_syntax:
+  - \{\{<.*?>\}\}
+  - \{\{%.*?%\}\}
+output_layout:
+  per_language_folders: true
+  pattern: '{lang}/{path}'
+tm_prefs:
+  use_semantic_tm: true
+  fallback_exact_only: false
+  min_similarity_score: 0.8
