@@ -67,6 +67,7 @@ dmypy.json
 
 # Data directories
 data/
+!data/benchmark_corpus/
 logs/
 *.lmdb
 *.lmdb-lock
@@ -162,3 +163,29 @@ tests/logs/
 
 # Backups directory
 /backups/
+/.venv-user-guide
+/artifacts
+
+# Local telemetry buffer (runtime data)
+/telemetry_buffer/
+
+# Test output artifacts
+m2m100_test_output.txt
+*_test_output.txt
+
+# Diagnostic scripts (dev-only)
+diagnose_*.py
+
+# Development prompts
+/prompts/
+
+# Generated translation samples (keep structure)
+samples/**/de/
+samples/**/fr/
+samples/**/es/
+samples/**/ja/
+samples/**/zh/
+
+# Documentation archives (not for commit)
+docs/_archive/
+docs/_audit/
