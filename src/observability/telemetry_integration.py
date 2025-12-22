@@ -4,6 +4,7 @@ Telemetry Integration for hugo-translator (TEL-04).
 Bridges hugo-translator translation operations with the TEL-03 telemetry platform
 to track translation metrics, token usage, cache performance, and file operations.
 """
+import logging
 import os
 import sys
 from pathlib import Path
@@ -11,7 +12,142 @@ from typing import Optional, Dict, Any, List
 
 import re
 
+logger = logging.getLogger(__name__)
+
 from src.observability.git_context import get_git_context
+
+
+def build_output_summary(
+    job_type: str,
+    outputs: Optional[Dict] = None,
+    successful_files: Optional[int] = None,
+    total_files: Optional[int] = None,
+    files_generated: Optional[int] = None,
+    errors: Optional[List] = None,
+) -> str:
+    """
+    Build standardized output_summary string for RunRecord (SR-03, TEL-05-B).
+
+    Args:
+        job_type: Type of job ("translate_file" or "translate_directory")
+        outputs: For single file: dict of target_lang -> output_path
+        successful_files: For directory: number of successful files
+        total_files: For directory: total files processed
+        files_generated: For directory: total output files created
+        errors: List of errors encountered
+
+    Returns:
+        Formatted output summary string
+
+    Examples:
+        >>> build_output_summary("translate_file", outputs={"es": "a.md", "fr": "b.md"}, errors=[])
+        "2 translations, 0 errors"
+        >>> build_output_summary("translate_directory", successful_files=8, total_files=10, files_generated=16, errors=[])
+        "8/10 files translated, 16 outputs"
+    """
+    error_count = len(errors) if errors else 0
+
+    if job_type == "translate_file":
+        translation_count = len(outputs) if outputs else 0
+        return f"{translation_count} translations, {error_count} errors"
+    elif job_type == "translate_directory":
+        successful = successful_files if successful_files is not None else 0
+        total = total_files if total_files is not None else 0
+        generated = files_generated if files_generated is not None else 0
+        return f"{successful}/{total} files translated, {generated} outputs"
+    else:
+        return f"Job completed, {error_count} errors"
+
+
+def build_error_summary(errors: List[str], max_errors: int = 5) -> str:
+    """
+    Build standardized error_summary string for RunRecord (SR-03, TEL-05-B).
+
+    Truncates to max_errors to prevent excessively long summaries.
+
+    Args:
+        errors: List of error messages
+        max_errors: Maximum number of errors to include (default: 5)
+
+    Returns:
+        Semicolon-separated error summary string, or empty string if no errors
+
+    Examples:
+        >>> build_error_summary(["Error 1", "Error 2"])
+        "Error 1; Error 2"
+        >>> build_error_summary([])
+        ""
+    """
+    if not errors:
+        return ""
+    truncated = errors[:max_errors]
+    return "; ".join(truncated)
+
+
+def calculate_items_metrics(
+    job_type: str,
+    stats: Optional[Any] = None,
+    total_files: Optional[int] = None,
+    successful_files: Optional[int] = None,
+    failed_files: Optional[int] = None,
+) -> Dict[str, int]:
+    """
+    Calculate items_discovered, items_succeeded, items_failed for RunRecord (SR-03, TEL-05-B).
+
+    Semantics:
+    - For single file translation:
+        - items_discovered = total_segments (all segments that need translation)
+        - items_succeeded = translated_segments + tm_hits (segments successfully translated)
+        - items_failed = skipped_segments (segments that failed/were skipped)
+
+    - For directory translation:
+        - items_discovered = total_files (all files found)
+        - items_succeeded = successful_files (files that translated successfully)
+        - items_failed = failed_files (files that failed)
+
+    Args:
+        job_type: Type of job ("translate_file" or "translate_directory")
+        stats: TranslationStats object (for single file)
+        total_files: Total files discovered (for directory)
+        successful_files: Successful files (for directory)
+        failed_files: Failed files (for directory)
+
+    Returns:
+        Dict with keys: items_discovered, items_succeeded, items_failed
+
+    Examples:
+        >>> calculate_items_metrics("translate_file", stats=mock_stats)
+        {"items_discovered": 10, "items_succeeded": 9, "items_failed": 1}
+        >>> calculate_items_metrics("translate_directory", total_files=10, successful_files=8, failed_files=2)
+        {"items_discovered": 10, "items_succeeded": 8, "items_failed": 2}
+    """
+    if job_type == "translate_file":
+        # Single file: items = segments
+        if stats:
+            return {
+                "items_discovered": stats.total_segments,
+                "items_succeeded": stats.translated_segments + stats.tm_hits,
+                "items_failed": stats.skipped_segments,
+            }
+        else:
+            return {
+                "items_discovered": 0,
+                "items_succeeded": 0,
+                "items_failed": 0,
+            }
+    elif job_type == "translate_directory":
+        # Directory: items = files
+        return {
+            "items_discovered": total_files if total_files is not None else 0,
+            "items_succeeded": successful_files if successful_files is not None else 0,
+            "items_failed": failed_files if failed_files is not None else 0,
+        }
+    else:
+        return {
+            "items_discovered": 0,
+            "items_succeeded": 0,
+            "items_failed": 0,
+        }
 
 
 def extract_business_context(
@@ -28,6 +164,15 @@ def extract_business_context(
     Returns:
         Dict with keys: product_family, subdomain, platform, product.
         Values are None if not extractable.
+
+    Field Semantics (TEL-07-C):
+        - product: Set to product_family (e.g., "slides", "words") rather than "hugo-translator".
+          Rationale: agent_name already identifies the tool; product enables per-product analytics.
+        - platform: Set to documentation target platform (e.g., ".NET", "Java") not runtime ("python").
+          Rationale: Runtime is always Python; doc platform enables per-platform translation analytics.
+          Falls back to DEFAULT_PLATFORM env var (default: ".NET") if not detected from path.
+        - product_family: Aspose product family extracted from path (slides, words, cells, etc.).
+        - subdomain: Site subdomain from site_id (products, docs, reference, etc.).
 
     Examples:
         >>> extract_business_context(Path("/slides/net/guide.md"), "products.aspose.com")
@@ -84,13 +229,30 @@ def extract_business_context(
                 result["platform"] = platform
                 break
 
+    # Apply default platform if not detected from path
+    if result["platform"] is None:
+        result["platform"] = os.getenv("DEFAULT_PLATFORM", ".NET")
+
     return result
 
 
 # Add local-telemetry src to path if available
-TELEMETRY_SRC_PATH = Path(r"C:\Users\prora\OneDrive\Documents\GitHub\local-telemetry\src")
-if TELEMETRY_SRC_PATH.exists() and str(TELEMETRY_SRC_PATH) not in sys.path:
+# Configurable via TELEMETRY_SRC_PATH environment variable.
+# Set TELEMETRY_SRC_PATH to override default location for different deployments.
+TELEMETRY_SRC_PATH = Path(
+    os.getenv(
+        'TELEMETRY_SRC_PATH',
+        r"C:\Users\prora\OneDrive\Documents\GitHub\local-telemetry\src"
+    )
+)
+
+if not TELEMETRY_SRC_PATH.exists():
+    logger.warning(f"Telemetry path not found: {TELEMETRY_SRC_PATH}. Telemetry will be unavailable.")
+elif str(TELEMETRY_SRC_PATH) not in sys.path:
+    logger.info(f"Loading telemetry from: {TELEMETRY_SRC_PATH}")
     sys.path.insert(0, str(TELEMETRY_SRC_PATH))
+else:
+    logger.debug(f"Telemetry path already in sys.path: {TELEMETRY_SRC_PATH}")
 
 try:
     from telemetry.client import TelemetryClient
@@ -106,6 +268,73 @@ except ImportError:
         @classmethod
         def from_env(cls):
             return cls()
+
+
+def _safe_duration_ms(stats: Optional[Any], context: str = "") -> tuple:
+    """
+    Safely calculate duration_ms from TranslationStats.
+
+    TI-01: Add observability for duration_ms fallback scenarios.
+    Emits metrics and structured logs when fallback to 0 is used.
+
+    Args:
+        stats: TranslationStats object (or None)
+        context: Context string for logging (e.g., "translate_file", "translate_directory")
+
+    Returns:
+        Tuple of (duration_ms as int, used_fallback as bool)
+        - duration_ms: Always an integer (never None)
+        - used_fallback: True if fallback to 0 was used, False for legitimate values
+    """
+    from src.translation_engine.models import TranslationStats
+
+    # Handle None stats
+    if stats is None:
+        logger.warning(
+            "Duration fallback: stats is None",
+            extra={"context": context, "reason": "none_stats"}
+        )
+        # Emit metric for observability
+        try:
+            from src.observability.metrics import get_metrics
+            metrics = get_metrics()
+            metrics.increment('telemetry_duration_fallback', labels={'reason': 'none_stats'})
+        except (ImportError, Exception):
+            pass  # Graceful degradation if metrics unavailable
+        return (0, True)
+
+    # Handle None or invalid duration_seconds
+    try:
+        if stats.duration_seconds is None:
+            logger.warning(
+                "Duration fallback: duration_seconds is None",
+                extra={"context": context, "reason": "none_duration"}
+            )
+            try:
+                from src.observability.metrics import get_metrics
+                metrics = get_metrics()
+                metrics.increment('telemetry_duration_fallback', labels={'reason': 'none_duration'})
+            except (ImportError, Exception):
+                pass
+            return (0, True)
+        elif stats.duration_seconds == 0.0:
+            # Legitimate 0 - not a fallback
+            return (0, False)
+        else:
+            # Valid duration, calculate ms
+            return (int(stats.duration_seconds * 1000), False)
+    except (TypeError, ValueError, AttributeError) as e:
+        logger.warning(
+            f"Duration fallback: invalid type - {e}",
+            extra={"context": context, "reason": "invalid_type"}
+        )
+        try:
+            from src.observability.metrics import get_metrics
+            metrics = get_metrics()
+            metrics.increment('telemetry_duration_fallback', labels={'reason': 'invalid_type'})
+        except (ImportError, Exception):
+            pass
+        return (0, True)
 
 
 class TranslationTelemetry:
@@ -171,10 +400,20 @@ class TranslationTelemetry:
             trigger_type: How translation was triggered ("cli", "web", "scheduled")
             file_path: Source file being translated
             target_langs: List of target languages
-            **additional_context: Additional context to track
+            **additional_context: Additional context to track (including site_id)
 
         Returns:
             Context manager for the translation run
+
+        Telemetry Fields (TEL-07-C):
+            This method populates the following telemetry fields with intentional semantics:
+            - agent_name: Always "hugo-translator" (identifies the tool)
+            - agent_owner: From AGENT_OWNER env var or default "Babar Raza"
+            - product: Product family from path (e.g., "slides") - NOT "hugo-translator"
+            - platform: Doc target platform (e.g., ".NET") - NOT runtime "python"
+            - product_family: Same as product (Aspose product family)
+            - subdomain: Site subdomain from site_id (e.g., "products", "docs")
+            - git_repo, git_branch, host: Captured from git/environment context
         """
         if not self.enabled or not self.client:
             # Return dummy context manager if telemetry is disabled
@@ -231,8 +470,17 @@ class TranslationTelemetry:
         if not self.enabled or not run_context:
             return
 
-        # Build metrics dict from stats
-        metrics = {
+        # TI-01: Use centralized helper with observability
+        # If stats is None, helper will create default stats and log fallback
+        duration_ms, used_fallback = _safe_duration_ms(stats, context="track_translation_stats")
+
+        # If stats was None, create empty stats for metrics dict
+        if stats is None:
+            from src.translation_engine.models import TranslationStats
+            stats = TranslationStats()
+
+        # Build custom metrics dict from stats
+        custom_metrics = {
             # Token metrics
             "tokens_input": stats.tokens_input,
             "tokens_output": stats.tokens_output,
@@ -259,8 +507,13 @@ class TranslationTelemetry:
             "duration_seconds": stats.duration_seconds,
         }
 
-        # Set all metrics at once using TEL-03 API
-        run_context.set_metrics(**metrics)
+        # Set metrics using TEL-03 API
+        # IMPORTANT: Send metrics_json as dict (not JSON string) to match API schema
+        # API expects: {"type": "object"}, not string
+        run_context.set_metrics(
+            duration_ms=duration_ms,
+            metrics_json=custom_metrics  # Send as dict, not json.dumps(custom_metrics)
+        )
 
     def is_available(self) -> bool:
         """Check if telemetry is available and enabled."""

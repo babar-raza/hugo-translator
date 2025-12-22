@@ -55,6 +55,7 @@ class HealthMonitor:
     def __init__(
         self,
         tm_data_dir: Optional[Path] = None,
+        config_root: Optional[Path] = None,
         timeout: float = 5.0,
         enable_auto_recovery: bool = True
     ):
@@ -63,10 +64,12 @@ class HealthMonitor:
 
         Args:
             tm_data_dir: TM data directory path
+            config_root: Config root directory path (default: ./config)
             timeout: Timeout for health checks in seconds
             enable_auto_recovery: Enable automatic recovery
         """
         self.tm_data_dir = tm_data_dir or Path("./data/tm")
+        self.config_root = Path(config_root) if config_root is not None else Path("config")
         self.timeout = timeout
         self.enable_auto_recovery = enable_auto_recovery
         self.recovery_attempts: List[RecoveryAction] = []
@@ -116,10 +119,11 @@ class HealthMonitor:
             cache = L1Cache(max_size=100)
 
             # Test basic operations
+            test_site = "health_check"
             test_key = "test_source"
             test_value = "test_target"
-            cache.set(test_key, test_value, "en", "es")
-            result = cache.get(test_key, "en", "es")
+            cache.put(test_site, "en", "es", test_key, test_value)
+            result = cache.get(test_site, "en", "es", test_key)
 
             if result == test_value:
                 return HealthCheckResult(
@@ -371,8 +375,17 @@ class HealthMonitor:
         try:
             from src.model_runtime.registry import ModelRegistry
 
-            registry = ModelRegistry()
-            available_models = registry.list_available_models()
+            registry_path = self.config_root / "model_registry.yaml"
+            if not registry_path.exists():
+                return HealthCheckResult(
+                    component="model_registry",
+                    status=HealthStatus.DEGRADED,
+                    message="Model registry file not found",
+                    details={"path": str(registry_path)}
+                )
+
+            registry = ModelRegistry(registry_path)
+            available_models = registry.list_models()
 
             if available_models:
                 return HealthCheckResult(
