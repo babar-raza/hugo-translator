@@ -360,3 +360,92 @@ class TestCTranslate2Backend:
 
         with pytest.raises(RuntimeError, match="Model not loaded"):
             backend.translate(["Hello"], "en", "fr")
+
+
+class TestModelLoaderLoadMode:
+    """Test ModelLoader load_mode parameter (T103: federated-splashing-panda)."""
+
+    def test_model_loader_with_load_mode_none(self, mock_registry):
+        """Test ModelLoader with load_mode=None (auto mode)."""
+        loader = ModelLoader(mock_registry, device="cpu", load_mode=None)
+        assert loader.load_mode is None
+
+    def test_model_loader_with_load_mode_fp16(self, mock_registry):
+        """Test ModelLoader with load_mode='fp16'."""
+        loader = ModelLoader(mock_registry, device="cuda", load_mode="fp16")
+        assert loader.load_mode == "fp16"
+
+    def test_model_loader_with_load_mode_fp32(self, mock_registry):
+        """Test ModelLoader with load_mode='fp32'."""
+        loader = ModelLoader(mock_registry, device="cpu", load_mode="fp32")
+        assert loader.load_mode == "fp32"
+
+    def test_model_loader_with_load_mode_int8(self, mock_registry):
+        """Test ModelLoader with load_mode='int8'."""
+        loader = ModelLoader(mock_registry, device="cpu", load_mode="int8")
+        assert loader.load_mode == "int8"
+
+    @patch("src.model_runtime.loader.HuggingFaceBackend")
+    def test_create_backend_translates_load_mode_fp16(
+        self, mock_backend_class, mock_registry, sample_model_info
+    ):
+        """Test _create_backend translates load_mode='fp16' to use_fp16=True."""
+        mock_backend = MagicMock()
+        mock_backend_class.return_value = mock_backend
+
+        loader = ModelLoader(mock_registry, device="cuda", load_mode="fp16")
+        backend = loader._create_backend(sample_model_info, "cuda")
+
+        # Verify HuggingFaceBackend was called with use_fp16=True
+        mock_backend_class.assert_called_once()
+        call_kwargs = mock_backend_class.call_args[1]
+        assert call_kwargs.get("use_fp16") is True
+
+    @patch("src.model_runtime.loader.HuggingFaceBackend")
+    def test_create_backend_translates_load_mode_fp32(
+        self, mock_backend_class, mock_registry, sample_model_info
+    ):
+        """Test _create_backend translates load_mode='fp32' to use_fp16=False."""
+        mock_backend = MagicMock()
+        mock_backend_class.return_value = mock_backend
+
+        loader = ModelLoader(mock_registry, device="cpu", load_mode="fp32")
+        backend = loader._create_backend(sample_model_info, "cpu")
+
+        # Verify HuggingFaceBackend was called with use_fp16=False
+        mock_backend_class.assert_called_once()
+        call_kwargs = mock_backend_class.call_args[1]
+        assert call_kwargs.get("use_fp16") is False
+
+    @patch("src.model_runtime.loader.HuggingFaceBackend")
+    def test_create_backend_translates_load_mode_int8(
+        self, mock_backend_class, mock_registry, sample_model_info
+    ):
+        """Test _create_backend translates load_mode='int8' to use_int8=True."""
+        mock_backend = MagicMock()
+        mock_backend_class.return_value = mock_backend
+
+        loader = ModelLoader(mock_registry, device="cpu", load_mode="int8")
+        backend = loader._create_backend(sample_model_info, "cpu")
+
+        # Verify HuggingFaceBackend was called with use_int8=True, use_fp16=False
+        mock_backend_class.assert_called_once()
+        call_kwargs = mock_backend_class.call_args[1]
+        assert call_kwargs.get("use_int8") is True
+        assert call_kwargs.get("use_fp16") is False
+
+    @patch("src.model_runtime.loader.HuggingFaceBackend")
+    def test_create_backend_translates_load_mode_none(
+        self, mock_backend_class, mock_registry, sample_model_info
+    ):
+        """Test _create_backend with load_mode=None uses default (auto)."""
+        mock_backend = MagicMock()
+        mock_backend_class.return_value = mock_backend
+
+        loader = ModelLoader(mock_registry, device="cuda", load_mode=None)
+        backend = loader._create_backend(sample_model_info, "cuda")
+
+        # Verify HuggingFaceBackend was called with use_fp16=True (default for CUDA)
+        mock_backend_class.assert_called_once()
+        call_kwargs = mock_backend_class.call_args[1]
+        assert call_kwargs.get("use_fp16") is True

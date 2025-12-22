@@ -258,6 +258,15 @@ class TestGlobalConfigValidationDefaults:
         assert decision_rules.max_retry_attempts == 2
         assert decision_rules.accept_warnings is True
 
+    def test_validation_defaults_post_write(self, config_service):
+        """Test that post-write validation configuration is loaded."""
+        config = config_service.global_config
+
+        post_write = config.validation_defaults.post_write
+        assert post_write.enabled is True
+        assert post_write.delete_on_failure is False
+        assert post_write.halt_on_failure is False
+
     def test_validation_defaults_validators(self, config_service):
         """Test that validator configurations are loaded."""
         config = config_service.global_config
@@ -465,7 +474,13 @@ class TestConfigYAMLValidity:
         assert "validation_defaults" in data
         assert "mode" in data["validation_defaults"]
         assert "decision_rules" in data["validation_defaults"]
+        assert "post_write" in data["validation_defaults"]
         assert "validators" in data["validation_defaults"]
+
+        # Verify post_write structure
+        assert "enabled" in data["validation_defaults"]["post_write"]
+        assert "delete_on_failure" in data["validation_defaults"]["post_write"]
+        assert "halt_on_failure" in data["validation_defaults"]["post_write"]
 
     def test_global_yaml_has_validation_section(self, config_root):
         """Test that global.yaml has top-level validation section."""

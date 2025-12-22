@@ -81,6 +81,14 @@ class TestCLIParser:
         args = parser.parse_args(["--site", "test", "--disable-validation"])
         assert args.disable_validation is True
 
+        # Test force-accept
+        args = parser.parse_args(["--site", "test", "--force-accept"])
+        assert args.force_accept is True
+
+        # Test strict-reject
+        args = parser.parse_args(["--site", "test", "--strict-reject"])
+        assert args.strict_reject is True
+
         # Test enable-terminology
         args = parser.parse_args(["--site", "test", "--enable-terminology"])
         assert args.enable_terminology is True
@@ -212,6 +220,33 @@ class TestCLIConfigOverrides:
         engine_overrides = overrides.get_engine_overrides()
         assert engine_overrides["dry_run"] is True
         assert engine_overrides["save_rejected"] is True
+
+    def test_get_engine_overrides_force_accept(self):
+        """Test that force-accept disables validation."""
+        parser = create_parser()
+        args = parser.parse_args(["--site", "test", "--force-accept"])
+        overrides = CLIConfigOverrides(args)
+        engine_overrides = overrides.get_engine_overrides()
+        assert engine_overrides["enable_validation"] is False
+
+    def test_get_engine_overrides_strict_reject(self):
+        """Test that strict-reject sets strict mode and zero retries."""
+        parser = create_parser()
+        args = parser.parse_args(["--site", "test", "--strict-reject"])
+        overrides = CLIConfigOverrides(args)
+        engine_overrides = overrides.get_engine_overrides()
+        assert engine_overrides["validation_mode"] == "strict"
+        assert engine_overrides["max_retries"] == 0
+
+    def test_strict_reject_overrides_max_retries(self):
+        """Test that strict-reject overrides any max-retries setting."""
+        parser = create_parser()
+        args = parser.parse_args(["--site", "test", "--strict-reject", "--max-retries", "5"])
+        overrides = CLIConfigOverrides(args)
+        engine_overrides = overrides.get_engine_overrides()
+        # strict-reject should force max_retries to 0
+        assert engine_overrides["max_retries"] == 0
+        assert engine_overrides["validation_mode"] == "strict"
 
 
 class TestCLIIntegration:
@@ -466,6 +501,242 @@ class TestCLIIntegration:
         assert call_kwargs["dry_run"] is True
         assert exit_code == 0
 
+    @patch("src.cli.ConfigService")
+    @patch("src.cli.TranslationMemory")
+    @patch("src.cli.ModelLoader")
+    @patch("src.cli.TranslationEngine")
+    def test_cli_force_accept(
+        self, mock_engine_class, mock_loader_class, mock_tm_class, mock_config_class
+    ):
+        """Test force-accept flag."""
+        # Setup mocks
+        mock_config = MagicMock()
+        mock_config.global_config.tm_data_dir = "/tmp/tm"
+        mock_config.global_config.model_cache_dir = "/tmp/models"
+        mock_site_profile = MagicMock()
+        mock_site_profile.content_roots = ["/content"]
+        mock_site_profile.target_langs = ["de", "es"]
+        mock_site_profile.tm_prefs.use_semantic_tm = True
+        mock_config.get_site_profile.return_value = mock_site_profile
+        mock_config_class.return_value = mock_config
+
+        mock_engine = MagicMock()
+        mock_engine.translate_directory.return_value = MagicMock(
+            total_files=1, success_count=1, failed_count=0
+        )
+        mock_engine_class.return_value = mock_engine
+
+        # Create args with force-accept
+        parser = create_parser()
+        args = parser.parse_args([
+            "--site", "test",
+            "--force-accept"
+        ])
+
+        # Run translate_site
+        exit_code = translate_site(args)
+
+        # Verify engine was initialized with validation disabled
+        assert mock_engine_class.called
+        call_kwargs = mock_engine_class.call_args[1]
+        assert call_kwargs["enable_validation"] is False
+        assert exit_code == 0
+
+    @patch("src.cli.ConfigService")
+    @patch("src.cli.TranslationMemory")
+    @patch("src.cli.ModelLoader")
+    @patch("src.cli.TranslationEngine")
+    def test_cli_strict_reject(
+        self, mock_engine_class, mock_loader_class, mock_tm_class, mock_config_class
+    ):
+        """Test strict-reject flag."""
+        # Setup mocks
+        mock_config = MagicMock()
+        mock_config.global_config.tm_data_dir = "/tmp/tm"
+        mock_config.global_config.model_cache_dir = "/tmp/models"
+        mock_site_profile = MagicMock()
+        mock_site_profile.content_roots = ["/content"]
+        mock_site_profile.target_langs = ["de", "es"]
+        mock_site_profile.tm_prefs.use_semantic_tm = True
+        mock_config.get_site_profile.return_value = mock_site_profile
+        mock_config_class.return_value = mock_config
+
+        mock_engine = MagicMock()
+        mock_engine.translate_directory.return_value = MagicMock(
+            total_files=1, success_count=1, failed_count=0
+        )
+        mock_engine_class.return_value = mock_engine
+
+        # Create args with strict-reject
+        parser = create_parser()
+        args = parser.parse_args([
+            "--site", "test",
+            "--strict-reject"
+        ])
+
+        # Run translate_site
+        exit_code = translate_site(args)
+
+        # Verify engine was initialized with strict mode and zero retries
+        assert mock_engine_class.called
+        call_kwargs = mock_engine_class.call_args[1]
+        assert call_kwargs["validation_mode"] == "strict"
+        assert call_kwargs["max_retries"] == 0
+        assert exit_code == 0
+
+    @patch("src.cli.ConfigService")
+    @patch("src.cli.TranslationMemory")
+    @patch("src.cli.ModelLoader")
+    @patch("src.cli.TranslationEngine")
+    def test_cli_save_rejected(
+        self, mock_engine_class, mock_loader_class, mock_tm_class, mock_config_class
+    ):
+        """Test save-rejected flag."""
+        # Setup mocks
+        mock_config = MagicMock()
+        mock_config.global_config.tm_data_dir = "/tmp/tm"
+        mock_config.global_config.model_cache_dir = "/tmp/models"
+        mock_site_profile = MagicMock()
+        mock_site_profile.content_roots = ["/content"]
+        mock_site_profile.target_langs = ["de", "es"]
+        mock_site_profile.tm_prefs.use_semantic_tm = True
+        mock_config.get_site_profile.return_value = mock_site_profile
+        mock_config_class.return_value = mock_config
+
+        mock_engine = MagicMock()
+        mock_engine.translate_directory.return_value = MagicMock(
+            total_files=1, success_count=1, failed_count=0
+        )
+        mock_engine_class.return_value = mock_engine
+
+        # Create args with save-rejected
+        parser = create_parser()
+        args = parser.parse_args([
+            "--site", "test",
+            "--save-rejected"
+        ])
+
+        # Run translate_site
+        exit_code = translate_site(args)
+
+        # Verify engine was initialized with save_rejected
+        assert mock_engine_class.called
+        call_kwargs = mock_engine_class.call_args[1]
+        assert call_kwargs["save_rejected"] is True
+        assert exit_code == 0
+
+
+class TestCLIFlagCombinations:
+    """Test combinations of CLI flags."""
+
+    def test_validation_mode_with_max_retries(self):
+        """Test validation mode with max-retries."""
+        parser = create_parser()
+        args = parser.parse_args([
+            "--site", "test",
+            "--validation-mode", "strict",
+            "--max-retries", "3"
+        ])
+        overrides = CLIConfigOverrides(args)
+        engine_overrides = overrides.get_engine_overrides()
+        assert engine_overrides["validation_mode"] == "strict"
+        assert engine_overrides["max_retries"] == 3
+
+    def test_dry_run_with_save_rejected(self):
+        """Test dry-run combined with save-rejected."""
+        parser = create_parser()
+        args = parser.parse_args([
+            "--site", "test",
+            "--dry-run",
+            "--save-rejected"
+        ])
+        overrides = CLIConfigOverrides(args)
+        engine_overrides = overrides.get_engine_overrides()
+        assert engine_overrides["dry_run"] is True
+        assert engine_overrides["save_rejected"] is True
+
+    def test_strict_reject_with_save_rejected(self):
+        """Test strict-reject combined with save-rejected for debugging."""
+        parser = create_parser()
+        args = parser.parse_args([
+            "--site", "test",
+            "--strict-reject",
+            "--save-rejected"
+        ])
+        overrides = CLIConfigOverrides(args)
+        engine_overrides = overrides.get_engine_overrides()
+        assert engine_overrides["validation_mode"] == "strict"
+        assert engine_overrides["max_retries"] == 0
+        assert engine_overrides["save_rejected"] is True
+
+    def test_validation_mode_with_terminology(self):
+        """Test validation mode combined with terminology settings."""
+        parser = create_parser()
+        args = parser.parse_args([
+            "--site", "test",
+            "--validation-mode", "lenient",
+            "--enable-terminology",
+            "--terminology-mode", "both"
+        ])
+        overrides = CLIConfigOverrides(args)
+        engine_overrides = overrides.get_engine_overrides()
+        assert engine_overrides["validation_mode"] == "lenient"
+        assert engine_overrides["enable_terminology"] is True
+        assert engine_overrides["terminology_mode"] == "both"
+
+    def test_force_accept_overrides_validation_mode(self):
+        """Test that force-accept disables validation even with validation-mode set."""
+        parser = create_parser()
+        args = parser.parse_args([
+            "--site", "test",
+            "--force-accept",
+            "--validation-mode", "strict"
+        ])
+        overrides = CLIConfigOverrides(args)
+        engine_overrides = overrides.get_engine_overrides()
+        # force-accept should disable validation regardless
+        assert engine_overrides["enable_validation"] is False
+
+    def test_dry_run_with_all_validation_flags(self):
+        """Test dry-run with comprehensive validation configuration."""
+        parser = create_parser()
+        args = parser.parse_args([
+            "--site", "test",
+            "--dry-run",
+            "--validation-mode", "strict",
+            "--max-retries", "2",
+            "--save-rejected"
+        ])
+        overrides = CLIConfigOverrides(args)
+        engine_overrides = overrides.get_engine_overrides()
+        assert engine_overrides["dry_run"] is True
+        assert engine_overrides["validation_mode"] == "strict"
+        assert engine_overrides["max_retries"] == 2
+        assert engine_overrides["save_rejected"] is True
+
+    def test_all_flags_together(self):
+        """Test a realistic combination of all major flags."""
+        parser = create_parser()
+        args = parser.parse_args([
+            "--site", "test",
+            "--validation-mode", "normal",
+            "--enable-terminology",
+            "--terminology-mode", "validate",
+            "--max-retries", "3",
+            "--save-rejected",
+            "--validation-config", "/custom/validation.yaml",
+            "--terminology-config", "/custom/terminology.yaml"
+        ])
+        overrides = CLIConfigOverrides(args)
+        engine_overrides = overrides.get_engine_overrides()
+        assert engine_overrides["validation_mode"] == "normal"
+        assert engine_overrides["enable_terminology"] is True
+        assert engine_overrides["terminology_mode"] == "validate"
+        assert engine_overrides["max_retries"] == 3
+        assert engine_overrides["save_rejected"] is True
+        assert overrides.validation_config_path == "/custom/validation.yaml"
+        assert overrides.terminology_config_path == "/custom/terminology.yaml"
+
 
 class TestCLIHelp:
     """Test CLI help text."""
@@ -519,3 +790,14 @@ class TestCLIHelp:
         # Check for output flags
         assert "--dry-run" in help_text
         assert "--save-rejected" in help_text
+
+    def test_help_contains_force_accept_and_strict_reject(self):
+        """Test that help text contains force-accept and strict-reject flags."""
+        parser = create_parser()
+
+        # Get help text
+        help_text = parser.format_help()
+
+        # Check for new validation flags
+        assert "--force-accept" in help_text
+        assert "--strict-reject" in help_text

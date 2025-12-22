@@ -313,3 +313,159 @@ def test_cli_config_overrides_dry_run(mock_dependencies):
     engine_overrides = overrides.get_engine_overrides()
     assert engine_overrides["dry_run"] is True
     assert engine_overrides["save_rejected"] is True
+
+
+def test_parser_max_tokens_type(mock_dependencies):
+    """Test max-tokens accepts integer values (TR-01)."""
+    from src.cli import create_parser
+    parser = create_parser()
+
+    args = parser.parse_args(["--site", "test", "--max-tokens", "1024"])
+    assert args.max_tokens == 1024
+    assert isinstance(args.max_tokens, int)
+
+    # Non-integer should fail
+    with pytest.raises(SystemExit):
+        parser.parse_args(["--site", "test", "--max-tokens", "invalid"])
+
+
+def test_parser_max_tokens_default_none(mock_dependencies):
+    """Test that max-tokens defaults to None when not specified."""
+    from src.cli import create_parser
+    parser = create_parser()
+
+    args = parser.parse_args(["--site", "test"])
+    assert args.max_tokens is None
+
+
+def test_cli_config_overrides_max_tokens(mock_dependencies):
+    """Test max-tokens override (TR-01)."""
+    from src.cli import create_parser, CLIConfigOverrides
+
+    parser = create_parser()
+
+    # Test with max-tokens specified
+    args = parser.parse_args(["--site", "test", "--max-tokens", "1024"])
+    overrides = CLIConfigOverrides(args)
+    assert overrides.max_tokens == 1024
+
+    engine_overrides = overrides.get_engine_overrides()
+    assert engine_overrides["max_tokens"] == 1024
+
+
+def test_cli_config_overrides_max_tokens_not_in_dict_when_none(mock_dependencies):
+    """Test that max_tokens is not in engine overrides when None."""
+    from src.cli import create_parser, CLIConfigOverrides
+
+    parser = create_parser()
+
+    # Test without max-tokens specified
+    args = parser.parse_args(["--site", "test"])
+    overrides = CLIConfigOverrides(args)
+    assert overrides.max_tokens is None
+
+    engine_overrides = overrides.get_engine_overrides()
+    assert "max_tokens" not in engine_overrides
+
+
+def test_device_flag_auto(mock_dependencies):
+    """Test --device auto (default) parses correctly (T101)."""
+    from src.cli import create_parser
+
+    parser = create_parser()
+    args = parser.parse_args(["--site", "test"])
+    assert args.device == "auto"
+
+
+def test_device_flag_cpu(mock_dependencies):
+    """Test --device cpu parses correctly (T101)."""
+    from src.cli import create_parser
+
+    parser = create_parser()
+    args = parser.parse_args(["--site", "test", "--device", "cpu"])
+    assert args.device == "cpu"
+
+
+def test_device_flag_cuda(mock_dependencies):
+    """Test --device cuda parses correctly (T101)."""
+    from src.cli import create_parser
+
+    parser = create_parser()
+    args = parser.parse_args(["--site", "test", "--device", "cuda"])
+    assert args.device == "cuda"
+
+
+def test_load_mode_flag_fp16(mock_dependencies):
+    """Test --load-mode fp16 parses correctly (T101)."""
+    from src.cli import create_parser
+
+    parser = create_parser()
+    args = parser.parse_args(["--site", "test", "--load-mode", "fp16"])
+    assert args.load_mode == "fp16"
+
+
+def test_load_mode_flag_int8(mock_dependencies):
+    """Test --load-mode int8 parses correctly (T101)."""
+    from src.cli import create_parser
+
+    parser = create_parser()
+    args = parser.parse_args(["--site", "test", "--load-mode", "int8"])
+    assert args.load_mode == "int8"
+
+
+def test_load_mode_flag_fp32(mock_dependencies):
+    """Test --load-mode fp32 parses correctly (T101)."""
+    from src.cli import create_parser
+
+    parser = create_parser()
+    args = parser.parse_args(["--site", "test", "--load-mode", "fp32"])
+    assert args.load_mode == "fp32"
+
+
+def test_device_override_stores_correctly(mock_dependencies):
+    """Test that device override stores None for 'auto' and actual value otherwise (T101)."""
+    from src.cli import create_parser, CLIConfigOverrides
+
+    parser = create_parser()
+
+    # Test auto -> None
+    args = parser.parse_args(["--site", "test", "--device", "auto"])
+    overrides = CLIConfigOverrides(args)
+    assert overrides.device is None
+
+    # Test cpu -> "cpu"
+    args = parser.parse_args(["--site", "test", "--device", "cpu"])
+    overrides = CLIConfigOverrides(args)
+    assert overrides.device == "cpu"
+
+    # Test cuda -> "cuda"
+    args = parser.parse_args(["--site", "test", "--device", "cuda"])
+    overrides = CLIConfigOverrides(args)
+    assert overrides.device == "cuda"
+
+
+def test_load_mode_override_stores_correctly(mock_dependencies):
+    """Test that load_mode override stores None for 'auto' and actual value otherwise (T101)."""
+    from src.cli import create_parser, CLIConfigOverrides
+
+    parser = create_parser()
+
+    # Test auto -> None
+    args = parser.parse_args(["--site", "test", "--load-mode", "auto"])
+    overrides = CLIConfigOverrides(args)
+    assert overrides.load_mode is None
+
+    # Test fp16 -> "fp16"
+    args = parser.parse_args(["--site", "test", "--load-mode", "fp16"])
+    overrides = CLIConfigOverrides(args)
+    assert overrides.load_mode == "fp16"
+
+    # Test int8 -> "int8"
+    args = parser.parse_args(["--site", "test", "--load-mode", "int8"])
+    overrides = CLIConfigOverrides(args)
+    assert overrides.load_mode == "int8"
+
+    # Test fp32 -> "fp32"
+    args = parser.parse_args(["--site", "test", "--load-mode", "fp32"])
+    overrides = CLIConfigOverrides(args)
+    assert overrides.load_mode == "fp32"

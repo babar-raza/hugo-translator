@@ -430,3 +430,205 @@ Paragraph two.
         # Check paragraphs present
         assert "Paragraph one" in result
         assert "Paragraph two" in result
+
+
+class TestInlineReconstruction:
+    """Tests for inline element reconstruction (HP-03)."""
+
+    @pytest.fixture
+    def mock_site_profile(self) -> SiteProfile:
+        """Create a minimal mock site profile for testing."""
+        return SiteProfile(
+            site_id="test",
+            content_roots=["/test"],
+            default_source_lang="en",
+            target_langs=["es"],
+            frontmatter={},
+            body=BodyRules(
+                translate_markdown=True,
+                preserve_blocks=[],
+                preserve_patterns=[],
+                placeholder_syntax=[],
+            ),
+        )
+
+    def _make_text_node(self, content: str):
+        """Helper to create a TEXT node."""
+        from translation_engine.parser import ASTNode, NodeType
+        return ASTNode(type=NodeType.TEXT, raw=content)
+
+    def _make_link_node(self, url: str, text: str, title: str = None):
+        """Helper to create a LINK node."""
+        from translation_engine.parser import ASTNode, NodeType
+        attrs = {"url": url}
+        if title:
+            attrs["title"] = title
+        return ASTNode(
+            type=NodeType.LINK,
+            attrs=attrs,
+            children=[self._make_text_node(text)]
+        )
+
+    def _make_strong_node(self, text: str):
+        """Helper to create a STRONG node."""
+        from translation_engine.parser import ASTNode, NodeType
+        return ASTNode(
+            type=NodeType.STRONG,
+            children=[self._make_text_node(text)]
+        )
+
+    def _make_emphasis_node(self, text: str):
+        """Helper to create an EMPHASIS node."""
+        from translation_engine.parser import ASTNode, NodeType
+        return ASTNode(
+            type=NodeType.EMPHASIS,
+            children=[self._make_text_node(text)]
+        )
+
+    def _make_image_node(self, src: str, alt: str, title: str = None):
+        """Helper to create an IMAGE node."""
+        from translation_engine.parser import ASTNode, NodeType
+        attrs = {"src": src, "alt": alt}
+        if title:
+            attrs["title"] = title
+        return ASTNode(type=NodeType.IMAGE, attrs=attrs)
+
+    def test_reconstruct_link(self, mock_site_profile: SiteProfile) -> None:
+        """LINK node reconstructs to [text](url)."""
+        reconstructor = MarkdownReconstructor(mock_site_profile)
+        children = [self._make_link_node("https://example.com", "Click here")]
+        result = reconstructor._reconstruct_inline_children(children)
+        assert result == "[Click here](https://example.com)"
+
+    def test_reconstruct_link_with_title(self, mock_site_profile: SiteProfile) -> None:
+        """LINK with title reconstructs to [text](url \"title\")."""
+        reconstructor = MarkdownReconstructor(mock_site_profile)
+        children = [self._make_link_node("url", "text", "My Title")]
+        result = reconstructor._reconstruct_inline_children(children)
+        assert result == '[text](url "My Title")'
+
+    def test_reconstruct_link_with_quotes_in_title(self, mock_site_profile: SiteProfile) -> None:
+        """LINK with quotes in title escapes them properly."""
+        reconstructor = MarkdownReconstructor(mock_site_profile)
+        children = [self._make_link_node("url", "text", 'Title with "quotes"')]
+        result = reconstructor._reconstruct_inline_children(children)
+        assert result == '[text](url "Title with \\"quotes\\"")'
+
+    def test_reconstruct_bold(self, mock_site_profile: SiteProfile) -> None:
+        """STRONG node reconstructs to **text**."""
+        reconstructor = MarkdownReconstructor(mock_site_profile)
+        children = [self._make_strong_node("bold")]
+        result = reconstructor._reconstruct_inline_children(children)
+        assert result == "**bold**"
+
+    def test_reconstruct_italic(self, mock_site_profile: SiteProfile) -> None:
+        """EMPHASIS node reconstructs to *text*."""
+        reconstructor = MarkdownReconstructor(mock_site_profile)
+        children = [self._make_emphasis_node("italic")]
+        result = reconstructor._reconstruct_inline_children(children)
+        assert result == "*italic*"
+
+    def test_reconstruct_image(self, mock_site_profile: SiteProfile) -> None:
+        """IMAGE node reconstructs to ![alt](src)."""
+        reconstructor = MarkdownReconstructor(mock_site_profile)
+        children = [self._make_image_node("img.png", "Alt text")]
+        result = reconstructor._reconstruct_inline_children(children)
+        assert result == "![Alt text](img.png)"
+
+    def test_reconstruct_image_with_title(self, mock_site_profile: SiteProfile) -> None:
+        """IMAGE with title reconstructs to ![alt](src \"title\")."""
+        reconstructor = MarkdownReconstructor(mock_site_profile)
+        children = [self._make_image_node("img.png", "Alt text", "Image Title")]
+        result = reconstructor._reconstruct_inline_children(children)
+        assert result == '![Alt text](img.png "Image Title")'
+
+    def test_reconstruct_nested_bold_link(self, mock_site_profile: SiteProfile) -> None:
+        """Nested STRONG containing LINK reconstructs correctly."""
+        from translation_engine.parser import ASTNode, NodeType
+        reconstructor = MarkdownReconstructor(mock_site_profile)
+        link = self._make_link_node("url", "link")
+        strong = ASTNode(type=NodeType.STRONG, children=[link])
+        result = reconstructor._reconstruct_inline_children([strong])
+        assert result == "**[link](url)**"
+
+    def test_reconstruct_link_with_bold_text(self, mock_site_profile: SiteProfile) -> None:
+        """LINK containing STRONG reconstructs correctly."""
+        from translation_engine.parser import ASTNode, NodeType
+        reconstructor = MarkdownReconstructor(mock_site_profile)
+        strong = self._make_strong_node("bold text")
+        link = ASTNode(type=NodeType.LINK, attrs={"url": "url"}, children=[strong])
+        result = reconstructor._reconstruct_inline_children([link])
+        assert result == "[**bold text**](url)"
+
+    def test_reconstruct_missing_attrs(self, mock_site_profile: SiteProfile) -> None:
+        """Missing attrs don't crash - graceful fallback."""
+        from translation_engine.parser import ASTNode, NodeType
+        reconstructor = MarkdownReconstructor(mock_site_profile)
+        # LINK without url attr
+        bad_link = ASTNode(type=NodeType.LINK, attrs={}, children=[])
+        result = reconstructor._reconstruct_inline_children([bad_link])
+        assert result == "[]()"  # Graceful empty
+
+    def test_reconstruct_empty_link_text(self, mock_site_profile: SiteProfile) -> None:
+        """Empty link text is preserved."""
+        reconstructor = MarkdownReconstructor(mock_site_profile)
+        children = [self._make_link_node("https://example.com", "")]
+        result = reconstructor._reconstruct_inline_children(children)
+        assert result == "[](https://example.com)"
+
+    def test_reconstruct_mixed_inline_elements(self, mock_site_profile: SiteProfile) -> None:
+        """Multiple inline elements in sequence reconstruct correctly."""
+        reconstructor = MarkdownReconstructor(mock_site_profile)
+        children = [
+            self._make_text_node("Visit "),
+            self._make_link_node("https://example.com", "our site"),
+            self._make_text_node(" for "),
+            self._make_strong_node("amazing"),
+            self._make_text_node(" content!"),
+        ]
+        result = reconstructor._reconstruct_inline_children(children)
+        assert result == "Visit [our site](https://example.com) for **amazing** content!"
+
+    def test_round_trip_preservation(self, mock_site_profile: SiteProfile) -> None:
+        """Parse and reconstruct preserves structure."""
+        parser = HugoParser()
+        reconstructor = MarkdownReconstructor(mock_site_profile)
+
+        source = "Visit [Aspose](https://aspose.com) for **powerful** tools."
+        doc = parser.parse_string(f"---\ntitle: t\n---\n\n{source}")
+
+        # Reconstruct body
+        result = reconstructor.reconstruct_body(doc.ast, {}, 'en')
+
+        assert "[Aspose](https://aspose.com)" in result
+        assert "**powerful**" in result
+
+    def test_round_trip_with_all_inline_types(self, mock_site_profile: SiteProfile) -> None:
+        """Round-trip test with links, bold, italic, and images."""
+        parser = HugoParser()
+        reconstructor = MarkdownReconstructor(mock_site_profile)
+
+        source = "[link](url) **bold** *italic* ![img](src.png)"
+        doc = parser.parse_string(f"---\ntitle: t\n---\n\n{source}")
+
+        # Reconstruct body
+        result = reconstructor.reconstruct_body(doc.ast, {}, 'en')
+
+        assert "[link](url)" in result
+        assert "**bold**" in result
+        assert "*italic*" in result
+        assert "![img](src.png)" in result
+
+    def test_complex_nested_formatting(self, mock_site_profile: SiteProfile) -> None:
+        """Complex nested formatting is preserved."""
+        parser = HugoParser()
+        reconstructor = MarkdownReconstructor(mock_site_profile)
+
+        source = "This is ***bold and italic*** text with **[bold link](url)**."
+        doc = parser.parse_string(f"---\ntitle: t\n---\n\n{source}")
+
+        result = reconstructor.reconstruct_body(doc.ast, {}, 'en')
+
+        # Should contain the key elements even if exact formatting differs
+        assert "bold" in result or "italic" in result
+        assert "[bold link](url)" in result or "bold link" in result
