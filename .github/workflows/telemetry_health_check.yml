@@ -1,0 +1,76 @@
+name: Telemetry Health Check
+
+on:
+  schedule:
+    # Run daily at 9 AM UTC
+    - cron: '0 9 * * *'
+  workflow_dispatch:
+    # Allow manual trigger
+
+jobs:
+  health-check:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout hugo-translator
+        uses: actions/checkout@v3
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Verify telemetry path
+        run: |
+          echo "Checking TELEMETRY_SRC_PATH..."
+          if (Test-Path "$env:TELEMETRY_SRC_PATH") {
+            Write-Host "✅ Telemetry path exists: $env:TELEMETRY_SRC_PATH"
+          } else {
+            Write-Error "❌ Telemetry path not found: $env:TELEMETRY_SRC_PATH"
+            exit 1
+          }
+        env:
+          TELEMETRY_SRC_PATH: C:\Users\prora\OneDrive\Documents\GitHub\local-telemetry\src
+        shell: pwsh
+
+      - name: Run PRAGMA settings diagnostic
+        run: |
+          cd C:\Users\prora\OneDrive\Documents\GitHub\local-telemetry
+          python scripts/diagnose_pragma_settings.py
+        shell: pwsh
+
+      - name: Check database integrity
+        run: |
+          cd C:\Users\prora\OneDrive\Documents\GitHub\local-telemetry
+          python scripts/check_db_integrity.py
+        shell: pwsh
+
+      - name: Validate installation
+        run: |
+          cd C:\Users\prora\OneDrive\Documents\GitHub\local-telemetry
+          python scripts/validate_installation.py
+        shell: pwsh
+
+      - name: Verify recent runs
+        run: |
+          cd C:\Users\prora\OneDrive\Documents\GitHub\hugo-translator
+          python scripts/verify_telemetry.py --latest
+        shell: pwsh
+
+      - name: Health check summary
+        if: success()
+        run: |
+          Write-Host ""
+          Write-Host "=" * 60
+          Write-Host "TELEMETRY HEALTH CHECK: PASSED"
+          Write-Host "=" * 60
+          Write-Host "✅ PRAGMA settings correct"
+          Write-Host "✅ Database integrity OK"
+          Write-Host "✅ Installation validated"
+          Write-Host "✅ Recent runs verified"
+        shell: pwsh
