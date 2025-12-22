@@ -24,7 +24,7 @@ from src.model_runtime import ModelLoader
 from src.model_runtime.registry import ModelRegistry
 from src.utils.config_loader import ConfigService
 
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.INFO, stream=sys.stdout)
 logger = logging.getLogger(__name__)
 
 
@@ -55,6 +55,11 @@ def main():
         choices=["auto", "cpu", "cuda"],
         default="cpu",
         help="Device for model inference (default: cpu)",
+    )
+    parser.add_argument(
+        "--model",
+        default=None,
+        help="Override model ID from registry (e.g., nllb_200_600m)",
     )
 
     # TMO-04: TM Cache Override Options
@@ -152,6 +157,8 @@ def main():
         model_loader=model_loader,
         override_mode=args.override_mode,
         override_filters=override_filters,
+        model_id=args.model,
+        output_dir_override=args.output,
     )
 
     # Log override mode if set

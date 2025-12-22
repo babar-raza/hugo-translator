@@ -49,11 +49,7 @@ from typing import Dict, List, Tuple, Optional
 from collections import defaultdict
 import re
 
-# Add src to path
-sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
-
 import frontmatter
-from utils.config_loader import ConfigLoader
 
 logging.basicConfig(
     level=logging.INFO,

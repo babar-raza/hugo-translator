@@ -38,9 +38,9 @@ def format_status_text(overall_status: HealthStatus, results, verbose: bool = Fa
 
     # Overall status
     status_symbols = {
-        HealthStatus.HEALTHY: "✓",
-        HealthStatus.DEGRADED: "⚠",
-        HealthStatus.UNHEALTHY: "✗"
+        HealthStatus.HEALTHY: "OK",
+        HealthStatus.DEGRADED: "WARN",
+        HealthStatus.UNHEALTHY: "FAIL"
     }
     symbol = status_symbols.get(overall_status, "?")
     lines.append(f"\nOverall Status: {symbol} {overall_status.value.upper()}")
@@ -118,6 +118,12 @@ Exit Codes:
         default="./data/tm",
         help="TM data directory path. Default: ./data/tm"
     )
+    parser.add_argument(
+        "--config-root",
+        type=str,
+        default="./config",
+        help="Config root directory path. Default: ./config"
+    )
 
     parser.add_argument(
         "--format",
@@ -151,6 +157,7 @@ Exit Codes:
     # Initialize health monitor
     monitor = HealthMonitor(
         tm_data_dir=Path(args.tm_data),
+        config_root=Path(args.config_root),
         timeout=args.timeout,
         enable_auto_recovery=not args.no_recovery
     )

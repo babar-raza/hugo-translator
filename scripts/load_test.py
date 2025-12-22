@@ -4,6 +4,7 @@ Load Testing CLI for Hugo Translation System.
 
 Run load tests to measure system performance under concurrent workloads.
 """
+from __future__ import annotations
 
 import argparse
 import json
@@ -11,16 +12,17 @@ import logging
 import sys
 import tempfile
 from pathlib import Path
-from typing import List
+from typing import List, TYPE_CHECKING
 
 # Add src to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from tests.load.test_concurrent_translations import (
-    LoadTestConfig,
-    LoadTestRunner,
-    LoadTestMetrics,
-)
+if TYPE_CHECKING:
+    from tests.load.test_concurrent_translations import (
+        LoadTestConfig,
+        LoadTestRunner,
+        LoadTestMetrics,
+    )
 
 # Setup logging
 logging.basicConfig(
@@ -28,6 +30,16 @@ logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger(__name__)
+
+
+def _load_test_classes():
+    """Import load test classes lazily to allow --help without pytest."""
+    from tests.load.test_concurrent_translations import (
+        LoadTestConfig,
+        LoadTestRunner,
+        LoadTestMetrics,
+    )
+    return LoadTestConfig, LoadTestRunner, LoadTestMetrics
 
 
 def create_sample_files(num_files: int = 3) -> List[Path]:
@@ -334,6 +346,8 @@ Examples:
     logger.info(f"Using {len(test_files)} test files")
 
     # Create config
+    LoadTestConfig, LoadTestRunner, LoadTestMetrics = _load_test_classes()
+
     config = LoadTestConfig(
         num_workers=args.workers,
         duration_seconds=args.duration,

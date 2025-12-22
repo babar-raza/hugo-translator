@@ -1,25 +1,233 @@
 #!/usr/bin/env python
 """
-Telemetry Verification Script.
+Telemetry Verification Script (TEL-07-A).
 
 Verifies that telemetry is properly recording translation runs.
+
+Usage:
+    python verify_telemetry.py           # Run full translation test
+    python verify_telemetry.py --latest  # Just verify latest DB record fields
+    python verify_telemetry.py --check   # Alias for --latest
 """
+import argparse
+import logging
 import os
 import sys
 import json
+import sqlite3
 from pathlib import Path
 from datetime import datetime
+
+logging.basicConfig(level=logging.INFO, format='%(levelname)s: %(message)s')
+logger = logging.getLogger(__name__)
 
 # Add src to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 os.chdir(Path(__file__).parent.parent)
 
 # Add telemetry module path
-TELEMETRY_SRC_PATH = Path(r"C:\Users\prora\OneDrive\Documents\GitHub\local-telemetry\src")
-if TELEMETRY_SRC_PATH.exists() and str(TELEMETRY_SRC_PATH) not in sys.path:
+# Configurable via TELEMETRY_SRC_PATH environment variable.
+# Set TELEMETRY_SRC_PATH to override default location for different deployments.
+TELEMETRY_SRC_PATH = Path(
+    os.getenv(
+        'TELEMETRY_SRC_PATH',
+        r"C:\Users\prora\OneDrive\Documents\GitHub\local-telemetry\src"
+    )
+)
+
+if not TELEMETRY_SRC_PATH.exists():
+    logger.warning(f"Telemetry path not found: {TELEMETRY_SRC_PATH}. Telemetry will be unavailable.")
+elif str(TELEMETRY_SRC_PATH) not in sys.path:
+    logger.info(f"Loading telemetry from: {TELEMETRY_SRC_PATH}")
     sys.path.insert(0, str(TELEMETRY_SRC_PATH))
+else:
+    logger.debug(f"Telemetry path already in sys.path: {TELEMETRY_SRC_PATH}")
+
+
+def verify_latest_record():
+    """
+    Verify all fields in the latest telemetry record (TEL-07-A).
+
+    Checks all fields identified in telemetry-status.md report:
+    - P0: product_family, subdomain
+    - P1: error_summary, items_discovered, schema_version
+    - P2: product, platform, agent_owner
+
+    Returns:
+        int: Exit code (0 = all pass, 1 = some failures)
+    """
+    print("=" * 60)
+    print("TELEMETRY FIELD VERIFICATION (TEL-07-A)")
+    print("=" * 60)
+
+    # Get database path
+    from telemetry.config import TelemetryConfig
+    config = TelemetryConfig.from_env()
+
+    db_path = config.database_path
+    if not db_path.exists():
+        print(f"\n[FAIL] Database not found: {db_path}")
+        return 1
+
+    print(f"\nDatabase: {db_path}")
+
+    # Connect and query latest record
+    conn = sqlite3.connect(str(db_path))
+    conn.row_factory = sqlite3.Row
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        SELECT * FROM agent_runs
+        WHERE agent_name LIKE '%hugo-translator%'
+        ORDER BY start_time DESC
+        LIMIT 1
+    """)
+
+    row = cursor.fetchone()
+    conn.close()
+
+    if not row:
+        print("\n[FAIL] No hugo-translator runs found in database")
+        return 1
+
+    record = dict(row)
+    print(f"\nLatest Run: {record['run_id']}")
+    print(f"Started: {record['start_time']}")
+    print(f"Status: {record['status']}")
+
+    # Define field checks
+    checks = []
+
+    def check(name: str, value, condition: bool, note: str = ""):
+        status = "PASS" if condition else "FAIL"
+        display_value = repr(value) if value is not None else "NULL"
+        checks.append((name, status, display_value, note))
+
+    # P0 - Critical (Business Context)
+    print("\n--- P0: Critical (Business Context) ---")
+    check("schema_version", record.get("schema_version"),
+          record.get("schema_version") == 4,
+          "Expected: 4")
+    check("product_family", record.get("product_family"),
+          record.get("product_family") is not None and len(record.get("product_family", "")) > 0,
+          "Should be 'slides', 'words', etc.")
+    check("subdomain", record.get("subdomain"),
+          record.get("subdomain") is not None and len(record.get("subdomain", "")) > 0,
+          "Should be 'products', 'docs', etc.")
+
+    # P1 - Important
+    print("\n--- P1: Important ---")
+    check("agent_owner", record.get("agent_owner"),
+          record.get("agent_owner") is not None and len(record.get("agent_owner", "")) > 0,
+          "Should be 'Babar Raza' or from env")
+    check("items_discovered", record.get("items_discovered"),
+          record.get("items_discovered") is not None and record.get("items_discovered", 0) > 0,
+          "Should be > 0 for successful runs")
+    # error_summary is only required if there were errors
+    items_failed = record.get("items_failed", 0) or 0
+    if items_failed > 0:
+        check("error_summary", record.get("error_summary"),
+              record.get("error_summary") is not None,
+              "Required when items_failed > 0")
+    else:
+        check("error_summary", record.get("error_summary"),
+              True,  # Pass - no errors so no summary needed
+              "OK (no errors)")
+
+    # P2 - Recommended
+    print("\n--- P2: Recommended ---")
+    check("product", record.get("product"),
+          record.get("product") is not None,
+          "Product family identifier")
+    check("platform", record.get("platform"),
+          True,  # Optional - may be None if not detectable from path
+          "Optional (doc target platform)")
+
+    # Git context
+    print("\n--- Git Context ---")
+    check("git_repo", record.get("git_repo"),
+          True,  # Optional
+          "Optional (populated in git dir)")
+    check("git_branch", record.get("git_branch"),
+          True,  # Optional
+          "Optional (populated in git dir)")
+    check("host", record.get("host"),
+          record.get("host") is not None,
+          "Should be hostname")
+
+    # Standard fields
+    print("\n--- Standard Fields ---")
+    check("run_id", record.get("run_id"),
+          record.get("run_id") is not None,
+          "Required")
+    check("agent_name", record.get("agent_name"),
+          record.get("agent_name") is not None,
+          "Required")
+    check("job_type", record.get("job_type"),
+          record.get("job_type") is not None,
+          "Required")
+    check("trigger_type", record.get("trigger_type"),
+          record.get("trigger_type") is not None,
+          "Required")
+    check("start_time", record.get("start_time"),
+          record.get("start_time") is not None,
+          "Required")
+    check("status", record.get("status"),
+          record.get("status") in ("running", "success", "failed", "partial"),
+          "Valid status")
+    check("input_summary", record.get("input_summary"),
+          record.get("input_summary") is not None,
+          "Should describe input")
+
+    # Print results table
+    print("\n" + "=" * 60)
+    print("VERIFICATION RESULTS")
+    print("=" * 60)
+    print(f"{'Field':<20} {'Status':<6} {'Value':<30} {'Note'}")
+    print("-" * 80)
+
+    failed_count = 0
+    for name, status, value, note in checks:
+        # Truncate long values
+        if len(value) > 28:
+            value = value[:25] + "..."
+        status_icon = "[OK]" if status == "PASS" else "[!!]"
+        print(f"{name:<20} {status_icon:<6} {value:<30} {note}")
+        if status == "FAIL":
+            failed_count += 1
+
+    print("-" * 80)
+    total = len(checks)
+    passed = total - failed_count
+    print(f"\nSummary: {passed}/{total} checks passed")
+
+    if failed_count > 0:
+        print(f"\n[FAIL] {failed_count} verification(s) failed")
+        return 1
+    else:
+        print(f"\n[PASS] All verifications passed!")
+        return 0
+
 
 def main():
+    parser = argparse.ArgumentParser(
+        description="Telemetry Verification Script (TEL-07-A)",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog=__doc__
+    )
+    parser.add_argument(
+        "--latest", "--check",
+        action="store_true",
+        dest="latest",
+        help="Just verify latest DB record fields (quick check)"
+    )
+    args = parser.parse_args()
+
+    # Route to field verification mode if requested
+    if args.latest:
+        return verify_latest_record()
+
+    # Default: full translation test
     print("=" * 60)
     print("TELEMETRY VERIFICATION")
     print("=" * 60)

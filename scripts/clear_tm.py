@@ -8,6 +8,7 @@ Usage:
     python scripts/clear_tm.py --l3-only          # Clear only L3 (semantic index)
 """
 import argparse
+import shutil
 import sys
 from pathlib import Path
 
@@ -17,8 +18,7 @@ sys.path.insert(0, str(project_root))
 
 from src.tm.l1_cache import L1Cache
 from src.tm.l2_persistent import L2PersistentTM
-from src.tm.l3_semantic import L3SemanticTM
-from src.utils.config_service import ConfigService
+from src.utils.config_loader import ConfigService
 
 
 def clear_tm(l1_only=False, l2_only=False, l3_only=False):
@@ -29,8 +29,10 @@ def clear_tm(l1_only=False, l2_only=False, l3_only=False):
     print()
 
     # Load config
-    config = ConfigService()
-    tm_config = config.translation_memory
+    config = ConfigService(project_root / "config")
+    global_config = config.global_config
+    tm_data_dir = Path(global_config.tm_data_dir)
+    tm_data_dir.mkdir(parents=True, exist_ok=True)
 
     # Determine which layers to clear
     clear_l1 = l1_only or (not l2_only and not l3_only)
@@ -40,7 +42,7 @@ def clear_tm(l1_only=False, l2_only=False, l3_only=False):
     # Clear L1
     if clear_l1:
         print("Clearing L1 Cache (in-memory)...")
-        l1 = L1Cache(capacity=tm_config.l1_capacity)
+        l1 = L1Cache(max_size=10000)
         l1.clear()
         print("  ✓ L1 cleared")
         print()
@@ -48,10 +50,12 @@ def clear_tm(l1_only=False, l2_only=False, l3_only=False):
     # Clear L2
     if clear_l2:
         print("Clearing L2 Persistent (LMDB)...")
-        l2 = L2PersistentTM(db_path=tm_config.l2_db_path)
+        l2_path = tm_data_dir / "l2_lmdb"
+        l2_path.mkdir(parents=True, exist_ok=True)
+        l2 = L2PersistentTM(db_path=str(l2_path))
         try:
             l2.clear()
-            print(f"  ✓ L2 cleared: {tm_config.l2_db_path}")
+            print(f"  ✓ L2 cleared: {l2_path}")
         finally:
             l2.close()
         print()
@@ -59,27 +63,18 @@ def clear_tm(l1_only=False, l2_only=False, l3_only=False):
     # Clear L3
     if clear_l3:
         print("Clearing L3 Semantic (FAISS index)...")
-        if not tm_config.use_semantic_tm:
-            print("  ⚠ L3 semantic TM is disabled in config")
+        if not global_config.default_tm_prefs.use_semantic_tm:
+            print("  ? L3 semantic TM is disabled in config")
             print()
         else:
             try:
-                # Initialize L3 (needs model loader)
-                from src.translation_engine.inference.model_loader import ModelLoader
-                from src.utils.gpu_monitor import GPUMonitor
-
-                gpu_monitor = GPUMonitor()
-                model_loader = ModelLoader(gpu_monitor=gpu_monitor)
-
-                l3 = L3SemanticTM(
-                    index_path=tm_config.l3_index_path,
-                    model_loader=model_loader,
-                    dimension=tm_config.l3_dimension or 1024,
-                )
-                l3.clear()
-                print(f"  ✓ L3 cleared: {tm_config.l3_index_path}")
+                l3_path = tm_data_dir / "l3_faiss"
+                if l3_path.exists():
+                    shutil.rmtree(l3_path)
+                l3_path.mkdir(parents=True, exist_ok=True)
+                print(f"  ? L3 cleared: {l3_path}")
             except Exception as e:
-                print(f"  ✗ Failed to clear L3: {e}")
+                print(f"  ?- Failed to clear L3: {e}")
             print()
 
     print("=" * 60)
