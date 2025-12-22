@@ -7,7 +7,7 @@ import re
 import uuid
 from io import StringIO
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 import frontmatter as fm
 from markdown_it import MarkdownIt
@@ -116,6 +116,15 @@ class HugoParser:
         # Parse body to AST
         ast = self._parse_markdown_to_ast(body_content)
 
+        # AST Translation: Assign stable node addresses to AST for deterministic translation
+        # Use per-type counters for addresses like "body.heading[0]", "body.paragraph[0]", etc.
+        type_counters: Dict[str, int] = {}
+        for node in ast:
+            type_name = node.type.value.replace('_', '')
+            idx = type_counters.get(type_name, 0)
+            type_counters[type_name] = idx + 1
+            node.assign_addresses(f"body.{type_name}[{idx}]")
+
         return HugoDocument(frontmatter=frontmatter_dict, ast=ast)
 
     def _parse_yaml_with_comments(self, content: str) -> Optional[Union[CommentedMap, Dict[str, Any]]]:
@@ -182,27 +191,214 @@ class HugoParser:
                 ast.append(ASTNode(type=NodeType.BLOCK_HTML, raw=token.content, node_id=self._generate_node_id()))
                 i += 1
 
+            elif token.type == "bullet_list_open":
+                node, i = self._parse_list(tokens, i, ordered=False)
+                ast.append(node)
+
+            elif token.type == "ordered_list_open":
+                node, i = self._parse_list(tokens, i, ordered=True)
+                ast.append(node)
+
             else:
                 i += 1
 
         return ast
 
     def _parse_inline_content(self, inline_token) -> List[ASTNode]:
-        """Parse inline token children to AST nodes."""
+        """Parse inline token children to AST nodes with proper nesting."""
         if not inline_token.children:
             return [text_node(inline_token.content, self._generate_node_id())]
 
-        nodes = []
-        for child in inline_token.children:
-            if child.type == "text":
-                nodes.append(text_node(child.content, self._generate_node_id()))
-            elif child.type == "code_inline":
-                nodes.append(ASTNode(type=NodeType.CODE_SPAN, raw=child.content, node_id=self._generate_node_id()))
-            elif child.type == "softbreak":
-                nodes.append(ASTNode(type=NodeType.SOFT_BREAK, node_id=self._generate_node_id()))
-            elif child.type == "hardbreak":
-                nodes.append(ASTNode(type=NodeType.LINE_BREAK, node_id=self._generate_node_id()))
-            elif child.type == "html_inline":
-                nodes.append(ASTNode(type=NodeType.INLINE_HTML, raw=child.content, node_id=self._generate_node_id()))
+        return self._parse_inline_tokens(inline_token.children, 0, None)[0]
 
-        return nodes
+    def _parse_inline_tokens(
+        self, tokens: List, start: int, close_type: Optional[str]
+    ) -> Tuple[List[ASTNode], int]:
+        """
+        Parse inline tokens with support for nested elements.
+
+        Args:
+            tokens: List of inline tokens
+            start: Starting index
+            close_type: Token type that closes current element (None for top-level)
+
+        Returns:
+            Tuple of (nodes, end_index)
+        """
+        nodes = []
+        i = start
+
+        while i < len(tokens):
+            token = tokens[i]
+
+            # Check for closing token
+            if close_type and token.type == close_type:
+                return nodes, i
+
+            if token.type == "text":
+                nodes.append(text_node(token.content, self._generate_node_id()))
+                i += 1
+
+            elif token.type == "link_open":
+                href = self._get_attr(token, "href", "")
+                title = self._get_attr(token, "title")
+                children, i = self._parse_inline_tokens(tokens, i + 1, "link_close")
+                nodes.append(link_node(href, children, title, self._generate_node_id()))
+                i += 1  # Skip link_close
+
+            elif token.type == "strong_open":
+                children, i = self._parse_inline_tokens(tokens, i + 1, "strong_close")
+                nodes.append(ASTNode(
+                    type=NodeType.STRONG,
+                    children=children,
+                    node_id=self._generate_node_id()
+                ))
+                i += 1  # Skip strong_close
+
+            elif token.type == "em_open":
+                children, i = self._parse_inline_tokens(tokens, i + 1, "em_close")
+                nodes.append(ASTNode(
+                    type=NodeType.EMPHASIS,
+                    children=children,
+                    node_id=self._generate_node_id()
+                ))
+                i += 1  # Skip em_close
+
+            elif token.type == "image":
+                src = self._get_attr(token, "src", "")
+                alt = token.content or ""
+                title = self._get_attr(token, "title")
+                attrs = {"src": src, "alt": alt}
+                if title:
+                    attrs["title"] = title
+                nodes.append(ASTNode(
+                    type=NodeType.IMAGE,
+                    attrs=attrs,
+                    node_id=self._generate_node_id()
+                ))
+                i += 1
+
+            elif token.type == "code_inline":
+                nodes.append(ASTNode(
+                    type=NodeType.CODE_SPAN,
+                    raw=token.content,
+                    node_id=self._generate_node_id()
+                ))
+                i += 1
+
+            elif token.type == "softbreak":
+                nodes.append(ASTNode(type=NodeType.SOFT_BREAK, node_id=self._generate_node_id()))
+                i += 1
+
+            elif token.type == "hardbreak":
+                nodes.append(ASTNode(type=NodeType.LINE_BREAK, node_id=self._generate_node_id()))
+                i += 1
+
+            elif token.type == "html_inline":
+                nodes.append(ASTNode(
+                    type=NodeType.INLINE_HTML,
+                    raw=token.content,
+                    node_id=self._generate_node_id()
+                ))
+                i += 1
+
+            else:
+                # Unknown token - skip
+                i += 1
+
+        return nodes, i
+
+    def _get_attr(self, token, name: str, default=None):
+        """Get attribute from token safely."""
+        if hasattr(token, 'attrs') and token.attrs:
+            if isinstance(token.attrs, dict):
+                return token.attrs.get(name, default)
+            # markdown_it uses list of tuples
+            for key, val in token.attrs:
+                if key == name:
+                    return val
+        return default
+
+    def _parse_list(self, tokens: List, start_idx: int, ordered: bool) -> Tuple[ASTNode, int]:
+        """Parse a list from tokens.
+
+        Args:
+            tokens: Full token list
+            start_idx: Index of *_list_open token
+            ordered: Whether this is an ordered list
+
+        Returns:
+            Tuple of (list_node, end_index)
+        """
+        items = []
+        i = start_idx + 1  # Skip the open token
+        close_type = "ordered_list_close" if ordered else "bullet_list_close"
+
+        # Get start number for ordered lists
+        start_num = 1
+        if ordered and hasattr(tokens[start_idx], 'attrs'):
+            attrs = tokens[start_idx].attrs or {}
+            if isinstance(attrs, dict):
+                start_num = attrs.get('start', 1)
+            elif isinstance(attrs, list):
+                # markdown_it uses list of tuples for attrs
+                for key, val in attrs:
+                    if key == 'start':
+                        start_num = int(val)
+                        break
+
+        while i < len(tokens):
+            token = tokens[i]
+
+            if token.type == close_type:
+                break
+
+            if token.type == "list_item_open":
+                item_node, i = self._parse_list_item(tokens, i)
+                if item_node:
+                    items.append(item_node)
+            else:
+                i += 1
+
+        list_attrs = {"ordered": ordered}
+        if ordered and start_num != 1:
+            list_attrs["start"] = start_num
+
+        return list_node(items, ordered=ordered, node_id=self._generate_node_id()), i + 1
+
+    def _parse_list_item(self, tokens: List, start_idx: int) -> Tuple[Optional[ASTNode], int]:
+        """Parse a list item from tokens.
+
+        Args:
+            tokens: Full token list
+            start_idx: Index of list_item_open token
+
+        Returns:
+            Tuple of (list_item_node, end_index)
+        """
+        children = []
+        i = start_idx + 1  # Skip list_item_open
+
+        while i < len(tokens):
+            token = tokens[i]
+
+            if token.type == "list_item_close":
+                break
+
+            # Handle nested paragraph
+            if token.type == "paragraph_open":
+                if i + 1 < len(tokens) and tokens[i + 1].type == "inline":
+                    inline_children = self._parse_inline_content(tokens[i + 1])
+                    children.extend(inline_children)
+                i += 3  # Skip open, inline, close
+
+            # Handle nested list
+            elif token.type in ("bullet_list_open", "ordered_list_open"):
+                is_ordered = token.type == "ordered_list_open"
+                nested_list, i = self._parse_list(tokens, i, ordered=is_ordered)
+                children.append(nested_list)
+
+            else:
+                i += 1
+
+        return list_item_node(children, node_id=self._generate_node_id()), i + 1

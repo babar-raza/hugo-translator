@@ -18,7 +18,7 @@ from threading import Lock
 from typing import Dict, List, Optional
 
 from ..model_runtime import ModelLoader
-from ..observability.telemetry_integration import get_telemetry
+from ..observability.telemetry_integration import get_telemetry, _safe_duration_ms
 from ..tm import TranslationMemory
 from .extractor.placeholder_manager import PlaceholderManager
 from ..tm.override_controller import OverrideController, OverrideConfig, OverrideMode
@@ -80,6 +80,10 @@ class TranslationEngine:
         save_rejected: bool = False,
         override_mode: Optional[str] = None,
         override_filters: Optional[Dict] = None,
+        batch_size: int = 16,
+        enable_verification: bool = False,
+        enable_verification_fix: bool = False,
+        output_dir_override: Optional[Path] = None,
         **kwargs,
     ):
         """
@@ -101,6 +105,10 @@ class TranslationEngine:
             save_rejected: Save rejected translations for debugging
             override_mode: TM cache override mode (normal, bypass, refresh, validate)
             override_filters: Optional filters for override (source_patterns, target_langs, frontmatter_keys)
+            batch_size: Maximum texts to translate per batch (reduces GPU memory usage)
+            enable_verification: Enable post-translation verification (VA-03)
+            enable_verification_fix: Enable automatic retry on verification failure (VA-03)
+            output_dir_override: Override output directory (takes precedence over site profile)
             **kwargs: Additional options (for future extensibility)
         """
         self.config = config_service
@@ -116,6 +124,53 @@ class TranslationEngine:
         self.max_retries_override = max_retries
         self.dry_run = dry_run
         self.save_rejected = save_rejected
+        self.batch_size = batch_size  # GPU memory optimization: limit texts per batch
+        self.output_dir_override = output_dir_override  # SR-02: CLI --output argument support
+
+        # SR-02c: Validate output_dir_override type (fail fast)
+        if output_dir_override is not None and not isinstance(output_dir_override, Path):
+            raise ValueError(
+                f"output_dir_override must be Path or None, got {type(output_dir_override).__name__}"
+            )
+
+        # VA-03: Post-translation verification settings
+        self.enable_verification = enable_verification
+        self.enable_verification_fix = enable_verification_fix
+        self.verification_agent = None  # Will be initialized lazily when needed
+
+        # Model override (from CLI --model flag)
+        self.model_id_override = kwargs.get('model_id', None)
+
+        # T202: Cache refresh control (federated-splashing-panda)
+        self.force_retranslate = kwargs.get('force_retranslate', False)
+        self.cache_write_mode = kwargs.get('cache_write_mode', 'auto')
+
+        # T203: Log cache write mode if non-default (federated-splashing-panda)
+        if self.cache_write_mode != "auto":
+            logger.info(f"Cache write mode: {self.cache_write_mode}")
+        if self.force_retranslate:
+            logger.info("Force retranslate enabled (cache lookup will be bypassed)")
+
+        # T304: Multi-language processing control (federated-splashing-panda)
+        self.parallel_languages = kwargs.get('parallel_languages', 0)
+        self.global_lang_rounds = kwargs.get('global_lang_rounds', 0)
+        self.global_lang_sort = kwargs.get('global_lang_sort', 'desc')
+
+        # T304: Mutual exclusion validation (federated-splashing-panda)
+        if self.parallel_languages > 0 and self.global_lang_rounds > 0:
+            raise ValueError(
+                "Cannot use both parallel_languages and global_lang_rounds simultaneously. "
+                "Choose either parallel processing or round-robin, not both."
+            )
+
+        # T304: Log multi-language mode if enabled (federated-splashing-panda)
+        if self.parallel_languages > 0:
+            logger.info(f"Parallel language processing enabled: {self.parallel_languages} workers")
+        elif self.global_lang_rounds > 0:
+            logger.info(
+                f"Round-robin language processing enabled: {self.global_lang_rounds} texts/round, "
+                f"sort={self.global_lang_sort}"
+            )
 
         # TMO-03: Configure TM override mode if specified
         if override_mode:
@@ -164,10 +219,39 @@ class TranslationEngine:
         # TEL-04: Initialize telemetry integration
         self.telemetry = get_telemetry() if enable_telemetry else None
 
+        # TRM-05: Initialize terminology manager if terminology protection is enabled
+        self.terminology_manager = None
+        if self.enable_terminology:
+            try:
+                from .terminology import TerminologyManager
+                terminology_config_path = "config/terminology.yaml"
+                if Path(terminology_config_path).exists():
+                    self.terminology_manager = TerminologyManager(terminology_config_path)
+                    logger.info(f"Terminology protection enabled (config: {terminology_config_path})")
+                else:
+                    logger.warning(f"Terminology config not found at {terminology_config_path}, terminology protection disabled")
+            except Exception as e:
+                logger.warning(f"Failed to initialize TerminologyManager: {e}")
+
         # Thread safety locks for parallel processing
         self._tm_lock = Lock()
         self._model_lock = Lock()
         self._file_write_lock = Lock()
+
+    def _get_model_id(self, site_profile):
+        """
+        Get model ID with CLI override support.
+
+        Args:
+            site_profile: Site profile with default_model attribute
+
+        Returns:
+            Model ID to use for translation
+        """
+        # Priority: CLI override > site profile > default
+        if self.model_id_override:
+            return self.model_id_override
+        return getattr(site_profile, 'default_model', None) or "m2m100_418m"
 
     def translate_file(
         self,
@@ -231,8 +315,8 @@ class TranslationEngine:
                 result.errors.append(f"Parse error: {e}")
                 return result
 
-            # Extract segments
-            extractor = SegmentExtractor(site_profile)
+            # Extract segments (TRM-05: pass terminology_manager for term protection)
+            extractor = SegmentExtractor(site_profile, terminology_manager=self.terminology_manager)
             segments = extractor.extract_all(doc, source_lang)
             result.stats.total_segments = len(segments)
 
@@ -241,7 +325,10 @@ class TranslationEngine:
             )
 
             # INT-01: Translate for each target language with retry loop
+            # VA-03: Determine if verification should run
             should_validate = validate if validate is not None else self.enable_validation
+            should_verify = self.enable_verification
+            should_fix = self.enable_verification_fix and should_verify
             max_retry_attempts = self.decision_engine.max_retry_attempts if self.decision_engine else 2
 
             for target_lang in target_langs:
@@ -251,6 +338,7 @@ class TranslationEngine:
                 translated_content = None
                 final_decision = None
                 final_validation_result = None
+                final_verification_result = None
 
                 while retry_count <= max_retry_attempts:
                     try:
@@ -277,8 +365,8 @@ class TranslationEngine:
                             translated_doc = self.parser.parse_string(translated_content)
                             translated_body = str(translated_doc.body) if hasattr(translated_doc, "body") else ""
 
-                            # Run validation suite
-                            validation_result = self.validation_suite.validate(
+                            # Run validation suite (use validate_aggregated for single result)
+                            validation_result = self.validation_suite.validate_aggregated(
                                 source_body,
                                 translated_body,
                                 context={
@@ -330,6 +418,85 @@ class TranslationEngine:
 
                             # ACCEPT - fall through to write file
 
+                        # VA-03: Post-translation verification (runs after validation)
+                        if should_verify:
+                            logger.debug(f"Running post-translation verification for {target_lang}")
+
+                            # Parse both source and translated docs for verification
+                            source_doc_dict = {
+                                "frontmatter": doc.frontmatter if hasattr(doc, "frontmatter") else {},
+                                "body": str(doc.body) if hasattr(doc, "body") else "",
+                            }
+                            translated_doc_parsed = self.parser.parse_string(translated_content)
+                            translated_doc_dict = {
+                                "frontmatter": translated_doc_parsed.frontmatter if hasattr(translated_doc_parsed, "frontmatter") else {},
+                                "body": str(translated_doc_parsed.body) if hasattr(translated_doc_parsed, "body") else "",
+                            }
+
+                            # Run verification
+                            verification_agent = self._get_verification_agent()
+                            verification_result = verification_agent.verify(
+                                source_doc=source_doc_dict,
+                                translated_doc=translated_doc_dict,
+                                target_lang=target_lang,
+                                context={
+                                    "source_lang": source_lang,
+                                    "file_path": str(file_path),
+                                    "site_id": site_id,
+                                }
+                            )
+
+                            final_verification_result = verification_result
+
+                            # Check if verification passed
+                            if not verification_result.passed:
+                                logger.warning(
+                                    f"Verification failed for {file_path} to {target_lang}: "
+                                    f"{verification_result.error_count} errors, "
+                                    f"{verification_result.warning_count} warnings"
+                                )
+
+                                # If fix mode enabled, retry with feedback
+                                if should_fix and retry_count < max_retry_attempts:
+                                    retry_count += 1
+                                    # Build feedback from verification issues
+                                    error_messages = [
+                                        f"- {issue.location}: {issue.message}"
+                                        for issue in verification_result.issues
+                                        if issue.severity == "error"
+                                    ]
+                                    retry_feedback = (
+                                        f"Previous translation had verification errors:\n"
+                                        + "\n".join(error_messages[:5])  # Limit to 5 issues
+                                        + "\n\nPlease fix these issues in the translation."
+                                    )
+                                    result.stats.validation_retried += 1
+                                    logger.info(
+                                        f"Retrying translation due to verification failure "
+                                        f"(attempt {retry_count}/{max_retry_attempts})"
+                                    )
+
+                                    # Track retry in result history
+                                    result.retry_history.append({
+                                        "attempt": retry_count,
+                                        "reason": "verification_failed",
+                                        "feedback": retry_feedback,
+                                        "error_count": verification_result.error_count,
+                                    })
+
+                                    continue  # Loop again with feedback
+                                else:
+                                    # No fix mode or max retries reached - log but continue
+                                    logger.warning(
+                                        f"Verification failed but continuing "
+                                        f"(fix={'disabled' if not should_fix else 'max retries reached'})"
+                                    )
+                            else:
+                                logger.debug(
+                                    f"Verification passed for {target_lang} "
+                                    f"({verification_result.warning_count} warnings)"
+                                )
+
                         # Write output file (only on ACCEPT or if validation disabled)
                         source_path = doc.source_path if hasattr(doc, "source_path") and doc.source_path else Path("output.md")
                         output_path = self._get_output_path(
@@ -366,6 +533,15 @@ class TranslationEngine:
                                 result.stats.validation_errors = final_validation_result.error_count
                                 result.stats.validation_warnings = final_validation_result.warning_count
                                 result.stats.validation_info = final_validation_result.info_count
+
+                        # VA-03: Store verification result
+                        if final_verification_result:
+                            result.verification_result = final_verification_result
+                            if not final_verification_result.passed:
+                                result.warnings.append(
+                                    f"Verification found {final_verification_result.error_count} errors "
+                                    f"in {target_lang} translation"
+                                )
 
                         logger.info(f"Successfully translated {file_path} to {target_lang} after {retry_count} retries")
                         break  # Success, exit retry loop
@@ -419,20 +595,189 @@ class TranslationEngine:
             if telemetry_run and telemetry_enabled:
                 try:
                     self.telemetry.track_translation_stats(telemetry_run, result.stats)
-                    # Track additional result metrics (TEL-05-A/B)
-                    error_summary = "; ".join(result.errors[:3]) if result.errors else ""  # TEL-05-B
+                    # SR-03: Use helper functions for RunRecord fields (TEL-05-B)
+                    from ..observability.telemetry_integration import (
+                        build_output_summary,
+                        build_error_summary,
+                        calculate_items_metrics,
+                    )
+                    items_metrics = calculate_items_metrics(
+                        job_type="translate_file",
+                        stats=result.stats,
+                    )
+                    output_summary = build_output_summary(
+                        job_type="translate_file",
+                        outputs=result.outputs,
+                        errors=result.errors,
+                    )
+                    error_summary = build_error_summary(result.errors, max_errors=5)
+
+                    # TI-01: Use centralized helper with observability
+                    duration_ms, used_fallback = _safe_duration_ms(result.stats, context="translate_file")
+
                     telemetry_run.set_metrics(
-                        items_discovered=result.stats.total_segments,
-                        items_succeeded=result.stats.translated_segments + result.stats.tm_hits,
-                        items_failed=result.stats.skipped_segments,
-                        output_summary=f"{len(result.outputs)} translations, {len(result.errors)} errors",
-                        error_summary=error_summary,  # TEL-05-B
+                        duration_ms=duration_ms,  # API requires integer
+                        items_discovered=items_metrics["items_discovered"],
+                        items_succeeded=items_metrics["items_succeeded"],
+                        items_failed=items_metrics["items_failed"],
+                        output_summary=output_summary,
+                        error_summary=error_summary,
                     )
                     telemetry_cm.__exit__(None, None, None)
                 except Exception as telemetry_error:
                     logger.warning(f"Telemetry tracking failed: {telemetry_error}")
 
         return result
+
+    def _clear_language_cache(self) -> None:
+        """
+        Clear L1 TM cache to free memory between language switches.
+
+        T304: Memory management for round-robin mode (federated-splashing-panda).
+        In round-robin mode, clearing the cache between languages prevents
+        memory buildup when processing many languages.
+        """
+        with self._tm_lock:
+            if hasattr(self.tm, 'l1') and hasattr(self.tm.l1, 'clear'):
+                cache_size_before = len(self.tm.l1.cache) if hasattr(self.tm.l1, 'cache') else 0
+                self.tm.l1.clear()
+                logger.debug(f"Cleared L1 cache ({cache_size_before} entries)")
+
+    def _translate_single_language(
+        self,
+        site_id: str,
+        file_path: Path,
+        target_lang: str,
+        force: bool = False,
+    ) -> TranslationResult:
+        """
+        Translate file for single target language.
+
+        T304: Helper method for parallel execution (federated-splashing-panda).
+        This method translates a file for a single language, used by
+        ParallelLanguageExecutor to process languages concurrently.
+
+        Args:
+            site_id: Site identifier
+            file_path: Path to source file
+            target_lang: Target language code
+            force: Force retranslation (bypass cache)
+
+        Returns:
+            TranslationResult for the single language
+        """
+        # Call translate_file with single language
+        return self.translate_file(
+            site_id=site_id,
+            file_path=file_path,
+            target_langs=[target_lang],
+            force=force,
+        )
+
+    def _translate_body_ast(
+        self,
+        doc,
+        target_lang: str,
+        site_profile,
+        stats: TranslationStats
+    ) -> str:
+        """
+        Translate document body using AST-based node-addressed translation.
+
+        This method implements complete AST-based translation with node addressing:
+        1. Extract TextUnits from AST with node addressing
+        2. Batch translate with M2M100 delimiter protection
+        3. Apply translations back to AST
+        4. Render AST to Markdown
+
+        This approach ensures 100% preservation of document structure and formatting
+        by separating content from structure.
+
+        Args:
+            doc: Parsed HugoDocument with AST
+            target_lang: Target language code
+            site_profile: Site profile configuration
+            stats: Stats object to update with telemetry
+
+        Returns:
+            Translated markdown body content
+
+        Raises:
+            RuntimeError: If AST translation fails
+        """
+        from .extractor import TextUnitExtractor
+        from .reconstructor import ASTRenderer
+        from pathlib import Path
+
+        try:
+            # Step 1: Load translation model for AST path
+            model_id = self._get_model_id(site_profile)
+            with self._model_lock:
+                mt_model = self.model_loader.load_model(model_id)
+
+            # Step 2: Extract TextUnits with M2M100 protection
+            terminology_file = Path("config/terminology/aspose_terms.txt")
+            extractor = TextUnitExtractor(
+                segmentation_strategy=site_profile.body.ast_segmentation_strategy,
+                terminology_file=terminology_file if terminology_file.exists() else None,
+                mt_model=mt_model  # Pass model for tokenizer protection
+            )
+
+            logger.info(f"AST Translation: Extracting TextUnits from AST (strategy: {site_profile.body.ast_segmentation_strategy})")
+            plan = extractor.extract_from_ast(doc.ast, frontmatter=doc.frontmatter)
+
+            # Telemetry: Track extracted units
+            total_units = len(plan.units)
+            translatable_units = len([u for u in plan.units if not u.do_not_translate])
+            protected_units = len([u for u in plan.units if u.do_not_translate])
+            logger.info(f"AST Translation: Extracted {total_units} units ({translatable_units} translatable, {protected_units} protected)")
+
+            # Update telemetry
+            stats.ast_translation_enabled = True
+            stats.ast_units_extracted = total_units
+            stats.ast_units_translatable = translatable_units
+            stats.ast_units_protected = protected_units
+
+            # Step 2: Translate units with batching + fallback
+            batch_size = site_profile.body.ast_batch_size
+            logger.info(f"AST Translation: Translating units (batch_size: {batch_size})")
+
+            # Track batch calls and fallbacks
+            batch_calls_before = getattr(extractor, '_batch_calls', 0)
+            fallbacks_before = getattr(extractor, '_individual_fallbacks', 0)
+
+            translated_units = extractor.batch_translate_units(
+                plan.units,
+                mt_model,
+                site_profile.default_source_lang,
+                target_lang,
+                batch_size=batch_size
+            )
+
+            # Update telemetry with batch statistics
+            batch_calls_after = getattr(extractor, '_batch_calls', 0)
+            fallbacks_after = getattr(extractor, '_individual_fallbacks', 0)
+            stats.ast_batch_calls = batch_calls_after - batch_calls_before
+            stats.ast_individual_fallbacks = fallbacks_after - fallbacks_before
+
+            # Step 3: Apply translations to AST and frontmatter
+            logger.info("AST Translation: Applying translations to AST and frontmatter")
+            renderer = ASTRenderer()
+            renderer.apply_translations(doc.ast, translated_units, frontmatter=doc.frontmatter)
+
+            # Step 4: Render to Markdown
+            logger.info("AST Translation: Rendering AST to Markdown")
+            translated_body = renderer.render_to_markdown(doc.ast)
+
+            # Telemetry: Track success
+            logger.info(f"AST Translation: Successfully translated {translatable_units} units "
+                       f"({stats.ast_batch_calls} batches, {stats.ast_individual_fallbacks} fallbacks)")
+
+            return translated_body
+
+        except Exception as e:
+            logger.error(f"AST-based translation failed: {e}", exc_info=True)
+            raise RuntimeError(f"AST-based translation failed: {e}")
 
     def _translate_to_language(
         self,
@@ -481,6 +826,9 @@ class TranslationEngine:
         # Create translation map: segment text -> translation
         translations = {}
         segments_to_translate = []
+
+        # Create extractor instance for inline formatting restoration (TRM-05: with terminology)
+        extractor = SegmentExtractor(site_profile, terminology_manager=self.terminology_manager)
 
         # Step 1: TM lookup (unless force=True)
         if not force:
@@ -531,7 +879,11 @@ class TranslationEngine:
                     segments_to_translate.append(segment)
 
         else:
-            # Force mode: translate everything
+            # Force mode: translate everything (T202: federated-splashing-panda)
+            logger.info(
+                f"Force retranslate enabled: bypassing cache lookup for {len(segments)} segments "
+                f"({source_lang} → {target_lang})"
+            )
             segments_to_translate = segments
 
         # Step 2: Translate new segments via model
@@ -542,9 +894,10 @@ class TranslationEngine:
                 + (f" (retry {retry_count} with feedback)" if retry_count > 0 else "")
             )
 
-            # Get model
-            model_id = getattr(site_profile, 'default_model', None) or "m2m100_418m"
-            backend = self.model_loader.load_model(model_id)
+            # Get model (use lock to prevent race conditions in parallel processing)
+            model_id = self._get_model_id(site_profile)
+            with self._model_lock:
+                backend = self.model_loader.load_model(model_id)
             stats.model_used = model_id
 
             # INT-02: Prepare translation texts
@@ -604,38 +957,101 @@ class TranslationEngine:
                         if hasattr(segment.context, "context_type"):
                             store_context["context_type"] = str(segment.context.context_type)
 
-                    # Store in TM for future use (respects override mode)
-                    self.tm.store(
-                        site_id=site_id,
-                        src_lang=source_lang,
-                        tgt_lang=target_lang,
-                        text=segment.source_text,
-                        translation=translation,
-                        context=str(segment.context) if segment.context else None,
-                        metadata={
-                            "model": model_id,
-                            "source_file": str(doc.file_path)
-                            if hasattr(doc, "file_path")
-                            else None,
-                        },
-                        store_context=store_context,
-                        force_update=force,  # Force mode updates cache with new translations
-                    )
-                    # TEL-04: Track TM entry storage
-                    stats.tm_entries_stored += 1
+                    # T203: Determine cache write behavior (federated-splashing-panda)
+                    # - "never": skip all cache writes (read-only mode)
+                    # - "always": overwrite existing entries
+                    # - "auto": write if missing (default)
+                    if self.cache_write_mode != "never":
+                        # Determine force_update based on cache_write_mode
+                        if self.cache_write_mode == "always":
+                            force_update = True
+                        else:  # "auto"
+                            force_update = force  # Use force_retranslate parameter
+
+                        # Store in TM for future use (respects override mode)
+                        self.tm.store(
+                            site_id=site_id,
+                            src_lang=source_lang,
+                            tgt_lang=target_lang,
+                            text=segment.source_text,
+                            translation=translation,
+                            context=str(segment.context) if segment.context else None,
+                            metadata={
+                                "model": model_id,
+                                "source_file": str(doc.file_path)
+                                if hasattr(doc, "file_path")
+                                else None,
+                            },
+                            store_context=store_context,
+                            force_update=force_update,
+                        )
+                        # TEL-04: Track TM entry storage
+                        stats.tm_entries_stored += 1
 
             except Exception as e:
                 logger.error(f"Model translation failed: {e}")
                 raise RuntimeError(f"Translation failed: {e}")
 
-        # Step 3: Reconstruct document
-        reconstructor = MarkdownReconstructor(site_profile)
-        translated_doc = reconstructor.reconstruct_document(
-            doc, translations, target_lang
-        )
+        # Step 3: Reconstruct document (AST-based or legacy)
+        # Check if AST-based body reconstruction is enabled
+        use_ast = getattr(site_profile.body, 'use_ast_body_reconstruction', False)
 
-        # INT-01: Return translated content without writing (writing moved to retry loop)
-        translated_content = str(translated_doc)
+        if use_ast:
+            logger.info("Using AST-based body reconstruction for translation")
+            try:
+                # AST Translation: Translate body using node-addressed AST
+                translated_body = self._translate_body_ast(
+                    doc, target_lang, site_profile, stats
+                )
+
+                # Reconstruct frontmatter (translate frontmatter fields)
+                from .reconstructor import YAMLFormatter
+                yaml_formatter = YAMLFormatter()
+
+                # Translate frontmatter fields
+                translated_frontmatter = {}
+                for key, value in doc.frontmatter.items():
+                    # Check if field should be translated
+                    field_rule = site_profile.frontmatter.get(key)
+                    if field_rule and field_rule.mode == "translate":
+                        # Find translation in segments (only for hashable types like strings)
+                        if isinstance(value, str) and value in translations:
+                            translated_frontmatter[key] = translations[value]
+                        else:
+                            translated_frontmatter[key] = value
+                    else:
+                        # Passthrough or other modes
+                        translated_frontmatter[key] = value
+
+                # Format frontmatter as YAML (includes --- delimiters)
+                frontmatter_yaml = yaml_formatter.format_frontmatter(translated_frontmatter)
+
+                # Combine frontmatter + body
+                translated_content = f"{frontmatter_yaml}\n{translated_body}"
+
+                logger.info("AST Translation: Successfully reconstructed document")
+
+            except Exception as e:
+                logger.error(f"AST reconstruction failed: {e}", exc_info=True)
+                # Fallback to legacy reconstruction
+                logger.warning("AST translation failed, falling back to legacy reconstruction")
+                use_ast = False
+
+        if not use_ast:
+            # Legacy: Build segment_map for body reconstruction (node_id -> segment_id)
+            segment_map = {}
+            for segment in segments:
+                if segment.context and segment.context.node_id:
+                    segment_map[segment.context.node_id] = segment.id
+
+            # Legacy: Reconstruct document with segment_map
+            reconstructor = MarkdownReconstructor(site_profile)
+            translated_doc = reconstructor.reconstruct_document(
+                doc, translations, target_lang, segment_map=segment_map
+            )
+
+            # INT-01: Return translated content without writing (writing moved to retry loop)
+            translated_content = str(translated_doc)
 
         # TEL-04: Calculate total tokens (cached + translated)
         stats.tokens_total = stats.tokens_cached + stats.tokens_input + stats.tokens_output
@@ -690,11 +1106,19 @@ class TranslationEngine:
         Returns:
             Output file path
         """
+        # SR-02: Priority: CLI override > site profile config
+        if self.output_dir_override:
+            output_path = self.output_dir_override / target_lang / source_path.name
+            logger.info(f"Using CLI output override: {output_path}")
+            return output_path
+
         # Check if site profile uses Hugo sibling folder pattern
         output_layout = getattr(site_profile, 'output_layout', None)
         per_language_folders = False
+        pattern = None
         if output_layout:
             per_language_folders = getattr(output_layout, 'per_language_folders', False) if hasattr(output_layout, 'per_language_folders') else output_layout.get('per_language_folders', False)
+            pattern = getattr(output_layout, 'pattern', None) if hasattr(output_layout, 'pattern') else output_layout.get('pattern', None)
 
         source_lang = getattr(site_profile, 'default_source_lang', 'en')
 
@@ -715,12 +1139,33 @@ class TranslationEngine:
                 if source_str.endswith(f"{sep}{source_lang}"):
                     output_path = Path(source_str[:-len(source_lang)] + target_lang)
                     return output_path
+        else:
+            # File-based localization: apply output_layout.pattern
+            if pattern:
+                # Extract filename components
+                filename_stem = source_path.stem  # e.g., "index"
+                filename_ext = source_path.suffix  # e.g., ".md"
+
+                # Apply pattern substitution
+                output_filename = pattern.format(
+                    filename=filename_stem,
+                    lang=target_lang,
+                    ext=filename_ext,
+                    path=str(source_path.name)  # Full filename as fallback
+                )
+
+                # Use source file's directory as base (not hardcoded output/)
+                output_path = source_path.parent / output_filename
+
+                logger.info(f"File-based localization: {source_path.name} → {output_filename}")
+                return output_path
 
         # Fallback: use output directory from site profile
         output_dir = Path(getattr(site_profile, 'output_dir', None) or "output")
 
         # Construct output path: output/{lang}/{relative_path}
         output_path = output_dir / target_lang / source_path.name
+        logger.info(f"Using site profile output: {output_path}")
 
         return output_path
 
@@ -748,14 +1193,25 @@ class TranslationEngine:
             DirectoryResult with outcomes for all files
         """
         # TEL-04: Start telemetry tracking for batch operation
+        # SR-01: Find representative file for business context extraction
         telemetry_enabled = self.enable_telemetry and self.telemetry and self.telemetry.is_available()
         telemetry_cm = None  # Context manager
         telemetry_run = None  # RunContext
+
+        # SR-01: Find first markdown file to extract business context
+        representative_file = None
+        if telemetry_enabled:
+            pattern = "**/*.md" if recursive else "*.md"
+            md_files_for_context = list(directory.glob(pattern))
+            if md_files_for_context:
+                representative_file = md_files_for_context[0]
+
         if telemetry_enabled:
             telemetry_cm = self.telemetry.track_translation_session(
                 job_type="translate_directory",
                 trigger_type="cli",
                 directory=str(directory),
+                file_path=representative_file,  # SR-01: Pass representative file for business context
                 target_langs=target_langs,
                 site_id=site_id,
                 recursive=recursive,
@@ -819,24 +1275,51 @@ class TranslationEngine:
                     # Get aggregated stats across all files
                     agg_stats = result.aggregate_stats
                     self.telemetry.track_translation_stats(telemetry_run, agg_stats)
-                    # Track additional directory-level metrics (TEL-05-A/B)
+
+                    # SR-03: Use helper functions for RunRecord fields (TEL-05-B)
+                    from ..observability.telemetry_integration import (
+                        build_output_summary,
+                        build_error_summary,
+                        calculate_items_metrics,
+                    )
+
                     # Calculate files_generated from all output files across results
                     files_generated = sum(
                         len(fr.outputs) for fr in result.file_results
                     )
-                    # Collect errors from failed files (TEL-05-B)
+
+                    # Collect errors from failed files
                     all_errors = []
                     for fr in result.file_results:
                         if fr.errors:
                             all_errors.extend(fr.errors[:2])  # Max 2 per file
-                    error_summary = "; ".join(all_errors[:5]) if all_errors else ""  # Max 5 total
-                    telemetry_run.set_metrics(
+
+                    items_metrics = calculate_items_metrics(
+                        job_type="translate_directory",
                         total_files=result.total_files,
-                        items_discovered=result.total_files,
-                        items_succeeded=result.successful_files,
-                        items_failed=result.failed_files,
-                        output_summary=f"{result.successful_files}/{result.total_files} files translated, {files_generated} outputs",
-                        error_summary=error_summary,  # TEL-05-B
+                        successful_files=result.successful_files,
+                        failed_files=result.failed_files,
+                    )
+                    output_summary = build_output_summary(
+                        job_type="translate_directory",
+                        successful_files=result.successful_files,
+                        total_files=result.total_files,
+                        files_generated=files_generated,
+                        errors=all_errors,
+                    )
+                    error_summary = build_error_summary(all_errors, max_errors=5)
+
+                    # TI-01: Use centralized helper with observability
+                    duration_ms, used_fallback = _safe_duration_ms(agg_stats, context="translate_directory")
+
+                    telemetry_run.set_metrics(
+                        duration_ms=duration_ms,  # API requires integer
+                        total_files=result.total_files,
+                        items_discovered=items_metrics["items_discovered"],
+                        items_succeeded=items_metrics["items_succeeded"],
+                        items_failed=items_metrics["items_failed"],
+                        output_summary=output_summary,
+                        error_summary=error_summary,
                     )
                     telemetry_cm.__exit__(None, None, None)
                 except Exception as telemetry_error:
@@ -906,10 +1389,23 @@ class TranslationEngine:
         """
         # Determine optimal number of workers
         if max_workers is None:
-            # Use min(32, CPU count + 4) as recommended by Python docs
-            max_workers = min(32, (os.cpu_count() or 1) + 4)
+            # Use only 1 worker to prevent memory exhaustion with large translation models
+            max_workers = 1
 
         logger.info(f"Translating {len(md_files)} files with {max_workers} workers")
+
+        # Pre-load the translation model BEFORE starting parallel workers
+        # This prevents race conditions when multiple workers try to load the model simultaneously
+        site_profile = self.config.get_site_profile(site_id)
+        if site_profile:
+            model_id = self._get_model_id(site_profile)
+            logger.info(f"Pre-loading model {model_id} before parallel processing...")
+            try:
+                self.model_loader.load_model(model_id)
+                logger.info(f"Model {model_id} pre-loaded successfully")
+            except Exception as e:
+                logger.error(f"Failed to pre-load model {model_id}: {e}")
+                # Continue anyway - workers will try to load individually
 
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
             # Submit all translation jobs
@@ -993,8 +1489,8 @@ class TranslationEngine:
             content = f.read()
         doc = self.parser.parse_string(content)
 
-        # Extract segments
-        extractor = SegmentExtractor(site_profile)
+        # Extract segments (TRM-05: with terminology protection)
+        extractor = SegmentExtractor(site_profile, terminology_manager=self.terminology_manager)
         source_lang = site_profile.default_source_lang
         segments = extractor.extract_all(doc, source_lang)
 
@@ -1208,6 +1704,30 @@ class TranslationEngine:
                         logger.warning(f"  - [WARNING] {issue.message}")
             return True
 
+    def _get_verification_agent(self):
+        """
+        Get or create the verification agent lazily.
+
+        VA-03: Creates agent with language detection check on first use.
+
+        Returns:
+            VerificationAgent instance
+        """
+        if self.verification_agent is None:
+            from ..verification import VerificationAgent
+            from ..verification.checks.language_check import LanguageDetectionCheck
+
+            # Initialize agent with language detection check
+            self.verification_agent = VerificationAgent(
+                checks=[
+                    LanguageDetectionCheck(min_text_length=20),
+                ],
+                fail_fast=False,  # Run all checks to get complete picture
+            )
+            logger.debug("Initialized VerificationAgent with LanguageDetectionCheck")
+
+        return self.verification_agent
+
     def set_override_mode(
         self,
         mode: str,
@@ -1249,14 +1769,40 @@ class TranslationEngine:
     def _restore_placeholders(self, text: str, segment) -> str:
         """
         Restore placeholder content (links, shortcodes, etc.) in translated text.
+
+        Also restores inline formatting (bold, italic, links) that was protected during translation.
+        TRM-05: Now also restores protected terminology.
         """
-        if not text or not getattr(segment, "placeholder_map", None):
+        if not text:
             return text
-        try:
-            return self.placeholder_manager.restore(text, segment.placeholder_map)
-        except Exception as e:
-            logger.warning(f"Placeholder restore failed: {e}")
-            return text
+
+        result = text
+
+        # TRM-05: Restore terminology placeholders first (before other placeholders)
+        if self.terminology_manager and getattr(segment, "protected_terms", None):
+            try:
+                for protected_segment in segment.protected_terms:
+                    if protected_segment.term_mapping:
+                        # Create a new ProtectedSegment with the current result text
+                        from .terminology.models import ProtectedSegment
+                        translated_protected = ProtectedSegment(
+                            original_text=protected_segment.original_text,
+                            protected_text=result,
+                            term_mapping=protected_segment.term_mapping
+                        )
+                        result = self.terminology_manager.restore(translated_protected)
+                        logger.debug(f"Restored {len(protected_segment.term_mapping)} terminology terms")
+            except Exception as e:
+                logger.warning(f"Terminology restore failed: {e}")
+
+        # Restore shortcode/pattern placeholders
+        if getattr(segment, "placeholder_map", None):
+            try:
+                result = self.placeholder_manager.restore(result, segment.placeholder_map)
+            except Exception as e:
+                logger.warning(f"Placeholder restore failed: {e}")
+
+        return result
 
     def _translate_with_multiline_support(
         self,
@@ -1307,20 +1853,37 @@ class TranslationEngine:
         # Initialize result list with placeholders
         translated_texts = [None] * len(texts)
 
-        # Translate single-line texts in batch (efficient)
+        # Translate single-line texts in batches (GPU memory optimization)
         if singleline_texts:
-            if hasattr(backend, 'translate_with_token_counts'):
-                batch_translations, input_tokens, output_tokens = backend.translate_with_token_counts(
-                    singleline_texts, source_lang, target_lang
-                )
-                stats.tokens_input += input_tokens
-                stats.tokens_output += output_tokens
-            else:
-                batch_translations = backend.translate(
-                    singleline_texts, source_lang, target_lang
-                )
-                stats.tokens_input += sum(estimate_token_count(t) for t in singleline_texts)
-                stats.tokens_output += sum(estimate_token_count(t) for t in batch_translations)
+            batch_translations = []
+            total_texts = len(singleline_texts)
+
+            # Process in chunks of batch_size to avoid GPU OOM
+            for chunk_start in range(0, total_texts, self.batch_size):
+                chunk_end = min(chunk_start + self.batch_size, total_texts)
+                chunk_texts = singleline_texts[chunk_start:chunk_end]
+
+                if hasattr(backend, 'translate_with_token_counts'):
+                    chunk_translations, input_tokens, output_tokens = backend.translate_with_token_counts(
+                        chunk_texts, source_lang, target_lang
+                    )
+                    stats.tokens_input += input_tokens
+                    stats.tokens_output += output_tokens
+                else:
+                    chunk_translations = backend.translate(
+                        chunk_texts, source_lang, target_lang
+                    )
+                    stats.tokens_input += sum(estimate_token_count(t) for t in chunk_texts)
+                    stats.tokens_output += sum(estimate_token_count(t) for t in chunk_translations)
+
+                batch_translations.extend(chunk_translations)
+
+                if total_texts > self.batch_size:
+                    logger.debug(
+                        f"Translated batch {chunk_start//self.batch_size + 1}/"
+                        f"{(total_texts + self.batch_size - 1)//self.batch_size} "
+                        f"({len(chunk_texts)} texts)"
+                    )
 
             # Place results in correct positions
             for list_idx, original_idx in enumerate(singleline_indices):

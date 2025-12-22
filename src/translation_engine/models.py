@@ -65,6 +65,14 @@ class TranslationStats:
     validation_duration_ms: float = 0.0  # Time spent in validation
     retry_duration_ms: float = 0.0  # Total time spent on retry attempts
 
+    # AST-based translation metrics
+    ast_translation_enabled: bool = False  # True if AST-based translation was used
+    ast_units_extracted: int = 0  # Total TextUnits extracted from AST
+    ast_units_translatable: int = 0  # TextUnits that needed translation
+    ast_units_protected: int = 0  # TextUnits marked as do_not_translate
+    ast_batch_calls: int = 0  # Number of batch translation calls
+    ast_individual_fallbacks: int = 0  # Number of fallbacks to individual translation
+
     @property
     def tm_hit_rate(self) -> float:
         """Calculate TM hit rate."""
@@ -114,6 +122,9 @@ class TranslationResult:
     retry_attempts: int = 0  # Number of retry attempts made
     retry_history: List[Dict[str, Any]] = field(default_factory=list)  # History of retry attempts
 
+    # VA-03: Post-translation verification result
+    verification_result: Optional[Any] = None  # VerificationResult from verification agent
+
     def __str__(self) -> str:
         """Human-readable summary."""
         status = "SUCCESS" if self.success else "FAILED"
@@ -160,6 +171,15 @@ class DirectoryResult:
             agg.validation_info += result.stats.validation_info
             agg.validation_duration_ms += result.stats.validation_duration_ms
             agg.retry_duration_ms += result.stats.retry_duration_ms
+
+            # Aggregate AST translation metrics
+            if result.stats.ast_translation_enabled:
+                agg.ast_translation_enabled = True
+            agg.ast_units_extracted += result.stats.ast_units_extracted
+            agg.ast_units_translatable += result.stats.ast_units_translatable
+            agg.ast_units_protected += result.stats.ast_units_protected
+            agg.ast_batch_calls += result.stats.ast_batch_calls
+            agg.ast_individual_fallbacks += result.stats.ast_individual_fallbacks
 
         agg.duration_seconds = self.duration_seconds
         return agg
@@ -216,3 +236,57 @@ class ValidationResult:
         status = "VALID" if self.valid else "INVALID"
         counts = f"{len(self.errors)} errors, {len(self.warnings)} warnings"
         return f"{status}: {counts}"
+
+
+@dataclass
+class LanguageProgress:
+    """
+    Progress tracking for a single language.
+
+    T304: Multi-language progress tracking (federated-splashing-panda).
+    """
+    language_code: str
+    total_texts: int = 0
+    completed_texts: int = 0
+    success: bool = False
+    error: Optional[str] = None
+
+    @property
+    def progress_percentage(self) -> float:
+        """Calculate progress percentage (0.0 to 100.0)."""
+        if self.total_texts == 0:
+            return 100.0
+        return (self.completed_texts / self.total_texts) * 100.0
+
+
+@dataclass
+class MultiLanguageProgress:
+    """
+    Aggregate progress tracking for multi-language processing.
+
+    T304: Multi-language progress tracking (federated-splashing-panda).
+    """
+    languages: Dict[str, LanguageProgress] = field(default_factory=dict)
+    mode: str = "serial"  # serial, parallel, roundrobin
+    current_round: int = 0
+
+    @property
+    def total_languages(self) -> int:
+        """Total number of languages."""
+        return len(self.languages)
+
+    @property
+    def completed_languages(self) -> int:
+        """Number of completed languages."""
+        return sum(1 for lang in self.languages.values() if lang.completed_texts >= lang.total_texts)
+
+    @property
+    def overall_progress_percentage(self) -> float:
+        """Calculate overall progress percentage."""
+        if not self.languages:
+            return 100.0
+        total_texts = sum(lang.total_texts for lang in self.languages.values())
+        completed_texts = sum(lang.completed_texts for lang in self.languages.values())
+        if total_texts == 0:
+            return 100.0
+        return (completed_texts / total_texts) * 100.0

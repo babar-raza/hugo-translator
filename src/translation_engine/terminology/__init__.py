@@ -4,6 +4,7 @@ This module provides data models and functionality for:
 - Protecting terminology during translation
 - Validating terminology preservation after translation
 - Managing term rules and configurations
+- Auto-discovering new terminology from source corpus
 """
 
 from .models import (
@@ -17,6 +18,7 @@ from .models import (
 from .terminology_detector import TerminologyDetector
 from .terminology_protector import TerminologyProtector
 from .terminology_manager import TerminologyManager
+from .discovery import TerminologyDiscovery, DiscoveredTerm
 
 __all__ = [
     "PreserveMode",
@@ -28,4 +30,6 @@ __all__ = [
     "TerminologyDetector",
     "TerminologyProtector",
     "TerminologyManager",
+    "TerminologyDiscovery",
+    "DiscoveredTerm",
 ]

@@ -6,6 +6,7 @@ This module provides the TerminologyProtector class which:
 - Handles nested and adjacent terms correctly
 """
 
+import re
 from typing import List
 from src.translation_engine.terminology.models import DetectedTerm, ProtectedSegment
 
@@ -79,6 +80,13 @@ class TerminologyProtector:
     def restore(self, protected_segment: ProtectedSegment) -> str:
         """Restore original terms from placeholders.
 
+        Handles common placeholder corruptions from translation models:
+        - Case changes: {TERM_0} -> {term_0}
+        - Space insertion: {TERM_0} -> { TERM_0 } or { TERM _0}
+        - Underscores removed: {TERM_0} -> {TERM0}
+        - Cyrillic translation: {TERM_0} -> {ТЕРМ_0}
+        - Other script translations
+
         Args:
             protected_segment: Protected segment with placeholders and term mapping
 
@@ -91,7 +99,26 @@ class TerminologyProtector:
         # Sort by term ID in reverse order to handle nested placeholders correctly
         for term_id in sorted(protected_segment.term_mapping.keys(), reverse=True):
             term = protected_segment.term_mapping[term_id]
-            placeholder = f"{{TERM_{term_id}}}"
-            restored_text = restored_text.replace(placeholder, term.term_text)
+
+            # Build patterns that handle common corruptions:
+            # - Case insensitive (Latin: TERM/term)
+            # - Cyrillic translation (ТЕРМ)
+            # - Optional spaces around and within placeholder
+            # - Optional underscore
+            # - Generic word-like patterns as fallback
+            patterns = [
+                # Latin TERM (case insensitive with spaces)
+                r'\{\s*[Tt][Ee][Rr][Mm]\s*_?\s*' + str(term_id) + r'\s*\}',
+                # Cyrillic ТЕРМ (Russian translation of "term")
+                r'\{\s*[ТтTt][ЕеEe][РрPp][МмMm]\s*_?\s*' + str(term_id) + r'\s*\}',
+                # Generic fallback: any word-like chars followed by term_id
+                r'\{\s*\w+\s*_?\s*' + str(term_id) + r'\s*\}',
+            ]
+
+            # Try each pattern until one matches
+            for pattern in patterns:
+                if re.search(pattern, restored_text):
+                    restored_text = re.sub(pattern, term.term_text, restored_text)
+                    break
 
         return restored_text

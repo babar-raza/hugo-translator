@@ -54,6 +54,45 @@ class BodyRules(BaseModel):
         description="Hugo shortcode/placeholder patterns to protect during translation",
     )
 
+    # AST-based complete body reconstruction
+    use_ast_body_reconstruction: bool = Field(
+        default=False,
+        description="Use AST-based complete body reconstruction for translation. "
+                    "When true, uses node-addressed translation with full structure preservation. "
+                    "When false, uses existing placeholder approach."
+    )
+    ast_segmentation_strategy: str = Field(
+        default="adaptive",
+        description="Segmentation strategy for AST text extraction. "
+                    "adaptive: Full-sentence for plain text, leaf-level for formatted content. "
+                    "leaf_only: Always leaf-level (maximum safety). "
+                    "sentence_only: Always full-sentence (maximum fluency, higher risk)."
+    )
+    ast_batch_size: int = Field(
+        default=50,
+        description="Number of TextUnits to batch per translation call. "
+                    "Higher values = fewer API calls but higher risk of delimiter corruption. "
+                    "Lower values = more API calls but safer translation. Default: 50."
+    )
+
+    # AST batch translation limits (NEW - dynamic sizing)
+    ast_translation_max_units_per_batch: int = Field(
+        default=20,
+        description="Hard limit on units per batch regardless of token count. "
+                    "Prevents batches from becoming too large even with small text units."
+    )
+    ast_translation_max_tokens_per_batch: int = Field(
+        default=512,
+        description="Maximum estimated tokens per batch. "
+                    "M2M100 max is 1024, using 50% for safety margin. "
+                    "Prevents context window overflow."
+    )
+    ast_translation_token_safety_margin: float = Field(
+        default=0.5,
+        description="Safety margin multiplier for token estimates (0.5 = use 50% of model capacity). "
+                    "Conservative estimation helps prevent context overflow."
+    )
+
 
 class OutputLayout(BaseModel):
     """Output file path layout configuration."""
@@ -361,6 +400,20 @@ class TerminologyConfig(BaseModel):
     model_config = {"populate_by_name": True}
 
 
+class PostWriteValidation(BaseModel):
+    """Post-write validation configuration."""
+
+    enabled: bool = Field(
+        default=True, description="Enable post-write file validation"
+    )
+    delete_on_failure: bool = Field(
+        default=False, description="Delete invalid files on validation failure"
+    )
+    halt_on_failure: bool = Field(
+        default=False, description="Stop processing on validation failure"
+    )
+
+
 class ValidationDefaults(BaseModel):
     """Validation defaults section for global config."""
 
@@ -369,6 +422,9 @@ class ValidationDefaults(BaseModel):
     )
     decision_rules: DecisionRules = Field(
         default_factory=DecisionRules, description="Default decision rules"
+    )
+    post_write: PostWriteValidation = Field(
+        default_factory=PostWriteValidation, description="Post-write validation configuration"
     )
     validators: Dict[str, ValidatorConfig] = Field(
         default_factory=dict, description="Validator configurations"

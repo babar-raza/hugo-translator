@@ -8,6 +8,12 @@ from .segment_extractor import (
     SegmentExtractor,
 )
 from .placeholder_manager import PlaceholderManager
+from .text_unit import (
+    TextUnit,
+    TextUnitKind,
+    BodyTranslationPlan,
+)
+from .text_unit_extractor import TextUnitExtractor
 
 __all__ = [
     "Segment",
@@ -15,4 +21,8 @@ __all__ = [
     "SegmentContextType",
     "SegmentExtractor",
     "PlaceholderManager",
+    "TextUnit",
+    "TextUnitKind",
+    "BodyTranslationPlan",
+    "TextUnitExtractor",
 ]

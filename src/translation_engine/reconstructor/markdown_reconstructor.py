@@ -295,6 +295,35 @@ class MarkdownReconstructor:
                 parts.append("\n")
             elif child.type == NodeType.INLINE_HTML:
                 parts.append(child.raw or "")
+            elif child.type == NodeType.LINK:
+                # Reconstruct link: [text](url) or [text](url "title")
+                url = child.attrs.get("url", "")
+                title = child.attrs.get("title")
+                text = self._reconstruct_inline_children(child.children)
+                if title:
+                    # Escape quotes in title
+                    escaped_title = title.replace('"', '\\"')
+                    parts.append(f'[{text}]({url} "{escaped_title}")')
+                else:
+                    parts.append(f'[{text}]({url})')
+            elif child.type == NodeType.STRONG:
+                # Reconstruct bold: **text**
+                text = self._reconstruct_inline_children(child.children)
+                parts.append(f'**{text}**')
+            elif child.type == NodeType.EMPHASIS:
+                # Reconstruct italic: *text*
+                text = self._reconstruct_inline_children(child.children)
+                parts.append(f'*{text}*')
+            elif child.type == NodeType.IMAGE:
+                # Reconstruct image: ![alt](src) or ![alt](src "title")
+                src = child.attrs.get("src", "")
+                alt = child.attrs.get("alt", "")
+                title = child.attrs.get("title")
+                if title:
+                    escaped_title = title.replace('"', '\\"')
+                    parts.append(f'![{alt}]({src} "{escaped_title}")')
+                else:
+                    parts.append(f'![{alt}]({src})')
             elif child.children:
                 # Recurse for nested inline elements
                 parts.append(self._reconstruct_inline_children(child.children))

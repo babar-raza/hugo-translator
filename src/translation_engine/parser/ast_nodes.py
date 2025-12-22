@@ -55,6 +55,7 @@ class ASTNode:
     raw: Optional[str] = None
     location: Optional[SourceLocation] = None
     node_id: Optional[str] = None
+    node_addr: Optional[str] = None  # AST Translation: Stable node address for deterministic translation
     
     def to_dict(self) -> Dict[str, Any]:
         """Convert node to dictionary representation."""
@@ -100,6 +101,85 @@ class ASTNode:
             )
         
         return node
+
+    def assign_addresses(self, prefix: str = "body") -> None:
+        """
+        Recursively assign stable node addresses to this node and all descendants.
+
+        Address format: hierarchical dot notation with type and index.
+        Example: "body.para[2].strong[0].text[1]"
+
+        This method is idempotent - calling it multiple times produces the same addresses.
+
+        Args:
+            prefix: Address prefix for this node (default: "body" for top-level)
+
+        Example:
+            >>> para = paragraph_node([text_node("Hello")])
+            >>> para.assign_addresses()
+            >>> assert para.node_addr == "body.para[0]"
+            >>> assert para.children[0].node_addr == "body.para[0].text[0]"
+        """
+        # Assign address to this node
+        self.node_addr = prefix
+
+        # Group children by type to assign indices
+        type_counters: Dict[str, int] = {}
+
+        for child in self.children:
+            # Get type name (lowercase, remove underscores)
+            type_name = child.type.value.replace('_', '')
+
+            # Get index for this type
+            idx = type_counters.get(type_name, 0)
+            type_counters[type_name] = idx + 1
+
+            # Build child address
+            child_addr = f"{prefix}.{type_name}[{idx}]"
+
+            # Recursively assign to child
+            child.assign_addresses(child_addr)
+
+    def get_node_by_addr(self, addr: str) -> Optional["ASTNode"]:
+        """
+        Get descendant node by address.
+
+        Args:
+            addr: Node address in dot notation (e.g., "body.para[2].text[0]")
+
+        Returns:
+            ASTNode if found, None if address is invalid or not found
+
+        Example:
+            >>> doc = paragraph_node([text_node("Hello")])
+            >>> doc.assign_addresses()
+            >>> text = doc.get_node_by_addr("body.para[0].text[0]")
+            >>> assert text is not None
+            >>> assert text.type == NodeType.TEXT
+        """
+        if not addr:
+            return None
+
+        # If this is the target address, return self
+        if self.node_addr == addr:
+            return self
+
+        # If addr doesn't start with this node's address, it's not a descendant
+        if not self.node_addr or not addr.startswith(self.node_addr + "."):
+            return None
+
+        # Parse the next component after this node's address
+        # Example: if self.node_addr = "body.para[0]" and addr = "body.para[0].text[1]"
+        # then we need to find child with addr starting with "body.para[0].text[1]"
+
+        # Search children recursively
+        for child in self.children:
+            result = child.get_node_by_addr(addr)
+            if result is not None:
+                return result
+
+        # Not found in any child
+        return None
 
 
 # Convenience constructors for common node types
@@ -153,3 +233,8 @@ def list_node(items: List[ASTNode], ordered: bool = False, node_id: Optional[str
 def list_item_node(children: List[ASTNode], node_id: Optional[str] = None) -> ASTNode:
     """Create a list item node."""
     return ASTNode(type=NodeType.LIST_ITEM, children=children, node_id=node_id)
+
+
+def code_span_node(code: str, node_id: Optional[str] = None) -> ASTNode:
+    """Create an inline code span node."""
+    return ASTNode(type=NodeType.CODE_SPAN, raw=code, node_id=node_id)

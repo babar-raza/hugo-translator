@@ -98,45 +98,74 @@ class LanguageConsistencyValidator(PostTranslationValidator):
                 issues=issues,
             )
 
-        # Detect language
+        # NEW: Check sentence-by-sentence for language purity
+        # Split into sentences using simple heuristic
+        sentences = self._split_into_sentences(cleaned_text)
+
+        total_sentences = 0
+        correct_lang_count = 0
+        wrong_lang_sentences = []
+
         try:
-            detected_langs = langdetect.detect_langs(cleaned_text)
-            if not detected_langs:
+            for i, sentence in enumerate(sentences):
+                # Skip very short sentences (< 15 chars) as they're unreliable
+                if len(sentence.strip()) < 15:
+                    continue
+
+                total_sentences += 1
+
+                try:
+                    detected_langs = langdetect.detect_langs(sentence)
+                    if not detected_langs:
+                        continue
+
+                    top_lang = detected_langs[0]
+                    detected_code = top_lang.lang
+                    confidence = top_lang.prob
+
+                    if detected_code == target_lang and confidence >= 0.7:
+                        correct_lang_count += 1
+                    else:
+                        # Log wrong language sentence (truncate for readability)
+                        snippet = sentence[:80] + "..." if len(sentence) > 80 else sentence
+                        wrong_lang_sentences.append({
+                            "sentence_num": i + 1,
+                            "snippet": snippet,
+                            "detected": detected_code,
+                            "confidence": confidence
+                        })
+
+                except langdetect.LangDetectException:
+                    # Skip sentences that fail detection
+                    continue
+
+            if total_sentences == 0:
                 issues.append(
                     ValidationIssue(
                         validator="LanguageConsistencyValidator",
                         severity=ValidationSeverity.WARNING,
-                        message="Could not detect language",
+                        message="No sentences long enough for reliable detection",
                         location="translation",
                     )
                 )
-                return ValidationResult(
-                    success=False,
-                    issues=issues,
-                )
+                return ValidationResult(success=True, issues=issues)
 
-            top_lang = detected_langs[0]
-            detected_code = top_lang.lang
-            confidence = top_lang.prob
+            # Calculate purity percentage
+            purity_pct = (correct_lang_count / total_sentences) * 100
 
-            # Check if detected language matches target
-            if detected_code != target_lang:
+            # Require 95% of sentences to be in correct language
+            if purity_pct < 95.0:
+                # Create detailed error message
+                examples = "; ".join([
+                    f"Sent {s['sentence_num']}: '{s['snippet']}' ({s['detected']}, conf={s['confidence']:.2f})"
+                    for s in wrong_lang_sentences[:3]  # Show first 3 examples
+                ])
+
                 issues.append(
                     ValidationIssue(
                         validator="LanguageConsistencyValidator",
                         severity=ValidationSeverity.ERROR,
-                        message=f"Wrong language detected: {detected_code} (expected {target_lang})",
-                        location="translation",
-                    )
-                )
-
-            # Check confidence
-            if confidence < self.confidence_threshold:
-                issues.append(
-                    ValidationIssue(
-                        validator="LanguageConsistencyValidator",
-                        severity=ValidationSeverity.WARNING,
-                        message=f"Low detection confidence: {confidence:.2f} < {self.confidence_threshold}",
+                        message=f"Mixed language detected: only {purity_pct:.1f}% of sentences are {target_lang}. Examples: {examples}",
                         location="translation",
                     )
                 )
@@ -145,9 +174,11 @@ class LanguageConsistencyValidator(PostTranslationValidator):
                 success=len([i for i in issues if i.severity == ValidationSeverity.ERROR]) == 0,
                 issues=issues,
                 metadata={
-                    "detected_language": detected_code,
-                    "confidence": confidence,
                     "target_language": target_lang,
+                    "total_sentences": total_sentences,
+                    "correct_language_count": correct_lang_count,
+                    "purity_percentage": purity_pct,
+                    "wrong_language_samples": wrong_lang_sentences[:5]
                 },
             )
 
@@ -164,6 +195,24 @@ class LanguageConsistencyValidator(PostTranslationValidator):
                 success=False,
                 issues=issues,
             )
+
+    def _split_into_sentences(self, text: str) -> list:
+        """Split text into sentences using simple heuristic.
+
+        Args:
+            text: Text to split
+
+        Returns:
+            List of sentences
+        """
+        # Split on period, exclamation, question mark followed by space and capital letter
+        # or end of string
+        sentences = re.split(r'[.!?]+(?:\s+(?=[A-Z])|$)', text)
+
+        # Filter out empty strings and strip whitespace
+        sentences = [s.strip() for s in sentences if s.strip()]
+
+        return sentences
 
     def _clean_text_for_detection(self, text: str) -> str:
         """Remove code blocks, URLs, and shortcodes from text.
