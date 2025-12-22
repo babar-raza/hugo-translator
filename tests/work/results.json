@@ -1,0 +1,99 @@
+{
+  "summary": {
+    "total_checks": 10,
+    "passed": 10,
+    "failed": 0,
+    "pass_rate": 1.0
+  },
+  "results": [
+    {
+      "name": "placeholder_exact_count",
+      "passed": true,
+      "message": "Expected 2 placeholders, found 2",
+      "details": {
+        "expected_count": 2,
+        "actual_count": 2,
+        "missing": [],
+        "extra": []
+      }
+    },
+    {
+      "name": "placeholder_set_equality",
+      "passed": true,
+      "message": "All 2 placeholder IDs preserved",
+      "details": {
+        "missing": [],
+        "extra": []
+      }
+    },
+    {
+      "name": "placeholder_no_duplicates_source",
+      "passed": true,
+      "message": "No duplicates among 2 placeholders in source",
+      "details": {}
+    },
+    {
+      "name": "placeholder_no_duplicates_translated",
+      "passed": true,
+      "message": "No duplicates among 2 placeholders in translated",
+      "details": {}
+    },
+    {
+      "name": "placeholder_checksum",
+      "passed": true,
+      "message": "Checksum match",
+      "details": {
+        "expected_checksum": "e3e002ca95c2a5b1",
+        "actual_checksum": "e3e002ca95c2a5b1"
+      }
+    },
+    {
+      "name": "boundary_left",
+      "passed": true,
+      "message": "Checked 2 placeholders, 0 left boundary violations",
+      "details": {
+        "violations": []
+      }
+    },
+    {
+      "name": "boundary_right",
+      "passed": true,
+      "message": "Checked 2 placeholders, 0 right boundary violations",
+      "details": {
+        "violations": []
+      }
+    },
+    {
+      "name": "codeblock_full_bypass",
+      "passed": true,
+      "message": "Checked 1 bypass-language blocks, 0 violations",
+      "details": {
+        "violations": []
+      }
+    },
+    {
+      "name": "frontmatter_keys_preserved",
+      "passed": true,
+      "message": "Frontmatter keys preserved",
+      "details": {
+        "expected_keys": [
+          "title",
+          "date"
+        ],
+        "actual_keys": [
+          "title",
+          "date"
+        ]
+      }
+    },
+    {
+      "name": "shortcode_syntax_valid",
+      "passed": true,
+      "message": "No broken shortcodes found",
+      "details": {
+        "violations": []
+      }
+    }
+  ],
+  "overall_pass": true
+}

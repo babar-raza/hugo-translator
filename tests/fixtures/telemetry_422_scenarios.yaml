@@ -1,0 +1,79 @@
+# Test scenarios for telemetry 422 error regression testing
+# TI-04: Integration test fixtures for PR-04 fix validation
+#
+# These scenarios document the edge cases that caused 422 errors
+# before PR-04 and should now be handled gracefully.
+
+scenarios:
+  - name: none_duration
+    description: "Error path where duration_seconds is None"
+    stats:
+      total_segments: 100
+      tm_hits: 50
+      duration_seconds: null
+    expected_result: success
+    expected_duration_ms: 0
+    notes: "Before PR-04: Would send duration_ms=null, causing 422. After: Sends 0."
+
+  - name: zero_duration
+    description: "Legitimate 0.0 duration (instant translation)"
+    stats:
+      total_segments: 100
+      tm_hits: 50
+      duration_seconds: 0.0
+    expected_result: success
+    expected_duration_ms: 0
+    notes: "Should not emit fallback metric - legitimate 0, not an error."
+
+  - name: valid_duration
+    description: "Normal translation with valid duration"
+    stats:
+      total_segments: 100
+      tm_hits: 50
+      duration_seconds: 5.5
+    expected_result: success
+    expected_duration_ms: 5500
+    notes: "Standard case - no fallback, valid duration."
+
+  - name: invalid_type_string
+    description: "Invalid type - string instead of float"
+    stats:
+      total_segments: 100
+      tm_hits: 50
+      duration_seconds: "invalid_string"
+    expected_result: success
+    expected_duration_ms: 0
+    notes: "Before PR-04: Type error. After: Gracefully falls back to 0."
+
+  - name: none_stats
+    description: "Extreme edge case - stats object is None"
+    stats: null
+    expected_result: success
+    expected_duration_ms: 0
+    notes: "Before PR-04: Would crash. After: Creates default stats with 0 duration."
+
+  - name: large_duration
+    description: "Very large duration value"
+    stats:
+      total_segments: 1000
+      tm_hits: 500
+      duration_seconds: 3600.5
+    expected_result: success
+    expected_duration_ms: 3600500
+    notes: "Validates large values are handled correctly (1 hour translation)."
+
+  - name: small_duration
+    description: "Very small non-zero duration"
+    stats:
+      total_segments: 10
+      tm_hits: 5
+      duration_seconds: 0.001
+    expected_result: success
+    expected_duration_ms: 1
+    notes: "Validates precision is maintained (1 millisecond)."
+
+# Usage in integration tests:
+# - Each scenario should be tested against real telemetry API
+# - Expected result should be validated
+# - No 422 errors should occur for any scenario
+# - Fallback metrics should be emitted only for null/invalid cases
