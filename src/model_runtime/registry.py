@@ -27,6 +27,7 @@ class ModelInfo:
     local_path: Optional[Path] = None
     hf_model_id: Optional[str] = None  # HuggingFace model ID
     description: Optional[str] = None
+    max_new_tokens: int = 512  # TR-01: Token limit for translation output
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary."""
@@ -49,6 +50,7 @@ class ModelInfo:
             "local_path": str(self.local_path) if self.local_path else None,
             "hf_model_id": self.hf_model_id,
             "description": self.description,
+            "max_new_tokens": self.max_new_tokens,
         }
         return result
 
@@ -80,6 +82,7 @@ class ModelInfo:
             local_path=local_path,
             hf_model_id=data.get("hf_model_id"),
             description=data.get("description"),
+            max_new_tokens=data.get("max_new_tokens", 512),
         )
 
 

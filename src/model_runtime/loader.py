@@ -5,12 +5,14 @@ Manages loading, caching, and lifecycle of translation models across different b
 """
 import gc
 import logging
+from pathlib import Path
 from abc import ABC, abstractmethod
 from typing import Dict, List, Optional
 
 import torch
 
 from .registry import ModelInfo, ModelRegistry
+from .language_codes import map_language_code
 
 logger = logging.getLogger(__name__)
 
@@ -65,7 +67,14 @@ class ModelBackend(ABC):
 class HuggingFaceBackend(ModelBackend):
     """Backend for HuggingFace Transformers models."""
 
-    def __init__(self, model_info: ModelInfo, device: str, max_memory_mb: Optional[int] = None):
+    def __init__(
+        self,
+        model_info: ModelInfo,
+        device: str,
+        max_memory_mb: Optional[int] = None,
+        use_fp16: Optional[bool] = None,
+        use_int8: bool = False
+    ):
         """
         Initialize HuggingFace backend.
 
@@ -73,14 +82,34 @@ class HuggingFaceBackend(ModelBackend):
             model_info: Model metadata
             device: Device to load model on
             max_memory_mb: Maximum GPU memory to use (MB)
+            use_fp16: Use float16 precision (None=auto, True=force, False=disable)
+            use_int8: Use INT8 dynamic quantization (CPU-optimized)
+                     (T104: federated-splashing-panda)
         """
         super().__init__(model_info, device)
         self.model = None
         self.tokenizer = None
         self.max_memory_mb = max_memory_mb
+
+        # Precision mode determination (T104: federated-splashing-panda)
+        if use_int8:
+            # INT8 quantization (CPU-optimized, mutually exclusive with FP16)
+            self.use_int8 = True
+            self.use_fp16 = False
+        else:
+            self.use_int8 = False
+            # FP16 mode: None=auto (CUDA default), True=force, False=disable
+            if use_fp16 is None:
+                self.use_fp16 = device.startswith("cuda")
+            else:
+                self.use_fp16 = use_fp16 and device.startswith("cuda")
+
         # Token tracking (TEL-04 integration)
         self.last_input_tokens = 0
         self.last_output_tokens = 0
+        # Truncation detection (TR-02)
+        self.last_truncation_detected = False
+        self.truncation_count = 0
 
     def load(self) -> None:
         """Load HuggingFace model and tokenizer."""
@@ -89,8 +118,16 @@ class HuggingFaceBackend(ModelBackend):
 
         try:
             from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
+            from transformers.utils import logging as hf_logging
 
             model_id = self.model_info.hf_model_id or self.model_info.model_id
+            if self.model_info.local_path:
+                local_path = Path(self.model_info.local_path)
+                if (local_path / "config.json").exists():
+                    model_id = str(local_path)
+
+            # Suppress noisy tokenizer/model warnings during automated runs
+            hf_logging.set_verbosity_error()
 
             # Enforce GPU memory limit if specified
             if self.device.startswith("cuda") and self.max_memory_mb:
@@ -110,17 +147,48 @@ class HuggingFaceBackend(ModelBackend):
                 model_id, use_fast=True
             )
 
-            # Load model
-            logger.info(f"Loading HuggingFace model {model_id} on {self.device}")
-            self.model = AutoModelForSeq2SeqLM.from_pretrained(model_id)
-            self.model.to(self.device)
-            self.model.eval()
+            # Load model with precision mode (T104: federated-splashing-panda)
+            if self.use_int8:
+                precision_str = "int8"
+                logger.info(f"Loading HuggingFace model {model_id} on {self.device} ({precision_str})")
+
+                # Load FP32 model first, then quantize to INT8
+                self.model = AutoModelForSeq2SeqLM.from_pretrained(model_id)
+                self.model.to(self.device)
+
+                # Apply dynamic INT8 quantization (CPU-optimized)
+                self.model = torch.quantization.quantize_dynamic(
+                    self.model, {torch.nn.Linear}, dtype=torch.qint8
+                )
+                self.model.eval()
+
+            elif self.use_fp16:
+                precision_str = "fp16"
+                logger.info(f"Loading HuggingFace model {model_id} on {self.device} ({precision_str})")
+
+                # Load with FP16 precision (halves GPU memory)
+                self.model = AutoModelForSeq2SeqLM.from_pretrained(
+                    model_id, torch_dtype=torch.float16
+                )
+                self.model.to(self.device)
+                self.model.eval()
+
+            else:
+                precision_str = "fp32"
+                logger.info(f"Loading HuggingFace model {model_id} on {self.device} ({precision_str})")
+
+                # Load with FP32 precision (full precision)
+                self.model = AutoModelForSeq2SeqLM.from_pretrained(model_id)
+                self.model.to(self.device)
+                self.model.eval()
 
             # Log GPU memory usage if on GPU
             if self.device.startswith("cuda"):
                 device_id = 0 if ":" not in self.device else int(self.device.split(":")[1])
                 allocated = torch.cuda.memory_allocated(device_id) / (1024**2)
-                logger.info(f"Model loaded. GPU memory allocated: {allocated:.0f}MB")
+                logger.info(f"Model loaded ({precision_str}). GPU memory allocated: {allocated:.0f}MB")
+            else:
+                logger.info(f"Model loaded ({precision_str}) on CPU")
 
             self.loaded = True
 
@@ -136,7 +204,7 @@ class HuggingFaceBackend(ModelBackend):
             )
 
     def translate(
-        self, texts: List[str], src_lang: str, tgt_lang: str
+        self, texts: List[str], src_lang: str, tgt_lang: str, max_new_tokens: Optional[int] = None
     ) -> List[str]:
         """
         Translate texts using HuggingFace model.
@@ -145,6 +213,7 @@ class HuggingFaceBackend(ModelBackend):
             texts: List of source texts
             src_lang: Source language code
             tgt_lang: Target language code
+            max_new_tokens: Override maximum new tokens (default: 512)
 
         Returns:
             List of translated texts
@@ -155,12 +224,12 @@ class HuggingFaceBackend(ModelBackend):
             - self.last_output_tokens
         """
         translations, input_tokens, output_tokens = self.translate_with_token_counts(
-            texts, src_lang, tgt_lang
+            texts, src_lang, tgt_lang, max_new_tokens
         )
         return translations
 
     def translate_with_token_counts(
-        self, texts: List[str], src_lang: str, tgt_lang: str
+        self, texts: List[str], src_lang: str, tgt_lang: str, max_new_tokens: Optional[int] = None
     ) -> tuple[List[str], int, int]:
         """
         Translate texts and return token counts.
@@ -169,9 +238,14 @@ class HuggingFaceBackend(ModelBackend):
             texts: List of source texts
             src_lang: Source language code
             tgt_lang: Target language code
+            max_new_tokens: Override maximum new tokens (default: 512)
 
         Returns:
             Tuple of (translations, input_token_count, output_token_count)
+
+        Note:
+            Logs warning if truncation is detected (output length >= max_new_tokens).
+            Truncation detection available via self.last_truncation_detected.
         """
         if not self.loaded:
             raise RuntimeError("Model not loaded. Call load() first.")
@@ -180,10 +254,38 @@ class HuggingFaceBackend(ModelBackend):
             return [], 0, 0
 
         try:
-            # Set source language on tokenizer (required for M2M100-style models)
-            # M2M100 tokenizer expects simple 2-letter language codes like "en", "de"
+            # Map language codes to model-specific format (M2M100 vs NLLB)
+            # M2M100 uses ISO 639-1 codes (en, es, de)
+            # NLLB uses language_Script format (eng_Latn, spa_Latn, deu_Latn)
+            mapped_src_lang = map_language_code(
+                src_lang,
+                self.model_info.model_id,
+                self.model_info.hf_model_id
+            )
+            mapped_tgt_lang = map_language_code(
+                tgt_lang,
+                self.model_info.model_id,
+                self.model_info.hf_model_id
+            )
+
+            logger.debug(
+                f"Language code mapping: {src_lang} -> {mapped_src_lang}, "
+                f"{tgt_lang} -> {mapped_tgt_lang}"
+            )
+
+            # Set source language on tokenizer
             if hasattr(self.tokenizer, 'src_lang'):
-                self.tokenizer.src_lang = src_lang
+                self.tokenizer.src_lang = mapped_src_lang
+                # NLLB tokenizers also need special tokens set
+                if hasattr(self.tokenizer, 'set_src_lang_special_tokens'):
+                    self.tokenizer.set_src_lang_special_tokens(mapped_src_lang)
+
+            # Set target language for NLLB tokenizers
+            if hasattr(self.tokenizer, 'tgt_lang'):
+                self.tokenizer.tgt_lang = mapped_tgt_lang
+                if hasattr(self.tokenizer, 'set_tgt_lang_special_tokens'):
+                    self.tokenizer.set_tgt_lang_special_tokens(mapped_tgt_lang)
+                    logger.debug(f"Set NLLB target language: {mapped_tgt_lang} (from {tgt_lang})")
 
             # Tokenize
             inputs = self.tokenizer(
@@ -195,24 +297,65 @@ class HuggingFaceBackend(ModelBackend):
             # Shape: (batch_size, sequence_length)
             input_token_count = inputs["input_ids"].numel()
 
-            # Get forced_bos_token_id for target language (required for M2M100)
-            # The tokenizer.get_lang_id() handles the mapping internally
+            # Get forced_bos_token_id for target language
+            # Different models use different methods:
+            # - M2M100: tokenizer.get_lang_id(lang)
+            # - NLLB: tokenizer.convert_tokens_to_ids(lang)
+            # - Others: tokenizer.lang_code_to_id[lang]
             forced_bos_token_id = None
+
+            # Try M2M100 method
             if hasattr(self.tokenizer, 'get_lang_id'):
                 try:
-                    forced_bos_token_id = self.tokenizer.get_lang_id(tgt_lang)
+                    forced_bos_token_id = self.tokenizer.get_lang_id(mapped_tgt_lang)
+                    logger.debug(
+                        f"Set forced_bos_token_id={forced_bos_token_id} for {mapped_tgt_lang} "
+                        f"(from {tgt_lang}) using get_lang_id()"
+                    )
                 except KeyError:
-                    logger.warning(f"Target language '{tgt_lang}' not found in tokenizer")
+                    logger.warning(
+                        f"Target language '{mapped_tgt_lang}' (from '{tgt_lang}') "
+                        f"not found in tokenizer via get_lang_id()"
+                    )
+            # Try NLLB method
+            elif hasattr(self.tokenizer, 'convert_tokens_to_ids') and hasattr(self.tokenizer, 'tgt_lang'):
+                try:
+                    forced_bos_token_id = self.tokenizer.convert_tokens_to_ids(mapped_tgt_lang)
+                    logger.debug(
+                        f"Set forced_bos_token_id={forced_bos_token_id} for {mapped_tgt_lang} "
+                        f"(from {tgt_lang}) using convert_tokens_to_ids() [NLLB]"
+                    )
+                except Exception as e:
+                    logger.warning(
+                        f"Failed to get token ID for '{mapped_tgt_lang}' via convert_tokens_to_ids(): {e}"
+                    )
+            # Try generic lang_code_to_id
             elif hasattr(self.tokenizer, 'lang_code_to_id'):
-                forced_bos_token_id = self.tokenizer.lang_code_to_id.get(tgt_lang)
+                forced_bos_token_id = self.tokenizer.lang_code_to_id.get(mapped_tgt_lang)
+                if forced_bos_token_id:
+                    logger.debug(
+                        f"Set forced_bos_token_id={forced_bos_token_id} for {mapped_tgt_lang} "
+                        f"(from {tgt_lang}) using lang_code_to_id"
+                    )
+                else:
+                    logger.warning(
+                        f"Target language '{mapped_tgt_lang}' (from '{tgt_lang}') "
+                        f"not found in tokenizer.lang_code_to_id"
+                    )
+            else:
+                logger.debug(
+                    f"Tokenizer doesn't use forced_bos_token_id. "
+                    f"Target language may be set via tokenizer.tgt_lang instead."
+                )
 
             # Generate translations (using settings from legacy/ast-translator.py)
             # Note: max_new_tokens increased from 200 to 512 to handle longer
             # multiline content like overview.content and content_left/content_right
+            # TR-01: Allow override via max_new_tokens parameter
+            effective_max_tokens = max_new_tokens if max_new_tokens is not None else 512
             generate_kwargs = {
-                "max_new_tokens": 512,
+                "max_new_tokens": effective_max_tokens,
                 "no_repeat_ngram_size": 2,
-                "early_stopping": True,
                 "repetition_penalty": 1.2,
             }
             if forced_bos_token_id is not None:
@@ -227,6 +370,28 @@ class HuggingFaceBackend(ModelBackend):
             # Calculate output token count
             # Shape: (batch_size, generated_sequence_length)
             output_token_count = outputs.numel()
+
+            # Detect truncation: check if any sequence in the batch reached max_new_tokens
+            # outputs.shape is (batch_size, sequence_length)
+            max_new_tokens = generate_kwargs["max_new_tokens"]
+            max_output_length = outputs.shape[1]
+            self.last_truncation_detected = False
+
+            # Check if output length reached or exceeded the token limit
+            # Allow a small tolerance (within 5 tokens) to account for early stopping
+            if max_output_length >= max_new_tokens - 5:
+                self.last_truncation_detected = True
+                self.truncation_count += 1
+
+                # Log warning with context for debugging
+                for idx, text in enumerate(texts):
+                    # Truncate source text for logging (first 100 chars)
+                    text_preview = text[:100] + "..." if len(text) > 100 else text
+                    logger.warning(
+                        f"Possible truncation detected: output reached {max_output_length} tokens "
+                        f"(limit: {max_new_tokens}). Source[{idx}]: '{text_preview}' "
+                        f"(src_lang={src_lang}, tgt_lang={tgt_lang})"
+                    )
 
             # Decode
             translations = self.tokenizer.batch_decode(
@@ -420,7 +585,13 @@ class ModelLoader:
     Handles loading, unloading, and caching of translation models.
     """
 
-    def __init__(self, registry: ModelRegistry, device: str = "cpu", max_memory_mb: Optional[int] = None):
+    def __init__(
+        self,
+        registry: ModelRegistry,
+        device: str = "cpu",
+        max_memory_mb: Optional[int] = None,
+        load_mode: Optional[str] = None
+    ):
         """
         Initialize model loader.
 
@@ -428,10 +599,13 @@ class ModelLoader:
             registry: ModelRegistry instance
             device: Default device for models
             max_memory_mb: Maximum GPU memory per model (MB)
+            load_mode: Model precision mode ("fp16", "fp32", "int8", or None for auto)
+                      (T103: federated-splashing-panda)
         """
         self.registry = registry
         self.device = device
         self.max_memory_mb = max_memory_mb
+        self.load_mode = load_mode
         self.loaded_models: Dict[str, ModelBackend] = {}
 
     def load_model(self, model_id: str, device: Optional[str] = None) -> ModelBackend:
@@ -479,8 +653,27 @@ class ModelLoader:
         Returns:
             ModelBackend instance
         """
+        # Translate load_mode to backend parameters (T103: federated-splashing-panda)
+        use_fp16 = None  # Auto by default
+        use_int8 = False
+
+        if self.load_mode == "fp16":
+            use_fp16 = True
+        elif self.load_mode == "fp32":
+            use_fp16 = False
+        elif self.load_mode == "int8":
+            use_int8 = True
+            use_fp16 = False  # INT8 and FP16 are mutually exclusive
+        # else: load_mode is None (auto mode) - use backend defaults
+
         if model_info.backend == "huggingface":
-            return HuggingFaceBackend(model_info, device, self.max_memory_mb)
+            return HuggingFaceBackend(
+                model_info,
+                device,
+                self.max_memory_mb,
+                use_fp16=use_fp16,  # None = auto, True = force, False = disable
+                use_int8=use_int8   # T104: federated-splashing-panda
+            )
         elif model_info.backend == "ctranslate2":
             return CTranslate2Backend(model_info, device, self.max_memory_mb)
         else:

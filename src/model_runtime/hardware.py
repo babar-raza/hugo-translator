@@ -7,7 +7,12 @@ import platform
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
 
-import psutil
+try:
+    import psutil
+    HAS_PSUTIL = True
+except ImportError:
+    HAS_PSUTIL = False
+
 import torch
 
 
@@ -53,8 +58,14 @@ class HardwareDetector:
             HardwareInfo with detected capabilities
         """
         # CPU and RAM
-        cpu_count = psutil.cpu_count(logical=True)
-        total_ram = psutil.virtual_memory().total / (1024**3)  # GB
+        if HAS_PSUTIL:
+            cpu_count = psutil.cpu_count(logical=True)
+            total_ram = psutil.virtual_memory().total / (1024**3)  # GB
+        else:
+            # Fallback if psutil not available
+            import os
+            cpu_count = os.cpu_count() or 4  # Fallback to 4 if unknown
+            total_ram = 16.0  # Assume 16GB as safe fallback
 
         # CUDA detection
         has_cuda = torch.cuda.is_available()
