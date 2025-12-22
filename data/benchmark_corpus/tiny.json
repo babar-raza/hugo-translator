@@ -1,0 +1,52 @@
+[
+  {
+    "id": "tiny_001",
+    "text_en": "Simple text.",
+    "domain": "general"
+  },
+  {
+    "id": "tiny_002",
+    "text_en": "**Bold** and *italic*.",
+    "domain": "general"
+  },
+  {
+    "id": "tiny_003",
+    "text_en": "Use `SaveFormat.Pptx` option.",
+    "domain": "technical"
+  },
+  {
+    "id": "tiny_004",
+    "text_en": "**Bold with `code`**.",
+    "domain": "technical"
+  },
+  {
+    "id": "tiny_005",
+    "text_en": "Visit [Example](https://example.com/).",
+    "domain": "documentation"
+  },
+  {
+    "id": "tiny_006",
+    "text_en": "Check **[docs](https://example.com/)**.",
+    "domain": "documentation"
+  },
+  {
+    "id": "tiny_007",
+    "text_en": "Install **Visual Studio**.",
+    "domain": "technical"
+  },
+  {
+    "id": "tiny_008",
+    "text_en": "Target **.NET 6.0+**.",
+    "domain": "technical"
+  },
+  {
+    "id": "tiny_009",
+    "text_en": "See [website](https://example.com).",
+    "domain": "marketing"
+  },
+  {
+    "id": "tiny_010",
+    "text_en": "Download now.",
+    "domain": "marketing"
+  }
+]

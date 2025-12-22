@@ -1,0 +1,1002 @@
+[
+  {
+    "id": "medium_001",
+    "text_en": "This is a simple paragraph with plain text.",
+    "domain": "general"
+  },
+  {
+    "id": "medium_002",
+    "text_en": "This is another paragraph with **bold text** and *italic text*.",
+    "domain": "general"
+  },
+  {
+    "id": "medium_003",
+    "text_en": "This text has **bold** and *italic* formatting.",
+    "domain": "technical"
+  },
+  {
+    "id": "medium_004",
+    "text_en": "This text has ***bold italic*** formatting.",
+    "domain": "technical"
+  },
+  {
+    "id": "medium_005",
+    "text_en": "This text has **bold *and italic*** nested formatting.",
+    "domain": "technical"
+  },
+  {
+    "id": "medium_006",
+    "text_en": "Use the `SaveFormat.Pptx` option to save presentations.",
+    "domain": "technical"
+  },
+  {
+    "id": "medium_007",
+    "text_en": "Run the `Aspose.Slides.LowCode` API command.",
+    "domain": "technical"
+  },
+  {
+    "id": "medium_008",
+    "text_en": "This **bold text with `code` inside** is complex.",
+    "domain": "technical"
+  },
+  {
+    "id": "medium_009",
+    "text_en": "This *italic with **bold** inside* is also complex.",
+    "domain": "technical"
+  },
+  {
+    "id": "medium_010",
+    "text_en": "Visit [Example Documentation](https://example.com/) for more information.",
+    "domain": "documentation"
+  },
+  {
+    "id": "medium_011",
+    "text_en": "See the [API Reference](https://example.com/api \"Example API\") page.",
+    "domain": "documentation"
+  },
+  {
+    "id": "medium_012",
+    "text_en": "Check **[Example Documentation](https://example.com/docs/)** for details.",
+    "domain": "documentation"
+  },
+  {
+    "id": "medium_013",
+    "text_en": "Use **the [documentation](https://example.com) for reference**.",
+    "domain": "documentation"
+  },
+  {
+    "id": "medium_014",
+    "text_en": "Contact us at <https://support.example.com> for help.",
+    "domain": "support"
+  },
+  {
+    "id": "medium_015",
+    "text_en": "First item",
+    "domain": "general"
+  },
+  {
+    "id": "medium_016",
+    "text_en": "Second item",
+    "domain": "general"
+  },
+  {
+    "id": "medium_017",
+    "text_en": "Third item",
+    "domain": "general"
+  },
+  {
+    "id": "medium_018",
+    "text_en": "**Bold item**",
+    "domain": "general"
+  },
+  {
+    "id": "medium_019",
+    "text_en": "*Italic item*",
+    "domain": "general"
+  },
+  {
+    "id": "medium_020",
+    "text_en": "`Code item`",
+    "domain": "technical"
+  },
+  {
+    "id": "medium_021",
+    "text_en": "Regular item",
+    "domain": "general"
+  },
+  {
+    "id": "medium_022",
+    "text_en": "First step",
+    "domain": "general"
+  },
+  {
+    "id": "medium_023",
+    "text_en": "Second step",
+    "domain": "general"
+  },
+  {
+    "id": "medium_024",
+    "text_en": "Third step",
+    "domain": "general"
+  },
+  {
+    "id": "medium_025",
+    "text_en": "Install **Visual Studio** 2019 or later",
+    "domain": "technical"
+  },
+  {
+    "id": "medium_026",
+    "text_en": "Target **.NET 6.0+** or **.NET Framework 4.0+**",
+    "domain": "technical"
+  },
+  {
+    "id": "medium_027",
+    "text_en": "Add reference to **Example.dll**",
+    "domain": "technical"
+  },
+  {
+    "id": "medium_028",
+    "text_en": "Visit [our website](https://example.com) for more information",
+    "domain": "marketing"
+  },
+  {
+    "id": "medium_029",
+    "text_en": "Check the [documentation](https://docs.example.com) for details",
+    "domain": "documentation"
+  },
+  {
+    "id": "medium_030",
+    "text_en": "Download from [this link](https://download.example.com)",
+    "domain": "marketing"
+  },
+  {
+    "id": "medium_031",
+    "text_en": "Install **Visual Studio** 2019 or later",
+    "domain": "technical"
+  },
+  {
+    "id": "medium_032",
+    "text_en": "Visit **[documentation](https://docs.example.com)** for info",
+    "domain": "documentation"
+  },
+  {
+    "id": "medium_033",
+    "text_en": "Use the `SaveFormat.Pptx` option to export",
+    "domain": "technical"
+  },
+  {
+    "id": "medium_034",
+    "text_en": "Check `Presentation.Save()` method in **[API reference](https://api.example.com)**",
+    "domain": "technical"
+  },
+  {
+    "id": "medium_035",
+    "text_en": "Top level item",
+    "domain": "general"
+  },
+  {
+    "id": "medium_036",
+    "text_en": "Nested item 1",
+    "domain": "general"
+  },
+  {
+    "id": "medium_037",
+    "text_en": "Nested item 2",
+    "domain": "general"
+  },
+  {
+    "id": "medium_038",
+    "text_en": "Double nested item",
+    "domain": "general"
+  },
+  {
+    "id": "medium_039",
+    "text_en": "Top level item 2",
+    "domain": "general"
+  },
+  {
+    "id": "medium_040",
+    "text_en": "Nested item 3",
+    "domain": "general"
+  },
+  {
+    "id": "medium_041",
+    "text_en": "First top level step",
+    "domain": "general"
+  },
+  {
+    "id": "medium_042",
+    "text_en": "First nested step",
+    "domain": "general"
+  },
+  {
+    "id": "medium_043",
+    "text_en": "Second nested step",
+    "domain": "general"
+  },
+  {
+    "id": "medium_044",
+    "text_en": "Second top level step",
+    "domain": "general"
+  },
+  {
+    "id": "medium_045",
+    "text_en": "Double nested step",
+    "domain": "general"
+  },
+  {
+    "id": "medium_046",
+    "text_en": "Third top level step",
+    "domain": "general"
+  },
+  {
+    "id": "medium_047",
+    "text_en": "Ordered top level",
+    "domain": "general"
+  },
+  {
+    "id": "medium_048",
+    "text_en": "Unordered nested",
+    "domain": "general"
+  },
+  {
+    "id": "medium_049",
+    "text_en": "Unordered nested 2",
+    "domain": "general"
+  },
+  {
+    "id": "medium_050",
+    "text_en": "Ordered top level 2",
+    "domain": "general"
+  },
+  {
+    "id": "medium_051",
+    "text_en": "Unordered nested 3",
+    "domain": "general"
+  },
+  {
+    "id": "medium_052",
+    "text_en": "Ordered double nested",
+    "domain": "general"
+  },
+  {
+    "id": "medium_053",
+    "text_en": "Ordered double nested 2",
+    "domain": "general"
+  },
+  {
+    "id": "medium_054",
+    "text_en": "This is a list item with multiple paragraphs.",
+    "domain": "general"
+  },
+  {
+    "id": "medium_055",
+    "text_en": "This is the second paragraph of the same list item.",
+    "domain": "general"
+  },
+  {
+    "id": "medium_056",
+    "text_en": "This is another list item.",
+    "domain": "general"
+  },
+  {
+    "id": "medium_057",
+    "text_en": "This is its second paragraph.",
+    "domain": "general"
+  },
+  {
+    "id": "medium_058",
+    "text_en": "Second item with inline `code`",
+    "domain": "technical"
+  },
+  {
+    "id": "medium_059",
+    "text_en": "This text has ***bold and italic together***.",
+    "domain": "technical"
+  },
+  {
+    "id": "medium_060",
+    "text_en": "This text has **bold *and italic* nested**.",
+    "domain": "technical"
+  },
+  {
+    "id": "medium_061",
+    "text_en": "This text has *italic **and bold** nested*.",
+    "domain": "technical"
+  },
+  {
+    "id": "medium_062",
+    "text_en": "This text has ***bold*** and ***italic*** separately.",
+    "domain": "technical"
+  },
+  {
+    "id": "medium_063",
+    "text_en": "Visit **[our website](https://example.com)** for more information.",
+    "domain": "marketing"
+  },
+  {
+    "id": "medium_064",
+    "text_en": "Check **[the documentation](https://docs.example.com)** for details.",
+    "domain": "documentation"
+  },
+  {
+    "id": "medium_065",
+    "text_en": "Download **[the latest version](https://download.example.com)** now.",
+    "domain": "marketing"
+  },
+  {
+    "id": "medium_066",
+    "text_en": "Visit [**our website**](https://example.com) for more information.",
+    "domain": "marketing"
+  },
+  {
+    "id": "medium_067",
+    "text_en": "Check [*the documentation*](https://docs.example.com) for details.",
+    "domain": "documentation"
+  },
+  {
+    "id": "medium_068",
+    "text_en": "Download [the **latest** *version*](https://download.example.com) now.",
+    "domain": "marketing"
+  },
+  {
+    "id": "medium_069",
+    "text_en": "Use **`SaveFormat.Pptx`** to export presentations.",
+    "domain": "technical"
+  },
+  {
+    "id": "medium_070",
+    "text_en": "The *`Presentation.Save()`* method saves the file.",
+    "domain": "technical"
+  },
+  {
+    "id": "medium_071",
+    "text_en": "See **[`Presentation` class](https://docs.example.com)** for details.",
+    "domain": "technical"
+  },
+  {
+    "id": "medium_072",
+    "text_en": "Visit **[our website](https://example.com) and [documentation](https://docs.example.com)** for help.",
+    "domain": "documentation"
+  },
+  {
+    "id": "medium_073",
+    "text_en": "Use **the `SaveFormat.Pptx` option in *Example Library*** for export.",
+    "domain": "technical"
+  },
+  {
+    "id": "medium_074",
+    "text_en": "Visit **[our *documentation*](https://docs.example.com)** for **more `info`**.",
+    "domain": "documentation"
+  },
+  {
+    "id": "medium_075",
+    "text_en": "Install **Visual Studio** 2019 or later for **optimal performance** on Windows.",
+    "domain": "technical"
+  },
+  {
+    "id": "medium_076",
+    "text_en": "Visit **[Example Documentation](https://docs.example.com)** or check `Presentation.Save()` method.",
+    "domain": "documentation"
+  },
+  {
+    "id": "medium_077",
+    "text_en": "The **`Example.LowCode` API** provides *simplified* **methods** for common tasks.",
+    "domain": "technical"
+  },
+  {
+    "id": "medium_078",
+    "text_en": "This document covers **Example.Slides** for .NET.",
+    "domain": "documentation"
+  },
+  {
+    "id": "medium_079",
+    "text_en": "You can also use **Example.Cells** for spreadsheets.",
+    "domain": "documentation"
+  },
+  {
+    "id": "medium_080",
+    "text_en": "For PDF processing, see **Example.PDF** for .NET.",
+    "domain": "documentation"
+  },
+  {
+    "id": "medium_081",
+    "text_en": "Word document processing is handled by **Example.Words**.",
+    "domain": "documentation"
+  },
+  {
+    "id": "medium_082",
+    "text_en": "Install **Example.Slides for .NET** version 24.1 or later.",
+    "domain": "technical"
+  },
+  {
+    "id": "medium_083",
+    "text_en": "Use **Example.Slides for Java** in Java applications.",
+    "domain": "technical"
+  },
+  {
+    "id": "medium_084",
+    "text_en": "Try **Example.Slides for Python** via .NET.",
+    "domain": "technical"
+  },
+  {
+    "id": "medium_085",
+    "text_en": "Check out **Example.Slides for C++** for native applications.",
+    "domain": "technical"
+  },
+  {
+    "id": "medium_086",
+    "text_en": "The **Example.Slides.LowCode** API provides simplified methods.",
+    "domain": "technical"
+  },
+  {
+    "id": "medium_087",
+    "text_en": "Use **Example.Cells.LowCode** for spreadsheet operations.",
+    "domain": "technical"
+  },
+  {
+    "id": "medium_088",
+    "text_en": "The **Example.PDF.LowCode** namespace simplifies PDF tasks.",
+    "domain": "technical"
+  },
+  {
+    "id": "medium_089",
+    "text_en": "Create a new **`Presentation`** instance.",
+    "domain": "technical"
+  },
+  {
+    "id": "medium_090",
+    "text_en": "Use the **`Slide`** class to access slides.",
+    "domain": "technical"
+  },
+  {
+    "id": "medium_091",
+    "text_en": "The **`Shape`** class represents shapes on slides.",
+    "domain": "technical"
+  },
+  {
+    "id": "medium_092",
+    "text_en": "Work with **`TextFrame`** for text content.",
+    "domain": "technical"
+  },
+  {
+    "id": "medium_093",
+    "text_en": "Call the **`Presentation.Save()`** method to save files.",
+    "domain": "technical"
+  },
+  {
+    "id": "medium_094",
+    "text_en": "Use **`Presentation.Load()`** to load existing presentations.",
+    "domain": "technical"
+  },
+  {
+    "id": "medium_095",
+    "text_en": "The **`Slide.AddClone()`** method duplicates slides.",
+    "domain": "technical"
+  },
+  {
+    "id": "medium_096",
+    "text_en": "Call **`Shape.RemoveAt()`** to delete shapes.",
+    "domain": "technical"
+  },
+  {
+    "id": "medium_097",
+    "text_en": "Set the **`Presentation.SlideSize`** property.",
+    "domain": "technical"
+  },
+  {
+    "id": "medium_098",
+    "text_en": "Access **`Slide.Background`** to modify backgrounds.",
+    "domain": "technical"
+  },
+  {
+    "id": "medium_099",
+    "text_en": "Use **`Shape.TextFrame.Text`** to get text content.",
+    "domain": "technical"
+  },
+  {
+    "id": "medium_100",
+    "text_en": "Modify **`Paragraph.Alignment`** for text alignment.",
+    "domain": "technical"
+  },
+  {
+    "id": "medium_101",
+    "text_en": "Use **`SaveFormat.Pptx`** for PowerPoint 2007+ format.",
+    "domain": "technical"
+  },
+  {
+    "id": "medium_102",
+    "text_en": "Save as **`SaveFormat.Pdf`** for PDF export.",
+    "domain": "technical"
+  },
+  {
+    "id": "medium_103",
+    "text_en": "Export to **`SaveFormat.Odp`** for OpenDocument format.",
+    "domain": "technical"
+  },
+  {
+    "id": "medium_104",
+    "text_en": "Use **`SaveFormat.Ppt`** for PowerPoint 97-2003 format.",
+    "domain": "technical"
+  },
+  {
+    "id": "medium_105",
+    "text_en": "Import the **`Example.Slides`** namespace.",
+    "domain": "technical"
+  },
+  {
+    "id": "medium_106",
+    "text_en": "Use **`Example.Slides.Export`** for export functionality.",
+    "domain": "technical"
+  },
+  {
+    "id": "medium_107",
+    "text_en": "The **`Example.Slides.Charts`** namespace handles charts.",
+    "domain": "technical"
+  },
+  {
+    "id": "medium_108",
+    "text_en": "Work with **`Example.Slides.SmartArt`** for diagrams.",
+    "domain": "technical"
+  },
+  {
+    "id": "medium_109",
+    "text_en": "Use **`Presentation.Load()`** to load existing files:",
+    "domain": "technical"
+  },
+  {
+    "id": "medium_110",
+    "text_en": "Add slides using the **`Slides`** collection:",
+    "domain": "technical"
+  },
+  {
+    "id": "medium_111",
+    "text_en": "Install **Visual Studio** 2019 or later.",
+    "domain": "technical"
+  },
+  {
+    "id": "medium_112",
+    "text_en": "You can also use **Visual Studio Code** with extensions.",
+    "domain": "technical"
+  },
+  {
+    "id": "medium_113",
+    "text_en": "For Java, use **IntelliJ IDEA** or **Eclipse**.",
+    "domain": "technical"
+  },
+  {
+    "id": "medium_114",
+    "text_en": "Target **.NET 6.0+** for modern applications.",
+    "domain": "technical"
+  },
+  {
+    "id": "medium_115",
+    "text_en": "Support for **.NET Framework 4.0+** is available.",
+    "domain": "technical"
+  },
+  {
+    "id": "medium_116",
+    "text_en": "Works with **.NET Core 3.1+** and later.",
+    "domain": "technical"
+  },
+  {
+    "id": "medium_117",
+    "text_en": "Compatible with **.NET Standard 2.0** libraries.",
+    "domain": "technical"
+  },
+  {
+    "id": "medium_118",
+    "text_en": "Install via NuGet: **`Example.Slides`** package.",
+    "domain": "technical"
+  },
+  {
+    "id": "medium_119",
+    "text_en": "For Python: **`example-slides`** package.",
+    "domain": "technical"
+  },
+  {
+    "id": "medium_120",
+    "text_en": "Java users: **`example-slides-java`** artifact.",
+    "domain": "technical"
+  },
+  {
+    "id": "medium_121",
+    "text_en": "Supports **PPTX** (PowerPoint 2007+).",
+    "domain": "technical"
+  },
+  {
+    "id": "medium_122",
+    "text_en": "Reads **PPT** (PowerPoint 97-2003).",
+    "domain": "technical"
+  },
+  {
+    "id": "medium_123",
+    "text_en": "Loads **ODP** (OpenDocument Presentation).",
+    "domain": "technical"
+  },
+  {
+    "id": "medium_124",
+    "text_en": "Imports **PPTM** (macro-enabled presentations).",
+    "domain": "technical"
+  },
+  {
+    "id": "medium_125",
+    "text_en": "Save as **PPTX**, **PPT**, **PDF**, **HTML**, **SVG**.",
+    "domain": "technical"
+  },
+  {
+    "id": "medium_126",
+    "text_en": "Export to **PNG**, **JPEG**, **TIFF** images.",
+    "domain": "technical"
+  },
+  {
+    "id": "medium_127",
+    "text_en": "Convert to **ODP**, **PPTM**, **POTX** formats.",
+    "domain": "technical"
+  },
+  {
+    "id": "medium_128",
+    "text_en": "Install **Visual Studio** 2019 or later",
+    "domain": "technical"
+  },
+  {
+    "id": "medium_129",
+    "text_en": "Target **.NET 6.0+**, **.NET Framework 4.0+**, or **.NET Core 3.1+**",
+    "domain": "technical"
+  },
+  {
+    "id": "medium_130",
+    "text_en": "Install **Example.Slides for .NET** via NuGet",
+    "domain": "technical"
+  },
+  {
+    "id": "medium_131",
+    "text_en": "Create a new **`Presentation`** instance",
+    "domain": "technical"
+  },
+  {
+    "id": "medium_132",
+    "text_en": "Add slides using **`Slides.AddEmptySlide()`**",
+    "domain": "technical"
+  },
+  {
+    "id": "medium_133",
+    "text_en": "Save with **`Presentation.Save()`** method",
+    "domain": "technical"
+  },
+  {
+    "id": "medium_134",
+    "text_en": "Use **`SaveFormat.Pptx`** for output format",
+    "domain": "technical"
+  },
+  {
+    "id": "medium_135",
+    "text_en": "Visit **[Example Documentation](https://docs.example.com/slides/net/)** for guides.",
+    "domain": "documentation"
+  },
+  {
+    "id": "medium_136",
+    "text_en": "Check the **[API Reference](https://reference.example.com/slides/net/)** for details.",
+    "domain": "documentation"
+  },
+  {
+    "id": "medium_137",
+    "text_en": "Download from **[releases page](https://releases.example.com/slides/net/)**.",
+    "domain": "documentation"
+  },
+  {
+    "id": "medium_138",
+    "text_en": "Get support at **[Example Forum](https://forum.example.com/c/slides)**.",
+    "domain": "support"
+  },
+  {
+    "id": "medium_139",
+    "text_en": "Install **Example.Slides 24.1** or later.",
+    "domain": "technical"
+  },
+  {
+    "id": "medium_140",
+    "text_en": "Requires **Visual Studio 2019** or **Visual Studio 2022**.",
+    "domain": "technical"
+  },
+  {
+    "id": "medium_141",
+    "text_en": "Compatible with **.NET 6.0+** and **.NET Framework 4.6.1+**.",
+    "domain": "technical"
+  },
+  {
+    "id": "medium_142",
+    "text_en": "Works with **PowerPoint 2007** through **PowerPoint 2021**.",
+    "domain": "technical"
+  },
+  {
+    "id": "medium_143",
+    "text_en": "The **Example.Slides.LowCode** API provides streamlined methods for common tasks.",
+    "domain": "technical"
+  },
+  {
+    "id": "medium_144",
+    "text_en": "Use the **`Presentation.Save()`** method with **`SaveFormat.Pptx`** to export.",
+    "domain": "technical"
+  },
+  {
+    "id": "medium_145",
+    "text_en": "Install **Visual Studio 2019** or later and target **.NET 6.0+** for best results.",
+    "domain": "technical"
+  },
+  {
+    "id": "medium_146",
+    "text_en": "Visit **[our documentation](https://docs.example.com)** and check `Presentation.Save()`.",
+    "domain": "documentation"
+  },
+  {
+    "id": "medium_147",
+    "text_en": "The Example.Slides for .NET library supports:",
+    "domain": "technical"
+  },
+  {
+    "id": "medium_148",
+    "text_en": ".NET Framework 4.0+",
+    "domain": "technical"
+  },
+  {
+    "id": "medium_149",
+    "text_en": ".NET Core 3.1+",
+    "domain": "technical"
+  },
+  {
+    "id": "medium_150",
+    "text_en": ".NET 6.0+",
+    "domain": "technical"
+  },
+  {
+    "id": "medium_151",
+    "text_en": "Install via NuGet Package Manager.",
+    "domain": "technical"
+  },
+  {
+    "id": "medium_152",
+    "text_en": "Install Visual Studio",
+    "domain": "technical"
+  },
+  {
+    "id": "medium_153",
+    "text_en": "Create new project",
+    "domain": "technical"
+  },
+  {
+    "id": "medium_154",
+    "text_en": "Add Example.Slides reference",
+    "domain": "technical"
+  },
+  {
+    "id": "medium_155",
+    "text_en": "**Initialize**: Create Presentation object",
+    "domain": "technical"
+  },
+  {
+    "id": "medium_156",
+    "text_en": "**Process**: Add or modify slides",
+    "domain": "technical"
+  },
+  {
+    "id": "medium_157",
+    "text_en": "**Save**: Export to desired format",
+    "domain": "technical"
+  },
+  {
+    "id": "medium_158",
+    "text_en": "See [API Reference](https://reference.example.net/) for details.",
+    "domain": "documentation"
+  },
+  {
+    "id": "medium_159",
+    "text_en": "Use `Presentation` class from Example.Slides namespace.",
+    "domain": "technical"
+  },
+  {
+    "id": "medium_160",
+    "text_en": "**Simplified Syntax**: Fewer lines of code",
+    "domain": "marketing"
+  },
+  {
+    "id": "medium_161",
+    "text_en": "**Performance**: Optimized for speed",
+    "domain": "technical"
+  },
+  {
+    "id": "medium_162",
+    "text_en": "**Reliability**: Built on robust engine",
+    "domain": "marketing"
+  },
+  {
+    "id": "medium_163",
+    "text_en": "Use `SaveFormat.Pptx` for output.",
+    "domain": "technical"
+  },
+  {
+    "id": "medium_164",
+    "text_en": "Visit [Example Documentation](https://docs.example.net/slides/)",
+    "domain": "documentation"
+  },
+  {
+    "id": "medium_165",
+    "text_en": "Check [API Reference](https://reference.example.net/slides/)",
+    "domain": "documentation"
+  },
+  {
+    "id": "medium_166",
+    "text_en": "Download [NuGet Package](https://www.nuget.org/packages/Example.Slides.NET/)",
+    "domain": "technical"
+  },
+  {
+    "id": "medium_167",
+    "text_en": "The system handles various file formats efficiently.",
+    "domain": "technical"
+  },
+  {
+    "id": "medium_168",
+    "text_en": "Performance optimization is critical for large files.",
+    "domain": "technical"
+  },
+  {
+    "id": "medium_169",
+    "text_en": "Memory management ensures stable operation.",
+    "domain": "technical"
+  },
+  {
+    "id": "medium_170",
+    "text_en": "Error handling provides robust recovery mechanisms.",
+    "domain": "technical"
+  },
+  {
+    "id": "medium_171",
+    "text_en": "The API supports multiple programming languages.",
+    "domain": "technical"
+  },
+  {
+    "id": "medium_172",
+    "text_en": "Cross-platform compatibility enables wide deployment.",
+    "domain": "technical"
+  },
+  {
+    "id": "medium_173",
+    "text_en": "Documentation includes comprehensive examples.",
+    "domain": "documentation"
+  },
+  {
+    "id": "medium_174",
+    "text_en": "Support team provides timely assistance.",
+    "domain": "support"
+  },
+  {
+    "id": "medium_175",
+    "text_en": "Regular updates ensure compatibility with new versions.",
+    "domain": "technical"
+  },
+  {
+    "id": "medium_176",
+    "text_en": "Community forums offer peer support.",
+    "domain": "support"
+  },
+  {
+    "id": "medium_177",
+    "text_en": "Code samples demonstrate best practices.",
+    "domain": "documentation"
+  },
+  {
+    "id": "medium_178",
+    "text_en": "Migration guides help transition from older versions.",
+    "domain": "documentation"
+  },
+  {
+    "id": "medium_179",
+    "text_en": "Licensing options suit different business needs.",
+    "domain": "marketing"
+  },
+  {
+    "id": "medium_180",
+    "text_en": "Trial versions enable evaluation before purchase.",
+    "domain": "marketing"
+  },
+  {
+    "id": "medium_181",
+    "text_en": "Integration with popular IDEs simplifies development.",
+    "domain": "technical"
+  },
+  {
+    "id": "medium_182",
+    "text_en": "Debugging tools help identify and fix issues quickly.",
+    "domain": "technical"
+  },
+  {
+    "id": "medium_183",
+    "text_en": "Performance profiling identifies bottlenecks.",
+    "domain": "technical"
+  },
+  {
+    "id": "medium_184",
+    "text_en": "Security features protect sensitive data.",
+    "domain": "technical"
+  },
+  {
+    "id": "medium_185",
+    "text_en": "Compliance with industry standards ensures compatibility.",
+    "domain": "technical"
+  },
+  {
+    "id": "medium_186",
+    "text_en": "Extensibility allows custom functionality.",
+    "domain": "technical"
+  },
+  {
+    "id": "medium_187",
+    "text_en": "Plugin architecture supports modular design.",
+    "domain": "technical"
+  },
+  {
+    "id": "medium_188",
+    "text_en": "Configuration options provide flexibility.",
+    "domain": "technical"
+  },
+  {
+    "id": "medium_189",
+    "text_en": "Template support accelerates development.",
+    "domain": "technical"
+  },
+  {
+    "id": "medium_190",
+    "text_en": "Batch processing handles multiple files efficiently.",
+    "domain": "technical"
+  },
+  {
+    "id": "medium_191",
+    "text_en": "Asynchronous operations improve responsiveness.",
+    "domain": "technical"
+  },
+  {
+    "id": "medium_192",
+    "text_en": "Caching mechanisms reduce processing time.",
+    "domain": "technical"
+  },
+  {
+    "id": "medium_193",
+    "text_en": "Validation ensures data integrity.",
+    "domain": "technical"
+  },
+  {
+    "id": "medium_194",
+    "text_en": "Logging facilities aid troubleshooting.",
+    "domain": "technical"
+  },
+  {
+    "id": "medium_195",
+    "text_en": "Event handling enables reactive programming.",
+    "domain": "technical"
+  },
+  {
+    "id": "medium_196",
+    "text_en": "Resource management prevents memory leaks.",
+    "domain": "technical"
+  },
+  {
+    "id": "medium_197",
+    "text_en": "Thread safety ensures concurrent operation.",
+    "domain": "technical"
+  },
+  {
+    "id": "medium_198",
+    "text_en": "API versioning maintains backward compatibility.",
+    "domain": "technical"
+  },
+  {
+    "id": "medium_199",
+    "text_en": "Deprecation warnings help plan upgrades.",
+    "domain": "technical"
+  },
+  {
+    "id": "medium_200",
+    "text_en": "Release notes document changes and improvements.",
+    "domain": "documentation"
+  }
+]

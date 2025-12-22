@@ -1,0 +1,55 @@
+collected: '2025-12-20T15:07:06.774026Z'
+samples:
+- category: api
+  id: api_2893b59b
+  lang: en
+  path: reference.aspose.net/barcode/hu/Aspose.BarCode.Generation.ImageParameters.md
+  tokens: 489
+- category: api
+  id: api_293b6ded
+  lang: en
+  path: reference.aspose.net/svg/cs/Aspose.Svg.Builder.Rotate.md
+  tokens: 257
+- category: api
+  id: api_5fcc34b7
+  lang: en
+  path: reference.aspose.net/svg/th/Aspose.Svg.Saving.ResourceHandling.md
+  tokens: 150
+- category: api
+  id: api_6f325495
+  lang: en
+  path: reference.aspose.net/tasks/nl/Aspose.Tasks.Primavera.PrimaveraActivityType.md
+  tokens: 218
+- category: api
+  id: api_7da989cf
+  lang: en
+  path: reference.aspose.net/tasks/ru/Aspose.Tasks.Visualization.Shape.md
+  tokens: 315
+- category: api
+  id: api_8d9abbe8
+  lang: en
+  path: reference.aspose.net/psd/fi/Aspose.PSD.FileFormats.Tiff.md
+  tokens: 222
+- category: api
+  id: api_bc4ab1e0
+  lang: en
+  path: reference.aspose.net/words/cs/Aspose.Words.Comparing.md
+  tokens: 127
+- category: api
+  id: api_c091ad01
+  lang: en
+  path: reference.aspose.net/html/en/Aspose.Html.Dom.Css.ICSSUnknownRule.md
+  tokens: 175
+- category: api
+  id: api_c5a2d252
+  lang: en
+  path: reference.aspose.net/psd/bg/Aspose.PSD.Xmp.Types.Complex.Version.md
+  tokens: 89
+- category: api
+  id: api_d9d5577a
+  lang: en
+  path: reference.aspose.net/barcode/ro/Aspose.BarCode.Generation.Pdf417EncodeMode.md
+  tokens: 417
+source: D:\onedrive\Documents\GitHub\aspose.net\content
+total_files: 268181
+version: '1.0'

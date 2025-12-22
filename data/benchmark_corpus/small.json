@@ -1,0 +1,252 @@
+[
+  {
+    "id": "small_001",
+    "text_en": "This is a simple paragraph with plain text.",
+    "domain": "general"
+  },
+  {
+    "id": "small_002",
+    "text_en": "This is another paragraph with **bold text** and *italic text*.",
+    "domain": "general"
+  },
+  {
+    "id": "small_003",
+    "text_en": "This text has **bold** and *italic* formatting.",
+    "domain": "technical"
+  },
+  {
+    "id": "small_004",
+    "text_en": "This text has ***bold italic*** formatting.",
+    "domain": "technical"
+  },
+  {
+    "id": "small_005",
+    "text_en": "This text has **bold *and italic*** nested formatting.",
+    "domain": "technical"
+  },
+  {
+    "id": "small_006",
+    "text_en": "Use the `SaveFormat.Pptx` option to save presentations.",
+    "domain": "technical"
+  },
+  {
+    "id": "small_007",
+    "text_en": "Run the `Aspose.Slides.LowCode` API command.",
+    "domain": "technical"
+  },
+  {
+    "id": "small_008",
+    "text_en": "This **bold text with `code` inside** is complex.",
+    "domain": "technical"
+  },
+  {
+    "id": "small_009",
+    "text_en": "This *italic with **bold** inside* is also complex.",
+    "domain": "technical"
+  },
+  {
+    "id": "small_010",
+    "text_en": "Visit [Example Documentation](https://example.com/) for more information.",
+    "domain": "documentation"
+  },
+  {
+    "id": "small_011",
+    "text_en": "See the [API Reference](https://example.com/api \"Example API\") page.",
+    "domain": "documentation"
+  },
+  {
+    "id": "small_012",
+    "text_en": "Check **[Example Documentation](https://example.com/docs/)** for details.",
+    "domain": "documentation"
+  },
+  {
+    "id": "small_013",
+    "text_en": "Use **the [documentation](https://example.com) for reference**.",
+    "domain": "documentation"
+  },
+  {
+    "id": "small_014",
+    "text_en": "Contact us at <https://support.example.com> for help.",
+    "domain": "support"
+  },
+  {
+    "id": "small_015",
+    "text_en": "First item",
+    "domain": "general"
+  },
+  {
+    "id": "small_016",
+    "text_en": "Second item",
+    "domain": "general"
+  },
+  {
+    "id": "small_017",
+    "text_en": "**Bold item**",
+    "domain": "general"
+  },
+  {
+    "id": "small_018",
+    "text_en": "*Italic item*",
+    "domain": "general"
+  },
+  {
+    "id": "small_019",
+    "text_en": "`Code item`",
+    "domain": "technical"
+  },
+  {
+    "id": "small_020",
+    "text_en": "Install **Visual Studio** 2019 or later",
+    "domain": "technical"
+  },
+  {
+    "id": "small_021",
+    "text_en": "Target **.NET 6.0+** or **.NET Framework 4.0+**",
+    "domain": "technical"
+  },
+  {
+    "id": "small_022",
+    "text_en": "Add reference to **Example.dll**",
+    "domain": "technical"
+  },
+  {
+    "id": "small_023",
+    "text_en": "Visit [our website](https://example.com) for more information",
+    "domain": "marketing"
+  },
+  {
+    "id": "small_024",
+    "text_en": "Check the [documentation](https://docs.example.com) for details",
+    "domain": "documentation"
+  },
+  {
+    "id": "small_025",
+    "text_en": "Download from [this link](https://download.example.com)",
+    "domain": "marketing"
+  },
+  {
+    "id": "small_026",
+    "text_en": "Use the `SaveFormat.Pptx` option to export",
+    "domain": "technical"
+  },
+  {
+    "id": "small_027",
+    "text_en": "Check `Presentation.Save()` method in **[API reference](https://api.example.com)**",
+    "domain": "technical"
+  },
+  {
+    "id": "small_028",
+    "text_en": "Top level item",
+    "domain": "general"
+  },
+  {
+    "id": "small_029",
+    "text_en": "Nested item 1",
+    "domain": "general"
+  },
+  {
+    "id": "small_030",
+    "text_en": "Nested item 2",
+    "domain": "general"
+  },
+  {
+    "id": "small_031",
+    "text_en": "This text has ***bold and italic together***.",
+    "domain": "technical"
+  },
+  {
+    "id": "small_032",
+    "text_en": "This text has **bold *and italic* nested**.",
+    "domain": "technical"
+  },
+  {
+    "id": "small_033",
+    "text_en": "This text has *italic **and bold** nested*.",
+    "domain": "technical"
+  },
+  {
+    "id": "small_034",
+    "text_en": "Visit **[our website](https://example.com)** for more information.",
+    "domain": "marketing"
+  },
+  {
+    "id": "small_035",
+    "text_en": "Check **[the documentation](https://docs.example.com)** for details.",
+    "domain": "documentation"
+  },
+  {
+    "id": "small_036",
+    "text_en": "Download **[the latest version](https://download.example.com)** now.",
+    "domain": "marketing"
+  },
+  {
+    "id": "small_037",
+    "text_en": "Visit [**our website**](https://example.com) for more information.",
+    "domain": "marketing"
+  },
+  {
+    "id": "small_038",
+    "text_en": "Check [*the documentation*](https://docs.example.com) for details.",
+    "domain": "documentation"
+  },
+  {
+    "id": "small_039",
+    "text_en": "Download [the **latest** *version*](https://download.example.com) now.",
+    "domain": "marketing"
+  },
+  {
+    "id": "small_040",
+    "text_en": "Use **`SaveFormat.Pptx`** to export presentations.",
+    "domain": "technical"
+  },
+  {
+    "id": "small_041",
+    "text_en": "The *`Presentation.Save()`* method saves the file.",
+    "domain": "technical"
+  },
+  {
+    "id": "small_042",
+    "text_en": "See **[`Presentation` class](https://docs.example.com)** for details.",
+    "domain": "technical"
+  },
+  {
+    "id": "small_043",
+    "text_en": "Visit **[our website](https://example.com) and [documentation](https://docs.example.com)** for help.",
+    "domain": "documentation"
+  },
+  {
+    "id": "small_044",
+    "text_en": "Use **the `SaveFormat.Pptx` option in *Example Library*** for export.",
+    "domain": "technical"
+  },
+  {
+    "id": "small_045",
+    "text_en": "Visit **[our *documentation*](https://docs.example.com)** for **more `info`**.",
+    "domain": "documentation"
+  },
+  {
+    "id": "small_046",
+    "text_en": "Install **Visual Studio** 2019 or later for **optimal performance** on Windows.",
+    "domain": "technical"
+  },
+  {
+    "id": "small_047",
+    "text_en": "Visit **[Example Documentation](https://docs.example.com)** or check `Presentation.Save()` method.",
+    "domain": "documentation"
+  },
+  {
+    "id": "small_048",
+    "text_en": "The **`Example.LowCode` API** provides *simplified* **methods** for common tasks.",
+    "domain": "technical"
+  },
+  {
+    "id": "small_049",
+    "text_en": "**Simplified Syntax**: Fewer lines of code",
+    "domain": "marketing"
+  },
+  {
+    "id": "small_050",
+    "text_en": "**Performance**: Optimized for speed",
+    "domain": "technical"
+  }
+]
