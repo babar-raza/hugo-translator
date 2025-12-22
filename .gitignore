@@ -71,6 +71,10 @@ data/*
 logs/
 *.lmdb
 *.lmdb-lock
+*.mdb
+
+# Config data (runtime TM databases)
+config/data/
 
 # Models
 models/
