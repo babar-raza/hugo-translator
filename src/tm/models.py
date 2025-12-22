@@ -41,6 +41,21 @@ class LookupResult:
 
 
 @dataclass
+class TMResult:
+    """Simplified TM result for L4 LLM adaptation."""
+
+    hit: bool
+    translation: Optional[str] = None
+    source: str = "none"
+    similarity_score: float = 0.0
+    metadata: Dict[str, Any] = field(default_factory=dict)
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert to dictionary."""
+        return asdict(self)
+
+
+@dataclass
 class TMStats:
     """Aggregated statistics from all TM layers."""
 

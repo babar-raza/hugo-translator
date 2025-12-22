@@ -9,7 +9,7 @@ except Exception:
     # FAISS may be unavailable; allow L1/L2-only operation
     L3SemanticTM = None
     SemanticMatch = None
-from .models import LookupRequest, LookupResult, TMStats
+from .models import LookupRequest, LookupResult, TMResult, TMStats
 from .translation_memory import TranslationMemory
 
 __all__ = [
@@ -20,6 +20,7 @@ __all__ = [
     "SemanticMatch",
     "LookupRequest",
     "LookupResult",
+    "TMResult",
     "TMStats",
     "TranslationMemory",
 ]
