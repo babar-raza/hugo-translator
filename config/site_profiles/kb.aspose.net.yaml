@@ -3,16 +3,44 @@ content_roots:
 - /content/kb
 default_source_lang: en
 target_langs:
+- ar
+- bg
+- cs
+- da
 - de
+- el
 - es
+- et
+- fa
+- fi
 - fr
+- he
+- hi
+- hr
+- hu
+- id
+- it
 - ja
 - ko
-- ru
-- zh
-- ar
-- it
+- lt
+- lv
+- nb
+- nl
+- pl
 - pt
+- pt-BR
+- ro
+- ru
+- sk
+- sl
+- sr
+- sv
+- th
+- tr
+- uk
+- vi
+- zh
+- zh-TW
 frontmatter:
   title:
     mode: translate
@@ -88,6 +116,12 @@ body:
   placeholder_syntax:
   - \{\{<.*?>\}\}
   - \{\{%.*?%\}\}
+  use_ast_body_reconstruction: true
+  ast_segmentation_strategy: sentence_only
+  ast_batch_size: 128
+  ast_translation_max_units_per_batch: 20
+  ast_translation_max_tokens_per_batch: 512
+  ast_translation_token_safety_margin: 0.5
 output_layout:
   per_language_folders: true
   pattern: '{lang}/{path}'
@@ -95,3 +129,59 @@ tm_prefs:
   use_semantic_tm: true
   fallback_exact_only: false
   min_similarity_score: 0.8
+validation:
+  enabled: true
+  validation_mode: normal
+  validators:
+    completeness:
+      enabled: true
+    language_consistency:
+      enabled: true
+      confidence_threshold: 0.85
+    shortcode_preservation:
+      enabled: true
+    frontmatter_protection:
+      enabled: true
+    terminology_preservation:
+      enabled: true
+      validation_mode: normal
+    file_placement:
+      enabled: true
+  post_write_validation: true
+terminology:
+  enabled: true
+  preserve_mode: BOTH
+  inherit_global: true
+  custom_terms:
+  - term: Knowledge Base
+    category: content_type
+    case_sensitive: false
+    preserve_mode: validate
+    severity: warning
+  - term: FAQ
+    category: content_type
+    case_sensitive: true
+    preserve_mode: both
+    severity: warning
+frontmatter_translation:
+  enabled: true
+  translatable_fields:
+  - title
+  - description
+  - keywords
+  - step1
+  - step2
+  - step3
+  - step4
+  - step5
+  protected_fields:
+  - slug
+  - productname
+  - productkey
+  - platformkey
+  - productplatform
+  - date
+  - lastmod
+  - weight
+  - draft
+  - type

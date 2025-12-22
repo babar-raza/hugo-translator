@@ -51,18 +51,37 @@ frontmatter:
 body:
   # Enable markdown translation
   translate_markdown: true
-  
+
   # Preserve code blocks (don't translate)
   preserve_blocks:
     - "block_code"
     - "codespan"
     - "html_block"
-  
+
   # Translate image alt text
   translate_image_alt: true
-  
+
   # Translate link titles
   translate_link_titles: true
+
+  # AST-based body reconstruction (NEW)
+  # When enabled, uses node-addressed AST translation for 100% structure preservation
+  # When disabled, uses legacy placeholder-based approach
+  use_ast_body_reconstruction: false  # Default: false (gradual rollout)
+
+  # AST segmentation strategy (only used if use_ast_body_reconstruction is true)
+  # Options:
+  #   - "adaptive": Full-sentence for plain text, leaf-level for formatted content (recommended)
+  #   - "leaf_only": Always leaf-level segmentation (maximum safety, may reduce fluency)
+  #   - "sentence_only": Always full-sentence segmentation (maximum fluency, higher risk)
+  ast_segmentation_strategy: "adaptive"
+
+  # AST batch size (only used if use_ast_body_reconstruction is true)
+  # Number of TextUnits to batch per translation call
+  # Higher values = fewer API calls but higher risk of delimiter corruption
+  # Lower values = more API calls but safer translation
+  # Recommended: 50 (default)
+  ast_batch_size: 50
 
 # Output configuration
 output_layout:

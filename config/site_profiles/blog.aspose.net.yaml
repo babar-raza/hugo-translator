@@ -3,16 +3,44 @@ content_roots:
 - /content/blog
 default_source_lang: en
 target_langs:
+- ar
+- bg
+- cs
+- da
 - de
+- el
 - es
+- et
+- fa
+- fi
 - fr
+- he
+- hi
+- hr
+- hu
+- id
+- it
 - ja
 - ko
-- ru
-- zh
-- ar
-- it
+- lt
+- lv
+- nb
+- nl
+- pl
 - pt
+- pt-BR
+- ro
+- ru
+- sk
+- sl
+- sr
+- sv
+- th
+- tr
+- uk
+- vi
+- zh
+- zh-TW
 frontmatter:
   title:
     mode: translate
@@ -55,56 +83,45 @@ body:
   - \{\{<.*?>\}\}
   - \{\{%.*?%\}\}
 output_layout:
-  per_language_folders: true
-  pattern: '{lang}/{path}'
+  per_language_folders: false
+  pattern: '{filename}.{lang}{ext}'
+model:
+  default: m2m100_1.2b
 tm_prefs:
   use_semantic_tm: true
   fallback_exact_only: false
   min_similarity_score: 0.8
-
-# Validation Configuration
-# Controls validation behavior for translation quality assurance
-# Blog content uses lenient mode for more creative translations
 validation:
   enabled: true
-  validation_mode: lenient  # Lenient mode for blog content
-
-  # Validator-specific settings
+  validation_mode: lenient
   validators:
     completeness:
       enabled: true
     language_consistency:
       enabled: true
-      confidence_threshold: 0.80  # Slightly lower threshold for blog content
+      confidence_threshold: 0.8
     shortcode_preservation:
       enabled: true
     frontmatter_protection:
       enabled: true
     terminology_preservation:
       enabled: true
-      validation_mode: normal  # Normal mode for terminology in blogs
+      validation_mode: normal
     file_placement:
       enabled: true
-
-  # Post-write validation (file placement checks)
   post_write_validation: true
-
-# Terminology Configuration
-# Defines site-specific terminology preservation rules
 terminology:
   enabled: true
-  preserve_mode: BOTH  # Options: PROTECT (pre-translation), VALIDATE (post-translation), BOTH, NONE
-  inherit_global: true  # Inherit global terminology rules from terminology.yaml
-
-  # Site-specific terminology for blog content
+  preserve_mode: BOTH
+  inherit_global: true
   custom_terms:
-    - term: "Blog Post"
-      category: content_type
-      case_sensitive: false
-      preserve_mode: validate
-      severity: info
-    - term: "Tutorial"
-      category: content_type
-      case_sensitive: false
-      preserve_mode: validate
-      severity: info
+  - term: Blog Post
+    category: content_type
+    case_sensitive: false
+    preserve_mode: validate
+    severity: info
+  - term: Tutorial
+    category: content_type
+    case_sensitive: false
+    preserve_mode: validate
+    severity: info
