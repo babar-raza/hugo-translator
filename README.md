@@ -1,390 +1,202 @@
 # Hugo Translation System
 
-A production-grade translation system for Hugo static sites featuring multi-layer Translation Memory with semantic search, intelligent caching, and structure-preserving markdown reconstruction.
+A production-ready automated translation system for Hugo static sites with built-in validation, terminology protection, and quality assurance.
 
 ## Overview
 
-This system translates Hugo markdown content (frontmatter + body) across multiple languages while:
-
-- **Preserving structure**: YAML frontmatter comments, quote styles, markdown formatting, shortcodes, and links
-- **Maximizing reuse**: 3-tier Translation Memory (L1 cache, L2 persistent LMDB, L3 semantic FAISS) dramatically reduces API calls
-- **Supporting multiple backends**: HuggingFace Transformers (M2M100, NLLB), with GPU acceleration via CUDA/MPS
-- **Validating quality**: Pre-write and post-write validation ensures translated output integrity
+The Hugo Translation System translates Hugo markdown content while preserving:
+- YAML frontmatter structure
+- Hugo shortcodes
+- Code blocks and syntax
+- Markdown formatting
+- Links and references
+- Protected terminology (company names, product names, API identifiers)
 
 ## Key Features
 
-### Translation Memory (3-Layer Architecture)
+### Automated Quality Validation
 
-| Layer | Storage | Match Type | Speed |
-|-------|---------|------------|-------|
-| **L1** | In-memory LRU | Exact | <1ms |
-| **L2** | LMDB persistent | Exact | ~5ms |
-| **L3** | FAISS + Sentence Transformers | Semantic (80%+ similarity) | ~50ms |
+The system includes a comprehensive validation engine with 10 validators that check translation quality before writing files to disk:
 
-### Translation Workflow
+- **Completeness**: 100% segment coverage, no missing translations
+- **Language Consistency**: Target language detection using langdetect
+- **Terminology Preservation**: Protect Aspose, .NET, product names, API identifiers
+- **Shortcode Preservation**: Hugo shortcode integrity ({{< ... >}})
+- **Structure Validation**: Markdown heading/list/code block preservation
+- **Placeholder Integrity**: Code/link placeholder restoration
+- **Frontmatter Protection**: Field-level translation rules
+- **Link Validation**: Link integrity and URL preservation
+- **YAML Validation**: Frontmatter syntax validation
+- **File Placement**: Output directory structure validation
 
-```
-Hugo MD File
-     |
-     v
-+--------------------+
-|   Hugo Parser      |  Parse frontmatter (YAML) + body (Markdown AST)
-+--------------------+
-     |
-     v
-+--------------------+
-| Segment Extractor  |  Extract translatable segments, protect links/shortcodes
-+--------------------+
-     |
-     v
-+--------------------+
-|  Translation Memory|  L1 -> L2 -> L3 cascade lookup
-+--------------------+
-     |
-     | (cache miss)
-     v
-+--------------------+
-|  Model Backend     |  M2M100, NLLB, etc. (CPU/GPU)
-+--------------------+
-     |
-     v
-+--------------------+
-|  Reconstructor     |  Rebuild markdown with translations, preserve structure
-+--------------------+
-     |
-     v
-+--------------------+
-|   Validator        |  Check placeholders, YAML, structure integrity
-+--------------------+
-     |
-     v
-  Output File (per target language)
+### Decision Engine (ACCEPT/RETRY/REJECT)
+
+Automated decision-making based on validation results:
+- **ACCEPT**: Translation meets quality standards, write to disk
+- **RETRY**: Translation has fixable issues, retry with feedback (up to 2 times)
+- **REJECT**: Translation has critical errors, discard
+
+### Configurable Validation Modes
+
+Choose validation strictness for your use case:
+- **Strict**: Zero tolerance, reject on first error (API docs, critical content)
+- **Normal**: Balanced approach, tolerate minor issues (default)
+- **Lenient**: Tolerant, more retries (draft content, testing)
+
+### CLI Control
+
+```bash
+# Use strict validation
+translate-hugo --site products.aspose.net --validation-mode strict
+
+# Disable validation for testing
+translate-hugo --site products.aspose.net --disable-validation
+
+# Use custom validation config
+translate-hugo --site products.aspose.net --validation-config ./custom-validation.yaml
+
+# Preview validation decisions without writing files
+translate-hugo --site products.aspose.net --preview
 ```
 
-### Supported Translation Models
+## Quick Start
 
-| Model | ID | Size | Quality | Speed |
-|-------|-----|------|---------|-------|
-| M2M100 418M | `m2m100_418m` | 418M params | Good | Fast |
-| M2M100 1.2B | `m2m100_1.2b` | 1.2B params | Better | Medium |
-| NLLB 200 600M | `nllb_200_600m` | 600M params | Good | Fast |
-| Small100 | `small100` | 330M params | Fair | Fastest |
+### Documentation
+
+- **[📚 Full Documentation](docs/README.md)** - Complete docs home with navigation by persona
+- **[🚀 User Quickstart](docs/getting-started/user-quickstart.md)** - Translate your first Hugo site
+- **[⚙️ Operator Quickstart](docs/getting-started/operator-quickstart.md)** - Deploy and monitor
+- **[💻 Contributor Quickstart](docs/getting-started/contributor-quickstart.md)** - Development setup
+
+### Key Guides
+
+- [Translation Workflows](docs/guides/translation-workflows.md) - Basic to advanced usage
+- [Quality Improvement](docs/guides/quality-improvement.md) - Validation and terminology
+- [Configuration Reference](docs/reference/config.md) - All config options
+- [CLI Reference](docs/reference/cli.md) - Command-line usage
+- [Troubleshooting](docs/operations/troubleshooting.md) - Common issues and fixes
+
+### Key Configuration Files
+
+- `config/validation.yaml` - Validation rules, decision thresholds, retry strategy
+- `config/terminology.yaml` - Protected terminology (exact matches and patterns)
+- `config/site_profiles/*.yaml` - Site-specific configuration
+
+### Example: Enable Terminology Protection
+
+Edit `config/terminology.yaml`:
+
+```yaml
+global:
+  exact_matches:
+    - term: "Aspose"
+      category: company_name
+      case_sensitive: true
+      preserve_mode: both
+      severity: error
+
+  patterns:
+    - pattern: "Aspose\\.[A-Z][a-z]+"
+      category: product_family
+      preserve_mode: protect
+      severity: error
+```
+
+## Architecture
+
+- **Source**: `src/` - Core translation engine and validators
+- **Tests**: `tests/` - Comprehensive test suite
+- **Config**: `config/` - Validation, terminology, site profiles
+- **Docs**: `docs/` - User guides, reference, troubleshooting
 
 ## Installation
 
-### Prerequisites
-
-- Python 3.10+
-- 8GB+ RAM (16GB recommended for larger models)
-- Optional: NVIDIA GPU with CUDA for acceleration
-
-### Quick Start
+### Basic Installation
 
 ```bash
-# Clone repository
-git clone <repository-url>
-cd hugo-translator
-
-# Create virtual environment
-python -m venv venv
-source venv/bin/activate  # Windows: venv\Scripts\activate
-
-# Install dependencies
-pip install -e ".[dev]"          # Development install
-# OR
-pip install -r requirements/cpu.txt   # CPU-only
-pip install -r requirements/gpu.txt   # With GPU support
-
-# Configure environment
-cp .env.example .env
-
-# Verify installation
-python -c "from src.translation_engine import TranslationEngine; print('OK')"
+pip install -e .
 ```
 
-### Docker Installation
+### Optional Dependencies
+
+#### Language Quality Checking
+
+The AST batch translation system uses `langdetect` to verify translations are in the target language. If not installed, this check is skipped with a warning logged.
+
+**Install:**
+```bash
+pip install -e ".[quality]"
+```
+
+**What it does:** Detects mixed-language output during batch translation and triggers automatic fallback to individual translation to ensure language purity.
+
+**Without langdetect:** Translations still work correctly, but mixed-language output may not be detected during batch translation. The sentence-level language consistency validator will still catch most issues.
+
+#### Development Tools
 
 ```bash
-# Copy and configure environment
-cp .env.example .env
-
-# Start services
-docker-compose up -d
-
-# Check status
-docker-compose ps
-
-# View logs
-docker-compose logs -f
+pip install -e ".[dev]"  # Install pytest, black, ruff, mypy, etc.
 ```
 
-## Usage
-
-### Command Line Interface
+#### GPU Acceleration
 
 ```bash
-# Translate a single file
-translate-hugo --site products.aspose.net --input content/en/products/overview.md --target-langs de fr es
-
-# Translate a directory
-translate-hugo --site kb.aspose.net --input content/en/ --target-langs de fr
-
-# With validation mode
-translate-hugo --site docs.aspose.net --input content/en/ --target-langs de --validation-mode strict
-
-# Dry run (preview without writing)
-translate-hugo --site example --input content/en/ --target-langs de --dry-run
-
-# With custom config
-translate-hugo --site example --config-root ./custom-config --target-langs de fr
+pip install -e ".[gpu]"  # Install FAISS-GPU, CTranslate2
 ```
 
-### CLI Options
-
-| Flag | Description |
-|------|-------------|
-| `--site` | Site profile ID (required) |
-| `--input` | Input file or directory |
-| `--target-langs` | Target languages (space-separated) |
-| `--validation-mode` | `strict`, `normal`, `lenient`, or `off` |
-| `--disable-validation` | Skip all validation |
-| `--dry-run` | Preview without writing files |
-| `--max-retries` | Max retry attempts on validation failure |
-| `--log-level` | `DEBUG`, `INFO`, `WARNING`, `ERROR` |
-| `--config-root` | Custom config directory path |
-
-### Programmatic Usage
-
-```python
-from src.translation_engine import TranslationEngine
-from src.tm import TranslationMemory
-from src.model_runtime import ModelLoader
-from src.utils.config_loader import ConfigService
-
-# Initialize components
-config = ConfigService("./config")
-tm = TranslationMemory(data_dir="./data/tm", enable_semantic=True)
-model_loader = ModelLoader(cache_dir="./data/models")
-
-# Create engine
-engine = TranslationEngine(
-    config_service=config,
-    tm=tm,
-    model_loader=model_loader,
-    enable_validation=True,
-)
-
-# Translate a file
-result = engine.translate_file(
-    site_id="example",
-    file_path=Path("content/en/page.md"),
-    target_langs=["de", "fr", "es"],
-)
-
-print(f"Success: {result.success}")
-print(f"Outputs: {result.outputs}")
-print(f"TM hits: {result.stats.tm_hits}")
-```
-
-## Configuration
-
-### Directory Structure
-
-```
-config/
-├── global.yaml              # System-wide settings
-├── model_registry.yaml      # Available translation models
-├── validation.yaml          # Validation rules and thresholds
-├── terminology.yaml         # Protected terms and glossaries
-├── site_profiles/           # Per-site configurations
-│   ├── default.yaml
-│   ├── example.yaml
-│   └── <your-site>.yaml
-└── schemas/
-    └── site_profile.schema.json
-```
-
-### Site Profile Example
-
-```yaml
-# config/site_profiles/example.yaml
-site_id: "example"
-name: "Example Site"
-default_source_lang: "en"
-target_langs:
-  - de
-  - fr
-  - es
-
-content_roots:
-  - "./content/en"
-
-output_layout:
-  per_language_folders: true
-  pattern: "{lang}/{path}"
-
-frontmatter_mode:
-  title: translate
-  description: translate
-  keywords: translate
-  date: preserve
-  url: preserve
-  aliases: preserve
-
-tm_prefs:
-  use_semantic_tm: true
-  semantic_threshold: 0.80
-```
-
-### Environment Variables
-
-Key variables (see `.env.example` for full list):
-
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `DEVICE` | Translation device (`auto`, `cpu`, `cuda`) | `auto` |
-| `DEFAULT_MODEL` | Default translation model | `m2m100_418m` |
-| `TM_DATA_PATH` | Translation Memory storage path | `./data/tm` |
-| `TM_SEMANTIC_THRESHOLD` | L3 semantic match threshold | `0.80` |
-| `MAX_PARALLEL_FILES` | Parallel file processing limit | `4` |
-| `LOG_LEVEL` | Logging verbosity | `INFO` |
-
-## Project Structure
-
-```
-hugo-translator/
-├── src/                          # Source code
-│   ├── cli.py                    # Command-line interface
-│   ├── translation_engine/       # Core translation workflow
-│   │   ├── engine.py            # Main orchestrator
-│   │   ├── parser/              # Hugo markdown parser
-│   │   ├── extractor/           # Segment extraction
-│   │   ├── reconstructor/       # Output reconstruction
-│   │   ├── validation/          # Quality validators
-│   │   └── handlers/            # Special content handlers
-│   ├── tm/                       # Translation Memory
-│   │   ├── l1_cache.py          # In-memory LRU cache
-│   │   ├── l2_persistent.py     # LMDB storage
-│   │   ├── l3_semantic.py       # FAISS semantic search
-│   │   └── translation_memory.py # Unified interface
-│   ├── model_runtime/            # Model management
-│   │   ├── loader.py            # Model loading
-│   │   ├── registry.py          # Model registry
-│   │   └── hardware.py          # Device detection
-│   ├── orchestrator/             # Job scheduling
-│   │   ├── orchestrator.py      # Job coordination
-│   │   ├── queue.py             # Job queue
-│   │   ├── scheduler.py         # Periodic tasks
-│   │   └── watcher.py           # File watching
-│   ├── observability/            # Logging & metrics
-│   │   ├── logger.py            # Structured logging
-│   │   ├── metrics.py           # Prometheus metrics
-│   │   └── flow_artifacts.py    # Debug artifacts
-│   └── utils/                    # Shared utilities
-│       └── config_loader.py     # Configuration management
-├── config/                       # Configuration files
-├── tests/                        # Test suite
-│   ├── unit/                    # Unit tests
-│   ├── integration/             # Integration tests
-│   └── fixtures/                # Test data
-├── scripts/                      # Operational scripts
-├── docker/                       # Docker configurations
-├── docs/                         # Documentation
-├── samples/                      # Sample Hugo content
-├── requirements/                 # Dependencies
-│   ├── base.txt                 # Core dependencies
-│   ├── cpu.txt                  # CPU-only
-│   ├── gpu.txt                  # With GPU support
-│   └── dev.txt                  # Development tools
-├── pyproject.toml               # Package configuration
-├── docker-compose.yml           # Container orchestration
-└── Dockerfile                   # Container build
-```
-
-## Development
-
-### Running Tests
+#### Documentation
 
 ```bash
-# All tests
-pytest tests/ -v
-
-# Unit tests only
-pytest tests/unit/ -v
-
-# With coverage
-pytest tests/ -v --cov=src --cov-report=html
-
-# Specific test file
-pytest tests/unit/phase-3/test_translation_memory.py -v
+pip install -e ".[docs]"  # Install Sphinx and themes
 ```
 
-### Code Quality
+## Telemetry Health Monitoring
+
+This repository includes automated health checks for telemetry integration:
+
+### Daily Health Check Workflow
+
+The GitHub Actions workflow automatically validates telemetry system health:
+- Runs daily at 9 AM UTC
+- Validates PRAGMA settings (synchronous=FULL, busy_timeout=30000)
+- Checks database integrity
+- Verifies recent telemetry runs
+
+### Manual Trigger
 
 ```bash
-# Format code
-black src/ tests/
-
-# Lint
-ruff check src/ tests/
-
-# Type check
-mypy src/
-
-# All checks
-black src/ tests/ && ruff check src/ tests/ && mypy src/
+# Trigger health check manually
+gh workflow run telemetry_health_check.yml
 ```
 
-### Adding a New Site Profile
+### View Results
 
-1. Create `config/site_profiles/<site-id>.yaml`
-2. Define content roots, target languages, and frontmatter rules
-3. Add sample content to `samples/<site-id>/`
-4. Test with: `translate-hugo --site <site-id> --input samples/<site-id>/ --target-langs de --dry-run`
+- **GitHub Actions Tab**: Navigate to Actions → "Telemetry Health Check"
+- **Command Line**:
+  ```bash
+  gh run list --workflow=telemetry_health_check.yml
+  gh run view --log
+  ```
 
-## Performance
+### Local Validation
 
-### Expected Throughput
+Run validation scripts locally:
 
-| Operation | Speed |
-|-----------|-------|
-| L1 cache lookup | >10,000/sec |
-| L2 LMDB lookup | >5,000/sec |
-| L3 semantic search | ~100/sec |
-| Model translation (CPU) | ~5-10 segments/sec |
-| Model translation (GPU) | ~50-100 segments/sec |
+```bash
+# Verify latest telemetry record
+python scripts/verify_telemetry.py --latest
 
-### Optimization Tips
+# Run comprehensive health checks (requires local-telemetry repo)
+cd ../local-telemetry
+python scripts/diagnose_pragma_settings.py
+python scripts/check_db_integrity.py
+python scripts/validate_installation.py
+```
 
-- **Maximize TM hits**: Pre-populate TM from existing translations
-- **Use GPU**: 5-10x faster for model translations
-- **Tune batch size**: Larger batches improve GPU throughput
-- **Enable parallel processing**: Process multiple files concurrently
-- **Adjust semantic threshold**: Lower threshold = more L3 hits but less precision
+## Version
 
-## Documentation
-
-Detailed documentation is available in `docs/`:
-
-- [User Guide](docs/USER_GUIDE.md) - Complete usage instructions
-- [Configuration Reference](docs/CONFIGURATION.md) - All configuration options
-- [Deployment Guide](docs/DEPLOYMENT.md) - Production deployment
-- [Operations Manual](docs/OPERATIONS.md) - Day-to-day operations
-- [Troubleshooting](docs/TROUBLESHOOTING.md) - Common issues and solutions
-- [CLI Reference](docs/CLI_FLAGS_REFERENCE.md) - All CLI flags explained
+Current version: 1.0
 
 ## License
 
-MIT License - see LICENSE file for details.
-
-## Contributing
-
-1. Fork the repository
-2. Create a feature branch
-3. Make changes with tests
-4. Ensure all tests pass and code quality checks pass
-5. Submit a pull request
-
----
-
-**Built with:** Python 3.10+ | HuggingFace Transformers | FAISS | LMDB | ruamel.yaml
+See LICENSE file for details.
