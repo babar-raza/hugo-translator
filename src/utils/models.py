@@ -93,6 +93,13 @@ class BodyRules(BaseModel):
                     "Conservative estimation helps prevent context overflow."
     )
 
+    # SR-01: Segment sorting for batching efficiency
+    sort_segments_by_length: bool = Field(
+        default=False,
+        description="Sort segments by length (shortest first) before translation for improved GPU batching efficiency. "
+                    "Recommended for large jobs with heterogeneous segment lengths. Default: False (document order)."
+    )
+
 
 class OutputLayout(BaseModel):
     """Output file path layout configuration."""

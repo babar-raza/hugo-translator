@@ -19,6 +19,7 @@ from pathlib import Path
 from typing import Dict, List, Optional
 
 import json
+import yaml
 
 try:
     # Relative imports (when used as package)
@@ -562,6 +563,15 @@ Examples:
         help="Sort languages by missing translation count: desc (most first, default) or asc (least first)",
     )
 
+    # Benchmarking (production metrics collection - OPT-IN)
+    benchmark_group = parser.add_argument_group("Benchmarking & Production Metrics")
+
+    benchmark_group.add_argument(
+        "--enable-production-metrics",
+        action="store_true",
+        help="Enable production metrics recording to benchmark database (OPT-IN, overrides config)",
+    )
+
     # Configuration
     config_group = parser.add_argument_group("Configuration")
 
@@ -572,6 +582,137 @@ Examples:
     )
 
     return parser
+
+
+def _load_benchmarking_yaml() -> Dict:
+    """
+    Load and parse benchmarking.yaml, return empty dict if not found.
+
+    Returns:
+        Parsed YAML config dict, or empty dict if file doesn't exist or parse fails.
+
+    Note:
+        This is a low-level loader. Use load_benchmarking_config() for full config with defaults.
+    """
+    config_path = Path("config/benchmarking.yaml")
+    logger_inst = logging.getLogger(__name__)
+
+    if not config_path.exists():
+        logger_inst.info("No benchmarking config file found, using defaults")
+        return {}
+
+    try:
+        with open(config_path) as f:
+            config = yaml.safe_load(f) or {}
+            logger_inst.info(f"Loaded benchmarking config: path={config_path}")
+            return config
+    except Exception as e:
+        logger_inst.warning(f"Failed to load benchmarking config: {e}, using defaults")
+        return {}
+
+
+def load_benchmarking_config() -> Dict:
+    """
+    Load benchmarking configuration from config/benchmarking.yaml.
+
+    Returns:
+        Config dict with 'production', 'scheduler', 'database' sections.
+        Returns safe defaults if config file doesn't exist or is invalid.
+    """
+    # Load raw YAML (uses shared loader)
+    config = _load_benchmarking_yaml()
+
+    # If config is empty (file doesn't exist or failed to load), return defaults
+    if not config:
+        return {
+            "production": {"record_enabled": False},
+            "database": {
+                "path": "data/benchmarks/benchmarks.db",
+                "production_path": "data/benchmarks/production.db",
+            },
+        }
+
+    # Ensure defaults for missing sections
+    if "production" not in config:
+        config["production"] = {"record_enabled": False}
+    if "database" not in config:
+        config["database"] = {
+            "path": "data/benchmarks/benchmarks.db",
+            "production_path": "data/benchmarks/production.db",
+        }
+
+    # Validate and return
+    return validate_benchmarking_config(config)
+
+
+def validate_benchmarking_config(config: Dict) -> Dict:
+    """
+    Validate benchmarking config types and ranges, return sanitized config.
+
+    Args:
+        config: Raw config dict from YAML
+
+    Returns:
+        Sanitized config with validated types and safe defaults
+    """
+    logger = logging.getLogger(__name__)
+    validated = config.copy()
+
+    # Validate production section
+    if "production" in validated:
+        prod = validated["production"]
+
+        # Validate record_enabled (bool)
+        if "record_enabled" in prod:
+            if not isinstance(prod["record_enabled"], bool):
+                logger.warning(
+                    f"Invalid type for production.record_enabled: {type(prod['record_enabled']).__name__}, "
+                    "expected bool. Using default: False"
+                )
+                prod["record_enabled"] = False
+
+        # Validate min_segments_to_record (int > 0)
+        if "min_segments_to_record" in prod:
+            val = prod["min_segments_to_record"]
+            if not isinstance(val, int):
+                logger.warning(
+                    f"Invalid type for production.min_segments_to_record: {type(val).__name__}, "
+                    "expected int. Using default: 1"
+                )
+                prod["min_segments_to_record"] = 1
+            elif val < 1:
+                logger.warning(
+                    f"Invalid value for production.min_segments_to_record: {val}, "
+                    "must be >= 1. Using default: 1"
+                )
+                prod["min_segments_to_record"] = 1
+        else:
+            # Add default if missing
+            prod["min_segments_to_record"] = 1
+
+    # Validate database section
+    if "database" in validated:
+        db = validated["database"]
+
+        # Validate path (str)
+        if "path" in db:
+            if not isinstance(db["path"], str):
+                logger.warning(
+                    f"Invalid type for database.path: {type(db['path']).__name__}, "
+                    "expected str. Using default"
+                )
+                db["path"] = "data/benchmarks/benchmarks.db"
+
+        # Validate production_path (str)
+        if "production_path" in db:
+            if not isinstance(db["production_path"], str):
+                logger.warning(
+                    f"Invalid type for database.production_path: {type(db['production_path']).__name__}, "
+                    "expected str. Using default"
+                )
+                db["production_path"] = "data/benchmarks/production.db"
+
+    return validated
 
 
 def validate_output_path(output_path: Path) -> None:
@@ -1020,11 +1161,61 @@ def translate_site(args: argparse.Namespace) -> int:
             validate_output_path(output_path)
             engine_kwargs["output_dir_override"] = output_path
 
+        # SR-03: Read sort_segments_by_length from config if CLI didn't override
+        if "sort_segments_by_length" not in engine_kwargs:
+            body_rules = config_service.site_config.get_body_rules()
+            if hasattr(body_rules, 'sort_segments_by_length'):
+                engine_kwargs["sort_segments_by_length"] = body_rules.sort_segments_by_length
+
+        # TC-BM-01: Initialize production metrics ingestor (OPT-IN)
+        production_ingestor = None
+        benchmark_config = load_benchmarking_config()
+
+        # Check if enabled via CLI flag or config
+        metrics_enabled = (
+            args.enable_production_metrics
+            or benchmark_config.get("production", {}).get("record_enabled", False)
+        )
+
+        logger.info(f"Production metrics recording: enabled={metrics_enabled}")
+
+        if metrics_enabled:
+            try:
+                # Import only when needed (try relative first, fallback to absolute)
+                try:
+                    from .benchmarking.storage import BenchmarkDatabase
+                    from .benchmarking.production_ingestor import ProductionMetricsIngestor
+                    from .benchmarking.cli import get_benchmark_db_path
+                except ImportError:
+                    from benchmarking.storage import BenchmarkDatabase
+                    from benchmarking.production_ingestor import ProductionMetricsIngestor
+                    from benchmarking.cli import get_benchmark_db_path
+
+                # Get database path from config
+                db_path = get_benchmark_db_path(purpose="production")
+                db_path.parent.mkdir(parents=True, exist_ok=True)
+
+                # Get min_segments threshold from config
+                min_segments = benchmark_config.get("production", {}).get("min_segments_to_record", 1)
+
+                # Initialize database and ingestor
+                db = BenchmarkDatabase(db_path)
+                production_ingestor = ProductionMetricsIngestor(db, enabled=True, min_segments=min_segments)
+
+                logger.info(f"Production metrics enabled, recording to {db_path} (min_segments={min_segments})")
+            except Exception as e:
+                logger.warning(
+                    f"Failed to initialize production metrics: {e}. "
+                    "Translation will continue without metrics recording."
+                )
+                production_ingestor = None
+
         engine = TranslationEngine(
             config_service=config_service,
             tm=tm,
             model_loader=model_loader,
             progress_tracker=translation_progress_tracker,
+            production_ingestor=production_ingestor,
             **engine_kwargs,
         )
 

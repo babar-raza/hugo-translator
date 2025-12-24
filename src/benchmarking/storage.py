@@ -18,33 +18,9 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
+from src.benchmarking.system_info import SystemInfo
+
 logger = logging.getLogger(__name__)
-
-
-@dataclass
-class SystemInfo:
-    """System configuration snapshot."""
-
-    cpu_model: str
-    cpu_cores: int
-    total_ram_gb: float
-    gpu_model: Optional[str] = None
-    gpu_vram_gb: Optional[float] = None
-    os_name: str = ""
-    os_version: str = ""
-    python_version: str = ""
-    torch_version: str = ""
-    transformers_version: str = ""
-    timestamp_utc: str = field(default_factory=lambda: datetime.now(UTC).isoformat())
-
-    def to_dict(self) -> Dict[str, Any]:
-        """Convert to dictionary for JSON serialization."""
-        return asdict(self)
-
-    @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "SystemInfo":
-        """Create SystemInfo from dictionary."""
-        return cls(**data)
 
 
 @dataclass
@@ -116,7 +92,7 @@ class BenchmarkDatabase:
     - JSON export/import
     """
 
-    SCHEMA_VERSION = 4
+    SCHEMA_VERSION = 5
 
     def __init__(self, db_path: Path | str):
         """Initialize database connection.
@@ -360,6 +336,49 @@ class BenchmarkDatabase:
             )
             logger.info("Applied schema migration to version 4")
 
+        if from_version < 5:
+            # v5: Extend system_info with comprehensive SystemInfo fields (SR-02)
+            # Add extended hardware context fields from src.benchmarking.system_info.SystemInfo
+
+            # GPU extended fields
+            conn.execute("ALTER TABLE system_info ADD COLUMN gpu_compute_capability TEXT")
+            conn.execute("ALTER TABLE system_info ADD COLUMN has_cuda INTEGER DEFAULT 0")
+            conn.execute("ALTER TABLE system_info ADD COLUMN cuda_version TEXT")
+            conn.execute("ALTER TABLE system_info ADD COLUMN gpu_driver_version TEXT")
+
+            # Platform extended fields
+            conn.execute("ALTER TABLE system_info ADD COLUMN platform_system TEXT")
+            conn.execute("ALTER TABLE system_info ADD COLUMN platform_release TEXT")
+
+            # Python extended fields
+            conn.execute("ALTER TABLE system_info ADD COLUMN python_implementation TEXT")
+
+            # PyTorch extended fields
+            conn.execute("ALTER TABLE system_info ADD COLUMN torch_cuda_available INTEGER DEFAULT 0")
+
+            # CPU extended fields (BM-09)
+            conn.execute("ALTER TABLE system_info ADD COLUMN cpu_frequency_mhz REAL")
+            conn.execute("ALTER TABLE system_info ADD COLUMN cpu_frequency_max_mhz REAL")
+            conn.execute("ALTER TABLE system_info ADD COLUMN cpu_tdp_watts REAL")
+            conn.execute("ALTER TABLE system_info ADD COLUMN memory_bandwidth_gbps REAL")
+            conn.execute("ALTER TABLE system_info ADD COLUMN numa_nodes INTEGER DEFAULT 1")
+
+            # Power management
+            conn.execute("ALTER TABLE system_info ADD COLUMN power_management_state TEXT")
+
+            # Metadata
+            conn.execute("ALTER TABLE system_info ADD COLUMN collected_at_utc TEXT")
+            conn.execute("ALTER TABLE system_info ADD COLUMN collector_version TEXT")
+
+            # Note: gpu_vram_gb remains for backward compatibility
+            # Mapping: gpu_vram_gb <-> gpu_memory_gb happens in save_run/get_run
+
+            conn.execute(
+                "INSERT INTO schema_version (version, applied_at) VALUES (?, ?)",
+                (5, datetime.now(UTC).isoformat()),
+            )
+            logger.info("Applied schema migration to version 5 - extended SystemInfo fields")
+
     def create_tables(self) -> None:
         """Create database tables (idempotent).
 
@@ -419,13 +438,13 @@ class BenchmarkDatabase:
                         si.cpu_cores,
                         si.total_ram_gb,
                         si.gpu_model,
-                        si.gpu_vram_gb,
+                        si.gpu_memory_gb,  # Comprehensive SystemInfo uses gpu_memory_gb
                         si.os_name,
                         si.os_version,
                         si.python_version,
-                        si.torch_version,
-                        si.transformers_version,
-                        si.timestamp_utc,
+                        si.torch_version or "",  # Handle None
+                        "",  # transformers_version not in comprehensive SystemInfo
+                        si.collected_at_utc if hasattr(si, 'collected_at_utc') else si.timestamp_utc,
                     ),
                 )
 
@@ -545,19 +564,20 @@ class BenchmarkDatabase:
             cursor = conn.execute("SELECT * FROM benchmark_results WHERE run_id = ?", (run_id,))
             result_rows = cursor.fetchall()
 
-            # Reconstruct objects
+            # Reconstruct objects - map DB fields to comprehensive SystemInfo
             system_info = SystemInfo(
                 cpu_model=sys_row["cpu_model"],
                 cpu_cores=sys_row["cpu_cores"],
                 total_ram_gb=sys_row["total_ram_gb"],
                 gpu_model=sys_row["gpu_model"],
-                gpu_vram_gb=sys_row["gpu_vram_gb"],
+                gpu_memory_gb=sys_row["gpu_vram_gb"],  # DB has gpu_vram_gb, SystemInfo uses gpu_memory_gb
                 os_name=sys_row["os_name"],
                 os_version=sys_row["os_version"],
                 python_version=sys_row["python_version"],
                 torch_version=sys_row["torch_version"],
-                transformers_version=sys_row["transformers_version"],
-                timestamp_utc=sys_row["timestamp_utc"],
+                # Comprehensive SystemInfo has additional fields not in v4 DB schema
+                # These will be NULL until SR-02 migration completes
+                collected_at_utc=sys_row["timestamp_utc"],
             )
 
             results = [

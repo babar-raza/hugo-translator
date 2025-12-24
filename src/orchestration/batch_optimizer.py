@@ -18,6 +18,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import List, Optional, Tuple
 
+from src.utils.metrics import calc_stats
+
 logger = logging.getLogger(__name__)
 
 
@@ -91,12 +93,16 @@ class BatchOptimizer:
         # Thread safety
         self._lock = threading.Lock()
 
-        # BM-08: Timing instrumentation (OPT-05: bounded to prevent memory leak)
+        # BM-08: Timing instrumentation (OPT-05: bounded to prevent memory leak, CFG-01: configurable)
+        from src.utils.config_loader import get_metrics_config
+        metrics_config = get_metrics_config()
+        timing_maxlen = metrics_config["metrics"]["storage"]["batch_optimizer"]["timing_metrics_maxlen"]
+
         self._timing_metrics = {
-            "prepare_batches_ms": deque(maxlen=5000),  # Keep last 5000 batch prep timings
-            "process_batch_ms": deque(maxlen=5000),  # Keep last 5000 batch process timings
-            "oom_recovery_ms": deque(maxlen=5000),  # Keep last 5000 OOM recovery timings
-            "batch_size_adjustments_ms": deque(maxlen=5000),  # Keep last 5000 adjustment timings
+            "prepare_batches_ms": deque(maxlen=timing_maxlen),  # Bounded by config
+            "process_batch_ms": deque(maxlen=timing_maxlen),  # Bounded by config
+            "oom_recovery_ms": deque(maxlen=timing_maxlen),  # Bounded by config
+            "batch_size_adjustments_ms": deque(maxlen=timing_maxlen),  # Bounded by config
         }
 
         # Initialize resource limits
@@ -495,18 +501,6 @@ class BatchOptimizer:
             Dictionary with timing statistics for batch operations
         """
         with self._lock:
-            # Calculate statistics for timing lists
-            def calc_stats(values: List[float]) -> Dict:
-                if not values:
-                    return {"count": 0, "mean": 0.0, "min": 0.0, "max": 0.0, "total": 0.0}
-                return {
-                    "count": len(values),
-                    "mean": sum(values) / len(values),
-                    "min": min(values),
-                    "max": max(values),
-                    "total": sum(values),
-                }
-
             return {
                 "prepare_batches": calc_stats(self._timing_metrics["prepare_batches_ms"]),
                 "process_batch": calc_stats(self._timing_metrics["process_batch_ms"]),

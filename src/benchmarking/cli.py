@@ -13,9 +13,12 @@ Usage:
 import argparse
 import json
 import logging
+import os
 import sys
 from pathlib import Path
 from typing import List, Optional
+
+import yaml
 
 from .reporter import BenchmarkReporter
 from .runner import BenchmarkRunner, load_corpus
@@ -23,10 +26,60 @@ from .storage import BenchmarkDatabase
 from ..model_runtime.recommender import ModelRecommender
 from ..model_runtime.registry import ModelRegistry
 
+# Import shared config loader (try relative first, fallback to absolute)
+try:
+    from ..cli import _load_benchmarking_yaml
+except ImportError:
+    from src.cli import _load_benchmarking_yaml
+
 logger = logging.getLogger(__name__)
 
 
 DEFAULT_DB_PATH = Path("data/benchmarks/benchmarks.db")
+
+
+def get_benchmark_db_path(purpose: str = "benchmark") -> Path:
+    """
+    Get database path from config/env with precedence: ENV > config > default.
+
+    Args:
+        purpose: "benchmark" for explicit benchmarks, "production" for production metrics
+
+    Returns:
+        Path to database file
+
+    Environment variable:
+        BENCHMARK_DB_PATH: Override any config/default path
+    """
+    # ENV override takes precedence
+    env_var = os.getenv("BENCHMARK_DB_PATH")
+    if env_var:
+        logger.info(f"Using benchmark database path from ENV: path={env_var} purpose={purpose}")
+        return Path(env_var)
+
+    # Load from config (uses shared loader)
+    config = _load_benchmarking_yaml()
+
+    if config:
+        # Extract database path from config
+        db_config = config.get("database", {})
+
+        if purpose == "production":
+            path_str = db_config.get("production_path", "data/benchmarks/production.db")
+        else:
+            path_str = db_config.get("path", "data/benchmarks/benchmarks.db")
+
+        logger.info(f"Using benchmark database path from config: path={path_str} purpose={purpose}")
+        return Path(path_str)
+
+    # Default fallback (config doesn't exist or failed to load)
+    if purpose == "production":
+        default_path = "data/benchmarks/production.db"
+    else:
+        default_path = "data/benchmarks/benchmarks.db"
+
+    logger.info(f"Using default benchmark database path: path={default_path} purpose={purpose}")
+    return Path(default_path)
 
 
 def cmd_run(args: argparse.Namespace) -> int:
@@ -128,7 +181,7 @@ def cmd_list(args: argparse.Namespace) -> int:
     Returns:
         Exit code (0 for success, 1 for failure)
     """
-    db_path = Path(args.db) if args.db else DEFAULT_DB_PATH
+    db_path = Path(args.db) if args.db else get_benchmark_db_path()
 
     # Check if DB exists
     if not db_path.exists():
@@ -187,7 +240,7 @@ def cmd_report(args: argparse.Namespace) -> int:
     Returns:
         Exit code (0 for success, 1 for failure)
     """
-    db_path = Path(args.db) if args.db else DEFAULT_DB_PATH
+    db_path = Path(args.db) if args.db else get_benchmark_db_path()
 
     # Check if DB exists
     if not db_path.exists():
@@ -231,7 +284,7 @@ def cmd_compare(args: argparse.Namespace) -> int:
     Returns:
         Exit code (0 for success, 1 for failure)
     """
-    db_path = Path(args.db) if args.db else DEFAULT_DB_PATH
+    db_path = Path(args.db) if args.db else get_benchmark_db_path()
 
     # Check if DB exists
     if not db_path.exists():
@@ -287,7 +340,7 @@ def cmd_recommend(args: argparse.Namespace) -> int:
         logger.info(f"Loaded registry with {len(registry.models)} models")
 
         # Load benchmark storage if DB exists
-        db_path = Path(args.db) if args.db else DEFAULT_DB_PATH
+        db_path = Path(args.db) if args.db else get_benchmark_db_path()
         benchmark_storage = None
 
         if db_path.exists():
@@ -394,7 +447,7 @@ Examples:
   python -m src.benchmarking.cli list --format json
         """,
     )
-    list_parser.add_argument("--db", help=f"Database path (default: {DEFAULT_DB_PATH})")
+    list_parser.add_argument("--db", help="Database path (default: data/benchmarks/benchmarks.db or from config)")
     list_parser.add_argument("--model", help="Filter by model ID")
     list_parser.add_argument("--device", help="Filter by device")
     list_parser.add_argument("--limit", type=int, default=10, help="Max results (default: 10)")
@@ -416,7 +469,7 @@ Examples:
         """,
     )
     report_parser.add_argument("--run", required=True, help="Run ID to report on")
-    report_parser.add_argument("--db", help=f"Database path (default: {DEFAULT_DB_PATH})")
+    report_parser.add_argument("--db", help="Database path (default: data/benchmarks/benchmarks.db or from config)")
     report_parser.add_argument("--format", choices=["markdown", "json"], default="markdown", help="Output format")
 
     # --- compare command ---
@@ -434,7 +487,7 @@ Examples:
         """,
     )
     compare_parser.add_argument("--runs", required=True, help="Comma-separated run IDs")
-    compare_parser.add_argument("--db", help=f"Database path (default: {DEFAULT_DB_PATH})")
+    compare_parser.add_argument("--db", help="Database path (default: data/benchmarks/benchmarks.db or from config)")
     compare_parser.add_argument(
         "--metric",
         default="throughput_tokens_per_sec",
@@ -463,7 +516,7 @@ Examples:
     recommend_parser.add_argument("--target-throughput", type=float, help="Minimum target throughput (tokens/sec)")
     recommend_parser.add_argument("--max-memory-gb", type=float, help="Maximum memory budget (GB)")
     recommend_parser.add_argument("--device", help="Preferred device (cpu, cuda, etc.)")
-    recommend_parser.add_argument("--db", help=f"Benchmark database (default: {DEFAULT_DB_PATH})")
+    recommend_parser.add_argument("--db", help="Benchmark database (default: data/benchmarks/benchmarks.db or from config)")
     recommend_parser.add_argument("--registry", default="config/model_registry.yaml", help="Model registry YAML")
     recommend_parser.add_argument("--format", choices=["markdown", "json"], default="markdown", help="Output format")
 

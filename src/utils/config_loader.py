@@ -44,11 +44,13 @@ class ConfigService:
         self.global_config_path = self.config_root / "global.yaml"
         self.validation_config_path = self.config_root / "validation.yaml"
         self.terminology_config_path = self.config_root / "terminology.yaml"
+        self.metrics_config_path = self.config_root / "metrics.yaml"
 
         self._profile_cache: Dict[str, SiteProfile] = {}
         self._global_config: Optional[GlobalConfig] = None
         self._validation_config: Optional[ValidationConfig] = None
         self._terminology_config: Optional[TerminologyConfig] = None
+        self._metrics_config: Optional[Dict[str, Any]] = None
         self._raw_global_config: Dict[str, Any] = {}
         self._load_global_config()
 
@@ -222,6 +224,123 @@ class ConfigService:
         self._terminology_config = None
         return self.get_terminology_config(use_cache=False)
 
+    def get_metrics_config(self, use_cache: bool = True) -> Dict[str, Any]:
+        """Load and validate the metrics configuration.
+
+        Supports environment variable overrides:
+        - METRICS_ENGINE_MAXLEN: Override retry_metrics_maxlen
+        - METRICS_L3_MAXLEN: Override l3 timing_metrics_maxlen
+        - METRICS_BATCH_MAXLEN: Override batch timing_metrics_maxlen
+        - METRICS_PERCENTILES: Override percentiles (comma-separated)
+
+        Returns:
+            Dictionary with metrics configuration
+        """
+        if use_cache and self._metrics_config is not None:
+            return self._metrics_config
+
+        # Load from file or use defaults
+        if self.metrics_config_path.exists():
+            try:
+                with open(self.metrics_config_path, "r", encoding="utf-8") as f:
+                    data = yaml.safe_load(f)
+
+                if not data:
+                    logger.warning("Metrics config is empty, using defaults")
+                    data = {}
+            except yaml.YAMLError as e:
+                logger.error(f"Invalid YAML in metrics config: {e}, using defaults")
+                data = {}
+            except Exception as e:
+                logger.error(f"Failed to load metrics config: {e}, using defaults")
+                data = {}
+        else:
+            logger.info("Metrics config not found, using defaults")
+            data = {}
+
+        # Apply defaults
+        config = {
+            "metrics": {
+                "storage": {
+                    "translation_engine": {
+                        "retry_metrics_maxlen": 1000
+                    },
+                    "l3_semantic": {
+                        "timing_metrics_maxlen": 10000
+                    },
+                    "batch_optimizer": {
+                        "timing_metrics_maxlen": 5000
+                    }
+                },
+                "statistics": {
+                    "percentiles": [0.50, 0.95, 0.99],
+                    "min_samples_for_p95": 20,
+                    "min_samples_for_p99": 100
+                },
+                "thresholds": {
+                    "l3_search_timeout_ms": 100,
+                    "l3_search_warning_ms": 50,
+                    "retry_max_duration_ms": 30000,
+                    "retry_warning_duration_ms": 10000,
+                    "batch_prepare_warning_ms": 1000,
+                    "batch_process_warning_ms": 5000,
+                    "oom_recovery_max_ms": 5000
+                }
+            }
+        }
+
+        # Merge with loaded data
+        if "metrics" in data:
+            self._deep_merge(config["metrics"], data["metrics"])
+
+        # Apply environment variable overrides
+        if "METRICS_ENGINE_MAXLEN" in os.environ:
+            try:
+                config["metrics"]["storage"]["translation_engine"]["retry_metrics_maxlen"] = \
+                    int(os.environ["METRICS_ENGINE_MAXLEN"])
+            except ValueError:
+                logger.warning("Invalid METRICS_ENGINE_MAXLEN, ignoring")
+
+        if "METRICS_L3_MAXLEN" in os.environ:
+            try:
+                config["metrics"]["storage"]["l3_semantic"]["timing_metrics_maxlen"] = \
+                    int(os.environ["METRICS_L3_MAXLEN"])
+            except ValueError:
+                logger.warning("Invalid METRICS_L3_MAXLEN, ignoring")
+
+        if "METRICS_BATCH_MAXLEN" in os.environ:
+            try:
+                config["metrics"]["storage"]["batch_optimizer"]["timing_metrics_maxlen"] = \
+                    int(os.environ["METRICS_BATCH_MAXLEN"])
+            except ValueError:
+                logger.warning("Invalid METRICS_BATCH_MAXLEN, ignoring")
+
+        if "METRICS_PERCENTILES" in os.environ:
+            try:
+                percentiles = [
+                    float(p.strip())
+                    for p in os.environ["METRICS_PERCENTILES"].split(",")
+                ]
+                config["metrics"]["statistics"]["percentiles"] = percentiles
+            except ValueError:
+                logger.warning("Invalid METRICS_PERCENTILES, ignoring")
+
+        self._metrics_config = config
+        return config
+
+    def _deep_merge(self, base: Dict, override: Dict) -> None:
+        """Deep merge override dict into base dict."""
+        for key, value in override.items():
+            if key in base and isinstance(base[key], dict) and isinstance(value, dict):
+                self._deep_merge(base[key], value)
+            else:
+                base[key] = value
+
+    def reload_metrics_config(self) -> Dict[str, Any]:
+        """Reload metrics config from disk, bypassing cache."""
+        self._metrics_config = None
+        return self.get_metrics_config(use_cache=False)
+
     def get_merged_validation_config(
         self, site_profile: "SiteProfile"
     ) -> Dict[str, any]:
@@ -320,3 +439,63 @@ class ConfigService:
                 merged["global_terms"] = {"exact_matches": [], "patterns": []}
 
         return merged
+
+
+# Standalone helper for metrics configuration
+_metrics_config_cache: Optional[Dict[str, Any]] = None
+
+
+def get_metrics_config() -> Dict[str, Any]:
+    """Get metrics configuration (standalone helper).
+
+    This is a convenience function for components that need metrics config
+    without creating a full ConfigService instance.
+
+    Returns:
+        Dictionary with metrics configuration including storage limits,
+        statistics settings, and performance thresholds
+    """
+    global _metrics_config_cache
+
+    if _metrics_config_cache is not None:
+        return _metrics_config_cache
+
+    # Try to create ConfigService and get metrics config
+    try:
+        # Determine config root
+        config_root = Path(__file__).parent.parent.parent / "config"
+        if not config_root.exists():
+            config_root = Path.cwd() / "config"
+
+        if config_root.exists():
+            config_service = ConfigService(config_root)
+            _metrics_config_cache = config_service.get_metrics_config()
+            return _metrics_config_cache
+    except Exception as e:
+        logger.warning(f"Failed to load metrics config: {e}, using defaults")
+
+    # Return defaults if loading fails
+    _metrics_config_cache = {
+        "metrics": {
+            "storage": {
+                "translation_engine": {"retry_metrics_maxlen": 1000},
+                "l3_semantic": {"timing_metrics_maxlen": 10000},
+                "batch_optimizer": {"timing_metrics_maxlen": 5000}
+            },
+            "statistics": {
+                "percentiles": [0.50, 0.95, 0.99],
+                "min_samples_for_p95": 20,
+                "min_samples_for_p99": 100
+            },
+            "thresholds": {
+                "l3_search_timeout_ms": 100,
+                "l3_search_warning_ms": 50,
+                "retry_max_duration_ms": 30000,
+                "retry_warning_duration_ms": 10000,
+                "batch_prepare_warning_ms": 1000,
+                "batch_process_warning_ms": 5000,
+                "oom_recovery_max_ms": 5000
+            }
+        }
+    }
+    return _metrics_config_cache

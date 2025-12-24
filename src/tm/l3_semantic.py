@@ -24,6 +24,8 @@ import faiss
 import numpy as np
 from sentence_transformers import SentenceTransformer
 
+from src.utils.metrics import calc_stats
+
 logger = logging.getLogger(__name__)
 
 
@@ -93,11 +95,15 @@ class L3SemanticTM:
         self._save_failures = 0
         self._last_save_time: Optional[float] = None
 
-        # BM-08: Timing instrumentation (TM-07: bounded to prevent memory leak)
+        # BM-08: Timing instrumentation (TM-07: bounded to prevent memory leak, CFG-01: configurable)
+        from src.utils.config_loader import get_metrics_config
+        metrics_config = get_metrics_config()
+        timing_maxlen = metrics_config["metrics"]["storage"]["l3_semantic"]["timing_metrics_maxlen"]
+
         self._metrics = {
-            "semantic_search_ms": deque(maxlen=10000),  # Keep last 10000 search timings
-            "add_entry_ms": deque(maxlen=10000),  # Keep last 10000 add timings
-            "batch_add_ms": deque(maxlen=10000),  # Keep last 10000 batch add timings
+            "semantic_search_ms": deque(maxlen=timing_maxlen),  # Bounded by config
+            "add_entry_ms": deque(maxlen=timing_maxlen),  # Bounded by config
+            "batch_add_ms": deque(maxlen=timing_maxlen),  # Bounded by config
             "cache_hits": 0,  # Integer counter (naturally bounded)
             "cache_misses": 0,  # Integer counter (naturally bounded)
         }
@@ -315,17 +321,6 @@ class L3SemanticTM:
             Dictionary with timing statistics and cache metrics
         """
         with self._lock:
-            # Calculate statistics for timing lists
-            def calc_stats(values: List[float]) -> Dict[str, float]:
-                if not values:
-                    return {"count": 0, "mean": 0.0, "min": 0.0, "max": 0.0}
-                return {
-                    "count": len(values),
-                    "mean": sum(values) / len(values),
-                    "min": min(values),
-                    "max": max(values),
-                }
-
             return {
                 "semantic_search": calc_stats(self._metrics["semantic_search_ms"]),
                 "add_entry": calc_stats(self._metrics["add_entry_ms"]),
