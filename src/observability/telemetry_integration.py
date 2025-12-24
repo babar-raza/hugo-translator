@@ -820,6 +820,18 @@ class DummyRunContext:
         """No-op increment_counter."""
         pass
 
+    def get_partial_metrics(self) -> Dict[str, Any]:
+        """
+        Get partial metrics captured so far (GS-04, GS-05).
+
+        Returns empty dict for DummyRunContext. Real RunContext from local-telemetry
+        should return partial items_*, metrics_json, etc.
+
+        Returns:
+            Dict with partial metrics (empty for dummy context)
+        """
+        return {}
+
 
 # Global telemetry instance (can be configured once and reused)
 _global_telemetry: Optional[TranslationTelemetry] = None
