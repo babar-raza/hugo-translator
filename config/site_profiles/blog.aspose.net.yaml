@@ -1,3 +1,9 @@
+# Blog Aspose Site Profile
+# This site uses file-based localization: index.md → index.es.md, index.de.md, etc.
+# IMPORTANT: The system will ONLY translate source files (e.g., index.md, _index.md)
+#            and will automatically SKIP already-translated files (e.g., index.es.md)
+#            to prevent creating double-language files like index.es.da.md
+
 site_id: blog.aspose.net
 content_roots:
 - /content/blog
@@ -28,7 +34,6 @@ target_langs:
 - nl
 - pl
 - pt
-- pt-BR
 - ro
 - ru
 - sk
@@ -40,7 +45,6 @@ target_langs:
 - uk
 - vi
 - zh
-- zh-TW
 frontmatter:
   title:
     mode: translate
@@ -82,6 +86,12 @@ body:
   placeholder_syntax:
   - \{\{<.*?>\}\}
   - \{\{%.*?%\}\}
+
+# File-based localization settings
+# Source file filtering: The system automatically excludes files with language codes
+# - Translates: index.md, _index.md, tutorial.md (NO language code in filename)
+# - Skips: index.es.md, tutorial.de.md (language code detected, already translated)
+# This prevents double-translation bugs like index.es.md → index.es.da.md
 output_layout:
   per_language_folders: false
   pattern: '{filename}.{lang}{ext}'

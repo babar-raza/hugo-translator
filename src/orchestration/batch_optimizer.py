@@ -13,6 +13,7 @@ import logging
 import os
 import threading
 import time
+from collections import deque
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import List, Optional, Tuple
@@ -90,6 +91,14 @@ class BatchOptimizer:
         # Thread safety
         self._lock = threading.Lock()
 
+        # BM-08: Timing instrumentation (OPT-05: bounded to prevent memory leak)
+        self._timing_metrics = {
+            "prepare_batches_ms": deque(maxlen=5000),  # Keep last 5000 batch prep timings
+            "process_batch_ms": deque(maxlen=5000),  # Keep last 5000 batch process timings
+            "oom_recovery_ms": deque(maxlen=5000),  # Keep last 5000 OOM recovery timings
+            "batch_size_adjustments_ms": deque(maxlen=5000),  # Keep last 5000 adjustment timings
+        }
+
         # Initialize resource limits
         self._initialize_resource_limits()
 
@@ -165,6 +174,9 @@ class BatchOptimizer:
         Returns:
             List of batches
         """
+        # BM-08: Timing instrumentation
+        start_time = time.perf_counter()
+
         should_sort = (
             sort_by_length
             if sort_by_length is not None
@@ -183,6 +195,14 @@ class BatchOptimizer:
         for i in range(0, len(items), batch_size):
             batch = items[i : i + batch_size]
             batches.append(batch)
+
+        # BM-08: Record timing
+        duration_ms = (time.perf_counter() - start_time) * 1000
+        with self._lock:
+            self._timing_metrics["prepare_batches_ms"].append(duration_ms)
+
+        if duration_ms > 100:
+            logger.warning(f"Slow batch preparation: {duration_ms:.1f}ms for {len(items)} items")
 
         logger.info(
             f"Created {len(batches)} batches "
@@ -210,7 +230,7 @@ class BatchOptimizer:
         Returns:
             Tuple of (result, success)
         """
-        start_time = time.time()
+        start_time = time.perf_counter()
 
         try:
             # Monitor memory before
@@ -241,9 +261,16 @@ class BatchOptimizer:
                     len(batch)
                 )
 
-            duration = time.time() - start_time
+            # BM-08: Record timing
+            duration_ms = (time.perf_counter() - start_time) * 1000
+            with self._lock:
+                self._timing_metrics["process_batch_ms"].append(duration_ms)
+
+            if duration_ms > 1000:
+                logger.warning(f"Slow batch processing: {duration_ms:.1f}ms for {len(batch)} items")
+
             logger.debug(
-                f"Batch processed: {len(batch)} items in {duration:.2f}s "
+                f"Batch processed: {len(batch)} items in {duration_ms/1000:.2f}s "
                 f"(mem: {mem_after:.0f}MB, gpu: {gpu_mem_after:.0f}MB)"
             )
 
@@ -281,6 +308,9 @@ class BatchOptimizer:
         Returns:
             Tuple of (result, success)
         """
+        # BM-08: Timing instrumentation
+        start_time = time.perf_counter()
+
         with self._lock:
             self.stats.oom_events += 1
 
@@ -292,7 +322,7 @@ class BatchOptimizer:
             )
 
             logger.warning(
-                f"OOM: Reduced batch size {old_size} → {self._current_batch_size}"
+                f"OOM: Reduced batch size {old_size} -> {self._current_batch_size}"
             )
 
         # Clear GPU cache if available
@@ -326,6 +356,13 @@ class BatchOptimizer:
                 else:
                     raise
 
+        # BM-08: Record OOM recovery timing
+        duration_ms = (time.perf_counter() - start_time) * 1000
+        with self._lock:
+            self._timing_metrics["oom_recovery_ms"].append(duration_ms)
+
+        logger.info(f"OOM recovery completed in {duration_ms:.1f}ms")
+
         # Combine results (assuming they're lists)
         if results and isinstance(results[0], list):
             combined = []
@@ -353,6 +390,9 @@ class BatchOptimizer:
             gpu_mem_after: GPU memory after batch (MB)
             batch_size: Current batch size
         """
+        # BM-08: Timing instrumentation
+        start_time = time.perf_counter()
+
         mem_used = mem_after - mem_before
         gpu_mem_used = gpu_mem_after - gpu_mem_before
 
@@ -388,8 +428,13 @@ class BatchOptimizer:
 
             if self._current_batch_size != old_size:
                 self.stats.batch_size_adjustments += 1
+
+                # BM-08: Record adjustment timing
+                duration_ms = (time.perf_counter() - start_time) * 1000
+                self._timing_metrics["batch_size_adjustments_ms"].append(duration_ms)
+
                 logger.info(
-                    f"Adjusted batch size: {old_size} → {self._current_batch_size} "
+                    f"Adjusted batch size: {old_size} -> {self._current_batch_size} "
                     f"(mem: {mem_util:.0%}, gpu: {gpu_util:.0%})"
                 )
 
@@ -441,6 +486,33 @@ class BatchOptimizer:
             )
 
         return stats
+
+    def get_timing_metrics(self) -> Dict:
+        """
+        Get timing metrics for performance monitoring (BM-08).
+
+        Returns:
+            Dictionary with timing statistics for batch operations
+        """
+        with self._lock:
+            # Calculate statistics for timing lists
+            def calc_stats(values: List[float]) -> Dict:
+                if not values:
+                    return {"count": 0, "mean": 0.0, "min": 0.0, "max": 0.0, "total": 0.0}
+                return {
+                    "count": len(values),
+                    "mean": sum(values) / len(values),
+                    "min": min(values),
+                    "max": max(values),
+                    "total": sum(values),
+                }
+
+            return {
+                "prepare_batches": calc_stats(self._timing_metrics["prepare_batches_ms"]),
+                "process_batch": calc_stats(self._timing_metrics["process_batch_ms"]),
+                "oom_recovery": calc_stats(self._timing_metrics["oom_recovery_ms"]),
+                "batch_size_adjustments": calc_stats(self._timing_metrics["batch_size_adjustments_ms"]),
+            }
 
 
 def create_batch_optimizer(

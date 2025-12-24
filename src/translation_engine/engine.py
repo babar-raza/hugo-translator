@@ -10,8 +10,11 @@ Orchestrates the complete translation workflow:
 6. Write output files
 """
 import logging
+import math
 import os
+import re
 import time
+from collections import deque
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 from threading import Lock
@@ -19,10 +22,20 @@ from typing import Dict, List, Optional
 
 from ..model_runtime import ModelLoader
 from ..observability.telemetry_integration import get_telemetry, _safe_duration_ms
+from ..observability.progress import get_progress_tracker
 from ..tm import TranslationMemory
 from .extractor.placeholder_manager import PlaceholderManager
 from ..tm.override_controller import OverrideController, OverrideConfig, OverrideMode
 from ..utils.config_loader import ConfigService
+from ..utils.atomic_write import (
+    atomic_write,
+    AtomicWriteError,
+    DiskFullError,
+    InvalidPathError,
+    ReadOnlyFilesystemError,
+)
+from ..utils.file_filters import filter_source_files
+from ..utils.file_lock import FileLock, LockError
 from .exceptions import TranslationRejectedError, TranslationRetryableError
 from .extractor import SegmentExtractor
 from .models import DirectoryResult, TranslationResult, TranslationStats, ValidationDecision
@@ -34,6 +47,76 @@ from .validation.post_translation_validator import ValidationDecision as PostVal
 from .handlers.multiline_handler import MultilineHandler
 
 logger = logging.getLogger(__name__)
+
+
+# Module-level constant: All supported language codes for translation filtering
+_ALL_LANGUAGE_CODES = frozenset([
+    'ar', 'bg', 'cs', 'da', 'de', 'el', 'es', 'et', 'fa', 'fi', 'fr',
+    'he', 'hi', 'hr', 'hu', 'id', 'it', 'ja', 'ko', 'lt', 'lv', 'nb',
+    'nl', 'pl', 'pt', 'ro', 'ru', 'sk', 'sl', 'sr', 'sv',
+    'th', 'tr', 'uk', 'vi', 'zh'
+])
+
+
+def _is_translated_filename(
+    filename: str,
+    target_langs: List[str],
+    source_lang: str = 'en'
+) -> tuple[bool, Optional[str]]:
+    """
+    Check if filename appears to be a translated file based on language code pattern.
+
+    Detects filenames matching pattern: {name}.{lang}.(md|markdown)
+    Examples:
+        - index.es.md → (True, 'es')
+        - index.ES.MD → (True, 'es')  # case-insensitive
+        - tutorial.fr.markdown → (True, 'fr')
+        - index.md → (False, None)  # source file
+        - index.es.da.md → (True, 'da')  # matches last language code
+
+    Args:
+        filename: The filename to check (e.g., "index.es.md")
+        target_langs: List of target language codes configured for translation
+        source_lang: Source language code (default: 'en')
+
+    Returns:
+        Tuple of (is_translated, detected_language_code)
+        - is_translated: True if filename contains a language code pattern
+        - detected_language_code: The language code found, or None if not translated
+
+    Performance: O(n) with single regex compilation for n language codes.
+                 Uses sorted lang codes (longest first) for correct matching of region codes.
+    """
+    # Build combined set of all possible language codes
+    all_lang_codes = _ALL_LANGUAGE_CODES | set(target_langs)
+    # Exclude source language (allow files like index.en.md if en is source)
+    all_lang_codes = all_lang_codes - {source_lang}
+
+    # Sort by length descending to ensure consistent matching
+    sorted_langs = sorted(all_lang_codes, key=len, reverse=True)
+
+    # Build single optimized regex pattern with all language codes
+    # Pattern: \.(es|fr|de|...)\.(md|markdown)$
+    escaped_langs = [re.escape(lang) for lang in sorted_langs]
+    lang_pattern = '|'.join(escaped_langs)
+    pattern = rf'\.({lang_pattern})\.(md|markdown)$'
+
+    # Compile and search once
+    compiled_pattern = re.compile(pattern, re.IGNORECASE)
+    match = compiled_pattern.search(filename)
+
+    if match:
+        detected_lang = match.group(1)
+        # Normalize case (pattern is case-insensitive, but we want consistent case)
+        # Find the original case from our language set
+        detected_lang_lower = detected_lang.lower()
+        for lang in sorted_langs:
+            if lang.lower() == detected_lang_lower:
+                return (True, lang)
+        # Fallback: return matched lang as-is
+        return (True, detected_lang)
+
+    return (False, None)
 
 
 def estimate_token_count(text: str) -> int:
@@ -84,6 +167,8 @@ class TranslationEngine:
         enable_verification: bool = False,
         enable_verification_fix: bool = False,
         output_dir_override: Optional[Path] = None,
+        progress_tracker: Optional["ProgressTracker"] = None,
+        production_ingestor: Optional["ProductionMetricsIngestor"] = None,
         **kwargs,
     ):
         """
@@ -109,6 +194,8 @@ class TranslationEngine:
             enable_verification: Enable post-translation verification (VA-03)
             enable_verification_fix: Enable automatic retry on verification failure (VA-03)
             output_dir_override: Override output directory (takes precedence over site profile)
+            progress_tracker: Optional ProgressTracker for crash recovery (RES-02)
+            production_ingestor: Optional ProductionMetricsIngestor for recording translation runs (BM-06)
             **kwargs: Additional options (for future extensibility)
         """
         self.config = config_service
@@ -116,6 +203,7 @@ class TranslationEngine:
         self.model_loader = model_loader
         self.enable_validation = enable_validation
         self.enable_telemetry = enable_telemetry
+        self.production_ingestor = production_ingestor  # BM-06: Production metrics recording
 
         # CFG-03: Store CLI overrides
         self.validation_mode = validation_mode
@@ -238,6 +326,122 @@ class TranslationEngine:
         self._model_lock = Lock()
         self._file_write_lock = Lock()
 
+        # RES-06: Graceful shutdown coordination
+        self._shutdown_requested = False
+        self._shutdown_lock = Lock()
+        self._current_file: Optional[Path] = None
+        self._shutdown_callbacks: list = []
+
+        # RES-02: Progress tracker for crash recovery
+        self.progress_tracker = progress_tracker
+
+        # BM-08: Retry timing instrumentation (SR-12: bounded to prevent memory leak)
+        self._retry_metrics = {
+            "retry_attempts": deque(maxlen=1000),  # Keep last 1000 retry counts
+            "retry_durations_ms": deque(maxlen=1000),  # Keep last 1000 retry durations
+            "retry_reasons": {},  # Dict mapping reason -> count (naturally bounded)
+        }
+        self._retry_metrics_lock = Lock()
+
+    def register_shutdown_callback(self, callback) -> None:
+        """
+        RES-06: Register callback to be called on shutdown.
+
+        Args:
+            callback: Function to call during shutdown
+        """
+        self._shutdown_callbacks.append(callback)
+
+    def request_shutdown(self) -> None:
+        """
+        RES-06: Request graceful shutdown.
+
+        Called by signal handler. Sets flag and allows current
+        file to complete before shutdown.
+        """
+        with self._shutdown_lock:
+            if self._shutdown_requested:
+                return
+
+            self._shutdown_requested = True
+
+            current = self._current_file
+            if current:
+                logger.info(
+                    f"Shutdown requested. Completing current file: {current}"
+                )
+            else:
+                logger.info("Shutdown requested. Finishing up...")
+
+    def _check_shutdown(self) -> bool:
+        """
+        RES-06: Check if shutdown has been requested.
+
+        Called between file translations to allow clean exit point.
+
+        Returns:
+            True if shutdown requested
+        """
+        return self._shutdown_requested
+
+    def _perform_shutdown(self) -> None:
+        """
+        RES-06: Perform shutdown sequence.
+
+        Steps:
+        1. Save progress tracker state
+        2. Save L3 index
+        3. Call registered shutdown callbacks
+        4. Log shutdown complete
+        """
+        logger.info("Performing graceful shutdown...")
+
+        try:
+            # Save L3 index via TM
+            if self.tm:
+                try:
+                    # Access L3 via the TM hierarchy
+                    l3 = getattr(self.tm, 'l3', None)
+                    if l3 and hasattr(l3, 'save_index'):
+                        logger.info("Saving L3 semantic index...")
+                        l3.save_index()
+                        logger.info("L3 index saved successfully")
+                except Exception as e:
+                    logger.warning(f"L3 index save may be incomplete: {e}")
+
+            # Call shutdown callbacks
+            for callback in self._shutdown_callbacks:
+                try:
+                    callback()
+                except Exception as e:
+                    logger.error(f"Shutdown callback failed: {e}")
+
+            logger.info("Graceful shutdown complete")
+
+        except Exception as e:
+            logger.error(f"Error during shutdown: {e}")
+            raise
+
+    def _get_free_space(self, path: Path) -> int:
+        """
+        RES-09: Get free disk space for path.
+
+        Cross-platform implementation for checking available disk space.
+
+        Args:
+            path: Directory path to check
+
+        Returns:
+            Free space in bytes, or 0 if unable to determine
+        """
+        try:
+            import shutil
+            total, used, free = shutil.disk_usage(path)
+            return free
+        except Exception as e:
+            logger.warning(f"Could not determine free space for {path}: {e}")
+            return 0
+
     def _get_model_id(self, site_profile):
         """
         Get model ID with CLI override support.
@@ -252,6 +456,97 @@ class TranslationEngine:
         if self.model_id_override:
             return self.model_id_override
         return getattr(site_profile, 'default_model', None) or "m2m100_418m"
+
+    def _should_skip_translation(
+        self,
+        source_path: Path,
+        output_path: Path,
+        force_retranslate: bool = False,
+        use_mtime_check: bool = True,
+    ) -> tuple:
+        """
+        RES-05: Determine if translation can be skipped.
+
+        Decision logic:
+        1. If force_retranslate: never skip
+        2. If output doesn't exist: don't skip
+        3. If output exists but is invalid: don't skip
+        4. If output exists and newer than source: skip
+
+        Args:
+            source_path: Path to source file
+            output_path: Path to output file
+            force_retranslate: Force retranslation flag
+            use_mtime_check: Use modification time comparison
+
+        Returns:
+            Tuple of (should_skip: bool, reason: str)
+        """
+        # Never skip if force flag set
+        if force_retranslate:
+            return (False, "force_retranslate enabled")
+
+        # Don't skip if output doesn't exist
+        if not output_path.exists():
+            return (False, "output file does not exist")
+
+        # Check if output is valid (not empty, has minimum content)
+        if not self._is_valid_output(output_path):
+            return (False, "output file invalid or empty")
+
+        # Use mtime comparison
+        if use_mtime_check:
+            try:
+                source_mtime = source_path.stat().st_mtime
+                output_mtime = output_path.stat().st_mtime
+
+                if output_mtime >= source_mtime:
+                    return (True, "output is newer than source")
+                else:
+                    return (False, "source has been modified")
+
+            except OSError as e:
+                logger.warning(f"Failed to check mtime: {e}")
+                return (False, "mtime check failed")
+
+        # Default: don't skip
+        return (False, "default behavior")
+
+    def _is_valid_output(self, output_path: Path) -> bool:
+        """
+        RES-05: Check if output file is valid.
+
+        Criteria:
+        - File exists
+        - File size > 0
+        - File is readable
+        - Has minimum expected content (basic structure)
+
+        Args:
+            output_path: Path to output file
+
+        Returns:
+            True if output appears valid
+        """
+        try:
+            # Check size
+            size = output_path.stat().st_size
+            if size == 0:
+                return False
+
+            # Check readability
+            with open(output_path, 'r', encoding='utf-8') as f:
+                content = f.read(1024)  # Read first 1KB
+
+            # Basic validation: has some content
+            if len(content.strip()) < 10:
+                return False
+
+            return True
+
+        except Exception as e:
+            logger.warning(f"Output validation failed for {output_path}: {e}")
+            return False
 
     def translate_file(
         self,
@@ -289,6 +584,13 @@ class TranslationEngine:
             )
             telemetry_run = telemetry_cm.__enter__()
 
+            # GS-02: Register telemetry context for graceful shutdown
+            try:
+                from ..observability.graceful_shutdown import register_active_context
+                register_active_context(telemetry_run)
+            except ImportError:
+                pass  # Graceful degradation if module not available
+
         result = TranslationResult(
             success=False,
             file_path=file_path,
@@ -303,6 +605,34 @@ class TranslationEngine:
                 return result
 
             source_lang = site_profile.default_source_lang
+
+            # Safety check: prevent translating already-translated files
+            # This prevents creating double-language files like index.es.da.md
+            output_layout = getattr(site_profile, 'output_layout', None)
+            per_language_folders = False
+            if output_layout:
+                per_language_folders = (
+                    getattr(output_layout, 'per_language_folders', False)
+                    if hasattr(output_layout, 'per_language_folders')
+                    else output_layout.get('per_language_folders', False)
+                )
+
+            if not per_language_folders:
+                # For file-based localization, use helper to check if file is already translated
+                is_translated, detected_lang = _is_translated_filename(
+                    file_path.name, target_langs, source_lang
+                )
+
+                if is_translated:
+                    error_msg = (
+                        f"Refusing to translate already-translated file: {file_path.name}\n"
+                        f"File appears to be a {detected_lang} translation. "
+                        f"Only source files (without language codes) should be translated.\n"
+                        f"To fix: Remove language-tagged files from input or use a directory with only source files."
+                    )
+                    logger.error(error_msg)
+                    result.errors.append(error_msg)
+                    return result
 
             # Parse file
             logger.info(f"Parsing {file_path}")
@@ -324,6 +654,12 @@ class TranslationEngine:
                 f"Extracted {len(segments)} segments from {file_path}"
             )
 
+            # Progress tracking: file started with segment count
+            # Multiply by number of target languages since segments_completed is called per language
+            progress = get_progress_tracker()
+            if progress:
+                progress.file_started(str(file_path), segment_count=len(segments) * len(target_langs))
+
             # INT-01: Translate for each target language with retry loop
             # VA-03: Determine if verification should run
             should_validate = validate if validate is not None else self.enable_validation
@@ -332,6 +668,25 @@ class TranslationEngine:
             max_retry_attempts = self.decision_engine.max_retry_attempts if self.decision_engine else 2
 
             for target_lang in target_langs:
+                # RES-05: Check if translation can be skipped
+                output_path = self._get_output_path(file_path, target_lang, site_profile)
+                should_skip, skip_reason = self._should_skip_translation(
+                    source_path=file_path,
+                    output_path=output_path,
+                    force_retranslate=self.force_retranslate or force,
+                    use_mtime_check=True,
+                )
+
+                if should_skip:
+                    logger.debug(
+                        f"Skipping {file_path} -> {target_lang}: {skip_reason}"
+                    )
+                    result.skipped_langs.append(target_lang)
+                    result.skip_reasons[target_lang] = skip_reason
+                    # Count as success since output already exists
+                    result.outputs[target_lang] = output_path
+                    continue
+
                 # Retry loop for this target language
                 retry_count = 0
                 retry_feedback = None
@@ -339,6 +694,9 @@ class TranslationEngine:
                 final_decision = None
                 final_validation_result = None
                 final_verification_result = None
+
+                # BM-08: Track retry timing
+                retry_start_time = time.perf_counter()
 
                 while retry_count <= max_retry_attempts:
                     try:
@@ -401,6 +759,10 @@ class TranslationEngine:
                                 retry_count += 1
                                 retry_feedback = decision_result.retry_feedback
                                 result.stats.validation_retried += 1
+                                # Progress tracking: retry
+                                progress = get_progress_tracker()
+                                if progress:
+                                    progress.add_retry()
                                 logger.info(
                                     f"Retrying translation for {file_path} to {target_lang} "
                                     f"(attempt {retry_count}/{max_retry_attempts}): "
@@ -413,6 +775,13 @@ class TranslationEngine:
                                     "reason": decision_result.decision_reason,
                                     "feedback": retry_feedback,
                                 })
+
+                                # BM-08: Track retry reason
+                                with self._retry_metrics_lock:
+                                    reason_key = "validation_retry"
+                                    self._retry_metrics["retry_reasons"][reason_key] = (
+                                        self._retry_metrics["retry_reasons"].get(reason_key, 0) + 1
+                                    )
 
                                 continue  # Loop again with feedback
 
@@ -484,6 +853,13 @@ class TranslationEngine:
                                         "error_count": verification_result.error_count,
                                     })
 
+                                    # BM-08: Track retry reason
+                                    with self._retry_metrics_lock:
+                                        reason_key = "verification_retry"
+                                        self._retry_metrics["retry_reasons"][reason_key] = (
+                                            self._retry_metrics["retry_reasons"].get(reason_key, 0) + 1
+                                        )
+
                                     continue  # Loop again with feedback
                                 else:
                                     # No fix mode or max retries reached - log but continue
@@ -544,6 +920,21 @@ class TranslationEngine:
                                 )
 
                         logger.info(f"Successfully translated {file_path} to {target_lang} after {retry_count} retries")
+
+                        # BM-06: Record production metrics (if enabled)
+                        if self.production_ingestor and self.production_ingestor.enabled:
+                            try:
+                                self._record_production_metrics(
+                                    file_path=file_path,
+                                    target_lang=target_lang,
+                                    stats=result.stats,
+                                    retry_count=retry_count,
+                                    success=True,
+                                )
+                            except Exception as e:
+                                # Don't let ingestor failures break translation
+                                logger.warning(f"Failed to record production metrics: {e}")
+
                         break  # Success, exit retry loop
 
                     except TranslationRejectedError:
@@ -557,6 +948,14 @@ class TranslationEngine:
                         # Handle retryable errors (from nested logic if needed)
                         retry_count += 1
                         retry_feedback = e.retry_feedback
+
+                        # BM-08: Track retry reason
+                        with self._retry_metrics_lock:
+                            reason_key = "retryable_error"
+                            self._retry_metrics["retry_reasons"][reason_key] = (
+                                self._retry_metrics["retry_reasons"].get(reason_key, 0) + 1
+                            )
+
                         if retry_count > max_retry_attempts:
                             raise TranslationRejectedError(
                                 message=f"Failed after {retry_count} retries",
@@ -576,12 +975,40 @@ class TranslationEngine:
                         )
                         break  # Exit retry loop on unexpected error
 
+                # BM-08: Record retry metrics after retry loop completes
+                retry_duration_ms = (time.perf_counter() - retry_start_time) * 1000
+                with self._retry_metrics_lock:
+                    self._retry_metrics["retry_attempts"].append(retry_count)
+                    self._retry_metrics["retry_durations_ms"].append(retry_duration_ms)
+
+                if retry_count > 0 and retry_duration_ms > 1000:
+                    logger.warning(
+                        f"High retry overhead for {file_path} to {target_lang}: "
+                        f"{retry_count} retries in {retry_duration_ms:.1f}ms"
+                    )
+
             # Mark success if at least one language succeeded
             result.success = len(result.outputs) > 0
+
+            # RES-05: Log skip summary if any languages were skipped
+            if result.skipped_langs:
+                logger.info(
+                    f"Skipped {len(result.skipped_langs)} language(s) for {file_path}: "
+                    f"{', '.join(result.skipped_langs)} (existing outputs)"
+                )
+
+            # Progress tracking: file completed
+            if progress:
+                progress.file_completed(success=result.success)
 
         except Exception as e:
             logger.error(f"Unexpected error translating {file_path}: {e}")
             result.errors.append(f"Unexpected error: {e}")
+            # Progress tracking: record error
+            progress = get_progress_tracker()
+            if progress:
+                progress.record_error("translation_error", str(e), str(file_path))
+                progress.file_completed(success=False)
             # TEL-04: Track error in telemetry
             if telemetry_run:
                 telemetry_run.log_event("error", {"error": str(e)})
@@ -624,6 +1051,13 @@ class TranslationEngine:
                         error_summary=error_summary,
                     )
                     telemetry_cm.__exit__(None, None, None)
+
+                    # GS-02: Unregister telemetry context after normal completion
+                    try:
+                        from ..observability.graceful_shutdown import unregister_active_context
+                        unregister_active_context(telemetry_run)
+                    except ImportError:
+                        pass
                 except Exception as telemetry_error:
                     logger.warning(f"Telemetry tracking failed: {telemetry_error}")
 
@@ -874,17 +1308,33 @@ class TranslationEngine:
                     cached_input_tokens = estimate_token_count(segment.source_text)
                     cached_output_tokens = estimate_token_count(tm_result.translation)
                     stats.tokens_cached += cached_input_tokens + cached_output_tokens
+
+                    # Progress tracking: cache hit
+                    progress = get_progress_tracker()
+                    if progress:
+                        progress.cache_hit(layer=tm_result.source.split("_")[0] if tm_result.source else "l1")
+                        progress.segments_completed(1)
                 else:
                     # Need to translate
                     segments_to_translate.append(segment)
+                    # Progress tracking: cache miss
+                    progress = get_progress_tracker()
+                    if progress:
+                        progress.cache_miss()
 
         else:
             # Force mode: translate everything (T202: federated-splashing-panda)
             logger.info(
                 f"Force retranslate enabled: bypassing cache lookup for {len(segments)} segments "
-                f"({source_lang} → {target_lang})"
+                f"({source_lang} -> {target_lang})"
             )
             segments_to_translate = segments
+
+            # Track cache misses for force mode (cache bypassed = implicit miss)
+            progress = get_progress_tracker()
+            if progress:
+                for _ in segments:
+                    progress.cache_miss()
 
         # Step 2: Translate new segments via model
         if segments_to_translate:
@@ -927,6 +1377,15 @@ class TranslationEngine:
             else:
                 temperature = base_temperature
             try:
+                # Progress tracking: batch started with total calculation
+                progress = get_progress_tracker()
+                batch_start_time = time.time()
+                if progress:
+                    # Calculate and add batch count for this language's translation
+                    batches_for_lang = math.ceil(len(segments_to_translate) / self.batch_size)
+                    progress.add_batches(batches_for_lang)
+                    progress.batch_started(len(segments_to_translate))
+
                 # MSP-02: Translate with multiline structure preservation
                 translated_texts = self._translate_with_multiline_support(
                     backend=backend,
@@ -988,8 +1447,19 @@ class TranslationEngine:
                         # TEL-04: Track TM entry storage
                         stats.tm_entries_stored += 1
 
+                # Progress tracking: batch and segments completed
+                batch_duration = time.time() - batch_start_time
+                if progress:
+                    progress.batch_completed(len(segments_to_translate))
+                    progress.segments_completed(len(segments_to_translate), duration_s=batch_duration)
+                    progress.add_tokens(tokens_in=stats.tokens_input, tokens_out=stats.tokens_output)
+
             except Exception as e:
                 logger.error(f"Model translation failed: {e}")
+                # Progress tracking: record error
+                progress = get_progress_tracker()
+                if progress:
+                    progress.record_error("model_error", str(e))
                 raise RuntimeError(f"Translation failed: {e}")
 
         # Step 3: Reconstruct document (AST-based or legacy)
@@ -1062,7 +1532,12 @@ class TranslationEngine:
         self, content: str, output_path: Path, source_path: Path, stats: TranslationStats
     ) -> None:
         """
-        Write translated content to output file.
+        Write translated content to output file atomically.
+
+        Uses atomic write (temp file + rename) to prevent file corruption
+        on unexpected termination (Ctrl+C, kill, power loss).
+
+        RES-09: Enhanced with comprehensive error detection and recovery.
 
         Args:
             content: Translated markdown content
@@ -1071,17 +1546,63 @@ class TranslationEngine:
             stats: Stats object to update with file operation metrics
 
         Raises:
-            IOError: If file writing fails
+            AtomicWriteError: If atomic write operation fails
+            DiskFullError: If disk is full
+            PermissionError: If permission denied
+            InvalidPathError: If path is invalid
+            ReadOnlyFilesystemError: If filesystem is read-only
         """
-        # Create output directories if needed
-        output_path.parent.mkdir(parents=True, exist_ok=True)
-
         # TEL-04: Track file operation (add vs. update)
         file_existed = output_path.exists()
 
-        # Write translated content
-        with open(output_path, "w", encoding="utf-8") as f:
-            f.write(content)
+        # RES-09: Check available disk space before write
+        content_size = len(content.encode('utf-8'))
+        free_space = self._get_free_space(output_path.parent)
+
+        if free_space > 0 and free_space < content_size * 2:  # 2x for temp file
+            logger.warning(
+                f"Low disk space: {free_space / 1024 / 1024:.1f}MB free, "
+                f"~{content_size * 2 / 1024:.1f}KB needed for {output_path.name}"
+            )
+
+        # RES-03: Atomic write - prevents file corruption on crash
+        # RES-09: Enhanced error handling with specific exception types
+        try:
+            atomic_write(
+                path=output_path,
+                content=content,
+                encoding='utf-8',
+                fsync=True,
+                create_parents=True
+            )
+        except DiskFullError as e:
+            # RES-09: Provide helpful disk full message
+            free_space = self._get_free_space(output_path.parent)
+            logger.error(
+                f"Disk full when writing {output_path}. "
+                f"Free space: {free_space / 1024 / 1024:.1f}MB, "
+                f"needed: ~{content_size / 1024:.1f}KB"
+            )
+            raise
+        except PermissionError as e:
+            # RES-09: Clear permission error message
+            logger.error(
+                f"Permission denied: {output_path}. "
+                f"Check file permissions and ownership."
+            )
+            raise
+        except InvalidPathError as e:
+            # RES-09: Clear invalid path message
+            logger.error(f"Invalid path: {e}")
+            raise
+        except ReadOnlyFilesystemError as e:
+            # RES-09: Clear read-only filesystem message
+            logger.error(f"Read-only filesystem: {output_path}")
+            raise
+        except AtomicWriteError as e:
+            # RES-09: Generic atomic write error
+            logger.error(f"Failed to write output atomically: {e}")
+            raise
 
         # TEL-04: Update file operation stats
         if file_existed:
@@ -1157,7 +1678,7 @@ class TranslationEngine:
                 # Use source file's directory as base (not hardcoded output/)
                 output_path = source_path.parent / output_filename
 
-                logger.info(f"File-based localization: {source_path.name} → {output_filename}")
+                logger.info(f"File-based localization: {source_path.name} -> {output_filename}")
                 return output_path
 
         # Fallback: use output directory from site profile
@@ -1191,6 +1712,48 @@ class TranslationEngine:
 
         Returns:
             DirectoryResult with outcomes for all files
+
+        Raises:
+            LockError: If another translation is already in progress for this site
+        """
+        # RES-08: Create lock to prevent concurrent translations of same site
+        lock_dir = Path(".translation_progress") / "locks"
+        lock_file = lock_dir / f"{site_id}.lock"
+        lock = FileLock(lock_file, timeout=300.0)  # 5 minute timeout
+
+        try:
+            logger.info(f"Acquiring translation lock for site: {site_id}")
+            if not lock.acquire(blocking=True):
+                raise LockError(
+                    f"Another translation is in progress for site '{site_id}'. "
+                    f"Wait for it to complete or remove lock file: {lock_file}"
+                )
+            logger.debug("Lock acquired, starting translation")
+        except LockError:
+            raise
+
+        try:
+            return self._translate_directory_locked(
+                site_id, directory, target_langs, recursive, parallel, max_workers
+            )
+        finally:
+            # RES-08: Always release lock
+            lock.release()
+
+    def _translate_directory_locked(
+        self,
+        site_id: str,
+        directory: Path,
+        target_langs: List[str],
+        recursive: bool = True,
+        parallel: bool = True,
+        max_workers: Optional[int] = None,
+    ) -> DirectoryResult:
+        """
+        Internal implementation of translate_directory (called while holding lock).
+
+        RES-08: This is the actual translation logic, called from translate_directory
+        after the lock has been acquired.
         """
         # TEL-04: Start telemetry tracking for batch operation
         # SR-01: Find representative file for business context extraction
@@ -1219,6 +1782,13 @@ class TranslationEngine:
             )
             telemetry_run = telemetry_cm.__enter__()
 
+            # GS-02: Register telemetry context for graceful shutdown
+            try:
+                from ..observability.graceful_shutdown import register_active_context
+                register_active_context(telemetry_run)
+            except ImportError:
+                pass  # Graceful degradation if module not available
+
         result = DirectoryResult(
             success=False,
             directory=directory,
@@ -1233,6 +1803,15 @@ class TranslationEngine:
             logger.info(
                 f"Found {len(md_files)} markdown files in {directory}"
             )
+
+            # Filter files based on localization strategy to avoid translating already-translated files
+            site_profile = self.config.get_site_profile(site_id)
+            if site_profile:
+                md_files = filter_source_files(md_files, site_profile, target_langs)
+                logger.info(
+                    f"After filtering: {len(md_files)} source files to translate"
+                )
+
             result.total_files = len(md_files)
 
             if not md_files:
@@ -1312,9 +1891,11 @@ class TranslationEngine:
                     # TI-01: Use centralized helper with observability
                     duration_ms, used_fallback = _safe_duration_ms(agg_stats, context="translate_directory")
 
+                    # TI-02: items_discovered already contains total_files for directory jobs
+                    # (calculated via calculate_items_metrics helper). The external telemetry API's
+                    # RunRecord schema does not include a total_files field, so we don't pass it here.
                     telemetry_run.set_metrics(
                         duration_ms=duration_ms,  # API requires integer
-                        total_files=result.total_files,
                         items_discovered=items_metrics["items_discovered"],
                         items_succeeded=items_metrics["items_succeeded"],
                         items_failed=items_metrics["items_failed"],
@@ -1322,6 +1903,13 @@ class TranslationEngine:
                         error_summary=error_summary,
                     )
                     telemetry_cm.__exit__(None, None, None)
+
+                    # GS-02: Unregister telemetry context after normal completion
+                    try:
+                        from ..observability.graceful_shutdown import unregister_active_context
+                        unregister_active_context(telemetry_run)
+                    except ImportError:
+                        pass
                 except Exception as telemetry_error:
                     logger.warning(f"Telemetry tracking failed: {telemetry_error}")
 
@@ -1347,6 +1935,15 @@ class TranslationEngine:
             Updated DirectoryResult
         """
         for md_file in md_files:
+            # RES-06: Check for shutdown before starting new file
+            if self._check_shutdown():
+                logger.info("Shutdown detected, stopping translation")
+                self._perform_shutdown()
+                break
+
+            # RES-06: Track current file for shutdown coordination
+            self._current_file = md_file
+
             try:
                 file_result = self.translate_file(
                     site_id=site_id,
@@ -1357,12 +1954,43 @@ class TranslationEngine:
 
                 if file_result.success:
                     result.successful_files += 1
+
+                    # RES-02: Mark progress for crash recovery
+                    if self.progress_tracker:
+                        try:
+                            for lang in target_langs:
+                                self.progress_tracker.mark_completed(md_file, lang)
+                            logger.debug(f"Progress saved for {md_file.name}")
+                        except Exception as e:
+                            logger.warning(f"Failed to save progress for {md_file}: {e}")
                 else:
                     result.failed_files += 1
+
+                    # RES-02: Mark failed translations
+                    if self.progress_tracker:
+                        try:
+                            for lang in target_langs:
+                                error_msg = '; '.join(file_result.errors[:2]) if file_result.errors else 'Unknown error'
+                                self.progress_tracker.mark_failed(md_file, lang, error_msg)
+                            logger.debug(f"Failure progress saved for {md_file.name}")
+                        except Exception as e:
+                            logger.warning(f"Failed to save failure progress for {md_file}: {e}")
 
             except Exception as e:
                 logger.error(f"Error translating {md_file}: {e}")
                 result.failed_files += 1
+
+                # RES-02: Mark as failed on exception
+                if self.progress_tracker:
+                    try:
+                        for lang in target_langs:
+                            self.progress_tracker.mark_failed(md_file, lang, str(e))
+                    except Exception as mark_error:
+                        logger.warning(f"Failed to save error progress: {mark_error}")
+
+            finally:
+                # RES-06: Clear current file
+                self._current_file = None
 
         return result
 
@@ -1418,6 +2046,15 @@ class TranslationEngine:
 
             # Collect results as they complete
             for future in as_completed(future_to_file):
+                # RES-06: Check for shutdown after each file completes
+                if self._check_shutdown():
+                    logger.info("Shutdown detected, cancelling remaining jobs")
+                    # Cancel pending futures
+                    for f in future_to_file:
+                        f.cancel()
+                    self._perform_shutdown()
+                    break
+
                 md_file = future_to_file[future]
                 try:
                     file_result = future.result()
@@ -1728,6 +2365,65 @@ class TranslationEngine:
 
         return self.verification_agent
 
+    def _record_production_metrics(
+        self,
+        file_path: Path,
+        target_lang: str,
+        stats: TranslationStats,
+        retry_count: int,
+        success: bool,
+    ) -> None:
+        """
+        Record production translation metrics to benchmarking database.
+
+        BM-06: Enables learning from real translation runs.
+
+        Args:
+            file_path: Source file path
+            target_lang: Target language code
+            stats: Translation statistics
+            retry_count: Number of retries performed
+            success: Whether translation succeeded
+        """
+        if not self.production_ingestor or not self.production_ingestor.enabled:
+            return
+
+        try:
+            # Extract metrics from stats
+            segments_translated = stats.segments_translated
+            segments_from_tm = stats.tm_hits
+            translation_model_used = self.model_id_override or "default"
+
+            # Calculate average throughput (if duration available)
+            # Note: TranslationStats might not have total duration,
+            # so we estimate from segments
+            # This is a rough estimate - ideally we'd track duration per file
+            estimated_duration_seconds = max(1.0, segments_translated * 0.1)  # ~0.1s per segment estimate
+
+            # Record via ingestor
+            self.production_ingestor.record_translation_run(
+                file_path=str(file_path),
+                target_lang=target_lang,
+                segments_translated=segments_translated,
+                segments_from_tm=segments_from_tm,
+                segments_translated_new=segments_translated - segments_from_tm,
+                translation_model=translation_model_used,
+                retry_count=retry_count,
+                success=success,
+                # Additional context
+                validation_passed=stats.validation_passed if hasattr(stats, 'validation_passed') else None,
+                validation_errors=stats.validation_errors if hasattr(stats, 'validation_errors') else 0,
+            )
+
+            logger.debug(
+                f"Recorded production metrics: {file_path} -> {target_lang} "
+                f"({segments_translated} segments, {retry_count} retries)"
+            )
+
+        except Exception as e:
+            # Log but don't propagate - production recording is optional
+            logger.warning(f"Failed to record production metrics for {file_path}: {e}")
+
     def set_override_mode(
         self,
         mode: str,
@@ -1765,6 +2461,34 @@ class TranslationEngine:
             Dict with override stats including mode, bypass counts, and filter info
         """
         return self.tm.get_override_stats()
+
+    def get_retry_timing_metrics(self) -> Dict:
+        """
+        Get retry timing metrics for performance monitoring (BM-08).
+
+        Returns:
+            Dictionary with retry statistics including attempt counts, durations, and reasons
+        """
+        with self._retry_metrics_lock:
+            # Calculate statistics
+            def calc_stats(values: List[float]) -> Dict:
+                if not values:
+                    return {"count": 0, "mean": 0.0, "min": 0.0, "max": 0.0, "total": 0.0}
+                return {
+                    "count": len(values),
+                    "mean": sum(values) / len(values),
+                    "min": min(values),
+                    "max": max(values),
+                    "total": sum(values),
+                }
+
+            return {
+                "retry_attempts": calc_stats(self._retry_metrics["retry_attempts"]),
+                "retry_durations_ms": calc_stats(self._retry_metrics["retry_durations_ms"]),
+                "retry_reasons": dict(self._retry_metrics["retry_reasons"]),
+                "total_retries": sum(self._retry_metrics["retry_attempts"]),
+                "files_with_retries": sum(1 for count in self._retry_metrics["retry_attempts"] if count > 0),
+            }
 
     def _restore_placeholders(self, text: str, segment) -> str:
         """

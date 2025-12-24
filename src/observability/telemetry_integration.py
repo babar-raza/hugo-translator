@@ -17,6 +17,141 @@ logger = logging.getLogger(__name__)
 from src.observability.git_context import get_git_context
 
 
+def extract_website(site_id: Optional[str]) -> str:
+    """
+    Extract root domain from site_id for the 'website' telemetry field.
+
+    Args:
+        site_id: Full site identifier (e.g., "products.aspose.com")
+
+    Returns:
+        Root domain (e.g., "aspose.com") or empty string if not extractable.
+
+    Examples:
+        >>> extract_website("products.aspose.com")
+        "aspose.com"
+        >>> extract_website("blog.aspose.net")
+        "aspose.net"
+        >>> extract_website("docs.groupdocs.cloud")
+        "groupdocs.cloud"
+    """
+    if not site_id:
+        return ""
+
+    parts = site_id.split(".")
+    if len(parts) >= 2:
+        # Return last two parts (domain.tld)
+        return ".".join(parts[-2:])
+    return site_id
+
+
+def map_website_section(subdomain: Optional[str]) -> str:
+    """
+    Map subdomain to website_section for telemetry field.
+
+    Args:
+        subdomain: First part of site_id (e.g., "products", "blog", "kb")
+
+    Returns:
+        Normalized section name ("Docs", "Blog", "KB", etc.) or "NA" if unknown.
+
+    Examples:
+        >>> map_website_section("products")
+        "Docs"
+        >>> map_website_section("blog")
+        "Blog"
+        >>> map_website_section("kb")
+        "KB"
+    """
+    if not subdomain:
+        return "NA"
+
+    # Mapping table: subdomain -> section name
+    section_map = {
+        "products": "Docs",
+        "docs": "Docs",
+        "reference": "Reference",
+        "blog": "Blog",
+        "kb": "KB",
+        "forum": "Forum",
+        "purchase": "Purchase",
+        "releases": "Releases",
+        "api": "API",
+    }
+
+    # TFR-01: Handle full site_id (e.g., "blog.aspose.net") by extracting first part
+    subdomain_part = subdomain.split(".")[0] if "." in subdomain else subdomain
+    return section_map.get(subdomain_part.lower(), "NA")
+
+
+# TFR-02: Product family mapping to capitalized Aspose product names
+PRODUCT_FAMILY_MAP = {
+    "slides": "Aspose.Slides",
+    "words": "Aspose.Words",
+    "cells": "Aspose.Cells",
+    "pdf": "Aspose.PDF",
+    "email": "Aspose.Email",
+    "imaging": "Aspose.Imaging",
+    "barcode": "Aspose.BarCode",
+    "diagram": "Aspose.Diagram",
+    "tasks": "Aspose.Tasks",
+    "ocr": "Aspose.OCR",
+    "note": "Aspose.Note",
+    "cad": "Aspose.CAD",
+    "3d": "Aspose.3D",
+    "html": "Aspose.HTML",
+    "gis": "Aspose.GIS",
+    "zip": "Aspose.ZIP",
+    "font": "Aspose.Font",
+    "psd": "Aspose.PSD",
+    "tex": "Aspose.TeX",
+    "page": "Aspose.Page",
+    "drawing": "Aspose.Drawing",
+    "svg": "Aspose.SVG",
+    "finance": "Aspose.Finance",
+    "pub": "Aspose.PUB",
+    "omr": "Aspose.OMR",
+}
+
+
+def get_product_family_name(product_key: Optional[str]) -> Optional[str]:
+    """
+    Map product key to capitalized product family name (TFR-02).
+
+    Args:
+        product_key: Lowercase product key (e.g., "slides", "words")
+
+    Returns:
+        Capitalized product name (e.g., "Aspose.Slides") or fallback format.
+    """
+    if not product_key:
+        return None
+    return PRODUCT_FAMILY_MAP.get(product_key.lower(), f"Aspose.{product_key.title()}")
+
+
+def get_item_name(job_type: str) -> str:
+    """
+    Get item_name based on job_type for telemetry field.
+
+    Args:
+        job_type: Type of translation job
+
+    Returns:
+        "Segments" for file translation, "Files" for directory translation.
+
+    Examples:
+        >>> get_item_name("translate_file")
+        "Segments"
+        >>> get_item_name("translate_directory")
+        "Files"
+    """
+    if job_type == "translate_file":
+        return "Segments"
+    elif job_type == "translate_directory":
+        return "Files"
+    return "Items"
+
+
 def build_output_summary(
     job_type: str,
     outputs: Optional[Dict] = None,
@@ -185,11 +320,10 @@ def extract_business_context(
         "product": None,
     }
 
-    # Extract subdomain from site_id (first part before first dot)
+    # TFR-01: Use full site_id as subdomain (not just first part)
+    # This allows proper identification like "blog.aspose.net" vs just "blog"
     if site_id:
-        parts = site_id.split(".")
-        if parts:
-            result["subdomain"] = parts[0]
+        result["subdomain"] = site_id
 
     # Extract product_family and platform from file path
     if file_path:
@@ -207,8 +341,9 @@ def extract_business_context(
         for pf in product_families:
             # Match /slides/, /words/, etc. in path
             if f"/{pf}/" in path_str or path_str.startswith(f"{pf}/"):
-                result["product_family"] = pf
-                result["product"] = pf  # product = product_family for now
+                result["product"] = pf  # Keep lowercase for product field
+                # TFR-02: Use capitalized product family name
+                result["product_family"] = get_product_family_name(pf)
                 break
 
         # Platform detection patterns
@@ -381,6 +516,7 @@ class TranslationTelemetry:
         trigger_type: str = "cli",
         file_path: Optional[Path] = None,
         target_langs: Optional[list] = None,
+        errors: Optional[List[str]] = None,
         **additional_context
     ):
         """
@@ -400,12 +536,13 @@ class TranslationTelemetry:
             trigger_type: How translation was triggered ("cli", "web", "scheduled")
             file_path: Source file being translated
             target_langs: List of target languages
+            errors: Optional list of error messages for error_summary
             **additional_context: Additional context to track (including site_id)
 
         Returns:
             Context manager for the translation run
 
-        Telemetry Fields (TEL-07-C):
+        Telemetry Fields (TEL-07-C, TSC-01, TSC-03):
             This method populates the following telemetry fields with intentional semantics:
             - agent_name: Always "hugo-translator" (identifies the tool)
             - agent_owner: From AGENT_OWNER env var or default "Babar Raza"
@@ -414,6 +551,14 @@ class TranslationTelemetry:
             - product_family: Same as product (Aspose product family)
             - subdomain: Site subdomain from site_id (e.g., "products", "docs")
             - git_repo, git_branch, host: Captured from git/environment context
+            - website: Root domain extracted from site_id (e.g., "aspose.com")
+            - website_section: Section name from subdomain (e.g., "Docs", "Blog")
+            - item_name: What is being counted ("Segments" or "Files")
+            - error_summary: Truncated error messages if any
+
+            NOTE: Fields step_name, source_ref, target_ref, environment are documented
+            in agentic-metrics-logging-integration-guide but NOT supported by
+            local-telemetry RunRecord schema. Use metrics_json for custom fields.
         """
         if not self.enabled or not self.client:
             # Return dummy context manager if telemetry is disabled
@@ -430,8 +575,9 @@ class TranslationTelemetry:
 
         input_summary = "; ".join(summary_parts) if summary_parts else None
 
-        # Capture git/environment context (TEL-05-C)
-        git_ctx = get_git_context()
+        # Capture git/environment context (TEL-05-C, TFR-03)
+        # TFR-03: Pass input file path to get git context from input repo
+        git_ctx = get_git_context(input_path=file_path)
 
         # Extract business context (TEL-05-A)
         site_id = additional_context.get("site_id")
@@ -440,7 +586,21 @@ class TranslationTelemetry:
         # Get agent_owner from env var or use default (TEL-06-B)
         agent_owner = os.getenv("AGENT_OWNER", "Babar Raza")
 
+        # TSC-01: Extract website and website_section
+        website = extract_website(site_id)
+        website_section = map_website_section(biz_ctx.get("subdomain"))
+
+        # TSC-02: Get item_name based on job_type
+        item_name = get_item_name(job_type)
+
+        # TSC-03: Build error_summary if errors provided
+        error_summary = build_error_summary(errors or [])
+
         # Create run context using TEL-03 API with git + business context
+        # NOTE: Fields like step_name, source_ref, target_ref, environment are NOT
+        # supported by local-telemetry RunRecord schema. They're documented in the
+        # agentic-metrics-logging-integration-guide for Google Sheets API only.
+        # Custom fields should go in metrics_json via set_metrics().
         return self.client.track_run(
             agent_name=self.agent_name,
             job_type=job_type,
@@ -457,15 +617,23 @@ class TranslationTelemetry:
             product_family=biz_ctx.get("product_family"),
             subdomain=biz_ctx.get("subdomain"),
             platform=biz_ctx.get("platform"),
+            # TSC-01: Website fields (Agentic Metrics schema compliance)
+            website=website,
+            website_section=website_section,
+            # TSC-02: Item tracking field
+            item_name=item_name,
+            # TSC-03: Error summary (step_name not in RunRecord schema)
+            error_summary=error_summary,
         )
 
-    def track_translation_stats(self, run_context, stats):
+    def track_translation_stats(self, run_context, stats, job_type: str = "translate_file"):
         """
         Set translation statistics as metrics on a run context.
 
         Args:
             run_context: Active run context from track_translation_session()
             stats: TranslationStats object with metrics to track
+            job_type: Type of job for calculating items_* fields
         """
         if not self.enabled or not run_context:
             return
@@ -479,7 +647,19 @@ class TranslationTelemetry:
             from src.translation_engine.models import TranslationStats
             stats = TranslationStats()
 
+        # TSC-02: Calculate items_* using existing helper
+        items_metrics = calculate_items_metrics(
+            job_type=job_type,
+            stats=stats,
+            total_files=getattr(stats, 'files_translated', 0) + getattr(stats, 'skipped_segments', 0),
+            successful_files=getattr(stats, 'files_translated', 0),
+            failed_files=0,  # Derive from errors if available
+        )
+
         # Build custom metrics dict from stats
+        # NOTE: items_skipped is NOT in RunRecord schema, so we include it in metrics_json
+        items_skipped = stats.skipped_segments if job_type == "translate_file" else 0
+
         custom_metrics = {
             # Token metrics
             "tokens_input": stats.tokens_input,
@@ -494,6 +674,7 @@ class TranslationTelemetry:
             "l3_hits": stats.l3_hits,
             "translated_segments": stats.translated_segments,
             "skipped_segments": stats.skipped_segments,  # TEL-05-A: additional stat
+            "items_skipped": items_skipped,  # Include here since not in RunRecord
             # File operation metrics
             "md_files_added": stats.md_files_added,
             "md_files_updated": stats.md_files_updated,
@@ -510,9 +691,14 @@ class TranslationTelemetry:
         # Set metrics using TEL-03 API
         # IMPORTANT: Send metrics_json as dict (not JSON string) to match API schema
         # API expects: {"type": "object"}, not string
+        # TSC-02: Include items_* fields for schema compliance
+        # NOTE: items_skipped is NOT in RunRecord schema, so it's in metrics_json
         run_context.set_metrics(
             duration_ms=duration_ms,
-            metrics_json=custom_metrics  # Send as dict, not json.dumps(custom_metrics)
+            items_discovered=items_metrics["items_discovered"],
+            items_succeeded=items_metrics["items_succeeded"],
+            items_failed=items_metrics["items_failed"],
+            metrics_json=custom_metrics  # Contains items_skipped and other custom metrics
         )
 
     def is_available(self) -> bool:

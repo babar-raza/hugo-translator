@@ -187,6 +187,13 @@ schema:
       required: false
       description: "Translation memory preferences"
 
+    default_model:
+      type: string
+      required: false
+      default: null
+      description: "Default translation model. Falls back to m2m100_418m if not set."
+      examples: ["m2m100_418m", "m2m100_1.2b", "nllb_200_600m"]
+
     validation:
       type: object
       required: false

@@ -2,17 +2,29 @@
 L3 Semantic Translation Memory using Vector Similarity Search.
 
 Fuzzy/semantic matching using embeddings for high TM hit rates.
+
+Enhanced with:
+- Periodic saves every N additions (RES-04)
+- Background save thread (optional)
+- Save timeout protection
+- Error handling and logging
 """
 import json
+import logging
 import pickle
 import threading
+import time
+from collections import deque
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any, Dict, List, Optional
+from concurrent.futures import ThreadPoolExecutor, TimeoutError as FutureTimeoutError
 
 import faiss
 import numpy as np
 from sentence_transformers import SentenceTransformer
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -48,15 +60,21 @@ class L3SemanticTM:
         embedding_model: str = "all-MiniLM-L6-v2",
         use_gpu: bool = False,
         use_faiss_gpu: bool = False,
+        save_interval: int = 100,
+        save_timeout: float = 5.0,
+        async_save: bool = False,
     ):
         """
-        Initialize L3 semantic TM.
+        Initialize L3 semantic TM with periodic saves.
 
         Args:
             index_path: Directory to store index and metadata
             embedding_model: Sentence transformer model name
             use_gpu: Whether to use GPU for embeddings (if available)
             use_faiss_gpu: Whether to use FAISS GPU index (requires faiss-gpu)
+            save_interval: Save every N additions (0 = disabled)
+            save_timeout: Max seconds for save operation
+            async_save: Use background thread for saves
         """
         self.index_path = Path(index_path)
         self.index_path.mkdir(parents=True, exist_ok=True)
@@ -64,13 +82,36 @@ class L3SemanticTM:
         # Store model name for config
         self.embedding_model_name = embedding_model
 
+        # RES-04: Periodic save configuration
+        self.save_interval = save_interval
+        self.save_timeout = save_timeout
+        self.async_save = async_save
+
+        # RES-04: Counters for periodic saves
+        self._additions_since_save = 0
+        self._total_additions = 0
+        self._save_failures = 0
+        self._last_save_time: Optional[float] = None
+
+        # BM-08: Timing instrumentation (TM-07: bounded to prevent memory leak)
+        self._metrics = {
+            "semantic_search_ms": deque(maxlen=10000),  # Keep last 10000 search timings
+            "add_entry_ms": deque(maxlen=10000),  # Keep last 10000 add timings
+            "batch_add_ms": deque(maxlen=10000),  # Keep last 10000 batch add timings
+            "cache_hits": 0,  # Integer counter (naturally bounded)
+            "cache_misses": 0,  # Integer counter (naturally bounded)
+        }
+
+        # RES-04: Thread pool for async saves
+        self._executor: Optional[ThreadPoolExecutor] = None
+        if async_save:
+            self._executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="l3_save")
+
         # Determine device for embeddings
         if use_gpu:
             import torch
             device = "cuda" if torch.cuda.is_available() else "cpu"
             if device == "cpu":
-                import logging
-                logger = logging.getLogger(__name__)
                 logger.warning("GPU requested but not available, falling back to CPU")
         else:
             device = "cpu"
@@ -91,12 +132,19 @@ class L3SemanticTM:
 
         # Lock for thread safety
         self._lock = threading.RLock()
+        self._save_lock = threading.Lock()
 
         # Try to load existing index
         if (self.index_path / "index.faiss").exists():
             self.load_index()
+            self._total_additions = len(self.metadata)
         else:
             self._create_index()
+
+        logger.info(
+            f"L3 index initialized: {self._total_additions} entries, "
+            f"save_interval={save_interval}, async_save={async_save}"
+        )
 
     def _create_index(self) -> None:
         """Create new FAISS index."""
@@ -133,7 +181,7 @@ class L3SemanticTM:
         metadata: Optional[Dict[str, Any]] = None,
     ) -> None:
         """
-        Embed source text and add to index.
+        Embed source text and add to index with periodic save.
 
         Args:
             entry_id: Unique identifier for this entry
@@ -145,6 +193,9 @@ class L3SemanticTM:
             context: Optional context information
             metadata: Optional additional metadata
         """
+        # BM-08: Timing instrumentation
+        start_time = time.perf_counter()
+
         # Generate embedding
         embedding = self.encoder.encode(
             source_text, convert_to_numpy=True, show_progress_bar=False
@@ -166,6 +217,127 @@ class L3SemanticTM:
                 "metadata": metadata or {},
             }
             self.metadata.append(entry_metadata)
+
+            # RES-04: Update counters and check for periodic save
+            self._additions_since_save += 1
+            self._total_additions += 1
+
+        # BM-08: Record timing
+        duration_ms = (time.perf_counter() - start_time) * 1000
+        with self._lock:
+            self._metrics["add_entry_ms"].append(duration_ms)
+
+        if duration_ms > 100:
+            logger.warning(f"Slow L3 add_entry: {duration_ms:.1f}ms")
+
+        # RES-04: Check if periodic save needed (outside lock to avoid blocking)
+        if self.save_interval > 0 and self._additions_since_save >= self.save_interval:
+            self._trigger_save()
+
+    def _trigger_save(self) -> bool:
+        """
+        Trigger periodic save (sync or async based on configuration).
+
+        Returns:
+            True if save was triggered, False if skipped (already in progress)
+        """
+        # Avoid multiple concurrent saves
+        if not self._save_lock.acquire(blocking=False):
+            logger.debug("Periodic save skipped - already in progress")
+            return False
+
+        try:
+            if self.async_save and self._executor:
+                # Submit save to background thread
+                future = self._executor.submit(self._do_save)
+                logger.debug(f"Periodic save submitted to background thread")
+                # Don't wait - let it run in background
+                return True
+            else:
+                # Synchronous save with timeout
+                return self._do_save()
+        finally:
+            self._save_lock.release()
+
+    def _do_save(self) -> bool:
+        """
+        Perform the actual save operation with timeout protection.
+
+        Returns:
+            True if save succeeded, False otherwise
+        """
+        start_time = time.time()
+        try:
+            logger.debug(f"Starting periodic save ({self._additions_since_save} additions)")
+            self.save_index()
+
+            # Reset counter on success
+            with self._lock:
+                self._additions_since_save = 0
+                self._last_save_time = time.time()
+
+            duration = time.time() - start_time
+            logger.info(
+                f"Periodic L3 save complete: {self._total_additions} entries in {duration:.2f}s"
+            )
+            return True
+
+        except Exception as e:
+            self._save_failures += 1
+            duration = time.time() - start_time
+            logger.error(
+                f"Periodic L3 save failed ({duration:.2f}s): {e}. "
+                f"Total failures: {self._save_failures}"
+            )
+            return False
+
+    def get_save_stats(self) -> Dict[str, Any]:
+        """
+        Get statistics about periodic saves.
+
+        Returns:
+            Dictionary with save statistics
+        """
+        return {
+            "total_additions": self._total_additions,
+            "additions_since_save": self._additions_since_save,
+            "save_failures": self._save_failures,
+            "last_save_time": self._last_save_time,
+            "save_interval": self.save_interval,
+            "async_save": self.async_save,
+        }
+
+    def get_timing_metrics(self) -> Dict[str, Any]:
+        """
+        Get timing metrics for performance monitoring (BM-08).
+
+        Returns:
+            Dictionary with timing statistics and cache metrics
+        """
+        with self._lock:
+            # Calculate statistics for timing lists
+            def calc_stats(values: List[float]) -> Dict[str, float]:
+                if not values:
+                    return {"count": 0, "mean": 0.0, "min": 0.0, "max": 0.0}
+                return {
+                    "count": len(values),
+                    "mean": sum(values) / len(values),
+                    "min": min(values),
+                    "max": max(values),
+                }
+
+            return {
+                "semantic_search": calc_stats(self._metrics["semantic_search_ms"]),
+                "add_entry": calc_stats(self._metrics["add_entry_ms"]),
+                "batch_add": calc_stats(self._metrics["batch_add_ms"]),
+                "cache_hits": self._metrics["cache_hits"],
+                "cache_misses": self._metrics["cache_misses"],
+                "cache_hit_rate": (
+                    self._metrics["cache_hits"] / (self._metrics["cache_hits"] + self._metrics["cache_misses"])
+                    if (self._metrics["cache_hits"] + self._metrics["cache_misses"]) > 0
+                    else 0.0
+                ),
+            }
 
     def semantic_search(
         self,
@@ -190,7 +362,13 @@ class L3SemanticTM:
         Returns:
             List of SemanticMatch objects, sorted by similarity
         """
+        # BM-08: Timing instrumentation
+        start_time = time.perf_counter()
+
         if self.index is None or self.index.ntotal == 0:
+            # BM-08: Record cache miss
+            with self._lock:
+                self._metrics["cache_misses"] += 1
             return []
 
         # Generate query embedding
@@ -242,7 +420,21 @@ class L3SemanticTM:
                     if len(matches) >= k:
                         break
 
-            return matches
+            # BM-08: Record cache hit/miss
+            if matches:
+                self._metrics["cache_hits"] += 1
+            else:
+                self._metrics["cache_misses"] += 1
+
+        # BM-08: Record timing
+        duration_ms = (time.perf_counter() - start_time) * 1000
+        with self._lock:
+            self._metrics["semantic_search_ms"].append(duration_ms)
+
+        if duration_ms > 100:
+            logger.warning(f"Slow L3 semantic_search: {duration_ms:.1f}ms")
+
+        return matches
 
     def batch_add(self, entries: List[Dict[str, Any]]) -> int:
         """
@@ -256,6 +448,9 @@ class L3SemanticTM:
         Returns:
             Number of entries added
         """
+        # BM-08: Timing instrumentation
+        start_time = time.perf_counter()
+
         if not entries:
             return 0
 
@@ -290,6 +485,22 @@ class L3SemanticTM:
                     "metadata": entry.get("metadata", {}),
                 }
                 self.metadata.append(entry_metadata)
+
+            # RES-04: Update counters for periodic saves
+            self._additions_since_save += len(entries)
+            self._total_additions += len(entries)
+
+        # BM-08: Record timing
+        duration_ms = (time.perf_counter() - start_time) * 1000
+        with self._lock:
+            self._metrics["batch_add_ms"].append(duration_ms)
+
+        if duration_ms > 100:
+            logger.warning(f"Slow L3 batch_add ({len(entries)} entries): {duration_ms:.1f}ms")
+
+        # RES-04: Check if periodic save needed (outside lock)
+        if self.save_interval > 0 and self._additions_since_save >= self.save_interval:
+            self._trigger_save()
 
         return len(entries)
 
@@ -401,5 +612,11 @@ class L3SemanticTM:
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
-        """Context manager exit - save index."""
+        """Context manager exit - save index and cleanup resources."""
+        # RES-04: Final save to capture any pending additions
         self.save_index()
+
+        # RES-04: Shutdown executor if using async saves
+        if self._executor:
+            self._executor.shutdown(wait=True)
+            self._executor = None

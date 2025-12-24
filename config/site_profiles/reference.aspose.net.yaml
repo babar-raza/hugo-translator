@@ -28,7 +28,6 @@ target_langs:
 - nl
 - pl
 - pt
-- pt-BR
 - ro
 - ru
 - sk
@@ -40,7 +39,6 @@ target_langs:
 - uk
 - vi
 - zh
-- zh-TW
 frontmatter:
   description:
     mode: translate

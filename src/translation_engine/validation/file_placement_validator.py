@@ -5,12 +5,17 @@ Validates that translated files are placed in the correct directory structure
 according to subdomain-specific rules and language folder conventions.
 """
 
+import re
 from pathlib import Path
 from typing import Any, Dict, List, Optional
+
+import structlog
 
 from src.utils.config_loader import ConfigService
 from src.utils.models import SiteProfile
 from .base import Validator, ValidationResult, ValidationSeverity
+
+logger = structlog.get_logger(__name__)
 
 
 class FilePlacementValidator(Validator):
@@ -96,9 +101,9 @@ class FilePlacementValidator(Validator):
                     )
                 )
 
-        # Validate language substitution
+        # Validate language substitution based on localization strategy
         self._validate_language_substitution(
-            source_path, translation_path, source_lang, target_lang, result
+            source_path, translation_path, source_lang, target_lang, result, site_profile
         )
 
         # Validate content root alignment if site profile available
@@ -122,12 +127,17 @@ class FilePlacementValidator(Validator):
         source_lang: str,
         target_lang: str,
         result: ValidationResult,
+        site_profile: Optional[SiteProfile] = None,
     ) -> None:
         """
-        Validate that language folder substitution is correct.
+        Validate that language substitution is correct based on localization strategy.
 
-        Checks that the translation path has the source language folder
-        replaced with the target language folder.
+        For folder-based localization (per_language_folders=True):
+            Checks that /en/ folder is replaced with /de/, /fr/, etc.
+
+        For file-based localization (per_language_folders=False):
+            Checks that index.md becomes index.de.md, index.fr.md, etc.
+            Source files won't have language in path - this is expected.
 
         Args:
             source_path: Source file path
@@ -135,7 +145,60 @@ class FilePlacementValidator(Validator):
             source_lang: Source language code
             target_lang: Target language code
             result: ValidationResult to add issues to
+            site_profile: Optional site profile for localization settings
+
+        Examples:
+            Folder-based (products.aspose.net, per_language_folders=True):
+                Source: /content/en/products/cells.md
+                Target: /content/de/products/cells.md
+                Validates: /en/ → /de/ substitution in path
+
+            File-based (blog.aspose.net, per_language_folders=False):
+                Source: /content/blog/post/index.md
+                Target: /content/blog/post/index.es.md
+                Validates: filename pattern (*.{lang}.md), NOT folder structure
         """
+        # Determine localization strategy
+        per_language_folders = True  # Default to folder-based for sites without explicit config (safer/stricter)
+
+        if site_profile and site_profile.output_layout:
+            # output_layout is a Pydantic OutputLayout model (defined in utils/models.py:97-108)
+            # The per_language_folders field is a required bool, so it's always True or False (never None)
+            per_language_folders = site_profile.output_layout.per_language_folders
+            # Note: If output_layout is None, we keep the safe default (folder-based validation)
+
+        # Log validation routing decision for observability
+        logger.debug(
+            "file_placement_validation_routing",
+            strategy="file-based" if not per_language_folders else "folder-based",
+            per_language_folders=per_language_folders,
+            site_id=getattr(site_profile, 'site_id', 'unknown'),
+            source_file=source_path.name
+        )
+
+        if per_language_folders:
+            # Folder-based localization: /content/en/post.md → /content/es/post.md
+            # Validates that /en/ folder is replaced with target language folder (/es/, /de/, etc.)
+            self._validate_folder_based_substitution(
+                source_path, translation_path, source_lang, target_lang, result
+            )
+        else:
+            # File-based localization: /content/post/index.md → /content/post/index.es.md
+            # Validates that filename includes target language code (index.es.md, index.de.md, etc.)
+            # Source files have NO language in path or filename (index.md, _index.md)
+            self._validate_file_based_substitution(
+                source_path, translation_path, source_lang, target_lang, result
+            )
+
+    def _validate_folder_based_substitution(
+        self,
+        source_path: Path,
+        translation_path: Path,
+        source_lang: str,
+        target_lang: str,
+        result: ValidationResult,
+    ) -> None:
+        """Validate folder-based localization (/en/ → /de/)."""
         source_parts = source_path.parts
         translation_parts = translation_path.parts
 
@@ -198,11 +261,9 @@ class FilePlacementValidator(Validator):
             result.success = False
 
         # Verify that the paths match except for language folders
-        # Build expected translation path by replacing language folders
         for source_idx in source_lang_indices:
             if source_idx < len(translation_parts):
                 if translation_parts[source_idx] != target_lang:
-                    # The corresponding position should have target language
                     result.issues.append(
                         self.create_issue(
                             ValidationSeverity.WARNING,
@@ -215,6 +276,57 @@ class FilePlacementValidator(Validator):
                             },
                         )
                     )
+
+    def _validate_file_based_substitution(
+        self,
+        source_path: Path,
+        translation_path: Path,
+        source_lang: str,
+        target_lang: str,
+        result: ValidationResult,
+    ) -> None:
+        """
+        Validate file-based localization (index.md → index.de.md).
+
+        For file-based sites:
+        - Source files are named: index.md, _index.md, post.md (no language code)
+        - Translation files are named: index.de.md, _index.fr.md, post.es.md
+        """
+        translation_name = translation_path.name
+
+        # Check if target language is in the filename
+        # Expected pattern: {name}.{lang}.md
+        pattern = rf'\.{re.escape(target_lang)}\.md$'
+        if not re.search(pattern, translation_name, re.IGNORECASE):
+            result.issues.append(
+                self.create_issue(
+                    ValidationSeverity.ERROR,
+                    f"Target language '{target_lang}' not found in translation filename",
+                    location="translation_path",
+                    details={
+                        "translation_path": str(translation_path),
+                        "translation_name": translation_name,
+                        "target_lang": target_lang,
+                        "expected_pattern": f"*.{target_lang}.md",
+                    },
+                )
+            )
+            result.success = False
+            return
+
+        # Verify source and translation are in same directory (file-based keeps same folder)
+        if source_path.parent != translation_path.parent:
+            result.issues.append(
+                self.create_issue(
+                    ValidationSeverity.WARNING,
+                    "Source and translation files are in different directories",
+                    location="translation_path",
+                    details={
+                        "source_dir": str(source_path.parent),
+                        "translation_dir": str(translation_path.parent),
+                    },
+                )
+            )
 
     def _validate_content_root(
         self,
@@ -440,20 +552,31 @@ class FilePlacementValidator(Validator):
             )
             result.merge(placement_result)
         else:
-            # At minimum, verify target language folder is in path
+            # At minimum, verify target language is present
+            # For folder-based sites: check if target_lang folder is in path
+            # For file-based sites: language is in filename, not path (skip check)
             if target_lang:
-                file_parts = file_path.parts
-                if target_lang not in file_parts:
-                    result.issues.append(
-                        self.create_issue(
-                            ValidationSeverity.WARNING,
-                            f"Target language '{target_lang}' not found in file path",
-                            location="file_path",
-                            details={
-                                "file_path": str(file_path),
-                                "target_lang": target_lang,
-                            },
+                # Determine localization strategy (same logic as _validate_language_substitution)
+                per_language_folders = True  # Default to folder-based
+                site_profile = context.get("site_profile")
+                if site_profile and site_profile.output_layout:
+                    per_language_folders = site_profile.output_layout.per_language_folders
+
+                # Only check for language folder if using folder-based localization
+                if per_language_folders:
+                    file_parts = file_path.parts
+                    if target_lang not in file_parts:
+                        result.issues.append(
+                            self.create_issue(
+                                ValidationSeverity.WARNING,
+                                f"Target language '{target_lang}' not found in file path",
+                                location="file_path",
+                                details={
+                                    "file_path": str(file_path),
+                                    "target_lang": target_lang,
+                                },
+                            )
                         )
-                    )
+                # For file-based localization, language is in filename (index.es.md), not folder path
 
         return result

@@ -1,5 +1,9 @@
 # TM Override Modes Guide
 
+**Version:** 2.0
+**Last Updated:** 2025-12-24
+**Related Guides:** [TM Architecture](../architecture/translation-memory.md) | [TM Maintenance](../operations/tm-maintenance.md) | [TM Getting Started](tm-getting-started.md)
+
 ## Overview
 
 Translation Memory (TM) Override Modes provide fine-grained control over how the Hugo Translation System interacts with its multi-layer translation cache. These modes allow operators to selectively bypass, refresh, or validate cached translations based on specific requirements.

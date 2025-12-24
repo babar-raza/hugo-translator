@@ -1,8 +1,12 @@
 # TM Statistics Monitoring Guide
 
+**Version:** 2.0
+**Last Updated:** 2025-12-24
+**Related Guides:** [TM Architecture](../architecture/translation-memory.md) | [TM Maintenance](../operations/tm-maintenance.md) | [TM Performance Tuning](../operations/tm-performance-tuning.md)
+
 ## Overview
 
-Translation Memory (TM) statistics monitoring provides critical operational visibility into the performance and health of the Hugo Translation System's multi-layer caching architecture. This guide explains how to monitor TM hit rates, cache performance, and layer utilization to ensure optimal translation efficiency and system reliability.
+Translation Memory (TM) statistics monitoring provides critical operational visibility into the performance and health of the Hugo Translation System's multi-layer caching architecture. This guide explains how to monitor TM hit rates, cache performance, layer utilization, and integrity metrics to ensure optimal translation efficiency and system reliability.
 
 ## TM Architecture Overview
 
@@ -55,6 +59,39 @@ python scripts/generate_metrics_report.py --since 1h --format json | jq '.tm'
 
 **L3 Index Size**: Number of semantic vectors indexed
 - **Correlation**: Should grow with L2 database size
+
+### Integrity & Health Metrics
+
+**Cache Health Percentage**: Percentage of valid entries in L2 cache
+- **Healthy**: 100% (no corruption)
+- **Warning**: 95-99.9% (minor corruption, run repair)
+- **Critical**: <95% (significant corruption, restore from backup)
+
+**Corrupted Entries**: Number of invalid entries detected
+- **Expected**: 0 entries
+- **Action Threshold**: >10 entries (investigate)
+
+**Last Integrity Check**: Timestamp of most recent health scan
+- **Recommended**: Weekly automated checks
+- **Alert**: No check in >30 days
+
+**Monitoring Commands**:
+```bash
+# Quick health check
+venv/Scripts/python.exe -c "
+from src.tm.integrity import check_cache_integrity
+from pathlib import Path
+report = check_cache_integrity(Path('data/tm/l2_lmdb'))
+print(f'Health: {report.health_percentage:.1f}%')
+print(f'Status: {\"HEALTHY\" if report.is_healthy else \"CORRUPTED\"}')"
+
+# Detailed integrity report
+python scripts/check_tm_integrity.py --output integrity_report.json
+```
+
+**See also:** [TM Maintenance - Integrity Checks](../operations/tm-maintenance.md#integrity-checks)
+
+---
 
 ## Accessing TM Statistics
 

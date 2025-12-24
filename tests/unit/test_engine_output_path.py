@@ -357,7 +357,7 @@ class TestEngineOutputPath:
             output_dir_override=Path("/tmp/output")
         )
 
-        langs = ["de", "fr", "es", "ja", "zh", "ar", "pt-BR", "en-US"]
+        langs = ["de", "fr", "es", "ja", "zh", "ar", "pt", "ru"]
 
         for lang in langs:
             result = engine._get_output_path(

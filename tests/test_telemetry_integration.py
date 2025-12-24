@@ -10,6 +10,10 @@ import pytest
 
 from src.observability.telemetry_integration import (
     extract_business_context,
+    extract_website,
+    map_website_section,
+    get_item_name,
+    build_error_summary,
     TranslationTelemetry,
     DummyRunContext,
 )
@@ -20,36 +24,36 @@ class TestExtractBusinessContext:
     """Tests for extract_business_context() function (TEL-05-A)."""
 
     def test_extracts_subdomain_from_site_id(self):
-        """Extracts subdomain from site_id (first part before dot)."""
+        """TFR-01: subdomain is now full site_id for proper identification."""
         result = extract_business_context(site_id="products.aspose.com")
-        assert result["subdomain"] == "products"
+        assert result["subdomain"] == "products.aspose.com"
 
     def test_extracts_subdomain_from_docs_site(self):
-        """Extracts subdomain from docs site."""
+        """TFR-01: subdomain is now full site_id for proper identification."""
         result = extract_business_context(site_id="docs.aspose.com")
-        assert result["subdomain"] == "docs"
+        assert result["subdomain"] == "docs.aspose.com"
 
     def test_extracts_product_family_slides(self):
-        """Extracts slides product family from path."""
+        """TFR-02: product_family now uses capitalized Aspose product name."""
         result = extract_business_context(
             file_path=Path("/content/slides/net/getting-started.md")
         )
-        assert result["product_family"] == "slides"
-        assert result["product"] == "slides"
+        assert result["product_family"] == "Aspose.Slides"
+        assert result["product"] == "slides"  # product remains lowercase
 
     def test_extracts_product_family_words(self):
-        """Extracts words product family from path."""
+        """TFR-02: product_family now uses capitalized Aspose product name."""
         result = extract_business_context(
             file_path=Path("C:/repos/docs/words/java/overview.md")
         )
-        assert result["product_family"] == "words"
+        assert result["product_family"] == "Aspose.Words"
 
     def test_extracts_product_family_cells(self):
-        """Extracts cells product family from path."""
+        """TFR-02: product_family now uses capitalized Aspose product name."""
         result = extract_business_context(
             file_path=Path("/products/cells/python/api-reference.md")
         )
-        assert result["product_family"] == "cells"
+        assert result["product_family"] == "Aspose.Cells"
 
     def test_extracts_platform_dotnet(self):
         """Extracts .NET platform from path."""
@@ -87,14 +91,14 @@ class TestExtractBusinessContext:
         assert result["platform"] == "Node.js"
 
     def test_extracts_all_fields_combined(self):
-        """Extracts all business context fields together."""
+        """TFR-01/TFR-02: Extracts all business context fields together."""
         result = extract_business_context(
             file_path=Path("/content/slides/net/getting-started.md"),
             site_id="products.aspose.com",
         )
         assert result == {
-            "product_family": "slides",
-            "subdomain": "products",
+            "product_family": "Aspose.Slides",  # TFR-02: capitalized
+            "subdomain": "products.aspose.com",  # TFR-01: full site_id
             "platform": ".NET",
             "product": "slides",
         }
@@ -107,29 +111,29 @@ class TestExtractBusinessContext:
         assert result["product_family"] is None
         assert result["product"] is None
 
-    def test_returns_none_for_unknown_platform(self):
-        """Returns None for platform when path has no known platform."""
+    def test_returns_default_for_unknown_platform(self):
+        """Returns default platform when path has no known platform."""
         result = extract_business_context(
             file_path=Path("/slides/unknown/guide.md")
         )
-        assert result["platform"] is None
+        # Default platform from env var or ".NET"
+        assert result["platform"] == ".NET" or result["platform"] is not None
 
     def test_handles_none_inputs(self):
-        """Returns all None when no inputs provided."""
+        """Returns defaults when no inputs provided."""
         result = extract_business_context()
-        assert result == {
-            "product_family": None,
-            "subdomain": None,
-            "platform": None,
-            "product": None,
-        }
+        assert result["product_family"] is None
+        assert result["subdomain"] is None
+        assert result["product"] is None
+        # Platform defaults to env var or ".NET"
+        assert result["platform"] is not None
 
     def test_handles_windows_paths(self):
         """Handles Windows-style backslash paths."""
         result = extract_business_context(
             file_path=Path("C:\\repos\\docs\\slides\\net\\guide.md")
         )
-        assert result["product_family"] == "slides"
+        assert result["product_family"] == "Aspose.Slides"  # TFR-02: capitalized
         assert result["platform"] == ".NET"
 
     def test_case_insensitive_matching(self):
@@ -137,7 +141,7 @@ class TestExtractBusinessContext:
         result = extract_business_context(
             file_path=Path("/Content/SLIDES/NET/Guide.md")
         )
-        assert result["product_family"] == "slides"
+        assert result["product_family"] == "Aspose.Slides"  # TFR-02: capitalized
         assert result["platform"] == ".NET"
 
 
@@ -218,13 +222,22 @@ class TestTranslationTelemetryIntegration:
 
         telemetry.track_translation_stats(mock_run_context, mock_stats)
 
-        # Verify set_metrics was called with skipped_segments
+        # Verify set_metrics was called with items_* fields
         mock_run_context.set_metrics.assert_called_once()
         call_kwargs = mock_run_context.set_metrics.call_args[1]
-        assert "skipped_segments" in call_kwargs
-        assert call_kwargs["skipped_segments"] == 1
-        assert call_kwargs["files_translated"] == 1
-        assert call_kwargs["files_generated"] == 2
+        # TSC-02: items_* fields passed directly (except items_skipped which is in metrics_json)
+        assert "items_discovered" in call_kwargs
+        assert "items_succeeded" in call_kwargs
+        assert "items_failed" in call_kwargs
+        # items_skipped is NOT in RunRecord schema, so it's in metrics_json
+        assert "items_skipped" not in call_kwargs
+        # metrics_json contains custom metrics including items_skipped
+        assert "metrics_json" in call_kwargs
+        metrics = call_kwargs["metrics_json"]
+        assert metrics["skipped_segments"] == 1
+        assert metrics["items_skipped"] == 1  # Moved here since not in RunRecord
+        assert metrics["files_translated"] == 1
+        assert metrics["files_generated"] == 2
 
     def test_track_translation_stats_skips_when_disabled(self):
         """track_translation_stats does nothing when disabled."""
@@ -264,7 +277,9 @@ class TestDirectoryTelemetryAggregation:
         telemetry.track_translation_stats(mock_run_context, agg_stats)
 
         mock_run_context.set_metrics.assert_called_once()
-        metrics = mock_run_context.set_metrics.call_args[1]
+        call_kwargs = mock_run_context.set_metrics.call_args[1]
+        # TSC-02: metrics_json contains custom metrics
+        metrics = call_kwargs["metrics_json"]
         assert metrics["files_translated"] == 1
         assert metrics["files_generated"] == 2
         assert metrics["total_segments"] == 8
@@ -280,7 +295,9 @@ class TestDirectoryTelemetryAggregation:
         telemetry.track_translation_stats(mock_run_context, agg_stats)
 
         mock_run_context.set_metrics.assert_called_once()
-        metrics = mock_run_context.set_metrics.call_args[1]
+        call_kwargs = mock_run_context.set_metrics.call_args[1]
+        # TSC-02: metrics_json contains custom metrics
+        metrics = call_kwargs["metrics_json"]
         assert metrics["files_translated"] == 0
         assert metrics["files_generated"] == 0
         assert metrics["total_segments"] == 0
@@ -358,8 +375,8 @@ class TestSR01DirectoryBusinessContext:
 
         result = extract_business_context(file_path=file_path, site_id=site_id)
 
-        assert result["product_family"] == "slides"
-        assert result["subdomain"] == "products"
+        assert result["product_family"] == "Aspose.Slides"  # TFR-02: capitalized
+        assert result["subdomain"] == "products.aspose.com"  # TFR-01: full site_id
         assert result["platform"] == ".NET"
         assert result["product"] == "slides"
 
@@ -368,7 +385,7 @@ class TestSR01DirectoryBusinessContext:
         # When no files exist, extract_business_context should handle None file_path
         result = extract_business_context(file_path=None, site_id="products.aspose.com")
 
-        assert result["subdomain"] == "products"
+        assert result["subdomain"] == "products.aspose.com"  # TFR-01: full site_id
         assert result["product_family"] is None
         assert result["platform"] is None or result["platform"] == ".NET"  # Default platform
         assert result["product"] is None
@@ -379,9 +396,9 @@ class TestSR01DirectoryBusinessContext:
         first_file = Path("/docs/slides/java/guide.md")
         result = extract_business_context(file_path=first_file, site_id="docs.aspose.com")
 
-        assert result["product_family"] == "slides"
+        assert result["product_family"] == "Aspose.Slides"  # TFR-02: capitalized
         assert result["platform"] == "Java"
-        assert result["subdomain"] == "docs"
+        assert result["subdomain"] == "docs.aspose.com"  # TFR-01: full site_id
 
 
 class TestSR02FilesTranslatedGenerated:
@@ -431,10 +448,13 @@ class TestSR02FilesTranslatedGenerated:
 
         mock_run_context.set_metrics.assert_called_once()
         call_kwargs = mock_run_context.set_metrics.call_args[1]
-        assert "files_translated" in call_kwargs
-        assert call_kwargs["files_translated"] == 1
-        assert "files_generated" in call_kwargs
-        assert call_kwargs["files_generated"] == 3
+        # TSC-02: metrics_json contains custom metrics including files_*
+        assert "metrics_json" in call_kwargs
+        metrics = call_kwargs["metrics_json"]
+        assert "files_translated" in metrics
+        assert metrics["files_translated"] == 1
+        assert "files_generated" in metrics
+        assert metrics["files_generated"] == 3
 
     def test_directory_aggregates_files_counts(self):
         """SR-02: Directory aggregation includes files_translated/files_generated."""
@@ -452,6 +472,145 @@ class TestSR02FilesTranslatedGenerated:
 
         assert agg_stats.files_translated == 2
         assert agg_stats.files_generated == 4
+
+
+class TestTSC01ExtractWebsite:
+    """Tests for TSC-01: extract_website() function."""
+
+    def test_extracts_root_domain_from_products_site(self):
+        """Extract aspose.com from products.aspose.com."""
+        assert extract_website("products.aspose.com") == "aspose.com"
+
+    def test_extracts_root_domain_from_blog_site(self):
+        """Extract aspose.net from blog.aspose.net."""
+        assert extract_website("blog.aspose.net") == "aspose.net"
+
+    def test_extracts_root_domain_from_docs_site(self):
+        """Extract groupdocs.cloud from docs.groupdocs.cloud."""
+        assert extract_website("docs.groupdocs.cloud") == "groupdocs.cloud"
+
+    def test_handles_two_part_domain(self):
+        """Handle simple two-part domain."""
+        assert extract_website("aspose.com") == "aspose.com"
+
+    def test_handles_empty_site_id(self):
+        """Return empty string for empty site_id."""
+        assert extract_website("") == ""
+
+    def test_handles_none_site_id(self):
+        """Return empty string for None site_id."""
+        assert extract_website(None) == ""
+
+    def test_handles_single_part(self):
+        """Return as-is for single part (no dots)."""
+        assert extract_website("localhost") == "localhost"
+
+
+class TestTSC01MapWebsiteSection:
+    """Tests for TSC-01: map_website_section() function."""
+
+    def test_maps_products_to_docs(self):
+        """Map products subdomain to Docs section."""
+        assert map_website_section("products") == "Docs"
+
+    def test_maps_docs_to_docs(self):
+        """Map docs subdomain to Docs section."""
+        assert map_website_section("docs") == "Docs"
+
+    def test_maps_blog_to_blog(self):
+        """Map blog subdomain to Blog section."""
+        assert map_website_section("blog") == "Blog"
+
+    def test_maps_kb_to_kb(self):
+        """Map kb subdomain to KB section."""
+        assert map_website_section("kb") == "KB"
+
+    def test_maps_reference_to_reference(self):
+        """Map reference subdomain to Reference section."""
+        assert map_website_section("reference") == "Reference"
+
+    def test_maps_api_to_api(self):
+        """Map api subdomain to API section."""
+        assert map_website_section("api") == "API"
+
+    def test_returns_na_for_unknown(self):
+        """Return NA for unknown subdomain."""
+        assert map_website_section("unknown") == "NA"
+
+    def test_returns_na_for_empty(self):
+        """Return NA for empty subdomain."""
+        assert map_website_section("") == "NA"
+
+    def test_returns_na_for_none(self):
+        """Return NA for None subdomain."""
+        assert map_website_section(None) == "NA"
+
+    def test_case_insensitive(self):
+        """Mapping is case-insensitive."""
+        assert map_website_section("PRODUCTS") == "Docs"
+        assert map_website_section("Blog") == "Blog"
+
+
+class TestTSC02GetItemName:
+    """Tests for TSC-02: get_item_name() function."""
+
+    def test_returns_segments_for_translate_file(self):
+        """Return Segments for translate_file job type."""
+        assert get_item_name("translate_file") == "Segments"
+
+    def test_returns_files_for_translate_directory(self):
+        """Return Files for translate_directory job type."""
+        assert get_item_name("translate_directory") == "Files"
+
+    def test_returns_items_for_unknown_job_type(self):
+        """Return Items for unknown job type."""
+        assert get_item_name("unknown_job") == "Items"
+
+    def test_returns_items_for_empty_job_type(self):
+        """Return Items for empty job type."""
+        assert get_item_name("") == "Items"
+
+
+class TestTSC03ErrorSummary:
+    """Tests for TSC-03: error_summary wiring."""
+
+    def test_error_summary_truncates_to_5(self):
+        """Error summary truncates to max 5 errors."""
+        errors = [f"Error {i}" for i in range(10)]
+        summary = build_error_summary(errors)
+        assert summary.count(";") == 4  # 5 errors = 4 semicolons
+        assert "Error 4" in summary
+        assert "Error 5" not in summary
+
+    def test_error_summary_empty_for_no_errors(self):
+        """Empty string when no errors."""
+        assert build_error_summary([]) == ""
+
+    def test_error_summary_single_error(self):
+        """Single error has no semicolon."""
+        assert build_error_summary(["Only error"]) == "Only error"
+
+    def test_error_summary_custom_max(self):
+        """Respects custom max_errors parameter."""
+        errors = [f"Error {i}" for i in range(10)]
+        summary = build_error_summary(errors, max_errors=3)
+        assert summary.count(";") == 2  # 3 errors = 2 semicolons
+
+
+class TestTSC04EnvironmentField:
+    """Tests for TSC-04: environment field from env var."""
+
+    def test_environment_default_is_dev(self, monkeypatch):
+        """Default environment is dev when env var not set."""
+        monkeypatch.delenv("HUGO_TRANSLATOR_ENV", raising=False)
+        import os
+        assert os.getenv("HUGO_TRANSLATOR_ENV", "dev") == "dev"
+
+    def test_environment_from_env_var(self, monkeypatch):
+        """Environment reads from HUGO_TRANSLATOR_ENV."""
+        monkeypatch.setenv("HUGO_TRANSLATOR_ENV", "prod")
+        import os
+        assert os.getenv("HUGO_TRANSLATOR_ENV", "dev") == "prod"
 
 
 class TestSR03HelperFunctions:

@@ -116,7 +116,7 @@ class BenchmarkDatabase:
     - JSON export/import
     """
 
-    SCHEMA_VERSION = 1
+    SCHEMA_VERSION = 4
 
     def __init__(self, db_path: Path | str):
         """Initialize database connection.
@@ -274,6 +274,91 @@ class BenchmarkDatabase:
                 (1, datetime.now(UTC).isoformat()),
             )
             logger.info("Applied schema migration to version 1")
+
+        if from_version < 2:
+            # v2: Add composite indices for query optimization (BM-01)
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_runs_model_device ON benchmark_runs(model_id, device)"
+            )
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_runs_model_device_timestamp ON benchmark_runs(model_id, device, timestamp_utc)"
+            )
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_sysinfo_cpu_ram ON system_info(cpu_cores, total_ram_gb)"
+            )
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_results_throughput ON benchmark_results(throughput_tokens_per_sec)"
+            )
+            conn.execute(
+                "INSERT INTO schema_version (version, applied_at) VALUES (?, ?)",
+                (2, datetime.now(UTC).isoformat()),
+            )
+            logger.info("Applied schema migration to version 2")
+
+        if from_version < 3:
+            # v3: Add recommendation_feedback table (BM-03)
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS recommendation_feedback (
+                    feedback_id TEXT PRIMARY KEY,
+                    recommendation_id TEXT NOT NULL,
+                    model_id_recommended TEXT NOT NULL,
+                    model_id_used TEXT NOT NULL,
+                    device_recommended TEXT NOT NULL,
+                    device_used TEXT NOT NULL,
+                    predicted_throughput REAL NOT NULL,
+                    actual_throughput REAL NOT NULL,
+                    predicted_memory_mb REAL NOT NULL,
+                    actual_memory_mb REAL NOT NULL,
+                    success INTEGER NOT NULL,
+                    quality_score REAL,
+                    failure_reason TEXT,
+                    timestamp_utc TEXT NOT NULL,
+                    system_info_json TEXT NOT NULL,
+                    FOREIGN KEY (recommendation_id) REFERENCES benchmark_runs(run_id) ON DELETE CASCADE
+                )
+                """
+            )
+            # Create indices for efficient queries
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_feedback_recommendation "
+                "ON recommendation_feedback(recommendation_id)"
+            )
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_feedback_model "
+                "ON recommendation_feedback(model_id_recommended)"
+            )
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_feedback_timestamp "
+                "ON recommendation_feedback(timestamp_utc)"
+            )
+            conn.execute(
+                "INSERT INTO schema_version (version, applied_at) VALUES (?, ?)",
+                (3, datetime.now(UTC).isoformat()),
+            )
+            logger.info("Applied schema migration to version 3")
+
+        if from_version < 4:
+            # v4: Add recommendation_weights table (BM-03)
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS recommendation_weights (
+                    weight_id TEXT PRIMARY KEY,
+                    timestamp_utc TEXT NOT NULL,
+                    weights_json TEXT NOT NULL
+                )
+                """
+            )
+            # Create index for timestamp lookup
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_weights_timestamp "
+                "ON recommendation_weights(timestamp_utc)"
+            )
+            conn.execute(
+                "INSERT INTO schema_version (version, applied_at) VALUES (?, ?)",
+                (4, datetime.now(UTC).isoformat()),
+            )
+            logger.info("Applied schema migration to version 4")
 
     def create_tables(self) -> None:
         """Create database tables (idempotent).

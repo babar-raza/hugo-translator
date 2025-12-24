@@ -193,3 +193,4 @@ samples/**/zh/
 # Documentation archives (not for commit)
 docs/_archive/
 docs/_audit/
+/.translation_progress

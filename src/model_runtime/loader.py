@@ -5,6 +5,7 @@ Manages loading, caching, and lifecycle of translation models across different b
 """
 import gc
 import logging
+import time
 from pathlib import Path
 from abc import ABC, abstractmethod
 from typing import Dict, List, Optional
@@ -13,6 +14,7 @@ import torch
 
 from .registry import ModelInfo, ModelRegistry
 from .language_codes import map_language_code
+from src.observability.metrics import get_metrics
 
 logger = logging.getLogger(__name__)
 
@@ -62,6 +64,33 @@ class ModelBackend(ABC):
     def is_loaded(self) -> bool:
         """Check if model is loaded."""
         return self.loaded
+
+
+def _check_sentencepiece_available() -> bool:
+    """Check if sentencepiece is installed."""
+    try:
+        import sentencepiece  # noqa: F401
+        return True
+    except ImportError:
+        return False
+
+
+def _model_requires_sentencepiece(model_id: str, hf_model_id: Optional[str] = None) -> bool:
+    """
+    Check if a model requires sentencepiece for tokenization.
+
+    M2M100 and NLLB models use SentencePiece tokenization.
+    """
+    check_ids = [model_id.lower()]
+    if hf_model_id:
+        check_ids.append(hf_model_id.lower())
+
+    sentencepiece_models = ["m2m100", "nllb", "mbart", "xlm"]
+    return any(
+        sp_model in check_id
+        for check_id in check_ids
+        for sp_model in sentencepiece_models
+    )
 
 
 class HuggingFaceBackend(ModelBackend):
@@ -115,6 +144,18 @@ class HuggingFaceBackend(ModelBackend):
         """Load HuggingFace model and tokenizer."""
         if self.loaded:
             return
+
+        # BM-08: Track model load time
+        load_start = time.perf_counter()
+
+        # Check for sentencepiece dependency before attempting to load
+        if _model_requires_sentencepiece(self.model_info.model_id, self.model_info.hf_model_id):
+            if not _check_sentencepiece_available():
+                raise RuntimeError(
+                    f"Model '{self.model_info.model_id}' requires sentencepiece for tokenization. "
+                    f"Install it with: pip install 'hugo-translation-system[m2m100]' "
+                    f"or: pip install sentencepiece>=0.1.99"
+                )
 
         try:
             from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
@@ -191,6 +232,13 @@ class HuggingFaceBackend(ModelBackend):
                 logger.info(f"Model loaded ({precision_str}) on CPU")
 
             self.loaded = True
+
+            # BM-08: Record model load duration
+            load_duration = time.perf_counter() - load_start
+            metrics = get_metrics()
+            if metrics:
+                metrics.observe("model_load_duration_seconds", load_duration)
+                logger.debug(f"Model load took {load_duration:.2f}s")
 
         except torch.cuda.OutOfMemoryError as e:
             logger.error(f"GPU OOM loading model. Try reducing max_memory_mb or batch size.")

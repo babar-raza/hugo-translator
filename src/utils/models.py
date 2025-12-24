@@ -199,6 +199,10 @@ class SiteProfile(BaseModel):
     terminology: Optional[SiteTerminologyConfig] = Field(
         None, description="Site-specific terminology configuration"
     )
+    default_model: Optional[str] = Field(
+        default=None,
+        description="Default translation model ID (e.g., m2m100_418m, m2m100_1.2b). Falls back to system default if not set."
+    )
 
     @field_validator("target_langs", mode="before")
     @classmethod
@@ -223,6 +227,14 @@ class SiteProfile(BaseModel):
         if not v:
             # Allow empty frontmatter, but warn in logs
             pass
+        return v
+
+    @field_validator("default_model", mode="before")
+    @classmethod
+    def normalize_default_model(cls, v: Optional[str]) -> Optional[str]:
+        """Normalize empty/whitespace-only strings to None."""
+        if isinstance(v, str) and not v.strip():
+            return None
         return v
 
 

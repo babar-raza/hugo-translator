@@ -3,9 +3,12 @@ Configuration loader service for site profiles and global settings.
 
 Provides centralized access to site profiles with validation and caching.
 """
+import logging
 import os
 from pathlib import Path
 from typing import Any, Dict, List, Optional
+
+logger = logging.getLogger(__name__)
 
 import yaml
 from pydantic import ValidationError
@@ -91,6 +94,18 @@ class ConfigService:
             with open(profile_path, "r", encoding="utf-8") as f:
                 data = yaml.safe_load(f)
             data = self._apply_env_overrides(site_id, data)
+            # Map legacy model.default to default_model for backward compatibility
+            if "model" in data and isinstance(data["model"], dict):
+                if "default" in data["model"] and "default_model" not in data:
+                    model_default = data["model"]["default"]
+                    if isinstance(model_default, str):
+                        data["default_model"] = model_default
+                        logger.debug(f"Mapped legacy model.default to default_model: {model_default}")
+                    else:
+                        logger.warning(
+                            f"Profile {site_id}: model.default has invalid type "
+                            f"{type(model_default).__name__}, expected str. Ignoring."
+                        )
             profile = SiteProfile(**data)
             self._profile_cache[site_id] = profile
             return profile

@@ -21,6 +21,10 @@ Translate Hugo content with quality assurance.
 - [Configure validation rules](guides/quality-improvement.md)
 - [Handle terminology](guides/quality-improvement.md#terminology-protection)
 
+**Translation Memory:**
+- [TM Getting Started](guides/tm-getting-started.md) - Understanding TM and cache performance
+- [TM Override Modes](guides/tm-override-modes.md) - Control cache behavior (bypass, refresh, validate)
+
 **Reference:**
 - [CLI Commands](reference/cli.md) - All command-line options
 - [File Contracts](reference/file-contracts.md) - Input/output formats
@@ -34,6 +38,12 @@ Deploy, monitor, and maintain production systems.
 - [Troubleshoot issues](operations/troubleshooting.md)
 - [Backup and restore](operations/backup-restore.md)
 
+**Translation Memory Operations:**
+- [TM Maintenance](operations/tm-maintenance.md) - Daily/weekly maintenance, integrity checks, backups
+- [TM Statistics & Monitoring](guides/tm-statistics-monitoring-guide.md) - Monitor hit rates and health
+- [TM Troubleshooting](operations/tm-troubleshooting.md) - Diagnose corruption, performance issues
+- [TM Performance Tuning](operations/tm-performance-tuning.md) - Optimize L1/L2/L3 layers
+
 **Reference:**
 - [Deployment Guide](operations/deployment.md) - Production setup
 - [Monitoring](operations/monitoring.md) - Metrics and alerts
@@ -46,6 +56,10 @@ Understand, extend, and contribute to the codebase.
 - [Run tests](development/testing.md)
 - [Understand architecture](architecture/translation-engine.md)
 - [Add features](development/scripts.md)
+
+**Translation Memory Deep Dives:**
+- [TM Architecture](architecture/translation-memory.md) - L1/L2/L3 design, ACID guarantees, crash safety
+- [TM API Reference](reference/tm-api.md) - Programmatic usage of TM layers
 
 **Reference:**
 - [Architecture Overview](architecture/) - System design
@@ -76,6 +90,12 @@ Understand, extend, and contribute to the codebase.
 - [Translation Memory](architecture/translation-memory.md) - Caching system
 - [Model Runtime](architecture/model-runtime.md) - AI integration
 
+### 💾 Translation Memory (TM)
+- **Getting Started**: [TM Introduction](guides/tm-getting-started.md) - What is TM and how it saves time
+- **Operations**: [Maintenance](operations/tm-maintenance.md) | [Monitoring](guides/tm-statistics-monitoring-guide.md) | [Troubleshooting](operations/tm-troubleshooting.md) | [Performance](operations/tm-performance-tuning.md)
+- **Advanced**: [Override Modes](guides/tm-override-modes.md) - Control cache behavior
+- **Technical**: [Architecture](architecture/translation-memory.md) | [API Reference](reference/tm-api.md)
+
 ### 🧪 Development
 - [Setup](development/setup.md) - Development environment
 - [Testing](development/testing.md) - Test suite and execution
@@ -100,9 +120,11 @@ Understand, extend, and contribute to the codebase.
 - **Structure Preservation** maintains Hugo formatting
 
 ### Translation Memory
-- **L1 Cache** - Fast in-memory lookups
-- **L2 Persistent** - LMDB database storage
-- **L3 Semantic** - FAISS vector similarity search
+- **L1 Cache** - Fast in-memory LRU cache (configurable size)
+- **L2 Persistent** - LMDB database with ACID guarantees and crash safety
+- **L3 Semantic** - FAISS vector search for fuzzy matching (90%+ similarity)
+- **Operations** - Integrity checks, backups, performance tuning
+- **Control** - Override modes (bypass, refresh, validate) for cache management
 
 ## Source of Truth
 
@@ -128,4 +150,4 @@ Follow the [style guide](_audit/style_guide.md) and [IA proposal](_audit/README_
 
 ---
 
-**Version**: 1.0.0 | **Last Updated**: 2025-12-19
+**Version**: 1.1.0 | **Last Updated**: 2025-12-24

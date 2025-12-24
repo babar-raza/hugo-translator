@@ -288,6 +288,23 @@ class MetricsCollector:
             {"worker_id": self.worker_id},
         )
 
+        # Retry tracking (BM-08)
+        self.register_counter(
+            "retry_count_total",
+            "Total retry attempts by error type",
+            {"worker_id": self.worker_id},
+        )
+        self.register_gauge(
+            "warmup_iterations",
+            "Number of warmup iterations performed",
+            {"worker_id": self.worker_id},
+        )
+        self.register_gauge(
+            "actual_iterations",
+            "Number of actual iterations performed",
+            {"worker_id": self.worker_id},
+        )
+
         # Histograms
         self.register_histogram(
             "translation_duration_seconds",
@@ -312,6 +329,38 @@ class MetricsCollector:
         self.register_histogram(
             "batch_size",
             "Translation batch sizes",
+            {"worker_id": self.worker_id},
+        )
+
+        # BM-08: Extended metrics for better performance visibility
+        self.register_histogram(
+            "model_load_duration_seconds",
+            "Time to load model into memory",
+            {"worker_id": self.worker_id},
+        )
+        self.register_histogram(
+            "tokenization_duration_seconds",
+            "Tokenization duration by language pair",
+            {"worker_id": self.worker_id},
+        )
+        self.register_histogram(
+            "l3_encoding_duration_seconds",
+            "L3 semantic encoding duration (separate from lookup)",
+            {"worker_id": self.worker_id},
+        )
+        self.register_histogram(
+            "l3_lookup_duration_seconds",
+            "L3 pure lookup duration (without encoding)",
+            {"worker_id": self.worker_id},
+        )
+        self.register_histogram(
+            "retry_duration_seconds",
+            "Time lost to retry attempts",
+            {"worker_id": self.worker_id},
+        )
+        self.register_histogram(
+            "batch_preparation_duration_seconds",
+            "Batch preparation overhead before translation",
             {"worker_id": self.worker_id},
         )
 

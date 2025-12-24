@@ -350,6 +350,45 @@ class L2PersistentTM:
                 # Drop and recreate the database
                 txn.drop(self.env.open_db())
 
+    def export_all(
+        self,
+        site_id: Optional[str] = None,
+        tgt_lang: Optional[str] = None
+    ) -> List[TranslationEntry]:
+        """
+        Export all entries from L2 cache.
+
+        Args:
+            site_id: Filter by site (optional)
+            tgt_lang: Filter by target language (optional)
+
+        Returns:
+            List of TranslationEntry objects
+        """
+        entries = []
+
+        with self._lock:
+            with self.env.begin() as txn:
+                cursor = txn.cursor()
+                for key, value in cursor:
+                    try:
+                        entry_dict = json.loads(value.decode('utf-8'))
+                        entry = TranslationEntry.from_dict(entry_dict)
+
+                        # Apply filters
+                        if site_id and entry.site_id != site_id:
+                            continue
+                        if tgt_lang and entry.tgt_lang != tgt_lang:
+                            continue
+
+                        entries.append(entry)
+
+                    except Exception as e:
+                        logger.warning(f"Failed to parse entry {key[:20]!r}: {e}")
+
+        logger.info(f"Exported {len(entries)} entries from L2")
+        return entries
+
     def close(self) -> None:
         """Close database connection."""
         if self.env:

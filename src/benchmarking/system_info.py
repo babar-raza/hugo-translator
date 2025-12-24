@@ -54,9 +54,20 @@ class SystemInfo:
     torch_version: Optional[str] = None
     torch_cuda_available: bool = False
 
+    # BM-09: Extended hardware context for better learning
+    cpu_frequency_mhz: Optional[float] = None  # Current CPU frequency
+    cpu_frequency_max_mhz: Optional[float] = None  # Max CPU frequency
+    cpu_tdp_watts: Optional[float] = None  # Thermal Design Power
+    memory_bandwidth_gbps: Optional[float] = None  # Memory bandwidth
+    numa_nodes: int = 1  # NUMA node count
+
+    gpu_driver_version: Optional[str] = None  # GPU driver version
+
+    power_management_state: Optional[str] = None  # "performance", "balanced", "power_saver"
+
     # Metadata
     collected_at_utc: str = ""
-    collector_version: str = "1.0.0"
+    collector_version: str = "1.0.1"  # BM-09: Bumped for new fields
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert to JSON-serializable dictionary."""
@@ -66,6 +77,15 @@ class SystemInfo:
     def from_dict(cls, data: Dict[str, Any]) -> "SystemInfo":
         """Create from dictionary."""
         return cls(**data)
+
+    def to_json(self) -> str:
+        """Convert to JSON string."""
+        return json.dumps(self.to_dict())
+
+    @classmethod
+    def from_json(cls, json_str: str) -> "SystemInfo":
+        """Create from JSON string."""
+        return cls.from_dict(json.loads(json_str))
 
 
 class SystemInfoCollector:
@@ -109,6 +129,9 @@ class SystemInfoCollector:
         # Collect PyTorch information
         torch_info = self._collect_torch_info()
 
+        # BM-09: Collect extended hardware context
+        extended_info = self._collect_extended_hardware_info()
+
         system_info = SystemInfo(
             # Hardware
             cpu_model=cpu_model,
@@ -131,6 +154,14 @@ class SystemInfoCollector:
             # PyTorch
             torch_version=torch_info.get("torch_version"),
             torch_cuda_available=torch_info.get("torch_cuda_available", False),
+            # BM-09: Extended hardware context
+            cpu_frequency_mhz=extended_info.get("cpu_frequency_mhz"),
+            cpu_frequency_max_mhz=extended_info.get("cpu_frequency_max_mhz"),
+            cpu_tdp_watts=extended_info.get("cpu_tdp_watts"),
+            memory_bandwidth_gbps=extended_info.get("memory_bandwidth_gbps"),
+            numa_nodes=extended_info.get("numa_nodes", 1),
+            gpu_driver_version=extended_info.get("gpu_driver_version"),
+            power_management_state=extended_info.get("power_management_state"),
             # Metadata
             collected_at_utc=datetime.now(timezone.utc).isoformat(),
         )
@@ -267,6 +298,70 @@ class SystemInfoCollector:
             logger.warning(f"Failed to collect torch info: {e}")
 
         return torch_info
+
+    def _collect_extended_hardware_info(self) -> Dict[str, Optional[Any]]:
+        """
+        Collect extended hardware information (BM-09).
+
+        Returns:
+            Dictionary with extended hardware context
+
+        Gracefully handles missing dependencies (psutil).
+        """
+        extended_info = {
+            "cpu_frequency_mhz": None,
+            "cpu_frequency_max_mhz": None,
+            "cpu_tdp_watts": None,
+            "memory_bandwidth_gbps": None,
+            "numa_nodes": 1,
+            "gpu_driver_version": None,
+            "power_management_state": None,
+        }
+
+        # Try to use psutil for detailed CPU info
+        try:
+            import psutil
+
+            # CPU frequency
+            cpu_freq = psutil.cpu_freq()
+            if cpu_freq:
+                extended_info["cpu_frequency_mhz"] = round(cpu_freq.current, 2) if cpu_freq.current else None
+                extended_info["cpu_frequency_max_mhz"] = round(cpu_freq.max, 2) if cpu_freq.max else None
+
+            # Power management state (very rough heuristic)
+            if cpu_freq and cpu_freq.max and cpu_freq.current:
+                freq_ratio = cpu_freq.current / cpu_freq.max
+                if freq_ratio > 0.9:
+                    extended_info["power_management_state"] = "performance"
+                elif freq_ratio < 0.5:
+                    extended_info["power_management_state"] = "power_saver"
+                else:
+                    extended_info["power_management_state"] = "balanced"
+
+        except ImportError:
+            logger.debug("psutil not available; extended CPU info unavailable")
+        except Exception as e:
+            logger.warning(f"Failed to collect extended CPU info: {e}")
+
+        # GPU driver version (CUDA only)
+        try:
+            import torch
+            if torch.cuda.is_available():
+                # Get CUDA driver version
+                try:
+                    from torch.utils.collect_env import get_nvidia_driver_version
+                    driver_version = get_nvidia_driver_version(torch.utils.collect_env.run)
+                    if driver_version:
+                        extended_info["gpu_driver_version"] = driver_version
+                except Exception:
+                    # Fallback: use nvidia-smi if available
+                    pass
+        except ImportError:
+            pass
+        except Exception as e:
+            logger.debug(f"Could not get GPU driver version: {e}")
+
+        return extended_info
 
     def _sanitize_string(self, value: str) -> str:
         """

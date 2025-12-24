@@ -12,14 +12,19 @@ CLI flags override configuration file settings.
 import argparse
 import logging
 import os
+import shutil
+import signal
 import sys
 from pathlib import Path
 from typing import Dict, List, Optional
+
+import json
 
 try:
     # Relative imports (when used as package)
     from .translation_engine import TranslationEngine
     from .translation_engine.models import TranslationResult, DirectoryResult
+    from .translation_engine.progress import ProgressTracker
     from .tm import TranslationMemory
     from .tm.l1_cache import L1Cache
     from .tm.l2_persistent import L2PersistentTM
@@ -28,12 +33,14 @@ try:
     from .model_runtime.registry import ModelRegistry
     from .model_runtime.cpu_optimizer import CPUOptimizer
     from .utils.config_loader import ConfigService
+    from .utils.file_filters import filter_source_files
     from .utils.models import ValidationSettings, TerminologySettings
     from .verification.report import write_report
 except ImportError:
     # Absolute imports (when run directly)
     from translation_engine import TranslationEngine
     from translation_engine.models import TranslationResult, DirectoryResult
+    from translation_engine.progress import ProgressTracker
     from tm import TranslationMemory
     from tm.l1_cache import L1Cache
     from tm.l2_persistent import L2PersistentTM
@@ -42,6 +49,7 @@ except ImportError:
     from model_runtime.registry import ModelRegistry
     from model_runtime.cpu_optimizer import CPUOptimizer
     from utils.config_loader import ConfigService
+    from utils.file_filters import filter_source_files
     from utils.models import ValidationSettings, TerminologySettings
     from verification.report import write_report
 
@@ -87,6 +95,15 @@ class CLIConfigOverrides:
         self.parallel_languages: int = args.parallel_languages
         self.global_lang_rounds: int = args.global_lang_rounds
         self.global_lang_sort: str = args.global_lang_sort
+        # Progress and metrics control
+        self.metrics_file: Optional[str] = args.metrics_file
+        self.metrics_interval: float = args.metrics_interval
+        self.metrics_only: bool = args.metrics_only
+        self.no_progress: bool = args.no_progress
+        # RES-02: Resume/restart control
+        self.resume: bool = args.resume
+        self.force_restart: bool = args.force_restart
+        self.progress_dir: str = args.progress_dir
 
     def apply_to_config_service(self, config_service: ConfigService) -> None:
         """
@@ -419,6 +436,67 @@ Examples:
         help="Write logs to file instead of console",
     )
 
+    # Progress and metrics control
+    metrics_group = parser.add_argument_group("Progress & Metrics")
+
+    metrics_group.add_argument(
+        "--metrics-file",
+        metavar="PATH",
+        help="Write metrics to file (creates PATH_current.json snapshot + PATH.ndjson stream)",
+    )
+
+    metrics_group.add_argument(
+        "--metrics-interval",
+        type=float,
+        default=2.0,
+        metavar="SECS",
+        help="Metrics update interval in seconds (default: 2.0)",
+    )
+
+    metrics_group.add_argument(
+        "--metrics-only",
+        action="store_true",
+        help="Suppress normal logs, emit only compact metrics line (for second terminal)",
+    )
+
+    metrics_group.add_argument(
+        "--no-progress",
+        action="store_true",
+        help="Disable progress tracking and ETA display",
+    )
+
+    # RES-02: Resume control
+    resume_group = parser.add_argument_group("Resume Control (Crash Recovery)")
+
+    resume_group.add_argument(
+        "--resume",
+        action="store_true",
+        default=True,
+        dest="resume",
+        help="Resume from previous progress if available (default: enabled)",
+    )
+
+    resume_group.add_argument(
+        "--no-resume",
+        action="store_false",
+        dest="resume",
+        help="Ignore previous progress and start fresh",
+    )
+
+    resume_group.add_argument(
+        "--force-restart",
+        action="store_true",
+        default=False,
+        help="Clear all progress for site and start fresh (overrides --resume)",
+    )
+
+    resume_group.add_argument(
+        "--progress-dir",
+        default=".translation_progress",
+        metavar="DIR",
+        help="Directory to store progress files (default: .translation_progress)",
+    )
+
     # Cache behavior control (federated-splashing-panda: Phase 2 redesign)
     cache_group = parser.add_argument_group("Translation Cache Control")
 
@@ -551,6 +629,36 @@ def _generate_verification_report(
         logger.error(f"Failed to write verification report: {e}")
 
 
+def _cleanup_progress(progress_dir: Path, site_id: str) -> int:
+    """
+    Remove all progress files for a site.
+
+    Args:
+        progress_dir: Directory containing progress files
+        site_id: Site identifier to clean up
+
+    Returns:
+        Number of progress files removed
+    """
+    if not progress_dir.exists():
+        return 0
+
+    removed = 0
+    for pf in progress_dir.glob("progress_*.json"):
+        try:
+            with open(pf, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+            if data.get('site_id') == site_id:
+                pf.unlink()
+                removed += 1
+                logger.info(f"Removed progress file: {pf}")
+        except (json.JSONDecodeError, KeyError, OSError) as e:
+            logger.warning(f"Failed to check/remove progress file {pf}: {e}")
+            continue
+
+    return removed
+
+
 def setup_logging(log_level: str, log_file: Optional[str] = None) -> None:
     """
     Configure logging for CLI.
@@ -585,6 +693,51 @@ def setup_logging(log_level: str, log_file: Optional[str] = None) -> None:
     root_logger.addHandler(handler)
 
 
+def setup_signal_handlers(engine: "TranslationEngine") -> None:
+    """
+    RES-06: Set up signal handlers for graceful shutdown.
+
+    Registers handlers for SIGINT (Ctrl+C) and SIGTERM to allow
+    the translation engine to complete its current file before
+    stopping and to save all TM state.
+
+    Supports multi-stage shutdown:
+    - First Ctrl+C: Graceful shutdown (finish current file)
+    - Second Ctrl+C: Force quit immediately
+
+    Args:
+        engine: The TranslationEngine instance to coordinate shutdown with
+    """
+    # Track number of interrupt signals received
+    interrupt_count = {'count': 0}
+
+    def signal_handler(signum, frame):
+        sig_name = signal.Signals(signum).name if hasattr(signal, 'Signals') else str(signum)
+        interrupt_count['count'] += 1
+
+        if interrupt_count['count'] == 1:
+            # First interrupt: request graceful shutdown
+            logger.warning(
+                f"Received {sig_name}, initiating graceful shutdown...\n"
+                "Finishing current file and saving progress. Press Ctrl+C again to force quit."
+            )
+            engine.request_shutdown()
+        else:
+            # Second or subsequent interrupt: force quit immediately
+            logger.error(
+                f"Received {sig_name} again, forcing immediate exit...\n"
+                "Warning: Translation state may not be fully saved!"
+            )
+            # Force immediate exit with standard interrupt exit code
+            sys.exit(130)
+
+    # Register handlers
+    signal.signal(signal.SIGINT, signal_handler)
+    signal.signal(signal.SIGTERM, signal_handler)
+
+    logger.debug("Signal handlers registered for graceful shutdown")
+
+
 def translate_site(args: argparse.Namespace) -> int:
     """
     Execute translation for a site with CLI overrides.
@@ -595,14 +748,113 @@ def translate_site(args: argparse.Namespace) -> int:
     Returns:
         Exit code (0 for success, non-zero for failure)
     """
+    # Import progress tracker
+    try:
+        from .observability.progress import init_progress_tracker, stop_progress_tracker, get_progress_tracker
+        from .observability.graceful_shutdown import setup_graceful_shutdown
+        from .observability.telemetry_cleanup import cleanup_stale_runs_direct_db
+    except ImportError:
+        from observability.progress import init_progress_tracker, stop_progress_tracker, get_progress_tracker
+        from observability.graceful_shutdown import setup_graceful_shutdown
+        from observability.telemetry_cleanup import cleanup_stale_runs_direct_db
+
+    progress_tracker = None
+
     try:
         # Setup logging
         setup_logging(args.log_level, args.log_file)
+
+        # GS-01: Setup graceful shutdown handlers before any work
+        setup_graceful_shutdown()
+
+        # TC-01: Clean up stale telemetry runs from previous interrupted sessions
+        # Only run if telemetry database is accessible (Docker environment)
+        try:
+            cleanup_stats = cleanup_stale_runs_direct_db(
+                db_path="/data/telemetry.sqlite",
+                max_age_hours=1,
+                dry_run=False
+            )
+            if cleanup_stats["stale_runs_found"] > 0:
+                logger.info(
+                    f"Telemetry cleanup: {cleanup_stats['updated']}/{cleanup_stats['stale_runs_found']} "
+                    f"stale run(s) marked as cancelled"
+                )
+        except Exception as cleanup_error:
+            # Non-critical - just log and continue
+            logger.debug(f"Telemetry cleanup skipped: {cleanup_error}")
 
         logger.info(f"Starting translation for site: {args.site}")
 
         # Create CLI overrides
         overrides = CLIConfigOverrides(args)
+
+        # RES-02: Handle resume/restart flags
+        resume_enabled = overrides.resume
+        if overrides.force_restart and overrides.resume:
+            logger.info("Note: --force-restart overrides --resume")
+            resume_enabled = False
+
+        progress_dir_path = Path(overrides.progress_dir)
+        translation_progress_tracker = None  # Distinct from observability progress_tracker
+
+        if overrides.force_restart:
+            logger.info("Force restart requested, clearing previous progress...")
+            removed = _cleanup_progress(progress_dir_path, args.site)
+            if removed > 0:
+                logger.info(f"Removed {removed} progress file(s) for site {args.site}")
+            else:
+                logger.info("No previous progress found to clear")
+
+        elif resume_enabled:
+            # Try to find existing progress for this site
+            translation_progress_tracker = ProgressTracker.find_latest(
+                progress_dir=progress_dir_path,
+                site_id=args.site
+            )
+
+            if translation_progress_tracker:
+                # RES-07: Validate progress file before using
+                is_valid, error_msg, recoverable = ProgressTracker.validate_progress_file(
+                    translation_progress_tracker.progress_file
+                )
+
+                if not is_valid:
+                    logger.warning(f"Progress file validation failed: {error_msg}")
+
+                    if recoverable:
+                        logger.info("Attempting recovery...")
+                        recovered_tracker = ProgressTracker.recover_progress_file(
+                            translation_progress_tracker.progress_file
+                        )
+
+                        if recovered_tracker:
+                            translation_progress_tracker = recovered_tracker
+                            logger.info("Progress recovered successfully")
+                        else:
+                            logger.warning("Recovery failed. Starting fresh.")
+                            translation_progress_tracker = None
+                    else:
+                        logger.warning("Progress file is unrecoverable. Starting fresh.")
+                        # Backup corrupted file
+                        backup_path = translation_progress_tracker.progress_file.with_suffix('.json.corrupt')
+                        try:
+                            shutil.copy(translation_progress_tracker.progress_file, backup_path)
+                            logger.info(f"Corrupted file backed up to: {backup_path}")
+                        except Exception as e:
+                            logger.warning(f"Could not backup corrupted file: {e}")
+                        translation_progress_tracker = None
+
+            if translation_progress_tracker:
+                stats = translation_progress_tracker.get_statistics()
+                logger.info(f"Found previous progress (run {stats['run_id'][:8]}...)")
+                logger.info(f"Progress: {stats['files_processed']}/{stats['total_files']} files")
+                logger.info(f"Completed: {stats['translations_completed']} translations")
+                logger.info(f"Failed: {stats['translations_failed']} translations")
+                logger.info(f"Pending: {stats['translations_pending']} translations ({stats['progress_percent']:.1f}%)")
+                logger.info("Resuming translation...")
+            else:
+                logger.info("No previous progress found, starting fresh...")
 
         # Load configuration
         config_service = ConfigService(args.config_root)
@@ -747,8 +999,12 @@ def translate_site(args: argparse.Namespace) -> int:
             config_service=config_service,
             tm=tm,
             model_loader=model_loader,
+            progress_tracker=translation_progress_tracker,
             **engine_kwargs,
         )
+
+        # RES-06: Set up signal handlers for graceful shutdown
+        setup_signal_handlers(engine)
 
         # Determine input path
         if args.input:
@@ -758,6 +1014,75 @@ def translate_site(args: argparse.Namespace) -> int:
             input_path = Path(site_profile.content_roots[0])
 
         logger.info(f"Input path: {input_path}")
+
+        # Determine output directory
+        output_dir = Path(args.output) if args.output else Path(site_profile.output_dir if hasattr(site_profile, 'output_dir') else "output")
+
+        # RES-02: Initialize translation progress tracker for crash recovery
+        if translation_progress_tracker is None and resume_enabled:
+            # Create new tracker for this run
+            translation_progress_tracker = ProgressTracker(
+                progress_dir=progress_dir_path,
+                site_id=args.site,
+                source_dir=input_path,
+                output_dir=output_dir,
+                target_langs=target_langs
+            )
+
+            # Initialize with file count (filter out already-translated files)
+            if input_path.is_dir():
+                all_files = list(input_path.glob("**/*.md"))
+                # Filter to only source files, excluding translated files
+                try:
+                    source_files = filter_source_files(all_files, site_profile, target_langs)
+                    logger.info(f"Translation progress tracker initialized: {len(source_files)} source files (filtered {len(all_files) - len(source_files)} translated files)")
+                except (ValueError, TypeError, AttributeError) as e:
+                    logger.warning(f"File filtering failed: {e}. Using all markdown files for progress tracking.")
+                    source_files = all_files
+                translation_progress_tracker.initialize(source_files)
+            else:
+                translation_progress_tracker.initialize([input_path])
+
+        # Initialize progress tracker if enabled
+        if not overrides.no_progress:
+            metrics_file_path = Path(overrides.metrics_file) if overrides.metrics_file else None
+            progress_tracker = init_progress_tracker(
+                update_interval=overrides.metrics_interval,
+                metrics_file=metrics_file_path,
+                metrics_only=overrides.metrics_only,
+                show_progress=True,
+            )
+
+            # Resolve model name with priority: CLI > profile > system default
+            resolved_model = overrides.model or getattr(site_profile, 'default_model', None) or "m2m100_418m"
+            if overrides.model:
+                logger.debug(f"Using CLI-specified model: {resolved_model}")
+            elif getattr(site_profile, 'default_model', None):
+                logger.debug(f"Using profile default_model: {resolved_model}")
+            else:
+                logger.debug(f"Using system default model: {resolved_model}")
+
+            # Count files for progress tracking (filter out already-translated files)
+            if input_path.is_dir():
+                all_md_files = list(input_path.glob("**/*.md"))
+                # Filter to only source files, excluding translated files
+                try:
+                    md_files = filter_source_files(all_md_files, site_profile, target_langs)
+                    logger.info(f"Progress tracking enabled: {len(md_files)} source files to process (filtered {len(all_md_files) - len(md_files)} translated files)")
+                except (ValueError, TypeError, AttributeError) as e:
+                    logger.warning(f"File filtering failed: {e}. Using all markdown files for progress count.")
+                    md_files = all_md_files
+                progress_tracker.start(files_total=len(md_files))
+                progress_tracker.set_model(
+                    model_name=resolved_model,
+                    device=device,
+                )
+            else:
+                progress_tracker.start(files_total=1)
+                progress_tracker.set_model(
+                    model_name=resolved_model,
+                    device=device,
+                )
 
         # Translate files
         if input_path.is_file():
@@ -778,9 +1103,14 @@ def translate_site(args: argparse.Namespace) -> int:
 
             if result.success:
                 logger.info("Translation completed successfully")
+                # RES-02: Clear progress on successful completion
+                if translation_progress_tracker:
+                    translation_progress_tracker.clear()
+                    logger.info("Progress cleared - translation complete")
                 return 0
             else:
                 logger.error(f"Translation failed: {'; '.join(result.errors)}")
+                logger.info("Progress saved. Fix the issue and resume with the same command.")
                 return 1
 
         elif input_path.is_dir():
@@ -801,6 +1131,14 @@ def translate_site(args: argparse.Namespace) -> int:
                     results=result,
                 )
 
+            # RES-02: Clear progress on successful completion
+            if result.failed_files == 0:
+                if translation_progress_tracker:
+                    translation_progress_tracker.clear()
+                    logger.info("Progress cleared - all translations complete")
+            else:
+                logger.info("Progress saved. Some translations failed - resume to retry.")
+
             return 0 if result.failed_files == 0 else 1
 
         else:
@@ -808,12 +1146,32 @@ def translate_site(args: argparse.Namespace) -> int:
             return 1
 
     except KeyboardInterrupt:
+        # RES-06: Handle second Ctrl+C during graceful shutdown
         logger.warning("Translation interrupted by user")
+        try:
+            # Ensure engine shutdown is performed if engine was created
+            engine._perform_shutdown()
+        except NameError:
+            # Engine wasn't created yet, nothing to shut down
+            pass
+        except Exception as shutdown_err:
+            logger.warning(f"Shutdown may be incomplete: {shutdown_err}")
+        logger.info("Progress saved. Resume with the same command.")
+        if progress_tracker:
+            stop_progress_tracker()
         return 130  # Standard Unix exit code for Ctrl+C
 
     except Exception as e:
         logger.exception(f"Translation failed with error: {e}")
+        logger.info("Progress saved. Fix the issue and resume with the same command.")
+        if progress_tracker:
+            stop_progress_tracker()
         return 1
+
+    finally:
+        # Stop progress tracking and show final summary
+        if progress_tracker:
+            stop_progress_tracker()
 
 
 def main() -> int:

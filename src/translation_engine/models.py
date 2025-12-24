@@ -125,6 +125,10 @@ class TranslationResult:
     # VA-03: Post-translation verification result
     verification_result: Optional[Any] = None  # VerificationResult from verification agent
 
+    # RES-05: Skip tracking for existing outputs
+    skipped_langs: List[str] = field(default_factory=list)  # Languages skipped due to existing output
+    skip_reasons: Dict[str, str] = field(default_factory=dict)  # {lang: reason} for skipped languages
+
     def __str__(self) -> str:
         """Human-readable summary."""
         status = "SUCCESS" if self.success else "FAILED"
