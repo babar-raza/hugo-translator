@@ -89,7 +89,105 @@ python -c "from src.tm.backup import create_tm_backup; from pathlib import Path;
 
 📚 **Full TM Documentation**: [Translation Memory Guide](docs/guides/tm-getting-started.md)
 
+### Benchmarking System
+
+Comprehensive benchmarking system for performance measurement and ML-based model recommendations:
+
+- **Performance Measurement**: Accurate metrics for throughput, memory usage, and latency
+- **Model Comparison**: Compare translation models on your hardware
+- **Production Learning**: Optionally record real workloads (OPT-IN) to improve recommendations
+- **Adaptive Recommendations**: ML-based suggestions for optimal configurations
+
+**Key Features:**
+- SQLite database with schema versioning (v1-v4 migrations)
+- Hardware detection with PII sanitization
+- Bounded metric storage (prevents memory leaks)
+- Thread-safe concurrent operations
+- OPT-IN production metrics (enabled=False default)
+
+**Quick Start:**
+```bash
+# Run benchmark
+python -m src.benchmarking.cli benchmark run \
+    --model facebook/m2m100_418M \
+    --device cpu \
+    --batch-size 8 \
+    --corpus tiny
+
+# Get recommendation
+python -c "
+from pathlib import Path
+from src.benchmarking.storage import BenchmarkDatabase
+from src.benchmarking.recommender import ModelRecommender
+from src.benchmarking.system_info import SystemInfoCollector
+
+db = BenchmarkDatabase(Path('data/benchmarks/benchmarks.db'))
+recommender = ModelRecommender(db)
+system_info = SystemInfoCollector().collect()
+rec = recommender.recommend(system_info)
+print(f'Recommended: {rec.model_id} (batch_size={rec.batch_size})')
+"
+```
+
+**Metrics Configuration:**
+
+The system uses configurable bounded storage to prevent memory leaks in long-running operations. Configure via `config/metrics.yaml` or environment variables:
+
+```bash
+# High-traffic production tuning
+export METRICS_ENGINE_MAXLEN=2000    # Retry metrics
+export METRICS_L3_MAXLEN=20000       # L3 semantic operations
+export METRICS_BATCH_MAXLEN=10000    # Batch processing
+```
+
+**Default limits:**
+- Translation engine retry metrics: 1,000 samples
+- L3 semantic timing metrics: 10,000 samples
+- Batch optimizer timing metrics: 5,000 samples
+
+📚 **Configuration Guide**: [Metrics Configuration](docs/configuration/metrics.md)
+
+📚 **Full Benchmarking Documentation**: [Benchmarking Guide](docs/features/benchmarking.md)
+
+### Segment Sorting
+
+Optional performance optimization that sorts translation segments by length (shortest first) before processing:
+
+- **Improved GPU Batching**: Groups similar-length segments together for efficient batching
+- **Reduced Memory Fragmentation**: Homogeneous batches reduce padding overhead
+- **Better GPU Utilization**: Minimizes wasted compute on padding tokens
+- **Lower OOM Risk**: More predictable memory usage with uniform batch sizes
+
+**When to use:**
+- Large translation jobs (1000+ segments)
+- Documents with high length variance (short titles + long paragraphs)
+- GPU-based translation (CUDA)
+- Low TM cache hit rates (<50%)
+
+**Quick Start:**
+```bash
+# Enable via CLI flag
+python -m src.cli translate --site mysite --sort-segments-by-length
+
+# Or configure in config/default.yaml
+body_rules:
+  sort_segments_by_length: true
+```
+
+**Note:** Sorting overhead is typically <1% of total translation time. Output preserves original document structure exactly.
+
+📚 **Full Documentation**: [Segment Sorting Guide](docs/features/segment-sorting.md)
+
 ## Quick Start
+
+### First-Time Setup
+
+New to the project? Start here:
+
+- **[⚡ Setup Guide](docs/user-guide/setup.md)** - First-time installation for Windows, Linux, and macOS
+  - Automated setup scripts with GPU auto-detection
+  - Prerequisites, troubleshooting, and verification
+  - Platform-specific instructions (including WSL)
 
 ### Documentation
 
@@ -110,6 +208,7 @@ python -c "from src.tm.backup import create_tm_backup; from pathlib import Path;
 
 - `config/validation.yaml` - Validation rules, decision thresholds, retry strategy
 - `config/terminology.yaml` - Protected terminology (exact matches and patterns)
+- `config/metrics.yaml` - Metrics storage limits, thresholds, statistics configuration
 - `config/site_profiles/*.yaml` - Site-specific configuration
 
 ### Example: Enable Terminology Protection
@@ -141,9 +240,25 @@ global:
 
 ## Installation
 
-### Basic Installation
+For first-time setup with automated scripts and GPU detection, see the **[Setup Guide](docs/user-guide/setup.md)**.
+
+### Manual Installation (Advanced Users)
+
+If you prefer manual installation or need custom configuration:
 
 ```bash
+# Create virtual environment
+python -m venv venv
+source venv/bin/activate  # On Windows: .\venv\Scripts\Activate.ps1
+
+# Install dependencies (CPU mode)
+pip install -r requirements/cpu.txt
+
+# Or for GPU mode (requires CUDA 12.1+)
+pip install torch --index-url https://download.pytorch.org/whl/cu121
+pip install -r requirements/gpu.txt
+
+# Install package
 pip install -e .
 ```
 
