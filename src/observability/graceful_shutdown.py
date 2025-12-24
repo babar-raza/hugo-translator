@@ -20,6 +20,7 @@ Usage:
 """
 
 import logging
+import platform
 import signal
 import sys
 import time
@@ -161,7 +162,10 @@ def _perform_graceful_shutdown(signum: int, frame) -> None:
 
 def setup_graceful_shutdown() -> None:
     """
-    Setup signal handlers for graceful shutdown on SIGINT and SIGTERM.
+    Setup platform-aware signal handlers for graceful shutdown.
+
+    On Windows: Registers SIGINT and SIGBREAK (if available)
+    On Unix (Linux/macOS): Registers SIGINT and SIGTERM
 
     Should be called once at application startup (in main() or cli entry point).
 
@@ -170,11 +174,23 @@ def setup_graceful_shutdown() -> None:
             setup_graceful_shutdown()
             # ... rest of application
     """
-    # Register signal handlers
-    signal.signal(signal.SIGINT, _perform_graceful_shutdown)
-    signal.signal(signal.SIGTERM, _perform_graceful_shutdown)
+    system = platform.system()
 
-    logger.info("Graceful shutdown handlers registered (SIGINT, SIGTERM)")
+    # Always register SIGINT (works on all platforms)
+    signal.signal(signal.SIGINT, _perform_graceful_shutdown)
+
+    if system == "Windows":
+        # Windows: Use SIGBREAK instead of SIGTERM
+        if hasattr(signal, 'SIGBREAK'):
+            signal.signal(signal.SIGBREAK, _perform_graceful_shutdown)
+            logger.info("Graceful shutdown handlers registered for Windows (SIGINT, SIGBREAK)")
+        else:
+            logger.warning("SIGBREAK not available, using SIGINT only")
+            logger.info("Graceful shutdown handlers registered for Windows (SIGINT)")
+    else:
+        # Unix-like systems (Linux, macOS, etc.): Use SIGTERM
+        signal.signal(signal.SIGTERM, _perform_graceful_shutdown)
+        logger.info(f"Graceful shutdown handlers registered for {system} (SIGINT, SIGTERM)")
 
 
 def get_active_context_count() -> int:

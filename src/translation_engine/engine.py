@@ -24,6 +24,7 @@ from ..model_runtime import ModelLoader
 from ..observability.telemetry_integration import get_telemetry, _safe_duration_ms
 from ..observability.progress import get_progress_tracker
 from ..tm import TranslationMemory
+from ..utils.metrics import calc_stats
 from .extractor.placeholder_manager import PlaceholderManager
 from ..tm.override_controller import OverrideController, OverrideConfig, OverrideMode
 from ..utils.config_loader import ConfigService
@@ -169,6 +170,7 @@ class TranslationEngine:
         output_dir_override: Optional[Path] = None,
         progress_tracker: Optional["ProgressTracker"] = None,
         production_ingestor: Optional["ProductionMetricsIngestor"] = None,
+        sort_segments_by_length: bool = False,
         **kwargs,
     ):
         """
@@ -196,6 +198,7 @@ class TranslationEngine:
             output_dir_override: Override output directory (takes precedence over site profile)
             progress_tracker: Optional ProgressTracker for crash recovery (RES-02)
             production_ingestor: Optional ProductionMetricsIngestor for recording translation runs (BM-06)
+            sort_segments_by_length: Sort segments by length (shortest first) for improved batching efficiency
             **kwargs: Additional options (for future extensibility)
         """
         self.config = config_service
@@ -214,6 +217,7 @@ class TranslationEngine:
         self.save_rejected = save_rejected
         self.batch_size = batch_size  # GPU memory optimization: limit texts per batch
         self.output_dir_override = output_dir_override  # SR-02: CLI --output argument support
+        self.sort_segments_by_length = sort_segments_by_length  # SR-01: Sort segments shortest→longest for batching efficiency
 
         # SR-02c: Validate output_dir_override type (fail fast)
         if output_dir_override is not None and not isinstance(output_dir_override, Path):
@@ -335,10 +339,14 @@ class TranslationEngine:
         # RES-02: Progress tracker for crash recovery
         self.progress_tracker = progress_tracker
 
-        # BM-08: Retry timing instrumentation (SR-12: bounded to prevent memory leak)
+        # BM-08: Retry timing instrumentation (SR-12: bounded to prevent memory leak, CFG-01: configurable)
+        from ..utils.config_loader import get_metrics_config
+        metrics_config = get_metrics_config()
+        retry_maxlen = metrics_config["metrics"]["storage"]["translation_engine"]["retry_metrics_maxlen"]
+
         self._retry_metrics = {
-            "retry_attempts": deque(maxlen=1000),  # Keep last 1000 retry counts
-            "retry_durations_ms": deque(maxlen=1000),  # Keep last 1000 retry durations
+            "retry_attempts": deque(maxlen=retry_maxlen),  # Bounded by config
+            "retry_durations_ms": deque(maxlen=retry_maxlen),  # Bounded by config
             "retry_reasons": {},  # Dict mapping reason -> count (naturally bounded)
         }
         self._retry_metrics_lock = Lock()
@@ -2470,18 +2478,6 @@ class TranslationEngine:
             Dictionary with retry statistics including attempt counts, durations, and reasons
         """
         with self._retry_metrics_lock:
-            # Calculate statistics
-            def calc_stats(values: List[float]) -> Dict:
-                if not values:
-                    return {"count": 0, "mean": 0.0, "min": 0.0, "max": 0.0, "total": 0.0}
-                return {
-                    "count": len(values),
-                    "mean": sum(values) / len(values),
-                    "min": min(values),
-                    "max": max(values),
-                    "total": sum(values),
-                }
-
             return {
                 "retry_attempts": calc_stats(self._retry_metrics["retry_attempts"]),
                 "retry_durations_ms": calc_stats(self._retry_metrics["retry_durations_ms"]),
@@ -2582,10 +2578,24 @@ class TranslationEngine:
             batch_translations = []
             total_texts = len(singleline_texts)
 
+            # SR-01: Sort segments by length for improved batching efficiency
+            if self.sort_segments_by_length and total_texts > 1:
+                # Create sorted index mapping (shortest to longest)
+                sorted_indices = sorted(range(total_texts), key=lambda i: len(singleline_texts[i]))
+                sorted_texts = [singleline_texts[i] for i in sorted_indices]
+                logger.debug(
+                    f"SR-01: Sorting {total_texts} segments by length "
+                    f"(range: {len(sorted_texts[0])}-{len(sorted_texts[-1])} chars)"
+                )
+            else:
+                # No sorting: maintain original order
+                sorted_indices = list(range(total_texts))
+                sorted_texts = singleline_texts
+
             # Process in chunks of batch_size to avoid GPU OOM
             for chunk_start in range(0, total_texts, self.batch_size):
                 chunk_end = min(chunk_start + self.batch_size, total_texts)
-                chunk_texts = singleline_texts[chunk_start:chunk_end]
+                chunk_texts = sorted_texts[chunk_start:chunk_end]
 
                 if hasattr(backend, 'translate_with_token_counts'):
                     chunk_translations, input_tokens, output_tokens = backend.translate_with_token_counts(
@@ -2609,9 +2619,15 @@ class TranslationEngine:
                         f"({len(chunk_texts)} texts)"
                     )
 
+            # SR-01: Map results back to original document order
+            # Create reverse mapping: sorted_order[i] -> original_position
+            unsorted_translations = [None] * total_texts
+            for sorted_idx, original_list_idx in enumerate(sorted_indices):
+                unsorted_translations[original_list_idx] = batch_translations[sorted_idx]
+
             # Place results in correct positions
             for list_idx, original_idx in enumerate(singleline_indices):
-                translated_texts[original_idx] = batch_translations[list_idx]
+                translated_texts[original_idx] = unsorted_translations[list_idx]
 
         # Translate multiline texts with structure preservation
         if multiline_indices:

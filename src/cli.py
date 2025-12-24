@@ -85,6 +85,8 @@ class CLIConfigOverrides:
         self.model: Optional[str] = args.model
         # TC-CPU-02: Batch size override
         self.batch_size: Optional[int] = args.batch_size
+        # SR-02: Segment sorting control
+        self.sort_segments_by_length: Optional[bool] = args.sort_segments_by_length
         # Device and load mode overrides (federated-splashing-panda: T101)
         self.device: Optional[str] = None if args.device == "auto" else args.device
         self.load_mode: Optional[str] = None if args.load_mode == "auto" else args.load_mode
@@ -179,6 +181,10 @@ class CLIConfigOverrides:
         # TC-CPU-02: Batch size override
         if self.batch_size is not None:
             overrides["batch_size"] = self.batch_size
+
+        # SR-02: Segment sorting control
+        if self.sort_segments_by_length is not None:
+            overrides["sort_segments_by_length"] = self.sort_segments_by_length
 
         # Cache behavior control (federated-splashing-panda: Phase 2 redesign)
         overrides["force_retranslate"] = self.force_retranslate
@@ -329,6 +335,21 @@ Examples:
         type=int,
         metavar="N",
         help="Override batch size for translation (default: auto-detected based on RAM)",
+    )
+
+    model_group.add_argument(
+        "--sort-segments-by-length",
+        action="store_true",
+        default=None,
+        dest="sort_segments_by_length",
+        help="Sort segments by length (shortest first) before translation for improved GPU batching efficiency",
+    )
+
+    model_group.add_argument(
+        "--no-sort-segments-by-length",
+        action="store_false",
+        dest="sort_segments_by_length",
+        help="Disable segment sorting (process in document order)",
     )
 
     model_group.add_argument(
@@ -752,11 +773,11 @@ def translate_site(args: argparse.Namespace) -> int:
     try:
         from .observability.progress import init_progress_tracker, stop_progress_tracker, get_progress_tracker
         from .observability.graceful_shutdown import setup_graceful_shutdown
-        from .observability.telemetry_cleanup import cleanup_stale_runs_direct_db
+        from .observability.telemetry_cleanup import cleanup_stale_runs
     except ImportError:
         from observability.progress import init_progress_tracker, stop_progress_tracker, get_progress_tracker
         from observability.graceful_shutdown import setup_graceful_shutdown
-        from observability.telemetry_cleanup import cleanup_stale_runs_direct_db
+        from observability.telemetry_cleanup import cleanup_stale_runs
 
     progress_tracker = None
 
@@ -768,10 +789,10 @@ def translate_site(args: argparse.Namespace) -> int:
         setup_graceful_shutdown()
 
         # TC-01: Clean up stale telemetry runs from previous interrupted sessions
-        # Only run if telemetry database is accessible (Docker environment)
+        # Uses API-based cleanup to respect single-writer pattern
         try:
-            cleanup_stats = cleanup_stale_runs_direct_db(
-                db_path="/data/telemetry.sqlite",
+            cleanup_stats = cleanup_stale_runs(
+                api_url=os.getenv("TELEMETRY_API_URL", "http://localhost:8765"),
                 max_age_hours=1,
                 dry_run=False
             )
@@ -779,6 +800,10 @@ def translate_site(args: argparse.Namespace) -> int:
                 logger.info(
                     f"Telemetry cleanup: {cleanup_stats['updated']}/{cleanup_stats['stale_runs_found']} "
                     f"stale run(s) marked as cancelled"
+                )
+            elif cleanup_stats["errors"]:
+                logger.debug(
+                    f"Telemetry cleanup completed with errors: {cleanup_stats['errors']}"
                 )
         except Exception as cleanup_error:
             # Non-critical - just log and continue
