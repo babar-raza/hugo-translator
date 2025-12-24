@@ -104,6 +104,7 @@ Understand, extend, and contribute to the codebase.
 - **Performance**: [CPU Benchmarks](performance/cpu-benchmarks.md) - Model comparison and guidance
 
 ### ⚡ Performance Optimization
+- **[Performance Tuning Guide](guides/performance-tuning.md)** - Complete performance optimization strategies (batch sizing, GPU config, segment sorting)
 - **Segment Sorting**: [Segment Sorting Guide](features/segment-sorting.md) - Length-based sorting for improved GPU batching (0-20% throughput improvement)
 - **Batch Optimization**: [Batch Optimization Guide](guides/batch-optimization.md) - Dynamic batch sizing and memory management
 - **CPU Optimization**: [CPU Performance](performance/cpu-benchmarks.md) - CPU-specific tuning and recommendations
