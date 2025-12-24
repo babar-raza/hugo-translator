@@ -394,9 +394,7 @@ A: Sorting works best with larger batches (16-32). Use `--batch-size` flag or CP
 
 ## See Also
 
-- [Batch Optimization](./batch-optimization.md) - Full batching optimization guide
 - [Performance Tuning](../guides/performance-tuning.md) - Complete performance optimization strategies
-- [Translation Engine API](../api/translation-engine.md) - Engine configuration reference
 - [CLI Reference](../reference/cli.md) - All CLI flags and options
 - [Benchmarking Guide](./benchmarking.md) - Measure performance improvements
 
