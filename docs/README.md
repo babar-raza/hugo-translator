@@ -96,6 +96,18 @@ Understand, extend, and contribute to the codebase.
 - **Advanced**: [Override Modes](guides/tm-override-modes.md) - Control cache behavior
 - **Technical**: [Architecture](architecture/translation-memory.md) | [API Reference](reference/tm-api.md)
 
+### 📊 Benchmarking
+- **Getting Started**: [Benchmarking Overview](features/benchmarking.md) - Performance measurement and ML recommendations
+- **Operations**: [Benchmarking Operations](operations/benchmarking-operations.md) - Database maintenance, tuning, monitoring
+- **Examples**: [Usage Examples](examples/benchmarking-examples.md) | [Quick Runbook](runbooks/benchmarking-runbook.md)
+- **Technical**: [Architecture](architecture/benchmarking-system.md) | [API Reference](api/benchmarking-api.md)
+- **Performance**: [CPU Benchmarks](performance/cpu-benchmarks.md) - Model comparison and guidance
+
+### ⚡ Performance Optimization
+- **Segment Sorting**: [Segment Sorting Guide](features/segment-sorting.md) - Length-based sorting for improved GPU batching (0-20% throughput improvement)
+- **Batch Optimization**: [Batch Optimization Guide](guides/batch-optimization.md) - Dynamic batch sizing and memory management
+- **CPU Optimization**: [CPU Performance](performance/cpu-benchmarks.md) - CPU-specific tuning and recommendations
+
 ### 🧪 Development
 - [Setup](development/setup.md) - Development environment
 - [Testing](development/testing.md) - Test suite and execution

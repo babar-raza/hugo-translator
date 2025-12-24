@@ -2,6 +2,8 @@
 
 This runbook provides step-by-step procedures for common daily operational tasks for the Hugo Translation System.
 
+> **Comprehensive Guide**: For detailed explanations, troubleshooting, and operational guidance beyond daily tasks, see the [Operations Manual (README.md)](README.md).
+
 ## Table of Contents
 
 - [System Startup](#system-startup)

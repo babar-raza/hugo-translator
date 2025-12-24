@@ -3,6 +3,8 @@
 **Version:** 1.0.0
 **Last Updated:** 2025-11-21
 
+> **Quick Reference**: For daily operational checklist and step-by-step procedures, see [DAILY_OPERATIONS.md](DAILY_OPERATIONS.md). This manual provides comprehensive guidance across all time scales (daily, weekly, monthly maintenance).
+
 ---
 
 ## Table of Contents
