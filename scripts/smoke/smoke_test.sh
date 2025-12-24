@@ -178,6 +178,53 @@ except Exception as e:
     return 0
 }
 
+# Test 5: Real translation
+test_real_translation() {
+    log_info "Test 5: Running real translation (may download models on first run ~1-2GB)..."
+    log_warning "First run downloads models from HuggingFace. Please be patient."
+
+    if [ ! -f "${FIXTURE_FILE}" ]; then
+        log_error "Fixture file not found: ${FIXTURE_FILE}"
+        return 1
+    fi
+
+    # Clean output directory
+    rm -rf "${OUTPUT_DIR}/de"
+    mkdir -p "${OUTPUT_DIR}/de"
+
+    # Run translation with timeout
+    log_info "Running: translate-hugo --input ${FIXTURE_FILE} --target-langs de --output ${OUTPUT_DIR} --disable-validation"
+
+    if timeout 300 translate-hugo \
+        --input "${FIXTURE_FILE}" \
+        --target-langs de \
+        --output "${OUTPUT_DIR}" \
+        --disable-validation \
+        2>&1 | tee /tmp/smoke_test_real_translation.log; then
+
+        # Verify output file exists and is not empty
+        OUTPUT_FILE="${OUTPUT_DIR}/de/smoke_test.md"
+        if [ -f "${OUTPUT_FILE}" ] && [ -s "${OUTPUT_FILE}" ]; then
+            FILE_SIZE=$(wc -c < "${OUTPUT_FILE}")
+            log_success "✓ Real translation completed (output: ${FILE_SIZE} bytes)"
+            return 0
+        else
+            log_error "✗ Output file not created or empty: ${OUTPUT_FILE}"
+            return 1
+        fi
+    else
+        EXIT_CODE=$?
+        if [ ${EXIT_CODE} -eq 124 ]; then
+            log_error "✗ Translation timed out (>300s) - may be downloading models"
+            log_error "Check /tmp/smoke_test_real_translation.log for details"
+        else
+            log_error "✗ Real translation failed"
+            log_error "Check /tmp/smoke_test_real_translation.log for details"
+        fi
+        return 1
+    fi
+}
+
 # Run all tests
 run_tests() {
     local failed=0
@@ -192,6 +239,9 @@ run_tests() {
     echo ""
 
     test_dry_run || ((failed++))
+    echo ""
+
+    test_real_translation || ((failed++))
     echo ""
 
     return $failed

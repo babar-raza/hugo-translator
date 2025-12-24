@@ -189,6 +189,56 @@ except Exception:
     Write-Host "  Package version: $version"
 }
 
+# Test 5: Real translation
+function Test-RealTranslation {
+    Write-Info "Running real translation (may download models on first run ~1-2GB)..."
+    Write-Warning "First run downloads models from HuggingFace. Please be patient."
+
+    if (-not (Test-Path $FixtureFile)) {
+        throw "Fixture file not found: $FixtureFile"
+    }
+
+    # Clean output directory
+    $targetDir = Join-Path $OutputDir "de"
+    if (Test-Path $targetDir) {
+        Remove-Item -Recurse -Force $targetDir
+    }
+    New-Item -ItemType Directory -Path $targetDir -Force | Out-Null
+
+    # Run translation with timeout
+    Write-Info "Running: translate-hugo --input $FixtureFile --target-langs de --output $OutputDir --disable-validation"
+
+    $logFile = Join-Path $env:TEMP "smoke_test_real_translation.log"
+
+    # Start translation process with timeout
+    $job = Start-Job -ScriptBlock {
+        param($fixture, $output)
+        translate-hugo --input $fixture --target-langs de --output $output --disable-validation 2>&1
+    } -ArgumentList $FixtureFile, $OutputDir
+
+    # Wait up to 300 seconds
+    $completed = Wait-Job -Job $job -Timeout 300
+
+    if ($completed) {
+        $output = Receive-Job -Job $job
+        $output | Tee-Object -FilePath $logFile | Out-Host
+        Remove-Job -Job $job
+
+        # Verify output file exists and is not empty
+        $outputFile = Join-Path $targetDir "smoke_test.md"
+        if ((Test-Path $outputFile) -and ((Get-Item $outputFile).Length -gt 0)) {
+            $fileSize = (Get-Item $outputFile).Length
+            Write-Success "✓ Real translation completed (output: $fileSize bytes)"
+        } else {
+            throw "Output file not created or empty: $outputFile"
+        }
+    } else {
+        Stop-Job -Job $job
+        Remove-Job -Job $job
+        throw "Translation timed out (>300s) - may be downloading models. Check $logFile for details"
+    }
+}
+
 # Run all tests
 function Invoke-AllTests {
     Invoke-Test "CLI Help Command" { Test-CLIHelp }
@@ -201,6 +251,9 @@ function Invoke-AllTests {
     Write-Host ""
 
     Invoke-Test "Dry-Run Translation" { Test-DryRun }
+    Write-Host ""
+
+    Invoke-Test "Real Translation" { Test-RealTranslation }
     Write-Host ""
 }
 
