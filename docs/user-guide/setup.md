@@ -480,6 +480,147 @@ If downloads fail:
 - Ensure sufficient disk space
 - Check Hugging Face Hub access (some networks block it)
 
+### Common Setup Failures and Solutions
+
+#### "No space left on device" during pip install
+
+**Symptom:**
+```
+OSError: [Errno 28] No space left on device
+```
+
+**Cause:** Insufficient disk space for PyTorch download (CUDA version is ~2.5GB).
+
+**Solution:**
+```bash
+# Check available space
+df -h .
+
+# Free up space (remove old packages, logs, etc.)
+sudo apt clean  # Linux
+# Or on Windows: Disk Cleanup utility
+
+# If still insufficient: use CPU mode instead
+./scripts/setup/setup.sh --cpu
+```
+
+---
+
+#### "Could not find a version that satisfies the requirement torch"
+
+**Symptom:**
+```
+ERROR: Could not find a version that satisfies the requirement torch>=2.1.0
+```
+
+**Cause:** Network timeout or pip cache corruption.
+
+**Solution:**
+```bash
+# Clear pip cache
+pip cache purge
+
+# Increase timeout and retry
+pip install --timeout=300 torch --index-url https://download.pytorch.org/whl/cu121
+
+# If behind proxy, configure pip:
+pip config set global.proxy http://proxy.example.com:8080
+```
+
+---
+
+#### "CUDA out of memory" immediately after setup
+
+**Symptom:**
+```
+RuntimeError: CUDA out of memory. Tried to allocate X.XX GiB
+```
+
+**Cause:** Other processes using GPU VRAM (games, browsers, ML tools).
+
+**Solution:**
+```bash
+# Check GPU memory usage
+nvidia-smi
+
+# Close GPU-heavy processes or force CPU mode
+./scripts/setup/setup.sh --cpu
+```
+
+---
+
+#### Certificate verification errors with pip
+
+**Symptom:**
+```
+SSL: CERTIFICATE_VERIFY_FAILED
+```
+
+**Cause:** Corporate proxy/firewall with SSL inspection.
+
+**Solution:**
+```bash
+# Option 1: Configure proxy
+export HTTP_PROXY=http://proxy.company.com:8080
+export HTTPS_PROXY=http://proxy.company.com:8080
+export NO_PROXY=localhost,127.0.0.1
+
+# Option 2: Use company certificate bundle
+pip config set global.cert /path/to/company-ca-bundle.crt
+
+# Option 3: Disable SSL verification (NOT RECOMMENDED for production)
+pip install --trusted-host pypi.org --trusted-host files.pythonhosted.org torch
+```
+
+---
+
+#### WSL: GPU detected but torch.cuda.is_available() returns False
+
+**Symptom:** nvidia-smi works but PyTorch can't use GPU.
+
+**Cause:** WSL CUDA support requires Windows driver only (don't install CUDA in WSL).
+
+**Solution:**
+```bash
+# Verify Windows NVIDIA driver version >= 450.80.02
+# In Windows PowerShell:
+nvidia-smi
+
+# In WSL, verify CUDA version matches PyTorch:
+python -c "import torch; print('CUDA version:', torch.version.cuda)"
+
+# If mismatch, reinstall PyTorch for correct CUDA version:
+pip uninstall torch
+pip install torch --index-url https://download.pytorch.org/whl/cu121
+```
+
+---
+
+#### Model download hangs or times out
+
+**Symptom:** First translation run downloads models but hangs at 50%.
+
+**Cause:** Slow network or HuggingFace Hub throttling.
+
+**Solution:**
+```bash
+# Increase timeout (environment variable)
+export HF_HUB_DOWNLOAD_TIMEOUT=600  # 10 minutes
+
+# Or pre-download models manually:
+python -c "
+from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+tokenizer = AutoTokenizer.from_pretrained('facebook/m2m100_418M')
+model = AutoModelForSeq2SeqLM.from_pretrained('facebook/m2m100_418M')
+print('Model cached successfully')
+"
+
+# Then run smoke tests (will use cached model)
+./scripts/smoke/smoke_test.sh
+```
+
+---
+
 ### Getting Help
 
 If you encounter issues not covered here:
