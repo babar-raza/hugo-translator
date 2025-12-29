@@ -1,0 +1,149 @@
+{% extends "base.html" %}
+
+{% block title %}Models{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Model Comparison</h1>
+    <p class="subtitle">Performance comparison across all benchmarked models</p>
+</div>
+
+<div class="controls">
+    <label>
+        <input type="checkbox" id="filterCPU" checked> CPU
+    </label>
+    <label>
+        <input type="checkbox" id="filterGPU" checked> GPU
+    </label>
+    <button id="exportCSV" class="btn-secondary">Export CSV</button>
+</div>
+
+<div id="modelsTable">
+    <div class="loading">Loading model data...</div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let allModels = [];
+
+// Fetch models
+fetch('/api/models')
+    .then(res => res.json())
+    .then(data => {
+        allModels = data;
+        renderModelsTable();
+    })
+    .catch(err => {
+        console.error('Error loading models:', err);
+        document.getElementById('modelsTable').innerHTML =
+            '<div class="error-message">Failed to load model data</div>';
+    });
+
+// Filter controls
+document.getElementById('filterCPU').addEventListener('change', renderModelsTable);
+document.getElementById('filterGPU').addEventListener('change', renderModelsTable);
+
+// Export CSV
+document.getElementById('exportCSV').addEventListener('click', exportToCSV);
+
+function renderModelsTable() {
+    const container = document.getElementById('modelsTable');
+
+    const showCPU = document.getElementById('filterCPU').checked;
+    const showGPU = document.getElementById('filterGPU').checked;
+
+    const filtered = allModels.filter(m => {
+        if (m.device === 'cpu' && !showCPU) return false;
+        if (m.device === 'cuda' && !showGPU) return false;
+        if (m.device === 'gpu' && !showGPU) return false;
+        return true;
+    });
+
+    if (filtered.length === 0) {
+        container.innerHTML = '<div class="no-data">No models match the selected filters</div>';
+        return;
+    }
+
+    let html = `
+        <table class="data-table sortable">
+            <thead>
+                <tr>
+                    <th>Model ID</th>
+                    <th>Device</th>
+                    <th>Runs</th>
+                    <th class="sortable" onclick="sortTable('avg_throughput')">
+                        Avg Throughput ▼
+                    </th>
+                    <th class="sortable" onclick="sortTable('max_throughput')">
+                        Max Throughput
+                    </th>
+                    <th class="sortable" onclick="sortTable('avg_memory')">
+                        Avg Memory
+                    </th>
+                    <th>Avg Time</th>
+                </tr>
+            </thead>
+            <tbody>
+    `;
+
+    filtered.forEach(model => {
+        html += `
+            <tr>
+                <td><strong>${model.model_id}</strong></td>
+                <td><span class="device-badge ${model.device}">${model.device}</span></td>
+                <td>${model.run_count}</td>
+                <td>${model.avg_throughput ? model.avg_throughput.toFixed(1) + ' tokens/sec' : 'N/A'}</td>
+                <td>${model.max_throughput ? model.max_throughput.toFixed(1) + ' tokens/sec' : 'N/A'}</td>
+                <td>${model.avg_memory ? model.avg_memory.toFixed(0) + ' MB' : 'N/A'}</td>
+                <td>${model.avg_time ? model.avg_time.toFixed(2) + 's' : 'N/A'}</td>
+            </tr>
+        `;
+    });
+
+    html += `
+            </tbody>
+        </table>
+    `;
+
+    container.innerHTML = html;
+}
+
+function sortTable(column) {
+    allModels.sort((a, b) => {
+        const aVal = a[column] || 0;
+        const bVal = b[column] || 0;
+        return bVal - aVal;  // Descending
+    });
+    renderModelsTable();
+}
+
+function exportToCSV() {
+    const showCPU = document.getElementById('filterCPU').checked;
+    const showGPU = document.getElementById('filterGPU').checked;
+
+    const filtered = allModels.filter(m => {
+        if (m.device === 'cpu' && !showCPU) return false;
+        if (m.device === 'cuda' && !showGPU) return false;
+        if (m.device === 'gpu' && !showGPU) return false;
+        return true;
+    });
+
+    let csv = 'Model ID,Device,Runs,Avg Throughput,Max Throughput,Avg Memory,Avg Time\\n';
+
+    filtered.forEach(model => {
+        csv += `${model.model_id},${model.device},${model.run_count},`;
+        csv += `${model.avg_throughput || ''},${model.max_throughput || ''},`;
+        csv += `${model.avg_memory || ''},${model.avg_time || ''}\\n`;
+    });
+
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'models_benchmark_export.csv';
+    a.click();
+    window.URL.revokeObjectURL(url);
+}
+</script>
+{% endblock %}

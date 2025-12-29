@@ -20,6 +20,7 @@ from typing import List, Optional
 
 import yaml
 
+from .recommender import ModelRecommender as BenchmarkRecommender
 from .reporter import BenchmarkReporter
 from .runner import BenchmarkRunner, load_corpus
 from .storage import BenchmarkDatabase
@@ -330,6 +331,55 @@ def cmd_recommend(args: argparse.Namespace) -> int:
         Exit code (0 for success, 1 for failure)
     """
     try:
+        # Check if this is an OOM-safe batch size recommendation (CUDA + max_memory_gb)
+        if args.device and args.device.startswith('cuda') and args.max_memory_gb:
+            # Use benchmarking recommender for OOM-safe batch size
+            db_path = Path(args.db) if args.db else get_benchmark_db_path()
+
+            if not db_path.exists():
+                print(f"ERROR: Benchmark database not found at {db_path}", file=sys.stderr)
+                print(f"HINT: Run GPU benchmarks first:", file=sys.stderr)
+                print(f"  python -m src.benchmarking.cli run --model m2m100_418m --device {args.device} --batch-sizes 8,16,32 --save-to-db {db_path}", file=sys.stderr)
+                return 1
+
+            db = BenchmarkDatabase(db_path)
+            recommender = BenchmarkRecommender(db=db)
+
+            # Get OOM-safe batch size recommendation
+            max_memory_mb = args.max_memory_gb * 1024
+            safety_margin = getattr(args, 'safety_margin', 0.20)
+
+            result = recommender.get_oom_safe_batch_size(
+                device=args.device,
+                max_memory_mb=max_memory_mb,
+                safety_margin=safety_margin
+            )
+
+            # Format output
+            if args.format == "json":
+                print(json.dumps(result, indent=2))
+            else:
+                # Markdown format
+                print("=" * 60)
+                print("OOM-Safe Batch Size Recommendation")
+                print("=" * 60)
+                print(f"Device:              {args.device}")
+                print(f"Max GPU Memory:      {result['max_memory_mb']:.0f} MB ({result['max_memory_mb']/1024:.1f} GB)")
+                print(f"Safety Margin:       {result['safety_margin_pct']:.0f}%")
+                print("")
+                print(f"✅ Recommended:      batch_size = {result['recommended_batch_size']}")
+                print(f"   Estimated Peak:   {result['estimated_peak_mb']:.0f} MB")
+                utilization = result['estimated_peak_mb'] / result['max_memory_mb'] * 100 if result['max_memory_mb'] > 0 else 0
+                print(f"   Utilization:      {utilization:.1f}%")
+                print(f"   Confidence:       {result['confidence_samples']} historical samples")
+
+                if 'warning' in result:
+                    print("")
+                    print(f"⚠️  WARNING: {result['warning']}", file=sys.stderr)
+
+            return 0
+
+        # Original model recommender logic for non-OOM-safe cases
         # Load registry
         registry_path = Path(args.registry)
         if not registry_path.exists():

@@ -3,16 +3,43 @@ content_roots:
 - /content/about
 default_source_lang: en
 target_langs:
-- de
-- es
-- fr
-- ja
-- ko
-- ru
-- zh
-- ar
-- it
-- pt
+  - ar
+  - bg
+  - ca
+  - cs
+  - da
+  - de
+  - el
+  - es
+  - fa
+  - fi
+  - fr
+  - he
+  - hi
+  - hr
+  - hu
+  - id
+  - it
+  - ja
+  - ko
+  - lt
+  - lv
+  - ms
+  - nl
+  - "no"
+  - pl
+  - pt
+  - ro
+  - ru
+  - sk
+  - sr
+  - sv
+  - th
+  - tr
+  - uk
+  - vi
+  - zh
+
 frontmatter:
   title:
     mode: translate
@@ -44,9 +71,13 @@ body:
   preserve_patterns:
   - ^\{\{<.*?>\}\}
   - ^\{\{%.*?%\}\}
+  - \bAspose\b  # Protect standalone Aspose brand name
   placeholder_syntax:
   - \{\{<.*?>\}\}
   - \{\{%.*?%\}\}
+  use_ast_body_reconstruction: true
+  ast_segmentation_strategy: adaptive
+  ast_batch_size: 50
 output_layout:
   per_language_folders: true
   pattern: '{lang}/{path}'

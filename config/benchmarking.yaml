@@ -1,0 +1,37 @@
+# Benchmarking system configuration
+# Feature flag: features.enable_model_benchmarking in config/global.yaml
+
+# Database configuration
+database:
+  # Path for benchmark runs (explicit benchmarking)
+  path: "data/benchmarks/benchmarks.db"
+
+  # Path for production metrics (automated recording)
+  production_path: "data/benchmarks/production.db"
+
+# Production metrics integration (BM-06)
+production:
+  # OPT-IN: Production run recording is disabled by default
+  # Set to true to record all translation runs as benchmark data points
+  record_enabled: false
+
+  # Minimum segments to record (skip tiny translations)
+  min_segments_to_record: 10
+
+  # Performance drift detection
+  drift_detection_enabled: true
+  drift_threshold_percent: 20  # Alert if performance degrades by >20%
+
+# Resource-aware scheduling (BM-04)
+scheduler:
+  # Maximum resource usage thresholds
+  max_cpu_percent: 80  # Don't run if CPU > 80%
+  max_memory_percent: 85  # Don't run if memory > 85%
+  max_gpu_memory_percent: 90  # Don't run if GPU memory > 90%
+
+  # Minimum available resources before running
+  min_available_memory_mb: 1024  # Require at least 1GB free
+
+  # Timeouts and polling
+  default_timeout_seconds: 3600  # Wait up to 1 hour for resources
+  poll_interval_seconds: 5  # Check resources every 5 seconds

@@ -10,10 +10,12 @@ Provides CLI flags for:
 CLI flags override configuration file settings.
 """
 import argparse
+import atexit
 import logging
 import os
 import shutil
 import signal
+import subprocess
 import sys
 from pathlib import Path
 from typing import Dict, List, Optional
@@ -33,6 +35,7 @@ try:
     from .model_runtime import ModelLoader
     from .model_runtime.registry import ModelRegistry
     from .model_runtime.cpu_optimizer import CPUOptimizer
+    from .model_runtime.gpu_optimizer import GPUOptimizer
     from .utils.config_loader import ConfigService
     from .utils.file_filters import filter_source_files
     from .utils.models import ValidationSettings, TerminologySettings
@@ -49,12 +52,26 @@ except ImportError:
     from model_runtime import ModelLoader
     from model_runtime.registry import ModelRegistry
     from model_runtime.cpu_optimizer import CPUOptimizer
+    from model_runtime.gpu_optimizer import GPUOptimizer
     from utils.config_loader import ConfigService
     from utils.file_filters import filter_source_files
     from utils.models import ValidationSettings, TerminologySettings
     from verification.report import write_report
 
 logger = logging.getLogger(__name__)
+
+# TC1: Global lock tracker for signal handlers (Lock Contention Fix)
+_parent_lock = None
+
+
+def _signal_handler(signum, frame):
+    """Release lock on SIGINT/SIGTERM."""
+    global _parent_lock
+    if _parent_lock:
+        logger.info(f"Received signal {signum}, releasing lock...")
+        _parent_lock.release()
+        _parent_lock = None
+    sys.exit(1)
 
 
 class CLIConfigOverrides:
@@ -107,6 +124,10 @@ class CLIConfigOverrides:
         self.resume: bool = args.resume
         self.force_restart: bool = args.force_restart
         self.progress_dir: str = args.progress_dir
+        # Content hash tracking
+        self.disable_content_hash: bool = args.disable_content_hash
+        self.rebuild_content_hashes: bool = args.rebuild_content_hashes
+        self.validate_output_integrity: bool = args.validate_output_integrity
 
     def apply_to_config_service(self, config_service: ConfigService) -> None:
         """
@@ -207,6 +228,12 @@ class CLIConfigOverrides:
             overrides["global_lang_rounds"] = self.global_lang_rounds
             overrides["global_lang_sort"] = self.global_lang_sort
 
+        # Content hash tracking control (CHT-04)
+        overrides["enable_content_hash_tracking"] = not self.disable_content_hash
+
+        # Note: rebuild_content_hashes is handled in main() before engine creation
+        # Note: validate_output_integrity would be passed to engine if implemented
+
         return overrides
 
 
@@ -272,6 +299,22 @@ Examples:
         "--target-langs",
         nargs="+",
         help="Target languages (overrides site profile)",
+    )
+
+    # Hidden flag to prevent infinite recursion in multi-language subprocess mode
+    parser.add_argument(
+        "--_single-lang-mode",
+        dest="_single_lang_mode",
+        action="store_true",
+        help=argparse.SUPPRESS,  # Hidden from help text
+    )
+
+    # Hidden flag for parent-held lock pattern (TC1: Lock Contention Fix)
+    parser.add_argument(
+        "--_skip-site-lock",
+        dest="_skip_site_lock",
+        action="store_true",
+        help=argparse.SUPPRESS,  # Hidden from help text
     )
 
     # Validation mode control
@@ -534,6 +577,24 @@ Examples:
         default="auto",
         metavar="MODE",
         help="Cache write behavior: auto (write if missing, default), always (overwrite existing), never (read-only)",
+    )
+
+    cache_group.add_argument(
+        "--disable-content-hash",
+        action="store_true",
+        help="Disable content hash tracking (use mtime-only change detection)",
+    )
+
+    cache_group.add_argument(
+        "--rebuild-content-hashes",
+        action="store_true",
+        help="Ignore stored content hashes and recompute all (forces metadata rebuild)",
+    )
+
+    cache_group.add_argument(
+        "--validate-output-integrity",
+        action="store_true",
+        help="Validate translated output file integrity (detect manual edits)",
     )
 
     # Multi-language processing (T301: federated-splashing-panda)
@@ -821,68 +882,138 @@ def _cleanup_progress(progress_dir: Path, site_id: str) -> int:
     return removed
 
 
-def setup_logging(log_level: str, log_file: Optional[str] = None) -> None:
+def setup_logging(log_level: str, log_file: Optional[str] = None, config_root: Optional[str] = None) -> None:
     """
-    Configure logging for CLI.
+    Configure structured logging for CLI.
+
+    Reads configuration from global.yaml and merges with CLI args.
+    Sets up dual output: NDJSON file + colored console.
 
     Args:
-        log_level: Logging level (DEBUG, INFO, WARNING, ERROR)
-        log_file: Optional file path to write logs to
+        log_level: Logging level from CLI (DEBUG, INFO, WARNING, ERROR)
+        log_file: Optional file path from CLI (overrides config)
+        config_root: Configuration root directory (defaults to ./config)
     """
-    level = getattr(logging, log_level.upper())
+    from pathlib import Path
+    import yaml
+    from src.observability.logger import setup_structured_logging
 
-    # Create formatter
-    formatter = logging.Formatter(
-        "%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-        datefmt="%Y-%m-%d %H:%M:%S",
-    )
-
-    # Configure root logger
-    root_logger = logging.getLogger()
-    root_logger.setLevel(level)
-
-    # Remove existing handlers
-    root_logger.handlers.clear()
-
-    # Add appropriate handler
-    if log_file:
-        handler = logging.FileHandler(log_file, encoding="utf-8")
+    # Use provided config_root or default
+    if config_root:
+        config_path = Path(config_root) / "global.yaml"
     else:
-        handler = logging.StreamHandler(sys.stdout)
+        config_path = Path("config/global.yaml")
 
-    handler.setLevel(level)
-    handler.setFormatter(formatter)
-    root_logger.addHandler(handler)
+    logging_config = None
+
+    if config_path.exists():
+        try:
+            with open(config_path, "r", encoding="utf-8") as f:
+                global_config = yaml.safe_load(f)
+                logging_config = global_config.get("observability", {}).get("logging", {})
+        except Exception as e:
+            # Fallback to defaults if config read fails
+            print(f"Warning: Failed to load logging config: {e}")
+            logging_config = None
+
+    # Determine effective logging configuration
+    if logging_config and logging_config.get("enabled", True):
+        # Use config from global.yaml, allowing CLI overrides
+        effective_log_level = log_level or logging_config.get("log_level", "INFO")
+        console_output = logging_config.get("console_output", True)
+        file_output = logging_config.get("file_output", True)
+
+        # CLI log_file takes precedence over config
+        if log_file:
+            log_file_path = Path(log_file)
+        elif file_output:
+            log_file_path = Path(logging_config.get("log_file", "data/logs/hugo-translator.ndjson"))
+        else:
+            log_file_path = None
+
+        max_mb = logging_config.get("max_file_size_mb", 100)
+        backup_count = logging_config.get("backup_count", 10)
+
+        # Set up structured logging with dual output
+        setup_structured_logging(
+            log_level=effective_log_level,
+            log_file=log_file_path if file_output or log_file else None,
+            console_output=console_output,
+            max_bytes=max_mb * 1024 * 1024,  # Convert MB to bytes
+            backup_count=backup_count,
+        )
+    else:
+        # Fallback to basic logging if structured logging is disabled
+        level = getattr(logging, log_level.upper())
+
+        # Create formatter
+        formatter = logging.Formatter(
+            "%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+            datefmt="%Y-%m-%d %H:%M:%S",
+        )
+
+        # Configure root logger
+        root_logger = logging.getLogger()
+        root_logger.setLevel(level)
+
+        # Remove existing handlers
+        root_logger.handlers.clear()
+
+        # Add appropriate handler
+        if log_file:
+            handler = logging.FileHandler(log_file, encoding="utf-8")
+        else:
+            handler = logging.StreamHandler(sys.stdout)
+
+        handler.setLevel(level)
+        handler.setFormatter(formatter)
+        root_logger.addHandler(handler)
 
 
-def setup_signal_handlers(engine: "TranslationEngine") -> None:
+def setup_unified_signal_handler(engine: "TranslationEngine") -> None:
     """
-    RES-06: Set up signal handlers for graceful shutdown.
+    SR-01, SR-05: Set up unified signal handler for graceful shutdown.
 
-    Registers handlers for SIGINT (Ctrl+C) and SIGTERM to allow
-    the translation engine to complete its current file before
-    stopping and to save all TM state.
+    This handler combines telemetry cleanup (from graceful_shutdown module)
+    with engine shutdown coordination, fixing the issue where two separate
+    handlers would conflict and cause the first to be overwritten.
+
+    Platform-aware signal handling:
+    - Windows: Handles SIGINT, SIGTERM, and SIGBREAK
+    - Unix/Linux/macOS: Handles SIGINT and SIGTERM
 
     Supports multi-stage shutdown:
-    - First Ctrl+C: Graceful shutdown (finish current file)
-    - Second Ctrl+C: Force quit immediately
+    - First Ctrl+C: Graceful shutdown (cleanup telemetry, finish current file)
+    - Second Ctrl+C: Force quit immediately (exit code 130)
 
     Args:
         engine: The TranslationEngine instance to coordinate shutdown with
     """
+    import platform as platform_mod
+    from .observability.graceful_shutdown import cleanup_telemetry_contexts
+
     # Track number of interrupt signals received
     interrupt_count = {'count': 0}
+    is_windows = platform_mod.system() == 'Windows'
 
-    def signal_handler(signum, frame):
+    def unified_signal_handler(signum, frame):
         sig_name = signal.Signals(signum).name if hasattr(signal, 'Signals') else str(signum)
         interrupt_count['count'] += 1
 
         if interrupt_count['count'] == 1:
-            # First interrupt: request graceful shutdown
+            # First interrupt: graceful shutdown sequence
             logger.warning(
                 f"Received {sig_name}, initiating graceful shutdown...\n"
                 "Finishing current file and saving progress. Press Ctrl+C again to force quit."
             )
+
+            # Step 1: Clean up telemetry contexts (preserves partial metrics)
+            try:
+                cleanup_telemetry_contexts(sig_name)
+            except Exception as e:
+                logger.error(f"Error during telemetry cleanup: {e}")
+
+            # Step 2: Request engine shutdown (saves L3 index, completes current file)
             engine.request_shutdown()
         else:
             # Second or subsequent interrupt: force quit immediately
@@ -893,11 +1024,35 @@ def setup_signal_handlers(engine: "TranslationEngine") -> None:
             # Force immediate exit with standard interrupt exit code
             sys.exit(130)
 
-    # Register handlers
-    signal.signal(signal.SIGINT, signal_handler)
-    signal.signal(signal.SIGTERM, signal_handler)
+    # Register handlers for all relevant signals (platform-aware)
+    signals_to_register = [signal.SIGINT, signal.SIGTERM]
 
-    logger.debug("Signal handlers registered for graceful shutdown")
+    # SR-05: Add SIGBREAK on Windows (CTRL+C may send SIGBREAK in some terminals)
+    if is_windows and hasattr(signal, 'SIGBREAK'):
+        signals_to_register.append(signal.SIGBREAK)
+
+    for sig in signals_to_register:
+        signal.signal(sig, unified_signal_handler)
+
+    sig_names = [s.name if hasattr(s, 'name') else str(s) for s in signals_to_register]
+    logger.debug(f"Unified signal handlers registered for graceful shutdown: {', '.join(sig_names)}")
+
+
+def setup_signal_handlers(engine: "TranslationEngine") -> None:
+    """
+    DEPRECATED: Legacy function kept for backward compatibility.
+
+    Use setup_unified_signal_handler() instead, which properly coordinates
+    telemetry cleanup AND engine shutdown without conflicts.
+
+    Args:
+        engine: The TranslationEngine instance to coordinate shutdown with
+    """
+    logger.warning(
+        "setup_signal_handlers() is deprecated. "
+        "Calling setup_unified_signal_handler() instead."
+    )
+    setup_unified_signal_handler(engine)
 
 
 def translate_site(args: argparse.Namespace) -> int:
@@ -924,20 +1079,24 @@ def translate_site(args: argparse.Namespace) -> int:
 
     try:
         # Setup logging
-        setup_logging(args.log_level, args.log_file)
+        setup_logging(args.log_level, args.log_file, args.config_root)
 
-        # GS-01: Setup graceful shutdown handlers before any work
-        setup_graceful_shutdown()
+        # Create CLI overrides early (needed for metrics_only flag)
+        overrides = CLIConfigOverrides(args)
+
+        # SR-01: Graceful shutdown setup moved after engine creation
+        # (unified handler requires engine instance to coordinate shutdown)
 
         # TC-01: Clean up stale telemetry runs from previous interrupted sessions
         # Uses API-based cleanup to respect single-writer pattern
         try:
             cleanup_stats = cleanup_stale_runs(
-                api_url=os.getenv("TELEMETRY_API_URL", "http://localhost:8765"),
+                api_url=os.getenv("METRICS_API_URL", "http://localhost:8765"),
                 max_age_hours=1,
-                dry_run=False
+                dry_run=False,
+                quiet=overrides.metrics_only  # Suppress verbose logging in metrics-only mode
             )
-            if cleanup_stats["stale_runs_found"] > 0:
+            if cleanup_stats["stale_runs_found"] > 0 and not overrides.metrics_only:
                 logger.info(
                     f"Telemetry cleanup: {cleanup_stats['updated']}/{cleanup_stats['stale_runs_found']} "
                     f"stale run(s) marked as cancelled"
@@ -950,10 +1109,8 @@ def translate_site(args: argparse.Namespace) -> int:
             # Non-critical - just log and continue
             logger.debug(f"Telemetry cleanup skipped: {cleanup_error}")
 
-        logger.info(f"Starting translation for site: {args.site}")
-
-        # Create CLI overrides
-        overrides = CLIConfigOverrides(args)
+        if not overrides.metrics_only:
+            logger.info(f"Starting translation for site: {args.site}")
 
         # RES-02: Handle resume/restart flags
         resume_enabled = overrides.resume
@@ -1035,6 +1192,144 @@ def translate_site(args: argparse.Namespace) -> int:
         target_langs = args.target_langs if args.target_langs else site_profile.target_langs
 
         logger.info(f"Target languages: {', '.join(target_langs)}")
+
+        # CRITICAL FIX: Process each language in separate subprocess to prevent state contamination
+        # Root cause: M2M100 model retains internal state between sequential translations to different
+        # target languages, causing text from one language (e.g., Turkish) to bleed into others
+        # (e.g., Ukrainian). This occurs even with model reload, use_cache=False, and TM bypass.
+        # Solution: Complete process isolation ensures each language starts with pristine state.
+        if len(target_langs) > 1 and not getattr(args, '_single_lang_mode', False):
+            logger.info(
+                f"Multi-language translation detected ({len(target_langs)} languages). "
+                f"Processing each language in separate subprocess to prevent state contamination..."
+            )
+
+            # TC1: Acquire site lock in PARENT before spawning subprocesses
+            from src.translation_engine.engine import get_site_lock
+
+            # CRITICAL: Timeout set on construction, not on acquire()
+            site_lock = get_site_lock(args.site, timeout=30.0)  # 30s parent timeout
+
+            # Register cleanup handlers for unexpected exit
+            def cleanup_lock():
+                global _parent_lock
+                if _parent_lock and _parent_lock._locked:
+                    logger.info("Cleaning up parent lock on exit")
+                    _parent_lock.release()
+                    _parent_lock = None
+
+            atexit.register(cleanup_lock)
+
+            # Register signal handlers
+            signal.signal(signal.SIGINT, _signal_handler)
+            signal.signal(signal.SIGTERM, _signal_handler)
+
+            try:
+                logger.info(f"Acquiring site lock for {args.site}...")
+                # NO timeout parameter here - it's set in FileLock constructor above
+                if not site_lock.acquire(blocking=True):
+                    logger.error(f"Failed to acquire site lock. Another translation may be running.")
+                    logger.info(f"Run 'python -m src.cli diagnose-lock --site {args.site}' for details")
+                    return 1
+
+                global _parent_lock
+                _parent_lock = site_lock  # For signal handler
+                logger.info("Site lock acquired by parent process")
+
+            except Exception as e:
+                logger.error(f"Error acquiring lock: {e}")
+                logger.info(f"Run 'python -m src.cli diagnose-lock --site {args.site}' for details")
+                return 1
+
+            exit_codes = []
+            try:
+                for i, lang in enumerate(target_langs, 1):
+                    logger.info(f"\n{'='*60}")
+                    logger.info(f"Processing language {i}/{len(target_langs)}: {lang}")
+                    logger.info(f"{'='*60}\n")
+
+                    # Build subprocess command with same args but single target language
+                    cmd = [sys.executable, "-m", "src.cli"]
+
+                # Copy all original arguments
+                cmd.extend(["--site", args.site])
+
+                if args.input:
+                    cmd.extend(["--input", str(args.input)])
+                if args.output:
+                    cmd.extend(["--output", str(args.output)])
+
+                # Single target language for this subprocess
+                cmd.extend(["--target-langs", lang])
+
+                # Copy other flags
+                if args.model:
+                    cmd.extend(["--model", args.model])
+                if args.device:
+                    cmd.extend(["--device", args.device])
+                if args.batch_size:
+                    cmd.extend(["--batch-size", str(args.batch_size)])
+                if args.max_tokens:
+                    cmd.extend(["--max-tokens", str(args.max_tokens)])
+                if args.log_level:
+                    cmd.extend(["--log-level", args.log_level])
+                if args.log_file:
+                    cmd.extend(["--log-file", args.log_file])
+                if args.force_retranslate:
+                    cmd.append("--force-retranslate")
+                if args.dry_run:
+                    cmd.append("--dry-run")
+                if args.no_progress:
+                    cmd.append("--no-progress")
+                if args.disable_validation:
+                    cmd.append("--disable-validation")
+                if args.force_accept:
+                    cmd.append("--force-accept")
+                if args.strict_reject:
+                    cmd.append("--strict-reject")
+                if args.enable_terminology is not None:
+                    if args.enable_terminology:
+                        cmd.append("--enable-terminology")
+                    else:
+                        cmd.append("--disable-terminology")
+                if args.config_root:
+                    cmd.extend(["--config-root", args.config_root])
+
+                # Mark as single-language mode to prevent infinite recursion
+                cmd.append("--_single-lang-mode")
+
+                # TC1: Tell subprocess to skip lock acquisition (parent holds it)
+                cmd.append("--_skip-site-lock")
+
+                # Run subprocess
+                logger.debug(f"Subprocess command: {' '.join(cmd)}")
+                result = subprocess.run(cmd, capture_output=False)
+                exit_codes.append(result.returncode)
+
+                if result.returncode != 0:
+                    logger.error(f"Translation failed for language {lang} with exit code {result.returncode}")
+                else:
+                    logger.info(f"Successfully completed translation for {lang}")
+
+                # Return overall status
+                if all(code == 0 for code in exit_codes):
+                    logger.info(f"\n{'='*60}")
+                    logger.info(f"All {len(target_langs)} languages translated successfully")
+                    logger.info(f"{'='*60}\n")
+                    return 0
+                else:
+                    failed = sum(1 for code in exit_codes if code != 0)
+                    logger.error(f"\n{'='*60}")
+                    logger.error(f"Translation failed for {failed}/{len(target_langs)} languages")
+                    logger.error(f"{'='*60}\n")
+                    return 1
+
+            finally:
+                # TC1: Always release lock
+                if site_lock and site_lock._locked:
+                    logger.info("Releasing site lock")
+                    site_lock.release()
+                    _parent_lock = None
 
         # Log validation settings
         if overrides.force_accept:
@@ -1151,6 +1446,39 @@ def translate_site(args: argparse.Namespace) -> int:
                 f"CPU optimization enabled: batch_size={cpu_config.batch_size}, "
                 f"threads={cpu_config.num_threads}"
             )
+        # GPU optimization: Apply GPU-aware batch sizing if on GPU and batch_size not explicitly set
+        elif device.startswith("cuda") and "batch_size" not in engine_kwargs:
+            logger.info("Optimizing for GPU runtime...")
+            try:
+                # Determine precision from load_mode (default to fp16 for GPU)
+                precision = overrides.load_mode or "fp16"
+
+                # Extract device ID if specified (e.g., "cuda:0" -> 0)
+                device_id = 0
+                if ":" in device:
+                    try:
+                        device_id = int(device.split(":")[1])
+                    except (IndexError, ValueError):
+                        device_id = 0
+
+                gpu_optimizer = GPUOptimizer(
+                    model_name=overrides.model,
+                    precision=precision,
+                    target_utilization=0.85,  # Target 85% VRAM utilization
+                    device_id=device_id,
+                )
+                gpu_config = gpu_optimizer.optimize()
+                engine_kwargs["batch_size"] = gpu_config.batch_size
+                logger.info(
+                    f"GPU optimization enabled: batch_size={gpu_config.batch_size}, "
+                    f"estimated_vram={gpu_config.estimated_vram_mb:.0f}MB "
+                    f"({gpu_config.estimated_vram_mb/gpu_config.total_vram_mb*100:.1f}% of {gpu_config.total_vram_mb:.0f}MB)"
+                )
+            except Exception as e:
+                logger.warning(
+                    f"GPU optimization failed: {e}. Using default batch size."
+                )
+                # Don't set batch_size, will use engine default
 
         logger.info("Initializing Translation Engine...")
 
@@ -1163,7 +1491,7 @@ def translate_site(args: argparse.Namespace) -> int:
 
         # SR-03: Read sort_segments_by_length from config if CLI didn't override
         if "sort_segments_by_length" not in engine_kwargs:
-            body_rules = config_service.site_config.get_body_rules()
+            body_rules = site_profile.body
             if hasattr(body_rules, 'sort_segments_by_length'):
                 engine_kwargs["sort_segments_by_length"] = body_rules.sort_segments_by_length
 
@@ -1210,6 +1538,22 @@ def translate_site(args: argparse.Namespace) -> int:
                 )
                 production_ingestor = None
 
+        # CHT-04: Handle --rebuild-content-hashes flag
+        if overrides.rebuild_content_hashes:
+            # Determine output directory (same logic as later in this function)
+            output_dir = Path(args.output) if args.output else Path(
+                site_profile.output_dir if hasattr(site_profile, 'output_dir') else "output"
+            )
+            metadata_file = output_dir / ".translation_metadata.json"
+
+            if metadata_file.exists():
+                logger.info(f"Rebuild content hashes requested, removing {metadata_file}")
+                try:
+                    metadata_file.unlink()
+                    logger.info("Metadata file deleted, will rebuild hashes from scratch")
+                except Exception as e:
+                    logger.warning(f"Failed to delete metadata file: {e}")
+
         engine = TranslationEngine(
             config_service=config_service,
             tm=tm,
@@ -1219,8 +1563,9 @@ def translate_site(args: argparse.Namespace) -> int:
             **engine_kwargs,
         )
 
-        # RES-06: Set up signal handlers for graceful shutdown
-        setup_signal_handlers(engine)
+        # SR-01, SR-05: Set up unified signal handler for graceful shutdown
+        # Coordinates telemetry cleanup AND engine shutdown without conflicts
+        setup_unified_signal_handler(engine)
 
         # Determine input path
         if args.input:
@@ -1335,6 +1680,7 @@ def translate_site(args: argparse.Namespace) -> int:
                 site_id=args.site,
                 directory=input_path,
                 target_langs=target_langs,
+                skip_site_lock=getattr(args, '_skip_site_lock', False),  # TC1
             )
 
             logger.info(f"Translation completed: {result.total_files} files processed")
@@ -1390,6 +1736,97 @@ def translate_site(args: argparse.Namespace) -> int:
             stop_progress_tracker()
 
 
+def cmd_unlock() -> int:
+    """
+    Force unlock a site (TC2).
+
+    Usage: python -m src.cli unlock --site <site> [--force] [--yes]
+
+    Returns:
+        Exit code (0 = success, 1 = failure, 2 = invalid usage)
+    """
+    import argparse
+    parser = argparse.ArgumentParser(
+        prog="translate-hugo unlock",
+        description="Force unlock a site (use with caution)"
+    )
+    parser.add_argument('unlock', help=argparse.SUPPRESS)  # Positional arg (already consumed)
+    parser.add_argument('--site', required=True, help='Site identifier')
+    parser.add_argument(
+        '--force',
+        action='store_true',
+        help='Force unlock even if holder process appears alive (DANGEROUS)'
+    )
+    parser.add_argument(
+        '--yes',
+        action='store_true',
+        help='Skip confirmation prompt (for automation)'
+    )
+
+    args = parser.parse_args()
+
+    from src.translation_engine.engine import get_site_lock
+    from src.utils.file_lock import diagnose_lock
+
+    # Show diagnostics first
+    print("Running diagnostics before unlock...\n")
+    diagnose_lock(args.site)
+
+    # Confirm with user (unless --yes or --force)
+    if not args.yes and not args.force:
+        # CRITICAL: Non-interactive mode must use --yes flag
+        if not sys.stdin.isatty():
+            print("\nERROR: Running in non-interactive mode without --yes flag")
+            print("Use --yes to skip confirmation in automation")
+            return 2  # Exit code 2 = invalid usage
+
+        response = input("\nProceed with unlock? [y/N]: ")
+        if response.lower() != 'y':
+            print("Unlock cancelled")
+            return 0
+
+    # Attempt force unlock
+    lock = get_site_lock(args.site)
+    check_pid = not args.force
+
+    try:
+        if lock.force_unlock(check_pid=check_pid):
+            print(f"\nSuccessfully unlocked site: {args.site}")
+            return 0  # Success
+        else:
+            print(f"\nFailed to unlock site: {args.site}")
+            print("Holder process is still running. Use --force to override (DANGEROUS).")
+            return 1  # Failure
+    except Exception as e:
+        print(f"\nError during unlock: {e}")
+        return 1
+
+
+def cmd_diagnose_lock() -> int:
+    """
+    Diagnose lock file issues for a site (TC2).
+
+    Usage: python -m src.cli diagnose-lock --site <site>
+
+    Returns:
+        Exit code (0 = success)
+    """
+    import argparse
+    parser = argparse.ArgumentParser(
+        prog="translate-hugo diagnose-lock",
+        description="Diagnose lock file issues for a site"
+    )
+    parser.add_argument('diagnose_lock', nargs='?', help=argparse.SUPPRESS)  # Positional (already consumed)
+    parser.add_argument('--site', required=True, help='Site identifier')
+
+    args = parser.parse_args()
+
+    from src.utils.file_lock import diagnose_lock
+
+    diagnose_lock(args.site)
+    return 0
+
+
 def main() -> int:
     """
     Main CLI entry point.
@@ -1397,6 +1834,13 @@ def main() -> int:
     Returns:
         Exit code (0 for success, non-zero for failure)
     """
+    # TC2: Handle special lock management commands
+    if len(sys.argv) > 1:
+        if sys.argv[1] == "diagnose-lock":
+            return cmd_diagnose_lock()
+        elif sys.argv[1] == "unlock":
+            return cmd_unlock()
+
     parser = create_parser()
     args = parser.parse_args()
 

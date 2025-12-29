@@ -1,0 +1,389 @@
+{% extends "base.html" %}
+
+{% block title %}Languages{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Language Coverage Matrix</h1>
+    <p class="subtitle">Benchmark coverage across all 36 target languages and models</p>
+</div>
+
+<div class="coverage-stats">
+    <div class="stat-inline">
+        <strong>Languages:</strong> <span id="langCount">-</span>/36
+    </div>
+    <div class="stat-inline">
+        <strong>Models:</strong> <span id="modelCount">-</span>
+    </div>
+    <div class="stat-inline">
+        <strong>Coverage:</strong> <span id="coveragePercent">-</span>%
+    </div>
+</div>
+
+<div class="controls">
+    <label>
+        <input type="checkbox" id="showOnlyGaps" onchange="toggleGapsOnly()">
+        Show only missing coverage
+    </label>
+    <button class="btn-secondary" onclick="exportToCSV()">Export CSV</button>
+    <button class="btn-secondary" onclick="refreshData()">Refresh</button>
+</div>
+
+<div class="heatmap-container">
+    <div class="loading" id="loading">Loading coverage matrix...</div>
+    <div id="heatmap" style="display: none;"></div>
+    <div class="error-message" id="error" style="display: none;"></div>
+</div>
+
+<div class="legend">
+    <h3>Legend</h3>
+    <div class="legend-items">
+        <div class="legend-item">
+            <span class="color-box complete"></span>
+            <span>Complete (5+ runs)</span>
+        </div>
+        <div class="legend-item">
+            <span class="color-box partial"></span>
+            <span>Partial (1-4 runs)</span>
+        </div>
+        <div class="legend-item">
+            <span class="color-box missing"></span>
+            <span>Missing (0 runs)</span>
+        </div>
+    </div>
+</div>
+
+<div class="info-banner" style="margin-top: 2rem;">
+    <strong>Note:</strong> Current implementation shows model-level coverage.
+    Per-language tracking will be enhanced when benchmark schema includes target language metadata.
+</div>
+
+<style>
+.coverage-stats {
+    display: flex;
+    gap: 2rem;
+    margin-bottom: 1.5rem;
+    padding: 1rem;
+    background: var(--card-bg);
+    border-radius: 8px;
+    box-shadow: var(--shadow);
+}
+
+.stat-inline {
+    font-size: 1.1rem;
+}
+
+.stat-inline strong {
+    color: var(--primary-color);
+}
+
+.heatmap-container {
+    background: var(--card-bg);
+    padding: 2rem;
+    border-radius: 8px;
+    box-shadow: var(--shadow);
+    margin-bottom: 2rem;
+    overflow-x: auto;
+}
+
+.heatmap-grid {
+    display: table;
+    border-collapse: separate;
+    border-spacing: 2px;
+    min-width: 100%;
+}
+
+.heatmap-row {
+    display: table-row;
+}
+
+.heatmap-cell, .heatmap-header {
+    display: table-cell;
+    padding: 10px;
+    text-align: center;
+    min-width: 50px;
+    border-radius: 3px;
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.heatmap-header {
+    background: var(--light-bg);
+    font-weight: 600;
+    font-size: 0.85rem;
+    color: var(--text-primary);
+    position: sticky;
+    top: 0;
+    z-index: 10;
+}
+
+.heatmap-row-label {
+    background: var(--light-bg);
+    font-weight: 600;
+    text-align: left;
+    padding-left: 1rem;
+    position: sticky;
+    left: 0;
+    z-index: 5;
+}
+
+.heatmap-cell {
+    cursor: pointer;
+    font-size: 0.75rem;
+}
+
+.heatmap-cell:hover {
+    transform: scale(1.05);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+    z-index: 20;
+}
+
+.heatmap-cell.complete {
+    background: #27ae60;
+    color: white;
+}
+
+.heatmap-cell.partial {
+    background: #f39c12;
+    color: white;
+}
+
+.heatmap-cell.missing {
+    background: #e74c3c;
+    color: white;
+}
+
+.legend {
+    background: var(--card-bg);
+    padding: 1.5rem;
+    border-radius: 8px;
+    box-shadow: var(--shadow);
+    margin-bottom: 2rem;
+}
+
+.legend h3 {
+    margin-bottom: 1rem;
+    font-size: 1.2rem;
+}
+
+.legend-items {
+    display: flex;
+    gap: 2rem;
+}
+
+.legend-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.color-box {
+    width: 30px;
+    height: 20px;
+    border-radius: 3px;
+}
+
+.color-box.complete {
+    background: #27ae60;
+}
+
+.color-box.partial {
+    background: #f39c12;
+}
+
+.color-box.missing {
+    background: #e74c3c;
+}
+
+.tooltip {
+    position: absolute;
+    background: rgba(0, 0, 0, 0.9);
+    color: white;
+    padding: 0.75rem;
+    border-radius: 4px;
+    font-size: 0.85rem;
+    pointer-events: none;
+    z-index: 1000;
+    max-width: 250px;
+    display: none;
+}
+
+.tooltip.show {
+    display: block;
+}
+</style>
+
+<div class="tooltip" id="tooltip"></div>
+
+<script>
+let coverageData = null;
+let showGapsOnly = false;
+
+// Fetch and render coverage matrix
+async function loadCoverageMatrix() {
+    const loadingEl = document.getElementById('loading');
+    const heatmapEl = document.getElementById('heatmap');
+    const errorEl = document.getElementById('error');
+
+    try {
+        loadingEl.style.display = 'block';
+        heatmapEl.style.display = 'none';
+        errorEl.style.display = 'none';
+
+        const response = await fetch('/api/coverage_matrix');
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+
+        coverageData = await response.json();
+
+        // Update stats
+        document.getElementById('langCount').textContent = coverageData.metadata.languages_covered;
+        document.getElementById('modelCount').textContent = coverageData.metadata.total_models;
+        document.getElementById('coveragePercent').textContent = coverageData.metadata.coverage_percentage;
+
+        // Render heatmap
+        renderHeatmap(coverageData);
+
+        loadingEl.style.display = 'none';
+        heatmapEl.style.display = 'block';
+
+    } catch (error) {
+        console.error('Error loading coverage matrix:', error);
+        loadingEl.style.display = 'none';
+        errorEl.textContent = `Failed to load coverage matrix: ${error.message}`;
+        errorEl.style.display = 'block';
+    }
+}
+
+function renderHeatmap(data) {
+    const heatmapEl = document.getElementById('heatmap');
+
+    if (data.models.length === 0) {
+        heatmapEl.innerHTML = '<p class="no-data">No benchmark data available. Run benchmarks first.</p>';
+        return;
+    }
+
+    let html = '<div class="heatmap-grid">';
+
+    // Header row
+    html += '<div class="heatmap-row">';
+    html += '<div class="heatmap-header heatmap-row-label">Language</div>';
+    for (const model of data.models) {
+        const modelShort = model.length > 20 ? model.substring(0, 18) + '...' : model;
+        html += `<div class="heatmap-header" title="${model}">${modelShort}</div>`;
+    }
+    html += '</div>';
+
+    // Data rows
+    for (let i = 0; i < data.languages.length; i++) {
+        const lang = data.languages[i];
+        const row = data.matrix[i];
+
+        // Check if row has any data (for gaps-only filter)
+        const hasData = row.some(cell => cell.run_count > 0);
+        if (showGapsOnly && hasData) {
+            continue;
+        }
+
+        html += '<div class="heatmap-row">';
+        html += `<div class="heatmap-header heatmap-row-label">${lang.toUpperCase()}</div>`;
+
+        for (let j = 0; j < row.length; j++) {
+            const cell = row[j];
+            const model = data.models[j];
+
+            let cellClass = 'missing';
+            if (cell.run_count >= 5) {
+                cellClass = 'complete';
+            } else if (cell.run_count > 0) {
+                cellClass = 'partial';
+            }
+
+            const tooltipData = {
+                language: lang,
+                model: model,
+                runs: cell.run_count,
+                throughput: cell.avg_throughput
+            };
+
+            html += `<div class="heatmap-cell ${cellClass}"
+                         onmouseenter="showTooltip(event, ${JSON.stringify(tooltipData).replace(/"/g, '&quot;')})"
+                         onmouseleave="hideTooltip()">
+                         ${cell.run_count}
+                     </div>`;
+        }
+
+        html += '</div>';
+    }
+
+    html += '</div>';
+    heatmapEl.innerHTML = html;
+}
+
+function showTooltip(event, data) {
+    const tooltip = document.getElementById('tooltip');
+
+    let html = `<strong>${data.language.toUpperCase()}</strong><br>`;
+    html += `Model: ${data.model}<br>`;
+    html += `Runs: ${data.runs}<br>`;
+    if (data.throughput > 0) {
+        html += `Avg Throughput: ${data.throughput} tok/s`;
+    } else {
+        html += `<em>No benchmark data</em>`;
+    }
+
+    tooltip.innerHTML = html;
+    tooltip.classList.add('show');
+
+    // Position tooltip
+    const x = event.pageX + 10;
+    const y = event.pageY + 10;
+    tooltip.style.left = x + 'px';
+    tooltip.style.top = y + 'px';
+}
+
+function hideTooltip() {
+    const tooltip = document.getElementById('tooltip');
+    tooltip.classList.remove('show');
+}
+
+function toggleGapsOnly() {
+    showGapsOnly = document.getElementById('showOnlyGaps').checked;
+    if (coverageData) {
+        renderHeatmap(coverageData);
+    }
+}
+
+function exportToCSV() {
+    if (!coverageData) {
+        alert('No data to export');
+        return;
+    }
+
+    let csv = 'Language,' + coverageData.models.join(',') + '\n';
+
+    for (let i = 0; i < coverageData.languages.length; i++) {
+        const lang = coverageData.languages[i];
+        const row = coverageData.matrix[i];
+        const values = row.map(cell => cell.run_count);
+        csv += lang + ',' + values.join(',') + '\n';
+    }
+
+    // Download CSV
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'language_coverage_matrix.csv';
+    a.click();
+    window.URL.revokeObjectURL(url);
+}
+
+function refreshData() {
+    loadCoverageMatrix();
+}
+
+// Load on page load
+document.addEventListener('DOMContentLoaded', loadCoverageMatrix);
+</script>
+{% endblock %}

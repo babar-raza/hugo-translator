@@ -36,6 +36,8 @@ class BenchmarkResult:
     tokens_output: int
     throughput_tokens_per_sec: float
     peak_memory_mb: Optional[float] = None
+    bleu_score: Optional[float] = None
+    comet_score: Optional[float] = None
     errors: List[str] = field(default_factory=list)
 
     def to_dict(self) -> Dict[str, Any]:
@@ -92,7 +94,7 @@ class BenchmarkDatabase:
     - JSON export/import
     """
 
-    SCHEMA_VERSION = 5
+    SCHEMA_VERSION = 6
 
     def __init__(self, db_path: Path | str):
         """Initialize database connection.
@@ -379,6 +381,25 @@ class BenchmarkDatabase:
             )
             logger.info("Applied schema migration to version 5 - extended SystemInfo fields")
 
+        if from_version < 6:
+            # v6: Add quality metrics (BLEU, COMET) to benchmark_results (BM-04)
+            conn.execute("ALTER TABLE benchmark_results ADD COLUMN bleu_score REAL")
+            conn.execute("ALTER TABLE benchmark_results ADD COLUMN comet_score REAL")
+
+            # Create indices for quality metric queries
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_results_bleu ON benchmark_results(bleu_score)"
+            )
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_results_comet ON benchmark_results(comet_score)"
+            )
+
+            conn.execute(
+                "INSERT INTO schema_version (version, applied_at) VALUES (?, ?)",
+                (6, datetime.now(UTC).isoformat()),
+            )
+            logger.info("Applied schema migration to version 6 - quality metrics (BLEU, COMET)")
+
     def create_tables(self) -> None:
         """Create database tables (idempotent).
 
@@ -455,8 +476,8 @@ class BenchmarkDatabase:
                         INSERT INTO benchmark_results
                         (run_id, sample_id, model_id, device, batch_size, duration_seconds,
                          tokens_input, tokens_output, throughput_tokens_per_sec,
-                         peak_memory_mb, errors)
-                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                         peak_memory_mb, bleu_score, comet_score, errors)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """,
                         (
                             run.run_id,
@@ -469,6 +490,8 @@ class BenchmarkDatabase:
                             result.tokens_output,
                             result.throughput_tokens_per_sec,
                             result.peak_memory_mb,
+                            result.bleu_score,
+                            result.comet_score,
                             json.dumps(result.errors),
                         ),
                     )

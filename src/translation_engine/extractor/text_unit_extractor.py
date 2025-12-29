@@ -23,6 +23,16 @@ LANGUAGE_PURITY_MIN_LENGTH = 15   # Minimum text length for reliable language de
 FALLBACK_RATE_THRESHOLD = 0.05    # Alert threshold for fallback rate (5%)
 TOKEN_PER_WORD_ESTIMATE = 1.3     # Average tokens per word for M2M100 estimation
 
+# Script-similar languages that may be confused by langdetect
+# Languages that share the same script often get misdetected
+SCRIPT_SIMILAR_LANGUAGES = {
+    'ar': {'fa'},  # Arabic <-> Farsi/Persian (both use Arabic script)
+    'fa': {'ar'},  # Farsi/Persian <-> Arabic
+    # Add more script-similar pairs as needed:
+    # 'hi': {'ne', 'mr'},  # Hindi, Nepali, Marathi all use Devanagari
+    # 'sr': {'ru', 'uk', 'bg'},  # Serbian, Russian, Ukrainian, Bulgarian use Cyrillic
+}
+
 # Frontmatter translation configuration (FIX-BT-03)
 TRANSLATABLE_FRONTMATTER_FIELDS = {
     'title', 'description', 'keywords',
@@ -71,7 +81,8 @@ class TextUnitExtractor:
         self,
         segmentation_strategy: str = "adaptive",
         terminology_file: Optional[Path] = None,
-        mt_model: Optional[Any] = None
+        mt_model: Optional[Any] = None,
+        preserve_patterns: Optional[List[str]] = None
     ):
         """
         Initialize extractor for native batch translation.
@@ -80,8 +91,16 @@ class TextUnitExtractor:
             segmentation_strategy: "adaptive", "leaf_only", or "sentence_only"
             terminology_file: Path to terminology dictionary (one term per line)
             mt_model: M2M100 model instance (optional, not used for native batching)
+            preserve_patterns: Regex patterns for content to preserve (e.g., brand names)
         """
         self.segmentation_strategy = segmentation_strategy
+
+        # Initialize preserve_patterns protection (if provided)
+        self.preserve_patterns = preserve_patterns or []
+        self.placeholder_manager = None
+        if self.preserve_patterns:
+            from .placeholder_manager import PlaceholderManager
+            self.placeholder_manager = PlaceholderManager()
 
         # Load terminology dictionary (product names, etc.)
         self.terminology_dict = set()
@@ -560,12 +579,20 @@ class TextUnitExtractor:
 
             try:
                 detected = langdetect.detect(translated)
-                if detected != target_lang:
+                # Check if detected language matches target or is script-similar
+                script_similar = SCRIPT_SIMILAR_LANGUAGES.get(target_lang, set())
+                if detected != target_lang and detected not in script_similar:
                     failed_units.append({
                         'text': translated[:60] + "..." if len(translated) > 60 else translated,
                         'expected': target_lang,
                         'detected': detected
                     })
+                elif detected in script_similar:
+                    # Log script-similar detection for monitoring
+                    logger.debug(
+                        f"Accepting script-similar language: detected={detected}, "
+                        f"target={target_lang}, text={translated[:50]}..."
+                    )
             except langdetect.lang_detect_exception.LangDetectException:
                 # Skip texts that can't be detected (often technical content)
                 pass
@@ -704,18 +731,27 @@ class TextUnitExtractor:
             # Empty or whitespace-only text
             prefix_ws = text
 
-        # Check if non-translatable (product name, technical identifier, etc.)
-        do_not_translate = self._is_non_translatable(stripped_text)
+        # Apply preserve_patterns protection (if configured)
+        placeholder_map = {}
+        protected_text = stripped_text
+        if self.placeholder_manager and stripped_text:
+            protected_text, placeholder_map = self.placeholder_manager.protect(
+                stripped_text, self.preserve_patterns
+            )
 
-        # Create TextUnit
+        # Check if non-translatable (product name, technical identifier, etc.)
+        do_not_translate = self._is_non_translatable(protected_text)
+
+        # Create TextUnit with protected text and placeholder map
         unit = TextUnit(
-            unit_id=TextUnit.create_id(node.node_addr, stripped_text, TextUnitKind.TEXT),
+            unit_id=TextUnit.create_id(node.node_addr, protected_text, TextUnitKind.TEXT),
             node_addr=node.node_addr,
             kind=TextUnitKind.TEXT,
-            source_text=stripped_text,
+            source_text=protected_text,
             prefix_ws=prefix_ws,
             suffix_ws=suffix_ws,
-            do_not_translate=do_not_translate
+            do_not_translate=do_not_translate,
+            metadata={'placeholder_map': placeholder_map} if placeholder_map else {}
         )
         units.append(unit)
 

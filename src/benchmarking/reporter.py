@@ -61,7 +61,7 @@ class BenchmarkReporter:
         lines.append(f"- **CPU:** {si.cpu_model} ({si.cpu_cores} cores)")
         lines.append(f"- **RAM:** {si.total_ram_gb:.1f} GB")
         if si.gpu_model:
-            vram = f" ({si.gpu_vram_gb:.1f} GB VRAM)" if si.gpu_vram_gb else ""
+            vram = f" ({si.gpu_memory_gb:.1f} GB VRAM)" if si.gpu_memory_gb else ""
             lines.append(f"- **GPU:** {si.gpu_model}{vram}")
         lines.append(f"- **OS:** {si.os_name} {si.os_version}")
         lines.append(f"- **Python:** {si.python_version}")

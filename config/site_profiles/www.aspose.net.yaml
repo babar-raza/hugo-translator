@@ -3,16 +3,43 @@ content_roots:
 - /content/www
 default_source_lang: en
 target_langs:
+- ar
+- bg
+- ca
+- cs
+- da
 - de
+- el
 - es
+- fa
+- fi
 - fr
+- he
+- hi
+- hr
+- hu
+- id
+- it
 - ja
 - ko
-- ru
-- zh
-- ar
-- it
+- lt
+- lv
+- ms
+- nl
+- "no"
+- pl
 - pt
+- ro
+- ru
+- sk
+- sr
+- sv
+- th
+- tr
+- uk
+- vi
+- zh
+
 frontmatter:
   title:
     mode: translate

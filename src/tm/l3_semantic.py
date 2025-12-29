@@ -25,6 +25,7 @@ import numpy as np
 from sentence_transformers import SentenceTransformer
 
 from src.utils.metrics import calc_stats
+from src.utils.file_lock import FileLock
 
 logger = logging.getLogger(__name__)
 
@@ -500,36 +501,57 @@ class L3SemanticTM:
         return len(entries)
 
     def save_index(self) -> None:
-        """Persist index and metadata to disk."""
-        with self._lock:
-            # Save FAISS index (move to CPU first if on GPU)
-            index_file = self.index_path / "index.faiss"
-            index_to_save = self.index
+        """Persist index and metadata to disk.
 
-            if self.use_faiss_gpu:
-                try:
-                    # Move index back to CPU for saving
-                    index_to_save = faiss.index_gpu_to_cpu(self.index)
-                except Exception:
-                    # If it fails, the index might already be on CPU
-                    pass
+        Uses FileLock for process-safe writes across concurrent subprocesses.
+        Implements atomic write pattern (write to temp, then rename).
+        """
+        # TC1/TC2: Process-safe lock for concurrent subprocess writes
+        lock_file = self.index_path / ".faiss_save.lock"
+        save_lock = FileLock(lock_file, timeout=60.0)
 
-            faiss.write_index(index_to_save, str(index_file))
+        try:
+            with save_lock:  # Process-safe lock across subprocesses
+                with self._lock:  # Thread-safe lock within process
+                    # Save FAISS index (move to CPU first if on GPU)
+                    index_file = self.index_path / "index.faiss"
+                    index_to_save = self.index
 
-            # Save metadata
-            metadata_file = self.index_path / "metadata.pkl"
-            with open(metadata_file, "wb") as f:
-                pickle.dump(self.metadata, f)
+                    if self.use_faiss_gpu:
+                        try:
+                            # Move index back to CPU for saving
+                            index_to_save = faiss.index_gpu_to_cpu(self.index)
+                        except Exception:
+                            # If it fails, the index might already be on CPU
+                            pass
 
-            # Save config
-            config_file = self.index_path / "config.json"
-            config = {
-                "embedding_dim": self.embedding_dim,
-                "num_entries": self.index.ntotal,
-                "embedding_model": self.embedding_model_name,
-            }
-            with open(config_file, "w") as f:
-                json.dump(config, f, indent=2)
+                    # Atomic write pattern: write to temp file, then rename
+                    temp_index_file = index_file.with_suffix('.faiss.tmp')
+                    faiss.write_index(index_to_save, str(temp_index_file))
+                    temp_index_file.replace(index_file)  # Atomic on POSIX and Windows
+
+                    # Save metadata (atomic write)
+                    metadata_file = self.index_path / "metadata.pkl"
+                    temp_metadata_file = metadata_file.with_suffix('.pkl.tmp')
+                    with open(temp_metadata_file, "wb") as f:
+                        pickle.dump(self.metadata, f)
+                    temp_metadata_file.replace(metadata_file)
+
+                    # Save config (atomic write)
+                    config_file = self.index_path / "config.json"
+                    temp_config_file = config_file.with_suffix('.json.tmp')
+                    config = {
+                        "embedding_dim": self.embedding_dim,
+                        "num_entries": self.index.ntotal,
+                        "embedding_model": self.embedding_model_name,
+                    }
+                    with open(temp_config_file, "w") as f:
+                        json.dump(config, f, indent=2)
+                    temp_config_file.replace(config_file)
+
+        except Exception as e:
+            logger.error(f"L3 save_index failed: {e}")
+            raise
 
     def load_index(self) -> None:
         """Load index and metadata from disk."""

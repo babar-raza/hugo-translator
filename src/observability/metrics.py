@@ -364,6 +364,61 @@ class MetricsCollector:
             {"worker_id": self.worker_id},
         )
 
+        # CHH-04: Content hash tracking metrics
+        self.register_histogram(
+            "content_hash_compute_duration_seconds",
+            "Duration to compute file content hash (MD5/SHA256)",
+            {"worker_id": self.worker_id},
+            buckets=[0.001, 0.005, 0.01, 0.05, 0.1, 0.5, 1.0, 5.0],
+        )
+        self.register_histogram(
+            "metadata_save_duration_seconds",
+            "Duration to save metadata file (including lock acquisition)",
+            {"worker_id": self.worker_id},
+            buckets=[0.01, 0.05, 0.1, 0.5, 1.0, 5.0, 10.0],
+        )
+        self.register_histogram(
+            "metadata_lock_acquire_duration_seconds",
+            "Duration to acquire Redis distributed lock for metadata",
+            {"worker_id": self.worker_id},
+            buckets=[0.001, 0.01, 0.05, 0.1, 0.5, 1.0, 5.0, 10.0, 30.0],
+        )
+        self.register_counter(
+            "content_hash_cache_hits",
+            "Number of content hash cache hits (mtime unchanged)",
+            {"worker_id": self.worker_id},
+        )
+        self.register_counter(
+            "content_hash_cache_misses",
+            "Number of content hash cache misses (mtime changed, recompute hash)",
+            {"worker_id": self.worker_id},
+        )
+        self.register_counter(
+            "content_hash_changes_detected",
+            "Number of file changes detected via content hash",
+            {"worker_id": self.worker_id},
+        )
+        self.register_counter(
+            "content_hash_no_change",
+            "Number of files with no content change detected",
+            {"worker_id": self.worker_id},
+        )
+        self.register_counter(
+            "metadata_lock_timeouts",
+            "Number of Redis lock timeouts (fell back to direct write)",
+            {"worker_id": self.worker_id},
+        )
+        self.register_gauge(
+            "metadata_file_size_bytes",
+            "Current metadata file size in bytes",
+            {"worker_id": self.worker_id},
+        )
+        self.register_gauge(
+            "metadata_tracked_files",
+            "Number of source files tracked in metadata",
+            {"worker_id": self.worker_id},
+        )
+
     def register_counter(
         self,
         name: str,

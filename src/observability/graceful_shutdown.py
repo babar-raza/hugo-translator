@@ -75,26 +75,17 @@ def register_shutdown_handler(handler: callable) -> None:
         logger.debug(f"Registered shutdown handler: {handler.__name__}")
 
 
-def _perform_graceful_shutdown(signum: int, frame) -> None:
+def cleanup_telemetry_contexts(signal_name: str = "SIGINT") -> None:
     """
-    Gracefully shutdown the application by closing all active telemetry contexts.
+    Close all active telemetry contexts and execute shutdown handlers.
 
-    Called when SIGINT (Ctrl+C) or SIGTERM is received.
+    This function is called by the unified signal handler to ensure telemetry
+    is properly cleaned up before engine shutdown.
 
     Args:
-        signum: Signal number
-        frame: Current stack frame (unused)
+        signal_name: Name of signal that triggered shutdown (for logging)
     """
-    global _shutdown_in_progress
-
-    if _shutdown_in_progress:
-        logger.warning("Shutdown already in progress, forcing exit...")
-        sys.exit(1)
-
-    _shutdown_in_progress = True
-
-    signal_name = "SIGINT" if signum == signal.SIGINT else "SIGTERM"
-    logger.info(f"Received {signal_name}, shutting down gracefully...")
+    logger.info(f"Cleaning up telemetry contexts (triggered by {signal_name})...")
 
     # Close all active telemetry contexts
     with _contexts_lock:
@@ -144,7 +135,7 @@ def _perform_graceful_shutdown(signum: int, frame) -> None:
 
             _active_contexts.clear()
         else:
-            logger.info("No active telemetry contexts to close")
+            logger.debug("No active telemetry contexts to close")
 
     # Call custom shutdown handlers
     if _shutdown_handlers:
@@ -156,13 +147,45 @@ def _perform_graceful_shutdown(signum: int, frame) -> None:
             except Exception as e:
                 logger.error(f"Shutdown handler {handler.__name__} failed: {e}")
 
-    logger.info(f"Graceful shutdown complete")
+    logger.info("Telemetry cleanup complete")
+
+
+def _perform_graceful_shutdown(signum: int, frame) -> None:
+    """
+    Legacy signal handler - kept for backward compatibility.
+
+    DEPRECATED: This handler is now replaced by the unified signal handler
+    in cli.py. It is kept here to avoid breaking existing code that might
+    call setup_graceful_shutdown() directly.
+
+    Args:
+        signum: Signal number
+        frame: Current stack frame (unused)
+    """
+    global _shutdown_in_progress
+
+    if _shutdown_in_progress:
+        logger.warning("Shutdown already in progress, forcing exit...")
+        sys.exit(1)
+
+    _shutdown_in_progress = True
+
+    signal_name = signal.Signals(signum).name if hasattr(signal, 'Signals') else str(signum)
+    cleanup_telemetry_contexts(signal_name)
+    logger.info("Graceful shutdown complete")
     sys.exit(0)
 
 
 def setup_graceful_shutdown() -> None:
     """
     Setup platform-aware signal handlers for graceful shutdown.
+
+    DEPRECATED: This function is deprecated and has been replaced by the unified
+    signal handler in cli.py (setup_unified_signal_handler). It is kept for
+    backward compatibility but will be removed in a future version.
+
+    The unified handler properly coordinates telemetry cleanup AND engine shutdown,
+    fixing the issue where the second handler registration would overwrite the first.
 
     On Windows: Registers SIGINT and SIGBREAK (if available)
     On Unix (Linux/macOS): Registers SIGINT and SIGTERM
@@ -174,6 +197,11 @@ def setup_graceful_shutdown() -> None:
             setup_graceful_shutdown()
             # ... rest of application
     """
+    logger.warning(
+        "setup_graceful_shutdown() is deprecated. "
+        "Use setup_unified_signal_handler() from cli.py instead."
+    )
+
     system = platform.system()
 
     # Always register SIGINT (works on all platforms)

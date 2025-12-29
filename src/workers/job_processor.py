@@ -1,0 +1,399 @@
+"""
+Job Processor for Translation Worker.
+
+Polls Redis queue for translation jobs and processes them.
+"""
+
+import logging
+import os
+import signal
+import sys
+import time
+from pathlib import Path
+from typing import Optional
+
+from src.model_runtime import HardwareDetector, ModelLoader, ModelRegistry
+from src.orchestrator.models import JobStatus, TranslationJob
+from src.orchestrator.redis_backend import RedisJobQueue
+from src.tm import TranslationMemory
+from src.tm.l1_cache import L1Cache
+from src.tm.l2_persistent import L2PersistentTM
+from src.tm.l3_semantic import L3SemanticTM
+from src.translation_engine.engine import TranslationEngine
+from src.utils.config_loader import ConfigService
+
+logger = logging.getLogger(__name__)
+
+
+class JobProcessor:
+    """
+    Job processor that polls Redis queue and processes translation jobs.
+
+    Runs in a loop, dequeuing jobs from Redis, processing them,
+    and updating their status.
+    """
+
+    def __init__(
+        self,
+        redis_host: str = "localhost",
+        redis_port: int = 6379,
+        redis_db: int = 0,
+        redis_password: Optional[str] = None,
+        poll_interval: float = 5.0,
+        max_retries: int = 3,
+        config_path: str = "./config",
+        tm_path: str = "./data/tm",
+    ):
+        """
+        Initialize job processor.
+
+        Args:
+            redis_host: Redis host
+            redis_port: Redis port
+            redis_db: Redis database number
+            redis_password: Optional Redis password
+            poll_interval: Seconds between queue polls
+            max_retries: Maximum job retry attempts
+            config_path: Configuration directory path
+            tm_path: Translation memory storage path
+        """
+        self.redis_host = redis_host
+        self.redis_port = redis_port
+        self.redis_db = redis_db
+        self.redis_password = redis_password
+        self.poll_interval = poll_interval
+        self.max_retries = max_retries
+        self.config_path = config_path
+        self.tm_path = tm_path
+
+        # Initialize components
+        self.queue: Optional[RedisJobQueue] = None
+        self.tm: Optional[TranslationMemory] = None
+        self.model_loader: Optional[ModelLoader] = None
+        self.engine: Optional[TranslationEngine] = None
+        self.config_service: Optional[ConfigService] = None
+
+        # Control flags
+        self._running = False
+        self._shutdown_requested = False
+
+        # Statistics
+        self.jobs_processed = 0
+        self.jobs_succeeded = 0
+        self.jobs_failed = 0
+
+    def setup(self) -> None:
+        """Setup processor components."""
+        logger.info("Setting up job processor...")
+
+        # Initialize Redis queue
+        self.queue = RedisJobQueue(
+            host=self.redis_host,
+            port=self.redis_port,
+            db=self.redis_db,
+            password=self.redis_password if self.redis_password else None,
+        )
+        logger.info(f"Connected to Redis queue at {self.redis_host}:{self.redis_port}")
+
+        # Initialize configuration service
+        self.config_service = ConfigService(config_root=self.config_path)
+        logger.info(f"Loaded configuration from {self.config_path}")
+
+        # Initialize translation memory layers
+        l1_cache = L1Cache(max_size=10000)  # Per-worker cache
+
+        # Setup L2 persistent TM path
+        l2_path = Path(self.tm_path) / "l2_lmdb"
+        l2_path.mkdir(parents=True, exist_ok=True)
+        l2_persistent = L2PersistentTM(str(l2_path))
+
+        # Setup L3 semantic TM (optional)
+        l3_path = Path(self.tm_path) / "l3_faiss"
+        l3_path.mkdir(parents=True, exist_ok=True)
+        l3_semantic = L3SemanticTM(
+            index_path=str(l3_path),
+            embedding_model="sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2",
+            use_gpu=False,
+        )
+
+        self.tm = TranslationMemory(
+            l1_cache=l1_cache,
+            l2_persistent=l2_persistent,
+            l3_semantic=l3_semantic,
+        )
+        logger.info("Translation memory initialized")
+
+        # Detect hardware and initialize model runtime
+        detector = HardwareDetector()
+        hardware = detector.detect()
+        logger.info(
+            f"Hardware detected: {len(hardware.cuda_devices)} GPUs, {hardware.cpu_count} CPUs"
+        )
+
+        registry = ModelRegistry(registry_path="config/model_registry.yaml")
+        self.model_loader = ModelLoader(
+            registry=registry,
+            device=hardware.recommended_device,
+        )
+        logger.info("Model runtime initialized")
+
+        # Get Redis client for distributed locking (CHH-02)
+        redis_client = None
+        try:
+            redis_client = self.queue.backend._get_redis()
+            logger.info("Redis client configured for metadata locking")
+        except Exception as e:
+            logger.warning(f"Redis client unavailable for metadata locking: {e}")
+
+        # Initialize translation engine
+        self.engine = TranslationEngine(
+            config_service=self.config_service,
+            tm=self.tm,
+            model_loader=self.model_loader,
+            redis_client=redis_client,  # CHH-02: Pass Redis client for metadata coordination
+        )
+        logger.info("Translation engine initialized")
+
+        logger.info("Job processor setup complete")
+
+    def shutdown(self) -> None:
+        """Graceful shutdown."""
+        logger.info("Shutting down job processor...")
+        self._shutdown_requested = True
+
+        # Close queue connection
+        if self.queue:
+            try:
+                self.queue.close()
+                logger.info("Redis connection closed")
+            except Exception as e:
+                logger.error(f"Error closing Redis connection: {e}")
+
+        # Cleanup engine
+        if self.engine:
+            try:
+                # Engine cleanup if needed
+                pass
+            except Exception as e:
+                logger.error(f"Error cleaning up engine: {e}")
+
+        logger.info(
+            f"Job processor shutdown complete. "
+            f"Stats: processed={self.jobs_processed}, "
+            f"succeeded={self.jobs_succeeded}, "
+            f"failed={self.jobs_failed}"
+        )
+
+    def _setup_signal_handlers(self) -> None:
+        """Setup signal handlers for graceful shutdown."""
+
+        def signal_handler(signum, frame):
+            sig_name = signal.Signals(signum).name
+            logger.info(f"Received signal {sig_name}, initiating shutdown...")
+            self.shutdown()
+            sys.exit(0)
+
+        signal.signal(signal.SIGTERM, signal_handler)
+        signal.signal(signal.SIGINT, signal_handler)
+        logger.info("Signal handlers registered (SIGTERM, SIGINT)")
+
+    def process_job(self, job: TranslationJob) -> bool:
+        """
+        Process a single translation job.
+
+        Args:
+            job: TranslationJob to process
+
+        Returns:
+            True if successful, False if failed
+        """
+        logger.info(
+            f"Processing job {job.job_id} "
+            f"(type={job.job_type.value}, site={job.site_id})"
+        )
+
+        try:
+            # Get job parameters
+            site_id = job.site_id
+            input_paths = job.input_paths
+            target_langs = job.target_langs
+
+            # Get site profile
+            site_profile = self.config_service.get_site_profile(site_id)
+
+            # Process all input files
+            files_processed = 0
+            files_failed = 0
+
+            for source_file in input_paths:
+                try:
+                    # Translate file
+                    result = self.engine.translate_file(
+                        site_profile=site_profile,
+                        source_file=source_file,
+                        target_langs=target_langs,
+                    )
+
+                    # Check result
+                    if result.get("status") == "success":
+                        files_processed += 1
+                        logger.info(
+                            f"Translated {source_file} to {len(target_langs)} languages"
+                        )
+                    else:
+                        files_failed += 1
+                        error_msg = result.get("error", "Unknown error")
+                        logger.error(f"Translation failed for {source_file}: {error_msg}")
+                except Exception as file_error:
+                    files_failed += 1
+                    logger.error(
+                        f"Error translating {source_file}: {file_error}",
+                        exc_info=True,
+                    )
+
+            # Determine overall job status
+            if files_failed == 0:
+                logger.info(
+                    f"Job {job.job_id} completed successfully. "
+                    f"Processed {files_processed} files, translated to {len(target_langs)} languages"
+                )
+
+                # Update job status
+                self.queue.update_job_status(
+                    job_id=job.job_id,
+                    status=JobStatus.COMPLETED,
+                    result_summary={
+                        "target_langs": target_langs,
+                        "files_processed": files_processed,
+                        "files_failed": files_failed,
+                    },
+                )
+
+                self.jobs_succeeded += 1
+                return True
+            else:
+                error_msg = f"{files_failed}/{len(input_paths)} files failed"
+                logger.error(f"Job {job.job_id} partially failed: {error_msg}")
+
+                # Update job status
+                self.queue.update_job_status(
+                    job_id=job.job_id,
+                    status=JobStatus.FAILED if files_processed == 0 else JobStatus.COMPLETED,
+                    error_message=error_msg,
+                    result_summary={
+                        "target_langs": target_langs,
+                        "files_processed": files_processed,
+                        "files_failed": files_failed,
+                    },
+                )
+
+                self.jobs_failed += 1
+                return False
+
+        except Exception as e:
+            logger.error(f"Error processing job {job.job_id}: {e}", exc_info=True)
+
+            # Update job status
+            try:
+                self.queue.update_job_status(
+                    job_id=job.job_id,
+                    status=JobStatus.FAILED,
+                    error_message=str(e),
+                )
+            except Exception as update_error:
+                logger.error(
+                    f"Failed to update job status for {job.job_id}: {update_error}"
+                )
+
+            self.jobs_failed += 1
+            return False
+
+    def run(self) -> None:
+        """
+        Main processing loop.
+
+        Polls Redis queue, dequeues jobs, and processes them.
+        """
+        # Setup
+        self.setup()
+        self._setup_signal_handlers()
+
+        logger.info("=" * 70)
+        logger.info("Job Processor Starting")
+        logger.info("=" * 70)
+        logger.info(f"Redis: {self.redis_host}:{self.redis_port}")
+        logger.info(f"Poll interval: {self.poll_interval}s")
+        logger.info(f"Max retries: {self.max_retries}")
+        logger.info(f"Config path: {self.config_path}")
+        logger.info("=" * 70)
+
+        self._running = True
+
+        # Main processing loop
+        while self._running and not self._shutdown_requested:
+            try:
+                # Dequeue job from Redis
+                job = self.queue.dequeue()
+
+                if job:
+                    # Process job
+                    self.jobs_processed += 1
+                    self.process_job(job)
+                else:
+                    # No jobs available, wait before polling again
+                    time.sleep(self.poll_interval)
+
+            except KeyboardInterrupt:
+                logger.info("Keyboard interrupt received, shutting down...")
+                break
+            except Exception as e:
+                logger.error(f"Error in processing loop: {e}", exc_info=True)
+                time.sleep(self.poll_interval)
+
+        # Shutdown
+        if not self._shutdown_requested:
+            self.shutdown()
+
+
+def main() -> int:
+    """Main entry point for job processor."""
+    # Configure logging
+    log_level = os.getenv("LOG_LEVEL", "INFO")
+    logging.basicConfig(
+        level=getattr(logging, log_level),
+        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+        stream=sys.stdout,
+    )
+
+    # Get configuration from environment
+    redis_host = os.getenv("REDIS_HOST", "localhost")
+    redis_port = int(os.getenv("REDIS_PORT", "6379"))
+    redis_db = int(os.getenv("REDIS_DB", "0"))
+    redis_password = os.getenv("REDIS_PASSWORD")
+    poll_interval = float(os.getenv("POLL_INTERVAL", "5.0"))
+    max_retries = int(os.getenv("MAX_RETRIES", "3"))
+    config_path = os.getenv("CONFIG_PATH", "./config")
+    tm_path = os.getenv("TM_DATA_PATH", "./data/tm")
+
+    # Create and run processor
+    processor = JobProcessor(
+        redis_host=redis_host,
+        redis_port=redis_port,
+        redis_db=redis_db,
+        redis_password=redis_password if redis_password else None,
+        poll_interval=poll_interval,
+        max_retries=max_retries,
+        config_path=config_path,
+        tm_path=tm_path,
+    )
+
+    try:
+        processor.run()
+        return 0
+    except Exception as e:
+        logger.error(f"Job processor failed: {e}", exc_info=True)
+        return 1
+
+
+if __name__ == "__main__":
+    sys.exit(main())

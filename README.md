@@ -89,6 +89,37 @@ python -c "from src.tm.backup import create_tm_backup; from pathlib import Path;
 
 📚 **Full TM Documentation**: [Translation Memory Guide](docs/guides/tm-getting-started.md)
 
+### Content-Based Change Detection
+
+Accurately detect file changes using content hashing instead of modification timestamps. Avoid unnecessary retranslations when files are touched but content is unchanged.
+
+**Benefits:**
+- ✅ **No false positives**: Detects actual content changes, not just timestamp updates
+- ✅ **Git-friendly**: Works seamlessly with `git checkout`, `git pull`, and other operations
+- ✅ **CI/CD compatible**: Handles file regeneration without triggering retranslations
+- ✅ **Performance optimized**: Fast-path mtime check avoids redundant hashing (<2% overhead)
+
+**Common Use Cases:**
+- Files touched without content changes (`touch file.md`)
+- Git operations that update timestamps (`git checkout`, `git pull`)
+- Build systems that regenerate files with identical content
+- CI/CD pipelines with fresh repository clones
+
+**Quick Start:**
+```bash
+# Enable in config/global.yaml
+features:
+  enable_content_hash_tracking: true
+
+# Or disable for a specific run
+python -m src.cli example.com --disable-content-hash
+
+# Rebuild hashes from scratch
+python -m src.cli example.com --rebuild-content-hashes
+```
+
+📚 **Full Documentation**: [Content Hash Tracking Guide](docs/guides/content-hash-tracking.md)
+
 ### Benchmarking System
 
 Comprehensive benchmarking system for performance measurement and ML-based model recommendations:
@@ -199,6 +230,7 @@ New to the project? Start here:
 ### Key Guides
 
 - [Translation Workflows](docs/guides/translation-workflows.md) - Basic to advanced usage
+- [Model Selection](docs/guides/model-selection.md) - Understanding models, downloads, and configuration
 - [Quality Improvement](docs/guides/quality-improvement.md) - Validation and terminology
 - [Configuration Reference](docs/reference/config.md) - All config options
 - [CLI Reference](docs/reference/cli.md) - Command-line usage
@@ -206,6 +238,7 @@ New to the project? Start here:
 
 ### Key Configuration Files
 
+- `config/model_registry.yaml` - Available translation models and metadata
 - `config/validation.yaml` - Validation rules, decision thresholds, retry strategy
 - `config/terminology.yaml` - Protected terminology (exact matches and patterns)
 - `config/metrics.yaml` - Metrics storage limits, thresholds, statistics configuration
@@ -231,9 +264,118 @@ global:
       severity: error
 ```
 
+## Translation Models
+
+### Automatic Model Downloads
+
+**Models are downloaded automatically** when first needed - no manual intervention required.
+
+When you run your first translation, the system:
+1. Determines which model to use (see [Model Selection](#model-selection) below)
+2. Automatically downloads the model from HuggingFace Hub (~1-2GB)
+3. Caches the model locally for instant future use
+4. Models are stored in `~/.cache/huggingface/` (or `%USERPROFILE%\.cache\huggingface\` on Windows)
+
+**No prompts, no manual downloads, just automatic setup.**
+
+### Model Selection
+
+The system chooses which translation model to use based on this priority:
+
+1. **CLI Override** (highest priority): `--model m2m100_1.2b`
+2. **Site Profile Default**: Configured in `config/site_profiles/*.yaml`
+3. **Fallback Default**: `m2m100_418m` (418M parameters, multilingual)
+
+**Available Models:**
+
+The system includes 19+ pre-configured models in the [model registry](config/model_registry.yaml):
+
+| Model | Parameters | Size | Languages | Best For |
+|-------|-----------|------|-----------|----------|
+| `m2m100_418m` | 418M | ~1.6GB | 100 languages | Default, balanced speed/quality |
+| `m2m100_1.2b` | 1.2B | ~4.8GB | 100 languages | Higher quality translations |
+| `nllb_600m` | 600M | ~2.4GB | 200 languages | More language pairs |
+| `nllb_1.3b` | 1.3B | ~5.2GB | 200 languages | Best quality, resource-intensive |
+| `opus_mt_*` | Varies | ~300MB | Language-pair specific | Fastest, single pair only |
+
+**Smart Recommendations:**
+
+The system can recommend models based on your hardware:
+
+```bash
+python -c "
+from src.model_runtime.registry import ModelRegistry
+from src.benchmarking.system_info import SystemInfoCollector
+
+registry = ModelRegistry()
+system_info = SystemInfoCollector().collect()
+
+# Get recommendation based on hardware
+rec = registry.recommend_model(
+    src_lang='en',
+    tgt_lang='fr',
+    hardware={'device': 'cuda', 'ram_gb': 16, 'gpu_vram_gb': 8},
+    prefer_quality=True
+)
+print(f'Recommended: {rec}')
+"
+```
+
+The recommendation engine considers:
+- Language pair support
+- Hardware constraints (RAM, GPU VRAM)
+- Device compatibility (CPU vs CUDA)
+- Model quality (parameter count)
+- Performance (inference speed)
+
+📚 **Full Model Documentation**: [Model Selection Guide](docs/guides/model-selection.md)
+
+### Configuring Models
+
+**Per-site configuration:**
+
+Edit `config/site_profiles/mysite.yaml`:
+```yaml
+default_model: "nllb_1.3b"  # Use higher quality model for this site
+```
+
+**CLI override for testing:**
+```bash
+# Try different models without changing config
+translate-hugo --site mysite --model m2m100_1.2b --source-lang en --target-lang fr
+```
+
+**Manual model pre-download (optional):**
+
+```bash
+# Pre-download a specific model before translation
+python -c "
+from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+tokenizer = AutoTokenizer.from_pretrained('facebook/m2m100_418M')
+model = AutoModelForSeq2SeqLM.from_pretrained('facebook/m2m100_418M')
+print('Model cached successfully')
+"
+```
+
 ## Architecture
 
+### System Components
+
+The system uses a **distributed architecture** with three main components:
+
+- **Orchestrator** - Monitors content, creates translation jobs, manages job queue
+- **Redis Queue** - Distributed job queue for orchestrator-worker communication
+- **Workers** - Process translation jobs from queue, write translated output
+
+See [Redis Queue Architecture](docs/architecture/redis-queue.md) for detailed documentation on the distributed job queue system, scaling, and troubleshooting.
+
+### Directory Structure
+
 - **Source**: `src/` - Core translation engine and validators
+  - `src/orchestrator/` - Job orchestration and queue management
+  - `src/workers/` - Translation job processors
+  - `src/translation_engine/` - Core translation logic
+  - `src/tm/` - Translation memory (L1/L2/L3)
 - **Tests**: `tests/` - Comprehensive test suite
 - **Config**: `config/` - Validation, terminology, site profiles
 - **Docs**: `docs/` - User guides, reference, troubleshooting
@@ -241,6 +383,15 @@ global:
 ## Installation
 
 For first-time setup with automated scripts and GPU detection, see the **[Setup Guide](docs/user-guide/setup.md)**.
+
+### Prerequisites
+
+- **Python 3.10+**
+- **Redis 7+** - Required for distributed job queue (orchestrator-worker communication)
+  - Docker: Included in `docker-compose.yml`
+  - Manual: `apt install redis-server` or `brew install redis`
+- **Docker** (optional) - For containerized deployment
+- **CUDA 12.1+** (optional) - For GPU acceleration
 
 ### Manual Installation (Advanced Users)
 

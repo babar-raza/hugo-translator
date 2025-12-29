@@ -1,0 +1,215 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard{% endblock %}
+
+{% block content %}
+<div class="dashboard-header">
+    <h1>Benchmark Dashboard</h1>
+    <p class="subtitle">Translation model performance analysis for 36 languages</p>
+</div>
+
+<div class="stats-grid">
+    <div class="stat-card">
+        <h2 class="stat-value">{{ total_runs }}</h2>
+        <p class="stat-label">Total Benchmark Runs</p>
+    </div>
+    <div class="stat-card">
+        <h2 class="stat-value">{{ total_models }}</h2>
+        <p class="stat-label">Models Tested</p>
+    </div>
+    <div class="stat-card">
+        <h2 class="stat-value">{{ devices }}</h2>
+        <p class="stat-label">Device Types</p>
+    </div>
+    <div class="stat-card">
+        <h2 class="stat-value" id="coverageValue">--%</h2>
+        <p class="stat-label">Language Coverage</p>
+    </div>
+</div>
+
+{% if latest_run %}
+<div class="info-banner">
+    <strong>Latest benchmark:</strong> {{ latest_run[:19] }}
+</div>
+{% endif %}
+
+<div class="dashboard-grid">
+    <div class="chart-container">
+        <h2>Top Models by Throughput</h2>
+        <div id="throughputChart" class="chart-placeholder">
+            <div class="loading">Loading chart data...</div>
+        </div>
+    </div>
+
+    <div class="chart-container">
+        <h2>Memory Usage by Model</h2>
+        <div id="memoryChart" class="chart-placeholder">
+            <div class="loading">Loading chart data...</div>
+        </div>
+    </div>
+</div>
+
+<div class="chart-container">
+    <h2>Recent Benchmark Runs</h2>
+    <div id="recentRunsTable">
+        <div class="loading">Loading recent runs...</div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Fetch and display model data
+fetch('/api/models')
+    .then(res => res.json())
+    .then(data => {
+        renderThroughputChart(data);
+        renderMemoryChart(data);
+    })
+    .catch(err => {
+        console.error('Error loading model data:', err);
+        document.getElementById('throughputChart').innerHTML =
+            '<div class="error-message">Failed to load chart data</div>';
+        document.getElementById('memoryChart').innerHTML =
+            '<div class="error-message">Failed to load chart data</div>';
+    });
+
+// Fetch and display recent runs
+fetch('/api/recent_runs?limit=10')
+    .then(res => res.json())
+    .then(data => {
+        renderRecentRunsTable(data);
+    })
+    .catch(err => {
+        console.error('Error loading recent runs:', err);
+        document.getElementById('recentRunsTable').innerHTML =
+            '<div class="error-message">Failed to load recent runs</div>';
+    });
+
+// Calculate and display coverage
+fetch('/api/summary')
+    .then(res => res.json())
+    .then(data => {
+        // Assuming 36 target languages
+        const coverage = (data.total_runs > 0) ? Math.min(100, (data.total_models * 2 / 36 * 100)) : 0;
+        document.getElementById('coverageValue').textContent = Math.round(coverage) + '%';
+    })
+    .catch(err => {
+        console.error('Error loading summary:', err);
+    });
+
+function renderThroughputChart(data) {
+    const container = document.getElementById('throughputChart');
+
+    if (!data || data.length === 0) {
+        container.innerHTML = '<div class="no-data">No benchmark data available</div>';
+        return;
+    }
+
+    // Simple bar chart using HTML/CSS (no external dependencies)
+    const topModels = data.slice(0, 10);
+    const maxThroughput = Math.max(...topModels.map(m => m.avg_throughput || 0));
+
+    let html = '<div class="bar-chart">';
+    topModels.forEach(model => {
+        const throughput = model.avg_throughput || 0;
+        const percentage = (throughput / maxThroughput * 100);
+
+        html += `
+            <div class="bar-chart-row">
+                <div class="bar-chart-label">
+                    ${model.model_id} <span class="device-badge ${model.device}">${model.device}</span>
+                </div>
+                <div class="bar-chart-bar-container">
+                    <div class="bar-chart-bar" style="width: ${percentage}%"></div>
+                    <span class="bar-chart-value">${throughput.toFixed(1)} tokens/sec</span>
+                </div>
+            </div>
+        `;
+    });
+    html += '</div>';
+
+    container.innerHTML = html;
+}
+
+function renderMemoryChart(data) {
+    const container = document.getElementById('memoryChart');
+
+    if (!data || data.length === 0) {
+        container.innerHTML = '<div class="no-data">No benchmark data available</div>';
+        return;
+    }
+
+    // Simple bar chart for memory usage
+    const modelsWithMemory = data.filter(m => m.avg_memory).slice(0, 10);
+    const maxMemory = Math.max(...modelsWithMemory.map(m => m.avg_memory || 0));
+
+    let html = '<div class="bar-chart">';
+    modelsWithMemory.forEach(model => {
+        const memory = model.avg_memory || 0;
+        const percentage = (memory / maxMemory * 100);
+
+        html += `
+            <div class="bar-chart-row">
+                <div class="bar-chart-label">
+                    ${model.model_id} <span class="device-badge ${model.device}">${model.device}</span>
+                </div>
+                <div class="bar-chart-bar-container">
+                    <div class="bar-chart-bar memory" style="width: ${percentage}%"></div>
+                    <span class="bar-chart-value">${memory.toFixed(0)} MB</span>
+                </div>
+            </div>
+        `;
+    });
+    html += '</div>';
+
+    container.innerHTML = html;
+}
+
+function renderRecentRunsTable(data) {
+    const container = document.getElementById('recentRunsTable');
+
+    if (!data || data.length === 0) {
+        container.innerHTML = '<div class="no-data">No recent runs available</div>';
+        return;
+    }
+
+    let html = `
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Run ID</th>
+                    <th>Model</th>
+                    <th>Device</th>
+                    <th>Timestamp</th>
+                    <th>Batch Size</th>
+                    <th>Samples</th>
+                    <th>Avg Throughput</th>
+                </tr>
+            </thead>
+            <tbody>
+    `;
+
+    data.forEach(run => {
+        html += `
+            <tr>
+                <td><code>${run.run_id}</code></td>
+                <td>${run.model_id}</td>
+                <td><span class="device-badge ${run.device}">${run.device}</span></td>
+                <td>${run.timestamp_display || run.timestamp}</td>
+                <td>${run.batch_size || 'N/A'}</td>
+                <td>${run.sample_count || 0}</td>
+                <td>${run.avg_throughput ? run.avg_throughput.toFixed(1) + ' tokens/sec' : 'N/A'}</td>
+            </tr>
+        `;
+    });
+
+    html += `
+            </tbody>
+        </table>
+    `;
+
+    container.innerHTML = html;
+}
+</script>
+{% endblock %}

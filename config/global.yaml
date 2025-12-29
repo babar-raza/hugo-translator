@@ -19,17 +19,18 @@ tm_defaults:
 model_defaults:
   fallback_model: "m2m100_418m"
   device: "auto"  # auto, cpu, cuda, mps
-  batch_size: 32
+  batch_size: 8  # Reduced from 32 to avoid CUDA OOM errors
   cache_models: true
   max_cached_models: 2
 
 # Hardware/GPU configuration
 hardware:
   enable_gpu: true  # Enable GPU acceleration if available
-  max_gpu_memory_mb: 6144  # Max GPU memory per process (6GB, adjust based on your VRAM)
+  max_gpu_memory_mb: 4096  # Reduced from 6144 to 4GB to leave headroom for OS
   gpu_device_id: -1  # -1 = auto-select best GPU, 0+ = specific device
   allow_cpu_fallback: true  # Fall back to CPU if GPU fails
   clear_cache_after_batch: true  # Clear GPU cache after each batch
+  clear_cache_frequency: 5  # Clear cache every N batches (new)
 
 # Orchestrator defaults
 orchestrator:
@@ -50,10 +51,33 @@ performance:
 
 # Observability defaults
 observability:
-  log_level: "INFO"  # DEBUG, INFO, WARNING, ERROR, CRITICAL
-  log_format: "json"  # text, json
+  # Logging configuration
+  logging:
+    enabled: true  # Enable structured logging
+    log_level: "DEBUG"  # DEBUG, INFO, WARNING, ERROR, CRITICAL
+    console_output: true  # Enable colored console output
+    file_output: true  # Enable NDJSON file output
+    log_file: "./data/logs/hugo-translator.ndjson"  # Path to log file
+    max_file_size_mb: 100  # Max size before rotation (MB)
+    backup_count: 10  # Number of rotated files to keep
+
+    # Component-specific logging levels (optional overrides)
+    components:
+      orchestrator: "INFO"  # Job queue, scheduling
+      translation_engine: "INFO"  # Segment extraction, translation
+      tm: "DEBUG"  # TM lookups, writes, cache stats
+      model_runtime: "INFO"  # Model loading, inference
+      validation: "INFO"  # Validation checks
+      worker: "INFO"  # Worker operations
+
+    # Enable correlation IDs for cross-component tracing
+    enable_correlation_ids: true
+
+  # Flow artifacts for debugging
   flow_artifact_detail: "summary"  # none, summary, sampled, full
   flow_artifact_sample_rate: 0.05  # 5% when sampled
+
+  # Metrics collection
   metrics_enabled: true
   metrics_port: 9090
   metrics_pushgateway: ""  # URL of Prometheus Pushgateway (optional)
@@ -113,6 +137,50 @@ features:
   enable_model_benchmarking: false
   enable_auto_model_selection: true
   enable_quality_scoring: false
+  enable_content_hash_tracking: true  # Content-based change detection (recommended for production)
+
+# Content hash tracking (file-level change detection)
+content_hash_tracking:
+  # Master toggle (redundant with features.enable_content_hash_tracking, but explicit)
+  enabled: false
+
+  # Hash algorithm: md5 (fast) or sha256 (secure but slower)
+  hash_algorithm: "md5"
+
+  # Metadata file location (relative to output_dir)
+  metadata_file: ".translation_metadata.json"
+
+  # Metadata directory (for Docker deployments with dedicated volume)
+  # If set, overrides output_dir for metadata storage location
+  # Leave empty to store metadata alongside output files
+  metadata_dir: ""  # Example: "/data/metadata" for Docker volume
+
+  # Redis distributed locking (multi-worker coordination)
+  # Timeout in seconds for acquiring Redis lock on metadata writes
+  # Only used when TranslationEngine is initialized with redis_client
+  redis_lock_timeout: 30
+
+  # Automatic cleanup of stale metadata (CHH-05)
+  auto_cleanup:
+    enabled: true  # Enable automatic cleanup
+    max_age_days: 30  # Remove entries not seen in 30 days
+    cleanup_on_load: true  # Run cleanup when loading metadata
+    cleanup_on_save: false  # Run cleanup when saving metadata (more aggressive)
+
+  # Performance: In-memory cache of file hashes (LRU)
+  in_memory_cache_size: 1000
+
+  # Behavior: Update metadata even when skipping translation
+  update_metadata_on_skip: true
+
+  # Output validation: Detect manual edits to translated files
+  validate_output_integrity: false
+
+  # Fallback: Use mtime if metadata corrupted/missing
+  fallback_to_mtime: true
+
+  # Performance: Only compute hash if mtime changed (fast-path)
+  fast_path_mtime_check: true
 
 # L4 LLM-based adaptation (Optional)
 l4_llm:

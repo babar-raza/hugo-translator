@@ -10,6 +10,7 @@ build/
 
 # Virtual environments
 venv/
+venv_wsl/
 env/
 ENV/
 
@@ -29,6 +30,13 @@ htmlcov/
 data/
 logs/
 artifacts/
+models/
+backups/
+output/
+telemetry_buffer/
+config/data/
+plans/
+reports_repo_hygiene/
 
 # Git
 .git/

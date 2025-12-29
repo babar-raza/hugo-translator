@@ -31,6 +31,29 @@ class ASTRenderer:
         """Initialize AST renderer."""
         self.unit_map: Dict[str, TextUnit] = {}
         self.applied_units: set = set()
+        # Lazy-initialize PlaceholderManager for placeholder restoration
+        self._placeholder_manager = None
+
+    def _restore_placeholders(self, text: str, placeholder_map: Dict[str, str]) -> str:
+        """
+        Restore placeholders in translated text back to original content.
+
+        Args:
+            text: Translated text potentially containing placeholders
+            placeholder_map: Mapping of placeholders to original content
+
+        Returns:
+            Text with placeholders restored to original content
+        """
+        if not placeholder_map:
+            return text
+
+        # Lazy-initialize PlaceholderManager
+        if self._placeholder_manager is None:
+            from ..extractor.placeholder_manager import PlaceholderManager
+            self._placeholder_manager = PlaceholderManager()
+
+        return self._placeholder_manager.restore(text, placeholder_map)
 
     def _sanitize_language_markers(self, text: str) -> str:
         """
@@ -162,6 +185,11 @@ class ASTRenderer:
 
             # Get final text (with whitespace reattached)
             final_text = unit.get_final_text()
+
+            # Restore placeholders (if any were applied during extraction)
+            placeholder_map = unit.metadata.get('placeholder_map', {})
+            if placeholder_map:
+                final_text = self._restore_placeholders(final_text, placeholder_map)
 
             # Update node content based on type
             if node.type in (NodeType.TEXT, NodeType.CODE_SPAN, NodeType.CODE_BLOCK):

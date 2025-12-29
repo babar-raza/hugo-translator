@@ -1,0 +1,197 @@
+{% extends "base.html" %}
+
+{% block title %}Benchmark Runs{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Benchmark Runs Explorer</h1>
+    <p class="subtitle">Browse and search all benchmark runs</p>
+</div>
+
+<div class="controls" style="flex-wrap: wrap;">
+    <div style="flex: 1; min-width: 200px;">
+        <input type="text" id="modelFilter" placeholder="Filter by model..."
+               onkeyup="applyFilters()" style="width: 100%; padding: 0.5rem; border: 1px solid var(--border-color); border-radius: 4px;">
+    </div>
+    <div>
+        <select id="deviceFilter" onchange="applyFilters()" style="padding: 0.5rem; border: 1px solid var(--border-color); border-radius: 4px;">
+            <option value="">All Devices</option>
+            <option value="cpu">CPU</option>
+            <option value="cuda">CUDA/GPU</option>
+        </select>
+    </div>
+    <div>
+        <button class="btn-secondary" onclick="resetFilters()">Reset Filters</button>
+    </div>
+    <div>
+        <button class="btn-secondary" onclick="loadRuns()">Refresh</button>
+    </div>
+</div>
+
+<div class="chart-container">
+    <div class="loading" id="loading">Loading runs...</div>
+
+    <div id="runsContainer" style="display: none;">
+        <div style="margin-bottom: 1rem;">
+            <strong>Total Runs:</strong> <span id="totalCount">0</span>
+        </div>
+
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Run ID</th>
+                    <th>Model</th>
+                    <th>Device</th>
+                    <th>Timestamp</th>
+                    <th>Samples</th>
+                    <th>Avg Throughput</th>
+                    <th>Avg Memory</th>
+                    <th>Total Time</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody id="runsTableBody">
+            </tbody>
+        </table>
+
+        <div id="pagination" style="margin-top: 2rem; display: flex; justify-content: space-between; align-items: center;">
+            <button class="btn-secondary" id="prevBtn" onclick="loadPreviousPage()" disabled>← Previous</button>
+            <span id="pageInfo">Page 1</span>
+            <button class="btn-secondary" id="nextBtn" onclick="loadNextPage()" disabled>Next →</button>
+        </div>
+    </div>
+
+    <div class="error-message" id="error" style="display: none;"></div>
+</div>
+
+<script>
+let currentOffset = 0;
+const pageSize = 50;
+let totalCount = 0;
+let currentFilters = {
+    model: '',
+    device: ''
+};
+
+async function loadRuns() {
+    const loadingEl = document.getElementById('loading');
+    const containerEl = document.getElementById('runsContainer');
+    const errorEl = document.getElementById('error');
+
+    try {
+        loadingEl.style.display = 'block';
+        containerEl.style.display = 'none';
+        errorEl.style.display = 'none';
+
+        // Build query string
+        const params = new URLSearchParams({
+            limit: pageSize,
+            offset: currentOffset
+        });
+
+        if (currentFilters.model) {
+            params.append('model', currentFilters.model);
+        }
+        if (currentFilters.device) {
+            params.append('device', currentFilters.device);
+        }
+
+        const response = await fetch(`/api/runs?${params}`);
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+
+        const data = await response.json();
+
+        totalCount = data.pagination.total;
+        document.getElementById('totalCount').textContent = totalCount;
+
+        renderRunsTable(data.runs);
+
+        // Update pagination
+        updatePagination(data.pagination);
+
+        loadingEl.style.display = 'none';
+        containerEl.style.display = 'block';
+
+    } catch (error) {
+        console.error('Error loading runs:', error);
+        loadingEl.style.display = 'none';
+        errorEl.textContent = `Failed to load runs: ${error.message}`;
+        errorEl.style.display = 'block';
+    }
+}
+
+function renderRunsTable(runs) {
+    const tbody = document.getElementById('runsTableBody');
+
+    if (runs.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="9" class="no-data">No runs found matching the current filters.</td></tr>';
+        return;
+    }
+
+    let html = '';
+    runs.forEach(run => {
+        const timestamp = run.timestamp ? run.timestamp.substring(0, 19).replace('T', ' ') : '-';
+        const runIdShort = run.run_id.substring(0, 8);
+
+        html += `
+            <tr>
+                <td><code title="${run.run_id}">${runIdShort}...</code></td>
+                <td><code>${run.model_id}</code></td>
+                <td><span class="device-badge ${run.device}">${run.device.toUpperCase()}</span></td>
+                <td>${timestamp}</td>
+                <td>${run.sample_count || 0}</td>
+                <td>${run.avg_throughput || '-'} tok/s</td>
+                <td>${run.avg_memory || '-'} MB</td>
+                <td>${run.total_time || '-'} s</td>
+                <td>
+                    <a href="/runs/${run.run_id}" class="btn-primary" style="padding: 0.25rem 0.75rem; font-size: 0.85rem;">View</a>
+                </td>
+            </tr>
+        `;
+    });
+
+    tbody.innerHTML = html;
+}
+
+function updatePagination(pagination) {
+    const currentPage = Math.floor(pagination.offset / pageSize) + 1;
+    const totalPages = Math.ceil(pagination.total / pageSize);
+
+    document.getElementById('pageInfo').textContent = `Page ${currentPage} of ${totalPages}`;
+
+    // Enable/disable buttons
+    document.getElementById('prevBtn').disabled = pagination.offset === 0;
+    document.getElementById('nextBtn').disabled = !pagination.has_more;
+}
+
+function loadNextPage() {
+    currentOffset += pageSize;
+    loadRuns();
+}
+
+function loadPreviousPage() {
+    currentOffset = Math.max(0, currentOffset - pageSize);
+    loadRuns();
+}
+
+function applyFilters() {
+    currentFilters.model = document.getElementById('modelFilter').value.trim();
+    currentFilters.device = document.getElementById('deviceFilter').value;
+    currentOffset = 0; // Reset to first page
+    loadRuns();
+}
+
+function resetFilters() {
+    document.getElementById('modelFilter').value = '';
+    document.getElementById('deviceFilter').value = '';
+    currentFilters = { model: '', device: '' };
+    currentOffset = 0;
+    loadRuns();
+}
+
+// Load on page load
+document.addEventListener('DOMContentLoaded', loadRuns);
+</script>
+{% endblock %}

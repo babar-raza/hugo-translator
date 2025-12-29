@@ -33,6 +33,7 @@ class TranslationOrchestrator:
         enable_file_watcher: bool = True,
         enable_sweep_scheduler: bool = True,
         sweep_interval_minutes: int = 60,
+        queue: Optional[JobQueue] = None,
     ):
         """
         Initialize orchestrator.
@@ -42,11 +43,12 @@ class TranslationOrchestrator:
             enable_file_watcher: Whether to enable file watching
             enable_sweep_scheduler: Whether to enable periodic sweeps
             sweep_interval_minutes: Interval between sweeps
+            queue: Optional job queue (defaults to in-memory JobQueue)
         """
         self.config_service = config_service
 
         # Initialize job queue
-        self.queue = JobQueue()
+        self.queue = queue if queue is not None else JobQueue()
 
         # Initialize file watcher (if enabled)
         self.file_watcher: Optional[FileWatcher] = None

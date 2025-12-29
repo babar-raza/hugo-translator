@@ -1,0 +1,84 @@
+{% extends "base.html" %}
+
+{% block title %}Cache Effectiveness{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Cache Effectiveness Dashboard</h1>
+    <p class="subtitle">Translation memory cache performance analysis</p>
+</div>
+
+<div class="info-banner">
+    <strong>Coming Soon:</strong> Cache tracking infrastructure is being implemented.
+    This dashboard will display cache hit rates, speedup factors, and TM level breakdowns once <code>BM-CACHE-01</code> is complete.
+</div>
+
+<div class="content-section">
+    <h2>Planned Features</h2>
+    <ul>
+        <li><strong>Overall Cache Hit Rate:</strong> Percentage of translations served from cache vs fresh translation</li>
+        <li><strong>Speedup Factor:</strong> How much faster cached translations are compared to uncached</li>
+        <li><strong>TM Level Breakdown:</strong> Performance by translation memory level (L1, L2, L3)</li>
+        <li><strong>Memory Usage:</strong> Cache size and memory consumption per level</li>
+        <li><strong>Time Series Analysis:</strong> Historical cache performance trends</li>
+        <li><strong>What-If Calculator:</strong> Estimate speedup with different cache configurations</li>
+        <li><strong>Recommendations:</strong> Optimal cache size suggestions based on workload</li>
+    </ul>
+</div>
+
+<div class="content-section">
+    <h2>Cache Architecture</h2>
+    <p>The translation system uses a three-level translation memory (TM) cache:</p>
+
+    <div class="language-grid">
+        <div class="language-item">
+            <strong>L1 Cache:</strong> Segment-level exact matches
+        </div>
+        <div class="language-item">
+            <strong>L2 Cache:</strong> Fuzzy matches and variations
+        </div>
+        <div class="language-item">
+            <strong>L3 Cache:</strong> Model predictions and embeddings
+        </div>
+    </div>
+
+    <p style="margin-top: 2rem;">
+        Cache effectiveness is measured by:
+    </p>
+    <ul>
+        <li><strong>Hit Rate:</strong> <code>cache_hits / (cache_hits + cache_misses)</code></li>
+        <li><strong>Speedup:</strong> <code>uncached_time / cached_time</code></li>
+        <li><strong>Memory Efficiency:</strong> <code>saved_tokens / cache_size_mb</code></li>
+    </ul>
+</div>
+
+<div class="content-section">
+    <h2>Implementation Status</h2>
+    <p>
+        To enable cache analytics, the following tasks must be completed:
+    </p>
+    <ol>
+        <li><strong>BM-CACHE-01:</strong> Implement cache tracking in benchmark infrastructure</li>
+        <li>Add <code>cached</code> boolean field to <code>benchmark_results</code> table</li>
+        <li>Add <code>cache_level</code> (L1/L2/L3) field for cache hits</li>
+        <li>Track cache hit/miss events during benchmarking</li>
+        <li>Run benchmarks with cache enabled to collect data</li>
+    </ol>
+
+    <p style="margin-top: 1rem;">
+        Once these are complete, this dashboard will automatically populate with real cache statistics.
+    </p>
+</div>
+
+<style>
+.language-item {
+    padding: 1rem !important;
+}
+
+.language-item strong {
+    display: block;
+    margin-bottom: 0.25rem;
+    color: var(--primary-color);
+}
+</style>
+{% endblock %}

@@ -28,6 +28,12 @@ from src.model_runtime.loader import ModelLoader
 from src.model_runtime.registry import ModelRegistry
 from src.translation_engine.engine import estimate_token_count
 
+try:
+    import torch
+    TORCH_AVAILABLE = True
+except ImportError:
+    TORCH_AVAILABLE = False
+
 logger = logging.getLogger(__name__)
 
 
@@ -179,24 +185,9 @@ class BenchmarkRunner:
             except ImportError:
                 raise RuntimeError("CUDA device requested but torch is not installed")
 
-        # Collect system info
+        # Collect system info (comprehensive SystemInfo from system_info.py)
         logger.info("Collecting system information...")
-        system_info_obj = self.system_collector.collect()
-
-        # Convert to storage format
-        system_info = SystemInfo(
-            cpu_model=system_info_obj.cpu_model,
-            cpu_cores=system_info_obj.cpu_cores,
-            total_ram_gb=system_info_obj.total_ram_gb,
-            gpu_model=system_info_obj.gpu_model,
-            gpu_vram_gb=system_info_obj.gpu_memory_gb,
-            os_name=system_info_obj.os_name,
-            os_version=system_info_obj.os_version,
-            python_version=system_info_obj.python_version,
-            torch_version=system_info_obj.torch_version or "",
-            transformers_version="",  # Not collected by system_info
-            timestamp_utc=system_info_obj.collected_at_utc,
-        )
+        system_info = self.system_collector.collect()
 
         # Load corpus
         logger.info(f"Loading corpus with filter: {corpus_filter}, source: {corpus_source}")
@@ -262,6 +253,11 @@ class BenchmarkRunner:
             raise RuntimeError(f"Benchmark execution failed: {e}") from e
 
         finally:
+            # Clean up GPU memory if using CUDA
+            if device.startswith('cuda') and TORCH_AVAILABLE and torch.cuda.is_available():
+                torch.cuda.empty_cache()
+                logger.debug("GPU memory cache cleared")
+
             # Unload model
             logger.info("Unloading model...")
             loader.unload_all()
@@ -318,6 +314,13 @@ class BenchmarkRunner:
         """
         results = []
         errors = []
+        peak_memory_mb = None
+
+        # Reset GPU memory stats before benchmark if using CUDA
+        is_cuda = device.startswith('cuda')
+        if is_cuda and TORCH_AVAILABLE and torch.cuda.is_available():
+            torch.cuda.reset_peak_memory_stats(device=device if ':' in device else None)
+            torch.cuda.empty_cache()
 
         try:
             start_time = time.time()
@@ -339,6 +342,12 @@ class BenchmarkRunner:
 
             duration = time.time() - start_time
 
+            # Capture peak GPU memory after translation
+            if is_cuda and TORCH_AVAILABLE and torch.cuda.is_available():
+                peak_memory_bytes = torch.cuda.max_memory_allocated(device=device if ':' in device else None)
+                peak_memory_mb = peak_memory_bytes / (1024 ** 2)
+                logger.debug(f"Peak GPU memory for batch_size={batch_size}: {peak_memory_mb:.2f} MB")
+
             # Create results for each sample
             for idx, (sample_id, text, translation) in enumerate(zip(sample_ids, texts, translations)):
                 # Calculate per-sample metrics
@@ -354,14 +363,32 @@ class BenchmarkRunner:
                     tokens_input=tokens_per_sample_in,
                     tokens_output=tokens_per_sample_out,
                     throughput_tokens_per_sec=throughput,
-                    peak_memory_mb=None,  # Would require GPU profiling
+                    peak_memory_mb=peak_memory_mb,
                     errors=[],
                 )
                 results.append(result)
 
         except Exception as e:
-            logger.error(f"Translation failed for batch: {e}")
-            errors.append(str(e))
+            # Check if this is an OOM error
+            is_oom = False
+            if TORCH_AVAILABLE and isinstance(e, torch.cuda.OutOfMemoryError):
+                is_oom = True
+                error_msg = f"OOM at batch_size={batch_size}"
+                logger.error(f"{error_msg}: {e}")
+
+                # Capture memory at OOM
+                if torch.cuda.is_available():
+                    peak_memory_bytes = torch.cuda.max_memory_allocated(device=device if ':' in device else None)
+                    peak_memory_mb = peak_memory_bytes / (1024 ** 2)
+                    logger.error(f"Peak GPU memory at OOM: {peak_memory_mb:.2f} MB")
+
+                    # Clean up GPU memory
+                    torch.cuda.empty_cache()
+            else:
+                error_msg = f"Translation failed for batch: {e}"
+                logger.error(error_msg)
+
+            errors.append(error_msg)
 
             # Create error results
             for sample_id in sample_ids:
@@ -374,7 +401,7 @@ class BenchmarkRunner:
                     tokens_input=0,
                     tokens_output=0,
                     throughput_tokens_per_sec=0.0,
-                    peak_memory_mb=None,
+                    peak_memory_mb=peak_memory_mb,
                     errors=errors,
                 )
                 results.append(result)

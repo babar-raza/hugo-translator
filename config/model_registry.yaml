@@ -1,177 +1,249 @@
-# Translation Model Registry
-#
-# This file catalogs available translation models with their metadata
-# and requirements. The system uses this to recommend and load appropriate
-# models based on hardware capabilities and language pairs.
-
 models:
-  # Facebook M2M100 (418M parameters) - HuggingFace
-  - model_id: m2m100_418m
-    name: "Facebook M2M100 (418M)"
-    backend: huggingface
-    supported_pairs: all  # Multilingual model supporting 100 languages
-    model_size_mb: 1600
-    min_ram_gb: 4
-    optimal_device: cuda
-    parameters: 418000000
-    license: MIT
-    local_path: models/m2m100_418M
-    hf_model_id: facebook/m2m100_418M
-    description: "Multilingual translation model from Facebook. Supports 100 languages with good quality."
-
-  # Facebook M2M100 (418M) - CTranslate2 optimized
-  - model_id: m2m100_418m_ct2
-    name: "Facebook M2M100 (418M, CTranslate2)"
-    backend: ctranslate2
-    local_path: ./models/ct2/m2m100_418m
-    supported_pairs: all
-    model_size_mb: 800
-    min_ram_gb: 2
-    optimal_device: cpu
-    parameters: 418000000
-    license: MIT
-    description: "CTranslate2 optimized version of M2M100. 2x faster with 50% less memory."
-
-  # Facebook M2M100 (418M) - CTranslate2 INT8 quantized
-  - model_id: m2m100_418m_ct2_int8
-    name: "Facebook M2M100 (418M, CTranslate2, INT8)"
-    backend: ctranslate2
-    local_path: ./models/ct2/m2m100_418m_int8
-    supported_pairs: all
-    model_size_mb: 250
-    min_ram_gb: 1.5
-    optimal_device: cpu
-    parameters: 418000000
-    license: MIT
-    description: "CTranslate2 INT8 quantized version of M2M100. ~1% quality trade-off, 50% less memory than FP32."
-
-  # NLLB-200 (600M) - CTranslate2 INT8 quantized
-  - model_id: nllb_200_600m_ct2_int8
-    name: "NLLB-200 (600M, CTranslate2, INT8)"
-    backend: ctranslate2
-    local_path: ./models/ct2/nllb_200_600m_int8
-    supported_pairs: all
-    model_size_mb: 350
-    min_ram_gb: 2
-    optimal_device: cpu
-    parameters: 600000000
-    license: CC-BY-NC-4.0
-    description: "CTranslate2 INT8 quantized version of NLLB-200. <0.5% quality trade-off, excellent for low-resource languages."
-
-  # Facebook M2M100 (1.2B parameters) - HuggingFace
-  - model_id: m2m100_1.2b
-    name: "Facebook M2M100 (1.2B)"
-    backend: huggingface
-    supported_pairs: all
-    model_size_mb: 4800
-    min_ram_gb: 8
-    optimal_device: cuda
-    parameters: 1200000000
-    license: MIT
-    local_path: models/m2m100_1.2b
-    hf_model_id: facebook/m2m100_1.2B
-    description: "Larger M2M100 model with higher quality. Requires good GPU."
-
-  # NLLB-200 (600M parameters) - HuggingFace
-  - model_id: nllb_200_600m
-    name: "NLLB-200 (600M)"
-    backend: huggingface
-    supported_pairs: all  # 200 languages
-    model_size_mb: 2400
-    min_ram_gb: 6
-    optimal_device: cuda
-    parameters: 600000000
-    license: CC-BY-NC-4.0
-    local_path: models/nllb_200_600m
-    hf_model_id: facebook/nllb-200-distilled-600M
-    description: "No Language Left Behind - 200 languages. Best for low-resource languages."
-
-  # NLLB-200 (1.3B parameters) - HuggingFace
-  - model_id: nllb_200_1.3b
-    name: "NLLB-200 (1.3B)"
-    backend: huggingface
-    supported_pairs: all
-    model_size_mb: 5200
-    min_ram_gb: 10
-    optimal_device: cuda
-    parameters: 1300000000
-    license: CC-BY-NC-4.0
-    local_path: models/nllb_200_1.3b
-    hf_model_id: facebook/nllb-200-1.3B
-    description: "Larger NLLB model. Excellent quality for 200 languages."
-
-  # OpusMT English-French - Small specialized model
-  - model_id: opus_en_fr
-    name: "Opus-MT English-French"
-    backend: huggingface
-    supported_pairs:
-      - ["en", "fr"]
-      - ["fr", "en"]
-    model_size_mb: 300
-    min_ram_gb: 1
-    optimal_device: cpu
-    parameters: 77000000
-    license: CC-BY-4.0
-    hf_model_id: Helsinki-NLP/opus-mt-en-fr
-    description: "Specialized English-French model. Fast and lightweight."
-
-  # OpusMT English-Spanish
-  - model_id: opus_en_es
-    name: "Opus-MT English-Spanish"
-    backend: huggingface
-    supported_pairs:
-      - ["en", "es"]
-      - ["es", "en"]
-    model_size_mb: 300
-    min_ram_gb: 1
-    optimal_device: cpu
-    parameters: 77000000
-    license: CC-BY-4.0
-    hf_model_id: Helsinki-NLP/opus-mt-en-es
-    description: "Specialized English-Spanish model. Fast and lightweight."
-
-  # OpusMT English-German
-  - model_id: opus_en_de
-    name: "Opus-MT English-German"
-    backend: huggingface
-    supported_pairs:
-      - ["en", "de"]
-      - ["de", "en"]
-    model_size_mb: 300
-    min_ram_gb: 1
-    optimal_device: cpu
-    parameters: 77000000
-    license: CC-BY-4.0
-    hf_model_id: Helsinki-NLP/opus-mt-en-de
-    description: "Specialized English-German model. Fast and lightweight."
-
-  # Marian-MT English-Romance languages
-  - model_id: marian_en_romance
-    name: "Marian-MT English-Romance"
-    backend: huggingface
-    supported_pairs:
-      - ["en", "fr"]
-      - ["en", "es"]
-      - ["en", "it"]
-      - ["en", "pt"]
-      - ["en", "ro"]
-    model_size_mb: 300
-    min_ram_gb: 1
-    optimal_device: cpu
-    parameters: 74000000
-    license: Apache-2.0
-    hf_model_id: Helsinki-NLP/opus-mt-en-ROMANCE
-    description: "English to Romance languages. Covers French, Spanish, Italian, Portuguese, Romanian."
-
-  # Small-100 (300M) - Compact multilingual
-  - model_id: small100
-    name: "Small-100 (300M)"
-    backend: huggingface
-    supported_pairs: all  # 100 languages
-    model_size_mb: 1200
-    min_ram_gb: 3
-    optimal_device: cpu
-    parameters: 300000000
-    license: MIT
-    hf_model_id: alirezamsh/small100
-    description: "Compact multilingual model. Good balance of size and quality."
+- model_id: m2m100_418m
+  name: Facebook M2M100 (418M)
+  backend: huggingface
+  supported_pairs: all
+  model_size_mb: 1600
+  min_ram_gb: 4
+  optimal_device: cuda
+  parameters: 418000000
+  license: MIT
+  local_path: models/m2m100_418M
+  hf_model_id: facebook/m2m100_418M
+  description: Multilingual translation model from Facebook. Supports 100 languages
+    with good quality.
+- model_id: m2m100_418m_ct2
+  name: Facebook M2M100 (418M, CTranslate2)
+  backend: ctranslate2
+  local_path: ./models/ct2/m2m100_418m
+  supported_pairs: all
+  model_size_mb: 800
+  min_ram_gb: 2
+  optimal_device: cpu
+  parameters: 418000000
+  license: MIT
+  description: CTranslate2 optimized version of M2M100. 2x faster with 50% less memory.
+- model_id: m2m100_418m_ct2_int8
+  name: Facebook M2M100 (418M, CTranslate2, INT8)
+  backend: ctranslate2
+  local_path: ./models/ct2/m2m100_418m_int8
+  supported_pairs: all
+  model_size_mb: 250
+  min_ram_gb: 1.5
+  optimal_device: cpu
+  parameters: 418000000
+  license: MIT
+  description: CTranslate2 INT8 quantized version of M2M100. ~1% quality trade-off,
+    50% less memory than FP32.
+- model_id: nllb_200_600m_ct2_int8
+  name: NLLB-200 (600M, CTranslate2, INT8)
+  backend: ctranslate2
+  local_path: ./models/ct2/nllb_200_600m_int8
+  supported_pairs: all
+  model_size_mb: 350
+  min_ram_gb: 2
+  optimal_device: cpu
+  parameters: 600000000
+  license: CC-BY-NC-4.0
+  description: CTranslate2 INT8 quantized version of NLLB-200. <0.5% quality trade-off,
+    excellent for low-resource languages.
+- model_id: m2m100_1.2b
+  name: Facebook M2M100 (1.2B)
+  backend: huggingface
+  supported_pairs: all
+  model_size_mb: 4800
+  min_ram_gb: 8
+  optimal_device: cuda
+  parameters: 1200000000
+  license: MIT
+  local_path: models/m2m100_1.2b
+  hf_model_id: facebook/m2m100_1.2B
+  description: Larger M2M100 model with higher quality. Requires good GPU.
+- model_id: nllb_200_600m
+  name: NLLB-200 (600M)
+  backend: huggingface
+  supported_pairs: all
+  model_size_mb: 2400
+  min_ram_gb: 6
+  optimal_device: cuda
+  parameters: 600000000
+  license: CC-BY-NC-4.0
+  local_path: models/nllb_200_600m
+  hf_model_id: facebook/nllb-200-distilled-600M
+  description: No Language Left Behind - 200 languages. Best for low-resource languages.
+- model_id: nllb_200_1.3b
+  name: NLLB-200 (1.3B)
+  backend: huggingface
+  supported_pairs: all
+  model_size_mb: 5200
+  min_ram_gb: 10
+  optimal_device: cuda
+  parameters: 1300000000
+  license: CC-BY-NC-4.0
+  local_path: models/nllb_200_1.3b
+  hf_model_id: facebook/nllb-200-1.3B
+  description: Larger NLLB model. Excellent quality for 200 languages.
+- model_id: opus_en_fr
+  name: Opus-MT English-French
+  backend: huggingface
+  supported_pairs:
+  - - en
+    - fr
+  - - fr
+    - en
+  model_size_mb: 300
+  min_ram_gb: 1
+  optimal_device: cpu
+  parameters: 77000000
+  license: CC-BY-4.0
+  hf_model_id: Helsinki-NLP/opus-mt-en-fr
+  description: Specialized English-French model. Fast and lightweight.
+- model_id: opus_en_es
+  name: Opus-MT English-Spanish
+  backend: huggingface
+  supported_pairs:
+  - - en
+    - es
+  - - es
+    - en
+  model_size_mb: 300
+  min_ram_gb: 1
+  optimal_device: cpu
+  parameters: 77000000
+  license: CC-BY-4.0
+  hf_model_id: Helsinki-NLP/opus-mt-en-es
+  description: Specialized English-Spanish model. Fast and lightweight.
+- model_id: opus_en_de
+  name: Opus-MT English-German
+  backend: huggingface
+  supported_pairs:
+  - - en
+    - de
+  - - de
+    - en
+  model_size_mb: 300
+  min_ram_gb: 1
+  optimal_device: cpu
+  parameters: 77000000
+  license: CC-BY-4.0
+  hf_model_id: Helsinki-NLP/opus-mt-en-de
+  description: Specialized English-German model. Fast and lightweight.
+- model_id: marian_en_romance
+  name: Marian-MT English-Romance
+  backend: huggingface
+  supported_pairs:
+  - - en
+    - fr
+  - - en
+    - es
+  - - en
+    - it
+  - - en
+    - pt
+  - - en
+    - ro
+  model_size_mb: 300
+  min_ram_gb: 1
+  optimal_device: cpu
+  parameters: 74000000
+  license: Apache-2.0
+  hf_model_id: Helsinki-NLP/opus-mt-en-ROMANCE
+  description: English to Romance languages. Covers French, Spanish, Italian, Portuguese,
+    Romanian.
+- model_id: small100
+  name: Small-100 (300M)
+  backend: huggingface
+  supported_pairs: all
+  model_size_mb: 1200
+  min_ram_gb: 3
+  optimal_device: cpu
+  parameters: 300000000
+  license: MIT
+  hf_model_id: alirezamsh/small100
+  description: Compact multilingual model. Good balance of size and quality.
+- model_id: t5_small
+  name: T5 Small
+  hf_model_id: google-t5/t5-small
+  backend: huggingface
+  supported_pairs: all
+  model_size_mb: 240
+  min_ram_gb: 1
+  optimal_device: cpu
+  parameters: 60000000
+  license: Apache-2.0
+  languages:
+  - de
+  - en
+  - fr
+  - jax
+  - ro
+  - tf
+  tags:
+  - auto-discovered
+  - transformers
+  - pytorch
+  - tf
+  - jax
+  - rust
+  metadata:
+    downloads: 2649008
+    likes: 523
+    description: Auto-discovered from HuggingFace Hub (2,649,008 downloads)
+    auto_discovered: true
+- model_id: t5_base
+  name: T5 Base
+  hf_model_id: google-t5/t5-base
+  backend: huggingface
+  supported_pairs: all
+  model_size_mb: 890
+  min_ram_gb: 2
+  optimal_device: cpu
+  parameters: 220000000
+  license: Apache-2.0
+  languages:
+  - de
+  - en
+  - fr
+  - jax
+  - ro
+  - tf
+  tags:
+  - auto-discovered
+  - transformers
+  - pytorch
+  - tf
+  - jax
+  - rust
+  metadata:
+    downloads: 2033712
+    likes: 760
+    description: Auto-discovered from HuggingFace Hub (2,033,712 downloads)
+    auto_discovered: true
+- model_id: t5_3b
+  name: T5 3b
+  hf_model_id: google-t5/t5-3b
+  backend: huggingface
+  supported_pairs: all
+  model_size_mb: 11000
+  min_ram_gb: 16
+  optimal_device: cuda
+  parameters: 3000000000
+  license: Apache-2.0
+  languages:
+  - de
+  - en
+  - fr
+  - ro
+  - tf
+  tags:
+  - auto-discovered
+  - transformers
+  - pytorch
+  - tf
+  - safetensors
+  - t5
+  metadata:
+    downloads: 801409
+    likes: 51
+    description: Auto-discovered from HuggingFace Hub (801,409 downloads)
+    auto_discovered: true

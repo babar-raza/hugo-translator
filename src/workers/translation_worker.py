@@ -19,6 +19,9 @@ from mcp.types import Tool, TextContent
 
 from src.model_runtime import HardwareDetector, ModelLoader, ModelRegistry
 from src.tm import TranslationMemory
+from src.tm.l1_cache import L1Cache
+from src.tm.l2_persistent import L2PersistentTM
+from src.tm.l3_semantic import L3SemanticTM
 from src.translation_engine import TranslationEngine
 from src.utils.config_loader import ConfigService
 from src.observability.logger import StructuredLogger
@@ -88,15 +91,13 @@ class TranslationWorker:
 
             # Initialize configuration
             self.config_service = ConfigService(
-                config_path=self.config_path,
-                site_profiles_dir=self.site_profiles_dir,
+                config_root=self.config_path
             )
             logger.info("Configuration service initialized")
 
             # Initialize observability
             self.structured_logger = StructuredLogger(
-                log_file=f"logs/worker-{self.worker_id}.ndjson",
-                console_output=True,
+                name=f"worker.{self.worker_id}"
             )
             self.metrics = MetricsCollector(
                 worker_id=self.worker_id,
@@ -104,22 +105,39 @@ class TranslationWorker:
             )
             logger.info("Observability initialized")
 
-            # Initialize translation memory
+            # Initialize translation memory layers
+            l1_cache = L1Cache(max_size=10000)  # Per-worker cache
+
+            # Setup L2 persistent TM path
+            l2_path = Path(self.tm_path) / "l2_lmdb"
+            l2_path.mkdir(parents=True, exist_ok=True)
+            l2_persistent = L2PersistentTM(str(l2_path))
+
+            # Setup L3 semantic TM (optional)
+            l3_path = Path(self.tm_path) / "l3_faiss"
+            l3_path.mkdir(parents=True, exist_ok=True)
+            l3_semantic = L3SemanticTM(
+                index_path=str(l3_path),
+                embedding_model="sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2",
+                use_gpu=False
+            )
+
             self.tm = TranslationMemory(
-                db_path=self.tm_path,
-                cache_size=10000,  # L1 cache size per worker
-                use_semantic=True,
+                l1_cache=l1_cache,
+                l2_persistent=l2_persistent,
+                l3_semantic=l3_semantic
             )
             logger.info("Translation memory initialized")
 
             # Detect hardware and initialize model runtime
-            hardware = HardwareDetector.detect()
-            logger.info(f"Hardware detected: {hardware.gpu_count} GPUs, {hardware.cpu_cores} CPUs")
+            detector = HardwareDetector()
+            hardware = detector.detect()
+            logger.info(f"Hardware detected: {len(hardware.cuda_devices)} GPUs, {hardware.cpu_count} CPUs")
 
-            registry = ModelRegistry(config_path="config/model_registry.yaml")
+            registry = ModelRegistry(registry_path="config/model_registry.yaml")
             self.model_loader = ModelLoader(
                 registry=registry,
-                hardware=hardware,
+                device=hardware.recommended_device,
             )
             logger.info("Model runtime initialized")
 

@@ -110,3 +110,46 @@ class TranslationRetryableError(TranslationError):
         self.validation_result = validation_result
         self.retry_feedback = retry_feedback
         self.retry_count = retry_count
+
+
+class ShutdownRequested(TranslationError):
+    """Raised when graceful shutdown is requested during translation.
+
+    SR-02: This exception enables CTRL+C to interrupt file translation
+    by allowing the translation loop to check for shutdown requests
+    periodically and cleanly exit mid-file instead of only between files.
+
+    When this exception is raised:
+    1. The current file's translated segments are saved to the L3 index
+    2. The file is marked as incomplete in the progress tracker
+    3. The translation engine performs its shutdown sequence
+    4. The application exits gracefully
+
+    Attributes:
+        file_path: Path to file being translated when shutdown was requested
+        segments_completed: Number of segments successfully translated before shutdown
+
+    Example:
+        >>> if self._check_shutdown():
+        ...     raise ShutdownRequested(
+        ...         file_path="/content/post.md",
+        ...         segments_completed=15
+        ...     )
+    """
+
+    def __init__(self, file_path: str = "", segments_completed: int = 0):
+        """Initialize ShutdownRequested.
+
+        Args:
+            file_path: Path to the file being translated
+            segments_completed: Number of segments completed before shutdown
+        """
+        message = f"Shutdown requested"
+        if file_path:
+            message += f" while translating {file_path}"
+        if segments_completed > 0:
+            message += f" (completed {segments_completed} segments)"
+
+        super().__init__(message)
+        self.file_path = file_path
+        self.segments_completed = segments_completed

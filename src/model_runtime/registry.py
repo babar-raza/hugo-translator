@@ -74,9 +74,9 @@ class ModelInfo:
             name=data["name"],
             backend=data["backend"],
             supported_pairs=supported_pairs,
-            model_size_mb=data["model_size_mb"],
-            min_ram_gb=data["min_ram_gb"],
-            optimal_device=data["optimal_device"],
+            model_size_mb=data.get("model_size_mb", 0),  # Default 0 for auto-discovered models
+            min_ram_gb=data.get("min_ram_gb", 4),  # Default 4GB minimum
+            optimal_device=data.get("optimal_device", "cpu"),  # Default to CPU
             parameters=data.get("parameters"),
             license=data.get("license", "unknown"),
             local_path=local_path,

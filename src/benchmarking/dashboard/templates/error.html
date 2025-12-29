@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+
+{% block title %}Error{% endblock %}
+
+{% block content %}
+<div class="error-container">
+    <div class="error-icon">⚠️</div>
+    <h1>{{ error }}</h1>
+    <p class="error-message">{{ message }}</p>
+
+    <div class="error-actions">
+        <a href="/" class="btn-primary">Back to Dashboard</a>
+        <a href="/health" class="btn-secondary">Check System Health</a>
+    </div>
+
+    {% if error == "Database not found" %}
+    <div class="help-section">
+        <h3>How to fix this:</h3>
+        <ol>
+            <li>Run benchmarks to create the database:
+                <code>python scripts/benchmark_cpu_comprehensive.py</code>
+            </li>
+            <li>Verify database exists at: <code>data/benchmarks/benchmarks.db</code></li>
+            <li>Refresh this page</li>
+        </ol>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

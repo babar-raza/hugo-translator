@@ -321,15 +321,29 @@ class HuggingFaceBackend(ModelBackend):
                 f"{tgt_lang} -> {mapped_tgt_lang}"
             )
 
-            # Set source language on tokenizer
+            # CRITICAL FIX: Reset tokenizer state before each translation
+            # This prevents state bleeding between sequential translations to different languages
+
+            # Step 1: Ensure model is in eval mode (should already be, but enforce it)
+            self.model.eval()
+
+            # Step 2: Set source language on tokenizer
             if hasattr(self.tokenizer, 'src_lang'):
+                old_src = getattr(self.tokenizer, 'src_lang', None)
+                if old_src and old_src != mapped_src_lang:
+                    logger.debug(f"Language switch detected: src {old_src} -> {mapped_src_lang}")
+
                 self.tokenizer.src_lang = mapped_src_lang
                 # NLLB tokenizers also need special tokens set
                 if hasattr(self.tokenizer, 'set_src_lang_special_tokens'):
                     self.tokenizer.set_src_lang_special_tokens(mapped_src_lang)
 
-            # Set target language for NLLB tokenizers
+            # Step 3: Set target language for NLLB tokenizers
             if hasattr(self.tokenizer, 'tgt_lang'):
+                old_tgt = getattr(self.tokenizer, 'tgt_lang', None)
+                if old_tgt and old_tgt != mapped_tgt_lang:
+                    logger.debug(f"Language switch detected: tgt {old_tgt} -> {mapped_tgt_lang}")
+
                 self.tokenizer.tgt_lang = mapped_tgt_lang
                 if hasattr(self.tokenizer, 'set_tgt_lang_special_tokens'):
                     self.tokenizer.set_tgt_lang_special_tokens(mapped_tgt_lang)
@@ -405,6 +419,9 @@ class HuggingFaceBackend(ModelBackend):
                 "max_new_tokens": effective_max_tokens,
                 "no_repeat_ngram_size": 2,
                 "repetition_penalty": 1.2,
+                # CRITICAL FIX: Disable KV caching to prevent state bleeding between
+                # sequential translations to different target languages
+                "use_cache": False,
             }
             if forced_bos_token_id is not None:
                 generate_kwargs["forced_bos_token_id"] = forced_bos_token_id

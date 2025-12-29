@@ -15,13 +15,14 @@ services:
       - PYTHONUNBUFFERED=1
     volumes:
       - ./config:/app/config:ro
-      - content_data:/data/content
+      - D:/onedrive/Documents/GitHub/aspose.net/content:/content
       - tm_data:/data/tm
       - model_cache:/data/models
       - artifacts:/data/artifacts
       - logs:/data/logs
+      - metadata_storage:/data/metadata
     networks:
-      - hugo-translator_network
+      - hugo-translator-network
     healthcheck:
       test: ["CMD", "python", "-c", "import sys; from pathlib import Path; sys.exit(0 if Path('/app/src').exists() else 1)"]
       interval: 30s
@@ -35,6 +36,30 @@ services:
         max-size: "10m"
         max-file: "3"
 
+  # Redis - Job Queue Backend
+  redis:
+    image: redis:7-alpine
+    container_name: hugo-translator-redis
+    command: redis-server --appendonly yes --appendfsync everysec --maxmemory 512mb --maxmemory-policy allkeys-lru --loglevel notice
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - hugo-translator-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
+    restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "5m"
+        max-file: "2"
+
   # CPU Worker
   worker-cpu:
     build:
@@ -42,22 +67,32 @@ services:
       dockerfile: Dockerfile
     image: hugo-translator-worker:latest
     container_name: hugo-translator-worker-cpu
+    command: ["python", "-m", "src.workers"]
     env_file:
       - .env.production
     environment:
       - WORKER_ID=cpu-1
+      - WORKER_MODE=processor
       - DEVICE=cpu
+      - REDIS_HOST=hugo-translator-redis
+      - REDIS_PORT=6379
+      - REDIS_DB=0
+      - POLL_INTERVAL=5
+      - MAX_RETRIES=3
       - PYTHONPATH=/app
       - PYTHONUNBUFFERED=1
     volumes:
       - ./config:/app/config:ro
-      - content_data:/data/content:ro
+      - D:/onedrive/Documents/GitHub/aspose.net/content:/content
       - tm_data:/data/tm
       - model_cache:/data/models
       - logs:/data/logs
+      - metadata_storage:/data/metadata
     networks:
-      - hugo-translator_network
+      - hugo-translator-network
     depends_on:
+      redis:
+        condition: service_healthy
       orchestrator:
         condition: service_healthy
     healthcheck:
@@ -80,23 +115,33 @@ services:
       dockerfile: Dockerfile.gpu
     image: hugo-translator-worker-gpu:latest
     container_name: hugo-translator-worker-gpu
+    command: ["python", "-m", "src.workers"]
     env_file:
       - .env.production
     environment:
       - WORKER_ID=gpu-1
+      - WORKER_MODE=processor
       - DEVICE=cuda:0
       - CUDA_VISIBLE_DEVICES=0
+      - REDIS_HOST=hugo-translator-redis
+      - REDIS_PORT=6379
+      - REDIS_DB=0
+      - POLL_INTERVAL=5
+      - MAX_RETRIES=3
       - PYTHONPATH=/app
       - PYTHONUNBUFFERED=1
     volumes:
       - ./config:/app/config:ro
-      - content_data:/data/content:ro
+      - D:/onedrive/Documents/GitHub/aspose.net/content:/content
       - tm_data:/data/tm
       - model_cache:/data/models
       - logs:/data/logs
+      - metadata_storage:/data/metadata
     networks:
-      - hugo-translator_network
+      - hugo-translator-network
     depends_on:
+      redis:
+        condition: service_healthy
       orchestrator:
         condition: service_healthy
     deploy:
@@ -138,7 +183,7 @@ services:
     ports:
       - "9190:9090"
     networks:
-      - hugo-translator_network
+      - hugo-translator-network
     restart: unless-stopped
     logging:
       driver: "json-file"
@@ -153,7 +198,7 @@ services:
     ports:
       - "9191:9091"
     networks:
-      - hugo-translator_network
+      - hugo-translator-network
     restart: unless-stopped
     logging:
       driver: "json-file"
@@ -177,7 +222,7 @@ services:
     ports:
       - "3100:3000"
     networks:
-      - hugo-translator_network
+      - hugo-translator-network
     depends_on:
       - prometheus
     restart: unless-stopped
@@ -201,14 +246,18 @@ volumes:
     driver: local
   logs:
     driver: local
+  redis_data:
+    driver: local
   prometheus_data:
     driver: local
   grafana_data:
     driver: local
+  metadata_storage:
+    driver: local
 
 # Network for inter-container communication
 networks:
-  hugo-translator_network:
+  hugo-translator-network:
     driver: bridge
     ipam:
       config:

@@ -100,6 +100,87 @@ class SystemInfoCollector:
         """Initialize collector with HardwareDetector."""
         self.hardware_detector = HardwareDetector()
 
+    @staticmethod
+    def get_available_gpu_memory_mb(device_id: int = 0) -> Optional[float]:
+        """Get currently available GPU memory in MB.
+
+        Args:
+            device_id: CUDA device index (default: 0)
+
+        Returns:
+            Available GPU memory in MB, or None if CUDA unavailable or error
+
+        Note:
+            Returns free memory (not allocated), useful for OOM prevention.
+        """
+        try:
+            import torch
+            if not torch.cuda.is_available():
+                return None
+
+            if device_id < 0 or device_id >= torch.cuda.device_count():
+                logger.error(f"Invalid device_id: {device_id} (available: {torch.cuda.device_count()})")
+                return None
+
+            # Get memory info for specified device
+            mem_free, mem_total = torch.cuda.mem_get_info(device_id)
+            return mem_free / (1024 ** 2)  # bytes to MB
+
+        except ImportError:
+            logger.debug("torch not available for GPU memory query")
+            return None
+        except Exception as e:
+            logger.error(f"Failed to get GPU memory for device {device_id}: {e}")
+            return None
+
+    @staticmethod
+    def get_gpu_memory_stats(device_id: int = 0) -> Optional[Dict[str, float]]:
+        """Get comprehensive GPU memory statistics.
+
+        Args:
+            device_id: CUDA device index (default: 0)
+
+        Returns:
+            Dictionary with memory stats in MB:
+                - total_mb: Total GPU memory
+                - free_mb: Currently free memory
+                - used_mb: Currently used memory
+                - allocated_mb: Memory allocated by PyTorch
+                - reserved_mb: Memory reserved by PyTorch caching allocator
+            Returns None if CUDA unavailable or error
+
+        Note:
+            Provides full memory breakdown for monitoring and debugging.
+        """
+        try:
+            import torch
+            if not torch.cuda.is_available():
+                return None
+
+            if device_id < 0 or device_id >= torch.cuda.device_count():
+                logger.error(f"Invalid device_id: {device_id} (available: {torch.cuda.device_count()})")
+                return None
+
+            # Get memory info
+            mem_free, mem_total = torch.cuda.mem_get_info(device_id)
+            mem_allocated = torch.cuda.memory_allocated(device_id)
+            mem_reserved = torch.cuda.memory_reserved(device_id)
+
+            return {
+                'total_mb': mem_total / (1024 ** 2),
+                'free_mb': mem_free / (1024 ** 2),
+                'used_mb': (mem_total - mem_free) / (1024 ** 2),
+                'allocated_mb': mem_allocated / (1024 ** 2),
+                'reserved_mb': mem_reserved / (1024 ** 2),
+            }
+
+        except ImportError:
+            logger.debug("torch not available for GPU memory stats")
+            return None
+        except Exception as e:
+            logger.error(f"Failed to get GPU memory stats for device {device_id}: {e}")
+            return None
+
     def collect(self) -> SystemInfo:
         """
         Collect complete system information.

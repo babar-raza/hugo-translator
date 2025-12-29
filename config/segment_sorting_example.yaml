@@ -1,0 +1,45 @@
+# Example Configuration: Segment Sorting for Improved Batching Efficiency
+#
+# This configuration enables length-based sorting of translation segments.
+# Recommended for large translation jobs with heterogeneous segment lengths.
+#
+# SR-03: Segment sorting configuration example
+
+body_rules:
+  # Sort segments by length (shortest first) before translation
+  # Benefits:
+  #   - Improved GPU batching efficiency (homogeneous batch sizes)
+  #   - Reduced GPU memory fragmentation
+  #   - Lower risk of OOM errors with variable-length segments
+  #   - Better GPU utilization (less padding overhead)
+  #
+  # Recommended for:
+  #   - Large jobs (1000+ segments)
+  #   - Documents with high length variance (short titles + long paragraphs)
+  #   - GPU-based translation (CUDA)
+  #   - Low TM cache hit rates (<50%)
+  #
+  # Not recommended for:
+  #   - Small jobs (<100 segments) - sorting overhead may outweigh benefits
+  #   - Uniform segment lengths - no batching improvement
+  #   - CPU-only translation - less benefit from homogeneous batches
+  #
+  # Default: false (document order preserved for backward compatibility)
+  sort_segments_by_length: true
+
+  # Other body_rules settings (examples)
+  translate_markdown: true
+  preserve_blocks: []
+  preserve_patterns: []
+  placeholder_syntax: []
+
+  # AST-based translation settings
+  use_ast_body_reconstruction: false
+  ast_segmentation_strategy: "adaptive"
+  ast_batch_size: 50
+  ast_translation_max_units_per_batch: 20
+  ast_translation_max_tokens_per_batch: 512
+  ast_translation_token_safety_margin: 0.5
+
+# Note: CLI flag overrides this config
+# Use --sort-segments-by-length or --no-sort-segments-by-length to override

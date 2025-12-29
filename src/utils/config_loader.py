@@ -441,6 +441,47 @@ class ConfigService:
         return merged
 
 
+# Standalone helper for global configuration
+_global_config_cache: Optional[Dict[str, Any]] = None
+
+
+def get_global_config() -> Dict[str, Any]:
+    """Get global configuration (standalone helper).
+
+    This is a convenience function for components that need global config
+    without creating a full ConfigService instance.
+
+    Returns:
+        Dictionary with global configuration
+    """
+    global _global_config_cache
+
+    if _global_config_cache is not None:
+        return _global_config_cache
+
+    # Try to create ConfigService and get global config
+    try:
+        # Determine config root
+        config_root = Path(__file__).parent.parent.parent / "config"
+        if not config_root.exists():
+            config_root = Path.cwd() / "config"
+
+        if config_root.exists():
+            config_service = ConfigService(config_root)
+            _global_config_cache = config_service.get_config()
+            return _global_config_cache
+    except Exception as e:
+        logger.warning(f"Failed to load global config: {e}, using defaults")
+
+    # Return minimal defaults if loading fails
+    _global_config_cache = {
+        "content_hash_tracking": {
+            "hash_algorithm": "md5"
+        }
+    }
+    return _global_config_cache
+
+
 # Standalone helper for metrics configuration
 _metrics_config_cache: Optional[Dict[str, Any]] = None
 

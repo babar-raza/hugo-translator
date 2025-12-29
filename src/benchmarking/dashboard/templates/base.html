@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Benchmark Dashboard{% endblock %} - Hugo Translator</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <nav class="navbar">
+        <div class="nav-container">
+            <div class="nav-brand">Hugo Translator Benchmarks</div>
+            <ul class="nav-menu">
+                <li><a href="/" {% if request.path == '/' %}class="active"{% endif %}>Home</a></li>
+                <li><a href="/models" {% if request.path == '/models' %}class="active"{% endif %}>Models</a></li>
+                <li><a href="/languages" {% if request.path == '/languages' %}class="active"{% endif %}>Languages</a></li>
+                <li><a href="/comparison" {% if request.path == '/comparison' %}class="active"{% endif %}>GPU vs CPU</a></li>
+                <li><a href="/runs" {% if request.path.startswith('/runs') %}class="active"{% endif %}>Runs</a></li>
+                <li><a href="/cache" {% if request.path == '/cache' %}class="active"{% endif %}>Cache</a></li>
+            </ul>
+        </div>
+    </nav>
+
+    <main class="container">
+        {% block content %}{% endblock %}
+    </main>
+
+    <footer class="footer">
+        <div class="footer-container">
+            <p>Hugo Translation System Benchmark Dashboard v1.0</p>
+            <p class="footer-secondary">
+                <a href="/health" target="_blank">System Health</a> •
+                <a href="https://github.com/anthropics/hugo-translator" target="_blank">Documentation</a>
+            </p>
+        </div>
+    </footer>
+
+    {% block scripts %}{% endblock %}
+</body>
+</html>

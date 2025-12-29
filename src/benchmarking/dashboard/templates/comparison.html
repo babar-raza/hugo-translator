@@ -1,0 +1,347 @@
+{% extends "base.html" %}
+
+{% block title %}GPU vs CPU Comparison{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>GPU vs CPU Performance Comparison</h1>
+    <p class="subtitle">Speedup analysis for models benchmarked on both devices</p>
+</div>
+
+<div class="stats-grid" id="summaryStats" style="display: none;">
+    <div class="stat-card">
+        <div class="stat-value" id="totalModels">-</div>
+        <div class="stat-label">Models Compared</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-value" id="avgSpeedup">-</div>
+        <div class="stat-label">Avg Speedup</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-value" id="maxSpeedup">-</div>
+        <div class="stat-label">Max Speedup</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-value" id="models5x">-</div>
+        <div class="stat-label">Models with 5x+ Speedup</div>
+    </div>
+</div>
+
+<div class="dashboard-grid">
+    <div class="chart-container">
+        <h2>Throughput Comparison</h2>
+        <div class="loading" id="loadingThroughput">Loading data...</div>
+        <div id="throughputChart" style="display: none;"></div>
+    </div>
+
+    <div class="chart-container">
+        <h2>GPU Speedup Factor</h2>
+        <div class="loading" id="loadingSpeedup">Loading data...</div>
+        <div id="speedupChart" style="display: none;"></div>
+    </div>
+</div>
+
+<div class="chart-container">
+    <h2>Memory Usage Comparison</h2>
+    <div class="loading" id="loadingMemory">Loading data...</div>
+    <div id="memoryChart" style="display: none;"></div>
+</div>
+
+<div class="chart-container">
+    <h2>Detailed Comparison Table</h2>
+    <div class="loading" id="loadingTable">Loading data...</div>
+    <div id="comparisonTable" style="display: none;">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th class="sortable" onclick="sortTable(0)">Model</th>
+                    <th class="sortable" onclick="sortTable(1)">CPU Throughput</th>
+                    <th class="sortable" onclick="sortTable(2)">GPU Throughput</th>
+                    <th class="sortable" onclick="sortTable(3)">Speedup</th>
+                    <th class="sortable" onclick="sortTable(4)">CPU Memory (MB)</th>
+                    <th class="sortable" onclick="sortTable(5)">GPU Memory (MB)</th>
+                    <th class="sortable" onclick="sortTable(6)">Memory Ratio</th>
+                </tr>
+            </thead>
+            <tbody id="tableBody">
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<div class="error-message" id="error" style="display: none;"></div>
+
+<style>
+.speedup-highlight {
+    background: #d5f4e6;
+    font-weight: 600;
+    color: #27ae60;
+}
+
+.speedup-bar {
+    height: 30px;
+    background: linear-gradient(to right, var(--success-color), var(--secondary-color));
+    border-radius: 4px;
+    position: relative;
+    margin: 0.5rem 0;
+}
+
+.speedup-label {
+    position: absolute;
+    right: 0.5rem;
+    top: 50%;
+    transform: translateY(-50%);
+    color: white;
+    font-weight: 600;
+    font-size: 0.85rem;
+}
+
+.comparison-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin: 0.75rem 0;
+    padding: 0.5rem;
+    background: var(--light-bg);
+    border-radius: 4px;
+}
+
+.comparison-label {
+    font-weight: 500;
+    min-width: 200px;
+}
+
+.comparison-values {
+    display: flex;
+    gap: 2rem;
+    align-items: center;
+}
+
+.comparison-bar-container {
+    flex: 1;
+    height: 25px;
+    background: var(--light-bg);
+    border-radius: 4px;
+    position: relative;
+    min-width: 300px;
+}
+
+.comparison-bar-cpu {
+    position: absolute;
+    height: 100%;
+    background: #3498db;
+    border-radius: 4px;
+}
+
+.comparison-bar-gpu {
+    position: absolute;
+    height: 100%;
+    background: #27ae60;
+    border-radius: 4px;
+    opacity: 0.8;
+}
+</style>
+
+<script>
+let comparisonData = null;
+
+async function loadComparisonData() {
+    const errorEl = document.getElementById('error');
+
+    try {
+        const response = await fetch('/api/gpu_cpu_comparison');
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+
+        comparisonData = await response.json();
+
+        if (comparisonData.models.length === 0) {
+            errorEl.textContent = 'No models have been benchmarked on both CPU and GPU yet.';
+            errorEl.style.display = 'block';
+            hideLoadingIndicators();
+            return;
+        }
+
+        // Update summary stats
+        document.getElementById('summaryStats').style.display = 'grid';
+        document.getElementById('totalModels').textContent = comparisonData.summary.total_models;
+        document.getElementById('avgSpeedup').textContent = comparisonData.summary.avg_speedup + 'x';
+        document.getElementById('maxSpeedup').textContent = comparisonData.summary.max_speedup + 'x';
+        document.getElementById('models5x').textContent = comparisonData.summary.models_with_5x_speedup;
+
+        // Render charts
+        renderThroughputChart(comparisonData.models);
+        renderSpeedupChart(comparisonData.models);
+        renderMemoryChart(comparisonData.models);
+        renderComparisonTable(comparisonData.models);
+
+        hideLoadingIndicators();
+
+    } catch (error) {
+        console.error('Error loading comparison data:', error);
+        errorEl.textContent = `Failed to load comparison data: ${error.message}`;
+        errorEl.style.display = 'block';
+        hideLoadingIndicators();
+    }
+}
+
+function hideLoadingIndicators() {
+    document.getElementById('loadingThroughput').style.display = 'none';
+    document.getElementById('loadingSpeedup').style.display = 'none';
+    document.getElementById('loadingMemory').style.display = 'none';
+    document.getElementById('loadingTable').style.display = 'none';
+}
+
+function renderThroughputChart(models) {
+    const chartEl = document.getElementById('throughputChart');
+    const topModels = models.sort((a, b) => b.gpu.throughput - a.gpu.throughput).slice(0, 10);
+
+    let html = '';
+    topModels.forEach(model => {
+        const modelShort = model.model_id.length > 30
+            ? model.model_id.substring(0, 28) + '...'
+            : model.model_id;
+
+        const maxThroughput = Math.max(model.cpu.throughput, model.gpu.throughput);
+        const cpuWidth = (model.cpu.throughput / maxThroughput * 100);
+        const gpuWidth = (model.gpu.throughput / maxThroughput * 100);
+
+        html += `
+            <div class="comparison-row">
+                <div class="comparison-label" title="${model.model_id}">${modelShort}</div>
+                <div class="comparison-values">
+                    <div class="comparison-bar-container">
+                        <div class="comparison-bar-cpu" style="width: ${cpuWidth}%"></div>
+                        <div class="comparison-bar-gpu" style="width: ${gpuWidth}%"></div>
+                    </div>
+                    <div style="min-width: 150px; text-align: right;">
+                        <div><span class="device-badge cpu">CPU</span> ${model.cpu.throughput} tok/s</div>
+                        <div><span class="device-badge gpu">GPU</span> ${model.gpu.throughput} tok/s</div>
+                    </div>
+                </div>
+            </div>
+        `;
+    });
+
+    chartEl.innerHTML = html;
+    chartEl.style.display = 'block';
+}
+
+function renderSpeedupChart(models) {
+    const chartEl = document.getElementById('speedupChart');
+    const sortedModels = models.sort((a, b) => b.speedup - a.speedup).slice(0, 15);
+
+    let html = '<div class="bar-chart">';
+    const maxSpeedup = Math.max(...sortedModels.map(m => m.speedup));
+
+    sortedModels.forEach(model => {
+        const modelShort = model.model_id.length > 30
+            ? model.model_id.substring(0, 28) + '...'
+            : model.model_id;
+
+        const percentage = (model.speedup / maxSpeedup * 100);
+        const highlightClass = model.speedup >= 5.0 ? ' speedup-highlight' : '';
+
+        html += `
+            <div class="bar-chart-row">
+                <div class="bar-chart-label" title="${model.model_id}">
+                    ${modelShort}
+                </div>
+                <div class="bar-chart-bar-container">
+                    <div class="bar-chart-bar${highlightClass}" style="width: ${percentage}%"></div>
+                    <div class="bar-chart-value">${model.speedup}x</div>
+                </div>
+            </div>
+        `;
+    });
+
+    html += '</div>';
+    chartEl.innerHTML = html;
+    chartEl.style.display = 'block';
+}
+
+function renderMemoryChart(models) {
+    const chartEl = document.getElementById('memoryChart');
+    const sortedModels = models.sort((a, b) => b.gpu.memory - a.gpu.memory).slice(0, 10);
+
+    let html = '';
+    sortedModels.forEach(model => {
+        const modelShort = model.model_id.length > 30
+            ? model.model_id.substring(0, 28) + '...'
+            : model.model_id;
+
+        const maxMemory = Math.max(...models.map(m => Math.max(m.cpu.memory, m.gpu.memory)));
+        const cpuWidth = (model.cpu.memory / maxMemory * 100);
+        const gpuWidth = (model.gpu.memory / maxMemory * 100);
+
+        html += `
+            <div class="comparison-row">
+                <div class="comparison-label" title="${model.model_id}">${modelShort}</div>
+                <div class="comparison-values">
+                    <div class="comparison-bar-container">
+                        <div class="comparison-bar-cpu" style="width: ${cpuWidth}%"></div>
+                        <div class="comparison-bar-gpu" style="width: ${gpuWidth}%"></div>
+                    </div>
+                    <div style="min-width: 150px; text-align: right;">
+                        <div><span class="device-badge cpu">CPU</span> ${model.cpu.memory} MB</div>
+                        <div><span class="device-badge gpu">GPU</span> ${model.gpu.memory} MB</div>
+                    </div>
+                </div>
+            </div>
+        `;
+    });
+
+    chartEl.innerHTML = html;
+    chartEl.style.display = 'block';
+}
+
+function renderComparisonTable(models) {
+    const tableBody = document.getElementById('tableBody');
+
+    let html = '';
+    models.forEach(model => {
+        const speedupClass = model.speedup >= 5.0 ? ' class="speedup-highlight"' : '';
+
+        html += `
+            <tr>
+                <td><code>${model.model_id}</code></td>
+                <td>${model.cpu.throughput}</td>
+                <td>${model.gpu.throughput}</td>
+                <td${speedupClass}>${model.speedup}x</td>
+                <td>${model.cpu.memory}</td>
+                <td>${model.gpu.memory}</td>
+                <td>${model.memory_ratio}x</td>
+            </tr>
+        `;
+    });
+
+    tableBody.innerHTML = html;
+    document.getElementById('comparisonTable').style.display = 'block';
+}
+
+function sortTable(columnIndex) {
+    // Simple table sorting implementation
+    if (!comparisonData) return;
+
+    const tbody = document.getElementById('tableBody');
+    const rows = Array.from(tbody.getElementsByTagName('tr'));
+
+    rows.sort((a, b) => {
+        const aVal = a.cells[columnIndex].textContent.replace(/[^\d.-]/g, '');
+        const bVal = b.cells[columnIndex].textContent.replace(/[^\d.-]/g, '');
+
+        const aNum = parseFloat(aVal) || 0;
+        const bNum = parseFloat(bVal) || 0;
+
+        return bNum - aNum; // Descending order
+    });
+
+    tbody.innerHTML = '';
+    rows.forEach(row => tbody.appendChild(row));
+}
+
+// Load on page load
+document.addEventListener('DOMContentLoaded', loadComparisonData);
+</script>
+{% endblock %}

@@ -1,0 +1,216 @@
+{% extends "base.html" %}
+
+{% block title %}Run Detail{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Benchmark Run Detail</h1>
+    <p class="subtitle">Run ID: <code>{{ run_id }}</code></p>
+    <div style="margin-top: 1rem;">
+        <a href="/runs" class="btn-secondary">← Back to Runs List</a>
+    </div>
+</div>
+
+<div class="loading" id="loading">Loading run details...</div>
+
+<div id="runDetailContainer" style="display: none;">
+    <!-- Run Metadata -->
+    <div class="content-section">
+        <h2>Run Metadata</h2>
+        <table class="data-table">
+            <tr>
+                <th style="width: 200px;">Run ID</th>
+                <td><code id="runId">-</code></td>
+            </tr>
+            <tr>
+                <th>Model</th>
+                <td><code id="modelId">-</code></td>
+            </tr>
+            <tr>
+                <th>Device</th>
+                <td id="device">-</td>
+            </tr>
+            <tr>
+                <th>Timestamp</th>
+                <td id="timestamp">-</td>
+            </tr>
+            <tr>
+                <th>Batch Size</th>
+                <td id="batchSize">-</td>
+            </tr>
+        </table>
+    </div>
+
+    <!-- Statistics -->
+    <div class="stats-grid" id="statsGrid">
+        <div class="stat-card">
+            <div class="stat-value" id="sampleCount">-</div>
+            <div class="stat-label">Samples</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value" id="avgThroughput">-</div>
+            <div class="stat-label">Avg Throughput (tok/s)</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value" id="maxThroughput">-</div>
+            <div class="stat-label">Max Throughput (tok/s)</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value" id="avgMemory">-</div>
+            <div class="stat-label">Avg Memory (MB)</div>
+        </div>
+    </div>
+
+    <!-- Sample Results Table -->
+    <div class="chart-container">
+        <h2>Sample Results (<span id="resultCount">0</span> samples)</h2>
+
+        <div class="controls">
+            <button class="btn-secondary" onclick="exportResultsToCSV()">Export CSV</button>
+            <button class="btn-secondary" onclick="exportResultsToJSON()">Export JSON</button>
+        </div>
+
+        <div style="overflow-x: auto;">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Sample ID</th>
+                        <th>Throughput (tok/s)</th>
+                        <th>Memory (MB)</th>
+                        <th>Time (s)</th>
+                        <th>Input Tokens</th>
+                        <th>Output Tokens</th>
+                    </tr>
+                </thead>
+                <tbody id="resultsTableBody">
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<div class="error-message" id="error" style="display: none;"></div>
+
+<script>
+let runData = null;
+
+async function loadRunDetail() {
+    const loadingEl = document.getElementById('loading');
+    const containerEl = document.getElementById('runDetailContainer');
+    const errorEl = document.getElementById('error');
+
+    try {
+        loadingEl.style.display = 'block';
+        containerEl.style.display = 'none';
+        errorEl.style.display = 'none';
+
+        const response = await fetch(`/api/runs/{{ run_id }}`);
+        if (!response.ok) {
+            if (response.status === 404) {
+                throw new Error('Run not found');
+            }
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+
+        runData = await response.json();
+
+        // Populate metadata
+        document.getElementById('runId').textContent = runData.run.run_id || '-';
+        document.getElementById('modelId').textContent = runData.run.model_id || '-';
+
+        const deviceBadge = `<span class="device-badge ${runData.run.device}">${(runData.run.device || '-').toUpperCase()}</span>`;
+        document.getElementById('device').innerHTML = deviceBadge;
+
+        const timestamp = runData.run.timestamp ? runData.run.timestamp.substring(0, 19).replace('T', ' ') : '-';
+        document.getElementById('timestamp').textContent = timestamp;
+
+        document.getElementById('batchSize').textContent = runData.run.batch_size || '-';
+
+        // Populate statistics
+        if (runData.statistics) {
+            document.getElementById('sampleCount').textContent = runData.statistics.sample_count || 0;
+            document.getElementById('avgThroughput').textContent = runData.statistics.avg_throughput || '-';
+            document.getElementById('maxThroughput').textContent = runData.statistics.max_throughput || '-';
+            document.getElementById('avgMemory').textContent = runData.statistics.avg_memory || '-';
+        }
+
+        // Populate results table
+        renderResultsTable(runData.results);
+
+        loadingEl.style.display = 'none';
+        containerEl.style.display = 'block';
+
+    } catch (error) {
+        console.error('Error loading run detail:', error);
+        loadingEl.style.display = 'none';
+        errorEl.textContent = `Failed to load run details: ${error.message}`;
+        errorEl.style.display = 'block';
+    }
+}
+
+function renderResultsTable(results) {
+    const tbody = document.getElementById('resultsTableBody');
+    document.getElementById('resultCount').textContent = results.length;
+
+    if (results.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="6" class="no-data">No sample results found.</td></tr>';
+        return;
+    }
+
+    let html = '';
+    results.forEach(result => {
+        html += `
+            <tr>
+                <td><code>${result.sample_id || '-'}</code></td>
+                <td>${result.throughput_tokens_per_sec || '-'}</td>
+                <td>${result.peak_memory_mb || '-'}</td>
+                <td>${result.translation_time_sec || '-'}</td>
+                <td>${result.input_tokens || '-'}</td>
+                <td>${result.output_tokens || '-'}</td>
+            </tr>
+        `;
+    });
+
+    tbody.innerHTML = html;
+}
+
+function exportResultsToCSV() {
+    if (!runData || !runData.results) {
+        alert('No data to export');
+        return;
+    }
+
+    let csv = 'Sample ID,Throughput (tok/s),Memory (MB),Time (s),Input Tokens,Output Tokens\n';
+
+    runData.results.forEach(r => {
+        csv += `${r.sample_id || ''},${r.throughput_tokens_per_sec || ''},${r.peak_memory_mb || ''},`;
+        csv += `${r.translation_time_sec || ''},${r.input_tokens || ''},${r.output_tokens || ''}\n`;
+    });
+
+    downloadFile(`run_${runData.run.run_id}_results.csv`, csv, 'text/csv');
+}
+
+function exportResultsToJSON() {
+    if (!runData) {
+        alert('No data to export');
+        return;
+    }
+
+    const json = JSON.stringify(runData, null, 2);
+    downloadFile(`run_${runData.run.run_id}_detail.json`, json, 'application/json');
+}
+
+function downloadFile(filename, content, contentType) {
+    const blob = new Blob([content], { type: contentType });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    a.click();
+    window.URL.revokeObjectURL(url);
+}
+
+// Load on page load
+document.addEventListener('DOMContentLoaded', loadRunDetail);
+</script>
+{% endblock %}

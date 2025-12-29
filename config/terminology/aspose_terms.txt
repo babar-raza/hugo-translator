@@ -2,6 +2,7 @@
 # One term per line - these will NOT be translated
 
 # Product Names
+Aspose
 Aspose.Slides
 Aspose.Cells
 Aspose.Words

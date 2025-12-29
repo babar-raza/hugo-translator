@@ -38,6 +38,7 @@ def cleanup_stale_runs(
     agent_name: str = "hugo-translator",
     dry_run: bool = False,
     timeout: int = 5,
+    quiet: bool = False,
 ) -> Dict[str, Any]:
     """
     Clean up stale "running" telemetry records via API.
@@ -52,6 +53,7 @@ def cleanup_stale_runs(
         agent_name: Agent name to filter (default: "hugo-translator")
         dry_run: If True, only report stale runs without updating
         timeout: Request timeout in seconds (default: 5)
+        quiet: If True, suppress verbose logging (only errors and final summary)
 
     Returns:
         dict: Statistics about cleanup operation
@@ -83,10 +85,11 @@ def cleanup_stale_runs(
         cutoff = datetime.now(timezone.utc) - timedelta(hours=max_age_hours)
         cutoff_iso = cutoff.isoformat()
 
-        logger.info(
-            f"Telemetry cleanup check: max_age={max_age_hours}h, "
-            f"agent={agent_name}, dry_run={dry_run}, api={api_url}"
-        )
+        if not quiet:
+            logger.info(
+                f"Telemetry cleanup check: max_age={max_age_hours}h, "
+                f"agent={agent_name}, dry_run={dry_run}, api={api_url}"
+            )
 
         # 1. Query for stale runs via GET /api/v1/runs
         try:
@@ -106,6 +109,15 @@ def cleanup_stale_runs(
                     "(GET /api/v1/runs returned 404). "
                     "Cleanup will be enabled when API is upgraded to v2.1+. "
                     "For now, stale runs will remain in database."
+                )
+                return stats
+
+            if response.status_code == 405:
+                logger.warning(
+                    "Telemetry API cleanup endpoints not yet available "
+                    "(GET /api/v1/runs returned 405 Method Not Allowed). "
+                    "This likely means the telemetry API is not running or hasn't been upgraded to v2.1+. "
+                    "Stale runs will remain in database until the API is available."
                 )
                 return stats
 
@@ -145,13 +157,15 @@ def cleanup_stale_runs(
         stats["stale_runs_found"] = len(stale_runs)
 
         if not stale_runs:
-            logger.info("No stale runs found")
+            if not quiet:
+                logger.info("No stale runs found")
             return stats
 
-        logger.info(
-            f"Found {len(stale_runs)} stale 'running' records "
-            f"older than {max_age_hours}h"
-        )
+        if not quiet:
+            logger.info(
+                f"Found {len(stale_runs)} stale 'running' records "
+                f"older than {max_age_hours}h"
+            )
 
         # 3. Update each stale run via PATCH
         if not dry_run:
@@ -185,9 +199,10 @@ def cleanup_stale_runs(
                     patch_response.raise_for_status()
                     stats["updated"] += 1
 
-                    logger.info(
-                        f"✓ Marked run {run_id} as cancelled (job: {job_type})"
-                    )
+                    if not quiet:
+                        logger.info(
+                            f"✓ Marked run {run_id} as cancelled (job: {job_type})"
+                        )
 
                 except requests.RequestException as e:
                     error_msg = f"Failed to update run {run_id}: {e}"
@@ -195,10 +210,12 @@ def cleanup_stale_runs(
                     stats["errors"].append(error_msg)
                     continue
 
-            logger.info(f"✓ Updated {stats['updated']} stale run(s)")
+            if not quiet:
+                logger.info(f"✓ Updated {stats['updated']} stale run(s)")
 
         else:
-            logger.info(f"DRY RUN: Would update {len(stale_runs)} stale run(s)")
+            if not quiet:
+                logger.info(f"DRY RUN: Would update {len(stale_runs)} stale run(s)")
 
     except Exception as e:
         error_msg = f"Telemetry cleanup failed: {e}"
