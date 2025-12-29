@@ -37,19 +37,18 @@ def mock_registry():
 
 @pytest.fixture
 def mock_system_info():
-    """Create mock SystemInfo for testing."""
+    """Create mock SystemInfo for testing (comprehensive version)."""
     return SystemInfo(
         cpu_model="Test CPU",
         cpu_cores=4,
         total_ram_gb=16.0,
         gpu_model=None,
-        gpu_vram_gb=None,
+        gpu_memory_gb=None,  # Comprehensive SystemInfo uses gpu_memory_gb
         os_name="TestOS",
         os_version="1.0",
         python_version="3.10",
         torch_version="2.0",
-        transformers_version="4.30",
-        timestamp_utc="2025-12-19T00:00:00Z",
+        collected_at_utc="2025-12-19T00:00:00Z",
     )
 
 
@@ -521,3 +520,210 @@ class TestRunnerCLI:
 
         assert exit_code == 0
         mock_runner.run_benchmark.assert_called_once()
+
+
+# GPU Memory Tracking Tests (migrated from test_runner_gpu_memory.py - BM04C-03)
+
+
+@pytest.fixture
+def mock_backend():
+    """Create mock backend with translate method."""
+    backend = Mock()
+    backend.translate_with_token_counts = Mock(
+        return_value=(
+            ['translated text'],
+            100,  # input tokens
+            50,   # output tokens
+        )
+    )
+    return backend
+
+
+def test_gpu_memory_tracking_enabled_on_cuda(mock_registry, mock_backend):
+    """Test that GPU memory tracking is enabled when using CUDA device."""
+    runner = BenchmarkRunner(registry=mock_registry, db_path=None)
+
+    with patch('src.benchmarking.runner.TORCH_AVAILABLE', True), \
+         patch('src.benchmarking.runner.torch') as mock_torch:
+
+        # Setup torch mock
+        mock_torch.cuda.is_available.return_value = True
+        mock_torch.cuda.max_memory_allocated.return_value = 1024 * 1024 * 512  # 512 MB
+
+        # Run benchmark
+        results = runner._benchmark_translation(
+            backend=mock_backend,
+            texts=['test text'],
+            sample_ids=['sample_1'],
+            model_id='test_model',
+            device='cuda',
+            batch_size=1,
+        )
+
+        # Verify GPU memory tracking was called
+        mock_torch.cuda.reset_peak_memory_stats.assert_called()
+        mock_torch.cuda.max_memory_allocated.assert_called()
+        mock_torch.cuda.empty_cache.assert_called()
+
+        # Verify result has peak_memory_mb set
+        assert len(results) == 1
+        assert results[0].peak_memory_mb is not None
+        assert results[0].peak_memory_mb == 512.0
+
+
+def test_gpu_memory_tracking_disabled_on_cpu(mock_registry, mock_backend):
+    """Test that GPU memory tracking is NOT called when using CPU device."""
+    runner = BenchmarkRunner(registry=mock_registry, db_path=None)
+
+    with patch('src.benchmarking.runner.TORCH_AVAILABLE', True), \
+         patch('src.benchmarking.runner.torch') as mock_torch:
+
+        # Setup torch mock
+        mock_torch.cuda.is_available.return_value = True
+
+        # Run benchmark on CPU
+        results = runner._benchmark_translation(
+            backend=mock_backend,
+            texts=['test text'],
+            sample_ids=['sample_1'],
+            model_id='test_model',
+            device='cpu',
+            batch_size=1,
+        )
+
+        # Verify GPU memory tracking was NOT called for CPU
+        mock_torch.cuda.reset_peak_memory_stats.assert_not_called()
+        mock_torch.cuda.max_memory_allocated.assert_not_called()
+
+        # Verify result has peak_memory_mb as None
+        assert len(results) == 1
+        assert results[0].peak_memory_mb is None
+
+
+def test_oom_exception_handling(mock_registry, mock_backend):
+    """Test that OOM exceptions are caught and logged properly."""
+    runner = BenchmarkRunner(registry=mock_registry, db_path=None)
+
+    with patch('src.benchmarking.runner.TORCH_AVAILABLE', True), \
+         patch('src.benchmarking.runner.torch') as mock_torch:
+
+        # Setup torch mock
+        mock_torch.cuda.is_available.return_value = True
+        mock_torch.cuda.OutOfMemoryError = RuntimeError  # Mock OOM exception
+        mock_torch.cuda.max_memory_allocated.return_value = 1024 * 1024 * 2048  # 2GB
+
+        # Make backend raise OOM
+        mock_backend.translate_with_token_counts.side_effect = RuntimeError("CUDA out of memory")
+
+        # Run benchmark
+        results = runner._benchmark_translation(
+            backend=mock_backend,
+            texts=['test text'],
+            sample_ids=['sample_1'],
+            model_id='test_model',
+            device='cuda',
+            batch_size=32,
+        )
+
+        # Verify error was captured
+        assert len(results) == 1
+        assert len(results[0].errors) > 0
+        assert 'Translation failed' in results[0].errors[0]
+
+        # Verify GPU cache was cleared
+        mock_torch.cuda.empty_cache.assert_called()
+
+
+def test_gpu_memory_tracking_without_torch(mock_registry, mock_backend):
+    """Test that benchmarks work when torch is not available."""
+    runner = BenchmarkRunner(registry=mock_registry, db_path=None)
+
+    with patch('src.benchmarking.runner.TORCH_AVAILABLE', False):
+        # Run benchmark without torch
+        results = runner._benchmark_translation(
+            backend=mock_backend,
+            texts=['test text'],
+            sample_ids=['sample_1'],
+            model_id='test_model',
+            device='cuda',  # Even with cuda device specified
+            batch_size=1,
+        )
+
+        # Should complete without error
+        assert len(results) == 1
+        assert results[0].peak_memory_mb is None
+
+
+def test_multiple_batch_sizes_track_memory(mock_registry, mock_backend):
+    """Test that different batch sizes track different memory usage."""
+    runner = BenchmarkRunner(registry=mock_registry, db_path=None)
+
+    with patch('src.benchmarking.runner.TORCH_AVAILABLE', True), \
+         patch('src.benchmarking.runner.torch') as mock_torch:
+
+        # Setup torch mock with increasing memory for larger batches
+        mock_torch.cuda.is_available.return_value = True
+
+        memory_values = [
+            1024 * 1024 * 100,  # 100 MB for batch_size=1
+            1024 * 1024 * 400,  # 400 MB for batch_size=4
+        ]
+        mock_torch.cuda.max_memory_allocated.side_effect = memory_values
+
+        # Run with batch_size=1
+        results_small = runner._benchmark_translation(
+            backend=mock_backend,
+            texts=['test text'],
+            sample_ids=['sample_1'],
+            model_id='test_model',
+            device='cuda',
+            batch_size=1,
+        )
+
+        # Run with batch_size=4
+        mock_backend.translate_with_token_counts.return_value = (
+            ['translated'] * 4,
+            400,
+            200,
+        )
+        results_large = runner._benchmark_translation(
+            backend=mock_backend,
+            texts=['test'] * 4,
+            sample_ids=[f'sample_{i}' for i in range(4)],
+            model_id='test_model',
+            device='cuda',
+            batch_size=4,
+        )
+
+        # Verify different memory values
+        assert results_small[0].peak_memory_mb == 100.0
+        assert results_large[0].peak_memory_mb == 400.0
+
+
+def test_cuda_device_with_index(mock_registry, mock_backend):
+    """Test GPU memory tracking works with specific CUDA device index (cuda:0)."""
+    runner = BenchmarkRunner(registry=mock_registry, db_path=None)
+
+    with patch('src.benchmarking.runner.TORCH_AVAILABLE', True), \
+         patch('src.benchmarking.runner.torch') as mock_torch:
+
+        # Setup torch mock
+        mock_torch.cuda.is_available.return_value = True
+        mock_torch.cuda.max_memory_allocated.return_value = 1024 * 1024 * 256  # 256 MB
+
+        # Run benchmark with cuda:0
+        results = runner._benchmark_translation(
+            backend=mock_backend,
+            texts=['test text'],
+            sample_ids=['sample_1'],
+            model_id='test_model',
+            device='cuda:0',
+            batch_size=1,
+        )
+
+        # Verify GPU memory tracking was called
+        mock_torch.cuda.reset_peak_memory_stats.assert_called()
+        mock_torch.cuda.max_memory_allocated.assert_called()
+
+        # Verify result
+        assert results[0].peak_memory_mb == 256.0

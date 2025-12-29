@@ -63,17 +63,17 @@ def mock_model_and_tokenizer():
 
 @pytest.mark.integration
 @pytest.mark.slow
-def test_cpu_benchmark_runner_initialization(mock_corpus_file, mock_db_path):
+def test_cpu_benchmark_runner_initialization(mock_corpus_file, mock_db_path, test_model):
     """Test CPUBenchmarkRunner initialization."""
     runner = CPUBenchmarkRunner(
-        model_ids=["m2m100_418m"],
+        model_ids=[test_model],
         batch_sizes=[4, 8],
         iterations=1,
         corpus_path=mock_corpus_file,
         db_path=mock_db_path,
     )
 
-    assert runner.model_ids == ["m2m100_418m"]
+    assert runner.model_ids == [test_model]
     assert runner.batch_sizes == [4, 8]
     assert runner.iterations == 1
     assert len(runner.corpus_samples) == 2
@@ -81,10 +81,10 @@ def test_cpu_benchmark_runner_initialization(mock_corpus_file, mock_db_path):
 
 
 @pytest.mark.integration
-def test_cpu_benchmark_runner_load_corpus_synthetic_fallback(mock_db_path):
+def test_cpu_benchmark_runner_load_corpus_synthetic_fallback(mock_db_path, test_model):
     """Test CPUBenchmarkRunner falls back to synthetic corpus."""
     runner = CPUBenchmarkRunner(
-        model_ids=["m2m100_418m"],
+        model_ids=[test_model],
         batch_sizes=[4],
         iterations=1,
         corpus_path=None,  # No corpus

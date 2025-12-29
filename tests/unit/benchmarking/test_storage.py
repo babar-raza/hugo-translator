@@ -46,28 +46,28 @@ def temp_db():
 
 @pytest.fixture
 def sample_system_info():
-    """Sample system information."""
+    """Sample system information (comprehensive SystemInfo)."""
     return SystemInfo(
         cpu_model="Intel Core i7-9700K",
         cpu_cores=8,
         total_ram_gb=16.0,
         gpu_model="NVIDIA RTX 3060",
-        gpu_vram_gb=12.0,
+        gpu_memory_gb=12.0,  # Comprehensive SystemInfo uses gpu_memory_gb
         os_name="Windows",
         os_version="10.0.19045",
         python_version="3.10.12",
         torch_version="2.1.0",
-        transformers_version="4.35.0",
+        collected_at_utc="2025-12-19T00:00:00Z",
     )
 
 
 @pytest.fixture
-def sample_results():
+def sample_results(test_model):
     """Sample benchmark results."""
     return [
         BenchmarkResult(
             sample_id="sample_001",
-            model_id="m2m100_418m",
+            model_id=test_model,
             device="cpu",
             batch_size=8,
             duration_seconds=2.5,
@@ -78,7 +78,7 @@ def sample_results():
         ),
         BenchmarkResult(
             sample_id="sample_002",
-            model_id="m2m100_418m",
+            model_id=test_model,
             device="cpu",
             batch_size=8,
             duration_seconds=2.3,
@@ -91,11 +91,11 @@ def sample_results():
 
 
 @pytest.fixture
-def sample_run(sample_system_info, sample_results):
+def sample_run(test_model, sample_system_info, sample_results):
     """Sample benchmark run."""
     return BenchmarkRun(
         run_id="test_run_001",
-        model_id="m2m100_418m",
+        model_id=test_model,
         device="cpu",
         batch_sizes=[8, 16],
         iterations=5,
@@ -172,7 +172,7 @@ class TestBenchmarkDatabase:
         assert retrieved.results[0].sample_id == sample_run.results[0].sample_id
         assert retrieved.results[0].throughput_tokens_per_sec == sample_run.results[0].throughput_tokens_per_sec
 
-    def test_list_runs_filtering_pagination(self, temp_db, sample_run, sample_system_info):
+    def test_list_runs_filtering_pagination(self, temp_db, test_model, sample_run, sample_system_info):
         """Test 3: Verify filtering and pagination of run listings."""
         db = BenchmarkDatabase(temp_db)
 
@@ -180,7 +180,7 @@ class TestBenchmarkDatabase:
         runs = [
             BenchmarkRun(
                 run_id=f"run_{i:03d}",
-                model_id="m2m100_418m" if i % 2 == 0 else "opus_en_fr",
+                model_id=test_model if i % 2 == 0 else "opus_en_fr",
                 device="cpu" if i % 3 == 0 else "cuda",
                 batch_sizes=[8],
                 iterations=1,
@@ -202,9 +202,9 @@ class TestBenchmarkDatabase:
         assert len(all_runs) == 10
 
         # Test model filtering
-        m2m_runs = db.list_runs(model_id="m2m100_418m")
+        m2m_runs = db.list_runs(model_id=test_model)
         assert len(m2m_runs) == 5
-        assert all(r[1] == "m2m100_418m" for r in m2m_runs)
+        assert all(r[1] == test_model for r in m2m_runs)
 
         # Test device filtering
         cpu_runs = db.list_runs(device="cpu")
@@ -256,7 +256,7 @@ class TestBenchmarkDatabase:
                 if wal_path.exists():
                     wal_path.unlink()
 
-    def test_compare_runs(self, temp_db, sample_system_info):
+    def test_compare_runs(self, temp_db, test_model, sample_system_info):
         """Test 5: Verify run comparison on different metrics."""
         db = BenchmarkDatabase(temp_db)
 
@@ -289,7 +289,7 @@ class TestBenchmarkDatabase:
 
         run2 = BenchmarkRun(
             run_id="slow_run",
-            model_id="m2m100_418m",
+            model_id=test_model,
             device="cpu",
             batch_sizes=[8],
             iterations=2,
@@ -300,7 +300,7 @@ class TestBenchmarkDatabase:
             results=[
                 BenchmarkResult(
                     sample_id="s2",
-                    model_id="m2m100_418m",
+                    model_id=test_model,
                     device="cpu",
                     batch_size=8,
                     duration_seconds=2.0,
@@ -453,7 +453,7 @@ class TestDataclasses:
 
         reconstructed = SystemInfo.from_dict(data)
         assert reconstructed.cpu_model == sample_system_info.cpu_model
-        assert reconstructed.gpu_vram_gb == sample_system_info.gpu_vram_gb
+        assert reconstructed.gpu_memory_gb == sample_system_info.gpu_memory_gb
 
     def test_benchmark_result_serialization(self, sample_results):
         """Test BenchmarkResult to_dict and from_dict roundtrip."""

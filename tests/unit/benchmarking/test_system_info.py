@@ -331,6 +331,123 @@ class TestSystemInfoCLI:
         assert data["cpu_cores"] == 4
 
 
+class TestGPUMemoryHelpers:
+    """Test GPU memory helper static methods (BM04C-02)."""
+
+    def test_get_available_gpu_memory_cuda_available(self):
+        """Test get_available_gpu_memory_mb when CUDA is available."""
+        mock_torch = Mock()
+        mock_torch.cuda.is_available.return_value = True
+        mock_torch.cuda.device_count.return_value = 1
+        mock_torch.cuda.mem_get_info.return_value = (4096 * 1024**2, 8192 * 1024**2)  # 4GB free, 8GB total
+
+        with patch.dict("sys.modules", {"torch": mock_torch}):
+            result = SystemInfoCollector.get_available_gpu_memory_mb(device_id=0)
+
+        assert result is not None
+        assert result == pytest.approx(4096.0, rel=0.01)
+        mock_torch.cuda.mem_get_info.assert_called_once_with(0)
+
+    def test_get_available_gpu_memory_cuda_unavailable(self):
+        """Test get_available_gpu_memory_mb when CUDA is unavailable."""
+        mock_torch = Mock()
+        mock_torch.cuda.is_available.return_value = False
+
+        with patch.dict("sys.modules", {"torch": mock_torch}):
+            result = SystemInfoCollector.get_available_gpu_memory_mb(device_id=0)
+
+        assert result is None
+
+    def test_get_available_gpu_memory_invalid_device_id(self):
+        """Test get_available_gpu_memory_mb with invalid device_id."""
+        mock_torch = Mock()
+        mock_torch.cuda.is_available.return_value = True
+        mock_torch.cuda.device_count.return_value = 1
+
+        with patch.dict("sys.modules", {"torch": mock_torch}):
+            result = SystemInfoCollector.get_available_gpu_memory_mb(device_id=5)
+
+        assert result is None
+
+    def test_get_available_gpu_memory_torch_not_installed(self):
+        """Test get_available_gpu_memory_mb when torch is not installed."""
+        with patch.dict("sys.modules", {"torch": None}):
+            with patch("builtins.__import__", side_effect=ImportError("No module named 'torch'")):
+                result = SystemInfoCollector.get_available_gpu_memory_mb(device_id=0)
+
+        assert result is None
+
+    def test_get_gpu_memory_stats_cuda_available(self):
+        """Test get_gpu_memory_stats when CUDA is available."""
+        mock_torch = Mock()
+        mock_torch.cuda.is_available.return_value = True
+        mock_torch.cuda.device_count.return_value = 1
+        mock_torch.cuda.mem_get_info.return_value = (4096 * 1024**2, 8192 * 1024**2)  # 4GB free, 8GB total
+        mock_torch.cuda.memory_allocated.return_value = 2048 * 1024**2  # 2GB allocated
+        mock_torch.cuda.memory_reserved.return_value = 3072 * 1024**2  # 3GB reserved
+
+        with patch.dict("sys.modules", {"torch": mock_torch}):
+            result = SystemInfoCollector.get_gpu_memory_stats(device_id=0)
+
+        assert result is not None
+        assert result['total_mb'] == pytest.approx(8192.0, rel=0.01)
+        assert result['free_mb'] == pytest.approx(4096.0, rel=0.01)
+        assert result['used_mb'] == pytest.approx(4096.0, rel=0.01)  # 8192 - 4096
+        assert result['allocated_mb'] == pytest.approx(2048.0, rel=0.01)
+        assert result['reserved_mb'] == pytest.approx(3072.0, rel=0.01)
+
+        mock_torch.cuda.mem_get_info.assert_called_once_with(0)
+        mock_torch.cuda.memory_allocated.assert_called_once_with(0)
+        mock_torch.cuda.memory_reserved.assert_called_once_with(0)
+
+    def test_get_gpu_memory_stats_cuda_unavailable(self):
+        """Test get_gpu_memory_stats when CUDA is unavailable."""
+        mock_torch = Mock()
+        mock_torch.cuda.is_available.return_value = False
+
+        with patch.dict("sys.modules", {"torch": mock_torch}):
+            result = SystemInfoCollector.get_gpu_memory_stats(device_id=0)
+
+        assert result is None
+
+    def test_get_gpu_memory_stats_invalid_device_id(self):
+        """Test get_gpu_memory_stats with invalid device_id."""
+        mock_torch = Mock()
+        mock_torch.cuda.is_available.return_value = True
+        mock_torch.cuda.device_count.return_value = 2
+
+        with patch.dict("sys.modules", {"torch": mock_torch}):
+            result = SystemInfoCollector.get_gpu_memory_stats(device_id=5)
+
+        assert result is None
+
+    def test_get_gpu_memory_stats_torch_not_installed(self):
+        """Test get_gpu_memory_stats when torch is not installed."""
+        with patch.dict("sys.modules", {"torch": None}):
+            with patch("builtins.__import__", side_effect=ImportError("No module named 'torch'")):
+                result = SystemInfoCollector.get_gpu_memory_stats(device_id=0)
+
+        assert result is None
+
+    def test_get_gpu_memory_stats_multi_device(self):
+        """Test get_gpu_memory_stats with multiple GPUs."""
+        mock_torch = Mock()
+        mock_torch.cuda.is_available.return_value = True
+        mock_torch.cuda.device_count.return_value = 2
+
+        # Device 0
+        mock_torch.cuda.mem_get_info.return_value = (2048 * 1024**2, 8192 * 1024**2)
+        mock_torch.cuda.memory_allocated.return_value = 1024 * 1024**2
+        mock_torch.cuda.memory_reserved.return_value = 1536 * 1024**2
+
+        with patch.dict("sys.modules", {"torch": mock_torch}):
+            result = SystemInfoCollector.get_gpu_memory_stats(device_id=0)
+
+        assert result is not None
+        assert result['total_mb'] == pytest.approx(8192.0, rel=0.01)
+        mock_torch.cuda.mem_get_info.assert_called_with(0)
+
+
 @pytest.mark.benchmarking
 class TestSystemInfoIntegration:
     """Integration tests (marked as benchmarking)."""
