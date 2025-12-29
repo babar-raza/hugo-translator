@@ -76,12 +76,27 @@ logs/
 # Config data (runtime TM databases)
 config/data/
 
-# Models
-models/
+# Models (exclude binaries, keep structure and metadata)
+models/huggingface/*/
+models/ctranslate2/*/
+models/cache/
+models/inventory.json
+models/m2m100*/
+models/nllb*/
+models/opus*/
+models/small*/
+!models/.gitkeep
+!models/README.md
+!models/MODEL_INVENTORY.md
+!models/DOWNLOAD_SUMMARY.md
+!models/**/.metadata.json
 *.bin
 *.pt
 *.pth
 *.onnx
+*.safetensors
+*.msgpack
+*.model
 
 # Reports (keep structure, ignore content)
 reports/**/output/
@@ -194,3 +209,32 @@ samples/**/zh/
 docs/_archive/
 docs/_audit/
 /.translation_progress
+
+# Root-level work reports and analysis (dev/debugging artifacts)
+/BENCHMARK_IMPLEMENTATION_REPORT.md
+/BENCHMARK_PROGRESS_REPORT.md
+/CHH-05_IMPLEMENTATION_SUMMARY.md
+/CRITICAL_TRANSLATION_CORRUPTION_REPORT.md
+/DIAGNOSTIC_SUMMARY.md
+/IMPLEMENTATION_SUMMARY.md
+/L3_LOCK_PROTECTION_SUMMARY.md
+/PRODUCTION_DEPLOYMENT_PLAN.md
+/ROOT_CAUSE_ANALYSIS.md
+/SELF_REVIEW_PATCHES.md
+/ads.md
+/cache_integrity_analysis_*.md
+/cache_integrity_report.txt
+
+# Runtime metrics/telemetry data
+/metrics.ndjson
+/metrics_current.json
+/metrics_test.ndjson
+/metrics_test_current.json
+
+# Test work directories (ephemeral test outputs)
+/tests/work/
+/test_e2e_*/
+/test_slides_translation/
+
+# Platform-specific virtual environments
+/venv_wsl/
