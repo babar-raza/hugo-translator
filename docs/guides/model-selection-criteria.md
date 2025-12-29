@@ -56,10 +56,12 @@ These models excel at specific language pairs but have limited language coverage
 |--------|----------------------|--------------------------|
 | **Parameters** | 1B+ (NLLB-1.3B, M2M100-1.2B) | 300M-600M (Small-100, NLLB-600M) |
 | **Memory** | 8GB+ GPU required | 2-4GB sufficient |
-| **Speed** | 40-70% slower | 2-3x faster |
-| **Accuracy** | +10-15% better BLEU scores | Good baseline quality |
+| **Speed** | Slower (larger models) | Faster (smaller models) |
+| **Accuracy** | Better BLEU scores (pending measurement) | Good baseline quality (pending measurement) |
 | **Languages** | 100-200 languages | 100-200 languages |
 | **Use Cases** | Production content, marketing | Draft translation, bulk processing |
+
+**Note:** Specific performance and quality comparisons pending comprehensive benchmarking (BM-04, BM-07).
 
 ## Selection Criteria Matrix
 
@@ -135,7 +137,7 @@ batch:
   threads: auto
 ```
 
-**Why:** 1.5-1.7x faster than standard models, 20-40% less memory usage.
+**Why:** CTranslate2 backend offers optimized inference (specific speedup pending measurement - see BM-03).
 
 ### CPU-Only Deployments
 
@@ -155,7 +157,7 @@ cpu_optimizer:
   num_threads: auto
 ```
 
-**Why:** Optimized for CPU inference, 40-70% faster than standard HuggingFace models.
+**Why:** Optimized for CPU inference (specific performance improvement pending CT2 benchmarks - see BM-03).
 
 ### Low-Resource Environments
 
@@ -225,29 +227,47 @@ model:
 
 ## Performance Benchmarks
 
+**Benchmark Status:** 🚧 In Progress - Real data collection ongoing (as of 2025-12-27)
+
 ### Throughput Comparison (tokens/second)
 
-| Model | Backend | Batch=4 | Batch=8 | Batch=16 | Hardware |
-|-------|---------|---------|---------|----------|----------|
-| M2M100-418M | HF | 35 | 50 | 70 | RTX 3060 |
-| M2M100-418M | CT2 FP32 | 55 | 85 | 120 | RTX 3060 |
-| M2M100-418M | CT2 INT8 | 50 | 80 | 115 | RTX 3060 |
-| NLLB-600M | HF | 25 | 40 | 55 | RTX 3060 |
-| Small-100 | HF | 45 | 70 | 95 | RTX 3060 |
-| Opus-MT EN-FR | HF | 120 | 200 | 300 | CPU i7 |
+**Real Data (Measured on this System):**
+
+| Model | Backend | Batch=4 | Batch=8 | Batch=16 | Hardware | Source |
+|-------|---------|---------|---------|----------|----------|--------|
+| M2M100-418M | HF | 45.3 | 44.2 | 42.3 | CPU 24-core, 64GB RAM | Measured 2025-12-27 |
+| NLLB-600M | HF | 34.3 | 36.9 | TBD | CPU 24-core, 64GB RAM | Measured 2025-12-27 |
+| Opus-MT EN-FR | HF | 136.9 | 138.8 | TBD | CPU 24-core, 64GB RAM | Measured 2025-12-27 |
+
+**Pending Measurements:**
+
+| Model | Backend | Batch=4 | Batch=8 | Batch=16 | Hardware | Status |
+|-------|---------|---------|---------|----------|----------|--------|
+| M2M100-418M | HF | TBD | TBD | TBD | GPU (RTX/CUDA) | Awaiting GPU benchmarks |
+| M2M100-418M | CT2 FP32 | TBD | TBD | TBD | GPU/CPU | Awaiting CT2 conversion |
+| M2M100-418M | CT2 INT8 | TBD | TBD | TBD | GPU/CPU | Awaiting CT2 conversion |
+| M2M100-1.2B | HF | TBD | TBD | TBD | GPU (8GB+) | Awaiting benchmarks |
+| NLLB-1.3B | HF | TBD | TBD | TBD | GPU (10GB+) | Awaiting benchmarks |
+| Small-100 | HF | TBD | TBD | TBD | CPU/GPU | Awaiting benchmarks |
+
+**Note:** Previous theoretical values have been removed per REQ-BM-04 (Real Data Only). All performance numbers above are from actual measurements on real hardware running this system. See `data/benchmarks/benchmarks.db` for full benchmark data.
 
 ### Quality Comparison (BLEU Scores)
 
-| Model | EN→ES | EN→FR | EN→DE | EN→ZH | Average |
-|-------|--------|--------|--------|--------|---------|
-| M2M100-418M | 32.1 | 35.2 | 28.9 | 22.4 | 29.7 |
-| M2M100-1.2B | 34.5 | 37.1 | 30.8 | 24.1 | 31.6 |
-| NLLB-600M | 33.8 | 36.5 | 29.7 | 23.8 | 31.0 |
-| NLLB-1.3B | 35.2 | 38.2 | 31.4 | 25.1 | 32.5 |
-| Small-100 | 30.8 | 33.9 | 27.2 | 20.9 | 28.2 |
-| Opus-MT EN-FR | - | 40.1 | - | - | 40.1* |
+**Status:** ⏳ Not Yet Measured - Quality metrics implementation in progress (BM-04)
 
-*Opus-MT scores are for specific pairs only
+All quality scores below are **pending implementation** of BLEU/COMET metrics. No quality benchmarks have been run yet.
+
+| Model | EN→ES | EN→FR | EN→DE | EN→ZH | Average | Status |
+|-------|--------|--------|--------|--------|---------|--------|
+| M2M100-418M | TBD | TBD | TBD | TBD | TBD | Awaiting quality metrics |
+| M2M100-1.2B | TBD | TBD | TBD | TBD | TBD | Awaiting quality metrics |
+| NLLB-600M | TBD | TBD | TBD | TBD | TBD | Awaiting quality metrics |
+| NLLB-1.3B | TBD | TBD | TBD | TBD | TBD | Awaiting quality metrics |
+| Small-100 | TBD | TBD | TBD | TBD | TBD | Awaiting quality metrics |
+| Opus-MT EN-FR | - | TBD | - | - | TBD | Awaiting quality metrics |
+
+**Note:** Quality benchmarks require reference translation corpus (BM-09) and BLEU/COMET implementation (BM-04). Expected completion: Q1 2026.
 
 ## Configuration Examples
 
@@ -405,7 +425,7 @@ print(f"Memory usage: {config.memory_mb} MB")
 ### Performance Issues
 
 **Slow translation:**
-- Switch to CT2 backend (+40-70% speedup)
+- Switch to CT2 backend (optimized inference - specific speedup pending measurement)
 - Increase batch size (if memory allows)
 - Use GPU acceleration if available
 

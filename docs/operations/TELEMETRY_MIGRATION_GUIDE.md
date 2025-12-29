@@ -101,7 +101,7 @@ The telemetry API service must be running on `localhost:8765`:
 ```bash
 # Check if API is running
 curl http://localhost:8765/health
-# Expected: {"status": "ok", "version": "2.0.0"}
+# Expected: {"status": "ok", "version": "2.1.0"}
 ```
 
 If not running, start it:
@@ -171,7 +171,7 @@ curl http://localhost:8765/health | jq .
 # Expected output:
 {
   "status": "ok",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "db_path": "D:/agent-metrics/telemetry.sqlite",
   "journal_mode": "DELETE",
   "synchronous": "FULL"

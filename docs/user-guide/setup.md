@@ -383,6 +383,78 @@ if torch.cuda.is_available():
 "
 ```
 
+## Understanding Models
+
+### Automatic Model Downloads
+
+After setup completes, **you don't need to manually download translation models**. The system handles this automatically.
+
+**What happens on first translation:**
+
+1. System determines which model to use (default: `m2m100_418m`)
+2. Downloads model from HuggingFace Hub (~1-2GB)
+3. Caches model locally for future use
+4. Begins translation
+
+**Subsequent translations:**
+- Load model from cache instantly (no download)
+- Models stored in `~/.cache/huggingface/` (Linux/macOS) or `%USERPROFILE%\.cache\huggingface\` (Windows)
+
+### Model Selection
+
+The system chooses models in this priority:
+
+1. **CLI override:** `--model nllb_1.3b` (highest priority)
+2. **Site profile:** Configured in `config/site_profiles/mysite.yaml`
+3. **Default:** `m2m100_418m` (418M parameters, 100 languages)
+
+**Available models:**
+
+| Model | Size | Quality | Speed | Best For |
+|-------|------|---------|-------|----------|
+| `opus_mt_*` | 300MB | ⭐⭐⭐ | ⚡⚡⚡⚡⚡ | Single language pair, fastest |
+| `m2m100_418m` | 1.6GB | ⭐⭐⭐⭐ | ⚡⚡⚡⚡ | Default, balanced |
+| `nllb_600m` | 2.4GB | ⭐⭐⭐⭐ | ⚡⚡⚡ | 200 languages |
+| `m2m100_1.2b` | 4.8GB | ⭐⭐⭐⭐⭐ | ⚡⚡ | Higher quality |
+| `nllb_1.3b` | 5.2GB | ⭐⭐⭐⭐⭐ | ⚡⚡ | Best quality, 200 languages |
+
+### Changing Models
+
+**Test different models:**
+```bash
+# Try higher quality model
+translate-hugo --site mysite --model nllb_1.3b --source-lang en --target-lang fr
+
+# Try faster language-specific model
+translate-hugo --site blog --model opus_mt_en_fr --source-lang en --target-lang fr
+```
+
+**Set default for a site:**
+
+Edit `config/site_profiles/mysite.yaml`:
+```yaml
+default_model: "nllb_1.3b"
+```
+
+### Pre-downloading Models (Optional)
+
+For production deployments or slow networks, pre-download models:
+
+```bash
+python -c "
+from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+
+# Download default model
+model_id = 'facebook/m2m100_418M'
+print(f'Downloading {model_id}...')
+tokenizer = AutoTokenizer.from_pretrained(model_id)
+model = AutoModelForSeq2SeqLM.from_pretrained(model_id)
+print('✓ Model cached successfully')
+"
+```
+
+📚 **Full Model Documentation:** [Model Selection Guide](../guides/model-selection.md)
+
 ## Troubleshooting
 
 ### Common Issues
