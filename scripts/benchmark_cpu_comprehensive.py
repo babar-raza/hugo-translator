@@ -1,24 +1,35 @@
 #!/usr/bin/env python3
 """
-Comprehensive CPU benchmarking for translation models.
+Comprehensive CPU benchmarking for translation models across 36 languages.
 
-Compares HuggingFace vs CTranslate2 backends with various batch sizes,
-thread counts, and quantization levels. Results saved to BenchmarkDatabase.
+Benchmarks HuggingFace and CTranslate2 backends with various batch sizes,
+thread counts, and target languages. Results saved to BenchmarkDatabase.
 
 Usage:
+    # Benchmark all 4 models for all 36 languages
     python scripts/benchmark_cpu_comprehensive.py \
-        --models m2m100_418m,m2m100_418m_ct2 \
+        --models m2m100_418m,m2m100_1.2b,nllb_200_600m,nllb_200_1.3b \
+        --languages all \
         --batch-sizes 4,8,16 \
         --iterations 3 \
-        --save-to-db data/benchmarks/cpu.db \
+        --save-to-db data/benchmarks/benchmarks.db \
         --corpus tiny
 
+    # Benchmark specific languages only
+    python scripts/benchmark_cpu_comprehensive.py \
+        --models nllb_200_600m \
+        --languages fr,es,de,zh,ja \
+        --batch-sizes 8 \
+        --iterations 2
+
 Features:
+    - Multi-language benchmarking (all 36 target languages)
+    - Supports NLLB-200 and M2M100 multilingual models
     - Compares HF vs CT2 on CPU
     - Tests multiple batch sizes and thread counts
-    - Measures throughput, memory, latency
+    - Measures throughput, memory, latency per language
     - Saves results to benchmark database
-    - Gracefully handles missing CT2 models
+    - Progress tracking across languages
 """
 
 import argparse
@@ -62,24 +73,30 @@ class CPUBenchmarkRunner:
         iterations: int = 3,
         corpus_path: Optional[Path] = None,
         db_path: Optional[Path] = None,
+        target_languages: Optional[List[str]] = None,
+        device: str = "cpu",
     ):
         """
-        Initialize CPU benchmark runner.
+        Initialize CPU/GPU benchmark runner.
 
         Args:
             model_ids: List of model IDs to benchmark
             batch_sizes: List of batch sizes to test
-            thread_counts: List of thread counts to test (None = auto-detect)
+            thread_counts: List of thread counts to test (None = auto-detect, CPU only)
             iterations: Number of iterations per configuration
             corpus_path: Path to benchmark corpus JSON file
             db_path: Path to benchmark database
+            target_languages: List of target language codes (None = ['en'])
+            device: Device to use ('cpu', 'cuda', 'cuda:0', etc.)
         """
         self.model_ids = model_ids
         self.batch_sizes = batch_sizes
-        self.thread_counts = thread_counts or [self._detect_optimal_threads()]
+        self.thread_counts = thread_counts or ([self._detect_optimal_threads()] if device == "cpu" else [1])
         self.iterations = iterations
         self.corpus_path = corpus_path
         self.db_path = db_path
+        self.target_languages = target_languages or ['en']
+        self.device = device
 
         # Locate registry file
         registry_path = Path(__file__).parent.parent / "config" / "model_registry.yaml"
@@ -91,9 +108,10 @@ class CPUBenchmarkRunner:
         self.corpus_samples = self._load_corpus()
 
         logger.info(
-            f"Initialized CPU benchmark: {len(model_ids)} models, "
+            f"Initialized benchmark: device={device}, {len(model_ids)} models, "
             f"{len(batch_sizes)} batch sizes, {len(self.thread_counts)} thread counts, "
-            f"{iterations} iterations, {len(self.corpus_samples)} samples"
+            f"{iterations} iterations, {len(self.corpus_samples)} samples, "
+            f"{len(self.target_languages)} target languages"
         )
 
     def _detect_optimal_threads(self) -> int:
@@ -151,51 +169,71 @@ class CPUBenchmarkRunner:
             List of BenchmarkRun objects with results
 
         Tests each combination of:
+        - Target language
         - Model (HF, CT2, CT2-INT8, etc.)
         - Batch size
         - Thread count
         """
         all_runs = []
+        total_configs = (
+            len(self.target_languages)
+            * len(self.model_ids)
+            * len(self.thread_counts)
+            * len(self.batch_sizes)
+        )
+        completed = 0
 
-        for model_id in self.model_ids:
-            logger.info(f"\n{'='*60}")
-            logger.info(f"Benchmarking model: {model_id}")
-            logger.info(f"{'='*60}")
+        for target_lang in self.target_languages:
+            logger.info(f"\n{'='*70}")
+            logger.info(f"TARGET LANGUAGE: {target_lang.upper()}")
+            logger.info(f"{'='*70}")
 
-            # Check if model is available
-            if not self._check_model_available(model_id):
-                logger.warning(f"Model {model_id} not available, skipping")
-                continue
+            for model_id in self.model_ids:
+                logger.info(f"\n{'='*60}")
+                logger.info(f"Benchmarking model: {model_id} -> {target_lang}")
+                logger.info(f"{'='*60}")
 
-            for thread_count in self.thread_counts:
-                for batch_size in self.batch_sizes:
-                    logger.info(
-                        f"\nConfiguration: threads={thread_count}, batch_size={batch_size}"
-                    )
+                # Check if model is available
+                if not self._check_model_available(model_id):
+                    logger.warning(f"Model {model_id} not available, skipping")
+                    continue
 
-                    try:
-                        run = self._benchmark_configuration(
-                            model_id=model_id,
-                            batch_size=batch_size,
-                            thread_count=thread_count,
+                for thread_count in self.thread_counts:
+                    for batch_size in self.batch_sizes:
+                        completed += 1
+                        progress_pct = (completed / total_configs) * 100
+
+                        logger.info(
+                            f"\nConfiguration [{completed}/{total_configs}] ({progress_pct:.1f}%): "
+                            f"lang={target_lang}, threads={thread_count}, batch_size={batch_size}"
                         )
 
-                        all_runs.append(run)
+                        try:
+                            run = self._benchmark_configuration(
+                                model_id=model_id,
+                                batch_size=batch_size,
+                                thread_count=thread_count,
+                                target_language=target_lang,
+                            )
 
-                        # Save to database if available
-                        if self.database:
-                            self.database.save_run(run)
-                            logger.info(f"Saved run {run.run_id} to database")
+                            all_runs.append(run)
 
-                    except Exception as e:
-                        logger.error(
-                            f"Failed to benchmark {model_id} "
-                            f"(threads={thread_count}, batch={batch_size}): {e}",
-                            exc_info=True,
-                        )
-                        continue
+                            # Save to database if available
+                            if self.database:
+                                self.database.save_run(run)
+                                logger.info(f"Saved run {run.run_id} to database")
 
-        logger.info(f"\nCompleted {len(all_runs)} benchmark runs")
+                        except Exception as e:
+                            logger.error(
+                                f"Failed to benchmark {model_id} -> {target_lang} "
+                                f"(threads={thread_count}, batch={batch_size}): {e}",
+                                exc_info=True,
+                            )
+                            continue
+
+        logger.info(f"\n{'='*70}")
+        logger.info(f"Completed {len(all_runs)} benchmark runs across {len(self.target_languages)} languages")
+        logger.info(f"{'='*70}")
         return all_runs
 
     def _check_model_available(self, model_id: str) -> bool:
@@ -240,7 +278,7 @@ class CPUBenchmarkRunner:
             return False
 
     def _benchmark_configuration(
-        self, model_id: str, batch_size: int, thread_count: int
+        self, model_id: str, batch_size: int, thread_count: int, target_language: str = "en"
     ) -> BenchmarkRun:
         """
         Benchmark a specific configuration.
@@ -249,6 +287,7 @@ class CPUBenchmarkRunner:
             model_id: Model identifier
             batch_size: Batch size to test
             thread_count: Thread count to use
+            target_language: Target language code (ISO 639-1)
 
         Returns:
             BenchmarkRun with results for all corpus samples
@@ -258,24 +297,26 @@ class CPUBenchmarkRunner:
         - Latency (duration)
         - Peak memory (MB)
         """
-        run_id = f"cpu_bench_{model_id}_{batch_size}_{thread_count}_{uuid.uuid4().hex[:8]}"
+        device_short = self.device.replace(":", "_")
+        run_id = f"{device_short}_bench_{model_id}_{target_language}_{batch_size}_{thread_count}_{uuid.uuid4().hex[:8]}"
 
-        # Configure CPU optimization
-        optimizer = CPUOptimizer(num_threads_override=thread_count)
-        config = optimizer.optimize()
+        # Configure CPU optimization (CPU only)
+        if self.device == "cpu":
+            optimizer = CPUOptimizer(num_threads_override=thread_count)
+            config = optimizer.optimize()
 
         # Collect system info
         system_info = self._collect_system_info()
 
         # Load model
         start_time = time.perf_counter()
-        model_loader = ModelLoader(registry=self.registry, device="cpu")
+        model_loader = ModelLoader(registry=self.registry, device=self.device)
 
         try:
             model_info = self.registry.get_model(model_id)
             logger.info(f"Loading model {model_id} ({model_info.backend})...")
 
-            model, tokenizer = model_loader.load_model(model_id, device="cpu")
+            backend = model_loader.load_model(model_id, device=self.device)
 
             load_duration = time.perf_counter() - start_time
             logger.info(f"Model loaded in {load_duration:.2f}s")
@@ -293,11 +334,13 @@ class CPUBenchmarkRunner:
 
             for sample in self.corpus_samples:
                 result = self._benchmark_sample(
-                    model=model,
-                    tokenizer=tokenizer,
+                    model=backend.model,
+                    tokenizer=backend.tokenizer,
                     sample=sample,
                     model_id=model_id,
                     batch_size=batch_size,
+                    target_language=target_language,
+                    device=self.device,
                 )
                 results.append(result)
 
@@ -307,12 +350,12 @@ class CPUBenchmarkRunner:
         run = BenchmarkRun(
             run_id=run_id,
             model_id=model_id,
-            device="cpu",
+            device=self.device,
             batch_sizes=[batch_size],
             iterations=self.iterations,
             corpus_category=self.corpus_path.stem if self.corpus_path else "synthetic",
-            purpose="cpu_optimization",
-            tags=["cpu", "comprehensive", f"threads_{thread_count}"],
+            purpose=f"{self.device}_multilang_benchmark",
+            tags=[self.device.split(":")[0], "comprehensive", f"lang_{target_language}", f"threads_{thread_count}"],
             system_info=system_info,
             results=results,
             total_duration_seconds=total_duration,
@@ -322,6 +365,7 @@ class CPUBenchmarkRunner:
                 "batch_size": batch_size,
                 "iterations": self.iterations,
                 "corpus_size": len(self.corpus_samples),
+                "target_language": target_language,
             },
         )
 
@@ -346,6 +390,8 @@ class CPUBenchmarkRunner:
         sample: Dict[str, Any],
         model_id: str,
         batch_size: int,
+        target_language: str = "en",
+        device: str = "cpu",
     ) -> BenchmarkResult:
         """
         Benchmark a single corpus sample.
@@ -356,6 +402,8 @@ class CPUBenchmarkRunner:
             sample: Corpus sample with 'id' and 'text_en'
             model_id: Model identifier
             batch_size: Batch size (for metadata)
+            target_language: Target language code (ISO 639-1)
+            device: Device being used ('cpu', 'cuda', etc.)
 
         Returns:
             BenchmarkResult with timing and memory metrics
@@ -384,7 +432,7 @@ class CPUBenchmarkRunner:
             return BenchmarkResult(
                 sample_id=sample_id,
                 model_id=model_id,
-                device="cpu",
+                device=device,
                 batch_size=batch_size,
                 duration_seconds=0.0,
                 tokens_input=0,
@@ -399,12 +447,24 @@ class CPUBenchmarkRunner:
         errors = []
 
         try:
+            # Determine forced_bos_token_id for target language
+            forced_bos_token_id = self._get_target_language_token_id(
+                tokenizer, model_id, target_language
+            )
+
             # Generate translation
+            generate_kwargs = {
+                "max_length": 512,
+                "num_beams": 1,  # Greedy for speed
+                "early_stopping": True,
+            }
+
+            if forced_bos_token_id is not None:
+                generate_kwargs["forced_bos_token_id"] = forced_bos_token_id
+
             outputs = model.generate(
                 inputs["input_ids"],
-                max_length=512,
-                num_beams=1,  # Greedy for speed
-                early_stopping=True,
+                **generate_kwargs,
             )
 
             # Decode output
@@ -429,7 +489,7 @@ class CPUBenchmarkRunner:
         return BenchmarkResult(
             sample_id=sample_id,
             model_id=model_id,
-            device="cpu",
+            device=device,
             batch_size=batch_size,
             duration_seconds=duration,
             tokens_input=tokens_input,
@@ -438,6 +498,71 @@ class CPUBenchmarkRunner:
             peak_memory_mb=memory_delta_mb,
             errors=errors,
         )
+
+    def _get_target_language_token_id(
+        self, tokenizer: Any, model_id: str, target_language: str
+    ) -> Optional[int]:
+        """
+        Get the forced_bos_token_id for the target language.
+
+        Args:
+            tokenizer: Model tokenizer
+            model_id: Model identifier
+            target_language: Target language code (ISO 639-1)
+
+        Returns:
+            Token ID for the target language, or None if not applicable
+
+        For NLLB models: Uses language code format like "fra_Latn"
+        For M2M100 models: Uses get_lang_id() method
+        """
+        try:
+            # NLLB models use special language tokens
+            if "nllb" in model_id.lower():
+                # NLLB language code mapping (ISO 639-1 -> NLLB code)
+                nllb_lang_map = {
+                    "ar": "arb_Arab", "bg": "bul_Cyrl", "ca": "cat_Latn",
+                    "cs": "ces_Latn", "da": "dan_Latn", "de": "deu_Latn",
+                    "el": "ell_Grek", "es": "spa_Latn", "fa": "pes_Arab",
+                    "fi": "fin_Latn", "fr": "fra_Latn", "he": "heb_Hebr",
+                    "hi": "hin_Deva", "hr": "hrv_Latn", "hu": "hun_Latn",
+                    "id": "ind_Latn", "it": "ita_Latn", "ja": "jpn_Jpan",
+                    "ko": "kor_Hang", "lt": "lit_Latn", "lv": "lav_Latn",
+                    "ms": "zsm_Latn", "nl": "nld_Latn", "no": "nob_Latn",
+                    "pl": "pol_Latn", "pt": "por_Latn", "ro": "ron_Latn",
+                    "ru": "rus_Cyrl", "sk": "slk_Latn", "sr": "srp_Cyrl",
+                    "sv": "swe_Latn", "th": "tha_Thai", "tr": "tur_Latn",
+                    "uk": "ukr_Cyrl", "vi": "vie_Latn", "zh": "zho_Hans",
+                }
+
+                nllb_code = nllb_lang_map.get(target_language)
+                if nllb_code:
+                    # NLLB uses special tokens like "<fra_Latn>"
+                    token = f"{nllb_code}"
+                    if hasattr(tokenizer, 'convert_tokens_to_ids'):
+                        token_id = tokenizer.convert_tokens_to_ids(token)
+                        if token_id != tokenizer.unk_token_id:
+                            return token_id
+                    logger.warning(f"Could not find NLLB token for {target_language} ({nllb_code})")
+                    return None
+
+            # M2M100 models use lang_code_to_id or get_lang_id
+            elif "m2m100" in model_id.lower():
+                if hasattr(tokenizer, 'get_lang_id'):
+                    try:
+                        return tokenizer.get_lang_id(target_language)
+                    except Exception as e:
+                        logger.warning(f"get_lang_id failed for {target_language}: {e}")
+                        return None
+                elif hasattr(tokenizer, 'lang_code_to_id'):
+                    return tokenizer.lang_code_to_id.get(target_language)
+
+            # For other models, no forced token needed
+            return None
+
+        except Exception as e:
+            logger.warning(f"Failed to get target language token for {target_language}: {e}")
+            return None
 
     def _collect_system_info(self) -> SystemInfo:
         """
@@ -473,18 +598,33 @@ class CPUBenchmarkRunner:
         except ImportError:
             transformers_version = "not_installed"
 
+        # Detect GPU info if running on CUDA
+        gpu_model = None
+        gpu_memory_gb = None
+        if self.device.startswith("cuda"):
+            try:
+                import torch
+                if torch.cuda.is_available():
+                    device_idx = 0  # Default to first GPU
+                    if ":" in self.device:
+                        device_idx = int(self.device.split(":")[1])
+
+                    gpu_model = torch.cuda.get_device_name(device_idx)
+                    gpu_memory_gb = torch.cuda.get_device_properties(device_idx).total_memory / (1024**3)
+            except Exception as e:
+                logger.warning(f"Failed to detect GPU info: {e}")
+
         return SystemInfo(
             cpu_model=cpu_model,
             cpu_cores=hw_info.cpu_count,
             total_ram_gb=hw_info.total_ram_gb,
-            gpu_model=None,  # CPU benchmarks only
-            gpu_vram_gb=None,
+            gpu_model=gpu_model,
+            gpu_memory_gb=gpu_memory_gb,
             os_name=platform.system(),
             os_version=platform.release(),
             python_version=platform.python_version(),
             torch_version=torch_version,
-            transformers_version=transformers_version,
-            timestamp_utc=datetime.now(timezone.utc).isoformat(),
+            collected_at_utc=datetime.now(timezone.utc).isoformat(),
         )
 
     def print_summary(self, runs: List[BenchmarkRun]) -> None:
@@ -552,15 +692,24 @@ def parse_args() -> argparse.Namespace:
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  # Compare HF vs CT2 with multiple batch sizes
+  # Benchmark all models for all 36 languages
   python scripts/benchmark_cpu_comprehensive.py \\
-      --models m2m100_418m,m2m100_418m_ct2 \\
+      --models m2m100_418m,m2m100_1.2b,nllb_200_600m,nllb_200_1.3b \\
+      --languages all \\
       --batch-sizes 4,8,16 \\
       --iterations 3 \\
-      --save-to-db data/benchmarks/cpu.db \\
+      --save-to-db data/benchmarks/benchmarks.db \\
       --corpus tiny
 
-  # Quick test with tiny corpus
+  # Benchmark specific languages
+  python scripts/benchmark_cpu_comprehensive.py \\
+      --models nllb_200_600m \\
+      --languages fr,es,de,zh,ja \\
+      --batch-sizes 8 \\
+      --iterations 2 \\
+      --save-to-db data/benchmarks/benchmarks.db
+
+  # Quick test with tiny corpus (single language)
   python scripts/benchmark_cpu_comprehensive.py \\
       --models m2m100_418m \\
       --batch-sizes 4,8 \\
@@ -569,11 +718,11 @@ Examples:
 
   # Test multiple thread counts
   python scripts/benchmark_cpu_comprehensive.py \\
-      --models m2m100_418m_ct2 \\
+      --models m2m100_418m \\
       --batch-sizes 8 \\
       --threads 1,2,4,8 \\
       --iterations 2 \\
-      --save-to-db data/benchmarks/cpu.db
+      --save-to-db data/benchmarks/benchmarks.db
         """,
     )
 
@@ -610,6 +759,20 @@ Examples:
         type=str,
         default="tiny",
         help="Corpus name (tiny/small/medium) or path to JSON file (default: tiny)",
+    )
+
+    parser.add_argument(
+        "--languages",
+        type=str,
+        default=None,
+        help="Comma-separated list of target language codes (ISO 639-1) or 'all' for all 36 languages (default: en only)",
+    )
+
+    parser.add_argument(
+        "--device",
+        type=str,
+        default="cpu",
+        help="Device to use: 'cpu', 'cuda', 'cuda:0', 'cuda:1', etc. (default: cpu)",
     )
 
     parser.add_argument(
@@ -667,6 +830,26 @@ def main() -> int:
     # Resolve database path
     db_path = Path(args.save_to_db) if args.save_to_db else None
 
+    # Parse target languages
+    target_languages = None
+    if args.languages:
+        if args.languages.lower() == "all":
+            # Load all 36 languages from config/target_languages.yaml
+            import yaml
+            config_path = Path(__file__).parent.parent / "config" / "target_languages.yaml"
+            if config_path.exists():
+                with open(config_path) as f:
+                    lang_config = yaml.safe_load(f)
+                    target_languages = [lang["iso_code"] for lang in lang_config.get("languages", [])]
+                    logger.info(f"Loaded {len(target_languages)} target languages from config")
+            else:
+                logger.error(f"Target languages config not found: {config_path}")
+                return 1
+        else:
+            # Parse comma-separated language codes
+            target_languages = [lang.strip() for lang in args.languages.split(",")]
+            logger.info(f"Using {len(target_languages)} target languages: {', '.join(target_languages)}")
+
     # Run benchmarks
     try:
         runner = CPUBenchmarkRunner(
@@ -676,6 +859,8 @@ def main() -> int:
             iterations=args.iterations,
             corpus_path=corpus_path,
             db_path=db_path,
+            target_languages=target_languages,
+            device=args.device,
         )
 
         runs = runner.run_all_benchmarks()
