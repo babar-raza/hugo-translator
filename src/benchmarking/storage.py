@@ -38,6 +38,9 @@ class BenchmarkResult:
     peak_memory_mb: Optional[float] = None
     bleu_score: Optional[float] = None
     comet_score: Optional[float] = None
+    cache_status: str = "unknown"  # hit, miss, cold, disabled, unknown
+    tm_level: str = "none"  # l1, l2, l3, none
+    cache_hit_rate: float = 0.0  # 0.0 to 1.0
     errors: List[str] = field(default_factory=list)
 
     def to_dict(self) -> Dict[str, Any]:
@@ -94,7 +97,7 @@ class BenchmarkDatabase:
     - JSON export/import
     """
 
-    SCHEMA_VERSION = 6
+    SCHEMA_VERSION = 7
 
     def __init__(self, db_path: Path | str):
         """Initialize database connection.
@@ -400,6 +403,26 @@ class BenchmarkDatabase:
             )
             logger.info("Applied schema migration to version 6 - quality metrics (BLEU, COMET)")
 
+        if from_version < 7:
+            # v7: Add cache tracking columns to benchmark_results (BM-CACHE-01)
+            conn.execute("ALTER TABLE benchmark_results ADD COLUMN cache_status TEXT DEFAULT 'unknown'")
+            conn.execute("ALTER TABLE benchmark_results ADD COLUMN tm_level TEXT DEFAULT 'none'")
+            conn.execute("ALTER TABLE benchmark_results ADD COLUMN cache_hit_rate REAL DEFAULT 0.0")
+
+            # Create indices for cache analysis queries
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_results_cache_status ON benchmark_results(cache_status)"
+            )
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_results_tm_level ON benchmark_results(tm_level)"
+            )
+
+            conn.execute(
+                "INSERT INTO schema_version (version, applied_at) VALUES (?, ?)",
+                (7, datetime.now(UTC).isoformat()),
+            )
+            logger.info("Applied schema migration to version 7 - cache tracking (BM-CACHE-01)")
+
     def create_tables(self) -> None:
         """Create database tables (idempotent).
 
@@ -476,8 +499,9 @@ class BenchmarkDatabase:
                         INSERT INTO benchmark_results
                         (run_id, sample_id, model_id, device, batch_size, duration_seconds,
                          tokens_input, tokens_output, throughput_tokens_per_sec,
-                         peak_memory_mb, bleu_score, comet_score, errors)
-                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                         peak_memory_mb, bleu_score, comet_score, cache_status, tm_level,
+                         cache_hit_rate, errors)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """,
                         (
                             run.run_id,
@@ -492,6 +516,9 @@ class BenchmarkDatabase:
                             result.peak_memory_mb,
                             result.bleu_score,
                             result.comet_score,
+                            result.cache_status,
+                            result.tm_level,
+                            result.cache_hit_rate,
                             json.dumps(result.errors),
                         ),
                     )
@@ -614,6 +641,11 @@ class BenchmarkDatabase:
                     tokens_output=row["tokens_output"],
                     throughput_tokens_per_sec=row["throughput_tokens_per_sec"],
                     peak_memory_mb=row["peak_memory_mb"],
+                    bleu_score=row.get("bleu_score"),
+                    comet_score=row.get("comet_score"),
+                    cache_status=row.get("cache_status", "unknown"),
+                    tm_level=row.get("tm_level", "none"),
+                    cache_hit_rate=row.get("cache_hit_rate", 0.0),
                     errors=json.loads(row["errors"]),
                 )
                 for row in result_rows

@@ -731,16 +731,17 @@ class TextUnitExtractor:
             # Empty or whitespace-only text
             prefix_ws = text
 
-        # Apply preserve_patterns protection (if configured)
+        # Check if non-translatable FIRST (before applying placeholders)
+        # This ensures heuristic patterns can match original text like "Aspose.Words"
+        do_not_translate = self._is_non_translatable(stripped_text)
+
+        # Apply preserve_patterns protection (if configured and not already protected)
         placeholder_map = {}
         protected_text = stripped_text
-        if self.placeholder_manager and stripped_text:
+        if self.placeholder_manager and stripped_text and not do_not_translate:
             protected_text, placeholder_map = self.placeholder_manager.protect(
                 stripped_text, self.preserve_patterns
             )
-
-        # Check if non-translatable (product name, technical identifier, etc.)
-        do_not_translate = self._is_non_translatable(protected_text)
 
         # Create TextUnit with protected text and placeholder map
         unit = TextUnit(
