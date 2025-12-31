@@ -9,7 +9,7 @@ on:
 
 jobs:
   health-check:
-    runs-on: windows-latest
+    runs-on: self-hosted
 
     steps:
       - name: Checkout hugo-translator
