@@ -40,7 +40,14 @@ from ..utils.file_lock import FileLock, LockError
 from ..utils.metadata_tracker import MetadataTracker
 from .exceptions import TranslationRejectedError, TranslationRetryableError
 from .extractor import SegmentExtractor
-from .models import DirectoryResult, TranslationResult, TranslationStats, ValidationDecision
+from .models import (
+    DirectoryResult,
+    TranslationResult,
+    TranslationStats,
+    ValidationDecision,
+    ValidationIssue,
+    ValidationResult,
+)
 from .parser import HugoParser
 from .reconstructor import MarkdownReconstructor
 from .validation import ValidationSuite
@@ -1381,6 +1388,27 @@ class TranslationEngine:
                 batch_size=batch_size
             )
 
+            empty_units = [
+                u for u in translated_units
+                if not u.do_not_translate and (u.translated_text is None or u.translated_text.strip() == "")
+            ]
+            if empty_units:
+                issues = [
+                    ValidationIssue(
+                        severity="error",
+                        rule="ASTTranslation",
+                        message=f"{len(empty_units)} units returned empty translations",
+                        location=str(doc.file_path) if hasattr(doc, "file_path") else None,
+                    )
+                ]
+                validation_result = ValidationResult(valid=False, issues=issues)
+                raise TranslationRetryableError(
+                    message="AST translation produced empty outputs",
+                    file_path=str(doc.file_path) if hasattr(doc, "file_path") else "",
+                    validation_result=validation_result,
+                    retry_feedback="All translated segments must return non-empty output.",
+                )
+
             # Update telemetry with batch statistics
             batch_calls_after = getattr(extractor, '_batch_calls', 0)
             fallbacks_after = getattr(extractor, '_individual_fallbacks', 0)
@@ -1402,6 +1430,8 @@ class TranslationEngine:
 
             return translated_body
 
+        except TranslationRetryableError:
+            raise
         except Exception as e:
             logger.error(f"AST-based translation failed: {e}", exc_info=True)
             raise RuntimeError(f"AST-based translation failed: {e}")
@@ -1722,6 +1752,8 @@ class TranslationEngine:
 
                 logger.info("AST Translation: Successfully reconstructed document")
 
+            except TranslationRetryableError:
+                raise
             except Exception as e:
                 logger.error(f"AST reconstruction failed: {e}", exc_info=True)
                 # Fallback to legacy reconstruction
