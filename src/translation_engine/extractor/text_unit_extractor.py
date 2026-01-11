@@ -81,6 +81,63 @@ if not (0.5 <= TOKEN_PER_WORD_ESTIMATE <= 3.0):
     )
 
 
+def analyze_segment_variance(segments: List[str]) -> Dict[str, Any]:
+    """
+    Analyze segment length distribution for batch optimization.
+
+    Calculates variance and standard deviation to determine if batch size
+    should be reduced for segments with high length variability.
+
+    Args:
+        segments: List of text segments to analyze
+
+    Returns:
+        Dictionary containing:
+            - variance: Variance of segment lengths
+            - std_dev: Standard deviation of segment lengths
+            - recommendation: "reduce_batch" or "default"
+            - suggested_factor: Batch size multiplier (0.6 for reduce, 1.0 for default)
+
+    Example:
+        >>> result = analyze_segment_variance(["short", "medium text", "very long text here"])
+        >>> if result["recommendation"] == "reduce_batch":
+        >>>     batch_size = int(batch_size * result["suggested_factor"])
+    """
+    if not segments:
+        return {
+            "variance": 0,
+            "std_dev": 0,
+            "recommendation": "default",
+            "suggested_factor": 1.0,
+        }
+
+    lengths = [len(s) for s in segments]
+    avg = sum(lengths) / len(lengths)
+    variance = sum((l - avg) ** 2 for l in lengths) / len(lengths)
+    std_dev = variance ** 0.5
+
+    # High variance = use smaller batches
+    # Coefficient of variation > 0.5 indicates high variability
+    coefficient_of_variation = std_dev / avg if avg > 0 else 0
+
+    if coefficient_of_variation > 0.5:
+        return {
+            "variance": variance,
+            "std_dev": std_dev,
+            "coefficient_of_variation": coefficient_of_variation,
+            "recommendation": "reduce_batch",
+            "suggested_factor": 0.6,
+        }
+    else:
+        return {
+            "variance": variance,
+            "std_dev": std_dev,
+            "coefficient_of_variation": coefficient_of_variation,
+            "recommendation": "default",
+            "suggested_factor": 1.0,
+        }
+
+
 class TextUnitExtractor:
     """
     Extracts TextUnits from AST for node-addressed translation.

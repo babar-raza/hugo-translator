@@ -179,6 +179,7 @@ git_commit:
   co_author_email: "hugo-translator@aspose.net"  # Email for Co-authored-by trailer
   co_author_name: "Hugo Translator"  # Name for Co-authored-by trailer
   timeout_seconds: 60  # Timeout for git operations (10-300)
+  block_signals: true  # Block SIGINT/SIGTERM during commit to prevent partial commits
 
 # Schema Documentation
 # This section documents the structure and options for site profiles

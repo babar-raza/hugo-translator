@@ -624,6 +624,21 @@ Examples:
         help="Sort languages by missing translation count: desc (most first, default) or asc (least first)",
     )
 
+    multilang_group.add_argument(
+        "--fail-fast",
+        action="store_true",
+        default=True,
+        dest="fail_fast",
+        help="Stop multi-language processing on first language failure (default: True)",
+    )
+
+    multilang_group.add_argument(
+        "--no-fail-fast",
+        action="store_false",
+        dest="fail_fast",
+        help="Continue processing remaining languages even if one fails",
+    )
+
     # Benchmarking (production metrics collection - OPT-IN)
     benchmark_group = parser.add_argument_group("Benchmarking & Production Metrics")
 
@@ -640,6 +655,32 @@ Examples:
         "--config-root",
         default="./config",
         help="Configuration root directory (default: ./config)",
+    )
+
+    # Git commit control
+    commit_group = parser.add_argument_group("Git Commit Control")
+
+    commit_group.add_argument(
+        "--auto-commit",
+        action="store_true",
+        default=None,
+        dest="auto_commit",
+        help="Enable automatic git commits after successful translation (config default)",
+    )
+
+    commit_group.add_argument(
+        "--no-commit",
+        action="store_false",
+        dest="auto_commit",
+        help="Disable automatic git commits (override config)",
+    )
+
+    commit_group.add_argument(
+        "--commit-message",
+        type=str,
+        default=None,
+        dest="commit_message_override",
+        help="Override commit message template",
     )
 
     return parser
@@ -1242,6 +1283,7 @@ def translate_site(args: argparse.Namespace) -> int:
                 return 1
 
             exit_codes = []
+            language_results = {}  # Track per-language results
             try:
                 for i, lang in enumerate(target_langs, 1):
                     logger.info(f"\n{'='*60}")
@@ -1251,77 +1293,97 @@ def translate_site(args: argparse.Namespace) -> int:
                     # Build subprocess command with same args but single target language
                     cmd = [sys.executable, "-m", "src.cli"]
 
-                # Copy all original arguments
-                cmd.extend(["--site", args.site])
+                    # Copy all original arguments
+                    cmd.extend(["--site", args.site])
 
-                if args.input:
-                    cmd.extend(["--input", str(args.input)])
-                if args.output:
-                    cmd.extend(["--output", str(args.output)])
+                    if args.input:
+                        cmd.extend(["--input", str(args.input)])
+                    if args.output:
+                        cmd.extend(["--output", str(args.output)])
 
-                # Single target language for this subprocess
-                cmd.extend(["--target-langs", lang])
+                    # Single target language for this subprocess
+                    cmd.extend(["--target-langs", lang])
 
-                # Copy other flags
-                if args.model:
-                    cmd.extend(["--model", args.model])
-                if args.device:
-                    cmd.extend(["--device", args.device])
-                if args.batch_size:
-                    cmd.extend(["--batch-size", str(args.batch_size)])
-                if args.max_tokens:
-                    cmd.extend(["--max-tokens", str(args.max_tokens)])
-                if args.log_level:
-                    cmd.extend(["--log-level", args.log_level])
-                if args.log_file:
-                    cmd.extend(["--log-file", args.log_file])
-                if args.force_retranslate:
-                    cmd.append("--force-retranslate")
-                if args.dry_run:
-                    cmd.append("--dry-run")
-                if args.no_progress:
-                    cmd.append("--no-progress")
-                if args.disable_validation:
-                    cmd.append("--disable-validation")
-                if args.force_accept:
-                    cmd.append("--force-accept")
-                if args.strict_reject:
-                    cmd.append("--strict-reject")
-                if args.enable_terminology is not None:
-                    if args.enable_terminology:
-                        cmd.append("--enable-terminology")
+                    # Copy other flags
+                    if args.model:
+                        cmd.extend(["--model", args.model])
+                    if args.device:
+                        cmd.extend(["--device", args.device])
+                    if args.batch_size:
+                        cmd.extend(["--batch-size", str(args.batch_size)])
+                    if args.max_tokens:
+                        cmd.extend(["--max-tokens", str(args.max_tokens)])
+                    if args.log_level:
+                        cmd.extend(["--log-level", args.log_level])
+                    if args.log_file:
+                        cmd.extend(["--log-file", args.log_file])
+                    if args.force_retranslate:
+                        cmd.append("--force-retranslate")
+                    if args.dry_run:
+                        cmd.append("--dry-run")
+                    if args.no_progress:
+                        cmd.append("--no-progress")
+                    if args.disable_validation:
+                        cmd.append("--disable-validation")
+                    if args.force_accept:
+                        cmd.append("--force-accept")
+                    if args.strict_reject:
+                        cmd.append("--strict-reject")
+                    if args.enable_terminology is not None:
+                        if args.enable_terminology:
+                            cmd.append("--enable-terminology")
+                        else:
+                            cmd.append("--disable-terminology")
+                    if args.config_root:
+                        cmd.extend(["--config-root", args.config_root])
+
+                    # Mark as single-language mode to prevent infinite recursion
+                    cmd.append("--_single-lang-mode")
+
+                    # TC1: Tell subprocess to skip lock acquisition (parent holds it)
+                    cmd.append("--_skip-site-lock")
+
+                    # Run subprocess
+                    logger.debug(f"Subprocess command: {' '.join(cmd)}")
+                    result = subprocess.run(cmd, capture_output=False)
+                    exit_codes.append(result.returncode)
+
+                    # Track result for this language
+                    language_results[lang] = {
+                        "exit_code": result.returncode,
+                        "success": result.returncode == 0,
+                    }
+
+                    if result.returncode != 0:
+                        logger.error(f"Translation failed for language {lang} with exit code {result.returncode}")
+
+                        # Fail-fast: Stop on first language failure if enabled
+                        if hasattr(args, 'fail_fast') and args.fail_fast:
+                            logger.error("Fail-fast enabled, stopping multi-language processing")
+                            break
                     else:
-                        cmd.append("--disable-terminology")
-                if args.config_root:
-                    cmd.extend(["--config-root", args.config_root])
+                        logger.info(f"Successfully completed translation for {lang}")
 
-                # Mark as single-language mode to prevent infinite recursion
-                cmd.append("--_single-lang-mode")
+                # Summary report with per-language results
+                successful_langs = [lang for lang, res in language_results.items() if res["success"]]
+                failed_langs = [lang for lang, res in language_results.items() if not res["success"]]
 
-                # TC1: Tell subprocess to skip lock acquisition (parent holds it)
-                cmd.append("--_skip-site-lock")
-
-                # Run subprocess
-                logger.debug(f"Subprocess command: {' '.join(cmd)}")
-                result = subprocess.run(cmd, capture_output=False)
-                exit_codes.append(result.returncode)
-
-                if result.returncode != 0:
-                    logger.error(f"Translation failed for language {lang} with exit code {result.returncode}")
-                else:
-                    logger.info(f"Successfully completed translation for {lang}")
+                logger.info(f"\n{'='*60}")
+                logger.info(f"Multi-Language Translation Summary")
+                logger.info(f"{'='*60}")
+                logger.info(f"Total languages: {len(target_langs)}")
+                logger.info(f"Successful: {len(successful_langs)}/{len(target_langs)}")
+                if successful_langs:
+                    logger.info(f"  Languages: {', '.join(successful_langs)}")
+                logger.info(f"Failed: {len(failed_langs)}/{len(target_langs)}")
+                if failed_langs:
+                    logger.warning(f"  Languages: {', '.join(failed_langs)}")
+                logger.info(f"{'='*60}\n")
 
                 # Return overall status
                 if all(code == 0 for code in exit_codes):
-                    logger.info(f"\n{'='*60}")
-                    logger.info(f"All {len(target_langs)} languages translated successfully")
-                    logger.info(f"{'='*60}\n")
                     return 0
                 else:
-                    failed = sum(1 for code in exit_codes if code != 0)
-                    logger.error(f"\n{'='*60}")
-                    logger.error(f"Translation failed for {failed}/{len(target_langs)} languages")
-                    logger.error(f"{'='*60}\n")
                     return 1
 
             finally:
@@ -1700,6 +1762,37 @@ def translate_site(args: argparse.Namespace) -> int:
                     logger.info("Progress cleared - all translations complete")
             else:
                 logger.info("Progress saved. Some translations failed - resume to retry.")
+
+            # Auto-commit translations if enabled and files succeeded
+            if result.successful_files > 0:
+                try:
+                    from src.observability.git_commit_helper import auto_commit_translations
+
+                    # Determine if commit should happen
+                    # args.auto_commit can be: True (--auto-commit), False (--no-commit), or None (use config default)
+                    no_commit = False
+                    if hasattr(args, 'auto_commit') and args.auto_commit is False:
+                        no_commit = True
+
+                    commit_success = auto_commit_translations(
+                        result=result,
+                        site_id=args.site,
+                        target_langs=target_langs,
+                        run_id="cli-run",  # Simple identifier for CLI-initiated translations
+                        config_service=config_service,
+                        commit_message_override=getattr(args, 'commit_message_override', None),
+                        no_commit=no_commit,
+                    )
+
+                    if commit_success:
+                        logger.info(
+                            f"Git commit successful: {result.successful_files} files committed"
+                        )
+                    else:
+                        logger.debug("Git commit skipped or failed (non-fatal)")
+
+                except Exception as e:
+                    logger.warning(f"Auto-commit error (non-fatal): {e}")
 
             return 0 if result.failed_files == 0 else 1
 

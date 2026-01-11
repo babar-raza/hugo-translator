@@ -320,23 +320,38 @@ class BatchOptimizer:
         with self._lock:
             self.stats.oom_events += 1
 
-            # Reduce batch size
+            # Progressive reduction: Try 50%, 25%, 12.5% until min_batch_size
+            reduction_steps = [0.5, 0.25, 0.125]
+
             old_size = self._current_batch_size
-            self._current_batch_size = max(
-                self.config.min_batch_size,
-                int(self._current_batch_size * self.config.oom_reduction_factor)
-            )
+            for reduction_factor in reduction_steps:
+                new_size = max(
+                    self.config.min_batch_size,
+                    int(self._initial_batch_size * reduction_factor)
+                )
 
-            logger.warning(
-                f"OOM: Reduced batch size {old_size} -> {self._current_batch_size}"
-            )
+                if new_size < self._current_batch_size:
+                    self._current_batch_size = new_size
+                    logger.warning(
+                        f"OOM recovery: Trying batch_size={new_size} "
+                        f"(reduction={reduction_factor:.1%} of initial)"
+                    )
+                    break
+            else:
+                # Already at minimum, use min_batch_size
+                self._current_batch_size = self.config.min_batch_size
+                logger.warning(
+                    f"OOM: Already at/near minimum, using batch_size={self._current_batch_size}"
+                )
 
-        # Clear GPU cache if available
+        # Clear GPU cache aggressively
         try:
             import torch
             if torch.cuda.is_available():
                 torch.cuda.empty_cache()
                 logger.info("Cleared GPU cache")
+                # Let GPU settle
+                time.sleep(0.5)
         except ImportError:
             pass
 

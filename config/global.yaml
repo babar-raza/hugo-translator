@@ -86,6 +86,16 @@ observability:
 telemetry:
   validation_metrics: true  # Track validation metrics (decisions, retries, rejection rates)
 
+# Git commit automation
+git_commit:
+  enabled: true  # Enable automatic git commits after successful translation
+  auto_push: true  # USER PREFERENCE: Fully automated workflow (push to remote)
+  commit_template: "chore: translate {file_count} files to {languages}"
+  co_author_name: "Hugo Translator"
+  co_author_email: "noreply@aspose.com"
+  timeout_seconds: 60  # Maximum time for git operations
+  block_signals: true  # Block SIGINT/SIGTERM during commit to prevent partial commits
+
 # Output Layout (defaults for all sites)
 default_output_layout:
   per_language_folders: true
