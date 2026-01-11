@@ -516,6 +516,8 @@ class GlobalConfig(BaseModel):
         None, description="Validation configuration defaults"
     )
 
+    model_config = {"protected_namespaces": ()}
+
 
 # Example usage and validation
 if __name__ == "__main__":
