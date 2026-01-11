@@ -30,7 +30,7 @@ target_langs:
   - lv
   - ms
   - nl
-  - no
+  - "no"
   - pl
   - pt
   - ro
