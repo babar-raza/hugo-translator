@@ -561,7 +561,8 @@ def _extract_model_id(dir_result: "DirectoryResult") -> Optional[str]:
     """
     Extract model ID from translation result.
 
-    Looks for model_id in file results or translation result metadata.
+    Model ID is stored in TranslationStats.model_used field within each file result.
+    Access path: dir_result.file_results[0].stats.model_used
 
     Args:
         dir_result: DirectoryResult from translation
@@ -570,22 +571,15 @@ def _extract_model_id(dir_result: "DirectoryResult") -> Optional[str]:
         Model ID string if found, None otherwise
     """
     try:
-        # Check if DirectoryResult has model_id attribute
-        if hasattr(dir_result, "model_id") and dir_result.model_id:
-            return dir_result.model_id
-
-        # Check first file result
-        if dir_result.file_results:
+        # Model ID is in file_results[0].stats.model_used
+        if dir_result.file_results and len(dir_result.file_results) > 0:
             first_result = dir_result.file_results[0]
-            if hasattr(first_result, "model_id") and first_result.model_id:
-                return first_result.model_id
+            if hasattr(first_result, "stats") and first_result.stats:
+                if hasattr(first_result.stats, "model_used") and first_result.stats.model_used:
+                    logger.info(f"Extracted model_id for commit message: {first_result.stats.model_used}")
+                    return first_result.stats.model_used
 
-        # Check metadata dict
-        if hasattr(dir_result, "metadata") and isinstance(dir_result.metadata, dict):
-            if "model_id" in dir_result.metadata:
-                return dir_result.metadata["model_id"]
-
-        logger.debug("Model ID not found in translation result")
+        logger.info("No model_id found - commit message will not include model info")
         return None
 
     except Exception as e:
@@ -597,7 +591,8 @@ def _extract_tm_stats(dir_result: "DirectoryResult") -> Optional[dict]:
     """
     Extract TM statistics from translation result.
 
-    Aggregates TM cache hit rates from file results.
+    TM stats are accessed via the aggregate_stats property (not a field).
+    Access path: dir_result.aggregate_stats.{l1_hits, l2_hits, l3_hits, total_segments}
 
     Args:
         dir_result: DirectoryResult from translation
@@ -606,44 +601,32 @@ def _extract_tm_stats(dir_result: "DirectoryResult") -> Optional[dict]:
         TM statistics dict with hit rates, or None if unavailable
     """
     try:
-        # Initialize counters
-        total_lookups = 0
-        l1_hits = 0
-        l2_hits = 0
-        l3_hits = 0
+        # Use aggregate_stats property (not tm_stats field - that doesn't exist)
+        if hasattr(dir_result, "aggregate_stats"):
+            agg = dir_result.aggregate_stats
+            if agg and hasattr(agg, "total_segments"):
+                total_lookups = agg.total_segments
+                l1_hits = getattr(agg, "l1_hits", 0)
+                l2_hits = getattr(agg, "l2_hits", 0)
+                l3_hits = getattr(agg, "l3_hits", 0)
 
-        # Aggregate from file results
-        for file_result in dir_result.file_results:
-            if hasattr(file_result, "tm_stats") and file_result.tm_stats:
-                stats = file_result.tm_stats
-                total_lookups += stats.get("total_lookups", 0)
-                l1_hits += stats.get("l1_hits", 0)
-                l2_hits += stats.get("l2_hits", 0)
-                l3_hits += stats.get("l3_hits", 0)
+                if total_lookups > 0:
+                    total_hits = l1_hits + l2_hits + l3_hits
+                    hit_rate = total_hits / total_lookups
 
-        # Check DirectoryResult level stats
-        if hasattr(dir_result, "tm_stats") and dir_result.tm_stats:
-            stats = dir_result.tm_stats
-            total_lookups += stats.get("total_lookups", 0)
-            l1_hits += stats.get("l1_hits", 0)
-            l2_hits += stats.get("l2_hits", 0)
-            l3_hits += stats.get("l3_hits", 0)
+                    result = {
+                        "total_lookups": total_lookups,
+                        "l1_hits": l1_hits,
+                        "l2_hits": l2_hits,
+                        "l3_hits": l3_hits,
+                        "hit_rate": hit_rate,
+                    }
 
-        if total_lookups == 0:
-            logger.debug("No TM statistics found in translation result")
-            return None
+                    logger.info(f"Extracted TM stats for commit message: {hit_rate:.1%} hit rate ({total_hits}/{total_lookups} hits)")
+                    return result
 
-        # Calculate hit rate
-        total_hits = l1_hits + l2_hits + l3_hits
-        hit_rate = total_hits / total_lookups if total_lookups > 0 else 0.0
-
-        return {
-            "total_lookups": total_lookups,
-            "l1_hits": l1_hits,
-            "l2_hits": l2_hits,
-            "l3_hits": l3_hits,
-            "hit_rate": hit_rate,
-        }
+        logger.info("No TM stats found - commit message will not include cache metrics")
+        return None
 
     except Exception as e:
         logger.debug(f"Failed to extract TM stats: {e}")
