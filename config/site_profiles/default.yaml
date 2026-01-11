@@ -170,6 +170,16 @@ terminology:
   # Site-specific profiles should add their own custom terminology
   custom_terms: []
 
+# Git Commit Configuration (GIT-COMMIT-01)
+# Controls automatic git commit behavior when output directory is a git repository
+git_commit:
+  enabled: true  # Enable automatic git commit of translation outputs
+  auto_push: true  # Push to remote after commit
+  commit_template: "chore: translate {file_count} files to {languages}"  # Placeholders: {file_count}, {languages}, {site_id}, {run_id}
+  co_author_email: "hugo-translator@aspose.net"  # Email for Co-authored-by trailer
+  co_author_name: "Hugo Translator"  # Name for Co-authored-by trailer
+  timeout_seconds: 60  # Timeout for git operations (10-300)
+
 # Schema Documentation
 # This section documents the structure and options for site profiles
 schema:
@@ -250,6 +260,13 @@ schema:
       default: null
       description: "Default translation model. Falls back to m2m100_418m if not set."
       examples: ["m2m100_418m", "m2m100_1.2b", "nllb_200_600m"]
+
+    auto_translation_enabled:
+      type: boolean
+      required: false
+      default: true
+      description: "Enable automatic translation for this site. When false, the site is excluded from sweep scheduler and automatic translation jobs. Manual translation via CLI is still possible."
+      examples: [true, false]
 
     validation:
       type: object
