@@ -9,6 +9,7 @@ import os
 import signal
 import sys
 import time
+import warnings
 from pathlib import Path
 from typing import Optional
 
@@ -43,20 +44,42 @@ class JobProcessor:
         max_retries: int = 3,
         config_path: str = "./config",
         tm_path: str = "./data/tm",
+        engines: Optional["SharedEngines"] = None,  # NEW: SharedEngines support
     ):
         """
         Initialize job processor.
 
         Args:
-            redis_host: Redis host
-            redis_port: Redis port
-            redis_db: Redis database number
-            redis_password: Optional Redis password
+            redis_host: Redis host (ignored if engines provided)
+            redis_port: Redis port (ignored if engines provided)
+            redis_db: Redis database number (ignored if engines provided)
+            redis_password: Optional Redis password (ignored if engines provided)
             poll_interval: Seconds between queue polls
-            max_retries: Maximum job retry attempts
-            config_path: Configuration directory path
+            max_retries: Maximum job retry attempts (overridden by engines.healing if provided)
+            config_path: Configuration directory path (ignored if engines provided)
             tm_path: Translation memory storage path
+            engines: SharedEngines container (NEW - Phase 5.1 migration)
+                    If provided, uses shared engines instead of direct instantiation.
+                    Enables unified telemetry, logging, and configuration.
         """
+        # PHASE 5.1: Detect if using SharedEngines or legacy mode
+        self._using_shared_engines = engines is not None
+        self.engines = engines
+
+        if not self._using_shared_engines:
+            # Legacy mode: Direct instantiation (DEPRECATED)
+            warnings.warn(
+                "Instantiating JobProcessor without SharedEngines is deprecated. "
+                "Use CompositionRoot.create_from_config() and pass engines parameter. "
+                "Legacy mode will be removed in a future release.",
+                DeprecationWarning,
+                stacklevel=2
+            )
+            logger.warning(
+                "JobProcessor running in LEGACY mode (direct instantiation). "
+                "Consider migrating to SharedEngines for unified telemetry and configuration."
+            )
+
         self.redis_host = redis_host
         self.redis_port = redis_port
         self.redis_db = redis_db
@@ -66,7 +89,7 @@ class JobProcessor:
         self.config_path = config_path
         self.tm_path = tm_path
 
-        # Initialize components
+        # Initialize components (will be set in setup())
         self.queue: Optional[RedisJobQueue] = None
         self.tm: Optional[TranslationMemory] = None
         self.model_loader: Optional[ModelLoader] = None
@@ -86,18 +109,42 @@ class JobProcessor:
         """Setup processor components."""
         logger.info("Setting up job processor...")
 
-        # Initialize Redis queue
-        self.queue = RedisJobQueue(
-            host=self.redis_host,
-            port=self.redis_port,
-            db=self.redis_db,
-            password=self.redis_password if self.redis_password else None,
-        )
-        logger.info(f"Connected to Redis queue at {self.redis_host}:{self.redis_port}")
+        # PHASE 5.1: Use SharedEngines if available, otherwise legacy instantiation
+        if self._using_shared_engines:
+            logger.info("Using SharedEngines (Phase 5.1 migration)")
 
-        # Initialize configuration service
-        self.config_service = ConfigService(config_root=self.config_path)
-        logger.info(f"Loaded configuration from {self.config_path}")
+            # Use job queue from SharedEngines
+            self.queue = self.engines.job.backend
+            logger.info(f"Using shared job queue: {self.queue.__class__.__name__}")
+
+            # Use configuration from SharedEngines
+            self.config_service = self.engines.profile.config_service
+            logger.info(f"Using shared configuration from {self.engines.profile.config_root}")
+
+            # Emit telemetry event for worker startup
+            try:
+                self.engines.telemetry.track_event(
+                    event_type="worker_started",
+                    worker_id=os.getenv("WORKER_ID", "worker-unknown"),
+                    mode="shared_engines"
+                )
+            except Exception as e:
+                logger.debug(f"Telemetry event failed (non-fatal): {e}")
+
+        else:
+            # LEGACY MODE: Direct instantiation
+            # Initialize Redis queue
+            self.queue = RedisJobQueue(
+                host=self.redis_host,
+                port=self.redis_port,
+                db=self.redis_db,
+                password=self.redis_password if self.redis_password else None,
+            )
+            logger.info(f"Connected to Redis queue at {self.redis_host}:{self.redis_port}")
+
+            # Initialize configuration service
+            self.config_service = ConfigService(config_root=self.config_path)
+            logger.info(f"Loaded configuration from {self.config_path}")
 
         # Initialize translation memory layers
         l1_cache = L1Cache(max_size=10000)  # Per-worker cache
@@ -375,6 +422,35 @@ def main() -> int:
     config_path = os.getenv("CONFIG_PATH", "./config")
     tm_path = os.getenv("TM_DATA_PATH", "./data/tm")
 
+    # PHASE 5.1: Optionally use SharedEngines
+    use_shared_engines = os.getenv("USE_SHARED_ENGINES", "false").lower() in ("true", "1", "yes")
+    shared_engines = None
+
+    if use_shared_engines:
+        logger.info("SharedEngines enabled via USE_SHARED_ENGINES environment variable")
+        try:
+            from src.shared_engines.composition_root import CompositionRoot
+
+            # Create engines configuration from environment
+            engines_config = {
+                "config_root": config_path,
+                "log_level": log_level,
+                "telemetry_enabled": True,
+                "job_backend": "redis",
+                "redis_host": redis_host,
+                "redis_port": redis_port,
+                "commit_enabled": os.getenv("COMMIT_ENABLED", "true").lower() in ("true", "1", "yes"),
+                "max_retries": max_retries,
+            }
+
+            shared_engines = CompositionRoot.create_from_config(engines_config)
+            logger.info("SharedEngines created successfully")
+
+        except Exception as e:
+            logger.error(f"Failed to create SharedEngines: {e}", exc_info=True)
+            logger.info("Falling back to legacy mode")
+            shared_engines = None
+
     # Create and run processor
     processor = JobProcessor(
         redis_host=redis_host,
@@ -385,6 +461,7 @@ def main() -> int:
         max_retries=max_retries,
         config_path=config_path,
         tm_path=tm_path,
+        engines=shared_engines,  # NEW: Pass SharedEngines if created
     )
 
     try:
