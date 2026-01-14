@@ -5,6 +5,7 @@ Manages job queue, file watcher, and sweep scheduler.
 """
 
 import logging
+import warnings
 from typing import Optional
 
 from src.utils.config_loader import ConfigService
@@ -29,32 +30,72 @@ class TranslationOrchestrator:
 
     def __init__(
         self,
-        config_service: ConfigService,
+        config_service: ConfigService = None,
         enable_file_watcher: bool = True,
         enable_sweep_scheduler: bool = True,
         sweep_interval_minutes: int = 60,
         queue: Optional[JobQueue] = None,
+        engines: Optional["SharedEngines"] = None,  # NEW: SharedEngines support
     ):
         """
         Initialize orchestrator.
 
         Args:
-            config_service: Configuration service
+            config_service: Configuration service (ignored if engines provided)
             enable_file_watcher: Whether to enable file watching
             enable_sweep_scheduler: Whether to enable periodic sweeps
             sweep_interval_minutes: Interval between sweeps
-            queue: Optional job queue (defaults to in-memory JobQueue)
+            queue: Optional job queue (ignored if engines provided)
+            engines: SharedEngines container (NEW - Phase 5.2 migration)
+                    If provided, uses shared engines instead of direct instantiation.
+                    Enables unified telemetry, logging, and configuration.
         """
-        self.config_service = config_service
+        # PHASE 5.2: Detect if using SharedEngines or legacy mode
+        self._using_shared_engines = engines is not None
+        self.engines = engines
 
-        # Initialize job queue
-        self.queue = queue if queue is not None else JobQueue()
+        if self._using_shared_engines:
+            logger.info("Orchestrator using SharedEngines (Phase 5.2)")
+
+            # Use SharedEngines components
+            self.config_service = engines.profile.config_service
+            self.queue = engines.job.backend
+
+            # Emit telemetry event for orchestrator startup
+            try:
+                engines.telemetry.track_event(
+                    event_type="orchestrator_started",
+                    mode="shared_engines",
+                    file_watcher_enabled=enable_file_watcher,
+                    sweep_scheduler_enabled=enable_sweep_scheduler
+                )
+            except Exception as e:
+                logger.debug(f"Telemetry event failed (non-fatal): {e}")
+        else:
+            # Legacy mode: Direct instantiation
+            if config_service is None:
+                raise ValueError("config_service required when engines not provided")
+
+            warnings.warn(
+                "Instantiating TranslationOrchestrator without SharedEngines is deprecated. "
+                "Use CompositionRoot.create_from_config() and pass engines parameter. "
+                "Legacy mode will be removed in a future release.",
+                DeprecationWarning,
+                stacklevel=2
+            )
+            logger.warning(
+                "Orchestrator running in LEGACY mode (direct instantiation). "
+                "Consider migrating to SharedEngines for unified telemetry and configuration."
+            )
+
+            self.config_service = config_service
+            self.queue = queue if queue is not None else JobQueue()
 
         # Initialize file watcher (if enabled)
         self.file_watcher: Optional[FileWatcher] = None
         if enable_file_watcher:
             self.file_watcher = FileWatcher(
-                config_service=config_service,
+                config_service=self.config_service,
                 job_enqueue_callback=self.enqueue_job,
                 debounce_seconds=2.0,
             )
@@ -63,7 +104,7 @@ class TranslationOrchestrator:
         self.scheduler: Optional[SweepScheduler] = None
         if enable_sweep_scheduler:
             self.scheduler = SweepScheduler(
-                config_service=config_service,
+                config_service=self.config_service,
                 job_enqueue_callback=self.enqueue_job,
                 sweep_interval_minutes=sweep_interval_minutes,
             )
@@ -96,6 +137,16 @@ class TranslationOrchestrator:
             return
 
         self._running = False
+
+        # PHASE 5.2: Emit telemetry event for orchestrator shutdown
+        if self._using_shared_engines:
+            try:
+                self.engines.telemetry.track_event(
+                    event_type="orchestrator_stopped",
+                    mode="shared_engines"
+                )
+            except Exception as e:
+                logger.debug(f"Telemetry event failed (non-fatal): {e}")
 
         # Stop file watcher
         if self.file_watcher:

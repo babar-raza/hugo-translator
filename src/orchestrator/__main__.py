@@ -116,41 +116,81 @@ def main() -> int:
         logger.error(f"Configuration directory not found: {config_path}")
         return 1
 
-    # Initialize configuration service
-    try:
-        config_service = ConfigService(
-            config_root=str(config_path)
-        )
-        logger.info("Configuration service initialized")
-    except Exception as e:
-        logger.error(f"Failed to initialize configuration: {e}")
-        return 1
+    # PHASE 5.2: Optionally use SharedEngines
+    use_shared_engines = os.getenv("USE_SHARED_ENGINES", "false").lower() in ("true", "1", "yes")
+    shared_engines = None
+    config_service = None
+    queue = None
 
-    # Initialize job queue based on backend configuration
-    queue_backend = os.getenv("QUEUE_BACKEND", "memory").lower()
-    try:
-        if queue_backend == "redis":
-            from src.orchestrator.redis_backend import RedisJobQueue
+    if use_shared_engines:
+        logger.info("SharedEngines enabled via USE_SHARED_ENGINES environment variable")
+        try:
+            from src.shared_engines.composition_root import CompositionRoot
 
-            redis_host = os.getenv("REDIS_HOST", "localhost")
-            redis_port = int(os.getenv("REDIS_PORT", "6379"))
-            redis_db = int(os.getenv("REDIS_DB", "0"))
-            redis_password = os.getenv("REDIS_PASSWORD")
+            # Determine queue backend
+            queue_backend = os.getenv("QUEUE_BACKEND", "memory").lower()
 
-            queue = RedisJobQueue(
-                host=redis_host,
-                port=redis_port,
-                db=redis_db,
-                password=redis_password if redis_password else None,
+            # Create engines configuration from environment
+            engines_config = {
+                "config_root": str(config_path),
+                "log_level": args.log_level,
+                "telemetry_enabled": True,
+                "job_backend": queue_backend,
+                "commit_enabled": os.getenv("COMMIT_ENABLED", "true").lower() in ("true", "1", "yes"),
+            }
+
+            # Add Redis config if using Redis backend
+            if queue_backend == "redis":
+                engines_config.update({
+                    "redis_host": os.getenv("REDIS_HOST", "localhost"),
+                    "redis_port": int(os.getenv("REDIS_PORT", "6379")),
+                })
+
+            shared_engines = CompositionRoot.create_from_config(engines_config)
+            logger.info("SharedEngines created successfully")
+
+        except Exception as e:
+            logger.error(f"Failed to create SharedEngines: {e}", exc_info=True)
+            logger.info("Falling back to legacy mode")
+            shared_engines = None
+
+    # Legacy mode: Initialize components directly
+    if not shared_engines:
+        # Initialize configuration service
+        try:
+            config_service = ConfigService(
+                config_root=str(config_path)
             )
-            logger.info(f"Using Redis queue backend at {redis_host}:{redis_port}")
-        else:
-            from src.orchestrator.queue import JobQueue
-            queue = JobQueue()
-            logger.info("Using in-memory queue backend")
-    except Exception as e:
-        logger.error(f"Failed to initialize queue backend: {e}")
-        return 1
+            logger.info("Configuration service initialized")
+        except Exception as e:
+            logger.error(f"Failed to initialize configuration: {e}")
+            return 1
+
+        # Initialize job queue based on backend configuration
+        queue_backend = os.getenv("QUEUE_BACKEND", "memory").lower()
+        try:
+            if queue_backend == "redis":
+                from src.orchestrator.redis_backend import RedisJobQueue
+
+                redis_host = os.getenv("REDIS_HOST", "localhost")
+                redis_port = int(os.getenv("REDIS_PORT", "6379"))
+                redis_db = int(os.getenv("REDIS_DB", "0"))
+                redis_password = os.getenv("REDIS_PASSWORD")
+
+                queue = RedisJobQueue(
+                    host=redis_host,
+                    port=redis_port,
+                    db=redis_db,
+                    password=redis_password if redis_password else None,
+                )
+                logger.info(f"Using Redis queue backend at {redis_host}:{redis_port}")
+            else:
+                from src.orchestrator.queue import JobQueue
+                queue = JobQueue()
+                logger.info("Using in-memory queue backend")
+        except Exception as e:
+            logger.error(f"Failed to initialize queue backend: {e}")
+            return 1
 
     # Create orchestrator
     enable_components = args.mode == "auto"
@@ -161,6 +201,7 @@ def main() -> int:
             enable_sweep_scheduler=enable_components,
             sweep_interval_minutes=args.sweep_interval * 60,
             queue=queue,
+            engines=shared_engines,  # NEW: Pass SharedEngines if created
         )
         logger.info("Orchestrator created")
     except Exception as e:
