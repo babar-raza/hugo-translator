@@ -17,6 +17,7 @@ import shutil
 import signal
 import subprocess
 import sys
+import time
 from pathlib import Path
 from typing import Dict, List, Optional
 
@@ -983,6 +984,27 @@ def setup_logging(log_level: str, log_file: Optional[str] = None, config_root: O
             max_bytes=max_mb * 1024 * 1024,  # Convert MB to bytes
             backup_count=backup_count,
         )
+
+        # WS4: Validate log file after setup
+        if log_file_path and (file_output or log_file):
+            # Import structlog to use the configured logger
+            import structlog
+            logger = structlog.get_logger(__name__)
+
+            # Log startup message to test file write
+            logger.info("Hugo Translator starting", version="0.1.0")
+
+            # Check if log file exists and has content
+            import time
+            time.sleep(0.1)  # Brief delay to allow file write to complete
+            if log_file_path.exists():
+                file_size = log_file_path.stat().st_size
+                if file_size == 0:
+                    print(f"WARNING: Log file is empty: {log_file_path}", file=sys.stderr)
+                    print(f"WARNING: Log file is empty: {log_file_path}", file=sys.stdout, flush=True)
+            else:
+                print(f"WARNING: Log file does not exist: {log_file_path}", file=sys.stderr)
+                print(f"WARNING: Log file does not exist: {log_file_path}", file=sys.stdout, flush=True)
     else:
         # Fallback to basic logging if structured logging is disabled
         level = getattr(logging, log_level.upper())
@@ -1094,6 +1116,97 @@ def setup_signal_handlers(engine: "TranslationEngine") -> None:
         "Calling setup_unified_signal_handler() instead."
     )
     setup_unified_signal_handler(engine)
+
+
+def _log_startup_configuration(args: argparse.Namespace, site_profile, global_config, target_langs: List[str]) -> None:
+    """
+    Log comprehensive startup configuration at INFO level (WS3, Requirement 10).
+
+    Displays all CLI settings, model configuration, validation mode, cache settings,
+    and processing options so users understand exactly what configuration is active.
+    """
+    logger.info("=" * 80)
+    logger.info("TRANSLATION CONFIGURATION")
+    logger.info("=" * 80)
+
+    # Basic settings
+    logger.info(f"Site: {args.site}")
+    if args.input:
+        logger.info(f"Input: {args.input}")
+    if args.output:
+        logger.info(f"Output: {args.output}")
+    else:
+        logger.info(f"Output: (default from site profile)")
+
+    logger.info(f"Target Languages: {', '.join(target_langs)} ({len(target_langs)} total)")
+
+    # Model settings
+    model_id = args.model or getattr(global_config, 'model_id', 'default')
+    logger.info(f"Model: {model_id}")
+    logger.info(f"Device: {args.device or 'auto'}")
+
+    if hasattr(args, 'load_mode') and args.load_mode:
+        logger.info(f"Load Mode: {args.load_mode}")
+
+    if args.batch_size:
+        logger.info(f"Batch Size: {args.batch_size}")
+    else:
+        logger.info(f"Batch Size: auto-optimized")
+
+    if args.max_tokens:
+        logger.info(f"Max Tokens: {args.max_tokens}")
+
+    # Cache settings
+    if args.force_retranslate:
+        logger.info(f"Force Retranslate: ENABLED (cache reads disabled)")
+    else:
+        logger.info(f"Force Retranslate: DISABLED (cache enabled)")
+
+    if hasattr(args, 'cache_write_mode') and args.cache_write_mode:
+        logger.info(f"Cache Write Mode: {args.cache_write_mode}")
+
+    # Validation settings
+    if args.force_accept:
+        logger.info("Validation: FORCE ACCEPT (all translations accepted)")
+    elif args.strict_reject:
+        logger.info("Validation: STRICT REJECT (strict validation enabled)")
+    elif args.disable_validation:
+        logger.info("Validation: DISABLED")
+    else:
+        max_retries = getattr(args, 'max_retries', 3)
+        logger.info(f"Validation: ENABLED (max retries: {max_retries})")
+
+    # Terminology settings
+    if args.enable_terminology:
+        terminology_mode = getattr(args, 'terminology_mode', 'both')
+        logger.info(f"Terminology: ENABLED (mode: {terminology_mode})")
+    else:
+        logger.info("Terminology: DISABLED")
+
+    # Processing settings
+    if hasattr(args, 'sort_segments_by_length') and args.sort_segments_by_length:
+        logger.info(f"Sort Segments: ENABLED (by length)")
+
+    if args.dry_run:
+        logger.info("Dry Run: ENABLED (no files will be written)")
+
+    if hasattr(args, 'auto_commit') and args.auto_commit:
+        logger.info("Auto Commit: ENABLED (translations will be committed)")
+
+    # Multi-language mode
+    if len(target_langs) > 1:
+        logger.info("Multi-Language Mode: Sequential subprocesses (state isolation)")
+        logger.info(f"Total Jobs: {len(target_langs)} languages")
+
+    # Benchmarking (if available)
+    if hasattr(global_config, 'benchmarking') and global_config.benchmarking:
+        if global_config.benchmarking.enabled:
+            output_dir = getattr(global_config.benchmarking, 'output_dir', 'data/benchmarks')
+            logger.info(f"Benchmarking: ENABLED (recording to {output_dir})")
+        else:
+            logger.info("Benchmarking: DISABLED")
+
+    logger.info("=" * 80)
 
 
 def translate_site(args: argparse.Namespace) -> int:
@@ -1232,7 +1345,48 @@ def translate_site(args: argparse.Namespace) -> int:
         # Override target languages if specified
         target_langs = args.target_langs if args.target_langs else site_profile.target_langs
 
-        logger.info(f"Target languages: {', '.join(target_langs)}")
+        # WS3: Log comprehensive startup configuration (Requirement 10)
+        _log_startup_configuration(args, site_profile, config_service.global_config, target_langs)
+
+        # P1-11: Initialize SharedEngines for unified observability (non-breaking, parallel to existing code)
+        shared_engines = None
+        try:
+            from .shared_engines.composition_root import CompositionRoot
+        except ImportError:
+            try:
+                from shared_engines.composition_root import CompositionRoot
+            except ImportError:
+                CompositionRoot = None  # Graceful degradation if not available
+
+        if CompositionRoot:
+            try:
+                # Create engines from CLI arguments and configuration
+                engines_config = {
+                    "config_root": args.config_root,
+                    "log_level": args.log_level,
+                    "log_file": Path(args.log_file) if args.log_file else None,
+                    "console_output": True,
+                    "telemetry_enabled": True,
+                    "job_backend": "memory",  # Use memory backend for CLI
+                    "commit_enabled": not overrides.dry_run,  # Disable commits in dry-run
+                    "max_retries": overrides.max_retries or 3,
+                    "translation_backend": "mt"  # CLI uses MT backend
+                }
+                shared_engines = CompositionRoot.create_from_config(engines_config)
+                logger.debug("SharedEngines initialized successfully")
+
+                # Use engines for parallel telemetry tracking (non-breaking)
+                shared_engines.logging.info(
+                    "Translation session started",
+                    site_id=args.site,
+                    target_langs=target_langs,
+                    source_lang=site_profile.source_lang if hasattr(site_profile, 'source_lang') else 'en'
+                )
+            except Exception as e:
+                logger.debug(f"SharedEngines initialization skipped: {e}")
+                shared_engines = None  # Graceful degradation
+        else:
+            logger.debug("SharedEngines not available (composition_root not imported)")
 
         # CRITICAL FIX: Process each language in separate subprocess to prevent state contamination
         # Root cause: M2M100 model retains internal state between sequential translations to different
@@ -1244,6 +1398,12 @@ def translate_site(args: argparse.Namespace) -> int:
                 f"Multi-language translation detected ({len(target_langs)} languages). "
                 f"Processing each language in separate subprocess to prevent state contamination..."
             )
+
+            # Import per-language commit and failure tracking functions
+            try:
+                from src.observability.language_commit import commit_language_translations, save_failure_report
+            except ImportError:
+                from observability.language_commit import commit_language_translations, save_failure_report
 
             # TC1: Acquire site lock in PARENT before spawning subprocesses
             from src.translation_engine.engine import get_site_lock
@@ -1284,11 +1444,19 @@ def translate_site(args: argparse.Namespace) -> int:
 
             exit_codes = []
             language_results = {}  # Track per-language results
+            failure_dir = Path("data/failures")  # Directory for failure reports
+
+            # Load global config for commit settings
+            global_config = config_service.global_config
+
             try:
                 for i, lang in enumerate(target_langs, 1):
                     logger.info(f"\n{'='*60}")
                     logger.info(f"Processing language {i}/{len(target_langs)}: {lang}")
                     logger.info(f"{'='*60}\n")
+
+                    # Track start time for this language
+                    lang_start_time = time.time()
 
                     # Build subprocess command with same args but single target language
                     cmd = [sys.executable, "-m", "src.cli"]
@@ -1343,26 +1511,267 @@ def translate_site(args: argparse.Namespace) -> int:
                     # TC1: Tell subprocess to skip lock acquisition (parent holds it)
                     cmd.append("--_skip-site-lock")
 
-                    # Run subprocess
+                    # Run subprocess with error handling
                     logger.debug(f"Subprocess command: {' '.join(cmd)}")
-                    result = subprocess.run(cmd, capture_output=False)
-                    exit_codes.append(result.returncode)
 
-                    # Track result for this language
-                    language_results[lang] = {
-                        "exit_code": result.returncode,
-                        "success": result.returncode == 0,
-                    }
+                    try:
+                        # Stream subprocess output in real-time with [lang] prefix
+                        import threading
+                        from io import StringIO
 
-                    if result.returncode != 0:
-                        logger.error(f"Translation failed for language {lang} with exit code {result.returncode}")
+                        # Buffers to capture full output for failure reporting
+                        stdout_buffer = StringIO()
+                        stderr_buffer = StringIO()
 
-                        # Fail-fast: Stop on first language failure if enabled
-                        if hasattr(args, 'fail_fast') and args.fail_fast:
-                            logger.error("Fail-fast enabled, stopping multi-language processing")
-                            break
-                    else:
-                        logger.info(f"Successfully completed translation for {lang}")
+                        def stream_output(pipe, prefix, log_func, buffer):
+                            """Stream subprocess output line-by-line with prefix"""
+                            try:
+                                for line in iter(pipe.readline, ''):
+                                    if line:
+                                        stripped = line.rstrip()
+                                        if stripped:  # Only log non-empty lines
+                                            log_func(f"[{prefix}] {stripped}")
+                                        buffer.write(line)
+                                pipe.close()
+                            except Exception as e:
+                                logger.debug(f"Error streaming {prefix} output: {e}")
+
+                        # Start subprocess with pipes
+                        # IMPORTANT: Use UTF-8 encoding to match subprocess output encoding
+                        # (subprocess uses UTF-8 stdout wrapper for Unicode support on Windows)
+                        process = subprocess.Popen(
+                            cmd,
+                            stdout=subprocess.PIPE,
+                            stderr=subprocess.PIPE,
+                            text=True,
+                            encoding='utf-8',  # Match subprocess UTF-8 encoding
+                            errors='replace',  # Handle any encoding errors gracefully
+                            bufsize=1,  # Line-buffered
+                        )
+
+                        # Create threads to stream stdout and stderr
+                        stdout_thread = threading.Thread(
+                            target=stream_output,
+                            args=(process.stdout, lang, logger.info, stdout_buffer),
+                            daemon=True
+                        )
+                        stderr_thread = threading.Thread(
+                            target=stream_output,
+                            args=(process.stderr, lang, logger.warning, stderr_buffer),
+                            daemon=True
+                        )
+
+                        stdout_thread.start()
+                        stderr_thread.start()
+
+                        # Wait for process completion with timeout
+                        try:
+                            exit_code = process.wait(timeout=3600)
+                        except subprocess.TimeoutExpired:
+                            process.kill()
+                            process.wait()  # Clean up zombie process
+                            raise  # Re-raise to be caught below
+
+                        # Wait for output threads to finish
+                        stdout_thread.join(timeout=5)
+                        stderr_thread.join(timeout=5)
+
+                        # Get captured output
+                        stdout_output = stdout_buffer.getvalue()
+                        stderr_output = stderr_buffer.getvalue()
+
+                        duration = time.time() - lang_start_time
+                        exit_codes.append(exit_code)
+
+                        # Track result for this language
+                        language_results[lang] = {
+                            "exit_code": exit_code,
+                            "success": exit_code == 0,
+                            "duration": duration,
+                            "stderr_preview": stderr_output[-500:] if stderr_output else "",
+                        }
+
+                        if exit_code != 0:
+                            logger.error(
+                                f"Translation failed for language {lang} with exit code {exit_code} "
+                                f"(duration: {duration:.1f}s)"
+                            )
+
+                            # Save failure report with captured output
+                            mock_result = subprocess.CompletedProcess(
+                                args=cmd,
+                                returncode=exit_code,
+                                stdout=stdout_output,
+                                stderr=stderr_output,
+                            )
+                            save_failure_report(
+                                target_lang=lang,
+                                subprocess_result=mock_result,
+                                failure_dir=failure_dir,
+                                duration_seconds=duration,
+                            )
+
+                            # Continue to next language (no break - continue-on-failure)
+                            logger.info(f"Continuing to next language despite failure...")
+                        else:
+                            logger.info(f"Successfully completed translation for {lang} (duration: {duration:.1f}s)")
+
+                            # Commit translations for this language
+                            # Note: We need to gather translated files and stats from subprocess
+                            # For now, we create a placeholder stats dict
+                            # TODO: Enhance subprocess to return stats via file/stdout
+                            stats = {
+                                "model_used": args.model or "default",
+                                "duration_seconds": duration,
+                                "tm_hit_rate": 0.0,  # Not available from subprocess
+                                "segments_total": 0,  # Not available from subprocess
+                            }
+
+                            # Get list of modified files for this language using git status
+                            try:
+                                git_status_result = subprocess.run(
+                                    ["git", "status", "--porcelain"],
+                                    capture_output=True,
+                                    text=True,
+                                    encoding='utf-8',  # Use UTF-8 for git output
+                                    errors='replace',  # Handle encoding errors gracefully
+                                    timeout=30,
+                                    check=True,
+                                )
+                                # Parse git status output to get modified/new files
+                                translated_files = []
+                                for line in git_status_result.stdout.splitlines():
+                                    if line.strip():
+                                        # Git status format: "XY filename"
+                                        file_path = line[3:].strip()
+                                        # Filter for files related to this language
+                                        if lang in file_path or (args.output and args.output in file_path):
+                                            translated_files.append(Path(file_path))
+
+                                if translated_files:
+                                    logger.debug(f"Detected {len(translated_files)} modified files for {lang}")
+                                else:
+                                    logger.warning(f"No modified files detected for {lang}, skipping commit")
+
+                            except Exception as e:
+                                logger.warning(f"Failed to detect modified files for {lang}: {e}")
+                                translated_files = []
+
+                            # Commit the translations if we have files
+                            if translated_files:
+                                commit_success = commit_language_translations(
+                                    target_lang=lang,
+                                    translated_files=translated_files,
+                                    stats=stats,
+                                    config=global_config,
+                                    auto_push=False,  # Don't auto-push, let user control
+                                )
+
+                                if commit_success:
+                                    logger.info(f"Committed {len(translated_files)} files for {lang}")
+                                else:
+                                    logger.warning(f"Failed to commit translations for {lang} (non-fatal)")
+                            else:
+                                logger.info(f"No files to commit for {lang} (possibly unchanged or already committed)")
+
+                    except subprocess.TimeoutExpired:
+                        duration = time.time() - lang_start_time
+                        logger.error(
+                            f"Translation timed out for language {lang} after {duration:.1f}s "
+                            f"(timeout: 3600s)"
+                        )
+
+                        # Create a mock result for failure reporting
+                        mock_result = subprocess.CompletedProcess(
+                            args=cmd,
+                            returncode=-1,
+                            stdout="",
+                            stderr=f"Process timed out after 3600 seconds",
+                        )
+
+                        exit_codes.append(-1)
+                        language_results[lang] = {
+                            "exit_code": -1,
+                            "success": False,
+                            "duration": duration,
+                            "stderr_preview": "TimeoutExpired",
+                        }
+
+                        save_failure_report(
+                            target_lang=lang,
+                            subprocess_result=mock_result,
+                            failure_dir=failure_dir,
+                            duration_seconds=duration,
+                        )
+
+                        # Continue to next language
+                        logger.info(f"Continuing to next language despite timeout...")
+
+                    except subprocess.CalledProcessError as e:
+                        duration = time.time() - lang_start_time
+                        logger.error(
+                            f"Subprocess error for language {lang}: {e} "
+                            f"(duration: {duration:.1f}s)"
+                        )
+
+                        exit_codes.append(e.returncode)
+                        language_results[lang] = {
+                            "exit_code": e.returncode,
+                            "success": False,
+                            "duration": duration,
+                            "stderr_preview": str(e)[-500:],
+                        }
+
+                        # Create result object for failure reporting
+                        result = subprocess.CompletedProcess(
+                            args=cmd,
+                            returncode=e.returncode,
+                            stdout=getattr(e, 'stdout', ''),
+                            stderr=getattr(e, 'stderr', str(e)),
+                        )
+
+                        save_failure_report(
+                            target_lang=lang,
+                            subprocess_result=result,
+                            failure_dir=failure_dir,
+                            duration_seconds=duration,
+                        )
+
+                        # Continue to next language
+                        logger.info(f"Continuing to next language despite error...")
+
+                    except Exception as e:
+                        duration = time.time() - lang_start_time
+                        logger.error(
+                            f"Unexpected error for language {lang}: {e} "
+                            f"(duration: {duration:.1f}s)"
+                        )
+
+                        exit_codes.append(-1)
+                        language_results[lang] = {
+                            "exit_code": -1,
+                            "success": False,
+                            "duration": duration,
+                            "stderr_preview": str(e)[-500:],
+                        }
+
+                        # Create mock result for failure reporting
+                        mock_result = subprocess.CompletedProcess(
+                            args=cmd,
+                            returncode=-1,
+                            stdout="",
+                            stderr=str(e),
+                        )
+
+                        save_failure_report(
+                            target_lang=lang,
+                            subprocess_result=mock_result,
+                            failure_dir=failure_dir,
+                            duration_seconds=duration,
+                        )
+
+                        # Continue to next language
+                        logger.info(f"Continuing to next language despite unexpected error...")
 
                 # Summary report with per-language results
                 successful_langs = [lang for lang, res in language_results.items() if res["success"]]
@@ -1375,16 +1784,34 @@ def translate_site(args: argparse.Namespace) -> int:
                 logger.info(f"Successful: {len(successful_langs)}/{len(target_langs)}")
                 if successful_langs:
                     logger.info(f"  Languages: {', '.join(successful_langs)}")
+                    # Show durations for successful languages
+                    for lang in successful_langs:
+                        duration = language_results[lang].get("duration", 0)
+                        logger.info(f"    - {lang}: {duration:.1f}s")
+
                 logger.info(f"Failed: {len(failed_langs)}/{len(target_langs)}")
                 if failed_langs:
                     logger.warning(f"  Languages: {', '.join(failed_langs)}")
+                    # Show exit codes and durations for failed languages
+                    for lang in failed_langs:
+                        exit_code = language_results[lang].get("exit_code", -1)
+                        duration = language_results[lang].get("duration", 0)
+                        logger.warning(f"    - {lang}: exit_code={exit_code}, duration={duration:.1f}s")
+
+                    # Show where failure reports are saved
+                    if failure_dir.exists():
+                        logger.info(f"\nFailure reports saved to: {failure_dir.absolute()}")
+                        logger.info(f"Review reports for detailed error information and retry commands")
+
                 logger.info(f"{'='*60}\n")
 
-                # Return overall status
-                if all(code == 0 for code in exit_codes):
-                    return 0
-                else:
+                # Return overall status - exit with 1 if ANY failures occurred
+                if failed_langs:
+                    logger.error(f"Translation completed with {len(failed_langs)} failure(s). Exiting with code 1.")
                     return 1
+                else:
+                    logger.info(f"All translations completed successfully!")
+                    return 0
 
             finally:
                 # TC1: Always release lock
@@ -1489,9 +1916,19 @@ def translate_site(args: argparse.Namespace) -> int:
             device = "cpu"
             logger.info("PyTorch not available, using CPU")
 
+        # Get max GPU memory from global config (use raw config since hardware not in GlobalConfig model)
+        max_gpu_memory_mb = None
+        if device.startswith("cuda"):
+            raw_config = config_service.get_config()
+            hardware_config = raw_config.get("hardware", {})
+            max_gpu_memory_mb = hardware_config.get("max_gpu_memory_mb")
+            if max_gpu_memory_mb:
+                logger.info(f"GPU memory limit from config: {max_gpu_memory_mb}MB")
+
         model_loader = ModelLoader(
             registry=model_registry,
             device=device,
+            max_memory_mb=max_gpu_memory_mb,
             load_mode=overrides.load_mode  # T103: federated-splashing-panda
         )
 
@@ -1526,16 +1963,24 @@ def translate_site(args: argparse.Namespace) -> int:
                 gpu_optimizer = GPUOptimizer(
                     model_name=overrides.model,
                     precision=precision,
-                    target_utilization=0.85,  # Target 85% VRAM utilization
+                    target_utilization=0.60,  # Target 60% VRAM utilization (very conservative to prevent OOM)
                     device_id=device_id,
+                    max_vram_mb=max_gpu_memory_mb,  # Use configured VRAM limit
                 )
                 gpu_config = gpu_optimizer.optimize()
                 engine_kwargs["batch_size"] = gpu_config.batch_size
+
+                # WS3: Pass hardware baseline to BatchStatsTracker for new language initialization
+                # This allows new languages to start with GPU-calculated batch sizes instead of hardcoded values
+                hardware_baseline = gpu_config.batch_size
+                engine_kwargs["hardware_baseline"] = hardware_baseline
+
                 logger.info(
                     f"GPU optimization enabled: batch_size={gpu_config.batch_size}, "
                     f"estimated_vram={gpu_config.estimated_vram_mb:.0f}MB "
                     f"({gpu_config.estimated_vram_mb/gpu_config.total_vram_mb*100:.1f}% of {gpu_config.total_vram_mb:.0f}MB)"
                 )
+                logger.info(f"GPU optimizer suggests hardware_baseline={hardware_baseline} for adaptive batch sizing")
             except Exception as e:
                 logger.warning(
                     f"GPU optimization failed: {e}. Using default batch size."
@@ -1695,13 +2140,13 @@ def translate_site(args: argparse.Namespace) -> int:
                 except (ValueError, TypeError, AttributeError) as e:
                     logger.warning(f"File filtering failed: {e}. Using all markdown files for progress count.")
                     md_files = all_md_files
-                progress_tracker.start(files_total=len(md_files))
+                progress_tracker.start(files_total=len(md_files), target_langs=target_langs)
                 progress_tracker.set_model(
                     model_name=resolved_model,
                     device=device,
                 )
             else:
-                progress_tracker.start(files_total=1)
+                progress_tracker.start(files_total=1, target_langs=target_langs)
                 progress_tracker.set_model(
                     model_name=resolved_model,
                     device=device,
@@ -1784,12 +2229,11 @@ def translate_site(args: argparse.Namespace) -> int:
                         no_commit=no_commit,
                     )
 
-                    if commit_success:
-                        logger.info(
-                            f"Git commit successful: {result.successful_files} files committed"
-                        )
-                    else:
-                        logger.debug("Git commit skipped or failed (non-fatal)")
+                    # Note: auto_commit_translations logs its own detailed messages
+                    # (e.g., "No files modified", "Committed X files", etc.)
+                    # So we only log a debug message here for the overall result
+                    if not commit_success:
+                        logger.debug("Git commit failed (non-fatal)")
 
                 except Exception as e:
                     logger.warning(f"Auto-commit error (non-fatal): {e}")
