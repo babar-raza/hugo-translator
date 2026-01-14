@@ -13,6 +13,8 @@ services:
       - CONFIG_PATH=/app/config
       - PYTHONPATH=/app
       - PYTHONUNBUFFERED=1
+      - USE_SHARED_ENGINES=true  # Phase 5.2: Enable SharedEngines
+      - QUEUE_BACKEND=redis
     volumes:
       - ./config:/app/config:ro
       - D:/onedrive/Documents/GitHub/aspose.net/content:/content
@@ -81,6 +83,7 @@ services:
       - MAX_RETRIES=3
       - PYTHONPATH=/app
       - PYTHONUNBUFFERED=1
+      - USE_SHARED_ENGINES=true  # Phase 5.1: Enable SharedEngines
     volumes:
       - ./config:/app/config:ro
       - D:/onedrive/Documents/GitHub/aspose.net/content:/content
@@ -130,6 +133,7 @@ services:
       - MAX_RETRIES=3
       - PYTHONPATH=/app
       - PYTHONUNBUFFERED=1
+      - USE_SHARED_ENGINES=true  # Phase 5.1: Enable SharedEngines
     volumes:
       - ./config:/app/config:ro
       - D:/onedrive/Documents/GitHub/aspose.net/content:/content
