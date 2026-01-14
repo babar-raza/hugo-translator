@@ -1345,10 +1345,7 @@ def translate_site(args: argparse.Namespace) -> int:
         # Override target languages if specified
         target_langs = args.target_langs if args.target_langs else site_profile.target_langs
 
-        # WS3: Log comprehensive startup configuration (Requirement 10)
-        _log_startup_configuration(args, site_profile, config_service.global_config, target_langs)
-
-        # P1-11: Initialize SharedEngines for unified observability (non-breaking, parallel to existing code)
+        # P1-12: Initialize SharedEngines early for unified engine access
         shared_engines = None
         try:
             from .shared_engines.composition_root import CompositionRoot
@@ -1374,19 +1371,32 @@ def translate_site(args: argparse.Namespace) -> int:
                 }
                 shared_engines = CompositionRoot.create_from_config(engines_config)
                 logger.debug("SharedEngines initialized successfully")
+            except Exception as e:
+                logger.debug(f"SharedEngines initialization failed: {e}")
+                shared_engines = None  # Graceful degradation
+        else:
+            logger.debug("SharedEngines not available (composition_root not imported)")
 
-                # Use engines for parallel telemetry tracking (non-breaking)
+        # WS3: Log comprehensive startup configuration (Requirement 10)
+        _log_startup_configuration(args, site_profile, config_service.global_config, target_langs)
+
+        # P1-12: Track translation session start via engines (if available)
+        if shared_engines:
+            try:
                 shared_engines.logging.info(
                     "Translation session started",
                     site_id=args.site,
                     target_langs=target_langs,
                     source_lang=site_profile.source_lang if hasattr(site_profile, 'source_lang') else 'en'
                 )
+                shared_engines.telemetry.track_event(
+                    event_type="translation_session_start",
+                    site_id=args.site,
+                    target_langs=target_langs,
+                    model_id=args.model or "default"
+                )
             except Exception as e:
-                logger.debug(f"SharedEngines initialization skipped: {e}")
-                shared_engines = None  # Graceful degradation
-        else:
-            logger.debug("SharedEngines not available (composition_root not imported)")
+                logger.debug(f"SharedEngines telemetry tracking failed (non-fatal): {e}")
 
         # CRITICAL FIX: Process each language in separate subprocess to prevent state contamination
         # Root cause: M2M100 model retains internal state between sequential translations to different
@@ -1657,20 +1667,43 @@ def translate_site(args: argparse.Namespace) -> int:
                                 logger.warning(f"Failed to detect modified files for {lang}: {e}")
                                 translated_files = []
 
-                            # Commit the translations if we have files
+                            # P1-12: Commit translations using CommitEngine (if available) or fallback
                             if translated_files:
-                                commit_success = commit_language_translations(
-                                    target_lang=lang,
-                                    translated_files=translated_files,
-                                    stats=stats,
-                                    config=global_config,
-                                    auto_push=False,  # Don't auto-push, let user control
-                                )
+                                # Try using CommitEngine first (preferred)
+                                if shared_engines and shared_engines.commit:
+                                    try:
+                                        commit_result = shared_engines.commit.commit_if_enabled(
+                                            output_files=translated_files,
+                                            site_id=args.site,
+                                            target_langs=[lang],
+                                            run_id=f"cli-multilang-{lang}",
+                                            model_id=args.model or "default",
+                                            tm_stats=stats
+                                        )
 
-                                if commit_success:
-                                    logger.info(f"Committed {len(translated_files)} files for {lang}")
+                                        if commit_result.success and commit_result.files_committed > 0:
+                                            logger.info(f"Committed {commit_result.files_committed} files for {lang}")
+                                        elif not commit_result.success:
+                                            logger.warning(f"Failed to commit translations for {lang}: {commit_result.error} (non-fatal)")
+                                        else:
+                                            logger.debug(f"No files to commit for {lang} (already committed or no changes)")
+                                    except Exception as e:
+                                        logger.warning(f"CommitEngine error for {lang} (non-fatal): {e}")
+
+                                # Fallback to direct commit_language_translations
                                 else:
-                                    logger.warning(f"Failed to commit translations for {lang} (non-fatal)")
+                                    commit_success = commit_language_translations(
+                                        target_lang=lang,
+                                        translated_files=translated_files,
+                                        stats=stats,
+                                        config=global_config,
+                                        auto_push=False,  # Don't auto-push, let user control
+                                    )
+
+                                    if commit_success:
+                                        logger.info(f"Committed {len(translated_files)} files for {lang}")
+                                    else:
+                                        logger.warning(f"Failed to commit translations for {lang} (non-fatal)")
                             else:
                                 logger.info(f"No files to commit for {lang} (possibly unchanged or already committed)")
 
@@ -1804,6 +1837,20 @@ def translate_site(args: argparse.Namespace) -> int:
                         logger.info(f"Review reports for detailed error information and retry commands")
 
                 logger.info(f"{'='*60}\n")
+
+                # P1-12: Track multi-language processing summary via telemetry
+                if shared_engines:
+                    try:
+                        shared_engines.telemetry.track_event(
+                            event_type="multilang_processing_complete",
+                            site_id=args.site,
+                            total_languages=len(target_langs),
+                            successful_languages=len(successful_langs),
+                            failed_languages=len(failed_langs),
+                            success_rate=len(successful_langs) / len(target_langs) if target_langs else 0
+                        )
+                    except Exception as e:
+                        logger.debug(f"Telemetry tracking failed (non-fatal): {e}")
 
                 # Return overall status - exit with 1 if ANY failures occurred
                 if failed_langs:
@@ -2171,6 +2218,17 @@ def translate_site(args: argparse.Namespace) -> int:
 
             if result.success:
                 logger.info("Translation completed successfully")
+                # P1-12: Track translation success via telemetry
+                if shared_engines:
+                    try:
+                        shared_engines.telemetry.track_event(
+                            event_type="translation_success",
+                            site_id=args.site,
+                            file_path=str(input_path),
+                            target_langs=target_langs
+                        )
+                    except Exception as e:
+                        logger.debug(f"Telemetry tracking failed (non-fatal): {e}")
                 # RES-02: Clear progress on successful completion
                 if translation_progress_tracker:
                     translation_progress_tracker.clear()
@@ -2178,6 +2236,17 @@ def translate_site(args: argparse.Namespace) -> int:
                 return 0
             else:
                 logger.error(f"Translation failed: {'; '.join(result.errors)}")
+                # P1-12: Track translation failure via telemetry
+                if shared_engines:
+                    try:
+                        shared_engines.telemetry.track_event(
+                            event_type="translation_failure",
+                            site_id=args.site,
+                            file_path=str(input_path),
+                            errors=result.errors
+                        )
+                    except Exception as e:
+                        logger.debug(f"Telemetry tracking failed (non-fatal): {e}")
                 logger.info("Progress saved. Fix the issue and resume with the same command.")
                 return 1
 
@@ -2192,6 +2261,20 @@ def translate_site(args: argparse.Namespace) -> int:
 
             logger.info(f"Translation completed: {result.total_files} files processed")
             logger.info(f"Success: {result.successful_files}, Failed: {result.failed_files}")
+
+            # P1-12: Track directory translation completion via telemetry
+            if shared_engines:
+                try:
+                    shared_engines.telemetry.track_event(
+                        event_type="directory_translation_complete",
+                        site_id=args.site,
+                        total_files=result.total_files,
+                        successful_files=result.successful_files,
+                        failed_files=result.failed_files,
+                        target_langs=target_langs
+                    )
+                except Exception as e:
+                    logger.debug(f"Telemetry tracking failed (non-fatal): {e}")
 
             # VA-04: Generate verification report if requested
             if overrides.verification_report and overrides.verify:
@@ -2208,35 +2291,78 @@ def translate_site(args: argparse.Namespace) -> int:
             else:
                 logger.info("Progress saved. Some translations failed - resume to retry.")
 
-            # Auto-commit translations if enabled and files succeeded
+            # P1-12: Auto-commit translations using CommitEngine (if available) or fallback
             if result.successful_files > 0:
-                try:
-                    from src.observability.git_commit_helper import auto_commit_translations
+                # Check if commit should happen based on CLI flags
+                should_commit = True
+                if hasattr(args, 'auto_commit') and args.auto_commit is False:
+                    should_commit = False
+                elif overrides.dry_run:
+                    should_commit = False
 
-                    # Determine if commit should happen
-                    # args.auto_commit can be: True (--auto-commit), False (--no-commit), or None (use config default)
-                    no_commit = False
-                    if hasattr(args, 'auto_commit') and args.auto_commit is False:
-                        no_commit = True
+                if should_commit:
+                    # Try to use CommitEngine from shared_engines (preferred)
+                    if shared_engines and shared_engines.commit:
+                        try:
+                            # Collect output files from result
+                            output_files = []
+                            for file_result in result.file_results:
+                                if file_result.success and file_result.outputs:
+                                    output_files.extend([Path(f) for f in file_result.outputs])
 
-                    commit_success = auto_commit_translations(
-                        result=result,
-                        site_id=args.site,
-                        target_langs=target_langs,
-                        run_id="cli-run",  # Simple identifier for CLI-initiated translations
-                        config_service=config_service,
-                        commit_message_override=getattr(args, 'commit_message_override', None),
-                        no_commit=no_commit,
-                    )
+                            if output_files:
+                                # Calculate TM stats from result
+                                tm_stats = {}
+                                if hasattr(result, 'tm_hit_rate'):
+                                    tm_stats['hit_rate'] = result.tm_hit_rate
+                                if hasattr(result, 'cache_hits'):
+                                    tm_stats['cache_hits'] = result.cache_hits
+                                if hasattr(result, 'cache_misses'):
+                                    tm_stats['cache_misses'] = result.cache_misses
 
-                    # Note: auto_commit_translations logs its own detailed messages
-                    # (e.g., "No files modified", "Committed X files", etc.)
-                    # So we only log a debug message here for the overall result
-                    if not commit_success:
-                        logger.debug("Git commit failed (non-fatal)")
+                                commit_result = shared_engines.commit.commit_if_enabled(
+                                    output_files=output_files,
+                                    site_id=args.site,
+                                    target_langs=target_langs,
+                                    run_id="cli-run",
+                                    translation_result=result,
+                                    model_id=args.model or "default",
+                                    tm_stats=tm_stats
+                                )
 
-                except Exception as e:
-                    logger.warning(f"Auto-commit error (non-fatal): {e}")
+                                if commit_result.success:
+                                    if commit_result.files_committed > 0:
+                                        logger.info(f"Committed {commit_result.files_committed} files")
+                                    else:
+                                        logger.debug("No files to commit (already committed or no changes)")
+                                else:
+                                    logger.warning(f"Commit failed (non-fatal): {commit_result.error}")
+                            else:
+                                logger.debug("No output files to commit")
+
+                        except Exception as e:
+                            logger.warning(f"CommitEngine error (non-fatal): {e}")
+
+                    # Fallback to direct auto_commit_translations if engines not available
+                    else:
+                        try:
+                            from src.observability.git_commit_helper import auto_commit_translations
+
+                            commit_success = auto_commit_translations(
+                                result=result,
+                                site_id=args.site,
+                                target_langs=target_langs,
+                                run_id="cli-run",
+                                config_service=config_service,
+                                commit_message_override=getattr(args, 'commit_message_override', None),
+                                no_commit=False,
+                            )
+
+                            if not commit_success:
+                                logger.debug("Git commit failed (non-fatal)")
+
+                        except Exception as e:
+                            logger.warning(f"Auto-commit error (non-fatal): {e}")
 
             return 0 if result.failed_files == 0 else 1
 
