@@ -60,7 +60,8 @@ gpu = [
     "ctranslate2>=3.20.0",
 ]
 quality = [
-    "langdetect==1.0.9",  # Language detection for AST translation purity checks (optional, graceful degradation)
+    "langdetect==1.0.9",  # Language detection for AST translation purity checks (fallback, graceful degradation)
+    "fasttext>=0.9.2",    # FastText language detection (preferred, 176 languages, higher accuracy)
 ]
 m2m100 = [
     "sentencepiece>=0.1.99",  # Required for M2M100 and NLLB multilingual models
@@ -74,8 +75,8 @@ docs = [
 [project.scripts]
 translate-hugo = "src.cli:main"
 
-[tool.setuptools]
-packages = ["src"]
+[tool.setuptools.packages.find]
+include = ["src*"]
 
 [tool.black]
 line-length = 100

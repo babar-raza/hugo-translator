@@ -1,0 +1,7 @@
+{
+  "exit_code": 0,
+  "stdout": "translate-hugo v0.1.0\nProcessing site: golden-test\nTarget languages: es, fr\nValidation mode: strict\nDry-run: enabled (no files will be written)\n\nLoading model: m2m100_418m...\nModel loaded successfully\n\nTranslating minimal_en.md...\n  Language: es [<N>/<M>]\n    Extracted <N> text units\n    Translated <N> segments in <DURATION>\n  Language: fr [<N>/<M>]\n    Extracted <N> text units\n    Translated <N> segments in <DURATION>\n\nTranslating minimal_multilang.md...\n  Language: es [<N>/<M>]\n    Extracted <N> text units\n    Translated <N> segments in <DURATION>\n  Language: fr [<N>/<M>]\n    Extracted <N> text units\n    Translated <N> segments in <DURATION>\n\nTranslation completed successfully\nTotal files processed: <N> files <ACTION>\nDry-run mode: No files were written\n",
+  "stderr": "",
+  "duration": 0.0,
+  "files_written": []
+}

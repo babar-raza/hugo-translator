@@ -1,0 +1,7 @@
+{
+  "exit_code": 0,
+  "stdout": "Lock Diagnostics for site: golden-test\n\nLock Status: Not locked\nLock file: <PROJECT_ROOT>/locks/golden-test.lock\n\nNo active lock found for this site.\n",
+  "stderr": "",
+  "duration": 0.0,
+  "files_written": []
+}
