@@ -159,9 +159,11 @@ def build_output_summary(
     total_files: Optional[int] = None,
     files_generated: Optional[int] = None,
     errors: Optional[List] = None,
+    skipped_langs: Optional[List] = None,
+    skip_reasons: Optional[Dict] = None,
 ) -> str:
     """
-    Build standardized output_summary string for RunRecord (SR-03, TEL-05-B).
+    Build standardized output_summary string for RunRecord (SR-03, TEL-05-B, RES-05).
 
     Args:
         job_type: Type of job ("translate_file" or "translate_directory")
@@ -170,6 +172,8 @@ def build_output_summary(
         total_files: For directory: total files processed
         files_generated: For directory: total output files created
         errors: List of errors encountered
+        skipped_langs: For single file: list of languages skipped (output exists)
+        skip_reasons: For single file: dict of {lang: reason} for skipped languages
 
     Returns:
         Formatted output summary string
@@ -177,6 +181,8 @@ def build_output_summary(
     Examples:
         >>> build_output_summary("translate_file", outputs={"es": "a.md", "fr": "b.md"}, errors=[])
         "2 translations, 0 errors"
+        >>> build_output_summary("translate_file", outputs={"es": "a.md", "fr": "b.md"}, skipped_langs=["de"], errors=[])
+        "2 translations, 1 skipped (existing outputs), 0 errors"
         >>> build_output_summary("translate_directory", successful_files=8, total_files=10, files_generated=16, errors=[])
         "8/10 files translated, 16 outputs"
     """
@@ -184,7 +190,13 @@ def build_output_summary(
 
     if job_type == "translate_file":
         translation_count = len(outputs) if outputs else 0
-        return f"{translation_count} translations, {error_count} errors"
+        skip_count = len(skipped_langs) if skipped_langs else 0
+
+        # RES-05: Include skip information when available
+        if skip_count > 0:
+            return f"{translation_count} translations, {skip_count} skipped (existing outputs), {error_count} errors"
+        else:
+            return f"{translation_count} translations, {error_count} errors"
     elif job_type == "translate_directory":
         successful = successful_files if successful_files is not None else 0
         total = total_files if total_files is not None else 0
@@ -225,6 +237,7 @@ def calculate_items_metrics(
     total_files: Optional[int] = None,
     successful_files: Optional[int] = None,
     failed_files: Optional[int] = None,
+    skip_count: int = 0,
 ) -> Dict[str, int]:
     """
     Calculate items_discovered, items_succeeded, items_failed for RunRecord (SR-03, TEL-05-B).
@@ -234,6 +247,7 @@ def calculate_items_metrics(
         - items_discovered = total_segments (all segments that need translation)
         - items_succeeded = translated_segments + tm_hits (segments successfully translated)
         - items_failed = skipped_segments (segments that failed/were skipped)
+        - NOTE: Languages skipped due to existing outputs are excluded from items_succeeded
 
     - For directory translation:
         - items_discovered = total_files (all files found)
@@ -246,29 +260,34 @@ def calculate_items_metrics(
         total_files: Total files discovered (for directory)
         successful_files: Successful files (for directory)
         failed_files: Failed files (for directory)
+        skip_count: Number of languages skipped (for single file, default: 0)
 
     Returns:
-        Dict with keys: items_discovered, items_succeeded, items_failed
+        Dict with keys: items_discovered, items_succeeded, items_failed, items_skipped
 
     Examples:
-        >>> calculate_items_metrics("translate_file", stats=mock_stats)
-        {"items_discovered": 10, "items_succeeded": 9, "items_failed": 1}
+        >>> calculate_items_metrics("translate_file", stats=mock_stats, skip_count=2)
+        {"items_discovered": 10, "items_succeeded": 9, "items_failed": 1, "items_skipped": 2}
         >>> calculate_items_metrics("translate_directory", total_files=10, successful_files=8, failed_files=2)
-        {"items_discovered": 10, "items_succeeded": 8, "items_failed": 2}
+        {"items_discovered": 10, "items_succeeded": 8, "items_failed": 2, "items_skipped": 0}
     """
     if job_type == "translate_file":
         # Single file: items = segments
         if stats:
+            # RES-05: Items succeeded should exclude skipped languages
+            # We report on segment-level work actually performed
             return {
                 "items_discovered": stats.total_segments,
                 "items_succeeded": stats.translated_segments + stats.tm_hits,
                 "items_failed": stats.skipped_segments,
+                "items_skipped": skip_count,
             }
         else:
             return {
                 "items_discovered": 0,
                 "items_succeeded": 0,
                 "items_failed": 0,
+                "items_skipped": 0,
             }
     elif job_type == "translate_directory":
         # Directory: items = files
@@ -276,12 +295,14 @@ def calculate_items_metrics(
             "items_discovered": total_files if total_files is not None else 0,
             "items_succeeded": successful_files if successful_files is not None else 0,
             "items_failed": failed_files if failed_files is not None else 0,
+            "items_skipped": 0,  # Directory-level skipping not tracked separately
         }
     else:
         return {
             "items_discovered": 0,
             "items_succeeded": 0,
             "items_failed": 0,
+            "items_skipped": 0,
         }
 
 
@@ -887,3 +908,35 @@ def configure_telemetry(
         config=config,
     )
     return _global_telemetry
+
+
+def emit_event(event_type: str, payload: Optional[Dict[str, Any]] = None) -> None:
+    """
+    Emit a telemetry event using the global telemetry instance.
+
+    This is a convenience function for emitting events without needing to
+    manage a RunContext. Events are logged via structlog for observability.
+
+    Note: For translation jobs with run contexts, prefer using
+    run_context.log_event() instead for better correlation.
+
+    Args:
+        event_type: Type of event (e.g., "subprocess_executed")
+        payload: Event payload data (optional)
+
+    Example:
+        >>> emit_event("subprocess_executed", {
+        ...     "command": "git status",
+        ...     "exit_code": 0,
+        ...     "duration": 0.5
+        ... })
+    """
+    try:
+        # Use structlog for event logging (matches existing pattern)
+        import structlog
+        logger = structlog.get_logger("hugo_translator.telemetry")
+        logger.info(event_type, **(payload or {}))
+    except Exception as e:
+        # Don't let telemetry failures break operations
+        import logging
+        logging.getLogger(__name__).debug(f"Failed to emit event {event_type}: {e}")
