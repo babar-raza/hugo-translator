@@ -146,6 +146,124 @@ class CompositionRoot:
         return mode_config
 
     @staticmethod
+    def _load_queue_config(config_root: str, caller_config: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Load queue configuration from global.yaml with 4-tier precedence.
+
+        Precedence (highest to lowest):
+        1. Environment variable QUEUE_BACKEND
+        2. Execution mode default (queue_backend from mode config)
+        3. Global queue.backend (from global.yaml)
+        4. Caller-provided config
+        5. Fallback backend (queue.fallback_backend)
+
+        Args:
+            config_root: Path to configuration directory
+            caller_config: Configuration provided by caller
+
+        Returns:
+            Queue configuration dictionary
+
+        Example:
+            queue_config = CompositionRoot._load_queue_config("config/", {})
+            # Returns: {
+            #     "backend": "redis",
+            #     "fallback_backend": "memory",
+            #     "redis": {...},
+            #     "memory": {...}
+            # }
+        """
+        import yaml
+
+        # Load global.yaml
+        global_yaml_path = Path(config_root) / "global.yaml"
+        queue_config = {
+            "backend": "redis",  # Default
+            "fallback_backend": "memory",  # Default
+            "redis": {
+                "host": "localhost",
+                "port": 6379,
+                "db": 0,
+                "max_retries": 3,
+                "retry_delay": 1.0,
+                "health_check_interval": 60
+            },
+            "memory": {
+                "max_queue_size": 1000
+            }
+        }
+
+        if global_yaml_path.exists():
+            try:
+                with open(global_yaml_path, "r", encoding="utf-8") as f:
+                    global_config = yaml.safe_load(f)
+
+                # Extract queue section
+                queue_section = global_config.get("queue", {})
+
+                if queue_section:
+                    # Update defaults with global.yaml values
+                    if "backend" in queue_section:
+                        queue_config["backend"] = queue_section["backend"]
+
+                    if "fallback_backend" in queue_section:
+                        queue_config["fallback_backend"] = queue_section["fallback_backend"]
+
+                    if "redis" in queue_section:
+                        queue_config["redis"].update(queue_section["redis"])
+
+                    if "memory" in queue_section:
+                        queue_config["memory"].update(queue_section["memory"])
+
+                    logger.info(
+                        f"Loaded queue config from global.yaml: "
+                        f"backend={queue_config['backend']}, "
+                        f"fallback={queue_config['fallback_backend']}"
+                    )
+
+            except Exception as e:
+                logger.warning(f"Failed to load queue config from global.yaml: {e}")
+
+        # Tier 2: Execution mode default
+        execution_mode = os.getenv("EXECUTION_MODE", "windows_cuda")
+        mode_config = CompositionRoot._load_execution_mode_config(config_root)
+        if "queue_backend" in mode_config:
+            queue_config["primary_backend_from_mode"] = mode_config["queue_backend"]
+            logger.info(
+                f"Queue backend from execution mode '{execution_mode}': "
+                f"{mode_config['queue_backend']}"
+            )
+
+        # Tier 1: Environment variable (highest priority)
+        env_backend = os.getenv("QUEUE_BACKEND")
+        if env_backend:
+            queue_config["backend"] = env_backend
+            logger.info(f"Queue backend from QUEUE_BACKEND env var: {env_backend}")
+
+        # Merge with caller config (caller config takes precedence)
+        if caller_config:
+            # Legacy support: job_backend -> backend
+            if "job_backend" in caller_config and "backend" not in caller_config:
+                queue_config["backend"] = caller_config["job_backend"]
+
+            # Legacy support: redis_host, redis_port -> redis dict
+            if "redis_host" in caller_config or "redis_port" in caller_config:
+                if "redis_host" in caller_config:
+                    queue_config["redis"]["host"] = caller_config["redis_host"]
+                if "redis_port" in caller_config:
+                    queue_config["redis"]["port"] = caller_config["redis_port"]
+
+            # Direct config overrides
+            for key in ["backend", "fallback_backend", "redis", "memory"]:
+                if key in caller_config:
+                    if isinstance(caller_config[key], dict) and isinstance(queue_config.get(key), dict):
+                        queue_config[key].update(caller_config[key])
+                    else:
+                        queue_config[key] = caller_config[key]
+
+        return queue_config
+
+    @staticmethod
     def create_from_config(config: Optional[Dict[str, Any]] = None) -> SharedEngines:
         """
         Create all shared engines from configuration.
@@ -224,14 +342,16 @@ class CompositionRoot:
         telemetry_engine = TelemetryEngine(config=telemetry_config)
         logger.debug(f"Created TelemetryEngine: enabled={telemetry_enabled}")
 
-        # 4. JobEngine - Job queue management
-        job_backend = cfg.get("job_backend", "memory")
-        job_config = {}
-        if job_backend == "redis":
-            job_config["redis_host"] = cfg.get("redis_host", "localhost")
-            job_config["redis_port"] = cfg.get("redis_port", 6379)
-        job_engine = JobEngine(backend=job_backend, config=job_config)
-        logger.debug(f"Created JobEngine: backend={job_backend}")
+        # 4. JobEngine - Job queue management (V2 with backend switching)
+        # Load queue configuration from global.yaml
+        job_config = CompositionRoot._load_queue_config(config_root, cfg)
+        # Add telemetry to queue config for event emission
+        job_config["telemetry"] = telemetry_engine
+        job_engine = JobEngine(config=job_config)
+        logger.debug(
+            f"Created JobEngine: backend={job_config.get('backend', 'memory')}, "
+            f"failover_enabled={job_config.get('fallback_backend') is not None}"
+        )
 
         # 5. CommitEngine - Git automation
         commit_enabled = cfg.get("commit_enabled", True)

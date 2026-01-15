@@ -3,6 +3,8 @@ JobEngine - Unified job queue abstraction for translation jobs.
 
 Wraps existing JobQueue and RedisJobQueue to provide consistent interface
 across execution modes (memory-based for CLI, Redis for distributed workers).
+
+Version 2: Adds backend switching, health checks, and auto-failover support.
 """
 
 import logging
@@ -19,44 +21,65 @@ class JobEngine:
     """
     Unified job queue engine for managing translation jobs.
 
+    Version 2: Supports backend switching with health checks and auto-failover.
+
     Wraps JobQueue (memory) or RedisJobQueue (distributed) to provide
     consistent interface across execution modes.
 
+    Supports two initialization patterns:
+    1. Legacy: backend + redis_config parameters (backward compatible)
+    2. New: config dictionary with backend switching support
+
     Args:
-        backend: Queue backend type ("memory" or "redis")
-        redis_config: Optional Redis configuration for distributed mode
-            - host: Redis host (default: "localhost")
-            - port: Redis port (default: 6379)
-            - db: Redis database number (default: 0)
-            - password: Optional Redis password
+        backend: (Legacy) Queue backend type ("memory" or "redis")
+        redis_config: (Legacy) Optional Redis configuration
+        config: (New) Configuration dictionary with:
+            - backend: Primary backend type ("redis" or "memory")
+            - fallback_backend: Fallback backend type (default: "memory")
+            - redis: Redis configuration dict
+            - memory: Memory queue configuration dict
+            - telemetry: Optional telemetry engine
 
     Example:
-        # Memory-based queue (manual CLI)
-        job_engine = JobEngine(backend="memory")
-        job_id = job_engine.enqueue(job)
+        # Legacy API (backward compatible)
+        engine = JobEngine(backend="redis", redis_config={"host": "localhost"})
 
-        # Redis-based queue (distributed workers)
-        job_engine = JobEngine(
-            backend="redis",
-            redis_config={"host": "localhost", "port": 6379}
-        )
-        job_id = job_engine.enqueue(job)
+        # New API with backend switching
+        engine = JobEngine(config={
+            "backend": "redis",
+            "fallback_backend": "memory",
+            "redis": {"host": "localhost", "port": 6379},
+            "memory": {"max_queue_size": 1000}
+        })
     """
 
     def __init__(
         self,
-        backend: str = "memory",
-        redis_config: Optional[Dict[str, Any]] = None
+        backend: Optional[str] = None,
+        redis_config: Optional[Dict[str, Any]] = None,
+        config: Optional[Dict[str, Any]] = None
     ):
         """Initialize job queue engine."""
-        self.backend_type = backend
+        # Determine initialization mode
+        if config is not None:
+            # New API: Use backend switching with V2 engine
+            self._use_v2 = True
+            self._init_v2(config)
+        else:
+            # Legacy API: Use simple backend selection
+            self._use_v2 = False
+            self._init_legacy(backend, redis_config)
+
+    def _init_legacy(self, backend: Optional[str], redis_config: Optional[Dict[str, Any]]):
+        """Initialize using legacy API (backward compatible)."""
+        self.backend_type = backend or "memory"
         self.redis_config = redis_config or {}
 
         # Initialize underlying queue
-        if backend == "memory":
+        if self.backend_type == "memory":
             self.queue = JobQueue(backend="memory")
-            logger.info("JobEngine initialized: backend=memory")
-        elif backend == "redis":
+            logger.info("JobEngine initialized: backend=memory (legacy mode)")
+        elif self.backend_type == "redis":
             host = self.redis_config.get("host", "localhost")
             port = self.redis_config.get("port", 6379)
             db = self.redis_config.get("db", 0)
@@ -69,12 +92,27 @@ class JobEngine:
                 password=password
             )
             logger.info(
-                f"JobEngine initialized: backend=redis, host={host}:{port}"
+                f"JobEngine initialized: backend=redis, host={host}:{port} (legacy mode)"
             )
         else:
             raise ValueError(
-                f"Unsupported backend: {backend}. Use 'memory' or 'redis'."
+                f"Unsupported backend: {self.backend_type}. Use 'memory' or 'redis'."
             )
+
+    def _init_v2(self, config: Dict[str, Any]):
+        """Initialize using V2 API with backend switching."""
+        from src.shared_engines.job_engine_v2 import JobEngineV2
+
+        self._engine_v2 = JobEngineV2(config=config)
+
+        # Expose V2 attributes for compatibility
+        self.backend_type = self._engine_v2.current_backend_type
+        self.queue = self._engine_v2.queue
+        self.redis_config = config.get("redis", {})
+
+        logger.info(
+            f"JobEngine initialized: backend={self.backend_type} (V2 mode with failover)"
+        )
 
     def enqueue(self, job: TranslationJob) -> str:
         """
@@ -99,6 +137,9 @@ class JobEngine:
             )
             job_id = engine.enqueue(job)
         """
+        if self._use_v2:
+            return self._engine_v2.enqueue(job)
+
         job_id = self.queue.enqueue(job)
         logger.debug(
             f"Enqueued job {job_id}: type={job.job_type.value}, "
@@ -122,6 +163,9 @@ class JobEngine:
                 # Process job...
                 engine.update_status(job.job_id, JobStatus.COMPLETED)
         """
+        if self._use_v2:
+            return self._engine_v2.dequeue()
+
         job = self.queue.dequeue()
         if job:
             logger.debug(
@@ -296,6 +340,10 @@ class JobEngine:
             finally:
                 engine.shutdown()
         """
+        if self._use_v2:
+            self._engine_v2.shutdown()
+            return
+
         if self.backend_type == "redis":
             logger.info("Shutting down JobEngine (Redis backend)")
             self.queue.close()
@@ -332,4 +380,22 @@ class JobEngine:
             if engine.get_backend_type() == "redis":
                 print("Using distributed queue")
         """
+        if self._use_v2:
+            return self._engine_v2.get_backend_type()
         return self.backend_type
+
+    def get_backend_stats(self) -> Optional[Dict[str, Any]]:
+        """
+        Get backend statistics (V2 only).
+
+        Returns:
+            Dictionary with backend stats or None if not using V2
+
+        Example:
+            stats = engine.get_backend_stats()
+            if stats:
+                print(f"Failover count: {stats['failover_count']}")
+        """
+        if self._use_v2:
+            return self._engine_v2.get_backend_stats()
+        return None

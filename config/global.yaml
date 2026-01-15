@@ -21,6 +21,7 @@ execution:
       poll_interval: 5.0
       max_retries: 3
       worker_id_prefix: "windows-gpu"
+      queue_backend: "redis"  # Use Redis for distributed workers
 
     # Docker containerized with CPU-only enforcement
     docker_cpu:
@@ -30,6 +31,7 @@ execution:
       poll_interval: 3.0  # Faster polling for CPU workers
       max_retries: 5  # More retries for CPU (slower, more resilient)
       worker_id_prefix: "docker-cpu"
+      queue_backend: "redis"  # Use Redis for distributed workers
 
     # Docker containerized with GPU passthrough (nvidia-docker)
     docker_gpu:
@@ -39,6 +41,7 @@ execution:
       poll_interval: 5.0
       max_retries: 3
       worker_id_prefix: "docker-gpu"
+      queue_backend: "redis"  # Use Redis for distributed workers
 
 # Default TM preferences (overridable per site)
 tm_defaults:
@@ -75,11 +78,35 @@ hardware:
     use_double_clear: true  # Call empty_cache() twice for stubborn fragments
     synchronize_before_clear: true  # Wait for GPU operations to complete
 
+# Queue configuration (Phase 3: Backend Production Switching)
+# Supports dynamic backend selection with automatic failover
+queue:
+  # Primary backend type (redis | memory)
+  # Can be overridden by QUEUE_BACKEND environment variable
+  backend: "redis"
+
+  # Fallback backend when primary is unavailable
+  fallback_backend: "memory"
+
+  # Redis backend configuration
+  redis:
+    host: "localhost"
+    port: 6379
+    db: 0
+    password: null  # Set if Redis requires authentication
+    max_retries: 3  # Connection retry attempts
+    retry_delay: 1.0  # Delay between retries (seconds)
+    health_check_interval: 60  # Health check interval (seconds)
+
+  # Memory backend configuration
+  memory:
+    max_queue_size: 1000  # Maximum items in queue (0 = unlimited)
+
 # Orchestrator defaults
 orchestrator:
   mode: "auto"  # auto, manual
   max_workers: 4
-  job_queue_backend: "memory"  # memory, redis
+  job_queue_backend: "memory"  # DEPRECATED: Use queue.backend instead
   sweep_interval_hours: 24
   file_watcher_debounce_seconds: 2.0
   enable_file_watcher: true
