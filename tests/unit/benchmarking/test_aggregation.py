@@ -62,7 +62,7 @@ class TestTimeSeriesAggregator:
             ))
 
         run = BenchmarkRun(
-            run_id=f"run_{timestamp_offset_hours}",
+            run_id=f"run_{model_id}_{device}_{timestamp_offset_hours}",
             model_id=model_id,
             device=device,
             batch_sizes=[8],
@@ -85,7 +85,7 @@ class TestTimeSeriesAggregator:
 
     def test_aggregate_model_creates_trends(self):
         """Test aggregating a model creates trend records."""
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
             db_path = Path(tmpdir) / "test.db"
             db = BenchmarkDatabase(db_path)
 
@@ -111,10 +111,11 @@ class TestTimeSeriesAggregator:
 
             finally:
                 db._close_connection(conn)
+                db.close()
 
     def test_aggregate_all_models(self):
         """Test aggregating all models."""
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
             db_path = Path(tmpdir) / "test.db"
             db = BenchmarkDatabase(db_path)
 
@@ -146,6 +147,7 @@ class TestTimeSeriesAggregator:
 
             finally:
                 db._close_connection(conn)
+                db.close()
 
     def test_percentile_calculation(self):
         """Test percentile calculation is correct."""
@@ -168,7 +170,7 @@ class TestTimeSeriesAggregator:
 
     def test_incremental_aggregation(self):
         """Test incremental aggregation only processes new data."""
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
             db_path = Path(tmpdir) / "test.db"
             db = BenchmarkDatabase(db_path)
 
@@ -188,9 +190,11 @@ class TestTimeSeriesAggregator:
             # Should create more trends
             assert trends_2 >= 0  # May be 0 if windows are the same
 
+            db.close()
+
     def test_create_baseline(self):
         """Test creating performance baseline."""
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
             db_path = Path(tmpdir) / "test.db"
             db = BenchmarkDatabase(db_path)
 
@@ -233,10 +237,11 @@ class TestTimeSeriesAggregator:
 
             finally:
                 db._close_connection(conn)
+                db.close()
 
     def test_create_baseline_insufficient_data(self):
         """Test baseline creation fails with insufficient data."""
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
             db_path = Path(tmpdir) / "test.db"
             db = BenchmarkDatabase(db_path)
 
@@ -253,9 +258,11 @@ class TestTimeSeriesAggregator:
             # Should return None (insufficient data)
             assert baseline_id is None
 
+            db.close()
+
     def test_cleanup_old_trends(self):
         """Test cleaning up old trend data."""
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
             db_path = Path(tmpdir) / "test.db"
             db = BenchmarkDatabase(db_path)
 
@@ -320,6 +327,8 @@ class TestTimeSeriesAggregator:
             # Should have deleted at least the old trend
             assert deleted >= 1
 
+            db.close()
+
     def test_aggregation_windows(self):
         """Test that all aggregation windows are defined."""
         assert len(AGGREGATION_WINDOWS) >= 4
@@ -332,7 +341,7 @@ class TestTimeSeriesAggregator:
 
     def test_trend_statistics_correctness(self):
         """Test that aggregated statistics are calculated correctly."""
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
             db_path = Path(tmpdir) / "test.db"
             db = BenchmarkDatabase(db_path)
 
@@ -402,21 +411,24 @@ class TestTimeSeriesAggregator:
 
             finally:
                 db._close_connection(conn)
+                db.close()
 
     def test_aggregate_empty_database(self):
         """Test aggregating empty database returns 0."""
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
             db_path = Path(tmpdir) / "test.db"
-            BenchmarkDatabase(db_path)  # Create empty database
+            db = BenchmarkDatabase(db_path)  # Create empty database
 
             aggregator = TimeSeriesAggregator(db_path)
             trends_created = aggregator.aggregate_all()
 
             assert trends_created == 0
 
+            db.close()
+
     def test_aggregate_nonexistent_model(self):
         """Test aggregating nonexistent model/device returns 0."""
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
             db_path = Path(tmpdir) / "test.db"
             db = BenchmarkDatabase(db_path)
 
@@ -428,3 +440,5 @@ class TestTimeSeriesAggregator:
             trends_created = aggregator.aggregate_model("model_b", "cpu")
 
             assert trends_created == 0
+
+            db.close()
