@@ -11,6 +11,9 @@ import pytest
 
 from src.benchmarking.storage import BenchmarkDatabase, BenchmarkRun, SystemInfo, BenchmarkResult
 
+# Current schema version from BenchmarkDatabase class
+CURRENT_SCHEMA_VERSION = BenchmarkDatabase.SCHEMA_VERSION
+
 
 class TestSchemaMigrations:
     """Test suite for schema migrations."""
@@ -142,7 +145,7 @@ class TestSchemaMigrations:
             db = BenchmarkDatabase(db_path)
 
             # Verify schema version is 4
-            assert db.get_schema_version() == 4
+            assert db.get_schema_version() == CURRENT_SCHEMA_VERSION
 
             # Verify data preserved
             run = db.get_run('run1')
@@ -191,7 +194,7 @@ class TestSchemaMigrations:
 
             # Versions should match
             assert version1 == version2
-            assert version2 == 4
+            assert version2 == CURRENT_SCHEMA_VERSION
 
     def test_v2_to_v4_migration(self):
         """Test migrating from v2 to v4."""
@@ -227,7 +230,7 @@ class TestSchemaMigrations:
             db = BenchmarkDatabase(db_path)
 
             # Verify migrated to v4
-            assert db.get_schema_version() == 4
+            assert db.get_schema_version() == CURRENT_SCHEMA_VERSION
 
             # Verify new tables exist
             conn = db._get_connection()
@@ -246,7 +249,7 @@ class TestSchemaMigrations:
 
     def test_foreign_key_constraints(self):
         """Test that foreign key constraints are enforced."""
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
             db_path = Path(tmpdir) / "test.db"
             db = BenchmarkDatabase(db_path)
 
@@ -313,8 +316,11 @@ class TestSchemaMigrations:
                         ),
                     )
                     conn.commit()
+                # Rollback after pytest.raises captures the exception
+                conn.rollback()
             finally:
                 db._close_connection(conn)
+                db.close()
 
     def test_cascading_delete(self):
         """Test that cascading deletes work for foreign keys."""
@@ -405,7 +411,7 @@ class TestSchemaMigrations:
             db = BenchmarkDatabase(db_path)
 
             # Should be at v4
-            assert db.get_schema_version() == 4
+            assert db.get_schema_version() == CURRENT_SCHEMA_VERSION
 
             # All tables should exist
             conn = db._get_connection()

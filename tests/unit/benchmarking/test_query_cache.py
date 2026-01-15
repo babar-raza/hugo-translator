@@ -300,9 +300,10 @@ class TestMakeCacheKey:
         assert key == "trends:m2m100:cpu"
 
     def test_kwargs_key(self):
-        """Test key generation with kwargs."""
+        """Test key generation with kwargs (sorted alphabetically)."""
         key = make_cache_key("trends", model_id="m2m100", device="cpu")
-        assert key == "trends:model_id=m2m100:device=cpu"
+        # kwargs are sorted alphabetically: device < model_id
+        assert key == "trends:device=cpu:model_id=m2m100"
 
     def test_mixed_args_kwargs(self):
         """Test key generation with mixed args and kwargs."""

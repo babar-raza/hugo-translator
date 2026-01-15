@@ -372,7 +372,7 @@ class TestBenchmarkExporter:
 
     def test_export_sqlite_with_filter(self):
         """Test filtered SQLite export."""
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
             db_path = Path(tmpdir) / "test.db"
             db = BenchmarkDatabase(db_path)
 
@@ -387,11 +387,19 @@ class TestBenchmarkExporter:
 
             assert result.error is None
 
-            # Verify backup contains only filtered data
-            backup_db = BenchmarkDatabase(backup_path)
-            runs = backup_db.list_runs()
+            # Verify backup contains only filtered data using raw SQLite
+            # (BenchmarkDatabase would try to re-apply migrations to exported db)
+            import sqlite3
+            backup_conn = sqlite3.connect(backup_path)
+            cursor = backup_conn.execute("SELECT run_id, model_id FROM benchmark_runs")
+            runs = cursor.fetchall()
+            backup_conn.close()
+
             assert len(runs) == 1
             assert runs[0][1] == "model_a"
+
+            # Close source database to prevent Windows file locking
+            db.close()
 
     def test_export_empty_database(self):
         """Test exporting from empty database."""

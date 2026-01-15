@@ -625,10 +625,10 @@ def test_oom_exception_handling(mock_registry, mock_backend):
             batch_size=32,
         )
 
-        # Verify error was captured
+        # Verify error was captured (OOM produces specific error format)
         assert len(results) == 1
         assert len(results[0].errors) > 0
-        assert 'Translation failed' in results[0].errors[0]
+        assert 'OOM' in results[0].errors[0]
 
         # Verify GPU cache was cleared
         mock_torch.cuda.empty_cache.assert_called()

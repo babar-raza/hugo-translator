@@ -27,6 +27,9 @@ from src.benchmarking.storage import (
     SystemInfo,
 )
 
+# Current schema version from BenchmarkDatabase class
+CURRENT_SCHEMA_VERSION = BenchmarkDatabase.SCHEMA_VERSION
+
 
 @pytest.fixture
 def temp_db():
@@ -139,7 +142,7 @@ class TestBenchmarkDatabase:
         assert mode.lower() == "wal"
 
         # Verify schema version
-        assert db.get_schema_version() == 1
+        assert db.get_schema_version() == CURRENT_SCHEMA_VERSION
 
     def test_save_and_retrieve_run(self, temp_db, sample_run):
         """Test 2: Verify saving and retrieving a complete benchmark run."""
@@ -167,10 +170,15 @@ class TestBenchmarkDatabase:
         assert retrieved.system_info.cpu_cores == sample_run.system_info.cpu_cores
         assert retrieved.system_info.gpu_model == sample_run.system_info.gpu_model
 
-        # Verify results
+        # Verify results (order-independent comparison)
         assert len(retrieved.results) == len(sample_run.results)
-        assert retrieved.results[0].sample_id == sample_run.results[0].sample_id
-        assert retrieved.results[0].throughput_tokens_per_sec == sample_run.results[0].throughput_tokens_per_sec
+        retrieved_ids = {r.sample_id for r in retrieved.results}
+        sample_ids = {r.sample_id for r in sample_run.results}
+        assert retrieved_ids == sample_ids
+        # Verify throughput values are present (order-independent)
+        retrieved_throughputs = {r.throughput_tokens_per_sec for r in retrieved.results}
+        sample_throughputs = {r.throughput_tokens_per_sec for r in sample_run.results}
+        assert retrieved_throughputs == sample_throughputs
 
     def test_list_runs_filtering_pagination(self, temp_db, test_model, sample_run, sample_system_info):
         """Test 3: Verify filtering and pagination of run listings."""
@@ -484,7 +492,7 @@ class TestDataclasses:
 def test_in_memory_database():
     """Test database creation with :memory: for isolation."""
     db = BenchmarkDatabase(":memory:")
-    assert db.get_schema_version() == 1
+    assert db.get_schema_version() == CURRENT_SCHEMA_VERSION
     assert db.verify_integrity() is True
 
     # Verify tables exist

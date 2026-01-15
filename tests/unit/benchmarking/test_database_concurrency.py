@@ -63,7 +63,7 @@ def test_foreign_keys_enabled():
 
 def test_concurrent_reads_during_write():
     """Test that multiple readers can read while one writer writes (WAL benefit)."""
-    with tempfile.TemporaryDirectory() as tmpdir:
+    with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
         db_path = Path(tmpdir) / "test.db"
         db = BenchmarkDatabase(db_path)
 
@@ -121,7 +121,7 @@ def test_concurrent_reads_during_write():
             try:
                 for i in range(3):
                     new_run = BenchmarkRun(
-                        run_id=f"test_run_{i:03d}",
+                        run_id=f"test_run_writer_{i:03d}",
                         model_id="test_model",
                         device="cpu",
                         batch_sizes=[1],
@@ -162,6 +162,8 @@ def test_concurrent_reads_during_write():
         assert not read_results["errors"], f"Concurrent access errors: {read_results['errors']}"
         assert read_results["thread1"] == "success", "Reader thread 1 failed"
         assert read_results["thread2"] == "success", "Reader thread 2 failed"
+
+        db.close()
 
 
 def test_concurrent_writes_with_retries():
@@ -323,7 +325,7 @@ def test_memory_database_concurrency():
 
 def test_foreign_key_constraint_enforcement():
     """Test that foreign key constraints are enforced."""
-    with tempfile.TemporaryDirectory() as tmpdir:
+    with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
         db_path = Path(tmpdir) / "test.db"
         db = BenchmarkDatabase(db_path)
 
@@ -357,11 +359,11 @@ def test_foreign_key_constraint_enforcement():
                     ),
                 )
                 conn.commit()
-        except sqlite3.IntegrityError:
-            # Expected - foreign key constraint should prevent this
+            # Rollback after pytest.raises captures the exception
             conn.rollback()
         finally:
             db._close_connection(conn)
+            db.close()
 
 
 def test_cascading_delete():

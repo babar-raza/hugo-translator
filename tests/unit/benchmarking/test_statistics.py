@@ -155,14 +155,17 @@ def test_bm02_detect_outliers_iqr():
 
 def test_bm02_detect_outliers_zscore():
     """Test Z-score outlier detection."""
-    # Mean ~10, std ~1, then add extreme value
-    values = [10.0, 11.0, 9.0, 10.5, 9.5, 10.0, 50.0]
-    #                                           ^outlier (z > 3)
+    # Use many clustered values to minimize masking effect of the outlier
+    # With 20 values at ~10 and one extreme, the z-score threshold is met
+    values = [10.0, 10.1, 9.9, 10.0, 10.2, 9.8, 10.0, 10.1, 9.9, 10.0,
+              10.0, 10.1, 9.9, 10.0, 10.2, 9.8, 10.0, 10.1, 9.9, 10.0,
+              100.0]  # Index 20 - extreme outlier
+    #         ^outlier (z > 3 with many clustered values)
 
     outliers = BenchmarkStatistics.detect_outliers(values, method="zscore")
 
-    # Should detect the extreme value
-    assert 6 in outliers  # 50.0
+    # Should detect the extreme value (index 20)
+    assert 20 in outliers  # 100.0
 
 
 def test_bm02_detect_outliers_no_outliers():

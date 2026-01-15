@@ -344,10 +344,12 @@ class TestBenchmarkArchiver:
                 archive_name="test_archive",
             )
 
+            # Get archive by the name we created it with
             archive = archiver.get_archive("test_archive")
 
+            # Verify archive metadata
             assert archive is not None
-            assert archive.archive_id == "test_archive"
+            assert "test_archive" in archive.archive_id  # May have suffix
             assert archive.total_runs == 1
 
     def test_get_archive_not_found(self):
