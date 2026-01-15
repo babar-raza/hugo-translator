@@ -97,7 +97,7 @@ class BenchmarkDatabase:
     - JSON export/import
     """
 
-    SCHEMA_VERSION = 7
+    SCHEMA_VERSION = 8
 
     def __init__(self, db_path: Path | str):
         """Initialize database connection.
@@ -422,6 +422,107 @@ class BenchmarkDatabase:
                 (7, datetime.now(UTC).isoformat()),
             )
             logger.info("Applied schema migration to version 7 - cache tracking (BM-CACHE-01)")
+
+        if from_version < 8:
+            # v8: Add analytics and time-series tables (Phase 4.1)
+            # benchmark_trends: Pre-aggregated time-series data
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS benchmark_trends (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    model_id TEXT NOT NULL,
+                    device TEXT NOT NULL,
+                    time_window TEXT NOT NULL,
+                    window_start TEXT NOT NULL,
+                    window_end TEXT NOT NULL,
+                    sample_count INTEGER NOT NULL,
+                    avg_throughput REAL NOT NULL,
+                    p50_throughput REAL NOT NULL,
+                    p95_throughput REAL NOT NULL,
+                    p99_throughput REAL NOT NULL,
+                    avg_duration REAL NOT NULL,
+                    avg_memory_mb REAL,
+                    created_at TEXT NOT NULL,
+                    UNIQUE(model_id, device, time_window, window_start)
+                )
+                """
+            )
+
+            # Indices for efficient trend queries
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_trends_model_device ON benchmark_trends(model_id, device)"
+            )
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_trends_window ON benchmark_trends(time_window, window_start)"
+            )
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_trends_model_device_window "
+                "ON benchmark_trends(model_id, device, time_window, window_start)"
+            )
+
+            # performance_baselines: Historical performance baselines
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS performance_baselines (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    model_id TEXT NOT NULL,
+                    device TEXT NOT NULL,
+                    baseline_type TEXT NOT NULL,
+                    baseline_date TEXT NOT NULL,
+                    avg_throughput REAL NOT NULL,
+                    p50_throughput REAL NOT NULL,
+                    p95_throughput REAL NOT NULL,
+                    sample_count INTEGER NOT NULL,
+                    metadata TEXT NOT NULL,
+                    created_at TEXT NOT NULL,
+                    UNIQUE(model_id, device, baseline_type, baseline_date)
+                )
+                """
+            )
+
+            # Indices for baseline lookups
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_baselines_model_device "
+                "ON performance_baselines(model_id, device)"
+            )
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_baselines_type_date "
+                "ON performance_baselines(baseline_type, baseline_date)"
+            )
+
+            # retention_policies: Configurable data retention
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS retention_policies (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    policy_name TEXT NOT NULL UNIQUE,
+                    target_table TEXT NOT NULL,
+                    retention_days INTEGER NOT NULL,
+                    enabled INTEGER NOT NULL DEFAULT 1,
+                    last_cleanup TEXT,
+                    created_at TEXT NOT NULL,
+                    updated_at TEXT NOT NULL
+                )
+                """
+            )
+
+            # Insert default retention policies
+            conn.execute(
+                """
+                INSERT INTO retention_policies
+                (policy_name, target_table, retention_days, enabled, created_at, updated_at)
+                VALUES
+                ('benchmark_results_90d', 'benchmark_results', 90, 1, datetime('now'), datetime('now')),
+                ('benchmark_trends_365d', 'benchmark_trends', 365, 1, datetime('now'), datetime('now')),
+                ('performance_baselines_730d', 'performance_baselines', 730, 1, datetime('now'), datetime('now'))
+                """
+            )
+
+            conn.execute(
+                "INSERT INTO schema_version (version, applied_at) VALUES (?, ?)",
+                (8, datetime.now(UTC).isoformat()),
+            )
+            logger.info("Applied schema migration to version 8 - analytics & time-series (Phase 4.1)")
 
     def create_tables(self) -> None:
         """Create database tables (idempotent).

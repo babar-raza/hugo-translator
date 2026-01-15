@@ -24,6 +24,9 @@ from .recommender import ModelRecommender as BenchmarkRecommender
 from .reporter import BenchmarkReporter
 from .runner import BenchmarkRunner, load_corpus
 from .storage import BenchmarkDatabase
+from .schema_migrations import MigrationManager
+from .aggregation import TimeSeriesAggregator
+from .analytics import AnalyticsQueryAPI
 from ..model_runtime.recommender import ModelRecommender
 from ..model_runtime.registry import ModelRegistry
 
@@ -436,6 +439,148 @@ def cmd_recommend(args: argparse.Namespace) -> int:
         return 1
 
 
+def cmd_migrate(args: argparse.Namespace) -> int:
+    """
+    Manage database schema migrations.
+
+    Args:
+        args: Parsed command-line arguments
+
+    Returns:
+        Exit code (0 for success, 1 for failure)
+    """
+    try:
+        # Get database path
+        if args.db:
+            db_path = Path(args.db)
+        else:
+            db_path = get_benchmark_db_path()
+
+        # Create migration manager
+        manager = MigrationManager(db_path=db_path)
+
+        # List migrations
+        if args.list:
+            migrations = manager.list_migrations()
+            current_version = manager.get_current_version()
+
+            print("\nAvailable Migrations:")
+            print("="*80)
+            for mig in migrations:
+                status = "CURRENT" if mig["current"] else ("APPLIED" if mig["applied"] else "PENDING")
+                marker = "*" if mig["current"] else (" " if mig["applied"] else " ")
+                print(f"{marker} v{mig['version']:<3} [{status:<8}] {mig['description']}")
+
+            print("="*80)
+            print(f"Current schema version: {current_version}")
+            return 0
+
+        # Migrate forward
+        if args.to:
+            dry_run_msg = " [DRY RUN]" if args.dry_run else ""
+            print(f"\nMigrating to schema v{args.to}{dry_run_msg}...")
+            manager.migrate_to(args.to, dry_run=args.dry_run)
+
+            if not args.dry_run:
+                print(f"✓ Migration to v{args.to} completed successfully")
+            else:
+                print(f"✓ Migration validation passed (dry run)")
+
+            return 0
+
+        # Rollback
+        if args.rollback:
+            dry_run_msg = " [DRY RUN]" if args.dry_run else ""
+            print(f"\nRolling back to schema v{args.rollback}{dry_run_msg}...")
+            manager.rollback_to(args.rollback, dry_run=args.dry_run)
+
+            if not args.dry_run:
+                print(f"✓ Rollback to v{args.rollback} completed successfully")
+            else:
+                print(f"✓ Rollback validation passed (dry run)")
+
+            return 0
+
+        # No action specified
+        print("ERROR: Must specify --list, --to, or --rollback", file=sys.stderr)
+        return 1
+
+    except Exception as e:
+        logger.error(f"Migration failed: {e}", exc_info=args.verbose)
+        print(f"ERROR: {e}", file=sys.stderr)
+        return 1
+
+
+def cmd_aggregate(args: argparse.Namespace) -> int:
+    """
+    Aggregate benchmark data into time-series trends.
+
+    Args:
+        args: Parsed command-line arguments
+
+    Returns:
+        Exit code (0 for success, 1 for failure)
+    """
+    try:
+        # Get database path
+        if args.db:
+            db_path = Path(args.db)
+        else:
+            db_path = get_benchmark_db_path()
+
+        # Create aggregator
+        aggregator = TimeSeriesAggregator(db_path=db_path)
+
+        # Create baseline
+        if args.baseline:
+            if not args.model or not args.device:
+                print("ERROR: --baseline requires --model and --device", file=sys.stderr)
+                return 1
+
+            print(f"\nCreating {args.type} baseline for {args.model}/{args.device}...")
+            baseline_id = aggregator.create_baseline(
+                model_id=args.model,
+                device=args.device,
+                baseline_type=args.type,
+                days_back=args.lookback_days
+            )
+
+            if baseline_id:
+                print(f"✓ Baseline {baseline_id} created successfully")
+            else:
+                print("⚠ Insufficient data for baseline (need at least 10 samples)")
+                return 1
+
+            return 0
+
+        # Aggregate all models
+        if args.all:
+            print(f"\nAggregating all models (lookback: {args.lookback_days} days)...")
+            trends_created = aggregator.aggregate_all(lookback_days=args.lookback_days)
+            print(f"✓ Created {trends_created} trend records")
+            return 0
+
+        # Aggregate specific model
+        if args.model and args.device:
+            print(f"\nAggregating {args.model}/{args.device} (lookback: {args.lookback_days} days)...")
+            trends_created = aggregator.aggregate_model(
+                model_id=args.model,
+                device=args.device,
+                lookback_days=args.lookback_days
+            )
+            print(f"✓ Created {trends_created} trend records")
+            return 0
+
+        # No action specified
+        print("ERROR: Must specify --all or (--model and --device)", file=sys.stderr)
+        return 1
+
+    except Exception as e:
+        logger.error(f"Aggregation failed: {e}", exc_info=args.verbose)
+        print(f"ERROR: {e}", file=sys.stderr)
+        return 1
+
+
 def main():
     """
     Main CLI entry point with subcommand routing.
@@ -570,6 +715,57 @@ Examples:
     recommend_parser.add_argument("--registry", default="config/model_registry.yaml", help="Model registry YAML")
     recommend_parser.add_argument("--format", choices=["markdown", "json"], default="markdown", help="Output format")
 
+    # --- migrate command ---
+    migrate_parser = subparsers.add_parser(
+        "migrate",
+        help="Manage database schema migrations",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+  # Migrate to latest schema version
+  python -m src.benchmarking.cli migrate --to 8
+
+  # List available migrations
+  python -m src.benchmarking.cli migrate --list
+
+  # Dry run migration (validate only)
+  python -m src.benchmarking.cli migrate --to 8 --dry-run
+
+  # Rollback to previous version
+  python -m src.benchmarking.cli migrate --rollback 7
+        """,
+    )
+    migrate_parser.add_argument("--db", help="Database path (default: data/benchmarks/benchmarks.db or from config)")
+    migrate_parser.add_argument("--to", type=int, help="Target schema version (migrate forward)")
+    migrate_parser.add_argument("--rollback", type=int, help="Rollback to schema version (migrate backward)")
+    migrate_parser.add_argument("--list", action="store_true", help="List available migrations")
+    migrate_parser.add_argument("--dry-run", action="store_true", help="Validate migration without executing")
+
+    # --- aggregate command ---
+    aggregate_parser = subparsers.add_parser(
+        "aggregate",
+        help="Aggregate benchmark data into time-series trends",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+  # Aggregate all models (last 90 days)
+  python -m src.benchmarking.cli aggregate --all
+
+  # Aggregate specific model
+  python -m src.benchmarking.cli aggregate --model m2m100_418m --device cpu
+
+  # Create performance baseline
+  python -m src.benchmarking.cli aggregate --baseline --model m2m100_418m --device cpu --type weekly
+        """,
+    )
+    aggregate_parser.add_argument("--db", help="Database path (default: data/benchmarks/benchmarks.db or from config)")
+    aggregate_parser.add_argument("--all", action="store_true", help="Aggregate all models/devices")
+    aggregate_parser.add_argument("--model", help="Model ID to aggregate")
+    aggregate_parser.add_argument("--device", help="Device to aggregate")
+    aggregate_parser.add_argument("--lookback-days", type=int, default=90, help="Days to look back (default: 90)")
+    aggregate_parser.add_argument("--baseline", action="store_true", help="Create performance baseline")
+    aggregate_parser.add_argument("--type", default="weekly", choices=["daily", "weekly", "monthly"], help="Baseline type")
+
     # Parse arguments
     args = parser.parse_args()
 
@@ -595,6 +791,10 @@ Examples:
         return cmd_compare(args)
     elif args.command == "recommend":
         return cmd_recommend(args)
+    elif args.command == "migrate":
+        return cmd_migrate(args)
+    elif args.command == "aggregate":
+        return cmd_aggregate(args)
     else:
         parser.print_help()
         return 1
