@@ -14,14 +14,7 @@ from src.benchmarking.feedback import (
 from src.benchmarking.storage import BenchmarkDatabase
 from src.benchmarking.system_info import SystemInfo
 
-
-@pytest.fixture
-def temp_db():
-    """Create temporary database for testing."""
-    with tempfile.TemporaryDirectory() as tmpdir:
-        db_path = Path(tmpdir) / "test_benchmark.db"
-        db = BenchmarkDatabase(db_path)
-        yield db
+# temp_db fixture imported from conftest.py
 
 
 @pytest.fixture

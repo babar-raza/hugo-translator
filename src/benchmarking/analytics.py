@@ -13,6 +13,8 @@ Implements Phase 4.1 analytics requirements with Phase 4.2 optimizations:
 - Performance monitoring
 """
 
+from __future__ import annotations
+
 import logging
 import sqlite3
 from dataclasses import dataclass
