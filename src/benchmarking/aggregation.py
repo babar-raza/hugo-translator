@@ -6,7 +6,9 @@ Provides pre-aggregated statistics at multiple time windows for dashboard perfor
 - Incremental aggregation (only process new data)
 - Performance baseline tracking
 
-Implements Phase 4.1 analytics requirements.
+Implements Phase 4.1 analytics requirements with Phase 4.2 optimizations:
+- Connection pooling
+- Performance monitoring
 """
 
 import json
@@ -20,7 +22,24 @@ from typing import TYPE_CHECKING, List, Optional, Tuple
 if TYPE_CHECKING:
     from src.shared_engines.composition_root import SharedEngines
 
+from src.benchmarking.connection_pool import ConnectionPool
+from src.benchmarking.performance_monitor import PerformanceMonitor
+
 logger = logging.getLogger(__name__)
+
+
+class _SimpleConnectionContext:
+    """Simple context manager for non-pooled connections."""
+
+    def __init__(self, conn: sqlite3.Connection):
+        self.conn = conn
+
+    def __enter__(self) -> sqlite3.Connection:
+        return self.conn
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.conn.close()
+        return False
 
 
 @dataclass
@@ -57,22 +76,44 @@ class TimeSeriesAggregator:
     def __init__(
         self,
         db_path: Path | str,
-        engines: Optional["SharedEngines"] = None
+        engines: Optional["SharedEngines"] = None,
+        pool_size: int = 3,
+        enable_pooling: bool = True,
+        enable_monitoring: bool = True
     ):
         """Initialize aggregator.
 
         Args:
             db_path: Path to benchmark database
             engines: Optional SharedEngines for logging/telemetry
+            pool_size: Connection pool size (default 3)
+            enable_pooling: Enable connection pooling (default True)
+            enable_monitoring: Enable performance monitoring (default True)
         """
         self.db_path = Path(db_path) if db_path != ":memory:" else db_path
         self.engines = engines
+
+        # Phase 4.2 optimizations
+        self._enable_pooling = enable_pooling
+        self._enable_monitoring = enable_monitoring
+
+        # Initialize connection pool
+        self._pool: Optional[ConnectionPool] = None
+        if enable_pooling and db_path != ":memory:":
+            self._pool = ConnectionPool(db_path, pool_size=pool_size)
+            logger.info(f"Connection pool enabled for aggregator: pool_size={pool_size}")
+
+        # Initialize performance monitor
+        self._monitor: Optional[PerformanceMonitor] = None
+        if enable_monitoring:
+            self._monitor = PerformanceMonitor(slow_threshold_ms=1000.0, engines=engines)
+            logger.info("Performance monitoring enabled for aggregator")
 
         if engines:
             logger.info("TimeSeriesAggregator initialized with SharedEngines support")
 
     def _create_connection(self) -> sqlite3.Connection:
-        """Create database connection.
+        """Create database connection (without pooling).
 
         Returns:
             Configured SQLite connection
@@ -80,6 +121,34 @@ class TimeSeriesAggregator:
         conn = sqlite3.connect(str(self.db_path))
         conn.row_factory = sqlite3.Row
         return conn
+
+    def _get_connection(self):
+        """Get database connection (with optional pooling).
+
+        Returns:
+            Connection context manager
+        """
+        if self._pool:
+            return self._pool.get_connection()
+        else:
+            return _SimpleConnectionContext(self._create_connection())
+
+    def close(self) -> None:
+        """Close resources (connection pool, etc.)."""
+        if self._pool:
+            self._pool.close_all()
+            logger.info("Aggregator connection pool closed")
+
+    def get_monitor_stats(self) -> Optional[dict]:
+        """Get performance monitor statistics.
+
+        Returns:
+            Monitor statistics dict or None if monitoring disabled
+        """
+        if self._monitor:
+            return self._monitor.get_stats()
+        return None
+
 
     def aggregate_all(self, lookback_days: int = 90) -> int:
         """Aggregate all models and devices for all time windows.
@@ -104,8 +173,7 @@ class TimeSeriesAggregator:
         start_time = datetime.now(UTC)
 
         try:
-            conn = self._create_connection()
-            try:
+            with self._get_connection() as conn:
                 # Get unique model/device combinations
                 cursor = conn.execute("""
                     SELECT DISTINCT model_id, device
@@ -135,25 +203,33 @@ class TimeSeriesAggregator:
 
                 conn.commit()
 
-                duration = (datetime.now(UTC) - start_time).total_seconds()
-                logger.info(
-                    f"Aggregation completed: {total_trends} trends in {duration:.2f}s "
-                    f"({len(combinations)} combinations)"
+            duration = (datetime.now(UTC) - start_time).total_seconds()
+            duration_ms = duration * 1000
+
+            # Record in monitor
+            if self._monitor:
+                self._monitor.record_query(
+                    "aggregate_all",
+                    duration_ms,
+                    row_count=total_trends,
+                    combinations=len(combinations)
                 )
 
-                # Emit telemetry: aggregation completed
-                if self.engines:
-                    self.engines.telemetry.track_event(
-                        "benchmark_aggregation_completed",
-                        trends_created=total_trends,
-                        combinations=len(combinations),
-                        duration_seconds=duration
-                    )
+            logger.info(
+                f"Aggregation completed: {total_trends} trends in {duration:.2f}s "
+                f"({len(combinations)} combinations)"
+            )
 
-                return total_trends
+            # Emit telemetry: aggregation completed
+            if self.engines:
+                self.engines.telemetry.track_event(
+                    "benchmark_aggregation_completed",
+                    trends_created=total_trends,
+                    combinations=len(combinations),
+                    duration_seconds=duration
+                )
 
-            finally:
-                conn.close()
+            return total_trends
 
         except Exception as e:
             logger.error(f"Aggregation failed: {e}", exc_info=True)

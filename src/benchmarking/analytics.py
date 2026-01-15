@@ -7,7 +7,10 @@ Provides high-level query methods for dashboard and analysis:
 - Model/device comparisons
 
 Returns pandas DataFrames for easy analysis and visualization.
-Implements Phase 4.1 analytics requirements.
+Implements Phase 4.1 analytics requirements with Phase 4.2 optimizations:
+- Query result caching (LRU + TTL)
+- Connection pooling
+- Performance monitoring
 """
 
 import logging
@@ -27,7 +30,25 @@ except ImportError:
 if TYPE_CHECKING:
     from src.shared_engines.composition_root import SharedEngines
 
+from src.benchmarking.query_cache import QueryCache, make_cache_key
+from src.benchmarking.connection_pool import ConnectionPool
+from src.benchmarking.performance_monitor import PerformanceMonitor
+
 logger = logging.getLogger(__name__)
+
+
+class _SimpleConnectionContext:
+    """Simple context manager for non-pooled connections."""
+
+    def __init__(self, conn: sqlite3.Connection):
+        self.conn = conn
+
+    def __enter__(self) -> sqlite3.Connection:
+        return self.conn
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.conn.close()
+        return False
 
 
 class AnalyticsQueryAPI:
@@ -55,13 +76,25 @@ class AnalyticsQueryAPI:
     def __init__(
         self,
         db_path: Path | str,
-        engines: Optional["SharedEngines"] = None
+        engines: Optional["SharedEngines"] = None,
+        cache_max_size: int = 100,
+        cache_ttl_seconds: int = 300,
+        pool_size: int = 5,
+        enable_caching: bool = True,
+        enable_pooling: bool = True,
+        enable_monitoring: bool = True
     ):
         """Initialize analytics API.
 
         Args:
             db_path: Path to benchmark database
             engines: Optional SharedEngines for logging/telemetry
+            cache_max_size: Maximum cache entries (default 100)
+            cache_ttl_seconds: Cache TTL in seconds (default 300)
+            pool_size: Connection pool size (default 5)
+            enable_caching: Enable query result caching (default True)
+            enable_pooling: Enable connection pooling (default True)
+            enable_monitoring: Enable performance monitoring (default True)
 
         Raises:
             ImportError: If pandas is not available
@@ -75,11 +108,34 @@ class AnalyticsQueryAPI:
         self.db_path = Path(db_path) if db_path != ":memory:" else db_path
         self.engines = engines
 
+        # Phase 4.2 optimizations
+        self._enable_caching = enable_caching
+        self._enable_pooling = enable_pooling
+        self._enable_monitoring = enable_monitoring
+
+        # Initialize query cache
+        self._cache: Optional[QueryCache] = None
+        if enable_caching:
+            self._cache = QueryCache(max_size=cache_max_size, ttl_seconds=cache_ttl_seconds)
+            logger.info(f"Query cache enabled: max_size={cache_max_size}, ttl={cache_ttl_seconds}s")
+
+        # Initialize connection pool
+        self._pool: Optional[ConnectionPool] = None
+        if enable_pooling and db_path != ":memory:":
+            self._pool = ConnectionPool(db_path, pool_size=pool_size)
+            logger.info(f"Connection pool enabled: pool_size={pool_size}")
+
+        # Initialize performance monitor
+        self._monitor: Optional[PerformanceMonitor] = None
+        if enable_monitoring:
+            self._monitor = PerformanceMonitor(slow_threshold_ms=500.0, engines=engines)
+            logger.info("Performance monitoring enabled")
+
         if engines:
             logger.info("AnalyticsQueryAPI initialized with SharedEngines support")
 
     def _create_connection(self) -> sqlite3.Connection:
-        """Create database connection.
+        """Create database connection (without pooling).
 
         Returns:
             Configured SQLite connection
@@ -87,6 +143,63 @@ class AnalyticsQueryAPI:
         conn = sqlite3.connect(str(self.db_path))
         conn.row_factory = sqlite3.Row
         return conn
+
+    def _get_connection(self):
+        """Get database connection (with optional pooling).
+
+        Returns:
+            Connection context manager
+        """
+        if self._pool:
+            return self._pool.get_connection()
+        else:
+            # Return a simple context manager for non-pooled connections
+            return _SimpleConnectionContext(self._create_connection())
+
+    def close(self) -> None:
+        """Close resources (connection pool, etc.)."""
+        if self._pool:
+            self._pool.close_all()
+            logger.info("Connection pool closed")
+
+    def get_cache_stats(self) -> Optional[Dict]:
+        """Get query cache statistics.
+
+        Returns:
+            Cache statistics dict or None if caching disabled
+        """
+        if self._cache:
+            return self._cache.get_stats()
+        return None
+
+    def get_monitor_stats(self) -> Optional[Dict]:
+        """Get performance monitor statistics.
+
+        Returns:
+            Monitor statistics dict or None if monitoring disabled
+        """
+        if self._monitor:
+            return self._monitor.get_stats()
+        return None
+
+    def invalidate_cache(self, pattern: Optional[str] = None) -> int:
+        """Invalidate cached query results.
+
+        Args:
+            pattern: Optional pattern to match (None clears all)
+
+        Returns:
+            Number of entries invalidated
+        """
+        if not self._cache:
+            return 0
+
+        if pattern:
+            return self._cache.invalidate_pattern(pattern)
+        else:
+            stats = self._cache.get_stats()
+            self._cache.clear()
+            return stats["size"]
 
     def _emit_query_event(self, query_type: str, duration_seconds: float, **kwargs) -> None:
         """Emit telemetry event for query execution.
@@ -136,8 +249,33 @@ class AnalyticsQueryAPI:
                 f"Must be one of: {valid_windows}"
             )
 
-        conn = self._create_connection()
-        try:
+        # Check cache first
+        cache_key = make_cache_key(
+            "trends",
+            model_id=model_id,
+            device=device,
+            window=time_window,
+            days=lookback_days
+        )
+
+        if self._cache:
+            cached_result = self._cache.get(cache_key)
+            if cached_result is not None:
+                duration_ms = (datetime.now(UTC) - start_time).total_seconds() * 1000
+                if self._monitor:
+                    self._monitor.record_query(
+                        "get_performance_trends",
+                        duration_ms,
+                        row_count=len(cached_result),
+                        cache_hit=True,
+                        model_id=model_id,
+                        device=device
+                    )
+                logger.debug(f"get_performance_trends: cache hit ({len(cached_result)} rows)")
+                return cached_result
+
+        # Cache miss - query database
+        with self._get_connection() as conn:
             query = """
                 SELECT
                     window_start,
@@ -168,26 +306,40 @@ class AnalyticsQueryAPI:
                 df['window_start'] = pd.to_datetime(df['window_start'])
                 df['window_end'] = pd.to_datetime(df['window_end'])
 
-            duration = (datetime.now(UTC) - start_time).total_seconds()
-            self._emit_query_event(
+        duration = (datetime.now(UTC) - start_time).total_seconds()
+        duration_ms = duration * 1000
+
+        # Record query in monitor
+        if self._monitor:
+            self._monitor.record_query(
                 "get_performance_trends",
-                duration,
+                duration_ms,
+                row_count=len(df),
+                cache_hit=False,
                 model_id=model_id,
-                device=device,
-                time_window=time_window,
-                lookback_days=lookback_days,
-                rows_returned=len(df)
+                device=device
             )
 
-            logger.debug(
-                f"get_performance_trends: {len(df)} rows in {duration:.3f}s "
-                f"({model_id}/{device}/{time_window})"
-            )
+        # Store in cache
+        if self._cache:
+            self._cache.set(cache_key, df)
 
-            return df
+        self._emit_query_event(
+            "get_performance_trends",
+            duration,
+            model_id=model_id,
+            device=device,
+            time_window=time_window,
+            lookback_days=lookback_days,
+            rows_returned=len(df)
+        )
 
-        finally:
-            conn.close()
+        logger.debug(
+            f"get_performance_trends: {len(df)} rows in {duration:.3f}s "
+            f"({model_id}/{device}/{time_window})"
+        )
+
+        return df
 
     def get_performance_baselines(
         self,
@@ -209,8 +361,32 @@ class AnalyticsQueryAPI:
         """
         start_time = datetime.now(UTC)
 
-        conn = self._create_connection()
-        try:
+        # Check cache first
+        cache_key = make_cache_key(
+            "baselines",
+            model_id=model_id,
+            device=device,
+            type=baseline_type
+        )
+
+        if self._cache:
+            cached_result = self._cache.get(cache_key)
+            if cached_result is not None:
+                duration_ms = (datetime.now(UTC) - start_time).total_seconds() * 1000
+                if self._monitor:
+                    self._monitor.record_query(
+                        "get_performance_baselines",
+                        duration_ms,
+                        row_count=len(cached_result),
+                        cache_hit=True,
+                        model_id=model_id,
+                        device=device
+                    )
+                logger.debug(f"get_performance_baselines: cache hit ({len(cached_result)} rows)")
+                return cached_result
+
+        # Cache miss - query database
+        with self._get_connection() as conn:
             if baseline_type:
                 query = """
                     SELECT
@@ -251,20 +427,34 @@ class AnalyticsQueryAPI:
                 df['baseline_date'] = pd.to_datetime(df['baseline_date'])
                 df['created_at'] = pd.to_datetime(df['created_at'])
 
-            duration = (datetime.now(UTC) - start_time).total_seconds()
-            self._emit_query_event(
+        duration = (datetime.now(UTC) - start_time).total_seconds()
+        duration_ms = duration * 1000
+
+        # Record query in monitor
+        if self._monitor:
+            self._monitor.record_query(
                 "get_performance_baselines",
-                duration,
+                duration_ms,
+                row_count=len(df),
+                cache_hit=False,
                 model_id=model_id,
-                device=device,
-                baseline_type=baseline_type,
-                rows_returned=len(df)
+                device=device
             )
 
-            return df
+        # Store in cache
+        if self._cache:
+            self._cache.set(cache_key, df)
 
-        finally:
-            conn.close()
+        self._emit_query_event(
+            "get_performance_baselines",
+            duration,
+            model_id=model_id,
+            device=device,
+            baseline_type=baseline_type,
+            rows_returned=len(df)
+        )
+
+        return df
 
     def compare_performance(
         self,
@@ -295,8 +485,32 @@ class AnalyticsQueryAPI:
         if current_date is None:
             current_date = datetime.now(UTC).date().isoformat()
 
-        conn = self._create_connection()
-        try:
+        # Check cache first
+        cache_key = make_cache_key(
+            "compare_performance",
+            model_id=model_id,
+            device=device,
+            baseline=baseline_date,
+            current=current_date
+        )
+
+        if self._cache:
+            cached_result = self._cache.get(cache_key)
+            if cached_result is not None:
+                duration_ms = (datetime.now(UTC) - start_time).total_seconds() * 1000
+                if self._monitor:
+                    self._monitor.record_query(
+                        "compare_performance",
+                        duration_ms,
+                        cache_hit=True,
+                        model_id=model_id,
+                        device=device
+                    )
+                logger.debug("compare_performance: cache hit")
+                return cached_result
+
+        # Cache miss - query database
+        with self._get_connection() as conn:
             # Get baseline
             cursor = conn.execute("""
                 SELECT avg_throughput, p95_throughput
@@ -355,38 +569,53 @@ class AnalyticsQueryAPI:
             throughputs = [row[0] for row in cursor.fetchall()]
             current_p95 = self._percentile(throughputs, 95) if throughputs else 0.0
 
-            # Calculate changes
-            throughput_change = (
-                ((current_throughput - baseline_throughput) / baseline_throughput * 100)
-                if baseline_throughput > 0 else 0.0
-            )
+        # Calculate changes
+        throughput_change = (
+            ((current_throughput - baseline_throughput) / baseline_throughput * 100)
+            if baseline_throughput > 0 else 0.0
+        )
 
-            p95_change = (
-                ((current_p95 - baseline_p95) / baseline_p95 * 100)
-                if baseline_p95 > 0 else 0.0
-            )
+        p95_change = (
+            ((current_p95 - baseline_p95) / baseline_p95 * 100)
+            if baseline_p95 > 0 else 0.0
+        )
 
-            duration = (datetime.now(UTC) - start_time).total_seconds()
-            self._emit_query_event(
+        duration = (datetime.now(UTC) - start_time).total_seconds()
+        duration_ms = duration * 1000
+
+        # Record query in monitor
+        if self._monitor:
+            self._monitor.record_query(
                 "compare_performance",
-                duration,
+                duration_ms,
+                cache_hit=False,
                 model_id=model_id,
-                device=device,
-                baseline_date=baseline_date,
-                current_date=current_date
+                device=device
             )
 
-            return {
-                "baseline_throughput": baseline_throughput,
-                "current_throughput": current_throughput,
-                "throughput_change_pct": throughput_change,
-                "baseline_p95": baseline_p95,
-                "current_p95": current_p95,
-                "p95_change_pct": p95_change
-            }
+        result = {
+            "baseline_throughput": baseline_throughput,
+            "current_throughput": current_throughput,
+            "throughput_change_pct": throughput_change,
+            "baseline_p95": baseline_p95,
+            "current_p95": current_p95,
+            "p95_change_pct": p95_change
+        }
 
-        finally:
-            conn.close()
+        # Store in cache
+        if self._cache:
+            self._cache.set(cache_key, result)
+
+        self._emit_query_event(
+            "compare_performance",
+            duration,
+            model_id=model_id,
+            device=device,
+            baseline_date=baseline_date,
+            current_date=current_date
+        )
+
+        return result
 
     def get_throughput_distribution(
         self,
@@ -406,8 +635,32 @@ class AnalyticsQueryAPI:
         """
         start_time = datetime.now(UTC)
 
-        conn = self._create_connection()
-        try:
+        # Check cache first
+        cache_key = make_cache_key(
+            "distribution",
+            model_id=model_id,
+            device=device,
+            days=days
+        )
+
+        if self._cache:
+            cached_result = self._cache.get(cache_key)
+            if cached_result is not None:
+                duration_ms = (datetime.now(UTC) - start_time).total_seconds() * 1000
+                if self._monitor:
+                    self._monitor.record_query(
+                        "get_throughput_distribution",
+                        duration_ms,
+                        row_count=len(cached_result),
+                        cache_hit=True,
+                        model_id=model_id,
+                        device=device
+                    )
+                logger.debug(f"get_throughput_distribution: cache hit ({len(cached_result)} rows)")
+                return cached_result
+
+        # Cache miss - query database
+        with self._get_connection() as conn:
             query = """
                 SELECT
                     r.timestamp_utc,
@@ -432,20 +685,34 @@ class AnalyticsQueryAPI:
             if not df.empty:
                 df['timestamp_utc'] = pd.to_datetime(df['timestamp_utc'])
 
-            duration = (datetime.now(UTC) - start_time).total_seconds()
-            self._emit_query_event(
+        duration = (datetime.now(UTC) - start_time).total_seconds()
+        duration_ms = duration * 1000
+
+        # Record query in monitor
+        if self._monitor:
+            self._monitor.record_query(
                 "get_throughput_distribution",
-                duration,
+                duration_ms,
+                row_count=len(df),
+                cache_hit=False,
                 model_id=model_id,
-                device=device,
-                days=days,
-                rows_returned=len(df)
+                device=device
             )
 
-            return df
+        # Store in cache
+        if self._cache:
+            self._cache.set(cache_key, df)
 
-        finally:
-            conn.close()
+        self._emit_query_event(
+            "get_throughput_distribution",
+            duration,
+            model_id=model_id,
+            device=device,
+            days=days,
+            rows_returned=len(df)
+        )
+
+        return df
 
     def get_model_comparison(
         self,
@@ -465,8 +732,31 @@ class AnalyticsQueryAPI:
         """
         start_time = datetime.now(UTC)
 
-        conn = self._create_connection()
-        try:
+        # Check cache first
+        cache_key = make_cache_key(
+            "model_comparison",
+            models="|".join(sorted(model_ids)),
+            device=device,
+            days=days
+        )
+
+        if self._cache:
+            cached_result = self._cache.get(cache_key)
+            if cached_result is not None:
+                duration_ms = (datetime.now(UTC) - start_time).total_seconds() * 1000
+                if self._monitor:
+                    self._monitor.record_query(
+                        "get_model_comparison",
+                        duration_ms,
+                        row_count=len(cached_result),
+                        cache_hit=True,
+                        device=device
+                    )
+                logger.debug(f"get_model_comparison: cache hit ({len(cached_result)} rows)")
+                return cached_result
+
+        # Cache miss - query database
+        with self._get_connection() as conn:
             placeholders = ','.join('?' * len(model_ids))
             query = f"""
                 SELECT
@@ -489,20 +779,33 @@ class AnalyticsQueryAPI:
             params = tuple(model_ids) + (device, f"-{days} days")
             df = pd.read_sql_query(query, conn, params=params)
 
-            duration = (datetime.now(UTC) - start_time).total_seconds()
-            self._emit_query_event(
+        duration = (datetime.now(UTC) - start_time).total_seconds()
+        duration_ms = duration * 1000
+
+        # Record query in monitor
+        if self._monitor:
+            self._monitor.record_query(
                 "get_model_comparison",
-                duration,
-                model_count=len(model_ids),
-                device=device,
-                days=days,
-                rows_returned=len(df)
+                duration_ms,
+                row_count=len(df),
+                cache_hit=False,
+                device=device
             )
 
-            return df
+        # Store in cache
+        if self._cache:
+            self._cache.set(cache_key, df)
 
-        finally:
-            conn.close()
+        self._emit_query_event(
+            "get_model_comparison",
+            duration,
+            model_count=len(model_ids),
+            device=device,
+            days=days,
+            rows_returned=len(df)
+        )
+
+        return df
 
     def get_device_comparison(
         self,
@@ -522,8 +825,31 @@ class AnalyticsQueryAPI:
         """
         start_time = datetime.now(UTC)
 
-        conn = self._create_connection()
-        try:
+        # Check cache first
+        cache_key = make_cache_key(
+            "device_comparison",
+            model_id=model_id,
+            devices="|".join(sorted(devices)),
+            days=days
+        )
+
+        if self._cache:
+            cached_result = self._cache.get(cache_key)
+            if cached_result is not None:
+                duration_ms = (datetime.now(UTC) - start_time).total_seconds() * 1000
+                if self._monitor:
+                    self._monitor.record_query(
+                        "get_device_comparison",
+                        duration_ms,
+                        row_count=len(cached_result),
+                        cache_hit=True,
+                        model_id=model_id
+                    )
+                logger.debug(f"get_device_comparison: cache hit ({len(cached_result)} rows)")
+                return cached_result
+
+        # Cache miss - query database
+        with self._get_connection() as conn:
             placeholders = ','.join('?' * len(devices))
             query = f"""
                 SELECT
@@ -544,20 +870,33 @@ class AnalyticsQueryAPI:
             params = (model_id,) + tuple(devices) + (f"-{days} days",)
             df = pd.read_sql_query(query, conn, params=params)
 
-            duration = (datetime.now(UTC) - start_time).total_seconds()
-            self._emit_query_event(
+        duration = (datetime.now(UTC) - start_time).total_seconds()
+        duration_ms = duration * 1000
+
+        # Record query in monitor
+        if self._monitor:
+            self._monitor.record_query(
                 "get_device_comparison",
-                duration,
-                model_id=model_id,
-                device_count=len(devices),
-                days=days,
-                rows_returned=len(df)
+                duration_ms,
+                row_count=len(df),
+                cache_hit=False,
+                model_id=model_id
             )
 
-            return df
+        # Store in cache
+        if self._cache:
+            self._cache.set(cache_key, df)
 
-        finally:
-            conn.close()
+        self._emit_query_event(
+            "get_device_comparison",
+            duration,
+            model_id=model_id,
+            device_count=len(devices),
+            days=days,
+            rows_returned=len(df)
+        )
+
+        return df
 
     def _percentile(self, values: List[float], percentile: int) -> float:
         """Calculate percentile.
