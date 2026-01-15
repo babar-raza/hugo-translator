@@ -15,7 +15,7 @@ from src.benchmarking.storage import (
 
 def test_foreign_keys_enabled_by_default():
     """Test that foreign keys are enabled on all connections."""
-    with tempfile.TemporaryDirectory() as tmpdir:
+    with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
         db_path = Path(tmpdir) / "test.db"
         db = BenchmarkDatabase(db_path)
 
@@ -26,11 +26,12 @@ def test_foreign_keys_enabled_by_default():
             assert fk_enabled == 1, "Foreign keys must be enabled"
         finally:
             db._close_connection(conn)
+            db.close()
 
 
 def test_system_info_fk_constraint():
     """Test that system_info enforces foreign key to benchmark_runs."""
-    with tempfile.TemporaryDirectory() as tmpdir:
+    with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
         db_path = Path(tmpdir) / "test.db"
         db = BenchmarkDatabase(db_path)
 
@@ -61,16 +62,16 @@ def test_system_info_fk_constraint():
                 conn.commit()
 
             assert "FOREIGN KEY constraint failed" in str(exc_info.value)
-        except sqlite3.IntegrityError:
-            # Expected - rollback
+            # Rollback after pytest.raises captures the exception
             conn.rollback()
         finally:
             db._close_connection(conn)
+            db.close()
 
 
 def test_benchmark_results_fk_constraint():
     """Test that benchmark_results enforces foreign key to benchmark_runs."""
-    with tempfile.TemporaryDirectory() as tmpdir:
+    with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
         db_path = Path(tmpdir) / "test.db"
         db = BenchmarkDatabase(db_path)
 
@@ -101,16 +102,16 @@ def test_benchmark_results_fk_constraint():
                 conn.commit()
 
             assert "FOREIGN KEY constraint failed" in str(exc_info.value)
-        except sqlite3.IntegrityError:
-            # Expected - rollback
+            # Rollback after pytest.raises captures the exception
             conn.rollback()
         finally:
             db._close_connection(conn)
+            db.close()
 
 
 def test_recommendation_feedback_fk_constraint():
     """Test that recommendation_feedback enforces foreign key to benchmark_runs."""
-    with tempfile.TemporaryDirectory() as tmpdir:
+    with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
         db_path = Path(tmpdir) / "test.db"
         db = BenchmarkDatabase(db_path)
 
@@ -145,16 +146,16 @@ def test_recommendation_feedback_fk_constraint():
                 conn.commit()
 
             assert "FOREIGN KEY constraint failed" in str(exc_info.value)
-        except sqlite3.IntegrityError:
-            # Expected - rollback
+            # Rollback after pytest.raises captures the exception
             conn.rollback()
         finally:
             db._close_connection(conn)
+            db.close()
 
 
 def test_cascading_delete_system_info():
     """Test that deleting a run cascades to system_info."""
-    with tempfile.TemporaryDirectory() as tmpdir:
+    with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
         db_path = Path(tmpdir) / "test.db"
         db = BenchmarkDatabase(db_path)
 
@@ -205,7 +206,7 @@ def test_cascading_delete_system_info():
 
 def test_cascading_delete_benchmark_results():
     """Test that deleting a run cascades to benchmark_results."""
-    with tempfile.TemporaryDirectory() as tmpdir:
+    with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
         db_path = Path(tmpdir) / "test.db"
         db = BenchmarkDatabase(db_path)
 
@@ -277,7 +278,7 @@ def test_cascading_delete_benchmark_results():
 
 def test_cascading_delete_recommendation_feedback():
     """Test that deleting a run cascades to recommendation_feedback."""
-    with tempfile.TemporaryDirectory() as tmpdir:
+    with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
         db_path = Path(tmpdir) / "test.db"
         db = BenchmarkDatabase(db_path)
 
@@ -359,7 +360,7 @@ def test_cascading_delete_recommendation_feedback():
 
 def test_fk_violation_prevents_orphaned_records():
     """Test that FK constraints prevent orphaned records."""
-    with tempfile.TemporaryDirectory() as tmpdir:
+    with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
         db_path = Path(tmpdir) / "test.db"
         db = BenchmarkDatabase(db_path)
 
@@ -423,7 +424,7 @@ def test_fk_violation_prevents_orphaned_records():
 
 def test_fk_preserved_across_connections():
     """Test that FK enforcement persists across multiple connections."""
-    with tempfile.TemporaryDirectory() as tmpdir:
+    with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
         db_path = Path(tmpdir) / "test.db"
 
         # Create database with first connection

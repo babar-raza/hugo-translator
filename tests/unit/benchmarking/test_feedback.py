@@ -11,7 +11,7 @@ from src.benchmarking.feedback import (
     RecommendationFeedback,
     RecommendationAccuracy,
 )
-from src.benchmarking.storage import BenchmarkDatabase
+from src.benchmarking.storage import BenchmarkDatabase, BenchmarkRun
 from src.benchmarking.system_info import SystemInfo
 
 # temp_db fixture imported from conftest.py
@@ -29,6 +29,40 @@ def system_info():
         python_version="3.11.0",
         collected_at_utc="2025-12-24T10:00:00Z",
     )
+
+
+@pytest.fixture
+def db_with_runs(temp_db, system_info):
+    """Create temp_db with pre-existing benchmark runs for FK satisfaction.
+
+    The recommendation_feedback table has FK to benchmark_runs(run_id),
+    so tests inserting feedback need corresponding runs to exist first.
+    """
+    # All run IDs used in feedback tests
+    run_ids = [
+        "rec_001", "rec_002",  # Basic tests
+        "rec_a", "rec_b",      # Model filter tests
+        "rec_0", "rec_1", "rec_2", "rec_3", "rec_4",  # History tests
+        "rec_success", "rec_fail",  # Success/failure tests
+    ]
+
+    for run_id in run_ids:
+        run = BenchmarkRun(
+            run_id=run_id,
+            model_id="model_a",
+            device="cpu",
+            batch_sizes=[8],
+            iterations=1,
+            corpus_category="test",
+            purpose="test",
+            tags=[],
+            system_info=system_info,
+            results=[],
+            total_duration_seconds=1.0,
+        )
+        temp_db.save_run(run)
+
+    return temp_db
 
 
 @pytest.fixture
@@ -65,9 +99,9 @@ def test_bm03_feedback_collector_creates_table(temp_db):
         assert cursor.fetchone() is not None
 
 
-def test_bm03_record_feedback(temp_db, sample_feedback):
+def test_bm03_record_feedback(db_with_runs, sample_feedback):
     """Test recording feedback."""
-    collector = FeedbackCollector(temp_db)
+    collector = FeedbackCollector(db_with_runs)
 
     collector.record_feedback(sample_feedback)
 
@@ -87,9 +121,9 @@ def test_bm03_get_feedback_for_nonexistent_recommendation(temp_db):
     assert feedback is None
 
 
-def test_bm03_get_feedback_for_recommendation(temp_db, sample_feedback):
+def test_bm03_get_feedback_for_recommendation(db_with_runs, sample_feedback):
     """Test getting feedback for specific recommendation."""
-    collector = FeedbackCollector(temp_db)
+    collector = FeedbackCollector(db_with_runs)
     collector.record_feedback(sample_feedback)
 
     feedback = collector.get_feedback_for_recommendation("rec_001")
@@ -100,9 +134,9 @@ def test_bm03_get_feedback_for_recommendation(temp_db, sample_feedback):
     assert feedback.actual_throughput == 95.0
 
 
-def test_bm03_feedback_roundtrip(temp_db, sample_feedback):
+def test_bm03_feedback_roundtrip(db_with_runs, sample_feedback):
     """Test that feedback can be stored and retrieved with all fields."""
-    collector = FeedbackCollector(temp_db)
+    collector = FeedbackCollector(db_with_runs)
 
     collector.record_feedback(sample_feedback)
     retrieved = collector.get_feedback_for_recommendation("rec_001")
@@ -126,9 +160,9 @@ def test_bm03_accuracy_metrics_empty(temp_db):
     assert accuracy.success_rate == 0.0
 
 
-def test_bm03_accuracy_metrics_single_feedback(temp_db, sample_feedback):
+def test_bm03_accuracy_metrics_single_feedback(db_with_runs, sample_feedback):
     """Test accuracy metrics with single feedback."""
-    collector = FeedbackCollector(temp_db)
+    collector = FeedbackCollector(db_with_runs)
     collector.record_feedback(sample_feedback)
 
     accuracy = collector.get_accuracy_metrics()
@@ -138,9 +172,9 @@ def test_bm03_accuracy_metrics_single_feedback(temp_db, sample_feedback):
     assert accuracy.success_rate == 1.0  # Success = True
 
 
-def test_bm03_accuracy_metrics_not_followed(temp_db, sample_feedback):
+def test_bm03_accuracy_metrics_not_followed(db_with_runs, sample_feedback):
     """Test accuracy when recommendation not followed."""
-    collector = FeedbackCollector(temp_db)
+    collector = FeedbackCollector(db_with_runs)
 
     # User chose different model
     feedback = sample_feedback
@@ -153,9 +187,9 @@ def test_bm03_accuracy_metrics_not_followed(temp_db, sample_feedback):
     assert accuracy.followed_count == 0  # Not followed
 
 
-def test_bm03_accuracy_metrics_prediction_error(temp_db, system_info):
+def test_bm03_accuracy_metrics_prediction_error(db_with_runs, system_info):
     """Test accuracy metrics calculate prediction error."""
-    collector = FeedbackCollector(temp_db)
+    collector = FeedbackCollector(db_with_runs)
 
     # Create feedback with prediction error
     feedback = RecommendationFeedback(
@@ -184,9 +218,9 @@ def test_bm03_accuracy_metrics_prediction_error(temp_db, system_info):
     assert accuracy.avg_memory_error_percent > 0
 
 
-def test_bm03_accuracy_metrics_filter_by_model(temp_db, system_info):
+def test_bm03_accuracy_metrics_filter_by_model(db_with_runs, system_info):
     """Test accuracy metrics filtered by model ID."""
-    collector = FeedbackCollector(temp_db)
+    collector = FeedbackCollector(db_with_runs)
 
     # Record feedback for two different models
     feedback_a = RecommendationFeedback(
@@ -235,9 +269,9 @@ def test_bm03_accuracy_metrics_filter_by_model(temp_db, system_info):
     assert accuracy_a.followed_count == 1
 
 
-def test_bm03_get_feedback_history(temp_db, system_info):
+def test_bm03_get_feedback_history(db_with_runs, system_info):
     """Test getting feedback history."""
-    collector = FeedbackCollector(temp_db)
+    collector = FeedbackCollector(db_with_runs)
 
     # Record multiple feedbacks
     for i in range(5):
@@ -292,9 +326,9 @@ def test_bm03_adaptive_weight_learner_default_weights(temp_db):
     assert "historical_success" in weights
 
 
-def test_bm03_adaptive_weight_learner_update_weights(temp_db, sample_feedback):
+def test_bm03_adaptive_weight_learner_update_weights(db_with_runs, sample_feedback):
     """Test weight update based on feedback."""
-    learner = AdaptiveWeightLearner(temp_db, learning_rate=0.1)
+    learner = AdaptiveWeightLearner(db_with_runs, learning_rate=0.1)
 
     initial_weights = learner.get_current_weights()
     updated_weights = learner.update_weights(sample_feedback)
@@ -303,9 +337,9 @@ def test_bm03_adaptive_weight_learner_update_weights(temp_db, sample_feedback):
     assert updated_weights != initial_weights
 
 
-def test_bm03_adaptive_weight_learner_weight_bounds(temp_db, system_info):
+def test_bm03_adaptive_weight_learner_weight_bounds(db_with_runs, system_info):
     """Test that weights stay within bounds."""
-    learner = AdaptiveWeightLearner(temp_db, learning_rate=0.9)
+    learner = AdaptiveWeightLearner(db_with_runs, learning_rate=0.9)
 
     # Create feedback with large error to trigger significant updates
     feedback = RecommendationFeedback(
@@ -344,9 +378,9 @@ def test_bm03_adaptive_weight_learner_learning_rate_bounds(temp_db):
     assert learner_high.learning_rate == 1.0
 
 
-def test_bm03_adaptive_weight_learner_history(temp_db, sample_feedback):
+def test_bm03_adaptive_weight_learner_history(db_with_runs, sample_feedback):
     """Test weight history tracking."""
-    learner = AdaptiveWeightLearner(temp_db)
+    learner = AdaptiveWeightLearner(db_with_runs)
 
     # Update weights multiple times
     for i in range(3):
@@ -363,9 +397,9 @@ def test_bm03_adaptive_weight_learner_history(temp_db, sample_feedback):
     assert isinstance(weights, dict)
 
 
-def test_bm03_feedback_success_failure_handling(temp_db, system_info):
+def test_bm03_feedback_success_failure_handling(db_with_runs, system_info):
     """Test handling of successful vs failed recommendations."""
-    collector = FeedbackCollector(temp_db)
+    collector = FeedbackCollector(db_with_runs)
 
     # Successful feedback
     success_feedback = RecommendationFeedback(
@@ -414,10 +448,10 @@ def test_bm03_feedback_success_failure_handling(temp_db, system_info):
     assert accuracy.success_rate == 0.5
 
 
-def test_bm03_integration_workflow(temp_db, system_info):
+def test_bm03_integration_workflow(db_with_runs, system_info):
     """Integration test: full feedback cycle."""
-    collector = FeedbackCollector(temp_db)
-    learner = AdaptiveWeightLearner(temp_db)
+    collector = FeedbackCollector(db_with_runs)
+    learner = AdaptiveWeightLearner(db_with_runs)
 
     # 1. Record initial feedback
     feedback1 = RecommendationFeedback(
