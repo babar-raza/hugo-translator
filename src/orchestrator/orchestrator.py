@@ -59,7 +59,7 @@ class TranslationOrchestrator:
 
             # Use SharedEngines components
             self.config_service = engines.profile.config_service
-            self.queue = engines.job.backend
+            self.queue = engines.job.queue
 
             # Emit telemetry event for orchestrator startup
             try:

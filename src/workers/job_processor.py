@@ -114,7 +114,7 @@ class JobProcessor:
             logger.info("Using SharedEngines (Phase 5.1 migration)")
 
             # Use job queue from SharedEngines
-            self.queue = self.engines.job.backend
+            self.queue = self.engines.job.queue
             logger.info(f"Using shared job queue: {self.queue.__class__.__name__}")
 
             # Use configuration from SharedEngines
