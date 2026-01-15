@@ -407,3 +407,221 @@ class TestAnalyticsQueryAPI:
             assert len(df_distribution) == 0
             assert len(df_model_comp) == 0
             assert len(df_device_comp) == 0
+
+    def test_init_all_options_disabled(self):
+        """Test initialization with all options disabled."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            db_path = Path(tmpdir) / "test.db"
+            BenchmarkDatabase(db_path)
+
+            api = AnalyticsQueryAPI(
+                db_path,
+                enable_caching=False,
+                enable_pooling=False,
+                enable_monitoring=False
+            )
+
+            assert api._cache is None
+            assert api._pool is None
+            assert api._monitor is None
+
+    def test_init_all_options_enabled(self):
+        """Test initialization with all options enabled."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            db_path = Path(tmpdir) / "test.db"
+            BenchmarkDatabase(db_path)
+
+            api = AnalyticsQueryAPI(
+                db_path,
+                enable_caching=True,
+                enable_pooling=True,
+                enable_monitoring=True
+            )
+
+            assert api._cache is not None
+            assert api._pool is not None
+            assert api._monitor is not None
+            api.close()
+
+    def test_get_cache_stats(self):
+        """Test get_cache_stats method."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            db_path = Path(tmpdir) / "test.db"
+            BenchmarkDatabase(db_path)
+
+            api = AnalyticsQueryAPI(db_path, enable_caching=True)
+            stats = api.get_cache_stats()
+
+            assert stats is not None
+            assert "size" in stats
+            assert "hits" in stats
+            assert "misses" in stats
+
+    def test_get_cache_stats_disabled(self):
+        """Test get_cache_stats returns None when disabled."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            db_path = Path(tmpdir) / "test.db"
+            BenchmarkDatabase(db_path)
+
+            api = AnalyticsQueryAPI(db_path, enable_caching=False)
+            stats = api.get_cache_stats()
+
+            assert stats is None
+
+    def test_get_monitor_stats(self):
+        """Test get_monitor_stats method."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            db_path = Path(tmpdir) / "test.db"
+            BenchmarkDatabase(db_path)
+
+            api = AnalyticsQueryAPI(db_path, enable_monitoring=True)
+            stats = api.get_monitor_stats()
+
+            assert stats is not None
+
+    def test_get_monitor_stats_disabled(self):
+        """Test get_monitor_stats returns None when disabled."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            db_path = Path(tmpdir) / "test.db"
+            BenchmarkDatabase(db_path)
+
+            api = AnalyticsQueryAPI(db_path, enable_monitoring=False)
+            stats = api.get_monitor_stats()
+
+            assert stats is None
+
+    def test_invalidate_cache_all(self):
+        """Test full cache invalidation."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            db_path = Path(tmpdir) / "test.db"
+            db = BenchmarkDatabase(db_path)
+            self._create_test_run(db, "test_model", "cpu")
+
+            api = AnalyticsQueryAPI(db_path, enable_caching=True)
+
+            # Populate cache
+            api.get_performance_trends("test_model", "cpu", "hourly")
+            api.get_throughput_distribution("test_model", "cpu")
+
+            # Invalidate all
+            count = api.invalidate_cache()
+            assert count >= 0
+
+    def test_invalidate_cache_pattern(self):
+        """Test pattern-based cache invalidation."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            db_path = Path(tmpdir) / "test.db"
+            db = BenchmarkDatabase(db_path)
+            self._create_test_run(db, "test_model", "cpu")
+
+            api = AnalyticsQueryAPI(db_path, enable_caching=True)
+
+            # Populate cache
+            api.get_performance_trends("test_model", "cpu", "hourly")
+
+            # Invalidate by pattern
+            count = api.invalidate_cache(pattern="trends")
+            assert count >= 0
+
+    def test_invalidate_cache_when_disabled(self):
+        """Test invalidate_cache returns 0 when caching disabled."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            db_path = Path(tmpdir) / "test.db"
+            BenchmarkDatabase(db_path)
+
+            api = AnalyticsQueryAPI(db_path, enable_caching=False)
+            count = api.invalidate_cache()
+
+            assert count == 0
+
+    def test_close_releases_resources(self):
+        """Test close method releases resources."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            db_path = Path(tmpdir) / "test.db"
+            BenchmarkDatabase(db_path)
+
+            api = AnalyticsQueryAPI(
+                db_path,
+                enable_caching=True,
+                enable_pooling=True,
+                enable_monitoring=True
+            )
+
+            # Should not raise
+            api.close()
+
+    def test_percentile_helper(self):
+        """Test _percentile helper method."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            db_path = Path(tmpdir) / "test.db"
+            BenchmarkDatabase(db_path)
+
+            api = AnalyticsQueryAPI(db_path)
+
+            # Empty list
+            assert api._percentile([], 50) == 0.0
+
+            # Single value
+            assert api._percentile([100.0], 50) == 100.0
+
+            # Multiple values
+            values = [10, 20, 30, 40, 50]
+            assert api._percentile(values, 50) == 30.0
+
+            # 0th percentile (min)
+            assert api._percentile(values, 0) == 10.0
+
+            # 100th percentile (max)
+            assert api._percentile(values, 100) == 50.0
+
+    def test_caching_hit(self):
+        """Test that cache hits work correctly."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            db_path = Path(tmpdir) / "test.db"
+            db = BenchmarkDatabase(db_path)
+            self._create_test_run(db, "test_model", "cpu")
+
+            aggregator = TimeSeriesAggregator(db_path)
+            aggregator.aggregate_model("test_model", "cpu")
+
+            api = AnalyticsQueryAPI(db_path, enable_caching=True)
+
+            # First call - cache miss
+            api.get_performance_trends("test_model", "cpu", "hourly")
+            stats1 = api.get_cache_stats()
+            misses1 = stats1["misses"]
+
+            # Second call - cache hit
+            api.get_performance_trends("test_model", "cpu", "hourly")
+            stats2 = api.get_cache_stats()
+            hits2 = stats2["hits"]
+
+            assert hits2 > 0  # Should have at least one hit
+
+    def test_pooled_connection(self):
+        """Test using connection pool."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            db_path = Path(tmpdir) / "test.db"
+            db = BenchmarkDatabase(db_path)
+            self._create_test_run(db, "test_model", "cpu")
+
+            api = AnalyticsQueryAPI(db_path, enable_pooling=True)
+
+            # Query should work with pooled connections
+            df = api.get_throughput_distribution("test_model", "cpu")
+            assert isinstance(df, pd.DataFrame)
+
+            api.close()
+
+    def test_non_pooled_connection(self):
+        """Test using non-pooled connection."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            db_path = Path(tmpdir) / "test.db"
+            db = BenchmarkDatabase(db_path)
+            self._create_test_run(db, "test_model", "cpu")
+
+            api = AnalyticsQueryAPI(db_path, enable_pooling=False)
+
+            # Query should work without pooling
+            df = api.get_throughput_distribution("test_model", "cpu")
+            assert isinstance(df, pd.DataFrame)
