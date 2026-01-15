@@ -4,6 +4,10 @@ Backup Translation Memory and Configuration.
 
 Creates compressed backups of L2 LMDB database, L3 FAISS index,
 and configuration files with integrity verification.
+
+Phase 5.3 Migration:
+    Supports optional SharedEngines for telemetry tracking.
+    Falls back to standalone mode if engines not available.
 """
 
 import argparse
@@ -16,7 +20,10 @@ import sys
 import tarfile
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from src.shared_engines.composition_root import SharedEngines
 
 # Add src to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -145,7 +152,8 @@ def create_backup(
     tm_data_dir: Path,
     config_dir: Path,
     rotate: Optional[int] = None,
-    compression: str = "gz"
+    compression: str = "gz",
+    engines: Optional["SharedEngines"] = None,
 ) -> Tuple[bool, str]:
     """
     Create compressed backup of TM and configs.
@@ -156,14 +164,40 @@ def create_backup(
         config_dir: Config directory
         rotate: Keep only last N backups (None = keep all)
         compression: Compression type ('gz', 'bz2', 'xz', '')
+        engines: Optional SharedEngines for telemetry (Phase 5.3)
 
     Returns:
         Tuple of (success, message)
     """
+    start_time = datetime.now()
+
+    # PHASE 5.3: Emit backup started event
+    if engines:
+        try:
+            engines.telemetry.track_event(
+                event_type="backup_started",
+                output_path=str(output_path),
+                compression=compression
+            )
+        except Exception as e:
+            logger.debug(f"Telemetry event failed (non-fatal): {e}")
+
     try:
         # Validate paths
         if not tm_data_dir.exists():
-            return False, f"TM data directory not found: {tm_data_dir}"
+            error_msg = f"TM data directory not found: {tm_data_dir}"
+
+            # PHASE 5.3: Emit failure event
+            if engines:
+                try:
+                    engines.telemetry.track_event(
+                        event_type="backup_failed",
+                        error=error_msg
+                    )
+                except Exception as e:
+                    logger.debug(f"Telemetry event failed (non-fatal): {e}")
+
+            return False, error_msg
 
         # Create output directory
         output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -219,10 +253,27 @@ def create_backup(
             f.write(f"{checksum}  {output_path.name}\n")
 
         backup_size = output_path.stat().st_size
+        duration_seconds = (datetime.now() - start_time).total_seconds()
+
         logger.info(f"Backup created successfully: {output_path}")
         logger.info(f"Backup size: {backup_size / (1024*1024):.2f} MB")
         logger.info(f"Checksum: {checksum}")
         logger.info(f"Checksum file: {checksum_path}")
+        logger.info(f"Duration: {duration_seconds:.1f}s")
+
+        # PHASE 5.3: Emit backup completed event
+        if engines:
+            try:
+                engines.telemetry.track_event(
+                    event_type="backup_completed",
+                    output_path=str(output_path),
+                    backup_size_mb=backup_size / (1024*1024),
+                    duration_seconds=duration_seconds,
+                    checksum=checksum,
+                    total_files=metadata.get('total_files', 0)
+                )
+            except Exception as e:
+                logger.debug(f"Telemetry event failed (non-fatal): {e}")
 
         # Rotate old backups if requested
         if rotate is not None and rotate > 0:
@@ -232,6 +283,18 @@ def create_backup(
 
     except Exception as e:
         logger.error(f"Backup failed: {e}", exc_info=True)
+
+        # PHASE 5.3: Emit failure event
+        if engines:
+            try:
+                engines.telemetry.track_event(
+                    event_type="backup_failed",
+                    error=str(e),
+                    duration_seconds=(datetime.now() - start_time).total_seconds()
+                )
+            except Exception as tel_err:
+                logger.debug(f"Telemetry event failed (non-fatal): {tel_err}")
+
         return False, f"Backup failed: {e}"
 
 
@@ -286,6 +349,9 @@ Examples:
 
   # Create uncompressed backup (faster)
   python scripts/backup_tm.py --output backups/tm_20250101.tar --compression none
+
+  # Enable telemetry tracking (Phase 5.3)
+  USE_SHARED_ENGINES=true python scripts/backup_tm.py --output backups/tm_20250101.tar.gz
         """
     )
 
@@ -345,18 +411,45 @@ Examples:
     # Validate compression
     compression = None if args.compression == "none" else args.compression
 
+    # PHASE 5.3: Optionally initialize SharedEngines
+    use_shared_engines = os.getenv("USE_SHARED_ENGINES", "false").lower() in ("true", "1", "yes")
+    shared_engines = None
+
+    if use_shared_engines:
+        logger.info("SharedEngines enabled via USE_SHARED_ENGINES environment variable")
+        try:
+            from src.shared_engines.composition_root import CompositionRoot
+
+            # Create minimal engines configuration for telemetry
+            engines_config = {
+                "config_root": str(config_dir),
+                "log_level": "DEBUG" if args.verbose else "INFO",
+                "telemetry_enabled": True,
+            }
+
+            shared_engines = CompositionRoot.create_from_config(engines_config)
+            logger.info("SharedEngines created successfully for telemetry tracking")
+
+        except Exception as e:
+            logger.warning(f"Failed to create SharedEngines: {e}")
+            logger.info("Continuing in standalone mode (no telemetry)")
+            shared_engines = None
+
     # Create backup
     logger.info("Starting backup process...")
     logger.info(f"TM data directory: {tm_data_dir}")
     logger.info(f"Config directory: {config_dir}")
     logger.info(f"Output: {output_path}")
+    if shared_engines:
+        logger.info("Telemetry: ENABLED")
 
     success, message = create_backup(
         output_path=output_path,
         tm_data_dir=tm_data_dir,
         config_dir=config_dir,
         rotate=args.rotate,
-        compression=compression
+        compression=compression,
+        engines=shared_engines,
     )
 
     if success:

@@ -4,17 +4,22 @@ Provides job queue management and resource-aware scheduling to prevent
 system choking from concurrent or resource-heavy benchmarks.
 """
 
+import os
 import uuid
+import warnings
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, List, Optional, Any
+from typing import Dict, List, Optional, Any, TYPE_CHECKING
 import logging
 import yaml
 
 from src.benchmarking.storage import BenchmarkDatabase, BenchmarkRun
 from src.benchmarking.resource_monitor import ResourceMonitor, ResourceEstimate, ResourceSnapshot
 from src.benchmarking.system_info import SystemInfo
+
+if TYPE_CHECKING:
+    from src.shared_engines.composition_root import SharedEngines
 
 logger = logging.getLogger(__name__)
 
@@ -99,16 +104,69 @@ class BenchmarkScheduler:
 
     Manages a queue of benchmark jobs and executes them when
     resources are available, preventing system overload.
+
+    Phase 5.3 Migration:
+        Supports optional SharedEngines for unified telemetry, logging,
+        and configuration. Falls back to legacy mode if engines not provided.
     """
 
-    def __init__(self, db: BenchmarkDatabase, config_path: Optional[Path] = None):
+    def __init__(
+        self,
+        db: BenchmarkDatabase,
+        config_path: Optional[Path] = None,
+        engines: Optional["SharedEngines"] = None,
+    ):
         """Initialize benchmark scheduler.
 
         Args:
-            db: Benchmark database instance
-            config_path: Optional path to scheduler config YAML
+            db: Benchmark database instance (ignored if engines provided)
+            config_path: Optional path to scheduler config YAML (ignored if engines provided)
+            engines: SharedEngines container (NEW - Phase 5.3 migration)
+                    If provided, uses shared engines instead of direct instantiation.
+                    Enables unified telemetry, logging, and configuration.
         """
-        self.db = db
+        # PHASE 5.3: Detect if using SharedEngines or legacy mode
+        self._using_shared_engines = engines is not None
+        self.engines = engines
+
+        if not self._using_shared_engines:
+            # Legacy mode: Direct instantiation (DEPRECATED)
+            warnings.warn(
+                "Instantiating BenchmarkScheduler without SharedEngines is deprecated. "
+                "Use CompositionRoot.create_from_config() and pass engines parameter. "
+                "Legacy mode will be removed in a future release.",
+                DeprecationWarning,
+                stacklevel=2
+            )
+            logger.warning(
+                "BenchmarkScheduler running in LEGACY mode (direct instantiation). "
+                "Consider migrating to SharedEngines for unified telemetry and configuration."
+            )
+
+        # PHASE 5.3: Use SharedEngines if available, otherwise legacy instantiation
+        if self._using_shared_engines:
+            logger.info("Using SharedEngines (Phase 5.3 migration)")
+
+            # Use logging from SharedEngines
+            # Note: Logger is already configured by SharedEngines
+            logger.info(f"Using shared logging from SharedEngines")
+
+            # Emit telemetry event for scheduler startup
+            try:
+                self.engines.telemetry.track_event(
+                    event_type="benchmark_scheduler_started",
+                    mode="shared_engines"
+                )
+            except Exception as e:
+                logger.debug(f"Telemetry event failed (non-fatal): {e}")
+
+            # For now, still use passed db (future: could use engines.job for storage)
+            self.db = db
+
+        else:
+            # LEGACY MODE: Direct instantiation
+            self.db = db
+
         self.monitor = ResourceMonitor()
         self.estimator = ResourceEstimator()
 
@@ -225,10 +283,35 @@ class BenchmarkScheduler:
                 f"Scheduled benchmark job {job_id} with priority {priority} "
                 f"(est. {estimate.estimated_memory_mb:.0f}MB, {estimate.estimated_duration_seconds:.0f}s)"
             )
+
+            # PHASE 5.3: Emit telemetry event if using SharedEngines
+            if self._using_shared_engines:
+                try:
+                    self.engines.telemetry.track_event(
+                        event_type="benchmark_job_scheduled",
+                        job_id=job_id,
+                        priority=priority,
+                        estimated_memory_mb=estimate.estimated_memory_mb,
+                        device_required=estimate.device_required
+                    )
+                except Exception as e:
+                    logger.debug(f"Telemetry event failed (non-fatal): {e}")
+
             return job_id
 
         except Exception as e:
             logger.error(f"Failed to schedule benchmark: {e}")
+
+            # PHASE 5.3: Emit failure event if using SharedEngines
+            if self._using_shared_engines:
+                try:
+                    self.engines.telemetry.track_event(
+                        event_type="benchmark_job_schedule_failed",
+                        error=str(e)
+                    )
+                except Exception as tel_err:
+                    logger.debug(f"Telemetry event failed (non-fatal): {tel_err}")
+
             raise
 
     def can_run_now(self, job_id: str) -> bool:
@@ -367,10 +450,32 @@ class BenchmarkScheduler:
             timeout = self.config.get("default_timeout_seconds", 3600)
             if not self.monitor.wait_for_resources(job.estimated_resources, timeout):
                 logger.warning(f"Timeout waiting for resources for job {job.job_id}")
+
+                # PHASE 5.3: Emit timeout event if using SharedEngines
+                if self._using_shared_engines:
+                    try:
+                        self.engines.telemetry.track_event(
+                            event_type="benchmark_job_timeout",
+                            job_id=job.job_id,
+                            timeout_seconds=timeout
+                        )
+                    except Exception as e:
+                        logger.debug(f"Telemetry event failed (non-fatal): {e}")
+
                 return None
 
             # Mark as running
             self._update_job_status(job.job_id, "running", started_at=datetime.utcnow())
+
+            # PHASE 5.3: Emit job started event if using SharedEngines
+            if self._using_shared_engines:
+                try:
+                    self.engines.telemetry.track_event(
+                        event_type="benchmark_job_started",
+                        job_id=job.job_id
+                    )
+                except Exception as e:
+                    logger.debug(f"Telemetry event failed (non-fatal): {e}")
 
             # Execute benchmark (stub - actual execution would go here)
             # For now, just mark as completed
@@ -379,11 +484,32 @@ class BenchmarkScheduler:
             # Mark as completed
             self._update_job_status(job.job_id, "completed", completed_at=datetime.utcnow())
 
+            # PHASE 5.3: Emit job completed event if using SharedEngines
+            if self._using_shared_engines:
+                try:
+                    self.engines.telemetry.track_event(
+                        event_type="benchmark_job_completed",
+                        job_id=job.job_id
+                    )
+                except Exception as e:
+                    logger.debug(f"Telemetry event failed (non-fatal): {e}")
+
             # Return None for now (would return BenchmarkRun in real implementation)
             return None
 
         except Exception as e:
             logger.error(f"Failed to run next job: {e}")
+
+            # PHASE 5.3: Emit failure event if using SharedEngines
+            if self._using_shared_engines:
+                try:
+                    self.engines.telemetry.track_event(
+                        event_type="benchmark_job_failed",
+                        error=str(e)
+                    )
+                except Exception as tel_err:
+                    logger.debug(f"Telemetry event failed (non-fatal): {tel_err}")
+
             return None
 
     def run_all(self, max_concurrent: int = 1) -> List[BenchmarkRun]:

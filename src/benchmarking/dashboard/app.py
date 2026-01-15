@@ -1,13 +1,23 @@
 """Benchmark dashboard web application.
 
 Provides web interface for visualizing benchmark results from SQLite database.
+
+Phase 5.3 Migration:
+    Supports optional SharedEngines for telemetry tracking.
+    Falls back to standalone mode if engines not available.
+
+    Note: Security hardening (authentication, HTTPS) is future work.
 """
 from flask import Flask, render_template, jsonify, request
 import sqlite3
+import os
 from pathlib import Path
 import logging
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, TYPE_CHECKING
 from datetime import datetime
+
+if TYPE_CHECKING:
+    from src.shared_engines.composition_root import SharedEngines
 
 logger = logging.getLogger(__name__)
 
@@ -15,6 +25,9 @@ app = Flask(__name__)
 
 # Database path
 DB_PATH = Path("data/benchmarks/benchmarks.db")
+
+# PHASE 5.3: Global reference to SharedEngines (if initialized)
+_shared_engines: Optional["SharedEngines"] = None
 
 
 def get_db():
@@ -752,12 +765,75 @@ def internal_error(error):
     ), 500
 
 
+def init_dashboard(engines: Optional["SharedEngines"] = None):
+    """Initialize dashboard with optional SharedEngines support.
+
+    Args:
+        engines: Optional SharedEngines for telemetry (Phase 5.3)
+    """
+    global _shared_engines
+    _shared_engines = engines
+
+    # PHASE 5.3: Emit dashboard startup event if using SharedEngines
+    if _shared_engines:
+        try:
+            _shared_engines.telemetry.track_event(
+                event_type="benchmark_dashboard_started",
+                mode="shared_engines",
+                db_path=str(DB_PATH)
+            )
+            logger.info("Dashboard initialized with SharedEngines telemetry support")
+        except Exception as e:
+            logger.debug(f"Telemetry event failed (non-fatal): {e}")
+    else:
+        logger.info("Dashboard initialized in standalone mode (no telemetry)")
+
+
 if __name__ == '__main__':
     logging.basicConfig(
         level=logging.INFO,
         format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
     )
+
+    # PHASE 5.3: Optionally initialize SharedEngines
+    use_shared_engines = os.getenv("USE_SHARED_ENGINES", "false").lower() in ("true", "1", "yes")
+    shared_engines = None
+
+    if use_shared_engines:
+        logger.info("SharedEngines enabled via USE_SHARED_ENGINES environment variable")
+        try:
+            import sys
+            from pathlib import Path
+            sys.path.insert(0, str(Path(__file__).parent.parent.parent))
+            from src.shared_engines.composition_root import CompositionRoot
+
+            # Create minimal engines configuration for telemetry
+            engines_config = {
+                "config_root": "./config",
+                "log_level": "INFO",
+                "telemetry_enabled": True,
+            }
+
+            shared_engines = CompositionRoot.create_from_config(engines_config)
+            logger.info("SharedEngines created successfully for telemetry tracking")
+
+        except Exception as e:
+            logger.warning(f"Failed to create SharedEngines: {e}")
+            logger.info("Continuing in standalone mode (no telemetry)")
+            shared_engines = None
+
+    # Initialize dashboard
+    init_dashboard(engines=shared_engines)
+
+    # TODO: Future security hardening (authentication, HTTPS, rate limiting)
+    # See Phase 5.3 migration notes for details
     print("Starting benchmark dashboard...")
     print("Open http://localhost:8080 in your browser")
     print("Press Ctrl+C to stop")
+    if shared_engines:
+        print("Telemetry: ENABLED")
+    print("")
+    print("⚠️  WARNING: This dashboard is NOT production-ready.")
+    print("   Security hardening (auth, HTTPS) is planned for future work.")
+
     app.run(host='0.0.0.0', port=8080, debug=True)
