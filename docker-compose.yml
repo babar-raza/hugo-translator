@@ -62,7 +62,7 @@ services:
         max-size: "5m"
         max-file: "2"
 
-  # CPU Worker
+  # CPU Worker (Phase 2: Dual-Run with docker_cpu mode)
   worker-cpu:
     build:
       context: .
@@ -73,14 +73,15 @@ services:
     env_file:
       - .env.production
     environment:
+      - EXECUTION_MODE=docker_cpu  # Phase 2: Enable dual-run execution layer
       - WORKER_ID=cpu-1
       - WORKER_MODE=processor
-      - DEVICE=cpu
+      - DEVICE=cpu  # Will be enforced by DevicePolicy
       - REDIS_HOST=hugo-translator-redis
       - REDIS_PORT=6379
       - REDIS_DB=0
-      - POLL_INTERVAL=5
-      - MAX_RETRIES=3
+      - POLL_INTERVAL=3  # Faster polling for CPU workers (from mode config)
+      - MAX_RETRIES=5  # More retries for CPU workers (from mode config)
       - PYTHONPATH=/app
       - PYTHONUNBUFFERED=1
       - USE_SHARED_ENGINES=true  # Phase 5.1: Enable SharedEngines
@@ -111,7 +112,8 @@ services:
         max-size: "10m"
         max-file: "3"
 
-  # GPU Worker (optional - requires NVIDIA GPU and nvidia-docker)
+  # GPU Worker (Phase 2: Dual-Run with docker_gpu mode)
+  # Requires NVIDIA GPU and nvidia-docker
   worker-gpu:
     build:
       context: .
@@ -122,10 +124,11 @@ services:
     env_file:
       - .env.production
     environment:
+      - EXECUTION_MODE=docker_gpu  # Phase 2: Enable dual-run execution layer
       - WORKER_ID=gpu-1
       - WORKER_MODE=processor
-      - DEVICE=cuda:0
-      - CUDA_VISIBLE_DEVICES=0
+      - DEVICE=cuda  # GPU device from mode config
+      - CUDA_VISIBLE_DEVICES=0  # GPU passthrough
       - REDIS_HOST=hugo-translator-redis
       - REDIS_PORT=6379
       - REDIS_DB=0

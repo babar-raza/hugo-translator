@@ -412,64 +412,142 @@ def main() -> int:
         stream=sys.stdout,
     )
 
-    # Get configuration from environment
-    redis_host = os.getenv("REDIS_HOST", "localhost")
-    redis_port = int(os.getenv("REDIS_PORT", "6379"))
-    redis_db = int(os.getenv("REDIS_DB", "0"))
-    redis_password = os.getenv("REDIS_PASSWORD")
-    poll_interval = float(os.getenv("POLL_INTERVAL", "5.0"))
-    max_retries = int(os.getenv("MAX_RETRIES", "3"))
-    config_path = os.getenv("CONFIG_PATH", "./config")
-    tm_path = os.getenv("TM_DATA_PATH", "./data/tm")
+    # PHASE 2 (AW-03): Check for execution mode (dual-run support)
+    execution_mode_env = os.getenv("EXECUTION_MODE")
+    use_worker_runner = execution_mode_env is not None
 
-    # PHASE 5.1: Optionally use SharedEngines
-    use_shared_engines = os.getenv("USE_SHARED_ENGINES", "false").lower() in ("true", "1", "yes")
-    shared_engines = None
+    if use_worker_runner:
+        logger.info(f"Using WorkerRunner with execution mode: {execution_mode_env}")
+        from src.workers.runner import WorkerConfig
 
-    if use_shared_engines:
-        logger.info("SharedEngines enabled via USE_SHARED_ENGINES environment variable")
+        # Load configuration with execution mode support
+        config_path = os.getenv("CONFIG_PATH", "./config")
+
+        # PHASE 2: Load mode defaults from global.yaml
+        from src.shared_engines.composition_root import CompositionRoot
+        mode_defaults = CompositionRoot._load_execution_mode_config(config_path)
+
+        # Create WorkerConfig with 3-tier precedence
+        worker_config = WorkerConfig.from_env(mode_defaults)
+
+        # PHASE 5.1 + PHASE 2: Always use SharedEngines when using WorkerRunner
+        logger.info("Creating SharedEngines for WorkerRunner")
         try:
-            from src.shared_engines.composition_root import CompositionRoot
-
-            # Create engines configuration from environment
+            # Build engines config from worker config
             engines_config = {
-                "config_root": config_path,
-                "log_level": log_level,
+                "config_root": worker_config.config_path,
+                "log_level": worker_config.log_level,
                 "telemetry_enabled": True,
                 "job_backend": "redis",
-                "redis_host": redis_host,
-                "redis_port": redis_port,
+                "redis_host": worker_config.redis_host,
+                "redis_port": worker_config.redis_port,
                 "commit_enabled": os.getenv("COMMIT_ENABLED", "true").lower() in ("true", "1", "yes"),
-                "max_retries": max_retries,
+                "max_retries": worker_config.max_retries,
+                "device": worker_config.device,  # PHASE 2: Device from execution mode
             }
 
             shared_engines = CompositionRoot.create_from_config(engines_config)
             logger.info("SharedEngines created successfully")
 
+            # Emit telemetry event for worker startup with execution mode
+            try:
+                shared_engines.telemetry.track_event(
+                    event_type="worker_started_with_execution_mode",
+                    worker_id=worker_config.worker_id,
+                    execution_mode=worker_config.execution_mode.value,
+                    device=worker_config.device,
+                    mode="worker_runner"
+                )
+            except Exception as e:
+                logger.debug(f"Telemetry event failed (non-fatal): {e}")
+
+            # Create and run processor with SharedEngines
+            processor = JobProcessor(
+                redis_host=worker_config.redis_host,
+                redis_port=worker_config.redis_port,
+                redis_db=worker_config.redis_db,
+                redis_password=worker_config.redis_password,
+                poll_interval=worker_config.poll_interval,
+                max_retries=worker_config.max_retries,
+                config_path=worker_config.config_path,
+                tm_path=worker_config.tm_path,
+                engines=shared_engines,
+            )
+
+            try:
+                processor.run()
+                return 0
+            except Exception as e:
+                logger.error(f"Job processor failed: {e}", exc_info=True)
+                return 1
+
         except Exception as e:
-            logger.error(f"Failed to create SharedEngines: {e}", exc_info=True)
-            logger.info("Falling back to legacy mode")
-            shared_engines = None
+            logger.error(f"Failed to create WorkerRunner components: {e}", exc_info=True)
+            return 1
 
-    # Create and run processor
-    processor = JobProcessor(
-        redis_host=redis_host,
-        redis_port=redis_port,
-        redis_db=redis_db,
-        redis_password=redis_password if redis_password else None,
-        poll_interval=poll_interval,
-        max_retries=max_retries,
-        config_path=config_path,
-        tm_path=tm_path,
-        engines=shared_engines,  # NEW: Pass SharedEngines if created
-    )
+    else:
+        # LEGACY MODE: No EXECUTION_MODE env var
+        from src.workers.runner import warn_legacy_mode
+        warn_legacy_mode()
 
-    try:
-        processor.run()
-        return 0
-    except Exception as e:
-        logger.error(f"Job processor failed: {e}", exc_info=True)
-        return 1
+        # Get configuration from environment (legacy)
+        redis_host = os.getenv("REDIS_HOST", "localhost")
+        redis_port = int(os.getenv("REDIS_PORT", "6379"))
+        redis_db = int(os.getenv("REDIS_DB", "0"))
+        redis_password = os.getenv("REDIS_PASSWORD")
+        poll_interval = float(os.getenv("POLL_INTERVAL", "5.0"))
+        max_retries = int(os.getenv("MAX_RETRIES", "3"))
+        config_path = os.getenv("CONFIG_PATH", "./config")
+        tm_path = os.getenv("TM_DATA_PATH", "./data/tm")
+
+        # PHASE 5.1: Optionally use SharedEngines
+        use_shared_engines = os.getenv("USE_SHARED_ENGINES", "false").lower() in ("true", "1", "yes")
+        shared_engines = None
+
+        if use_shared_engines:
+            logger.info("SharedEngines enabled via USE_SHARED_ENGINES environment variable")
+            try:
+                from src.shared_engines.composition_root import CompositionRoot
+
+                # Create engines configuration from environment
+                engines_config = {
+                    "config_root": config_path,
+                    "log_level": log_level,
+                    "telemetry_enabled": True,
+                    "job_backend": "redis",
+                    "redis_host": redis_host,
+                    "redis_port": redis_port,
+                    "commit_enabled": os.getenv("COMMIT_ENABLED", "true").lower() in ("true", "1", "yes"),
+                    "max_retries": max_retries,
+                }
+
+                shared_engines = CompositionRoot.create_from_config(engines_config)
+                logger.info("SharedEngines created successfully")
+
+            except Exception as e:
+                logger.error(f"Failed to create SharedEngines: {e}", exc_info=True)
+                logger.info("Falling back to legacy mode")
+                shared_engines = None
+
+        # Create and run processor (legacy mode)
+        processor = JobProcessor(
+            redis_host=redis_host,
+            redis_port=redis_port,
+            redis_db=redis_db,
+            redis_password=redis_password if redis_password else None,
+            poll_interval=poll_interval,
+            max_retries=max_retries,
+            config_path=config_path,
+            tm_path=tm_path,
+            engines=shared_engines,  # NEW: Pass SharedEngines if created
+        )
+
+        try:
+            processor.run()
+            return 0
+        except Exception as e:
+            logger.error(f"Job processor failed: {e}", exc_info=True)
+            return 1
 
 
 if __name__ == "__main__":

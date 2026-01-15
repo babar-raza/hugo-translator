@@ -6,6 +6,7 @@ unified access through a single SharedEngines container.
 """
 
 import logging
+import os
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional, Dict, Any
@@ -89,6 +90,62 @@ class CompositionRoot:
     """
 
     @staticmethod
+    def _load_execution_mode_config(config_root: str) -> Dict[str, Any]:
+        """
+        Load execution mode configuration from global.yaml.
+
+        Implements 3-tier precedence:
+        1. EXECUTION_MODE environment variable (highest)
+        2. execution.modes.{mode} section from global.yaml (middle)
+        3. Caller-provided config defaults (lowest)
+
+        Args:
+            config_root: Path to configuration directory
+
+        Returns:
+            Dictionary with execution mode defaults
+
+        Example:
+            mode_config = CompositionRoot._load_execution_mode_config("config/")
+            # Returns: {"device": "cpu", "max_retries": 5, ...}
+        """
+        import yaml
+
+        # Determine execution mode from environment (default: windows_cuda)
+        execution_mode = os.getenv("EXECUTION_MODE", "windows_cuda")
+
+        # Load global.yaml to get mode-specific defaults
+        global_yaml_path = Path(config_root) / "global.yaml"
+        mode_config = {}
+
+        if global_yaml_path.exists():
+            try:
+                with open(global_yaml_path, "r", encoding="utf-8") as f:
+                    global_config = yaml.safe_load(f)
+
+                # Extract execution mode defaults
+                execution_section = global_config.get("execution", {})
+                modes_section = execution_section.get("modes", {})
+                mode_defaults = modes_section.get(execution_mode, {})
+
+                if mode_defaults:
+                    logger.info(
+                        f"Loaded execution mode config for '{execution_mode}' from global.yaml: "
+                        f"{list(mode_defaults.keys())}"
+                    )
+                    mode_config = mode_defaults
+                else:
+                    logger.warning(
+                        f"No execution mode config found for '{execution_mode}' in global.yaml. "
+                        f"Using defaults."
+                    )
+
+            except Exception as e:
+                logger.warning(f"Failed to load execution mode config from global.yaml: {e}")
+
+        return mode_config
+
+    @staticmethod
     def create_from_config(config: Optional[Dict[str, Any]] = None) -> SharedEngines:
         """
         Create all shared engines from configuration.
@@ -107,6 +164,8 @@ class CompositionRoot:
                 - max_retries: Maximum retry attempts (default: 3)
                 - max_gpu_memory_mb: GPU memory limit
                 - translation_backend: "mt" or "llm" (default: "mt")
+                - execution_mode: "windows_cuda", "docker_cpu", or "docker_gpu"
+                  (default: from EXECUTION_MODE env var or "windows_cuda")
 
         Returns:
             SharedEngines with all 8 engines initialized
@@ -124,6 +183,23 @@ class CompositionRoot:
         cfg = config or {}
 
         logger.info("Creating SharedEngines from configuration")
+
+        # PHASE 2: Load execution mode configuration from global.yaml
+        # This implements 3-tier precedence:
+        # 1. Environment variables (highest - handled by caller)
+        # 2. Execution mode defaults from global.yaml (middle)
+        # 3. Provided config dictionary (lowest)
+        config_root = cfg.get("config_root", "config")
+        mode_config = CompositionRoot._load_execution_mode_config(config_root)
+
+        # Merge mode config with provided config (provided config takes precedence)
+        merged_cfg = {**mode_config, **cfg}
+        cfg = merged_cfg
+
+        # Log execution mode if present
+        execution_mode = os.getenv("EXECUTION_MODE")
+        if execution_mode:
+            logger.info(f"Execution mode: {execution_mode}")
 
         # 1. ProfileEngine - Configuration resolution
         config_root = cfg.get("config_root", "config")

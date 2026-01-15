@@ -5,6 +5,41 @@ system:
   version: "1.0.0"
   environment: "production"  # development, staging, production
 
+# Execution modes for dual-run deployment (Phase 2: Autonomous Workers Unification)
+# Supports three deployment modes: windows_cuda, docker_cpu, docker_gpu
+execution:
+  # Default execution mode (overridden by EXECUTION_MODE env var)
+  default_mode: "windows_cuda"
+
+  # Mode-specific configuration overrides
+  modes:
+    # Windows native with CUDA GPU support
+    windows_cuda:
+      device: "auto"  # Auto-detect best device (cuda/cpu/mps)
+      enable_gpu: true
+      max_gpu_memory_mb: 4096
+      poll_interval: 5.0
+      max_retries: 3
+      worker_id_prefix: "windows-gpu"
+
+    # Docker containerized with CPU-only enforcement
+    docker_cpu:
+      device: "cpu"  # Force CPU-only (enforced by DevicePolicy)
+      enable_gpu: false  # Disable GPU support
+      max_gpu_memory_mb: 0  # No GPU memory allocation
+      poll_interval: 3.0  # Faster polling for CPU workers
+      max_retries: 5  # More retries for CPU (slower, more resilient)
+      worker_id_prefix: "docker-cpu"
+
+    # Docker containerized with GPU passthrough (nvidia-docker)
+    docker_gpu:
+      device: "cuda"  # Use CUDA GPU
+      enable_gpu: true
+      max_gpu_memory_mb: 6144  # Higher limit for dedicated GPU containers
+      poll_interval: 5.0
+      max_retries: 3
+      worker_id_prefix: "docker-gpu"
+
 # Default TM preferences (overridable per site)
 tm_defaults:
   use_semantic_tm: true
@@ -19,18 +54,26 @@ tm_defaults:
 model_defaults:
   fallback_model: "m2m100_418m"
   device: "auto"  # auto, cpu, cuda, mps
-  batch_size: 8  # Reduced from 32 to avoid CUDA OOM errors
+  batch_size: 4  # Conservative default to prevent CUDA OOM (GPU optimizer will calculate optimal)
   cache_models: true
   max_cached_models: 2
 
 # Hardware/GPU configuration
 hardware:
   enable_gpu: true  # Enable GPU acceleration if available
-  max_gpu_memory_mb: 4096  # Reduced from 6144 to 4GB to leave headroom for OS
+  max_gpu_memory_mb: 4096  # Conservative limit to prevent VRAM exhaustion
   gpu_device_id: -1  # -1 = auto-select best GPU, 0+ = specific device
   allow_cpu_fallback: true  # Fall back to CPU if GPU fails
   clear_cache_after_batch: true  # Clear GPU cache after each batch
-  clear_cache_frequency: 5  # Clear cache every N batches (new)
+  clear_cache_frequency: 10  # Clear cache every N files (used by GPUCacheManager)
+
+  # Aggressive GPU cache management (prevents VRAM fragmentation over long runs)
+  aggressive_cache_clearing:
+    enabled: true  # Enable aggressive cache management
+    clear_every_n_files: 10  # Perform aggressive clear every 10 files
+    fragmentation_threshold: 0.50  # Trigger clear at 50% fragmentation
+    use_double_clear: true  # Call empty_cache() twice for stubborn fragments
+    synchronize_before_clear: true  # Wait for GPU operations to complete
 
 # Orchestrator defaults
 orchestrator:
@@ -148,6 +191,150 @@ features:
   enable_auto_model_selection: true
   enable_quality_scoring: false
   enable_content_hash_tracking: true  # Content-based change detection (recommended for production)
+
+# Language Detection Configuration
+# FastText-based detection with adaptive similarity learning
+language_detection:
+  provider: "fasttext"  # fasttext, langdetect (fallback)
+
+  fasttext:
+    model_url: "https://dl.fbaipublicfiles.com/fasttext/supervised-models/lid.176.bin"
+    model_cache_dir: "./data/models/fasttext"
+    model_filename: "lid.176.bin"
+    min_confidence: 0.70  # Minimum confidence threshold for detection
+
+    # Download behavior
+    auto_download: true
+    download_timeout_seconds: 300
+    download_retries: 3
+
+    # Fallback if FastText fails
+    fallback_to_langdetect: true
+
+  # Script-based validation (tertiary fallback)
+  script_validation:
+    enabled: true
+    thresholds:
+      latin: 0.90      # Romance languages (90% Latin characters required)
+      cyrillic: 0.90   # Slavic languages (90% Cyrillic required)
+      arabic: 0.85     # Arabic script (85% required)
+      devanagari: 0.85 # Indic languages (85% required)
+      cjk: 0.80        # Chinese/Japanese/Korean (80% required)
+
+  # Adaptive similarity learning
+  adaptive_similarity:
+    enabled: true
+    stats_file: ".translation_progress/language_similarities.json"
+    failure_rate_threshold: 0.30  # Add pair when failure_rate > 30%
+    min_samples: 50  # Require at least 50 samples before adapting
+    rolling_window_size: 50  # Track last 50 samples per pair
+
+    # Conservative baseline similarity groups
+    baseline_groups:
+      romance: ["ca", "es", "pt", "fr", "it", "ro", "gl"]
+      cyrillic: ["bg", "ru", "mk", "uk", "sr", "be"]
+      arabic: ["ar", "fa", "ur", "ps"]
+      devanagari: ["hi", "mr", "ne", "sa"]
+      nordic: ["da", "no", "sv", "is"]
+      chinese: ["zh-CN", "zh-TW", "zh-HK"]
+
+    log_adaptations: true  # Log when new pairs are learned
+    log_level: "INFO"
+
+# Adaptive Batch Translation (Reactive System)
+# Automatically adjusts batch size based on language-specific failure rates
+# Persists learning across translation sessions to reduce fallback rates
+adaptive_batching:
+  enabled: true  # Master toggle for adaptive batch sizing
+
+  # Fallback detection threshold (EMA-based)
+  fallback_rate_threshold: 0.05  # 5% - trigger adaptation if EMA exceeds this
+
+  # Adaptation parameters
+  reduction_factor: 0.80  # Reduce batch size by 20% when fallback rate high
+  increase_factor: 1.10   # Increase batch size by 10% after sustained success
+  min_batches_before_increase: 5  # Require 5 consecutive successes before increasing
+
+  # Per-language overrides (languages with known translation challenges)
+  language_overrides:
+    # Cyrillic languages (script confusion between bg, ru, mk, uk, sr)
+    bg:  # Bulgarian
+      initial_batch_size: 8
+      min_batch_size: 4
+      max_batch_size: 20
+      fallback_rate_threshold: 0.30  # More tolerant threshold for Bulgarian
+    ru:  # Russian
+      initial_batch_size: 8
+      min_batch_size: 4
+      max_batch_size: 25
+    mk:  # Macedonian
+      initial_batch_size: 8
+      min_batch_size: 4
+      max_batch_size: 20
+    uk:  # Ukrainian
+      initial_batch_size: 8
+      min_batch_size: 4
+      max_batch_size: 25
+    sr:  # Serbian
+      initial_batch_size: 8
+      min_batch_size: 4
+      max_batch_size: 25
+    be:  # Belarusian
+      initial_batch_size: 8
+      min_batch_size: 4
+      max_batch_size: 20
+
+    # Arabic script languages (script confusion between ar, fa, ur)
+    ar:  # Arabic
+      initial_batch_size: 10
+      min_batch_size: 4
+      max_batch_size: 20
+    fa:  # Persian/Farsi
+      initial_batch_size: 10
+      min_batch_size: 4
+      max_batch_size: 20
+    ur:  # Urdu
+      initial_batch_size: 10
+      min_batch_size: 4
+      max_batch_size: 20
+
+  # Persistence
+  stats_file: ".translation_progress/batch_stats.json"
+  stats_retention_days: 30  # Auto-cleanup entries older than 30 days
+  rolling_window_size: 50   # Track statistics for last 50 batches per language
+
+  # Logging
+  log_adaptations: true  # Log batch size changes to help with debugging
+  log_level: "INFO"      # DEBUG for detailed adaptation logs
+
+# Autonomous Recovery (OOM Retry Handler)
+# Automatically retries file translation with reduced batch size on CUDA OOM errors
+# Enables autonomous multi-language translation with continue-on-failure
+autonomous_recovery:
+  # File-level OOM retry
+  oom_retry:
+    enabled: true  # Enable OOM retry handler
+    max_retries: 3  # Maximum retry attempts per file
+    batch_reduction_factor: 0.5  # Reduce batch size by 50% on each retry
+    min_batch_size: 1  # Minimum batch size (final fallback)
+
+  # Continue processing on language failure
+  continue_on_failure:
+    enabled: true  # Continue to next language if one fails
+    save_failure_reports: true  # Save detailed failure reports
+    failure_reports_dir: "./data/failures"  # Directory for failure reports
+    max_language_timeout_seconds: 3600  # 1 hour timeout per language
+
+  # Per-language incremental commits
+  incremental_commits:
+    enabled: true  # Create commit after each language completes
+    commit_after_each_language: true  # Commit immediately after success
+    push_after_each_language: false  # Require manual push for safety
+
+  # Resumption support
+  resumption:
+    enabled: true  # Allow resuming from failures
+    allow_resume_from_failures: true  # Resume from failure reports
 
 # Content hash tracking (file-level change detection)
 content_hash_tracking:
