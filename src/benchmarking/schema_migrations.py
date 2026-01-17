@@ -221,6 +221,95 @@ class MigrationManager:
             ],
         ))
 
+        # Migration v9 -> v10: Add Language Pair Support (Phase 1 - Benchmarking Hardcode Fix)
+        self._migrations.append(Migration(
+            version=10,
+            description="Add src_lang and tgt_lang columns to support multi-language benchmarking",
+            up_sql=[
+                # Add language columns to benchmark_results
+                "ALTER TABLE benchmark_results ADD COLUMN src_lang TEXT DEFAULT 'en'",
+                "ALTER TABLE benchmark_results ADD COLUMN tgt_lang TEXT DEFAULT 'ru'",
+                # Add language columns to benchmark_runs for run-level tracking
+                "ALTER TABLE benchmark_runs ADD COLUMN src_lang TEXT DEFAULT 'en'",
+                "ALTER TABLE benchmark_runs ADD COLUMN tgt_lang TEXT DEFAULT 'ru'",
+                # Create index for language pair queries
+                """
+                CREATE INDEX IF NOT EXISTS idx_results_lang_pair
+                ON benchmark_results(src_lang, tgt_lang)
+                """,
+                """
+                CREATE INDEX IF NOT EXISTS idx_runs_lang_pair
+                ON benchmark_runs(src_lang, tgt_lang)
+                """,
+                # Create composite index for model+language queries
+                """
+                CREATE INDEX IF NOT EXISTS idx_results_model_lang
+                ON benchmark_results(model_id, src_lang, tgt_lang)
+                """,
+            ],
+            down_sql=[
+                "DROP INDEX IF EXISTS idx_results_model_lang",
+                "DROP INDEX IF EXISTS idx_runs_lang_pair",
+                "DROP INDEX IF EXISTS idx_results_lang_pair",
+                # Note: SQLite doesn't support DROP COLUMN, so rollback would require recreating tables
+                # For production, consider keeping columns or implementing full table recreation
+            ],
+            post_check=self._validate_v10_schema,
+        ))
+
+    def _validate_v10_schema(self, conn: sqlite3.Connection) -> bool:
+        """Validate schema v10 language columns exist.
+
+        Args:
+            conn: Database connection
+
+        Returns:
+            True if validation passes
+
+        Raises:
+            MigrationError: If validation fails
+        """
+        # Check benchmark_results has language columns
+        cursor = conn.execute("PRAGMA table_info(benchmark_results)")
+        columns = {row[1] for row in cursor.fetchall()}
+
+        required_cols = {'src_lang', 'tgt_lang'}
+        missing = required_cols - columns
+        if missing:
+            raise MigrationError(
+                f"Schema v10 validation failed: benchmark_results missing columns {missing}"
+            )
+
+        # Check benchmark_runs has language columns
+        cursor = conn.execute("PRAGMA table_info(benchmark_runs)")
+        columns = {row[1] for row in cursor.fetchall()}
+
+        missing = required_cols - columns
+        if missing:
+            raise MigrationError(
+                f"Schema v10 validation failed: benchmark_runs missing columns {missing}"
+            )
+
+        # Verify indices exist
+        cursor = conn.execute(
+            "SELECT name FROM sqlite_master WHERE type='index' AND name LIKE 'idx_%lang%'"
+        )
+        indices = {row[0] for row in cursor.fetchall()}
+
+        required_indices = {
+            'idx_results_lang_pair',
+            'idx_runs_lang_pair',
+            'idx_results_model_lang'
+        }
+        missing_indices = required_indices - indices
+        if missing_indices:
+            raise MigrationError(
+                f"Schema v10 validation failed: missing indices {missing_indices}"
+            )
+
+        logger.info("Schema v10 validation passed")
+        return True
+
     def _validate_v8_schema(self, conn: sqlite3.Connection) -> bool:
         """Validate schema v8 tables exist with correct structure.
 

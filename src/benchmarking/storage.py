@@ -35,6 +35,8 @@ class BenchmarkResult:
     tokens_input: int
     tokens_output: int
     throughput_tokens_per_sec: float
+    src_lang: str = "en"  # Source language (ISO 639-1 code)
+    tgt_lang: str = "ru"  # Target language (ISO 639-1 code)
     peak_memory_mb: Optional[float] = None
     bleu_score: Optional[float] = None
     comet_score: Optional[float] = None
@@ -68,6 +70,8 @@ class BenchmarkRun:
     system_info: SystemInfo
     results: List[BenchmarkResult]
     total_duration_seconds: float
+    src_lang: str = "en"  # Source language for this run
+    tgt_lang: str = "ru"  # Target language for this run
     timestamp_utc: str = field(default_factory=lambda: datetime.now(UTC).isoformat())
     metadata: Dict[str, Any] = field(default_factory=dict)
 
@@ -607,8 +611,8 @@ class BenchmarkDatabase:
                     """
                     INSERT INTO benchmark_runs
                     (run_id, model_id, device, batch_sizes, iterations, corpus_category,
-                     purpose, tags, total_duration_seconds, timestamp_utc, metadata)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                     purpose, tags, total_duration_seconds, src_lang, tgt_lang, timestamp_utc, metadata)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                     (
                         run.run_id,
@@ -620,6 +624,8 @@ class BenchmarkDatabase:
                         run.purpose,
                         json.dumps(run.tags),
                         run.total_duration_seconds,
+                        run.src_lang,
+                        run.tgt_lang,
                         run.timestamp_utc,
                         json.dumps(run.metadata),
                     ),
@@ -657,10 +663,10 @@ class BenchmarkDatabase:
                         """
                         INSERT INTO benchmark_results
                         (run_id, sample_id, model_id, device, batch_size, duration_seconds,
-                         tokens_input, tokens_output, throughput_tokens_per_sec,
+                         tokens_input, tokens_output, throughput_tokens_per_sec, src_lang, tgt_lang,
                          peak_memory_mb, bleu_score, comet_score, cache_status, tm_level,
                          cache_hit_rate, errors)
-                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """,
                         (
                             run.run_id,
@@ -672,6 +678,8 @@ class BenchmarkDatabase:
                             result.tokens_input,
                             result.tokens_output,
                             result.throughput_tokens_per_sec,
+                            result.src_lang,
+                            result.tgt_lang,
                             result.peak_memory_mb,
                             result.bleu_score,
                             result.comet_score,

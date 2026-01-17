@@ -55,6 +55,22 @@ class BenchmarkQueryBuilder:
         self._filters.append(QueryFilter("device", "=", device, "benchmark_runs"))
         return self
 
+    def by_language_pair(self, src_lang: str, tgt_lang: str) -> "BenchmarkQueryBuilder":
+        """Filter by language pair (source and target)."""
+        self._filters.append(QueryFilter("src_lang", "=", src_lang, "benchmark_runs"))
+        self._filters.append(QueryFilter("tgt_lang", "=", tgt_lang, "benchmark_runs"))
+        return self
+
+    def by_source_lang(self, src_lang: str) -> "BenchmarkQueryBuilder":
+        """Filter by source language."""
+        self._filters.append(QueryFilter("src_lang", "=", src_lang, "benchmark_runs"))
+        return self
+
+    def by_target_lang(self, tgt_lang: str) -> "BenchmarkQueryBuilder":
+        """Filter by target language."""
+        self._filters.append(QueryFilter("tgt_lang", "=", tgt_lang, "benchmark_runs"))
+        return self
+
     def by_hardware(
         self,
         cpu_cores: Optional[int] = None,

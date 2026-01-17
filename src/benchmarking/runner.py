@@ -139,6 +139,8 @@ class BenchmarkRunner:
         purpose: str = "benchmark",
         tags: Optional[List[str]] = None,
         max_samples: Optional[int] = None,
+        src_lang: str = 'en',
+        tgt_lang: str = 'ru',
     ) -> BenchmarkRun:
         """
         Run benchmark for a specific model and configuration.
@@ -154,6 +156,8 @@ class BenchmarkRunner:
             purpose: Purpose description for the run
             tags: Optional tags for categorization
             max_samples: Maximum number of samples to process (for testing)
+            src_lang: Source language code (default: 'en')
+            tgt_lang: Target language code (default: 'ru')
 
         Returns:
             BenchmarkRun object with results
@@ -237,6 +241,8 @@ class BenchmarkRunner:
                             model_id=model_id,
                             device=device,
                             batch_size=batch_size,
+                            src_lang=src_lang,
+                            tgt_lang=tgt_lang,
                         )
 
                         all_results.extend(result)
@@ -275,6 +281,8 @@ class BenchmarkRunner:
             system_info=system_info,
             results=all_results,
             total_duration_seconds=total_duration,
+            src_lang=src_lang,
+            tgt_lang=tgt_lang,
             metadata={
                 "corpus_size": len(corpus),
                 "load_duration_seconds": load_duration,
@@ -297,6 +305,8 @@ class BenchmarkRunner:
         model_id: str,
         device: str,
         batch_size: int,
+        src_lang: str = 'en',
+        tgt_lang: str = 'ru',
     ) -> List[BenchmarkResult]:
         """
         Benchmark a single translation batch.
@@ -308,6 +318,8 @@ class BenchmarkRunner:
             model_id: Model identifier
             device: Device name
             batch_size: Batch size used
+            src_lang: Source language code (default: 'en')
+            tgt_lang: Target language code (default: 'ru')
 
         Returns:
             List of BenchmarkResult objects for each sample
@@ -328,14 +340,14 @@ class BenchmarkRunner:
             # Try to use translate_with_token_counts if available (HuggingFace backend)
             if hasattr(backend, 'translate_with_token_counts'):
                 translations, input_tokens, output_tokens = backend.translate_with_token_counts(
-                    texts, src_lang='en', tgt_lang='ru'
+                    texts, src_lang=src_lang, tgt_lang=tgt_lang
                 )
                 # Distribute tokens across batch (rough estimate)
                 tokens_per_sample_in = input_tokens // len(texts) if texts else 0
                 tokens_per_sample_out = output_tokens // len(texts) if texts else 0
             else:
                 # Fallback for CT2 backend: use heuristic token estimation
-                translations = backend.translate(texts, src_lang='en', tgt_lang='ru')
+                translations = backend.translate(texts, src_lang=src_lang, tgt_lang=tgt_lang)
                 # Estimate tokens using heuristic
                 tokens_per_sample_in = sum(estimate_token_count(t) for t in texts) // len(texts) if texts else 0
                 tokens_per_sample_out = sum(estimate_token_count(t) for t in translations) // len(translations) if translations else 0
@@ -363,6 +375,8 @@ class BenchmarkRunner:
                     tokens_input=tokens_per_sample_in,
                     tokens_output=tokens_per_sample_out,
                     throughput_tokens_per_sec=throughput,
+                    src_lang=src_lang,
+                    tgt_lang=tgt_lang,
                     peak_memory_mb=peak_memory_mb,
                     errors=[],
                 )
@@ -401,6 +415,8 @@ class BenchmarkRunner:
                     tokens_input=0,
                     tokens_output=0,
                     throughput_tokens_per_sec=0.0,
+                    src_lang=src_lang,
+                    tgt_lang=tgt_lang,
                     peak_memory_mb=peak_memory_mb,
                     errors=errors,
                 )

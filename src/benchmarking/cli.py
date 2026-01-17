@@ -185,6 +185,27 @@ def get_benchmark_db_path(purpose: str = "benchmark") -> Path:
     return Path(default_path)
 
 
+def load_target_languages() -> List[str]:
+    """Load target language codes from target_languages.yaml.
+
+    Returns:
+        List of ISO language codes (e.g., ['ar', 'bg', 'ca', ...])
+
+    Raises:
+        FileNotFoundError: If target_languages.yaml not found
+    """
+    config_path = Path("config/target_languages.yaml")
+    if not config_path.exists():
+        raise FileNotFoundError(f"Target languages config not found: {config_path}")
+
+    with open(config_path, 'r', encoding='utf-8') as f:
+        config = yaml.safe_load(f)
+
+    languages = [lang['iso_code'] for lang in config['languages']]
+    logger.info(f"Loaded {len(languages)} target languages")
+    return languages
+
+
 def cmd_run(args: argparse.Namespace) -> int:
     """
     Run a new benchmark.
@@ -234,50 +255,97 @@ def cmd_run(args: argparse.Namespace) -> int:
         logger.error(f"Failed to initialize runner: {e}")
         return 1
 
-    # Run benchmark
+    # Validate language arguments
+    if args.all_languages and args.target_lang:
+        logger.error("Cannot specify both --all-languages and --target-lang")
+        return 1
+
+    if not args.all_languages and not args.target_lang:
+        logger.error("Must specify either --target-lang or --all-languages")
+        return 1
+
+    # Determine language pairs to benchmark
     try:
-        result = runner.run_benchmark(
-            model_id=args.model,
-            device=args.device,
-            batch_sizes=batch_sizes,
-            iterations=args.iterations,
-            corpus_filter=args.corpus,
-            purpose=args.purpose,
-            tags=tags,
-            max_samples=args.max_samples,
-        )
+        if args.all_languages:
+            target_languages = load_target_languages()
+            language_pairs = [(args.source_lang, tgt) for tgt in target_languages]
+            logger.info(f"Benchmarking {len(language_pairs)} language pairs")
+        else:
+            language_pairs = [(args.source_lang, args.target_lang)]
+    except FileNotFoundError as e:
+        logger.error(f"Failed to load target languages: {e}")
+        return 1
 
-        # Print summary
-        print("\n" + "="*60)
-        print(f"Benchmark Run: {result.run_id}")
+    # Run benchmarks for each language pair
+    results = []
+    failed_pairs = []
+
+    for src_lang, tgt_lang in language_pairs:
+        logger.info(f"Benchmarking {src_lang} -> {tgt_lang}")
+
+        try:
+            result = runner.run_benchmark(
+                model_id=args.model,
+                device=args.device,
+                batch_sizes=batch_sizes,
+                iterations=args.iterations,
+                corpus_filter=args.corpus,
+                purpose=args.purpose,
+                tags=tags,
+                max_samples=args.max_samples,
+                src_lang=src_lang,
+                tgt_lang=tgt_lang,
+            )
+            results.append(result)
+            logger.info(f"✓ {src_lang}->{tgt_lang} completed: {len(result.results)} samples")
+        except Exception as e:
+            logger.error(f"✗ {src_lang}->{tgt_lang} failed: {e}")
+            failed_pairs.append((src_lang, tgt_lang, str(e)))
+            if not args.continue_on_error:
+                return 1
+
+    # Print summary
+    print("\n" + "="*60)
+    if len(language_pairs) == 1:
+        # Single language pair summary
+        result = results[0] if results else None
+        if result:
+            print(f"Benchmark Run: {result.run_id}")
+            print("="*60)
+            print(f"Model:          {result.model_id}")
+            print(f"Device:         {result.device}")
+            print(f"Languages:      {result.src_lang} -> {result.tgt_lang}")
+            print(f"Batch sizes:    {result.batch_sizes}")
+            print(f"Iterations:     {result.iterations}")
+            print(f"Corpus:         {result.corpus_category}")
+            print(f"Total samples:  {len(result.results)}")
+            print(f"Duration:       {result.total_duration_seconds:.2f}s")
+
+            if result.results:
+                avg_throughput = sum(r.throughput_tokens_per_sec for r in result.results) / len(result.results)
+                print(f"Avg throughput: {avg_throughput:.2f} tokens/sec")
+
+            if db_path:
+                print(f"\nResults saved to: {db_path}")
+                print(f"Run ID: {result.run_id}")
+    else:
+        # Multi-language summary
+        print(f"Benchmarking Summary: {len(results)}/{len(language_pairs)} language pairs")
         print("="*60)
-        print(f"Model:          {result.model_id}")
-        print(f"Device:         {result.device}")
-        print(f"Batch sizes:    {result.batch_sizes}")
-        print(f"Iterations:     {result.iterations}")
-        print(f"Corpus:         {result.corpus_category}")
-        print(f"Total samples:  {len(result.results)}")
-        print(f"Duration:       {result.total_duration_seconds:.2f}s")
+        for result in results:
+            avg_throughput = sum(r.throughput_tokens_per_sec for r in result.results) / len(result.results) if result.results else 0
+            print(f"  {result.src_lang}->{result.tgt_lang}: {len(result.results)} samples, "
+                  f"{result.total_duration_seconds:.2f}s, {avg_throughput:.2f} tok/s")
 
-        if result.results:
-            avg_throughput = sum(r.throughput_tokens_per_sec for r in result.results) / len(result.results)
-            print(f"Avg throughput: {avg_throughput:.2f} tokens/sec")
+        if failed_pairs:
+            print(f"\nFailed: {len(failed_pairs)} language pairs")
+            for src, tgt, error in failed_pairs:
+                print(f"  ✗ {src}->{tgt}: {error}")
 
         if db_path:
             print(f"\nResults saved to: {db_path}")
-            print(f"Run ID: {result.run_id}")
 
-        return 0
-
-    except ValueError as e:
-        logger.error(f"Configuration error: {e}")
-        return 1
-    except RuntimeError as e:
-        logger.error(f"Benchmark failed: {e}")
-        return 1
-    except Exception as e:
-        logger.error(f"Unexpected error: {e}", exc_info=args.verbose)
-        return 1
+    return 0 if not failed_pairs or args.continue_on_error else 1
 
 
 def cmd_list(args: argparse.Namespace) -> int:
@@ -1078,6 +1146,10 @@ Examples:
     run_parser.add_argument("--save-to-db", help="Database file to save results")
     run_parser.add_argument("--max-samples", type=int, help="Max samples to process (for testing)")
     run_parser.add_argument("--registry", default="config/model_registry.yaml", help="Model registry YAML")
+    run_parser.add_argument("--source-lang", default="en", help="Source language code (default: en)")
+    run_parser.add_argument("--target-lang", help="Target language code (required for single-language run)")
+    run_parser.add_argument("--all-languages", action="store_true", help="Benchmark all 36 languages from target_languages.yaml")
+    run_parser.add_argument("--continue-on-error", action="store_true", help="Continue benchmarking remaining languages if one fails")
 
     # --- list command ---
     list_parser = subparsers.add_parser(
