@@ -1228,10 +1228,10 @@ class TranslationEngine:
 
                                 retry_feedback = decision_result.retry_feedback
                                 result.stats.validation_retried += 1
-                                # Progress tracking: retry
+                                # Progress tracking: reset segment counters for retry
                                 progress = get_progress_tracker()
                                 if progress:
-                                    progress.add_retry()
+                                    progress.file_translation_retry(segments_to_undo=len(segments))
                                 logger.info(
                                     f"Retrying translation for {file_path} to {target_lang} "
                                     f"(attempt {retry_count}/{max_retry_attempts}): "
@@ -1309,6 +1309,12 @@ class TranslationEngine:
                                         + "\n\nPlease fix these issues in the translation."
                                     )
                                     result.stats.validation_retried += 1
+
+                                    # Progress tracking: reset segment counters for retry
+                                    progress = get_progress_tracker()
+                                    if progress:
+                                        progress.file_translation_retry(segments_to_undo=len(segments))
+
                                     logger.info(
                                         f"Retrying translation due to verification failure "
                                         f"(attempt {retry_count}/{max_retry_attempts})"
@@ -1438,6 +1444,11 @@ class TranslationEngine:
                         # Handle retryable errors (from nested logic if needed)
                         retry_count += 1
                         retry_feedback = e.retry_feedback
+
+                        # Progress tracking: reset segment counters for retry
+                        progress = get_progress_tracker()
+                        if progress:
+                            progress.file_translation_retry(segments_to_undo=len(segments))
 
                         # BM-08: Track retry reason
                         with self._retry_metrics_lock:

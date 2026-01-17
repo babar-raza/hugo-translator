@@ -795,6 +795,27 @@ class ProgressTracker:
         with self._lock:
             self._retries += 1
 
+    def file_translation_retry(self, segments_to_undo: int = 0) -> None:
+        """
+        Mark that current file translation is being retried.
+
+        This resets current file segment tracking to avoid double-counting
+        segments during retry attempts.
+
+        Args:
+            segments_to_undo: Number of segments to subtract from total (from failed attempt)
+        """
+        with self._lock:
+            # Reset current file segment counter (fixes 200%, 300% display bug)
+            self._current_file_segments_done = 0
+
+            # Subtract segments from previous failed attempt to avoid inflation
+            if segments_to_undo > 0:
+                self._segments_done = max(0, self._segments_done - segments_to_undo)
+
+            # Increment retry counter
+            self._retries += 1
+
     def record_error(self, error_type: str, message: str, file_path: str = "") -> None:
         """Record an error."""
         with self._lock:
