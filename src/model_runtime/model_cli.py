@@ -14,6 +14,7 @@ from typing import List, Optional
 
 from .model_store import ModelStore, ModelManifest
 from .registry import ModelRegistry
+from .ct2_manager import CT2ConversionManager
 
 logger = logging.getLogger(__name__)
 
@@ -323,6 +324,145 @@ def cmd_plan(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_convert_ct2(args: argparse.Namespace) -> int:
+    """
+    Convert models to CTranslate2 format.
+
+    Args:
+        args: Parsed arguments
+
+    Returns:
+        Exit code (0 for success)
+    """
+    logger.info("=== CT2 Conversion ===")
+
+    # Load registry
+    try:
+        registry = ModelRegistry(args.registry)
+    except Exception as e:
+        logger.error(f"Failed to load registry: {e}")
+        return 1
+
+    # Create CT2 manager
+    manager = CT2ConversionManager(
+        registry=registry,
+        models_dir=Path(args.models_dir),
+    )
+
+    # Determine models to convert
+    model_ids = []
+
+    if args.model:
+        model_ids = [args.model]
+    elif args.all_multilingual:
+        # Convert core multilingual models
+        model_ids = ["m2m100_418m", "m2m100_1.2b", "nllb_distilled_600m", "small100"]
+        logger.info(f"Converting multilingual models: {', '.join(model_ids)}")
+    elif args.all_opus:
+        # Convert Opus models
+        opus_models = [m.model_id for m in registry.list_models() if m.backend == "opus"]
+        model_ids = opus_models
+        logger.info(f"Converting {len(opus_models)} Opus models")
+    else:
+        logger.error("Must specify --model, --all-multilingual, or --all-opus")
+        return 1
+
+    # Convert each model
+    results = []
+    for model_id in model_ids:
+        logger.info(f"\nConverting {model_id}...")
+
+        result = manager.ensure_ct2(
+            model_id=model_id,
+            quantization=args.quant,
+            device_target="cpu" if args.quant == "int8" else "cuda",
+            force=args.force,
+        )
+
+        results.append(result)
+
+        if result.success:
+            logger.info(f"✓ {model_id} -> {result.model_id} ({result.size_mb:.1f}MB)")
+        else:
+            logger.error(f"✗ {model_id}: {result.error}")
+
+    # Summary
+    success_count = sum(1 for r in results if r.success)
+    failure_count = len(results) - success_count
+    total_size_mb = sum(r.size_mb for r in results if r.success)
+
+    logger.info(f"\n=== Conversion Summary ===")
+    logger.info(f"Total: {len(results)}")
+    logger.info(f"Success: {success_count}")
+    logger.info(f"Failed: {failure_count}")
+    logger.info(f"Total size: {total_size_mb:.1f} MB")
+
+    if failure_count > 0:
+        logger.warning("Some conversions failed. Check logs above for details.")
+
+    return 0 if failure_count == 0 else 1
+
+
+def cmd_list_ct2(args: argparse.Namespace) -> int:
+    """
+    List CT2 models (existing and potential).
+
+    Args:
+        args: Parsed arguments
+
+    Returns:
+        Exit code (0 for success)
+    """
+    logger.info("=== CT2 Models ===")
+
+    # Load registry
+    try:
+        registry = ModelRegistry(args.registry)
+    except Exception as e:
+        logger.error(f"Failed to load registry: {e}")
+        return 1
+
+    # Create CT2 manager
+    manager = CT2ConversionManager(
+        registry=registry,
+        models_dir=Path(args.models_dir),
+    )
+
+    # Get CT2 models
+    ct2_models = manager.list_ct2_models()
+
+    # Group by status
+    existing = [(m, p) for m, exists, p in ct2_models if exists]
+    potential = [(m, p) for m, exists, p in ct2_models if not exists]
+
+    # Display existing
+    print(f"\n{'CT2 Model ID':<40} {'Status':<15} {'Path':<50}")
+    print("-" * 110)
+
+    if existing:
+        print("\nExisting CT2 Models:")
+        for model_id, path in sorted(existing):
+            print(f"  ✓ {model_id:<38} {'Ready':<15} {path}")
+
+    if args.show_potential and potential:
+        print("\nPotential CT2 Conversions:")
+        for model_id, path in sorted(potential):
+            print(f"  ⬇ {model_id:<38} {'Not converted':<15} {path}")
+
+    # Summary
+    print("\n" + "=" * 110)
+    print(f"Existing CT2 models: {len(existing)}")
+    if args.show_potential:
+        print(f"Potential conversions: {len(potential)}")
+
+    if not existing and not potential:
+        print("\nNo CT2 models found. Run 'convert-ct2' to create them.")
+    elif not existing:
+        print("\nNo CT2 models exist yet. Run 'convert-ct2 --all-multilingual' to get started.")
+
+    return 0
+
+
 def main() -> int:
     """Main entry point for model CLI."""
     parser = argparse.ArgumentParser(
@@ -445,6 +585,68 @@ def main() -> int:
         help="Base directory for model storage"
     )
 
+    # convert-ct2 command
+    convert_ct2_parser = subparsers.add_parser(
+        "convert-ct2",
+        help="Convert models to CTranslate2 format"
+    )
+    convert_ct2_parser.add_argument(
+        "--model",
+        help="Model ID to convert (e.g., m2m100_418m)"
+    )
+    convert_ct2_parser.add_argument(
+        "--all-multilingual",
+        action="store_true",
+        help="Convert all multilingual models (m2m100, nllb, small100)"
+    )
+    convert_ct2_parser.add_argument(
+        "--all-opus",
+        action="store_true",
+        help="Convert all Opus models"
+    )
+    convert_ct2_parser.add_argument(
+        "--quant",
+        choices=["int8", "int16", "float16", "float32"],
+        default="int8",
+        help="Quantization type (default: int8 for CPU)"
+    )
+    convert_ct2_parser.add_argument(
+        "--force",
+        action="store_true",
+        help="Force reconversion even if CT2 model exists"
+    )
+    convert_ct2_parser.add_argument(
+        "--registry",
+        default="config/model_registry.yaml",
+        help="Registry path"
+    )
+    convert_ct2_parser.add_argument(
+        "--models-dir",
+        default="models",
+        help="Base directory for model storage"
+    )
+
+    # list-ct2 command
+    list_ct2_parser = subparsers.add_parser(
+        "list-ct2",
+        help="List CT2 models (existing and potential)"
+    )
+    list_ct2_parser.add_argument(
+        "--show-potential",
+        action="store_true",
+        help="Show potential CT2 conversions (not yet converted)"
+    )
+    list_ct2_parser.add_argument(
+        "--registry",
+        default="config/model_registry.yaml",
+        help="Registry path"
+    )
+    list_ct2_parser.add_argument(
+        "--models-dir",
+        default="models",
+        help="Base directory for model storage"
+    )
+
     # Parse arguments
     args = parser.parse_args()
 
@@ -469,6 +671,10 @@ def main() -> int:
         return cmd_list(args)
     elif args.command == "plan":
         return cmd_plan(args)
+    elif args.command == "convert-ct2":
+        return cmd_convert_ct2(args)
+    elif args.command == "list-ct2":
+        return cmd_list_ct2(args)
     else:
         logger.error(f"Unknown command: {args.command}")
         return 1

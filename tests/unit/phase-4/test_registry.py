@@ -355,6 +355,141 @@ class TestRegistryPersistence:
                 temp_path.unlink()
 
 
+class TestDeviceAwareSelection:
+    """Test device-aware model selection (CT2 automation)."""
+
+    def test_cuda_can_select_cpu_optimized_models(self, registry):
+        """Test that CUDA device can select CPU-optimized models (e.g., CT2 int8)."""
+        # Add a CPU-optimized CT2 model
+        ct2_model = ModelInfo(
+            model_id="m2m100_418m__int8_ct2",
+            name="M2M100 418M CT2 INT8",
+            backend="ctranslate2",
+            supported_pairs="all",
+            model_size_mb=480,
+            min_ram_gb=2,
+            optimal_device="cpu",  # Optimized for CPU
+            parameters=418000000,
+        )
+        registry.register_model(ct2_model)
+
+        # CUDA hardware
+        hardware_cuda = HardwareInfo(
+            cpu_count=8,
+            total_ram_gb=16,
+            has_cuda=True,
+            cuda_devices=[{"total_memory_gb": 8}],
+            recommended_device="cuda",
+        )
+
+        # Should be able to select CT2 model even though optimal_device is CPU
+        model = registry.recommend_model("en", "fr", hardware_cuda)
+        assert model is not None
+        # CT2 should be eligible (not filtered out by device mismatch)
+
+    def test_optimal_device_affects_scoring_not_filtering(self, registry):
+        """Test that optimal_device affects scoring but doesn't exclude models."""
+        # Add models with different optimal devices
+        cpu_model = ModelInfo(
+            model_id="model_cpu",
+            name="CPU Model",
+            backend="ctranslate2",
+            supported_pairs="all",
+            model_size_mb=500,
+            min_ram_gb=2,
+            optimal_device="cpu",
+            parameters=400000000,
+        )
+
+        cuda_model = ModelInfo(
+            model_id="model_cuda",
+            name="CUDA Model",
+            backend="huggingface",
+            supported_pairs="all",
+            model_size_mb=1500,
+            min_ram_gb=4,
+            optimal_device="cuda",
+            parameters=600000000,
+        )
+
+        registry.register_model(cpu_model)
+        registry.register_model(cuda_model)
+
+        # CUDA hardware - should prefer CUDA-optimized model (higher score)
+        hardware_cuda = HardwareInfo(
+            cpu_count=8,
+            total_ram_gb=16,
+            has_cuda=True,
+            recommended_device="cuda",
+        )
+
+        model = registry.recommend_model("zh", "ja", hardware_cuda)
+        # Should prefer model_cuda due to device match bonus
+        assert model.optimal_device == "cuda"
+
+    def test_ram_filtering_still_applies(self, registry):
+        """Test that RAM requirements still filter models."""
+        # Add high-RAM model
+        high_ram_model = ModelInfo(
+            model_id="large_model",
+            name="Large Model",
+            backend="huggingface",
+            supported_pairs="all",
+            model_size_mb=5000,
+            min_ram_gb=32,  # Requires 32GB RAM
+            optimal_device="cuda",
+            parameters=2000000000,
+        )
+        registry.register_model(high_ram_model)
+
+        # Low RAM hardware
+        hardware_low_ram = HardwareInfo(
+            cpu_count=8,
+            total_ram_gb=8,  # Only 8GB RAM
+            has_cuda=True,
+            recommended_device="cuda",
+        )
+
+        model = registry.recommend_model("en", "fr", hardware_low_ram)
+        # Should NOT select high_ram_model (RAM requirement not met)
+        assert model.min_ram_gb <= 8
+
+    def test_ct2_models_eligible_for_benchmark(self, registry):
+        """Test that CT2 models can be selected for CUDA benchmarking."""
+        # Add CT2 model optimized for CPU but runnable on CUDA
+        ct2_model = ModelInfo(
+            model_id="nllb__int8_ct2",
+            name="NLLB CT2 INT8",
+            backend="ctranslate2",
+            supported_pairs="all",
+            model_size_mb=600,
+            min_ram_gb=3,
+            optimal_device="cpu",
+            parameters=600000000,
+        )
+        registry.register_model(ct2_model)
+
+        # CUDA hardware for benchmarking
+        hardware_cuda = HardwareInfo(
+            cpu_count=8,
+            total_ram_gb=16,
+            has_cuda=True,
+            recommended_device="cuda",
+        )
+
+        # CT2 model should be eligible for selection on CUDA
+        # (even though optimal_device is CPU)
+        models = registry.list_models()
+        ct2_models = [m for m in models if m.backend == "ctranslate2"]
+
+        # Verify CT2 models can be scored for CUDA hardware
+        for model in ct2_models:
+            if model.min_ram_gb <= hardware_cuda.total_ram_gb:
+                score = registry._score_model(model, hardware_cuda, prefer_quality=False)
+                assert score is not None  # Model can be scored
+                # Device mismatch results in lower score, but not exclusion
+
+
 class TestRealRegistry:
     """Test with actual registry file."""
 

@@ -270,6 +270,12 @@ class ModelRegistry:
         """
         Select best model from candidates based on hardware and preferences.
 
+        Device-aware selection (CT2 automation):
+        - optimal_device is a preference, not an exclusion
+        - User-chosen device can run any model as long as backend supports it
+        - Models are filtered only by RAM requirements
+        - Device match affects scoring (bonus points for optimal_device match)
+
         Args:
             candidates: List of candidate models to choose from
             hardware: Hardware capabilities
@@ -284,27 +290,23 @@ class ModelRegistry:
         if not candidates:
             raise ValueError("Cannot select from empty candidate list")
 
-        # Filter by hardware constraints
+        # Filter by hardware constraints (RAM only)
+        # Device compatibility is handled in scoring, not filtering
         suitable = []
         for model in candidates:
             # Check RAM requirements
             if model.min_ram_gb <= hardware.total_ram_gb:
-                # Check device compatibility
-                if model.optimal_device == hardware.recommended_device:
-                    suitable.append(model)
-                elif hardware.recommended_device == "cpu":
-                    # CPU can run anything
-                    suitable.append(model)
+                suitable.append(model)
 
         if not suitable:
-            # No exact match, return smallest model
+            # No models meet RAM requirements, return smallest model
             logger.debug(
-                f"No hardware-compatible models found, selecting smallest "
-                f"from {len(candidates)} candidates"
+                f"No models meet RAM requirements ({hardware.total_ram_gb}GB), "
+                f"selecting smallest from {len(candidates)} candidates"
             )
             return min(candidates, key=lambda m: m.model_size_mb)
 
-        # Score models
+        # Score models (optimal_device affects score, not eligibility)
         scored = []
         for model in suitable:
             score = self._score_model(model, hardware, prefer_quality)
@@ -315,7 +317,7 @@ class ModelRegistry:
         best_model = scored[0][1]
         logger.debug(
             f"Selected {best_model.model_id} from {len(suitable)} suitable models "
-            f"(score: {scored[0][0]:.2f})"
+            f"(score: {scored[0][0]:.2f}, optimal_device: {best_model.optimal_device})"
         )
         return best_model
 
