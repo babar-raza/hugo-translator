@@ -654,13 +654,18 @@ class ProgressTracker:
             self._batches_total += count
 
     def file_started(self, file_path: str, segment_count: int = 0) -> None:
-        """Mark file processing started."""
+        """
+        Mark file processing started.
+
+        Note: segment_count is used only for current file tracking (progress detail).
+        The total segment count should be set upfront via set_totals() after pre-parsing.
+        """
         with self._lock:
             self._current_file = os.path.basename(file_path)
-            self._current_file_segments_total = segment_count  # NEW
-            self._current_file_segments_done = 0  # NEW: Reset
-            if segment_count > 0:
-                self._segments_total += segment_count
+            self._current_file_segments_total = segment_count
+            self._current_file_segments_done = 0  # Reset for new file
+            # NOTE: We no longer increment _segments_total here, as it's set upfront via set_totals()
+            # after pre-parsing all files in _discover_all_segments()
             self._last_file_time = time.time()
 
         if not self.metrics_only:

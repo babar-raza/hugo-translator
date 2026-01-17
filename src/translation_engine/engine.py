@@ -887,6 +887,66 @@ class TranslationEngine:
         # Get from site profile or use default
         return Path(getattr(site_profile, 'output_dir', None) or "output")
 
+    def _discover_all_segments(
+        self,
+        files: List[Path],
+        target_langs: List[str],
+        site_id: str,
+        source_lang: str = "en",
+    ) -> int:
+        """
+        Pre-parse all files to discover total segment count.
+
+        This provides accurate progress tracking from the start by scanning all files
+        upfront to count segments, rather than discovering them progressively during
+        translation.
+
+        Args:
+            files: List of markdown files to scan
+            target_langs: Target languages
+            site_id: Site identifier for profile lookup
+            source_lang: Source language (default: "en")
+
+        Returns:
+            Total number of segments across all files * target languages
+        """
+        from ..observability.progress import get_progress_tracker
+
+        total_segments = 0
+        progress = get_progress_tracker()
+
+        # Get site profile for extractor configuration
+        site_profile = self.config.get_site_profile(site_id)
+
+        logger.info("[INIT] Discovering files...")
+
+        for i, file_path in enumerate(files, 1):
+            # Show progress every 5 files or on last file
+            if i % 5 == 0 or i == len(files):
+                logger.info(f"[INIT] Scanning files... ({i}/{len(files)})")
+
+            try:
+                # Parse file (quick read + parse, no translation)
+                with open(file_path, "r", encoding="utf-8") as f:
+                    content = f.read()
+                doc = self.parser.parse_string(content)
+
+                # Extract segments (same logic as translate_file)
+                extractor = SegmentExtractor(site_profile, terminology_manager=self.terminology_manager)
+                segments = extractor.extract_all(doc, source_lang)
+
+                # Count segments per file * number of target languages
+                segment_count = len(segments) * len(target_langs)
+                total_segments += segment_count
+
+            except Exception as e:
+                logger.warning(f"Failed to parse {file_path} during discovery: {e}")
+                # Continue with other files, don't fail the whole discovery
+
+        logger.info(f"[INIT] Found {len(files)} files with {total_segments:,} total segments")
+
+        return total_segments
+
     def translate_file(
         self,
         site_id: str,

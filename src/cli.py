@@ -2523,7 +2523,18 @@ def translate_site(args: argparse.Namespace) -> int:
                 except (ValueError, TypeError, AttributeError) as e:
                     logger.warning(f"File filtering failed: {e}. Using all markdown files for progress count.")
                     md_files = all_md_files
+
+                # Pre-parse all files to discover accurate segment totals
+                total_segments = engine._discover_all_segments(
+                    files=md_files,
+                    target_langs=target_langs,
+                    site_id=args.site,
+                    source_lang=source_lang,
+                )
+
                 progress_tracker.start(files_total=len(md_files), target_langs=target_langs)
+                # Set accurate segment total from pre-parsing
+                progress_tracker.set_totals(segments=total_segments)
                 progress_tracker.set_model(
                     model_name=resolved_model,
                     device=device,
