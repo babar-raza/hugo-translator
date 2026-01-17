@@ -27,7 +27,7 @@ class ModelInfo:
     local_path: Optional[Path] = None
     hf_model_id: Optional[str] = None  # HuggingFace model ID
     description: Optional[str] = None
-    max_new_tokens: int = 512  # TR-01: Token limit for translation output
+    max_new_tokens: int = 256  # TR-01: Reduced from 512 to 256 for memory efficiency
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary."""
@@ -93,33 +93,48 @@ class ModelRegistry:
     Loads model catalog from YAML and provides selection logic.
     """
 
-    def __init__(self, registry_path: Path | str):
+    def __init__(self, registry_path: Path | str = "config/model_registry.yaml"):
         """
         Initialize model registry.
 
         Args:
-            registry_path: Path to YAML registry file
+            registry_path: Path to YAML registry file or comma-separated list of paths
         """
-        self.registry_path = Path(registry_path)
+        if isinstance(registry_path, (list, tuple)):
+            registry_paths = [Path(p) for p in registry_path]
+        elif isinstance(registry_path, str) and "," in registry_path:
+            registry_paths = [Path(p.strip()) for p in registry_path.split(",") if p.strip()]
+        else:
+            registry_paths = [Path(registry_path)]
+
+        if not registry_paths:
+            raise ValueError("No registry paths provided")
+
+        self.registry_paths = registry_paths
+        self.registry_path = registry_paths[0]
         self.models: Dict[str, ModelInfo] = {}
         self._load_registry()
 
     def _load_registry(self) -> None:
         """Load model registry from YAML file."""
-        if not self.registry_path.exists():
-            raise FileNotFoundError(
-                f"Registry file not found: {self.registry_path}"
-            )
+        for registry_path in self.registry_paths:
+            if not registry_path.exists():
+                raise FileNotFoundError(
+                    f"Registry file not found: {registry_path}"
+                )
 
-        with open(self.registry_path, "r", encoding="utf-8") as f:
-            data = yaml.safe_load(f)
+            with open(registry_path, "r", encoding="utf-8") as f:
+                data = yaml.safe_load(f)
 
-        if not data or "models" not in data:
-            raise ValueError("Invalid registry format: missing 'models' key")
+            if not data or "models" not in data:
+                raise ValueError(
+                    f"Invalid registry format in {registry_path}: missing 'models' key"
+                )
 
-        for model_data in data["models"]:
-            model = ModelInfo.from_dict(model_data)
-            self.models[model.model_id] = model
+            for model_data in data["models"]:
+                model = ModelInfo.from_dict(model_data)
+                # Later registries override earlier ones
+                self.models[model.model_id] = model
 
     def list_models(
         self, lang_pair: Optional[Tuple[str, str]] = None

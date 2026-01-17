@@ -54,6 +54,9 @@ from .validation import ValidationSuite
 from .validation.decision_engine import ValidationDecisionEngine
 from .validation.post_translation_validator import ValidationDecision as PostValidationDecision
 from .handlers.multiline_handler import MultilineHandler
+from .language_detection.fasttext_detector import FastTextDetector
+from .language_detection.similarity_tracker import SimilarityTracker
+from .retry_handler import RetryHandler
 
 logger = logging.getLogger(__name__)
 
@@ -400,6 +403,193 @@ class TranslationEngine:
         else:
             self.metadata_tracker = None
 
+        # Adaptive batch translation (reactive system)
+        self.batch_stats_tracker = None
+        adaptive_config = self._load_adaptive_config()
+        if adaptive_config.get('enabled', False):
+            from .extractor.batch_stats_tracker import BatchStatsTracker
+            # WS3: Accept hardware baseline from GPU optimizer (via CLI)
+            # Used to seed new languages with hardware-aware batch sizes instead of hardcoded values
+            hardware_baseline = kwargs.get('hardware_baseline')
+            self.batch_stats_tracker = BatchStatsTracker(
+                config=adaptive_config,
+                hardware_baseline=hardware_baseline
+            )
+            try:
+                self.batch_stats_tracker.load()
+                # Enhanced logging: show loaded languages and their batch sizes
+                lang_count = len(self.batch_stats_tracker.languages)
+                threshold = self.batch_stats_tracker.fallback_rate_threshold
+                logger.info(
+                    f"[ENABLED] Adaptive Batching: {lang_count} languages loaded, "
+                    f"threshold={threshold:.1%}"
+                )
+                # Log first 5 languages with their learned batch sizes
+                if lang_count > 0:
+                    for i, (lang, stats) in enumerate(self.batch_stats_tracker.languages.items()):
+                        if i >= 5:
+                            break
+                        batch_size = stats.get('batch_size', 'N/A')
+                        logger.info(f"  - {lang}: batch_size={batch_size}")
+            except Exception as e:
+                logger.warning(f"Failed to load batch statistics: {e}, starting fresh")
+        else:
+            logger.info("[DISABLED] Adaptive Batching")
+
+        # WS-A: FastText language detection integration
+        self.fasttext_detector = None
+        self.similarity_tracker = None
+
+        # D3: Disk space check cache (60-second TTL to avoid repeated stat calls)
+        # Structure: {path_str: (timestamp, free_space_bytes)}
+        self._space_check_cache = {}
+        lang_detection_config = self._load_language_detection_config()
+        if lang_detection_config.get('provider') == 'fasttext':
+            try:
+                # Initialize FastTextDetector with config
+                fasttext_config = lang_detection_config.get('fasttext', {})
+                cache_dir = Path(fasttext_config.get('model_cache_dir', './data/models/fasttext'))
+                model_url = fasttext_config.get('model_url')
+                min_confidence = fasttext_config.get('min_confidence', 0.70)
+                auto_download = fasttext_config.get('auto_download', True)
+                download_retries = fasttext_config.get('download_retries', 3)
+                fallback_to_langdetect = fasttext_config.get('fallback_to_langdetect', True)
+
+                self.fasttext_detector = FastTextDetector(
+                    cache_dir=cache_dir,
+                    model_url=model_url,
+                    min_confidence=min_confidence,
+                    auto_download=auto_download,
+                    download_retries=download_retries,
+                    fallback_to_langdetect=fallback_to_langdetect,
+                )
+
+                if self.fasttext_detector.is_available:
+                    logger.info("FastText language detection initialized")
+                else:
+                    logger.warning("FastText language detection unavailable, continuing without it")
+                    self.fasttext_detector = None
+
+            except Exception as e:
+                logger.warning(f"Failed to initialize FastTextDetector: {e}, continuing without language detection")
+                self.fasttext_detector = None
+
+        # WS-A: Adaptive similarity tracker integration
+        adaptive_similarity_config = lang_detection_config.get('adaptive_similarity', {})
+        if adaptive_similarity_config.get('enabled', True) and lang_detection_config.get('provider') == 'fasttext':
+            try:
+                self.similarity_tracker = SimilarityTracker(adaptive_similarity_config)
+                self.similarity_tracker.load()
+                logger.info("Adaptive similarity tracker initialized")
+            except Exception as e:
+                logger.warning(f"Failed to initialize SimilarityTracker: {e}, continuing without adaptive similarity")
+                self.similarity_tracker = None
+
+        # WS-A: RetryHandler for OOM recovery
+        self.retry_handler = None
+        oom_retry_config = self._load_oom_retry_config()
+        if oom_retry_config and oom_retry_config.get('enabled', True):
+            try:
+                max_retries = oom_retry_config.get('max_retries', 3)
+                batch_reduction_factor = oom_retry_config.get('batch_reduction_factor', 0.5)
+                min_batch_size = oom_retry_config.get('min_batch_size', 1)
+
+                self.retry_handler = RetryHandler(
+                    max_retries=max_retries,
+                    batch_reduction_factor=batch_reduction_factor,
+                    min_batch_size=min_batch_size,
+                )
+                logger.info(
+                    f"[ENABLED] OOM Retry Handler: max_retries={max_retries}, "
+                    f"reduction_factor={batch_reduction_factor}, min_batch={min_batch_size}"
+                )
+            except Exception as e:
+                logger.error(
+                    f"[FAILED] OOM Retry Handler initialization: {e}. "
+                    f"GPU OOM errors will NOT be automatically recovered"
+                )
+                self.retry_handler = None
+        elif oom_retry_config and not oom_retry_config.get('enabled', True):
+            logger.info("[DISABLED] OOM Retry Handler: enabled=false")
+        else:
+            logger.info("[DISABLED] OOM Retry Handler: missing config")
+
+    def _load_adaptive_config(self) -> dict:
+        """Load adaptive batching configuration from global config."""
+        try:
+            global_config = self.config.get_config()
+            return global_config.get('adaptive_batching', {})
+        except Exception as e:
+            logger.debug(f"Failed to load adaptive batching config: {e}")
+            return {'enabled': False}
+
+    def _load_language_detection_config(self) -> dict:
+        """Load language detection configuration from global config."""
+        try:
+            global_config = self.config.get_config()
+            return global_config.get('language_detection', {})
+        except Exception as e:
+            logger.debug(f"Failed to load language detection config: {e}")
+            return {}
+
+    def _load_oom_retry_config(self) -> dict:
+        """Load OOM retry configuration from global config."""
+        try:
+            global_config = self.config.get_config()
+            autonomous_recovery = global_config.get('autonomous_recovery', {})
+            oom_retry = autonomous_recovery.get('oom_retry', {})
+
+            # Debug logging to help diagnose config loading issues
+            if not oom_retry:
+                logger.debug(
+                    f"OOM retry config not found. "
+                    f"Has autonomous_recovery: {bool(autonomous_recovery)}, "
+                    f"Keys: {list(autonomous_recovery.keys()) if autonomous_recovery else []}"
+                )
+
+            return oom_retry
+        except Exception as e:
+            logger.warning(f"Failed to load OOM retry config: {e}", exc_info=True)
+            return {}
+
+    def _is_oom_error(self, exception: Exception) -> bool:
+        """
+        OOM-01: Detect CUDA Out of Memory errors.
+
+        Checks if the exception is a GPU OOM error by examining the error message
+        for common OOM patterns. This allows the exception handler in translate_file()
+        to distinguish between OOM errors (which should be retried with batch reduction)
+        and other exceptions (which should break the retry loop).
+
+        Args:
+            exception: Exception to check
+
+        Returns:
+            True if this is a CUDA OOM error, False otherwise
+        """
+        error_str = str(exception).lower()
+
+        oom_patterns = [
+            "cuda out of memory",
+            "out of memory",
+            "gpu out of memory during translation",
+            "reduce batch size",
+            "cudnn_status_not_enough_memory",
+            "cublas error",
+        ]
+
+        for pattern in oom_patterns:
+            if pattern in error_str:
+                logger.debug(
+                    f"OOM detected in Engine: pattern='{pattern}' matched in error"
+                )
+                return True
+
+        # Log non-OOM for troubleshooting
+        error_preview = error_str[:150] + "..." if len(error_str) > 150 else error_str
+        logger.debug(f"NOT OOM in Engine: {error_preview}")
+        return False
+
     def register_shutdown_callback(self, callback) -> None:
         """
         RES-06: Register callback to be called on shutdown.
@@ -481,9 +671,13 @@ class TranslationEngine:
 
     def _get_free_space(self, path: Path) -> int:
         """
-        RES-09: Get free disk space for path.
+        RES-09 + D3: Get free disk space for path with parent walking and caching.
 
         Cross-platform implementation for checking available disk space.
+        Features:
+        - Parent directory walking: finds nearest existing ancestor if path doesn't exist
+        - 60-second cache: avoids repeated stat calls for same path
+        - Graceful degradation: returns 0 if all checks fail
 
         Args:
             path: Directory path to check
@@ -491,10 +685,49 @@ class TranslationEngine:
         Returns:
             Free space in bytes, or 0 if unable to determine
         """
+        import time
+        import shutil
+
+        # D3: Check cache first (60-second TTL)
+        path_str = str(path)
+        if path_str in self._space_check_cache:
+            timestamp, cached_free = self._space_check_cache[path_str]
+            age = time.time() - timestamp
+            if age < 60:  # Cache valid for 60 seconds
+                logger.debug(f"Disk space cache hit for {path} (age: {age:.1f}s, free: {cached_free/(1024**3):.2f}GB)")
+                return cached_free
+
         try:
-            import shutil
-            total, used, free = shutil.disk_usage(path)
+            # D3: Parent directory walking - find nearest existing ancestor
+            check_path = path
+            walked_steps = 0
+            max_steps = 20  # Safety limit to prevent infinite loops
+
+            while not check_path.exists() and walked_steps < max_steps:
+                parent = check_path.parent
+                if parent == check_path:
+                    # Reached filesystem root without finding existing path
+                    logger.warning(f"Could not find existing path for {path} (walked to root)")
+                    return 0
+                check_path = parent
+                walked_steps += 1
+
+            if walked_steps >= max_steps:
+                logger.warning(f"Exceeded max parent walk steps ({max_steps}) for {path}")
+                return 0
+
+            if walked_steps > 0:
+                logger.debug(f"Walked {walked_steps} parent directories: {path} -> {check_path}")
+
+            # D3: Get disk usage for existing path
+            total, used, free = shutil.disk_usage(check_path)
+
+            # D3: Cache the result with timestamp
+            self._space_check_cache[path_str] = (time.time(), free)
+            logger.debug(f"Cached disk space for {path}: {free/(1024**3):.2f}GB free")
+
             return free
+
         except Exception as e:
             logger.warning(f"Could not determine free space for {path}: {e}")
             return 0
@@ -529,8 +762,8 @@ class TranslationEngine:
         1. If force_retranslate: never skip
         2. If output doesn't exist: don't skip
         3. If output exists but is invalid: don't skip
-        4. Content hash check (if enabled): skip if content unchanged
-        5. Fallback to mtime check
+        4. mtime check: skip if output is newer than source
+        5. Content hash check (if enabled): skip if content unchanged
 
         Args:
             source_path: Path to source file
@@ -554,6 +787,20 @@ class TranslationEngine:
         if not self._is_valid_output(output_path):
             return (False, "output file invalid or empty")
 
+        # Use mtime comparison first (quick check)
+        if use_mtime_check:
+            try:
+                source_mtime = source_path.stat().st_mtime
+                output_mtime = output_path.stat().st_mtime
+
+                if source_mtime > output_mtime:
+                    return (False, "source has been modified (mtime)")
+                # If output is newer or same age, continue to content hash check
+
+            except OSError as e:
+                logger.warning(f"Failed to check mtime: {e}")
+                # Fall through to content hash check or default
+
         # Content hash check (if enabled)
         if self.enable_content_hash and self.metadata_tracker:
             try:
@@ -572,24 +819,19 @@ class TranslationEngine:
                 return (False, f"content changed: {reason}")
 
             except Exception as e:
-                # Hash check failed → fall back to mtime
-                logger.warning(f"Content hash check failed, using mtime: {e}")
-                # Fall through to mtime check
+                # Hash check failed → fall back to default
+                logger.warning(f"Content hash check failed: {e}")
+                # Fall through to default
 
-        # Use mtime comparison
+        # If we got here after mtime check and output was newer, skip translation
         if use_mtime_check:
             try:
                 source_mtime = source_path.stat().st_mtime
                 output_mtime = output_path.stat().st_mtime
-
                 if output_mtime >= source_mtime:
                     return (True, "output is newer than source (mtime)")
-                else:
-                    return (False, "source has been modified (mtime)")
-
-            except OSError as e:
-                logger.warning(f"Failed to check mtime: {e}")
-                return (False, "mtime check failed")
+            except OSError:
+                pass
 
         # Default: don't skip
         return (False, "default behavior")
@@ -652,6 +894,7 @@ class TranslationEngine:
         target_langs: List[str],
         force: bool = False,
         validate: Optional[bool] = None,
+        trigger_type: str = "cli",
     ) -> TranslationResult:
         """
         Translate a single Hugo markdown file.
@@ -662,6 +905,7 @@ class TranslationEngine:
             target_langs: List of target language codes
             force: If True, bypass TM and force retranslation
             validate: Whether to validate translation quality. If None, uses engine default.
+            trigger_type: How translation was triggered ("cli", "scheduled", "web", etc.)
 
         Returns:
             TranslationResult with outcomes for all target languages
@@ -673,7 +917,7 @@ class TranslationEngine:
         if telemetry_enabled:
             telemetry_cm = self.telemetry.track_translation_session(
                 job_type="translate_file",
-                trigger_type="cli",
+                trigger_type=trigger_type,
                 file_path=file_path,
                 target_langs=target_langs,
                 site_id=site_id,
@@ -816,6 +1060,12 @@ class TranslationEngine:
                     )
                     result.skipped_langs.append(target_lang)
                     result.skip_reasons[target_lang] = skip_reason
+
+                    # Record skip in progress tracker
+                    progress = get_progress_tracker()
+                    if progress:
+                        progress.record_skip(target_lang, skip_reason)
+
                     # Count as success since output already exists
                     result.outputs[target_lang] = output_path
 
@@ -1071,6 +1321,11 @@ class TranslationEngine:
 
                         result.outputs[target_lang] = output_path
 
+                        # Mark language as completed in progress tracker
+                        progress = get_progress_tracker()
+                        if progress:
+                            progress.language_completed(target_lang)
+
                         # Track validation decision in result
                         if final_decision:
                             result.validation_decision = ValidationDecision.ACCEPT if final_decision.decision == PostValidationDecision.ACCEPT else None
@@ -1154,6 +1409,26 @@ class TranslationEngine:
                                 progress.file_completed(success=False)
                             raise
 
+                        # OOM-01: Detect OOM errors and allow RetryHandler to engage
+                        if self._is_oom_error(e):
+                            if self.retry_handler:
+                                # Re-raise to let RetryHandler catch and apply batch reduction
+                                logger.debug(
+                                    f"OOM error detected for {file_path} to {target_lang}. "
+                                    f"Re-raising to engage RetryHandler with batch reduction."
+                                )
+                                raise
+                            else:
+                                # Helpful message when handler disabled
+                                logger.error(
+                                    f"OOM error detected for {file_path} to {target_lang}, "
+                                    f"but RetryHandler is disabled. Consider enabling autonomous_recovery.oom_retry "
+                                    f"in config to automatically reduce batch size. Error: {e}"
+                                )
+                                result.errors.append(
+                                    f"Translation to {target_lang} failed (OOM): {e}"
+                                )
+                                break
 
                         # Unexpected error - don't retry
                         logger.error(
@@ -1201,6 +1476,21 @@ class TranslationEngine:
                     progress.file_completed(success=False)
                 raise  # Re-raise to propagate to caller
 
+            # OOM-01: Detect OOM errors and allow RetryHandler to engage (outer handler)
+            if self._is_oom_error(e):
+                if self.retry_handler:
+                    # Re-raise to let RetryHandler catch and apply batch reduction
+                    logger.debug(
+                        f"OOM error detected for {file_path} (outer handler). "
+                        f"Re-raising to engage RetryHandler with batch reduction."
+                    )
+                    # Mark file as incomplete before re-raising
+                    progress = get_progress_tracker()
+                    if progress:
+                        progress.record_error("translation_error", str(e), str(file_path))
+                        progress.file_completed(success=False)
+                    raise
+
             logger.error(f"Unexpected error translating {file_path}: {e}")
             result.errors.append(f"Unexpected error: {e}")
             # Progress tracking: record error
@@ -1211,45 +1501,94 @@ class TranslationEngine:
             # TEL-04: Track error in telemetry
             if telemetry_run:
                 telemetry_run.log_event("error", {"error": str(e)})
+                # Capture full stack trace as error_details (truncate to 10KB)
+                import traceback
+                error_details = traceback.format_exc()
+                # Truncate to 10KB to avoid API payload issues
+                max_error_details_size = 10 * 1024  # 10KB
+                if len(error_details) > max_error_details_size:
+                    error_details = error_details[:max_error_details_size] + "\n... [truncated]"
+                telemetry_run.set_metrics(error_details=error_details)
 
         finally:
             result.stats.files_translated = 1 if result.success else 0
             result.stats.files_generated = len(result.outputs)
             result.stats.duration_seconds = time.time() - start_time
 
+            # RES-05: Calculate language-level skip vs translation counts
+            result.stats.langs_skipped = len(result.skipped_langs)
+            result.stats.langs_translated = len(result.outputs) - len(result.skipped_langs)
+
+            if result.stats.multiline_segments > 0:
+                logger.info(
+                    "MSP-02: Multiline batching summary for %s: segments=%d, lines=%d, backend_calls=%d",
+                    file_path,
+                    result.stats.multiline_segments,
+                    result.stats.multiline_lines,
+                    result.stats.multiline_backend_calls,
+                )
+
             # TEL-04: Track stats and close telemetry
             if telemetry_run and telemetry_enabled:
                 try:
-                    self.telemetry.track_translation_stats(telemetry_run, result.stats)
-                    # SR-03: Use helper functions for RunRecord fields (TEL-05-B)
-                    from ..observability.telemetry_integration import (
-                        build_output_summary,
-                        build_error_summary,
-                        calculate_items_metrics,
-                    )
-                    items_metrics = calculate_items_metrics(
-                        job_type="translate_file",
-                        stats=result.stats,
-                    )
-                    output_summary = build_output_summary(
-                        job_type="translate_file",
-                        outputs=result.outputs,
-                        errors=result.errors,
-                    )
-                    error_summary = build_error_summary(result.errors, max_errors=5)
+                    # RES-05: Detect if all languages were skipped (no work done)
+                    # CRITICAL: If no work done, create NO telemetry entry at all
+                    total_langs = len(result.outputs)  # Total languages requested
+                    all_skipped = (result.stats.langs_skipped == total_langs and
+                                   total_langs > 0 and
+                                   result.success)
 
-                    # TI-01: Use centralized helper with observability
-                    duration_ms, used_fallback = _safe_duration_ms(result.stats, context="translate_file")
+                    if all_skipped:
+                        # NO WORK DONE → NO TELEMETRY ENTRY
+                        # Exit telemetry context without recording anything
+                        telemetry_cm.__exit__(None, None, None)
+                        logger.info(
+                            "Skipping telemetry entry: all languages skipped (no work done)",
+                            extra={
+                                "langs_skipped": result.stats.langs_skipped,
+                                "total_langs": total_langs,
+                                "skipped_langs": result.skipped_langs,
+                            }
+                        )
+                    else:
+                        # Work was done → Record telemetry with skip metrics
+                        self.telemetry.track_translation_stats(
+                            telemetry_run,
+                            result.stats,
+                            output_paths=result.outputs
+                        )
+                        # SR-03: Use helper functions for RunRecord fields (TEL-05-B)
+                        from ..observability.telemetry_integration import (
+                            build_output_summary,
+                            build_error_summary,
+                            calculate_items_metrics,
+                        )
+                        items_metrics = calculate_items_metrics(
+                            job_type="translate_file",
+                            stats=result.stats,
+                            skip_count=len(result.skipped_langs),  # RES-05: Pass skip count
+                        )
+                        output_summary = build_output_summary(
+                            job_type="translate_file",
+                            outputs=result.outputs,
+                            errors=result.errors,
+                            skipped_langs=result.skipped_langs,  # RES-05: Pass skip data
+                            skip_reasons=result.skip_reasons,  # RES-05: Pass skip reasons
+                        )
+                        error_summary = build_error_summary(result.errors, max_errors=5)
 
-                    telemetry_run.set_metrics(
-                        duration_ms=duration_ms,  # API requires integer
-                        items_discovered=items_metrics["items_discovered"],
-                        items_succeeded=items_metrics["items_succeeded"],
-                        items_failed=items_metrics["items_failed"],
-                        output_summary=output_summary,
-                        error_summary=error_summary,
-                    )
-                    telemetry_cm.__exit__(None, None, None)
+                        # TI-01: Use centralized helper with observability
+                        duration_ms, used_fallback = _safe_duration_ms(result.stats, context="translate_file")
+
+                        telemetry_run.set_metrics(
+                            duration_ms=duration_ms,  # API requires integer
+                            items_discovered=items_metrics["items_discovered"],
+                            items_succeeded=items_metrics["items_succeeded"],
+                            items_failed=items_metrics["items_failed"],
+                            output_summary=output_summary,
+                            error_summary=error_summary,
+                        )
+                        telemetry_cm.__exit__(None, None, None)
 
                     # GS-02: Unregister telemetry context after normal completion
                     try:
@@ -1259,6 +1598,27 @@ class TranslationEngine:
                         pass
                 except Exception as telemetry_error:
                     logger.warning(f"Telemetry tracking failed: {telemetry_error}")
+
+            # Save adaptive batch statistics
+            if self.batch_stats_tracker:
+                try:
+                    self.batch_stats_tracker.save()
+                    logger.debug("Saved adaptive batch statistics")
+                except Exception as save_error:
+                    logger.warning(f"Failed to save batch statistics: {save_error}")
+
+            # TC-GIT-01: Store telemetry context for git commit association
+            if telemetry_enabled and telemetry_run:
+                result.telemetry_context = telemetry_run
+
+            # D5: Clear GPU cache after file translation (per-file, not per call)
+            try:
+                if self.model_loader:
+                    self.model_loader.clear_cache_after_file()
+                    if self.model_loader.check_and_clear_cache():
+                        logger.info("Performed aggressive GPU cache clear after file translation")
+            except Exception as cache_error:
+                logger.warning(f"GPU cache clear after file failed: {cache_error}")
 
         return result
 
@@ -1350,11 +1710,22 @@ class TranslationEngine:
 
             # Step 2: Extract TextUnits with M2M100 protection
             terminology_file = Path("config/terminology/aspose_terms.txt")
+
+            # WS-A: Get script validation thresholds for language detection
+            lang_detection_config = self._load_language_detection_config()
+            script_validation_config = lang_detection_config.get('script_validation', {})
+            script_validation_thresholds = script_validation_config.get('thresholds', {}) if script_validation_config.get('enabled', True) else None
+
             extractor = TextUnitExtractor(
                 segmentation_strategy=site_profile.body.ast_segmentation_strategy,
                 terminology_file=terminology_file if terminology_file.exists() else None,
                 mt_model=mt_model,  # Pass model for tokenizer protection
-                preserve_patterns=site_profile.body.preserve_patterns  # Apply preserve_patterns
+                preserve_patterns=site_profile.body.preserve_patterns,  # Apply preserve_patterns
+                site_profile=site_profile,  # Pass site profile for extraction config
+                batch_stats_tracker=self.batch_stats_tracker,  # Adaptive batch sizing
+                fasttext_detector=self.fasttext_detector,  # WS-A: Language detection
+                similarity_tracker=self.similarity_tracker,  # WS-A: Adaptive similarity learning
+                script_validation_thresholds=script_validation_thresholds  # WS-A: Script validation config
             )
 
             logger.info(f"AST Translation: Extracting TextUnits from AST (strategy: {site_profile.body.ast_segmentation_strategy})")
@@ -1487,6 +1858,9 @@ class TranslationEngine:
         # Create extractor instance for inline formatting restoration (TRM-05: with terminology)
         extractor = SegmentExtractor(site_profile, terminology_manager=self.terminology_manager)
 
+        # Get model_id early for accurate token counting (if model already loaded)
+        model_id = self._get_model_id(site_profile)
+
         # Step 1: TM lookup (unless force=True)
         if not force:
             for idx, segment in enumerate(segments, 1):
@@ -1526,10 +1900,20 @@ class TranslationEngine:
                     elif tm_result.source == "l3_semantic":
                         stats.l3_hits += 1
 
-                    # Track cached tokens (estimate input + output)
+                    # Track cached tokens - use actual count if available for accuracy
                     # TEL-04: Count tokens saved by cache hit
-                    cached_input_tokens = estimate_token_count(segment.source_text)
-                    cached_output_tokens = estimate_token_count(tm_result.translation)
+                    backend = self.model_loader.get_tokenizer_for_counting(model_id)
+                    if backend and hasattr(backend, 'get_token_count'):
+                        # Actual tokenization (accurate ~10-20ms overhead acceptable for logs)
+                        cached_input_tokens = backend.get_token_count(segment.source_text)
+                        cached_output_tokens = backend.get_token_count(tm_result.translation)
+                        stats.token_count_method = "actual"
+                    else:
+                        # Heuristic fallback (fast but approximate)
+                        cached_input_tokens = estimate_token_count(segment.source_text)
+                        cached_output_tokens = estimate_token_count(tm_result.translation)
+                        stats.token_count_method = "estimated"
+
                     stats.tokens_cached += cached_input_tokens + cached_output_tokens
 
                     # Progress tracking: cache hit
@@ -1576,7 +1960,6 @@ class TranslationEngine:
             )
 
             # Get model (use lock to prevent race conditions in parallel processing)
-            model_id = self._get_model_id(site_profile)
             with self._model_lock:
                 backend = self.model_loader.load_model(model_id)
             stats.model_used = model_id
@@ -1699,7 +2082,11 @@ class TranslationEngine:
                 if progress:
                     progress.batch_completed(len(segments_to_translate))
                     progress.segments_completed(len(segments_to_translate), duration_s=batch_duration)
-                    progress.add_tokens(tokens_in=stats.tokens_input, tokens_out=stats.tokens_output)
+                    progress.add_tokens(
+                        tokens_in=stats.tokens_input,
+                        tokens_out=stats.tokens_output,
+                        method=getattr(stats, 'token_count_method', 'actual')
+                    )
 
             except Exception as e:
                 logger.error(f"Model translation failed: {e}")
@@ -1952,6 +2339,8 @@ class TranslationEngine:
         parallel: bool = True,
         max_workers: Optional[int] = None,
         skip_site_lock: bool = False,
+        trigger_type: str = "cli",
+        max_files: int = 0,
     ) -> DirectoryResult:
         """
         Translate all eligible files in a directory.
@@ -1964,6 +2353,8 @@ class TranslationEngine:
             parallel: If True, process files in parallel (default: True)
             max_workers: Maximum number of parallel workers (default: auto)
             skip_site_lock: If True, skip lock acquisition (parent holds lock) - TC1
+            trigger_type: How translation was triggered ("cli", "scheduled", "web", etc.)
+            max_files: Maximum number of files to process (0=unlimited, default: 0)
 
         Returns:
             DirectoryResult with outcomes for all files
@@ -1988,7 +2379,7 @@ class TranslationEngine:
         if skip_site_lock:
             logger.info(f"Skipping site lock acquisition (parent holds lock for {site_id})")
             return self._translate_directory_locked(
-                site_id, directory, target_langs, recursive, parallel, max_workers
+                site_id, directory, target_langs, recursive, parallel, max_workers, trigger_type, max_files
             )
 
         # RES-08: Create lock to prevent concurrent translations of same site
@@ -2009,7 +2400,7 @@ class TranslationEngine:
 
         try:
             return self._translate_directory_locked(
-                site_id, directory, target_langs, recursive, parallel, max_workers
+                site_id, directory, target_langs, recursive, parallel, max_workers, trigger_type, max_files
             )
         finally:
             # RES-08: Always release lock
@@ -2023,12 +2414,18 @@ class TranslationEngine:
         recursive: bool = True,
         parallel: bool = True,
         max_workers: Optional[int] = None,
+        trigger_type: str = "cli",
+        max_files: int = 0,
     ) -> DirectoryResult:
         """
         Internal implementation of translate_directory (called while holding lock).
 
         RES-08: This is the actual translation logic, called from translate_directory
         after the lock has been acquired.
+
+        Args:
+            max_files: Maximum number of files to process (0=unlimited, default: 0).
+                      Files are selected deterministically (sorted by path).
         """
         # TEL-04: Start telemetry tracking for batch operation
         # SR-01: Find representative file for business context extraction
@@ -2047,7 +2444,7 @@ class TranslationEngine:
         if telemetry_enabled:
             telemetry_cm = self.telemetry.track_translation_session(
                 job_type="translate_directory",
-                trigger_type="cli",
+                trigger_type=trigger_type,
                 directory=str(directory),
                 file_path=representative_file,  # SR-01: Pass representative file for business context
                 target_langs=target_langs,
@@ -2087,6 +2484,13 @@ class TranslationEngine:
                     f"After filtering: {len(md_files)} source files to translate"
                 )
 
+            # Apply max_files limit if specified (deterministic selection)
+            if max_files and max_files > 0 and len(md_files) > max_files:
+                md_files = sorted(md_files, key=str)[:max_files]
+                logger.info(
+                    f"Limited to first {max_files} files for sampling (deterministic selection)"
+                )
+
             result.total_files = len(md_files)
 
             if not md_files:
@@ -2114,6 +2518,14 @@ class TranslationEngine:
             # TEL-04: Track error in telemetry
             if telemetry_run:
                 telemetry_run.log_event("error", {"error": str(e)})
+                # Capture full stack trace as error_details (truncate to 10KB)
+                import traceback
+                error_details = traceback.format_exc()
+                # Truncate to 10KB to avoid API payload issues
+                max_error_details_size = 10 * 1024  # 10KB
+                if len(error_details) > max_error_details_size:
+                    error_details = error_details[:max_error_details_size] + "\n... [truncated]"
+                telemetry_run.set_metrics(error_details=error_details)
 
         finally:
             result.duration_seconds = time.time() - start_time
@@ -2128,7 +2540,19 @@ class TranslationEngine:
                 try:
                     # Get aggregated stats across all files
                     agg_stats = result.aggregate_stats
-                    self.telemetry.track_translation_stats(telemetry_run, agg_stats)
+
+                    # Aggregate outputs from all file results for target_ref
+                    all_outputs = {}
+                    for file_result in result.file_results:
+                        if file_result.outputs:
+                            all_outputs.update(file_result.outputs)
+
+                    self.telemetry.track_translation_stats(
+                        telemetry_run,
+                        agg_stats,
+                        job_type="translate_directory",
+                        output_paths=all_outputs
+                    )
 
                     # SR-03: Use helper functions for RunRecord fields (TEL-05-B)
                     from ..observability.telemetry_integration import (
@@ -2188,6 +2612,10 @@ class TranslationEngine:
                 except Exception as telemetry_error:
                     logger.warning(f"Telemetry tracking failed: {telemetry_error}")
 
+            # TC-GIT-01: Store telemetry context for git commit association
+            if telemetry_enabled and telemetry_run:
+                result.telemetry_context = telemetry_run
+
         return result
 
     def _translate_directory_sequential(
@@ -2220,11 +2648,90 @@ class TranslationEngine:
             self._current_file = md_file
 
             try:
-                file_result = self.translate_file(
-                    site_id=site_id,
-                    file_path=md_file,
-                    target_langs=target_langs,
-                )
+                # WS-A: Use RetryHandler for OOM recovery if available
+                if self.retry_handler:
+                    # Wrapper function that adapts to RetryHandler's interface
+                    def translate_with_batch_size(file_path: Path, batch_size: int, **kwargs):
+                        # Temporarily set batch_size for this file translation
+                        original_batch_size = self.batch_size
+                        self.batch_size = batch_size
+                        try:
+                            return self.translate_file(
+                                site_id=kwargs.get('site_id'),
+                                file_path=file_path,
+                                target_langs=kwargs.get('target_langs'),
+                            )
+                        finally:
+                            # Restore original batch_size
+                            self.batch_size = original_batch_size
+
+                    # WS2-CALLBACK: Define OOM recovery learning callback
+                    def handle_oom_recovery(failed_batch_size: int, success_batch_size: int):
+                        """Teach BatchStatsTracker when OOM retry succeeds."""
+                        logger.info(
+                            f"OOM RECOVERY: {failed_batch_size}→{success_batch_size}, "
+                            f"teaching adaptive tracker for file {md_file.name}"
+                        )
+
+                        # Guard: Only proceed if batch_stats_tracker exists
+                        if not self.batch_stats_tracker:
+                            logger.debug("No batch_stats_tracker available, skipping OOM learning")
+                            return
+
+                        try:
+                            # Record failure at the batch size that caused OOM
+                            for lang in target_langs:
+                                self.batch_stats_tracker.record_batch_result(
+                                    language=lang,
+                                    batch_size=failed_batch_size,
+                                    success=False,
+                                    fallback_reason='oom_retry'
+                                )
+
+                                # Cap current_batch_size to success size
+                                if lang in self.batch_stats_tracker.languages:
+                                    lang_data = self.batch_stats_tracker.languages[lang]
+                                    current = lang_data.get('current_batch_size', success_batch_size)
+                                    new_size = min(current, success_batch_size)
+                                    lang_data['current_batch_size'] = new_size
+                                    logger.debug(
+                                        f"Capped {lang} batch_size: {current}→{new_size}"
+                                    )
+
+                            # Persist immediately to protect next file
+                            self.batch_stats_tracker.save()
+                            logger.info(
+                                f"OOM learning persisted for {len(target_langs)} languages"
+                            )
+                        except Exception as e:
+                            logger.warning(f"Failed to record OOM learning: {e}")
+
+                    # WS4: Log per-file protection status
+                    logger.info(
+                        f"Translating {md_file.name} | OOM Protection: ACTIVE "
+                        f"(max_retries={self.retry_handler.max_retries}) | Batch size: {self.batch_size}"
+                    )
+
+                    file_result = self.retry_handler.translate_file_with_retry(
+                        translate_func=translate_with_batch_size,
+                        file_path=md_file,
+                        initial_batch_size=self.batch_size,
+                        on_oom_recovery=handle_oom_recovery,
+                        site_id=site_id,
+                        target_langs=target_langs,
+                    )
+                else:
+                    # WS4: Log per-file protection status when disabled
+                    logger.info(
+                        f"Translating {md_file.name} | OOM Protection: DISABLED | Batch size: {self.batch_size}"
+                    )
+
+                    # Fallback to direct translation without retry
+                    file_result = self.translate_file(
+                        site_id=site_id,
+                        file_path=md_file,
+                        target_langs=target_langs,
+                    )
                 result.file_results.append(file_result)
 
                 if file_result.success:
@@ -2382,10 +2889,89 @@ class TranslationEngine:
             TranslationResult
         """
         try:
-            # The translate_file method will use locks internally where needed
-            return self.translate_file(
-                site_id=site_id, file_path=file_path, target_langs=target_langs
-            )
+            # WS-A: Use RetryHandler for OOM recovery if available
+            if self.retry_handler:
+                # Wrapper function that adapts to RetryHandler's interface
+                def translate_with_batch_size(file_path: Path, batch_size: int, **kwargs):
+                    # Temporarily set batch_size for this file translation
+                    original_batch_size = self.batch_size
+                    self.batch_size = batch_size
+                    try:
+                        return self.translate_file(
+                            site_id=kwargs.get('site_id'),
+                            file_path=file_path,
+                            target_langs=kwargs.get('target_langs'),
+                        )
+                    finally:
+                        # Restore original batch_size
+                        self.batch_size = original_batch_size
+
+                # WS2-CALLBACK: Define OOM recovery learning callback
+                def handle_oom_recovery(failed_batch_size: int, success_batch_size: int):
+                    """Teach BatchStatsTracker when OOM retry succeeds."""
+                    logger.info(
+                        f"OOM RECOVERY: {failed_batch_size}→{success_batch_size}, "
+                        f"teaching adaptive tracker for file {file_path.name}"
+                    )
+
+                    # Guard: Only proceed if batch_stats_tracker exists
+                    if not self.batch_stats_tracker:
+                        logger.debug("No batch_stats_tracker available, skipping OOM learning")
+                        return
+
+                    try:
+                        # Record failure at the batch size that caused OOM
+                        for lang in target_langs:
+                            self.batch_stats_tracker.record_batch_result(
+                                language=lang,
+                                batch_size=failed_batch_size,
+                                success=False,
+                                fallback_reason='oom_retry'
+                            )
+
+                            # Cap current_batch_size to success size
+                            if lang in self.batch_stats_tracker.languages:
+                                lang_data = self.batch_stats_tracker.languages[lang]
+                                current = lang_data.get('current_batch_size', success_batch_size)
+                                new_size = min(current, success_batch_size)
+                                lang_data['current_batch_size'] = new_size
+                                logger.debug(
+                                    f"Capped {lang} batch_size: {current}→{new_size}"
+                                )
+
+                        # Persist immediately to protect next file
+                        self.batch_stats_tracker.save()
+                        logger.info(
+                            f"OOM learning persisted for {len(target_langs)} languages"
+                        )
+                    except Exception as e:
+                        logger.warning(f"Failed to record OOM learning: {e}")
+
+                # WS4: Log per-file protection status
+                logger.info(
+                    f"Translating {file_path.name} | OOM Protection: ACTIVE "
+                    f"(max_retries={self.retry_handler.max_retries}) | Batch size: {self.batch_size}"
+                )
+
+                return self.retry_handler.translate_file_with_retry(
+                    translate_func=translate_with_batch_size,
+                    file_path=file_path,
+                    initial_batch_size=self.batch_size,
+                    on_oom_recovery=handle_oom_recovery,
+                    site_id=site_id,
+                    target_langs=target_langs,
+                )
+            else:
+                # WS4: Log per-file protection status when disabled
+                logger.info(
+                    f"Translating {file_path.name} | OOM Protection: DISABLED | Batch size: {self.batch_size}"
+                )
+
+                # Fallback to direct translation without retry
+                # The translate_file method will use locks internally where needed
+                return self.translate_file(
+                    site_id=site_id, file_path=file_path, target_langs=target_langs
+                )
         except Exception as e:
             logger.error(f"Error in _translate_file_safe for {file_path}: {e}")
             return TranslationResult(
@@ -2838,6 +3424,8 @@ class TranslationEngine:
         Returns:
             List of translated texts with structure preserved
         """
+        batch_size = getattr(self, "batch_size", 1)
+        sort_by_length = getattr(self, "sort_segments_by_length", False)
         translated_texts = []
 
         # Separate multiline and single-line segments for efficient processing
@@ -2863,7 +3451,7 @@ class TranslationEngine:
             total_texts = len(singleline_texts)
 
             # SR-01: Sort segments by length for improved batching efficiency
-            if self.sort_segments_by_length and total_texts > 1:
+            if sort_by_length and total_texts > 1:
                 # Create sorted index mapping (shortest to longest)
                 sorted_indices = sorted(range(total_texts), key=lambda i: len(singleline_texts[i]))
                 sorted_texts = [singleline_texts[i] for i in sorted_indices]
@@ -2877,8 +3465,8 @@ class TranslationEngine:
                 sorted_texts = singleline_texts
 
             # Process in chunks of batch_size to avoid GPU OOM
-            for chunk_start in range(0, total_texts, self.batch_size):
-                chunk_end = min(chunk_start + self.batch_size, total_texts)
+            for chunk_start in range(0, total_texts, batch_size):
+                chunk_end = min(chunk_start + batch_size, total_texts)
                 chunk_texts = sorted_texts[chunk_start:chunk_end]
 
                 if hasattr(backend, 'translate_with_token_counts'):
@@ -2896,10 +3484,10 @@ class TranslationEngine:
 
                 batch_translations.extend(chunk_translations)
 
-                if total_texts > self.batch_size:
+                if total_texts > batch_size:
                     logger.debug(
-                        f"Translated batch {chunk_start//self.batch_size + 1}/"
-                        f"{(total_texts + self.batch_size - 1)//self.batch_size} "
+                        f"Translated batch {chunk_start//batch_size + 1}/"
+                        f"{(total_texts + batch_size - 1)//batch_size} "
                         f"({len(chunk_texts)} texts)"
                     )
 
@@ -2919,46 +3507,119 @@ class TranslationEngine:
                 f"MSP-02: Processing {len(multiline_indices)} multiline segments "
                 f"with structure preservation"
             )
+            multiline_line_items = []
+            multiline_line_info = {}
+
+            for original_idx in multiline_indices:
+                text = texts[original_idx]
+                lines_info = self.multiline_handler.parse_lines(text)
+                multiline_line_info[original_idx] = lines_info
+                for line_info in lines_info:
+                    if line_info.is_empty:
+                        continue
+                    if not line_info.content.strip():
+                        continue
+                    multiline_line_items.append(
+                        (original_idx, line_info.line_index, line_info.content)
+                    )
+
+            stats.multiline_segments += len(multiline_indices)
+            stats.multiline_lines += len(multiline_line_items)
+
+            translated_line_map = {}
+            multiline_backend_calls = 0
+
+            if multiline_line_items:
+                line_texts = [item[2] for item in multiline_line_items]
+
+                # Optional length sorting for padding efficiency
+                if sort_by_length and len(line_texts) > 1:
+                    sorted_indices = sorted(range(len(line_texts)), key=lambda i: len(line_texts[i]))
+                    sorted_texts = [line_texts[i] for i in sorted_indices]
+                    logger.debug(
+                        f"MSP-02: Sorting {len(line_texts)} multiline lines by length "
+                        f"(range: {len(sorted_texts[0])}-{len(sorted_texts[-1])} chars)"
+                    )
+                else:
+                    sorted_indices = list(range(len(line_texts)))
+                    sorted_texts = line_texts
+
+                batch_translations = []
+                total_lines = len(sorted_texts)
+
+                for chunk_start in range(0, total_lines, batch_size):
+                    chunk_end = min(chunk_start + batch_size, total_lines)
+                    chunk_texts = sorted_texts[chunk_start:chunk_end]
+                    multiline_backend_calls += 1
+
+                    if hasattr(backend, 'translate_with_token_counts'):
+                        chunk_translations, input_tokens, output_tokens = backend.translate_with_token_counts(
+                            chunk_texts, source_lang, target_lang
+                        )
+                        stats.tokens_input += input_tokens
+                        stats.tokens_output += output_tokens
+                    else:
+                        chunk_translations = backend.translate(
+                            chunk_texts, source_lang, target_lang
+                        )
+                        stats.tokens_input += sum(estimate_token_count(t) for t in chunk_texts)
+                        stats.tokens_output += sum(estimate_token_count(t) for t in chunk_translations)
+
+                    batch_translations.extend(chunk_translations)
+
+                    if total_lines > batch_size:
+                        logger.debug(
+                            f"MSP-02: Translated multiline batch {chunk_start//batch_size + 1}/"
+                            f"{(total_lines + batch_size - 1)//batch_size} "
+                            f"({len(chunk_texts)} lines)"
+                        )
+
+                # Map translations back to original order
+                unsorted_translations = [None] * total_lines
+                for sorted_idx, original_list_idx in enumerate(sorted_indices):
+                    unsorted_translations[original_list_idx] = batch_translations[sorted_idx]
+
+                for list_idx, (segment_idx, line_idx, _) in enumerate(multiline_line_items):
+                    translated_line_map[(segment_idx, line_idx)] = unsorted_translations[list_idx]
+
+            stats.multiline_backend_calls += multiline_backend_calls
 
             for original_idx in multiline_indices:
                 segment = segments[original_idx]
-                text = texts[original_idx]
+                lines_info = multiline_line_info.get(original_idx, [])
+                translated_lines = []
 
-                # Create a translation function that calls the backend for single lines
-                def translate_line(line_text: str) -> str:
-                    """Translate a single line via backend."""
-                    if not line_text.strip():
-                        return line_text
-
-                    if hasattr(backend, 'translate_with_token_counts'):
-                        translations, in_tok, out_tok = backend.translate_with_token_counts(
-                            [line_text], source_lang, target_lang
+                for line_info in lines_info:
+                    if line_info.is_empty:
+                        translated_lines.append(line_info.original)
+                        continue
+                    if not line_info.content.strip():
+                        translated_lines.append(
+                            f"{line_info.indent}{line_info.prefix}{line_info.content}"
                         )
-                        stats.tokens_input += in_tok
-                        stats.tokens_output += out_tok
-                        return translations[0]
-                    else:
-                        translations = backend.translate(
-                            [line_text], source_lang, target_lang
-                        )
-                        stats.tokens_input += estimate_token_count(line_text)
-                        stats.tokens_output += estimate_token_count(translations[0])
-                        return translations[0]
+                        continue
 
-                # Use multiline handler for structure-preserving translation
-                result = self.multiline_handler.translate(text, translate_line)
-
-                if not result.structure_preserved:
-                    logger.warning(
-                        f"MSP-02: Structure drift in segment {segment.id}: "
-                        f"{result.line_count_source} -> {result.line_count_translated} lines"
+                    translated_content = translated_line_map.get(
+                        (original_idx, line_info.line_index), line_info.content
+                    )
+                    translated_lines.append(
+                        f"{line_info.indent}{line_info.prefix}{translated_content}"
                     )
 
-                translated_texts[original_idx] = result.translated_text
+                translated_text = '\n'.join(translated_lines)
+                structure_preserved = len(translated_lines) == len(lines_info)
+
+                if not structure_preserved:
+                    logger.warning(
+                        f"MSP-02: Structure drift in segment {segment.id}: "
+                        f"{len(lines_info)} -> {len(translated_lines)} lines"
+                    )
+
+                translated_texts[original_idx] = translated_text
 
                 logger.debug(
                     f"MSP-02: Multiline segment {segment.id} translated with "
-                    f"{result.line_count_source} lines preserved"
+                    f"{len(lines_info)} lines preserved"
                 )
 
         return translated_texts

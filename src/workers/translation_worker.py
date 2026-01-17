@@ -135,9 +135,11 @@ class TranslationWorker:
             logger.info(f"Hardware detected: {len(hardware.cuda_devices)} GPUs, {hardware.cpu_count} CPUs")
 
             registry = ModelRegistry(registry_path="config/model_registry.yaml")
+            raw_config = self.config_service.get_config()
             self.model_loader = ModelLoader(
                 registry=registry,
                 device=hardware.recommended_device,
+                config=raw_config,
             )
             logger.info("Model runtime initialized")
 

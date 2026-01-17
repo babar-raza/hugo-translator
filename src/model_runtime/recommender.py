@@ -371,8 +371,7 @@ Examples:
     )
     parser.add_argument(
         "--registry",
-        type=Path,
-        default=Path("config/model_registry.yaml"),
+        default="config/model_registry.yaml",
         help="Path to model registry YAML (default: config/model_registry.yaml)",
     )
     parser.add_argument(
@@ -403,8 +402,10 @@ Examples:
 
     try:
         # Load registry
-        if not args.registry.exists():
-            print(f"ERROR: Registry file not found: {args.registry}", file=sys.stderr)
+        registry_paths = [Path(p.strip()) for p in args.registry.split(",") if p.strip()]
+        missing = [str(p) for p in registry_paths if not p.exists()]
+        if missing:
+            print(f"ERROR: Registry file(s) not found: {', '.join(missing)}", file=sys.stderr)
             sys.exit(1)
 
         registry = ModelRegistry(args.registry)

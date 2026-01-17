@@ -177,12 +177,59 @@ class JobProcessor:
             f"Hardware detected: {len(hardware.cuda_devices)} GPUs, {hardware.cpu_count} CPUs"
         )
 
+        # Get max_gpu_memory_mb from config (computed by LimitingEngine if using SharedEngines)
+        # For legacy mode, compute it from hardware config
+        max_memory_mb = None
+        if self._using_shared_engines:
+            # SharedEngines: Get from LimitingEngine (already computed from percent if needed)
+            max_memory_mb = self.engines.limiting.limits.max_gpu_memory_mb
+            logger.info(
+                f"Using max_memory_mb from SharedEngines LimitingEngine: {max_memory_mb}MB"
+            )
+        else:
+            # Legacy mode: Compute from global config
+            try:
+                global_config = self.config_service.get_global_config()
+                hardware_config = global_config.get("hardware", {})
+
+                # Use VRAM budget resolution logic
+                from src.hardware.vram_budget import resolve_vram_budget_mb
+                import torch
+
+                if hardware.recommended_device.startswith("cuda") and torch.cuda.is_available():
+                    device_id = 0
+                    if ":" in hardware.recommended_device:
+                        device_id = int(hardware.recommended_device.split(":")[1])
+
+                    props = torch.cuda.get_device_properties(device_id)
+                    total_mb = props.total_memory / (1024**2)
+
+                    max_gpu_memory_percent = hardware_config.get("max_gpu_memory_percent")
+                    max_gpu_memory_mb_config = hardware_config.get("max_gpu_memory_mb")
+
+                    budget_mb, budget = resolve_vram_budget_mb(
+                        total_mb=total_mb,
+                        max_gpu_memory_percent=max_gpu_memory_percent,
+                        max_gpu_memory_mb=max_gpu_memory_mb_config,
+                    )
+
+                    max_memory_mb = budget_mb
+                    logger.info(
+                        f"Computed max_memory_mb from hardware config: {max_memory_mb}MB "
+                        f"({budget.percent:.1f}% of {total_mb:.0f}MB, source: {budget.source})"
+                    )
+            except Exception as e:
+                logger.warning(f"Failed to compute max_memory_mb from config: {e}")
+
         registry = ModelRegistry(registry_path="config/model_registry.yaml")
+        raw_config = self.config_service.get_config()
         self.model_loader = ModelLoader(
             registry=registry,
             device=hardware.recommended_device,
+            max_memory_mb=max_memory_mb,  # Pass computed budget to ModelLoader
+            config=raw_config,
         )
-        logger.info("Model runtime initialized")
+        logger.info(f"Model runtime initialized (max_memory_mb: {max_memory_mb}MB)")
 
         # Get Redis client for distributed locking (CHH-02)
         redis_client = None

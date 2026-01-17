@@ -8,6 +8,9 @@ Provides CLI flags for:
 - Output control (dry-run, save-rejected)
 
 CLI flags override configuration file settings.
+
+Note: Heavy ML dependencies (torch, transformers) are lazily imported to allow
+--help to work without the full ML stack installed. See _import_heavy_deps().
 """
 import argparse
 import atexit
@@ -18,46 +21,126 @@ import signal
 import subprocess
 import sys
 import time
+import importlib.metadata
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, TYPE_CHECKING
 
 import json
 import yaml
 
-try:
-    # Relative imports (when used as package)
+# TYPE_CHECKING guard: These imports are only used for type hints
+# and won't be executed at runtime, allowing --help to work without torch
+if TYPE_CHECKING:
     from .translation_engine import TranslationEngine
     from .translation_engine.models import TranslationResult, DirectoryResult
     from .translation_engine.progress import ProgressTracker
     from .tm import TranslationMemory
-    from .tm.l1_cache import L1Cache
-    from .tm.l2_persistent import L2PersistentTM
-    from .tm.l3_semantic import L3SemanticTM
     from .model_runtime import ModelLoader
     from .model_runtime.registry import ModelRegistry
-    from .model_runtime.cpu_optimizer import CPUOptimizer
-    from .model_runtime.gpu_optimizer import GPUOptimizer
     from .utils.config_loader import ConfigService
-    from .utils.file_filters import filter_source_files
-    from .utils.models import ValidationSettings, TerminologySettings
-    from .verification.report import write_report
-except ImportError:
-    # Absolute imports (when run directly)
-    from translation_engine import TranslationEngine
-    from translation_engine.models import TranslationResult, DirectoryResult
-    from translation_engine.progress import ProgressTracker
-    from tm import TranslationMemory
-    from tm.l1_cache import L1Cache
-    from tm.l2_persistent import L2PersistentTM
-    from tm.l3_semantic import L3SemanticTM
-    from model_runtime import ModelLoader
-    from model_runtime.registry import ModelRegistry
-    from model_runtime.cpu_optimizer import CPUOptimizer
-    from model_runtime.gpu_optimizer import GPUOptimizer
-    from utils.config_loader import ConfigService
-    from utils.file_filters import filter_source_files
-    from utils.models import ValidationSettings, TerminologySettings
-    from verification.report import write_report
+
+logger = logging.getLogger(__name__)
+
+# Module-level cache for lazy-loaded heavy dependencies
+_heavy_deps_loaded = False
+_heavy_deps_cache = {}
+
+
+def _import_heavy_deps():
+    """
+    Lazily import heavy ML dependencies when actually needed.
+
+    This allows --help to work without torch/transformers installed.
+    Imports are cached after first successful load.
+
+    Returns:
+        dict: Dictionary containing all heavy dependency modules/classes
+
+    Raises:
+        ImportError: If required dependencies are not installed
+    """
+    global _heavy_deps_loaded, _heavy_deps_cache
+
+    if _heavy_deps_loaded:
+        return _heavy_deps_cache
+
+    try:
+        # Try relative imports first (when used as package)
+        from .translation_engine import TranslationEngine
+        from .translation_engine.models import TranslationResult, DirectoryResult
+        from .translation_engine.progress import ProgressTracker
+        from .tm import TranslationMemory
+        from .tm.l1_cache import L1Cache
+        from .tm.l2_persistent import L2PersistentTM
+        from .tm.l3_semantic import L3SemanticTM
+        from .model_runtime import ModelLoader
+        from .model_runtime.registry import ModelRegistry
+        from .model_runtime.cpu_optimizer import CPUOptimizer
+        from .model_runtime.gpu_optimizer import GPUOptimizer
+        from .utils.config_loader import ConfigService
+        from .utils.file_filters import filter_source_files
+        from .utils.models import ValidationSettings, TerminologySettings
+        from .verification.report import write_report
+    except ImportError:
+        # Try absolute imports (when run directly)
+        try:
+            from translation_engine import TranslationEngine
+            from translation_engine.models import TranslationResult, DirectoryResult
+            from translation_engine.progress import ProgressTracker
+            from tm import TranslationMemory
+            from tm.l1_cache import L1Cache
+            from tm.l2_persistent import L2PersistentTM
+            from tm.l3_semantic import L3SemanticTM
+            from model_runtime import ModelLoader
+            from model_runtime.registry import ModelRegistry
+            from model_runtime.cpu_optimizer import CPUOptimizer
+            from model_runtime.gpu_optimizer import GPUOptimizer
+            from utils.config_loader import ConfigService
+            from utils.file_filters import filter_source_files
+            from utils.models import ValidationSettings, TerminologySettings
+            from verification.report import write_report
+        except ImportError as e:
+            # Provide helpful error message about missing dependencies
+            error_msg = str(e)
+            if 'torch' in error_msg.lower() or "No module named 'torch'" in error_msg:
+                raise ImportError(
+                    "PyTorch is required for translation but not installed. "
+                    "Install with: pip install torch or "
+                    "install all ML dependencies: pip install -r requirements.txt"
+                ) from e
+            elif 'transformers' in error_msg.lower():
+                raise ImportError(
+                    "HuggingFace Transformers is required for translation but not installed. "
+                    "Install with: pip install transformers or "
+                    "install all ML dependencies: pip install -r requirements.txt"
+                ) from e
+            else:
+                raise
+
+    # Cache all imports
+    _heavy_deps_cache = {
+        'TranslationEngine': TranslationEngine,
+        'TranslationResult': TranslationResult,
+        'DirectoryResult': DirectoryResult,
+        'ProgressTracker': ProgressTracker,
+        'TranslationMemory': TranslationMemory,
+        'L1Cache': L1Cache,
+        'L2PersistentTM': L2PersistentTM,
+        'L3SemanticTM': L3SemanticTM,
+        'ModelLoader': ModelLoader,
+        'ModelRegistry': ModelRegistry,
+        'CPUOptimizer': CPUOptimizer,
+        'GPUOptimizer': GPUOptimizer,
+        'ConfigService': ConfigService,
+        'filter_source_files': filter_source_files,
+        'ValidationSettings': ValidationSettings,
+        'TerminologySettings': TerminologySettings,
+        'write_report': write_report,
+    }
+    _heavy_deps_loaded = True
+    return _heavy_deps_cache
+
+
 
 logger = logging.getLogger(__name__)
 
@@ -130,7 +213,7 @@ class CLIConfigOverrides:
         self.rebuild_content_hashes: bool = args.rebuild_content_hashes
         self.validate_output_integrity: bool = args.validate_output_integrity
 
-    def apply_to_config_service(self, config_service: ConfigService) -> None:
+    def apply_to_config_service(self, config_service: "ConfigService") -> None:
         """
         Apply CLI overrides to configuration service.
 
@@ -238,6 +321,60 @@ class CLIConfigOverrides:
         return overrides
 
 
+# CLI-TC-03: Custom action for mutually exclusive multi-language mode flags
+class _MultiLangModeAction(argparse.Action):
+    """
+    Custom argparse action for --parallel-languages and --global-lang-rounds.
+
+    Enforces mutual exclusion at parse time: if one flag is provided with a
+    non-zero value, the other cannot be provided with a non-zero value.
+
+    This is superior to runtime validation because:
+    1. Error appears immediately when parsing command
+    2. argparse provides consistent error formatting
+    3. User gets feedback before any processing begins
+    """
+
+    def __call__(self, parser, namespace, values, option_string=None):
+        # Convert to int (argparse type=int already handles this, but be safe)
+        value = int(values) if values is not None else 0
+
+        # Determine which flag this is and which is the conflicting one
+        if option_string in ('--parallel-languages',):
+            this_flag = '--parallel-languages'
+            other_flag = '--global-lang-rounds'
+            other_attr = 'global_lang_rounds'
+        else:
+            this_flag = '--global-lang-rounds'
+            other_flag = '--parallel-languages'
+            other_attr = 'parallel_languages'
+
+        # Check if conflicting flag was already set to non-zero
+        other_value = getattr(namespace, other_attr, 0)
+        if value > 0 and other_value > 0:
+            parser.error(
+                f"argument {this_flag}: not allowed with argument {other_flag}: "
+                f"cannot use both {this_flag} and {other_flag} simultaneously. "
+                f"Choose either parallel processing or round-robin, not both."
+            )
+
+        # Store the value
+        setattr(namespace, self.dest, value)
+
+
+def get_version() -> str:
+    """
+    Get the package version from installed metadata.
+
+    Returns:
+        Version string from pyproject.toml if installed, otherwise "0.1.0-dev"
+    """
+    try:
+        return importlib.metadata.version("hugo-translation-system")
+    except importlib.metadata.PackageNotFoundError:
+        return "0.1.0-dev"
+
+
 def create_parser() -> argparse.ArgumentParser:
     """
     Create CLI argument parser with all flags.
@@ -281,6 +418,14 @@ Examples:
   # Override token limit for longer translations
   translate-hugo --site products.aspose.net --max-tokens 1024
         """,
+    )
+
+    # Version flag
+    parser.add_argument(
+        "--version",
+        action="version",
+        version=f"%(prog)s {get_version()}",
+        help="Show program version and exit",
     )
 
     # Required arguments
@@ -487,6 +632,18 @@ Examples:
         ),
     )
 
+    output_group.add_argument(
+        "--max-files",
+        type=int,
+        default=0,
+        metavar="N",
+        help=(
+            "Maximum number of files to process (0=unlimited, default: 0). "
+            "Useful for testing/sampling. Files are selected deterministically "
+            "(sorted by path) for reproducibility."
+        ),
+    )
+
     # Logging control
     logging_group = parser.add_argument_group("Logging")
 
@@ -606,6 +763,7 @@ Examples:
         type=int,
         default=0,
         metavar="N",
+        action=_MultiLangModeAction,  # CLI-TC-03: Parse-time mutual exclusion
         help="Process up to N languages in parallel (0=disabled, default)",
     )
 
@@ -614,6 +772,7 @@ Examples:
         type=int,
         default=0,
         metavar="N",
+        action=_MultiLangModeAction,  # CLI-TC-03: Parse-time mutual exclusion
         help="Process N texts per language in round-robin fashion (0=disabled, default)",
     )
 
@@ -857,6 +1016,14 @@ def _generate_verification_report(
         results: Either a list of (file_path, TranslationResult) tuples for single file,
                  or a DirectoryResult for batch operations
     """
+    # Import dependencies
+    try:
+        from .translation_engine.models import DirectoryResult
+        from .verification.report import write_report
+    except ImportError:
+        from translation_engine.models import DirectoryResult
+        from verification.report import write_report
+
     # VA-04: Extract verification results
     verification_results = []
 
@@ -1219,15 +1386,41 @@ def translate_site(args: argparse.Namespace) -> int:
     Returns:
         Exit code (0 for success, non-zero for failure)
     """
-    # Import progress tracker
+    # Import all dependencies needed for translation
     try:
         from .observability.progress import init_progress_tracker, stop_progress_tracker, get_progress_tracker
         from .observability.graceful_shutdown import setup_graceful_shutdown
         from .observability.telemetry_cleanup import cleanup_stale_runs
+        from .translation_engine.progress import ProgressTracker
+        from .translation_engine import TranslationEngine
+        from .utils.config_loader import ConfigService
+        from .utils.file_filters import filter_source_files
+        from .model_runtime.cpu_optimizer import CPUOptimizer
+        from .model_runtime.gpu_optimizer import GPUOptimizer
+        from .model_runtime import ModelLoader
+        from .model_runtime.registry import ModelRegistry
+        from .verification.report import write_report
+        from .tm import TranslationMemory
+        from .tm.l1_cache import L1Cache
+        from .tm.l2_persistent import L2PersistentTM
+        from .tm.l3_semantic import L3SemanticTM
     except ImportError:
         from observability.progress import init_progress_tracker, stop_progress_tracker, get_progress_tracker
         from observability.graceful_shutdown import setup_graceful_shutdown
         from observability.telemetry_cleanup import cleanup_stale_runs
+        from translation_engine.progress import ProgressTracker
+        from translation_engine import TranslationEngine
+        from utils.config_loader import ConfigService
+        from utils.file_filters import filter_source_files
+        from model_runtime.cpu_optimizer import CPUOptimizer
+        from model_runtime.gpu_optimizer import GPUOptimizer
+        from model_runtime import ModelLoader
+        from model_runtime.registry import ModelRegistry
+        from tm import TranslationMemory
+        from tm.l1_cache import L1Cache
+        from tm.l2_persistent import L2PersistentTM
+        from tm.l3_semantic import L3SemanticTM
+        from verification.report import write_report
 
     progress_tracker = None
 
@@ -1456,6 +1649,32 @@ def translate_site(args: argparse.Namespace) -> int:
             language_results = {}  # Track per-language results
             failure_dir = Path("data/failures")  # Directory for failure reports
 
+            # Determine input path for git repo detection
+            if args.input:
+                input_path = Path(args.input)
+            else:
+                # Use first content root from site profile
+                input_path = Path(site_profile.content_roots[0])
+
+            # Determine git repository root once for all languages
+            git_repo_root = None
+            if args.auto_commit:
+                try:
+                    # Find git root by walking up from input path
+                    search_path = input_path if input_path.is_dir() else input_path.parent
+                    while search_path != search_path.parent:
+                        if (search_path / ".git").exists():
+                            git_repo_root = search_path
+                            logger.info(f"Auto-commit enabled. Git repository: {git_repo_root}")
+                            break
+                        search_path = search_path.parent
+
+                    if git_repo_root is None:
+                        logger.warning(f"Could not find git repository root for {input_path}. Auto-commit will be disabled.")
+                except Exception as e:
+                    logger.warning(f"Failed to determine git repository root: {e}. Auto-commit will be disabled.")
+                    git_repo_root = None
+
             # Load global config for commit settings
             global_config = config_service.global_config
 
@@ -1638,34 +1857,63 @@ def translate_site(args: argparse.Namespace) -> int:
                             }
 
                             # Get list of modified files for this language using git status
-                            try:
-                                git_status_result = subprocess.run(
-                                    ["git", "status", "--porcelain"],
-                                    capture_output=True,
-                                    text=True,
-                                    encoding='utf-8',  # Use UTF-8 for git output
-                                    errors='replace',  # Handle encoding errors gracefully
-                                    timeout=30,
-                                    check=True,
-                                )
-                                # Parse git status output to get modified/new files
+                            # Skip auto-commit if git repo root wasn't found
+                            if git_repo_root is None:
+                                logger.debug(f"Skipping auto-commit for {lang} (git repository not found)")
                                 translated_files = []
-                                for line in git_status_result.stdout.splitlines():
-                                    if line.strip():
-                                        # Git status format: "XY filename"
-                                        file_path = line[3:].strip()
-                                        # Filter for files related to this language
-                                        if lang in file_path or (args.output and args.output in file_path):
-                                            translated_files.append(Path(file_path))
+                            else:
+                                try:
+                                    git_status_result = subprocess.run(
+                                        ["git", "status", "--porcelain"],
+                                        cwd=git_repo_root,  # Run in the correct repository
+                                        capture_output=True,
+                                        text=True,
+                                        encoding='utf-8',  # Use UTF-8 for git output
+                                        errors='replace',  # Handle encoding errors gracefully
+                                        timeout=30,
+                                        check=True,
+                                    )
+                                    # Parse git status output to get modified/new files
+                                    translated_files = []
+                                    for line in git_status_result.stdout.splitlines():
+                                        if line.strip():
+                                            # Git status format: "XY filename" or "XY oldname -> newname" for renames
+                                            status_code = line[:2]
+                                            file_path = line[3:].strip()
 
-                                if translated_files:
-                                    logger.debug(f"Detected {len(translated_files)} modified files for {lang}")
-                                else:
-                                    logger.warning(f"No modified files detected for {lang}, skipping commit")
+                                            # Skip renamed files (R) and deleted files (D) - these are pre-existing changes
+                                            if 'R' in status_code or 'D' in status_code:
+                                                continue
 
-                            except Exception as e:
-                                logger.warning(f"Failed to detect modified files for {lang}: {e}")
-                                translated_files = []
+                                            # Handle modified/added files only (M, A, ??)
+                                            if 'M' not in status_code and 'A' not in status_code and '?' not in status_code:
+                                                continue
+
+                                            # Filter for files related to this language:
+                                            # - Should be in language-specific directory (e.g., ar/, bg/)
+                                            # - Or in output directory if specified
+                                            file_path_normalized = file_path.replace('\\', '/')
+                                            is_translated = False
+
+                                            # Check if file is in language directory (e.g., "ar/..." or "output/ar/...")
+                                            if f'/{lang}/' in file_path_normalized or file_path_normalized.startswith(f'{lang}/'):
+                                                is_translated = True
+
+                                            # Check if file has language code in filename (e.g., "file.ar.md")
+                                            if f'.{lang}.' in file_path_normalized:
+                                                is_translated = True
+
+                                            if is_translated:
+                                                translated_files.append(Path(file_path))
+
+                                    if translated_files:
+                                        logger.debug(f"Detected {len(translated_files)} modified files for {lang}")
+                                    else:
+                                        logger.warning(f"No modified files detected for {lang}, skipping commit")
+
+                                except Exception as e:
+                                    logger.warning(f"Failed to detect modified files for {lang}: {e}")
+                                    translated_files = []
 
                             # P1-12: Commit translations using CommitEngine (if available) or fallback
                             if translated_files:
@@ -1696,8 +1944,9 @@ def translate_site(args: argparse.Namespace) -> int:
                                         target_lang=lang,
                                         translated_files=translated_files,
                                         stats=stats,
-                                        config=global_config,
+                                        config=config_service.get_config(),
                                         auto_push=False,  # Don't auto-push, let user control
+                                        git_repo_root=git_repo_root,
                                     )
 
                                     if commit_success:
@@ -1963,20 +2212,54 @@ def translate_site(args: argparse.Namespace) -> int:
             device = "cpu"
             logger.info("PyTorch not available, using CPU")
 
+        # Load raw config once for dict-based lookups
+        raw_config = config_service.get_config()
+
         # Get max GPU memory from global config (use raw config since hardware not in GlobalConfig model)
         max_gpu_memory_mb = None
+        print(f"DEBUG CLI: device={device}", flush=True)
         if device.startswith("cuda"):
-            raw_config = config_service.get_config()
             hardware_config = raw_config.get("hardware", {})
             max_gpu_memory_mb = hardware_config.get("max_gpu_memory_mb")
-            if max_gpu_memory_mb:
+            print(f"DEBUG CLI: max_gpu_memory_mb from hardware_config={max_gpu_memory_mb}", flush=True)
+
+            # If not set in hardware config, compute from execution mode percent
+            if max_gpu_memory_mb is None:
+                import os
+                exec_mode = os.getenv("EXECUTION_MODE", "windows_cuda")
+                exec_mode_config = raw_config.get("execution", {}).get("modes", {}).get(exec_mode, {})
+                max_gpu_memory_percent = exec_mode_config.get("max_gpu_memory_percent")
+                print(f"DEBUG CLI: exec_mode={exec_mode}, max_gpu_memory_percent={max_gpu_memory_percent}", flush=True)
+                if max_gpu_memory_percent is not None:
+                    try:
+                        import torch
+                        if torch.cuda.is_available():
+                            total_vram_mb = torch.cuda.get_device_properties(0).total_memory / (1024**2)
+                            max_gpu_memory_mb = int(total_vram_mb * (max_gpu_memory_percent / 100.0))
+                            logger.info(
+                                f"Computed GPU memory limit from {max_gpu_memory_percent}%: "
+                                f"{max_gpu_memory_mb}MB ({max_gpu_memory_percent}% of {total_vram_mb:.0f}MB)"
+                            )
+                            print(f"DEBUG CLI: Computed max_gpu_memory_mb={max_gpu_memory_mb}", flush=True)
+                    except Exception as e:
+                        logger.warning(f"Failed to compute GPU memory limit from percent: {e}")
+                        print(f"DEBUG CLI: Failed to compute: {e}", flush=True)
+            elif max_gpu_memory_mb:
                 logger.info(f"GPU memory limit from config: {max_gpu_memory_mb}MB")
+
+        # Enforce VRAM limit if configured for CUDA device
+        if device.startswith("cuda") and max_gpu_memory_mb:
+            from src.hardware.gpu_manager import GPUManager
+            gpu_mgr = GPUManager(config={"max_gpu_memory_mb": max_gpu_memory_mb})
+            gpu_mgr.enforce_memory_limit(device)
+            logger.info(f"VRAM enforcement applied: {max_gpu_memory_mb}MB")
 
         model_loader = ModelLoader(
             registry=model_registry,
             device=device,
             max_memory_mb=max_gpu_memory_mb,
-            load_mode=overrides.load_mode  # T103: federated-splashing-panda
+            load_mode=overrides.load_mode,  # T103: federated-splashing-panda
+            config=raw_config
         )
 
         # Get engine overrides from CLI
@@ -2007,10 +2290,18 @@ def translate_site(args: argparse.Namespace) -> int:
                     except (IndexError, ValueError):
                         device_id = 0
 
+                # Determine model name: CLI override > site profile default > global config fallback
+                model_name = overrides.model
+                if model_name is None:
+                    model_name = site_profile.default_model
+                if model_name is None:
+                    model_name = global_config.model_defaults.fallback_model
+
+                print(f"DEBUG CLI: Creating GPUOptimizer with max_vram_mb={max_gpu_memory_mb}", flush=True)
                 gpu_optimizer = GPUOptimizer(
-                    model_name=overrides.model,
+                    model_name=model_name,
                     precision=precision,
-                    target_utilization=0.60,  # Target 60% VRAM utilization (very conservative to prevent OOM)
+                    # target_utilization uses GPUOptimizer default (0.40) to account for generation peak memory
                     device_id=device_id,
                     max_vram_mb=max_gpu_memory_mb,  # Use configured VRAM limit
                 )
@@ -2257,6 +2548,7 @@ def translate_site(args: argparse.Namespace) -> int:
                 directory=input_path,
                 target_langs=target_langs,
                 skip_site_lock=getattr(args, '_skip_site_lock', False),  # TC1
+                max_files=getattr(args, 'max_files', 0),
             )
 
             logger.info(f"Translation completed: {result.total_files} files processed")

@@ -14,6 +14,7 @@ import torch
 
 from .registry import ModelInfo, ModelRegistry
 from .language_codes import map_language_code
+from .gpu_cache_manager import GPUCacheManager  # D5: Import GPU cache manager
 from src.observability.metrics import get_metrics
 
 logger = logging.getLogger(__name__)
@@ -102,7 +103,8 @@ class HuggingFaceBackend(ModelBackend):
         device: str,
         max_memory_mb: Optional[int] = None,
         use_fp16: Optional[bool] = None,
-        use_int8: bool = False
+        use_int8: bool = False,
+        generation_config: Optional[Dict] = None
     ):
         """
         Initialize HuggingFace backend.
@@ -119,6 +121,7 @@ class HuggingFaceBackend(ModelBackend):
         self.model = None
         self.tokenizer = None
         self.max_memory_mb = max_memory_mb
+        self.generation_config = generation_config or {}
 
         # Precision mode determination (T104: federated-splashing-panda)
         if use_int8:
@@ -170,18 +173,14 @@ class HuggingFaceBackend(ModelBackend):
             # Suppress noisy tokenizer/model warnings during automated runs
             hf_logging.set_verbosity_error()
 
-            # Enforce GPU memory limit if specified
+            # NOTE: GPU memory limit enforcement is handled by vram_enforcer.py
+            # Do NOT set torch.cuda.set_per_process_memory_fraction here as it conflicts
+            # with the global VRAM budget enforcement
             if self.device.startswith("cuda") and self.max_memory_mb:
-                device_id = 0 if ":" not in self.device else int(self.device.split(":")[1])
-                try:
-                    total_memory = torch.cuda.get_device_properties(device_id).total_memory / (1024**2)
-                    fraction = min(1.0, self.max_memory_mb / total_memory)
-                    torch.cuda.set_per_process_memory_fraction(fraction, device_id)
-                    logger.info(
-                        f"Set GPU memory limit: {self.max_memory_mb}MB (fraction: {fraction:.2f})"
-                    )
-                except Exception as e:
-                    logger.warning(f"Failed to set GPU memory limit: {e}")
+                logger.debug(
+                    f"GPU memory limit: {self.max_memory_mb}MB "
+                    f"(enforced by vram_enforcer, not set here)"
+                )
 
             # Load tokenizer
             self.tokenizer = AutoTokenizer.from_pretrained(
@@ -349,11 +348,15 @@ class HuggingFaceBackend(ModelBackend):
                     self.tokenizer.set_tgt_lang_special_tokens(mapped_tgt_lang)
                     logger.debug(f"Set NLLB target language: {mapped_tgt_lang} (from {tgt_lang})")
 
+            total_start = time.perf_counter()
+
             # Tokenize
+            tokenize_start = time.perf_counter()
             inputs = self.tokenizer(
                 texts, return_tensors="pt", padding=True, truncation=True
             )
             inputs = {k: v.to(self.device) for k, v in inputs.items()}
+            tokenize_ms = (time.perf_counter() - tokenize_start) * 1000
 
             # Calculate input token count
             # Shape: (batch_size, sequence_length)
@@ -411,26 +414,34 @@ class HuggingFaceBackend(ModelBackend):
                 )
 
             # Generate translations (using settings from legacy/ast-translator.py)
-            # Note: max_new_tokens increased from 200 to 512 to handle longer
-            # multiline content like overview.content and content_left/content_right
+            # Note: max_new_tokens reduced to 256 for better memory efficiency
+            # (was 512, but caused OOM with larger batches)
             # TR-01: Allow override via max_new_tokens parameter
-            effective_max_tokens = max_new_tokens if max_new_tokens is not None else 512
+            effective_max_tokens = max_new_tokens if max_new_tokens is not None else 256
+            speed_mode = self.generation_config.get("speed_mode", True)
             generate_kwargs = {
                 "max_new_tokens": effective_max_tokens,
-                "no_repeat_ngram_size": 2,
-                "repetition_penalty": 1.2,
-                # CRITICAL FIX: Disable KV caching to prevent state bleeding between
-                # sequential translations to different target languages
-                "use_cache": False,
+                "num_beams": 1,
+                "do_sample": False,
+                "use_cache": True,
             }
+            if not speed_mode:
+                generate_kwargs["no_repeat_ngram_size"] = self.generation_config.get(
+                    "no_repeat_ngram_size", 2
+                )
+                generate_kwargs["repetition_penalty"] = self.generation_config.get(
+                    "repetition_penalty", 1.2
+                )
             if forced_bos_token_id is not None:
                 generate_kwargs["forced_bos_token_id"] = forced_bos_token_id
 
-            with torch.no_grad():
+            generate_start = time.perf_counter()
+            with torch.inference_mode():
                 outputs = self.model.generate(
                     **inputs,
                     **generate_kwargs,
                 )
+            generate_ms = (time.perf_counter() - generate_start) * 1000
 
             # Calculate output token count
             # Shape: (batch_size, generated_sequence_length)
@@ -459,17 +470,29 @@ class HuggingFaceBackend(ModelBackend):
                     )
 
             # Decode
+            decode_start = time.perf_counter()
             translations = self.tokenizer.batch_decode(
                 outputs, skip_special_tokens=True
             )
+            decode_ms = (time.perf_counter() - decode_start) * 1000
 
             # Store for backward compatibility
             self.last_input_tokens = input_token_count
             self.last_output_tokens = output_token_count
 
-            # Clear GPU cache after translation if on GPU
-            if self.device.startswith("cuda"):
-                torch.cuda.empty_cache()
+            total_ms = (time.perf_counter() - total_start) * 1000
+            logger.info(
+                "HF timing: batch=%d tokens_in=%d tokens_out=%d "
+                "tokenize=%.1fms generate=%.1fms decode=%.1fms total=%.1fms speed_mode=%s",
+                len(texts),
+                input_token_count,
+                output_token_count,
+                tokenize_ms,
+                generate_ms,
+                decode_ms,
+                total_ms,
+                speed_mode,
+            )
 
             return translations, input_token_count, output_token_count
 
@@ -500,6 +523,43 @@ class HuggingFaceBackend(ModelBackend):
             torch.cuda.empty_cache()
 
         self.loaded = False
+
+    def get_token_count(self, text: str) -> int:
+        """
+        Get actual token count using model tokenizer (accurate but ~5-10ms overhead).
+
+        Args:
+            text: Text to tokenize
+
+        Returns:
+            Token count, or 0 if tokenizer unavailable
+        """
+        if not self.tokenizer or not self.loaded:
+            return 0
+        try:
+            tokens = self.tokenizer.tokenize(text)
+            return len(tokens)
+        except Exception as e:
+            logger.debug(f"Token count failed: {e}")
+            return 0
+
+    def get_batch_token_counts(self, texts: List[str]) -> List[int]:
+        """
+        Get token counts for multiple texts efficiently.
+
+        Args:
+            texts: List of texts to tokenize
+
+        Returns:
+            List of token counts, or list of zeros if tokenizer unavailable
+        """
+        if not self.tokenizer or not self.loaded:
+            return [0] * len(texts)
+        try:
+            encodings = self.tokenizer(texts, padding=False, truncation=False)
+            return [len(ids) for ids in encodings["input_ids"]]
+        except Exception:
+            return [0] * len(texts)
 
 
 class CTranslate2Backend(ModelBackend):
@@ -532,18 +592,13 @@ class CTranslate2Backend(ModelBackend):
                 self.model_info.local_path or self.model_info.model_id
             )
 
-            # Enforce GPU memory limit if specified
+            # NOTE: GPU memory limit enforcement is handled by vram_enforcer.py
+            # Do NOT set torch.cuda.set_per_process_memory_fraction here
             if self.device.startswith("cuda") and self.max_memory_mb:
-                device_id = 0 if ":" not in self.device else int(self.device.split(":")[1])
-                try:
-                    total_memory = torch.cuda.get_device_properties(device_id).total_memory / (1024**2)
-                    fraction = min(1.0, self.max_memory_mb / total_memory)
-                    torch.cuda.set_per_process_memory_fraction(fraction, device_id)
-                    logger.info(
-                        f"Set GPU memory limit for CT2: {self.max_memory_mb}MB (fraction: {fraction:.2f})"
-                    )
-                except Exception as e:
-                    logger.warning(f"Failed to set GPU memory limit: {e}")
+                logger.debug(
+                    f"GPU memory limit for CT2: {self.max_memory_mb}MB "
+                    f"(enforced by vram_enforcer, not set here)"
+                )
 
             # Load tokenizer
             tokenizer_id = self.model_info.hf_model_id or model_path
@@ -642,6 +697,24 @@ class CTranslate2Backend(ModelBackend):
         gc.collect()
         self.loaded = False
 
+    def get_token_count(self, text: str) -> int:
+        """
+        CTranslate2 tokenizer wrapper for token counting.
+
+        Args:
+            text: Text to tokenize
+
+        Returns:
+            Token count, or 0 if tokenizer unavailable
+        """
+        if not self.tokenizer or not self.loaded:
+            return 0
+        try:
+            tokens = self.tokenizer.tokenize(text)
+            return len(tokens)
+        except Exception:
+            return 0
+
 
 class ModelLoader:
     """
@@ -655,7 +728,8 @@ class ModelLoader:
         registry: ModelRegistry,
         device: str = "cpu",
         max_memory_mb: Optional[int] = None,
-        load_mode: Optional[str] = None
+        load_mode: Optional[str] = None,
+        config: Optional[Dict] = None
     ):
         """
         Initialize model loader.
@@ -666,12 +740,22 @@ class ModelLoader:
             max_memory_mb: Maximum GPU memory per model (MB)
             load_mode: Model precision mode ("fp16", "fp32", "int8", or None for auto)
                       (T103: federated-splashing-panda)
+            config: Optional config dict for hardware settings (D5)
         """
         self.registry = registry
         self.device = device
         self.max_memory_mb = max_memory_mb
         self.load_mode = load_mode
         self.loaded_models: Dict[str, ModelBackend] = {}
+
+        # D5: Initialize GPU cache manager with config
+        self.config = config or {}
+        hardware_config = self.config.get("hardware", {})
+        clear_every_n = hardware_config.get("clear_cache_frequency", 10)  # Default: every 10 files
+        self.gpu_cache_manager = GPUCacheManager(clear_every_n_files=clear_every_n)
+        logger.debug(f"ModelLoader initialized with GPU cache manager (clear_every_n_files={clear_every_n})")
+        translation_config = self.config.get("translation") or {}
+        self.generation_config = translation_config.get("generation") or {}
 
     def load_model(self, model_id: str, device: Optional[str] = None) -> ModelBackend:
         """
@@ -737,7 +821,8 @@ class ModelLoader:
                 device,
                 self.max_memory_mb,
                 use_fp16=use_fp16,  # None = auto, True = force, False = disable
-                use_int8=use_int8   # T104: federated-splashing-panda
+                use_int8=use_int8,   # T104: federated-splashing-panda
+                generation_config=self.generation_config
             )
         elif model_info.backend == "ctranslate2":
             return CTranslate2Backend(model_info, device, self.max_memory_mb)
@@ -755,6 +840,18 @@ class ModelLoader:
 
         Returns:
             ModelBackend if loaded, None otherwise
+        """
+        return self.loaded_models.get(model_id)
+
+    def get_tokenizer_for_counting(self, model_id: str) -> Optional[ModelBackend]:
+        """
+        Get backend with tokenizer for token counting (if loaded).
+
+        Args:
+            model_id: Model identifier
+
+        Returns:
+            ModelBackend if loaded and has tokenizer, None otherwise
         """
         return self.loaded_models.get(model_id)
 
@@ -828,3 +925,24 @@ class ModelLoader:
     def get_loaded_models(self) -> List[str]:
         """Get list of loaded model IDs."""
         return self.list_loaded_models()
+
+    def clear_cache_after_file(self) -> None:
+        """
+        D5: Clear GPU cache after file translation using cache manager.
+
+        This should be called after each file is translated to prevent
+        memory accumulation and fragmentation.
+        """
+        self.gpu_cache_manager.clear_after_file(self.device)
+
+    def check_and_clear_cache(self) -> bool:
+        """
+        D5: Check if aggressive cache clear is needed and perform if necessary.
+
+        This should be called before large translation operations to ensure
+        sufficient GPU memory is available.
+
+        Returns:
+            True if aggressive clear was performed, False otherwise
+        """
+        return self.gpu_cache_manager.check_and_clear(self.device)

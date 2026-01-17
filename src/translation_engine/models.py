@@ -23,7 +23,12 @@ class ValidationDecision(IntEnum):
 
 @dataclass
 class TranslationStats:
-    """Statistics for a translation operation."""
+    """
+    Statistics for a translation operation.
+
+    Tracks both segment-level operations (translation, cache hits, skips) and
+    language-level outcomes (translated vs skipped languages).
+    """
 
     total_segments: int = 0
     tm_hits: int = 0  # Segments found in TM
@@ -42,6 +47,9 @@ class TranslationStats:
     tokens_cached: int = 0  # Estimated tokens saved via TM hits
     tokens_total: int = 0  # Total tokens processed (cached + translated)
 
+    # Token counting accuracy tracking
+    token_count_method: str = "estimated"  # "estimated" or "actual"
+
     # File operation tracking (TEL-04 integration)
     md_files_added: int = 0  # New .md files created
     md_files_updated: int = 0  # Existing .md files overwritten
@@ -49,6 +57,10 @@ class TranslationStats:
     tm_entries_stored: int = 0  # TM entries stored (JSON-like)
     files_translated: int = 0  # Files completed successfully (TEL-05-A)
     files_generated: int = 0  # Output files produced across languages (TEL-05-A)
+
+    # Language-level tracking (RES-05: Skip handling for existing outputs)
+    langs_skipped: int = 0  # Number of languages skipped (output already exists)
+    langs_translated: int = 0  # Number of languages actually translated (work done)
 
     # Validation metrics (INF-03: Post-translation validation tracking)
     validation_passed: bool = False  # True if validation passed without errors
@@ -72,6 +84,11 @@ class TranslationStats:
     ast_units_protected: int = 0  # TextUnits marked as do_not_translate
     ast_batch_calls: int = 0  # Number of batch translation calls
     ast_individual_fallbacks: int = 0  # Number of fallbacks to individual translation
+
+    # MSP-02: Multiline batching metrics
+    multiline_segments: int = 0  # Multiline segments translated
+    multiline_lines: int = 0  # Translatable multiline lines
+    multiline_backend_calls: int = 0  # Backend calls for multiline batching
 
     @property
     def tm_hit_rate(self) -> float:
@@ -129,6 +146,9 @@ class TranslationResult:
     skipped_langs: List[str] = field(default_factory=list)  # Languages skipped due to existing output
     skip_reasons: Dict[str, str] = field(default_factory=dict)  # {lang: reason} for skipped languages
 
+    # TC-GIT-01: Telemetry context for git commit association
+    telemetry_context: Optional[Any] = None  # RunContext from telemetry tracking
+
     def __str__(self) -> str:
         """Human-readable summary."""
         status = "SUCCESS" if self.success else "FAILED"
@@ -147,6 +167,9 @@ class DirectoryResult:
     successful_files: int = 0
     failed_files: int = 0
     duration_seconds: float = 0.0
+
+    # TC-GIT-01: Telemetry context for git commit association
+    telemetry_context: Optional[Any] = None  # RunContext from telemetry tracking
 
     @property
     def aggregate_stats(self) -> TranslationStats:

@@ -531,12 +531,13 @@ Examples:
 
     # Load registry
     try:
-        registry_path = Path(args.registry)
-        if not registry_path.exists():
-            logger.error(f"Registry file not found: {registry_path}")
+        registry_paths = [Path(p.strip()) for p in args.registry.split(",") if p.strip()]
+        missing = [str(p) for p in registry_paths if not p.exists()]
+        if missing:
+            logger.error(f"Registry file(s) not found: {', '.join(missing)}")
             return 1
 
-        registry = ModelRegistry(registry_path)
+        registry = ModelRegistry(args.registry)
         logger.info(f"Loaded registry with {len(registry.models)} models")
     except Exception as e:
         logger.error(f"Failed to load registry: {e}")

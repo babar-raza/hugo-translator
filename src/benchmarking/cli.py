@@ -9,34 +9,133 @@ Usage:
     python -m src.benchmarking.cli report --run RUN_ID --format markdown
     python -m src.benchmarking.cli compare --runs RUN_A,RUN_B --metric throughput_tokens_per_sec
     python -m src.benchmarking.cli recommend --target-throughput 8 --max-memory-gb 4
+
+Note: Heavy ML dependencies (torch) are lazily imported to allow
+--help to work without the full ML stack installed.
 """
 import argparse
+import importlib.metadata
 import json
 import logging
 import os
 import sys
 from pathlib import Path
-from typing import List, Optional
+from typing import List, Optional, TYPE_CHECKING
 
 import yaml
 
-from .recommender import ModelRecommender as BenchmarkRecommender
-from .reporter import BenchmarkReporter
-from .runner import BenchmarkRunner, load_corpus
-from .storage import BenchmarkDatabase
-from .schema_migrations import MigrationManager
-from .aggregation import TimeSeriesAggregator
-from .analytics import AnalyticsQueryAPI
-from ..model_runtime.recommender import ModelRecommender
-from ..model_runtime.registry import ModelRegistry
+# TYPE_CHECKING guard for type hints only
+if TYPE_CHECKING:
+    from .recommender import ModelRecommender as BenchmarkRecommender
+    from .reporter import BenchmarkReporter
+    from .runner import BenchmarkRunner
+    from .storage import BenchmarkDatabase
+    from .schema_migrations import MigrationManager
+    from .aggregation import TimeSeriesAggregator
+    from .analytics import AnalyticsQueryAPI
+    from .retention import RetentionEngine
+    from .exporter import BenchmarkExporter, ExportFilter
+    from .archiver import BenchmarkArchiver
+    from ..model_runtime.recommender import ModelRecommender
+    from ..model_runtime.registry import ModelRegistry
 
-# Import shared config loader (try relative first, fallback to absolute)
-try:
-    from ..cli import _load_benchmarking_yaml
-except ImportError:
-    from src.cli import _load_benchmarking_yaml
+# Module-level cache for lazy-loaded heavy dependencies
+_heavy_deps_loaded = False
+_heavy_deps_cache = {}
+
+
+def _import_heavy_deps():
+    """
+    Lazily import heavy ML dependencies when actually needed.
+
+    This allows --help to work without torch installed.
+    Imports are cached after first successful load.
+
+    Returns:
+        dict: Dictionary containing all heavy dependency modules/classes
+
+    Raises:
+        ImportError: If required dependencies are not installed
+    """
+    global _heavy_deps_loaded, _heavy_deps_cache
+
+    if _heavy_deps_loaded:
+        return _heavy_deps_cache
+
+    try:
+        from .recommender import ModelRecommender as BenchmarkRecommender
+        from .reporter import BenchmarkReporter
+        from .runner import BenchmarkRunner, load_corpus
+        from .storage import BenchmarkDatabase
+        from .schema_migrations import MigrationManager
+        from .aggregation import TimeSeriesAggregator
+        from .analytics import AnalyticsQueryAPI
+        from .retention import RetentionEngine
+        from .exporter import BenchmarkExporter, ExportFilter
+        from .archiver import BenchmarkArchiver
+        from ..model_runtime.recommender import ModelRecommender
+        from ..model_runtime.registry import ModelRegistry
+    except ImportError as e:
+        error_msg = str(e)
+        if 'torch' in error_msg.lower() or "No module named 'torch'" in error_msg:
+            raise ImportError(
+                "PyTorch is required for benchmarking but not installed. "
+                "Install with: pip install torch or "
+                "install all ML dependencies: pip install -r requirements.txt"
+            ) from e
+        else:
+            raise
+
+    _heavy_deps_cache = {
+        'BenchmarkRecommender': BenchmarkRecommender,
+        'BenchmarkReporter': BenchmarkReporter,
+        'BenchmarkRunner': BenchmarkRunner,
+        'load_corpus': load_corpus,
+        'BenchmarkDatabase': BenchmarkDatabase,
+        'MigrationManager': MigrationManager,
+        'TimeSeriesAggregator': TimeSeriesAggregator,
+        'AnalyticsQueryAPI': AnalyticsQueryAPI,
+        'RetentionEngine': RetentionEngine,
+        'BenchmarkExporter': BenchmarkExporter,
+        'ExportFilter': ExportFilter,
+        'BenchmarkArchiver': BenchmarkArchiver,
+        'ModelRecommender': ModelRecommender,
+        'ModelRegistry': ModelRegistry,
+    }
+    _heavy_deps_loaded = True
+    return _heavy_deps_cache
+
+
+def _load_benchmarking_yaml():
+    """
+    Load benchmarking config from yaml.
+
+    This is a local copy to avoid importing from src.cli which may trigger heavy imports.
+    """
+    config_path = Path("config/benchmarking.yaml")
+    if not config_path.exists():
+        return {}
+    try:
+        with open(config_path) as f:
+            return yaml.safe_load(f) or {}
+    except Exception:
+        return {}
+
 
 logger = logging.getLogger(__name__)
+
+
+def get_version() -> str:
+    """
+    Get package version from importlib.metadata with fallback.
+
+    Returns:
+        Version string (e.g., "0.1.0" or "0.1.0-dev" if not installed)
+    """
+    try:
+        return importlib.metadata.version("hugo-translation-system")
+    except importlib.metadata.PackageNotFoundError:
+        return "0.1.0-dev"  # Fallback for development mode
 
 
 DEFAULT_DB_PATH = Path("data/benchmarks/benchmarks.db")
@@ -96,6 +195,11 @@ def cmd_run(args: argparse.Namespace) -> int:
     Returns:
         Exit code (0 for success, 1 for failure)
     """
+    # Load heavy dependencies
+    deps = _import_heavy_deps()
+    ModelRegistry = deps['ModelRegistry']
+    BenchmarkRunner = deps['BenchmarkRunner']
+
     try:
         # Parse batch sizes
         batch_sizes = [int(bs.strip()) for bs in args.batch_sizes.split(',')]
@@ -108,12 +212,13 @@ def cmd_run(args: argparse.Namespace) -> int:
 
     # Load registry
     try:
-        registry_path = Path(args.registry)
-        if not registry_path.exists():
-            logger.error(f"Registry file not found: {registry_path}")
+        registry_paths = [Path(p.strip()) for p in args.registry.split(',') if p.strip()]
+        missing = [str(p) for p in registry_paths if not p.exists()]
+        if missing:
+            logger.error(f"Registry file(s) not found: {', '.join(missing)}")
             return 1
 
-        registry = ModelRegistry(registry_path)
+        registry = ModelRegistry(args.registry)
         logger.info(f"Loaded registry with {len(registry.models)} models")
     except Exception as e:
         logger.error(f"Failed to load registry: {e}")
@@ -185,6 +290,11 @@ def cmd_list(args: argparse.Namespace) -> int:
     Returns:
         Exit code (0 for success, 1 for failure)
     """
+    # Load heavy dependencies
+    deps = _import_heavy_deps()
+    BenchmarkDatabase = deps['BenchmarkDatabase']
+    BenchmarkReporter = deps['BenchmarkReporter']
+
     db_path = Path(args.db) if args.db else get_benchmark_db_path()
 
     # Check if DB exists
@@ -244,6 +354,11 @@ def cmd_report(args: argparse.Namespace) -> int:
     Returns:
         Exit code (0 for success, 1 for failure)
     """
+    # Load heavy dependencies
+    deps = _import_heavy_deps()
+    BenchmarkDatabase = deps['BenchmarkDatabase']
+    BenchmarkReporter = deps['BenchmarkReporter']
+
     db_path = Path(args.db) if args.db else get_benchmark_db_path()
 
     # Check if DB exists
@@ -288,6 +403,11 @@ def cmd_compare(args: argparse.Namespace) -> int:
     Returns:
         Exit code (0 for success, 1 for failure)
     """
+    # Load heavy dependencies
+    deps = _import_heavy_deps()
+    BenchmarkDatabase = deps['BenchmarkDatabase']
+    BenchmarkReporter = deps['BenchmarkReporter']
+
     db_path = Path(args.db) if args.db else get_benchmark_db_path()
 
     # Check if DB exists
@@ -333,6 +453,14 @@ def cmd_recommend(args: argparse.Namespace) -> int:
     Returns:
         Exit code (0 for success, 1 for failure)
     """
+    # Load heavy dependencies
+    deps = _import_heavy_deps()
+    BenchmarkDatabase = deps['BenchmarkDatabase']
+    BenchmarkRecommender = deps['BenchmarkRecommender']
+    BenchmarkReporter = deps['BenchmarkReporter']
+    ModelRegistry = deps['ModelRegistry']
+    ModelRecommender = deps['ModelRecommender']
+
     try:
         # Check if this is an OOM-safe batch size recommendation (CUDA + max_memory_gb)
         if args.device and args.device.startswith('cuda') and args.max_memory_gb:
@@ -384,12 +512,13 @@ def cmd_recommend(args: argparse.Namespace) -> int:
 
         # Original model recommender logic for non-OOM-safe cases
         # Load registry
-        registry_path = Path(args.registry)
-        if not registry_path.exists():
-            logger.error(f"Registry file not found: {registry_path}")
+        registry_paths = [Path(p.strip()) for p in args.registry.split(',') if p.strip()]
+        missing = [str(p) for p in registry_paths if not p.exists()]
+        if missing:
+            logger.error(f"Registry file(s) not found: {', '.join(missing)}")
             return 1
 
-        registry = ModelRegistry(registry_path)
+        registry = ModelRegistry(args.registry)
         logger.info(f"Loaded registry with {len(registry.models)} models")
 
         # Load benchmark storage if DB exists
@@ -449,6 +578,10 @@ def cmd_migrate(args: argparse.Namespace) -> int:
     Returns:
         Exit code (0 for success, 1 for failure)
     """
+    # Load heavy dependencies
+    deps = _import_heavy_deps()
+    MigrationManager = deps['MigrationManager']
+
     try:
         # Get database path
         if args.db:
@@ -521,6 +654,10 @@ def cmd_aggregate(args: argparse.Namespace) -> int:
     Returns:
         Exit code (0 for success, 1 for failure)
     """
+    # Load heavy dependencies
+    deps = _import_heavy_deps()
+    TimeSeriesAggregator = deps['TimeSeriesAggregator']
+
     try:
         # Get database path
         if args.db:
@@ -581,6 +718,316 @@ def cmd_aggregate(args: argparse.Namespace) -> int:
         return 1
 
 
+def cmd_retention(args: argparse.Namespace) -> int:
+    """
+    Execute data retention policies.
+
+    Args:
+        args: Parsed command-line arguments
+
+    Returns:
+        Exit code (0 for success, 1 for failure)
+    """
+    # Load heavy dependencies
+    deps = _import_heavy_deps()
+    RetentionEngine = deps['RetentionEngine']
+
+    try:
+        db_path = Path(args.db) if args.db else get_benchmark_db_path()
+
+        if not db_path.exists():
+            logger.error(f"Database not found: {db_path}")
+            print(f"ERROR: Benchmark database not found at {db_path}", file=sys.stderr)
+            return 1
+
+        engine = RetentionEngine(db_path)
+
+        # Status command
+        if args.status:
+            status = engine.get_retention_status()
+
+            print("\nRetention Policy Status")
+            print("=" * 80)
+            print(f"Total policies: {status['total_policies']}")
+            print(f"Enabled: {status['enabled_policies']}, Disabled: {status['disabled_policies']}")
+            print()
+
+            print("Policies:")
+            print("-" * 80)
+            for policy in status["policies"]:
+                enabled_str = "ENABLED" if policy["enabled"] else "DISABLED"
+                print(f"  {policy['name']:<30} {enabled_str:<10} {policy['retention_days']:>4}d")
+                print(f"    Table: {policy['table']:<20} Rows: {policy['rows_total']:>8} To delete: {policy['rows_to_delete']:>8}")
+                if policy["last_cleanup"]:
+                    print(f"    Last cleanup: {policy['last_cleanup'][:19]}")
+                print()
+
+            return 0
+
+        # Run retention
+        if args.run:
+            dry_run_msg = " [DRY RUN]" if args.dry_run else ""
+            print(f"\nExecuting retention policies{dry_run_msg}...")
+
+            policies = args.policies.split(",") if args.policies else None
+            results = engine.execute_retention(policy_names=policies, dry_run=args.dry_run)
+
+            print()
+            print("Results:")
+            print("-" * 80)
+            total_deleted = 0
+            for result in results:
+                action = "Would delete" if result.dry_run else "Deleted"
+                status = "ERROR" if result.error else "OK"
+                print(f"  {result.policy_name:<30} {status:<6} {action} {result.rows_deleted:>8} rows")
+                if result.error:
+                    print(f"    Error: {result.error}")
+                total_deleted += result.rows_deleted
+
+            print()
+            print(f"Total: {total_deleted} rows {'would be ' if args.dry_run else ''}deleted")
+
+            # Vacuum if requested and not dry run
+            if args.vacuum and not args.dry_run:
+                print("\nVacuuming database...")
+                reduction = engine.vacuum_database()
+                print(f"Reclaimed {reduction:,} bytes")
+
+            return 0
+
+        # No action specified
+        print("ERROR: Must specify --run or --status", file=sys.stderr)
+        return 1
+
+    except Exception as e:
+        logger.error(f"Retention failed: {e}", exc_info=args.verbose)
+        print(f"ERROR: {e}", file=sys.stderr)
+        return 1
+
+
+def cmd_export(args: argparse.Namespace) -> int:
+    """
+    Export benchmark data to various formats.
+
+    Args:
+        args: Parsed command-line arguments
+
+    Returns:
+        Exit code (0 for success, 1 for failure)
+    """
+    # Load heavy dependencies
+    deps = _import_heavy_deps()
+    BenchmarkExporter = deps['BenchmarkExporter']
+    ExportFilter = deps['ExportFilter']
+
+    try:
+        db_path = Path(args.db) if args.db else get_benchmark_db_path()
+
+        if not db_path.exists():
+            logger.error(f"Database not found: {db_path}")
+            print(f"ERROR: Benchmark database not found at {db_path}", file=sys.stderr)
+            return 1
+
+        exporter = BenchmarkExporter(db_path)
+
+        # Build filter
+        filter_obj = None
+        if args.start_date or args.end_date or args.model or args.device:
+            filter_obj = ExportFilter(
+                start_date=args.start_date,
+                end_date=args.end_date,
+                model_ids=args.model.split(",") if args.model else None,
+                devices=args.device.split(",") if args.device else None,
+            )
+
+        # Progress callback
+        def progress_callback(progress):
+            if args.verbose:
+                print(f"  {progress.table}: {progress.rows_exported}/{progress.total_rows} ({progress.percent_complete:.1f}%)")
+
+        output_path = Path(args.output)
+
+        # Export based on format
+        if args.format == "csv":
+            result = exporter.export_csv(
+                output_path,
+                filter=filter_obj,
+                compress=args.compress,
+                progress_callback=progress_callback if args.verbose else None,
+            )
+        elif args.format == "json":
+            result = exporter.export_json(
+                output_path,
+                filter=filter_obj,
+                compress=args.compress,
+                progress_callback=progress_callback if args.verbose else None,
+                pretty_print=args.pretty,
+            )
+        elif args.format == "sqlite":
+            result = exporter.export_sqlite(
+                output_path,
+                filter=filter_obj,
+                progress_callback=progress_callback if args.verbose else None,
+            )
+        else:
+            print(f"ERROR: Unknown format: {args.format}", file=sys.stderr)
+            return 1
+
+        # Print result
+        if result.error:
+            print(f"ERROR: Export failed: {result.error}", file=sys.stderr)
+            return 1
+
+        print()
+        print("Export completed:")
+        print("-" * 60)
+        print(f"Format:          {result.format}")
+        print(f"Output:          {result.output_path}")
+        print(f"Tables:          {', '.join(result.tables_exported)}")
+        print(f"Rows exported:   {result.rows_exported:,}")
+        print(f"File size:       {result.file_size_bytes:,} bytes")
+        print(f"Compressed:      {result.compressed}")
+        print(f"Duration:        {result.duration_seconds:.2f}s")
+
+        return 0
+
+    except Exception as e:
+        logger.error(f"Export failed: {e}", exc_info=args.verbose)
+        print(f"ERROR: {e}", file=sys.stderr)
+        return 1
+
+
+def cmd_archive(args: argparse.Namespace) -> int:
+    """
+    Manage benchmark data archives.
+
+    Args:
+        args: Parsed command-line arguments
+
+    Returns:
+        Exit code (0 for success, 1 for failure)
+    """
+    # Load heavy dependencies
+    deps = _import_heavy_deps()
+    BenchmarkArchiver = deps['BenchmarkArchiver']
+
+    try:
+        db_path = Path(args.db) if args.db else get_benchmark_db_path()
+        archive_dir = Path(args.archive_dir) if args.archive_dir else None
+
+        archiver = BenchmarkArchiver(db_path, archive_dir=archive_dir)
+
+        # List archives
+        if args.list:
+            archives = archiver.list_archives()
+
+            print("\nAvailable Archives")
+            print("=" * 100)
+
+            if not archives:
+                print("No archives found.")
+                return 0
+
+            for archive in archives:
+                compressed = "[GZIP]" if archive.compressed else ""
+                print(f"\n{archive.archive_id} {compressed}")
+                print(f"  Path:      {archive.archive_path}")
+                print(f"  Created:   {archive.created_at[:19]}")
+                print(f"  Data:      {archive.data_start_date[:10] if archive.data_start_date else 'N/A'} to {archive.data_end_date[:10] if archive.data_end_date else 'N/A'}")
+                print(f"  Runs:      {archive.total_runs:,}")
+                print(f"  Results:   {archive.total_results:,}")
+                print(f"  Size:      {archive.file_size_bytes:,} bytes")
+
+            # Print summary
+            summary = archiver.get_archive_summary()
+            print()
+            print("-" * 100)
+            print(f"Total: {summary['archive_count']} archives, {summary['total_size_bytes']:,} bytes")
+
+            return 0
+
+        # Create archive
+        if args.create:
+            if not args.before:
+                print("ERROR: --before DATE is required for archive creation", file=sys.stderr)
+                return 1
+
+            if not db_path.exists():
+                print(f"ERROR: Database not found: {db_path}", file=sys.stderr)
+                return 1
+
+            print(f"\nCreating archive for data before {args.before}...")
+
+            result = archiver.create_archive(
+                before_date=args.before,
+                compress=args.compress,
+                delete_after_archive=args.delete_after,
+            )
+
+            if not result.success:
+                print(f"ERROR: Archive creation failed: {result.error}", file=sys.stderr)
+                return 1
+
+            if result.archive_path is None:
+                print("No data found to archive.")
+                return 0
+
+            print()
+            print("Archive created:")
+            print("-" * 60)
+            print(f"Path:            {result.archive_path}")
+            print(f"Runs archived:   {result.metadata.total_runs:,}")
+            print(f"Results:         {result.metadata.total_results:,}")
+            print(f"File size:       {result.metadata.file_size_bytes:,} bytes")
+            print(f"Duration:        {result.duration_seconds:.2f}s")
+            if result.rows_deleted > 0:
+                print(f"Rows deleted:    {result.rows_deleted:,}")
+
+            return 0
+
+        # Restore archive
+        if args.restore:
+            if not db_path.exists():
+                print(f"ERROR: Database not found: {db_path}", file=sys.stderr)
+                return 1
+
+            print(f"\nRestoring from archive: {args.restore}...")
+
+            result = archiver.restore_archive(args.restore)
+
+            if not result.success:
+                print(f"ERROR: Restore failed: {result.error}", file=sys.stderr)
+                return 1
+
+            print()
+            print("Archive restored:")
+            print("-" * 60)
+            print(f"Archive:         {result.archive_path}")
+            print(f"Tables:          {', '.join(result.tables_restored)}")
+            print(f"Rows restored:   {result.rows_restored:,}")
+            print(f"Duration:        {result.duration_seconds:.2f}s")
+
+            return 0
+
+        # Rotate archives
+        if args.rotate:
+            print(f"\nRotating archives (keeping {args.keep} most recent)...")
+
+            deleted = archiver.rotate_archives(keep_count=args.keep)
+
+            print(f"Deleted {deleted} old archives.")
+            return 0
+
+        # No action specified
+        print("ERROR: Must specify --list, --create, --restore, or --rotate", file=sys.stderr)
+        return 1
+
+    except Exception as e:
+        logger.error(f"Archive operation failed: {e}", exc_info=args.verbose)
+        print(f"ERROR: {e}", file=sys.stderr)
+        return 1
+
+
 def main():
     """
     Main CLI entry point with subcommand routing.
@@ -595,6 +1042,13 @@ def main():
         "-v", "--verbose",
         action="store_true",
         help="Enable verbose logging",
+    )
+
+    parser.add_argument(
+        "--version",
+        action="version",
+        version=f"%(prog)s {get_version()}",
+        help="Show program version and exit",
     )
 
     # Subcommands
@@ -766,6 +1220,97 @@ Examples:
     aggregate_parser.add_argument("--baseline", action="store_true", help="Create performance baseline")
     aggregate_parser.add_argument("--type", default="weekly", choices=["daily", "weekly", "monthly"], help="Baseline type")
 
+    # --- retention command ---
+    retention_parser = subparsers.add_parser(
+        "retention",
+        help="Execute data retention policies",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+  # Show retention policy status
+  python -m src.benchmarking.cli retention --status
+
+  # Dry run (show what would be deleted)
+  python -m src.benchmarking.cli retention --run --dry-run
+
+  # Execute retention and vacuum database
+  python -m src.benchmarking.cli retention --run --vacuum
+
+  # Execute specific policies
+  python -m src.benchmarking.cli retention --run --policies benchmark_results_90d
+        """,
+    )
+    retention_parser.add_argument("--db", help="Database path (default: data/benchmarks/benchmarks.db or from config)")
+    retention_parser.add_argument("--status", action="store_true", help="Show retention policy status")
+    retention_parser.add_argument("--run", action="store_true", help="Execute retention policies")
+    retention_parser.add_argument("--dry-run", action="store_true", help="Show what would be deleted without deleting")
+    retention_parser.add_argument("--policies", help="Comma-separated policy names to execute (default: all enabled)")
+    retention_parser.add_argument("--vacuum", action="store_true", help="Vacuum database after retention")
+
+    # --- export command ---
+    export_parser = subparsers.add_parser(
+        "export",
+        help="Export benchmark data to various formats",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+  # Export to CSV
+  python -m src.benchmarking.cli export --format csv --output export/
+
+  # Export to JSON with compression
+  python -m src.benchmarking.cli export --format json --output export.json.gz --compress
+
+  # Export to SQLite backup
+  python -m src.benchmarking.cli export --format sqlite --output backup.db
+
+  # Export with filters
+  python -m src.benchmarking.cli export --format json --output filtered.json --model m2m100_418m --device cpu --start-date 2024-01-01
+        """,
+    )
+    export_parser.add_argument("--db", help="Database path (default: data/benchmarks/benchmarks.db or from config)")
+    export_parser.add_argument("--format", required=True, choices=["csv", "json", "sqlite"], help="Export format")
+    export_parser.add_argument("--output", required=True, help="Output path (file or directory)")
+    export_parser.add_argument("--compress", action="store_true", help="Compress output with gzip (csv/json only)")
+    export_parser.add_argument("--pretty", action="store_true", help="Pretty-print JSON output")
+    export_parser.add_argument("--start-date", help="Filter: start date (YYYY-MM-DD)")
+    export_parser.add_argument("--end-date", help="Filter: end date (YYYY-MM-DD)")
+    export_parser.add_argument("--model", help="Filter: comma-separated model IDs")
+    export_parser.add_argument("--device", help="Filter: comma-separated devices")
+
+    # --- archive command ---
+    archive_parser = subparsers.add_parser(
+        "archive",
+        help="Manage benchmark data archives",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+  # List archives
+  python -m src.benchmarking.cli archive --list
+
+  # Create archive for data before a date
+  python -m src.benchmarking.cli archive --create --before 2024-01-01
+
+  # Create compressed archive and delete source data
+  python -m src.benchmarking.cli archive --create --before 2024-01-01 --compress --delete-after
+
+  # Restore from archive
+  python -m src.benchmarking.cli archive --restore archive_20240115_120000
+
+  # Rotate archives (keep 5 most recent)
+  python -m src.benchmarking.cli archive --rotate --keep 5
+        """,
+    )
+    archive_parser.add_argument("--db", help="Database path (default: data/benchmarks/benchmarks.db or from config)")
+    archive_parser.add_argument("--archive-dir", help="Archive directory (default: data/archives)")
+    archive_parser.add_argument("--list", action="store_true", help="List all archives")
+    archive_parser.add_argument("--create", action="store_true", help="Create new archive")
+    archive_parser.add_argument("--before", help="Archive data before this date (YYYY-MM-DD)")
+    archive_parser.add_argument("--compress", action="store_true", help="Compress archive with gzip")
+    archive_parser.add_argument("--delete-after", action="store_true", help="Delete source data after archiving")
+    archive_parser.add_argument("--restore", help="Restore from archive (archive name)")
+    archive_parser.add_argument("--rotate", action="store_true", help="Rotate old archives")
+    archive_parser.add_argument("--keep", type=int, default=5, help="Number of archives to keep when rotating")
+
     # Parse arguments
     args = parser.parse_args()
 
@@ -795,6 +1340,12 @@ Examples:
         return cmd_migrate(args)
     elif args.command == "aggregate":
         return cmd_aggregate(args)
+    elif args.command == "retention":
+        return cmd_retention(args)
+    elif args.command == "export":
+        return cmd_export(args)
+    elif args.command == "archive":
+        return cmd_archive(args)
     else:
         parser.print_help()
         return 1

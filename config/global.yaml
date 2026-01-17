@@ -17,11 +17,12 @@ execution:
     windows_cuda:
       device: "auto"  # Auto-detect best device (cuda/cpu/mps)
       enable_gpu: true
-      max_gpu_memory_mb: 4096
+      max_gpu_memory_percent: 50  # Balanced - target batch_size ~8-10 with max_new_tokens=256
+      max_gpu_memory_mb: null  # Optional explicit override
       poll_interval: 5.0
       max_retries: 3
       worker_id_prefix: "windows-gpu"
-      queue_backend: "redis"  # Use Redis for distributed workers
+      queue_backend: "memory"  # Use memory backend (redis requires external service)
 
     # Docker containerized with CPU-only enforcement
     docker_cpu:
@@ -31,17 +32,18 @@ execution:
       poll_interval: 3.0  # Faster polling for CPU workers
       max_retries: 5  # More retries for CPU (slower, more resilient)
       worker_id_prefix: "docker-cpu"
-      queue_backend: "redis"  # Use Redis for distributed workers
+      queue_backend: "memory"  # Use memory backend (redis requires external service)
 
     # Docker containerized with GPU passthrough (nvidia-docker)
     docker_gpu:
       device: "cuda"  # Use CUDA GPU
       enable_gpu: true
-      max_gpu_memory_mb: 6144  # Higher limit for dedicated GPU containers
+      max_gpu_memory_percent: 60  # Use 60% of VRAM (safe default)
+      max_gpu_memory_mb: null  # Optional explicit override (e.g., 6144 for dedicated containers)
       poll_interval: 5.0
       max_retries: 3
       worker_id_prefix: "docker-gpu"
-      queue_backend: "redis"  # Use Redis for distributed workers
+      queue_backend: "memory"  # Use memory backend (redis requires external service)
 
 # Default TM preferences (overridable per site)
 tm_defaults:
@@ -60,11 +62,18 @@ model_defaults:
   batch_size: 4  # Conservative default to prevent CUDA OOM (GPU optimizer will calculate optimal)
   cache_models: true
   max_cached_models: 2
+  allow_model_download: false  # Prevent automatic model downloads in production (default: false)
+
+# Translation generation defaults
+translation:
+  generation:
+    speed_mode: true  # true = minimal constraints for throughput
 
 # Hardware/GPU configuration
 hardware:
   enable_gpu: true  # Enable GPU acceleration if available
-  max_gpu_memory_mb: 4096  # Conservative limit to prevent VRAM exhaustion
+  max_gpu_memory_percent: 60  # Maximum GPU memory as percentage of total VRAM (default: 60% for safety)
+  max_gpu_memory_mb: null  # Optional explicit MB limit (overrides percent if set)
   gpu_device_id: -1  # -1 = auto-select best GPU, 0+ = specific device
   allow_cpu_fallback: true  # Fall back to CPU if GPU fails
   clear_cache_after_batch: true  # Clear GPU cache after each batch
@@ -83,7 +92,7 @@ hardware:
 queue:
   # Primary backend type (redis | memory)
   # Can be overridden by QUEUE_BACKEND environment variable
-  backend: "redis"
+  backend: "memory"  # Changed from redis to memory for production hardening
 
   # Fallback backend when primary is unavailable
   fallback_backend: "memory"
@@ -418,6 +427,49 @@ l4_llm:
   timeout_seconds: 30
   max_latency_ms: 500  # Maximum acceptable latency for adaptation
   cache_adaptations: true  # Cache LLM adaptations in L2
+
+# TM Improvement Worker Configuration
+# Autonomous worker that uses LLM to improve TM entries during off-peak hours
+tm_improvement:
+  # Master toggle for TM improvement worker
+  enabled: true
+
+  # Scheduling configuration (4-5 runs/day during off-peak hours)
+  schedule:
+    runs_per_day: 5  # Number of improvement runs per day
+    window_start: "10:00"  # Start of daily window (America/Los_Angeles)
+    window_end: "22:00"  # End of daily window (America/Los_Angeles)
+    timezone: "America/Los_Angeles"
+    jitter_minutes: 10  # Random jitter to avoid exact timing patterns
+
+  # Improvement batch configuration
+  batch:
+    candidates_per_run: 50  # Max candidates to process per run
+    max_llm_calls_per_run: 200  # Max LLM calls per run (safety limit)
+    max_seconds_per_run: 900  # Max runtime per run (15 minutes)
+
+  # LLM configuration for improvements
+  llm:
+    provider: "ollama"  # ollama, openai, anthropic
+    model: "llama2"  # Model name for improvements
+    base_url: "http://localhost:11434"  # Ollama base URL
+    api_key: null  # API key for cloud providers (optional)
+    timeout_seconds: 30  # Timeout per LLM call
+    temperature: 0.3  # Low temperature for consistency
+    fallback_provider: null  # Optional fallback provider if primary fails
+
+  # Improvement queue configuration
+  queue:
+    enabled: true  # Enable queue-based candidate tracking
+    path: "data/tm/improvement_queue.jsonl"  # Path to queue file
+    append_on_store: true  # Append candidates when storing new TM entries
+    quality_threshold: 0.80  # Only queue entries below this similarity score
+
+  # VRAM management (for Ollama using GPU)
+  resources:
+    max_gpu_memory_percent: 60  # Maximum GPU memory usage (60% budget)
+    preflight_check: true  # Check GPU usage before starting run
+    abort_on_high_usage: true  # Abort run if GPU already >=60% at start
 
 # Validation defaults
 validation_defaults:

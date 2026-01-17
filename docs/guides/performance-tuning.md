@@ -117,6 +117,14 @@ See [Segment Sorting Feature Guide](../features/segment-sorting.md) for implemen
 
 ## Other Performance Optimizations
 
+### Multiline Batching
+
+Multiline segments (lists, blockquotes, wrapped paragraphs) are parsed into lines and translated in batches to avoid per-line calls. This preserves indentation, prefixes, and line counts while improving throughput on GPU.
+
+**Notes:**
+- Large amounts of multiline content benefit most from higher `batch_size` (within VRAM limits).
+- Logs include an MSP-02 summary per file with multiline segments, lines translated, and backend call counts.
+
 ### Batch Sizing
 
 Batch size affects memory usage and throughput. Larger batches improve GPU utilization but increase memory requirements.
