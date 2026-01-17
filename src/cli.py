@@ -543,6 +543,12 @@ Examples:
     )
 
     model_group.add_argument(
+        "--auto-select-model",
+        action="store_true",
+        help="Automatically select best model for each target language (uses Opus when available, falls back to multilingual). Mutually exclusive with --model.",
+    )
+
+    model_group.add_argument(
         "--device",
         type=str,
         choices=["auto", "cpu", "cuda"],
@@ -2401,6 +2407,42 @@ def translate_site(args: argparse.Namespace) -> int:
                     logger.info("Metadata file deleted, will rebuild hashes from scratch")
                 except Exception as e:
                     logger.warning(f"Failed to delete metadata file: {e}")
+
+        # PROD-004: Language-aware model selection (Agent-E)
+        # If --auto-select-model flag is enabled, select best model per language pair
+        # This happens AFTER model_loader is created but BEFORE engine initialization
+        if args.auto_select_model and overrides.model:
+            logger.error("Cannot use both --auto-select-model and --model flags. Please choose one.")
+            return 1
+
+        if args.auto_select_model:
+            logger.info("Auto-selection enabled - will select best model for target language(s)")
+            # Import selector module
+            try:
+                from .model_runtime.selector import LanguageAwareModelSelector
+                from .model_runtime.hardware import HardwareDetector
+            except ImportError:
+                from model_runtime.selector import LanguageAwareModelSelector
+                from model_runtime.hardware import HardwareDetector
+
+            # Detect hardware for selector
+            hardware_detector = HardwareDetector()
+            hardware_info = hardware_detector.detect()
+
+            # Get fallback model from config
+            fallback_model = global_config.model_defaults.fallback_model if hasattr(global_config, 'model_defaults') else None
+
+            # Create selector
+            selector = LanguageAwareModelSelector(
+                registry=model_registry,
+                hardware_info=hardware_info,
+                fallback_model=fallback_model
+            )
+
+            # Note: Actual model selection happens per-language in the engine
+            # We pass the selector to engine_kwargs so engine can use it
+            engine_kwargs["model_selector"] = selector
+            logger.info("Model selector initialized and passed to engine")
 
         engine = TranslationEngine(
             config_service=config_service,
