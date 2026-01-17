@@ -140,6 +140,26 @@ terminology:
     case_sensitive: false
     preserve_mode: validate
     severity: warning
+  - term: Exception
+    category: api_term
+    case_sensitive: false
+    preserve_mode: validate
+    severity: warning
+  - term: Interface
+    category: api_term
+    case_sensitive: false
+    preserve_mode: validate
+    severity: warning
+  - term: Enum
+    category: api_term
+    case_sensitive: false
+    preserve_mode: validate
+    severity: warning
+  - term: Struct
+    category: api_term
+    case_sensitive: false
+    preserve_mode: validate
+    severity: warning
   patterns:
   - pattern: \b[A-Z][a-z]+(?:[A-Z][a-z]+)+\b
     category: pascal_case_identifier
@@ -151,3 +171,23 @@ terminology:
     description: UPPER_CASE constants
     preserve_mode: protect
     severity: warning
+  - pattern: \b[A-Z][a-zA-Z0-9]*\.[A-Z][a-zA-Z0-9.]*\b
+    category: namespace_identifier
+    description: Dotted namespace identifiers (System.Exception, Aspose.BarCode)
+    preserve_mode: protect
+    severity: error
+  - pattern: \bI[A-Z][a-zA-Z0-9]+\b
+    category: interface_name
+    description: Interface names starting with I (ISerializable, IDisposable)
+    preserve_mode: protect
+    severity: error
+  - pattern: ^\*\*Q\d+[.:]\s
+    category: faq_marker
+    description: FAQ question markers (Q1., Q2:, etc.)
+    preserve_mode: protect
+    severity: warning
+  - pattern: \b[A-Z][a-z]+Exception\b
+    category: exception_class
+    description: Exception class names (BarCodeException, InvalidCodeException)
+    preserve_mode: protect
+    severity: error
