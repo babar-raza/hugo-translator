@@ -156,7 +156,11 @@ class TextUnitExtractor:
         terminology_file: Optional[Path] = None,
         mt_model: Optional[Any] = None,
         preserve_patterns: Optional[List[str]] = None,
-        site_profile: Optional[Any] = None
+        site_profile: Optional[Any] = None,
+        batch_stats_tracker: Optional[Any] = None,
+        fasttext_detector: Optional[Any] = None,
+        similarity_tracker: Optional[Any] = None,
+        script_validation_thresholds: Optional[dict] = None
     ):
         """
         Initialize extractor for native batch translation.
@@ -167,6 +171,10 @@ class TextUnitExtractor:
             mt_model: M2M100 model instance (optional, not used for native batching)
             preserve_patterns: Regex patterns for content to preserve (e.g., brand names)
             site_profile: Site profile configuration for frontmatter field handling (optional)
+            batch_stats_tracker: BatchStatsTracker for adaptive batch sizing (optional)
+            fasttext_detector: FastTextDetector for language detection (optional, replaces langdetect)
+            similarity_tracker: SimilarityTracker for adaptive similarity learning (optional)
+            script_validation_thresholds: Script validation thresholds for fallback (optional)
         """
         self.segmentation_strategy = segmentation_strategy
         self.site_profile = site_profile
@@ -242,6 +250,14 @@ class TextUnitExtractor:
 
         # Load technical terms whitelist for language purity bypass (PO-01)
         self.technical_terms = self._load_technical_terms()
+
+        # Adaptive batch sizing tracker (optional)
+        self.batch_stats_tracker = batch_stats_tracker
+
+        # Language detection (FastText + adaptive similarity learning)
+        self.fasttext_detector = fasttext_detector
+        self.similarity_tracker = similarity_tracker
+        self.script_validation_thresholds = script_validation_thresholds or {}
 
     def _load_extraction_config(self) -> dict:
         """
@@ -751,9 +767,31 @@ class TextUnitExtractor:
         if not self._verify_translation_language_purity(batch, tgt_lang):
             logger.warning(
                 f"LANGUAGE PURITY CHECK FAILED: Batch produced mixed-language output. "
-                f"Re-translating {batch_count} units individually to ensure language purity."
+                f"Attempting reactive batch splitting (batch_size={batch_count})."
             )
             self.batch_stats['language_purity_failures'] = self.batch_stats.get('language_purity_failures', 0) + 1
+
+            # REACTIVE SPLITTING: Try smaller batches before individual fallback
+            if batch_count > 1 and self.batch_stats_tracker:
+                reduced_size = self.batch_stats_tracker.react_to_failure(tgt_lang, batch_count)
+
+                # Split batch in half and retry
+                mid = batch_count // 2
+                logger.info(
+                    f"Reactive split: {batch_count} → [{mid} + {batch_count - mid}] "
+                    f"(target={tgt_lang})"
+                )
+
+                success_1 = self._translate_single_batch(batch[:mid], mt_model, src_lang, tgt_lang)
+                success_2 = self._translate_single_batch(batch[mid:], mt_model, src_lang, tgt_lang)
+
+                # Return combined success status
+                return success_1 and success_2
+
+            # Fallback to individual if already at size 1 or no tracker
+            logger.warning(
+                f"Re-translating {batch_count} units individually to ensure language purity."
+            )
             self._fallback_to_individual(batch, mt_model, src_lang, tgt_lang)
             return False
 
@@ -793,10 +831,17 @@ class TextUnitExtractor:
         """
         Verify all translated units are in target language.
 
-        Uses langdetect to check each translated unit. Skips very short texts
-        as they may not have enough content for reliable detection.
+        Uses FastText (preferred) or langdetect (fallback) for language detection.
+        Integrates with adaptive similarity tracker to learn which language pairs
+        cause false positives and automatically accept them.
 
-        PO-01: Units with high technical term density (>30%) bypass this check
+        Multi-tier validation:
+        1. Technical density bypass (>25% technical terms)
+        2. FastText/langdetect detection with confidence threshold
+        3. Adaptive similarity groups (learned + baseline)
+        4. Script-based validation fallback
+
+        PO-01: Units with high technical term density (>=25%) bypass this check
         to prevent false positives from technical content.
 
         Args:
@@ -806,21 +851,30 @@ class TextUnitExtractor:
         Returns:
             True if all units pass language check, False if any fail
         """
-        try:
-            import langdetect
-            from langdetect import DetectorFactory
+        # Check if detection is available
+        has_fasttext = self.fasttext_detector and self.fasttext_detector.is_available
+        has_langdetect = False
 
-            # Set seed for reproducible detection
-            DetectorFactory.seed = 0
-        except ImportError:
+        if not has_fasttext:
+            # Try langdetect fallback
+            try:
+                import langdetect
+                from langdetect import DetectorFactory
+                DetectorFactory.seed = 0  # Reproducible results
+                has_langdetect = True
+            except ImportError:
+                pass
+
+        if not has_fasttext and not has_langdetect:
             logger.warning(
-                "langdetect not available, skipping language purity check. "
-                "Install with: pip install langdetect"
+                "Neither FastText nor langdetect available, skipping language purity check. "
+                "Install with: pip install fasttext"
             )
             return True
 
         failed_units = []
         bypassed_count = 0
+        similarity_accepted_count = 0
         script_override_count = 0
 
         for unit in units:
@@ -842,55 +896,131 @@ class TextUnitExtractor:
                 bypassed_count += 1
                 continue
 
-            try:
-                detected = langdetect.detect(translated)
-                # Check if detected language matches target or is script-similar
-                script_similar = self.script_similar_languages.get(target_lang, set())
-                if detected != target_lang and detected not in script_similar:
+            # Use FastText if available, otherwise langdetect
+            if has_fasttext:
+                # FastText with integrated verification
+                is_valid = self.fasttext_detector.verify_language(
+                    text=translated,
+                    expected_lang=target_lang,
+                    similarity_tracker=self.similarity_tracker,
+                    script_validation_thresholds=self.script_validation_thresholds,
+                )
+
+                if is_valid:
+                    # Check if accepted due to similarity (for statistics)
+                    detected_lang, confidence = self.fasttext_detector.detect(translated)
+                    if detected_lang != target_lang and detected_lang != "unknown":
+                        similarity_accepted_count += 1
+                else:
+                    # Detection failed
+                    detected_lang, confidence = self.fasttext_detector.detect(translated)
+                    failed_units.append({
+                        'text': translated[:60] + "..." if len(translated) > 60 else translated,
+                        'expected': target_lang,
+                        'detected': detected_lang,
+                        'confidence': f"{confidence:.2f}",
+                        'method': 'fasttext',
+                    })
+
+            else:
+                # Langdetect fallback (legacy behavior)
+                try:
+                    detected = langdetect.detect(translated)
+
+                    # Check exact match
+                    if detected == target_lang:
+                        continue
+
+                    # Check old script_similar_languages config (backward compatibility)
+                    script_similar = self.script_similar_languages.get(target_lang, set())
+                    if detected in script_similar:
+                        logger.debug(
+                            f"Accepting script-similar language (legacy): detected={detected}, "
+                            f"target={target_lang}"
+                        )
+                        similarity_accepted_count += 1
+                        continue
+
+                    # Check adaptive similarity tracker
+                    if self.similarity_tracker and self.similarity_tracker.are_similar(target_lang, detected):
+                        logger.debug(
+                            f"Accepting similar language (adaptive): detected={detected}, "
+                            f"target={target_lang}"
+                        )
+                        similarity_accepted_count += 1
+
+                        # Record for learning
+                        self.similarity_tracker.record_detection(
+                            expected_lang=target_lang,
+                            detected_lang=detected,
+                            confidence=0.80,  # langdetect assumed confidence
+                            success=True,
+                        )
+                        continue
+
+                    # Script validation fallback
                     script_ratio = self._target_script_ratio(translated, target_lang)
                     if script_ratio >= self.language_purity_min_script_ratio:
                         logger.debug(
                             f"Accepting target-script ratio override (ratio={script_ratio:.2f}): "
-                            f"detected={detected}, target={target_lang}, text={translated[:50]}..."
+                            f"detected={detected}, target={target_lang}"
                         )
                         script_override_count += 1
                         continue
+
+                    # Failed all checks
                     failed_units.append({
                         'text': translated[:60] + "..." if len(translated) > 60 else translated,
                         'expected': target_lang,
-                        'detected': detected
+                        'detected': detected,
+                        'method': 'langdetect',
                     })
-                elif detected in script_similar:
-                    # Log script-similar detection for monitoring
-                    logger.debug(
-                        f"Accepting script-similar language: detected={detected}, "
-                        f"target={target_lang}, text={translated[:50]}..."
-                    )
-            except langdetect.lang_detect_exception.LangDetectException:
-                # Skip texts that can't be detected (often technical content)
-                pass
 
-        if bypassed_count > 0:
-            logger.info(
-                f"Bypassed purity check for {bypassed_count} high-density technical units "
-                f"(>=25% technical terms)"
-            )
+                    # Record failed detection for adaptive learning
+                    if self.similarity_tracker:
+                        self.similarity_tracker.record_detection(
+                            expected_lang=target_lang,
+                            detected_lang=detected,
+                            confidence=0.80,  # langdetect assumed confidence
+                            success=False,
+                        )
 
-        if script_override_count > 0:
-            logger.debug(
-                f"Accepted {script_override_count} units based on target-script ratio "
-                f"(>= {self.language_purity_min_script_ratio:.2f})"
-            )
+                except Exception as e:
+                    # Skip texts that can't be detected (often technical content)
+                    logger.debug(f"Language detection failed (skipping): {e}")
+                    pass
 
+        # Calculate truly detected count
+        total_validated = len(units)
+        truly_detected_count = total_validated - bypassed_count - similarity_accepted_count - script_override_count - len(failed_units)
+
+        # Determine detection method
+        detection_method = 'FastText' if has_fasttext else 'langdetect'
+
+        # Log comprehensive summary with breakdown
         if failed_units:
+            # FAILURE case
             logger.error(
-                f"Language purity check FAILED: {len(failed_units)} units have wrong language. "
-                f"Examples: {failed_units[:3]}"
+                f"Language purity check FAILED for batch (method={detection_method}):\n"
+                f"  Total units: {total_validated}\n"
+                f"  - Failed (wrong language): {len(failed_units)} ({len(failed_units)/total_validated*100:.1f}%)\n"
+                f"  - Detected correctly: {truly_detected_count} ({truly_detected_count/total_validated*100:.1f}%)\n"
+                f"  - Bypassed (technical): {bypassed_count} ({bypassed_count/total_validated*100:.1f}%)\n"
+                f"  - Accepted (similarity): {similarity_accepted_count} ({similarity_accepted_count/total_validated*100:.1f}%)\n"
+                f"  - Accepted (script): {script_override_count} ({script_override_count/total_validated*100:.1f}%)"
             )
             return False
-
-        logger.info(f"Language purity check passed for {len(units)} units")
-        return True
+        else:
+            # SUCCESS case - show detailed breakdown
+            logger.info(
+                f"Language purity check PASSED (method={detection_method}):\n"
+                f"  Total units: {total_validated}\n"
+                f"  - Detected as {target_lang}: {truly_detected_count} ({truly_detected_count/total_validated*100:.1f}%)\n"
+                f"  - Bypassed (technical ≥25%): {bypassed_count} ({bypassed_count/total_validated*100:.1f}%)\n"
+                f"  - Accepted (similarity): {similarity_accepted_count} ({similarity_accepted_count/total_validated*100:.1f}%)\n"
+                f"  - Accepted (script): {script_override_count} ({script_override_count/total_validated*100:.1f}%)"
+            )
+            return True
 
     def _target_script_ratio(self, text: str, target_lang: str) -> float:
         """Compute ratio of target-script letters among all letters in text."""
@@ -1394,6 +1524,15 @@ class TextUnitExtractor:
         Returns:
             Units with translated_text populated
         """
+        # Get adaptive batch size if tracker available
+        if self.batch_stats_tracker:
+            adaptive_size = self.batch_stats_tracker.get_batch_size(tgt_lang)
+            logger.info(
+                f"Adaptive batch sizing: {tgt_lang} batch_size={adaptive_size} "
+                f"(baseline={batch_size})"
+            )
+            batch_size = adaptive_size
+
         # Separate translatable from non-translatable
         translatable = [u for u in units if not u.do_not_translate]
         non_translatable = [u for u in units if u.do_not_translate]
@@ -1429,6 +1568,26 @@ class TextUnitExtractor:
                     success = self._translate_single_batch(
                         batch, mt_model, src_lang, tgt_lang
                     )
+
+                    # Record result to adaptive tracker
+                    if self.batch_stats_tracker:
+                        fallback_reason = None
+                        if not success:
+                            # Determine reason from batch_stats
+                            if self.batch_stats.get('language_purity_failures', 0) > 0:
+                                fallback_reason = 'language_purity'
+                            elif self.batch_stats.get('mapping_failures', 0) > 0:
+                                fallback_reason = 'mapping'
+                            else:
+                                fallback_reason = 'translation_error'
+
+                        self.batch_stats_tracker.record_batch_result(
+                            language=tgt_lang,
+                            batch_size=len(batch),
+                            success=success,
+                            fallback_reason=fallback_reason
+                        )
+
                     if not success:
                         # Fallback occurred, counted internally
                         self.batch_stats['fallback_batches'] += 1
@@ -1437,6 +1596,16 @@ class TextUnitExtractor:
                     logger.error(f"Batch translation error in batch {batch_num}: {e}")
                     self.batch_stats['fallback_batches'] += 1
                     self.batch_stats['translation_errors'] += 1
+
+                    # Record exception to adaptive tracker
+                    if self.batch_stats_tracker:
+                        self.batch_stats_tracker.record_batch_result(
+                            language=tgt_lang,
+                            batch_size=len(batch),
+                            success=False,
+                            fallback_reason='exception'
+                        )
+
                     # Fallback to individual translation
                     self._fallback_to_individual(batch, mt_model, src_lang, tgt_lang)
 
@@ -1459,6 +1628,14 @@ class TextUnitExtractor:
         fallback_rate = self.batch_stats['fallback_batches'] / max(self.batch_stats['total_batches'], 1)
         if fallback_rate > self.fallback_rate_threshold:
             self._alert_high_fallback_rate(fallback_rate)
+
+        # Update adaptive statistics for long-term adaptation
+        if self.batch_stats_tracker:
+            self.batch_stats_tracker.update_language_stats(tgt_lang)
+            logger.info(
+                f"Updated adaptive stats for {tgt_lang}: "
+                f"current_batch_size={self.batch_stats_tracker.get_batch_size(tgt_lang)}"
+            )
 
         return units
 

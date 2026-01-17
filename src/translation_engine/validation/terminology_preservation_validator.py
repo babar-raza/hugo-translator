@@ -105,6 +105,32 @@ class TerminologyPreservationValidator(Validator):
         if result.has_errors():
             result.success = False
 
+        # WS5: Log terminology issues at INFO level (Requirement 16)
+        if result.issues:
+            import logging
+            logger = logging.getLogger(__name__)
+
+            # Count issues by severity
+            error_count = sum(1 for issue in result.issues if issue.severity == ValidationSeverity.ERROR)
+            warning_count = sum(1 for issue in result.issues if issue.severity == ValidationSeverity.WARNING)
+
+            # Extract affected terms (up to 5)
+            affected_terms = []
+            for issue in result.issues[:5]:
+                if 'term' in issue.details:
+                    affected_terms.append(issue.details['term'])
+
+            # Determine decision
+            decision = "RETRY" if result.has_errors() else "ACCEPT"
+
+            logger.info(
+                f"TERMINOLOGY ISSUES: {len(result.issues)} violations detected "
+                f"({error_count} errors, {warning_count} warnings) | "
+                f"Terms affected: {', '.join(affected_terms)} | "
+                f"Decision: {decision} | "
+                f"Action: {'Retry translation' if decision == 'RETRY' else 'Accept with warnings'}"
+            )
+
         return result
 
     def _validate_exact_match(
