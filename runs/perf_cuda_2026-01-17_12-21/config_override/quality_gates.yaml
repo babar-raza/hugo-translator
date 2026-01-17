@@ -1,0 +1,98 @@
+# Quality Gates Configuration
+#
+# This file defines quality thresholds that must be met before declaring "production ready"
+# Each gate has: name, description, severity (critical/warning), and threshold
+
+version: "1.0"
+
+# Gate severity levels:
+# - critical: Blocks production deployment if fails
+# - warning: Generates alerts but doesn't block
+
+gates:
+  # File Existence Gates
+  file_existence:
+    enabled: true
+    severity: critical
+    description: "Verify all expected files exist"
+    threshold:
+      min_files: 4  # Minimum number of expected files that must exist
+
+  # Syntax Validation Gates
+  syntax_valid:
+    enabled: true
+    severity: critical
+    description: "All Python files have valid syntax"
+    threshold:
+      min_valid_percentage: 1.0  # 100% of files must have valid syntax
+
+  # Import Health Gates
+  import_health:
+    enabled: true
+    severity: critical
+    description: "All modules can be imported successfully"
+    threshold:
+      min_import_percentage: 1.0  # 100% of modules must be importable
+
+  # Test Execution Gates
+  test_pass_rate:
+    enabled: true
+    severity: critical
+    description: "Tests pass at acceptable rate"
+    threshold:
+      min_pass_rate: 0.90  # At least 90% of tests must pass
+      min_total_tests: 10  # Must have at least 10 tests
+      max_errors: 10  # Maximum test errors allowed
+      max_skipped: 5  # Maximum skipped tests allowed
+
+  # Test Coverage Gates
+  test_coverage:
+    enabled: false  # Disabled by default (requires coverage tool)
+    severity: warning
+    description: "Test coverage meets minimum threshold"
+    threshold:
+      min_coverage_percentage: 0.70  # At least 70% code coverage
+
+  # Documentation Gates
+  documentation_complete:
+    enabled: true
+    severity: warning
+    description: "All required documentation exists"
+    threshold:
+      required_docs:
+        - "README.md"
+        - "docs/VERIFICATION_WORKFLOW.md"
+
+  # Directory Structure Gates
+  directory_structure:
+    enabled: true
+    severity: critical
+    description: "Expected directory structure exists"
+    threshold:
+      required_directories:
+        - "scripts"
+        - "src"
+        - "tests"
+        - "config"
+        - "docs"
+
+# Gate execution order (gates run in this order)
+execution_order:
+  - directory_structure
+  - file_existence
+  - syntax_valid
+  - import_health
+  - test_pass_rate
+  - documentation_complete
+  - test_coverage
+
+# Reporting options
+reporting:
+  generate_json: true
+  generate_markdown: true
+  verbose_output: true
+
+# Performance constraints
+performance:
+  max_execution_time_seconds: 120  # Maximum time for all gates
+  parallel_execution: false  # Whether to run gates in parallel

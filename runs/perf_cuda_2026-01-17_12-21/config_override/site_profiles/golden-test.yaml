@@ -1,0 +1,71 @@
+# Golden Test Site Profile - Minimal configuration for CLI regression tests
+
+site_id: "golden-test"
+
+# Content directory
+content_roots:
+  - "tests/golden/fixtures"
+
+# Source and target languages
+default_source_lang: "en"
+target_langs:
+  - "es"
+  - "fr"
+  - "de"
+  - "pt"
+
+# Simple frontmatter rules
+frontmatter:
+  title:
+    mode: "translate"
+  description:
+    mode: "translate"
+  date:
+    mode: "passthrough"
+
+# Body translation
+body:
+  translate_markdown: true
+  preserve_blocks:
+    - "block_code"
+    - "codespan"
+  translate_image_alt: false
+  translate_link_titles: false
+  use_ast_body_reconstruction: false
+
+# Output configuration
+output_layout:
+  per_language_folders: true
+  pattern: "/{lang}/{relative_path}"
+  preserve_structure: true
+
+# TM preferences (minimal for testing)
+tm_preferences:
+  semantic_threshold: 0.80
+  use_semantic: false  # Disable for faster testing
+  use_context: false
+
+# Model selection
+model:
+  default: "m2m100_418m"
+
+# Validation (minimal)
+validation:
+  check_placeholders: false
+  check_links: false
+  check_yaml_structure: true
+  fail_on_error: false
+
+# Performance settings
+performance:
+  batch_size: 8  # Small batch for fast testing
+  enable_cache: false  # Disable caching for testing
+
+# Logging
+logging:
+  level: "INFO"
+  flow_artifacts: false
+
+# Metadata
+metadata:
+  add_translation_info: false

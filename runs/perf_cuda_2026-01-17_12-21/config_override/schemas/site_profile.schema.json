@@ -1,0 +1,160 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Site Profile",
+  "description": "Configuration schema for Hugo site translation profiles",
+  "type": "object",
+  "required": [
+    "site_id",
+    "content_roots",
+    "default_source_lang",
+    "target_langs",
+    "frontmatter",
+    "body"
+  ],
+  "properties": {
+    "site_id": {
+      "type": "string",
+      "description": "Unique identifier for the site (e.g., products.aspose.net)",
+      "pattern": "^[a-z0-9.-]+$"
+    },
+    "content_roots": {
+      "type": "array",
+      "description": "List of content root directories to watch/translate",
+      "items": {
+        "type": "string"
+      },
+      "minItems": 1
+    },
+    "default_source_lang": {
+      "type": "string",
+      "description": "Default source language code (e.g., en)",
+      "pattern": "^[a-z]{2}(-[A-Z]{2})?$"
+    },
+    "target_langs": {
+      "type": "array",
+      "description": "List of target language codes",
+      "items": {
+        "type": "string",
+        "pattern": "^[a-z]{2}(-[A-Z]{2})?$"
+      },
+      "minItems": 1
+    },
+    "frontmatter": {
+      "type": "object",
+      "description": "Frontmatter field rules",
+      "additionalProperties": {
+        "$ref": "#/definitions/FrontmatterRule"
+      }
+    },
+    "body": {
+      "$ref": "#/definitions/BodyRules"
+    },
+    "output_layout": {
+      "$ref": "#/definitions/OutputLayout"
+    },
+    "tm_prefs": {
+      "$ref": "#/definitions/TMPreferences"
+    }
+  },
+  "definitions": {
+    "FrontmatterRule": {
+      "type": "object",
+      "required": [
+        "mode"
+      ],
+      "properties": {
+        "mode": {
+          "type": "string",
+          "enum": [
+            "translate",
+            "passthrough",
+            "computed",
+            "translate_list",
+            "ignore"
+          ],
+          "description": "How to handle this frontmatter field"
+        },
+        "strategy": {
+          "type": "string",
+          "description": "Optional strategy for translation (e.g., preserve_case, technical_terms)"
+        }
+      }
+    },
+    "BodyRules": {
+      "type": "object",
+      "required": [
+        "translate_markdown"
+      ],
+      "properties": {
+        "translate_markdown": {
+          "type": "boolean",
+          "description": "Whether to translate markdown body content"
+        },
+        "preserve_blocks": {
+          "type": "array",
+          "description": "Block types to preserve (not translate)",
+          "items": {
+            "type": "string"
+          },
+          "default": []
+        },
+        "preserve_patterns": {
+          "type": "array",
+          "description": "Regex patterns for content to preserve",
+          "items": {
+            "type": "string"
+          },
+          "default": []
+        },
+        "placeholder_syntax": {
+          "type": "array",
+          "description": "Hugo shortcode/placeholder patterns",
+          "items": {
+            "type": "string"
+          },
+          "default": []
+        }
+      }
+    },
+    "OutputLayout": {
+      "type": "object",
+      "required": [
+        "per_language_folders",
+        "pattern"
+      ],
+      "properties": {
+        "per_language_folders": {
+          "type": "boolean",
+          "description": "Whether to use per-language folder structure"
+        },
+        "pattern": {
+          "type": "string",
+          "description": "Output file path pattern (e.g., {lang}/{path})",
+          "default": "{lang}/{path}"
+        }
+      }
+    },
+    "TMPreferences": {
+      "type": "object",
+      "properties": {
+        "use_semantic_tm": {
+          "type": "boolean",
+          "description": "Enable L3 semantic translation memory",
+          "default": true
+        },
+        "fallback_exact_only": {
+          "type": "boolean",
+          "description": "Fallback to exact match only if semantic fails",
+          "default": false
+        },
+        "min_similarity_score": {
+          "type": "number",
+          "description": "Minimum similarity score for semantic matches",
+          "minimum": 0.0,
+          "maximum": 1.0,
+          "default": 0.8
+        }
+      }
+    }
+  }
+}

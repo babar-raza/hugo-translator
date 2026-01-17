@@ -1,0 +1,504 @@
+# Global Configuration Defaults for Hugo Translation System
+
+system:
+  name: "Hugo Translation System"
+  version: "1.0.0"
+  environment: "production"  # development, staging, production
+
+# Execution modes for dual-run deployment (Phase 2: Autonomous Workers Unification)
+# Supports three deployment modes: windows_cuda, docker_cpu, docker_gpu
+execution:
+  # Default execution mode (overridden by EXECUTION_MODE env var)
+  default_mode: "windows_cuda"
+
+  # Mode-specific configuration overrides
+  modes:
+    # Windows native with CUDA GPU support
+    windows_cuda:
+      device: "auto"  # Auto-detect best device (cuda/cpu/mps)
+      enable_gpu: true
+      max_gpu_memory_percent: 50  # Balanced - target batch_size ~8-10 with max_new_tokens=256
+      max_gpu_memory_mb: 12000  # Optional explicit override
+      poll_interval: 5.0
+      max_retries: 3
+      worker_id_prefix: "windows-gpu"
+      queue_backend: "memory"  # Use memory backend (redis requires external service)
+
+    # Docker containerized with CPU-only enforcement
+    docker_cpu:
+      device: "cpu"  # Force CPU-only (enforced by DevicePolicy)
+      enable_gpu: false  # Disable GPU support
+      max_gpu_memory_mb: 0  # No GPU memory allocation
+      poll_interval: 3.0  # Faster polling for CPU workers
+      max_retries: 5  # More retries for CPU (slower, more resilient)
+      worker_id_prefix: "docker-cpu"
+      queue_backend: "memory"  # Use memory backend (redis requires external service)
+
+    # Docker containerized with GPU passthrough (nvidia-docker)
+    docker_gpu:
+      device: "cuda"  # Use CUDA GPU
+      enable_gpu: true
+      max_gpu_memory_percent: 60  # Use 60% of VRAM (safe default)
+      max_gpu_memory_mb: 12000  # Optional explicit override (e.g., 6144 for dedicated containers)
+      poll_interval: 5.0
+      max_retries: 3
+      worker_id_prefix: "docker-gpu"
+      queue_backend: "memory"  # Use memory backend (redis requires external service)
+
+# Default TM preferences (overridable per site)
+tm_defaults:
+  use_semantic_tm: true
+  semantic_threshold: 0.80
+  fallback_exact_only: false
+  l1_cache_size: 10000
+  l2_max_size_mb: 1024
+  l3_embedding_model: "sentence-transformers/paraphrase-multilingual-mpnet-base-v2"
+  l3_index_type: "IVFFlat"  # Flat, IVFFlat, HNSW
+
+# Default model preferences
+model_defaults:
+  fallback_model: "m2m100_418m"
+  device: "auto"  # auto, cpu, cuda, mps
+  batch_size: 4  # Conservative default to prevent CUDA OOM (GPU optimizer will calculate optimal)
+  cache_models: true
+  max_cached_models: 2
+  allow_model_download: false  # Prevent automatic model downloads in production (default: false)
+
+# Translation generation defaults
+translation:
+  generation:
+    speed_mode: true  # true = minimal constraints for throughput
+
+# Hardware/GPU configuration
+hardware:
+  enable_gpu: true  # Enable GPU acceleration if available
+  max_gpu_memory_percent: 60  # Maximum GPU memory as percentage of total VRAM (default: 60% for safety)
+  max_gpu_memory_mb: 12000  # Optional explicit MB limit (overrides percent if set)
+  gpu_device_id: -1  # -1 = auto-select best GPU, 0+ = specific device
+  allow_cpu_fallback: true  # Fall back to CPU if GPU fails
+  clear_cache_after_batch: true  # Clear GPU cache after each batch
+  clear_cache_frequency: 10  # Clear cache every N files (used by GPUCacheManager)
+
+  # Aggressive GPU cache management (prevents VRAM fragmentation over long runs)
+  aggressive_cache_clearing:
+    enabled: true  # Enable aggressive cache management
+    clear_every_n_files: 10  # Perform aggressive clear every 10 files
+    fragmentation_threshold: 0.50  # Trigger clear at 50% fragmentation
+    use_double_clear: true  # Call empty_cache() twice for stubborn fragments
+    synchronize_before_clear: true  # Wait for GPU operations to complete
+
+# Queue configuration (Phase 3: Backend Production Switching)
+# Supports dynamic backend selection with automatic failover
+queue:
+  # Primary backend type (redis | memory)
+  # Can be overridden by QUEUE_BACKEND environment variable
+  backend: "memory"  # Changed from redis to memory for production hardening
+
+  # Fallback backend when primary is unavailable
+  fallback_backend: "memory"
+
+  # Redis backend configuration
+  redis:
+    host: "localhost"
+    port: 6379
+    db: 0
+    password: null  # Set if Redis requires authentication
+    max_retries: 3  # Connection retry attempts
+    retry_delay: 1.0  # Delay between retries (seconds)
+    health_check_interval: 60  # Health check interval (seconds)
+
+  # Memory backend configuration
+  memory:
+    max_queue_size: 1000  # Maximum items in queue (0 = unlimited)
+
+# Orchestrator defaults
+orchestrator:
+  mode: "auto"  # auto, manual
+  max_workers: 4
+  job_queue_backend: "memory"  # DEPRECATED: Use queue.backend instead
+  sweep_interval_hours: 24
+  file_watcher_debounce_seconds: 2.0
+  enable_file_watcher: true
+  enable_sweep_scheduler: true
+
+# Performance settings
+performance:
+  parallel_translation: true
+  max_parallel_files: 8
+  model_cache_size: 2
+  enable_batch_optimization: true
+
+# Observability defaults
+observability:
+  # Logging configuration
+  logging:
+    enabled: true  # Enable structured logging
+    log_level: "DEBUG"  # DEBUG, INFO, WARNING, ERROR, CRITICAL
+    console_output: true  # Enable colored console output
+    file_output: true  # Enable NDJSON file output
+    log_file: "./data/logs/hugo-translator.ndjson"  # Path to log file
+    max_file_size_mb: 100  # Max size before rotation (MB)
+    backup_count: 10  # Number of rotated files to keep
+
+    # Component-specific logging levels (optional overrides)
+    components:
+      orchestrator: "INFO"  # Job queue, scheduling
+      translation_engine: "INFO"  # Segment extraction, translation
+      tm: "DEBUG"  # TM lookups, writes, cache stats
+      model_runtime: "INFO"  # Model loading, inference
+      validation: "INFO"  # Validation checks
+      worker: "INFO"  # Worker operations
+
+    # Enable correlation IDs for cross-component tracing
+    enable_correlation_ids: true
+
+  # Flow artifacts for debugging
+  flow_artifact_detail: "summary"  # none, summary, sampled, full
+  flow_artifact_sample_rate: 0.05  # 5% when sampled
+
+  # Metrics collection
+  metrics_enabled: true
+  metrics_port: 9090
+  metrics_pushgateway: ""  # URL of Prometheus Pushgateway (optional)
+
+# Telemetry settings
+telemetry:
+  validation_metrics: true  # Track validation metrics (decisions, retries, rejection rates)
+
+# Git commit automation
+git_commit:
+  enabled: true  # Enable automatic git commits after successful translation
+  auto_push: true  # USER PREFERENCE: Fully automated workflow (push to remote)
+  commit_template: "chore: translate {file_count} files to {languages}"
+  co_author_name: "Hugo Translator"
+  co_author_email: "noreply@aspose.com"
+  timeout_seconds: 60  # Maximum time for git operations
+  block_signals: true  # Block SIGINT/SIGTERM during commit to prevent partial commits
+
+# Output Layout (defaults for all sites)
+default_output_layout:
+  per_language_folders: true
+  pattern: "{lang}/{path}"
+
+# Paths (can be overridden by environment variables)
+paths:
+  config_dir: "./config"
+  content_root: "./content"
+  output_dir: "./output"
+  model_cache_dir: "./data/models"
+  tm_data_dir: "./data/tm"
+  l3_index_dir: "l3_faiss"  # Relative to tm_data_dir; can override with L3_INDEX_PATH env var
+  artifacts_dir: "./data/artifacts"
+  logs_dir: "./data/logs"
+  backup_dir: "./backups"
+
+# Validation settings (top-level kill switch and config reference)
+validation:
+  enabled: true  # Global kill switch for validation pipeline
+  config_file: "config/validation.yaml"  # Path to detailed validation configuration
+  mode: "normal"  # Default validation mode: strict, normal, lenient (can be overridden per site)
+  rules:
+    - placeholder_integrity
+    - yaml_validity
+    - structure_preservation
+    - link_validity
+  strict_mode: false  # Fail translation on validation errors
+
+# Terminology settings (top-level configuration reference)
+terminology:
+  enabled: true  # Global kill switch for terminology preservation
+  config_file: "config/terminology.yaml"  # Path to terminology configuration
+  preserve_mode: "BOTH"  # Default preservation mode: PROTECT, VALIDATE, BOTH, NONE (can be overridden per term)
+
+# Security settings
+security:
+  enable_input_validation: true
+  max_file_size_mb: 10
+  allowed_extensions:
+    - ".md"
+    - ".markdown"
+  sanitize_output: true
+
+# Feature flags
+features:
+  enable_parallel_processing: true
+  enable_semantic_tm: true
+  enable_model_benchmarking: false
+  enable_auto_model_selection: true
+  enable_quality_scoring: false
+  enable_content_hash_tracking: true  # Content-based change detection (recommended for production)
+
+# Language Detection Configuration
+# FastText-based detection with adaptive similarity learning
+language_detection:
+  provider: "fasttext"  # fasttext, langdetect (fallback)
+
+  fasttext:
+    model_url: "https://dl.fbaipublicfiles.com/fasttext/supervised-models/lid.176.bin"
+    model_cache_dir: "./data/models/fasttext"
+    model_filename: "lid.176.bin"
+    min_confidence: 0.70  # Minimum confidence threshold for detection
+
+    # Download behavior
+    auto_download: true
+    download_timeout_seconds: 300
+    download_retries: 3
+
+    # Fallback if FastText fails
+    fallback_to_langdetect: true
+
+  # Script-based validation (tertiary fallback)
+  script_validation:
+    enabled: true
+    thresholds:
+      latin: 0.90      # Romance languages (90% Latin characters required)
+      cyrillic: 0.90   # Slavic languages (90% Cyrillic required)
+      arabic: 0.85     # Arabic script (85% required)
+      devanagari: 0.85 # Indic languages (85% required)
+      cjk: 0.80        # Chinese/Japanese/Korean (80% required)
+
+  # Adaptive similarity learning
+  adaptive_similarity:
+    enabled: true
+    stats_file: ".translation_progress/language_similarities.json"
+    failure_rate_threshold: 0.30  # Add pair when failure_rate > 30%
+    min_samples: 50  # Require at least 50 samples before adapting
+    rolling_window_size: 50  # Track last 50 samples per pair
+
+    # Conservative baseline similarity groups
+    baseline_groups:
+      romance: ["ca", "es", "pt", "fr", "it", "ro", "gl"]
+      cyrillic: ["bg", "ru", "mk", "uk", "sr", "be"]
+      arabic: ["ar", "fa", "ur", "ps"]
+      devanagari: ["hi", "mr", "ne", "sa"]
+      nordic: ["da", "no", "sv", "is"]
+      chinese: ["zh-CN", "zh-TW", "zh-HK"]
+
+    log_adaptations: true  # Log when new pairs are learned
+    log_level: "INFO"
+
+# Adaptive Batch Translation (Reactive System)
+# Automatically adjusts batch size based on language-specific failure rates
+# Persists learning across translation sessions to reduce fallback rates
+adaptive_batching:
+  enabled: true  # Master toggle for adaptive batch sizing
+
+  # Fallback detection threshold (EMA-based)
+  fallback_rate_threshold: 0.05  # 5% - trigger adaptation if EMA exceeds this
+
+  # Adaptation parameters
+  reduction_factor: 0.80  # Reduce batch size by 20% when fallback rate high
+  increase_factor: 1.10   # Increase batch size by 10% after sustained success
+  min_batches_before_increase: 5  # Require 5 consecutive successes before increasing
+
+  # Per-language overrides (languages with known translation challenges)
+  language_overrides:
+    # Cyrillic languages (script confusion between bg, ru, mk, uk, sr)
+    bg:  # Bulgarian
+      initial_batch_size: 8
+      min_batch_size: 4
+      max_batch_size: 20
+      fallback_rate_threshold: 0.30  # More tolerant threshold for Bulgarian
+    ru:  # Russian
+      initial_batch_size: 8
+      min_batch_size: 4
+      max_batch_size: 25
+    mk:  # Macedonian
+      initial_batch_size: 8
+      min_batch_size: 4
+      max_batch_size: 20
+    uk:  # Ukrainian
+      initial_batch_size: 8
+      min_batch_size: 4
+      max_batch_size: 25
+    sr:  # Serbian
+      initial_batch_size: 8
+      min_batch_size: 4
+      max_batch_size: 25
+    be:  # Belarusian
+      initial_batch_size: 8
+      min_batch_size: 4
+      max_batch_size: 20
+
+    # Arabic script languages (script confusion between ar, fa, ur)
+    ar:  # Arabic
+      initial_batch_size: 10
+      min_batch_size: 4
+      max_batch_size: 20
+    fa:  # Persian/Farsi
+      initial_batch_size: 10
+      min_batch_size: 4
+      max_batch_size: 20
+    ur:  # Urdu
+      initial_batch_size: 10
+      min_batch_size: 4
+      max_batch_size: 20
+
+  # Persistence
+  stats_file: ".translation_progress/batch_stats.json"
+  stats_retention_days: 30  # Auto-cleanup entries older than 30 days
+  rolling_window_size: 50   # Track statistics for last 50 batches per language
+
+  # Logging
+  log_adaptations: true  # Log batch size changes to help with debugging
+  log_level: "INFO"      # DEBUG for detailed adaptation logs
+
+# Autonomous Recovery (OOM Retry Handler)
+# Automatically retries file translation with reduced batch size on CUDA OOM errors
+# Enables autonomous multi-language translation with continue-on-failure
+autonomous_recovery:
+  # File-level OOM retry
+  oom_retry:
+    enabled: true  # Enable OOM retry handler
+    max_retries: 3  # Maximum retry attempts per file
+    batch_reduction_factor: 0.5  # Reduce batch size by 50% on each retry
+    min_batch_size: 1  # Minimum batch size (final fallback)
+
+  # Continue processing on language failure
+  continue_on_failure:
+    enabled: true  # Continue to next language if one fails
+    save_failure_reports: true  # Save detailed failure reports
+    failure_reports_dir: "./data/failures"  # Directory for failure reports
+    max_language_timeout_seconds: 3600  # 1 hour timeout per language
+
+  # Per-language incremental commits
+  incremental_commits:
+    enabled: true  # Create commit after each language completes
+    commit_after_each_language: true  # Commit immediately after success
+    push_after_each_language: false  # Require manual push for safety
+
+  # Resumption support
+  resumption:
+    enabled: true  # Allow resuming from failures
+    allow_resume_from_failures: true  # Resume from failure reports
+
+# Content hash tracking (file-level change detection)
+content_hash_tracking:
+  # Master toggle (redundant with features.enable_content_hash_tracking, but explicit)
+  enabled: false
+
+  # Hash algorithm: md5 (fast) or sha256 (secure but slower)
+  hash_algorithm: "md5"
+
+  # Metadata file location (relative to output_dir)
+  metadata_file: ".translation_metadata.json"
+
+  # Metadata directory (for Docker deployments with dedicated volume)
+  # If set, overrides output_dir for metadata storage location
+  # Leave empty to store metadata alongside output files
+  metadata_dir: ""  # Example: "/data/metadata" for Docker volume
+
+  # Redis distributed locking (multi-worker coordination)
+  # Timeout in seconds for acquiring Redis lock on metadata writes
+  # Only used when TranslationEngine is initialized with redis_client
+  redis_lock_timeout: 30
+
+  # Automatic cleanup of stale metadata (CHH-05)
+  auto_cleanup:
+    enabled: true  # Enable automatic cleanup
+    max_age_days: 30  # Remove entries not seen in 30 days
+    cleanup_on_load: true  # Run cleanup when loading metadata
+    cleanup_on_save: false  # Run cleanup when saving metadata (more aggressive)
+
+  # Performance: In-memory cache of file hashes (LRU)
+  in_memory_cache_size: 1000
+
+  # Behavior: Update metadata even when skipping translation
+  update_metadata_on_skip: true
+
+  # Output validation: Detect manual edits to translated files
+  validate_output_integrity: false
+
+  # Fallback: Use mtime if metadata corrupted/missing
+  fallback_to_mtime: true
+
+  # Performance: Only compute hash if mtime changed (fast-path)
+  fast_path_mtime_check: true
+
+# L4 LLM-based adaptation (Optional)
+l4_llm:
+  enabled: false  # Set to true to enable LLM-based fuzzy match adaptation
+  provider: "ollama"  # ollama, openai, anthropic
+  model: "llama2"  # Model name
+  api_key: null  # API key for cloud providers (optional)
+  base_url: "http://localhost:11434"  # Base URL for Ollama
+  min_similarity: 0.75  # Only adapt matches above this threshold
+  max_similarity: 0.95  # Don't adapt matches above this (already good)
+  timeout_seconds: 30
+  max_latency_ms: 500  # Maximum acceptable latency for adaptation
+  cache_adaptations: true  # Cache LLM adaptations in L2
+
+# TM Improvement Worker Configuration
+# Autonomous worker that uses LLM to improve TM entries during off-peak hours
+tm_improvement:
+  # Master toggle for TM improvement worker
+  enabled: true
+
+  # Scheduling configuration (4-5 runs/day during off-peak hours)
+  schedule:
+    runs_per_day: 5  # Number of improvement runs per day
+    window_start: "10:00"  # Start of daily window (America/Los_Angeles)
+    window_end: "22:00"  # End of daily window (America/Los_Angeles)
+    timezone: "America/Los_Angeles"
+    jitter_minutes: 10  # Random jitter to avoid exact timing patterns
+
+  # Improvement batch configuration
+  batch:
+    candidates_per_run: 50  # Max candidates to process per run
+    max_llm_calls_per_run: 200  # Max LLM calls per run (safety limit)
+    max_seconds_per_run: 900  # Max runtime per run (15 minutes)
+
+  # LLM configuration for improvements
+  llm:
+    provider: "ollama"  # ollama, openai, anthropic
+    model: "llama2"  # Model name for improvements
+    base_url: "http://localhost:11434"  # Ollama base URL
+    api_key: null  # API key for cloud providers (optional)
+    timeout_seconds: 30  # Timeout per LLM call
+    temperature: 0.3  # Low temperature for consistency
+    fallback_provider: null  # Optional fallback provider if primary fails
+
+  # Improvement queue configuration
+  queue:
+    enabled: true  # Enable queue-based candidate tracking
+    path: "data/tm/improvement_queue.jsonl"  # Path to queue file
+    append_on_store: true  # Append candidates when storing new TM entries
+    quality_threshold: 0.80  # Only queue entries below this similarity score
+
+  # VRAM management (for Ollama using GPU)
+  resources:
+    max_gpu_memory_percent: 60  # Maximum GPU memory usage (60% budget)
+    preflight_check: true  # Check GPU usage before starting run
+    abort_on_high_usage: true  # Abort run if GPU already >=60% at start
+
+# Validation defaults
+validation_defaults:
+  mode: "normal"  # Validation mode: strict, normal, lenient
+
+  # Decision rules for validation pipeline
+  decision_rules:
+    reject_on_error_count: 3
+    max_retry_attempts: 2
+    accept_warnings: true
+
+  # Post-write validation configuration
+  post_write:
+    enabled: true  # Enable post-write file validation
+    delete_on_failure: false  # Delete invalid files on validation failure
+    halt_on_failure: false  # Stop processing on validation failure
+
+  # Validator enablement and configuration
+  validators:
+    completeness:
+      enabled: true
+    language_consistency:
+      enabled: true
+      confidence_threshold: 0.85
+    shortcode_preservation:
+      enabled: true
+    frontmatter_protection:
+      enabled: true
+    terminology_preservation:
+      enabled: true
+    file_placement:
+      enabled: true

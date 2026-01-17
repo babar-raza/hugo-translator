@@ -1,0 +1,81 @@
+# Quality assessment rubric for taskcards
+
+dimensions:
+  correctness:
+    name: "Correctness"
+    weight: 0.30
+    description: "Functional accuracy, no bugs"
+    criteria:
+      5: "Works perfectly, all edge cases handled"
+      4: "Works correctly, edge cases may fail"
+      3: "Works mostly, minor bugs"
+      2: "Works partially, major bugs"
+      1: "Fundamentally broken"
+    automated_checks:
+      - command: "pytest tests/ -v"
+        passing_criteria: "exit code 0"
+      - command: "mypy src/"
+        passing_criteria: "no errors"
+
+  completeness:
+    name: "Completeness"
+    weight: 0.25
+    description: "All requirements implemented"
+    criteria:
+      5: "100% complete, no TODOs"
+      4: "95%+ complete, minor TODOs"
+      3: "80%+ complete, some gaps"
+      2: "50-80% complete"
+      1: "<50% complete"
+    automated_checks:
+      - command: "grep -r 'TODO\\|FIXME' src/ | wc -l"
+        passing_criteria: "0"
+
+  production_ready:
+    name: "Production-Ready"
+    weight: 0.25
+    description: "No stubs, TODOs, hardcoded values"
+    criteria:
+      5: "Fully production-ready"
+      4: "Mostly production-ready, minor polish"
+      3: "Mostly production-ready, some TODOs"
+      2: "Not production-safe"
+      1: "Prototype code"
+    automated_checks:
+      - command: "bandit -r src/"
+        passing_criteria: "no high severity issues"
+
+  documentation:
+    name: "Documentation"
+    weight: 0.10
+    description: "Clear docs, examples, diagrams"
+    criteria:
+      5: "Excellent docs, examples, diagrams"
+      4: "Good docs, basic examples"
+      3: "Basic docs"
+      2: "Sparse docs"
+      1: "No documentation"
+    automated_checks:
+      - command: "pydocstyle src/"
+        passing_criteria: "no errors"
+
+  testability:
+    name: "Testability"
+    weight: 0.10
+    description: "Test coverage, edge cases"
+    criteria:
+      5: "100% coverage, all edge cases"
+      4: ">90% coverage, most edge cases"
+      3: ">70% coverage, basic tests"
+      2: "40-70% coverage"
+      1: "<40% coverage"
+    automated_checks:
+      - command: "pytest tests/ --cov=src --cov-report=term-missing"
+        passing_criteria: "coverage >= 90%"
+
+passing_criteria:
+  overall_minimum: 4.0
+  dimension_minimum: 3.0
+  critical_dimensions:
+    - correctness: 4.0
+    - completeness: 4.0
