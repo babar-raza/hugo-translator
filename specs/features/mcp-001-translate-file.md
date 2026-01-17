@@ -327,6 +327,7 @@ output_dir: /output
 ## Related Specs
 
 - [API-001: translate_file Method](api-001-translate-file.md) - Underlying implementation
-- [MCP-005: health_check Tool](mcp-005-health-check.md) - Worker health monitoring
-- [MCP-006: get_stats Tool](mcp-006-get-stats.md) - Worker metrics
-- [SVC-002: Worker Service](svc-002-worker-service.md) - Deployment configuration
+
+<!-- NOTE: References to MCP-005, MCP-006, and SVC-002 removed 2026-01-15
+     These were planned specs that were never implemented. References removed to
+     eliminate broken links. See reports/agents/agent_d/wi002_wi003_docs/run_20260115_231500/ -->

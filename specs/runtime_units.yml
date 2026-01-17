@@ -1,0 +1,272 @@
+---
+runtime_units:
+  - id: "orchestrator"
+    name: "Translation Orchestrator"
+    description: "Coordinates translation operations and manages job queues"
+    start_method: "docker-compose up orchestrator"
+    ports:
+      - "8000"
+    deps:
+      - "redis"
+      - "config"
+    config_knobs:
+      - "MODE"
+      - "SWEEP_INTERVAL_HOURS"
+      - "CONFIG_PATH"
+    evidence_ids:
+      - "evidence-002"
+      - "evidence-009"
+      - "evidence-020"
+  - id: "worker-cpu"
+    name: "CPU Translation Worker"
+    description: "CPU-based translation worker for processing translation jobs"
+    start_method: "docker-compose up worker-cpu"
+    ports: []
+    deps:
+      - "orchestrator"
+      - "redis"
+      - "config"
+    config_knobs:
+      - "WORKER_ID"
+      - "WORKER_MODE"
+      - "DEVICE"
+      - "REDIS_HOST"
+      - "REDIS_PORT"
+      - "REDIS_DB"
+      - "POLL_INTERVAL"
+      - "MAX_RETRIES"
+    evidence_ids:
+      - "evidence-003"
+  - id: "worker-gpu"
+    name: "GPU Translation Worker"
+    description: "GPU-based translation worker for processing translation jobs"
+    start_method: "docker-compose up worker-gpu"
+    ports: []
+    deps:
+      - "orchestrator"
+      - "redis"
+      - "config"
+    config_knobs:
+      - "WORKER_ID"
+      - "WORKER_MODE"
+      - "DEVICE"
+      - "CUDA_VISIBLE_DEVICES"
+      - "REDIS_HOST"
+      - "REDIS_PORT"
+      - "REDIS_DB"
+      - "POLL_INTERVAL"
+      - "MAX_RETRIES"
+    evidence_ids:
+      - "evidence-004"
+      - "evidence-021"
+  - id: "prometheus"
+    name: "Prometheus Metrics Server"
+    description: "Metrics collection and alerting server"
+    start_method: "docker-compose up prometheus"
+    ports:
+      - "9190"
+    deps: []
+    config_knobs:
+      - "prometheus.yml"
+      - "alert_rules.yml"
+    evidence_ids:
+      - "evidence-005"
+  - id: "pushgateway"
+    name: "Pushgateway Metrics Server"
+    description: "Metrics push gateway for batch job metrics"
+    start_method: "docker-compose up pushgateway"
+    ports:
+      - "9191"
+    deps: []
+    config_knobs: []
+    evidence_ids:
+      - "evidence-006"
+  - id: "grafana"
+    name: "Grafana Dashboard"
+    description: "Metrics visualization dashboard"
+    start_method: "docker-compose up grafana"
+    ports:
+      - "3100"
+    deps:
+      - "prometheus"
+    config_knobs:
+      - "GF_SECURITY_ADMIN_PASSWORD"
+      - "GF_USERS_ALLOW_SIGN_UP"
+      - "GF_PATHS_PROVISIONING"
+    evidence_ids:
+      - "evidence-007"
+  - id: "redis"
+    name: "Redis Job Queue"
+    description: "Job queue backend for translation jobs"
+    start_method: "docker-compose up redis"
+    ports:
+      - "6379"
+    deps: []
+    config_knobs:
+      - "REDIS_PORT"
+    evidence_ids:
+      - "evidence-002"
+  - id: "cli"
+    name: "CLI Translation Tool"
+    description: "Command-line interface for translating Hugo sites"
+    start_method: "translate-hugo --site <site_id> --input <path> --target-langs <lang1> <lang2>"
+    ports: []
+    deps:
+      - "config"
+    config_knobs:
+      - "--validation-mode"
+      - "--disable-validation"
+      - "--force-accept"
+      - "--strict-reject"
+      - "--validation-config"
+      - "--max-retries"
+      - "--model"
+      - "--max-tokens"
+      - "--batch-size"
+      - "--sort-segments-by-length"
+      - "--device"
+      - "--load-mode"
+      - "--verify"
+      - "--fix"
+      - "--verification-report"
+      - "--enable-terminology"
+      - "--disable-terminology"
+      - "--terminology-mode"
+      - "--terminology-config"
+      - "--dry-run"
+      - "--save-rejected"
+      - "--output"
+      - "--log-level"
+      - "--log-file"
+      - "--metrics-file"
+      - "--metrics-interval"
+      - "--metrics-only"
+      - "--no-progress"
+      - "--resume"
+      - "--no-resume"
+      - "--force-restart"
+      - "--progress-dir"
+      - "--force-retranslate"
+      - "--cache-write-mode"
+      - "--disable-content-hash"
+      - "--rebuild-content-hashes"
+      - "--validate-output-integrity"
+      - "--parallel-languages"
+      - "--global-lang-rounds"
+      - "--global-lang-sort"
+      - "--fail-fast"
+      - "--no-fail-fast"
+      - "--enable-production-metrics"
+      - "--config-root"
+      - "--auto-commit"
+      - "--no-commit"
+      - "--commit-message"
+    evidence_ids:
+      - "evidence-001"
+      - "evidence-008"
+  - id: "translation-worker"
+    name: "Translation Worker Module"
+    description: "Translation worker module for distributed processing"
+    start_method: "python -m src.workers.translation_worker"
+    ports: []
+    deps:
+      - "config"
+      - "tm"
+    config_knobs:
+      - "CONFIG_PATH"
+      - "SITE_PROFILES_DIR"
+      - "TM_PATH"
+      - "WORKER_ID"
+    evidence_ids:
+      - "evidence-010"
+  - id: "job-processor"
+    name: "Job Processor"
+    description: "Job processor for translation jobs"
+    start_method: "python -m src.workers.job_processor"
+    ports: []
+    deps:
+      - "config"
+      - "tm"
+    config_knobs: []
+    evidence_ids:
+      - "evidence-011"
+  - id: "model-recommender"
+    name: "Model Recommender"
+    description: "Model recommendation tool"
+    start_method: "python -m src.model_runtime.recommender"
+    ports: []
+    deps:
+      - "config"
+    config_knobs: []
+    evidence_ids:
+      - "evidence-012"
+  - id: "ct2-converter"
+    name: "CT2 Converter"
+    description: "CT2 model conversion tool"
+    start_method: "python -m src.model_runtime.ct2_converter"
+    ports: []
+    deps:
+      - "config"
+    config_knobs: []
+    evidence_ids:
+      - "evidence-013"
+  - id: "benchmarking-cli"
+    name: "Benchmarking CLI"
+    description: "Benchmarking command-line tools"
+    start_method: "python -m src.benchmarking.cli"
+    ports: []
+    deps:
+      - "config"
+    config_knobs: []
+    evidence_ids:
+      - "evidence-014"
+  - id: "system-info"
+    name: "System Info"
+    description: "System information tool"
+    start_method: "python -m src.benchmarking.system_info"
+    ports: []
+    deps:
+      - "config"
+    config_knobs: []
+    evidence_ids:
+      - "evidence-015"
+  - id: "benchmarking-runner"
+    name: "Benchmarking Runner"
+    description: "Benchmarking runner tool"
+    start_method: "python -m src.benchmarking.runner"
+    ports: []
+    deps:
+      - "config"
+    config_knobs: []
+    evidence_ids:
+      - "evidence-016"
+  - id: "gpu-manager"
+    name: "GPU Manager"
+    description: "GPU management tool"
+    start_method: "python -m src.hardware.gpu_manager"
+    ports: []
+    deps:
+      - "config"
+    config_knobs: []
+    evidence_ids:
+      - "evidence-017"
+  - id: "metrics-tail"
+    name: "Metrics Tail"
+    description: "Metrics tail utility"
+    start_method: "python -m src.observability.metrics_tail"
+    ports: []
+    deps:
+      - "config"
+    config_knobs: []
+    evidence_ids:
+      - "evidence-018"
+  - id: "graceful-shutdown"
+    name: "Graceful Shutdown"
+    description: "Graceful shutdown example"
+    start_method: "python -m src.observability.graceful_shutdown"
+    ports: []
+    deps:
+      - "config"
+    config_knobs: []
+    evidence_ids:
+      - "evidence-019"

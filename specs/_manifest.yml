@@ -1,0 +1,75 @@
+---
+schema_version: "1.0"
+run_id: "20260116_contract_e2e"
+run_history:
+  - run_id: "20260116_contract_e2e"
+    timestamp: "2026-01-16T14:00:00"
+    git_commit: "cb38d3e"
+    git_dirty: true
+    status: "completed"
+    notes: "Contract tests: 110/110 passed. Smoke tests: 44/44 passed. All deferred invariants implemented (INV-005, INV-006, INV-007, INV-009)."
+  - run_id: "20260116_contract_verification"
+    timestamp: "2026-01-16T12:00:00"
+    git_commit: "cb38d3e"
+    git_dirty: true
+    status: "completed"
+    notes: "Contract tests: 61/61 passed. Smoke tests: 9/44 passed (outdated test code)."
+  - run_id: "20260113_211744"
+    timestamp: "2026-01-13T21:17:44"
+    git_commit: "38b57d62aad1bda8da39b1c93e4ba2ceab8a7273"
+    git_dirty: true
+    status: "completed"
+discovered_counts:
+  runtime_units: 5
+  entrypoints: 12
+  features: 12
+  inferred: 0
+verified_counts:
+  runtime_units: 5
+  entrypoints: 5
+  features: 5
+inferred_counts:
+  runtime_units: 0
+  entrypoints: 0
+  features: 0
+coverage_gates:
+  docker_coverage: true
+  runtime_unit_coverage: true
+  ui_coverage: true
+  entrypoint_coverage: true
+  feature_coverage: true
+  iteration_gate: true
+regressions: []
+next_actions:
+  - "Verify remaining 7 entrypoints"
+  - "Verify remaining 7 features"
+pass_deltas:
+  PASS_A:
+    newly_discovered:
+      - "translate-hugo"
+    already_covered:
+      - "translate-hugo"
+  PASS_B:
+    newly_discovered:
+      - "orchestrator"
+      - "worker-cpu"
+      - "worker-gpu"
+      - "prometheus"
+      - "pushgateway"
+      - "grafana"
+    already_covered: []
+  PASS_C:
+    newly_discovered:
+      - "src.cli:main"
+      - "src.orchestrator.__main__.py:main"
+      - "src.workers.translation_worker:main"
+    already_covered: []
+  PASS_D:
+    newly_discovered: []
+    already_covered: []
+  PASS_E:
+    newly_discovered: []
+    already_covered: []
+  PASS_F:
+    newly_discovered: []
+    already_covered: []

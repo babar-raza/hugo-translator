@@ -1,0 +1,37 @@
+---
+items:
+  - id: "specscan-not-present"
+    type: "tool"
+    priority: "P0"
+    description: "specscan tool not present in the project"
+    suggested_pass: "Create specscan tool"
+    owner: "spec_harden"
+    evidence: []
+  - id: "verify-runtime-units"
+    type: "runtime_unit"
+    priority: "P1"
+    description: "Verify all runtime units"
+    suggested_pass: "Run and verify each runtime unit"
+    owner: "spec_verify"
+    evidence: []
+  - id: "verify-entrypoints"
+    type: "entrypoint"
+    priority: "P1"
+    description: "Verify all entrypoints"
+    suggested_pass: "Run and verify each entrypoint"
+    owner: "spec_verify"
+    evidence: []
+  - id: "verify-features"
+    type: "feature"
+    priority: "P1"
+    description: "Verify all features"
+    suggested_pass: "Run and verify each feature"
+    owner: "spec_verify"
+    evidence: []
+  - id: "tighten-governance-gates"
+    type: "gate"
+    priority: "P2"
+    description: "Tighten governance gates"
+    suggested_pass: "Review and tighten governance gates"
+    owner: "spec_harden"
+    evidence: []

@@ -371,14 +371,65 @@ See [Redis Queue Architecture](docs/architecture/redis-queue.md) for detailed do
 
 ### Directory Structure
 
-- **Source**: `src/` - Core translation engine and validators
-  - `src/orchestrator/` - Job orchestration and queue management
-  - `src/workers/` - Translation job processors
-  - `src/translation_engine/` - Core translation logic
-  - `src/tm/` - Translation memory (L1/L2/L3)
-- **Tests**: `tests/` - Comprehensive test suite
-- **Config**: `config/` - Validation, terminology, site profiles
-- **Docs**: `docs/` - User guides, reference, troubleshooting
+```
+hugo-translator/
+├── archive/                      # Historical artifacts
+│   ├── legacy/                   # Old translation system
+│   ├── plans/                    # Completed plans
+│   ├── reports/                  # Historical reports
+│   └── samples/                  # Development samples
+├── config/                       # Configuration
+│   ├── global.yaml               # Global settings
+│   ├── site_profiles/            # Site-specific configs
+│   └── terminology/              # Term protection rules
+├── data/                         # Data directory
+│   ├── benchmark_corpus/         # Benchmark test data
+│   ├── benchmarks/               # Benchmark results
+│   └── tm/                       # Translation memory storage
+├── docker/                       # Docker configurations
+├── docs/                         # Documentation
+│   ├── development/              # Developer guides
+│   ├── deployment/               # Deployment guides
+│   ├── operations/               # Operations runbooks
+│   └── ...                       # Additional docs
+├── models/                       # Model storage
+├── plans/                        # Active plans only
+│   ├── autonomous_workers/       # Worker implementation plans
+│   ├── from_chat/                # Plans from conversations
+│   └── templates/                # Plan templates
+├── reports/                      # Active reports only
+│   ├── agents/                   # Agent execution reports
+│   └── autonomous_workers/       # Worker analysis reports
+├── requirements/                 # Python dependencies
+├── scripts/                      # Scripts (reorganized)
+│   ├── archived/                 # Historical scripts
+│   │   └── migrations/           # One-time migration scripts
+│   ├── diagnostics/              # Diagnostic utilities
+│   └── observability/            # Telemetry scripts
+├── specs/                        # Technical specifications
+├── src/                          # Source code
+│   ├── benchmarking/             # Benchmarking system (dev-only)
+│   ├── model_runtime/            # Model loading/inference
+│   ├── observability/            # Logging/telemetry
+│   ├── orchestrator/             # Job orchestration
+│   ├── shared_engines/           # Unified shared engines
+│   ├── tm/                       # Translation memory (L1/L2/L3)
+│   ├── translation_engine/       # Core translation logic
+│   ├── utils/                    # Shared utilities
+│   ├── verification/             # Output verification
+│   └── workers/                  # Worker processes
+└── tests/                        # Test suite
+    ├── adhoc/                    # Ad-hoc manual tests
+    ├── contract/                 # Contract tests
+    ├── fixtures/                 # Consolidated test fixtures
+    ├── golden/                   # Golden tests
+    ├── integration/              # Integration tests
+    ├── regression/               # Regression tests
+    ├── smoke/                    # Smoke tests
+    └── unit/                     # Unit tests
+```
+
+For detailed structure documentation, see [Repository Structure](docs/development/REPO_STRUCTURE.md).
 
 ## Installation
 

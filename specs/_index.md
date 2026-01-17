@@ -1,6 +1,6 @@
 # Hugo Translation System - Specification Index
 
-**Last Updated:** 2025-12-26
+**Last Updated:** 2026-01-15
 **Status:** Initial spec mining complete, verification pending
 
 ---
@@ -132,8 +132,11 @@ The Hugo Translation System is a production-ready automated translation system f
 ### MCP Tools
 
 - [MCP-001: translate_hugo_file Tool](features/mcp-001-translate-file.md)
-- [MCP-003: tm_exact_lookup Tool](features/mcp-003-tm-exact-lookup.md)
-- [MCP-005: health_check Tool](features/mcp-005-health-check.md)
+
+<!-- NOTE: MCP-003 (tm_exact_lookup) and MCP-005 (health_check) removed 2026-01-15
+     These were planned specs that were never implemented. References removed to
+     eliminate broken links. See reports/agents/agent_d/wi002_wi003_docs/run_20260115_231500/
+     for documentation of this change. -->
 
 ### Translation Engine
 
@@ -289,6 +292,27 @@ One-line feature description
 
 ---
 
+## Repository Structure
+
+The repository follows a structured organization defined in Phase 6 (Repo File Organization). See:
+
+- [REPO_STRUCTURE.md](../docs/development/REPO_STRUCTURE.md) - Detailed directory documentation
+- [FILE_ORGANIZATION.md](../reports/autonomous_workers/FILE_ORGANIZATION.md) - Organization plan with KEEP/MOVE/ARCHIVE/DELETE decisions
+
+### Key Directories
+
+| Directory | Purpose |
+|-----------|---------|
+| `src/` | Production source code |
+| `tests/` | Unit, integration, contract, regression tests |
+| `config/` | Site profiles, terminology, validation rules |
+| `specs/` | Technical specifications (this directory) |
+| `docs/` | User and development documentation |
+| `scripts/` | Utility and maintenance scripts |
+| `archive/` | Historical artifacts (legacy, old reports) |
+
+---
+
 ## Maintenance
 
 This index and all feature specs are living documents. Update when:
@@ -299,3 +323,18 @@ This index and all feature specs are living documents. Update when:
 - Contract tests uncover spec gaps
 
 Always update specs BEFORE modifying contract tests (spec is source of truth).
+
+---
+
+## Phase 6 Completion Note
+
+**Date:** 2026-01-15
+
+Phase 6 (Repo File Organization) of the Autonomous Workers Unification project is COMPLETE. This phase produced:
+
+1. **FILE_MANIFEST.json** - Complete inventory of 151,642 files (51.29 GB)
+2. **FILE_ORGANIZATION.md** - Organization plan categorizing files into KEEP/MOVE/ARCHIVE/DELETE
+3. **reorganize_repo.py** - Automated migration script with dry-run mode
+4. **REPO_STRUCTURE.md** - Comprehensive repository structure documentation
+
+All deliverables passed self-review gate (≥4/5 on all 12 dimensions).
