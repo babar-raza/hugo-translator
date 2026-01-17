@@ -31,12 +31,19 @@ def find_git_root(path: Union[str, Path]) -> Optional[Path]:
     Returns:
         Path to git repository root, or None if not in a git repo.
     """
+    logger.debug(f"find_git_root called with: {path} (type: {type(path)})")
     try:
         path = Path(path).resolve()
+        logger.debug(f"Resolved path: {path}")
+        logger.debug(f"Path exists: {path.exists()}")
+        logger.debug(f"Path is file: {path.is_file()}")
+
         # If path is a file, start from its parent directory
         if path.is_file():
             path = path.parent
+            logger.debug(f"Using parent directory: {path}")
 
+        logger.debug(f"Running git rev-parse in cwd: {path}")
         result = subprocess.run(
             ["git", "rev-parse", "--show-toplevel"],
             capture_output=True,
@@ -44,10 +51,20 @@ def find_git_root(path: Union[str, Path]) -> Optional[Path]:
             timeout=5,
             cwd=str(path),
         )
+        logger.debug(f"Git command return code: {result.returncode}")
+        logger.debug(f"Git command stdout: {result.stdout.strip()}")
+        logger.debug(f"Git command stderr: {result.stderr.strip()}")
+
         if result.returncode == 0 and result.stdout.strip():
-            return Path(result.stdout.strip())
+            git_root = Path(result.stdout.strip())
+            logger.debug(f"Found git root: {git_root}")
+            return git_root
+        else:
+            logger.debug(f"Git command failed or returned empty output")
     except (subprocess.TimeoutExpired, FileNotFoundError, OSError) as e:
-        logger.debug(f"find_git_root failed for {path}: {e}")
+        logger.debug(f"find_git_root exception for {path}: {e}")
+
+    logger.debug(f"find_git_root returning None for path: {path}")
     return None
 
 

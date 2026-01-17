@@ -28,7 +28,7 @@ Usage:
     )
 """
 from pathlib import Path
-from typing import List, Optional, Union
+from typing import Dict, List, Optional, Union
 import logging
 import signal
 import platform
@@ -378,10 +378,10 @@ def auto_commit_translations(
             logger.debug("No successful translations, skipping commit")
             return True
 
-        # Collect output files
+        # Collect output files (only files that were actually written/modified)
         output_files = collect_output_files(dir_result)
         if not output_files:
-            logger.debug("No output files to commit")
+            logger.info("No files modified in this run - skipping commit")
             return True
 
         # Load git commit config
@@ -398,11 +398,44 @@ def auto_commit_translations(
         # Create committer and check git repo
         committer = GitCommitter(git_config)
         if not committer.is_git_repo(output_files[0]):
-            logger.debug("Output directory is not a git repo, skipping auto-commit")
+            logger.info("Output directory is not a git repo - skipping commit")
             return True
 
         # Extract additional metadata for enhanced commit messages
-        model_id = _extract_model_id(dir_result)
+        # D2: Pass config to enable 3-tier fallback for model_id
+
+        # VALIDATE config extraction (WS2: COMMIT-FIX-02-MODEL)
+        config_dict = None
+        if hasattr(config_service, 'global_config') and config_service.global_config:
+            try:
+                config_dict = config_service.global_config.__dict__
+                if not config_dict:
+                    logger.warning("[auto_commit] config_dict is empty after extraction from global_config.__dict__")
+                else:
+                    logger.debug(f"[auto_commit] config_dict extracted successfully, keys: {list(config_dict.keys())[:5]}...")
+
+                    # Validate model_defaults is present
+                    if "model_defaults" not in config_dict:
+                        logger.error("[auto_commit] config_dict missing 'model_defaults' key! Tier 3 fallback may fail!")
+                    else:
+                        model_defaults = config_dict["model_defaults"]
+                        logger.debug(f"[auto_commit] model_defaults found, type: {type(model_defaults).__name__}")
+                        # Check if it's a dict or Pydantic model
+                        if isinstance(model_defaults, dict):
+                            if "fallback_model" not in model_defaults:
+                                logger.error("[auto_commit] config_dict.model_defaults missing 'fallback_model' key!")
+                        elif not hasattr(model_defaults, "fallback_model"):
+                            logger.error("[auto_commit] config_dict.model_defaults has no 'fallback_model' attribute!")
+            except Exception as e:
+                logger.error(f"[auto_commit] Failed to extract config_dict: {e}", exc_info=True)
+                config_dict = None
+        else:
+            logger.warning("[auto_commit] config_service has no global_config attribute - Tier 3 fallback will fail!")
+
+        model_id = _extract_model_id(dir_result, config=config_dict)
+
+        if not model_id:
+            logger.error("[auto_commit] model_id is None after _extract_model_id - commit message will lack model info!")
         tm_stats = _extract_tm_stats(dir_result)
 
         # Commit translations (optionally block SIGINT to prevent partial commits)
@@ -440,6 +473,24 @@ def auto_commit_translations(
 
             # Save telemetry
             _save_commit_telemetry(run_id, site_id, commit_result, target_langs)
+
+            # TC-GIT-01: Associate git commit with telemetry run
+            if hasattr(result, 'telemetry_context') and result.telemetry_context:
+                try:
+                    from src.observability.telemetry_integration import TranslationTelemetry
+                    telemetry = TranslationTelemetry()
+                    telemetry.associate_commit(
+                        result.telemetry_context,
+                        commit_result.commit_hash,
+                        commit_source="llm",
+                        commit_author=getattr(commit_result, 'commit_author', None),
+                        commit_timestamp=getattr(commit_result, 'commit_timestamp', None)
+                    )
+                    logger.debug(f"Associated commit {commit_result.commit_hash[:7]} with telemetry run")
+                except Exception as e:
+                    # TC-GIT-01: Graceful degradation - don't fail translation on telemetry error
+                    logger.warning(f"Failed to associate commit with telemetry: {e}")
+
             return True
         else:
             logger.error(f"Auto-commit failed: {commit_result.error}")
@@ -557,33 +608,109 @@ def _save_commit_telemetry(
         logger.debug(f"Commit telemetry save failed: {e}")
 
 
-def _extract_model_id(dir_result: "DirectoryResult") -> Optional[str]:
+def _extract_model_id(dir_result: "DirectoryResult", config: Optional[Dict] = None) -> Optional[str]:
     """
-    Extract model ID from translation result.
+    Extract model ID from translation result with 3-tier fallback.
 
-    Model ID is stored in TranslationStats.model_used field within each file result.
-    Access path: dir_result.file_results[0].stats.model_used
+    D2: Implements robust model_id extraction to ensure 100% of commits have model info.
+
+    Fallback tiers:
+    1. Check dir_result.aggregate_stats.model_used (preferred)
+    2. Check dir_result.file_results[0].stats.model_used (legacy)
+    3. Return config["model_defaults"]["fallback_model"] (guaranteed)
 
     Args:
         dir_result: DirectoryResult from translation
+        config: Optional config dict with model_defaults.fallback_model
 
     Returns:
-        Model ID string if found, None otherwise
+        Model ID string (never returns None with config provided)
     """
+    logger.debug(f"[_extract_model_id] Called with config={'present' if config else 'MISSING'}")
+
     try:
-        # Model ID is in file_results[0].stats.model_used
+        # Tier 1: Check aggregate_stats.model_used (most reliable)
+        if hasattr(dir_result, "aggregate_stats") and dir_result.aggregate_stats:
+            agg_stats = dir_result.aggregate_stats
+            logger.debug(f"[Tier 1] aggregate_stats exists: {type(agg_stats).__name__}")
+            if hasattr(agg_stats, "model_used"):
+                model_value = agg_stats.model_used
+                logger.debug(f"[Tier 1] model_used attribute exists, value: {repr(model_value)}, type: {type(model_value).__name__}")
+                if model_value:
+                    logger.info(f"[Tier 1] SUCCESS - Extracted model_id from aggregate_stats: {model_value}")
+                    return model_value
+                else:
+                    logger.debug(f"[Tier 1] model_used is falsy (None or empty string): {repr(model_value)}")
+            else:
+                logger.debug("[Tier 1] aggregate_stats exists but has no model_used attribute")
+        else:
+            logger.debug("[Tier 1] dir_result has no aggregate_stats or it is None")
+
+        # Tier 2: Check file_results[0].stats.model_used (legacy path)
         if dir_result.file_results and len(dir_result.file_results) > 0:
             first_result = dir_result.file_results[0]
+            logger.debug(f"[Tier 2] file_results[0] exists: {type(first_result).__name__}")
             if hasattr(first_result, "stats") and first_result.stats:
-                if hasattr(first_result.stats, "model_used") and first_result.stats.model_used:
-                    logger.info(f"Extracted model_id for commit message: {first_result.stats.model_used}")
-                    return first_result.stats.model_used
+                logger.debug(f"[Tier 2] file_results[0].stats exists: {type(first_result.stats).__name__}")
+                if hasattr(first_result.stats, "model_used"):
+                    model_value = first_result.stats.model_used
+                    logger.debug(f"[Tier 2] model_used attribute exists, value: {repr(model_value)}, type: {type(model_value).__name__}")
+                    if model_value:
+                        logger.info(f"[Tier 2] SUCCESS - Extracted model_id from file_results: {model_value}")
+                        return model_value
+                    else:
+                        logger.debug(f"[Tier 2] model_used is falsy (None or empty string): {repr(model_value)}")
+                else:
+                    logger.debug("[Tier 2] file_results[0].stats exists but has no model_used attribute")
+            else:
+                logger.debug("[Tier 2] file_results[0] has no stats or it is None")
+        else:
+            logger.debug(f"[Tier 2] dir_result has no file_results or empty list (len={len(dir_result.file_results) if hasattr(dir_result, 'file_results') and dir_result.file_results else 0})")
 
-        logger.info("No model_id found - commit message will not include model info")
-        return None
+        # Tier 3: Fallback to config default (guaranteed to work)
+        if config:
+            logger.debug(f"[Tier 3] Config present, attempting fallback. Config keys: {list(config.keys())[:10]}")
+            if "model_defaults" in config:
+                model_defaults = config["model_defaults"]
+                logger.debug(f"[Tier 3] model_defaults key found, type: {type(model_defaults).__name__}")
+                if isinstance(model_defaults, dict):
+                    logger.debug(f"[Tier 3] model_defaults is dict, keys: {list(model_defaults.keys())}")
+                    fallback = model_defaults.get("fallback_model", "m2m100_418m")
+                else:
+                    # Handle case where model_defaults is a Pydantic model
+                    logger.debug(f"[Tier 3] model_defaults is not dict, attempting attribute access")
+                    fallback = getattr(model_defaults, "fallback_model", "m2m100_418m")
+            else:
+                logger.warning("[Tier 3] Config missing 'model_defaults' key - using hardcoded default")
+                fallback = "m2m100_418m"
+
+            logger.warning(
+                f"[Tier 3] SUCCESS - No model_id found in results, using fallback: {fallback} "
+                f"(from config.model_defaults.fallback_model)"
+            )
+            return fallback
+        else:
+            logger.error("[Tier 3] FAILURE - No config provided - cannot use fallback! This is a bug!")
+            return None
 
     except Exception as e:
-        logger.debug(f"Failed to extract model ID: {e}")
+        logger.error(f"[_extract_model_id] Exception: {e}", exc_info=True)
+        # Try config fallback even on exception
+        if config:
+            try:
+                if "model_defaults" in config:
+                    model_defaults = config["model_defaults"]
+                    if isinstance(model_defaults, dict):
+                        fallback = model_defaults.get("fallback_model", "m2m100_418m")
+                    else:
+                        fallback = getattr(model_defaults, "fallback_model", "m2m100_418m")
+                else:
+                    fallback = "m2m100_418m"
+                logger.warning(f"[Tier 3] Using fallback due to exception: {fallback}")
+                return fallback
+            except Exception as fallback_error:
+                logger.error(f"[Tier 3] Exception during fallback extraction: {fallback_error}", exc_info=True)
+                return "m2m100_418m"  # Ultimate hardcoded fallback
         return None
 
 

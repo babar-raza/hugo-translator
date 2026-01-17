@@ -25,9 +25,15 @@ Requirements:
 """
 
 import logging
-import requests
 from datetime import datetime, timezone, timedelta
 from typing import Dict, List, Any
+
+try:
+    import requests
+    REQUESTS_AVAILABLE = True
+except ImportError:
+    REQUESTS_AVAILABLE = False
+    requests = None  # type: ignore
 
 logger = logging.getLogger(__name__)
 
@@ -79,6 +85,12 @@ def cleanup_stale_runs(
         "errors": [],
         "api_available": False,
     }
+
+    # Gracefully degrade if requests module is not available
+    if not REQUESTS_AVAILABLE:
+        if not quiet:
+            logger.debug("Telemetry cleanup skipped: requests module not available")
+        return stats
 
     try:
         # Calculate cutoff time

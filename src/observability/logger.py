@@ -5,17 +5,18 @@ Provides JSON structured logging for debugging, audit, and monitoring.
 Supports dual output: NDJSON to file for LLM analysis + colored console for humans.
 """
 
+import io
 import logging
 import sys
 import uuid
 from contextvars import ContextVar
 from datetime import datetime
-from logging.handlers import RotatingFileHandler
 from pathlib import Path
 from typing import Any, Dict, Optional
 
 import structlog
 
+from src.observability.timestamped_rotating_handler import TimestampedRotatingFileHandler
 from src.orchestrator.models import TranslationJob
 from src.tm.models import LookupResult
 from src.translation_engine.extractor.segment_extractor import Segment
@@ -66,7 +67,7 @@ class DualOutputProcessor:
         self.file_logger.propagate = False
         self.file_logger.setLevel(logging.DEBUG)
 
-        file_handler = RotatingFileHandler(
+        file_handler = TimestampedRotatingFileHandler(
             str(log_file),
             maxBytes=max_bytes,
             backupCount=backup_count,
@@ -98,18 +99,21 @@ class DualOutputProcessor:
                 json_output,
             )
         except Exception as e:
-            # Fallback to stderr if file logging fails
+            # WS4: Write logging errors to both stderr AND stdout for visibility
             # This prevents logging failures from crashing the application
             import traceback
-            print(
-                f"LOGGING ERROR: Failed to write NDJSON log: {e}",
-                file=sys.stderr,
-            )
+            error_msg = f"LOGGING ERROR: Failed to write NDJSON log: {e}"
+            print(error_msg, file=sys.stderr)
+            print(error_msg, file=sys.stdout, flush=True)
             traceback.print_exc(file=sys.stderr)
+            traceback.print_exc(file=sys.stdout)
 
         # Return event_dict unchanged for console rendering
         return event_dict
 
+
+# Global flag to prevent re-entrancy issues
+_logging_configured = False
 
 def setup_structured_logging(
     log_level: str = "INFO",
@@ -134,14 +138,26 @@ def setup_structured_logging(
         max_bytes: Maximum size of each log file before rotation (default 100MB)
         backup_count: Number of rotated log files to keep (default 10)
     """
+    global _logging_configured
+
+    # Prevent re-entrancy - if logging is already configured, skip
+    if _logging_configured:
+        print("DEBUG: setup_structured_logging: Already configured, skipping", flush=True)
+        return
+
+    print("DEBUG: setup_structured_logging: Starting", flush=True)
+    _logging_configured = True
     # Clear any existing handlers
     root_logger = logging.getLogger()
     root_logger.handlers.clear()
+    print("DEBUG: setup_structured_logging: Cleared handlers", flush=True)
 
     # Set root logger level
     root_logger.setLevel(getattr(logging, log_level.upper()))
+    print("DEBUG: setup_structured_logging: Set log level", flush=True)
 
     # Base processors for all outputs
+    print("DEBUG: setup_structured_logging: Creating base_processors list", flush=True)
     base_processors = [
         structlog.stdlib.filter_by_level,
         structlog.stdlib.add_logger_name,
@@ -153,6 +169,7 @@ def setup_structured_logging(
         structlog.processors.format_exc_info,
         structlog.processors.UnicodeDecoder(),
     ]
+    print("DEBUG: setup_structured_logging: base_processors created", flush=True)
 
     # Add dual output processor if both console and file are requested
     if log_file:
@@ -160,21 +177,42 @@ def setup_structured_logging(
         base_processors.append(
             DualOutputProcessor(log_file, max_bytes, backup_count)
         )
+    print("DEBUG: setup_structured_logging: DualOutputProcessor handled", flush=True)
 
     # Add console renderer if console output is enabled
     if console_output:
+        print("DEBUG: setup_structured_logging: Adding console renderer", flush=True)
         base_processors.append(structlog.dev.ConsoleRenderer())
+        print("DEBUG: setup_structured_logging: Console renderer added", flush=True)
 
         # Set up console handler for standard library logging
-        console_handler = logging.StreamHandler(sys.stdout)
+        # Wrap stdout with UTF-8 encoding to handle Unicode characters on Windows
+        print("DEBUG: setup_structured_logging: About to wrap stdout", flush=True)
+        if hasattr(sys.stdout, 'buffer'):
+            # Use UTF-8 encoding with error handling for Unicode support on Windows
+            utf8_stdout = io.TextIOWrapper(
+                sys.stdout.buffer,
+                encoding='utf-8',
+                errors='replace',  # Replace unencodable chars instead of crashing
+                line_buffering=True
+            )
+        else:
+            # Fallback if stdout.buffer is not available
+            utf8_stdout = sys.stdout
+        print("DEBUG: setup_structured_logging: stdout wrapped", flush=True)
+
+        console_handler = logging.StreamHandler(utf8_stdout)
         console_handler.setLevel(getattr(logging, log_level.upper()))
         console_handler.setFormatter(logging.Formatter("%(message)s"))
+        print("DEBUG: setup_structured_logging: About to add console_handler", flush=True)
         root_logger.addHandler(console_handler)
+        print("DEBUG: setup_structured_logging: console_handler added", flush=True)
     elif log_file:
         # File only: use JSON renderer instead of console renderer
         base_processors.append(structlog.processors.JSONRenderer())
 
     # Configure structlog
+    print("DEBUG: setup_structured_logging: About to configure structlog", flush=True)
     structlog.configure(
         processors=base_processors,
         wrapper_class=structlog.stdlib.BoundLogger,
@@ -182,6 +220,7 @@ def setup_structured_logging(
         logger_factory=structlog.stdlib.LoggerFactory(),
         cache_logger_on_first_use=True,
     )
+    print("DEBUG: setup_structured_logging: structlog configured", flush=True)
 
 
 class LogContext:

@@ -88,6 +88,8 @@ class GitCommitResult:
     files_committed: int = 0
     push_success: bool = False
     error: Optional[str] = None
+    commit_author: Optional[str] = None  # Git commit author (e.g., "Name <email>")
+    commit_timestamp: Optional[str] = None  # ISO timestamp of commit
 
 
 class GitCommitter:
@@ -150,9 +152,19 @@ class GitCommitter:
         if not output_files:
             return GitCommitResult(success=False, error="No files to commit")
 
+        # Debug: Log output files being committed
+        logger.debug(f"Attempting to commit {len(output_files)} files")
+        logger.debug(f"First output file: {output_files[0]}")
+        logger.debug(f"First output file type: {type(output_files[0])}")
+        logger.debug(f"First output file exists: {output_files[0].exists() if hasattr(output_files[0], 'exists') else 'N/A'}")
+
         # Find git root from first output file
         git_root = find_git_root(output_files[0])
+        logger.debug(f"find_git_root returned: {git_root}")
+
         if git_root is None:
+            logger.error(f"Failed to find git root from: {output_files[0]}")
+            logger.error(f"Output file absolute path: {Path(output_files[0]).resolve() if output_files[0] else 'None'}")
             return GitCommitResult(
                 success=False, error="Output directory is not a git repository"
             )
@@ -189,6 +201,10 @@ class GitCommitter:
             remote_url = get_git_repo(git_root)
             branch = get_git_branch(git_root)
 
+            # Get commit author and timestamp for telemetry association
+            commit_author = self._get_commit_author(git_root)
+            commit_timestamp = self._get_commit_timestamp(git_root)
+
             result = GitCommitResult(
                 success=True,
                 commit_hash=commit_hash,
@@ -196,6 +212,8 @@ class GitCommitter:
                 remote_url=remote_url,
                 branch=branch,
                 files_committed=staged_count,
+                commit_author=commit_author,
+                commit_timestamp=commit_timestamp,
             )
 
             # Step 4: Push if configured
@@ -289,6 +307,20 @@ class GitCommitter:
             Formatted commit message with co-author trailer
         """
         try:
+            # Load site profile to get display_name
+            site_profile = None
+            try:
+                from src.utils.config_loader import ConfigService
+                config_service = ConfigService("./config")
+                site_profile_obj = config_service.get_site_profile(site_id)
+
+                # Convert to dict for easier access
+                site_profile = {
+                    "display_name": site_profile_obj.display_name if hasattr(site_profile_obj, "display_name") else None,
+                }
+            except Exception as e:
+                logger.warning(f"Failed to load site profile for {site_id}: {e}")
+
             # Use enhanced commit message generator
             generator = CommitMessageGenerator()
             subject, body = generator.generate(
@@ -296,6 +328,7 @@ class GitCommitter:
                 target_langs=languages,
                 site_id=site_id,
                 run_id=run_id,
+                site_profile=site_profile,
                 translation_result=translation_result,
                 model_id=model_id,
                 tm_stats=tm_stats,
@@ -384,6 +417,64 @@ class GitCommitter:
             logger.error(self._last_error)
             return None
 
+    def _get_commit_author(self, git_root: Path) -> Optional[str]:
+        """
+        Get the author of the most recent commit.
+
+        Args:
+            git_root: Git repository root
+
+        Returns:
+            Commit author in format "Name <email>" or None if failed
+        """
+        try:
+            result = subprocess.run(
+                ["git", "log", "-1", "--format=%an <%ae>", "HEAD"],
+                cwd=str(git_root),
+                capture_output=True,
+                text=True,
+                timeout=5,
+            )
+
+            if result.returncode == 0:
+                return result.stdout.strip()
+
+            logger.warning("Failed to get commit author")
+            return None
+
+        except Exception as e:
+            logger.warning(f"Error getting commit author: {e}")
+            return None
+
+    def _get_commit_timestamp(self, git_root: Path) -> Optional[str]:
+        """
+        Get the timestamp of the most recent commit in ISO format.
+
+        Args:
+            git_root: Git repository root
+
+        Returns:
+            ISO timestamp or None if failed
+        """
+        try:
+            result = subprocess.run(
+                ["git", "log", "-1", "--format=%aI", "HEAD"],
+                cwd=str(git_root),
+                capture_output=True,
+                text=True,
+                timeout=5,
+            )
+
+            if result.returncode == 0:
+                return result.stdout.strip()
+
+            logger.warning("Failed to get commit timestamp")
+            return None
+
+        except Exception as e:
+            logger.warning(f"Error getting commit timestamp: {e}")
+            return None
+
     def _push(self, git_root: Path, branch: Optional[str]) -> bool:
         """Push to remote origin.
 
@@ -421,18 +512,23 @@ class GitCommitter:
 
 def collect_output_files(result: "DirectoryResult") -> List[Path]:
     """
-    Collect all output file paths from translation result.
+    Collect output file paths that were actually written during this translation run.
+
+    Only includes files for languages that were not skipped (i.e., languages that
+    were actually translated or updated during this run).
 
     Args:
         result: DirectoryResult from translate_directory
 
     Returns:
-        List of output file paths that exist
+        List of output file paths that were written (modified or created) in this run
     """
     files = []
     for file_result in result.file_results:
         if file_result.success:
+            # Only include files for languages that were NOT skipped
+            # skipped_langs contains languages where output already existed and was unchanged
             for lang, output_path in file_result.outputs.items():
-                if output_path.exists():
+                if output_path.exists() and lang not in file_result.skipped_langs:
                     files.append(output_path)
     return files
