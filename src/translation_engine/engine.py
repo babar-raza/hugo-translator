@@ -1832,25 +1832,42 @@ class TranslationEngine:
                 batch_size=batch_size
             )
 
+            # Check for empty translations, but only for units with substantial source text
+            # Allow empty output if source was whitespace-only or very short (≤2 chars)
             empty_units = [
                 u for u in translated_units
-                if not u.do_not_translate and (u.translated_text is None or u.translated_text.strip() == "")
+                if not u.do_not_translate
+                and (u.translated_text is None or u.translated_text.strip() == "")
+                and u.source_text
+                and u.source_text.strip() != ""
+                and len(u.source_text.strip()) > 2
             ]
             if empty_units:
+                # Log warning for all empty units (including whitespace) for diagnostics
+                all_empty = [
+                    u for u in translated_units
+                    if not u.do_not_translate and (u.translated_text is None or u.translated_text.strip() == "")
+                ]
+                if len(all_empty) > len(empty_units):
+                    logger.debug(
+                        f"Skipped {len(all_empty) - len(empty_units)} empty translations "
+                        f"for whitespace/short source text"
+                    )
+
                 issues = [
                     ValidationIssue(
                         severity="error",
                         rule="ASTTranslation",
-                        message=f"{len(empty_units)} units returned empty translations",
+                        message=f"{len(empty_units)} units with substantial source text returned empty translations",
                         location=str(doc.file_path) if hasattr(doc, "file_path") else None,
                     )
                 ]
                 validation_result = ValidationResult(valid=False, issues=issues)
                 raise TranslationRetryableError(
-                    message="AST translation produced empty outputs",
+                    message="AST translation produced empty outputs for substantial text",
                     file_path=str(doc.file_path) if hasattr(doc, "file_path") else "",
                     validation_result=validation_result,
-                    retry_feedback="All translated segments must return non-empty output.",
+                    retry_feedback="All translated segments with substantial source text must return non-empty output.",
                 )
 
             # Update telemetry with batch statistics
