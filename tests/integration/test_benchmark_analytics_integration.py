@@ -27,6 +27,9 @@ from src.benchmarking.aggregation import TimeSeriesAggregator
 from src.benchmarking.analytics import AnalyticsQueryAPI
 from src.model_runtime.registry import ModelRegistry
 
+# Current schema version from BenchmarkDatabase class
+CURRENT_SCHEMA_VERSION = BenchmarkDatabase.SCHEMA_VERSION
+
 
 class TestBenchmarkAnalyticsIntegration:
     """Integration tests for benchmark analytics workflow."""
@@ -78,7 +81,7 @@ class TestBenchmarkAnalyticsIntegration:
 
             # Step 1: Create database and verify schema
             db = BenchmarkDatabase(db_path)
-            assert db.get_schema_version() == 8
+            assert db.get_schema_version() == CURRENT_SCHEMA_VERSION
 
             # Step 2: Create benchmark runs
             self._create_test_runs(db, num_runs=10)
@@ -130,9 +133,9 @@ class TestBenchmarkAnalyticsIntegration:
         with tempfile.TemporaryDirectory() as tmpdir:
             db_path = Path(tmpdir) / "test.db"
 
-            # Step 1: Create v7 database
+            # Step 1: Create database at current schema version
             db = BenchmarkDatabase(db_path)
-            assert db.get_schema_version() == 8  # New DB starts at v8
+            assert db.get_schema_version() == CURRENT_SCHEMA_VERSION
 
             # Create test data
             self._create_test_runs(db, num_runs=5)
@@ -140,7 +143,7 @@ class TestBenchmarkAnalyticsIntegration:
 
             # Step 2: Verify schema version
             manager = MigrationManager(db_path)
-            assert manager.get_current_version() == 8
+            assert manager.get_current_version() == CURRENT_SCHEMA_VERSION
 
             # Step 3: Aggregate data
             aggregator = TimeSeriesAggregator(db_path)

@@ -155,18 +155,24 @@ class TestMutualExclusion:
     """Test mutual exclusion between parallel and round-robin modes."""
 
     def test_parallel_and_roundrobin_mutually_exclusive(self):
-        """Test that using both --parallel-languages and --global-lang-rounds raises ValueError."""
-        parser = create_parser()
-        args = parser.parse_args([
-            "--site", "test",
-            "--parallel-languages", "2",
-            "--global-lang-rounds", "50"
-        ])
-        overrides = CLIConfigOverrides(args)
+        """
+        Test that using both --parallel-languages and --global-lang-rounds raises error at parse time.
 
-        # get_engine_overrides() should raise ValueError
-        with pytest.raises(ValueError, match="Cannot use both"):
-            overrides.get_engine_overrides()
+        CLI-TC-03: Error now occurs at parse time (SystemExit) instead of runtime (ValueError).
+        This provides better UX as users get immediate feedback.
+        """
+        parser = create_parser()
+
+        # CLI-TC-03: Error should occur at parse time, not runtime
+        with pytest.raises(SystemExit) as exc_info:
+            parser.parse_args([
+                "--site", "test",
+                "--parallel-languages", "2",
+                "--global-lang-rounds", "50"
+            ])
+
+        # SystemExit with code 2 indicates argparse error
+        assert exc_info.value.code == 2
 
     def test_parallel_only_succeeds(self):
         """Test that using only --parallel-languages succeeds."""

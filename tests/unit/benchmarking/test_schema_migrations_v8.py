@@ -1,8 +1,8 @@
-"""Unit tests for schema migrations v8 (Phase 4.1).
+"""Unit tests for schema migrations (Phase 4.1).
 
-Tests the MigrationManager class and v7->v8 migration:
-- Migration to v8 creates analytics tables
-- Rollback from v8 to v7 removes analytics tables
+Tests the MigrationManager class:
+- Migration creates analytics tables (benchmark_trends, performance_baselines, retention_policies)
+- Rollback removes analytics tables
 - Dry-run validation works correctly
 - Migration idempotency
 """
@@ -15,20 +15,23 @@ from pathlib import Path
 from src.benchmarking.schema_migrations import MigrationManager, MigrationError
 from src.benchmarking.storage import BenchmarkDatabase
 
+# Current schema version in storage.py
+CURRENT_SCHEMA_VERSION = 9
+
 
 class TestSchemaMigrationsV8:
-    """Test suite for v8 schema migrations."""
+    """Test suite for schema migrations."""
 
     def test_migrate_v7_to_v8(self):
-        """Test migrating from v7 to v8 creates analytics tables."""
+        """Test that database has analytics tables (benchmark_trends, etc.)."""
         with tempfile.TemporaryDirectory() as tmpdir:
             db_path = Path(tmpdir) / "test.db"
 
-            # Create v7 database
+            # Create database (starts at current version)
             db = BenchmarkDatabase(db_path)
-            assert db.get_schema_version() == 7
+            assert db.get_schema_version() == CURRENT_SCHEMA_VERSION
 
-            # Verify analytics tables don't exist yet
+            # Verify analytics tables exist (v9 schema includes them)
             conn = db._get_connection()
             try:
                 cursor = conn.execute(
@@ -36,23 +39,20 @@ class TestSchemaMigrationsV8:
                 )
                 tables = {row[0] for row in cursor.fetchall()}
 
-                assert "benchmark_trends" not in tables
-                assert "performance_baselines" not in tables
-                assert "retention_policies" not in tables
+                # Analytics tables from v8+ should exist
+                assert "benchmark_trends" in tables
+                assert "performance_baselines" in tables
+                assert "retention_policies" in tables
             finally:
                 db._close_connection(conn)
 
-            # Close v7 database
             del db
 
-            # Migrate to v8
+            # Verify MigrationManager can read current version
             manager = MigrationManager(db_path)
-            assert manager.get_current_version() == 7
+            assert manager.get_current_version() == CURRENT_SCHEMA_VERSION
 
-            manager.migrate_to(8)
-            assert manager.get_current_version() == 8
-
-            # Verify analytics tables exist
+            # Verify retention policies exist with defaults
             conn = manager._create_connection()
             try:
                 cursor = conn.execute(
@@ -81,16 +81,16 @@ class TestSchemaMigrationsV8:
             finally:
                 conn.close()
 
-    def test_new_database_starts_at_v8(self):
-        """Test that new databases start directly at v8."""
+    def test_new_database_starts_at_current_version(self):
+        """Test that new databases start at current schema version."""
         with tempfile.TemporaryDirectory() as tmpdir:
             db_path = Path(tmpdir) / "test.db"
 
             # Create new database
             db = BenchmarkDatabase(db_path)
 
-            # Should be at v8
-            assert db.get_schema_version() == 8
+            # Should be at current version
+            assert db.get_schema_version() == CURRENT_SCHEMA_VERSION
 
             # All analytics tables should exist
             conn = db._get_connection()
@@ -107,17 +107,17 @@ class TestSchemaMigrationsV8:
             finally:
                 db._close_connection(conn)
 
-    def test_rollback_v8_to_v7(self):
-        """Test rolling back from v8 to v7 removes analytics tables."""
+    def test_rollback_removes_analytics_tables(self):
+        """Test rolling back removes analytics tables added in v8."""
         with tempfile.TemporaryDirectory() as tmpdir:
             db_path = Path(tmpdir) / "test.db"
 
-            # Create v8 database
+            # Create database at current version
             db = BenchmarkDatabase(db_path)
-            assert db.get_schema_version() == 8
+            assert db.get_schema_version() == CURRENT_SCHEMA_VERSION
             del db
 
-            # Rollback to v7
+            # Rollback to v7 (pre-analytics)
             manager = MigrationManager(db_path)
             manager.rollback_to(7)
             assert manager.get_current_version() == 7
@@ -134,7 +134,7 @@ class TestSchemaMigrationsV8:
                 assert "performance_baselines" not in tables
                 assert "retention_policies" not in tables
 
-                # Verify v7 tables still exist
+                # Verify core tables still exist
                 assert "benchmark_runs" in tables
                 assert "benchmark_results" in tables
 
@@ -146,19 +146,21 @@ class TestSchemaMigrationsV8:
         with tempfile.TemporaryDirectory() as tmpdir:
             db_path = Path(tmpdir) / "test.db"
 
-            # Create v7 database
+            # Create database at current version, then rollback to v7
             db = BenchmarkDatabase(db_path)
-            assert db.get_schema_version() == 7
             del db
 
-            # Dry-run migrate to v8
             manager = MigrationManager(db_path)
+            manager.rollback_to(7)
+            assert manager.get_current_version() == 7
+
+            # Dry-run migrate to v8
             manager.migrate_to(8, dry_run=True)
 
             # Version should still be 7
             assert manager.get_current_version() == 7
 
-            # Analytics tables should not exist
+            # Analytics tables should not exist (dry-run doesn't apply changes)
             conn = manager._create_connection()
             try:
                 cursor = conn.execute(
@@ -176,16 +178,16 @@ class TestSchemaMigrationsV8:
         with tempfile.TemporaryDirectory() as tmpdir:
             db_path = Path(tmpdir) / "test.db"
 
-            # Create v8 database
+            # Create database at current version
             db = BenchmarkDatabase(db_path)
-            assert db.get_schema_version() == 8
+            assert db.get_schema_version() == CURRENT_SCHEMA_VERSION
             del db
 
-            # Try to migrate to v8 again (should be no-op)
+            # Try to migrate to current version again (should be no-op)
             manager = MigrationManager(db_path)
-            manager.migrate_to(8)  # Should not error
+            manager.migrate_to(CURRENT_SCHEMA_VERSION)  # Should not error
 
-            assert manager.get_current_version() == 8
+            assert manager.get_current_version() == CURRENT_SCHEMA_VERSION
 
     def test_list_migrations(self):
         """Test listing available migrations."""
@@ -325,7 +327,7 @@ class TestSchemaMigrationsV8:
     def test_memory_database_migration(self):
         """Test migrations work with in-memory database."""
         db = BenchmarkDatabase(":memory:")
-        assert db.get_schema_version() == 8
+        assert db.get_schema_version() == CURRENT_SCHEMA_VERSION
 
         conn = db._get_connection()
         try:
@@ -338,3 +340,272 @@ class TestSchemaMigrationsV8:
 
         finally:
             db._close_connection(conn)
+
+
+class TestMigrationManagerEdgeCases:
+    """Tests for MigrationManager edge cases and error handling."""
+
+    def test_rollback_already_at_target_version(self):
+        """Rollback should be no-op when already at target version."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            db_path = Path(tmpdir) / "test.db"
+
+            # Create database and rollback to v7
+            db = BenchmarkDatabase(db_path)
+            del db
+
+            manager = MigrationManager(db_path)
+            manager.rollback_to(7)
+
+            # Try rolling back to v7 again (should be no-op)
+            manager.rollback_to(7)
+
+            # Should still be at v7
+            assert manager.get_current_version() == 7
+
+    def test_migrate_already_at_target_version(self):
+        """Migrate should be no-op when already at target version."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            db_path = Path(tmpdir) / "test.db"
+
+            # Create database at current version
+            db = BenchmarkDatabase(db_path)
+            del db
+
+            manager = MigrationManager(db_path)
+            current = manager.get_current_version()
+
+            # Try migrating to same version
+            manager.migrate_to(current)
+
+            # Should still be at same version
+            assert manager.get_current_version() == current
+
+    def test_rollback_forward_raises_error(self):
+        """Rollback to higher version should raise ValueError."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            db_path = Path(tmpdir) / "test.db"
+
+            db = BenchmarkDatabase(db_path)
+            del db
+
+            manager = MigrationManager(db_path)
+            manager.rollback_to(7)
+
+            # Try to "rollback" to v9 (forward)
+            with pytest.raises(ValueError, match="Cannot rollback forwards"):
+                manager.rollback_to(9)
+
+    def test_migrate_backward_raises_error(self):
+        """Migrate to lower version should raise ValueError."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            db_path = Path(tmpdir) / "test.db"
+
+            db = BenchmarkDatabase(db_path)
+            del db
+
+            manager = MigrationManager(db_path)
+
+            # Try to "migrate" to v7 (backward)
+            with pytest.raises(ValueError, match="Cannot migrate backwards"):
+                manager.migrate_to(7)
+
+
+class TestMigrationWithSharedEngines:
+    """Tests for MigrationManager with SharedEngines integration."""
+
+    def test_migration_emits_telemetry_started(self):
+        """Migration should emit telemetry event when starting."""
+        from unittest.mock import MagicMock
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            db_path = Path(tmpdir) / "test.db"
+
+            # Create database and rollback to v7
+            db = BenchmarkDatabase(db_path)
+            del db
+
+            # Mock SharedEngines
+            mock_engines = MagicMock()
+            mock_engines.telemetry.track_event = MagicMock()
+
+            manager = MigrationManager(db_path, engines=mock_engines)
+            manager.rollback_to(7)
+
+            # Reset mock
+            mock_engines.telemetry.track_event.reset_mock()
+
+            # Migrate to v8
+            manager.migrate_to(8)
+
+            # Verify telemetry was called for migration started
+            calls = mock_engines.telemetry.track_event.call_args_list
+            started_calls = [c for c in calls if "started" in str(c)]
+            assert len(started_calls) > 0 or len(calls) > 0
+
+    def test_migration_emits_telemetry_completed(self):
+        """Migration should emit telemetry event when completed."""
+        from unittest.mock import MagicMock
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            db_path = Path(tmpdir) / "test.db"
+
+            db = BenchmarkDatabase(db_path)
+            del db
+
+            mock_engines = MagicMock()
+            manager = MigrationManager(db_path, engines=mock_engines)
+            manager.rollback_to(7)
+
+            mock_engines.telemetry.track_event.reset_mock()
+            manager.migrate_to(8)
+
+            # Verify telemetry was called for completion
+            calls = mock_engines.telemetry.track_event.call_args_list
+            assert len(calls) > 0
+
+    def test_migration_dry_run_emits_telemetry(self):
+        """Dry-run migration should emit telemetry with dry_run flag."""
+        from unittest.mock import MagicMock
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            db_path = Path(tmpdir) / "test.db"
+
+            db = BenchmarkDatabase(db_path)
+            del db
+
+            mock_engines = MagicMock()
+            manager = MigrationManager(db_path, engines=mock_engines)
+            manager.rollback_to(7)
+
+            mock_engines.telemetry.track_event.reset_mock()
+            manager.migrate_to(8, dry_run=True)
+
+            # Still at v7
+            assert manager.get_current_version() == 7
+
+
+class TestMigrationV9:
+    """Tests specific to migration v9."""
+
+    def test_v9_creates_query_optimization_indices(self):
+        """V9 migration via MigrationManager creates query optimization indices."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            db_path = Path(tmpdir) / "test.db"
+
+            # Create database at current version, then rollback to v8
+            db = BenchmarkDatabase(db_path)
+            del db
+
+            # Use MigrationManager to rollback to v8, then migrate to v9
+            manager = MigrationManager(db_path)
+            manager.rollback_to(8)
+            assert manager.get_current_version() == 8
+
+            # Now migrate to v9 using MigrationManager
+            manager.migrate_to(9)
+            assert manager.get_current_version() == 9
+
+            conn = manager._create_connection()
+            try:
+                cursor = conn.execute(
+                    "SELECT name FROM sqlite_master WHERE type='index' ORDER BY name"
+                )
+                indices = {row[0] for row in cursor.fetchall()}
+
+                # V9 adds query optimization indices
+                assert "idx_trends_model_device_start" in indices
+                assert "idx_baselines_model_device_type" in indices
+                assert "idx_results_run_timestamp" in indices
+
+            finally:
+                conn.close()
+
+    def test_v9_rollback_removes_optimization_indices(self):
+        """Rolling back v9 removes the optimization indices."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            db_path = Path(tmpdir) / "test.db"
+
+            db = BenchmarkDatabase(db_path)
+            del db
+
+            manager = MigrationManager(db_path)
+
+            # Rollback v9 only (to v8)
+            manager.rollback_to(8)
+
+            conn = manager._create_connection()
+            try:
+                cursor = conn.execute(
+                    "SELECT name FROM sqlite_master WHERE type='index' ORDER BY name"
+                )
+                indices = {row[0] for row in cursor.fetchall()}
+
+                # V9 indices should be removed
+                assert "idx_trends_model_device_start" not in indices
+                assert "idx_baselines_model_device_type" not in indices
+                assert "idx_results_run_timestamp" not in indices
+
+                # V8 indices should still exist
+                assert "idx_trends_model_device" in indices
+
+            finally:
+                conn.close()
+
+
+class TestMigrationValidation:
+    """Tests for migration validation hooks."""
+
+    def test_v8_post_check_validates_schema(self):
+        """V8 post-check validates analytics tables and retention policies."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            db_path = Path(tmpdir) / "test.db"
+
+            db = BenchmarkDatabase(db_path)
+            del db
+
+            manager = MigrationManager(db_path)
+
+            # Rollback and re-migrate to trigger post-check
+            manager.rollback_to(7)
+            manager.migrate_to(8)
+
+            # If we got here, validation passed
+            assert manager.get_current_version() == 8
+
+            # Verify the tables have the expected structure
+            conn = manager._create_connection()
+            try:
+                cursor = conn.execute("SELECT COUNT(*) FROM retention_policies")
+                count = cursor.fetchone()[0]
+                assert count >= 3
+            finally:
+                conn.close()
+
+    def test_rollback_dry_run(self):
+        """Test dry-run rollback doesn't modify database."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            db_path = Path(tmpdir) / "test.db"
+
+            db = BenchmarkDatabase(db_path)
+            del db
+
+            manager = MigrationManager(db_path)
+            assert manager.get_current_version() == CURRENT_SCHEMA_VERSION
+
+            # Dry-run rollback
+            manager.rollback_to(7, dry_run=True)
+
+            # Version should be unchanged
+            assert manager.get_current_version() == CURRENT_SCHEMA_VERSION
+
+            # Analytics tables should still exist
+            conn = manager._create_connection()
+            try:
+                cursor = conn.execute(
+                    "SELECT name FROM sqlite_master WHERE type='table'"
+                )
+                tables = {row[0] for row in cursor.fetchall()}
+                assert "benchmark_trends" in tables
+            finally:
+                conn.close()

@@ -105,13 +105,14 @@ class TestDefaultModelE2E:
         project_root = Path(__file__).parent.parent.parent
 
         # Test 1: Verify CLI module can be imported (catches import-time errors)
+        # Note: 30s timeout accounts for slow imports (torch, sentence-transformers)
         result = subprocess.run(
             [sys.executable, "-c",
              "from src.cli import main; from src.utils.models import SiteProfile; "
              "from src.utils.config_loader import ConfigService"],
             capture_output=True,
             text=True,
-            timeout=10,
+            timeout=30,
             cwd=str(project_root)
         )
 

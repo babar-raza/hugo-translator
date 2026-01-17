@@ -7,6 +7,9 @@ from pathlib import Path
 
 from src.benchmarking.storage import BenchmarkDatabase
 
+# Current schema version from BenchmarkDatabase class
+CURRENT_SCHEMA_VERSION = BenchmarkDatabase.SCHEMA_VERSION
+
 
 def create_v0_database(db_path: Path) -> sqlite3.Connection:
     """Create a v0 (empty) database for testing migrations."""
@@ -37,7 +40,7 @@ def test_migration_from_v0_to_v4():
         db = BenchmarkDatabase(db_path)
 
         # Verify schema version is 4
-        assert db.get_schema_version() == 4
+        assert db.get_schema_version() == CURRENT_SCHEMA_VERSION
 
         # Verify all tables exist
         conn = db._get_connection()
@@ -68,11 +71,11 @@ def test_migration_idempotent():
 
         # Initialize database (runs migrations once)
         db1 = BenchmarkDatabase(db_path)
-        assert db1.get_schema_version() == 4
+        assert db1.get_schema_version() == CURRENT_SCHEMA_VERSION
 
         # Re-initialize same database (should not error)
         db2 = BenchmarkDatabase(db_path)
-        assert db2.get_schema_version() == 4
+        assert db2.get_schema_version() == CURRENT_SCHEMA_VERSION
 
         # Verify only one entry per version in schema_version table
         conn = db2._get_connection()
@@ -99,7 +102,8 @@ def test_schema_version_tracking():
             cursor = conn.execute("SELECT version FROM schema_version ORDER BY version")
             versions = [row[0] for row in cursor.fetchall()]
 
-            assert versions == [1, 2, 3, 4], f"Expected [1, 2, 3, 4], got {versions}"
+            expected_versions = list(range(1, CURRENT_SCHEMA_VERSION + 1))
+            assert versions == expected_versions, f"Expected {expected_versions}, got {versions}"
 
             # Check timestamps are present
             cursor = conn.execute("SELECT version, applied_at FROM schema_version")
@@ -188,7 +192,7 @@ def test_memory_database_migration():
     db = BenchmarkDatabase(":memory:")
 
     # Verify schema version
-    assert db.get_schema_version() == 4
+    assert db.get_schema_version() == CURRENT_SCHEMA_VERSION
 
     # Verify tables exist
     conn = db._get_connection()

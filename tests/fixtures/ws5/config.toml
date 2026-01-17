@@ -1,0 +1,13 @@
+baseURL = "https://example.com"
+languageCode = "en-us"
+title = "WS5 Test Site"
+defaultContentLanguage = "en"
+
+[languages]
+  [languages.en]
+    languageName = "English"
+    weight = 1
+
+  [languages.es]
+    languageName = "Español"
+    weight = 2

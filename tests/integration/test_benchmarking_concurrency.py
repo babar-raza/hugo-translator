@@ -27,19 +27,22 @@ def create_test_run(run_id: str, cpu_cores: int = 8) -> BenchmarkRun:
         tags=["test"],
         system_info=SystemInfo(
             python_version="3.11",
-            platform="linux",
+            os_name="Linux",
             cpu_model="test_cpu",
             cpu_cores=cpu_cores,
-            ram_total_gb=16.0,
+            total_ram_gb=16.0,
         ),
         results=[
             BenchmarkResult(
-                iteration=1,
+                sample_id="sample-1",
+                model_id="test_model",
+                device="cpu",
                 batch_size=8,
                 duration_seconds=1.0,
+                tokens_input=100,
+                tokens_output=100,
                 throughput_tokens_per_sec=100.0,
                 peak_memory_mb=1000.0,
-                errors=None,
             )
         ],
     )
@@ -157,10 +160,10 @@ def test_concurrent_recommender_requests():
             try:
                 system_info = SystemInfo(
                     python_version="3.11",
-                    platform="linux",
+                    os_name="Linux",
                     cpu_model="test_cpu",
                     cpu_cores=8,
-                    ram_total_gb=16.0,
+                    total_ram_gb=16.0,
                 )
 
                 rec = recommender.recommend(system_info)
@@ -211,10 +214,10 @@ def test_concurrent_feedback_updates():
                 # Generate recommendation first
                 system_info = SystemInfo(
                     python_version="3.11",
-                    platform="linux",
+                    os_name="Linux",
                     cpu_model="test_cpu",
                     cpu_cores=8,
-                    ram_total_gb=16.0,
+                    total_ram_gb=16.0,
                 )
 
                 rec = recommender.recommend(system_info)
@@ -344,7 +347,7 @@ def test_concurrent_system_info_collection():
 
             # Verify info is valid
             assert info.cpu_cores > 0
-            assert info.ram_total_gb > 0
+            assert info.total_ram_gb > 0
 
         except Exception as e:
             errors.append(f"Worker {worker_id}: {e}")
@@ -441,10 +444,10 @@ def test_stress_concurrent_mixed_operations():
                 for i in range(3):
                     system_info = SystemInfo(
                         python_version="3.11",
-                        platform="linux",
+                        os_name="Linux",
                         cpu_model="test_cpu",
                         cpu_cores=8,
-                        ram_total_gb=16.0,
+                        total_ram_gb=16.0,
                     )
                     recommender.recommend(system_info)
                     time.sleep(0.001)

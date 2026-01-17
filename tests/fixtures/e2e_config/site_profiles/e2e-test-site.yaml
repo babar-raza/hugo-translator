@@ -1,0 +1,61 @@
+# E2E Test Site Profile
+site_id: "e2e-test-site"
+
+# Content directories to translate
+content_roots:
+  - "tests/fixtures/e2e_content_repo"
+
+# Default source language
+default_source_lang: "en"
+
+# Target languages for translation
+target_langs:
+  - "de"
+  - "fr"
+
+# Frontmatter translation rules
+frontmatter:
+  title:
+    mode: "translate"
+  description:
+    mode: "translate"
+  date:
+    mode: "passthrough"
+
+# Body translation rules
+body:
+  translate_markdown: true
+  preserve_blocks:
+    - "block_code"
+    - "codespan"
+    - "html_block"
+  translate_image_alt: true
+  translate_link_titles: true
+  use_ast_body_reconstruction: false
+
+# Output configuration
+output_layout:
+  per_language_folders: true
+  pattern: "/{lang}/{relative_path}"
+  preserve_structure: true
+
+# Model selection
+model:
+  default: "m2m100_418m"
+
+# Performance settings
+performance:
+  batch_size: 2
+  enable_cache: true
+
+# Quality validation
+validation:
+  check_placeholders: true
+  check_links: true
+  check_yaml_structure: true
+  fail_on_error: false
+
+# Logging
+logging:
+  level: "INFO"
+  flow_artifacts: false

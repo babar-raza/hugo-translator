@@ -12,6 +12,9 @@ from src.benchmarking.storage import (
     SystemInfo,
 )
 
+# Current schema version from BenchmarkDatabase class
+CURRENT_SCHEMA_VERSION = BenchmarkDatabase.SCHEMA_VERSION
+
 
 @pytest.fixture
 def test_db():
@@ -323,7 +326,6 @@ def test_find_similar_hardware(test_db, sample_runs):
         os_version="Ubuntu 22.04",
         python_version="3.11.0",
         torch_version="2.1.0",
-        transformers_version="4.36.0",
     )
 
     similar = api.find_similar_hardware(target, tolerance=0.1)
@@ -383,7 +385,7 @@ def test_build_sql_with_joins():
 
 def test_schema_migration_v2(test_db):
     """Test that schema migration to v2 was applied."""
-    assert test_db.get_schema_version() == 2
+    assert test_db.get_schema_version() == CURRENT_SCHEMA_VERSION
 
     # Verify indices exist by querying sqlite_master
     conn = test_db._get_connection()

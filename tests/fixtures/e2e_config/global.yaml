@@ -1,0 +1,19 @@
+# E2E Test Global Configuration
+default_model: "facebook/nllb-200-distilled-600M"
+default_batch_size: 4
+default_device: "cpu"
+
+telemetry:
+  enabled: true
+  endpoint: "http://localhost:8765"  # Stub endpoint for E2E tests
+  session_timeout_minutes: 60
+
+translation_memory:
+  l1_cache_size: 1000
+  l2_persistent_path: "tests/fixtures/e2e_tm/l2"
+  l3_semantic_path: "tests/fixtures/e2e_tm/l3"
+  l3_enabled: false  # Disable semantic TM for faster E2E tests
+
+git:
+  auto_commit: false  # Controlled explicitly in E2E tests
+  commit_by_language: true
