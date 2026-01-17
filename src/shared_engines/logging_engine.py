@@ -63,6 +63,7 @@ class LoggingEngine:
         console_output: bool = True
     ):
         """Initialize logging engine."""
+        print("DEBUG: LoggingEngine.__init__ started", flush=True)
         self.name = name
         self.log_level = log_level
         self.log_file = log_file
@@ -70,14 +71,18 @@ class LoggingEngine:
 
         # Set up structured logging
         if log_file or console_output:
+            print(f"DEBUG: About to call setup_structured_logging", flush=True)
             setup_structured_logging(
                 log_level=log_level,
                 log_file=log_file,
                 console_output=console_output
             )
+            print(f"DEBUG: setup_structured_logging completed", flush=True)
 
         # Get structured logger
+        print(f"DEBUG: About to create StructuredLogger", flush=True)
         self.logger = StructuredLogger(name=name)
+        print(f"DEBUG: StructuredLogger created", flush=True)
 
         logger.info(
             f"LoggingEngine initialized: name={name}, level={log_level}, "

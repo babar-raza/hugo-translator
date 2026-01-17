@@ -13,6 +13,7 @@ except Exception:
     L3SemanticTM = None  # type: ignore
 from .models import LookupRequest, LookupResult, TMStats
 from .override_controller import OverrideController, OverrideConfig, OverrideMode
+from .improvement_queue import ImprovementQueue
 
 
 class TranslationMemory:
@@ -40,6 +41,7 @@ class TranslationMemory:
         l2_persistent: L2PersistentTM,
         l3_semantic: Optional[L3SemanticTM] = None,
         override_controller: Optional[OverrideController] = None,
+        improvement_queue: Optional[ImprovementQueue] = None,
     ):
         """
         Initialize unified TM.
@@ -49,11 +51,13 @@ class TranslationMemory:
             l2_persistent: LMDB persistent storage
             l3_semantic: Optional semantic search index
             override_controller: Optional override controller for cache bypass
+            improvement_queue: Optional improvement queue for LLM-based improvements
         """
         self.l1 = l1_cache
         self.l2 = l2_persistent
         self.l3 = l3_semantic
         self.override = override_controller or OverrideController()
+        self.improvement_queue = improvement_queue
 
         # Statistics
         self._total_lookups = 0
@@ -221,6 +225,29 @@ class TranslationMemory:
                 translation=translation,
                 context=context,
                 metadata=metadata,
+            )
+
+        # Append to improvement queue (if enabled and L2 was stored)
+        # This allows the TM improvement worker to enhance translations later
+        if stored and self.improvement_queue is not None:
+            # Extract similarity score from metadata if available (from L3 semantic match)
+            similarity_score = None
+            if metadata and "similarity_score" in metadata:
+                similarity_score = metadata["similarity_score"]
+
+            # Queue candidate with metadata for improvement worker
+            queue_metadata = metadata.copy() if metadata else {}
+            if similarity_score is not None:
+                queue_metadata["similarity_score"] = similarity_score
+
+            self.improvement_queue.append_candidate(
+                site_id=site_id,
+                src_lang=src_lang,
+                tgt_lang=tgt_lang,
+                text=text,
+                translation=translation,
+                context=context,
+                metadata=queue_metadata,
             )
 
         return stored

@@ -9,7 +9,10 @@ import logging
 from dataclasses import dataclass
 from typing import Dict, Any, Optional
 
+import torch
+
 from src.hardware.gpu_manager import GPUManager, GPUMemoryInfo
+from src.hardware.vram_budget import resolve_vram_budget_mb
 from src.benchmarking.resource_monitor import ResourceMonitor, ResourceSnapshot, ResourceEstimate
 
 logger = logging.getLogger(__name__)
@@ -27,7 +30,8 @@ class ResourceLimits:
     max_memory_percent: Optional[float] = None  # Maximum memory usage (0-100)
 
     # GPU/VRAM limits
-    max_gpu_memory_mb: Optional[int] = None  # Maximum GPU memory in MB
+    max_gpu_memory_percent: Optional[int] = None  # Maximum GPU memory as % of total (0-100)
+    max_gpu_memory_mb: Optional[int] = None  # Maximum GPU memory in MB (overrides percent)
     gpu_device_id: int = -1  # GPU device ID (-1 = auto-select)
     enable_gpu: bool = True  # Whether to use GPU
 
@@ -78,6 +82,40 @@ class LimitingEngine:
         """Initialize limiting engine."""
         self.limits = limits or ResourceLimits()
 
+        # Resolve max_gpu_memory_mb from percent if not explicitly set
+        # This ensures ModelLoader receives a concrete MB value
+        if (
+            self.limits.max_gpu_memory_mb is None
+            and self.limits.max_gpu_memory_percent is not None
+            and self.limits.enable_gpu
+            and torch.cuda.is_available()
+        ):
+            try:
+                # Get GPU 0 total memory (default device)
+                device_id = max(0, self.limits.gpu_device_id) if self.limits.gpu_device_id >= 0 else 0
+                props = torch.cuda.get_device_properties(device_id)
+                total_mb = props.total_memory / (1024**2)
+
+                # Compute MB from percent
+                budget_mb, budget = resolve_vram_budget_mb(
+                    total_mb=total_mb,
+                    max_gpu_memory_percent=self.limits.max_gpu_memory_percent,
+                    max_gpu_memory_mb=None,
+                )
+
+                # Update limits with computed value
+                self.limits.max_gpu_memory_mb = budget_mb
+                logger.info(
+                    f"Computed max_gpu_memory_mb from percent: {budget_mb}MB "
+                    f"({self.limits.max_gpu_memory_percent}% of {total_mb:.0f}MB)"
+                )
+
+            except Exception as e:
+                logger.warning(
+                    f"Failed to compute max_gpu_memory_mb from percent: {e}. "
+                    f"Using default 60% on-demand enforcement."
+                )
+
         # Initialize GPU manager
         gpu_cfg = gpu_config or {}
         if self.limits.max_gpu_memory_mb:
@@ -95,6 +133,7 @@ class LimitingEngine:
             f"LimitingEngine initialized: "
             f"cpu_max={self.limits.max_cpu_percent}%, "
             f"mem_min={self.limits.min_memory_mb}MB, "
+            f"gpu_mem_percent={self.limits.max_gpu_memory_percent}%, "
             f"gpu_mem_max={self.limits.max_gpu_memory_mb}MB"
         )
 

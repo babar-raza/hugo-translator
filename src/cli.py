@@ -1904,7 +1904,10 @@ def translate_site(args: argparse.Namespace) -> int:
                                                 is_translated = True
 
                                             if is_translated:
-                                                translated_files.append(Path(file_path))
+                                                # Convert relative path to absolute path using git_repo_root
+                                                # Git status returns paths relative to git root
+                                                absolute_file_path = git_repo_root / file_path
+                                                translated_files.append(absolute_file_path)
 
                                     if translated_files:
                                         logger.debug(f"Detected {len(translated_files)} modified files for {lang}")
@@ -2600,7 +2603,9 @@ def translate_site(args: argparse.Namespace) -> int:
                             output_files = []
                             for file_result in result.file_results:
                                 if file_result.success and file_result.outputs:
-                                    output_files.extend([Path(f) for f in file_result.outputs])
+                                    # file_result.outputs is a dict: {target_lang: output_path}
+                                    # Extract the path values, not the language keys
+                                    output_files.extend([Path(f) for f in file_result.outputs.values()])
 
                             if output_files:
                                 # Calculate TM stats from result

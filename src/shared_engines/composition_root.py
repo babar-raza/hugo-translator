@@ -131,7 +131,7 @@ class CompositionRoot:
                 if mode_defaults:
                     logger.info(
                         f"Loaded execution mode config for '{execution_mode}' from global.yaml: "
-                        f"{list(mode_defaults.keys())}"
+                        f"{mode_defaults}"
                     )
                     mode_config = mode_defaults
                 else:
@@ -325,15 +325,18 @@ class CompositionRoot:
         logger.debug(f"Created ProfileEngine: config_root={config_root}")
 
         # 2. LoggingEngine - Structured logging
+        print("DEBUG: About to create LoggingEngine", flush=True)
         log_level = cfg.get("log_level", "INFO")
         log_file = cfg.get("log_file")
         console_output = cfg.get("console_output", True)
+        print(f"DEBUG: LoggingEngine config - level={log_level}, file={log_file}, console={console_output}", flush=True)
         logging_engine = LoggingEngine(
             name="translation_system",
             log_level=log_level,
             log_file=log_file,
             console_output=console_output
         )
+        print("DEBUG: LoggingEngine created successfully", flush=True)
         logger.debug(f"Created LoggingEngine: level={log_level}, file={log_file}")
 
         # 3. TelemetryEngine - Event tracking
@@ -368,11 +371,15 @@ class CompositionRoot:
         resource_limits = ResourceLimits(
             max_cpu_percent=cfg.get("max_cpu_percent"),
             min_memory_mb=cfg.get("min_memory_mb"),
+            max_gpu_memory_percent=cfg.get("max_gpu_memory_percent"),
             max_gpu_memory_mb=cfg.get("max_gpu_memory_mb"),
             enable_gpu=cfg.get("enable_gpu", True)
         )
         limiting_engine = LimitingEngine(limits=resource_limits)
-        logger.debug(f"Created LimitingEngine: gpu_limit={resource_limits.max_gpu_memory_mb}MB")
+        logger.debug(
+            f"Created LimitingEngine: gpu_percent={resource_limits.max_gpu_memory_percent}%, "
+            f"gpu_limit={resource_limits.max_gpu_memory_mb}MB"
+        )
 
         # 7. HealingEngine - Retry and recovery
         max_retries = cfg.get("max_retries", 3)

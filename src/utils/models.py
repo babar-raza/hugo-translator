@@ -170,6 +170,10 @@ class SiteProfile(BaseModel):
         description="Unique identifier for the site (e.g., products.aspose.net)",
         pattern=r"^[a-z0-9.-]+$",
     )
+    display_name: Optional[str] = Field(
+        default=None,
+        description="Human-readable content type name for commit messages (e.g., 'Documentation', 'blog posts')",
+    )
     content_roots: List[str] = Field(
         ...,
         min_length=1,
@@ -484,6 +488,31 @@ class TelemetrySettings(BaseModel):
     )
 
 
+class ModelDefaults(BaseModel):
+    """Model configuration defaults."""
+
+    fallback_model: str = Field(
+        default="m2m100_418m",
+        description="Fallback model when no model info in results"
+    )
+    device: str = Field(
+        default="auto",
+        description="Device preference: auto, cpu, cuda, mps"
+    )
+    batch_size: int = Field(
+        default=4,
+        description="Default batch size"
+    )
+    cache_models: bool = Field(
+        default=True,
+        description="Enable model caching"
+    )
+    max_cached_models: int = Field(
+        default=2,
+        description="Maximum number of cached models"
+    )
+
+
 class GlobalConfig(BaseModel):
     """Global configuration defaults."""
 
@@ -514,6 +543,10 @@ class GlobalConfig(BaseModel):
     )
     validation_defaults: Optional[ValidationDefaults] = Field(
         None, description="Validation configuration defaults"
+    )
+    model_defaults: Optional[ModelDefaults] = Field(
+        default_factory=ModelDefaults,
+        description="Model configuration defaults"
     )
 
     model_config = {"protected_namespaces": ()}
