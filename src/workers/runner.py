@@ -19,6 +19,8 @@ from typing import Optional, Dict, Any
 
 import torch
 
+from src.hardware.vram_enforcer import VRAMEnforcer
+
 logger = logging.getLogger(__name__)
 
 
@@ -351,6 +353,36 @@ class WorkerRunner(ABC):
         # Apply device policy to config
         self.config.device = self.device_policy.get_device(self.config.device)
         logger.info(f"Device after policy enforcement: {self.config.device}")
+
+        # Apply VRAM budget enforcement for CUDA modes
+        # This applies torch.cuda.set_per_process_memory_fraction() early
+        # before any model loading to ensure budget is enforced process-wide
+        if self.config.execution_mode in (ExecutionMode.WINDOWS_CUDA, ExecutionMode.DOCKER_GPU):
+            if self.config.device.startswith("cuda"):
+                try:
+                    # Build hardware config from mode_config
+                    hardware_config = {
+                        "enable_gpu": True,
+                        "max_gpu_memory_percent": self.config.mode_config.get("max_gpu_memory_percent"),
+                        "max_gpu_memory_mb": self.config.mode_config.get("max_gpu_memory_mb"),
+                    }
+
+                    # Apply VRAM enforcement
+                    enforcer = VRAMEnforcer()
+                    max_memory_mb, budget = enforcer.enforce_from_config(
+                        hardware_config, device=self.config.device
+                    )
+
+                    if budget:
+                        logger.info(
+                            f"VRAM budget enforced: {max_memory_mb}MB "
+                            f"({budget.percent:.1f}% of total, source: {budget.source})"
+                        )
+                    else:
+                        logger.warning("VRAM budget enforcement skipped (GPU disabled or unavailable)")
+
+                except Exception as e:
+                    logger.error(f"Failed to enforce VRAM budget: {e}", exc_info=True)
 
     @abstractmethod
     def setup(self) -> None:

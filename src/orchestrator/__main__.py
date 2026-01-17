@@ -10,6 +10,7 @@ The orchestrator coordinates translation operations by managing:
 """
 
 import argparse
+import importlib.metadata
 import logging
 import os
 import signal
@@ -25,6 +26,19 @@ from src.observability.graceful_shutdown import (
 from src.utils.config_loader import ConfigService
 
 logger = logging.getLogger(__name__)
+
+
+def get_version() -> str:
+    """
+    Get package version from importlib.metadata with fallback.
+
+    Returns:
+        Version string (e.g., "0.1.0" or "0.1.0-dev" if not installed)
+    """
+    try:
+        return importlib.metadata.version("hugo-translation-system")
+    except importlib.metadata.PackageNotFoundError:
+        return "0.1.0-dev"  # Fallback for development mode
 
 
 def parse_args() -> argparse.Namespace:
@@ -80,6 +94,13 @@ Environment Variables:
         choices=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"],
         default=os.getenv("LOG_LEVEL", "INFO"),
         help="Logging level. Default: INFO (or LOG_LEVEL env var)",
+    )
+
+    parser.add_argument(
+        "--version",
+        action="version",
+        version=f"%(prog)s {get_version()}",
+        help="Show program version and exit",
     )
 
     return parser.parse_args()

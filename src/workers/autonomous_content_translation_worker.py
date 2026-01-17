@@ -179,9 +179,40 @@ class AutonomousContentTranslationWorker:
         # Initialize TranslationMemory
         try:
             from src.tm import TranslationMemory
-            global_config = self.config_service.global_config
-            tm = TranslationMemory(global_config.translation_memory)
-            logger.info("Initialized TranslationMemory")
+            from src.tm.l1_cache import L1Cache
+            from src.tm.l2_persistent import L2PersistentTM
+            try:
+                from src.tm.l3_semantic import L3SemanticTM
+            except ImportError:
+                L3SemanticTM = None
+            from pathlib import Path
+
+            # Get TM paths from global config
+            raw_config = self.config_service.get_config()
+            paths_config = raw_config.get("paths", {})
+            tm_data_dir = Path(paths_config.get("tm_data_dir", "data/tm"))
+
+            # Create TM components
+            l1_cache = L1Cache(max_size=10000)
+            l2_persistent = L2PersistentTM(db_path=tm_data_dir / "l2.lmdb")
+
+            # Try to initialize L3 semantic TM (optional)
+            l3_semantic = None
+            if L3SemanticTM is not None:
+                try:
+                    l3_semantic = L3SemanticTM(
+                        index_dir=tm_data_dir / "l3_faiss",
+                        device="cpu"  # Use CPU for L3 to save GPU memory
+                    )
+                except Exception as e:
+                    logger.warning(f"L3 semantic TM not available: {e}")
+
+            tm = TranslationMemory(
+                l1_cache=l1_cache,
+                l2_persistent=l2_persistent,
+                l3_semantic=l3_semantic
+            )
+            logger.info("Initialized TranslationMemory (L1+L2+L3)")
         except Exception as e:
             logger.error(f"Failed to initialize TranslationMemory: {e}")
             raise
