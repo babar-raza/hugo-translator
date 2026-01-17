@@ -1406,7 +1406,7 @@ class TranslationEngine:
                             # Save partial progress before re-raising
                             progress = get_progress_tracker()
                             if progress:
-                                progress.file_completed(success=False)
+                                progress.file_completed(success=False, has_new_translations=False)
                             raise
 
                         # OOM-01: Detect OOM errors and allow RetryHandler to engage
@@ -1463,7 +1463,9 @@ class TranslationEngine:
 
             # Progress tracking: file completed
             if progress:
-                progress.file_completed(success=result.success)
+                # Calculate if any new translations occurred
+                has_new_translations = len(result.outputs) > len(result.skipped_langs)
+                progress.file_completed(success=result.success, has_new_translations=has_new_translations)
 
         except Exception as e:
             # SR-02: Handle shutdown request - re-raise to propagate up
@@ -1473,7 +1475,7 @@ class TranslationEngine:
                 # Mark file as incomplete before propagating shutdown
                 progress = get_progress_tracker()
                 if progress:
-                    progress.file_completed(success=False)
+                    progress.file_completed(success=False, has_new_translations=False)
                 raise  # Re-raise to propagate to caller
 
             # OOM-01: Detect OOM errors and allow RetryHandler to engage (outer handler)
@@ -1488,7 +1490,7 @@ class TranslationEngine:
                     progress = get_progress_tracker()
                     if progress:
                         progress.record_error("translation_error", str(e), str(file_path))
-                        progress.file_completed(success=False)
+                        progress.file_completed(success=False, has_new_translations=False)
                     raise
 
             logger.error(f"Unexpected error translating {file_path}: {e}")
@@ -1497,7 +1499,7 @@ class TranslationEngine:
             progress = get_progress_tracker()
             if progress:
                 progress.record_error("translation_error", str(e), str(file_path))
-                progress.file_completed(success=False)
+                progress.file_completed(success=False, has_new_translations=False)
             # TEL-04: Track error in telemetry
             if telemetry_run:
                 telemetry_run.log_event("error", {"error": str(e)})
