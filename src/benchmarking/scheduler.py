@@ -16,7 +16,7 @@ import yaml
 
 from src.benchmarking.storage import BenchmarkDatabase, BenchmarkRun
 from src.benchmarking.resource_monitor import ResourceMonitor, ResourceEstimate, ResourceSnapshot
-from src.benchmarking.system_info import SystemInfo
+from src.benchmarking.system_info import SystemInfo, SystemInfoCollector
 
 if TYPE_CHECKING:
     from src.shared_engines.composition_root import SharedEngines
@@ -249,7 +249,7 @@ class BenchmarkScheduler:
             queued_at = datetime.utcnow()
 
             # Estimate resources
-            system_info = SystemInfo.collect()
+            system_info = SystemInfoCollector().collect()
             estimate = self.estimator.estimate(config, system_info)
 
             # Store in queue

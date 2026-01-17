@@ -97,7 +97,7 @@ class BenchmarkDatabase:
     - JSON export/import
     """
 
-    SCHEMA_VERSION = 8
+    SCHEMA_VERSION = 9
 
     def __init__(self, db_path: Path | str):
         """Initialize database connection.
@@ -145,7 +145,31 @@ class BenchmarkDatabase:
             conn: Connection to close
         """
         if conn is not self._memory_conn:
+            # Checkpoint WAL to prevent file locking issues on Windows
+            conn.execute("PRAGMA wal_checkpoint(TRUNCATE)")
             conn.close()
+
+    def close(self) -> None:
+        """Close all database connections and checkpoint WAL.
+
+        Call this before deleting database files to ensure WAL is flushed.
+        """
+        if self._memory_conn is not None:
+            self._memory_conn.close()
+            self._memory_conn = None
+        elif self.db_path != ":memory:":
+            # For file-based databases, checkpoint WAL before final close
+            conn = self._create_connection()
+            conn.execute("PRAGMA wal_checkpoint(TRUNCATE)")
+            conn.close()
+
+    def __enter__(self) -> "BenchmarkDatabase":
+        """Enter context manager."""
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb) -> None:
+        """Exit context manager, closing connections."""
+        self.close()
 
     def _init_db(self) -> None:
         """Initialize database schema."""
@@ -524,6 +548,40 @@ class BenchmarkDatabase:
             )
             logger.info("Applied schema migration to version 8 - analytics & time-series (Phase 4.1)")
 
+        if from_version < 9:
+            # v9: Add query optimization indices (Phase 4.2)
+            # Additional composite indices for common query patterns
+
+            # Optimize trend queries with window_start filter
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_trends_model_device_start "
+                "ON benchmark_trends(model_id, device, window_start)"
+            )
+
+            # Optimize baseline queries with baseline_type filter
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_baselines_model_device_type "
+                "ON performance_baselines(model_id, device, baseline_type)"
+            )
+
+            # Optimize result aggregation queries
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_results_throughput_perf "
+                "ON benchmark_results(run_id, throughput_tokens_per_sec)"
+            )
+
+            # Optimize timestamp-based result queries
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_runs_created_at "
+                "ON benchmark_runs(model_id, device, timestamp_utc)"
+            )
+
+            conn.execute(
+                "INSERT INTO schema_version (version, applied_at) VALUES (?, ?)",
+                (9, datetime.now(UTC).isoformat()),
+            )
+            logger.info("Applied schema migration to version 9 - query optimization indices (Phase 4.2)")
+
     def create_tables(self) -> None:
         """Create database tables (idempotent).
 
@@ -742,11 +800,11 @@ class BenchmarkDatabase:
                     tokens_output=row["tokens_output"],
                     throughput_tokens_per_sec=row["throughput_tokens_per_sec"],
                     peak_memory_mb=row["peak_memory_mb"],
-                    bleu_score=row.get("bleu_score"),
-                    comet_score=row.get("comet_score"),
-                    cache_status=row.get("cache_status", "unknown"),
-                    tm_level=row.get("tm_level", "none"),
-                    cache_hit_rate=row.get("cache_hit_rate", 0.0),
+                    bleu_score=dict(row).get("bleu_score"),
+                    comet_score=dict(row).get("comet_score"),
+                    cache_status=dict(row).get("cache_status", "unknown"),
+                    tm_level=dict(row).get("tm_level", "none"),
+                    cache_hit_rate=dict(row).get("cache_hit_rate", 0.0),
                     errors=json.loads(row["errors"]),
                 )
                 for row in result_rows
@@ -915,5 +973,147 @@ class BenchmarkDatabase:
             else:
                 logger.error(f"Database integrity check failed: {result}")
             return is_ok
+        finally:
+            self._close_connection(conn)
+
+    # -------------------------------------------------------------------------
+    # Retention Policy Helpers (Phase 4.3)
+    # -------------------------------------------------------------------------
+
+    def get_retention_policies(self, enabled_only: bool = False) -> List[Dict[str, Any]]:
+        """Get retention policies from database.
+
+        Args:
+            enabled_only: Only return enabled policies
+
+        Returns:
+            List of policy dictionaries
+        """
+        conn = self._get_connection()
+        try:
+            if enabled_only:
+                cursor = conn.execute(
+                    "SELECT * FROM retention_policies WHERE enabled = 1 ORDER BY policy_name"
+                )
+            else:
+                cursor = conn.execute(
+                    "SELECT * FROM retention_policies ORDER BY policy_name"
+                )
+
+            return [dict(row) for row in cursor.fetchall()]
+        except sqlite3.Error:
+            # Table may not exist in older schemas
+            return []
+        finally:
+            self._close_connection(conn)
+
+    def get_data_age_summary(self) -> Dict[str, Any]:
+        """Get summary of data age across tables.
+
+        Returns:
+            Dictionary with data age statistics
+        """
+        conn = self._get_connection()
+        try:
+            summary = {
+                "benchmark_runs": {},
+                "benchmark_trends": {},
+                "performance_baselines": {},
+            }
+
+            # benchmark_runs
+            cursor = conn.execute("""
+                SELECT
+                    COUNT(*) as total,
+                    MIN(timestamp_utc) as oldest,
+                    MAX(timestamp_utc) as newest
+                FROM benchmark_runs
+            """)
+            row = cursor.fetchone()
+            if row:
+                summary["benchmark_runs"] = {
+                    "total": row["total"],
+                    "oldest": row["oldest"],
+                    "newest": row["newest"],
+                }
+
+            # benchmark_trends (may not exist in older schemas)
+            try:
+                cursor = conn.execute("""
+                    SELECT
+                        COUNT(*) as total,
+                        MIN(created_at) as oldest,
+                        MAX(created_at) as newest
+                    FROM benchmark_trends
+                """)
+                row = cursor.fetchone()
+                if row:
+                    summary["benchmark_trends"] = {
+                        "total": row["total"],
+                        "oldest": row["oldest"],
+                        "newest": row["newest"],
+                    }
+            except sqlite3.Error:
+                pass
+
+            # performance_baselines (may not exist in older schemas)
+            try:
+                cursor = conn.execute("""
+                    SELECT
+                        COUNT(*) as total,
+                        MIN(created_at) as oldest,
+                        MAX(created_at) as newest
+                    FROM performance_baselines
+                """)
+                row = cursor.fetchone()
+                if row:
+                    summary["performance_baselines"] = {
+                        "total": row["total"],
+                        "oldest": row["oldest"],
+                        "newest": row["newest"],
+                    }
+            except sqlite3.Error:
+                pass
+
+            return summary
+        finally:
+            self._close_connection(conn)
+
+    def get_database_stats(self) -> Dict[str, Any]:
+        """Get database statistics including size and table counts.
+
+        Returns:
+            Dictionary with database statistics
+        """
+        conn = self._get_connection()
+        try:
+            stats = {
+                "schema_version": self.get_schema_version(),
+                "tables": {},
+                "file_size_bytes": 0,
+            }
+
+            # Get file size
+            if self.db_path != ":memory:":
+                stats["file_size_bytes"] = Path(self.db_path).stat().st_size
+
+            # Get row counts for each table
+            tables = [
+                "benchmark_runs",
+                "benchmark_results",
+                "system_info",
+                "benchmark_trends",
+                "performance_baselines",
+                "retention_policies",
+            ]
+
+            for table in tables:
+                try:
+                    cursor = conn.execute(f"SELECT COUNT(*) FROM {table}")
+                    stats["tables"][table] = cursor.fetchone()[0]
+                except sqlite3.Error:
+                    stats["tables"][table] = 0
+
+            return stats
         finally:
             self._close_connection(conn)

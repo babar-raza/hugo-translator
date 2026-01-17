@@ -193,6 +193,34 @@ class MigrationManager:
             post_check=self._validate_v8_schema
         ))
 
+        # Migration v8 -> v9: Query Optimization Indices (Phase 4.2)
+        self._migrations.append(Migration(
+            version=9,
+            description="Add query optimization indices for common query patterns",
+            up_sql=[
+                # Optimize trend queries with window_start filter
+                """
+                CREATE INDEX IF NOT EXISTS idx_trends_model_device_start
+                ON benchmark_trends(model_id, device, window_start)
+                """,
+                # Optimize baseline queries with baseline_type filter
+                """
+                CREATE INDEX IF NOT EXISTS idx_baselines_model_device_type
+                ON performance_baselines(model_id, device, baseline_type)
+                """,
+                # Optimize results queries with timestamp filter
+                """
+                CREATE INDEX IF NOT EXISTS idx_results_run_timestamp
+                ON benchmark_results(run_id, sample_id)
+                """,
+            ],
+            down_sql=[
+                "DROP INDEX IF EXISTS idx_results_run_timestamp",
+                "DROP INDEX IF EXISTS idx_baselines_model_device_type",
+                "DROP INDEX IF EXISTS idx_trends_model_device_start",
+            ],
+        ))
+
     def _validate_v8_schema(self, conn: sqlite3.Connection) -> bool:
         """Validate schema v8 tables exist with correct structure.
 
