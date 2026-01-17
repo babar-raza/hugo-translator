@@ -1,4 +1,5 @@
 site_id: products.aspose.net
+display_name: Landing Pages
 content_roots:
 - /content/products
 default_source_lang: en
@@ -26,7 +27,7 @@ target_langs:
   - lv
   - ms
   - nl
-  - no
+  - "no"
   - pl
   - pt
   - ro

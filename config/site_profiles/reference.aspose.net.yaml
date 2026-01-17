@@ -1,4 +1,5 @@
 site_id: reference.aspose.net
+display_name: API References
 content_roots:
 - /content/reference
 default_source_lang: en
@@ -26,7 +27,7 @@ target_langs:
   - lv
   - ms
   - nl
-  - no
+  - "no"
   - pl
   - pt
   - ro

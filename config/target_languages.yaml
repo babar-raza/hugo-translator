@@ -189,7 +189,7 @@ languages:
     script: Latn
     family: indo-european
 
-  - iso_code: no
+  - iso_code: "no"
     name: Norwegian
     native_name: Norsk
     aspose_locale: nb-no

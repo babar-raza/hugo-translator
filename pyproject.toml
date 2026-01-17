@@ -61,7 +61,7 @@ gpu = [
 ]
 quality = [
     "langdetect==1.0.9",  # Language detection for AST translation purity checks (fallback, graceful degradation)
-    "fasttext>=0.9.2",    # FastText language detection (preferred, 176 languages, higher accuracy)
+    "fasttext>=0.9.2; python_version<'3.13'",  # FastText language detection (preferred, 176 languages, higher accuracy) - Python 3.13 not supported due to C++ compiler issues
 ]
 m2m100 = [
     "sentencepiece>=0.1.99",  # Required for M2M100 and NLLB multilingual models
@@ -149,6 +149,7 @@ ignore_missing_imports = true
 minversion = "7.0"
 addopts = "-ra -q --strict-markers --cov=src --cov-report=term-missing --cov-report=html"
 testpaths = ["tests"]
+norecursedirs = ["scripts", "archive", "docs", "specs", ".git", "venv", ".venv", "build", "dist"]
 python_files = ["test_*.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]

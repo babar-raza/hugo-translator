@@ -1,4 +1,5 @@
 site_id: about.aspose.net
+display_name: files
 content_roots:
 - /content/about
 default_source_lang: en

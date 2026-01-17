@@ -29,19 +29,19 @@ frontmatter:
     
   # Keep date unchanged
   date:
-    mode: "keep"
+    mode: "passthrough"
     
   # Keep draft status unchanged
   draft:
-    mode: "keep"
+    mode: "passthrough"
     
   # Keep tags unchanged (or use "translate" to translate tag names)
   tags:
-    mode: "keep"
+    mode: "passthrough"
     
   # Keep categories unchanged
   categories:
-    mode: "keep"
+    mode: "passthrough"
     
   # Translate custom excerpt field
   excerpt:

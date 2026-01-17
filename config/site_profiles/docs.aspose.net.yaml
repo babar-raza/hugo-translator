@@ -1,4 +1,5 @@
 site_id: docs.aspose.net
+display_name: Documentation
 content_roots:
 - /content/docs
 default_source_lang: en

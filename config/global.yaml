@@ -428,19 +428,42 @@ l4_llm:
   max_latency_ms: 500  # Maximum acceptable latency for adaptation
   cache_adaptations: true  # Cache LLM adaptations in L2
 
+# Autonomous Content Translation Worker Configuration
+# Scheduled translation of Hugo content directories
+autonomous_content_translation:
+  # Master toggle for content translation worker
+  enabled: true
+
+  # Scheduling configuration (4+ runs/day with CUDA support)
+  schedule:
+    runs_per_day: 4  # Number of translation runs per day (minimum 4 as requested)
+    window_start: "08:00"  # Start of daily window (America/Los_Angeles)
+    window_end: "23:00"  # End of daily window (America/Los_Angeles)
+    timezone: "America/Los_Angeles"
+    jitter_minutes: 15  # Random jitter to avoid exact timing patterns
+
+  # Execution configuration
+  execution:
+    device: "cuda"  # Force CUDA usage for translation
+    max_gpu_memory_percent: 50  # Maximum GPU memory usage (50% budget for safety)
+    max_sites_per_run: null  # Process all sites (null = no limit)
+
+  # Git commit configuration (uses global git_commit settings)
+  # Auto-commits are enabled via git_commit.enabled and git_commit.auto_push
+
 # TM Improvement Worker Configuration
 # Autonomous worker that uses LLM to improve TM entries during off-peak hours
 tm_improvement:
   # Master toggle for TM improvement worker
   enabled: true
 
-  # Scheduling configuration (4-5 runs/day during off-peak hours)
+  # Scheduling configuration (4+ runs/day with CUDA support)
   schedule:
-    runs_per_day: 5  # Number of improvement runs per day
-    window_start: "10:00"  # Start of daily window (America/Los_Angeles)
-    window_end: "22:00"  # End of daily window (America/Los_Angeles)
+    runs_per_day: 4  # Number of improvement runs per day (minimum 4 as requested)
+    window_start: "08:00"  # Start of daily window (America/Los_Angeles) - expanded window
+    window_end: "23:00"  # End of daily window (America/Los_Angeles) - expanded window
     timezone: "America/Los_Angeles"
-    jitter_minutes: 10  # Random jitter to avoid exact timing patterns
+    jitter_minutes: 15  # Random jitter to avoid exact timing patterns
 
   # Improvement batch configuration
   batch:
@@ -467,9 +490,10 @@ tm_improvement:
 
   # VRAM management (for Ollama using GPU)
   resources:
-    max_gpu_memory_percent: 60  # Maximum GPU memory usage (60% budget)
+    device: "cuda"  # Force CUDA usage for workers
+    max_gpu_memory_percent: 50  # Maximum GPU memory usage (50% budget for safety)
     preflight_check: true  # Check GPU usage before starting run
-    abort_on_high_usage: true  # Abort run if GPU already >=60% at start
+    abort_on_high_usage: true  # Abort run if GPU already >=50% at start
 
 # Validation defaults
 validation_defaults:

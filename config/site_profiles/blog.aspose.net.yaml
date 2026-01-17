@@ -5,6 +5,7 @@
 #            to prevent creating double-language files like index.es.da.md
 
 site_id: blog.aspose.net
+display_name: blog posts
 content_roots:
 - /content/blog
 default_source_lang: en
