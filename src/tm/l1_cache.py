@@ -76,7 +76,7 @@ class L1Cache:
         # Create deterministic key
         key_data = f"{site_id}:{src_lang}:{tgt_lang}:{text}"
         # Use MD5 for speed (not security-critical)
-        return hashlib.md5(key_data.encode()).hexdigest()
+        return hashlib.md5(key_data.encode(), usedforsecurity=False).hexdigest()
 
     def get(
         self, site_id: str, src_lang: str, tgt_lang: str, text: str

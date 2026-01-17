@@ -44,9 +44,9 @@ def compute_file_hash(
     start_time = time.time()
 
     if algorithm == "md5":
-        hasher = hashlib.md5()
+        hasher = hashlib.md5(usedforsecurity=False)
     elif algorithm == "sha1":
-        hasher = hashlib.sha1()
+        hasher = hashlib.sha1(usedforsecurity=False)
     elif algorithm == "sha256":
         hasher = hashlib.sha256()
     else:

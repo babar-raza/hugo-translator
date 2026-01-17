@@ -434,7 +434,7 @@ class CorpusManager:
 
         # Use path hash for uniqueness
         path_str = str(rel_path.as_posix())
-        path_hash = hashlib.md5(path_str.encode()).hexdigest()[:8]
+        path_hash = hashlib.md5(path_str.encode(), usedforsecurity=False).hexdigest()[:8]
 
         return f"{category}_{path_hash}"
 

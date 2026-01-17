@@ -2525,6 +2525,7 @@ def translate_site(args: argparse.Namespace) -> int:
                     md_files = all_md_files
 
                 # Pre-parse all files to discover accurate segment totals
+                source_lang = getattr(site_profile, 'default_source_lang', 'en')
                 total_segments = engine._discover_all_segments(
                     files=md_files,
                     target_langs=target_langs,

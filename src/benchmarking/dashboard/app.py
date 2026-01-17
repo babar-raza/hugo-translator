@@ -836,4 +836,6 @@ if __name__ == '__main__':
     print("⚠️  WARNING: This dashboard is NOT production-ready.")
     print("   Security hardening (auth, HTTPS) is planned for future work.")
 
-    app.run(host='0.0.0.0', port=8080, debug=True)
+    # Use environment variable to control debug mode (disabled in production)
+    debug_mode = os.getenv('FLASK_DEBUG', 'false').lower() == 'true'
+    app.run(host='0.0.0.0', port=8080, debug=debug_mode)

@@ -44,7 +44,7 @@ def hash_text(text: str) -> str:
         MD5 hash (hex string)
     """
     normalized = normalize_text(text)
-    return hashlib.md5(normalized.encode("utf-8")).hexdigest()
+    return hashlib.md5(normalized.encode("utf-8"), usedforsecurity=False).hexdigest()
 
 
 def make_tm_key(
