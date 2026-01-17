@@ -1,0 +1,49 @@
+# WS5 Test Scenario 4: All Systems Disabled
+# Used for Test 5.4 (Graceful Degradation)
+
+# Model configuration
+model_defaults:
+  default_model: "m2m100_418m"
+  fallback_model: "m2m100_418m"
+  cache_dir: "./models"
+
+# Autonomous Recovery Configuration - DISABLED
+autonomous_recovery:
+  # OOM Retry Handler - DISABLED
+  oom_retry:
+    enabled: false
+    max_retries: 3
+    batch_reduction_factor: 0.5
+    min_batch_size: 1
+
+# Adaptive Batch Translation - DISABLED
+adaptive:
+  enabled: false
+  fallback_rate_threshold: 0.05
+  state_file: ".translation_progress/batch_stats.json"
+
+# Language Detection
+language_detection:
+  provider: "fasttext"
+  fasttext:
+    model_path: "./models/fasttext/lid.176.bin"
+  adaptive_similarity:
+    enabled: false
+
+# Telemetry
+telemetry:
+  enabled: false
+  sentry:
+    dsn: ""
+
+# Commit Configuration
+commit:
+  enabled: false
+  commit_per_language: false
+  message_style: "standard"
+
+# Translation Engine
+engine:
+  batch_size: 20
+  parallel_files: false
+  skip_existing: false

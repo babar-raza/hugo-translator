@@ -1,0 +1,619 @@
+# Auto-generated Opus model registry
+# Generated from: config\target_languages.yaml
+# Source language: en
+# Target languages: 36
+# Available models: 36
+
+models:
+- model_id: opus_en_ar
+  name: Opus-MT EN-AR
+  backend: opus
+  supported_pairs:
+  - - en
+    - ar
+  - - ar
+    - en
+  model_size_mb: 300
+  min_ram_gb: 1.0
+  optimal_device: cpu
+  parameters: 77000000
+  license: CC-BY-4.0
+  hf_model_id: Helsinki-NLP/opus-mt-en-ar
+  local_path: models/opus/opus-mt-en-ar
+  description: "Specialized bilingual model for en\u2194ar. Fast and lightweight."
+  available: true
+- model_id: opus_en_bg
+  name: Opus-MT EN-BG
+  backend: opus
+  supported_pairs:
+  - - en
+    - bg
+  - - bg
+    - en
+  model_size_mb: 300
+  min_ram_gb: 1.0
+  optimal_device: cpu
+  parameters: 77000000
+  license: CC-BY-4.0
+  hf_model_id: Helsinki-NLP/opus-mt-en-bg
+  local_path: models/opus/opus-mt-en-bg
+  description: "Specialized bilingual model for en\u2194bg. Fast and lightweight."
+  available: true
+- model_id: opus_en_ca
+  name: Opus-MT EN-CA
+  backend: opus
+  supported_pairs:
+  - - en
+    - ca
+  - - ca
+    - en
+  model_size_mb: 300
+  min_ram_gb: 1.0
+  optimal_device: cpu
+  parameters: 77000000
+  license: CC-BY-4.0
+  hf_model_id: Helsinki-NLP/opus-mt-en-ca
+  local_path: models/opus/opus-mt-en-ca
+  description: "Specialized bilingual model for en\u2194ca. Fast and lightweight."
+  available: true
+- model_id: opus_en_cs
+  name: Opus-MT EN-CS
+  backend: opus
+  supported_pairs:
+  - - en
+    - cs
+  - - cs
+    - en
+  model_size_mb: 300
+  min_ram_gb: 1.0
+  optimal_device: cpu
+  parameters: 77000000
+  license: CC-BY-4.0
+  hf_model_id: Helsinki-NLP/opus-mt-en-cs
+  local_path: models/opus/opus-mt-en-cs
+  description: "Specialized bilingual model for en\u2194cs. Fast and lightweight."
+  available: true
+- model_id: opus_en_da
+  name: Opus-MT EN-DA
+  backend: opus
+  supported_pairs:
+  - - en
+    - da
+  - - da
+    - en
+  model_size_mb: 300
+  min_ram_gb: 1.0
+  optimal_device: cpu
+  parameters: 77000000
+  license: CC-BY-4.0
+  hf_model_id: Helsinki-NLP/opus-mt-en-da
+  local_path: models/opus/opus-mt-en-da
+  description: "Specialized bilingual model for en\u2194da. Fast and lightweight."
+  available: true
+- model_id: opus_en_de
+  name: Opus-MT EN-DE
+  backend: opus
+  supported_pairs:
+  - - en
+    - de
+  - - de
+    - en
+  model_size_mb: 300
+  min_ram_gb: 1.0
+  optimal_device: cpu
+  parameters: 77000000
+  license: CC-BY-4.0
+  hf_model_id: Helsinki-NLP/opus-mt-en-de
+  local_path: models/opus/opus-mt-en-de
+  description: "Specialized bilingual model for en\u2194de. Fast and lightweight."
+  available: true
+- model_id: opus_en_el
+  name: Opus-MT EN-EL
+  backend: opus
+  supported_pairs:
+  - - en
+    - el
+  - - el
+    - en
+  model_size_mb: 300
+  min_ram_gb: 1.0
+  optimal_device: cpu
+  parameters: 77000000
+  license: CC-BY-4.0
+  hf_model_id: Helsinki-NLP/opus-mt-en-el
+  local_path: models/opus/opus-mt-en-el
+  description: "Specialized bilingual model for en\u2194el. Fast and lightweight."
+  available: true
+- model_id: opus_en_es
+  name: Opus-MT EN-ES
+  backend: opus
+  supported_pairs:
+  - - en
+    - es
+  - - es
+    - en
+  model_size_mb: 300
+  min_ram_gb: 1.0
+  optimal_device: cpu
+  parameters: 77000000
+  license: CC-BY-4.0
+  hf_model_id: Helsinki-NLP/opus-mt-en-es
+  local_path: models/opus/opus-mt-en-es
+  description: "Specialized bilingual model for en\u2194es. Fast and lightweight."
+  available: true
+- model_id: opus_en_fa
+  name: Opus-MT EN-FA
+  backend: opus
+  supported_pairs:
+  - - en
+    - fa
+  - - fa
+    - en
+  model_size_mb: 300
+  min_ram_gb: 1.0
+  optimal_device: cpu
+  parameters: 77000000
+  license: CC-BY-4.0
+  hf_model_id: Helsinki-NLP/opus-mt-en-fa
+  local_path: models/opus/opus-mt-en-fa
+  description: "Specialized bilingual model for en\u2194fa. Fast and lightweight."
+  available: true
+- model_id: opus_en_fi
+  name: Opus-MT EN-FI
+  backend: opus
+  supported_pairs:
+  - - en
+    - fi
+  - - fi
+    - en
+  model_size_mb: 300
+  min_ram_gb: 1.0
+  optimal_device: cpu
+  parameters: 77000000
+  license: CC-BY-4.0
+  hf_model_id: Helsinki-NLP/opus-mt-en-fi
+  local_path: models/opus/opus-mt-en-fi
+  description: "Specialized bilingual model for en\u2194fi. Fast and lightweight."
+  available: true
+- model_id: opus_en_fr
+  name: Opus-MT EN-FR
+  backend: opus
+  supported_pairs:
+  - - en
+    - fr
+  - - fr
+    - en
+  model_size_mb: 300
+  min_ram_gb: 1.0
+  optimal_device: cpu
+  parameters: 77000000
+  license: CC-BY-4.0
+  hf_model_id: Helsinki-NLP/opus-mt-en-fr
+  local_path: models/opus/opus-mt-en-fr
+  description: "Specialized bilingual model for en\u2194fr. Fast and lightweight."
+  available: true
+- model_id: opus_en_he
+  name: Opus-MT EN-HE
+  backend: opus
+  supported_pairs:
+  - - en
+    - he
+  - - he
+    - en
+  model_size_mb: 300
+  min_ram_gb: 1.0
+  optimal_device: cpu
+  parameters: 77000000
+  license: CC-BY-4.0
+  hf_model_id: Helsinki-NLP/opus-mt-en-he
+  local_path: models/opus/opus-mt-en-he
+  description: "Specialized bilingual model for en\u2194he. Fast and lightweight."
+  available: true
+- model_id: opus_en_hi
+  name: Opus-MT EN-HI
+  backend: opus
+  supported_pairs:
+  - - en
+    - hi
+  - - hi
+    - en
+  model_size_mb: 300
+  min_ram_gb: 1.0
+  optimal_device: cpu
+  parameters: 77000000
+  license: CC-BY-4.0
+  hf_model_id: Helsinki-NLP/opus-mt-en-hi
+  local_path: models/opus/opus-mt-en-hi
+  description: "Specialized bilingual model for en\u2194hi. Fast and lightweight."
+  available: true
+- model_id: opus_en_hr
+  name: Opus-MT EN-HR
+  backend: opus
+  supported_pairs:
+  - - en
+    - hr
+  - - hr
+    - en
+  model_size_mb: 300
+  min_ram_gb: 1.0
+  optimal_device: cpu
+  parameters: 77000000
+  license: CC-BY-4.0
+  hf_model_id: Helsinki-NLP/opus-mt-en-hr
+  local_path: models/opus/opus-mt-en-hr
+  description: "Specialized bilingual model for en\u2194hr. Fast and lightweight."
+  available: true
+- model_id: opus_en_hu
+  name: Opus-MT EN-HU
+  backend: opus
+  supported_pairs:
+  - - en
+    - hu
+  - - hu
+    - en
+  model_size_mb: 300
+  min_ram_gb: 1.0
+  optimal_device: cpu
+  parameters: 77000000
+  license: CC-BY-4.0
+  hf_model_id: Helsinki-NLP/opus-mt-en-hu
+  local_path: models/opus/opus-mt-en-hu
+  description: "Specialized bilingual model for en\u2194hu. Fast and lightweight."
+  available: true
+- model_id: opus_en_id
+  name: Opus-MT EN-ID
+  backend: opus
+  supported_pairs:
+  - - en
+    - id
+  - - id
+    - en
+  model_size_mb: 300
+  min_ram_gb: 1.0
+  optimal_device: cpu
+  parameters: 77000000
+  license: CC-BY-4.0
+  hf_model_id: Helsinki-NLP/opus-mt-en-id
+  local_path: models/opus/opus-mt-en-id
+  description: "Specialized bilingual model for en\u2194id. Fast and lightweight."
+  available: true
+- model_id: opus_en_it
+  name: Opus-MT EN-IT
+  backend: opus
+  supported_pairs:
+  - - en
+    - it
+  - - it
+    - en
+  model_size_mb: 300
+  min_ram_gb: 1.0
+  optimal_device: cpu
+  parameters: 77000000
+  license: CC-BY-4.0
+  hf_model_id: Helsinki-NLP/opus-mt-en-it
+  local_path: models/opus/opus-mt-en-it
+  description: "Specialized bilingual model for en\u2194it. Fast and lightweight."
+  available: true
+- model_id: opus_en_ja
+  name: Opus-MT EN-JA
+  backend: opus
+  supported_pairs:
+  - - en
+    - ja
+  - - ja
+    - en
+  model_size_mb: 300
+  min_ram_gb: 1.0
+  optimal_device: cpu
+  parameters: 77000000
+  license: CC-BY-4.0
+  hf_model_id: Helsinki-NLP/opus-mt-en-ja
+  local_path: models/opus/opus-mt-en-ja
+  description: "Specialized bilingual model for en\u2194ja. Fast and lightweight."
+  available: true
+- model_id: opus_en_ko
+  name: Opus-MT EN-KO
+  backend: opus
+  supported_pairs:
+  - - en
+    - ko
+  - - ko
+    - en
+  model_size_mb: 300
+  min_ram_gb: 1.0
+  optimal_device: cpu
+  parameters: 77000000
+  license: CC-BY-4.0
+  hf_model_id: Helsinki-NLP/opus-mt-en-ko
+  local_path: models/opus/opus-mt-en-ko
+  description: "Specialized bilingual model for en\u2194ko. Fast and lightweight."
+  available: true
+- model_id: opus_en_lt
+  name: Opus-MT EN-LT
+  backend: opus
+  supported_pairs:
+  - - en
+    - lt
+  - - lt
+    - en
+  model_size_mb: 300
+  min_ram_gb: 1.0
+  optimal_device: cpu
+  parameters: 77000000
+  license: CC-BY-4.0
+  hf_model_id: Helsinki-NLP/opus-mt-en-lt
+  local_path: models/opus/opus-mt-en-lt
+  description: "Specialized bilingual model for en\u2194lt. Fast and lightweight."
+  available: true
+- model_id: opus_en_lv
+  name: Opus-MT EN-LV
+  backend: opus
+  supported_pairs:
+  - - en
+    - lv
+  - - lv
+    - en
+  model_size_mb: 300
+  min_ram_gb: 1.0
+  optimal_device: cpu
+  parameters: 77000000
+  license: CC-BY-4.0
+  hf_model_id: Helsinki-NLP/opus-mt-en-lv
+  local_path: models/opus/opus-mt-en-lv
+  description: "Specialized bilingual model for en\u2194lv. Fast and lightweight."
+  available: true
+- model_id: opus_en_ms
+  name: Opus-MT EN-MS
+  backend: opus
+  supported_pairs:
+  - - en
+    - ms
+  - - ms
+    - en
+  model_size_mb: 300
+  min_ram_gb: 1.0
+  optimal_device: cpu
+  parameters: 77000000
+  license: CC-BY-4.0
+  hf_model_id: Helsinki-NLP/opus-mt-en-ms
+  local_path: models/opus/opus-mt-en-ms
+  description: "Specialized bilingual model for en\u2194ms. Fast and lightweight."
+  available: true
+- model_id: opus_en_nl
+  name: Opus-MT EN-NL
+  backend: opus
+  supported_pairs:
+  - - en
+    - nl
+  - - nl
+    - en
+  model_size_mb: 300
+  min_ram_gb: 1.0
+  optimal_device: cpu
+  parameters: 77000000
+  license: CC-BY-4.0
+  hf_model_id: Helsinki-NLP/opus-mt-en-nl
+  local_path: models/opus/opus-mt-en-nl
+  description: "Specialized bilingual model for en\u2194nl. Fast and lightweight."
+  available: true
+- model_id: opus_en_no
+  name: Opus-MT EN-NO
+  backend: opus
+  supported_pairs:
+  - - en
+    - 'no'
+  - - 'no'
+    - en
+  model_size_mb: 300
+  min_ram_gb: 1.0
+  optimal_device: cpu
+  parameters: 77000000
+  license: CC-BY-4.0
+  hf_model_id: Helsinki-NLP/opus-mt-en-no
+  local_path: models/opus/opus-mt-en-no
+  description: "Specialized bilingual model for en\u2194no. Fast and lightweight."
+  available: true
+- model_id: opus_en_pl
+  name: Opus-MT EN-PL
+  backend: opus
+  supported_pairs:
+  - - en
+    - pl
+  - - pl
+    - en
+  model_size_mb: 300
+  min_ram_gb: 1.0
+  optimal_device: cpu
+  parameters: 77000000
+  license: CC-BY-4.0
+  hf_model_id: Helsinki-NLP/opus-mt-en-pl
+  local_path: models/opus/opus-mt-en-pl
+  description: "Specialized bilingual model for en\u2194pl. Fast and lightweight."
+  available: true
+- model_id: opus_en_pt
+  name: Opus-MT EN-PT
+  backend: opus
+  supported_pairs:
+  - - en
+    - pt
+  - - pt
+    - en
+  model_size_mb: 300
+  min_ram_gb: 1.0
+  optimal_device: cpu
+  parameters: 77000000
+  license: CC-BY-4.0
+  hf_model_id: Helsinki-NLP/opus-mt-en-pt
+  local_path: models/opus/opus-mt-en-pt
+  description: "Specialized bilingual model for en\u2194pt. Fast and lightweight."
+  available: true
+- model_id: opus_en_ro
+  name: Opus-MT EN-RO
+  backend: opus
+  supported_pairs:
+  - - en
+    - ro
+  - - ro
+    - en
+  model_size_mb: 300
+  min_ram_gb: 1.0
+  optimal_device: cpu
+  parameters: 77000000
+  license: CC-BY-4.0
+  hf_model_id: Helsinki-NLP/opus-mt-en-ro
+  local_path: models/opus/opus-mt-en-ro
+  description: "Specialized bilingual model for en\u2194ro. Fast and lightweight."
+  available: true
+- model_id: opus_en_ru
+  name: Opus-MT EN-RU
+  backend: opus
+  supported_pairs:
+  - - en
+    - ru
+  - - ru
+    - en
+  model_size_mb: 300
+  min_ram_gb: 1.0
+  optimal_device: cpu
+  parameters: 77000000
+  license: CC-BY-4.0
+  hf_model_id: Helsinki-NLP/opus-mt-en-ru
+  local_path: models/opus/opus-mt-en-ru
+  description: "Specialized bilingual model for en\u2194ru. Fast and lightweight."
+  available: true
+- model_id: opus_en_sk
+  name: Opus-MT EN-SK
+  backend: opus
+  supported_pairs:
+  - - en
+    - sk
+  - - sk
+    - en
+  model_size_mb: 300
+  min_ram_gb: 1.0
+  optimal_device: cpu
+  parameters: 77000000
+  license: CC-BY-4.0
+  hf_model_id: Helsinki-NLP/opus-mt-en-sk
+  local_path: models/opus/opus-mt-en-sk
+  description: "Specialized bilingual model for en\u2194sk. Fast and lightweight."
+  available: true
+- model_id: opus_en_sr
+  name: Opus-MT EN-SR
+  backend: opus
+  supported_pairs:
+  - - en
+    - sr
+  - - sr
+    - en
+  model_size_mb: 300
+  min_ram_gb: 1.0
+  optimal_device: cpu
+  parameters: 77000000
+  license: CC-BY-4.0
+  hf_model_id: Helsinki-NLP/opus-mt-en-sr
+  local_path: models/opus/opus-mt-en-sr
+  description: "Specialized bilingual model for en\u2194sr. Fast and lightweight."
+  available: true
+- model_id: opus_en_sv
+  name: Opus-MT EN-SV
+  backend: opus
+  supported_pairs:
+  - - en
+    - sv
+  - - sv
+    - en
+  model_size_mb: 300
+  min_ram_gb: 1.0
+  optimal_device: cpu
+  parameters: 77000000
+  license: CC-BY-4.0
+  hf_model_id: Helsinki-NLP/opus-mt-en-sv
+  local_path: models/opus/opus-mt-en-sv
+  description: "Specialized bilingual model for en\u2194sv. Fast and lightweight."
+  available: true
+- model_id: opus_en_th
+  name: Opus-MT EN-TH
+  backend: opus
+  supported_pairs:
+  - - en
+    - th
+  - - th
+    - en
+  model_size_mb: 300
+  min_ram_gb: 1.0
+  optimal_device: cpu
+  parameters: 77000000
+  license: CC-BY-4.0
+  hf_model_id: Helsinki-NLP/opus-mt-en-th
+  local_path: models/opus/opus-mt-en-th
+  description: "Specialized bilingual model for en\u2194th. Fast and lightweight."
+  available: true
+- model_id: opus_en_tr
+  name: Opus-MT EN-TR
+  backend: opus
+  supported_pairs:
+  - - en
+    - tr
+  - - tr
+    - en
+  model_size_mb: 300
+  min_ram_gb: 1.0
+  optimal_device: cpu
+  parameters: 77000000
+  license: CC-BY-4.0
+  hf_model_id: Helsinki-NLP/opus-mt-en-tr
+  local_path: models/opus/opus-mt-en-tr
+  description: "Specialized bilingual model for en\u2194tr. Fast and lightweight."
+  available: true
+- model_id: opus_en_uk
+  name: Opus-MT EN-UK
+  backend: opus
+  supported_pairs:
+  - - en
+    - uk
+  - - uk
+    - en
+  model_size_mb: 300
+  min_ram_gb: 1.0
+  optimal_device: cpu
+  parameters: 77000000
+  license: CC-BY-4.0
+  hf_model_id: Helsinki-NLP/opus-mt-en-uk
+  local_path: models/opus/opus-mt-en-uk
+  description: "Specialized bilingual model for en\u2194uk. Fast and lightweight."
+  available: true
+- model_id: opus_en_vi
+  name: Opus-MT EN-VI
+  backend: opus
+  supported_pairs:
+  - - en
+    - vi
+  - - vi
+    - en
+  model_size_mb: 300
+  min_ram_gb: 1.0
+  optimal_device: cpu
+  parameters: 77000000
+  license: CC-BY-4.0
+  hf_model_id: Helsinki-NLP/opus-mt-en-vi
+  local_path: models/opus/opus-mt-en-vi
+  description: "Specialized bilingual model for en\u2194vi. Fast and lightweight."
+  available: true
+- model_id: opus_en_zh
+  name: Opus-MT EN-ZH
+  backend: opus
+  supported_pairs:
+  - - en
+    - zh
+  - - zh
+    - en
+  model_size_mb: 300
+  min_ram_gb: 1.0
+  optimal_device: cpu
+  parameters: 77000000
+  license: CC-BY-4.0
+  hf_model_id: Helsinki-NLP/opus-mt-en-zh
+  local_path: models/opus/opus-mt-en-zh
+  description: "Specialized bilingual model for en\u2194zh. Fast and lightweight."
+  available: true
