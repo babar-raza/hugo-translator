@@ -3,12 +3,15 @@ Model Registry for translation model catalog and selection.
 
 Manages available translation models with metadata.
 """
+import logging
 import yaml
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Dict, List, Literal, Optional, Tuple
 
 from .hardware import HardwareInfo
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -205,6 +208,11 @@ class ModelRegistry:
         """
         Recommend best model for given hardware and language pair.
 
+        Implements a 2-tier fallback chain:
+        1. Opus-specific models (fast, specialized for language pair)
+        2. Multilingual models (m2m100, nllb - support all language pairs)
+        3. ValueError if no models available
+
         Args:
             src_lang: Source language code
             tgt_lang: Target language code
@@ -215,20 +223,66 @@ class ModelRegistry:
             Recommended ModelInfo
 
         Raises:
-            ValueError: If no suitable model found
+            ValueError: If no suitable model found (including multilingual fallback)
         """
         lang_pair = (src_lang, tgt_lang)
 
-        # Get models that support the language pair
+        # Tier 1: Try Opus-specific models first (fast, specialized)
+        # Exclude multilingual models (supported_pairs="all") from this tier
         candidates = [
             m for m in self.models.values()
-            if self._supports_lang_pair(m, lang_pair)
+            if self._supports_lang_pair(m, lang_pair) and m.supported_pairs != "all"
         ]
 
-        if not candidates:
-            raise ValueError(
-                f"No models found for language pair: {src_lang}->{tgt_lang}"
+        if candidates:
+            logger.debug(f"Found {len(candidates)} Opus models for {src_lang}→{tgt_lang}")
+            return self._select_best(candidates, hardware, prefer_quality)
+
+        # Tier 2: Fallback to multilingual models (covers all language pairs)
+        multilingual = [
+            m for m in self.models.values()
+            if m.supported_pairs == "all"
+        ]
+
+        if multilingual:
+            logger.info(
+                f"No Opus model for {src_lang}→{tgt_lang}, using multilingual fallback "
+                f"({len(multilingual)} models available)"
             )
+            return self._select_best(multilingual, hardware, prefer_quality)
+
+        # Tier 3: No models available at all
+        logger.warning(
+            f"No models available for {src_lang}→{tgt_lang}. "
+            f"Registry contains {len(self.models)} models total."
+        )
+        raise ValueError(
+            f"No models available for {src_lang}→{tgt_lang}. "
+            "Registry contains no models supporting this pair or multilingual models."
+        )
+
+    def _select_best(
+        self,
+        candidates: List[ModelInfo],
+        hardware: HardwareInfo,
+        prefer_quality: bool,
+    ) -> ModelInfo:
+        """
+        Select best model from candidates based on hardware and preferences.
+
+        Args:
+            candidates: List of candidate models to choose from
+            hardware: Hardware capabilities
+            prefer_quality: Whether to prefer quality over speed
+
+        Returns:
+            Best ModelInfo from candidates
+
+        Raises:
+            ValueError: If candidates list is empty
+        """
+        if not candidates:
+            raise ValueError("Cannot select from empty candidate list")
 
         # Filter by hardware constraints
         suitable = []
@@ -244,6 +298,10 @@ class ModelRegistry:
 
         if not suitable:
             # No exact match, return smallest model
+            logger.debug(
+                f"No hardware-compatible models found, selecting smallest "
+                f"from {len(candidates)} candidates"
+            )
             return min(candidates, key=lambda m: m.model_size_mb)
 
         # Score models
@@ -254,7 +312,12 @@ class ModelRegistry:
 
         # Return highest scored model
         scored.sort(key=lambda x: x[0], reverse=True)
-        return scored[0][1]
+        best_model = scored[0][1]
+        logger.debug(
+            f"Selected {best_model.model_id} from {len(suitable)} suitable models "
+            f"(score: {scored[0][0]:.2f})"
+        )
+        return best_model
 
     def _score_model(
         self, model: ModelInfo, hardware: HardwareInfo, prefer_quality: bool
