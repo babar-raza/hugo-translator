@@ -199,6 +199,10 @@ class HugoParser:
                 node, i = self._parse_list(tokens, i, ordered=True)
                 ast.append(node)
 
+            elif token.type == "table_open":
+                node, i = self._parse_table(tokens, i)
+                ast.append(node)
+
             else:
                 i += 1
 
@@ -402,3 +406,141 @@ class HugoParser:
                 i += 1
 
         return list_item_node(children, node_id=self._generate_node_id()), i + 1
+
+    def _parse_table(self, tokens: List, start_idx: int) -> Tuple[ASTNode, int]:
+        """Parse a table from tokens.
+
+        Args:
+            tokens: Full token list
+            start_idx: Index of table_open token
+
+        Returns:
+            Tuple of (table_node, end_index)
+        """
+        rows = []
+        i = start_idx + 1  # Skip table_open
+
+        while i < len(tokens):
+            token = tokens[i]
+
+            if token.type == "table_close":
+                break
+
+            # Parse thead section
+            if token.type == "thead_open":
+                i += 1  # Skip thead_open
+                while i < len(tokens) and tokens[i].type != "thead_close":
+                    if tokens[i].type == "tr_open":
+                        row_node, i = self._parse_table_row(tokens, i, is_header=True)
+                        if row_node:
+                            rows.append(row_node)
+                    else:
+                        i += 1
+                i += 1  # Skip thead_close
+
+            # Parse tbody section
+            elif token.type == "tbody_open":
+                i += 1  # Skip tbody_open
+                while i < len(tokens) and tokens[i].type != "tbody_close":
+                    if tokens[i].type == "tr_open":
+                        row_node, i = self._parse_table_row(tokens, i, is_header=False)
+                        if row_node:
+                            rows.append(row_node)
+                    else:
+                        i += 1
+                i += 1  # Skip tbody_close
+
+            else:
+                i += 1
+
+        return ASTNode(type=NodeType.TABLE, children=rows, node_id=self._generate_node_id()), i + 1
+
+    def _parse_table_row(self, tokens: List, start_idx: int, is_header: bool) -> Tuple[Optional[ASTNode], int]:
+        """Parse a table row from tokens.
+
+        Args:
+            tokens: Full token list
+            start_idx: Index of tr_open token
+            is_header: Whether this is a header row
+
+        Returns:
+            Tuple of (table_row_node, end_index)
+        """
+        cells = []
+        i = start_idx + 1  # Skip tr_open
+
+        while i < len(tokens):
+            token = tokens[i]
+
+            if token.type == "tr_close":
+                break
+
+            # Parse header cells (th)
+            if token.type == "th_open":
+                cell_node, i = self._parse_table_cell(tokens, i, is_header=True)
+                if cell_node:
+                    cells.append(cell_node)
+
+            # Parse data cells (td)
+            elif token.type == "td_open":
+                cell_node, i = self._parse_table_cell(tokens, i, is_header=False)
+                if cell_node:
+                    cells.append(cell_node)
+
+            else:
+                i += 1
+
+        attrs = {"is_header": is_header}
+        return ASTNode(type=NodeType.TABLE_ROW, children=cells, attrs=attrs, node_id=self._generate_node_id()), i + 1
+
+    def _parse_table_cell(self, tokens: List, start_idx: int, is_header: bool) -> Tuple[Optional[ASTNode], int]:
+        """Parse a table cell from tokens.
+
+        Args:
+            tokens: Full token list
+            start_idx: Index of th_open or td_open token
+            is_header: Whether this is a header cell
+
+        Returns:
+            Tuple of (table_cell_node, end_index)
+        """
+        children = []
+        i = start_idx + 1  # Skip th_open/td_open
+        close_type = "th_close" if is_header else "td_close"
+
+        # Get alignment if present
+        align = None
+        start_token = tokens[start_idx]
+        if hasattr(start_token, 'attrs') and start_token.attrs:
+            if isinstance(start_token.attrs, dict):
+                align = start_token.attrs.get('style')
+            elif isinstance(start_token.attrs, list):
+                for key, val in start_token.attrs:
+                    if key == 'style' and 'text-align' in val:
+                        # Extract alignment from style="text-align:center"
+                        if 'left' in val:
+                            align = 'left'
+                        elif 'center' in val:
+                            align = 'center'
+                        elif 'right' in val:
+                            align = 'right'
+
+        while i < len(tokens):
+            token = tokens[i]
+
+            if token.type == close_type:
+                break
+
+            # Handle inline content
+            if token.type == "inline":
+                inline_children = self._parse_inline_content(token)
+                children.extend(inline_children)
+                i += 1
+            else:
+                i += 1
+
+        attrs = {"is_header": is_header}
+        if align:
+            attrs["align"] = align
+
+        return ASTNode(type=NodeType.TABLE_CELL, children=children, attrs=attrs, node_id=self._generate_node_id()), i + 1

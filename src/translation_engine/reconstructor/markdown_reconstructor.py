@@ -239,6 +239,10 @@ class MarkdownReconstructor:
             # Reconstruct list
             return self._reconstruct_list(node, translations)
 
+        elif node.type == NodeType.TABLE:
+            # Reconstruct table
+            return self._reconstruct_table(node, translations)
+
         elif node.type == NodeType.LIST_ITEM:
             # Find translation for list item
             text = self._find_body_translation(node.node_id, translations)
@@ -279,6 +283,62 @@ class MarkdownReconstructor:
                 items.append(f"{marker} {text}")
 
         return "\n".join(items)
+
+    def _reconstruct_table(
+        self, table_node: ASTNode, translations: Dict[str, str]
+    ) -> str:
+        """Reconstruct a markdown table from AST node."""
+        if not table_node.children:
+            return ""
+
+        rows = []
+        header_row = None
+        num_columns = 0
+
+        for row_node in table_node.children:
+            if row_node.type != NodeType.TABLE_ROW:
+                continue
+
+            is_header = row_node.attrs.get("is_header", False)
+            cells = []
+
+            for cell_node in row_node.children:
+                if cell_node.type != NodeType.TABLE_CELL:
+                    continue
+
+                # Find translation for cell
+                text = self._find_body_translation(cell_node.node_id, translations)
+                if not text:
+                    text = self._reconstruct_inline_children(cell_node.children)
+
+                cells.append(text.strip())
+
+            if is_header:
+                header_row = cells
+                num_columns = len(cells)
+            else:
+                rows.append(cells)
+
+        # Build table markdown
+        if not header_row:
+            return ""
+
+        lines = []
+
+        # Header row
+        lines.append("| " + " | ".join(header_row) + " |")
+
+        # Separator row
+        lines.append("| " + " | ".join(["---"] * num_columns) + " |")
+
+        # Data rows
+        for row in rows:
+            # Pad row if needed
+            while len(row) < num_columns:
+                row.append("")
+            lines.append("| " + " | ".join(row) + " |")
+
+        return "\n".join(lines)
 
     def _reconstruct_inline_children(self, children: List[ASTNode]) -> str:
         """Reconstruct inline content from child nodes."""

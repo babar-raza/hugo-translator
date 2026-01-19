@@ -74,11 +74,12 @@ body:
   preserve_patterns:
   - ^\{\{<.*>\}\}
   - ^\{\{%.*?%\}\}
+  - '\[([^\]]+)\]\(([^)]+)\)'
   placeholder_syntax:
   - \{\{<.*?>\}\}
   - \{\{%.*?%\}\}
   use_ast_body_reconstruction: true
-  ast_segmentation_strategy: adaptive
+  ast_segmentation_strategy: sentence_only
   ast_batch_size: 50
 output_layout:
   per_language_folders: true
