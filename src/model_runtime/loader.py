@@ -633,6 +633,27 @@ class CTranslate2Backend(ModelBackend):
                 f"Failed to load CTranslate2 model {self.model_info.model_id}: {e}"
             )
 
+    def _convert_to_nllb_code(self, lang_code: str) -> str:
+        """
+        Convert ISO language code to NLLB format.
+
+        NLLB uses format: {lang}_{script} (e.g., "fra_Latn", "eng_Latn", "zho_Hans")
+        """
+        # Map common codes to NLLB format
+        nllb_map = {
+            "en": "eng_Latn", "fr": "fra_Latn", "de": "deu_Latn", "es": "spa_Latn",
+            "it": "ita_Latn", "pt": "por_Latn", "nl": "nld_Latn", "ru": "rus_Cyrl",
+            "zh": "zho_Hans", "ja": "jpn_Jpan", "ko": "kor_Hang", "ar": "arb_Arab",
+            "hi": "hin_Deva", "tr": "tur_Latn", "pl": "pol_Latn", "uk": "ukr_Cyrl",
+            "cs": "ces_Latn", "sv": "swe_Latn", "da": "dan_Latn", "no": "nob_Latn",
+            "fi": "fin_Latn", "el": "ell_Grek", "he": "heb_Hebr", "th": "tha_Thai",
+            "vi": "vie_Latn", "id": "ind_Latn", "ro": "ron_Latn", "hu": "hun_Latn",
+            "bg": "bul_Cyrl", "sk": "slk_Latn", "hr": "hrv_Latn", "sr": "srp_Cyrl",
+            "sl": "slv_Latn", "et": "est_Latn", "lv": "lvs_Latn", "lt": "lit_Latn",
+            "fa": "pes_Arab", "ca": "cat_Latn",
+        }
+        return nllb_map.get(lang_code, f"{lang_code}_Latn")
+
     def translate(
         self, texts: List[str], src_lang: str, tgt_lang: str
     ) -> List[str]:
@@ -654,19 +675,46 @@ class CTranslate2Backend(ModelBackend):
             return []
 
         try:
-            # Tokenize
-            tokenized = [self.tokenizer.tokenize(text) for text in texts]
+            # For NLLB models, we need to:
+            # 1. Encode to token IDs, then convert to token strings
+            # 2. Use target language code as prefix
+            # 3. Strip language token from output and decode
+
+            # Set source language for tokenizer
+            src_lang_code = self._convert_to_nllb_code(src_lang)
+            self.tokenizer.src_lang = src_lang_code
+
+            # Tokenize: encode to IDs, then convert to token strings
+            tokenized = [
+                self.tokenizer.convert_ids_to_tokens(self.tokenizer.encode(text, add_special_tokens=True))
+                for text in texts
+            ]
+
+            # Set target language as prefix
+            tgt_lang_code = self._convert_to_nllb_code(tgt_lang)
+            target_prefix = [[tgt_lang_code]] * len(texts)
 
             # Translate
             results = self.translator.translate_batch(
-                tokenized, beam_size=4, max_decoding_length=512
+                tokenized,
+                target_prefix=target_prefix,
+                beam_size=4,
+                max_decoding_length=512
             )
 
-            # Detokenize
-            translations = [
-                self.tokenizer.convert_tokens_to_string(result.hypotheses[0])
-                for result in results
-            ]
+            # Detokenize: strip language token if present, convert tokens to IDs, decode
+            translations = []
+            for result in results:
+                output_tokens = result.hypotheses[0]
+                # Strip target language token if it's the first token
+                if output_tokens and output_tokens[0] == tgt_lang_code:
+                    output_tokens = output_tokens[1:]
+                # Convert tokens to IDs and decode
+                translation = self.tokenizer.decode(
+                    self.tokenizer.convert_tokens_to_ids(output_tokens),
+                    skip_special_tokens=True
+                )
+                translations.append(translation)
 
             # Clear GPU cache after translation if on GPU
             if self.device.startswith("cuda"):

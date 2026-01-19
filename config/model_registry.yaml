@@ -16,6 +16,7 @@ models:
   name: Facebook M2M100 (418M, CTranslate2)
   backend: ctranslate2
   local_path: ./models/ct2/m2m100_418m
+  hf_model_id: facebook/m2m100_418M
   supported_pairs: all
   model_size_mb: 800
   min_ram_gb: 2
@@ -27,6 +28,7 @@ models:
   name: Facebook M2M100 (418M, CTranslate2, INT8)
   backend: ctranslate2
   local_path: ./models/ct2/m2m100_418m_int8
+  hf_model_id: facebook/m2m100_418M
   supported_pairs: all
   model_size_mb: 250
   min_ram_gb: 1.5
@@ -39,6 +41,7 @@ models:
   name: NLLB-200 (600M, CTranslate2, INT8)
   backend: ctranslate2
   local_path: ./models/ct2/nllb_200_600m_int8
+  hf_model_id: facebook/nllb-200-distilled-600M
   supported_pairs: all
   model_size_mb: 350
   min_ram_gb: 2
