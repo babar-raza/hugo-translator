@@ -65,7 +65,7 @@ jobs:
 
       - name: Upload execution test report
         if: always()
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: cli-execution-report
           path: reports/cli_execution_test_report.md
@@ -96,7 +96,7 @@ jobs:
 
       - name: Upload runtime test report
         if: always()
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: cli-runtime-report
           path: reports/cli_runtime_test_report.md
@@ -127,7 +127,7 @@ jobs:
 
       - name: Upload full test report
         if: always()
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: cli-full-matrix-report
           path: reports/cli_runtime_test_report.md
