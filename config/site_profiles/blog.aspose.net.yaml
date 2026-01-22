@@ -7,7 +7,7 @@
 site_id: blog.aspose.net
 display_name: blog posts
 content_roots:
-- /content/blog
+- D:\onedrive\Documents\GitHub\aspose.net\content\blog.aspose.net
 default_source_lang: en
 target_langs:
 - ar

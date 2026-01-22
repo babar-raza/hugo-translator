@@ -201,7 +201,7 @@ class AutonomousContentTranslationWorker:
             if L3SemanticTM is not None:
                 try:
                     l3_semantic = L3SemanticTM(
-                        index_dir=tm_data_dir / "l3_faiss",
+                        index_path=tm_data_dir / "l3_faiss",
                         device="cpu"  # Use CPU for L3 to save GPU memory
                     )
                 except Exception as e:

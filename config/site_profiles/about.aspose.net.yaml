@@ -1,7 +1,7 @@
 site_id: about.aspose.net
 display_name: files
 content_roots:
-- /content/about
+- D:\onedrive\Documents\GitHub\aspose.net\content\about.aspose.net
 default_source_lang: en
 target_langs:
   - ar

@@ -1,0 +1,323 @@
+# Default Site Profile Configuration
+# This profile serves as a fallback when a specific site profile is not found
+# All site-specific profiles should inherit and override these defaults as needed
+
+site_id: default
+content_roots:
+  - /content
+default_source_lang: en
+target_langs:
+  - ar
+  - bg
+  - ca
+  - cs
+  - da
+  - de
+  - el
+  - es
+  - fa
+  - fi
+  - fr
+  - he
+  - hi
+  - hr
+  - hu
+  - id
+  - it
+  - ja
+  - ko
+  - lt
+  - lv
+  - ms
+  - nl
+  - "no"
+  - pl
+  - pt
+  - ro
+  - ru
+  - sk
+  - sr
+  - sv
+  - th
+  - tr
+  - uk
+  - vi
+  - zh
+
+# Default Frontmatter Rules
+# Common fields that should be handled consistently across all sites
+frontmatter:
+  title:
+    mode: translate
+    strategy: null
+  description:
+    mode: translate
+    strategy: null
+  summary:
+    mode: translate
+    strategy: null
+  draft:
+    mode: passthrough
+    strategy: null
+  date:
+    mode: passthrough
+    strategy: null
+  type:
+    mode: passthrough
+    strategy: null
+  layout:
+    mode: passthrough
+    strategy: null
+  url:
+    mode: passthrough
+    strategy: null
+  slug:
+    mode: passthrough
+    strategy: null
+
+# Default Body Processing Rules
+body:
+  translate_markdown: true
+  preserve_blocks:
+    - block_code
+    - codespan
+  preserve_patterns:
+    - ^\{\{<.*>\}\}
+    - ^\{\{%.*?%\}\}
+  placeholder_syntax:
+    - \{\{<.*?>\}\}
+    - \{\{%.*?%\}\}
+
+# Extraction Configuration
+# Controls text extraction behavior for translation
+extraction:
+  # Language purity checking
+  # Ensures translated content is in the correct target language
+  language_purity:
+    # Minimum text length for reliable language detection (5-100)
+    min_length: 15
+    # Minimum ratio of target-script letters to accept mixed-script content (0.0-1.0)
+    min_script_ratio: 0.4
+
+    # Script-similar languages that may be confused by langdetect
+    # Key = target language, Value = list of acceptable similar languages
+    script_similar_languages:
+      ar: [fa]  # Arabic <-> Farsi/Persian (both use Arabic script)
+      fa: [ar]  # Farsi/Persian <-> Arabic
+      # Add more script-similar pairs as needed:
+      # hi: [ne, mr]  # Hindi, Nepali, Marathi all use Devanagari
+      # sr: [ru, uk, bg]  # Serbian, Russian, Ukrainian, Bulgarian use Cyrillic
+
+  # Batch translation tuning
+  # Controls batch processing efficiency and quality
+  batch_translation:
+    # Alert threshold for fallback rate (0.01-0.5)
+    # Triggers warning if more than this percentage of batches fall back to individual translation
+    fallback_rate_threshold: 0.05  # 5%
+
+    # Average tokens per word for M2M100 estimation (0.5-3.0)
+    # Used to prevent context window overflow by estimating batch token counts
+    token_per_word_estimate: 1.3
+
+# Default Output Layout
+output_layout:
+  per_language_folders: true
+  pattern: '{lang}/{path}'
+
+# Default Translation Memory Preferences
+tm_prefs:
+  use_semantic_tm: true
+  fallback_exact_only: false
+  min_similarity_score: 0.8
+
+# Default Validation Configuration
+# Controls validation behavior for translation quality assurance
+# Default uses normal mode for balanced quality and flexibility
+validation:
+  enabled: true
+  validation_mode: normal  # Options: strict, normal, lenient, off
+
+  # Validator-specific settings
+  # All validators enabled by default with reasonable thresholds
+  validators:
+    completeness:
+      enabled: true
+    language_consistency:
+      enabled: true
+      confidence_threshold: 0.85
+    shortcode_preservation:
+      enabled: true
+    frontmatter_protection:
+      enabled: true
+    terminology_preservation:
+      enabled: true
+      validation_mode: normal
+    file_placement:
+      enabled: true
+
+  # Post-write validation (file placement checks)
+  post_write_validation: true
+
+# Default Terminology Configuration
+# Defines terminology preservation rules
+# Default inherits all global rules without site-specific overrides
+terminology:
+  enabled: true
+  preserve_mode: BOTH  # Options: PROTECT (pre-translation), VALIDATE (post-translation), BOTH, NONE
+  inherit_global: true  # Inherit global terminology rules from terminology.yaml
+
+  # No custom terms in default profile
+  # Site-specific profiles should add their own custom terminology
+  custom_terms: []
+
+# Git Commit Configuration (GIT-COMMIT-01)
+# Controls automatic git commit behavior when output directory is a git repository
+git_commit:
+  enabled: true  # Enable automatic git commit of translation outputs
+  auto_push: true  # Push to remote after commit
+  commit_template: "chore: translate {file_count} files to {languages}"  # Placeholders: {file_count}, {languages}, {site_id}, {run_id}
+  co_author_email: "hugo-translator@aspose.net"  # Email for Co-authored-by trailer
+  co_author_name: "Hugo Translator"  # Name for Co-authored-by trailer
+  timeout_seconds: 60  # Timeout for git operations (10-300)
+  block_signals: true  # Block SIGINT/SIGTERM during commit to prevent partial commits
+
+# Schema Documentation
+# This section documents the structure and options for site profiles
+schema:
+  version: "1.0"
+  description: "Hugo Translation System Site Profile Schema"
+
+  fields:
+    site_id:
+      type: string
+      required: true
+      description: "Unique identifier for the site"
+
+    content_roots:
+      type: array
+      required: true
+      description: "Root directories for content"
+
+    default_source_lang:
+      type: string
+      required: true
+      description: "Source language code (ISO 639-1)"
+
+    target_langs:
+      type: array
+      required: true
+      description: "List of target language codes"
+
+    frontmatter:
+      type: object
+      required: true
+      description: "Frontmatter field handling rules"
+      field_options:
+        mode:
+          values: [translate, passthrough, translate_list]
+          description: "How to handle the field"
+        strategy:
+          values: [null, custom]
+          description: "Optional custom strategy"
+
+    body:
+      type: object
+      required: true
+      description: "Body content processing rules"
+      fields:
+        translate_markdown:
+          type: boolean
+          description: "Whether to translate markdown content"
+        preserve_blocks:
+          type: array
+          description: "Block types to preserve untranslated"
+        preserve_patterns:
+          type: array
+          description: "Regex patterns to preserve"
+        placeholder_syntax:
+          type: array
+          description: "Shortcode/placeholder patterns to protect"
+
+    output_layout:
+      type: object
+      required: true
+      description: "Output file structure"
+      fields:
+        per_language_folders:
+          type: boolean
+          description: "Organize by language folders"
+        pattern:
+          type: string
+          description: "Path pattern template"
+
+    tm_prefs:
+      type: object
+      required: false
+      description: "Translation memory preferences"
+
+    default_model:
+      type: string
+      required: false
+      default: null
+      description: "Default translation model. Falls back to m2m100_418m if not set."
+      examples: ["m2m100_418m", "m2m100_1.2b", "nllb_200_600m"]
+
+    auto_translation_enabled:
+      type: boolean
+      required: false
+      default: true
+      description: "Enable automatic translation for this site. When false, the site is excluded from sweep scheduler and automatic translation jobs. Manual translation via CLI is still possible."
+      examples: [true, false]
+
+    validation:
+      type: object
+      required: false
+      description: "Validation configuration"
+      fields:
+        enabled:
+          type: boolean
+          description: "Enable validation engine"
+        validation_mode:
+          values: [strict, normal, lenient, off]
+          description: "Validation strictness level"
+        validators:
+          type: object
+          description: "Per-validator settings"
+        post_write_validation:
+          type: boolean
+          description: "Enable post-write checks"
+
+    terminology:
+      type: object
+      required: false
+      description: "Terminology preservation rules"
+      fields:
+        enabled:
+          type: boolean
+          description: "Enable terminology protection"
+        preserve_mode:
+          values: [PROTECT, VALIDATE, BOTH, NONE]
+          description: "When to apply terminology rules"
+        inherit_global:
+          type: boolean
+          description: "Inherit global terminology rules"
+        custom_terms:
+          type: array
+          description: "Site-specific terminology"
+
+  examples:
+    - site: products.aspose.net
+      description: "Product pages with normal validation"
+      validation_mode: normal
+
+    - site: blog.aspose.net
+      description: "Blog content with lenient validation"
+      validation_mode: lenient
+
+    - site: docs.aspose.net
+      description: "Technical documentation with normal validation"
+      validation_mode: normal
+
+    - site: reference.aspose.net
+      description: "API reference with strict validation"
+      validation_mode: strict

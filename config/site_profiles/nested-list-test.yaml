@@ -1,0 +1,66 @@
+# Nested List Test Site Profile - E2E verification for Issue #5 fix
+
+site_id: "nested-list-test"
+
+# Content directory
+content_roots:
+  - "test_site/content"
+
+# Source and target languages
+default_source_lang: "en"
+target_langs:
+  - "fr"
+
+# Frontmatter rules
+frontmatter:
+  title:
+    mode: "translate"
+  description:
+    mode: "translate"
+
+# Body translation with AST reconstruction (required for nested list fix)
+body:
+  translate_markdown: true
+  preserve_blocks:
+    - "block_code"
+    - "codespan"
+  translate_image_alt: false
+  translate_link_titles: false
+  use_ast_body_reconstruction: true  # CRITICAL: Must be true to use the ast_renderer fix
+
+# Output configuration
+output_layout:
+  per_language_folders: true
+  pattern: "/{lang}/{relative_path}"
+  preserve_structure: true
+
+# TM preferences (minimal for testing)
+tm_preferences:
+  semantic_threshold: 0.80
+  use_semantic: false  # Disable for faster testing
+  use_context: false
+
+# Model selection (use Opus EN-FR - fast and available)
+model:
+  default: "opus_en_fr"
+
+# Validation
+validation:
+  check_placeholders: true
+  check_links: false
+  check_yaml_structure: true
+  fail_on_error: false
+
+# Performance settings
+performance:
+  batch_size: 8
+  enable_cache: true
+
+# Logging (verbose to see nested list processing)
+logging:
+  level: "INFO"
+  flow_artifacts: true
+
+# Metadata
+metadata:
+  add_translation_info: true

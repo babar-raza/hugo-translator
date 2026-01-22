@@ -1,7 +1,7 @@
 site_id: products.aspose.net
 display_name: Landing Pages
 content_roots:
-- /content/products
+- D:\onedrive\Documents\GitHub\aspose.net\content\products.aspose.net
 default_source_lang: en
 target_langs:
   - ar

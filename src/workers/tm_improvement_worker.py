@@ -289,7 +289,7 @@ class TMImprovementWorker:
             if L3SemanticTM is not None:
                 try:
                     l3_store = L3SemanticTM(
-                        index_dir=self.config.tm_path / "l3_faiss",
+                        index_path=self.config.tm_path / "l3_faiss",
                         device=self.config.device,
                     )
                 except Exception as e:
