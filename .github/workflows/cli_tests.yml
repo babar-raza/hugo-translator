@@ -20,7 +20,7 @@ on:
 jobs:
   cli-static-analysis:
     name: Static Analysis
-    runs-on: self-hosted
+    runs-on: windows-latest
 
     steps:
       - name: Checkout
@@ -41,7 +41,7 @@ jobs:
 
   cli-execution-tests:
     name: Execution Tests
-    runs-on: self-hosted
+    runs-on: windows-latest
     needs: cli-static-analysis
 
     steps:
@@ -72,7 +72,7 @@ jobs:
 
   cli-runtime-tests:
     name: Runtime Tests
-    runs-on: self-hosted
+    runs-on: windows-latest
     needs: cli-execution-tests
 
     steps:
@@ -103,7 +103,7 @@ jobs:
 
   cli-full-matrix:
     name: Full Option Matrix (manual only)
-    runs-on: self-hosted
+    runs-on: windows-latest
     if: github.event_name == 'workflow_dispatch'
 
     steps:
@@ -134,7 +134,7 @@ jobs:
 
   summary:
     name: Test Summary
-    runs-on: self-hosted
+    runs-on: windows-latest
     needs: [cli-static-analysis, cli-execution-tests, cli-runtime-tests]
     if: always()
 

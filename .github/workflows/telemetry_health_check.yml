@@ -1,11 +1,12 @@
 name: Telemetry Health Check
 
 on:
-  schedule:
-    # Run daily at 9 AM UTC
-    - cron: '0 9 * * *'
+  # Disabled automatic schedule - requires self-hosted runner with local telemetry paths
+  # schedule:
+  #   # Run daily at 9 AM UTC
+  #   - cron: '0 9 * * *'
   workflow_dispatch:
-    # Allow manual trigger
+    # Allow manual trigger (requires self-hosted runner)
 
 jobs:
   health-check:
