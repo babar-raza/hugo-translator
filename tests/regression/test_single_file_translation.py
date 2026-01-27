@@ -4,7 +4,7 @@ import os
 from pathlib import Path
 
 # Add src to path
-REPO_ROOT = Path(__file__).parent
+REPO_ROOT = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(REPO_ROOT))
 os.chdir(str(REPO_ROOT))
 
@@ -93,17 +93,16 @@ def test_single_translation():
     )
 
     print(f"\n[3/4] Translation Results:")
-    for lang, outcome in result.items():
-        print(f"   {lang}: {outcome.success}")
-        if outcome.success:
-            print(f"      Duration: {outcome.duration_seconds:.2f}s")
-            print(f"      Segments: {outcome.total_segments}")
-            print(f"      Output: {outcome.output_path}")
+    print(f"   Success: {result.success}")
+    print(f"   Duration: {result.stats.duration_seconds:.2f}s")
+    print(f"   Segments: {result.stats.total_segments}")
+    for lang, output_path in result.outputs.items():
+        print(f"   {lang}: {output_path}")
 
     # Verify output
     print(f"\n[4/4] Verifying output...")
-    if result["de"].success and result["de"].output_path:
-        output_file = Path(result["de"].output_path)
+    if result.success and "de" in result.outputs:
+        output_file = result.outputs["de"]
         if output_file.exists():
             content = output_file.read_text(encoding="utf-8")
 
