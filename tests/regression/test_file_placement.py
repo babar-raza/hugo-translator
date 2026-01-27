@@ -1,56 +1,52 @@
 """Quick test script for FilePlacementValidator."""
 
 import sys
-import os
-
-# Add src to path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__)))
-
-# Import modules directly
 import importlib.util
 from pathlib import Path
 
-# Load the validator module directly
-spec = importlib.util.spec_from_file_location(
-    "file_placement_validator",
-    os.path.join(os.path.dirname(__file__), "src", "translation_engine", "validation", "file_placement_validator.py")
-)
-validator_module = importlib.util.module_from_spec(spec)
+# Add repo root to path for 'src.*' imports
+REPO_ROOT = Path(__file__).parent.parent.parent
+SRC_ROOT = REPO_ROOT / "src"
+sys.path.insert(0, str(REPO_ROOT))
 
-# Load base module
-base_spec = importlib.util.spec_from_file_location(
-    "base",
-    os.path.join(os.path.dirname(__file__), "src", "translation_engine", "validation", "base.py")
+# Load modules directly to avoid package __init__.py issues
+def load_module_from_path(module_name: str, file_path: Path):
+    """Load a Python module from file path and register in sys.modules."""
+    spec = importlib.util.spec_from_file_location(module_name, file_path)
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[module_name] = module
+    spec.loader.exec_module(module)
+    return module
+
+# Load base module first and register as the relative import target
+base_module = load_module_from_path(
+    "src.translation_engine.validation.base",
+    SRC_ROOT / "translation_engine" / "validation" / "base.py"
 )
-base_module = importlib.util.module_from_spec(base_spec)
-base_spec.loader.exec_module(base_module)
 
 # Load models module
-models_spec = importlib.util.spec_from_file_location(
-    "models",
-    os.path.join(os.path.dirname(__file__), "src", "utils", "models.py")
+models_module = load_module_from_path(
+    "src.utils.models",
+    SRC_ROOT / "utils" / "models.py"
 )
-models_module = importlib.util.module_from_spec(models_spec)
 
-# Inject base module into validator module's globals
-sys.modules['src.translation_engine.validation.base'] = base_module
-sys.modules['src.utils.models'] = models_module
+# Load config_loader (needed by file_placement_validator)
+config_loader_module = load_module_from_path(
+    "src.utils.config_loader",
+    SRC_ROOT / "utils" / "config_loader.py"
+)
 
-# Now load validator
-spec.loader.exec_module(validator_module)
+# Now load the validator (it will find dependencies in sys.modules)
+validator_module = load_module_from_path(
+    "src.translation_engine.validation.file_placement_validator",
+    SRC_ROOT / "translation_engine" / "validation" / "file_placement_validator.py"
+)
 
+# Extract the classes we need
 FilePlacementValidator = validator_module.FilePlacementValidator
-
-# We need to load models for testing
-try:
-    models_spec.loader.exec_module(models_module)
-    SiteProfile = models_module.SiteProfile
-    OutputLayout = models_module.OutputLayout
-except Exception as e:
-    print(f"Warning: Could not load models module: {e}")
-    print("Tests requiring SiteProfile will be skipped.")
-    SiteProfile = None
-    OutputLayout = None
+SiteProfile = models_module.SiteProfile
+OutputLayout = models_module.OutputLayout
+BodyRules = models_module.BodyRules
 
 def test_basic():
     """Test basic functionality."""
@@ -107,6 +103,9 @@ def test_basic():
         content_roots=["/content/products"],
         default_source_lang="en",
         target_langs=["de", "es", "fr"],
+        body=BodyRules(
+            translate_markdown=True
+        ),
         output_layout=OutputLayout(
             per_language_folders=True,
             pattern="{lang}/{path}"
