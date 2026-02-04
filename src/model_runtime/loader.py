@@ -8,7 +8,7 @@ import logging
 import time
 from pathlib import Path
 from abc import ABC, abstractmethod
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 
 import torch
 
@@ -42,7 +42,12 @@ class ModelBackend(ABC):
 
     @abstractmethod
     def translate(
-        self, texts: List[str], src_lang: str, tgt_lang: str
+        self,
+        texts: List[str],
+        src_lang: str,
+        tgt_lang: str,
+        max_new_tokens: Optional[int] = None,
+        generation_params: Optional[Dict[str, Any]] = None
     ) -> List[str]:
         """
         Translate batch of texts.
@@ -51,6 +56,9 @@ class ModelBackend(ABC):
             texts: List of source texts
             src_lang: Source language code
             tgt_lang: Target language code
+            max_new_tokens: Optional override for maximum new tokens
+            generation_params: Optional dict of generation parameters
+                              (e.g., {"num_beams": 4, "repetition_penalty": 1.2})
 
         Returns:
             List of translated texts
@@ -251,7 +259,8 @@ class HuggingFaceBackend(ModelBackend):
             )
 
     def translate(
-        self, texts: List[str], src_lang: str, tgt_lang: str, max_new_tokens: Optional[int] = None
+        self, texts: List[str], src_lang: str, tgt_lang: str, max_new_tokens: Optional[int] = None,
+        generation_params: Optional[Dict[str, Any]] = None
     ) -> List[str]:
         """
         Translate texts using HuggingFace model.
@@ -261,6 +270,8 @@ class HuggingFaceBackend(ModelBackend):
             src_lang: Source language code
             tgt_lang: Target language code
             max_new_tokens: Override maximum new tokens (default: 512)
+            generation_params: Optional dict of generation parameters to override defaults
+                              (e.g., {"num_beams": 4, "temperature": 0.7})
 
         Returns:
             List of translated texts
@@ -271,12 +282,13 @@ class HuggingFaceBackend(ModelBackend):
             - self.last_output_tokens
         """
         translations, input_tokens, output_tokens = self.translate_with_token_counts(
-            texts, src_lang, tgt_lang, max_new_tokens
+            texts, src_lang, tgt_lang, max_new_tokens, generation_params
         )
         return translations
 
     def translate_with_token_counts(
-        self, texts: List[str], src_lang: str, tgt_lang: str, max_new_tokens: Optional[int] = None
+        self, texts: List[str], src_lang: str, tgt_lang: str, max_new_tokens: Optional[int] = None,
+        generation_params: Optional[Dict[str, Any]] = None
     ) -> tuple[List[str], int, int]:
         """
         Translate texts and return token counts.
@@ -286,6 +298,8 @@ class HuggingFaceBackend(ModelBackend):
             src_lang: Source language code
             tgt_lang: Target language code
             max_new_tokens: Override maximum new tokens (default: 512)
+            generation_params: Optional dict of generation parameters to override defaults
+                              (e.g., {"num_beams": 4, "temperature": 0.7})
 
         Returns:
             Tuple of (translations, input_token_count, output_token_count)
@@ -435,6 +449,12 @@ class HuggingFaceBackend(ModelBackend):
             if forced_bos_token_id is not None:
                 generate_kwargs["forced_bos_token_id"] = forced_bos_token_id
 
+            # FIX-BATCH-API: Merge user-provided generation_params if present
+            # Allow caller to override generation settings (e.g., num_beams, temperature)
+            if generation_params:
+                generate_kwargs.update(generation_params)
+                logger.debug(f"Applied generation_params override: {generation_params}")
+
             generate_start = time.perf_counter()
             with torch.inference_mode():
                 outputs = self.model.generate(
@@ -476,6 +496,64 @@ class HuggingFaceBackend(ModelBackend):
             )
             decode_ms = (time.perf_counter() - decode_start) * 1000
 
+            # EMPTY TRANSLATION FALLBACK (Iter6 empty-translation fix)
+            # Detect empty translations and retry with safer generation parameters
+            empty_indices = []
+            for idx, (translation, source_text) in enumerate(zip(translations, texts)):
+                source_stripped = source_text.strip()
+                translation_stripped = translation.strip()
+                # Check if source is non-empty but translation is empty
+                if source_stripped and not translation_stripped:
+                    empty_indices.append(idx)
+                    logger.warning(
+                        f"Empty translation detected for text[{idx}]: '{source_text[:100]}...' "
+                        f"(src_lang={src_lang}, tgt_lang={tgt_lang})"
+                    )
+
+            # If empty translations detected, attempt fallback recovery
+            if empty_indices:
+                metrics = get_metrics()
+                if metrics:
+                    metrics.increment("empty_translation_detected", len(empty_indices))
+
+                logger.info(
+                    f"Attempting recovery for {len(empty_indices)} empty translation(s) "
+                    f"using fallback ladder"
+                )
+
+                # Attempt recovery using fallback ladder
+                translations, recovered_count = self._recover_empty_translations(
+                    texts, empty_indices, translations, inputs,
+                    src_lang, tgt_lang, mapped_src_lang, mapped_tgt_lang,
+                    forced_bos_token_id
+                )
+
+                if metrics and recovered_count > 0:
+                    metrics.increment("empty_translation_recovered", recovered_count)
+
+                # Check if any are still empty after recovery
+                still_empty = []
+                for idx in empty_indices:
+                    if not translations[idx].strip():
+                        still_empty.append(idx)
+
+                if still_empty:
+                    # Log detailed error for unrecovered empties
+                    error_details = []
+                    for idx in still_empty[:5]:  # Limit to 5 for logging
+                        source_preview = texts[idx][:100] + "..." if len(texts[idx]) > 100 else texts[idx]
+                        error_details.append(f"  [{idx}] '{source_preview}'")
+
+                    logger.error(
+                        f"Failed to recover {len(still_empty)} empty translation(s) after fallback attempts. "
+                        f"Samples:\n" + "\n".join(error_details)
+                    )
+                else:
+                    logger.info(
+                        f"Successfully recovered all {len(empty_indices)} empty translation(s) "
+                        f"using fallback strategies"
+                    )
+
             # Store for backward compatibility
             self.last_input_tokens = input_token_count
             self.last_output_tokens = output_token_count
@@ -504,6 +582,162 @@ class HuggingFaceBackend(ModelBackend):
             raise RuntimeError(
                 f"GPU Out of Memory during translation. Reduce batch size (current: {len(texts)})"
             ) from e
+
+    def _recover_empty_translations(
+        self,
+        texts: List[str],
+        empty_indices: List[int],
+        current_translations: List[str],
+        inputs: Dict,
+        src_lang: str,
+        tgt_lang: str,
+        mapped_src_lang: str,
+        mapped_tgt_lang: str,
+        forced_bos_token_id: Optional[int]
+    ) -> tuple[List[str], int]:
+        """
+        Attempt to recover empty translations using a fallback ladder.
+
+        Args:
+            texts: Original source texts
+            empty_indices: Indices of texts with empty translations
+            current_translations: Current translation results
+            inputs: Tokenized inputs (for reuse)
+            src_lang: Source language code
+            tgt_lang: Target language code
+            mapped_src_lang: Mapped source language code
+            mapped_tgt_lang: Mapped target language code
+            forced_bos_token_id: Forced BOS token ID for target language
+
+        Returns:
+            Tuple of (updated_translations, recovered_count)
+        """
+        import re
+
+        recovered_count = 0
+        updated_translations = current_translations.copy()
+
+        # Fallback strategies (tried in order)
+        fallback_strategies = [
+            {
+                "name": "min_tokens_forced",
+                "description": "Force min_new_tokens=1 with greedy decoding",
+                "params": {
+                    "min_new_tokens": 1,
+                    "max_new_tokens": 256,
+                    "num_beams": 1,
+                    "do_sample": False,
+                    "early_stopping": False,
+                },
+            },
+            {
+                "name": "beam_search",
+                "description": "Use beam search with 5 beams",
+                "params": {
+                    "min_new_tokens": 1,
+                    "max_new_tokens": 256,
+                    "num_beams": 5,
+                    "do_sample": False,
+                    "early_stopping": True,
+                },
+            },
+            {
+                "name": "stripped_markdown",
+                "description": "Strip markdown formatting and retry",
+                "params": {
+                    "min_new_tokens": 1,
+                    "max_new_tokens": 256,
+                    "num_beams": 3,
+                    "do_sample": False,
+                },
+                "strip_markdown": True,
+            },
+        ]
+
+        # Process each empty translation
+        for idx in empty_indices:
+            source_text = texts[idx]
+            logger.debug(f"Attempting recovery for empty translation at index {idx}")
+
+            # Try each fallback strategy in order
+            for strategy in fallback_strategies:
+                strategy_name = strategy["name"]
+                gen_params = strategy["params"].copy()
+                strip_markdown = strategy.get("strip_markdown", False)
+
+                # Prepare text for this strategy
+                if strip_markdown:
+                    # Strip common markdown formatting
+                    processed_text = re.sub(r'\*\*([^*]+)\*\*', r'\1', source_text)  # Bold
+                    processed_text = re.sub(r'\*([^*]+)\*', r'\1', processed_text)  # Italic
+                    processed_text = re.sub(r'`([^`]+)`', r'\1', processed_text)  # Code
+                    logger.debug(
+                        f"Strategy '{strategy_name}': stripped markdown "
+                        f"'{source_text[:50]}...' -> '{processed_text[:50]}...'"
+                    )
+                else:
+                    processed_text = source_text
+
+                try:
+                    # Tokenize the (possibly processed) text
+                    single_input = self.tokenizer(
+                        [processed_text], return_tensors="pt", padding=True, truncation=True
+                    )
+                    single_input = {k: v.to(self.device) for k, v in single_input.items()}
+
+                    # Add forced_bos_token_id if available
+                    if forced_bos_token_id is not None:
+                        gen_params["forced_bos_token_id"] = forced_bos_token_id
+
+                    # Generate with fallback parameters
+                    logger.debug(
+                        f"Strategy '{strategy_name}' attempt for index {idx}: {gen_params}"
+                    )
+
+                    with torch.inference_mode():
+                        output = self.model.generate(
+                            **single_input,
+                            **gen_params,
+                        )
+
+                    # Decode
+                    translation = self.tokenizer.batch_decode(
+                        output, skip_special_tokens=True
+                    )[0]
+
+                    # Check if we got a non-empty translation
+                    if translation.strip():
+                        logger.info(
+                            f"Strategy '{strategy_name}' recovered empty translation at index {idx}: "
+                            f"'{translation[:100]}...' (source: '{source_text[:50]}...')"
+                        )
+
+                        # If we stripped markdown, we need to re-wrap the result
+                        if strip_markdown and "**" in source_text:
+                            # Attempt to re-wrap in bold (simple heuristic)
+                            # Only if source had bold and translation doesn't
+                            if "**" not in translation:
+                                translation = f"**{translation}**"
+                                logger.debug(
+                                    f"Re-wrapped translation in bold: '{translation}'"
+                                )
+
+                        updated_translations[idx] = translation
+                        recovered_count += 1
+                        break  # Success, move to next empty index
+
+                    else:
+                        logger.debug(
+                            f"Strategy '{strategy_name}' still produced empty output for index {idx}"
+                        )
+
+                except Exception as e:
+                    logger.warning(
+                        f"Strategy '{strategy_name}' failed for index {idx}: {e}"
+                    )
+                    continue
+
+        return updated_translations, recovered_count
 
     def unload(self) -> None:
         """Unload model and free resources."""
@@ -605,8 +839,11 @@ class CTranslate2Backend(ModelBackend):
             self.tokenizer = AutoTokenizer.from_pretrained(tokenizer_id)
 
             # Load CT2 model with compute type based on device
-            logger.info(f"Loading CTranslate2 model {model_path} on {self.device}")
             compute_type = "int8" if self.device == "cpu" else "float16"
+            logger.info(
+                f"Loading CTranslate2 model: {self.model_info.model_id} "
+                f"(path={model_path}, device={self.device}, compute_type={compute_type})"
+            )
 
             self.translator = ctranslate2.Translator(
                 model_path,
@@ -655,7 +892,12 @@ class CTranslate2Backend(ModelBackend):
         return nllb_map.get(lang_code, f"{lang_code}_Latn")
 
     def translate(
-        self, texts: List[str], src_lang: str, tgt_lang: str
+        self,
+        texts: List[str],
+        src_lang: str,
+        tgt_lang: str,
+        max_new_tokens: Optional[int] = None,
+        generation_params: Optional[Dict[str, Any]] = None
     ) -> List[str]:
         """
         Translate texts using CTranslate2.
@@ -664,6 +906,9 @@ class CTranslate2Backend(ModelBackend):
             texts: List of source texts
             src_lang: Source language code
             tgt_lang: Target language code
+            max_new_tokens: Override maximum new tokens (default: 512)
+            generation_params: Optional dict of generation parameters
+                              (e.g., {"beam_size": 4, "repetition_penalty": 1.2})
 
         Returns:
             List of translated texts
@@ -694,12 +939,25 @@ class CTranslate2Backend(ModelBackend):
             tgt_lang_code = self._convert_to_nllb_code(tgt_lang)
             target_prefix = [[tgt_lang_code]] * len(texts)
 
-            # Translate
+            # Extract generation parameters with defaults
+            if generation_params is None:
+                generation_params = {}
+
+            beam_size = generation_params.get('num_beams', generation_params.get('beam_size', 4))
+            max_decoding_length = max_new_tokens or generation_params.get('max_new_tokens', 512)
+            repetition_penalty = generation_params.get('repetition_penalty', 1.0)
+            length_penalty = generation_params.get('length_penalty', 1.0)
+            no_repeat_ngram_size = generation_params.get('no_repeat_ngram_size', 0)
+
+            # Translate with generation parameters
             results = self.translator.translate_batch(
                 tokenized,
                 target_prefix=target_prefix,
-                beam_size=4,
-                max_decoding_length=512
+                beam_size=beam_size,
+                max_decoding_length=max_decoding_length,
+                repetition_penalty=repetition_penalty,
+                length_penalty=length_penalty,
+                no_repeat_ngram_size=no_repeat_ngram_size
             )
 
             # Detokenize: strip language token if present, convert tokens to IDs, decode
@@ -715,6 +973,47 @@ class CTranslate2Backend(ModelBackend):
                     skip_special_tokens=True
                 )
                 translations.append(translation)
+
+            # EMPTY TRANSLATION FALLBACK (parity with HuggingFaceBackend)
+            # Detect empty translations and fall back to source text
+            empty_indices = []
+            for idx, (translation, source_text) in enumerate(zip(translations, texts)):
+                source_stripped = source_text.strip()
+                translation_stripped = translation.strip()
+                # Check if source is non-empty but translation is empty
+                if source_stripped and not translation_stripped:
+                    empty_indices.append(idx)
+                    logger.warning(
+                        f"CT2 empty translation detected for text[{idx}]: '{source_text[:100]}...' "
+                        f"(src_lang={src_lang}, tgt_lang={tgt_lang})"
+                    )
+
+            # If empty translations detected, fall back to source text
+            if empty_indices:
+                from ..observability.metrics import get_metrics
+                metrics = get_metrics()
+                if metrics:
+                    metrics.increment("ct2_empty_translation_detected", len(empty_indices))
+
+                logger.info(
+                    f"CT2: Falling back to source text for {len(empty_indices)} empty translation(s)"
+                )
+
+                # Replace empty translations with source text
+                recovered_count = 0
+                for idx in empty_indices:
+                    translations[idx] = texts[idx]
+                    recovered_count += 1
+                    logger.debug(
+                        f"CT2: Fallback applied for index {idx}: '{texts[idx][:100]}...'"
+                    )
+
+                if metrics and recovered_count > 0:
+                    metrics.increment("ct2_empty_translation_recovered", recovered_count)
+
+                logger.info(
+                    f"CT2: Applied source text fallback to {recovered_count} empty translation(s)"
+                )
 
             # Clear GPU cache after translation if on GPU
             if self.device.startswith("cuda"):
