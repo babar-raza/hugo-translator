@@ -699,7 +699,32 @@ class TextUnitExtractor:
             try:
                 results = mt_model.translate([unit.source_text], src_lang, tgt_lang)
                 if results and results[0]:
-                    unit.translated_text = results[0].strip()
+                    translated = results[0].strip()
+
+                    # NEW: Validate individual translation language purity
+                    if self.fasttext_detector and self.fasttext_detector.is_available:
+                        try:
+                            detected, conf = self.fasttext_detector.detect(translated)
+
+                            # If wrong language with high confidence, mark as failed
+                            if detected != tgt_lang and conf > 0.70:
+                                is_similar = False
+                                if self.similarity_tracker:
+                                    is_similar = self.similarity_tracker.are_similar(tgt_lang, detected)
+
+                                if not is_similar:
+                                    logger.warning(
+                                        f"Individual fallback failed purity: Expected {tgt_lang}, "
+                                        f"got {detected} ({conf:.2%}). Marking as empty."
+                                    )
+                                    unit.translated_text = ""  # Mark as failed
+                                    self.batch_stats['individual_purity_failures'] = \
+                                        self.batch_stats.get('individual_purity_failures', 0) + 1
+                                    continue
+                        except Exception as e:
+                            logger.debug(f"Could not validate individual translation: {e}")
+
+                    unit.translated_text = translated
                     if unit.translated_text == "":
                         self.batch_stats['individual_translation_errors'] += 1
                 else:
@@ -748,10 +773,24 @@ class TextUnitExtractor:
 
         # TRANSLATION: Send list to model (model handles batching internally)
         try:
+            # DEBUG: Log translation attempt
+            if batch_count <= 3:  # Only log details for small batches
+                logger.debug(
+                    f"Translating batch of {batch_count} segments ({src_lang}→{tgt_lang}): "
+                    f"[{', '.join([repr(t[:30]) for t in batch_texts[:3]])}...]"
+                )
+
             translations = mt_model.translate(
                 batch_texts, src_lang, tgt_lang,
                 generation_params=generation_params
             )
+
+            # DEBUG: Log translation results
+            if batch_count <= 3 and translations:
+                logger.debug(
+                    f"Translation results: "
+                    f"[{', '.join([repr(t[:30]) for t in translations[:3]])}...]"
+                )
 
             if not translations:
                 logger.warning("Translation returned empty result. Falling back.")
@@ -887,11 +926,11 @@ class TextUnitExtractor:
                 pass
 
         if not has_fasttext and not has_langdetect:
-            logger.warning(
-                "Neither FastText nor langdetect available, skipping language purity check. "
-                "Install with: pip install fasttext"
+            logger.error(
+                "CRITICAL: No language detector available. Cannot validate translation purity. "
+                "Install fasttext or langdetect before running translations."
             )
-            return True
+            raise RuntimeError("Language detector required for translation quality assurance")
 
         failed_units = []
         bypassed_count = 0
@@ -932,9 +971,19 @@ class TextUnitExtractor:
                     detected_lang, confidence = self.fasttext_detector.detect(translated)
                     if detected_lang != target_lang and detected_lang != "unknown":
                         similarity_accepted_count += 1
+                        logger.debug(
+                            f"Language purity: Accepted due to similarity "
+                            f"(detected={detected_lang}, expected={target_lang}): "
+                            f"{sanitize_for_log(translated[:50], 50)}"
+                        )
                 else:
                     # Detection failed
                     detected_lang, confidence = self.fasttext_detector.detect(translated)
+                    logger.debug(
+                        f"Language purity FAILED: detected={detected_lang} "
+                        f"(confidence={confidence:.2f}), expected={target_lang}: "
+                        f"{sanitize_for_log(translated[:50], 50)}"
+                    )
                     failed_units.append({
                         'text': translated[:60] + "..." if len(translated) > 60 else translated,
                         'expected': target_lang,
@@ -1436,13 +1485,23 @@ class TextUnitExtractor:
 
     def _should_extract_full_sentence(self, node: ASTNode) -> bool:
         """
-        Determine if node should be extracted as full sentence (adaptive mode).
+        Determine if node should be extracted as full sentence.
+
+        FIX-B: Even in sentence_only mode, fallback to leaf extraction when
+        inline formatting is present to prevent markdown loss.
 
         Returns True for plain text paragraphs without inline formatting.
         """
         if self.segmentation_strategy == "leaf_only":
             return False
         elif self.segmentation_strategy == "sentence_only":
+            # FIX-B: Make sentence_only safe - check for inline formatting
+            # If inline formatting is present, fall back to leaf extraction
+            has_formatting = self._has_inline_formatting(node)
+            if has_formatting:
+                # Don't extract full sentence - inline formatting would be lost
+                logger.debug(f"FIX-B: Skipping full-sentence extraction for {node.node_addr} (has inline formatting)")
+                return False
             return True
         elif self.segmentation_strategy == "adaptive":
             # Extract full sentence if:
@@ -1523,6 +1582,23 @@ class TextUnitExtractor:
             )
             return True
 
+        # Strategy 0.5: Punctuation-only or separator-only strings - NEVER translate
+        # These cause corruption like ",et," when the model tries to "translate" commas
+        # Detect: strings with no alphanumeric content after stripping
+        if not any(c.isalnum() for c in text_stripped):
+            # Pure punctuation/symbols/separators: , . : ; - — → ← ↔ | / \ etc.
+            logger.debug(
+                "Punctuation-only text detected (protected)",
+                extra={"source_text": sanitize_for_log(text_stripped, 50)}
+            )
+            return True
+
+        # Strategy 0.7: Method/type signatures - NEVER translate (FIX Concern #4)
+        # Signatures like BarCodeReader(string) must be preserved exactly
+        # as they represent API contracts
+        if self._is_signature_like(text_stripped):
+            return True
+
         # Strategy 1: NER-based detection (requires spaCy)
         try:
             import spacy
@@ -1589,6 +1665,71 @@ class TextUnitExtractor:
 
         return False
 
+    def _is_signature_like(self, text: str) -> bool:
+        """
+        Check if text looks like a method/type signature that should be preserved exactly.
+
+        Method signatures contain parentheses with parameters and should never be translated
+        as they represent API contracts. Examples:
+        - BarCodeReader(string)
+        - BarCodeReader\\(string\\)  # Escaped markdown
+        - Foo(int, bool)
+        - Aspose.BarCode.BarCodeReader(string)
+
+        Also detects HTML anchors with signature-like IDs that should be preserved:
+        - <a id="...__ctor_System_String_"></a> BarCodeReader(string)
+
+        Args:
+            text: Text to check
+
+        Returns:
+            True if text looks like a method/type signature that should be preserved
+        """
+        if not text:
+            return False
+
+        text_stripped = text.strip()
+
+        # Pattern 1: Method signature with parentheses (possibly escaped)
+        # Matches: BarCodeReader(string), BarCodeReader\(string\), Foo(int, bool)
+        # Prefix: identifier or dotted.identifier
+        # Inside parentheses: type names (letters, digits, underscore, space, comma, [], <>, etc.)
+        signature_pattern = r'^(?:[A-Za-z_][A-Za-z0-9_]*\.)*[A-Za-z_][A-Za-z0-9_]*\\?\([\w\s,\[\]<>?&|*@.]*\\?\)$'
+        if re.match(signature_pattern, text_stripped):
+            logger.debug(
+                f"Method signature detected (protected): {text_stripped[:80]}"
+            )
+            return True
+
+        # Pattern 2: HTML anchor with method signature following
+        # Matches: <a id="..."></a> BarCodeReader(string)
+        # This catches headings with anchors that contain method signatures
+        anchor_with_signature = r'^<a\s+id="[^"]*"[^>]*>\s*</a>\s*(?:[A-Za-z_][A-Za-z0-9_]*\.)*[A-Za-z_][A-Za-z0-9_]*\\?\([\w\s,\[\]<>?&|*@.]*\\?\)$'
+        if re.match(anchor_with_signature, text_stripped):
+            logger.debug(
+                f"Anchor + method signature detected (protected): {text_stripped[:80]}"
+            )
+            return True
+
+        # Pattern 3: Text ending with method signature (for mixed content)
+        # Matches text that ends with: SomeMethod(params)
+        ends_with_signature = r'(?:[A-Za-z_][A-Za-z0-9_]*\.)*[A-Za-z_][A-Za-z0-9_]*\\?\([\w\s,\[\]<>?&|*@.]*\\?\)$'
+        if re.search(ends_with_signature, text_stripped):
+            # Only protect if the main content is the signature (not a sentence about methods)
+            # Check if text starts with identifier or anchor
+            if re.match(r'^(?:<a\s|[A-Za-z_])', text_stripped):
+                # Check ratio of signature to total text - if signature is >50%, protect it
+                match = re.search(ends_with_signature, text_stripped)
+                if match:
+                    signature_len = len(match.group())
+                    if signature_len > len(text_stripped) * 0.5:
+                        logger.debug(
+                            f"Text dominated by method signature (protected): {text_stripped[:80]}"
+                        )
+                        return True
+
+        return False
+
     def _tokenize_for_repetition_check(self, text: str) -> List[str]:
         """
         Tokenize text into words for repetition detection.
@@ -1611,8 +1752,9 @@ class TextUnitExtractor:
         """
         Quick repetition detection for batch translations.
 
-        Checks for n-gram repetition (3-grams appearing >=3 times).
-        Reuses logic from RepetitionDetectorValidator for consistency.
+        Checks for:
+        1. N-gram repetition within single translations (3-grams appearing >=3 times)
+        2. Cross-unit duplicate translations (different sources → same output)
 
         Args:
             units: TextUnits with translated_text populated
@@ -1624,6 +1766,8 @@ class TextUnitExtractor:
         from collections import Counter
 
         problematic = []
+
+        # Check 1: N-gram repetition within each unit
         for unit in units:
             if not unit.translated_text or len(unit.translated_text) < 20:
                 continue
@@ -1646,7 +1790,68 @@ class TextUnitExtractor:
                     problematic.append(unit)
                     break
 
+        # Check 2: Cross-unit duplicate translations
+        cross_unit_dups = self._detect_cross_unit_duplicates(units)
+        for unit in cross_unit_dups:
+            if unit not in problematic:
+                problematic.append(unit)
+
         return len(problematic) > 0, problematic
+
+    def _detect_cross_unit_duplicates(
+        self, units: List[TextUnit], min_length: int = 5
+    ) -> List[TextUnit]:
+        """
+        Detect when different source texts produce the same translation.
+
+        This catches the "[Précédent]" bug where multiple different English
+        headings like "Inheritance", "Derived", "Implements" all translate
+        to the same French word.
+
+        Args:
+            units: TextUnits with source_text and translated_text populated
+            min_length: Minimum translation length to consider (skip short strings)
+
+        Returns:
+            List of problematic TextUnits that have duplicate translations
+        """
+        from collections import defaultdict
+
+        # Group units by their normalized translation
+        translation_groups: dict[str, List[TextUnit]] = defaultdict(list)
+
+        for unit in units:
+            if not unit.translated_text or len(unit.translated_text.strip()) < min_length:
+                continue
+
+            # Normalize translation: lowercase, strip, collapse whitespace
+            normalized = ' '.join(unit.translated_text.strip().lower().split())
+            translation_groups[normalized].append(unit)
+
+        problematic = []
+
+        for translation, group in translation_groups.items():
+            if len(group) < 2:
+                continue  # Not a duplicate
+
+            # Check if the source texts are actually different
+            source_texts = set(
+                ' '.join(u.source_text.strip().lower().split())
+                for u in group if u.source_text
+            )
+
+            if len(source_texts) >= 2:
+                # Different source texts produced the same translation!
+                logger.warning(
+                    f"Cross-unit duplicate detected: {len(group)} different sources "
+                    f"translated to '{translation[:50]}...'"
+                )
+                logger.debug(
+                    f"  Source texts: {[u.source_text[:30] for u in group[:3]]}..."
+                )
+                problematic.extend(group)
+
+        return problematic
 
     def _translate_single_batch_with_repetition_check(
         self,
@@ -1791,12 +1996,18 @@ class TextUnitExtractor:
             batch_size = adaptive_size
 
         # Separate translatable from non-translatable
-        translatable = [u for u in units if not u.do_not_translate]
+        # E2E FIX: Also skip units that already have translations (reused from earlier phase)
+        translatable = [u for u in units if not u.do_not_translate and not u.translated_text]
         non_translatable = [u for u in units if u.do_not_translate]
+        already_translated = [u for u in units if not u.do_not_translate and u.translated_text]
 
         # Non-translatable: copy source to translated (NEVER sent to MT)
         for unit in non_translatable:
             unit.translated_text = unit.source_text
+
+        # E2E FIX: Log reused translations
+        if already_translated:
+            logger.debug(f"Skipping {len(already_translated)} units with existing translations")
 
         if not translatable:
             return units

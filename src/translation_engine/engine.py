@@ -193,7 +193,7 @@ class TranslationEngine:
         config_service: ConfigService,
         tm: TranslationMemory,
         model_loader: ModelLoader,
-        enable_validation: bool = False,
+        enable_validation: bool = True,  # Always validate in production
         enable_telemetry: bool = True,
         validation_suite: Optional[ValidationSuite] = None,
         decision_engine: Optional[ValidationDecisionEngine] = None,
@@ -1312,6 +1312,21 @@ class TranslationEngine:
 
                             # ACCEPT - fall through to write file
 
+                        # ═══════════════════════════════════════════════════════════════
+                        # AGENT B-7.6: RESTRUCTURED WRITE FLOW
+                        # CRITICAL ARCHITECTURAL FIX: Validate THEN Write
+                        #
+                        # OLD FLOW (WRONG): write → verify → decide
+                        # NEW FLOW (CORRECT): validate → decide → write
+                        #
+                        # Ensures NO files are written unless ALL validation passes.
+                        # ═══════════════════════════════════════════════════════════════
+
+                        # PHASE 1: ALL VALIDATION (before write decision)
+                        # Collect all validation results into a single flag
+                        validation_passed = True
+                        validation_error = None
+
                         # VA-03: Post-translation verification (runs after validation)
                         if should_verify:
                             logger.debug(f"Running post-translation verification for {target_lang}")
@@ -1393,10 +1408,15 @@ class TranslationEngine:
 
                                     continue  # Loop again with feedback
                                 else:
-                                    # No fix mode or max retries reached - log but continue
-                                    logger.warning(
-                                        f"Verification failed but continuing "
-                                        f"(fix={'disabled' if not should_fix else 'max retries reached'})"
+                                    # CRITICAL FIX (B-7.6): Block write if verification failed
+                                    # OLD: logged warning and continued to write (WRONG!)
+                                    # NEW: set validation_passed=False to prevent write
+                                    validation_passed = False
+                                    validation_error = f"Verification failed: {verification_result.error_count} errors (fix={'disabled' if not should_fix else 'max retries reached'})"
+                                    logger.error(
+                                        f"WRITE BLOCKED: Verification failed for {output_path.name} "
+                                        f"(fix mode {'disabled' if not should_fix else 'max retries reached'}). "
+                                        f"Refusing to write file with {verification_result.error_count} verification errors."
                                     )
                             else:
                                 logger.debug(
@@ -1404,7 +1424,7 @@ class TranslationEngine:
                                     f"({verification_result.warning_count} warnings)"
                                 )
 
-                        # Write output file (only on ACCEPT or if validation disabled)
+                        # Prepare output path for validation checks
                         source_path = doc.source_path if hasattr(doc, "source_path") and doc.source_path else Path("output.md")
 
                         # CRITICAL FIX: Use cached output_path to prevent path mismatch
@@ -1430,38 +1450,144 @@ class TranslationEngine:
                         # Use the cached path for write
                         output_path = expected_output_path
 
-                        # CRITICAL FIX: Validate content language before writing
-                        # Prevents multi-language garbage from being written
-                        try:
-                            # Use same FastTextDetector as initialized for the engine
-                            detector = self.detector
-                            detected_lang, confidence = detector.detect(translated_content)
+                        # Only proceed with further validation if not already failed
+                        if validation_passed:
+                            # AGENT B-7.1: Language detection validation
+                            # Prevents multi-language garbage from being written
+                            # ALSO prevents overwriting good files with bad translations
+                            try:
+                                # Use same FastTextDetector as initialized for the engine
+                                detector = self.detector
+                                detected_lang, confidence = detector.detect(translated_content)
 
-                            # Check for language mismatch (with high confidence)
-                            if detected_lang != target_lang and confidence > 0.70:
-                                # Check if this is a learned similarity pair
-                                is_similar = False
-                                if hasattr(self, 'similarity_tracker') and self.similarity_tracker:
-                                    is_similar = self.similarity_tracker.are_similar(target_lang, detected_lang)
+                                # Check for language mismatch (with high confidence)
+                                if detected_lang != target_lang and confidence > 0.70:
+                                    # Check if this is a learned similarity pair
+                                    is_similar = False
+                                    if hasattr(self, 'similarity_tracker') and self.similarity_tracker:
+                                        is_similar = self.similarity_tracker.are_similar(target_lang, detected_lang)
 
-                                if not is_similar:
+                                    if not is_similar:
+                                        validation_passed = False
+                                        validation_error = f"Language mismatch: detected {detected_lang}, expected {target_lang}"
+                                        logger.error(
+                                            f"WRITE BLOCKED: Content language mismatch! "
+                                            f"Expected: {target_lang}, Detected: {detected_lang} ({confidence:.2%}). "
+                                            f"Refusing to write wrong-language content to {output_path.name}."
+                                        )
+                                    else:
+                                        logger.warning(
+                                            f"Language mismatch detected but allowing due to learned similarity: "
+                                            f"{target_lang} <-> {detected_lang} ({confidence:.2%})"
+                                        )
+
+                                # AGENT B-7.4: Pre-Write Existing File Quality Check
+                                # CRITICAL: If existing file exists, don't overwrite with lower quality
+                                if validation_passed and output_path.exists():
+                                    try:
+                                        existing_content = output_path.read_text(encoding='utf-8')
+                                        existing_lang, existing_conf = detector.detect(existing_content)
+
+                                        # CASE 1: Existing file is correct language and new file is wrong → BLOCK
+                                        if existing_lang == target_lang and detected_lang != target_lang:
+                                            validation_passed = False
+                                            validation_error = f"Blocked overwrite: existing={existing_lang}, new={detected_lang}"
+                                            logger.error(
+                                                f"OVERWRITE BLOCKED: Existing file is correct {target_lang} "
+                                                f"({existing_conf:.2%}), new content is wrong {detected_lang} "
+                                                f"({confidence:.2%}). Refusing to replace good file with bad translation."
+                                            )
+
+                                        # CASE 2: Both correct but existing has higher confidence → BLOCK
+                                        elif (existing_lang == target_lang and detected_lang == target_lang and
+                                            existing_conf > confidence + 0.05):  # 5% threshold to avoid churn
+                                            validation_passed = False
+                                            validation_error = f"Blocked overwrite: existing quality higher"
+                                            logger.warning(
+                                                f"OVERWRITE BLOCKED: Existing file has higher quality "
+                                                f"({existing_lang} {existing_conf:.2%}) than new translation "
+                                                f"({detected_lang} {confidence:.2%}). Keeping existing."
+                                            )
+
+                                        # CASE 3: Existing wrong but new correct → ALLOW (healing)
+                                        elif existing_lang != target_lang and detected_lang == target_lang:
+                                            logger.info(
+                                                f"HEALING OVERWRITE: Replacing incorrect {existing_lang} "
+                                                f"({existing_conf:.2%}) with correct {detected_lang} "
+                                                f"({confidence:.2%}). Quality improvement for {output_path.name}."
+                                            )
+                                            # Allow write to proceed (healing case)
+
+                                        # CASE 4: Both wrong → BLOCK
+                                        elif existing_lang != target_lang and detected_lang != target_lang:
+                                            validation_passed = False
+                                            validation_error = f"Blocked overwrite: both translations wrong (existing={existing_lang}, new={detected_lang})"
+                                            logger.error(
+                                                f"OVERWRITE BLOCKED: Both existing ({existing_lang}) and new "
+                                                f"({detected_lang}) are wrong language. Expected {target_lang}. "
+                                                f"Blocking to prevent further corruption of {output_path.name}."
+                                            )
+
+                                    except (IOError, OSError) as existing_check_error:
+                                        # Existing file read error - non-fatal, allow write (new translation)
+                                        logger.warning(f"Could not read existing file for comparison (allowing write): {existing_check_error}")
+                                    except ValueError as existing_check_error:
+                                        # Detection confidence too low on existing file - log and allow write
+                                        logger.warning(f"Existing file language detection uncertain (allowing write): {existing_check_error}")
+
+                            except ImportError as e:
+                                # Detector module missing - FATAL, block write
+                                validation_passed = False
+                                validation_error = "Language validation unavailable"
+                                logger.error(f"Language detector unavailable: {e}")
+                            except (IOError, OSError) as e:
+                                # File I/O error during validation - non-fatal for new files
+                                logger.warning(f"I/O error during language validation: {e}")
+                                # Continue to write (new translation)
+                            except ValueError as e:
+                                # Detection confidence too low - log and decide
+                                logger.warning(f"Language detection uncertain: {e}")
+                                # Continue to write (detector exists but uncertain)
+
+                            # AGENT B-7.5: Final file-level purity check
+                            # Detects mixed-language content that passes aggregate detection
+                            if validation_passed:
+                                purity_result = self._verify_final_file_purity(
+                                    translated_content,
+                                    target_lang,
+                                    detector
+                                )
+
+                                if not purity_result['passed']:
+                                    validation_passed = False
+                                    validation_error = f"Final purity check failed: {purity_result['reason']}"
                                     logger.error(
-                                        f"WRITE BLOCKED: Content language mismatch! "
-                                        f"Expected: {target_lang}, Detected: {detected_lang} ({confidence:.2%}). "
-                                        f"Refusing to write wrong-language content to {output_path.name}."
+                                        f"FINAL PURITY CHECK FAILED: Assembled file contains "
+                                        f"{purity_result['wrong_lang_percentage']:.1%} wrong-language content. "
+                                        f"Detected languages: {purity_result['detected_languages']}. "
+                                        f"Blocking write to prevent corruption of {output_path.name}."
                                     )
-                                    result.success = False
-                                    result.error = f"Language mismatch: detected {detected_lang}, expected {target_lang}"
-                                    continue  # Skip to next language
-                                else:
-                                    logger.warning(
-                                        f"Language mismatch detected but allowing due to learned similarity: "
-                                        f"{target_lang} <-> {detected_lang} ({confidence:.2%})"
-                                    )
-                        except Exception as e:
-                            logger.warning(f"Language validation failed (non-fatal): {e}")
 
-                        self._write_output(translated_content, output_path, source_path, result.stats)
+                        # PHASE 2: DECISION - Block write if any validation failed
+                        if not validation_passed:
+                            logger.error(f"WRITE BLOCKED for {output_path.name}: {validation_error}")
+                            result.success = False
+                            result.error = validation_error
+                            continue  # Skip to next language
+
+                        # PHASE 3: WRITE (only if ALL validation passed)
+                        try:
+                            self._write_output(translated_content, output_path, source_path, result.stats)
+                            logger.info(f"✓ Successfully wrote {output_path.name} after passing all validation checks")
+                        except Exception as write_error:
+                            # Write operation failed - handle separately from validation
+                            logger.error(f"Write operation failed for {output_path.name}: {write_error}")
+                            result.success = False
+                            result.error = f"Write error: {write_error}"
+                            continue  # Skip to next language
+
+                        # File successfully written - add to outputs
+                        result.outputs[target_lang] = output_path
 
                         # Update content hash metadata (if enabled)
                         if self.enable_content_hash and self.metadata_tracker:
@@ -1479,7 +1605,9 @@ class TranslationEngine:
                             except Exception as e:
                                 logger.warning(f"Failed to update content hash metadata: {e}")
 
-                        # INT-05: Run post-write validation
+                        # INT-05: Post-write validation (file placement/structure checks)
+                        # NOTE: This runs AFTER file is written to verify write succeeded
+                        # (file exists, readable, not empty, correct folder structure)
                         post_write_passed = self._post_write_validation(
                             output_path=output_path,
                             source_path=source_path,
@@ -1490,8 +1618,6 @@ class TranslationEngine:
 
                         if not post_write_passed:
                             logger.warning(f"Post-write validation failed for {output_path}, but file was written")
-
-                        result.outputs[target_lang] = output_path
 
                         # Mark language as completed in progress tracker
                         progress = get_progress_tracker()
@@ -2008,6 +2134,38 @@ class TranslationEngine:
                 batch_size=batch_size
             )
 
+            # AGENT B-7.3: Check batch-level purity failures to prevent file corruption
+            # If too many batches failed language purity checks, block the entire file write
+            batch_stats = extractor.batch_stats
+            if batch_stats.get('language_purity_failures', 0) > 0:
+                total_batches = batch_stats.get('total_batches', 0)
+                if total_batches > 0:
+                    purity_failure_rate = batch_stats['language_purity_failures'] / total_batches
+
+                    # If >10% of batches failed purity, block write
+                    if purity_failure_rate > 0.10:
+                        logger.error(
+                            f"HIGH PURITY FAILURE RATE: {purity_failure_rate:.1%} of batches failed "
+                            f"language validation. Blocking write to prevent corruption. "
+                            f"Stats: {batch_stats['language_purity_failures']}/{total_batches} batches failed."
+                        )
+
+                        issues = [
+                            ValidationIssue(
+                                severity="error",
+                                rule="BatchLanguagePurity",
+                                message=f"High batch purity failure rate: {purity_failure_rate:.1%} ({batch_stats['language_purity_failures']}/{total_batches} batches)",
+                                location=str(doc.file_path) if hasattr(doc, "file_path") else None,
+                            )
+                        ]
+                        validation_result = ValidationResult(valid=False, issues=issues)
+                        raise TranslationRetryableError(
+                            message=f"Batch purity failure rate too high: {purity_failure_rate:.1%}",
+                            file_path=str(doc.file_path) if hasattr(doc, "file_path") else "",
+                            validation_result=validation_result,
+                            retry_feedback=f"Batch language purity check failed for {purity_failure_rate:.1%} of batches. Ensure all translated units are in the target language {target_lang}.",
+                        )
+
             # Check for empty translations, but only for units with substantial source text
             # Allow empty output if source was whitespace-only or very short (≤2 chars)
             empty_units = [
@@ -2521,6 +2679,96 @@ class TranslationEngine:
         stats.bytes_written_md += len(content.encode('utf-8'))
 
         logger.info(f"Written translated file: {output_path}")
+
+    def _verify_final_file_purity(
+        self,
+        content: str,
+        expected_lang: str,
+        detector
+    ) -> dict:
+        """
+        Verify entire file content is correct language.
+
+        AGENT B-7.5: File-Level Language Purity Verification
+
+        Splits content into paragraphs and checks each one.
+        Fails if >5% of content is wrong language.
+
+        This addresses the corruption bug where batch-level validation
+        detects issues but file-level validation loses context. Mixed
+        content (95% correct + 5% wrong) can pass aggregate detection
+        if majority correct, but this paragraph-level check catches it.
+
+        Args:
+            content: Full translated markdown content
+            expected_lang: Target language code (e.g., 'ar', 'uk')
+            detector: FastTextDetector instance
+
+        Returns:
+            dict with keys: passed (bool), wrong_lang_percentage (float),
+                           detected_languages (dict), reason (str)
+        """
+        # Split content into paragraphs (skip frontmatter/code blocks)
+        paragraphs = []
+        in_code_block = False
+        in_frontmatter = False
+
+        for line in content.split('\n'):
+            if line.strip().startswith('```'):
+                in_code_block = not in_code_block
+            elif line.strip() == '---' and not paragraphs:
+                in_frontmatter = not in_frontmatter
+            elif not in_code_block and not in_frontmatter and line.strip():
+                paragraphs.append(line.strip())
+
+        if not paragraphs:
+            return {"passed": True, "reason": "No content to validate"}
+
+        wrong_lang_count = 0
+        total_count = 0
+        detected_languages = {}
+
+        for para in paragraphs:
+            if len(para) < 20:
+                continue  # Too short to validate
+
+            try:
+                detected, conf = detector.detect(para)
+                total_count += 1
+
+                detected_languages[detected] = detected_languages.get(detected, 0) + 1
+
+                if detected != expected_lang and conf > 0.70:
+                    # Check if similarity-learned
+                    is_similar = False
+                    if hasattr(self, 'similarity_tracker') and self.similarity_tracker:
+                        is_similar = self.similarity_tracker.are_similar(expected_lang, detected)
+
+                    if not is_similar:
+                        wrong_lang_count += 1
+            except (ValueError, Exception) as e:
+                # Detection failed for this paragraph - skip it
+                logger.debug(f"Paragraph detection failed: {e}")
+                continue
+
+        if total_count == 0:
+            return {"passed": True, "reason": "No content to validate"}
+
+        wrong_percentage = wrong_lang_count / total_count
+
+        if wrong_percentage > 0.05:  # 5% threshold
+            return {
+                "passed": False,
+                "wrong_lang_percentage": wrong_percentage,
+                "detected_languages": detected_languages,
+                "reason": f"{wrong_lang_count}/{total_count} paragraphs wrong language"
+            }
+
+        return {
+            "passed": True,
+            "wrong_lang_percentage": wrong_percentage,
+            "detected_languages": detected_languages
+        }
 
     def _get_output_path(
         self, source_path: Path, target_lang: str, site_profile

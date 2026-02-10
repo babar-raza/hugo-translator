@@ -526,3 +526,23 @@ validation_defaults:
       enabled: true
     file_placement:
       enabled: true
+
+# Translation Engine Quality Gates
+# Mandatory validation settings to prevent corrupted/wrong-language translations in production
+# WARNING: Disabling these settings in production will result in quality degradation
+translation_engine:
+  # Quality gates (mandatory for production)
+  enable_validation: true  # NEVER set to false in production - enables all quality checks
+
+  require_language_detector: true  # Fail translation if language detector unavailable (prevents blind translation)
+
+  max_batch_purity_failure_rate: 0.10  # Block write if >10% of batches fail language purity checks
+
+  min_file_purity_percentage: 0.95  # Require 95% of segments match target language (5% tolerance for mixed content)
+
+  allow_quality_downgrades: false  # Never overwrite existing good translations with lower quality output
+
+  # Thresholds for language detection and quality assessment
+  language_detection_confidence_threshold: 0.70  # Minimum confidence to flag wrong-language segments (70% = high precision)
+
+  existing_file_confidence_delta: 0.05  # Quality improvement required to overwrite existing file (5% minimum gain)
