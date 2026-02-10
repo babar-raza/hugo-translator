@@ -32,6 +32,7 @@ from typing import Dict, List, Optional, Union
 import logging
 import signal
 import platform
+import subprocess
 
 logger = logging.getLogger(__name__)
 
@@ -314,6 +315,67 @@ class _SignalBlocker:
         )
 
 
+def collect_modified_files_from_git(output_dir: Path, dir_result: "DirectoryResult") -> List[Path]:
+    """
+    Fallback: Collect modified files using git status.
+
+    Used when collect_output_files() returns empty but we know translations succeeded.
+    This fallback helps catch files that were modified but marked as skipped incorrectly.
+
+    Args:
+        output_dir: Directory to search for modified files
+        dir_result: DirectoryResult for context
+
+    Returns:
+        List of modified files found via git status, or empty list if failed
+    """
+    try:
+        from .git_context import find_git_root
+
+        git_root = find_git_root(output_dir)
+        if not git_root:
+            logger.warning("[Fallback] Could not find git root from output directory")
+            return []
+
+        # Run git status to find modified files in output directory
+        try:
+            rel_path = output_dir.relative_to(git_root)
+        except ValueError:
+            # output_dir not relative to git_root, try using output_dir directly
+            logger.warning(f"[Fallback] Output dir {output_dir} not relative to git root {git_root}")
+            rel_path = "."
+
+        result = subprocess.run(
+            ["git", "status", "--porcelain", str(rel_path)],
+            cwd=str(git_root),
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+
+        if result.returncode != 0:
+            logger.warning(f"[Fallback] Git status failed: {result.stderr}")
+            return []
+
+        # Parse modified files (lines starting with " M" or "M " or "MM")
+        modified_files = []
+        for line in result.stdout.splitlines():
+            # Handle various git status codes for modified files
+            status_code = line[:2]
+            if 'M' in status_code:  # Modified in index, working tree, or both
+                file_path = git_root / line[3:].strip()
+                if file_path.exists():
+                    modified_files.append(file_path)
+                    logger.debug(f"[Fallback] Found modified file: {file_path}")
+
+        logger.info(f"[Fallback] Found {len(modified_files)} modified files via git status")
+        return modified_files
+
+    except Exception as e:
+        logger.warning(f"[Fallback] git status collection failed: {e}")
+        return []
+
+
 def auto_commit_translations(
     result: Union["TranslationResult", "DirectoryResult"],
     site_id: str,
@@ -322,17 +384,26 @@ def auto_commit_translations(
     config_service: "ConfigService",
     commit_message_override: Optional[str] = None,
     no_commit: bool = False,
+    require_verification_pass: bool = True,
+    require_telemetry_success: bool = False,
 ) -> bool:
     """
-    Auto-commit translation outputs if enabled.
+    Auto-commit translation outputs if enabled and all quality gates pass.
 
     Works with both TranslationResult (single file) and DirectoryResult (batch).
     Handles all git commit logic including:
     - Config loading (site profile -> global -> defaults)
     - Git repo detection
+    - Quality gates (verification pass, telemetry success)
     - File staging and committing
     - Push to remote
     - Telemetry recording
+    - Commit hash persistence to reports/
+
+    Quality Gates (STOP-THE-LINE):
+    - All files must pass verification (if require_verification_pass=True)
+    - Telemetry must succeed with 2xx (if require_telemetry_success=True)
+    - Working tree must have changes
 
     Args:
         result: Translation result (single file or directory)
@@ -342,12 +413,14 @@ def auto_commit_translations(
         config_service: Config service for loading git settings
         commit_message_override: Optional commit message template override
         no_commit: If True, skip commit (respects --no-commit flag)
+        require_verification_pass: If True, require all files to pass verification
+        require_telemetry_success: If True, require telemetry post to succeed (2xx)
 
     Returns:
         True if commit succeeded or was skipped gracefully, False if failed
     """
     if no_commit:
-        logger.debug("Git commit disabled via --no-commit flag")
+        logger.warning("Git commit SKIPPED: --no-commit flag set")
         return True
 
     try:
@@ -359,7 +432,7 @@ def auto_commit_translations(
         # Wrap TranslationResult in DirectoryResult if needed
         if isinstance(result, TranslationResult):
             if not result.success:
-                logger.debug("Translation failed, skipping commit")
+                logger.error(f"Git commit SKIPPED: Translation failed (success={result.success})")
                 return True
 
             # Create DirectoryResult wrapper for single file
@@ -375,13 +448,61 @@ def auto_commit_translations(
             dir_result = result
 
         if dir_result.successful_files == 0:
-            logger.debug("No successful translations, skipping commit")
+            logger.warning("Git commit SKIPPED: No successful files to commit (successful_files=0)")
             return True
+
+        # QUALITY GATE 1: Verification Pass (STOP-THE-LINE)
+        if require_verification_pass:
+            verification_failed = _check_verification_failures(dir_result)
+            if verification_failed:
+                logger.error(
+                    f"STOP-THE-LINE: Cannot commit - {verification_failed} file(s) failed verification. "
+                    f"Fix verification errors before committing."
+                )
+                return False
+
+        # QUALITY GATE 2: Telemetry Success (STOP-THE-LINE)
+        if require_telemetry_success:
+            telemetry_failed = _check_telemetry_failure(dir_result)
+            if telemetry_failed:
+                logger.error(
+                    f"STOP-THE-LINE: Cannot commit - telemetry post failed. "
+                    f"Error: {telemetry_failed}"
+                )
+                return False
 
         # Collect output files (only files that were actually written/modified)
         output_files = collect_output_files(dir_result)
         if not output_files:
-            logger.info("No files modified in this run - skipping commit")
+            logger.error("Git commit SKIPPED: collect_output_files() returned empty list")
+            logger.error(f"  - DirectoryResult.successful_files: {dir_result.successful_files}")
+            logger.error(f"  - DirectoryResult.file_results count: {len(dir_result.file_results) if hasattr(dir_result, 'file_results') else 'N/A'}")
+
+            # Try fallback: collect files from git status
+            if dir_result.successful_files > 0 and hasattr(dir_result, 'file_results') and dir_result.file_results:
+                logger.info("Attempting fallback: collecting modified files from git status...")
+                try:
+                    # Get output directory from first file result
+                    first_output = list(dir_result.file_results[0].outputs.values())[0]
+                    output_dir = first_output.parent
+                    logger.info(f"  - Using output directory: {output_dir}")
+
+                    output_files = collect_modified_files_from_git(output_dir, dir_result)
+
+                    if output_files:
+                        logger.info(f"Fallback successful: collected {len(output_files)} files from git status")
+                        # Continue with commit using fallback files
+                    else:
+                        logger.error("Fallback failed: no modified files found in git status either")
+                        return True  # Graceful skip
+                except Exception as e:
+                    logger.error(f"Fallback collection failed with exception: {e}")
+                    return True  # Graceful skip
+            else:
+                return True  # Graceful skip (no files to commit)
+
+        # Only continue if we have files to commit (either from primary or fallback collection)
+        if not output_files:
             return True
 
         # Load git commit config
@@ -392,14 +513,29 @@ def auto_commit_translations(
         )
 
         if not git_config.enabled:
-            logger.debug("Git commit disabled in config")
+            logger.warning("Git commit SKIPPED: disabled in configuration")
+            # Try to identify config source for debugging
+            config_source = "unknown"
+            if config_service:
+                try:
+                    site_profile = config_service.get_site_profile(site_id) if site_id else None
+                    if site_profile and hasattr(site_profile, 'git_commit'):
+                        config_source = "site profile"
+                    elif hasattr(config_service, 'global_config'):
+                        config_source = "global config"
+                except Exception:
+                    pass
+            logger.warning(f"  - Config source: {config_source}")
             return True
 
         # Create committer and check git repo
         committer = GitCommitter(git_config)
         if not committer.is_git_repo(output_files[0]):
-            logger.info("Output directory is not a git repo - skipping commit")
-            return True
+            logger.error("Git commit FAILED: Output directory is not a git repository")
+            logger.error(f"  - Attempted path: {output_files[0]}")
+            logger.error(f"  - Resolved path: {output_files[0].resolve()}")
+            logger.error(f"  - Parent directory: {output_files[0].parent}")
+            return False  # Return FALSE - this is an error condition, not graceful skip
 
         # Extract additional metadata for enhanced commit messages
         # D2: Pass config to enable 3-tier fallback for model_id
@@ -470,6 +606,9 @@ def auto_commit_translations(
                 f"Committed {commit_result.files_committed} files: "
                 f"{commit_result.commit_hash_short} (push: {push_status})"
             )
+
+            # Save commit hash to reports/ for external review
+            _save_commit_hash_to_reports(commit_result)
 
             # Save telemetry
             _save_commit_telemetry(run_id, site_id, commit_result, target_langs)
@@ -758,3 +897,112 @@ def _extract_tm_stats(dir_result: "DirectoryResult") -> Optional[dict]:
     except Exception as e:
         logger.debug(f"Failed to extract TM stats: {e}")
         return None
+
+
+def _check_verification_failures(dir_result: "DirectoryResult") -> int:
+    """
+    Check if any files failed verification.
+
+    Args:
+        dir_result: DirectoryResult from translation
+
+    Returns:
+        Number of files that failed verification, 0 if all passed
+    """
+    failed_count = 0
+
+    try:
+        if hasattr(dir_result, "file_results") and dir_result.file_results:
+            for file_result in dir_result.file_results:
+                # Check if verification result exists and passed
+                if hasattr(file_result, "verification_result") and file_result.verification_result:
+                    if not file_result.verification_result.get("passed", True):
+                        failed_count += 1
+                        errors = file_result.verification_result.get("errors", [])
+                        logger.warning(
+                            f"Verification failed for {file_result.file_path}: {len(errors)} errors"
+                        )
+
+        logger.debug(f"Verification check: {failed_count} file(s) failed")
+
+    except Exception as e:
+        logger.debug(f"Failed to check verification failures: {e}")
+
+    return failed_count
+
+
+def _check_telemetry_failure(dir_result: "DirectoryResult") -> Optional[str]:
+    """
+    Check if telemetry post failed.
+
+    Args:
+        dir_result: DirectoryResult from translation
+
+    Returns:
+        Error message if telemetry failed, None if succeeded or not available
+    """
+    try:
+        # Check if telemetry context exists and has status
+        if hasattr(dir_result, "telemetry_context") and dir_result.telemetry_context:
+            telemetry = dir_result.telemetry_context
+
+            # Check HTTP status code
+            if hasattr(telemetry, "http_status_code"):
+                status = telemetry.http_status_code
+                if status and not (200 <= status < 300):
+                    return f"HTTP {status}"
+
+            # Check error flag
+            if hasattr(telemetry, "post_failed") and telemetry.post_failed:
+                error_msg = getattr(telemetry, "error_message", "Unknown error")
+                return error_msg
+
+        # No telemetry context or no errors
+        logger.debug("Telemetry check: OK or not available")
+        return None
+
+    except Exception as e:
+        logger.debug(f"Failed to check telemetry status: {e}")
+        return None
+
+
+def _save_commit_hash_to_reports(commit_result: "GitCommitResult") -> None:
+    """
+    Save commit hash to reports/CONTENT_COMMIT.txt for external review.
+
+    Creates or appends to reports/CONTENT_COMMIT.txt with:
+    - Commit hash (full and short)
+    - Timestamp
+    - Files committed
+    - Push status
+
+    Args:
+        commit_result: Git commit result with hash and metadata
+    """
+    try:
+        reports_dir = Path("reports")
+        reports_dir.mkdir(exist_ok=True)
+
+        commit_file = reports_dir / "CONTENT_COMMIT.txt"
+
+        # Build commit info
+        from datetime import datetime
+        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+        commit_info = (
+            f"Timestamp: {timestamp}\n"
+            f"Commit Hash: {commit_result.commit_hash}\n"
+            f"Short Hash: {commit_result.commit_hash_short}\n"
+            f"Files Committed: {commit_result.files_committed}\n"
+            f"Push Success: {commit_result.push_success}\n"
+            f"{'='*70}\n\n"
+        )
+
+        # Append to file (preserves history)
+        with open(commit_file, "a", encoding="utf-8") as f:
+            f.write(commit_info)
+
+        logger.info(f"Commit hash saved to: {commit_file}")
+
+    except Exception as e:
+        logger.debug(f"Failed to save commit hash to reports: {e}")

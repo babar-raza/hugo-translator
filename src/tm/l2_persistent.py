@@ -200,6 +200,37 @@ class L2PersistentTM:
             ValueError: If entry validation fails
             RuntimeError: If JSON serialization or database write fails
         """
+        # CRITICAL FIX: Validate translation language before storing (prevents TM contamination)
+        # This is a conservative check - only blocks on high-confidence mismatches
+        try:
+            # Import here to avoid circular dependencies
+            from src.translation_engine.language_detection.fasttext_detector import FastTextDetector
+
+            # Only validate if translation is long enough for accurate detection
+            if len(translation.strip()) > 50:
+                detector = FastTextDetector()
+                detected_lang, confidence = detector.detect(translation)
+
+                # Block storage only on high-confidence mismatch (>80%)
+                if detected_lang != tgt_lang and confidence > 0.80:
+                    logger.error(
+                        f"TM STORE BLOCKED: Translation language mismatch! "
+                        f"Site: {site_id}, Expected: {tgt_lang}, Detected: {detected_lang} ({confidence:.2%}). "
+                        f"Translation: {translation[:100]}... "
+                        f"Refusing to store contaminated entry to prevent TM pollution."
+                    )
+                    # Don't raise - just return False to indicate not stored
+                    return False
+                elif detected_lang != tgt_lang and confidence > 0.70:
+                    # Log warning for moderate confidence mismatches
+                    logger.warning(
+                        f"TM language concern: Expected {tgt_lang}, detected {detected_lang} ({confidence:.2%}). "
+                        f"Storing anyway (confidence < 80%) but flagging for review."
+                    )
+        except Exception as e:
+            # Non-fatal - don't block TM storage on validation errors
+            logger.debug(f"TM language validation failed (non-fatal): {e}")
+
         # T204: Create and validate entry before write
         entry = TranslationEntry(
             source_text=text,

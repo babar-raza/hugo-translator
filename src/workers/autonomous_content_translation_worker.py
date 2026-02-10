@@ -10,8 +10,14 @@ Runs scheduled translation tasks on Hugo content directories with:
 """
 
 import argparse
+import json
 import logging
+import os
+import platform
+import signal
 import sys
+import threading
+import time
 import uuid
 from datetime import datetime
 from pathlib import Path
@@ -19,6 +25,7 @@ from typing import List, Optional
 
 from src.hardware.vram_enforcer import VRAMEnforcer
 from src.observability.git_commit_helper import auto_commit_translations
+from src.observability.worker_telemetry import emit_worker_event, start_worker_run, complete_worker_run
 from src.translation_engine.engine import TranslationEngine
 from src.utils.config_loader import ConfigService
 from src.workers.window_scheduler import ScheduleConfig, WindowScheduler
@@ -114,6 +121,8 @@ class AutonomousContentTranslationWorker:
         worker.run()  # Runs continuously
     """
 
+    _worker_id = "content_worker"
+
     def __init__(self, config: AutonomousWorkerConfig):
         """
         Initialize autonomous worker.
@@ -202,7 +211,7 @@ class AutonomousContentTranslationWorker:
                 try:
                     l3_semantic = L3SemanticTM(
                         index_path=tm_data_dir / "l3_faiss",
-                        device="cpu"  # Use CPU for L3 to save GPU memory
+                        use_gpu=False  # Use CPU for L3 to save GPU memory
                     )
                 except Exception as e:
                     logger.warning(f"L3 semantic TM not available: {e}")
@@ -270,6 +279,97 @@ class AutonomousContentTranslationWorker:
 
         logger.info("Setup complete")
 
+    def _write_pid_file(self):
+        """Write PID file for watchdog monitoring."""
+        pid_path = Path("data/logs") / f"{self._worker_id}.pid"
+        pid_path.parent.mkdir(parents=True, exist_ok=True)
+        pid_path.write_text(str(os.getpid()))
+
+    def _write_heartbeat(self, status="alive"):
+        """Write heartbeat file for watchdog monitoring."""
+        heartbeat_path = Path("data/logs") / f"{self._worker_id}.heartbeat"
+        heartbeat_path.parent.mkdir(parents=True, exist_ok=True)
+        heartbeat_path.write_text(json.dumps({
+            "timestamp": datetime.now().isoformat(),
+            "pid": os.getpid(),
+            "status": status,
+        }))
+
+    def _start_heartbeat_thread(self):
+        """Start a daemon thread that writes heartbeat every 60 seconds."""
+        self._heartbeat_stop_event = threading.Event()
+
+        def _heartbeat_loop():
+            while not self._heartbeat_stop_event.is_set():
+                try:
+                    self._write_heartbeat("alive")
+                except Exception as e:
+                    logger.warning(f"Heartbeat write failed: {e}")
+                self._heartbeat_stop_event.wait(timeout=60)
+
+        self._heartbeat_thread = threading.Thread(
+            target=_heartbeat_loop,
+            name=f"{self._worker_id}-heartbeat",
+            daemon=True,
+        )
+        self._heartbeat_thread.start()
+        logger.info("Background heartbeat thread started (60s interval)")
+
+    def _stop_heartbeat_thread(self):
+        """Signal the heartbeat thread to stop."""
+        if hasattr(self, '_heartbeat_stop_event'):
+            self._heartbeat_stop_event.set()
+            if hasattr(self, '_heartbeat_thread'):
+                self._heartbeat_thread.join(timeout=5)
+
+    def _preflight_check(self) -> bool:
+        """Validate dependencies before run. Returns True if safe to proceed."""
+        import shutil
+        checks_passed = True
+
+        # 1. GPU available (if device=cuda)
+        if self.config.device == "cuda":
+            try:
+                import torch
+                if not torch.cuda.is_available():
+                    logger.warning("PREFLIGHT FAIL: CUDA requested but not available, skipping run")
+                    checks_passed = False
+            except ImportError:
+                logger.warning("PREFLIGHT FAIL: torch not installed, cannot use CUDA")
+                checks_passed = False
+
+        # 2. Config root exists
+        config_root = Path(self.config.config_root) if hasattr(self.config, 'config_root') else Path("config")
+        if not config_root.exists():
+            logger.warning(f"PREFLIGHT FAIL: Config root missing: {config_root}")
+            checks_passed = False
+
+        # 3. Disk space > 5%
+        try:
+            total, used, free = shutil.disk_usage(".")
+            if (free / total) < 0.05:
+                logger.warning(f"PREFLIGHT FAIL: Disk space critical ({free / total * 100:.1f}% free)")
+                checks_passed = False
+        except Exception as e:
+            logger.warning(f"PREFLIGHT WARNING: Could not check disk space: {e}")
+
+        # Emit preflight telemetry
+        try:
+            emit_worker_event(
+                agent_name="content_worker",
+                job_type="worker_preflight",
+                status="success" if checks_passed else "failure",
+                metrics={
+                    "gpu_check": self.config.device != "cuda" or checks_passed,
+                    "config_root_exists": config_root.exists(),
+                    "device": self.config.device,
+                },
+            )
+        except Exception:
+            pass
+
+        return checks_passed
+
     def run(self) -> None:
         """
         Run autonomous worker.
@@ -277,18 +377,38 @@ class AutonomousContentTranslationWorker:
         In oneshot mode: Executes one translation run and exits
         In daemon mode: Continuously schedules and executes runs
         """
-        if self.config.mode == "oneshot":
-            self._run_oneshot()
-        elif self.config.mode == "daemon":
-            self._run_daemon()
-        else:
-            raise ValueError(f"Invalid mode: {self.config.mode}. Expected 'oneshot' or 'daemon'")
+        self._write_pid_file()
+        self._write_heartbeat("starting")
+        self._start_heartbeat_thread()
+        self._lifecycle_event_id = start_worker_run(
+            "content_worker", "worker_lifecycle",
+            context={
+                "mode": self.config.mode,
+                "runs_per_day": getattr(self.config, "runs_per_day", None),
+                "window": f"{getattr(self.config, 'window_start', '?')}-{getattr(self.config, 'window_end', '?')}",
+            },
+        )
+        self._daemon_start_time = time.time()
+        try:
+            if self.config.mode == "oneshot":
+                self._run_oneshot()
+            elif self.config.mode == "daemon":
+                self._run_daemon()
+            else:
+                raise ValueError(f"Invalid mode: {self.config.mode}. Expected 'oneshot' or 'daemon'")
+        finally:
+            self._stop_heartbeat_thread()
+            self._write_heartbeat("stopped")
 
     def _run_oneshot(self) -> None:
         """Execute a single translation run and exit."""
         logger.info("=" * 80)
         logger.info("ONESHOT MODE: Running single translation pass")
         logger.info("=" * 80)
+
+        if not self._preflight_check():
+            logger.warning("Preflight check failed, aborting oneshot run")
+            return  # Graceful exit, not sys.exit(1)
 
         try:
             self._execute_translation_run()
@@ -306,10 +426,13 @@ class AutonomousContentTranslationWorker:
         logger.info("=" * 80)
 
         run_count = 0
+        consecutive_failures = 0
+        max_consecutive_failures = 10
 
         try:
             while True:
                 # Sleep until next run time
+                self._write_heartbeat("sleeping")
                 next_run = self.scheduler.sleep_until_next_run()
                 run_count += 1
 
@@ -317,18 +440,55 @@ class AutonomousContentTranslationWorker:
                 logger.info(f"SCHEDULED RUN #{run_count} at {next_run.strftime('%Y-%m-%d %H:%M:%S %Z')}")
                 logger.info("=" * 80)
 
+                if not self._preflight_check():
+                    logger.warning(f"Skipping run #{run_count} due to preflight failure")
+                    self._write_heartbeat("skipped_preflight")
+                    continue
+
                 try:
                     self._execute_translation_run()
                     logger.info(f"Scheduled run #{run_count} completed successfully")
+                    consecutive_failures = 0
                 except Exception as e:
-                    logger.error(f"Scheduled run #{run_count} failed: {e}", exc_info=True)
-                    # Continue to next run despite failure
+                    consecutive_failures += 1
+                    logger.error(
+                        f"Scheduled run #{run_count} failed "
+                        f"({consecutive_failures} consecutive): {e}",
+                        exc_info=True,
+                    )
+                    emit_worker_event(
+                        agent_name="content_worker",
+                        job_type="worker_run_failure",
+                        status="failure",
+                        error_summary=str(e)[:500],
+                        metrics={"run_number": run_count, "consecutive_failures": consecutive_failures},
+                    )
+                    if consecutive_failures >= max_consecutive_failures:
+                        logger.critical(
+                            f"Aborting daemon: {max_consecutive_failures} consecutive failures"
+                        )
+                        self._write_heartbeat("fatal_failure")
+                        if getattr(self, "_lifecycle_event_id", None):
+                            complete_worker_run(
+                                self._lifecycle_event_id,
+                                status="failure",
+                                duration_ms=int((time.time() - self._daemon_start_time) * 1000),
+                                error_summary=f"{max_consecutive_failures} consecutive failures",
+                            )
+                        sys.exit(1)
+
+                self._write_heartbeat("run_completed")
+                self.scheduler.mark_run_complete()
 
         except KeyboardInterrupt:
             logger.info("Daemon interrupted by user (Ctrl+C)")
-        except Exception as e:
-            logger.error(f"Daemon failed: {e}", exc_info=True)
-            sys.exit(1)
+            if getattr(self, "_lifecycle_event_id", None):
+                complete_worker_run(
+                    self._lifecycle_event_id,
+                    status="cancelled",
+                    duration_ms=int((time.time() - self._daemon_start_time) * 1000),
+                    output_summary=f"Interrupted after {run_count} runs",
+                )
 
     def _execute_translation_run(self) -> None:
         """
@@ -353,6 +513,14 @@ class AutonomousContentTranslationWorker:
             if self.config.max_sites_per_run and len(sites) > self.config.max_sites_per_run:
                 sites = sites[: self.config.max_sites_per_run]
                 logger.info(f"Limited to {self.config.max_sites_per_run} sites per run")
+
+        # Emit site discovery telemetry
+        emit_worker_event(
+            agent_name="content_worker",
+            job_type="worker_site_discovery",
+            items_discovered=len(sites),
+            metrics={"sites": sites[:10], "max_sites_per_run": self.config.max_sites_per_run},
+        )
 
         # Process each site
         for site_id in sites:
@@ -445,6 +613,21 @@ class AutonomousContentTranslationWorker:
         if result.successful_files > 0:
             logger.info("Auto-committing translation outputs...")
 
+            # Pre-commit diagnostic logging
+            logger.info(f"[COMMIT-DIAG] Pre-commit state:")
+            logger.info(f"  - successful_files: {result.successful_files}")
+            logger.info(f"  - total_files: {result.total_files}")
+            logger.info(f"  - failed_files: {result.failed_files}")
+
+            if hasattr(result, 'file_results') and result.file_results:
+                logger.info(f"  - file_results count: {len(result.file_results)}")
+                # Sample first result for diagnostics
+                first = result.file_results[0]
+                logger.info(f"  - first result success: {first.success}")
+                logger.info(f"  - first result outputs: {list(first.outputs.keys())}")
+                logger.info(f"  - first result skipped_langs: {first.skipped_langs}")
+                logger.info(f"  - first output path: {list(first.outputs.values())[0] if first.outputs else 'None'}")
+
             # Generate run_id for this specific translation (includes invocation_id + site + content_root)
             run_id = f"{self.invocation_id}:{site_id}:{Path(content_root).name}"
 
@@ -456,10 +639,14 @@ class AutonomousContentTranslationWorker:
                 config_service=self.config_service,
             )
 
+            # Post-commit diagnostic logging
+            logger.info(f"[COMMIT-DIAG] Post-commit result: {success}")
+
             if success:
                 logger.info("Git commit successful")
             else:
-                logger.warning("Git commit failed or was skipped")
+                # Elevate from WARNING to ERROR for visibility
+                logger.error("Git commit FAILED or was SKIPPED - check logs above for details")
         else:
             logger.info("No successful translations, skipping git commit")
 
@@ -614,7 +801,42 @@ def main():
 
     # Create and run worker
     worker = AutonomousContentTranslationWorker(config)
-    worker.setup()
+
+    # Setup with retry and exponential backoff for transient failures
+    max_setup_retries = 5
+    for attempt in range(1, max_setup_retries + 1):
+        try:
+            worker.setup()
+            break
+        except Exception as e:
+            if attempt == max_setup_retries:
+                logger.error(f"Setup failed after {max_setup_retries} attempts: {e}")
+                sys.exit(1)
+            backoff = min(30 * (2 ** (attempt - 1)), 300)
+            logger.warning(
+                f"Setup attempt {attempt}/{max_setup_retries} failed: {e}. "
+                f"Retrying in {backoff}s..."
+            )
+            time.sleep(backoff)
+
+    # Register signal handlers for graceful shutdown
+    def _shutdown_handler(signum, frame):
+        sig_name = signal.Signals(signum).name if hasattr(signal, 'Signals') else str(signum)
+        logger.warning(f"Received {sig_name}, initiating graceful shutdown...")
+        worker._stop_heartbeat_thread()
+        worker._write_heartbeat("shutting_down")
+        try:
+            from src.observability.graceful_shutdown import cleanup_telemetry_contexts
+            cleanup_telemetry_contexts(sig_name)
+        except Exception:
+            pass
+        sys.exit(0)
+
+    for sig in [signal.SIGINT, signal.SIGTERM]:
+        signal.signal(sig, _shutdown_handler)
+    if platform.system() == "Windows" and hasattr(signal, 'SIGBREAK'):
+        signal.signal(signal.SIGBREAK, _shutdown_handler)
+
     worker.run()
 
 

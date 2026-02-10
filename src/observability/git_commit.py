@@ -510,6 +510,35 @@ class GitCommitter:
             return False
 
 
+def _is_file_modified_in_git(file_path: Path) -> bool:
+    """
+    Check if file is modified in git working directory.
+
+    Returns True if file shows as modified in git status.
+    Used to catch cases where files marked as "skipped" were actually modified.
+    """
+    try:
+        # Import here to avoid circular dependencies
+        import subprocess
+
+        # Run git status for specific file
+        result = subprocess.run(
+            ["git", "status", "--porcelain", str(file_path)],
+            capture_output=True,
+            text=True,
+            timeout=5,
+            cwd=str(file_path.parent)
+        )
+
+        # Modified files show as " M " or "M  " or "MM"
+        # Any output means file is modified/staged/untracked
+        return bool(result.stdout.strip())
+
+    except Exception as e:
+        logger.debug(f"Git status check failed for {file_path}: {e}")
+        return False
+
+
 def collect_output_files(result: "DirectoryResult") -> List[Path]:
     """
     Collect output file paths that were actually written during this translation run.
@@ -524,11 +553,54 @@ def collect_output_files(result: "DirectoryResult") -> List[Path]:
         List of output file paths that were written (modified or created) in this run
     """
     files = []
+
+    # Diagnostic counters
+    total_results = len(result.file_results) if hasattr(result, 'file_results') else 0
+    successful_results = 0
+    total_outputs = 0
+    skipped_outputs = 0
+    nonexistent_outputs = 0
+
     for file_result in result.file_results:
         if file_result.success:
+            successful_results += 1
             # Only include files for languages that were NOT skipped
             # skipped_langs contains languages where output already existed and was unchanged
             for lang, output_path in file_result.outputs.items():
-                if output_path.exists() and lang not in file_result.skipped_langs:
+                total_outputs += 1
+
+                # Check existence and skip status
+                exists = output_path.exists()
+                is_skipped = lang in file_result.skipped_langs
+
+                if exists and not is_skipped:
                     files.append(output_path)
+                elif exists and is_skipped:
+                    # CRITICAL FIX: Check if skipped file was actually modified
+                    # This catches the write-after-skip bug where files get overwritten
+                    # despite being marked as skipped
+                    if _is_file_modified_in_git(output_path):
+                        logger.warning(
+                            f"[collect_output_files] File marked as skipped but IS modified in git: {output_path}. "
+                            f"Collecting for commit to capture unexpected changes (possible corruption)."
+                        )
+                        files.append(output_path)
+                    else:
+                        skipped_outputs += 1
+                        logger.debug(f"[collect_output_files] Skipped lang {lang}: {output_path}")
+                else:
+                    skipped_outputs += 1
+                    if not exists:
+                        nonexistent_outputs += 1
+                        logger.warning(f"[collect_output_files] File doesn't exist: {output_path}")
+
+    # Log diagnostic summary
+    logger.info(f"[collect_output_files] Collection summary:")
+    logger.info(f"  - Total file_results: {total_results}")
+    logger.info(f"  - Successful results: {successful_results}")
+    logger.info(f"  - Total outputs: {total_outputs}")
+    logger.info(f"  - Files collected for commit: {len(files)}")
+    logger.info(f"  - Skipped outputs: {skipped_outputs}")
+    logger.info(f"  - Nonexistent outputs: {nonexistent_outputs}")
+
     return files

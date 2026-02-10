@@ -33,6 +33,7 @@ def find_git_root(path: Union[str, Path]) -> Optional[Path]:
     """
     logger.debug(f"find_git_root called with: {path} (type: {type(path)})")
     try:
+        # Resolve path to absolute, normalized form (handles Windows paths)
         path = Path(path).resolve()
         logger.debug(f"Resolved path: {path}")
         logger.debug(f"Path exists: {path.exists()}")
@@ -40,29 +41,38 @@ def find_git_root(path: Union[str, Path]) -> Optional[Path]:
 
         # If path is a file, start from its parent directory
         if path.is_file():
-            path = path.parent
-            logger.debug(f"Using parent directory: {path}")
+            search_dir = path.parent
+        else:
+            search_dir = path
 
-        logger.debug(f"Running git rev-parse in cwd: {path}")
+        # Ensure search_dir is resolved and exists
+        search_dir = search_dir.resolve()
+        if not search_dir.exists():
+            logger.error(f"Search directory doesn't exist: {search_dir}")
+            return None
+
+        logger.debug(f"Running git rev-parse in cwd: {search_dir}")
         result = subprocess.run(
             ["git", "rev-parse", "--show-toplevel"],
             capture_output=True,
             text=True,
             timeout=5,
-            cwd=str(path),
+            cwd=str(search_dir),
         )
         logger.debug(f"Git command return code: {result.returncode}")
         logger.debug(f"Git command stdout: {result.stdout.strip()}")
         logger.debug(f"Git command stderr: {result.stderr.strip()}")
 
         if result.returncode == 0 and result.stdout.strip():
-            git_root = Path(result.stdout.strip())
+            git_root = Path(result.stdout.strip()).resolve()
             logger.debug(f"Found git root: {git_root}")
             return git_root
         else:
             logger.debug(f"Git command failed or returned empty output")
     except (subprocess.TimeoutExpired, FileNotFoundError, OSError) as e:
-        logger.debug(f"find_git_root exception for {path}: {e}")
+        logger.error(f"find_git_root exception for {path}: {e}")
+    except Exception as e:
+        logger.error(f"Unexpected error in find_git_root for {path}: {e}")
 
     logger.debug(f"find_git_root returning None for path: {path}")
     return None

@@ -209,6 +209,7 @@ class TranslationEngine:
         enable_verification: bool = False,
         enable_verification_fix: bool = False,
         output_dir_override: Optional[Path] = None,
+        input_root: Optional[Path] = None,
         progress_tracker: Optional["ProgressTracker"] = None,
         production_ingestor: Optional["ProductionMetricsIngestor"] = None,
         sort_segments_by_length: bool = False,
@@ -238,6 +239,7 @@ class TranslationEngine:
             enable_verification: Enable post-translation verification (VA-03)
             enable_verification_fix: Enable automatic retry on verification failure (VA-03)
             output_dir_override: Override output directory (takes precedence over site profile)
+            input_root: Input root directory for computing relative output paths (prevents collisions)
             progress_tracker: Optional ProgressTracker for crash recovery (RES-02)
             production_ingestor: Optional ProductionMetricsIngestor for recording translation runs (BM-06)
             sort_segments_by_length: Sort segments by length (shortest first) for improved batching efficiency
@@ -261,6 +263,7 @@ class TranslationEngine:
         self.save_rejected = save_rejected
         self.batch_size = batch_size  # GPU memory optimization: limit texts per batch
         self.output_dir_override = output_dir_override  # SR-02: CLI --output argument support
+        self.input_root = input_root  # Path collision fix: preserve directory structure in output
         self.sort_segments_by_length = sort_segments_by_length  # SR-01: Sort segments shortest→longest for batching efficiency
 
         # SR-02c: Validate output_dir_override type (fail fast)
@@ -276,6 +279,14 @@ class TranslationEngine:
 
         # Model override (from CLI --model flag)
         self.model_id_override = kwargs.get('model_id', None)
+
+        # CT2-002: Language-aware model selector (if provided by CLI)
+        self.model_selector = kwargs.get('model_selector', None)
+        if self.model_selector:
+            logger.info(
+                f"Language-aware model selector enabled "
+                f"(device={self.model_selector.hardware_info.recommended_device})"
+            )
 
         # T202: Cache refresh control (federated-splashing-panda)
         self.force_retranslate = kwargs.get('force_retranslate', False)
@@ -732,20 +743,59 @@ class TranslationEngine:
             logger.warning(f"Could not determine free space for {path}: {e}")
             return 0
 
-    def _get_model_id(self, site_profile):
+    def _get_model_id(self, site_profile, src_lang: Optional[str] = None, tgt_lang: Optional[str] = None):
         """
-        Get model ID with CLI override support.
+        Get model ID with CLI override, dynamic selection, and site profile fallback support.
+
+        CT2-002: Implements language-aware model selection via ModelSelector if available.
+
+        Selection priority:
+        1. CLI --model override (highest priority)
+        2. Dynamic selection via model_selector (CT2 models preferred for language pairs)
+        3. Site profile default_model
+        4. Global fallback "m2m100_418m"
 
         Args:
             site_profile: Site profile with default_model attribute
+            src_lang: Optional source language code (for dynamic selection)
+            tgt_lang: Optional target language code (for dynamic selection)
 
         Returns:
             Model ID to use for translation
         """
-        # Priority: CLI override > site profile > default
+        # Priority 1: CLI override (explicit user choice)
         if self.model_id_override:
             return self.model_id_override
-        return getattr(site_profile, 'default_model', None) or "m2m100_418m"
+
+        # Priority 2: Dynamic selection via model_selector (CT2-002)
+        # Only if both languages provided and selector available
+        if src_lang and tgt_lang and self.model_selector:
+            try:
+                selection = self.model_selector.select_for_language_pair(src_lang, tgt_lang)
+                logger.info(
+                    f"CT2-002: Selected {selection.model_info.model_id} for {src_lang}→{tgt_lang} "
+                    f"(strategy={selection.selection_strategy}, backend={selection.model_info.backend})"
+                )
+                return selection.model_info.model_id
+            except ValueError as e:
+                # No suitable model found via selector, fall through to static defaults
+                logger.warning(
+                    f"CT2-002: Model selector failed for {src_lang}→{tgt_lang}: {e}. "
+                    f"Falling back to site profile or global default."
+                )
+
+        # Priority 3: Site profile default
+        # Priority 4: Global fallback
+        fallback_model = getattr(site_profile, 'default_model', None) or "m2m100_418m"
+
+        # Log if using fallback (helps with observability)
+        if src_lang and tgt_lang:
+            logger.debug(
+                f"Using fallback model {fallback_model} for {src_lang}→{tgt_lang} "
+                f"(no selector or languages not provided)"
+            )
+
+        return fallback_model
 
     def _should_skip_translation(
         self,
@@ -1103,9 +1153,15 @@ class TranslationEngine:
             should_fix = self.enable_verification_fix and should_verify
             max_retry_attempts = self.decision_engine.max_retry_attempts if self.decision_engine else 2
 
+            # CRITICAL FIX: Cache output paths to prevent path mismatch between skip check and write
+            # Bug: If path calculated differently at write time, skip check tests wrong path
+            output_paths_cache = {}
+
             for target_lang in target_langs:
                 # RES-05: Check if translation can be skipped
+                # Calculate path ONCE and cache it
                 output_path = self._get_output_path(file_path, target_lang, site_profile)
+                output_paths_cache[target_lang] = output_path
                 should_skip, skip_reason = self._should_skip_translation(
                     source_path=file_path,
                     output_path=output_path,
@@ -1350,11 +1406,60 @@ class TranslationEngine:
 
                         # Write output file (only on ACCEPT or if validation disabled)
                         source_path = doc.source_path if hasattr(doc, "source_path") and doc.source_path else Path("output.md")
-                        output_path = self._get_output_path(
+
+                        # CRITICAL FIX: Use cached output_path to prevent path mismatch
+                        # Validate that recalculated path matches cached path
+                        expected_output_path = output_paths_cache.get(target_lang)
+                        recalculated_output_path = self._get_output_path(
                             source_path,
                             target_lang,
                             site_profile,
                         )
+
+                        if expected_output_path != recalculated_output_path:
+                            logger.error(
+                                f"PATH MISMATCH DETECTED! Refusing to write to prevent corruption. "
+                                f"Skip check used: {expected_output_path}, "
+                                f"Write would use: {recalculated_output_path}. "
+                                f"This indicates doc.source_path ({source_path}) differs from original file_path ({file_path})."
+                            )
+                            result.success = False
+                            result.error = f"Output path mismatch: {expected_output_path} != {recalculated_output_path}"
+                            break  # Stop processing this file
+
+                        # Use the cached path for write
+                        output_path = expected_output_path
+
+                        # CRITICAL FIX: Validate content language before writing
+                        # Prevents multi-language garbage from being written
+                        try:
+                            detector = FastTextDetector()
+                            detected_lang, confidence = detector.detect(translated_content)
+
+                            # Check for language mismatch (with high confidence)
+                            if detected_lang != target_lang and confidence > 0.70:
+                                # Check if this is a learned similarity pair
+                                is_similar = False
+                                if hasattr(self, 'similarity_tracker') and self.similarity_tracker:
+                                    is_similar = self.similarity_tracker.are_similar(target_lang, detected_lang)
+
+                                if not is_similar:
+                                    logger.error(
+                                        f"WRITE BLOCKED: Content language mismatch! "
+                                        f"Expected: {target_lang}, Detected: {detected_lang} ({confidence:.2%}). "
+                                        f"Refusing to write wrong-language content to {output_path.name}."
+                                    )
+                                    result.success = False
+                                    result.error = f"Language mismatch: detected {detected_lang}, expected {target_lang}"
+                                    continue  # Skip to next language
+                                else:
+                                    logger.warning(
+                                        f"Language mismatch detected but allowing due to learned similarity: "
+                                        f"{target_lang} <-> {detected_lang} ({confidence:.2%})"
+                                    )
+                        except Exception as e:
+                            logger.warning(f"Language validation failed (non-fatal): {e}")
+
                         self._write_output(translated_content, output_path, source_path, result.stats)
 
                         # Update content hash metadata (if enabled)
@@ -1745,16 +1850,19 @@ class TranslationEngine:
         doc,
         target_lang: str,
         site_profile,
-        stats: TranslationStats
+        stats: TranslationStats,
+        segments: Optional[List] = None,
+        translations: Optional[Dict[str, str]] = None
     ) -> str:
         """
         Translate document body using AST-based node-addressed translation.
 
         This method implements complete AST-based translation with node addressing:
         1. Extract TextUnits from AST with node addressing
-        2. Batch translate with M2M100 delimiter protection
-        3. Apply translations back to AST
-        4. Render AST to Markdown
+        2. Reuse existing translations if available (source text match)
+        3. Batch translate remaining units
+        4. Apply translations back to AST
+        5. Render AST to Markdown
 
         This approach ensures 100% preservation of document structure and formatting
         by separating content from structure.
@@ -1764,6 +1872,9 @@ class TranslationEngine:
             target_lang: Target language code
             site_profile: Site profile configuration
             stats: Stats object to update with telemetry
+            segments: Optional list of segments from SegmentExtractor (for building source text lookup)
+            translations: Optional dict mapping segment.id to translations.
+                         If provided along with segments, will reuse translations by source text match.
 
         Returns:
             Translated markdown body content
@@ -1816,9 +1927,73 @@ class TranslationEngine:
             stats.ast_units_translatable = translatable_units
             stats.ast_units_protected = protected_units
 
+            # E2E FIX: Reuse existing translations if available (avoids re-translation)
+            reused_count = 0
+            not_matched_count = 0
+            if segments and translations:
+                # Helper function to strip markdown formatting for matching
+                import re
+                def strip_markdown(text: str) -> str:
+                    """Strip common markdown formatting for source_text matching."""
+                    # Strip bold/italic: **text** or *text*
+                    text = re.sub(r'\*\*(.+?)\*\*', r'\1', text)
+                    text = re.sub(r'\*(.+?)\*', r'\1', text)
+                    # Strip inline code: `text`
+                    text = re.sub(r'`(.+?)`', r'\1', text)
+                    # Strip links: [text](url) -> text
+                    text = re.sub(r'\[([^\]]+)\]\([^)]+\)', r'\1', text)
+                    return text
+
+                # Apply placeholder protection to segments for matching
+                from .extractor.placeholder_manager import PlaceholderManager
+                pm = PlaceholderManager()
+                preserve_patterns = site_profile.body.preserve_patterns or []
+
+                # Build source_text -> translation mapping from segments + translations
+                # Normalize both segment and unit source_texts by stripping markdown
+                source_to_translation = {}
+                for segment in segments:
+                    if segment.id in translations and translations[segment.id]:
+                        # Normalize segment source_text by stripping markdown
+                        normalized_source = strip_markdown(segment.source_text)
+                        # Apply placeholder protection
+                        protected_source, _ = pm.protect(normalized_source, preserve_patterns)
+                        source_to_translation[protected_source] = translations[segment.id]
+
+                logger.debug(f"E2E DEBUG: Built mapping with {len(source_to_translation)} segment translations")
+                logger.debug(f"E2E DEBUG: First 3 normalized segment source_texts: {list(source_to_translation.keys())[:3]}")
+
+                # Apply translations to units by source text match
+                unmatched_units = []
+                for unit in plan.units:
+                    if not unit.do_not_translate and unit.source_text:
+                        # Normalize unit source_text same way as segments
+                        normalized_unit_source = strip_markdown(unit.source_text)
+                        # Apply same placeholder protection for matching
+                        protected_unit_source, _ = pm.protect(normalized_unit_source, preserve_patterns)
+
+                        if protected_unit_source in source_to_translation:
+                            unit.translated_text = source_to_translation[protected_unit_source]
+                            reused_count += 1
+                        else:
+                            not_matched_count += 1
+                            unmatched_units.append(unit)
+                            if not_matched_count <= 5:
+                                logger.debug(f"E2E DEBUG: Unmatched unit [{unit.kind}]: normalized={normalized_unit_source[:80]}")
+
+                logger.info(f"AST Translation: Reused {reused_count} existing translations, {not_matched_count} units not matched")
+
+                # E2E DEBUG: Log all unmatched unit kinds to understand the mismatch
+                if unmatched_units:
+                    kind_counts = {}
+                    for u in unmatched_units:
+                        kind_counts[u.kind] = kind_counts.get(u.kind, 0) + 1
+                    logger.debug(f"E2E DEBUG: Unmatched unit kinds: {kind_counts}")
+
             # Step 2: Translate units with batching + fallback
             batch_size = site_profile.body.ast_batch_size
-            logger.info(f"AST Translation: Translating units (batch_size: {batch_size})")
+            units_needing_translation = [u for u in plan.units if not u.do_not_translate and not u.translated_text]
+            logger.info(f"AST Translation: Translating {len(units_needing_translation)} new units (batch_size: {batch_size}, reused: {reused_count})")
 
             # Track batch calls and fallbacks
             batch_calls_before = getattr(extractor, '_batch_calls', 0)
@@ -1948,8 +2123,8 @@ class TranslationEngine:
         # Create extractor instance for inline formatting restoration (TRM-05: with terminology)
         extractor = SegmentExtractor(site_profile, terminology_manager=self.terminology_manager)
 
-        # Get model_id early for accurate token counting (if model already loaded)
-        model_id = self._get_model_id(site_profile)
+        # CT2-002: Get model_id with language-aware selection (early for accurate token counting)
+        model_id = self._get_model_id(site_profile, src_lang=source_lang, tgt_lang=target_lang)
 
         # Step 1: TM lookup (unless force=True)
         if not force:
@@ -2198,8 +2373,11 @@ class TranslationEngine:
             logger.info("Using AST-based body reconstruction for translation")
             try:
                 # AST Translation: Translate body using node-addressed AST
+                # E2E FIX: Pass segments and translations to reuse existing work
                 translated_body = self._translate_body_ast(
-                    doc, target_lang, site_profile, stats
+                    doc, target_lang, site_profile, stats,
+                    segments=segments,
+                    translations=translations
                 )
 
                 # Reconstruct frontmatter (translate frontmatter fields)
@@ -2359,8 +2537,25 @@ class TranslationEngine:
         """
         # SR-02: Priority: CLI override > site profile config
         if self.output_dir_override:
-            output_path = self.output_dir_override / target_lang / source_path.name
-            logger.info(f"Using CLI output override: {output_path}")
+            # Collision fix: Preserve directory structure if input_root is known
+            if self.input_root:
+                try:
+                    # Resolve to absolute paths for reliable relative_to computation
+                    abs_source = source_path.resolve()
+                    abs_input_root = self.input_root.resolve()
+                    # Compute relative path from input root
+                    relative_path = abs_source.relative_to(abs_input_root)
+                    logger.debug(f"Computed relative path: {relative_path} from {abs_source} relative to {abs_input_root}")
+                except ValueError:
+                    # Fallback if source_path is not under input_root
+                    logger.warning(f"Source path {source_path} not under input root {self.input_root}, using basename")
+                    relative_path = source_path.name
+            else:
+                # Fallback: use basename (preserves existing behavior)
+                relative_path = source_path.name
+
+            output_path = self.output_dir_override / target_lang / relative_path
+            logger.info(f"Using CLI output override: {output_path} (relative: {relative_path})")
             return output_path
 
         # Check if site profile uses Hugo sibling folder pattern
@@ -2584,8 +2779,17 @@ class TranslationEngine:
             result.total_files = len(md_files)
 
             if not md_files:
-                logger.warning(f"No markdown files found in {directory}")
-                result.success = True
+                # Count files before filtering for better diagnostics
+                all_md_count = len(list(directory.glob(pattern)))
+                logger.error(
+                    f"No markdown files to translate in {directory}. "
+                    f"Discovered {all_md_count} .md file(s) total, "
+                    f"but after filtering: 0 source files remain. "
+                    f"Check: input path exists, site profile content_roots are correct, "
+                    f"working directory is repository root, and files aren't already translated."
+                )
+                result.success = False
+                result.failed_files = 1  # Signal failure to CLI
                 return result
 
             # Choose processing mode
