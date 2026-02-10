@@ -1433,7 +1433,8 @@ class TranslationEngine:
                         # CRITICAL FIX: Validate content language before writing
                         # Prevents multi-language garbage from being written
                         try:
-                            detector = FastTextDetector()
+                            # Use same FastTextDetector as initialized for the engine
+                            detector = self.detector
                             detected_lang, confidence = detector.detect(translated_content)
 
                             # Check for language mismatch (with high confidence)

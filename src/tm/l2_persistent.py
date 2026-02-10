@@ -205,10 +205,13 @@ class L2PersistentTM:
         try:
             # Import here to avoid circular dependencies
             from src.translation_engine.language_detection.fasttext_detector import FastTextDetector
+            from pathlib import Path
 
             # Only validate if translation is long enough for accurate detection
             if len(translation.strip()) > 50:
-                detector = FastTextDetector()
+                # Use models directory for FastText cache
+                cache_dir = Path("models")
+                detector = FastTextDetector(cache_dir=cache_dir)
                 detected_lang, confidence = detector.detect(translation)
 
                 # Block storage only on high-confidence mismatch (>80%)
