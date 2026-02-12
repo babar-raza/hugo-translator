@@ -55,6 +55,66 @@ class ASTRenderer:
 
         return self._placeholder_manager.restore(text, placeholder_map)
 
+    def _preserve_punctuation(self, source_text: str, translated_text: str, prefix_ws: str, suffix_ws: str) -> str:
+        """
+        Preserve leading/trailing punctuation that MT models sometimes drop (FIX-C).
+
+        MT models occasionally drop leading punctuation (period, comma, semicolon)
+        which creates malformed markdown like `**bold**Word` instead of `**bold**. Word`.
+        This breaks markdown parsing and loses bold formatting.
+
+        Args:
+            source_text: Original source text (stripped, no whitespace)
+            translated_text: Translated text from MT model (stripped, no whitespace)
+            prefix_ws: Leading whitespace
+            suffix_ws: Trailing whitespace
+
+        Returns:
+            Final text with punctuation preserved and whitespace reattached
+        """
+        # Define punctuation characters to preserve
+        LEADING_PUNCT = '.!?;:,‚„…'
+        TRAILING_PUNCT = '.!?;:,‚„…'
+
+        # Check if source had leading punctuation but translation doesn't
+        if source_text and translated_text:
+            # Extract leading punctuation from source
+            source_leading_punct = ""
+            for char in source_text:
+                if char in LEADING_PUNCT:
+                    source_leading_punct += char
+                else:
+                    break
+
+            # Check if translation is missing this punctuation
+            if source_leading_punct and not translated_text.startswith(source_leading_punct):
+                logger.debug(
+                    f"[FIX-C] Restoring leading punctuation '{source_leading_punct}' "
+                    f"dropped by MT model. Source: {source_text[:30]}, "
+                    f"Translation: {translated_text[:30]}"
+                )
+                translated_text = source_leading_punct + translated_text
+
+            # Extract trailing punctuation from source
+            source_trailing_punct = ""
+            for char in reversed(source_text):
+                if char in TRAILING_PUNCT:
+                    source_trailing_punct = char + source_trailing_punct
+                else:
+                    break
+
+            # Check if translation is missing trailing punctuation
+            if source_trailing_punct and not translated_text.endswith(source_trailing_punct):
+                logger.debug(
+                    f"[FIX-C] Restoring trailing punctuation '{source_trailing_punct}' "
+                    f"dropped by MT model. Source: {source_text[-30:]}, "
+                    f"Translation: {translated_text[-30:]}"
+                )
+                translated_text = translated_text + source_trailing_punct
+
+        # Reattach whitespace
+        return f"{prefix_ws}{translated_text}{suffix_ws}"
+
     def _sanitize_language_markers(self, text: str) -> str:
         """
         Remove language markers from text (FIX-BT-02).
@@ -87,6 +147,215 @@ class ASTRenderer:
             logger.debug(f"Cleaned text preview: {cleaned[:200]}")
 
         return cleaned
+
+    def _reparse_inline_markdown(self, text: str, parent_node_addr: str) -> List[ASTNode]:
+        """
+        Re-parse translated text containing markdown syntax back into AST nodes.
+
+        FIX-MARKDOWN-PRESERVATION: When text contains markdown formatting like **bold**
+        or *italic*, parse it back into proper AST structure (STRONG/EMPHASIS nodes).
+
+        This fixes the core issue where translated text like "Ceci est **texte gras** ici"
+        was being treated as plain text instead of being parsed into STRONG nodes.
+
+        Args:
+            text: Translated text potentially containing markdown syntax
+            parent_node_addr: Node address of parent for child addressing
+
+        Returns:
+            List of AST nodes representing the parsed inline content
+
+        Example:
+            Input: "This is **bold** and *italic* text"
+            Output: [TEXT("This is "), STRONG([TEXT("bold")]), TEXT(" and "),
+                     EMPHASIS([TEXT("italic")]), TEXT(" text")]
+        """
+        from markdown_it import MarkdownIt
+
+        # Use markdown_it to parse inline content
+        md = MarkdownIt("commonmark")
+
+        # Parse as inline content (wrap in dummy paragraph for parsing)
+        tokens = md.parse(text)
+
+        # Extract inline tokens from paragraph
+        inline_tokens = None
+        for i, token in enumerate(tokens):
+            if token.type == "inline":
+                inline_tokens = token.children
+                break
+
+        if not inline_tokens:
+            # No inline tokens found, return as plain text
+            from ..parser.ast_nodes import ASTNode
+            return [ASTNode(
+                type=NodeType.TEXT,
+                raw=text,
+                children=[],
+                attrs={},
+                node_addr=f"{parent_node_addr}.0"
+            )]
+
+        # Parse inline tokens into AST nodes
+        return self._parse_inline_tokens_to_ast(inline_tokens, parent_node_addr)
+
+    def _parse_inline_tokens_to_ast(self, tokens: List, parent_node_addr: str) -> List[ASTNode]:
+        """
+        Convert markdown_it inline tokens to AST nodes.
+
+        Args:
+            tokens: List of inline tokens from markdown_it
+            parent_node_addr: Parent node address for child addressing
+
+        Returns:
+            List of AST nodes
+        """
+        from ..parser.ast_nodes import ASTNode
+
+        nodes = []
+        i = 0
+        child_idx = 0
+
+        while i < len(tokens):
+            token = tokens[i]
+            node_addr = f"{parent_node_addr}.{child_idx}"
+
+            if token.type == "text":
+                nodes.append(ASTNode(
+                    type=NodeType.TEXT,
+                    raw=token.content,
+                    children=[],
+                    attrs={},
+                    node_addr=node_addr
+                ))
+                child_idx += 1
+                i += 1
+
+            elif token.type == "strong_open":
+                # Find matching strong_close
+                children_tokens = []
+                i += 1
+                depth = 1
+                while i < len(tokens) and depth > 0:
+                    if tokens[i].type == "strong_open":
+                        depth += 1
+                    elif tokens[i].type == "strong_close":
+                        depth -= 1
+                        if depth == 0:
+                            break
+                    children_tokens.append(tokens[i])
+                    i += 1
+
+                # Recursively parse children
+                children = self._parse_inline_tokens_to_ast(children_tokens, node_addr)
+
+                nodes.append(ASTNode(
+                    type=NodeType.STRONG,
+                    children=children,
+                    attrs={},
+                    node_addr=node_addr
+                ))
+                child_idx += 1
+                i += 1  # Skip strong_close
+
+            elif token.type == "em_open":
+                # Find matching em_close
+                children_tokens = []
+                i += 1
+                depth = 1
+                while i < len(tokens) and depth > 0:
+                    if tokens[i].type == "em_open":
+                        depth += 1
+                    elif tokens[i].type == "em_close":
+                        depth -= 1
+                        if depth == 0:
+                            break
+                    children_tokens.append(tokens[i])
+                    i += 1
+
+                # Recursively parse children
+                children = self._parse_inline_tokens_to_ast(children_tokens, node_addr)
+
+                nodes.append(ASTNode(
+                    type=NodeType.EMPHASIS,
+                    children=children,
+                    attrs={},
+                    node_addr=node_addr
+                ))
+                child_idx += 1
+                i += 1  # Skip em_close
+
+            elif token.type == "code_inline":
+                nodes.append(ASTNode(
+                    type=NodeType.CODE_SPAN,
+                    raw=token.content,
+                    children=[],
+                    attrs={},
+                    node_addr=node_addr
+                ))
+                child_idx += 1
+                i += 1
+
+            elif token.type == "link_open":
+                # Extract link URL
+                url = ""
+                for attr in token.attrs or []:
+                    if attr[0] == "href":
+                        url = attr[1]
+                        break
+
+                # Find matching link_close
+                children_tokens = []
+                i += 1
+                depth = 1
+                while i < len(tokens) and depth > 0:
+                    if tokens[i].type == "link_open":
+                        depth += 1
+                    elif tokens[i].type == "link_close":
+                        depth -= 1
+                        if depth == 0:
+                            break
+                    children_tokens.append(tokens[i])
+                    i += 1
+
+                # Recursively parse children
+                children = self._parse_inline_tokens_to_ast(children_tokens, node_addr)
+
+                nodes.append(ASTNode(
+                    type=NodeType.LINK,
+                    children=children,
+                    attrs={"url": url},
+                    node_addr=node_addr
+                ))
+                child_idx += 1
+                i += 1  # Skip link_close
+
+            elif token.type == "softbreak":
+                nodes.append(ASTNode(
+                    type=NodeType.SOFT_BREAK,
+                    children=[],
+                    attrs={},
+                    node_addr=node_addr
+                ))
+                child_idx += 1
+                i += 1
+
+            elif token.type == "hardbreak":
+                nodes.append(ASTNode(
+                    type=NodeType.LINE_BREAK,
+                    children=[],
+                    attrs={},
+                    node_addr=node_addr
+                ))
+                child_idx += 1
+                i += 1
+
+            else:
+                # Skip unknown token types
+                logger.debug(f"Skipping unknown inline token type: {token.type}")
+                i += 1
+
+        return nodes
 
     def _apply_frontmatter_translations(self, frontmatter_dict: Dict[str, Any], text_units: List[TextUnit]) -> None:
         """
@@ -179,48 +448,182 @@ class ASTRenderer:
         Args:
             node: ASTNode to update
         """
+        import os
+        debug_mode = os.environ.get('TRANSLATION_DEBUG', '0') == '1'
+
+        # INSTRUMENTATION: Log PARAGRAPH processing with children info
+        if debug_mode and node.type == NodeType.PARAGRAPH:
+            children_summary = [f"{child.type.name}" for child in node.children]
+            logger.info(f"[HARDENING-INSTRUMENT] BEFORE: PARAGRAPH node_addr={node.node_addr}")
+            logger.info(f"[HARDENING-INSTRUMENT]   Children count: {len(node.children)}")
+            logger.info(f"[HARDENING-INSTRUMENT]   Children types: {children_summary}")
+            logger.info(f"[HARDENING-INSTRUMENT]   Has translation unit: {node.node_addr in self.unit_map if node.node_addr else False}")
+
+            # Log inline formatting presence
+            has_strong = any(c.type == NodeType.STRONG for c in node.children)
+            has_emphasis = any(c.type == NodeType.EMPHASIS for c in node.children)
+            logger.info(f"[HARDENING-INSTRUMENT]   Has STRONG nodes: {has_strong}")
+            logger.info(f"[HARDENING-INSTRUMENT]   Has EMPHASIS nodes: {has_emphasis}")
+
         # Check if this node has a corresponding TextUnit
         if node.node_addr and node.node_addr in self.unit_map:
             unit = self.unit_map[node.node_addr]
 
-            # Get final text (with whitespace reattached)
-            final_text = unit.get_final_text()
+            # FIX-C: Preserve leading/trailing punctuation that MT models sometimes drop
+            # This prevents malformed markdown like `**bold**Word` instead of `**bold**. Word`
+            if unit.translated_text and unit.source_text:
+                final_text = self._preserve_punctuation(unit.source_text, unit.translated_text, unit.prefix_ws, unit.suffix_ws)
+            else:
+                # No translation or no source - use standard whitespace reattachment
+                final_text = unit.get_final_text()
 
             # Restore placeholders (if any were applied during extraction)
             placeholder_map = unit.metadata.get('placeholder_map', {})
             if placeholder_map:
                 final_text = self._restore_placeholders(final_text, placeholder_map)
 
+            # INSTRUMENTATION: Log translation application
+            if debug_mode and node.type == NodeType.PARAGRAPH:
+                logger.info(f"[HARDENING-INSTRUMENT]   Translated text preview: {final_text[:100]}")
+                logger.info(f"[HARDENING-INSTRUMENT]   Unit extraction_mode: {unit.metadata.get('extraction_mode', 'UNKNOWN')}")
+
             # Update node content based on type
             if node.type in (NodeType.TEXT, NodeType.CODE_SPAN, NodeType.CODE_BLOCK):
                 # Text nodes: update raw content
                 node.raw = final_text
+                self.applied_units.add(node.node_addr)
             elif node.type == NodeType.IMAGE:
                 # Image: update alt text (src preserved in attrs)
                 if 'alt' in node.attrs:
                     node.attrs['alt'] = final_text
+                self.applied_units.add(node.node_addr)
             elif node.type == NodeType.LINK:
                 # Link: text is in children (url preserved in attrs)
                 pass  # Text children will be updated recursively
-            elif node.type in (NodeType.PARAGRAPH, NodeType.HEADING, NodeType.LIST_ITEM,
+                self.applied_units.add(node.node_addr)
+            elif node.type == NodeType.STRONG:
+                # FIX-B: STRONG nodes must never be flattened
+                # Apply translation to TEXT children only, preserve STRONG wrapper
+                if debug_mode:
+                    logger.info(f"[HARDENING-FIX-B] Preserving STRONG node, processing children")
+                # Don't mark as applied - let children be processed
+                pass
+            elif node.type == NodeType.EMPHASIS:
+                # FIX-B: EMPHASIS nodes must never be flattened
+                # Apply translation to TEXT children only, preserve EMPHASIS wrapper
+                if debug_mode:
+                    logger.info(f"[HARDENING-FIX-B] Preserving EMPHASIS node, processing children")
+                # Don't mark as applied - let children be processed
+                pass
+            elif node.type == NodeType.HEADING:
+                # FIX-B: HEADING nodes must NEVER be flattened
+                # Preserve heading level attribute and process children recursively
+                heading_level = node.attrs.get('level', 1)
+
+                # Check for inline formatting in heading
+                has_inline_formatting = any(
+                    child.type in (NodeType.STRONG, NodeType.EMPHASIS, NodeType.LINK,
+                                   NodeType.CODE_SPAN, NodeType.IMAGE)
+                    for child in node.children
+                )
+
+                if has_inline_formatting:
+                    # FIX-MARKDOWN-PRESERVATION: Re-parse heading with inline formatting
+                    if debug_mode:
+                        logger.info(f"[FIX-MARKDOWN-PRESERVATION] Re-parsing HEADING level={heading_level} with inline formatting")
+
+                    # Re-parse the translated text back into AST nodes
+                    new_children = self._reparse_inline_markdown(final_text, node.node_addr)
+                    node.children = new_children
+
+                    # CRITICAL: Preserve heading level
+                    node.attrs['level'] = heading_level
+
+                    # Mark as applied
+                    self.applied_units.add(node.node_addr)
+                else:
+                    # HEADING with plain text - safe to flatten but MUST preserve level
+                    from ..parser.ast_nodes import ASTNode
+
+                    if debug_mode:
+                        logger.info(f"[HARDENING-FIX-B] Flattening HEADING level={heading_level} (no inline formatting)")
+
+                    text_node = ASTNode(
+                        type=NodeType.TEXT,
+                        raw=final_text,
+                        children=[],
+                        attrs={},
+                        node_addr=f"{node.node_addr}.0"
+                    )
+                    node.children = [text_node]
+
+                    # CRITICAL: Preserve heading level
+                    node.attrs['level'] = heading_level
+
+                    # Mark as applied
+                    self.applied_units.add(node.node_addr)
+            elif node.type in (NodeType.PARAGRAPH, NodeType.LIST_ITEM,
                               NodeType.BLOCKQUOTE, NodeType.TABLE_CELL):
                 # Container nodes with full-sentence extraction (sentence_only strategy):
-                # Replace all children with a single TEXT node containing the translation
-                from ..parser.ast_nodes import ASTNode
-                text_node = ASTNode(
-                    type=NodeType.TEXT,
-                    raw=final_text,
-                    children=[],
-                    attrs={},
-                    node_addr=f"{node.node_addr}.0"  # Give it a child address
+                # FIX-A: Only flatten if NO inline formatting is present
+
+                # Check for inline formatting nodes
+                # FIX-F: Include LINE_BREAK to preserve multi-line list items
+                has_inline_formatting = any(
+                    child.type in (NodeType.STRONG, NodeType.EMPHASIS, NodeType.LINK,
+                                   NodeType.CODE_SPAN, NodeType.IMAGE, NodeType.LINE_BREAK)
+                    for child in node.children
                 )
-                node.children = [text_node]
+
+                if has_inline_formatting:
+                    # FIX-MARKDOWN-PRESERVATION: Re-parse translated text with markdown
+                    # Instead of skipping, re-parse the translation to reconstruct inline formatting
+                    if debug_mode and node.type == NodeType.PARAGRAPH:
+                        logger.info(f"[FIX-MARKDOWN-PRESERVATION] Re-parsing translated text with inline formatting")
+                        logger.info(f"[FIX-MARKDOWN-PRESERVATION]   Original children: {len(node.children)}")
+                        logger.info(f"[FIX-MARKDOWN-PRESERVATION]   Text preview: {final_text[:100]}")
+
+                    # Re-parse the translated text (which contains markdown like **bold**)
+                    # back into AST nodes with proper STRONG/EMPHASIS structure
+                    new_children = self._reparse_inline_markdown(final_text, node.node_addr)
+
+                    if debug_mode and node.type == NodeType.PARAGRAPH:
+                        logger.info(f"[FIX-MARKDOWN-PRESERVATION]   Re-parsed children: {len(new_children)}")
+                        strong_count = sum(1 for c in new_children if c.type == NodeType.STRONG)
+                        logger.info(f"[FIX-MARKDOWN-PRESERVATION]   STRONG nodes: {strong_count}")
+
+                    # Replace children with re-parsed nodes
+                    node.children = new_children
+
+                    # Mark as applied
+                    self.applied_units.add(node.node_addr)
+                else:
+                    # Safe to flatten - no inline formatting to destroy
+                    from ..parser.ast_nodes import ASTNode
+
+                    # INSTRUMENTATION: Log before flattening
+                    if debug_mode and node.type == NodeType.PARAGRAPH:
+                        logger.info(f"[HARDENING-FIX-A] FLATTENING (no inline formatting)")
+
+                    text_node = ASTNode(
+                        type=NodeType.TEXT,
+                        raw=final_text,
+                        children=[],
+                        attrs={},
+                        node_addr=f"{node.node_addr}.0"
+                    )
+                    node.children = [text_node]
+
+                    # Mark as applied
+                    self.applied_units.add(node.node_addr)
             else:
                 # Other containers: content is in children
                 pass  # Children will be updated recursively
+                # Mark as applied for these other containers
+                self.applied_units.add(node.node_addr)
 
-            # Mark as applied
-            self.applied_units.add(node.node_addr)
+            # Note: For PARAGRAPH with inline formatting (FIX-A), we don't mark as applied
+            # so children can be processed recursively
 
         # Recursively apply to children
         for child in node.children:
@@ -245,6 +648,13 @@ class ASTRenderer:
 
         # Join with appropriate spacing
         rendered = "".join(output)
+
+        # FIX-D: Preserve spacing between bold-only paragraphs and lists
+        # Remove extra blank line when bold-only paragraph is followed by a list
+        # Pattern: **text**\n\n- list  →  **text**\n- list
+        import re
+        rendered = re.sub(r'(\*\*[^*\n]+\*\*)\n\n(-\s)', r'\1\n\2', rendered)
+        rendered = re.sub(r'(\*\*[^*\n]+\*\*)\n\n(\d+\.\s)', r'\1\n\2', rendered)  # ordered lists too
 
         # Final sanitization pass (FIX-BT-02)
         rendered = self._sanitize_language_markers(rendered)
@@ -341,8 +751,27 @@ class ASTRenderer:
             return self._render_children(node)
 
     def _render_children(self, node: ASTNode) -> str:
-        """Render all children of a node."""
-        return "".join([self._render_node(child) for child in node.children])
+        """
+        Render all children of a node, adding newlines before block elements.
+
+        FIX-NESTED-LIST: Block elements (LIST, BLOCKQUOTE, CODE_BLOCK, TABLE)
+        need newlines before them when nested inside list items or other containers.
+        Without this, nested lists get concatenated on the same line as their parent content.
+        """
+        # Block elements that should start on a new line
+        BLOCK_TYPES = {NodeType.LIST, NodeType.BLOCKQUOTE, NodeType.CODE_BLOCK, NodeType.TABLE}
+
+        result = []
+        for child in node.children:
+            rendered = self._render_node(child)
+
+            # Add newline before block elements (unless it's the first child)
+            if result and child.type in BLOCK_TYPES:
+                result.append('\n')
+
+            result.append(rendered)
+
+        return "".join(result)
 
     def _render_list(self, list_node: ASTNode) -> str:
         """

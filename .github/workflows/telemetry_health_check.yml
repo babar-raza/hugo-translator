@@ -10,14 +10,15 @@ on:
 
 jobs:
   health-check:
-    runs-on: self-hosted
+    runs-on: self-hosted  # Requires self-hosted runner: accesses local C:\Users\prora paths and local-telemetry repo
+    timeout-minutes: 10
 
     steps:
       - name: Checkout hugo-translator
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Setup Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
           python-version: '3.10'
 

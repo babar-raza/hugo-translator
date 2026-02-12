@@ -22,7 +22,7 @@ echo - Runs per day: 4
 echo - Time window: 08:00-23:00 Pacific Time
 echo - Device: CUDA (GPU acceleration)
 echo - Max GPU memory: 50%%
-echo - LLM: Ollama/llama2
+echo - LLM: Ollama/qwen3:14b
 echo.
 
 python -m src.workers.tm_improvement_worker ^
@@ -35,7 +35,7 @@ python -m src.workers.tm_improvement_worker ^
     --device cuda ^
     --max-gpu-memory-percent 50 ^
     --llm-provider ollama ^
-    --llm-model llama2 ^
+    --llm-model qwen3:14b ^
     --candidates-per-run 50 ^
     --max-llm-calls-per-run 200 ^
     --max-seconds-per-run 900 ^

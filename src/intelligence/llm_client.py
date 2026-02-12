@@ -26,7 +26,7 @@ class LLMConfig:
     """LLM client configuration."""
 
     provider: str = "ollama"
-    model: str = "llama2"
+    model: str = "qwen3:14b"
     base_url: Optional[str] = None
     api_key: Optional[str] = None
     timeout_seconds: int = 30
@@ -381,7 +381,7 @@ Adapted Translation:"""
 
 def create_llm_client(
     provider: str = "ollama",
-    model: str = "llama2",
+    model: str = "qwen3:14b",
     api_key: Optional[str] = None,
     base_url: Optional[str] = None,
     **kwargs
@@ -417,7 +417,7 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(description="Test LLM client")
     parser.add_argument("--provider", default="ollama", help="LLM provider")
-    parser.add_argument("--model", default="llama2", help="Model name")
+    parser.add_argument("--model", default="qwen3:14b", help="Model name")
     parser.add_argument("--test-query", help="Test query to run")
     parser.add_argument("--api-key", help="API key (for cloud providers)")
 

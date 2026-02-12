@@ -16,6 +16,7 @@ Key Features:
 
 import json
 import logging
+import math
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Dict, Optional, Any
@@ -323,9 +324,14 @@ class BatchStatsTracker:
                 return  # Don't check for increase in same update
 
         # INCREASE: Sustained success (only if below baseline)
+        # FIX Concern #10: Use math.ceil + minimum +1 to ensure batch size actually increases
+        # Previous bug: int(4 * 1.10) = int(4.4) = 4 (no increase!)
+        # Fixed: max(current+1, ceil(current*factor)) ensures at least +1
         consecutive = lang_data.get('consecutive_successes', 0)
         if consecutive >= self.min_batches_before_increase and current_size < baseline:
-            new_size = min(baseline, int(current_size * self.increase_factor))
+            # Use ceil to round up AND ensure at least +1 increase
+            proportional_increase = math.ceil(current_size * self.increase_factor)
+            new_size = min(baseline, max(current_size + 1, proportional_increase))
             if new_size != current_size:
                 # Prepare detailed reason
                 reason_detail = f"consecutive_successes {consecutive} >= {self.min_batches_before_increase}"

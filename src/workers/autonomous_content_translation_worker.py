@@ -28,6 +28,7 @@ from src.observability.git_commit_helper import auto_commit_translations
 from src.observability.worker_telemetry import emit_worker_event, start_worker_run, complete_worker_run
 from src.translation_engine.engine import TranslationEngine
 from src.utils.config_loader import ConfigService
+from src.utils.timeout_guard import timeout_guard, TimeoutError
 from src.workers.window_scheduler import ScheduleConfig, WindowScheduler
 
 logger = logging.getLogger(__name__)
@@ -49,6 +50,7 @@ class AutonomousWorkerConfig:
         max_sites_per_run: Optional limit on sites to process per run
         max_gpu_memory_percent: GPU memory limit (percentage)
         device: Device for model inference (cpu, cuda, mps)
+        file_timeout_seconds: Timeout for translation operations (seconds)
     """
 
     def __init__(
@@ -64,6 +66,7 @@ class AutonomousWorkerConfig:
         max_sites_per_run: Optional[int] = None,
         max_gpu_memory_percent: Optional[int] = 60,
         device: str = "auto",
+        file_timeout_seconds: int = 600,
     ):
         """Initialize worker configuration."""
         self.config_root = config_root
@@ -77,6 +80,7 @@ class AutonomousWorkerConfig:
         self.max_sites_per_run = max_sites_per_run
         self.max_gpu_memory_percent = max_gpu_memory_percent
         self.device = device
+        self.file_timeout_seconds = file_timeout_seconds
 
     @classmethod
     def from_args(cls, args: argparse.Namespace) -> "AutonomousWorkerConfig":
@@ -93,6 +97,7 @@ class AutonomousWorkerConfig:
             max_sites_per_run=args.max_sites_per_run,
             max_gpu_memory_percent=args.max_gpu_memory_percent,
             device=args.device,
+            file_timeout_seconds=args.file_timeout_seconds,
         )
 
 
@@ -327,16 +332,21 @@ class AutonomousContentTranslationWorker:
         import shutil
         checks_passed = True
 
-        # 1. GPU available (if device=cuda)
+        # 1. GPU available (if device=cuda) - Fall back to CPU if unavailable
+        original_device = self.config.device
         if self.config.device == "cuda":
             try:
                 import torch
                 if not torch.cuda.is_available():
-                    logger.warning("PREFLIGHT FAIL: CUDA requested but not available, skipping run")
-                    checks_passed = False
+                    logger.warning(
+                        "PREFLIGHT WARNING: CUDA requested but not available, falling back to CPU"
+                    )
+                    self.config.device = "cpu"  # Graceful fallback
             except ImportError:
-                logger.warning("PREFLIGHT FAIL: torch not installed, cannot use CUDA")
-                checks_passed = False
+                logger.warning(
+                    "PREFLIGHT WARNING: torch not installed, falling back to CPU"
+                )
+                self.config.device = "cpu"  # Graceful fallback
 
         # 2. Config root exists
         config_root = Path(self.config.config_root) if hasattr(self.config, 'config_root') else Path("config")
@@ -363,10 +373,18 @@ class AutonomousContentTranslationWorker:
                     "gpu_check": self.config.device != "cuda" or checks_passed,
                     "config_root_exists": config_root.exists(),
                     "device": self.config.device,
+                    "device_fallback": original_device != self.config.device,
+                    "original_device": original_device,
                 },
             )
         except Exception:
             pass
+
+        # Log device fallback info
+        if original_device != self.config.device:
+            logger.info(
+                f"Device fallback applied: {original_device} → {self.config.device}"
+            )
 
         return checks_passed
 
@@ -441,8 +459,34 @@ class AutonomousContentTranslationWorker:
                 logger.info("=" * 80)
 
                 if not self._preflight_check():
-                    logger.warning(f"Skipping run #{run_count} due to preflight failure")
-                    self._write_heartbeat("skipped_preflight")
+                    consecutive_failures += 1
+                    logger.error(
+                        f"CRITICAL: Run #{run_count} FAILED preflight check "
+                        f"({consecutive_failures} consecutive failures)"
+                    )
+                    self._write_heartbeat("preflight_failed")
+                    emit_worker_event(
+                        agent_name="content_worker",
+                        job_type="worker_preflight_failure",
+                        status="failure",
+                        error_summary="Preflight checks failed",
+                        metrics={"run_number": run_count, "consecutive_failures": consecutive_failures},
+                    )
+
+                    # Circuit breaker: exit after too many consecutive failures
+                    if consecutive_failures >= max_consecutive_failures:
+                        logger.critical(
+                            f"Aborting daemon: {max_consecutive_failures} consecutive preflight failures"
+                        )
+                        self._write_heartbeat("fatal_preflight_failure")
+                        if getattr(self, "_lifecycle_event_id", None):
+                            complete_worker_run(
+                                self._lifecycle_event_id,
+                                status="failure",
+                                duration_ms=int((time.time() - self._daemon_start_time) * 1000),
+                                error_summary=f"{max_consecutive_failures} consecutive preflight failures",
+                            )
+                        sys.exit(1)
                     continue
 
                 try:
@@ -590,16 +634,41 @@ class AutonomousContentTranslationWorker:
         logger.info(f"Translating content_root: {content_root}")
         logger.info(f"Target languages: {', '.join(target_langs)}")
 
-        # Run translation with trigger_type="scheduled"
-        # This ensures telemetry is tagged correctly
-        result = self.translation_engine.translate_directory(
-            site_id=site_id,
-            directory=content_dir,
-            target_langs=target_langs,
-            recursive=True,
-            parallel=True,
-            trigger_type="scheduled",  # CRITICAL: Use "scheduled" trigger type
-        )
+        # Run translation with timeout protection
+        # Timeout scales with number of target languages
+        timeout_seconds = self.config.file_timeout_seconds * len(target_langs)
+        operation_name = f"translate_directory({content_dir.name}, {len(target_langs)} langs)"
+
+        try:
+            with timeout_guard(timeout_seconds, operation_name):
+                # Run translation with trigger_type="scheduled"
+                # This ensures telemetry is tagged correctly
+                result = self.translation_engine.translate_directory(
+                    site_id=site_id,
+                    directory=content_dir,
+                    target_langs=target_langs,
+                    recursive=True,
+                    parallel=True,
+                    trigger_type="scheduled",  # CRITICAL: Use "scheduled" trigger type
+                )
+        except TimeoutError as e:
+            logger.error(
+                f"⏱️  TIMEOUT: Translation exceeded {timeout_seconds}s limit: {e}"
+            )
+            self._write_heartbeat("timeout_detected")
+            emit_worker_event(
+                agent_name="content_worker",
+                job_type="worker_timeout",
+                status="failure",
+                error_summary=str(e)[:500],
+                metrics={
+                    "timeout_seconds": timeout_seconds,
+                    "content_root": str(content_root),
+                    "target_langs": target_langs,
+                },
+            )
+            # Re-raise to trigger consecutive failure tracking
+            raise
 
         # Log summary
         logger.info(
@@ -756,6 +825,13 @@ Examples:
         type=str,
         default="auto",
         help="Device for model inference: cpu, cuda, mps, or auto (default: auto)",
+    )
+
+    parser.add_argument(
+        "--file-timeout-seconds",
+        type=int,
+        default=600,
+        help="Timeout for translation operations in seconds (default: 600 = 10 minutes)",
     )
 
     # Logging

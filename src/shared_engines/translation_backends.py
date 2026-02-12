@@ -121,11 +121,8 @@ class MTBackend(TranslationBackend):
         """
         Translate using MT model.
 
-        Note: This is a stub implementation. In practice, this should:
-        1. Load model via ModelLoader if not loaded
-        2. Tokenize input
-        3. Generate translation
-        4. Decode output
+        Note: This is a DEPRECATED stub implementation that returns English unchanged!
+        DO NOT USE THIS CLASS. Use src.translation_engine.backends.mt_backend.MTBackend instead.
 
         Args:
             text: Source text
@@ -135,14 +132,16 @@ class MTBackend(TranslationBackend):
 
         Returns:
             Translated text
+
+        Raises:
+            NotImplementedError: This is a stub - use the real MTBackend
         """
-        # Stub implementation - actual translation logic would go here
-        # In production, this would interface with TranslationEngine or ModelLoader
-        logger.warning(
-            "MTBackend.translate() is a stub. "
-            "Use full TranslationEngine for actual translation."
+        raise NotImplementedError(
+            "This MTBackend is a deprecated stub that returns English unchanged. "
+            "Use src.translation_engine.backends.mt_backend.MTBackend instead. "
+            "This stub was accidentally returning source text without translation, "
+            "causing English to appear in translated output."
         )
-        return text  # Pass-through for now
 
     def is_available(self) -> bool:
         """Check if MT backend is available."""

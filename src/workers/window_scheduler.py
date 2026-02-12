@@ -117,20 +117,28 @@ class WindowScheduler:
         # ... execute task ...
     """
 
-    def __init__(self, config: ScheduleConfig):
+    def __init__(self, config: ScheduleConfig, min_gap_seconds: int = 300):
         """
         Initialize scheduler with configuration.
 
         Args:
             config: Schedule configuration
+            min_gap_seconds: Minimum gap between runs in seconds (default: 300 = 5 min)
         """
         self.config = config
         self.tz = ZoneInfo(config.timezone)
+        self.min_gap_seconds = min_gap_seconds
+        self._last_run_end: Optional[datetime] = None
 
         logger.info(
             f"Initialized WindowScheduler: {config.runs_per_day} runs/day, "
-            f"window {config.window_start}-{config.window_end} {config.timezone}"
+            f"window {config.window_start}-{config.window_end} {config.timezone}, "
+            f"min_gap={min_gap_seconds}s"
         )
+
+    def mark_run_complete(self):
+        """Record that a run has completed, for overlap protection."""
+        self._last_run_end = datetime.now(self.tz)
 
     def get_base_run_times_today(self) -> List[datetime]:
         """
@@ -262,6 +270,16 @@ class WindowScheduler:
         """
         next_run = self.get_next_run_time(apply_jitter=apply_jitter)
         now = datetime.now(self.tz)
+
+        # Enforce minimum gap between runs
+        if self._last_run_end is not None:
+            earliest_allowed = self._last_run_end + timedelta(seconds=self.min_gap_seconds)
+            if next_run < earliest_allowed:
+                next_run = earliest_allowed
+                logger.info(
+                    f"Enforcing {self.min_gap_seconds}s minimum gap. "
+                    f"Next run adjusted to {next_run.strftime('%H:%M:%S')}"
+                )
 
         if next_run <= now:
             # Already past run time, return immediately

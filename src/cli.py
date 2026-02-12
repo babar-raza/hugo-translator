@@ -1710,6 +1710,9 @@ def translate_site(args: argparse.Namespace) -> int:
                     # Copy other flags
                     if args.model:
                         cmd.extend(["--model", args.model])
+                    # CT2-002: Pass model selection flag to subprocess
+                    if args.auto_select_model:
+                        cmd.append("--auto-select-model")
                     if args.device:
                         cmd.extend(["--device", args.device])
                     if args.batch_size:
@@ -2182,8 +2185,18 @@ def translate_site(args: argparse.Namespace) -> int:
         )
 
         logger.info("Initializing Model Loader...")
-        registry_path = Path(args.config_root) / "model_registry.yaml"
-        model_registry = ModelRegistry(registry_path)
+        # CT2-002: Support multiple registries (base + custom CT2 registry)
+        registry_paths = [
+            Path(args.config_root) / "model_registry.yaml",
+            Path(args.config_root) / "custom_ct2_registry.yaml",
+        ]
+        # Filter to only existing registry files
+        existing_registries = [p for p in registry_paths if p.exists()]
+        if not existing_registries:
+            raise FileNotFoundError(f"No model registry files found in {args.config_root}")
+
+        logger.info(f"Loading model registries: {[str(p) for p in existing_registries]}")
+        model_registry = ModelRegistry(existing_registries)
 
         # Device selection with CLI override support (T102: federated-splashing-panda)
         try:
@@ -2342,6 +2355,10 @@ def translate_site(args: argparse.Namespace) -> int:
             # SR-02c: Validate output path before engine creation (fail fast)
             validate_output_path(output_path)
             engine_kwargs["output_dir_override"] = output_path
+
+            # Collision fix: Pass input_root to preserve directory structure
+            if args.input:
+                engine_kwargs["input_root"] = Path(args.input)
 
         # SR-03: Read sort_segments_by_length from config if CLI didn't override
         if "sort_segments_by_length" not in engine_kwargs:
@@ -2715,6 +2732,15 @@ def translate_site(args: argparse.Namespace) -> int:
                         except Exception as e:
                             logger.warning(f"Auto-commit error (non-fatal): {e}")
 
+            # Check for no-op (0 files processed)
+            if result.total_files == 0:
+                logger.error(
+                    "No files were processed. Translation cannot proceed. "
+                    "Possible causes: input path doesn't exist, no .md files found, "
+                    "all files filtered out, or incorrect working directory."
+                )
+                return 1
+
             return 0 if result.failed_files == 0 else 1
 
         else:
@@ -2806,13 +2832,37 @@ def cmd_unlock() -> int:
     try:
         if lock.force_unlock(check_pid=check_pid):
             print(f"\nSuccessfully unlocked site: {args.site}")
+            try:
+                from src.observability.worker_telemetry import emit_worker_event
+                emit_worker_event(
+                    agent_name="hugo-translator", job_type="cli_unlock", trigger_type="cli",
+                    status="success", metrics={"site": args.site, "force": args.force},
+                )
+            except Exception:
+                pass
             return 0  # Success
         else:
             print(f"\nFailed to unlock site: {args.site}")
             print("Holder process is still running. Use --force to override (DANGEROUS).")
+            try:
+                from src.observability.worker_telemetry import emit_worker_event
+                emit_worker_event(
+                    agent_name="hugo-translator", job_type="cli_unlock", trigger_type="cli",
+                    status="failure", metrics={"site": args.site, "force": args.force, "reason": "holder_alive"},
+                )
+            except Exception:
+                pass
             return 1  # Failure
     except Exception as e:
         print(f"\nError during unlock: {e}")
+        try:
+            from src.observability.worker_telemetry import emit_worker_event
+            emit_worker_event(
+                agent_name="hugo-translator", job_type="cli_unlock", trigger_type="cli",
+                status="failure", error_summary=str(e)[:500], metrics={"site": args.site},
+            )
+        except Exception:
+            pass
         return 1
 
 
@@ -2838,6 +2888,14 @@ def cmd_diagnose_lock() -> int:
     from src.utils.file_lock import diagnose_lock
 
     diagnose_lock(args.site)
+    try:
+        from src.observability.worker_telemetry import emit_worker_event
+        emit_worker_event(
+            agent_name="hugo-translator", job_type="cli_diagnose_lock", trigger_type="cli",
+            status="success", metrics={"site": args.site},
+        )
+    except Exception:
+        pass
     return 0
 
 

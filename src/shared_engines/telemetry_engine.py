@@ -6,6 +6,9 @@ for both manual CLI and autonomous workers.
 """
 
 import logging
+import os
+import uuid
+from datetime import datetime, timezone
 from typing import Optional, Dict, Any, List
 from pathlib import Path
 
@@ -109,11 +112,60 @@ class TelemetryEngine:
             **additional_context
         )
 
+    def track_event(self, event_type: str, **kwargs) -> None:
+        """
+        Track a discrete event as a completed telemetry run.
+
+        Creates a fire-and-forget telemetry run via POST /api/v1/runs with
+        status="success" and event details in metrics_json. Non-fatal: never raises.
+
+        Args:
+            event_type: Event identifier (used as job_type in the telemetry run)
+            **kwargs: Event data stored in metrics_json
+
+        Example:
+            engine.track_event("translation_session_start",
+                site_id="products.aspose.com",
+                target_langs=["es", "fr"])
+        """
+        if not self.enabled:
+            return
+
+        try:
+            import requests as _requests
+
+            api_url = os.getenv("TELEMETRY_API_URL", "http://localhost:8765")
+            event_id = str(uuid.uuid4())
+            now = datetime.now(timezone.utc).isoformat()
+
+            run_data = {
+                "event_id": event_id,
+                "run_id": f"{now}-{self.agent_name}-{event_type}-{uuid.uuid4().hex[:8]}",
+                "agent_name": self.agent_name,
+                "job_type": event_type,
+                "status": "success",
+                "start_time": now,
+                "end_time": now,
+                "duration_ms": 0,
+                "trigger_type": kwargs.pop("trigger_type", "cli"),
+                "environment": os.getenv("HUGO_TRANSLATOR_ENV", "dev"),
+                "metrics_json": kwargs if kwargs else None,
+            }
+
+            _requests.post(
+                f"{api_url}/api/v1/runs",
+                json=run_data,
+                timeout=5,
+            )
+            logger.debug(f"track_event posted: {event_type} -> {event_id}")
+        except Exception as exc:
+            logger.debug(f"track_event failed (non-fatal): {exc}")
+
     def emit(self, event_type: str, data: Dict[str, Any]) -> None:
         """
         Emit a telemetry event.
 
-        Convenience method for simple event tracking without context manager.
+        Delegates to track_event() to POST the event to the telemetry API.
 
         Args:
             event_type: Type of event (e.g., "model_loaded", "cache_hit")
@@ -129,12 +181,7 @@ class TelemetryEngine:
         if not self.enabled:
             return
 
-        logger.debug(f"Telemetry event: {event_type}, data={data}")
-
-        # Note: TranslationTelemetry doesn't have a direct emit() method,
-        # so we log the event. In future, this could write to a separate
-        # event stream or buffer.
-        # For now, we just log it for observability.
+        self.track_event(event_type, **data)
 
     def is_enabled(self) -> bool:
         """

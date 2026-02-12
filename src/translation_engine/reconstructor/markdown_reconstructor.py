@@ -1,8 +1,10 @@
 """
 Markdown reconstruction from translated segments and original AST.
 """
+import logging
 from copy import deepcopy
 from io import StringIO
+from pathlib import Path
 from typing import Any, Dict, List, Optional, Union
 
 from ruamel.yaml import YAML
@@ -10,9 +12,12 @@ from ruamel.yaml.comments import CommentedMap
 
 from ..extractor import PlaceholderManager, Segment, SegmentContextType
 from ..parser import ASTNode, HugoDocument, NodeType
+from ..quality.glossary_corrector import get_glossary_corrector
 from ...utils.models import FrontmatterMode, SiteProfile
 
 from .yaml_formatter import YAMLFormatter
+
+logger = logging.getLogger(__name__)
 
 # Module-level ruamel.yaml instance for CommentedMap round-trip copying
 _yaml_copier = YAML()
@@ -183,7 +188,7 @@ class MarkdownReconstructor:
             target_lang: Target language code
 
         Returns:
-            Reconstructed Markdown string
+            Reconstructed Markdown string with glossary corrections applied
         """
         if not original_ast:
             return ""
@@ -194,7 +199,25 @@ class MarkdownReconstructor:
             if md:
                 parts.append(md)
 
-        return "\n\n".join(parts)
+        reconstructed = "\n\n".join(parts)
+
+        # FIX-TRANSLATION-QUALITY: Apply glossary corrections
+        # Post-process the reconstructed markdown to fix known mistranslations
+        src_lang = self.site_profile.default_source_lang
+        corrector = get_glossary_corrector(src_lang, target_lang)
+
+        if corrector:
+            corrected, corrections_applied = corrector.apply_corrections(
+                reconstructed, src_lang, target_lang
+            )
+            if corrections_applied:
+                logger.info(
+                    f"Applied {len(corrections_applied)} glossary corrections "
+                    f"for {src_lang}->{target_lang}: {corrections_applied}"
+                )
+            return corrected
+
+        return reconstructed
 
     def _reconstruct_node(
         self, node: ASTNode, translations: Dict[str, str]

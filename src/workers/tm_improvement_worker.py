@@ -11,9 +11,14 @@ Autonomous worker that improves TM entries using LLM with:
 
 import argparse
 import hashlib
+import json
 import logging
+import os
+import platform
 import re
+import signal
 import sys
+import threading
 import time
 from datetime import datetime
 from pathlib import Path
@@ -21,6 +26,7 @@ from typing import Dict, Any, Optional, List
 
 import torch
 
+from src.observability.worker_telemetry import emit_worker_event, start_worker_run, complete_worker_run
 from src.hardware.vram_enforcer import VRAMEnforcer
 from src.hardware.gpu_manager import GPUManager
 from src.intelligence.llm_client import LLMClient, LLMConfig
@@ -35,6 +41,11 @@ try:
     from src.tm.l3_semantic import L3SemanticTM
 except ImportError:
     L3SemanticTM = None
+
+try:
+    from src.observability.telemetry_integration import TranslationTelemetry
+except ImportError:
+    TranslationTelemetry = None
 
 logger = logging.getLogger(__name__)
 
@@ -81,7 +92,7 @@ class TMImprovementWorkerConfig:
         max_llm_calls_per_run: int = 200,
         max_seconds_per_run: int = 900,
         llm_provider: str = "ollama",
-        llm_model: str = "llama2",
+        llm_model: str = "qwen3:14b",
         llm_base_url: Optional[str] = "http://localhost:11434",
         llm_api_key: Optional[str] = None,
         llm_timeout_seconds: int = 30,
@@ -155,7 +166,7 @@ class TMImprovementWorkerConfig:
             max_llm_calls_per_run=batch.get("max_llm_calls_per_run", 200),
             max_seconds_per_run=batch.get("max_seconds_per_run", 900),
             llm_provider=llm.get("provider", "ollama"),
-            llm_model=llm.get("model", "llama2"),
+            llm_model=llm.get("model", "qwen3:14b"),
             llm_base_url=llm.get("base_url", "http://localhost:11434"),
             llm_api_key=llm.get("api_key"),
             llm_timeout_seconds=llm.get("timeout_seconds", 30),
@@ -192,6 +203,8 @@ class TMImprovementWorker:
         worker.run()  # Runs continuously
     """
 
+    _worker_id = "tm_worker"
+
     def __init__(self, config: TMImprovementWorkerConfig):
         """
         Initialize TM improvement worker.
@@ -206,6 +219,7 @@ class TMImprovementWorker:
         self.llm_client = None
         self.scheduler = None
         self.gpu_manager = None
+        self._llm_unavailable = False  # Track LLM availability state
 
         logger.info(f"Initialized TMImprovementWorker: mode={config.mode}")
 
@@ -290,7 +304,7 @@ class TMImprovementWorker:
                 try:
                     l3_store = L3SemanticTM(
                         index_path=self.config.tm_path / "l3_faiss",
-                        device=self.config.device,
+                        use_gpu=(self.config.device == "cuda"),
                     )
                 except Exception as e:
                     logger.warning(f"Failed to initialize L3 semantic TM: {e}")
@@ -308,7 +322,7 @@ class TMImprovementWorker:
             logger.error(f"Failed to initialize TranslationMemory: {e}")
             raise
 
-        # Initialize LLM client
+        # Initialize LLM client (with auto-discovery fallback)
         try:
             llm_config = LLMConfig(
                 provider=self.config.llm_provider,
@@ -321,17 +335,43 @@ class TMImprovementWorker:
 
             self.llm_client = LLMClient(llm_config)
 
+            if not self.llm_client.is_available():
+                # Auto-discover an available model from Ollama
+                logger.warning(
+                    f"Configured model '{self.config.llm_model}' not available. "
+                    f"Attempting auto-discovery of available Ollama models..."
+                )
+                fallback_model = self._discover_available_model()
+                if fallback_model:
+                    logger.info(f"Using discovered model: {fallback_model}")
+                    llm_config = LLMConfig(
+                        provider=self.config.llm_provider,
+                        model=fallback_model,
+                        base_url=self.config.llm_base_url,
+                        api_key=self.config.llm_api_key,
+                        timeout_seconds=self.config.llm_timeout_seconds,
+                        temperature=self.config.llm_temperature,
+                    )
+                    self.llm_client = LLMClient(llm_config)
+
             if self.llm_client.is_available():
                 logger.info(
-                    f"Initialized LLM client: {self.config.llm_provider}/{self.config.llm_model}"
+                    f"Initialized LLM client: {self.config.llm_provider}/{self.llm_client.config.model}"
                 )
+                self._llm_unavailable = False
             else:
-                logger.error("LLM client is not available - worker cannot function")
-                raise RuntimeError("LLM client unavailable")
+                logger.warning(
+                    "LLM client is not available - TM worker will skip improvement runs. "
+                    "Worker will remain alive and retry on next scheduled run."
+                )
+                self._llm_unavailable = True
 
         except Exception as e:
-            logger.error(f"Failed to initialize LLM client: {e}")
-            raise
+            logger.warning(
+                f"Failed to initialize LLM client: {e}. "
+                "Worker will continue and retry on next scheduled run."
+            )
+            self._llm_unavailable = True
 
         # Initialize WindowScheduler for daemon mode
         if self.config.mode == "daemon":
@@ -352,7 +392,152 @@ class TMImprovementWorker:
                 logger.error(f"Failed to initialize scheduler: {e}")
                 raise
 
+        # Initialize telemetry (graceful degradation — never blocks worker)
+        self.telemetry = None
+        if TranslationTelemetry is not None:
+            try:
+                self.telemetry = TranslationTelemetry(
+                    agent_name="tm_improvement_worker",
+                    enabled=True,
+                )
+                logger.info(f"Telemetry initialized: available={self.telemetry.is_available()}")
+            except Exception as e:
+                logger.warning(f"Telemetry initialization failed (non-critical): {e}")
+                self.telemetry = None
+        else:
+            logger.info("Telemetry not available (TranslationTelemetry not importable)")
+
         logger.info("Setup complete")
+
+    def _discover_available_model(self) -> Optional[str]:
+        """Query Ollama for available models and return the first suitable one."""
+        try:
+            import requests
+            base_url = self.config.llm_base_url or "http://localhost:11434"
+            response = requests.get(f"{base_url}/api/tags", timeout=5)
+            response.raise_for_status()
+            models = response.json().get("models", [])
+            model_names = [m.get("name", "") for m in models]
+            logger.info(f"Available Ollama models: {model_names}")
+
+            # Prefer models in this order
+            preferred_prefixes = ["qwen", "llama", "mistral", "codellama"]
+            for prefix in preferred_prefixes:
+                for name in model_names:
+                    if name.startswith(prefix):
+                        return name
+
+            # Return first available model if no preferred match
+            if model_names:
+                return model_names[0]
+
+            return None
+        except Exception as e:
+            logger.warning(f"Model auto-discovery failed: {e}")
+            return None
+
+    def _write_pid_file(self):
+        """Write PID file for watchdog monitoring."""
+        pid_path = Path("data/logs") / f"{self._worker_id}.pid"
+        pid_path.parent.mkdir(parents=True, exist_ok=True)
+        pid_path.write_text(str(os.getpid()))
+
+    def _write_heartbeat(self, status="alive"):
+        """Write heartbeat file for watchdog monitoring."""
+        heartbeat_path = Path("data/logs") / f"{self._worker_id}.heartbeat"
+        heartbeat_path.parent.mkdir(parents=True, exist_ok=True)
+        heartbeat_path.write_text(json.dumps({
+            "timestamp": datetime.now().isoformat(),
+            "pid": os.getpid(),
+            "status": status,
+        }))
+
+    def _start_heartbeat_thread(self):
+        """Start a daemon thread that writes heartbeat every 60 seconds."""
+        self._heartbeat_stop_event = threading.Event()
+
+        def _heartbeat_loop():
+            while not self._heartbeat_stop_event.is_set():
+                try:
+                    self._write_heartbeat("alive")
+                except Exception as e:
+                    logger.warning(f"Heartbeat write failed: {e}")
+                self._heartbeat_stop_event.wait(timeout=60)
+
+        self._heartbeat_thread = threading.Thread(
+            target=_heartbeat_loop,
+            name=f"{self._worker_id}-heartbeat",
+            daemon=True,
+        )
+        self._heartbeat_thread.start()
+        logger.info("Background heartbeat thread started (60s interval)")
+
+    def _stop_heartbeat_thread(self):
+        """Signal the heartbeat thread to stop."""
+        if hasattr(self, '_heartbeat_stop_event'):
+            self._heartbeat_stop_event.set()
+            if hasattr(self, '_heartbeat_thread'):
+                self._heartbeat_thread.join(timeout=5)
+
+    def _preflight_check(self) -> bool:
+        """Validate dependencies before run. Returns True if safe to proceed."""
+        import shutil
+        checks_passed = True
+
+        # 1. GPU available (if device=cuda)
+        if self.config.device == "cuda":
+            try:
+                import torch
+                if not torch.cuda.is_available():
+                    logger.warning("PREFLIGHT FAIL: CUDA requested but not available, skipping run")
+                    checks_passed = False
+            except ImportError:
+                logger.warning("PREFLIGHT FAIL: torch not installed, cannot use CUDA")
+                checks_passed = False
+
+        # 2. Config root exists
+        config_root = Path(self.config.config_root) if hasattr(self.config, 'config_root') else Path("config")
+        if not config_root.exists():
+            logger.warning(f"PREFLIGHT FAIL: Config root missing: {config_root}")
+            checks_passed = False
+
+        # 3. Disk space > 5%
+        try:
+            total, used, free = shutil.disk_usage(".")
+            if (free / total) < 0.05:
+                logger.warning(f"PREFLIGHT FAIL: Disk space critical ({free / total * 100:.1f}% free)")
+                checks_passed = False
+        except Exception as e:
+            logger.warning(f"PREFLIGHT WARNING: Could not check disk space: {e}")
+
+        # 4. Ollama reachable (TM worker specific)
+        ollama_ok = True
+        if hasattr(self.config, 'llm_provider') and self.config.llm_provider == "ollama":
+            try:
+                import urllib.request
+                urllib.request.urlopen("http://localhost:11434/api/tags", timeout=5)
+            except Exception:
+                logger.warning("PREFLIGHT FAIL: Ollama not reachable at localhost:11434")
+                checks_passed = False
+                ollama_ok = False
+
+        # Emit preflight telemetry
+        try:
+            emit_worker_event(
+                agent_name="tm_improvement_worker",
+                job_type="worker_preflight",
+                status="success" if checks_passed else "failure",
+                metrics={
+                    "gpu_check": self.config.device != "cuda" or checks_passed,
+                    "config_root_exists": config_root.exists(),
+                    "ollama_check": ollama_ok,
+                    "device": self.config.device,
+                },
+            )
+        except Exception:
+            pass
+
+        return checks_passed
 
     def run(self) -> None:
         """
@@ -361,14 +546,31 @@ class TMImprovementWorker:
         In oneshot mode: Executes one improvement run and exits
         In daemon mode: Continuously schedules and executes runs
         """
-        if self.config.mode == "oneshot":
-            self._run_oneshot()
-        elif self.config.mode == "daemon":
-            self._run_daemon()
-        else:
-            raise ValueError(
-                f"Invalid mode: {self.config.mode}. Expected 'oneshot' or 'daemon'"
-            )
+        self._write_pid_file()
+        self._write_heartbeat("starting")
+        self._start_heartbeat_thread()
+        self._lifecycle_event_id = start_worker_run(
+            "tm_improvement_worker", "worker_lifecycle",
+            context={
+                "mode": self.config.mode,
+                "llm_provider": getattr(self.config, "llm_provider", None),
+                "llm_model": getattr(self.config, "llm_model", None),
+                "runs_per_day": getattr(self.config, "runs_per_day", None),
+            },
+        )
+        self._daemon_start_time = time.time()
+        try:
+            if self.config.mode == "oneshot":
+                self._run_oneshot()
+            elif self.config.mode == "daemon":
+                self._run_daemon()
+            else:
+                raise ValueError(
+                    f"Invalid mode: {self.config.mode}. Expected 'oneshot' or 'daemon'"
+                )
+        finally:
+            self._stop_heartbeat_thread()
+            self._write_heartbeat("stopped")
 
     def _run_oneshot(self) -> None:
         """Execute a single improvement run and exit."""
@@ -376,8 +578,12 @@ class TMImprovementWorker:
         logger.info("ONESHOT MODE: Running single improvement pass")
         logger.info("=" * 80)
 
+        if not self._preflight_check():
+            logger.warning("Preflight check failed, aborting oneshot run")
+            return  # Graceful exit, not sys.exit(1)
+
         try:
-            result = self._execute_improvement_run()
+            result = self._execute_improvement_run_with_telemetry()
 
             if result["status"] == "success":
                 logger.info(
@@ -402,10 +608,13 @@ class TMImprovementWorker:
         logger.info("=" * 80)
 
         run_count = 0
+        consecutive_failures = 0
+        max_consecutive_failures = 10
 
         try:
             while True:
                 # Sleep until next run time
+                self._write_heartbeat("sleeping")
                 next_run = self.scheduler.sleep_until_next_run()
                 run_count += 1
 
@@ -415,8 +624,13 @@ class TMImprovementWorker:
                 )
                 logger.info("=" * 80)
 
+                if not self._preflight_check():
+                    logger.warning(f"Skipping run #{run_count} due to preflight failure")
+                    self._write_heartbeat("skipped_preflight")
+                    continue
+
                 try:
-                    result = self._execute_improvement_run()
+                    result = self._execute_improvement_run_with_telemetry()
 
                     if result["status"] == "success":
                         logger.info(
@@ -426,15 +640,48 @@ class TMImprovementWorker:
                     else:
                         logger.warning(f"Run #{run_count} status: {result['status']}")
 
+                    consecutive_failures = 0
+
                 except Exception as e:
-                    logger.error(f"Run #{run_count} failed: {e}", exc_info=True)
-                    # Continue to next run despite failure
+                    consecutive_failures += 1
+                    logger.error(
+                        f"Run #{run_count} failed "
+                        f"({consecutive_failures} consecutive): {e}",
+                        exc_info=True,
+                    )
+                    emit_worker_event(
+                        agent_name="tm_improvement_worker",
+                        job_type="worker_run_failure",
+                        status="failure",
+                        error_summary=str(e)[:500],
+                        metrics={"run_number": run_count, "consecutive_failures": consecutive_failures},
+                    )
+                    if consecutive_failures >= max_consecutive_failures:
+                        logger.critical(
+                            f"Aborting daemon: {max_consecutive_failures} consecutive failures"
+                        )
+                        self._write_heartbeat("fatal_failure")
+                        if getattr(self, "_lifecycle_event_id", None):
+                            complete_worker_run(
+                                self._lifecycle_event_id,
+                                status="failure",
+                                duration_ms=int((time.time() - self._daemon_start_time) * 1000),
+                                error_summary=f"{max_consecutive_failures} consecutive failures",
+                            )
+                        sys.exit(1)
+
+                self._write_heartbeat("run_completed")
+                self.scheduler.mark_run_complete()
 
         except KeyboardInterrupt:
             logger.info("Daemon interrupted by user (Ctrl+C)")
-        except Exception as e:
-            logger.error(f"Daemon failed: {e}", exc_info=True)
-            sys.exit(1)
+            if getattr(self, "_lifecycle_event_id", None):
+                complete_worker_run(
+                    self._lifecycle_event_id,
+                    status="cancelled",
+                    duration_ms=int((time.time() - self._daemon_start_time) * 1000),
+                    output_summary=f"Interrupted after {run_count} runs",
+                )
 
     def _check_gpu_usage(self) -> Optional[float]:
         """
@@ -456,6 +703,31 @@ class TMImprovementWorker:
 
         return None
 
+    def _execute_improvement_run_with_telemetry(self) -> Dict[str, Any]:
+        """Execute improvement run wrapped in telemetry tracking."""
+        if not (self.telemetry and self.telemetry.is_available()):
+            return self._execute_improvement_run()
+
+        with self.telemetry.client.track_run(
+            agent_name="tm_improvement_worker",
+            job_type="tm_improvement",
+            trigger_type="scheduled",
+        ) as ctx:
+            result = self._execute_improvement_run()
+            ctx.set_metrics(
+                items_discovered=result.get("candidates_pulled", 0),
+                items_succeeded=result.get("improved_count", 0),
+                items_failed=result.get("failed_count", 0),
+                metrics_json={
+                    "llm_calls": result.get("llm_calls", 0),
+                    "skipped_count": result.get("skipped_count", 0),
+                    "elapsed_seconds": result.get("elapsed_seconds", 0),
+                    "llm_provider": self.config.llm_provider,
+                    "llm_model": self.config.llm_model,
+                },
+            )
+            return result
+
     def _execute_improvement_run(self) -> Dict[str, Any]:
         """
         Execute a single improvement run.
@@ -465,6 +737,34 @@ class TMImprovementWorker:
         """
         start_time = time.time()
 
+        # Check LLM availability before attempting work
+        if self._llm_unavailable or not self.llm_client or not self.llm_client.is_available():
+            logger.info("LLM unavailable - attempting to reconnect...")
+
+            # Try to reconnect (maybe Ollama came back online)
+            try:
+                if self.llm_client:
+                    # Re-initialize the client
+                    self.llm_client._initialize_client()
+                    if self.llm_client.is_available():
+                        logger.info("✓ LLM reconnected successfully!")
+                        self._llm_unavailable = False
+                    else:
+                        raise RuntimeError("Still unavailable after reconnection attempt")
+                else:
+                    raise RuntimeError("LLM client not initialized")
+            except Exception as e:
+                logger.info(f"LLM still unavailable: {e}. Skipping improvement run.")
+                return {
+                    "status": "skipped",
+                    "reason": "llm_unavailable",
+                    "candidates_pulled": 0,
+                    "improved_count": 0,
+                    "skipped_count": 0,
+                    "failed_count": 0,
+                    "elapsed_seconds": time.time() - start_time,
+                }
+
         # VRAM preflight check
         if self.config.preflight_check and self.config.abort_on_high_usage:
             gpu_usage = self._check_gpu_usage()
@@ -472,6 +772,13 @@ class TMImprovementWorker:
                 logger.warning(
                     f"PREFLIGHT CHECK FAILED: GPU usage ({gpu_usage:.1f}%) already at or above "
                     f"threshold ({self.config.max_gpu_memory_percent}%). Aborting run."
+                )
+                emit_worker_event(
+                    agent_name="tm_improvement_worker",
+                    job_type="worker_gpu_check",
+                    status="failure",
+                    metrics={"gpu_usage_percent": gpu_usage, "threshold": self.config.max_gpu_memory_percent, "phase": "pre_run"},
+                    error_summary=f"GPU usage {gpu_usage:.1f}% exceeds threshold",
                 )
                 return {
                     "status": "aborted",
@@ -482,6 +789,14 @@ class TMImprovementWorker:
         # Pop candidates from queue
         logger.info(f"Popping up to {self.config.candidates_per_run} candidates from queue...")
         candidates = self.improvement_queue.pop_candidates(limit=self.config.candidates_per_run)
+
+        # Emit queue pull telemetry
+        emit_worker_event(
+            agent_name="tm_improvement_worker",
+            job_type="worker_queue_pull",
+            items_discovered=len(candidates),
+            metrics={"requested": self.config.candidates_per_run},
+        )
 
         if not candidates:
             logger.info("No candidates in queue")
@@ -552,12 +867,26 @@ class TMImprovementWorker:
                             f"threshold ({self.config.max_gpu_memory_percent}%). "
                             f"Pausing further work."
                         )
+                        emit_worker_event(
+                            agent_name="tm_improvement_worker",
+                            job_type="worker_gpu_check",
+                            status="failure",
+                            metrics={"gpu_usage_percent": gpu_usage, "threshold": self.config.max_gpu_memory_percent, "phase": "post_call", "candidate_index": i},
+                            error_summary=f"Post-call GPU usage {gpu_usage:.1f}% exceeds threshold",
+                        )
                         break
 
             except Exception as e:
                 logger.error(
                     f"Failed to process candidate {i + 1}/{len(candidates)}: {e}",
                     exc_info=True,
+                )
+                emit_worker_event(
+                    agent_name="tm_improvement_worker",
+                    job_type="worker_llm_failure",
+                    status="failure",
+                    error_summary=str(e)[:500],
+                    metrics={"candidate_index": i, "site_id": getattr(candidate, "site_id", None)},
                 )
                 failed_count += 1
 
@@ -825,8 +1154,8 @@ Examples:
     parser.add_argument(
         "--llm-model",
         type=str,
-        default="llama2",
-        help="LLM model name (default: llama2)",
+        default="qwen3:14b",
+        help="LLM model name (default: qwen3:14b)",
     )
 
     parser.add_argument(
@@ -934,7 +1263,42 @@ def main():
 
     # Create and run worker
     worker = TMImprovementWorker(config)
-    worker.setup()
+
+    # Setup with retry and exponential backoff for transient failures
+    max_setup_retries = 5
+    for attempt in range(1, max_setup_retries + 1):
+        try:
+            worker.setup()
+            break
+        except Exception as e:
+            if attempt == max_setup_retries:
+                logger.error(f"Setup failed after {max_setup_retries} attempts: {e}")
+                sys.exit(1)
+            backoff = min(30 * (2 ** (attempt - 1)), 300)
+            logger.warning(
+                f"Setup attempt {attempt}/{max_setup_retries} failed: {e}. "
+                f"Retrying in {backoff}s..."
+            )
+            time.sleep(backoff)
+
+    # Register signal handlers for graceful shutdown
+    def _shutdown_handler(signum, frame):
+        sig_name = signal.Signals(signum).name if hasattr(signal, 'Signals') else str(signum)
+        logger.warning(f"Received {sig_name}, initiating graceful shutdown...")
+        worker._stop_heartbeat_thread()
+        worker._write_heartbeat("shutting_down")
+        try:
+            from src.observability.graceful_shutdown import cleanup_telemetry_contexts
+            cleanup_telemetry_contexts(sig_name)
+        except Exception:
+            pass
+        sys.exit(0)
+
+    for sig in [signal.SIGINT, signal.SIGTERM]:
+        signal.signal(sig, _shutdown_handler)
+    if platform.system() == "Windows" and hasattr(signal, 'SIGBREAK'):
+        signal.signal(signal.SIGBREAK, _shutdown_handler)
+
     worker.run()
 
 

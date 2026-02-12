@@ -22,6 +22,7 @@ echo - Runs per day: 4
 echo - Time window: 08:00-23:00 Pacific Time
 echo - Device: CUDA (GPU acceleration)
 echo - Max GPU memory: 50%%
+echo - Timeout: 600 seconds (10 minutes)
 echo.
 
 python -m src.workers.autonomous_content_translation_worker ^
@@ -33,6 +34,7 @@ python -m src.workers.autonomous_content_translation_worker ^
     --jitter-minutes 15 ^
     --device cuda ^
     --max-gpu-memory-percent 50 ^
+    --file-timeout-seconds 600 ^
     --log-level INFO
 
 REM Capture exit code
