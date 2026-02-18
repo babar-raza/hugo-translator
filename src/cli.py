@@ -1662,16 +1662,31 @@ def translate_site(args: argparse.Namespace) -> int:
                 # Use first content root from site profile
                 input_path = Path(site_profile.content_roots[0])
 
+            # Load global config for commit settings
+            global_config = config_service.global_config
+
+            # Determine effective auto-commit flag:
+            # Explicit --auto-commit / --no-commit overrides global config;
+            # when neither is provided (args.auto_commit is None), fall back to
+            # global_config.git_commit.enabled so the workers always commit when
+            # the config says so (e.g. global.yaml git_commit.enabled: true).
+            effective_auto_commit = args.auto_commit
+            if effective_auto_commit is None:
+                try:
+                    effective_auto_commit = bool(global_config.git_commit.enabled)
+                except Exception:
+                    effective_auto_commit = False
+
             # Determine git repository root once for all languages
             git_repo_root = None
-            if args.auto_commit:
+            if effective_auto_commit:
                 try:
                     # Find git root by walking up from input path
                     search_path = input_path if input_path.is_dir() else input_path.parent
                     while search_path != search_path.parent:
                         if (search_path / ".git").exists():
                             git_repo_root = search_path
-                            logger.info(f"Auto-commit enabled. Git repository: {git_repo_root}")
+                            logger.info(f"Auto-commit enabled (config: git_commit.enabled=true). Git repository: {git_repo_root}")
                             break
                         search_path = search_path.parent
 
@@ -1680,9 +1695,6 @@ def translate_site(args: argparse.Namespace) -> int:
                 except Exception as e:
                     logger.warning(f"Failed to determine git repository root: {e}. Auto-commit will be disabled.")
                     git_repo_root = None
-
-            # Load global config for commit settings
-            global_config = config_service.global_config
 
             try:
                 for i, lang in enumerate(target_langs, 1):
@@ -1952,12 +1964,13 @@ def translate_site(args: argparse.Namespace) -> int:
 
                                 # Fallback to direct commit_language_translations
                                 else:
+                                    _auto_push = getattr(global_config.git_commit, 'auto_push', False)
                                     commit_success = commit_language_translations(
                                         target_lang=lang,
                                         translated_files=translated_files,
                                         stats=stats,
                                         config=config_service.get_config(),
-                                        auto_push=False,  # Don't auto-push, let user control
+                                        auto_push=_auto_push,
                                         git_repo_root=git_repo_root,
                                     )
 
