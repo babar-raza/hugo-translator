@@ -30,6 +30,7 @@ from src.translation_engine.engine import TranslationEngine
 from src.utils.config_loader import ConfigService
 from src.utils.timeout_guard import timeout_guard, TimeoutError
 from src.workers.window_scheduler import ScheduleConfig, WindowScheduler
+from src.workers.worker_state import record_worker_state
 
 logger = logging.getLogger(__name__)
 
@@ -127,6 +128,7 @@ class AutonomousContentTranslationWorker:
     """
 
     _worker_id = "content_worker"
+    _worker_log_path = "data/logs/content_worker.log"
 
     def __init__(self, config: AutonomousWorkerConfig):
         """
@@ -199,6 +201,10 @@ class AutonomousContentTranslationWorker:
                 from src.tm.l3_semantic import L3SemanticTM
             except ImportError:
                 L3SemanticTM = None
+            try:
+                from src.tm.improvement_queue import ImprovementQueue
+            except ImportError:
+                ImprovementQueue = None
             from pathlib import Path
 
             # Get TM paths from global config
@@ -221,12 +227,22 @@ class AutonomousContentTranslationWorker:
                 except Exception as e:
                     logger.warning(f"L3 semantic TM not available: {e}")
 
+            # Initialize improvement queue if enabled in config
+            improvement_queue = None
+            if ImprovementQueue is not None:
+                tm_improve_cfg = raw_config.get("tm_improvement", {}).get("queue", {})
+                if tm_improve_cfg.get("enabled", False):
+                    improvement_queue = ImprovementQueue(tm_path=tm_data_dir)
+                    logger.info("Initialized ImprovementQueue for TM candidate tracking")
+
             tm = TranslationMemory(
                 l1_cache=l1_cache,
                 l2_persistent=l2_persistent,
-                l3_semantic=l3_semantic
+                l3_semantic=l3_semantic,
+                improvement_queue=improvement_queue,
             )
-            logger.info("Initialized TranslationMemory (L1+L2+L3)")
+            queue_status = "with ImprovementQueue" if improvement_queue else "no ImprovementQueue"
+            logger.info(f"Initialized TranslationMemory (L1+L2+L3, {queue_status})")
         except Exception as e:
             logger.error(f"Failed to initialize TranslationMemory: {e}")
             raise
@@ -299,6 +315,19 @@ class AutonomousContentTranslationWorker:
             "pid": os.getpid(),
             "status": status,
         }))
+
+    def _record_state(self, state: str, *, success: bool = False, error: Optional[str] = None) -> None:
+        """Persist durable worker state for health audit tooling."""
+        try:
+            record_worker_state(
+                self._worker_id,
+                state,
+                success=success,
+                error=error,
+                log_path=self._worker_log_path,
+            )
+        except Exception as exc:
+            logger.debug(f"Worker state write failed (non-fatal): {exc}")
 
     def _start_heartbeat_thread(self):
         """Start a daemon thread that writes heartbeat every 60 seconds."""
@@ -397,6 +426,7 @@ class AutonomousContentTranslationWorker:
         """
         self._write_pid_file()
         self._write_heartbeat("starting")
+        self._record_state("starting")
         self._start_heartbeat_thread()
         self._lifecycle_event_id = start_worker_run(
             "content_worker", "worker_lifecycle",
@@ -417,6 +447,7 @@ class AutonomousContentTranslationWorker:
         finally:
             self._stop_heartbeat_thread()
             self._write_heartbeat("stopped")
+            self._record_state("stopped")
 
     def _run_oneshot(self) -> None:
         """Execute a single translation run and exit."""
@@ -426,13 +457,16 @@ class AutonomousContentTranslationWorker:
 
         if not self._preflight_check():
             logger.warning("Preflight check failed, aborting oneshot run")
+            self._record_state("preflight_failed", error="Preflight checks failed")
             return  # Graceful exit, not sys.exit(1)
 
         try:
             self._execute_translation_run()
             logger.info("Oneshot run completed successfully")
+            self._record_state("run_completed", success=True)
         except Exception as e:
             logger.error(f"Oneshot run failed: {e}", exc_info=True)
+            self._record_state("run_failed", error=str(e))
             sys.exit(1)
 
     def _run_daemon(self) -> None:
@@ -465,6 +499,7 @@ class AutonomousContentTranslationWorker:
                         f"({consecutive_failures} consecutive failures)"
                     )
                     self._write_heartbeat("preflight_failed")
+                    self._record_state("preflight_failed", error="Preflight checks failed")
                     emit_worker_event(
                         agent_name="content_worker",
                         job_type="worker_preflight_failure",
@@ -479,6 +514,10 @@ class AutonomousContentTranslationWorker:
                             f"Aborting daemon: {max_consecutive_failures} consecutive preflight failures"
                         )
                         self._write_heartbeat("fatal_preflight_failure")
+                        self._record_state(
+                            "fatal_preflight_failure",
+                            error=f"{max_consecutive_failures} consecutive preflight failures",
+                        )
                         if getattr(self, "_lifecycle_event_id", None):
                             complete_worker_run(
                                 self._lifecycle_event_id,
@@ -492,6 +531,7 @@ class AutonomousContentTranslationWorker:
                 try:
                     self._execute_translation_run()
                     logger.info(f"Scheduled run #{run_count} completed successfully")
+                    self._record_state("run_completed", success=True)
                     consecutive_failures = 0
                 except Exception as e:
                     consecutive_failures += 1
@@ -507,11 +547,16 @@ class AutonomousContentTranslationWorker:
                         error_summary=str(e)[:500],
                         metrics={"run_number": run_count, "consecutive_failures": consecutive_failures},
                     )
+                    self._record_state("run_failed", error=str(e))
                     if consecutive_failures >= max_consecutive_failures:
                         logger.critical(
                             f"Aborting daemon: {max_consecutive_failures} consecutive failures"
                         )
                         self._write_heartbeat("fatal_failure")
+                        self._record_state(
+                            "fatal_failure",
+                            error=f"{max_consecutive_failures} consecutive failures",
+                        )
                         if getattr(self, "_lifecycle_event_id", None):
                             complete_worker_run(
                                 self._lifecycle_event_id,
@@ -526,6 +571,7 @@ class AutonomousContentTranslationWorker:
 
         except KeyboardInterrupt:
             logger.info("Daemon interrupted by user (Ctrl+C)")
+            self._record_state("cancelled")
             if getattr(self, "_lifecycle_event_id", None):
                 complete_worker_run(
                     self._lifecycle_event_id,
@@ -625,19 +671,28 @@ class AutonomousContentTranslationWorker:
             content_root: Content root directory path
             target_langs: Target language codes
         """
-        content_dir = Path(content_root)
+        resolved_content_dir = (
+            self.config_service.resolve_content_root(content_root)
+            if self.config_service is not None
+            else Path(content_root)
+        )
 
-        if not content_dir.exists():
-            logger.warning(f"Content root does not exist: {content_root}, skipping")
+        if not resolved_content_dir.exists():
+            logger.warning(
+                "Content root does not exist for site %s: configured='%s' resolved='%s', skipping",
+                site_id,
+                content_root,
+                resolved_content_dir,
+            )
             return
 
-        logger.info(f"Translating content_root: {content_root}")
+        logger.info(f"Translating content_root: {resolved_content_dir}")
         logger.info(f"Target languages: {', '.join(target_langs)}")
 
         # Run translation with timeout protection
         # Timeout scales with number of target languages
         timeout_seconds = self.config.file_timeout_seconds * len(target_langs)
-        operation_name = f"translate_directory({content_dir.name}, {len(target_langs)} langs)"
+        operation_name = f"translate_directory({resolved_content_dir.name}, {len(target_langs)} langs)"
 
         try:
             with timeout_guard(timeout_seconds, operation_name):
@@ -645,7 +700,7 @@ class AutonomousContentTranslationWorker:
                 # This ensures telemetry is tagged correctly
                 result = self.translation_engine.translate_directory(
                     site_id=site_id,
-                    directory=content_dir,
+                    directory=resolved_content_dir,
                     target_langs=target_langs,
                     recursive=True,
                     parallel=True,
@@ -851,11 +906,20 @@ def main():
     # Parse arguments
     args = parse_args()
 
+    log_dir = Path("data/logs")
+    log_dir.mkdir(parents=True, exist_ok=True)
+    log_path = log_dir / "content_worker.log"
+
     # Setup logging
     logging.basicConfig(
         level=getattr(logging, args.log_level),
         format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
         datefmt="%Y-%m-%d %H:%M:%S",
+        handlers=[
+            logging.StreamHandler(),
+            logging.FileHandler(log_path, encoding="utf-8"),
+        ],
+        force=True,
     )
 
     logger.info("=" * 80)

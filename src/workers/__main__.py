@@ -8,6 +8,7 @@ This module supports multiple modes:
 - Processor mode: Polls Redis queue and processes translation jobs
 - Autonomous Translate mode: Scheduled content translation worker
 - TM Improve mode: Translation memory improvement worker
+- Autonomous Verification mode: Scheduled verification worker
 
 Mode selection via WORKER_MODE environment variable.
 """
@@ -74,6 +75,20 @@ def run_tm_improve_mode():
         sys.exit(1)
 
 
+def run_autonomous_verification_mode():
+    """Run autonomous verification worker."""
+    from src.workers.autonomous_verification_worker import main
+
+    try:
+        main()
+    except KeyboardInterrupt:
+        print("\nAutonomous verification worker interrupted by user", file=sys.stderr)
+        sys.exit(130)  # Standard exit code for SIGINT
+    except Exception as e:
+        print(f"Autonomous verification worker failed: {e}", file=sys.stderr)
+        sys.exit(1)
+
+
 if __name__ == "__main__":
     # Get worker mode from environment
     worker_mode = os.getenv("WORKER_MODE", "mcp").lower()
@@ -87,6 +102,9 @@ if __name__ == "__main__":
     elif worker_mode == "tm_improve":
         print(f"Starting worker in TM IMPROVE mode", file=sys.stderr)
         run_tm_improve_mode()
+    elif worker_mode == "autonomous_verification":
+        print(f"Starting worker in AUTONOMOUS VERIFICATION mode", file=sys.stderr)
+        run_autonomous_verification_mode()
     else:
         print(f"Starting worker in MCP mode", file=sys.stderr)
         run_mcp_mode()

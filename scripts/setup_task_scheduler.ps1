@@ -72,7 +72,7 @@ Write-Host ""
 # Task 1: Autonomous Content Translation Worker
 # Pattern: python.exe -m module (matches working HugoTranslator-AutonomousVerification)
 # ============================================================================
-Write-Host "[1/3] Creating task: HugoTranslator-ContentWorker" -ForegroundColor Cyan
+Write-Host "[1/4] Creating task: HugoTranslator-ContentWorker" -ForegroundColor Cyan
 
 $contentWorkerArgs = "-m src.workers.autonomous_content_translation_worker --mode daemon --runs-per-day 4 --window-start 08:00 --window-end 23:00 --timezone America/Los_Angeles --jitter-minutes 15 --device cuda --max-gpu-memory-percent 50 --log-level INFO"
 
@@ -114,7 +114,7 @@ Write-Host ""
 # Task 2: TM Improvement Worker
 # Pattern: python.exe -m module (matches working HugoTranslator-AutonomousVerification)
 # ============================================================================
-Write-Host "[2/3] Creating task: HugoTranslator-TMWorker" -ForegroundColor Cyan
+Write-Host "[2/4] Creating task: HugoTranslator-TMWorker" -ForegroundColor Cyan
 
 $tmWorkerArgs = "-m src.workers.tm_improvement_worker --mode daemon --runs-per-day 4 --window-start 08:00 --window-end 23:00 --timezone America/Los_Angeles --jitter-minutes 15 --device cuda --max-gpu-memory-percent 50 --llm-provider ollama --llm-model qwen3:14b --candidates-per-run 50 --max-llm-calls-per-run 200 --max-seconds-per-run 900 --log-level INFO"
 
@@ -153,10 +153,10 @@ try {
 Write-Host ""
 
 # ============================================================================
-# Task 3: Worker Watchdog (runs every 5 minutes)
+# Task 3: Worker Watchdog (runs every 1 hour)
 # Pattern: powershell.exe -File (already correct)
 # ============================================================================
-Write-Host "[3/3] Creating task: HugoTranslator-Watchdog" -ForegroundColor Cyan
+Write-Host "[3/4] Creating task: HugoTranslator-Watchdog" -ForegroundColor Cyan
 
 $watchdogScript = Join-Path $PSScriptRoot "worker_watchdog.ps1"
 if (-not (Test-Path $watchdogScript)) {
@@ -169,11 +169,11 @@ if (-not (Test-Path $watchdogScript)) {
         -WorkingDirectory $ProjectRoot
 
     $trigger3 = New-ScheduledTaskTrigger -Once -At (Get-Date) `
-        -RepetitionInterval (New-TimeSpan -Minutes 5) `
+        -RepetitionInterval (New-TimeSpan -Hours 1) `
         -RepetitionDuration (New-TimeSpan -Days 9999)
 
     $principal3 = New-ScheduledTaskPrincipal -UserId $currentUser -LogonType Interactive -RunLevel Limited
-    $settings3 = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -ExecutionTimeLimit (New-TimeSpan -Minutes 4)
+    $settings3 = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -ExecutionTimeLimit (New-TimeSpan -Minutes 10)
 
     Write-Host "  Execute: powershell.exe"
     Write-Host "  Script: $watchdogScript"
@@ -188,12 +188,52 @@ if (-not (Test-Path $watchdogScript)) {
 
         Register-ScheduledTask -TaskName "HugoTranslator-Watchdog" `
             -Action $action3 -Trigger $trigger3 -Principal $principal3 -Settings $settings3 `
-            -Description "Worker Watchdog - checks worker health every 5 min and restarts dead workers" | Out-Null
+            -Description "Worker Watchdog - checks worker health every 1 hour and restarts dead workers" | Out-Null
         Write-Host "  [OK] Task created successfully" -ForegroundColor Green
     } catch {
         Write-Host "  [ERROR] Failed to create task: $_" -ForegroundColor Red
         $failCount++
     }
+}
+
+Write-Host ""
+
+# ============================================================================
+# Task 4: Autonomous Verification Worker
+# Pattern: python.exe -m module
+# ============================================================================
+Write-Host "[4/4] Creating task: HugoTranslator-AutonomousVerification" -ForegroundColor Cyan
+
+$verificationWorkerArgs = "-m src.workers.autonomous_verification_worker --mode daemon --runs-per-day 4 --window-start 08:00 --window-end 23:00 --timezone America/Los_Angeles --jitter-minutes 15 --log-level INFO"
+
+$action4 = New-ScheduledTaskAction `
+    -Execute $VenvPython `
+    -Argument $verificationWorkerArgs `
+    -WorkingDirectory $ProjectRoot
+
+$trigger4 = New-ScheduledTaskTrigger -AtStartup
+$principal4 = New-ScheduledTaskPrincipal -UserId $currentUser -LogonType Interactive -RunLevel Limited
+$settings4 = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -RestartCount 3 -RestartInterval (New-TimeSpan -Minutes 5)
+
+Write-Host "  Execute: $VenvPython"
+Write-Host "  Args: $verificationWorkerArgs"
+Write-Host "  WorkDir: $ProjectRoot"
+Write-Host "  User: $currentUser (Interactive)"
+
+try {
+    $existingTask4 = Get-ScheduledTask -TaskName "HugoTranslator-AutonomousVerification" -ErrorAction SilentlyContinue
+    if ($existingTask4) {
+        Write-Host "  Removing existing task..." -ForegroundColor Yellow
+        Unregister-ScheduledTask -TaskName "HugoTranslator-AutonomousVerification" -Confirm:$false
+    }
+
+    Register-ScheduledTask -TaskName "HugoTranslator-AutonomousVerification" `
+        -Action $action4 -Trigger $trigger4 -Principal $principal4 -Settings $settings4 `
+        -Description "Autonomous Verification Worker - scheduled verification and audit pass" | Out-Null
+    Write-Host "  [OK] Task created successfully" -ForegroundColor Green
+} catch {
+    Write-Host "  [ERROR] Failed to create task: $_" -ForegroundColor Red
+    $failCount++
 }
 
 Write-Host ""
@@ -206,7 +246,12 @@ Write-Host "Verifying task registration..." -ForegroundColor Yellow
 Write-Host "================================================================================" -ForegroundColor Yellow
 Write-Host ""
 
-$expectedTasks = @("HugoTranslator-ContentWorker", "HugoTranslator-TMWorker", "HugoTranslator-Watchdog")
+$expectedTasks = @(
+    "HugoTranslator-ContentWorker",
+    "HugoTranslator-TMWorker",
+    "HugoTranslator-Watchdog",
+    "HugoTranslator-AutonomousVerification"
+)
 $verifiedCount = 0
 
 foreach ($taskName in $expectedTasks) {
@@ -228,7 +273,7 @@ Write-Host ""
 # ============================================================================
 # Final Summary
 # ============================================================================
-if ($failCount -eq 0 -and $verifiedCount -eq 3) {
+if ($failCount -eq 0 -and $verifiedCount -eq $expectedTasks.Count) {
     Write-Host "================================================================================" -ForegroundColor Cyan
     Write-Host "Setup Complete! All $verifiedCount tasks registered successfully." -ForegroundColor Green
     Write-Host "================================================================================" -ForegroundColor Cyan
@@ -253,9 +298,14 @@ Write-Host "     - LLM: Ollama/qwen3:14b"
 Write-Host "     - Trigger: At system startup"
 Write-Host ""
 Write-Host "  3. HugoTranslator-Watchdog" -ForegroundColor White
-Write-Host "     - Runs: Every 5 minutes"
+Write-Host "     - Runs: Every 1 hour"
 Write-Host "     - Checks worker liveness and auto-restarts dead workers"
 Write-Host "     - Circuit breaker: Max 5 restarts per hour"
+Write-Host ""
+Write-Host "  4. HugoTranslator-AutonomousVerification" -ForegroundColor White
+Write-Host "     - Runs: 4 times per day (08:00-23:00 Pacific Time)"
+Write-Host "     - Verifies scheduled worker readiness and emits audit telemetry"
+Write-Host "     - Trigger: At system startup"
 Write-Host ""
 Write-Host "All tasks will:" -ForegroundColor Yellow
 Write-Host "  - Start automatically when the system boots"
@@ -268,15 +318,19 @@ Write-Host "  View tasks:    taskschd.msc" -ForegroundColor White
 Write-Host "  Start now:     Start-ScheduledTask -TaskName 'HugoTranslator-ContentWorker'" -ForegroundColor White
 Write-Host "                 Start-ScheduledTask -TaskName 'HugoTranslator-TMWorker'" -ForegroundColor White
 Write-Host "                 Start-ScheduledTask -TaskName 'HugoTranslator-Watchdog'" -ForegroundColor White
+Write-Host "                 Start-ScheduledTask -TaskName 'HugoTranslator-AutonomousVerification'" -ForegroundColor White
 Write-Host "  Stop:          Stop-ScheduledTask -TaskName 'HugoTranslator-ContentWorker'" -ForegroundColor White
 Write-Host "                 Stop-ScheduledTask -TaskName 'HugoTranslator-TMWorker'" -ForegroundColor White
 Write-Host "                 Stop-ScheduledTask -TaskName 'HugoTranslator-Watchdog'" -ForegroundColor White
+Write-Host "                 Stop-ScheduledTask -TaskName 'HugoTranslator-AutonomousVerification'" -ForegroundColor White
 Write-Host "  Disable:       Disable-ScheduledTask -TaskName 'HugoTranslator-ContentWorker'" -ForegroundColor White
 Write-Host "                 Disable-ScheduledTask -TaskName 'HugoTranslator-TMWorker'" -ForegroundColor White
 Write-Host "                 Disable-ScheduledTask -TaskName 'HugoTranslator-Watchdog'" -ForegroundColor White
+Write-Host "                 Disable-ScheduledTask -TaskName 'HugoTranslator-AutonomousVerification'" -ForegroundColor White
 Write-Host "  Remove:        Unregister-ScheduledTask -TaskName 'HugoTranslator-ContentWorker'" -ForegroundColor White
 Write-Host "                 Unregister-ScheduledTask -TaskName 'HugoTranslator-TMWorker'" -ForegroundColor White
 Write-Host "                 Unregister-ScheduledTask -TaskName 'HugoTranslator-Watchdog'" -ForegroundColor White
+Write-Host "                 Unregister-ScheduledTask -TaskName 'HugoTranslator-AutonomousVerification'" -ForegroundColor White
 Write-Host ""
 Write-Host "Log file: $LogFile" -ForegroundColor Cyan
 Write-Host "NOTE: Workers will start on next system boot, or you can start them manually now." -ForegroundColor Cyan

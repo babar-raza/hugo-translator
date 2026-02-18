@@ -27,6 +27,12 @@ def mock_config_service():
 
     mock_service.get_site_profile.return_value = mock_profile
     mock_service.list_sites.return_value = ["test-site"]
+    mock_service.get_config.return_value = {
+        "paths": {
+            "tm_data_dir": "data/tm",
+        }
+    }
+    mock_service.resolve_content_root.side_effect = lambda path: Path(path)
 
     return mock_service
 
@@ -57,7 +63,7 @@ def mock_translation_engine():
 def worker_config():
     """Create test worker configuration."""
     return AutonomousWorkerConfig(
-        config_root="tests/fixtures/config",
+        config_root="config",
         site="test-site",
         mode="oneshot",
         device="cpu",
@@ -113,7 +119,7 @@ class TestAutonomousWorkerOneshot:
         """Test oneshot mode processing all sites."""
         # Config without specific site
         config = AutonomousWorkerConfig(
-            config_root="tests/fixtures/config",
+            config_root="config",
             site=None,  # Process all sites
             mode="oneshot",
             device="cpu",
@@ -145,7 +151,7 @@ class TestAutonomousWorkerOneshot:
     def test_oneshot_max_sites_limit(self, mock_config_service, mock_translation_engine):
         """Test oneshot mode with max_sites_per_run limit."""
         config = AutonomousWorkerConfig(
-            config_root="tests/fixtures/config",
+            config_root="config",
             site=None,
             mode="oneshot",
             device="cpu",
@@ -203,7 +209,7 @@ class TestAutonomousWorkerOneshot:
     def test_oneshot_site_error_continues(self, mock_config_service, mock_translation_engine):
         """Test that worker continues processing after site error."""
         config = AutonomousWorkerConfig(
-            config_root="tests/fixtures/config",
+            config_root="config",
             site=None,
             mode="oneshot",
             device="cpu",
@@ -242,11 +248,15 @@ class TestAutonomousWorkerOneshot:
     def test_oneshot_content_root_does_not_exist(self, worker_config, mock_config_service, mock_translation_engine):
         """Test that nonexistent content_root is skipped."""
         worker = AutonomousContentTranslationWorker(worker_config)
+        mock_config_service.get_site_profile.return_value = Mock(
+            content_roots=["/path/that/should/not/exist/for/test"],
+            target_langs=["es", "fr"],
+            default_source_lang="en",
+        )
 
         with patch("src.workers.autonomous_content_translation_worker.ConfigService") as mock_cs, \
              patch("src.workers.autonomous_content_translation_worker.TranslationEngine") as mock_te, \
-             patch("src.workers.autonomous_content_translation_worker.auto_commit_translations") as mock_commit, \
-             patch("src.workers.autonomous_content_translation_worker.Path.exists", return_value=False):  # Content root doesn't exist
+             patch("src.workers.autonomous_content_translation_worker.auto_commit_translations") as mock_commit:
 
             mock_cs.return_value = mock_config_service
             mock_te.return_value = mock_translation_engine
@@ -265,7 +275,7 @@ class TestAutonomousWorkerVRAM:
     def test_vram_enforcement_cuda(self, mock_config_service, mock_translation_engine):
         """Test that VRAM enforcement is called for CUDA device."""
         config = AutonomousWorkerConfig(
-            config_root="tests/fixtures/config",
+            config_root="config",
             site="test-site",
             mode="oneshot",
             device="cuda",
@@ -302,7 +312,7 @@ class TestAutonomousWorkerVRAM:
     def test_vram_enforcement_skipped_cpu(self, mock_config_service, mock_translation_engine):
         """Test that VRAM enforcement is skipped for CPU device."""
         config = AutonomousWorkerConfig(
-            config_root="tests/fixtures/config",
+            config_root="config",
             site="test-site",
             mode="oneshot",
             device="cpu",
@@ -361,7 +371,7 @@ class TestAutonomousWorkerDaemonMode:
     def test_daemon_mode_scheduling(self, mock_config_service, mock_translation_engine):
         """Test that daemon mode uses WindowScheduler."""
         config = AutonomousWorkerConfig(
-            config_root="tests/fixtures/config",
+            config_root="config",
             site="test-site",
             mode="daemon",
             runs_per_day=5,
@@ -405,3 +415,4 @@ class TestAutonomousWorkerDaemonMode:
 
             # Verify translation was executed
             assert mock_translation_engine.translate_directory.call_count >= 1
+

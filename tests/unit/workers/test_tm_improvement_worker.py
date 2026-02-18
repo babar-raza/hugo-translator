@@ -391,6 +391,8 @@ def test_execute_improvement_run_preflight_check_aborts_high_usage(
     worker = TMImprovementWorker(worker_config)
     worker.config_service = mock_dependencies["config_service"]
     worker.improvement_queue = mock_dependencies["queue"]
+    worker.llm_client = mock_dependencies["llm"]
+    worker._llm_unavailable = False
 
     # Mock high GPU usage
     mock_gpu_manager = Mock()

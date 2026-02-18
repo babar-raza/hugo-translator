@@ -467,9 +467,9 @@ tm_improvement:
 
   # Improvement batch configuration
   batch:
-    candidates_per_run: 50  # Max candidates to process per run
-    max_llm_calls_per_run: 200  # Max LLM calls per run (safety limit)
-    max_seconds_per_run: 900  # Max runtime per run (15 minutes)
+    candidates_per_run: 300  # Max candidates to process per run
+    max_llm_calls_per_run: 500  # Max LLM calls per run (safety limit)
+    max_seconds_per_run: 3600  # Max runtime per run (60 minutes)
 
   # LLM configuration for improvements
   llm:

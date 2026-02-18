@@ -13,9 +13,10 @@ logger = logging.getLogger(__name__)
 
 # Comprehensive set of supported language codes
 _ALL_LANGUAGE_CODES = frozenset([
-    'ar', 'bg', 'ca', 'cs', 'da', 'de', 'el', 'en', 'es', 'et', 'fa', 'fi', 'fr',
-    'he', 'hi', 'hr', 'hu', 'id', 'it', 'ja', 'ko', 'lt', 'lv', 'ms', 'nb', 'nl',
-    'pl', 'pt', 'ro', 'ru', 'sk', 'sl', 'sr', 'sv', 'th', 'tr', 'uk', 'vi', 'zh'
+    'af', 'ar', 'az', 'bg', 'ca', 'cs', 'da', 'de', 'el', 'en', 'es', 'et',
+    'fa', 'fi', 'fr', 'ga', 'he', 'hi', 'hr', 'hu', 'id', 'it', 'ja', 'ko',
+    'lt', 'lv', 'ms', 'nb', 'nl', 'no', 'pl', 'pt', 'ro', 'ru', 'sk', 'sl',
+    'sr', 'sv', 'th', 'tr', 'uk', 'vi', 'zh'
 ])
 
 
@@ -100,30 +101,14 @@ def filter_source_files(
     filtered_files = []
 
     if per_language_folders:
-        # Folder-based localization: only include files from source language folder
-        # Build set of all language codes to filter out
-        all_lang_codes = set(_ALL_LANGUAGE_CODES) | set(target_langs)
-        all_lang_codes.discard(source_lang)
+        # Folder-based localization: ONLY include files from source language folder.
+        # Files not in any language folder are ambiguous and excluded.
+        source_folder_patterns = [f'/{source_lang}/', f'\\{source_lang}\\']
 
         for file_path in files:
             path_str = str(file_path)
-            # Check if file is in source language folder
-            source_folder_patterns = [f'/{source_lang}/', f'\\{source_lang}\\']
-            is_source = any(pattern in path_str for pattern in source_folder_patterns)
-
-            # Check if file is NOT in any target language folder
-            is_target = False
-            for lang in all_lang_codes:
-                target_patterns = [f'/{lang}/', f'\\{lang}\\']
-                if any(pattern in path_str for pattern in target_patterns):
-                    is_target = True
-                    break
-
-            if is_source or not is_target:
-                # Include if in source folder OR not in any language-specific folder
-                # (handles cases where files aren't in language folders at all)
-                if not is_target:
-                    filtered_files.append(file_path)
+            if any(pattern in path_str for pattern in source_folder_patterns):
+                filtered_files.append(file_path)
     else:
         # File-based localization: use helper to exclude translated files
         for file_path in files:

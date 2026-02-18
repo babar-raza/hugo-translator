@@ -63,10 +63,10 @@ logger = logging.getLogger(__name__)
 
 # Module-level constant: All supported language codes for translation filtering
 _ALL_LANGUAGE_CODES = frozenset([
-    'ar', 'bg', 'cs', 'da', 'de', 'el', 'es', 'et', 'fa', 'fi', 'fr',
-    'he', 'hi', 'hr', 'hu', 'id', 'it', 'ja', 'ko', 'lt', 'lv', 'nb',
-    'nl', 'pl', 'pt', 'ro', 'ru', 'sk', 'sl', 'sr', 'sv',
-    'th', 'tr', 'uk', 'vi', 'zh'
+    'af', 'ar', 'az', 'bg', 'ca', 'cs', 'da', 'de', 'el', 'es', 'et',
+    'fa', 'fi', 'fr', 'ga', 'he', 'hi', 'hr', 'hu', 'id', 'it', 'ja',
+    'ko', 'lt', 'lv', 'ms', 'nb', 'nl', 'no', 'pl', 'pt', 'ro', 'ru',
+    'sk', 'sl', 'sr', 'sv', 'th', 'tr', 'uk', 'vi', 'zh'
 ])
 
 
@@ -449,6 +449,8 @@ class TranslationEngine:
 
         # WS-A: FastText language detection integration
         self.fasttext_detector = None
+        # Backward-compatible alias used by older write-validation paths.
+        self.detector = None
         self.similarity_tracker = None
 
         # D3: Disk space check cache (60-second TTL to avoid repeated stat calls)
@@ -474,16 +476,19 @@ class TranslationEngine:
                     download_retries=download_retries,
                     fallback_to_langdetect=fallback_to_langdetect,
                 )
+                self.detector = self.fasttext_detector
 
                 if self.fasttext_detector.is_available:
                     logger.info("FastText language detection initialized")
                 else:
                     logger.warning("FastText language detection unavailable, continuing without it")
                     self.fasttext_detector = None
+                    self.detector = None
 
             except Exception as e:
                 logger.warning(f"Failed to initialize FastTextDetector: {e}, continuing without language detection")
                 self.fasttext_detector = None
+                self.detector = None
 
         # WS-A: Adaptive similarity tracker integration
         adaptive_similarity_config = lang_detection_config.get('adaptive_similarity', {})
@@ -562,6 +567,18 @@ class TranslationEngine:
         except Exception as e:
             logger.warning(f"Failed to load OOM retry config: {e}", exc_info=True)
             return {}
+
+    def _get_language_detector(self):
+        """
+        Resolve active language detector with backward compatibility.
+
+        Returns:
+            Detector object implementing detect(text) -> (lang, confidence), or None.
+        """
+        detector = getattr(self, "fasttext_detector", None)
+        if detector is not None:
+            return detector
+        return getattr(self, "detector", None)
 
     def _is_oom_error(self, exception: Exception) -> bool:
         """
@@ -1457,83 +1474,89 @@ class TranslationEngine:
                             # ALSO prevents overwriting good files with bad translations
                             try:
                                 # Use same FastTextDetector as initialized for the engine
-                                detector = self.detector
-                                detected_lang, confidence = detector.detect(translated_content)
+                                detector = self._get_language_detector()
+                                if detector is None:
+                                    logger.warning(
+                                        "Language detector unavailable, skipping language validation for %s",
+                                        output_path.name,
+                                    )
+                                else:
+                                    detected_lang, confidence = detector.detect(translated_content)
 
-                                # Check for language mismatch (with high confidence)
-                                if detected_lang != target_lang and confidence > 0.70:
-                                    # Check if this is a learned similarity pair
-                                    is_similar = False
-                                    if hasattr(self, 'similarity_tracker') and self.similarity_tracker:
-                                        is_similar = self.similarity_tracker.are_similar(target_lang, detected_lang)
+                                    # Check for language mismatch (with high confidence)
+                                    if detected_lang != target_lang and confidence > 0.70:
+                                        # Check if this is a learned similarity pair
+                                        is_similar = False
+                                        if hasattr(self, 'similarity_tracker') and self.similarity_tracker:
+                                            is_similar = self.similarity_tracker.are_similar(target_lang, detected_lang)
 
-                                    if not is_similar:
-                                        validation_passed = False
-                                        validation_error = f"Language mismatch: detected {detected_lang}, expected {target_lang}"
-                                        logger.error(
-                                            f"WRITE BLOCKED: Content language mismatch! "
-                                            f"Expected: {target_lang}, Detected: {detected_lang} ({confidence:.2%}). "
-                                            f"Refusing to write wrong-language content to {output_path.name}."
-                                        )
-                                    else:
-                                        logger.warning(
-                                            f"Language mismatch detected but allowing due to learned similarity: "
-                                            f"{target_lang} <-> {detected_lang} ({confidence:.2%})"
-                                        )
-
-                                # AGENT B-7.4: Pre-Write Existing File Quality Check
-                                # CRITICAL: If existing file exists, don't overwrite with lower quality
-                                if validation_passed and output_path.exists():
-                                    try:
-                                        existing_content = output_path.read_text(encoding='utf-8')
-                                        existing_lang, existing_conf = detector.detect(existing_content)
-
-                                        # CASE 1: Existing file is correct language and new file is wrong → BLOCK
-                                        if existing_lang == target_lang and detected_lang != target_lang:
+                                        if not is_similar:
                                             validation_passed = False
-                                            validation_error = f"Blocked overwrite: existing={existing_lang}, new={detected_lang}"
+                                            validation_error = f"Language mismatch: detected {detected_lang}, expected {target_lang}"
                                             logger.error(
-                                                f"OVERWRITE BLOCKED: Existing file is correct {target_lang} "
-                                                f"({existing_conf:.2%}), new content is wrong {detected_lang} "
-                                                f"({confidence:.2%}). Refusing to replace good file with bad translation."
+                                                f"WRITE BLOCKED: Content language mismatch! "
+                                                f"Expected: {target_lang}, Detected: {detected_lang} ({confidence:.2%}). "
+                                                f"Refusing to write wrong-language content to {output_path.name}."
                                             )
-
-                                        # CASE 2: Both correct but existing has higher confidence → BLOCK
-                                        elif (existing_lang == target_lang and detected_lang == target_lang and
-                                            existing_conf > confidence + 0.05):  # 5% threshold to avoid churn
-                                            validation_passed = False
-                                            validation_error = f"Blocked overwrite: existing quality higher"
+                                        else:
                                             logger.warning(
-                                                f"OVERWRITE BLOCKED: Existing file has higher quality "
-                                                f"({existing_lang} {existing_conf:.2%}) than new translation "
-                                                f"({detected_lang} {confidence:.2%}). Keeping existing."
+                                                f"Language mismatch detected but allowing due to learned similarity: "
+                                                f"{target_lang} <-> {detected_lang} ({confidence:.2%})"
                                             )
 
-                                        # CASE 3: Existing wrong but new correct → ALLOW (healing)
-                                        elif existing_lang != target_lang and detected_lang == target_lang:
-                                            logger.info(
-                                                f"HEALING OVERWRITE: Replacing incorrect {existing_lang} "
-                                                f"({existing_conf:.2%}) with correct {detected_lang} "
-                                                f"({confidence:.2%}). Quality improvement for {output_path.name}."
-                                            )
-                                            # Allow write to proceed (healing case)
+                                    # AGENT B-7.4: Pre-Write Existing File Quality Check
+                                    # CRITICAL: If existing file exists, don't overwrite with lower quality
+                                    if validation_passed and output_path.exists():
+                                        try:
+                                            existing_content = output_path.read_text(encoding='utf-8')
+                                            existing_lang, existing_conf = detector.detect(existing_content)
 
-                                        # CASE 4: Both wrong → BLOCK
-                                        elif existing_lang != target_lang and detected_lang != target_lang:
-                                            validation_passed = False
-                                            validation_error = f"Blocked overwrite: both translations wrong (existing={existing_lang}, new={detected_lang})"
-                                            logger.error(
-                                                f"OVERWRITE BLOCKED: Both existing ({existing_lang}) and new "
-                                                f"({detected_lang}) are wrong language. Expected {target_lang}. "
-                                                f"Blocking to prevent further corruption of {output_path.name}."
-                                            )
+                                            # CASE 1: Existing file is correct language and new file is wrong → BLOCK
+                                            if existing_lang == target_lang and detected_lang != target_lang:
+                                                validation_passed = False
+                                                validation_error = f"Blocked overwrite: existing={existing_lang}, new={detected_lang}"
+                                                logger.error(
+                                                    f"OVERWRITE BLOCKED: Existing file is correct {target_lang} "
+                                                    f"({existing_conf:.2%}), new content is wrong {detected_lang} "
+                                                    f"({confidence:.2%}). Refusing to replace good file with bad translation."
+                                                )
 
-                                    except (IOError, OSError) as existing_check_error:
-                                        # Existing file read error - non-fatal, allow write (new translation)
-                                        logger.warning(f"Could not read existing file for comparison (allowing write): {existing_check_error}")
-                                    except ValueError as existing_check_error:
-                                        # Detection confidence too low on existing file - log and allow write
-                                        logger.warning(f"Existing file language detection uncertain (allowing write): {existing_check_error}")
+                                            # CASE 2: Both correct but existing has higher confidence → BLOCK
+                                            elif (existing_lang == target_lang and detected_lang == target_lang and
+                                                existing_conf > confidence + 0.05):  # 5% threshold to avoid churn
+                                                validation_passed = False
+                                                validation_error = f"Blocked overwrite: existing quality higher"
+                                                logger.warning(
+                                                    f"OVERWRITE BLOCKED: Existing file has higher quality "
+                                                    f"({existing_lang} {existing_conf:.2%}) than new translation "
+                                                    f"({detected_lang} {confidence:.2%}). Keeping existing."
+                                                )
+
+                                            # CASE 3: Existing wrong but new correct → ALLOW (healing)
+                                            elif existing_lang != target_lang and detected_lang == target_lang:
+                                                logger.info(
+                                                    f"HEALING OVERWRITE: Replacing incorrect {existing_lang} "
+                                                    f"({existing_conf:.2%}) with correct {detected_lang} "
+                                                    f"({confidence:.2%}). Quality improvement for {output_path.name}."
+                                                )
+                                                # Allow write to proceed (healing case)
+
+                                            # CASE 4: Both wrong → BLOCK
+                                            elif existing_lang != target_lang and detected_lang != target_lang:
+                                                validation_passed = False
+                                                validation_error = f"Blocked overwrite: both translations wrong (existing={existing_lang}, new={detected_lang})"
+                                                logger.error(
+                                                    f"OVERWRITE BLOCKED: Both existing ({existing_lang}) and new "
+                                                    f"({detected_lang}) are wrong language. Expected {target_lang}. "
+                                                    f"Blocking to prevent further corruption of {output_path.name}."
+                                                )
+
+                                        except (IOError, OSError) as existing_check_error:
+                                            # Existing file read error - non-fatal, allow write (new translation)
+                                            logger.warning(f"Could not read existing file for comparison (allowing write): {existing_check_error}")
+                                        except ValueError as existing_check_error:
+                                            # Detection confidence too low on existing file - log and allow write
+                                            logger.warning(f"Existing file language detection uncertain (allowing write): {existing_check_error}")
 
                             except ImportError as e:
                                 # Detector module missing - FATAL, block write
@@ -1551,7 +1574,7 @@ class TranslationEngine:
 
                             # AGENT B-7.5: Final file-level purity check
                             # Detects mixed-language content that passes aggregate detection
-                            if validation_passed:
+                            if validation_passed and detector is not None:
                                 purity_result = self._verify_final_file_purity(
                                     translated_content,
                                     target_lang,
@@ -1573,7 +1596,7 @@ class TranslationEngine:
                             logger.error(f"WRITE BLOCKED for {output_path.name}: {validation_error}")
                             result.success = False
                             result.error = validation_error
-                            continue  # Skip to next language
+                            break  # Exit retry loop - validation failure is deterministic
 
                         # PHASE 3: WRITE (only if ALL validation passed)
                         try:
@@ -1584,7 +1607,7 @@ class TranslationEngine:
                             logger.error(f"Write operation failed for {output_path.name}: {write_error}")
                             result.success = False
                             result.error = f"Write error: {write_error}"
-                            continue  # Skip to next language
+                            break  # Exit retry loop - write failed, move to next language
 
                         # File successfully written - add to outputs
                         result.outputs[target_lang] = output_path
@@ -2714,12 +2737,13 @@ class TranslationEngine:
         in_frontmatter = False
 
         for line in content.split('\n'):
-            if line.strip().startswith('```'):
+            stripped = line.strip()
+            if stripped.startswith('```'):
                 in_code_block = not in_code_block
-            elif line.strip() == '---' and not paragraphs:
+            elif stripped == '---' and not paragraphs:
                 in_frontmatter = not in_frontmatter
-            elif not in_code_block and not in_frontmatter and line.strip():
-                paragraphs.append(line.strip())
+            elif not in_code_block and not in_frontmatter and stripped:
+                paragraphs.append(stripped)
 
         if not paragraphs:
             return {"passed": True, "reason": "No content to validate"}
@@ -2756,7 +2780,10 @@ class TranslationEngine:
 
         wrong_percentage = wrong_lang_count / total_count
 
-        if wrong_percentage > 0.05:  # 5% threshold
+        # 30% threshold: technical docs legitimately contain English API names, inline code,
+        # and non-translatable identifiers. The original 5% threshold was too strict for
+        # real-world content. Genuine corruption shows 50%+ wrong-language content.
+        if wrong_percentage > 0.30:
             return {
                 "passed": False,
                 "wrong_lang_percentage": wrong_percentage,

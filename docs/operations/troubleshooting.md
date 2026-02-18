@@ -872,3 +872,18 @@ translate-hugo --site reference.aspose.net --validation-config ./reference-valid
 - [Validation Guide](./validation_guide.md) - How validators work and decision logic
 - [Terminology Pattern Syntax](../reference/terminology-pattern-syntax.md) - Regex patterns for terminology protection
 - [Configuration Reference](./configuration_reference.md) - Complete config file reference
+
+## Update — 2026-02-16 22:36 PKT
+
+### Worker Verification Delta (SR-03)
+
+- `TranslationEngine` now resolves language detector via `_get_language_detector()` and initializes backward-compatible `self.detector` alias.
+- This removes the prior runtime crash path (`'TranslationEngine' object has no attribute 'detector'`) in current oneshot worker output.
+- New blocker observed during manual oneshot: repeated `FINAL PURITY CHECK FAILED` loops on `file1.md`, then timeout (`translate_directory(...) timed out after 60s`) and `[Errno 22] Invalid argument` for fixture files.
+
+Evidence:
+- `reports/agents/Agent_B/ORCH-AW-002/run_20260216_223609/artifacts/git_diff.txt`
+- `reports/agents/Agent_C/ORCH-AW-003/run_20260216_223609/artifacts/pytest_worker_slice.txt`
+- `reports/agents/Agent_C/ORCH-AW-003/run_20260216_223609/artifacts/content_worker_oneshot.txt`
+- `reports/agents/Agent_C/ORCH-AW-003/run_20260216_223609/artifacts/content_worker_new_blockers.txt`
+

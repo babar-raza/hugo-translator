@@ -36,6 +36,7 @@ from src.tm.l1_cache import L1Cache
 from src.tm.l2_persistent import L2PersistentTM
 from src.utils.config_loader import ConfigService
 from src.workers.window_scheduler import ScheduleConfig, WindowScheduler
+from src.workers.worker_state import record_worker_state
 
 try:
     from src.tm.l3_semantic import L3SemanticTM
@@ -204,6 +205,7 @@ class TMImprovementWorker:
     """
 
     _worker_id = "tm_worker"
+    _worker_log_path = "data/logs/tm_worker.log"
 
     def __init__(self, config: TMImprovementWorkerConfig):
         """
@@ -452,6 +454,19 @@ class TMImprovementWorker:
             "status": status,
         }))
 
+    def _record_state(self, state: str, *, success: bool = False, error: Optional[str] = None) -> None:
+        """Persist durable worker state for health audit tooling."""
+        try:
+            record_worker_state(
+                self._worker_id,
+                state,
+                success=success,
+                error=error,
+                log_path=self._worker_log_path,
+            )
+        except Exception as exc:
+            logger.debug(f"Worker state write failed (non-fatal): {exc}")
+
     def _start_heartbeat_thread(self):
         """Start a daemon thread that writes heartbeat every 60 seconds."""
         self._heartbeat_stop_event = threading.Event()
@@ -548,6 +563,7 @@ class TMImprovementWorker:
         """
         self._write_pid_file()
         self._write_heartbeat("starting")
+        self._record_state("starting")
         self._start_heartbeat_thread()
         self._lifecycle_event_id = start_worker_run(
             "tm_improvement_worker", "worker_lifecycle",
@@ -571,6 +587,7 @@ class TMImprovementWorker:
         finally:
             self._stop_heartbeat_thread()
             self._write_heartbeat("stopped")
+            self._record_state("stopped")
 
     def _run_oneshot(self) -> None:
         """Execute a single improvement run and exit."""
@@ -580,6 +597,7 @@ class TMImprovementWorker:
 
         if not self._preflight_check():
             logger.warning("Preflight check failed, aborting oneshot run")
+            self._record_state("preflight_failed", error="Preflight checks failed")
             return  # Graceful exit, not sys.exit(1)
 
         try:
@@ -590,11 +608,14 @@ class TMImprovementWorker:
                     f"Oneshot run completed: {result['improved_count']} improved, "
                     f"{result['skipped_count']} skipped, {result['failed_count']} failed"
                 )
+                self._record_state("run_completed", success=True)
             else:
                 logger.warning(f"Oneshot run completed with status: {result['status']}")
+                self._record_state("run_completed_non_success")
 
         except Exception as e:
             logger.error(f"Oneshot run failed: {e}", exc_info=True)
+            self._record_state("run_failed", error=str(e))
             sys.exit(1)
 
     def _run_daemon(self) -> None:
@@ -627,6 +648,7 @@ class TMImprovementWorker:
                 if not self._preflight_check():
                     logger.warning(f"Skipping run #{run_count} due to preflight failure")
                     self._write_heartbeat("skipped_preflight")
+                    self._record_state("preflight_failed", error="Preflight checks failed")
                     continue
 
                 try:
@@ -637,8 +659,10 @@ class TMImprovementWorker:
                             f"Run #{run_count} completed: {result['improved_count']} improved, "
                             f"{result['skipped_count']} skipped, {result['failed_count']} failed"
                         )
+                        self._record_state("run_completed", success=True)
                     else:
                         logger.warning(f"Run #{run_count} status: {result['status']}")
+                        self._record_state("run_completed_non_success")
 
                     consecutive_failures = 0
 
@@ -656,11 +680,16 @@ class TMImprovementWorker:
                         error_summary=str(e)[:500],
                         metrics={"run_number": run_count, "consecutive_failures": consecutive_failures},
                     )
+                    self._record_state("run_failed", error=str(e))
                     if consecutive_failures >= max_consecutive_failures:
                         logger.critical(
                             f"Aborting daemon: {max_consecutive_failures} consecutive failures"
                         )
                         self._write_heartbeat("fatal_failure")
+                        self._record_state(
+                            "fatal_failure",
+                            error=f"{max_consecutive_failures} consecutive failures",
+                        )
                         if getattr(self, "_lifecycle_event_id", None):
                             complete_worker_run(
                                 self._lifecycle_event_id,
@@ -675,6 +704,7 @@ class TMImprovementWorker:
 
         except KeyboardInterrupt:
             logger.info("Daemon interrupted by user (Ctrl+C)")
+            self._record_state("cancelled")
             if getattr(self, "_lifecycle_event_id", None):
                 complete_worker_run(
                     self._lifecycle_event_id,
@@ -1216,11 +1246,20 @@ def main():
     # Parse arguments
     args = parse_args()
 
+    log_dir = Path("data/logs")
+    log_dir.mkdir(parents=True, exist_ok=True)
+    log_path = log_dir / "tm_worker.log"
+
     # Setup logging
     logging.basicConfig(
         level=getattr(logging, args.log_level),
         format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
         datefmt="%Y-%m-%d %H:%M:%S",
+        handlers=[
+            logging.StreamHandler(),
+            logging.FileHandler(log_path, encoding="utf-8"),
+        ],
+        force=True,
     )
 
     logger.info("=" * 80)

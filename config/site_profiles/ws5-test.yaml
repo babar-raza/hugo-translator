@@ -4,7 +4,7 @@ site_id: "ws5-test"
 
 # Content directory
 content_roots:
-  - "test_fixtures/ws5/content"
+  - "tests/fixtures/ws5/content"
 
 # Source and target languages
 default_source_lang: "en"

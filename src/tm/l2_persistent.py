@@ -209,8 +209,8 @@ class L2PersistentTM:
 
             # Only validate if translation is long enough for accurate detection
             if len(translation.strip()) > 50:
-                # Use models directory for FastText cache
-                cache_dir = Path("models")
+                # Use correct FastText model directory
+                cache_dir = Path("data/models/fasttext")
                 detector = FastTextDetector(cache_dir=cache_dir)
                 detected_lang, confidence = detector.detect(translation)
 

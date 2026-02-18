@@ -134,6 +134,37 @@ class ConfigService:
             return []
         return sorted([f.stem for f in self.site_profiles_dir.glob("*.yaml")])
 
+    def resolve_content_root(self, content_root: str) -> Path:
+        """
+        Resolve a site-profile content root to an absolute path.
+
+        Resolution order for relative paths:
+        1. Current working directory
+        2. Project root inferred as `config_root.parent`
+        3. Config root directory
+
+        If none exist, returns the first candidate (cwd-relative) for deterministic
+        diagnostics.
+        """
+        raw = Path(content_root).expanduser()
+        if raw.is_absolute():
+            return raw
+
+        candidates = [
+            (Path.cwd() / raw).resolve(),
+            (self.config_root.parent / raw).resolve(),
+            (self.config_root / raw).resolve(),
+        ]
+
+        for candidate in candidates:
+            if candidate.exists():
+                return candidate
+        return candidates[0]
+
+    def resolve_content_roots(self, content_roots: List[str]) -> List[Path]:
+        """Resolve multiple content-root entries using `resolve_content_root`."""
+        return [self.resolve_content_root(root) for root in content_roots]
+
     def validate_all_profiles(self) -> Dict[str, List[str]]:
         """Validate all profiles and return errors per site."""
         errors: Dict[str, List[str]] = {}
