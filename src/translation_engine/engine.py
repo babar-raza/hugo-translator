@@ -2780,10 +2780,9 @@ class TranslationEngine:
 
         wrong_percentage = wrong_lang_count / total_count
 
-        # 30% threshold: technical docs legitimately contain English API names, inline code,
-        # and non-translatable identifiers. The original 5% threshold was too strict for
-        # real-world content. Genuine corruption shows 50%+ wrong-language content.
-        if wrong_percentage > 0.30:
+        # 10% threshold: allows for English API names and inline code identifiers in
+        # technical docs without permitting genuine language mixing (which shows 15%+).
+        if wrong_percentage > 0.10:
             return {
                 "passed": False,
                 "wrong_lang_percentage": wrong_percentage,
