@@ -74,7 +74,7 @@ Write-Host ""
 # ============================================================================
 Write-Host "[1/4] Creating task: HugoTranslator-ContentWorker" -ForegroundColor Cyan
 
-$contentWorkerArgs = "-m src.workers.autonomous_content_translation_worker --mode daemon --runs-per-day 4 --window-start 08:00 --window-end 23:00 --timezone America/Los_Angeles --jitter-minutes 15 --device cuda --max-gpu-memory-percent 50 --log-level INFO"
+$contentWorkerArgs = "-m src.workers.autonomous_content_translation_worker --mode daemon --runs-per-day 12 --window-start 07:00 --window-end 23:00 --timezone America/Los_Angeles --jitter-minutes 5 --device cuda --max-gpu-memory-percent 50 --log-level INFO"
 
 $action1 = New-ScheduledTaskAction `
     -Execute $VenvPython `

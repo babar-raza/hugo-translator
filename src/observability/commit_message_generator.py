@@ -354,12 +354,12 @@ class CommitMessageGenerator:
         """
         Build commit subject line.
 
-        Format: (chore): Translated {N} {Product} {ContentType} to {Language}.
+        Format: chore(<scope>): translate N <content_type> to <langs>
 
         Examples:
-        - (chore): Translated 15 Aspose.Slides Documentations to Catalan.
-        - (chore): Translated 13 Aspose.Slides Knowledge Base Articles to Czech.
-        - (chore): Translated 25 Aspose.Words Blog posts to French.
+        - chore(slides): translate 15 docs to Catalan
+        - chore(words): translate 13 knowledge base articles to Czech
+        - chore(blog): translate 25 blog posts to French, German
 
         Args:
             analysis: Path analysis dict
@@ -371,62 +371,54 @@ class CommitMessageGenerator:
         Returns:
             Subject line string
         """
-        is_multi_site = len(site_ids) > 1
         primary_site_id = site_ids[0]
 
-        # Determine product name
-        if analysis["product_display"]:
-            product_name = analysis["product_display"]  # e.g., "Aspose.Slides"
-        elif self._is_home_family(analysis, None):
-            product_name = "Home"
+        # Determine scope: product name (email, slides, words) or site type
+        if analysis["product"]:
+            scope = analysis["product"].replace("aspose.", "")  # "email", "slides", etc.
         else:
-            # Fallback: Use site_id as product name if no product detected
-            product_name = primary_site_id
+            site_scope_map = {
+                "blog.aspose.net": "blog",
+                "kb.aspose.net": "kb",
+                "docs.aspose.net": "docs",
+                "reference.aspose.net": "reference",
+                "products.aspose.net": "products",
+                "about.aspose.net": "about",
+                "websites.aspose.net": "websites",
+                "www.aspose.net": "www",
+            }
+            scope = site_scope_map.get(primary_site_id)
+            if not scope:
+                # Derive from site_id: take part before first dot or dash
+                scope = primary_site_id.split(".")[0].split("-")[0]
 
-        # Determine content type based on site
+        # Determine content type (lowercase, concise)
         site_content_types = {
-            "kb.aspose.net": "Knowledge Base Articles",
-            "blog.aspose.net": "Blog Posts",
-            "products.aspose.net": "Landing Pages",
-            "docs.aspose.net": "Documentations",
-            "reference.aspose.net": "References",
-            "about.aspose.net": "Pages",
-            "www.aspose.net": "Pages",
-            "websites.aspose.net": "Pages",
+            "kb.aspose.net": "knowledge base articles",
+            "blog.aspose.net": "blog posts",
+            "products.aspose.net": "landing pages",
+            "docs.aspose.net": "docs",
+            "reference.aspose.net": "API references",
+            "about.aspose.net": "pages",
+            "www.aspose.net": "pages",
+            "websites.aspose.net": "pages",
         }
-
-        # Use site-specific content type if available
         content_type = site_content_types.get(primary_site_id)
-
-        logger.debug(f"Content type lookup: primary_site_id={primary_site_id}, content_type={content_type}, site_display_name={site_display_name}")
-
         if not content_type:
-            # Fallback to display_name or "pages"
-            if is_multi_site:
-                content_type = "pages"
-            elif site_display_name:
-                content_type = site_display_name
-            else:
-                content_type = "pages"
+            content_type = site_display_name.lower() if site_display_name else "files"
 
-        logger.debug(f"Final content_type={content_type}")
+        logger.debug(f"Subject: scope={scope}, content_type={content_type}, site={primary_site_id}")
 
-        # Determine language (singular if one, comma-separated if multiple)
-        if len(target_langs) == 1:
-            lang_name = self._get_language_names([target_langs[0]])[0]
+        # Language list: use codes directly (compact), max 4 shown then "+ N more"
+        if len(target_langs) <= 4:
+            lang_str = ", ".join(target_langs)
         else:
-            # Multiple languages: "German, French, and Spanish"
-            lang_names = self._get_language_names(target_langs)
-            if len(lang_names) == 2:
-                lang_name = f"{lang_names[0]} and {lang_names[1]}"
-            else:
-                lang_name = f"{', '.join(lang_names[:-1])}, and {lang_names[-1]}"
+            lang_str = f"{', '.join(target_langs[:4])}, +{len(target_langs)-4} more"
 
-        subject = f"(chore): Translated {file_count} {product_name} {content_type} to {lang_name}."
+        subject = f"chore({scope}): translate {file_count} {content_type} to {lang_str}"
 
         # Ensure subject doesn't exceed 72 characters (git best practice)
         if len(subject) > 72:
-            # Truncate before the period and add ellipsis
             subject = subject[:69] + "..."
 
         return subject
@@ -499,77 +491,12 @@ class CommitMessageGenerator:
         """
         lines = []
 
-        # Section 1: High-level description
-        lang_names = self._get_language_names(target_langs)
-        product_section = ""
-        if analysis["product_display"]:
-            product_section = f" {analysis['product_display']}"
-            if analysis["section_display"]:
-                product_section += f" {analysis['section_display'].lower()}"
+        # Line 1: file count and site
+        lines.append(f"{file_count} translation files across {site_id}.")
 
-        lang_str = " and ".join(lang_names) if len(lang_names) <= 2 else f"{', '.join(lang_names[:-1])}, and {lang_names[-1]}"
-
-        description = f"Translates{product_section} documentation to {lang_str}:"
-        lines.append(description)
-        lines.append("")
-
-        # Section 2: Path patterns (show top 3 directories)
-        # Special handling for _index.md files
-        index_files = [f for f in output_files if f.name == "_index.md"]
-        is_all_index_files = len(index_files) == len(output_files) and len(output_files) > 0
-
-        if is_all_index_files:
-            # All files are _index.md - show parent directory names instead
-            parent_dirs = sorted(set(f.parent.name for f in output_files))
-
-            if len(parent_dirs) <= 5:
-                dirs_str = ", ".join(parent_dirs)
-                lines.append(f"- {len(output_files)} section index files ({dirs_str})")
-            else:
-                dirs_str = ", ".join(parent_dirs[:3])
-                lines.append(f"- {len(output_files)} section index files ({dirs_str}, +{len(parent_dirs)-3} more)")
-        else:
-            # Mixed files or no index files - use existing path grouping logic
-            path_groups_sorted = sorted(
-                analysis["path_groups"].items(),
-                key=lambda x: len(x[1]),
-                reverse=True
-            )[:3]
-
-            for parent_dir, files in path_groups_sorted:
-                # Show relative path from common ancestor if available
-                if analysis["common_ancestor"]:
-                    try:
-                        rel_path = parent_dir.relative_to(analysis["common_ancestor"])
-                        display_path = str(rel_path).replace("\\", "/")
-                    except ValueError:
-                        display_path = parent_dir.name
-                else:
-                    display_path = parent_dir.name
-
-                lines.append(f"- {display_path}/ ({len(files)} files)")
-
-            # Show "and X more" if there are more directories
-            if len(analysis["path_groups"]) > 3:
-                remaining = len(analysis["path_groups"]) - 3
-                lines.append(f"- ... and {remaining} more directories")
-
-        lines.append("")
-
-        # Section 3: Topics (if detected)
-        if analysis["topics"]:
-            topics_str = ", ".join(sorted(analysis["topics"]))
-            lines.append(f"Topics: {topics_str}")
-            lines.append("")
-
-        # Section 4: Translation quality metrics
-        lines.append("Translation quality:")
-
-        # Model information
+        # Model
         if model_id:
-            # Extract model name and parameters
-            model_display = self._format_model_name(model_id)
-            lines.append(f"- Model: {model_display}")
+            lines.append(f"- Model: {model_id}")
 
         # TM cache hit rates
         if tm_stats:
@@ -583,50 +510,51 @@ class CommitMessageGenerator:
                 l1_rate = (l1_hits / total_lookups) * 100
                 l2_rate = (l2_hits / total_lookups) * 100
                 l3_rate = (l3_hits / total_lookups) * 100
-
-                lines.append(f"- TM cache hit rate: {hit_rate:.1%} (L1: {l1_rate:.0f}%, L2: {l2_rate:.0f}%, L3: {l3_rate:.0f}%)")
+                lines.append(
+                    f"- TM cache hit rate: {hit_rate:.1%} "
+                    f"(L1: {l1_rate:.0f}%, L2: {l2_rate:.0f}%, L3: {l3_rate:.0f}%)"
+                )
 
         # Validation results
         if translation_result:
-            # CRITICAL FIX: Filter file_results to only those in output_files
-            # Problem: translation_result.file_results contains results for ALL languages,
-            # but output_files only contains files for the current commit (one language).
-            # This caused impossible ratios like "48/5 files passed".
             output_paths = set(output_files)
-
-            # Match file_results to output_files by checking if any output path matches
             relevant_results = []
             for fr in translation_result.file_results:
                 if hasattr(fr, 'outputs') and fr.outputs:
-                    # Check if any output file in this result matches our output_files
                     for output_path in fr.outputs.values():
                         if output_path in output_paths:
                             relevant_results.append(fr)
-                            break  # Found a match, no need to check other outputs
-
+                            break
             if relevant_results:
                 passed_count = sum(1 for fr in relevant_results if fr.success)
-                failed_count = len(relevant_results) - passed_count
-
                 lines.append(f"- Validation: {passed_count}/{len(relevant_results)} files passed")
 
-                # Average validation score (if available)
-                validation_scores = []
-                for file_result in relevant_results:
-                    if hasattr(file_result, "validation_score") and file_result.validation_score:
-                        validation_scores.append(file_result.validation_score)
-
-                if validation_scores:
-                    avg_score = sum(validation_scores) / len(validation_scores)
-                    lines.append(f"- Average quality score: {avg_score:.2f}")
+        # Per-language file counts
+        lang_counts = self._count_files_by_lang(output_files, target_langs)
+        if lang_counts:
+            lang_parts = [f"{lang} ({count})" for lang, count in sorted(lang_counts.items())]
+            lines.append(f"- Languages: {', '.join(lang_parts)}")
 
         lines.append("")
 
-        # Section 5: Metadata footer
+        # Metadata footer
         lines.append(f"Run ID: {run_id}")
         lines.append(f"Site: {site_id}")
 
         return "\n".join(lines)
+
+    def _count_files_by_lang(
+        self, output_files: List[Path], target_langs: List[str]
+    ) -> Dict[str, int]:
+        """Count output files per language by matching lang code in path."""
+        counts: Dict[str, int] = {}
+        for f in output_files:
+            parts = f.parts
+            for lang in target_langs:
+                if lang in parts:
+                    counts[lang] = counts.get(lang, 0) + 1
+                    break
+        return counts
 
     def _get_language_names(self, lang_codes: List[str]) -> List[str]:
         """

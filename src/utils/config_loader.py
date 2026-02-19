@@ -128,11 +128,32 @@ class ConfigService:
         
         return data
 
-    def list_sites(self) -> List[str]:
-        """List all configured site IDs."""
+    def list_sites(self, autonomous_only: bool = True) -> List[str]:
+        """List configured site IDs.
+
+        Args:
+            autonomous_only: If True (default), exclude profiles with
+                autonomous_enabled: false. Used by the autonomous worker
+                to skip test/dev profiles.
+        """
         if not self.site_profiles_dir.exists():
             return []
-        return sorted([f.stem for f in self.site_profiles_dir.glob("*.yaml")])
+        all_stems = sorted([f.stem for f in self.site_profiles_dir.glob("*.yaml")])
+        if not autonomous_only:
+            return all_stems
+        # Filter profiles that have autonomous_enabled: false
+        import yaml as _yaml
+        enabled = []
+        for stem in all_stems:
+            profile_path = self.site_profiles_dir / f"{stem}.yaml"
+            try:
+                with open(profile_path, "r", encoding="utf-8") as _f:
+                    raw = _yaml.safe_load(_f) or {}
+                if raw.get("autonomous_enabled", True):
+                    enabled.append(stem)
+            except Exception:
+                enabled.append(stem)  # Default to enabled on parse error
+        return enabled
 
     def resolve_content_root(self, content_root: str) -> Path:
         """

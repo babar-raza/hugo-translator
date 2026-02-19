@@ -1,6 +1,7 @@
 # Nested List Test Site Profile - E2E verification for Issue #5 fix
 
 site_id: "nested-list-test"
+autonomous_enabled: false  # excluded from autonomous worker (test profile)
 
 # Content directory
 content_roots:

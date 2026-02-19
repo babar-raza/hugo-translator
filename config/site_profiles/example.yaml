@@ -161,3 +161,4 @@ metadata:
   custom_fields:
     translated_by: "Hugo Translation System"
     translation_engine: "m2m100"
+autonomous_enabled: false  # excluded from autonomous worker

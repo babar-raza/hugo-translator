@@ -18,8 +18,8 @@ call .venv\Scripts\activate.bat
 
 REM Start worker in daemon mode with CUDA support
 echo Starting worker in daemon mode...
-echo - Runs per day: 4
-echo - Time window: 08:00-23:00 Pacific Time
+echo - Runs per day: 12
+echo - Time window: 07:00-23:00 Pacific Time
 echo - Device: CUDA (GPU acceleration)
 echo - Max GPU memory: 50%%
 echo - Timeout: 600 seconds (10 minutes)
@@ -27,8 +27,8 @@ echo.
 
 python -m src.workers.autonomous_content_translation_worker ^
     --mode daemon ^
-    --runs-per-day 4 ^
-    --window-start 08:00 ^
+    --runs-per-day 12 ^
+    --window-start 07:00 ^
     --window-end 23:00 ^
     --timezone America/Los_Angeles ^
     --jitter-minutes 15 ^

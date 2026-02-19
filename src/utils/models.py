@@ -214,6 +214,10 @@ class SiteProfile(BaseModel):
         default=None,
         description="Default translation model ID (e.g., m2m100_418m, m2m100_1.2b). Falls back to system default if not set."
     )
+    autonomous_enabled: bool = Field(
+        default=True,
+        description="Whether the autonomous worker should process this site. Set to false for test/dev profiles.",
+    )
 
     @field_validator("target_langs", mode="before")
     @classmethod

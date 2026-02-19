@@ -1,0 +1,86 @@
+site_id: stage-b-canary
+display_name: Stage B Canary Run (200 files)
+content_roots:
+- runs/ht_bulk_stage_b_20260131_093038/canary_temp_input
+default_source_lang: en
+target_langs:
+  - fr
+  - ru
+
+frontmatter:
+  description:
+    mode: translate
+  summary:
+    mode: translate
+  draft:
+    mode: passthrough
+  date:
+    mode: passthrough
+  type:
+    mode: passthrough
+  layout:
+    mode: passthrough
+  url:
+    mode: passthrough
+  slug:
+    mode: passthrough
+
+body:
+  translate_markdown: true
+  preserve_blocks:
+  - block_code
+  - codespan
+  - link
+  preserve_patterns:
+  # Hugo shortcodes
+  - ^\{\{<.*>\}\}
+  # PascalCase identifiers (require internal capital)
+  - ^[A-Z][a-z0-9]+(?:[A-Z][a-z0-9]+)+$
+  # ALL_CAPS constants
+  - ^[A-Z]{2,}$
+  # HTML/XML tags
+  - ^<.*>
+  # Method calls like GetValue()
+  - ^[A-Z][A-Za-z0-9_]*\s*\(.*\)$
+  placeholder_syntax:
+  - \{\{<.*?>\}\}
+  - \{\{%.*?%\}\}
+  use_ast_body_reconstruction: true
+  ast_segmentation_strategy: adaptive
+  ast_batch_size: 50
+
+output_layout:
+  per_language_folders: true
+  pattern: '{lang}/{path}'
+
+tm_prefs:
+  use_semantic_tm: true
+  fallback_exact_only: false
+  min_similarity_score: 0.8
+
+validation:
+  enabled: true
+  validation_mode: strict
+  validators:
+    completeness:
+      enabled: true
+    language_consistency:
+      enabled: true
+      confidence_threshold: 0.9
+    shortcode_preservation:
+      enabled: true
+    frontmatter_protection:
+      enabled: true
+    terminology_preservation:
+      enabled: true
+      validation_mode: strict
+    file_placement:
+      enabled: true
+  post_write_validation: true
+
+terminology:
+  enabled: true
+  preserve_mode: BOTH
+  inherit_global: true
+  custom_terms: []
+autonomous_enabled: false  # excluded from autonomous worker

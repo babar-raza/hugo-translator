@@ -66,3 +66,4 @@ logging:
 # Metadata
 metadata:
   add_translation_info: false
+autonomous_enabled: false  # excluded from autonomous worker

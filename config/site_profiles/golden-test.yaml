@@ -1,6 +1,7 @@
 # Golden Test Site Profile - Minimal configuration for CLI regression tests
 
 site_id: "golden-test"
+autonomous_enabled: false  # excluded from autonomous worker (test profile)
 
 # Content directory
 content_roots:

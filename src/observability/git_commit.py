@@ -38,6 +38,7 @@ from typing import TYPE_CHECKING, Dict, List, Optional
 
 from .git_context import find_git_root, get_git_branch, get_git_repo
 from .commit_message_generator import CommitMessageGenerator
+from ..translation_engine.models import ValidationDecision
 
 if TYPE_CHECKING:
     from src.translation_engine.models import DirectoryResult
@@ -573,7 +574,18 @@ def collect_output_files(result: "DirectoryResult") -> List[Path]:
                 exists = output_path.exists()
                 is_skipped = lang in file_result.skipped_langs
 
-                if exists and not is_skipped:
+                # Check if validation passed for this language.
+                # None means validation was not run (allowed); ACCEPT means it passed.
+                # Only RETRY/REJECT should block the commit.
+                validation_passed = (
+                    lang not in file_result.errors
+                    and (
+                        file_result.validation_decision is None
+                        or file_result.validation_decision == ValidationDecision.ACCEPT
+                    )
+                )
+
+                if exists and not is_skipped and validation_passed:
                     files.append(output_path)
                 elif exists and is_skipped:
                     # CRITICAL FIX: Check if skipped file was actually modified

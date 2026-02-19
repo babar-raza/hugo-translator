@@ -1,0 +1,90 @@
+# Targeted test profile: blog.aspose.net with 2 languages only
+# Purpose: Verify content worker on real production data (~11 untranslated files)
+# Uses file-based localization (index.md -> index.fr.md, index.de.md)
+site_id: blog-test
+display_name: Blog Posts (2 lang test)
+content_roots:
+- D:\onedrive\Documents\GitHub\aspose.net\content\blog.aspose.net
+default_source_lang: en
+target_langs:
+  - fr
+  - de
+
+frontmatter:
+  title:
+    mode: translate
+    strategy: null
+  seoTitle:
+    mode: translate
+    strategy: null
+  description:
+    mode: translate
+    strategy: null
+  summary:
+    mode: translate
+    strategy: null
+  draft:
+    mode: passthrough
+    strategy: null
+  date:
+    mode: passthrough
+    strategy: null
+  type:
+    mode: passthrough
+    strategy: null
+  layout:
+    mode: passthrough
+    strategy: null
+  url:
+    mode: passthrough
+    strategy: null
+  slug:
+    mode: passthrough
+    strategy: null
+body:
+  translate_markdown: true
+  preserve_blocks:
+  - block_code
+  - codespan
+  preserve_patterns:
+  - ^\{\{<.*>\}\}
+  - \bAspose\b
+  placeholder_syntax:
+  - \{\{<.*?>\}\}
+  - \{\{%.*?%\}\}
+  use_ast_body_reconstruction: true
+  ast_segmentation_strategy: adaptive
+  ast_batch_size: 50
+output_layout:
+  per_language_folders: false
+  pattern: '{filename}.{lang}{ext}'
+model:
+  default: m2m100_1.2b
+tm_prefs:
+  use_semantic_tm: true
+  fallback_exact_only: false
+  min_similarity_score: 0.8
+validation:
+  enabled: true
+  validation_mode: lenient
+  validators:
+    completeness:
+      enabled: true
+    language_consistency:
+      enabled: true
+      confidence_threshold: 0.8
+    shortcode_preservation:
+      enabled: true
+    frontmatter_protection:
+      enabled: true
+    terminology_preservation:
+      enabled: true
+      validation_mode: normal
+    file_placement:
+      enabled: true
+  post_write_validation: true
+terminology:
+  enabled: true
+  preserve_mode: BOTH
+  inherit_global: true
+autonomous_enabled: false  # excluded from autonomous worker

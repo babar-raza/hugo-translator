@@ -321,3 +321,4 @@ schema:
     - site: reference.aspose.net
       description: "API reference with strict validation"
       validation_mode: strict
+autonomous_enabled: false  # excluded from autonomous worker

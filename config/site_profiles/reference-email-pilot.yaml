@@ -1,0 +1,102 @@
+# Scoped pilot profile: reference.aspose.net/email, fr+de only
+# Purpose: Small production verification batch before full autonomous E2E run
+# Files: 8 en source files, ~4 translations missing (fr+de each missing 2)
+site_id: reference-email-pilot
+display_name: API References - Email (Pilot)
+content_roots:
+- D:\onedrive\Documents\GitHub\aspose.net\content\reference.aspose.net\email
+default_source_lang: en
+target_langs:
+  - fr
+  - de
+
+frontmatter:
+  description:
+    mode: translate
+    strategy: null
+  summary:
+    mode: translate
+    strategy: null
+  draft:
+    mode: passthrough
+    strategy: null
+  date:
+    mode: passthrough
+    strategy: null
+  type:
+    mode: passthrough
+    strategy: null
+  layout:
+    mode: passthrough
+    strategy: null
+  url:
+    mode: passthrough
+    strategy: null
+  slug:
+    mode: passthrough
+    strategy: null
+body:
+  translate_markdown: true
+  preserve_blocks:
+  - block_code
+  - codespan
+  - link
+  preserve_patterns:
+  - ^\{\{<.*>\}\}
+  - ^[A-Z][a-z0-9]+(?:[A-Z][a-z0-9]+)*$
+  - ^[A-Z]{2,}$
+  - ^<.*>
+  - ^[A-Z][A-Za-z0-9_]*\s*\(.*\)$
+  placeholder_syntax:
+  - \{\{<.*?>\}\}
+  - \{\{%.*?%\}\}
+  use_ast_body_reconstruction: true
+  ast_segmentation_strategy: adaptive
+  ast_batch_size: 50
+output_layout:
+  per_language_folders: true
+  pattern: '{lang}/{path}'
+tm_prefs:
+  use_semantic_tm: true
+  fallback_exact_only: false
+  min_similarity_score: 0.8
+validation:
+  enabled: true
+  validation_mode: strict
+  validators:
+    completeness:
+      enabled: true
+    language_consistency:
+      enabled: true
+      confidence_threshold: 0.9
+    shortcode_preservation:
+      enabled: true
+    frontmatter_protection:
+      enabled: true
+    terminology_preservation:
+      enabled: true
+      validation_mode: strict
+    file_placement:
+      enabled: true
+  post_write_validation: true
+terminology:
+  enabled: true
+  preserve_mode: BOTH
+  inherit_global: true
+  custom_terms:
+  - term: API
+    category: technical_term
+    case_sensitive: true
+    preserve_mode: both
+    severity: error
+  patterns:
+  - pattern: \b[A-Z][a-z]+(?:[A-Z][a-z]+)+\b
+    category: pascal_case_identifier
+    description: PascalCase API identifiers
+    preserve_mode: protect
+    severity: error
+  - pattern: \b[A-Z][a-zA-Z0-9]*\.[A-Z][a-zA-Z0-9.]*\b
+    category: namespace_identifier
+    description: Dotted namespace identifiers
+    preserve_mode: protect
+    severity: error
