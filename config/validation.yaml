@@ -11,6 +11,7 @@ decision_rules:
   reject_on_placeholder_error: true  # Reject if placeholder integrity fails
   reject_on_code_block_error: true  # Reject if code blocks are corrupted
   reject_on_link_error: true  # Reject if links are broken
+  reject_on_repetition_error: true  # Reject immediately on any repetition ERROR (hallucination guard)
 
   # Retry configuration - when to attempt re-translation
   max_retry_attempts: 2  # Maximum number of retry attempts
@@ -95,3 +96,7 @@ validators:
   file_placement:
     enabled: true
     description: "Validates file placement and directory structure"
+
+  repetition_detector:
+    enabled: true
+    description: "Detects excessive word/phrase repetition (model hallucination guard)"

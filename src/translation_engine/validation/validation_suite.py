@@ -19,6 +19,7 @@ from .link_validator import LinkValidator
 from .placeholder_validator import PlaceholderValidator
 from .shortcode_preservation_validator import ShortcodePreservationValidator
 from .structure_validator import StructureValidator
+from .repetition_detector_validator import RepetitionDetectorValidator
 from .terminology_preservation_validator import TerminologyPreservationValidator
 from .yaml_validator import YAMLValidator
 
@@ -79,6 +80,7 @@ class ValidationSuite:
             CompletenessValidator(),
             LanguageConsistencyValidator(),
             ShortcodePreservationValidator(),
+            RepetitionDetectorValidator(),
             # Note: FrontmatterProtectionValidator, TerminologyPreservationValidator,
             # and FilePlacementValidator require constructor arguments,
             # so they are only created via from_config() or explicitly passed in
@@ -155,6 +157,9 @@ class ValidationSuite:
 
         if validators_config.get('file_placement', {}).get('enabled', True):
             validators.append(FilePlacementValidator(config_service=config_service))
+
+        if validators_config.get('repetition_detector', {}).get('enabled', True):
+            validators.append(RepetitionDetectorValidator())
 
         return cls(
             validators=validators,

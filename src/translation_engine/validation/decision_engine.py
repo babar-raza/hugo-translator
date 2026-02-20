@@ -83,6 +83,7 @@ class ValidationDecisionEngine:
         self.reject_on_placeholder_error = self.decision_rules.get("reject_on_placeholder_error", True)
         self.reject_on_code_block_error = self.decision_rules.get("reject_on_code_block_error", True)
         self.reject_on_link_error = self.decision_rules.get("reject_on_link_error", True)
+        self.reject_on_repetition_error = self.decision_rules.get("reject_on_repetition_error", True)
 
         # Retry triggers
         self.retry_on_structure_error = self.decision_rules.get("retry_on_structure_error", True)
@@ -214,6 +215,8 @@ class ValidationDecisionEngine:
                     return "CodeBlockError"
                 if "link" in issue.message.lower() and self.reject_on_link_error:
                     return "LinkError"
+                if issue.validator == "RepetitionDetectorValidator" and self.reject_on_repetition_error:
+                    return "RepetitionError"
 
         return None
 

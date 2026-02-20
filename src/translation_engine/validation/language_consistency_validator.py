@@ -6,7 +6,7 @@ Uses Google's langdetect library for language detection with deterministic seedi
 """
 
 import re
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 import langdetect
 from langdetect import DetectorFactory
@@ -16,6 +16,77 @@ from .post_translation_validator import PostTranslationValidator
 
 # Set seed for deterministic results
 DetectorFactory.seed = 0
+
+# ---------------------------------------------------------------------------
+# Unicode script-range patterns used for script-mixing detection.
+# Latin is intentionally excluded from forbidden-script lists because
+# product names, API identifiers, and URLs legitimately appear in any language.
+# ---------------------------------------------------------------------------
+_SCRIPT_ARABIC     = re.compile(r'[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF]')
+_SCRIPT_CYRILLIC   = re.compile(r'[\u0400-\u04FF]')
+_SCRIPT_HEBREW     = re.compile(r'[\u0590-\u05FF]')
+_SCRIPT_CHINESE    = re.compile(r'[\u4E00-\u9FFF]')
+_SCRIPT_JAPANESE   = re.compile(r'[\u3040-\u30FF\u31F0-\u31FF]')
+_SCRIPT_KOREAN     = re.compile(r'[\uAC00-\uD7AF]')
+_SCRIPT_DEVANAGARI = re.compile(r'[\u0900-\u097F]')
+_SCRIPT_THAI       = re.compile(r'[\u0E00-\u0E7F]')
+
+# For each target language, the list of Unicode-script patterns that must NOT
+# appear in translated content (outside code blocks / frontmatter).
+_FORBIDDEN_SCRIPTS: Dict[str, List[re.Pattern]] = {
+    # Cyrillic-script languages
+    'bg': [_SCRIPT_ARABIC, _SCRIPT_HEBREW, _SCRIPT_CHINESE, _SCRIPT_JAPANESE, _SCRIPT_KOREAN, _SCRIPT_DEVANAGARI, _SCRIPT_THAI],
+    'ru': [_SCRIPT_ARABIC, _SCRIPT_HEBREW, _SCRIPT_CHINESE, _SCRIPT_JAPANESE, _SCRIPT_KOREAN, _SCRIPT_DEVANAGARI, _SCRIPT_THAI],
+    'uk': [_SCRIPT_ARABIC, _SCRIPT_HEBREW, _SCRIPT_CHINESE, _SCRIPT_JAPANESE, _SCRIPT_KOREAN, _SCRIPT_DEVANAGARI, _SCRIPT_THAI],
+    'sr': [_SCRIPT_ARABIC, _SCRIPT_HEBREW, _SCRIPT_CHINESE, _SCRIPT_JAPANESE, _SCRIPT_KOREAN, _SCRIPT_DEVANAGARI, _SCRIPT_THAI],
+    'mk': [_SCRIPT_ARABIC, _SCRIPT_HEBREW, _SCRIPT_CHINESE, _SCRIPT_JAPANESE, _SCRIPT_KOREAN, _SCRIPT_DEVANAGARI, _SCRIPT_THAI],
+    # Arabic-script languages
+    'ar': [_SCRIPT_CYRILLIC, _SCRIPT_HEBREW, _SCRIPT_CHINESE, _SCRIPT_JAPANESE, _SCRIPT_KOREAN, _SCRIPT_DEVANAGARI, _SCRIPT_THAI],
+    'fa': [_SCRIPT_CYRILLIC, _SCRIPT_HEBREW, _SCRIPT_CHINESE, _SCRIPT_JAPANESE, _SCRIPT_KOREAN, _SCRIPT_DEVANAGARI, _SCRIPT_THAI],
+    'ur': [_SCRIPT_CYRILLIC, _SCRIPT_HEBREW, _SCRIPT_CHINESE, _SCRIPT_JAPANESE, _SCRIPT_KOREAN, _SCRIPT_DEVANAGARI, _SCRIPT_THAI],
+    # Latin-script languages
+    'fr': [_SCRIPT_ARABIC, _SCRIPT_CYRILLIC, _SCRIPT_HEBREW, _SCRIPT_CHINESE, _SCRIPT_JAPANESE, _SCRIPT_KOREAN, _SCRIPT_DEVANAGARI, _SCRIPT_THAI],
+    'de': [_SCRIPT_ARABIC, _SCRIPT_CYRILLIC, _SCRIPT_HEBREW, _SCRIPT_CHINESE, _SCRIPT_JAPANESE, _SCRIPT_KOREAN, _SCRIPT_DEVANAGARI, _SCRIPT_THAI],
+    'es': [_SCRIPT_ARABIC, _SCRIPT_CYRILLIC, _SCRIPT_HEBREW, _SCRIPT_CHINESE, _SCRIPT_JAPANESE, _SCRIPT_KOREAN, _SCRIPT_DEVANAGARI, _SCRIPT_THAI],
+    'it': [_SCRIPT_ARABIC, _SCRIPT_CYRILLIC, _SCRIPT_HEBREW, _SCRIPT_CHINESE, _SCRIPT_JAPANESE, _SCRIPT_KOREAN, _SCRIPT_DEVANAGARI, _SCRIPT_THAI],
+    'pt': [_SCRIPT_ARABIC, _SCRIPT_CYRILLIC, _SCRIPT_HEBREW, _SCRIPT_CHINESE, _SCRIPT_JAPANESE, _SCRIPT_KOREAN, _SCRIPT_DEVANAGARI, _SCRIPT_THAI],
+    'nl': [_SCRIPT_ARABIC, _SCRIPT_CYRILLIC, _SCRIPT_HEBREW, _SCRIPT_CHINESE, _SCRIPT_JAPANESE, _SCRIPT_KOREAN, _SCRIPT_DEVANAGARI, _SCRIPT_THAI],
+    'pl': [_SCRIPT_ARABIC, _SCRIPT_CYRILLIC, _SCRIPT_HEBREW, _SCRIPT_CHINESE, _SCRIPT_JAPANESE, _SCRIPT_KOREAN, _SCRIPT_DEVANAGARI, _SCRIPT_THAI],
+    'cs': [_SCRIPT_ARABIC, _SCRIPT_CYRILLIC, _SCRIPT_HEBREW, _SCRIPT_CHINESE, _SCRIPT_JAPANESE, _SCRIPT_KOREAN, _SCRIPT_DEVANAGARI, _SCRIPT_THAI],
+    'sk': [_SCRIPT_ARABIC, _SCRIPT_CYRILLIC, _SCRIPT_HEBREW, _SCRIPT_CHINESE, _SCRIPT_JAPANESE, _SCRIPT_KOREAN, _SCRIPT_DEVANAGARI, _SCRIPT_THAI],
+    'ro': [_SCRIPT_ARABIC, _SCRIPT_CYRILLIC, _SCRIPT_HEBREW, _SCRIPT_CHINESE, _SCRIPT_JAPANESE, _SCRIPT_KOREAN, _SCRIPT_DEVANAGARI, _SCRIPT_THAI],
+    'hu': [_SCRIPT_ARABIC, _SCRIPT_CYRILLIC, _SCRIPT_HEBREW, _SCRIPT_CHINESE, _SCRIPT_JAPANESE, _SCRIPT_KOREAN, _SCRIPT_DEVANAGARI, _SCRIPT_THAI],
+    'sv': [_SCRIPT_ARABIC, _SCRIPT_CYRILLIC, _SCRIPT_HEBREW, _SCRIPT_CHINESE, _SCRIPT_JAPANESE, _SCRIPT_KOREAN, _SCRIPT_DEVANAGARI, _SCRIPT_THAI],
+    'da': [_SCRIPT_ARABIC, _SCRIPT_CYRILLIC, _SCRIPT_HEBREW, _SCRIPT_CHINESE, _SCRIPT_JAPANESE, _SCRIPT_KOREAN, _SCRIPT_DEVANAGARI, _SCRIPT_THAI],
+    'fi': [_SCRIPT_ARABIC, _SCRIPT_CYRILLIC, _SCRIPT_HEBREW, _SCRIPT_CHINESE, _SCRIPT_JAPANESE, _SCRIPT_KOREAN, _SCRIPT_DEVANAGARI, _SCRIPT_THAI],
+    'nb': [_SCRIPT_ARABIC, _SCRIPT_CYRILLIC, _SCRIPT_HEBREW, _SCRIPT_CHINESE, _SCRIPT_JAPANESE, _SCRIPT_KOREAN, _SCRIPT_DEVANAGARI, _SCRIPT_THAI],
+    'no': [_SCRIPT_ARABIC, _SCRIPT_CYRILLIC, _SCRIPT_HEBREW, _SCRIPT_CHINESE, _SCRIPT_JAPANESE, _SCRIPT_KOREAN, _SCRIPT_DEVANAGARI, _SCRIPT_THAI],
+    'tr': [_SCRIPT_ARABIC, _SCRIPT_CYRILLIC, _SCRIPT_HEBREW, _SCRIPT_CHINESE, _SCRIPT_JAPANESE, _SCRIPT_KOREAN, _SCRIPT_DEVANAGARI, _SCRIPT_THAI],
+    'id': [_SCRIPT_ARABIC, _SCRIPT_CYRILLIC, _SCRIPT_HEBREW, _SCRIPT_CHINESE, _SCRIPT_JAPANESE, _SCRIPT_KOREAN, _SCRIPT_DEVANAGARI, _SCRIPT_THAI],
+    'ms': [_SCRIPT_ARABIC, _SCRIPT_CYRILLIC, _SCRIPT_HEBREW, _SCRIPT_CHINESE, _SCRIPT_JAPANESE, _SCRIPT_KOREAN, _SCRIPT_DEVANAGARI, _SCRIPT_THAI],
+    'vi': [_SCRIPT_ARABIC, _SCRIPT_CYRILLIC, _SCRIPT_HEBREW, _SCRIPT_CHINESE, _SCRIPT_JAPANESE, _SCRIPT_KOREAN, _SCRIPT_DEVANAGARI, _SCRIPT_THAI],
+    'af': [_SCRIPT_ARABIC, _SCRIPT_CYRILLIC, _SCRIPT_HEBREW, _SCRIPT_CHINESE, _SCRIPT_JAPANESE, _SCRIPT_KOREAN, _SCRIPT_DEVANAGARI, _SCRIPT_THAI],
+    'ca': [_SCRIPT_ARABIC, _SCRIPT_CYRILLIC, _SCRIPT_HEBREW, _SCRIPT_CHINESE, _SCRIPT_JAPANESE, _SCRIPT_KOREAN, _SCRIPT_DEVANAGARI, _SCRIPT_THAI],
+    'ga': [_SCRIPT_ARABIC, _SCRIPT_CYRILLIC, _SCRIPT_HEBREW, _SCRIPT_CHINESE, _SCRIPT_JAPANESE, _SCRIPT_KOREAN, _SCRIPT_DEVANAGARI, _SCRIPT_THAI],
+    'az': [_SCRIPT_ARABIC, _SCRIPT_CYRILLIC, _SCRIPT_HEBREW, _SCRIPT_CHINESE, _SCRIPT_JAPANESE, _SCRIPT_KOREAN, _SCRIPT_DEVANAGARI, _SCRIPT_THAI],
+    'et': [_SCRIPT_ARABIC, _SCRIPT_CYRILLIC, _SCRIPT_HEBREW, _SCRIPT_CHINESE, _SCRIPT_JAPANESE, _SCRIPT_KOREAN, _SCRIPT_DEVANAGARI, _SCRIPT_THAI],
+    'lt': [_SCRIPT_ARABIC, _SCRIPT_CYRILLIC, _SCRIPT_HEBREW, _SCRIPT_CHINESE, _SCRIPT_JAPANESE, _SCRIPT_KOREAN, _SCRIPT_DEVANAGARI, _SCRIPT_THAI],
+    'lv': [_SCRIPT_ARABIC, _SCRIPT_CYRILLIC, _SCRIPT_HEBREW, _SCRIPT_CHINESE, _SCRIPT_JAPANESE, _SCRIPT_KOREAN, _SCRIPT_DEVANAGARI, _SCRIPT_THAI],
+    'hr': [_SCRIPT_ARABIC, _SCRIPT_CYRILLIC, _SCRIPT_HEBREW, _SCRIPT_CHINESE, _SCRIPT_JAPANESE, _SCRIPT_KOREAN, _SCRIPT_DEVANAGARI, _SCRIPT_THAI],
+    'sl': [_SCRIPT_ARABIC, _SCRIPT_CYRILLIC, _SCRIPT_HEBREW, _SCRIPT_CHINESE, _SCRIPT_JAPANESE, _SCRIPT_KOREAN, _SCRIPT_DEVANAGARI, _SCRIPT_THAI],
+    # East-Asian
+    'zh': [_SCRIPT_ARABIC, _SCRIPT_CYRILLIC, _SCRIPT_HEBREW, _SCRIPT_DEVANAGARI, _SCRIPT_THAI],
+    'ja': [_SCRIPT_ARABIC, _SCRIPT_CYRILLIC, _SCRIPT_HEBREW, _SCRIPT_DEVANAGARI, _SCRIPT_THAI],
+    'ko': [_SCRIPT_ARABIC, _SCRIPT_CYRILLIC, _SCRIPT_HEBREW, _SCRIPT_DEVANAGARI, _SCRIPT_THAI],
+    # South / Southeast Asian
+    'hi': [_SCRIPT_ARABIC, _SCRIPT_CYRILLIC, _SCRIPT_HEBREW, _SCRIPT_CHINESE, _SCRIPT_JAPANESE, _SCRIPT_KOREAN, _SCRIPT_THAI],
+    'th': [_SCRIPT_ARABIC, _SCRIPT_CYRILLIC, _SCRIPT_HEBREW, _SCRIPT_CHINESE, _SCRIPT_JAPANESE, _SCRIPT_KOREAN, _SCRIPT_DEVANAGARI],
+}
+
+# Lines shorter than this are skipped in the script-mixing check (too short / noise)
+_SCRIPT_MIX_MIN_LINE_LEN = 15
+# Fraction of content lines that may contain a forbidden script before flagging
+_SCRIPT_MIX_THRESHOLD = 0.06
 
 
 class LanguageConsistencyValidator(PostTranslationValidator):
@@ -80,6 +151,12 @@ class LanguageConsistencyValidator(PostTranslationValidator):
                 success=True,
                 issues=issues,
             )
+
+        # Unicode script-mixing check (fast, no ML, catches inline foreign phrases).
+        # Runs before the slower langdetect pass but does NOT short-circuit so that
+        # purity_percentage is always included in the returned metadata.
+        script_issues = self._check_script_mixing(translation, target_lang)
+        issues.extend(script_issues)
 
         # Clean text for detection
         cleaned_text = self._clean_text_for_detection(translation)
@@ -195,6 +272,82 @@ class LanguageConsistencyValidator(PostTranslationValidator):
                 success=False,
                 issues=issues,
             )
+
+    def _check_script_mixing(
+        self,
+        text: str,
+        target_lang: str,
+    ) -> List[ValidationIssue]:
+        """Detect Unicode script contamination using character-range analysis.
+
+        Unlike langdetect / fasttext which return the *dominant* language and
+        therefore miss short inline phrases in a foreign script, this method
+        checks every content line for characters from scripts that are
+        incompatible with the target language.
+
+        Latin characters are deliberately allowed in all languages because
+        product names, API identifiers, and URLs legitimately appear anywhere.
+
+        Args:
+            text: Full translated document text (including markdown).
+            target_lang: ISO 639-1 target language code (e.g. 'bg', 'ar').
+
+        Returns:
+            List with at most one ValidationIssue (ERROR) if contamination
+            exceeds the threshold, otherwise empty list.
+        """
+        forbidden = _FORBIDDEN_SCRIPTS.get(target_lang)
+        if not forbidden:
+            return []
+
+        # Strip content that legitimately contains foreign characters
+        clean = re.sub(r'```.*?```', '', text, flags=re.DOTALL)   # fenced code
+        clean = re.sub(r'`[^`]+`', '', clean)                      # inline code
+        clean = re.sub(r'^---.*?^---', '', clean, flags=re.DOTALL | re.MULTILINE)  # frontmatter
+        clean = re.sub(r'https?://\S+', '', clean)                 # URLs
+        clean = re.sub(r'\{\{[<{%].*?[>}%]\}\}', '', clean, flags=re.DOTALL)  # shortcodes
+
+        lines = [
+            ln for ln in clean.splitlines()
+            if len(ln.strip()) >= _SCRIPT_MIX_MIN_LINE_LEN
+        ]
+        if not lines:
+            return []
+
+        contaminated: List[str] = []
+        for line in lines:
+            for pattern in forbidden:
+                if pattern.search(line):
+                    contaminated.append(line.strip()[:120])
+                    break  # one forbidden script per line is enough
+
+        if not contaminated:
+            return []
+
+        ratio = len(contaminated) / len(lines)
+        if ratio <= _SCRIPT_MIX_THRESHOLD:
+            return []
+
+        examples = " | ".join(contaminated[:3])
+        return [
+            ValidationIssue(
+                validator="LanguageConsistencyValidator",
+                severity=ValidationSeverity.ERROR,
+                message=(
+                    f"Script mixing detected: {len(contaminated)}/{len(lines)} lines "
+                    f"({ratio * 100:.1f}%) contain characters from a script incompatible "
+                    f"with '{target_lang}'. Examples: {examples}"
+                ),
+                location="translation",
+                details={
+                    "contaminated_lines": len(contaminated),
+                    "total_lines": len(lines),
+                    "ratio": ratio,
+                    "target_lang": target_lang,
+                    "examples": contaminated[:5],
+                },
+            )
+        ]
 
     def _split_into_sentences(self, text: str) -> list:
         """Split text into sentences using simple heuristic.
