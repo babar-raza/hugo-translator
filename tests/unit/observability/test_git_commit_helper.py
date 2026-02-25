@@ -324,5 +324,167 @@ class TestExtractModelId(unittest.TestCase):
         self.assertEqual(result, "tier1_model")
 
 
+class TestCollectModifiedFilesFromGit(unittest.TestCase):
+    """Test collect_modified_files_from_git fallback function."""
+
+    def _make_dir_result(self):
+        """Create a minimal mock DirectoryResult."""
+        mock = Mock()
+        mock.file_results = []
+        mock.successful_files = 0
+        return mock
+
+    @unittest.mock.patch("src.observability.git_commit_helper.subprocess.run")
+    @unittest.mock.patch("src.observability.git_context.find_git_root")
+    def test_catches_untracked_files(self, mock_find_root, mock_run):
+        """Untracked (??) .md files must be collected."""
+        import tempfile, os
+        from pathlib import Path
+        from src.observability.git_commit_helper import collect_modified_files_from_git
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            git_root = Path(tmpdir)
+            mock_find_root.return_value = git_root
+
+            # Create the files so .exists() returns True
+            (git_root / "content" / "ar").mkdir(parents=True)
+            (git_root / "content" / "bg").mkdir(parents=True)
+            (git_root / "content" / "ar" / "file1.md").touch()
+            (git_root / "content" / "bg" / "file2.md").touch()
+
+            mock_run.return_value = Mock(
+                returncode=0,
+                stdout="?? content/ar/file1.md\n?? content/bg/file2.md\n",
+            )
+
+            content_dir = git_root / "content"
+            result = collect_modified_files_from_git(
+                content_dir,
+                self._make_dir_result(),
+                content_root=content_dir,
+            )
+
+        self.assertEqual(len(result), 2)
+
+    @unittest.mock.patch("src.observability.git_commit_helper.subprocess.run")
+    @unittest.mock.patch("src.observability.git_context.find_git_root")
+    def test_catches_modified_files(self, mock_find_root, mock_run):
+        """Modified (M) .md files must be collected."""
+        import tempfile
+        from pathlib import Path
+        from src.observability.git_commit_helper import collect_modified_files_from_git
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            git_root = Path(tmpdir)
+            mock_find_root.return_value = git_root
+
+            (git_root / "content" / "ar").mkdir(parents=True)
+            (git_root / "content" / "bg").mkdir(parents=True)
+            (git_root / "content" / "ar" / "file1.md").touch()
+            (git_root / "content" / "bg" / "file2.md").touch()
+
+            mock_run.return_value = Mock(
+                returncode=0,
+                stdout=" M content/ar/file1.md\nMM content/bg/file2.md\n",
+            )
+
+            content_dir = git_root / "content"
+            result = collect_modified_files_from_git(
+                content_dir,
+                self._make_dir_result(),
+                content_root=content_dir,
+            )
+
+        self.assertEqual(len(result), 2)
+
+    @unittest.mock.patch("src.observability.git_commit_helper.subprocess.run")
+    @unittest.mock.patch("src.observability.git_context.find_git_root")
+    def test_filters_non_md_files(self, mock_find_root, mock_run):
+        """Non-.md files must NOT be collected."""
+        import tempfile
+        from pathlib import Path
+        from src.observability.git_commit_helper import collect_modified_files_from_git
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            git_root = Path(tmpdir)
+            mock_find_root.return_value = git_root
+
+            (git_root / "content" / "ar").mkdir(parents=True)
+            (git_root / "content" / "ar" / "file.md").touch()
+            (git_root / "content" / "config.yaml").write_text("x")
+            (git_root / "content" / "script.py").write_text("x")
+
+            mock_run.return_value = Mock(
+                returncode=0,
+                stdout="?? content/config.yaml\n?? content/ar/file.md\n M content/script.py\n",
+            )
+
+            content_dir = git_root / "content"
+            result = collect_modified_files_from_git(
+                content_dir,
+                self._make_dir_result(),
+                content_root=content_dir,
+            )
+
+        # Only the .md file should be collected
+        self.assertEqual(len(result), 1)
+        self.assertTrue(str(result[0]).endswith("file.md"))
+
+    @unittest.mock.patch("src.observability.git_commit_helper.subprocess.run")
+    @unittest.mock.patch("src.observability.git_context.find_git_root")
+    def test_content_root_overrides_output_dir(self, mock_find_root, mock_run):
+        """content_root should be used as scan directory, not output_dir."""
+        import tempfile
+        from pathlib import Path
+        from src.observability.git_commit_helper import collect_modified_files_from_git
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            git_root = Path(tmpdir)
+            mock_find_root.return_value = git_root
+
+            # Create both directories
+            narrow_dir = git_root / "content" / "site" / "ar"
+            wide_dir = git_root / "content" / "site"
+            narrow_dir.mkdir(parents=True)
+
+            mock_run.return_value = Mock(returncode=0, stdout="")
+
+            collect_modified_files_from_git(
+                narrow_dir,  # narrow output_dir
+                self._make_dir_result(),
+                content_root=wide_dir,  # wide content_root
+            )
+
+        # The git status should have been called (not short-circuited)
+        mock_run.assert_called_once()
+        # The path argument should contain "site" (from content_root), not "site/ar" (from output_dir)
+        git_cmd = mock_run.call_args[0][0]
+        path_arg = git_cmd[3]  # ["git", "status", "--porcelain", <path>]
+        self.assertFalse(path_arg.endswith("ar"), f"Should use content_root, not output_dir: {path_arg}")
+
+    @unittest.mock.patch("src.observability.git_commit_helper.subprocess.run")
+    @unittest.mock.patch("src.observability.git_context.find_git_root")
+    def test_empty_git_status_returns_empty_list(self, mock_find_root, mock_run):
+        """Empty git status output should return empty list."""
+        import tempfile
+        from pathlib import Path
+        from src.observability.git_commit_helper import collect_modified_files_from_git
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            git_root = Path(tmpdir)
+            mock_find_root.return_value = git_root
+            content_dir = git_root / "content"
+            content_dir.mkdir(parents=True)
+
+            mock_run.return_value = Mock(returncode=0, stdout="")
+
+            result = collect_modified_files_from_git(
+                content_dir,
+                self._make_dir_result(),
+            )
+
+        self.assertEqual(result, [])
+
+
 if __name__ == "__main__":
     unittest.main()

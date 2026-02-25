@@ -315,60 +315,70 @@ class _SignalBlocker:
         )
 
 
-def collect_modified_files_from_git(output_dir: Path, dir_result: "DirectoryResult") -> List[Path]:
+def collect_modified_files_from_git(
+    output_dir: Path,
+    dir_result: "DirectoryResult",
+    content_root: Optional[Path] = None,
+) -> List[Path]:
     """
-    Fallback: Collect modified files using git status.
+    Fallback: Collect uncommitted .md files using git status.
 
     Used when collect_output_files() returns empty but we know translations succeeded.
-    This fallback helps catch files that were modified but marked as skipped incorrectly.
+    Catches modified, added, AND untracked files (previous fallback missed untracked).
 
     Args:
-        output_dir: Directory to search for modified files
+        output_dir: Narrow directory fallback (single language subdir)
         dir_result: DirectoryResult for context
+        content_root: Wide scan directory (site content root). Preferred over output_dir.
 
     Returns:
-        List of modified files found via git status, or empty list if failed
+        List of uncommitted .md files found via git status, or empty list if failed
     """
     try:
         from .git_context import find_git_root
 
-        git_root = find_git_root(output_dir)
+        # Prefer content_root (site-wide scan) over output_dir (single subdir)
+        scan_dir = content_root if content_root else output_dir
+
+        git_root = find_git_root(scan_dir)
         if not git_root:
-            logger.warning("[Fallback] Could not find git root from output directory")
+            logger.warning("[Fallback] Could not find git root from scan directory")
             return []
 
-        # Run git status to find modified files in output directory
         try:
-            rel_path = output_dir.relative_to(git_root)
+            rel_path = scan_dir.resolve().relative_to(git_root.resolve())
         except ValueError:
-            # output_dir not relative to git_root, try using output_dir directly
-            logger.warning(f"[Fallback] Output dir {output_dir} not relative to git root {git_root}")
+            logger.warning(f"[Fallback] Scan dir {scan_dir} not relative to git root {git_root}")
             rel_path = "."
+
+        logger.info(f"[Fallback] Scanning {rel_path} (git root: {git_root})")
 
         result = subprocess.run(
             ["git", "status", "--porcelain", str(rel_path)],
             cwd=str(git_root),
             capture_output=True,
             text=True,
-            timeout=10,
+            timeout=30,
         )
 
         if result.returncode != 0:
             logger.warning(f"[Fallback] Git status failed: {result.stderr}")
             return []
 
-        # Parse modified files (lines starting with " M" or "M " or "MM")
+        # Parse ALL uncommitted files: modified (M), added (A), untracked (??)
         modified_files = []
         for line in result.stdout.splitlines():
-            # Handle various git status codes for modified files
             status_code = line[:2]
-            if 'M' in status_code:  # Modified in index, working tree, or both
-                file_path = git_root / line[3:].strip()
-                if file_path.exists():
-                    modified_files.append(file_path)
-                    logger.debug(f"[Fallback] Found modified file: {file_path}")
+            file_rel_path = line[3:].strip()
 
-        logger.info(f"[Fallback] Found {len(modified_files)} modified files via git status")
+            if 'M' in status_code or 'A' in status_code or status_code == '??':
+                file_path = git_root / file_rel_path
+                # Only collect .md files (translation outputs)
+                if file_path.suffix == '.md' and file_path.exists():
+                    modified_files.append(file_path)
+                    logger.debug(f"[Fallback] Found uncommitted file [{status_code.strip()}]: {file_path}")
+
+        logger.info(f"[Fallback] Found {len(modified_files)} uncommitted .md files via git status in {rel_path}")
         return modified_files
 
     except Exception as e:
@@ -447,47 +457,52 @@ def auto_commit_translations(
         else:
             dir_result = result
 
-        if dir_result.successful_files == 0:
-            logger.warning("Git commit SKIPPED: No successful files to commit (successful_files=0)")
-            return True
+        # Quality gates only apply when there are files from THIS run
+        if dir_result.successful_files > 0:
+            # QUALITY GATE 1: Verification Pass (STOP-THE-LINE)
+            if require_verification_pass:
+                verification_failed = _check_verification_failures(dir_result)
+                if verification_failed:
+                    logger.error(
+                        f"STOP-THE-LINE: Cannot commit - {verification_failed} file(s) failed verification. "
+                        f"Fix verification errors before committing."
+                    )
+                    return False
 
-        # QUALITY GATE 1: Verification Pass (STOP-THE-LINE)
-        if require_verification_pass:
-            verification_failed = _check_verification_failures(dir_result)
-            if verification_failed:
-                logger.error(
-                    f"STOP-THE-LINE: Cannot commit - {verification_failed} file(s) failed verification. "
-                    f"Fix verification errors before committing."
-                )
-                return False
-
-        # QUALITY GATE 2: Telemetry Success (STOP-THE-LINE)
-        if require_telemetry_success:
-            telemetry_failed = _check_telemetry_failure(dir_result)
-            if telemetry_failed:
-                logger.error(
-                    f"STOP-THE-LINE: Cannot commit - telemetry post failed. "
-                    f"Error: {telemetry_failed}"
-                )
-                return False
+            # QUALITY GATE 2: Telemetry Success (STOP-THE-LINE)
+            if require_telemetry_success:
+                telemetry_failed = _check_telemetry_failure(dir_result)
+                if telemetry_failed:
+                    logger.error(
+                        f"STOP-THE-LINE: Cannot commit - telemetry post failed. "
+                        f"Error: {telemetry_failed}"
+                    )
+                    return False
 
         # Collect output files (only files that were actually written/modified)
         output_files = collect_output_files(dir_result)
         if not output_files:
-            logger.error("Git commit SKIPPED: collect_output_files() returned empty list")
-            logger.error(f"  - DirectoryResult.successful_files: {dir_result.successful_files}")
-            logger.error(f"  - DirectoryResult.file_results count: {len(dir_result.file_results) if hasattr(dir_result, 'file_results') else 'N/A'}")
+            if dir_result.successful_files > 0:
+                logger.error("Git commit: collect_output_files() returned empty list")
+                logger.error(f"  - DirectoryResult.successful_files: {dir_result.successful_files}")
+                logger.error(f"  - DirectoryResult.file_results count: {len(dir_result.file_results) if hasattr(dir_result, 'file_results') else 'N/A'}")
+            else:
+                logger.info("No files from this run; scanning for orphans from previous runs...")
 
-            # Try fallback: collect files from git status
-            if dir_result.successful_files > 0 and hasattr(dir_result, 'file_results') and dir_result.file_results:
-                logger.info("Attempting fallback: collecting modified files from git status...")
+            # Fallback: scan for uncommitted .md files via git status.
+            # This catches orphans from previous runs AND files missed by collect_output_files.
+            if hasattr(dir_result, 'file_results') and dir_result.file_results:
+                logger.info("Attempting fallback: collecting uncommitted files from git status...")
                 try:
                     # Get output directory from first file result
                     first_output = list(dir_result.file_results[0].outputs.values())[0]
                     output_dir = first_output.parent
-                    logger.info(f"  - Using output directory: {output_dir}")
 
-                    output_files = collect_modified_files_from_git(output_dir, dir_result)
+                    # Use dir_result.directory (site content root) for wide scan
+                    content_root = getattr(dir_result, 'directory', None)
+                    logger.info(f"  - Content root: {content_root}, output_dir fallback: {output_dir}")
+
+                    output_files = collect_modified_files_from_git(output_dir, dir_result, content_root=content_root)
 
                     if output_files:
                         logger.info(f"Fallback successful: collected {len(output_files)} files from git status")
@@ -871,7 +886,7 @@ def _extract_tm_stats(dir_result: "DirectoryResult") -> Optional[dict]:
         if hasattr(dir_result, "aggregate_stats"):
             agg = dir_result.aggregate_stats
             if agg and hasattr(agg, "total_segments"):
-                total_lookups = agg.total_segments
+                total_lookups = getattr(agg, "total_lookups", 0) or agg.total_segments
                 l1_hits = getattr(agg, "l1_hits", 0)
                 l2_hits = getattr(agg, "l2_hits", 0)
                 l3_hits = getattr(agg, "l3_hits", 0)
