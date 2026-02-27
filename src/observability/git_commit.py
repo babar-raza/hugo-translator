@@ -31,7 +31,9 @@ Usage:
     )
 """
 import logging
+import os
 import subprocess
+import time
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING, Dict, List, Optional
@@ -125,6 +127,36 @@ class GitCommitter:
         """
         return find_git_root(path) is not None
 
+    def _recover_stale_index_lock(self, git_root: Path) -> None:
+        """Remove stale .git/index.lock if no git process holds it.
+
+        External tools (SEO automation, editors) can leave behind a stale
+        index.lock if they crash or time out. This blocks ALL subsequent
+        git add/commit/push operations until manually deleted.
+
+        Safety: only removes the lock if it's older than 60 seconds.
+        Note: git status is read-only and succeeds even with a stale lock,
+        so we cannot use it to test if the lock is blocking. The age check
+        alone is sufficient — any legitimate git operation finishes in <60s.
+        """
+        lock_file = git_root / ".git" / "index.lock"
+        if not lock_file.exists():
+            return
+
+        try:
+            lock_age = time.time() - lock_file.stat().st_mtime
+            if lock_age < 60:
+                logger.info(f"index.lock exists but is fresh ({lock_age:.0f}s old), leaving it")
+                return
+
+            lock_file.unlink()
+            logger.warning(
+                f"Removed stale .git/index.lock ({lock_age:.0f}s old) from {git_root}. "
+                f"This was likely left by a crashed git process or external tool."
+            )
+        except OSError as e:
+            logger.warning(f"Could not remove stale index.lock: {e}")
+
     def commit_translation_outputs(
         self,
         output_files: List[Path],
@@ -169,6 +201,9 @@ class GitCommitter:
             return GitCommitResult(
                 success=False, error="Output directory is not a git repository"
             )
+
+        # Pre-check: recover from stale index.lock
+        self._recover_stale_index_lock(git_root)
 
         try:
             # Step 1: Stage specific files

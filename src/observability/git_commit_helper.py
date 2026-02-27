@@ -377,6 +377,13 @@ def collect_modified_files_from_git(
                 if file_path.suffix == '.md' and file_path.exists():
                     modified_files.append(file_path)
                     logger.debug(f"[Fallback] Found uncommitted file [{status_code.strip()}]: {file_path}")
+                elif file_path.is_dir() and status_code == '??':
+                    # Untracked directories: git shows "?? dir/" — recurse for .md files
+                    md_in_dir = list(file_path.rglob("*.md"))
+                    for md_file in md_in_dir:
+                        modified_files.append(md_file)
+                    if md_in_dir:
+                        logger.debug(f"[Fallback] Found {len(md_in_dir)} .md files in untracked dir: {file_path}")
 
         logger.info(f"[Fallback] Found {len(modified_files)} uncommitted .md files via git status in {rel_path}")
         return modified_files
