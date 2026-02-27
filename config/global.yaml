@@ -57,7 +57,7 @@ tm_defaults:
 
 # Default model preferences
 model_defaults:
-  fallback_model: "m2m100_418m"
+  fallback_model: "professionalize_llm"
   device: "auto"  # auto, cpu, cuda, mps
   batch_size: 4  # Conservative default to prevent CUDA OOM (GPU optimizer will calculate optimal)
   cache_models: true
@@ -174,6 +174,7 @@ git_commit:
   co_author_email: "noreply@aspose.com"
   timeout_seconds: 60  # Maximum time for git operations
   block_signals: true  # Block SIGINT/SIGTERM during commit to prevent partial commits
+  files_per_commit: 3  # Commit every N files for incremental batching (0 = commit all at end)
 
 # Output Layout (defaults for all sites)
 default_output_layout:
@@ -273,6 +274,9 @@ language_detection:
       devanagari: ["hi", "mr", "ne", "sa"]
       nordic: ["da", "no", "sv", "is"]
       chinese: ["zh-CN", "zh-TW", "zh-HK"]
+      south_slavic: ["hr", "sr", "bs", "sl", "sh"]   # Croatian/Serbian/Bosnian/Slovenian/Serbo-Croatian
+      malay_indonesian: ["ms", "id"]                   # Malay/Indonesian (mutually intelligible)
+      west_slavic: ["cs", "sk"]                        # Czech/Slovak
 
     log_adaptations: true  # Log when new pairs are learned
     log_level: "INFO"
@@ -333,6 +337,33 @@ adaptive_batching:
       initial_batch_size: 10
       min_batch_size: 4
       max_batch_size: 20
+
+    # South Slavic / Malay-Indonesian / West Slavic (high false-positive rate from FastText)
+    hr:  # Croatian (confused with Serbian/Bosnian/Serbo-Croatian)
+      initial_batch_size: 8
+      min_batch_size: 4
+      max_batch_size: 20
+      fallback_rate_threshold: 0.30
+    ms:  # Malay (confused with Indonesian)
+      initial_batch_size: 8
+      min_batch_size: 4
+      max_batch_size: 20
+      fallback_rate_threshold: 0.30
+    id:  # Indonesian (confused with Malay)
+      initial_batch_size: 8
+      min_batch_size: 4
+      max_batch_size: 20
+      fallback_rate_threshold: 0.30
+    cs:  # Czech (confused with Slovak)
+      initial_batch_size: 8
+      min_batch_size: 4
+      max_batch_size: 20
+      fallback_rate_threshold: 0.30
+    sk:  # Slovak (confused with Czech)
+      initial_batch_size: 8
+      min_batch_size: 4
+      max_batch_size: 20
+      fallback_rate_threshold: 0.30
 
   # Persistence
   stats_file: ".translation_progress/batch_stats.json"
@@ -447,6 +478,11 @@ autonomous_content_translation:
     device: "cuda"  # Force CUDA usage for translation
     max_gpu_memory_percent: 50  # Maximum GPU memory usage (50% budget for safety)
     max_sites_per_run: null  # Process all sites (null = no limit)
+    # Per-site run time limit overrides (override global --max-seconds-per-run for specific sites).
+    # Useful for sites with very large or very small files.
+    per_site_limits:
+      reference.aspose.net:
+        max_seconds_per_run: 28800  # 8h — API reference files are large (1000+ lines x 36 langs)
 
   # Git commit configuration (uses global git_commit settings)
   # Auto-commits are enabled via git_commit.enabled and git_commit.auto_push
@@ -459,26 +495,27 @@ tm_improvement:
 
   # Scheduling configuration (4+ runs/day with CUDA support)
   schedule:
-    runs_per_day: 4  # Number of improvement runs per day (minimum 4 as requested)
-    window_start: "08:00"  # Start of daily window (America/Los_Angeles) - expanded window
-    window_end: "23:00"  # End of daily window (America/Los_Angeles) - expanded window
-    timezone: "America/Los_Angeles"
+    runs_per_day: 12  # Number of improvement runs per day
+    window_start: "07:00"  # Start of daily window (Asia/Karachi)
+    window_end: "23:00"  # End of daily window (Asia/Karachi)
+    timezone: "Asia/Karachi"
     jitter_minutes: 15  # Random jitter to avoid exact timing patterns
 
   # Improvement batch configuration
   batch:
-    candidates_per_run: 300  # Max candidates to process per run
-    max_llm_calls_per_run: 500  # Max LLM calls per run (safety limit)
+    candidates_per_run: 500  # Max candidates to process per run
+    max_llm_calls_per_run: 1000  # Max LLM calls per run (safety limit)
     max_seconds_per_run: 3600  # Max runtime per run (60 minutes)
 
   # LLM configuration for improvements
   llm:
-    provider: "ollama"  # ollama, openai, anthropic
-    model: "llama2"  # Model name for improvements
-    base_url: "http://localhost:11434"  # Ollama base URL
-    api_key: null  # API key for cloud providers (optional)
-    timeout_seconds: 30  # Timeout per LLM call
-    temperature: 0.3  # Low temperature for consistency
+    provider: "openai_compatible"
+    model: "recommended"
+    base_url: "https://llm.professionalize.com/v1"
+    api_key: null
+    api_key_env: "litellm_key"
+    timeout_seconds: 300
+    temperature: 0.0
     fallback_provider: null  # Optional fallback provider if primary fails
 
   # Improvement queue configuration
@@ -508,7 +545,7 @@ validation_defaults:
   # Post-write validation configuration
   post_write:
     enabled: true  # Enable post-write file validation
-    delete_on_failure: false  # Delete invalid files on validation failure
+    delete_on_failure: false  # Never enable — use scan_language_contamination.py --repair --confirm for cleanup
     halt_on_failure: false  # Stop processing on validation failure
 
   # Validator enablement and configuration

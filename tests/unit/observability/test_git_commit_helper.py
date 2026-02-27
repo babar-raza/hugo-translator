@@ -4,6 +4,7 @@ Unit tests for git_commit_helper._extract_model_id.
 Tests all 3 tiers of model_id extraction and edge cases.
 """
 import unittest
+from pathlib import Path
 from unittest.mock import Mock, MagicMock
 from dataclasses import dataclass
 from typing import List, Optional
@@ -484,6 +485,129 @@ class TestCollectModifiedFilesFromGit(unittest.TestCase):
             )
 
         self.assertEqual(result, [])
+
+
+class TestWritePendingCommitFallback(unittest.TestCase):
+    """Tests for _write_pending_commit_fallback() — SEO watcher integration."""
+
+    def setUp(self):
+        from src.observability.git_commit_helper import _write_pending_commit_fallback
+        self._fn = _write_pending_commit_fallback
+
+    def test_writes_valid_json(self):
+        """Happy path: writes .pending_commit.json with correct fields."""
+        import json
+        import tempfile
+        with tempfile.TemporaryDirectory() as tmpdir:
+            git_root = Path(tmpdir)
+            output_files = [git_root / "content" / "de" / "index.md"]
+            (git_root / "content" / "de").mkdir(parents=True)
+            output_files[0].touch()
+
+            result = self._fn(
+                output_files=output_files,
+                git_root=git_root,
+                site_id="blog.aspose.net",
+                target_langs=["de", "fr", "es"],
+            )
+
+            self.assertTrue(result)
+            pending = git_root / ".pending_commit.json"
+            self.assertTrue(pending.exists())
+            data = json.loads(pending.read_text())
+            self.assertIn("files", data)
+            self.assertIn("commit_message", data)
+            self.assertEqual(data["author_name"], "Hugo Translator")
+            self.assertEqual(data["author_email"], "hugo-translator@aspose.net")
+            self.assertIn("created_at", data)
+            self.assertIn("blog.aspose.net", data["commit_message"])
+            self.assertIn("de, fr, es", data["commit_message"])
+
+    def test_relative_paths_use_forward_slashes(self):
+        """File paths in JSON use forward slashes regardless of OS."""
+        import json
+        import tempfile
+        with tempfile.TemporaryDirectory() as tmpdir:
+            git_root = Path(tmpdir)
+            sub = git_root / "content" / "blog" / "ar"
+            sub.mkdir(parents=True)
+            f = sub / "index.md"
+            f.touch()
+
+            self._fn(
+                output_files=[f],
+                git_root=git_root,
+                site_id="blog.aspose.net",
+                target_langs=["ar"],
+            )
+
+            data = json.loads((git_root / ".pending_commit.json").read_text())
+            for rel in data["files"]:
+                self.assertNotIn("\\", rel, f"Path should use forward slashes: {rel}")
+
+    def test_skips_files_outside_git_root(self):
+        """Files not under git_root are silently skipped."""
+        import json
+        import tempfile
+        with tempfile.TemporaryDirectory() as tmpdir:
+            git_root = Path(tmpdir) / "repo"
+            git_root.mkdir()
+            inside = git_root / "file.md"
+            inside.touch()
+            outside = Path(tmpdir) / "other" / "file.md"
+            Path(tmpdir, "other").mkdir()
+            outside.touch()
+
+            result = self._fn(
+                output_files=[inside, outside],
+                git_root=git_root,
+                site_id="test.net",
+                target_langs=["de"],
+            )
+
+            self.assertTrue(result)
+            data = json.loads((git_root / ".pending_commit.json").read_text())
+            self.assertEqual(len(data["files"]), 1)
+            self.assertEqual(data["files"][0], "file.md")
+
+    def test_returns_false_when_no_files_in_git_root(self):
+        """Returns False when all files are outside the git root."""
+        import tempfile
+        with tempfile.TemporaryDirectory() as tmpdir:
+            git_root = Path(tmpdir) / "repo"
+            git_root.mkdir()
+            outside = Path(tmpdir) / "outside.md"
+            outside.touch()
+
+            result = self._fn(
+                output_files=[outside],
+                git_root=git_root,
+                site_id="test.net",
+                target_langs=["de"],
+            )
+
+            self.assertFalse(result)
+            self.assertFalse((git_root / ".pending_commit.json").exists())
+
+    def test_lang_list_truncates_beyond_six(self):
+        """commit_message truncates to 6 langs + '+N more' when many languages."""
+        import json
+        import tempfile
+        with tempfile.TemporaryDirectory() as tmpdir:
+            git_root = Path(tmpdir)
+            f = git_root / "file.md"
+            f.touch()
+            langs = ["ar", "bg", "ca", "cs", "da", "de", "el", "es", "fa", "fi"]
+
+            self._fn(
+                output_files=[f],
+                git_root=git_root,
+                site_id="test.net",
+                target_langs=langs,
+            )
+
+            data = json.loads((git_root / ".pending_commit.json").read_text())
+            self.assertIn("+4 more", data["commit_message"])
 
 
 if __name__ == "__main__":

@@ -393,6 +393,59 @@ def collect_modified_files_from_git(
         return []
 
 
+def _write_pending_commit_fallback(
+    output_files: List[Path],
+    git_root: Path,
+    site_id: str,
+    target_langs: List[str],
+) -> bool:
+    """Write .pending_commit.json for SEO-PendingCommitWatcher to pick up within 30s.
+
+    Called only when the direct git commit fails. The watcher (Watch-PendingCommit.ps1)
+    removes stale index.lock files itself before staging, polls every 30 seconds, and has
+    a noop-safety check (git diff --cached) that prevents double-commits if a later run
+    already committed the same files.
+    """
+    import json
+    from datetime import datetime, timezone
+
+    try:
+        rel_files = []
+        for f in output_files:
+            try:
+                rel_files.append(str(f.relative_to(git_root)).replace("\\", "/"))
+            except ValueError:
+                pass  # file outside git root — skip
+
+        if not rel_files:
+            logger.warning("[pending_commit] No files within git root — cannot write fallback")
+            return False
+
+        lang_list = ", ".join(target_langs[:6])
+        if len(target_langs) > 6:
+            lang_list += f" +{len(target_langs) - 6} more"
+        commit_msg = f"chore({site_id}): translate {len(rel_files)} files to {lang_list}"
+
+        payload = {
+            "files": rel_files,
+            "commit_message": commit_msg,
+            "author_name": "Hugo Translator",
+            "author_email": "hugo-translator@aspose.net",
+            "created_at": datetime.now(timezone.utc).isoformat(),
+        }
+
+        pending_path = git_root / ".pending_commit.json"
+        pending_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+        logger.warning(
+            "[pending_commit] Direct commit failed — wrote .pending_commit.json "
+            f"({len(rel_files)} files). SEO-PendingCommitWatcher will commit within ~30s."
+        )
+        return True
+    except Exception as exc:
+        logger.warning(f"[pending_commit] Failed to write .pending_commit.json: {exc}")
+        return False
+
+
 def auto_commit_translations(
     result: Union["TranslationResult", "DirectoryResult"],
     site_id: str,
@@ -655,6 +708,19 @@ def auto_commit_translations(
             return True
         else:
             logger.error(f"Auto-commit failed: {commit_result.error}")
+            # Fallback: signal the SEO-PendingCommitWatcher (polls every 30s)
+            try:
+                from .git_context import find_git_root
+                git_root = find_git_root(output_files[0])
+                if git_root:
+                    _write_pending_commit_fallback(
+                        output_files=output_files,
+                        git_root=git_root,
+                        site_id=site_id,
+                        target_langs=target_langs,
+                    )
+            except Exception as _fb_exc:
+                logger.warning(f"[pending_commit] Fallback write skipped: {_fb_exc}")
             return False
 
     except ImportError as e:
