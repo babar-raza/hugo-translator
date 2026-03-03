@@ -10,12 +10,17 @@ from pathlib import Path
 from abc import ABC, abstractmethod
 from typing import Any, Dict, List, Optional
 
-import torch
-
 from .registry import ModelInfo, ModelRegistry
 from .language_codes import map_language_code
 from .gpu_cache_manager import GPUCacheManager  # D5: Import GPU cache manager
 from src.observability.metrics import get_metrics
+
+# Conditional torch import — allows LLM-only usage without PyTorch installed.
+# HuggingFace and CT2 backends will fail at load() time if torch is missing.
+try:
+    import torch
+except ImportError:
+    torch = None  # type: ignore[assignment]
 
 logger = logging.getLogger(__name__)
 
@@ -1042,6 +1047,8 @@ class CTranslate2Backend(ModelBackend):
             self.tokenizer = None
 
         gc.collect()
+        if torch.cuda.is_available() and getattr(self, 'device', '') == 'cuda':
+            torch.cuda.empty_cache()
         self.loaded = False
 
     def get_token_count(self, text: str) -> int:
@@ -1173,6 +1180,9 @@ class ModelLoader:
             )
         elif model_info.backend == "ctranslate2":
             return CTranslate2Backend(model_info, device, self.max_memory_mb)
+        elif model_info.backend in ("llm", "local_llm"):
+            from .llm_backend import LLMModelBackend
+            return LLMModelBackend(model_info, device="api")
         else:
             raise ValueError(
                 f"Unsupported backend: {model_info.backend}"

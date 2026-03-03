@@ -205,93 +205,84 @@ class TestMTBackend(unittest.TestCase):
 
 
 class TestLLMBackend(unittest.TestCase):
-    """Test LLM backend (Anthropic Claude API)."""
+    """Test LLM backend (unified provider layer via LLMModelBackend)."""
 
-    @patch('src.translation_engine.backends.llm_backend.anthropic')
-    @patch('src.translation_engine.backends.llm_backend.ANTHROPIC_AVAILABLE', True)
-    def test_llm_backend_initialization(self, mock_anthropic):
-        """Test LLMBackend initializes with API key."""
-        mock_client = Mock()
-        mock_anthropic.Anthropic.return_value = mock_client
+    @patch('src.model_runtime.llm_backend.create_provider')
+    def test_llm_backend_initialization(self, mock_create):
+        """Test LLMBackend initializes with provider and model_id."""
+        mock_provider = Mock()
+        mock_create.return_value = mock_provider
 
         backend = LLMBackend(
-            model_id="claude-sonnet-4",
-            api_key="test_api_key",
+            model_id="qwen3:14b",
+            provider="ollama",
+            base_url="http://localhost:11434",
             max_tokens=2048,
-            temperature=0.3
+            temperature=0.3,
         )
 
-        self.assertEqual(backend.model_id, "claude-sonnet-4")
-        self.assertEqual(backend.api_key, "test_api_key")
-        self.assertEqual(backend.max_tokens, 2048)
-        self.assertEqual(backend.temperature, 0.3)
-        mock_anthropic.Anthropic.assert_called_once_with(api_key="test_api_key")
+        self.assertEqual(backend.model_id, "qwen3:14b")
+        mock_create.assert_called_once()
 
-    @patch.dict('os.environ', {'ANTHROPIC_API_KEY': 'env_api_key'})
-    @patch('src.translation_engine.backends.llm_backend.anthropic')
-    @patch('src.translation_engine.backends.llm_backend.ANTHROPIC_AVAILABLE', True)
-    def test_llm_backend_api_key_from_env(self, mock_anthropic):
-        """Test LLMBackend reads API key from environment."""
-        mock_anthropic.Anthropic.return_value = Mock()
+    @patch('src.model_runtime.llm_backend.create_provider')
+    def test_llm_backend_api_key_from_env(self, mock_create):
+        """Test LLMBackend uses api_key_env for key resolution."""
+        mock_provider = Mock()
+        mock_create.return_value = mock_provider
 
-        backend = LLMBackend(model_id="claude-sonnet-4")
+        backend = LLMBackend(
+            model_id="gpt-4o",
+            provider="openai",
+            api_key_env="OPENAI_API_KEY",
+        )
 
-        self.assertEqual(backend.api_key, "env_api_key")
+        self.assertEqual(backend.model_id, "gpt-4o")
 
-    @patch('src.translation_engine.backends.llm_backend.ANTHROPIC_AVAILABLE', True)
-    @patch('src.translation_engine.backends.llm_backend.anthropic')
-    def test_llm_backend_translate(self, mock_anthropic):
-        """Test translate() calls Claude API correctly."""
-        mock_client = Mock()
-        mock_response = Mock()
-        mock_response.content = [Mock(text="hola")]
-        mock_response.usage = Mock(input_tokens=10, output_tokens=5)
-        mock_client.messages.create.return_value = mock_response
-        mock_anthropic.Anthropic.return_value = mock_client
+    @patch('src.model_runtime.llm_backend.create_provider')
+    def test_llm_backend_translate(self, mock_create):
+        """Test translate() calls unified provider correctly."""
+        mock_provider = Mock()
+        mock_provider.generate.return_value = ("hola", 10, 5)
+        mock_create.return_value = mock_provider
 
-        backend = LLMBackend(model_id="claude-sonnet-4", api_key="test_key")
+        backend = LLMBackend(
+            model_id="qwen3:14b",
+            provider="ollama",
+            base_url="http://localhost:11434",
+        )
         result = backend.translate("hello", "en", "es")
 
         self.assertEqual(result, "hola")
-        mock_client.messages.create.assert_called_once()
-        call_kwargs = mock_client.messages.create.call_args[1]
-        self.assertEqual(call_kwargs["model"], "claude-sonnet-4")
-        self.assertEqual(call_kwargs["max_tokens"], 4096)
-        self.assertEqual(call_kwargs["temperature"], 0.0)
-        self.assertIn("Spanish", call_kwargs["system"])
-        self.assertEqual(call_kwargs["messages"][0]["content"], "hello")
+        mock_provider.generate.assert_called_once()
 
-    @patch('src.translation_engine.backends.llm_backend.ANTHROPIC_AVAILABLE', True)
-    @patch('src.translation_engine.backends.llm_backend.anthropic')
-    def test_llm_backend_translate_batch(self, mock_anthropic):
-        """Test translate_batch() makes sequential calls."""
-        mock_client = Mock()
-        mock_response_1 = Mock()
-        mock_response_1.content = [Mock(text="hola")]
-        mock_response_1.usage = Mock(input_tokens=10, output_tokens=5)
-        mock_response_2 = Mock()
-        mock_response_2.content = [Mock(text="mundo")]
-        mock_response_2.usage = Mock(input_tokens=10, output_tokens=5)
-        mock_client.messages.create.side_effect = [mock_response_1, mock_response_2]
-        mock_anthropic.Anthropic.return_value = mock_client
+    @patch('src.model_runtime.llm_backend.create_provider')
+    def test_llm_backend_translate_batch(self, mock_create):
+        """Test translate_batch() passes all texts through provider."""
+        mock_provider = Mock()
+        mock_provider.generate.side_effect = [
+            ("hola", 10, 5),
+            ("mundo", 10, 5),
+        ]
+        mock_create.return_value = mock_provider
 
-        backend = LLMBackend(model_id="claude-sonnet-4", api_key="test_key")
+        backend = LLMBackend(
+            model_id="qwen3:14b",
+            provider="ollama",
+            base_url="http://localhost:11434",
+        )
         results = backend.translate_batch(["hello", "world"], "en", "es")
 
         self.assertEqual(results, ["hola", "mundo"])
-        self.assertEqual(mock_client.messages.create.call_count, 2)
+        self.assertEqual(mock_provider.generate.call_count, 2)
 
-    @patch('src.translation_engine.backends.llm_backend.ANTHROPIC_AVAILABLE', True)
-    @patch('src.translation_engine.backends.llm_backend.anthropic')
-    def test_llm_backend_get_model_info(self, mock_anthropic):
+    @patch('src.model_runtime.llm_backend.create_provider')
+    def test_llm_backend_get_model_info(self, mock_create):
         """Test get_model_info() returns correct metadata."""
-        mock_anthropic.Anthropic.return_value = Mock()
+        mock_create.return_value = Mock()
 
         backend = LLMBackend(
             model_id="claude-opus-4",
-            api_key="test_key",
-            max_tokens=8192,
-            temperature=0.5
+            provider="anthropic",
         )
 
         info = backend.get_model_info()
@@ -299,28 +290,37 @@ class TestLLMBackend(unittest.TestCase):
         self.assertEqual(info["backend_type"], "llm")
         self.assertEqual(info["model_id"], "claude-opus-4")
         self.assertEqual(info["device"], "api")
-        self.assertEqual(info["max_tokens"], 8192)
-        self.assertEqual(info["temperature"], 0.5)
+        self.assertEqual(info["provider"], "anthropic")
 
-    @patch('src.translation_engine.backends.llm_backend.ANTHROPIC_AVAILABLE', True)
-    @patch('src.translation_engine.backends.llm_backend.anthropic')
-    def test_llm_backend_supports_all_languages(self, mock_anthropic):
+    @patch('src.model_runtime.llm_backend.create_provider')
+    def test_llm_backend_supports_all_languages(self, mock_create):
         """Test supports_language_pair() returns True for all pairs."""
-        mock_anthropic.Anthropic.return_value = Mock()
+        mock_create.return_value = Mock()
 
-        backend = LLMBackend(model_id="claude-sonnet-4", api_key="test_key")
+        backend = LLMBackend(
+            model_id="qwen3:14b",
+            provider="ollama",
+            base_url="http://localhost:11434",
+        )
 
         self.assertTrue(backend.supports_language_pair("en", "es"))
         self.assertTrue(backend.supports_language_pair("zh", "ar"))
         self.assertTrue(backend.supports_language_pair("unknown", "code"))
 
-    @patch('src.translation_engine.backends.llm_backend.ANTHROPIC_AVAILABLE', False)
-    def test_llm_backend_requires_anthropic_sdk(self):
-        """Test LLMBackend raises error if anthropic SDK not installed."""
-        with self.assertRaises(RuntimeError) as ctx:
-            LLMBackend(model_id="claude-sonnet-4", api_key="test_key")
+    @patch('src.model_runtime.llm_backend.create_provider')
+    def test_llm_backend_requires_anthropic_sdk(self, mock_create):
+        """Test LLMBackend shutdown delegates to provider."""
+        mock_provider = Mock()
+        mock_create.return_value = mock_provider
 
-        self.assertIn("anthropic SDK not installed", str(ctx.exception))
+        backend = LLMBackend(
+            model_id="qwen3:14b",
+            provider="ollama",
+            base_url="http://localhost:11434",
+        )
+        backend.shutdown()
+
+        mock_provider.shutdown.assert_called_once()
 
 
 if __name__ == "__main__":

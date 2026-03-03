@@ -15,6 +15,7 @@ models:
     optimal_device: cuda
     parameters: 418000000
     license: MIT
+    local_path: models/m2m100_418m
     hf_model_id: facebook/m2m100_418M
     description: "Multilingual translation model from Facebook. Supports 100 languages with good quality."
 
@@ -147,3 +148,100 @@ models:
     license: MIT
     hf_model_id: alirezamsh/small100
     description: "Compact multilingual model. Good balance of size and quality."
+
+  # ============================================================================
+  # LLM Models — Plug-and-play via unified LLM backend
+  # Use --model <model_id> to switch between MT and LLM at the CLI.
+  # ============================================================================
+
+  # Professionalize LLM (company endpoint, OpenAI-compatible)
+  - model_id: professionalize_llm
+    name: "Professionalize LLM"
+    backend: llm
+    provider: openai_compatible
+    model_name: "recommended"
+    base_url: "https://llm.professionalize.com/v1"
+    api_key_env: "litellm_key"
+    supported_pairs: all
+    model_size_mb: 0
+    min_ram_gb: 0
+    optimal_device: api
+    temperature: 0.0
+    max_tokens: 6000
+    timeout_seconds: 300
+    description: "Company Professionalize LLM via OpenAI-compatible API. Deterministic translation."
+
+  # Ollama local — Qwen3 14B
+  - model_id: ollama_qwen3_14b
+    name: "Qwen3 14B (Ollama)"
+    backend: llm
+    provider: ollama
+    model_name: "qwen3:14b"
+    base_url: "http://localhost:11434"
+    supported_pairs: all
+    model_size_mb: 0
+    min_ram_gb: 16
+    optimal_device: api
+    temperature: 0.1
+    max_tokens: 4096
+    description: "Local Qwen3 14B via Ollama. Good multilingual translation quality."
+
+  # Ollama local — Gemma3 12B (fallback)
+  - model_id: ollama_gemma3_12b
+    name: "Gemma3 12B (Ollama)"
+    backend: llm
+    provider: ollama
+    model_name: "gemma3:12b"
+    base_url: "http://localhost:11434"
+    supported_pairs: all
+    model_size_mb: 0
+    min_ram_gb: 12
+    optimal_device: api
+    temperature: 0.1
+    max_tokens: 4096
+    description: "Local Gemma3 12B via Ollama. Good quality fallback model."
+
+  # OpenAI GPT-4o
+  - model_id: openai_gpt4o
+    name: "GPT-4o (OpenAI)"
+    backend: llm
+    provider: openai
+    model_name: "gpt-4o"
+    api_key_env: "OPENAI_API_KEY"
+    supported_pairs: all
+    model_size_mb: 0
+    min_ram_gb: 0
+    optimal_device: api
+    temperature: 0.1
+    max_tokens: 4096
+    description: "OpenAI GPT-4o via API. High quality translation, API costs apply."
+
+  # Anthropic Claude Sonnet
+  - model_id: anthropic_claude_sonnet
+    name: "Claude Sonnet (Anthropic)"
+    backend: llm
+    provider: anthropic
+    model_name: "claude-sonnet-4-20250514"
+    api_key_env: "ANTHROPIC_API_KEY"
+    supported_pairs: all
+    model_size_mb: 0
+    min_ram_gb: 0
+    optimal_device: api
+    temperature: 0.1
+    max_tokens: 4096
+    description: "Anthropic Claude Sonnet via API. Excellent translation quality."
+
+  # Generic OpenAI-compatible (vLLM, LM Studio, etc.) — template
+  - model_id: local_vllm
+    name: "Local vLLM Server"
+    backend: llm
+    provider: openai_compatible
+    model_name: "default"
+    base_url: "http://localhost:8000/v1"
+    supported_pairs: all
+    model_size_mb: 0
+    min_ram_gb: 0
+    optimal_device: api
+    temperature: 0.1
+    max_tokens: 4096
+    description: "Local model via vLLM/LM Studio/llama.cpp OpenAI-compatible endpoint."

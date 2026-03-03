@@ -20,7 +20,7 @@ class ModelInfo:
 
     model_id: str
     name: str
-    backend: Literal["huggingface", "ctranslate2", "opus", "local_llm"]
+    backend: Literal["huggingface", "ctranslate2", "opus", "llm", "local_llm"]
     supported_pairs: List[Tuple[str, str]] | Literal["all"]  # (src, tgt) lang pairs
     model_size_mb: int
     min_ram_gb: float
@@ -31,6 +31,16 @@ class ModelInfo:
     hf_model_id: Optional[str] = None  # HuggingFace model ID
     description: Optional[str] = None
     max_new_tokens: int = 256  # TR-01: Reduced from 512 to 256 for memory efficiency
+
+    # LLM-specific fields (only used when backend="llm" or "local_llm")
+    provider: Optional[str] = None          # "ollama" | "openai" | "anthropic" | "openai_compatible"
+    model_name: Optional[str] = None        # Provider model name (e.g., "qwen3:14b", "gpt-4o")
+    base_url: Optional[str] = None          # API endpoint URL
+    api_key_env: Optional[str] = None       # Env var name for API key (e.g., "OPENAI_API_KEY")
+    temperature: Optional[float] = None     # Sampling temperature (default: 0.1 for translation)
+    max_tokens: Optional[int] = None        # Max response tokens (default: 4096)
+    timeout_seconds: Optional[int] = None   # Request timeout (default: 120)
+    system_prompt_template: Optional[str] = None  # Custom system prompt
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary."""
@@ -55,6 +65,17 @@ class ModelInfo:
             "description": self.description,
             "max_new_tokens": self.max_new_tokens,
         }
+
+        # Include LLM-specific fields only when set (keeps MT entries clean)
+        for llm_field in (
+            "provider", "model_name", "base_url", "api_key_env",
+            "temperature", "max_tokens", "timeout_seconds",
+            "system_prompt_template",
+        ):
+            value = getattr(self, llm_field, None)
+            if value is not None:
+                result[llm_field] = value
+
         return result
 
     @classmethod
@@ -86,6 +107,15 @@ class ModelInfo:
             hf_model_id=data.get("hf_model_id"),
             description=data.get("description"),
             max_new_tokens=data.get("max_new_tokens", 512),
+            # LLM-specific fields
+            provider=data.get("provider"),
+            model_name=data.get("model_name"),
+            base_url=data.get("base_url"),
+            api_key_env=data.get("api_key_env"),
+            temperature=data.get("temperature"),
+            max_tokens=data.get("max_tokens"),
+            timeout_seconds=data.get("timeout_seconds"),
+            system_prompt_template=data.get("system_prompt_template"),
         )
 
 

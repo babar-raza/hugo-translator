@@ -8,6 +8,7 @@ from .loader import (
     ModelBackend,
     ModelLoader,
 )
+from .llm_backend import LLMModelBackend
 from .registry import ModelInfo, ModelRegistry
 
 __all__ = [
@@ -18,5 +19,6 @@ __all__ = [
     "ModelBackend",
     "HuggingFaceBackend",
     "CTranslate2Backend",
+    "LLMModelBackend",
     "ModelLoader",
 ]
