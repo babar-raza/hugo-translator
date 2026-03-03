@@ -500,6 +500,58 @@ class L3SemanticTM:
 
         return len(entries)
 
+    def offload_to_cpu(self) -> None:
+        """Move FAISS index and embedding encoder from GPU to CPU RAM before sleeping.
+
+        Keeps all Python objects alive — only weights are moved to system RAM.
+        VRAM is freed; reload is fast (no disk I/O needed).
+        """
+        with self._lock:
+            # Move FAISS GPU index to CPU
+            if self.use_faiss_gpu and self.index is not None:
+                try:
+                    self.index = faiss.index_gpu_to_cpu(self.index)
+                    self._index_on_gpu = False
+                    logger.debug("L3 FAISS index moved to CPU")
+                except Exception as e:
+                    logger.warning("L3 FAISS CPU offload failed: %s", e)
+
+            # Move SentenceTransformer encoder to CPU
+            if self.device == "cuda" and self.encoder is not None:
+                try:
+                    self.encoder.to("cpu")
+                    self._encoder_on_gpu = False
+                    import torch
+                    torch.cuda.empty_cache()
+                    logger.debug("L3 embedding encoder moved to CPU")
+                except Exception as e:
+                    logger.warning("L3 encoder CPU offload failed: %s", e)
+
+    def reload_to_gpu(self) -> None:
+        """Move FAISS index and embedding encoder back to GPU on wake.
+
+        Only does work if the objects were previously offloaded via offload_to_cpu().
+        """
+        with self._lock:
+            # Move FAISS CPU index back to GPU
+            if self.use_faiss_gpu and self.index is not None and not getattr(self, '_index_on_gpu', self.use_faiss_gpu):
+                try:
+                    res = faiss.StandardGpuResources()
+                    self.index = faiss.index_cpu_to_gpu(res, 0, self.index)
+                    self._index_on_gpu = True
+                    logger.debug("L3 FAISS index moved back to GPU")
+                except Exception as e:
+                    logger.warning("L3 FAISS GPU reload failed: %s", e)
+
+            # Move SentenceTransformer encoder back to GPU
+            if self.device == "cuda" and self.encoder is not None and not getattr(self, '_encoder_on_gpu', self.device == "cuda"):
+                try:
+                    self.encoder.to("cuda")
+                    self._encoder_on_gpu = True
+                    logger.debug("L3 embedding encoder moved back to GPU")
+                except Exception as e:
+                    logger.warning("L3 encoder GPU reload failed: %s", e)
+
     def save_index(self) -> None:
         """Persist index and metadata to disk.
 

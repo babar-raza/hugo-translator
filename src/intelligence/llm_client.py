@@ -196,6 +196,18 @@ Adapted Translation:"""
         if self._provider:
             self._provider.shutdown()
 
+    def reconnect(self) -> bool:
+        """Reinitialize the provider after a transient connectivity failure."""
+        try:
+            self._initialize_provider()
+        except Exception as e:
+            logger.warning(f"LLM reconnect failed: {e}")
+            self._available = False
+            return False
+
+        self._available = True
+        return True
+
     def test_connection(self) -> Dict[str, Any]:
         """Test LLM connection."""
         result = {

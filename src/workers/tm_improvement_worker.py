@@ -96,6 +96,7 @@ class TMImprovementWorkerConfig:
         llm_model: str = "qwen3:14b",
         llm_base_url: Optional[str] = "http://localhost:11434",
         llm_api_key: Optional[str] = None,
+        llm_api_key_env: Optional[str] = None,
         llm_timeout_seconds: int = 30,
         llm_temperature: float = 0.3,
         max_gpu_memory_percent: int = 60,
@@ -119,6 +120,7 @@ class TMImprovementWorkerConfig:
         self.llm_model = llm_model
         self.llm_base_url = llm_base_url
         self.llm_api_key = llm_api_key
+        self.llm_api_key_env = llm_api_key_env
         self.llm_timeout_seconds = llm_timeout_seconds
         self.llm_temperature = llm_temperature
         self.max_gpu_memory_percent = max_gpu_memory_percent
@@ -141,7 +143,7 @@ class TMImprovementWorkerConfig:
             TMImprovementWorkerConfig instance
         """
         # Load tm_improvement config section
-        config = config_service.config
+        config = config_service.get_config()
 
         tm_improvement = config.get("tm_improvement", {})
         schedule = tm_improvement.get("schedule", {})
@@ -170,6 +172,7 @@ class TMImprovementWorkerConfig:
             llm_model=llm.get("model", "qwen3:14b"),
             llm_base_url=llm.get("base_url", "http://localhost:11434"),
             llm_api_key=llm.get("api_key"),
+            llm_api_key_env=llm.get("api_key_env"),
             llm_timeout_seconds=llm.get("timeout_seconds", 30),
             llm_temperature=llm.get("temperature", 0.3),
             max_gpu_memory_percent=resources.get("max_gpu_memory_percent", 60),
@@ -331,6 +334,7 @@ class TMImprovementWorker:
                 model=self.config.llm_model,
                 base_url=self.config.llm_base_url,
                 api_key=self.config.llm_api_key,
+                api_key_env=self.config.llm_api_key_env,
                 timeout_seconds=self.config.llm_timeout_seconds,
                 temperature=self.config.llm_temperature,
             )
@@ -338,23 +342,30 @@ class TMImprovementWorker:
             self.llm_client = LLMClient(llm_config)
 
             if not self.llm_client.is_available():
-                # Auto-discover an available model from Ollama
-                logger.warning(
-                    f"Configured model '{self.config.llm_model}' not available. "
-                    f"Attempting auto-discovery of available Ollama models..."
-                )
-                fallback_model = self._discover_available_model()
-                if fallback_model:
-                    logger.info(f"Using discovered model: {fallback_model}")
-                    llm_config = LLMConfig(
-                        provider=self.config.llm_provider,
-                        model=fallback_model,
-                        base_url=self.config.llm_base_url,
-                        api_key=self.config.llm_api_key,
-                        timeout_seconds=self.config.llm_timeout_seconds,
-                        temperature=self.config.llm_temperature,
+                if self.config.llm_provider == "ollama":
+                    # Auto-discover an available model from Ollama
+                    logger.warning(
+                        f"Configured model '{self.config.llm_model}' not available. "
+                        f"Attempting auto-discovery of available Ollama models..."
                     )
-                    self.llm_client = LLMClient(llm_config)
+                    fallback_model = self._discover_available_model()
+                    if fallback_model:
+                        logger.info(f"Using discovered model: {fallback_model}")
+                        llm_config = LLMConfig(
+                            provider=self.config.llm_provider,
+                            model=fallback_model,
+                            base_url=self.config.llm_base_url,
+                            api_key=self.config.llm_api_key,
+                            api_key_env=self.config.llm_api_key_env,
+                            timeout_seconds=self.config.llm_timeout_seconds,
+                            temperature=self.config.llm_temperature,
+                        )
+                        self.llm_client = LLMClient(llm_config)
+                else:
+                    logger.warning(
+                        f"Configured LLM provider '{self.config.llm_provider}' not available. "
+                        "Skipping auto-discovery (only supported for Ollama)."
+                    )
 
             if self.llm_client.is_available():
                 logger.info(
@@ -443,6 +454,43 @@ class TMImprovementWorker:
         pid_path = Path("data/logs") / f"{self._worker_id}.pid"
         pid_path.parent.mkdir(parents=True, exist_ok=True)
         pid_path.write_text(str(os.getpid()))
+
+    def _offload_resources(self) -> None:
+        """Unload LLM from Ollama VRAM and offload L3 FAISS + encoder before sleeping.
+
+        Python objects stay alive — only GPU weights are released.
+        Everything reloads automatically on the next run.
+        """
+        # 1. Signal LLM provider to release the model (~8-10 GB freed for local providers)
+        if self.llm_client is not None:
+            try:
+                self.llm_client.unload_from_server()
+                logger.info(
+                    "[VRAM] Signalled LLM provider (%s) to release model '%s'",
+                    self.config.llm_provider,
+                    self.config.llm_model,
+                )
+            except Exception as e:
+                logger.warning("[VRAM] LLM provider unload signal failed: %s", e)
+
+        # 2. Move L3 FAISS index + embedding encoder to CPU RAM
+        try:
+            l3 = getattr(self.tm, 'l3', None)
+            if l3 is not None and hasattr(l3, 'offload_to_cpu'):
+                l3.offload_to_cpu()
+                logger.info("[VRAM] L3 FAISS index and encoder offloaded to CPU")
+        except Exception as e:
+            logger.warning("[VRAM] L3 offload failed: %s", e)
+
+        # 3. Force CUDA cache flush
+        try:
+            import gc
+            import torch
+            gc.collect()
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
+        except ImportError:
+            pass
 
     def _write_heartbeat(self, status="alive"):
         """Write heartbeat file for watchdog monitoring."""
@@ -634,7 +682,8 @@ class TMImprovementWorker:
 
         try:
             while True:
-                # Sleep until next run time
+                # Release VRAM, then sleep until next run time
+                self._offload_resources()
                 self._write_heartbeat("sleeping")
                 next_run = self.scheduler.sleep_until_next_run()
                 run_count += 1
@@ -767,6 +816,14 @@ class TMImprovementWorker:
         """
         start_time = time.time()
 
+        # Reload L3 FAISS index + encoder back to GPU after a sleep offload
+        try:
+            l3 = getattr(self.tm, 'l3', None)
+            if l3 is not None and hasattr(l3, 'reload_to_gpu'):
+                l3.reload_to_gpu()
+        except Exception as e:
+            logger.warning("[VRAM] L3 GPU reload failed (continuing on CPU): %s", e)
+
         # Check LLM availability before attempting work
         if self._llm_unavailable or not self.llm_client or not self.llm_client.is_available():
             logger.info("LLM unavailable - attempting to reconnect...")
@@ -775,8 +832,7 @@ class TMImprovementWorker:
             try:
                 if self.llm_client:
                     # Re-initialize the client
-                    self.llm_client._initialize_client()
-                    if self.llm_client.is_available():
+                    if self.llm_client.reconnect():
                         logger.info("✓ LLM reconnected successfully!")
                         self._llm_unavailable = False
                     else:
@@ -927,6 +983,16 @@ class TMImprovementWorker:
             f"{improved_count} improved, {skipped_count} skipped, {failed_count} failed, "
             f"{llm_calls} LLM calls"
         )
+
+        # Flush L3 FAISS index to disk before returning.
+        # L2 LMDB persists on every store() call; L3 only persists on save_index().
+        if self.tm is not None and self.tm.l3 is not None:
+            logger.info("Flushing L3 semantic index to disk...")
+            try:
+                self.tm.l3.save_index()
+                logger.info("L3 index flushed successfully")
+            except Exception as e:
+                logger.warning(f"L3 index flush failed (non-fatal): {e}")
 
         return {
             "status": "success",
@@ -1173,33 +1239,40 @@ Examples:
         help="Maximum runtime per run in seconds (default: 900 = 15 minutes)",
     )
 
-    # LLM configuration
+    # LLM configuration — all default to None so main() can detect explicit CLI overrides
     parser.add_argument(
         "--llm-provider",
         type=str,
-        default="ollama",
-        help="LLM provider: ollama, openai, anthropic (default: ollama)",
+        default=None,
+        help="LLM provider: ollama, openai, anthropic, openai_compatible (overrides config)",
     )
 
     parser.add_argument(
         "--llm-model",
         type=str,
-        default="qwen3:14b",
-        help="LLM model name (default: qwen3:14b)",
+        default=None,
+        help="LLM model name (overrides config)",
     )
 
     parser.add_argument(
         "--llm-base-url",
         type=str,
-        default="http://localhost:11434",
-        help="LLM base URL for Ollama (default: http://localhost:11434)",
+        default=None,
+        help="LLM base URL (overrides config)",
     )
 
     parser.add_argument(
         "--llm-api-key",
         type=str,
         default=None,
-        help="LLM API key for cloud providers (default: None)",
+        help="LLM API key for cloud providers (overrides config)",
+    )
+
+    parser.add_argument(
+        "--llm-api-key-env",
+        type=str,
+        default=None,
+        help="Env var name holding the LLM API key (overrides config)",
     )
 
     # Safety and resource arguments
@@ -1268,7 +1341,7 @@ def main():
     logger.info(f"Mode: {args.mode}")
     logger.info(f"Config root: {args.config_root}")
     logger.info(f"TM path: {args.tm_path}")
-    logger.info(f"LLM: {args.llm_provider}/{args.llm_model}")
+    logger.info(f"LLM: {args.llm_provider or '(from config)'}/{args.llm_model or '(from config)'}")
     logger.info(f"Device: {args.device}")
 
     if args.mode == "daemon":
@@ -1277,28 +1350,35 @@ def main():
 
     logger.info("=" * 80)
 
-    # Create worker configuration
-    config = TMImprovementWorkerConfig(
-        config_root=args.config_root,
-        tm_path=args.tm_path,
-        mode=args.mode,
-        runs_per_day=args.runs_per_day,
-        window_start=args.window_start,
-        window_end=args.window_end,
-        timezone=args.timezone,
-        jitter_minutes=args.jitter_minutes,
-        candidates_per_run=args.candidates_per_run,
-        max_llm_calls_per_run=args.max_llm_calls_per_run,
-        max_seconds_per_run=args.max_seconds_per_run,
-        llm_provider=args.llm_provider,
-        llm_model=args.llm_model,
-        llm_base_url=args.llm_base_url,
-        llm_api_key=args.llm_api_key,
-        max_gpu_memory_percent=args.max_gpu_memory_percent,
-        preflight_check=not args.no_preflight_check,
-        abort_on_high_usage=not args.no_abort_on_high_usage,
-        device=args.device,
-    )
+    # Load base config from global.yaml via ConfigService
+    config_service = ConfigService(args.config_root)
+    config = TMImprovementWorkerConfig.from_config_service(config_service, mode=args.mode)
+
+    # Apply CLI arg overrides — only when explicitly provided (non-None)
+    if args.tm_path != "data/tm":  # non-default value
+        config.tm_path = Path(args.tm_path)
+    if args.candidates_per_run != 50:
+        config.candidates_per_run = args.candidates_per_run
+    if args.max_llm_calls_per_run != 200:
+        config.max_llm_calls_per_run = args.max_llm_calls_per_run
+    if args.max_seconds_per_run != 900:
+        config.max_seconds_per_run = args.max_seconds_per_run
+    if args.llm_provider is not None:
+        config.llm_provider = args.llm_provider
+    if args.llm_model is not None:
+        config.llm_model = args.llm_model
+    if args.llm_base_url is not None:
+        config.llm_base_url = args.llm_base_url
+    if args.llm_api_key is not None:
+        config.llm_api_key = args.llm_api_key
+    if args.llm_api_key_env is not None:
+        config.llm_api_key_env = args.llm_api_key_env
+    if args.max_gpu_memory_percent != 60:
+        config.max_gpu_memory_percent = args.max_gpu_memory_percent
+    config.preflight_check = not args.no_preflight_check
+    config.abort_on_high_usage = not args.no_abort_on_high_usage
+    if args.device != "auto":
+        config.device = args.device
 
     # Create and run worker
     worker = TMImprovementWorker(config)
