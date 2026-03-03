@@ -1866,120 +1866,131 @@ def translate_site(args: argparse.Namespace) -> int:
                         else:
                             logger.info(f"Successfully completed translation for {lang} (duration: {duration:.1f}s)")
 
-                            # Commit translations for this language
-                            # Note: We need to gather translated files and stats from subprocess
-                            # For now, we create a placeholder stats dict
-                            # TODO: Enhance subprocess to return stats via file/stdout
-                            stats = {
-                                "model_used": args.model or "default",
-                                "duration_seconds": duration,
-                                "tm_hit_rate": 0.0,  # Not available from subprocess
-                                "segments_total": 0,  # Not available from subprocess
-                            }
+                            # CRITICAL FIX: Check validation status before committing
+                            # Subprocess should return validation status via exit code or file
+                            # For now, we trust exit_code == 0 means validation passed
+                            # But we also need to check if files were actually modified
+                            validation_passed = exit_code == 0
 
-                            # Get list of modified files for this language using git status
-                            # Skip auto-commit if git repo root wasn't found
-                            if git_repo_root is None:
-                                logger.debug(f"Skipping auto-commit for {lang} (git repository not found)")
+                            if not validation_passed:
+                                logger.warning(f"Skipping commit for {lang} - validation failed (exit_code={exit_code})")
                                 translated_files = []
                             else:
-                                try:
-                                    git_status_result = subprocess.run(
-                                        ["git", "status", "--porcelain"],
-                                        cwd=git_repo_root,  # Run in the correct repository
-                                        capture_output=True,
-                                        text=True,
-                                        encoding='utf-8',  # Use UTF-8 for git output
-                                        errors='replace',  # Handle encoding errors gracefully
-                                        timeout=30,
-                                        check=True,
-                                    )
-                                    # Parse git status output to get modified/new files
+                                # Commit translations for this language
+                                # Note: We need to gather translated files and stats from subprocess
+                                # For now, we create a placeholder stats dict
+                                # TODO: Enhance subprocess to return stats via file/stdout
+                                stats = {
+                                    "model_used": args.model or "default",
+                                    "duration_seconds": duration,
+                                    "tm_hit_rate": 0.0,  # Not available from subprocess
+                                    "segments_total": 0,  # Not available from subprocess
+                                }
+
+                                # Get list of modified files for this language using git status
+                                # Skip auto-commit if git repo root wasn't found
+                                if git_repo_root is None:
+                                    logger.debug(f"Skipping auto-commit for {lang} (git repository not found)")
                                     translated_files = []
-                                    for line in git_status_result.stdout.splitlines():
-                                        if line.strip():
-                                            # Git status format: "XY filename" or "XY oldname -> newname" for renames
-                                            status_code = line[:2]
-                                            file_path = line[3:].strip()
-
-                                            # Skip renamed files (R) and deleted files (D) - these are pre-existing changes
-                                            if 'R' in status_code or 'D' in status_code:
-                                                continue
-
-                                            # Handle modified/added files only (M, A, ??)
-                                            if 'M' not in status_code and 'A' not in status_code and '?' not in status_code:
-                                                continue
-
-                                            # Filter for files related to this language:
-                                            # - Should be in language-specific directory (e.g., ar/, bg/)
-                                            # - Or in output directory if specified
-                                            file_path_normalized = file_path.replace('\\', '/')
-                                            is_translated = False
-
-                                            # Check if file is in language directory (e.g., "ar/..." or "output/ar/...")
-                                            if f'/{lang}/' in file_path_normalized or file_path_normalized.startswith(f'{lang}/'):
-                                                is_translated = True
-
-                                            # Check if file has language code in filename (e.g., "file.ar.md")
-                                            if f'.{lang}.' in file_path_normalized:
-                                                is_translated = True
-
-                                            if is_translated:
-                                                # Convert relative path to absolute path using git_repo_root
-                                                # Git status returns paths relative to git root
-                                                absolute_file_path = git_repo_root / file_path
-                                                translated_files.append(absolute_file_path)
-
-                                    if translated_files:
-                                        logger.debug(f"Detected {len(translated_files)} modified files for {lang}")
-                                    else:
-                                        logger.warning(f"No modified files detected for {lang}, skipping commit")
-
-                                except Exception as e:
-                                    logger.warning(f"Failed to detect modified files for {lang}: {e}")
-                                    translated_files = []
-
-                            # P1-12: Commit translations using CommitEngine (if available) or fallback
-                            if translated_files:
-                                # Try using CommitEngine first (preferred)
-                                if shared_engines and shared_engines.commit:
+                                else:
                                     try:
-                                        commit_result = shared_engines.commit.commit_if_enabled(
-                                            output_files=translated_files,
-                                            site_id=args.site,
-                                            target_langs=[lang],
-                                            run_id=f"cli-multilang-{lang}",
-                                            model_id=args.model or "default",
-                                            tm_stats=stats
+                                        git_status_result = subprocess.run(
+                                            ["git", "status", "--porcelain"],
+                                            cwd=git_repo_root,  # Run in the correct repository
+                                            capture_output=True,
+                                            text=True,
+                                            encoding='utf-8',  # Use UTF-8 for git output
+                                            errors='replace',  # Handle encoding errors gracefully
+                                            timeout=30,
+                                            check=True,
+                                        )
+                                        # Parse git status output to get modified/new files
+                                        translated_files = []
+                                        for line in git_status_result.stdout.splitlines():
+                                            if line.strip():
+                                                # Git status format: "XY filename" or "XY oldname -> newname" for renames
+                                                status_code = line[:2]
+                                                file_path = line[3:].strip()
+
+                                                # Skip renamed files (R) and deleted files (D) - these are pre-existing changes
+                                                if 'R' in status_code or 'D' in status_code:
+                                                    continue
+
+                                                # Handle modified/added files only (M, A, ??)
+                                                if 'M' not in status_code and 'A' not in status_code and '?' not in status_code:
+                                                    continue
+
+                                                # Filter for files related to this language:
+                                                # - Should be in language-specific directory (e.g., ar/, bg/)
+                                                # - Or in output directory if specified
+                                                file_path_normalized = file_path.replace('\\', '/')
+                                                is_translated = False
+
+                                                # Check if file is in language directory (e.g., "ar/..." or "output/ar/...")
+                                                if f'/{lang}/' in file_path_normalized or file_path_normalized.startswith(f'{lang}/'):
+                                                    is_translated = True
+
+                                                # Check if file has language code in filename (e.g., "file.ar.md")
+                                                if f'.{lang}.' in file_path_normalized:
+                                                    is_translated = True
+
+                                                if is_translated:
+                                                    # Convert relative path to absolute path using git_repo_root
+                                                    # Git status returns paths relative to git root
+                                                    absolute_file_path = git_repo_root / file_path
+                                                    translated_files.append(absolute_file_path)
+
+                                        if translated_files:
+                                            logger.debug(f"Detected {len(translated_files)} modified files for {lang}")
+                                        else:
+                                            logger.warning(f"No modified files detected for {lang}, skipping commit")
+
+                                    except Exception as e:
+                                        logger.warning(f"Failed to detect modified files for {lang}: {e}")
+                                        translated_files = []
+
+                                # P1-12: Commit translations using CommitEngine (if available) or fallback
+                                if translated_files:
+                                    # Try using CommitEngine first (preferred)
+                                    if shared_engines and shared_engines.commit:
+                                        try:
+                                            commit_result = shared_engines.commit.commit_if_enabled(
+                                                output_files=translated_files,
+                                                site_id=args.site,
+                                                target_langs=[lang],
+                                                run_id=f"cli-multilang-{lang}",
+                                                model_id=args.model or "default",
+                                                tm_stats=stats
+                                            )
+
+                                            if commit_result.success and commit_result.files_committed > 0:
+                                                logger.info(f"Committed {commit_result.files_committed} files for {lang}")
+                                            elif not commit_result.success:
+                                                logger.warning(f"Failed to commit translations for {lang}: {commit_result.error} (non-fatal)")
+                                            else:
+                                                logger.debug(f"No files to commit for {lang} (already committed or no changes)")
+                                        except Exception as e:
+                                            logger.warning(f"CommitEngine error for {lang} (non-fatal): {e}")
+
+                                    # Fallback to direct commit_language_translations
+                                    else:
+                                        _auto_push = getattr(global_config.git_commit, 'auto_push', False)
+                                        commit_success = commit_language_translations(
+                                            target_lang=lang,
+                                            translated_files=translated_files,
+                                            stats=stats,
+                                            config=config_service.get_config(),
+                                            auto_push=_auto_push,
+                                            git_repo_root=git_repo_root,
+                                            validation_passed=validation_passed,
                                         )
 
-                                        if commit_result.success and commit_result.files_committed > 0:
-                                            logger.info(f"Committed {commit_result.files_committed} files for {lang}")
-                                        elif not commit_result.success:
-                                            logger.warning(f"Failed to commit translations for {lang}: {commit_result.error} (non-fatal)")
+                                        if commit_success:
+                                            logger.info(f"Committed {len(translated_files)} files for {lang}")
                                         else:
-                                            logger.debug(f"No files to commit for {lang} (already committed or no changes)")
-                                    except Exception as e:
-                                        logger.warning(f"CommitEngine error for {lang} (non-fatal): {e}")
-
-                                # Fallback to direct commit_language_translations
+                                            logger.warning(f"Failed to commit translations for {lang} (non-fatal)")
                                 else:
-                                    _auto_push = getattr(global_config.git_commit, 'auto_push', False)
-                                    commit_success = commit_language_translations(
-                                        target_lang=lang,
-                                        translated_files=translated_files,
-                                        stats=stats,
-                                        config=config_service.get_config(),
-                                        auto_push=_auto_push,
-                                        git_repo_root=git_repo_root,
-                                    )
-
-                                    if commit_success:
-                                        logger.info(f"Committed {len(translated_files)} files for {lang}")
-                                    else:
-                                        logger.warning(f"Failed to commit translations for {lang} (non-fatal)")
-                            else:
-                                logger.info(f"No files to commit for {lang} (possibly unchanged or already committed)")
+                                    logger.info(f"No files to commit for {lang} (possibly unchanged or already committed)")
 
                     except subprocess.TimeoutExpired:
                         duration = time.time() - lang_start_time

@@ -23,6 +23,7 @@ def commit_language_translations(
     config: Dict[str, Any],
     auto_push: bool = False,
     git_repo_root: Optional[Path] = None,
+    validation_passed: bool = True,
 ) -> bool:
     """
     Create git commit for single language completion.
@@ -49,10 +50,16 @@ def commit_language_translations(
         config: Global configuration dictionary
         auto_push: Automatically push to remote after commit
         git_repo_root: Git repository root directory (defaults to CWD if not specified)
+        validation_passed: Whether validation passed (default: True). If False, commit is skipped.
 
     Returns:
         True if commit succeeded, False otherwise
     """
+    # CRITICAL FIX: Check validation status before committing
+    if not validation_passed:
+        logger.warning(f"Skipping commit for {target_lang} - validation failed")
+        return False
+
     if not translated_files:
         logger.warning(f"No files to commit for language {target_lang}")
         return False

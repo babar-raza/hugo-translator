@@ -446,6 +446,140 @@ def _write_pending_commit_fallback(
         return False
 
 
+def recover_pending_commits(git_root: Path) -> int:
+    """Scan git_root for .pending_commit.json and .pending_commit.json.stale_* files
+    and attempt to commit the files they describe.
+
+    Called automatically by the worker after each translation run. Handles two cases:
+    - .pending_commit.json older than 2 minutes (watcher never picked it up)
+    - .pending_commit.json.stale_* (watcher staged the files but git commit timed out)
+
+    Returns the number of commits successfully recovered.
+    """
+    import json
+    import time
+
+    # Collect candidates
+    candidates: List[Path] = []
+    active = git_root / ".pending_commit.json"
+    if active.exists():
+        age = time.time() - active.stat().st_mtime
+        if age > 120:  # give the external watcher 2 minutes to act first
+            candidates.append(active)
+    candidates.extend(sorted(git_root.glob(".pending_commit.json.stale_*")))
+
+    if not candidates:
+        return 0
+
+    logger.info(
+        f"[pending_commit_recovery] Found {len(candidates)} pending commit file(s) in {git_root}"
+    )
+
+    recovered = 0
+    for pf in candidates:
+        try:
+            payload = json.loads(pf.read_text(encoding="utf-8"))
+            rel_files: List[str] = payload.get("files", [])
+            commit_msg: str = (payload.get("commit_message") or "").strip()
+            author_name: str = payload.get("author_name") or "Hugo Translator"
+            author_email: str = payload.get("author_email") or "hugo-translator@aspose.net"
+
+            if not rel_files or not commit_msg:
+                logger.warning(
+                    f"[pending_commit_recovery] {pf.name}: missing files or message — removing"
+                )
+                pf.unlink(missing_ok=True)
+                continue
+
+            # Determine which files still need staging
+            cached_result = subprocess.run(
+                ["git", "diff", "--cached", "--name-only"],
+                cwd=str(git_root),
+                capture_output=True,
+                text=True,
+                timeout=15,
+            )
+            staged_set = set(cached_result.stdout.splitlines())
+
+            to_add = [
+                r for r in rel_files
+                if r not in staged_set and (git_root / r).exists()
+            ]
+            if to_add:
+                add_result = subprocess.run(
+                    ["git", "add", "--"] + to_add,
+                    cwd=str(git_root),
+                    capture_output=True,
+                    text=True,
+                    timeout=60,
+                )
+                if add_result.returncode != 0:
+                    logger.warning(
+                        f"[pending_commit_recovery] git add failed for {pf.name}: "
+                        f"{add_result.stderr.strip()}"
+                    )
+
+            # Re-check what's staged from our list
+            cached_result2 = subprocess.run(
+                ["git", "diff", "--cached", "--name-only"],
+                cwd=str(git_root),
+                capture_output=True,
+                text=True,
+                timeout=15,
+            )
+            staged_now = set(cached_result2.stdout.splitlines())
+            our_staged = [r for r in rel_files if r in staged_now]
+
+            if not our_staged:
+                logger.info(
+                    f"[pending_commit_recovery] {pf.name}: no staged changes "
+                    "— files may already be committed. Removing."
+                )
+                pf.unlink(missing_ok=True)
+                continue
+
+            # Commit with original author preserved
+            author_str = f"{author_name} <{author_email}>"
+            commit_result = subprocess.run(
+                ["git", "commit", "-m", commit_msg, "--author", author_str],
+                cwd=str(git_root),
+                capture_output=True,
+                text=True,
+                timeout=90,
+            )
+
+            combined_out = (commit_result.stdout + commit_result.stderr).lower()
+            if commit_result.returncode == 0:
+                logger.info(
+                    f"[pending_commit_recovery] ✓ Recovered {len(our_staged)} file(s) "
+                    f"from {pf.name}"
+                )
+                pf.unlink(missing_ok=True)
+                recovered += 1
+            elif "nothing to commit" in combined_out:
+                logger.info(
+                    f"[pending_commit_recovery] {pf.name}: nothing to commit "
+                    "— already committed. Removing."
+                )
+                pf.unlink(missing_ok=True)
+            else:
+                logger.warning(
+                    f"[pending_commit_recovery] {pf.name}: commit failed — "
+                    f"{(commit_result.stderr or commit_result.stdout).strip()[:200]}. "
+                    "Will retry next run."
+                )
+                # Leave stale file in place; next run will retry
+
+        except subprocess.TimeoutExpired:
+            logger.warning(
+                f"[pending_commit_recovery] {pf.name}: timed out — will retry next run"
+            )
+        except Exception as exc:
+            logger.warning(f"[pending_commit_recovery] {pf.name}: error — {exc}")
+
+    return recovered
+
+
 def auto_commit_translations(
     result: Union["TranslationResult", "DirectoryResult"],
     site_id: str,
@@ -575,6 +709,27 @@ def auto_commit_translations(
                     return True  # Graceful skip
             else:
                 return True  # Graceful skip (no files to commit)
+        else:
+            # Orphan sweep: augment current-run files with any modified .md files left
+            # uncommitted from previous failed runs (timeout, git error, etc.).
+            # Without this, only the current run's files get committed and older orphans
+            # accumulate indefinitely across runs.
+            content_root = getattr(dir_result, 'directory', None)
+            if content_root:
+                try:
+                    orphaned = collect_modified_files_from_git(
+                        output_files[0].parent, dir_result, content_root=content_root
+                    )
+                    existing_paths = set(output_files)
+                    new_orphans = [f for f in orphaned if f not in existing_paths]
+                    if new_orphans:
+                        logger.info(
+                            f"[orphan_sweep] Sweeping {len(new_orphans)} orphaned file(s) "
+                            "from previous failed commits into this commit"
+                        )
+                        output_files = list(output_files) + new_orphans
+                except Exception as e:
+                    logger.warning(f"[orphan_sweep] Failed to collect orphaned files: {e}")
 
         # Only continue if we have files to commit (either from primary or fallback collection)
         if not output_files:

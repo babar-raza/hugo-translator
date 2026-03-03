@@ -125,10 +125,13 @@ class CommitMessageGenerator:
         # Analyze file paths to extract structure
         analysis = self._analyze_paths(output_files)
 
+        # Derive actual languages present in output files (not all configured langs)
+        actual_langs = self._get_actual_languages(output_files, target_langs, translation_result)
+
         # Build subject line
         subject = self._build_subject(
             analysis=analysis,
-            target_langs=target_langs,
+            target_langs=actual_langs,
             file_count=len(output_files),
             site_ids=site_ids,
             site_display_name=site_display_name,
@@ -373,24 +376,31 @@ class CommitMessageGenerator:
         """
         primary_site_id = site_ids[0]
 
-        # Determine scope: product name (email, slides, words) or site type
-        if analysis["product"]:
-            scope = analysis["product"].replace("aspose.", "")  # "email", "slides", etc.
+        # Determine scope: site type for content sites, product name for doc/reference sites
+        site_scope_map = {
+            "blog.aspose.net": "blog",
+            "kb.aspose.net": "kb",
+            "docs.aspose.net": "docs",
+            "reference.aspose.net": "reference",
+            "products.aspose.net": "products",
+            "about.aspose.net": "about",
+            "websites.aspose.net": "websites",
+            "www.aspose.net": "www",
+        }
+        site_scope = site_scope_map.get(primary_site_id)
+
+        # Content sites always use site-level scope (blog posts about Aspose.ZIP
+        # are still blog posts, not "zip" scope). Product scope only for
+        # docs/products/reference where product specificity is meaningful.
+        content_site_scopes = {"blog", "kb", "about", "www", "websites"}
+        if site_scope and site_scope in content_site_scopes:
+            scope = site_scope
+        elif analysis["product"]:
+            scope = analysis["product"].replace("aspose.", "")
+        elif site_scope:
+            scope = site_scope
         else:
-            site_scope_map = {
-                "blog.aspose.net": "blog",
-                "kb.aspose.net": "kb",
-                "docs.aspose.net": "docs",
-                "reference.aspose.net": "reference",
-                "products.aspose.net": "products",
-                "about.aspose.net": "about",
-                "websites.aspose.net": "websites",
-                "www.aspose.net": "www",
-            }
-            scope = site_scope_map.get(primary_site_id)
-            if not scope:
-                # Derive from site_id: take part before first dot or dash
-                scope = primary_site_id.split(".")[0].split("-")[0]
+            scope = primary_site_id.split(".")[0].split("-")[0]
 
         # Determine content type (lowercase, concise)
         site_content_types = {
@@ -409,19 +419,43 @@ class CommitMessageGenerator:
 
         logger.debug(f"Subject: scope={scope}, content_type={content_type}, site={primary_site_id}")
 
-        # Language list: use codes directly (compact), max 4 shown then "+ N more"
-        if len(target_langs) <= 4:
-            lang_str = ", ".join(target_langs)
+        # Build subject fitting within 72-char limit without blind truncation.
+        # Incrementally add language codes; use "+N more" only when needed.
+        prefix = f"chore({scope}): translate {file_count} {content_type} to "
+        max_len = 72
+        remaining = max_len - len(prefix)
+
+        sorted_langs = sorted(target_langs)
+        if not sorted_langs:
+            return prefix.rstrip(" to ")
+
+        # Try fitting all languages first
+        all_langs_str = ", ".join(sorted_langs)
+        if len(all_langs_str) <= remaining:
+            return prefix + all_langs_str
+
+        # Incrementally add languages until we'd exceed the limit
+        included = []
+        for i, lang in enumerate(sorted_langs):
+            leftover = len(sorted_langs) - (i + 1)
+            suffix = f", +{leftover} more" if leftover > 0 else ""
+            candidate = ", ".join(included + [lang]) + suffix
+            if len(candidate) <= remaining:
+                included.append(lang)
+            else:
+                break
+
+        if included:
+            leftover = len(sorted_langs) - len(included)
+            if leftover > 0:
+                lang_str = ", ".join(included) + f", +{leftover} more"
+            else:
+                lang_str = ", ".join(included)
         else:
-            lang_str = f"{', '.join(target_langs[:4])}, +{len(target_langs)-4} more"
+            # Even one lang + suffix doesn't fit; show count only
+            lang_str = f"{len(sorted_langs)} langs"
 
-        subject = f"chore({scope}): translate {file_count} {content_type} to {lang_str}"
-
-        # Ensure subject doesn't exceed 72 characters (git best practice)
-        if len(subject) > 72:
-            subject = subject[:69] + "..."
-
-        return subject
+        return prefix + lang_str
 
     def _is_home_family(self, analysis: Dict, output_files: Optional[List[Path]]) -> bool:
         """
@@ -515,22 +549,23 @@ class CommitMessageGenerator:
                     f"(L1: {l1_rate:.0f}%, L2: {l2_rate:.0f}%, L3: {l3_rate:.0f}%)"
                 )
 
-        # Validation results
+        # Validation results (count per output file, not per source file)
         if translation_result:
             output_paths = set(output_files)
-            relevant_results = []
+            matched_count = 0
+            passed_count = 0
             for fr in translation_result.file_results:
                 if hasattr(fr, 'outputs') and fr.outputs:
-                    for output_path in fr.outputs.values():
+                    for lang, output_path in fr.outputs.items():
                         if output_path in output_paths:
-                            relevant_results.append(fr)
-                            break
-            if relevant_results:
-                passed_count = sum(1 for fr in relevant_results if fr.success)
-                lines.append(f"- Validation: {passed_count}/{len(relevant_results)} files passed")
+                            matched_count += 1
+                            if fr.success:
+                                passed_count += 1
+            if matched_count > 0:
+                lines.append(f"- Validation: {passed_count}/{matched_count} files passed")
 
         # Per-language file counts
-        lang_counts = self._count_files_by_lang(output_files, target_langs)
+        lang_counts = self._count_files_by_lang(output_files, target_langs, translation_result)
         if lang_counts:
             lang_parts = [f"{lang} ({count})" for lang, count in sorted(lang_counts.items())]
             lines.append(f"- Languages: {', '.join(lang_parts)}")
@@ -544,17 +579,58 @@ class CommitMessageGenerator:
         return "\n".join(lines)
 
     def _count_files_by_lang(
-        self, output_files: List[Path], target_langs: List[str]
+        self,
+        output_files: List[Path],
+        target_langs: List[str],
+        translation_result: Optional["DirectoryResult"] = None,
     ) -> Dict[str, int]:
-        """Count output files per language by matching lang code in path."""
+        """Count output files per language using structured data with path fallbacks."""
+        output_set = set(output_files)
         counts: Dict[str, int] = {}
+
+        # Tier 1: Use structured data from translation_result (most reliable)
+        if translation_result and hasattr(translation_result, 'file_results'):
+            for fr in translation_result.file_results:
+                if hasattr(fr, 'outputs') and fr.outputs:
+                    for lang, output_path in fr.outputs.items():
+                        if output_path in output_set:
+                            counts[lang] = counts.get(lang, 0) + 1
+            if counts:
+                return counts
+
+        # Tier 2: Path directory component matching (e.g., /de/file.md)
         for f in output_files:
             parts = f.parts
             for lang in target_langs:
                 if lang in parts:
                     counts[lang] = counts.get(lang, 0) + 1
                     break
+        if counts:
+            return counts
+
+        # Tier 3: Filename suffix matching (e.g., index.de.md)
+        for f in output_files:
+            stem_parts = f.stem.split('.')
+            for lang in target_langs:
+                if lang in stem_parts:
+                    counts[lang] = counts.get(lang, 0) + 1
+                    break
+
         return counts
+
+    def _get_actual_languages(
+        self,
+        output_files: List[Path],
+        target_langs: List[str],
+        translation_result: Optional["DirectoryResult"] = None,
+    ) -> List[str]:
+        """Derive actual languages present in output files (not all configured langs)."""
+        lang_counts = self._count_files_by_lang(output_files, target_langs, translation_result)
+        if lang_counts:
+            return sorted(lang_counts.keys())
+
+        # Fallback: return target_langs as-is if detection fails
+        return target_langs
 
     def _get_language_names(self, lang_codes: List[str]) -> List[str]:
         """

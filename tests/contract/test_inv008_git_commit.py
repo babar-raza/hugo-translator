@@ -492,12 +492,16 @@ def test_collect_output_files_excludes_skipped_languages():
     file1.success = True
     file1.outputs = {"de": Mock(exists=Mock(return_value=True)), "fr": Mock(exists=Mock(return_value=True))}
     file1.skipped_langs = set()
+    file1.errors = {}
+    file1.validation_decision = None
 
     # File 2: One language skipped
     file2 = Mock()
     file2.success = True
     file2.outputs = {"de": Mock(exists=Mock(return_value=True)), "fr": Mock(exists=Mock(return_value=True))}
     file2.skipped_langs = {"fr"}  # French was skipped
+    file2.errors = {}
+    file2.validation_decision = None
 
     mock_result.file_results = [file1, file2]
 
