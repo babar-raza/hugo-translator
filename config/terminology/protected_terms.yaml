@@ -81,6 +81,48 @@ global:
       preserve_mode: protect
       severity: info
 
+    - term: "TAR"
+      category: format
+      case_sensitive: true
+      preserve_mode: protect
+      severity: info
+
+    - term: "GZ"
+      category: format
+      case_sensitive: true
+      preserve_mode: protect
+      severity: info
+
+    - term: "BZ2"
+      category: format
+      case_sensitive: true
+      preserve_mode: protect
+      severity: info
+
+    - term: "TGZ"
+      category: format
+      case_sensitive: true
+      preserve_mode: protect
+      severity: info
+
+    - term: "XZ"
+      category: format
+      case_sensitive: true
+      preserve_mode: protect
+      severity: info
+
+    - term: "7Z"
+      category: format
+      case_sensitive: true
+      preserve_mode: protect
+      severity: info
+
+    - term: "BZIP2"
+      category: format
+      case_sensitive: true
+      preserve_mode: protect
+      severity: info
+
   # Pattern-based matches
   patterns:
     - pattern: "Aspose\\.[A-Z][a-z]+"

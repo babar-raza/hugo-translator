@@ -63,20 +63,45 @@ class TerminologyDiscovery:
 
         # Patterns for discovery
         self.discovery_patterns = {
-            'aspose_product': r'Aspose\.[A-Z][a-z]+(?:[A-Z][a-z]+)*',
-            'pascal_case': r'\b[A-Z][a-z]+(?:[A-Z][a-z]+){2,}\b',  # Min 3 parts
-            'constant_name': r'\b[A-Z_]{4,}\b',  # UPPER_CASE
-            'dotted_name': r'\b\.[A-Z][A-Z]+\b',  # Like .NET
+            # Aspose product families: Aspose.Words, Aspose.PDF, Aspose.Cells, …
+            'aspose_product': r'Aspose\.[A-Z][a-zA-Z]+',
+            # 2+ part PascalCase API identifiers: DocumentBuilder, SaveFormat, MemoryStream
+            'pascal_case': r'\b[A-Z][a-z]+(?:[A-Z][a-z]+)+\b',  # 2+ PascalCase parts
+            # UPPER_CASE constants (4+ chars): MAX_SIZE, DEFAULT_TIMEOUT
+            'constant_name': r'\b[A-Z_]{4,}\b',
+            # All-caps acronyms 2-8 chars: GZ, XZ, TAR, ZIP, PPTX, HTML, …
+            'file_format': r'\b[A-Z][A-Z0-9]{1,7}\b',
+            # Platform names that begin with a dot when NOT embedded in an identifier:
+            # " .NET", "(.NET" but NOT "Aspose.NET" (that's aspose_product)
+            'dotted_name': r'(?<![a-zA-Z0-9])\.[A-Z][A-Z]+\b',
         }
 
         # Exception filter (false positives to exclude)
         self.exceptions = {
+            # Calendar words
             'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday',
             'Saturday', 'Sunday', 'January', 'February', 'March',
             'April', 'May', 'June', 'July', 'August', 'September',
             'October', 'November', 'December',
-            # Common false positives
+            # Common English pronoun/article false positives
             'The', 'This', 'That', 'These', 'Those',
+            # Common all-caps English words that are NOT technical identifiers
+            'THE', 'AND', 'FOR', 'NOT', 'ARE', 'BUT', 'CAN', 'HAS',
+            'GET', 'SET', 'PUT', 'NEW', 'OLD', 'ONE', 'TWO', 'ALL',
+            # Generic programming/doc words too broad to protect
+            'FILE', 'PATH', 'NAME', 'TYPE', 'CODE', 'DATA', 'TEXT',
+            'USER', 'HOST', 'PORT', 'MODE', 'SIZE', 'TIME', 'DATE',
+            'FROM', 'THEN', 'WHEN', 'THAN', 'WILL', 'WITH', 'INTO',
+            'OVER', 'EACH', 'BOTH', 'ALSO', 'NOTE', 'INFO', 'WARN',
+            'TODO', 'LINK', 'MORE', 'STEP', 'TIPS', 'BEST', 'NEXT',
+            'OPEN', 'SAVE', 'LOAD', 'SEND', 'READ', 'COPY', 'MOVE',
+            'LIST', 'ITEM', 'NEED', 'MAKE', 'TAKE', 'GIVE', 'SHOW',
+            # Very common 2-char English initials
+            'OK', 'NO', 'GO', 'DO', 'IS', 'IT', 'AT', 'AN', 'IN',
+            'ON', 'UP', 'BY', 'OR', 'IF', 'AS', 'BE', 'US',
+            # Platform suffixes covered by dotted_name (.NET, .COM, .EXE, .DLL)
+            # — exclude bare forms to avoid double-counting
+            'NET', 'COM', 'EXE', 'DLL',
         }
 
     def discover_terms(self, corpus: List[str]) -> List[DiscoveredTerm]:
@@ -184,10 +209,11 @@ class TerminologyDiscovery:
 
                 # Category confidence
                 category_weights = {
-                    'aspose_product': 1.0,  # Very confident
-                    'pascal_case': 0.7,     # Medium confident
-                    'constant_name': 0.6,   # Lower confident
-                    'dotted_name': 0.9,     # High confident
+                    'aspose_product': 1.0,  # Very confident — always Aspose product
+                    'dotted_name': 0.9,     # High — .NET style platform names
+                    'file_format': 0.8,     # High — all-caps acronyms in tech docs
+                    'pascal_case': 0.75,    # Medium-high — 2+ part API identifiers
+                    'constant_name': 0.65,  # Medium — UPPER_CASE may be generic
                 }
                 category_confidence = category_weights.get(category, 0.5)
 

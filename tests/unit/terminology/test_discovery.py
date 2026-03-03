@@ -134,8 +134,9 @@ class TestTerminologyDiscovery:
 
     def test_confidence_threshold(self):
         """Terms below confidence threshold are excluded."""
-        # Set very high confidence threshold
-        config = {'enabled': True, 'min_frequency': 2, 'confidence_threshold': 0.95}
+        # Aspose.Words (freq=2): freq_conf = 0.55, category=1.0 → combined = 0.775
+        # Threshold of 0.70 lets Aspose.Words through; SomeClass (cat=0.75) → 0.65 is excluded
+        config = {'enabled': True, 'min_frequency': 2, 'confidence_threshold': 0.70}
         discovery = TerminologyDiscovery(config)
         corpus = [
             "Aspose.Words is great.",
@@ -146,9 +147,7 @@ class TestTerminologyDiscovery:
 
         discovered = discovery.discover_terms(corpus)
 
-        # Only high-confidence terms should pass
-        # Aspose.Words has category weight 1.0, should pass
-        # SomeClass has lower category weight, might not pass
+        # Aspose.Words confidence = (0.55 + 1.0) / 2 = 0.775 ≥ 0.70 → passes
         term_texts = [t.term_text for t in discovered]
         assert "Aspose.Words" in term_texts
 
@@ -324,12 +323,12 @@ class TestTerminologyDiscovery:
         assert "Aspose.PDF" in term_texts
 
     def test_pattern_pascal_case_minimum_parts(self):
-        """PascalCase pattern requires minimum 3 parts."""
+        """PascalCase pattern matches 2+ part identifiers (e.g. SaveFormat, MemoryStream)."""
         config = {'enabled': True, 'min_frequency': 2, 'confidence_threshold': 0.5}
         discovery = TerminologyDiscovery(config)
 
         corpus = [
-            "OneTwo has only 2 parts.",  # Should NOT match (2 parts)
+            "OneTwo has 2 parts.",  # Should match (2 parts — API identifiers)
             "OneTwo again.",
             "OneTwoThree has 3 parts.",  # Should match (3 parts)
             "OneTwoThree again.",
@@ -341,11 +340,10 @@ class TestTerminologyDiscovery:
         pascal_terms = [t for t in discovered if t.category == 'pascal_case']
         term_texts = [t.term_text for t in pascal_terms]
 
-        # Only 3+ part terms should match
+        # 2-part and longer terms all match
         assert "OneTwoThree" in term_texts
         assert "OneTwoThreeFour" in term_texts
-        # 2-part term should not match
-        assert "OneTwo" not in term_texts
+        assert "OneTwo" in term_texts  # 2-part PascalCase is now intentionally discovered
 
     def test_discovered_term_dataclass(self):
         """DiscoveredTerm dataclass works correctly."""

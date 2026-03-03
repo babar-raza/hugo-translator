@@ -34,6 +34,61 @@ global:
       preserve_mode: both
       severity: error
 
+    # File/archive format acronyms — must never be transliterated (e.g. TAR→Тар is wrong)
+    - term: "ZIP"
+      category: format
+      case_sensitive: true
+      preserve_mode: protect
+      severity: info
+
+    - term: "TAR"
+      category: format
+      case_sensitive: true
+      preserve_mode: protect
+      severity: info
+
+    - term: "RAR"
+      category: format
+      case_sensitive: true
+      preserve_mode: protect
+      severity: info
+
+    - term: "GZ"
+      category: format
+      case_sensitive: true
+      preserve_mode: protect
+      severity: info
+
+    - term: "XZ"
+      category: format
+      case_sensitive: true
+      preserve_mode: protect
+      severity: info
+
+    - term: "BZ2"
+      category: format
+      case_sensitive: true
+      preserve_mode: protect
+      severity: info
+
+    - term: "TGZ"
+      category: format
+      case_sensitive: true
+      preserve_mode: protect
+      severity: info
+
+    - term: "BZIP2"
+      category: format
+      case_sensitive: true
+      preserve_mode: protect
+      severity: info
+
+    - term: "7Z"
+      category: format
+      case_sensitive: true
+      preserve_mode: protect
+      severity: info
+
   # Pattern-based matches: Regular expressions for dynamic terminology
   patterns:
     # Aspose product families (e.g., Aspose.Words, Aspose.Cells, Aspose.PDF)
