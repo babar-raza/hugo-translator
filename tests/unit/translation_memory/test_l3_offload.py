@@ -39,8 +39,7 @@ for _name, _mod in [
     ("sentence_transformers", _st_stub),
     ("numpy", types.ModuleType("numpy")),
 ]:
-    if _name not in sys.modules:
-        sys.modules[_name] = _mod
+    sys.modules[_name] = _mod
 
 
 def _make_l3(*, use_faiss_gpu=True, device="cuda"):
