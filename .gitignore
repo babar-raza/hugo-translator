@@ -62,6 +62,7 @@ dmypy.json
 
 # Environment
 .env
+.env.test
 .env.local
 .env.*.local
 
@@ -191,6 +192,24 @@ tests/logs/
 # Test output artifacts
 m2m100_test_output.txt
 *_test_output.txt
+
+# Local run bundles and evidence exports
+/runs/*
+/archive/plans/
+/archive/legacy/
+/config/site_profiles/.LOCK
+/scripts/*.dist-info/
+/scripts/langdetect/
+/scripts/six.py
+/*.zip
+/coverage*.json
+/current_*.txt
+/temp_*.txt
+/temp_*.zip
+/reports*.txt
+/echo
+/python
+/EXIT CODE*
 
 # Diagnostic scripts (dev-only)
 diagnose_*.py
