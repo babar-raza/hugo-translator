@@ -10,6 +10,7 @@ Anthropic, and any OpenAI-compatible endpoint.
 """
 
 import logging
+import re
 import time
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
@@ -144,6 +145,11 @@ class LLMModelBackend:
         )
         return translations
 
+    # LLM-WASTE-FIX-3: max segments packed into a single LLM prompt.
+    # Each segment gets a numbered tag; the LLM returns numbered translations.
+    # If parsing fails, we fall back to per-segment calls for that sub-batch.
+    MAX_SEGMENTS_PER_PROMPT = 8
+
     def translate_with_token_counts(
         self,
         texts: List[str],
@@ -153,6 +159,9 @@ class LLMModelBackend:
         generation_params: Optional[Dict[str, Any]] = None,
     ) -> Tuple[List[str], int, int]:
         """Translate texts and return token counts.
+
+        LLM-WASTE-FIX-3: packs multiple segments into a single prompt using
+        numbered delimiters to reduce per-call system-prompt overhead.
 
         Args:
             texts: Source texts.
@@ -170,49 +179,37 @@ class LLMModelBackend:
         if not texts:
             return [], 0, 0
 
-        system_prompt = self._build_system_prompt(src_lang, tgt_lang)
-
-        translations: List[str] = []
+        translations: List[str] = [""] * len(texts)
         total_input = 0
         total_output = 0
         start_time = time.perf_counter()
-
         tm = self._term_manager
 
-        for idx, text in enumerate(texts):
-            if not text.strip():
-                translations.append(text)
-                continue
+        # Separate empty/whitespace-only texts (no API call needed)
+        non_empty_indices = [i for i, t in enumerate(texts) if t.strip()]
+        for i, t in enumerate(texts):
+            if not t.strip():
+                translations[i] = t  # preserve whitespace-only as-is
 
-            try:
-                # Protect technical terms with placeholders before LLM call
-                # (prevents transliteration of TAR→Тар, ZIP→Жип, etc.)
-                protected = tm.protect(text) if tm else None
-                input_text = protected.protected_text if protected else text
+        # Process non-empty texts in packed sub-batches
+        for sub_start in range(0, len(non_empty_indices), self.MAX_SEGMENTS_PER_PROMPT):
+            sub_indices = non_empty_indices[sub_start:sub_start + self.MAX_SEGMENTS_PER_PROMPT]
 
-                result, inp_tokens, out_tokens = self._provider.generate(
-                    system_prompt=system_prompt,
-                    user_text=input_text,
+            if len(sub_indices) == 1:
+                # Single segment — use direct prompt (no packing overhead)
+                idx = sub_indices[0]
+                inp, out = self._translate_single_segment(
+                    texts[idx], idx, len(texts), src_lang, tgt_lang, tm, translations
                 )
-
-                # Restore protected terms (handles Cyrillic/case corruption of placeholders)
-                if protected:
-                    protected.protected_text = result
-                    result = tm.restore(protected)
-
-                translations.append(result)
-                total_input += inp_tokens
-                total_output += out_tokens
-
-            except Exception as e:
-                logger.error(
-                    "LLM translation failed for segment %d/%d: %s",
-                    idx + 1,
-                    len(texts),
-                    e,
+                total_input += inp
+                total_output += out
+            else:
+                # Multi-segment — pack into numbered prompt
+                inp, out = self._translate_packed_batch(
+                    texts, sub_indices, src_lang, tgt_lang, tm, translations
                 )
-                # Fallback to source text — matches engine's empty-translation pattern
-                translations.append(text)
+                total_input += inp
+                total_output += out
 
         elapsed = time.perf_counter() - start_time
 
@@ -228,6 +225,198 @@ class LLMModelBackend:
         )
 
         return translations, total_input, total_output
+
+    def _translate_single_segment(
+        self,
+        text: str,
+        idx: int,
+        total: int,
+        src_lang: str,
+        tgt_lang: str,
+        tm,
+        translations: List[str],
+    ) -> Tuple[int, int]:
+        """Translate a single segment via one LLM call.
+
+        Returns (input_tokens, output_tokens).
+        """
+        system_prompt = self._build_system_prompt(src_lang, tgt_lang)
+        try:
+            protected = tm.protect(text) if tm else None
+            input_text = protected.protected_text if protected else text
+
+            result, inp_tokens, out_tokens = self._provider.generate(
+                system_prompt=system_prompt,
+                user_text=input_text,
+            )
+
+            # Hallucination length-ratio check
+            input_len = len(input_text)
+            output_len = len(result)
+            if input_len > 0 and output_len > 5 * input_len:
+                logger.error(
+                    "LLM hallucination detected: segment %d/%d output is %.1fx input "
+                    "(%d→%d chars). Truncating to 2x source length.",
+                    idx + 1, total, output_len / input_len, input_len, output_len,
+                )
+                self.last_truncation_detected = True
+                self.truncation_count += 1
+                result = result[:input_len * 2]
+            elif input_len > 0 and output_len > 3 * input_len:
+                logger.warning(
+                    "LLM output unusually long: segment %d/%d is %.1fx input (%d→%d chars)",
+                    idx + 1, total, output_len / input_len, input_len, output_len,
+                )
+
+            if protected:
+                protected.protected_text = result
+                result = tm.restore(protected)
+
+            translations[idx] = result
+            return inp_tokens, out_tokens
+
+        except Exception as e:
+            logger.error("LLM translation failed for segment %d/%d: %s", idx + 1, total, e)
+            translations[idx] = text  # fallback to source
+            return 0, 0
+
+    def _translate_packed_batch(
+        self,
+        texts: List[str],
+        indices: List[int],
+        src_lang: str,
+        tgt_lang: str,
+        tm,
+        translations: List[str],
+    ) -> Tuple[int, int]:
+        """Pack multiple segments into one numbered prompt, parse results back.
+
+        Falls back to per-segment calls if output parsing fails.
+        Returns (total_input_tokens, total_output_tokens).
+        """
+        system_prompt = self._build_batch_system_prompt(src_lang, tgt_lang, len(indices))
+
+        # Protect terms and build packed input
+        protected_map = {}  # idx -> ProtectedResult
+        lines = []
+        for seq, idx in enumerate(indices, 1):
+            if tm:
+                p = tm.protect(texts[idx])
+                if p:
+                    protected_map[idx] = p
+                    lines.append(f"[{seq}] {p.protected_text}")
+                else:
+                    lines.append(f"[{seq}] {texts[idx]}")
+            else:
+                lines.append(f"[{seq}] {texts[idx]}")
+
+        packed_input = "\n".join(lines)
+
+        try:
+            result, inp_tokens, out_tokens = self._provider.generate(
+                system_prompt=system_prompt,
+                user_text=packed_input,
+            )
+
+            # Parse numbered outputs
+            parsed = self._parse_packed_output(result, len(indices))
+
+            if parsed is not None:
+                # Successfully parsed — assign translations
+                for seq, idx in enumerate(indices):
+                    trans = parsed[seq]
+                    if idx in protected_map:
+                        protected_map[idx].protected_text = trans
+                        trans = tm.restore(protected_map[idx])
+                    translations[idx] = trans
+                return inp_tokens, out_tokens
+            else:
+                # Parsing failed — fall back to per-segment calls
+                logger.warning(
+                    "Packed batch parsing failed (%d segments). "
+                    "Falling back to per-segment translation.",
+                    len(indices),
+                )
+                total_in, total_out = 0, 0
+                for idx in indices:
+                    i, o = self._translate_single_segment(
+                        texts[idx], idx, len(texts), src_lang, tgt_lang, tm, translations
+                    )
+                    total_in += i
+                    total_out += o
+                return total_in, total_out
+
+        except Exception as e:
+            logger.error("Packed batch LLM call failed: %s. Falling back to per-segment.", e)
+            total_in, total_out = 0, 0
+            for idx in indices:
+                i, o = self._translate_single_segment(
+                    texts[idx], idx, len(texts), src_lang, tgt_lang, tm, translations
+                )
+                total_in += i
+                total_out += o
+            return total_in, total_out
+
+    @staticmethod
+    def _parse_packed_output(raw: str, expected_count: int) -> Optional[List[str]]:
+        """Parse numbered LLM output back into individual translations.
+
+        Expected format:
+            [1] Translation one
+            [2] Translation two
+
+        Returns list of translations (0-indexed) or None if parsing fails.
+        """
+        # Match lines starting with [N] (with optional leading whitespace)
+        pattern = re.compile(r"^\s*\[(\d+)\]\s*(.*)$", re.MULTILINE)
+        matches = list(pattern.finditer(raw))
+
+        if len(matches) != expected_count:
+            return None
+
+        result = [None] * expected_count
+        for match in matches:
+            seq = int(match.group(1))
+            text = match.group(2).strip()
+            if seq < 1 or seq > expected_count:
+                return None
+            result[seq - 1] = text
+
+        # Check all slots filled
+        if any(r is None for r in result):
+            return None
+
+        return result
+
+    def _build_batch_system_prompt(self, src_lang: str, tgt_lang: str, segment_count: int) -> str:
+        """Build system prompt for packed multi-segment translation.
+
+        Args:
+            src_lang: Source language code.
+            tgt_lang: Target language code.
+            segment_count: Number of segments in the batch.
+
+        Returns:
+            Formatted system prompt string.
+        """
+        src_name = LANGUAGE_NAMES.get(src_lang, src_lang.upper())
+        tgt_name = LANGUAGE_NAMES.get(tgt_lang, tgt_lang.upper())
+
+        return (
+            f"You are a professional translator. Translate each numbered segment "
+            f"from {src_name} to {tgt_name}.\n\n"
+            f"Input: {segment_count} numbered segments, each prefixed with [N].\n"
+            f"Output: {segment_count} translated segments, each on its own line "
+            f"prefixed with the SAME number [N].\n\n"
+            f"Rules:\n"
+            f"- Output ONLY the translations with their numbers, nothing else\n"
+            f"- Preserve all formatting: markdown, HTML tags, code blocks, links\n"
+            f"- Preserve all Hugo shortcodes ({{{{< ... >}}}}) and template syntax exactly\n"
+            f"- Keep technical terms, brand names, and API identifiers unchanged\n"
+            f"- NEVER transliterate or translate archive/compression format names: "
+            f"TAR, ZIP, RAR, GZ, BZ2, TGZ, XZ, 7Z, BZIP2 — keep them exactly as written\n"
+            f"- Maintain the same tone and register as the source"
+        )
 
     def unload(self) -> None:
         """Release provider resources."""

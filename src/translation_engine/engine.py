@@ -802,8 +802,14 @@ class TranslationEngine:
                 )
 
         # Priority 3: Site profile default
-        # Priority 4: Global fallback
-        fallback_model = getattr(site_profile, 'default_model', None) or "m2m100_418m"
+        # Priority 4: Global config fallback_model
+        # Priority 5: Hardcoded default
+        global_fallback = "m2m100_418m"
+        if self.config and hasattr(self.config, 'global_config'):
+            md = getattr(self.config.global_config, 'model_defaults', None)
+            if md and getattr(md, 'fallback_model', None):
+                global_fallback = md.fallback_model
+        fallback_model = getattr(site_profile, 'default_model', None) or global_fallback
 
         # Log if using fallback (helps with observability)
         if src_lang and tgt_lang:
@@ -1244,11 +1250,23 @@ class TranslationEngine:
                         # Pre-write validation (if enabled)
                         if should_validate and self.validation_suite and self.decision_engine:
                             # Extract source body for validation
-                            source_body = str(doc.body) if hasattr(doc, "body") else ""
+                            # HugoDocument has .ast, not .body — render AST to markdown
+                            if doc.ast:
+                                from .reconstructor import ASTRenderer
+                                _val_renderer = ASTRenderer()
+                                source_body = _val_renderer.render_to_markdown(doc.ast)
+                            else:
+                                source_body = ""
 
-                            # Parse translated content to get body
-                            translated_doc = self.parser.parse_string(translated_content)
-                            translated_body = str(translated_doc.body) if hasattr(translated_doc, "body") else ""
+                            # Extract translated body by stripping frontmatter
+                            def _strip_frontmatter(text: str) -> str:
+                                if text.startswith("---"):
+                                    end = text.find("---", 3)
+                                    if end != -1:
+                                        return text[end + 3:].lstrip("\n")
+                                return text
+
+                            translated_body = _strip_frontmatter(translated_content)
 
                             # Run validation suite (use validate_aggregated for single result)
                             validation_result = self.validation_suite.validate_aggregated(
@@ -1590,6 +1608,46 @@ class TranslationEngine:
                                         f"Detected languages: {purity_result['detected_languages']}. "
                                         f"Blocking write to prevent corruption of {output_path.name}."
                                     )
+
+                        # CODE BLOCK / HALLUCINATION GATE
+                        # Blocks write if code blocks were lost or content was hallucinated
+                        if validation_passed:
+                            import re as _re_gate
+                            _src_body = content.split("---", 2)[2] if content.count("---") >= 2 else content
+                            _tgt_body = translated_content.split("---", 2)[2] if translated_content.count("---") >= 2 else translated_content
+                            _src_cb = len(_re_gate.findall(r"^```", _src_body, _re_gate.MULTILINE)) // 2
+                            _tgt_cb = len(_re_gate.findall(r"^```", _tgt_body, _re_gate.MULTILINE)) // 2
+                            if _src_cb > 0 and _tgt_cb < _src_cb:
+                                validation_passed = False
+                                validation_error = (
+                                    f"Code block gate: source has {_src_cb} code blocks "
+                                    f"but translation has {_tgt_cb}"
+                                )
+                                logger.error(
+                                    "CODE BLOCK GATE FAILED for %s: %s",
+                                    output_path.name, validation_error,
+                                )
+
+                            _src_hd = len(_re_gate.findall(r"^#{1,6}\s", _src_body, _re_gate.MULTILINE))
+                            _tgt_hd = len(_re_gate.findall(r"^#{1,6}\s", _tgt_body, _re_gate.MULTILINE))
+                            if validation_passed and _tgt_hd >= _src_hd + 3:
+                                validation_passed = False
+                                validation_error = (
+                                    f"Heading surplus gate: source has {_src_hd} headings "
+                                    f"but translation has {_tgt_hd} (+{_tgt_hd - _src_hd})"
+                                )
+                                logger.error(
+                                    "HEADING SURPLUS GATE FAILED for %s: %s",
+                                    output_path.name, validation_error,
+                                )
+
+                            if validation_passed and _tgt_body.lstrip().startswith("TITLE:"):
+                                validation_passed = False
+                                validation_error = "Hallucination marker: body starts with 'TITLE:'"
+                                logger.error(
+                                    "TITLE GATE FAILED for %s: %s",
+                                    output_path.name, validation_error,
+                                )
 
                         # PHASE 2: WRITE (only if ALL validation passed)
                         if validation_passed:
@@ -2049,6 +2107,17 @@ class TranslationEngine:
             script_validation_config = lang_detection_config.get('script_validation', {})
             script_validation_thresholds = script_validation_config.get('thresholds', {}) if script_validation_config.get('enabled', True) else None
 
+            # LLM-WASTE-FIX-2b: Load batch_purity_skip_langs from global config
+            _batch_purity_skip_langs = None
+            if self.config and hasattr(self.config, 'global_config'):
+                _te_cfg = getattr(self.config.global_config, 'translation_engine', None)
+                if _te_cfg:
+                    _batch_purity_skip_langs = (
+                        _te_cfg.get('batch_purity_skip_langs')
+                        if isinstance(_te_cfg, dict)
+                        else getattr(_te_cfg, 'batch_purity_skip_langs', None)
+                    )
+
             extractor = TextUnitExtractor(
                 segmentation_strategy=site_profile.body.ast_segmentation_strategy,
                 terminology_file=terminology_file if terminology_file.exists() else None,
@@ -2058,7 +2127,8 @@ class TranslationEngine:
                 batch_stats_tracker=self.batch_stats_tracker,  # Adaptive batch sizing
                 fasttext_detector=self.fasttext_detector,  # WS-A: Language detection
                 similarity_tracker=self.similarity_tracker,  # WS-A: Adaptive similarity learning
-                script_validation_thresholds=script_validation_thresholds  # WS-A: Script validation config
+                script_validation_thresholds=script_validation_thresholds,  # WS-A: Script validation config
+                batch_purity_skip_langs=_batch_purity_skip_langs,  # LLM-WASTE-FIX-2b
             )
 
             logger.info(f"AST Translation: Extracting TextUnits from AST (strategy: {site_profile.body.ast_segmentation_strategy})")
@@ -2069,6 +2139,10 @@ class TranslationEngine:
             translatable_units = len([u for u in plan.units if not u.do_not_translate])
             protected_units = len([u for u in plan.units if u.do_not_translate])
             logger.info(f"AST Translation: Extracted {total_units} units ({translatable_units} translatable, {protected_units} protected)")
+
+            # DIAG: Code block count after extraction
+            _code_block_units = [u for u in plan.units if u.kind == "block_code"]
+            logger.info(f"AST DIAG: {len(_code_block_units)} code block TextUnits extracted (do_not_translate={sum(1 for u in _code_block_units if u.do_not_translate)})")
 
             # Update telemetry
             stats.ast_translation_enabled = True
@@ -2156,6 +2230,11 @@ class TranslationEngine:
                 batch_size=batch_size
             )
 
+            # DIAG: Code block units after batch translation
+            _cb_after_batch = [u for u in translated_units if u.kind == "block_code"]
+            _cb_with_content = [u for u in _cb_after_batch if u.translated_text and u.translated_text.strip()]
+            logger.info(f"AST DIAG: After batch translate: {len(_cb_after_batch)} code block units, {len(_cb_with_content)} with content")
+
             # AGENT B-7.3: Check batch-level purity failures to prevent file corruption
             # If too many batches failed language purity checks, block the entire file write
             batch_stats = extractor.batch_stats
@@ -2240,6 +2319,11 @@ class TranslationEngine:
             # Step 4: Render to Markdown
             logger.info("AST Translation: Rendering AST to Markdown")
             translated_body = renderer.render_to_markdown(doc.ast)
+
+            # DIAG: Code block count in rendered markdown
+            import re as _re_diag
+            _rendered_cb = len(_re_diag.findall(r"^```", translated_body, _re_diag.MULTILINE)) // 2
+            logger.info(f"AST DIAG: Rendered markdown contains {_rendered_cb} code blocks")
 
             # Telemetry: Track success
             logger.info(f"AST Translation: Successfully translated {translatable_units} units "
@@ -2600,6 +2684,11 @@ class TranslationEngine:
                 use_ast = False
 
         if not use_ast:
+            # DIAG: Log code block count from source AST before legacy fallback
+            import re as _re_legacy_diag
+            _src_ast_text = str(doc.ast) if doc.ast else ""
+            _legacy_src_cb = len(_re_legacy_diag.findall(r"^```", _src_ast_text, _re_legacy_diag.MULTILINE)) // 2
+            logger.info(f"LEGACY DIAG: Source has ~{_legacy_src_cb} code blocks, using legacy MarkdownReconstructor")
             # Legacy: Build segment_map for body reconstruction (node_id -> segment_id)
             segment_map = {}
             for segment in segments:

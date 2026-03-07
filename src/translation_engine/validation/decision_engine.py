@@ -60,6 +60,7 @@ class ValidationDecisionEngine:
         "PlaceholderValidator",
         "CodeBlockValidator",
         "LinkValidator",
+        "StructureValidator",
     }
 
     def __init__(self, config: Dict[str, Any], telemetry=None, run_context=None) -> None:
@@ -173,7 +174,9 @@ class ValidationDecisionEngine:
                 return decision_result
 
         # Rule 5: Exhausted retries → ACCEPT or REJECT
-        if self.accept_after_max_retries:
+        # Never accept if a critical validator still reports errors
+        critical_still_failing = self._check_critical_failure(validation_result)
+        if self.accept_after_max_retries and not critical_still_failing:
             decision_result = DecisionResult(
                 decision=ValidationDecision.ACCEPT,
                 decision_reason=f"Best effort after {retry_count} retries",

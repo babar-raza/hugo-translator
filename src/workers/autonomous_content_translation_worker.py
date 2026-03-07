@@ -273,6 +273,7 @@ class AutonomousContentTranslationWorker:
                 tm=tm,
                 model_loader=model_loader,
                 enable_telemetry=True,  # Always enable telemetry for autonomous workers
+                model_id="professionalize_llm",
             )
             logger.info("Initialized TranslationEngine")
         except Exception as e:
@@ -330,7 +331,7 @@ class AutonomousContentTranslationWorker:
             logger.debug(f"Worker state write failed (non-fatal): {exc}")
 
     def _start_heartbeat_thread(self):
-        """Start a daemon thread that writes heartbeat every 60 seconds."""
+        """Start a daemon thread that writes heartbeat every 3600 seconds (60 minutes)."""
         self._heartbeat_stop_event = threading.Event()
 
         def _heartbeat_loop():
@@ -339,7 +340,7 @@ class AutonomousContentTranslationWorker:
                     self._write_heartbeat("alive")
                 except Exception as e:
                     logger.warning(f"Heartbeat write failed: {e}")
-                self._heartbeat_stop_event.wait(timeout=60)
+                self._heartbeat_stop_event.wait(timeout=3600)
 
         self._heartbeat_thread = threading.Thread(
             target=_heartbeat_loop,
@@ -347,7 +348,7 @@ class AutonomousContentTranslationWorker:
             daemon=True,
         )
         self._heartbeat_thread.start()
-        logger.info("Background heartbeat thread started (60s interval)")
+        logger.info("Background heartbeat thread started (3600s interval)")
 
     def _stop_heartbeat_thread(self):
         """Signal the heartbeat thread to stop."""
@@ -743,9 +744,27 @@ class AutonomousContentTranslationWorker:
             f"{result.failed_files} failed"
         )
 
+        # LLM-WASTE-FIX-1: Skip commit when ALL file results have every language
+        # in skipped_langs (no new translations produced).  This avoids the
+        # costly collect_output_files() → empty list → fallback git-status cycle
+        # that was burning wall-clock time on sites with all outputs present.
+        _has_new_translations = True
+        if hasattr(result, 'file_results') and result.file_results:
+            _has_new_translations = any(
+                set(fr.outputs.keys()) - set(fr.skipped_langs)
+                for fr in result.file_results
+                if fr.success and fr.outputs
+            )
+            if not _has_new_translations:
+                logger.info(
+                    "All %d files had every language skipped (outputs already exist). "
+                    "Skipping commit attempt.",
+                    result.successful_files,
+                )
+
         # Commit only modified files using git_commit_helper
         # This reuses existing TC-GIT-01 flow with commit hash association
-        if result.successful_files > 0:
+        if result.successful_files > 0 and _has_new_translations:
             logger.info("Auto-committing translation outputs...")
 
             # Pre-commit diagnostic logging
@@ -852,6 +871,119 @@ class AutonomousContentTranslationWorker:
         )
         return f"{subject}\n\n{body}"
 
+    @staticmethod
+    def _validate_orphan_structural_integrity(
+        orphan_path: Path,
+        git_root: Path,
+        source_lang: str,
+        per_language_folders: bool,
+    ) -> bool:
+        """Check that an orphaned translation file preserves the structural
+        integrity of its source file (code blocks, heading count, no TITLE: prefix).
+
+        CRITICAL: Reads source from git HEAD (not disk) to avoid comparing
+        against a corrupted working-tree copy of the source file.
+
+        Returns True if the file passes validation, False if it should be rejected.
+        """
+        import re
+        import subprocess
+
+        # --- Derive source file path (relative to git root) ---
+        try:
+            orphan_rel = orphan_path.resolve().relative_to(git_root.resolve())
+        except ValueError:
+            logger.warning("[orphan_gate] Cannot derive relative path for %s", orphan_path)
+            return True  # can't validate — let it through
+
+        if per_language_folders:
+            # Folder-based: e.g. content/fr/blog/post/index.md → content/en/blog/post/index.md
+            parts = list(orphan_rel.parts)
+            if len(parts) >= 2:
+                parts[0] = source_lang
+                source_rel = Path(*parts)
+            else:
+                return True
+        else:
+            # File-based: e.g. content/blog/post/index.pl.md → content/blog/post/index.md
+            name = orphan_path.name
+            # Strip language suffix: index.pl.md → index.md
+            stem_parts = name.rsplit(".", 2)
+            if len(stem_parts) >= 3:
+                source_name = stem_parts[0] + "." + stem_parts[-1]
+            else:
+                return True  # can't determine source name
+            source_rel = orphan_rel.parent / source_name
+
+        # --- Read source from git HEAD (not disk!) ---
+        source_rel_posix = source_rel.as_posix()
+        try:
+            result = subprocess.run(
+                ["git", "show", f"HEAD:{source_rel_posix}"],
+                cwd=str(git_root),
+                capture_output=True, text=True,
+                encoding="utf-8", errors="replace",
+                timeout=10,
+            )
+            if result.returncode != 0:
+                logger.debug("[orphan_gate] Source not in git HEAD: %s", source_rel_posix)
+                return True  # source missing from git — can't compare
+            source_text = result.stdout
+        except Exception as e:
+            logger.warning("[orphan_gate] git show failed for %s: %s", source_rel_posix, e)
+            return True
+
+        # --- Read orphan from disk ---
+        try:
+            orphan_text = orphan_path.read_text(encoding="utf-8", errors="replace")
+        except OSError as e:
+            logger.warning("[orphan_gate] Cannot read orphan %s: %s", orphan_path.name, e)
+            return True
+
+        # --- Strip frontmatter for body comparison ---
+        def strip_frontmatter(text: str) -> str:
+            if text.startswith("---"):
+                end = text.find("---", 3)
+                if end != -1:
+                    return text[end + 3:].lstrip("\n")
+            return text
+
+        source_body = strip_frontmatter(source_text)
+        orphan_body = strip_frontmatter(orphan_text)
+
+        # --- Check 1: TITLE: prefix (hallucination marker) ---
+        if orphan_body.lstrip().startswith("TITLE:"):
+            logger.error(
+                "[orphan_gate] REJECTED %s — body starts with 'TITLE:' (hallucination marker)",
+                orphan_path.name,
+            )
+            return False
+
+        # --- Check 2: Code block preservation ---
+        source_code_blocks = len(re.findall(r"^```", source_body, re.MULTILINE)) // 2
+        orphan_code_blocks = len(re.findall(r"^```", orphan_body, re.MULTILINE)) // 2
+
+        if source_code_blocks > 0 and orphan_code_blocks < source_code_blocks:
+            logger.error(
+                "[orphan_gate] REJECTED %s — code blocks decreased: source=%d orphan=%d",
+                orphan_path.name, source_code_blocks, orphan_code_blocks,
+            )
+            return False
+
+        # --- Check 3: Heading surplus (hallucinated sections) ---
+        source_headings = len(re.findall(r"^#{1,6}\s", source_body, re.MULTILINE))
+        orphan_headings = len(re.findall(r"^#{1,6}\s", orphan_body, re.MULTILINE))
+
+        if orphan_headings >= source_headings + 3:
+            logger.error(
+                "[orphan_gate] REJECTED %s — heading surplus: source=%d orphan=%d (+%d)",
+                orphan_path.name, source_headings, orphan_headings,
+                orphan_headings - source_headings,
+            )
+            return False
+
+        return True
+
     def _commit_orphaned_translations(self) -> int:
         """Scan all configured content roots for .md files written but not committed
         in previous runs, and commit them per-site.
@@ -862,6 +994,11 @@ class AutonomousContentTranslationWorker:
         Returns:
             Total number of files committed across all sites.
         """
+        # DISABLED: orphan recovery is committing corrupted files (code blocks
+        # stripped, hallucinated content, even overwriting English source files).
+        # Root cause investigation in progress. See commit 3f90f922.
+        logger.warning("[orphan_sweep] DISABLED — orphan recovery is suspended pending root cause fix")
+        return 0
         import subprocess
         from src.observability.git_commit import GitCommitter, GitCommitConfig
         from src.observability.git_context import find_git_root
@@ -935,6 +1072,14 @@ class AutonomousContentTranslationWorker:
                         )
                         continue
 
+                    # Determine localization strategy to filter translation outputs
+                    output_layout = getattr(profile, 'output_layout', None)
+                    per_language_folders = False
+                    if output_layout:
+                        per_language_folders = getattr(output_layout, 'per_language_folders', False)
+                    source_lang = getattr(profile, 'default_source_lang', 'en')
+                    target_langs = getattr(profile, 'target_langs', None) or []
+
                     orphaned: List[Path] = []
                     for line in status_result.stdout.splitlines():
                         status_code = line[:2]
@@ -946,6 +1091,42 @@ class AutonomousContentTranslationWorker:
                                 orphaned.extend(abs_path.rglob("*.md"))
                             elif abs_path.suffix == ".md" and abs_path.exists():
                                 orphaned.append(abs_path)
+
+                    # Filter to translation outputs only — exclude source-language
+                    # files and files changed by other processes (e.g. example reviewer)
+                    if per_language_folders:
+                        # Folder-based: keep only files NOT in the source lang folder
+                        source_markers = [f'/{source_lang}/', f'\\{source_lang}\\']
+                        orphaned = [
+                            f for f in orphaned
+                            if not any(m in str(f) for m in source_markers)
+                        ]
+                    elif target_langs:
+                        # File-based: keep only files with a target-lang suffix
+                        from src.translation_engine.engine import _is_translated_filename
+                        orphaned = [
+                            f for f in orphaned
+                            if _is_translated_filename(f.name, target_langs, source_lang)[0]
+                        ]
+
+                    if not orphaned:
+                        continue
+
+                    # Structural integrity gate — reject orphans with code block
+                    # loss, hallucinated sections, or TITLE: prefix corruption
+                    pre_gate = len(orphaned)
+                    orphaned = [
+                        f for f in orphaned
+                        if self._validate_orphan_structural_integrity(
+                            f, git_root, source_lang, per_language_folders,
+                        )
+                    ]
+                    rejected = pre_gate - len(orphaned)
+                    if rejected:
+                        logger.warning(
+                            "[orphan_sweep] %s: structural gate rejected %d/%d file(s)",
+                            site_id, rejected, pre_gate,
+                        )
 
                     if not orphaned:
                         continue
