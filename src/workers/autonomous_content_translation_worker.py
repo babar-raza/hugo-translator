@@ -930,15 +930,22 @@ class AutonomousContentTranslationWorker:
                 return True  # source missing from git — can't compare
             source_text = result.stdout
         except Exception as e:
-            logger.warning("[orphan_gate] git show failed for %s: %s", source_rel_posix, e)
-            return True
+            logger.error(
+                "[orphan_gate] git show FAILED for %s: %s — REJECTING (fail-safe; "
+                "fix git access before re-enabling orphan recovery)",
+                source_rel_posix, e,
+            )
+            return False  # fail-safe: unknown state is treated as corrupted
 
         # --- Read orphan from disk ---
         try:
             orphan_text = orphan_path.read_text(encoding="utf-8", errors="replace")
         except OSError as e:
-            logger.warning("[orphan_gate] Cannot read orphan %s: %s", orphan_path.name, e)
-            return True
+            logger.error(
+                "[orphan_gate] Cannot read orphan %s: %s — REJECTING (fail-safe)",
+                orphan_path.name, e,
+            )
+            return False  # fail-safe
 
         # --- Strip frontmatter for body comparison ---
         def strip_frontmatter(text: str) -> str:
