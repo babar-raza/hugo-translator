@@ -65,6 +65,7 @@ class AutonomousWorkerConfig:
         timezone: str = "America/Los_Angeles",
         jitter_minutes: int = 10,
         max_sites_per_run: Optional[int] = None,
+        max_seconds_per_run: Optional[int] = None,
         max_gpu_memory_percent: Optional[int] = 60,
         device: str = "auto",
         file_timeout_seconds: int = 600,
@@ -79,6 +80,7 @@ class AutonomousWorkerConfig:
         self.timezone = timezone
         self.jitter_minutes = jitter_minutes
         self.max_sites_per_run = max_sites_per_run
+        self.max_seconds_per_run = max_seconds_per_run
         self.max_gpu_memory_percent = max_gpu_memory_percent
         self.device = device
         self.file_timeout_seconds = file_timeout_seconds
@@ -141,6 +143,8 @@ class AutonomousContentTranslationWorker:
         self.config_service = None
         self.translation_engine = None
         self.scheduler = None
+        self._site_profile_cache = {}
+        self._site_profile_errors = {}
 
         # Generate stable run ID for this invocation (used across all sites in this run)
         self.invocation_id = str(uuid.uuid4())
@@ -273,7 +277,7 @@ class AutonomousContentTranslationWorker:
                 tm=tm,
                 model_loader=model_loader,
                 enable_telemetry=True,  # Always enable telemetry for autonomous workers
-                model_id="professionalize_llm",
+                model_id=self.config_service.get_config().get('model_defaults', {}).get('fallback_model', 'm2m100_1.2b'),
             )
             logger.info("Initialized TranslationEngine")
         except Exception as e:
@@ -331,7 +335,7 @@ class AutonomousContentTranslationWorker:
             logger.debug(f"Worker state write failed (non-fatal): {exc}")
 
     def _start_heartbeat_thread(self):
-        """Start a daemon thread that writes heartbeat every 3600 seconds (60 minutes)."""
+        """Start a daemon thread that writes heartbeat every 60 seconds."""
         self._heartbeat_stop_event = threading.Event()
 
         def _heartbeat_loop():
@@ -340,7 +344,7 @@ class AutonomousContentTranslationWorker:
                     self._write_heartbeat("alive")
                 except Exception as e:
                     logger.warning(f"Heartbeat write failed: {e}")
-                self._heartbeat_stop_event.wait(timeout=3600)
+                self._heartbeat_stop_event.wait(timeout=60)
 
         self._heartbeat_thread = threading.Thread(
             target=_heartbeat_loop,
@@ -348,7 +352,7 @@ class AutonomousContentTranslationWorker:
             daemon=True,
         )
         self._heartbeat_thread.start()
-        logger.info("Background heartbeat thread started (3600s interval)")
+        logger.info("Background heartbeat thread started (60s interval)")
 
     def _stop_heartbeat_thread(self):
         """Signal the heartbeat thread to stop."""
@@ -384,11 +388,21 @@ class AutonomousContentTranslationWorker:
             logger.warning(f"PREFLIGHT FAIL: Config root missing: {config_root}")
             checks_passed = False
 
-        # 3. Disk space > 5%
+        # 3. Disk space > 5% (check output drive, not CWD)
         try:
-            total, used, free = shutil.disk_usage(".")
+            # Check the content root drive (where translations are written)
+            disk_check_path = "."
+            if self.config_service and self.config.site:
+                try:
+                    profile = self.config_service.get_site_profile(self.config.site)
+                    if profile and profile.content_roots:
+                        resolved = self.config_service.resolve_content_root(profile.content_roots[0])
+                        disk_check_path = str(resolved)
+                except Exception:
+                    pass  # Fall back to CWD
+            total, used, free = shutil.disk_usage(disk_check_path)
             if (free / total) < 0.05:
-                logger.warning(f"PREFLIGHT FAIL: Disk space critical ({free / total * 100:.1f}% free)")
+                logger.warning(f"PREFLIGHT FAIL: Disk space critical ({free / total * 100:.1f}% free on {disk_check_path})")
                 checks_passed = False
         except Exception as e:
             logger.warning(f"PREFLIGHT WARNING: Could not check disk space: {e}")
@@ -487,6 +501,10 @@ class AutonomousContentTranslationWorker:
 
         try:
             while True:
+                # BUG-1 FIX: Release VRAM before sleeping so TM worker can load its LLM.
+                # M2M100 (4.7 GB) stayed resident across all sleep periods without this call.
+                # Mirrors the pattern in tm_improvement_worker.py:_offload_resources().
+                self._offload_models()
                 # Sleep until next run time
                 self._write_heartbeat("sleeping")
                 next_run = self.scheduler.sleep_until_next_run()
@@ -601,6 +619,13 @@ class AutonomousContentTranslationWorker:
         2. Translate each content_root directory
         3. Commit only modified files with git_commit_helper
         """
+        # BUG-2 FIX: Initialize per-run tracking so health monitoring works correctly.
+        # Without this, _run_new_files is always {} → success=False on every run →
+        # last_success_ts is never written → health checks show "never succeeded".
+        # Also initializes _run_start so per-site time limits are enforced.
+        self._run_new_files = {}
+        self._run_start = time.time()
+
         # Determine sites to process
         if self.config.site:
             # Single site specified
@@ -647,7 +672,7 @@ class AutonomousContentTranslationWorker:
 
         # Load site profile
         try:
-            site_profile = self.config_service.get_site_profile(site_id)
+            site_profile = self._get_site_profile(site_id)
         except Exception as e:
             logger.error(f"Failed to load site profile {site_id}: {e}")
             return
@@ -672,16 +697,97 @@ class AutonomousContentTranslationWorker:
                 )
                 # Continue with next content_root
 
+    def _get_site_profile(self, site_id: str):
+        """Load and cache a site profile for the current worker invocation."""
+        if not hasattr(self, "_site_profile_cache") or self._site_profile_cache is None:
+            self._site_profile_cache = {}
+        if not hasattr(self, "_site_profile_errors") or self._site_profile_errors is None:
+            self._site_profile_errors = {}
+        if site_id in self._site_profile_errors:
+            raise self._site_profile_errors[site_id]
+        if site_id not in self._site_profile_cache:
+            try:
+                self._site_profile_cache[site_id] = self.config_service.get_site_profile(site_id)
+            except Exception as exc:
+                self._site_profile_errors[site_id] = exc
+                raise
+        return self._site_profile_cache[site_id]
+
+    def _iter_recovery_git_roots(self) -> List[Path]:
+        """Discover git roots relevant to this worker run without reloading profiles."""
+        from src.observability.git_context import find_git_root
+
+        git_roots: set[Path] = set()
+        sites = [self.config.site] if self.config.site else self.config_service.list_sites()
+        if (
+            not self.config.site
+            and self.config.max_sites_per_run
+            and len(sites) > self.config.max_sites_per_run
+        ):
+            sites = sites[: self.config.max_sites_per_run]
+        for site_id in sites:
+            try:
+                profile = self._get_site_profile(site_id)
+            except Exception:
+                continue
+
+            for content_root_str in (profile.content_roots or []):
+                try:
+                    content_root = self.config_service.resolve_content_root(content_root_str)
+                    git_root = find_git_root(content_root)
+                    if git_root:
+                        git_roots.add(git_root)
+                except Exception:
+                    continue
+
+        return sorted(git_roots)
+
+    def _site_ids_for_git_root(self, git_root: Path) -> List[str]:
+        """Return configured sites whose content roots live under this git root."""
+        from src.observability.git_context import find_git_root
+
+        site_ids: List[str] = []
+        sites = [self.config.site] if self.config.site else self.config_service.list_sites()
+        if (
+            not self.config.site
+            and self.config.max_sites_per_run
+            and len(sites) > self.config.max_sites_per_run
+        ):
+            sites = sites[: self.config.max_sites_per_run]
+
+        for site_id in sites:
+            try:
+                profile = self._get_site_profile(site_id)
+            except Exception:
+                continue
+
+            for content_root_str in (profile.content_roots or []):
+                try:
+                    content_root = self.config_service.resolve_content_root(content_root_str)
+                    if find_git_root(content_root) == git_root:
+                        site_ids.append(site_id)
+                        break
+                except Exception:
+                    continue
+
+        return site_ids
+
     def _translate_content_root(
-        self, site_id: str, content_root: str, target_langs: List[str]
+        self, site_id: str, content_root: str, target_langs: List[str],
+        batch_idx: int = 1,
     ) -> None:
         """
         Translate a single content_root directory.
+
+        Supports chunked commit mode (files_per_commit > 0) where translation
+        runs in fixed-size slices with a commit after each chunk.  Legacy mode
+        (files_per_commit == 0) is a single-pass translate + commit.
 
         Args:
             site_id: Site identifier
             content_root: Content root directory path
             target_langs: Target language codes
+            batch_idx: Daemon-run batch number (used to build unique run_ids)
         """
         resolved_content_dir = (
             self.config_service.resolve_content_root(content_root)
@@ -698,111 +804,228 @@ class AutonomousContentTranslationWorker:
             )
             return
 
+        # Read chunked commit config
+        raw_config = self.config_service.get_config() if self.config_service is not None else {}
+        files_per_commit = raw_config.get("git_commit", {}).get("files_per_commit", 0) or 0
+
+        # Compute run_deadline (per-site override > global config)
+        per_site_limits = (
+            raw_config
+            .get("autonomous_content_translation", {})
+            .get("execution", {})
+            .get("per_site_limits", {})
+        )
+        site_max_seconds = (
+            per_site_limits.get(site_id, {}).get("max_seconds_per_run")
+            if isinstance(per_site_limits, dict)
+            else None
+        )
+        effective_max_seconds = site_max_seconds or getattr(self.config, "max_seconds_per_run", None)
+        _PRE_RUN_BUFFER = 300  # seconds reserved for clean shutdown
+        run_deadline = (
+            self._run_start + effective_max_seconds - _PRE_RUN_BUFFER
+            if effective_max_seconds is not None and getattr(self, "_run_start", None) is not None
+            else None
+        )
+
         logger.info(f"Translating content_root: {resolved_content_dir}")
         logger.info(f"Target languages: {', '.join(target_langs)}")
 
-        # Run translation with timeout protection
-        # Timeout scales with number of target languages
         timeout_seconds = self.config.file_timeout_seconds * len(target_langs)
         operation_name = f"translate_directory({resolved_content_dir.name}, {len(target_langs)} langs)"
 
-        try:
-            with timeout_guard(timeout_seconds, operation_name):
-                # Run translation with trigger_type="scheduled"
-                # This ensures telemetry is tagged correctly
-                result = self.translation_engine.translate_directory(
-                    site_id=site_id,
-                    directory=resolved_content_dir,
-                    target_langs=target_langs,
-                    recursive=True,
-                    parallel=True,
-                    trigger_type="scheduled",  # CRITICAL: Use "scheduled" trigger type
-                )
-        except TimeoutError as e:
-            logger.error(
-                f"⏱️  TIMEOUT: Translation exceeded {timeout_seconds}s limit: {e}"
-            )
-            self._write_heartbeat("timeout_detected")
-            emit_worker_event(
-                agent_name="content_worker",
-                job_type="worker_timeout",
-                status="failure",
-                error_summary=str(e)[:500],
-                metrics={
-                    "timeout_seconds": timeout_seconds,
-                    "content_root": str(content_root),
-                    "target_langs": target_langs,
-                },
-            )
-            # Re-raise to trigger consecutive failure tracking
-            raise
+        # Pre-loop remaining time check
+        if run_deadline is not None:
+            remaining = run_deadline - time.time()
+            if remaining <= 0:
+                logger.warning("Run deadline already exceeded before translation, skipping")
+                return
+            logger.info(f"Time budget for this content root: {remaining:.0f}s")
 
-        # Log summary
-        logger.info(
-            f"Translation completed: "
-            f"{result.successful_files}/{result.total_files} files succeeded, "
-            f"{result.failed_files} failed"
-        )
+        if files_per_commit > 0:
+            # Chunked commit mode: translate in fixed-size slices
+            chunk_idx = 0
+            skip_first = 0
+            while True:
+                # Pre-chunk deadline check
+                if run_deadline is not None and time.time() >= run_deadline:
+                    logger.info("Run deadline reached, stopping chunked translation")
+                    break
 
-        # LLM-WASTE-FIX-1: Skip commit when ALL file results have every language
-        # in skipped_langs (no new translations produced).  This avoids the
-        # costly collect_output_files() → empty list → fallback git-status cycle
-        # that was burning wall-clock time on sites with all outputs present.
-        _has_new_translations = True
-        if hasattr(result, 'file_results') and result.file_results:
-            _has_new_translations = any(
-                set(fr.outputs.keys()) - set(fr.skipped_langs)
-                for fr in result.file_results
-                if fr.success and fr.outputs
-            )
-            if not _has_new_translations:
+                run_id = f"{self.invocation_id}:{site_id}:batch-{batch_idx}-chunk-{chunk_idx}"
+                try:
+                    with timeout_guard(timeout_seconds, operation_name):
+                        result = self.translation_engine.translate_directory(
+                            site_id=site_id,
+                            directory=resolved_content_dir,
+                            target_langs=target_langs,
+                            recursive=True,
+                            parallel=True,
+                            trigger_type="scheduled",
+                            max_files=files_per_commit,
+                            skip_first=skip_first,
+                            run_deadline=run_deadline,
+                        )
+                except TimeoutError as e:
+                    logger.error(f"⏱️  TIMEOUT: Translation exceeded {timeout_seconds}s limit: {e}")
+                    self._write_heartbeat("timeout_detected")
+                    emit_worker_event(
+                        agent_name="content_worker",
+                        job_type="worker_timeout",
+                        status="failure",
+                        error_summary=str(e)[:500],
+                        metrics={"timeout_seconds": timeout_seconds,
+                                 "content_root": str(content_root),
+                                 "target_langs": target_langs},
+                    )
+                    raise
+
                 logger.info(
-                    "All %d files had every language skipped (outputs already exist). "
-                    "Skipping commit attempt.",
-                    result.successful_files,
+                    "Chunk %d: %d/%d files succeeded, %d failed",
+                    chunk_idx, result.successful_files, result.total_files, result.failed_files,
                 )
 
-        # Commit only modified files using git_commit_helper
-        # This reuses existing TC-GIT-01 flow with commit hash association
-        if result.successful_files > 0 and _has_new_translations:
-            logger.info("Auto-committing translation outputs...")
+                # Log rejection rate for validation monitoring
+                try:
+                    agg = result.aggregate_stats
+                    rejected = getattr(agg, 'rejected_count', 0) or 0
+                    if rejected > 0 and result.total_files > 0:
+                        rej_rate = rejected / result.total_files * 100
+                        logger.info("Chunk %d rejection rate: %d/%d (%.1f%%)",
+                                    chunk_idx, rejected, result.total_files, rej_rate)
+                        if rej_rate > 10:
+                            logger.warning("High rejection rate %.1f%% in chunk %d — check validation config",
+                                           rej_rate, chunk_idx)
+                except (AttributeError, TypeError):
+                    pass  # Gracefully handle incomplete result objects
 
-            # Pre-commit diagnostic logging
-            logger.info(f"[COMMIT-DIAG] Pre-commit state:")
-            logger.info(f"  - successful_files: {result.successful_files}")
-            logger.info(f"  - total_files: {result.total_files}")
-            logger.info(f"  - failed_files: {result.failed_files}")
+                # BUG-2 FIX: Accumulate successful file count for run-level health tracking
+                _site_files = getattr(self, "_run_new_files", {})
+                _site_files[site_id] = _site_files.get(site_id, 0) + result.successful_files
+                self._run_new_files = _site_files
 
-            if hasattr(result, 'file_results') and result.file_results:
-                logger.info(f"  - file_results count: {len(result.file_results)}")
-                # Sample first result for diagnostics
-                first = result.file_results[0]
-                logger.info(f"  - first result success: {first.success}")
-                logger.info(f"  - first result outputs: {list(first.outputs.keys())}")
-                logger.info(f"  - first result skipped_langs: {first.skipped_langs}")
-                logger.info(f"  - first output path: {list(first.outputs.values())[0] if first.outputs else 'None'}")
+                if result.successful_files > 0:
+                    success = auto_commit_translations(
+                        result=result,
+                        site_id=site_id,
+                        target_langs=target_langs,
+                        run_id=run_id,
+                        config_service=self.config_service,
+                    )
+                    if success:
+                        logger.info("Chunk %d committed", chunk_idx)
+                    else:
+                        logger.error("Chunk %d commit failed", chunk_idx)
 
-            # Generate run_id for this specific translation (includes invocation_id + site + content_root)
+                chunk_idx += 1
+                skip_first += result.total_files
+
+                # Exit when the slice was smaller than the chunk size (last slice)
+                if result.total_files < files_per_commit:
+                    break
+
+        else:
+            # Legacy single-pass mode
             run_id = f"{self.invocation_id}:{site_id}:{Path(content_root).name}"
+            try:
+                with timeout_guard(timeout_seconds, operation_name):
+                    result = self.translation_engine.translate_directory(
+                        site_id=site_id,
+                        directory=resolved_content_dir,
+                        target_langs=target_langs,
+                        recursive=True,
+                        parallel=True,
+                        trigger_type="scheduled",
+                        max_files=0,
+                        run_deadline=run_deadline,
+                    )
+            except TimeoutError as e:
+                logger.error(f"⏱️  TIMEOUT: Translation exceeded {timeout_seconds}s limit: {e}")
+                self._write_heartbeat("timeout_detected")
+                emit_worker_event(
+                    agent_name="content_worker",
+                    job_type="worker_timeout",
+                    status="failure",
+                    error_summary=str(e)[:500],
+                    metrics={"timeout_seconds": timeout_seconds,
+                             "content_root": str(content_root),
+                             "target_langs": target_langs},
+                )
+                raise
 
-            success = auto_commit_translations(
-                result=result,
-                site_id=site_id,
-                target_langs=target_langs,
-                run_id=run_id,
-                config_service=self.config_service,
+            logger.info(
+                f"Translation completed: "
+                f"{result.successful_files}/{result.total_files} files succeeded, "
+                f"{result.failed_files} failed"
             )
 
-            # Post-commit diagnostic logging
-            logger.info(f"[COMMIT-DIAG] Post-commit result: {success}")
+            # Log rejection rate for validation monitoring
+            try:
+                agg = result.aggregate_stats
+                rejected = getattr(agg, 'rejected_count', 0) or 0
+                if rejected > 0 and result.total_files > 0:
+                    rej_rate = rejected / result.total_files * 100
+                    logger.info("Rejection rate: %d/%d (%.1f%%)",
+                                rejected, result.total_files, rej_rate)
+                    if rej_rate > 10:
+                        logger.warning("High rejection rate %.1f%% — check validation config", rej_rate)
+            except (AttributeError, TypeError):
+                pass  # Gracefully handle incomplete result objects
 
-            if success:
-                logger.info("Git commit successful")
+            # BUG-2 FIX: Accumulate successful file count for run-level health tracking
+            _site_files = getattr(self, "_run_new_files", {})
+            _site_files[site_id] = _site_files.get(site_id, 0) + result.successful_files
+            self._run_new_files = _site_files
+
+            # LLM-WASTE-FIX-1: Skip commit when ALL file results have every language skipped
+            _has_new_translations = True
+            if hasattr(result, 'file_results') and result.file_results:
+                _has_new_translations = any(
+                    set(fr.outputs.keys()) - set(fr.skipped_langs)
+                    for fr in result.file_results
+                    if fr.success and fr.outputs
+                )
+                if not _has_new_translations:
+                    logger.info(
+                        "All %d files had every language skipped (outputs already exist). "
+                        "Skipping commit attempt.",
+                        result.successful_files,
+                    )
+
+            if result.successful_files > 0 and _has_new_translations:
+                success = auto_commit_translations(
+                    result=result,
+                    site_id=site_id,
+                    target_langs=target_langs,
+                    run_id=run_id,
+                    config_service=self.config_service,
+                )
+                if success:
+                    logger.info("Git commit successful")
+                else:
+                    logger.error("Git commit FAILED or was SKIPPED - check logs above for details")
             else:
-                # Elevate from WARNING to ERROR for visibility
-                logger.error("Git commit FAILED or was SKIPPED - check logs above for details")
-        else:
-            logger.info("No successful translations, skipping git commit")
+                logger.info("No successful translations, skipping git commit")
+
+    def _offload_models(self) -> None:
+        """Unload translation model weights and free VRAM between daemon runs."""
+        if self.translation_engine is None:
+            return
+        model_loader = getattr(self.translation_engine, "model_loader", None)
+        if model_loader is None:
+            return
+        loaded_models = getattr(model_loader, "loaded_models", {})
+        if not loaded_models:
+            return
+        model_loader.unload_all()
+        import gc
+        gc.collect()
+        try:
+            import torch
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
+        except ImportError:
+            pass
 
     @staticmethod
     def _build_orphan_commit_message(
@@ -992,6 +1215,43 @@ class AutonomousContentTranslationWorker:
         return True
 
     def _commit_orphaned_translations(self) -> int:
+        from src.observability.git_commit_helper import recover_orphaned_commit_manifests
+        from src.observability.legacy_backlog_recovery import recover_legacy_translation_backlog
+
+        try:
+            git_roots = self._iter_recovery_git_roots()
+        except Exception as exc:
+            logger.warning(f"[orphan_sweep] Could not discover git roots: {exc}")
+            return 0
+
+        total_recovered = 0
+        for git_root in git_roots:
+            try:
+                recovered = recover_orphaned_commit_manifests(git_root)
+                if recovered:
+                    logger.info(
+                        f"[orphan_sweep] Recovered {recovered} manifest-backed commit(s) in {git_root}"
+                    )
+                total_recovered += recovered
+
+                legacy_report = recover_legacy_translation_backlog(
+                    repo=git_root,
+                    config_service=self.config_service,
+                    validate_fn=self._validate_orphan_structural_integrity,
+                    build_message_fn=self._build_orphan_commit_message,
+                    site_ids=self._site_ids_for_git_root(git_root),
+                    apply=True,
+                )
+                legacy_commits = sum(1 for item in legacy_report.commits if item.commit_hash)
+                if legacy_commits:
+                    logger.info(
+                        f"[orphan_sweep] Recovered {legacy_commits} legacy backlog commit(s) in {git_root}"
+                    )
+                total_recovered += legacy_commits
+            except Exception as exc:
+                logger.warning(f"[orphan_sweep] {git_root}: {exc}")
+
+        return total_recovered
         """Scan all configured content roots for .md files written but not committed
         in previous runs, and commit them per-site.
 
@@ -1186,32 +1446,26 @@ class AutonomousContentTranslationWorker:
         Discovers the git root for every configured content root, then delegates to
         recover_pending_commits() which handles staging and committing.
         """
-        from src.observability.git_commit_helper import recover_pending_commits
-        from src.observability.git_context import find_git_root
-
-        git_roots: set = set()
+        from src.observability.git_commit_helper import (
+            recover_orphaned_commit_manifests,
+            recover_pending_commits,
+        )
         try:
-            sites = self.config_service.list_sites()
+            git_roots = self._iter_recovery_git_roots()
         except Exception as exc:
-            logger.warning(f"[pending_commit_recovery] Could not list sites: {exc}")
+            logger.warning(f"[pending_commit_recovery] Could not discover git roots: {exc}")
             return
-
-        for site_id in sites:
-            try:
-                profile = self.config_service.get_site_profile(site_id)
-                for content_root in (profile.content_roots or []):
-                    try:
-                        resolved = self.config_service.resolve_content_root(content_root)
-                        gr = find_git_root(resolved)
-                        if gr:
-                            git_roots.add(gr)
-                    except Exception:
-                        pass
-            except Exception:
-                pass
 
         for git_root in git_roots:
             try:
+                manifest_recovered = recover_orphaned_commit_manifests(
+                    git_root,
+                    stale_ready_seconds=0,
+                )
+                if manifest_recovered > 0:
+                    logger.info(
+                        f"[pending_commit_recovery] Recovered {manifest_recovered} manifest commit(s) in {git_root}"
+                    )
                 n = recover_pending_commits(git_root)
                 if n > 0:
                     logger.info(
@@ -1370,6 +1624,10 @@ def main():
         force=True,
     )
 
+    # Ensure logs are flushed on any exit path (normal, exception, signal)
+    import atexit
+    atexit.register(logging.shutdown)
+
     logger.info("=" * 80)
     logger.info("AUTONOMOUS CONTENT TRANSLATION WORKER")
     logger.info("=" * 80)
@@ -1418,6 +1676,7 @@ def main():
             cleanup_telemetry_contexts(sig_name)
         except Exception:
             pass
+        logging.shutdown()
         sys.exit(0)
 
     for sig in [signal.SIGINT, signal.SIGTERM]:
@@ -1425,7 +1684,15 @@ def main():
     if platform.system() == "Windows" and hasattr(signal, 'SIGBREAK'):
         signal.signal(signal.SIGBREAK, _shutdown_handler)
 
-    worker.run()
+    try:
+        worker.run()
+    except SystemExit:
+        raise  # Let sys.exit() propagate normally
+    except Exception:
+        logger.exception("Worker crashed with unhandled exception")
+        sys.exit(1)
+    finally:
+        logging.shutdown()
 
 
 if __name__ == "__main__":
