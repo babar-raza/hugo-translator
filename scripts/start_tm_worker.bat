@@ -22,23 +22,21 @@ echo - Runs per day: 4
 echo - Time window: 08:00-23:00 Pacific Time
 echo - Device: CUDA (GPU acceleration)
 echo - Max GPU memory: 50%%
-echo - LLM: Ollama/qwen3:14b
+echo - LLM: from config (global.yaml tm_improvement.llm)
 echo.
 
 python -m src.workers.tm_improvement_worker ^
     --mode daemon ^
     --runs-per-day 4 ^
-    --window-start 08:00 ^
-    --window-end 23:00 ^
-    --timezone America/Los_Angeles ^
+    --window-start 10:00 ^
+    --window-end 20:00 ^
+    --timezone Asia/Karachi ^
     --jitter-minutes 15 ^
     --device cuda ^
     --max-gpu-memory-percent 50 ^
-    --llm-provider ollama ^
-    --llm-model qwen3:14b ^
-    --candidates-per-run 50 ^
-    --max-llm-calls-per-run 200 ^
-    --max-seconds-per-run 900 ^
+    --candidates-per-run 500 ^
+    --max-llm-calls-per-run 1000 ^
+    --max-seconds-per-run 3600 ^
     --log-level INFO
 
 REM Capture exit code
