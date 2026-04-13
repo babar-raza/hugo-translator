@@ -143,6 +143,76 @@ class RepetitionDetectorValidator(PostTranslationValidator):
 
         return terms
 
+    # Minimum number of source tokens required before computing ceilings.
+    # Short sources (< 30 words) produce unreliable frequency statistics —
+    # e.g. a 2-word source gives 50% word frequency for each word, which would
+    # incorrectly raise the translation's word-frequency threshold.
+    _MIN_SOURCE_WORDS_FOR_CEILING = 30
+
+    def _source_ngram_ceiling(self, source: str) -> int:
+        """Compute the maximum n-gram repetition count in the source text.
+
+        Because source and translation use different languages, we cannot compare
+        individual n-grams across them. Instead we use the source's *maximum*
+        n-gram count as a document-level ceiling: if the source's most-repeated
+        3-gram appears N times, every n-gram in the translation is allowed up to
+        N × 1.5 repetitions before triggering an ERROR.
+
+        This prevents false positives on SEO/tutorial articles whose English
+        source intentionally repeats keyword phrases (e.g. "document versioning
+        system" 11×), while still catching true model hallucinations that add
+        repetition far beyond anything the source contained.
+
+        Returns 0 for sources shorter than _MIN_SOURCE_WORDS_FOR_CEILING — their
+        frequency statistics are unreliable and should not override the threshold.
+
+        Args:
+            source: English source text
+
+        Returns:
+            Maximum n-gram count in source (0 if source is empty or too short)
+        """
+        words = self._tokenize(source)
+        if len(words) < max(self.ngram_size, self._MIN_SOURCE_WORDS_FOR_CEILING):
+            return 0
+        ngrams = [
+            tuple(words[i:i + self.ngram_size])
+            for i in range(len(words) - self.ngram_size + 1)
+            if not any(w in self.whitelist_terms for w in words[i:i + self.ngram_size])
+        ]
+        if not ngrams:
+            return 0
+        return Counter(ngrams).most_common(1)[0][1]
+
+    def _source_max_word_freq(self, source: str) -> float:
+        """Compute the maximum word frequency in the source text.
+
+        Used as a document-level ceiling for word-frequency checks: if a word
+        dominates the source at frequency F, the same (or any) word is allowed
+        up to F × 1.1 frequency in the translation before triggering an ERROR.
+
+        Returns 0.0 for sources shorter than _MIN_SOURCE_WORDS_FOR_CEILING —
+        their word-frequency statistics are unreliable (e.g. a 2-word source
+        has 50% frequency for each word, which would incorrectly disable the
+        word-frequency check).
+
+        Args:
+            source: English source text
+
+        Returns:
+            Max word frequency ratio in source (0.0 if source is empty or too short)
+        """
+        words = self._tokenize(source)
+        filtered = [
+            w for w in words
+            if w not in self.STOP_WORDS and w not in self.whitelist_terms
+        ]
+        if len(filtered) < self._MIN_SOURCE_WORDS_FOR_CEILING:
+            return 0.0
+        total = len(filtered)
+        top_count = Counter(filtered).most_common(1)[0][1]
+        return top_count / total
+
     def validate(
         self,
         source: str,
@@ -152,7 +222,9 @@ class RepetitionDetectorValidator(PostTranslationValidator):
         """Validate translation for repetition issues.
 
         Args:
-            source: Original source text (unused, for signature compatibility)
+            source: Original source text — used to derive a document-level
+                    repetition ceiling so source-faithful keyword density in
+                    translations is not flagged as model hallucination
             translation: Translated text to check
             context: Optional context with 'translation_map' (dict[segment_id -> text])
 
@@ -163,6 +235,12 @@ class RepetitionDetectorValidator(PostTranslationValidator):
             context = {}
 
         issues = []
+
+        # Derive document-level source ceilings (cross-lingual: we cannot compare
+        # individual n-grams across languages, so we use the source's MAXIMUM
+        # n-gram / word-freq counts to scale thresholds for the whole translation).
+        src_ngram_ceil = self._source_ngram_ceiling(source) if source else 0
+        src_word_freq_ceil = self._source_max_word_freq(source) if source else 0.0
 
         # Get translation segments from context
         translation_map = context.get("translation_map", {})
@@ -177,12 +255,16 @@ class RepetitionDetectorValidator(PostTranslationValidator):
                 # Skip very short segments (unreliable for repetition detection)
                 continue
 
-            # Check 1: N-gram repetition
-            ngram_issues = self._check_ngram_repetition(segment_text, str(segment_id))
+            # Check 1: N-gram repetition (source-ceiling-scaled)
+            ngram_issues = self._check_ngram_repetition(
+                segment_text, str(segment_id), src_ngram_ceil
+            )
             issues.extend(ngram_issues)
 
-            # Check 2: Word frequency
-            word_freq_issues = self._check_word_frequency(segment_text, str(segment_id))
+            # Check 2: Word frequency (source-ceiling-scaled)
+            word_freq_issues = self._check_word_frequency(
+                segment_text, str(segment_id), src_word_freq_ceil
+            )
             issues.extend(word_freq_issues)
 
             # Check 3: Sentence duplication
@@ -207,13 +289,18 @@ class RepetitionDetectorValidator(PostTranslationValidator):
         )
 
     def _check_ngram_repetition(
-        self, text: str, segment_id: str
+        self, text: str, segment_id: str, source_ngram_ceiling: int = 0
     ) -> List[ValidationIssue]:
         """Check for n-gram repetition in text.
 
         Args:
             text: Text to check
             segment_id: Segment identifier for error reporting
+            source_ngram_ceiling: Maximum n-gram count observed in the source.
+                When > 0, thresholds are scaled document-wide: any n-gram in
+                the translation is allowed up to ceiling×1.5 repetitions before
+                triggering an ERROR. This is cross-lingual safe (no word-for-word
+                comparison) and prevents false positives on SEO/tutorial articles.
 
         Returns:
             List of validation issues found
@@ -237,36 +324,51 @@ class RepetitionDetectorValidator(PostTranslationValidator):
         # Count n-gram occurrences
         ngram_counts = Counter(ngrams)
 
+        # Document-level scaled thresholds.
+        # If source already has a 3-gram repeated N times (SEO/tutorial articles),
+        # any n-gram in the translation is allowed up to N×1.5 repetitions before
+        # we flag an ERROR — model hallucinations add far more than 1.5× source.
+        effective_error_threshold = max(
+            self.ngram_threshold,
+            int(source_ngram_ceiling * 1.5) + 1 if source_ngram_ceiling else 0,
+        )
+        effective_warn_threshold = max(
+            self.ngram_warning_threshold,
+            int(source_ngram_ceiling * 1.2) + 1 if source_ngram_ceiling else 0,
+        )
+
         # Report n-grams exceeding thresholds
         for ngram, count in ngram_counts.most_common():
-            if count >= self.ngram_threshold:
+            if count >= effective_error_threshold:
                 ngram_text = " ".join(ngram)
                 issues.append(
                     ValidationIssue(
                         validator="RepetitionDetectorValidator",
                         severity=ValidationSeverity.ERROR,
-                        message=f"{self.ngram_size}-gram '{ngram_text}' repeated {count} times (threshold: {self.ngram_threshold})",
+                        message=f"{self.ngram_size}-gram '{ngram_text}' repeated {count} times (threshold: {effective_error_threshold}, src_ceiling: {source_ngram_ceiling})",
                         location=f"segment_{segment_id}",
                         details={
                             "ngram": ngram_text,
                             "count": count,
-                            "threshold": self.ngram_threshold,
+                            "threshold": effective_error_threshold,
+                            "source_ngram_ceiling": source_ngram_ceiling,
                             "suggestion": "Translation appears to have repetitive content - retry translation",
                         },
                     )
                 )
-            elif count >= self.ngram_warning_threshold:
+            elif count >= effective_warn_threshold:
                 ngram_text = " ".join(ngram)
                 issues.append(
                     ValidationIssue(
                         validator="RepetitionDetectorValidator",
                         severity=ValidationSeverity.WARNING,
-                        message=f"{self.ngram_size}-gram '{ngram_text}' repeated {count} times (warning threshold: {self.ngram_warning_threshold})",
+                        message=f"{self.ngram_size}-gram '{ngram_text}' repeated {count} times (warning threshold: {effective_warn_threshold}, src_ceiling: {source_ngram_ceiling})",
                         location=f"segment_{segment_id}",
                         details={
                             "ngram": ngram_text,
                             "count": count,
-                            "threshold": self.ngram_warning_threshold,
+                            "threshold": effective_warn_threshold,
+                            "source_ngram_ceiling": source_ngram_ceiling,
                         },
                     )
                 )
@@ -274,13 +376,19 @@ class RepetitionDetectorValidator(PostTranslationValidator):
         return issues
 
     def _check_word_frequency(
-        self, text: str, segment_id: str
+        self, text: str, segment_id: str,
+        source_word_freq_ceiling: float = 0.0
     ) -> List[ValidationIssue]:
         """Check for excessive word frequency in text.
 
         Args:
             text: Text to check
             segment_id: Segment identifier for error reporting
+            source_word_freq_ceiling: Maximum word frequency ratio observed in
+                the source (after stop-word filtering). When the source itself
+                has a dominant word at frequency F, the effective error threshold
+                is raised to F×1.1, preventing false positives on keyword-dense
+                articles. Cross-lingual safe — no word-for-word comparison.
 
         Returns:
             List of validation issues found
@@ -306,38 +414,50 @@ class RepetitionDetectorValidator(PostTranslationValidator):
         word_counts = Counter(filtered_words)
         total_words = len(filtered_words)
 
+        # Document-level effective threshold: if source has a dominant word at
+        # frequency F, allow up to F×1.1 in the translation (mirrors source density).
+        effective_error_threshold = max(
+            self.word_freq_threshold,
+            source_word_freq_ceiling * 1.1 if source_word_freq_ceiling >= self.word_freq_threshold else 0.0,
+        )
+        effective_warn_threshold = max(
+            self.word_freq_warning_threshold,
+            source_word_freq_ceiling * 1.05 if source_word_freq_ceiling >= self.word_freq_warning_threshold else 0.0,
+        )
+
         # Check for words exceeding frequency thresholds
         for word, count in word_counts.most_common(5):  # Check top 5 most common
             frequency = count / total_words
 
-            if frequency > self.word_freq_threshold:
+            if frequency > effective_error_threshold:
                 issues.append(
                     ValidationIssue(
                         validator="RepetitionDetectorValidator",
                         severity=ValidationSeverity.ERROR,
-                        message=f"Word '{word}' appears {count} times ({frequency:.1%} of content, threshold: {self.word_freq_threshold:.0%})",
+                        message=f"Word '{word}' appears {count} times ({frequency:.1%} of content, threshold: {effective_error_threshold:.0%}, src_ceiling: {source_word_freq_ceiling:.1%})",
                         location=f"segment_{segment_id}",
                         details={
                             "word": word,
                             "count": count,
                             "frequency": frequency,
-                            "threshold": self.word_freq_threshold,
+                            "threshold": effective_error_threshold,
+                            "source_word_freq_ceiling": source_word_freq_ceiling,
                             "suggestion": "Single word dominates content - likely translation failure",
                         },
                     )
                 )
-            elif frequency > self.word_freq_warning_threshold:
+            elif frequency > effective_warn_threshold:
                 issues.append(
                     ValidationIssue(
                         validator="RepetitionDetectorValidator",
                         severity=ValidationSeverity.WARNING,
-                        message=f"Word '{word}' appears {count} times ({frequency:.1%} of content, warning threshold: {self.word_freq_warning_threshold:.0%})",
+                        message=f"Word '{word}' appears {count} times ({frequency:.1%} of content, warning threshold: {effective_warn_threshold:.0%})",
                         location=f"segment_{segment_id}",
                         details={
                             "word": word,
                             "count": count,
                             "frequency": frequency,
-                            "threshold": self.word_freq_warning_threshold,
+                            "threshold": effective_warn_threshold,
                         },
                     )
                 )

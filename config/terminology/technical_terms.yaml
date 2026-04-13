@@ -68,3 +68,6 @@ terms:
   - XZ
   - 7Z
   - BZIP2
+  # Non-translatable framework names (kb.aspose.net.words articles)
+  - ASP.NET
+  - REST

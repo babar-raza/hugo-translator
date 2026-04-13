@@ -347,6 +347,7 @@ class TranslationEngine:
                 "reject_on_placeholder_error": True,
                 "reject_on_code_block_error": True,
                 "reject_on_link_error": True,
+                "reject_on_repetition_error": False,  # Allow retries before rejecting; structured docs repeat legitimately
                 "retry_on_structure_error": True,
                 "retry_on_terminology_warning": True,
             }
@@ -1502,7 +1503,9 @@ class TranslationEngine:
                                     detected_lang, confidence = detector.detect(translated_content)
 
                                     # Check for language mismatch (with high confidence)
-                                    if detected_lang != target_lang and confidence > 0.70:
+                                    # Threshold raised to 0.80: technical docs with product names score ~74% English
+                                    # even when correctly translated — 0.70 caused too many false write-blocks
+                                    if detected_lang != target_lang and confidence > 0.80:
                                         # Check if this is a learned similarity pair
                                         is_similar = False
                                         if hasattr(self, 'similarity_tracker') and self.similarity_tracker:
@@ -1530,7 +1533,11 @@ class TranslationEngine:
                                             existing_lang, existing_conf = detector.detect(existing_content)
 
                                             # CASE 1: Existing file is correct language and new file is wrong → BLOCK
-                                            if existing_lang == target_lang and detected_lang != target_lang:
+                                            # But respect similarity groups (e.g. ms/id, cs/sk) — don't block similar langs
+                                            _case1_new_is_similar = False
+                                            if hasattr(self, 'similarity_tracker') and self.similarity_tracker:
+                                                _case1_new_is_similar = self.similarity_tracker.are_similar(target_lang, detected_lang)
+                                            if existing_lang == target_lang and detected_lang != target_lang and not _case1_new_is_similar:
                                                 validation_passed = False
                                                 validation_error = f"Blocked overwrite: existing={existing_lang}, new={detected_lang}"
                                                 logger.error(
@@ -1575,6 +1582,27 @@ class TranslationEngine:
                                         except ValueError as existing_check_error:
                                             # Detection confidence too low on existing file - log and allow write
                                             logger.warning(f"Existing file language detection uncertain (allowing write): {existing_check_error}")
+
+                                    # OW-01 extension: new translation failed but existing file may be correct
+                                    # The guard above only runs when validation_passed=True; handle the inverse case.
+                                    elif not validation_passed and output_path.exists():
+                                        try:
+                                            existing_content = output_path.read_text(encoding='utf-8')
+                                            existing_lang, existing_conf = detector.detect(existing_content)
+                                            if existing_lang == target_lang:
+                                                # Existing file has a correct translation — treat as protected skip
+                                                # (No confidence threshold here — matches CASE 1 logic above)
+                                                validation_error = (
+                                                    f"Blocked overwrite: existing={existing_lang} "
+                                                    f"({existing_conf:.2%}) preserved, new translation failed"
+                                                )
+                                                result.overwrite_blocked = True
+                                                logger.info(
+                                                    f"OVERWRITE PROTECTED: New translation failed but existing "
+                                                    f"{target_lang} file ({existing_conf:.2%}) is preserved for {output_path.name}"
+                                                )
+                                        except Exception:
+                                            pass  # Cannot read existing — keep as real failure
 
                             except ImportError as e:
                                 # Detector module missing - FATAL, block write
@@ -1664,6 +1692,9 @@ class TranslationEngine:
                             logger.error(f"WRITE BLOCKED for {output_path.name}: {validation_error}")
                             result.success = False
                             result.error = validation_error
+                            # OW-01: Mark as overwrite-protected so directory counter treats it as a skip
+                            if "Blocked overwrite:" in validation_error:
+                                result.overwrite_blocked = True
                             break  # Exit retry loop - validation failure is deterministic
 
                         # File successfully written - add to outputs
@@ -1860,6 +1891,17 @@ class TranslationEngine:
                 if progress:
                     progress.file_completed(success=False, has_new_translations=False)
                 raise  # Re-raise to propagate to caller
+
+            # TC-02: TranslationRejectedError already logged by inner handler (line 1779)
+            # and re-raised. Don't double-log it as "Unexpected error".
+            if isinstance(e, TranslationRejectedError):
+                progress = get_progress_tracker()
+                if progress:
+                    progress.record_error("translation_error", str(e), str(file_path))
+                    progress.file_completed(success=False, has_new_translations=False)
+                if telemetry_run:
+                    telemetry_run.log_event("validation_rejected", {"reason": str(e)})
+                return result
 
             # OOM-01: Detect OOM errors and allow RetryHandler to engage (outer handler)
             if self._is_oom_error(e):
@@ -2108,15 +2150,26 @@ class TranslationEngine:
             script_validation_thresholds = script_validation_config.get('thresholds', {}) if script_validation_config.get('enabled', True) else None
 
             # LLM-WASTE-FIX-2b: Load batch_purity_skip_langs from global config
+            # NOTE: 'translation_engine' is a top-level key in global.yaml but NOT a field in
+            # GlobalConfig (Pydantic model), so it's silently dropped on load. Must use the raw
+            # config dict via get_config() to read it correctly.
             _batch_purity_skip_langs = None
-            if self.config and hasattr(self.config, 'global_config'):
-                _te_cfg = getattr(self.config.global_config, 'translation_engine', None)
-                if _te_cfg:
-                    _batch_purity_skip_langs = (
-                        _te_cfg.get('batch_purity_skip_langs')
-                        if isinstance(_te_cfg, dict)
-                        else getattr(_te_cfg, 'batch_purity_skip_langs', None)
-                    )
+            if self.config:
+                try:
+                    if hasattr(self.config, 'get_config'):
+                        _te_cfg = self.config.get_config().get('translation_engine', {})
+                        _batch_purity_skip_langs = _te_cfg.get('batch_purity_skip_langs') if _te_cfg else None
+                    elif hasattr(self.config, 'global_config'):
+                        # Fallback: try Pydantic object (works if translation_engine ever added to GlobalConfig)
+                        _te_cfg = getattr(self.config.global_config, 'translation_engine', None)
+                        if _te_cfg:
+                            _batch_purity_skip_langs = (
+                                _te_cfg.get('batch_purity_skip_langs')
+                                if isinstance(_te_cfg, dict)
+                                else getattr(_te_cfg, 'batch_purity_skip_langs', None)
+                            )
+                except Exception:
+                    pass  # Non-fatal: skip list unavailable → all languages use purity checks
 
             extractor = TextUnitExtractor(
                 segmentation_strategy=site_profile.body.ast_segmentation_strategy,
@@ -2237,8 +2290,9 @@ class TranslationEngine:
 
             # AGENT B-7.3: Check batch-level purity failures to prevent file corruption
             # If too many batches failed language purity checks, block the entire file write
+            # LLM-WASTE-FIX-2b: Skip this check entirely for languages in batch_purity_skip_langs
             batch_stats = extractor.batch_stats
-            if batch_stats.get('language_purity_failures', 0) > 0:
+            if batch_stats.get('language_purity_failures', 0) > 0 and target_lang not in (_batch_purity_skip_langs or []):
                 total_batches = batch_stats.get('total_batches', 0)
                 if total_batches > 0:
                     purity_failure_rate = batch_stats['language_purity_failures'] / total_batches
@@ -3420,7 +3474,11 @@ class TranslationEngine:
                         except Exception as e:
                             logger.warning(f"Failed to save progress for {md_file}: {e}")
                 else:
-                    result.failed_files += 1
+                    # OW-01: Overwrite-protected files are existing correct translations — treat as skip, not failure
+                    if file_result.overwrite_blocked:
+                        logger.info(f"Protected skip {md_file.name}: overwrite blocked (existing translation preserved)")
+                    else:
+                        result.failed_files += 1
 
                     # RES-02: Mark failed translations
                     if self.progress_tracker:
@@ -3537,6 +3595,9 @@ class TranslationEngine:
                     if file_result.success:
                         result.successful_files += 1
                         logger.debug(f"✓ Translated {md_file.name}")
+                    elif file_result.overwrite_blocked:
+                        # OW-01: Existing translation preserved — not a failure, treat as skip
+                        logger.info(f"Protected skip {md_file.name}: overwrite blocked (existing translation preserved)")
                     else:
                         result.failed_files += 1
                         logger.warning(f"✗ Failed {md_file.name}: {file_result.errors}")

@@ -11,7 +11,7 @@ decision_rules:
   reject_on_placeholder_error: true  # Reject if placeholder integrity fails
   reject_on_code_block_error: true  # Reject if code blocks are corrupted
   reject_on_link_error: true  # Reject if links are broken
-  reject_on_repetition_error: true  # Reject immediately on any repetition ERROR (hallucination guard)
+  reject_on_repetition_error: false  # Allow retries before rejecting repetition errors (structured docs have legitimate repetition)
 
   # Retry configuration - when to attempt re-translation
   max_retry_attempts: 2  # Maximum number of retry attempts
@@ -100,3 +100,6 @@ validators:
   repetition_detector:
     enabled: true
     description: "Detects excessive word/phrase repetition (model hallucination guard)"
+    ngram_threshold: 5          # Require 5+ occurrences (was 3) — reduces false positives on structured docs
+    sentence_dup_threshold: 3   # Require 3 duplicates (was 2) — allows paired FAQ patterns
+    word_freq_threshold: 0.35   # Allow slightly higher word frequency (was 0.30)
