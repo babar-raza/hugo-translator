@@ -2893,6 +2893,15 @@ class TranslationEngine:
         if not paragraphs:
             return {"passed": True, "reason": "No content to validate"}
 
+        # Use the same confidence threshold as the batch-level check (global.yaml
+        # language_detection_confidence_threshold). Technical docs with product names
+        # score ~74% English even when correctly translated — raised from 0.70 to 0.80.
+        try:
+            _te_cfg = self.config.get_config().get('translation_engine', {})
+            conf_threshold = _te_cfg.get('language_detection_confidence_threshold', 0.80)
+        except Exception:
+            conf_threshold = 0.80
+
         wrong_lang_count = 0
         total_count = 0
         detected_languages = {}
@@ -2907,7 +2916,7 @@ class TranslationEngine:
 
                 detected_languages[detected] = detected_languages.get(detected, 0) + 1
 
-                if detected != expected_lang and conf > 0.70:
+                if detected != expected_lang and conf > conf_threshold:
                     # Check if similarity-learned
                     is_similar = False
                     if hasattr(self, 'similarity_tracker') and self.similarity_tracker:
