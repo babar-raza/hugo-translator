@@ -322,6 +322,9 @@ docs/_audit/
 # Source-level ad-hoc test scripts (not proper tests)
 /src/test_*.py
 
+# Archived stale test directories (local history, not for commit)
+tests/_archived/
+
 # Test regression artifacts (generated during test runs)
 tests/regression/.translation_progress/
 tests/regression/MagicMock/
