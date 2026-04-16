@@ -75,6 +75,6 @@ samples:
   lang: en
   path: developer-guide/presentation-to-tiff-converter/_index.md
   tokens: 887
-source: D:\onedrive\Documents\GitHub\aspose.net\content\docs.aspose.net\slides\en
+source: ${ASPOSE_NET_CONTENT}/docs.aspose.net/slides/en  # Set ASPOSE_NET_CONTENT env var
 total_files: 15
 version: '1.0'

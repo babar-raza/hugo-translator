@@ -10,8 +10,13 @@ on:
 
 jobs:
   health-check:
-    runs-on: self-hosted  # Requires self-hosted runner: accesses local C:\Users\prora paths and local-telemetry repo
+    runs-on: self-hosted  # Requires self-hosted runner with local-telemetry repo clone
+    if: ${{ vars.HAS_SELF_HOSTED_RUNNER == 'true' }}
     timeout-minutes: 10
+
+    # Required repository variables (Settings > Variables > Actions):
+    #   TELEMETRY_REPO_PATH  - absolute path to local-telemetry repo clone
+    #   HAS_SELF_HOSTED_RUNNER - set to 'true' to enable this workflow
 
     steps:
       - name: Checkout hugo-translator
@@ -31,36 +36,35 @@ jobs:
         run: |
           echo "Checking TELEMETRY_SRC_PATH..."
           if (Test-Path "$env:TELEMETRY_SRC_PATH") {
-            Write-Host "✅ Telemetry path exists: $env:TELEMETRY_SRC_PATH"
+            Write-Host "Telemetry path exists: $env:TELEMETRY_SRC_PATH"
           } else {
-            Write-Error "❌ Telemetry path not found: $env:TELEMETRY_SRC_PATH"
+            Write-Error "Telemetry path not found: $env:TELEMETRY_SRC_PATH"
             exit 1
           }
         env:
-          TELEMETRY_SRC_PATH: C:\Users\prora\OneDrive\Documents\GitHub\local-telemetry\src
+          TELEMETRY_SRC_PATH: ${{ vars.TELEMETRY_REPO_PATH }}\src
         shell: pwsh
 
       - name: Run PRAGMA settings diagnostic
         run: |
-          cd C:\Users\prora\OneDrive\Documents\GitHub\local-telemetry
+          cd "${{ vars.TELEMETRY_REPO_PATH }}"
           python scripts/diagnose_pragma_settings.py
         shell: pwsh
 
       - name: Check database integrity
         run: |
-          cd C:\Users\prora\OneDrive\Documents\GitHub\local-telemetry
+          cd "${{ vars.TELEMETRY_REPO_PATH }}"
           python scripts/check_db_integrity.py
         shell: pwsh
 
       - name: Validate installation
         run: |
-          cd C:\Users\prora\OneDrive\Documents\GitHub\local-telemetry
+          cd "${{ vars.TELEMETRY_REPO_PATH }}"
           python scripts/validate_installation.py
         shell: pwsh
 
       - name: Verify recent runs
         run: |
-          cd C:\Users\prora\OneDrive\Documents\GitHub\hugo-translator
           python scripts/verify_telemetry.py --latest
         shell: pwsh
 
@@ -71,8 +75,8 @@ jobs:
           Write-Host "=" * 60
           Write-Host "TELEMETRY HEALTH CHECK: PASSED"
           Write-Host "=" * 60
-          Write-Host "✅ PRAGMA settings correct"
-          Write-Host "✅ Database integrity OK"
-          Write-Host "✅ Installation validated"
-          Write-Host "✅ Recent runs verified"
+          Write-Host "PRAGMA settings correct"
+          Write-Host "Database integrity OK"
+          Write-Host "Installation validated"
+          Write-Host "Recent runs verified"
         shell: pwsh

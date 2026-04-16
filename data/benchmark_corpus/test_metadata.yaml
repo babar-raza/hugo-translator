@@ -50,6 +50,6 @@ samples:
   lang: en
   path: reference.aspose.net/barcode/ro/Aspose.BarCode.Generation.Pdf417EncodeMode.md
   tokens: 417
-source: D:\onedrive\Documents\GitHub\aspose.net\content
+source: ${ASPOSE_NET_CONTENT}  # Set ASPOSE_NET_CONTENT env var to your content repo path
 total_files: 268181
 version: '1.0'

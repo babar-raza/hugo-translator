@@ -397,13 +397,9 @@ def extract_business_context(
 
 # Add local-telemetry src to path if available
 # Configurable via TELEMETRY_SRC_PATH environment variable.
-# Set TELEMETRY_SRC_PATH to override default location for different deployments.
-TELEMETRY_SRC_PATH = Path(
-    os.getenv(
-        'TELEMETRY_SRC_PATH',
-        r"C:\Users\prora\OneDrive\Documents\GitHub\local-telemetry\src"
-    )
-)
+# Set TELEMETRY_SRC_PATH in .env to point to your local-telemetry checkout's src/ directory.
+_telemetry_src = os.getenv('TELEMETRY_SRC_PATH', '')
+TELEMETRY_SRC_PATH = Path(_telemetry_src) if _telemetry_src else Path('.')
 
 if not TELEMETRY_SRC_PATH.exists():
     logger.warning(f"Telemetry path not found: {TELEMETRY_SRC_PATH}. Telemetry will be unavailable.")
