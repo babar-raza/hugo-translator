@@ -5,6 +5,7 @@ Validates that translated files are placed in the correct directory structure
 according to subdomain-specific rules and language folder conventions.
 """
 
+import os
 import re
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -349,15 +350,17 @@ class FilePlacementValidator(Validator):
 
         # Check if source path contains any content root
         # Normalize to POSIX (forward slashes) before comparison to handle Windows paths
+        # Expand env vars in content roots (e.g. ${ASPOSE_NET_CONTENT}/blog.aspose.net)
         source_str = str(source_path.as_posix())
+        expanded_roots = [os.path.expandvars(root) for root in site_profile.content_roots]
         source_has_root = any(
-            Path(root).as_posix() in source_str for root in site_profile.content_roots
+            Path(root).as_posix() in source_str for root in expanded_roots
         )
 
         # Check if translation path contains any content root
         translation_str = str(translation_path.as_posix())
         translation_has_root = any(
-            Path(root).as_posix() in translation_str for root in site_profile.content_roots
+            Path(root).as_posix() in translation_str for root in expanded_roots
         )
 
         if not source_has_root:
