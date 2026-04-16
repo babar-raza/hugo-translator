@@ -89,7 +89,7 @@ Q: Is hugo-translator still translating files successfully?
 **To preserve buffered data before rollback**:
 ```bash
 # 1. Start API service
-cd C:\Users\prora\OneDrive\Documents\GitHub\local-telemetry
+cd /path/to/local-telemetry
 python telemetry_service.py
 
 # 2. Wait for buffer sync (check for .jsonl.synced files)
@@ -146,7 +146,7 @@ curl http://localhost:8765/health
 **IMPORTANT**: The current code already uses the new architecture. To rollback, you need to revert to old commit.
 
 ```bash
-cd c:\Users\prora\OneDrive\Documents\GitHub\hugo-translator
+cd /path/to/hugo-translator
 
 # Find commit before HTTP API migration
 git log --oneline src/observability/telemetry_integration.py | head -10
@@ -187,7 +187,7 @@ telemetry_client = TelemetryClient(
 ### Step 3: Update Environment Variables
 
 ```bash
-cd c:\Users\prora\OneDrive\Documents\GitHub\hugo-translator
+cd /path/to/hugo-translator
 
 # Backup current .env
 cp .env .env.new-architecture-backup
@@ -213,7 +213,7 @@ TELEMETRY_DB_PATH=D:/agent-metrics/db/telemetry.sqlite
 # TELEMETRY_BUFFER_DIR=C:/telemetry/hugo-translator/buffer
 
 # Path to local-telemetry source
-TELEMETRY_SRC_PATH=C:/Users/prora/OneDrive/Documents/GitHub/local-telemetry/src
+TELEMETRY_SRC_PATH=/path/to/local-telemetry/src
 ```
 
 ---
@@ -223,7 +223,7 @@ TELEMETRY_SRC_PATH=C:/Users/prora/OneDrive/Documents/GitHub/local-telemetry/src
 If local-telemetry also needs rollback:
 
 ```bash
-cd C:\Users\prora\OneDrive\Documents\GitHub\local-telemetry
+cd /path/to/local-telemetry
 
 # Create rollback branch
 git checkout -b rollback/pre-http-api
@@ -244,7 +244,7 @@ grep -A 10 "def __init__" src/telemetry/client.py | grep "db_path"
 ### Step 5: Restart Hugo-Translator
 
 ```bash
-cd c:\Users\prora\OneDrive\Documents\GitHub\hugo-translator
+cd /path/to/hugo-translator
 
 # Start hugo-translator
 # (adjust command for your deployment)
@@ -349,7 +349,7 @@ git pull origin main
 cp .env.new-architecture-backup .env
 
 # 3. Start API service
-cd C:\Users\prora\OneDrive\Documents\GitHub\local-telemetry
+cd /path/to/local-telemetry
 python telemetry_service.py
 
 # 4. Restart hugo-translator

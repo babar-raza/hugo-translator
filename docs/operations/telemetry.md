@@ -270,7 +270,7 @@ ls C:/telemetry/hugo-translator/buffer/
 Run the telemetry integration tests:
 
 ```bash
-cd C:\Users\prora\OneDrive\Documents\GitHub\hugo-translator
+cd /path/to/hugo-translator
 python -m pytest tests/test_telemetry_integration.py -v
 ```
 

@@ -90,7 +90,7 @@ TelemetryClient (local-telemetry)
 
 In local-telemetry environment:
 ```bash
-cd C:\Users\prora\OneDrive\Documents\GitHub\local-telemetry
+cd /path/to/local-telemetry
 pip install requests  # Required for HTTP API client
 ```
 
@@ -106,7 +106,7 @@ curl http://localhost:8765/health
 
 If not running, start it:
 ```bash
-cd C:\Users\prora\OneDrive\Documents\GitHub\local-telemetry
+cd /path/to/local-telemetry
 python telemetry_service.py
 ```
 
@@ -119,7 +119,7 @@ python telemetry_service.py
 Check that `src/observability/telemetry_integration.py` uses the correct pattern:
 
 ```bash
-cd c:\Users\prora\OneDrive\Documents\GitHub\hugo-translator
+cd /path/to/hugo-translator
 
 # Should NOT find db_path parameter
 grep -n "db_path" src/observability/telemetry_integration.py
@@ -201,7 +201,7 @@ TELEMETRY_BUFFER_DIR=C:/telemetry/hugo-translator/buffer
 
 # Path to local-telemetry source code
 # Adjust this path to match your local setup
-TELEMETRY_SRC_PATH=C:/Users/prora/OneDrive/Documents/GitHub/local-telemetry/src
+TELEMETRY_SRC_PATH=/path/to/local-telemetry/src
 
 # Optional: Agent owner name (for telemetry records)
 AGENT_OWNER=Your Name
@@ -240,7 +240,7 @@ If you're setting up telemetry for the first time:
 
 ```bash
 # Clone local-telemetry repository
-cd C:\Users\prora\OneDrive\Documents\GitHub
+cd /path/to
 git clone https://github.com/YOUR_ORG/local-telemetry.git
 cd local-telemetry
 
@@ -255,7 +255,7 @@ git log -1 --oneline
 ### 2. Start Telemetry API Service
 
 ```bash
-cd C:\Users\prora\OneDrive\Documents\GitHub\local-telemetry
+cd /path/to/local-telemetry
 
 # Start API service
 python telemetry_service.py
@@ -272,7 +272,7 @@ Keep this running in a separate terminal.
 ### 3. Configure Hugo-Translator
 
 ```bash
-cd c:\Users\prora\OneDrive\Documents\GitHub\hugo-translator
+cd /path/to/hugo-translator
 
 # Copy example environment file
 cp .env.example .env
@@ -280,7 +280,7 @@ cp .env.example .env
 # Edit .env and set:
 # - METRICS_API_URL=http://localhost:8765
 # - TELEMETRY_BUFFER_DIR=C:/telemetry/hugo-translator/buffer
-# - TELEMETRY_SRC_PATH=C:/Users/prora/.../local-telemetry/src
+# - TELEMETRY_SRC_PATH=/path/to/local-telemetry/src
 ```
 
 ### 4. Verify Configuration
@@ -372,7 +372,7 @@ ModuleNotFoundError: No module named 'requests'
 
 **Fix**:
 ```bash
-cd C:\Users\prora\OneDrive\Documents\GitHub\local-telemetry
+cd /path/to/local-telemetry
 pip install requests
 ```
 
@@ -392,7 +392,7 @@ APIUnavailableError: Cannot reach telemetry API at http://localhost:8765/api/v1/
 **Fix**:
 ```bash
 # Start API service in separate terminal
-cd C:\Users\prora\OneDrive\Documents\GitHub\local-telemetry
+cd /path/to/local-telemetry
 python telemetry_service.py
 ```
 
@@ -412,10 +412,10 @@ WARNING: Telemetry path not found: C:\...\local-telemetry\src
 **Fix**:
 ```bash
 # Verify path exists
-ls C:\Users\prora\OneDrive\Documents\GitHub\local-telemetry\src
+ls /path/to/local-telemetry/src
 
 # Update .env file with correct path
-TELEMETRY_SRC_PATH=C:/Users/prora/OneDrive/Documents/GitHub/local-telemetry/src
+TELEMETRY_SRC_PATH=/path/to/local-telemetry/src
 ```
 
 ---

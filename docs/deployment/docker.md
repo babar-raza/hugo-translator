@@ -24,7 +24,7 @@ The Hugo Translation System uses Docker named volumes for persistent data storag
 | Host Path | Container Path | Purpose | Access |
 |-----------|----------------|---------|--------|
 | `./config` | `/app/config` | Site profiles, model registry, global config | Read-only |
-| `D:/onedrive/Documents/GitHub/aspose.net/content` | `/content` | Source markdown files (Hugo content directory) | Read-write |
+| `$ASPOSE_NET_CONTENT` | `/content` | Source markdown files (Hugo content directory) | Read-write |
 
 ## Content Hash Metadata Volume
 

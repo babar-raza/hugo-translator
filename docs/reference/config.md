@@ -1188,7 +1188,7 @@ Environment variables provide runtime configuration options that can override de
 
 **Purpose**: Override the default path to the local-telemetry source directory.
 
-**Default**: `C:\Users\prora\OneDrive\Documents\GitHub\local-telemetry\src`
+**Default**: None (set `TELEMETRY_SRC_PATH` env var to your local-telemetry checkout's `src/` directory)
 
 **When to use**:
 - **Development**: Point to a local checkout of local-telemetry for debugging or testing changes

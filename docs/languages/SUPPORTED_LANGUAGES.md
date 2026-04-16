@@ -133,7 +133,7 @@ See [config/model_registry.yaml](../../config/model_registry.yaml) for model cov
 ## Data Sources
 
 Benchmark corpus extracted from real Aspose.net content (read-only):
-- **Source:** `D:\onedrive\Documents\GitHub\aspose.net\content`
+- **Source:** Set via `ASPOSE_NET_CONTENT` environment variable (see `.env.example`)
 - **Content types:** Technical documentation, API references, tutorials, blog posts
 - **Sampling strategy:** Stratified by content type and complexity
 
