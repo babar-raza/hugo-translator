@@ -1657,10 +1657,10 @@ def translate_site(args: argparse.Namespace) -> int:
 
             # Determine input path for git repo detection
             if args.input:
-                input_path = Path(args.input)
+                input_path = Path(os.path.expandvars(args.input))
             else:
                 # Use first content root from site profile
-                input_path = Path(site_profile.content_roots[0])
+                input_path = Path(os.path.expandvars(site_profile.content_roots[0]))
 
             # Load global config for commit settings
             global_config = config_service.global_config
@@ -2522,10 +2522,10 @@ def translate_site(args: argparse.Namespace) -> int:
 
         # Determine input path
         if args.input:
-            input_path = Path(args.input)
+            input_path = Path(os.path.expandvars(args.input))
         else:
             # Use first content root from site profile
-            input_path = Path(site_profile.content_roots[0])
+            input_path = Path(os.path.expandvars(site_profile.content_roots[0]))
 
         logger.info(f"Input path: {input_path}")
 
