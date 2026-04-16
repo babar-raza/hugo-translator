@@ -35,6 +35,44 @@ pytest tests/unit/workers/ -v            # Worker tests only
 - Commit format: `<type>(<scope>): <subject>` (imperative mood)
 - Types: `feat`, `fix`, `chore`, `docs`
 
+## Repository Structure
+
+The root should contain only essential project files (~13 files). Everything else lives in organized subdirectories.
+
+**Root files** (keep minimal):
+`README.md`, `CONTRIBUTING.md`, `CHANGELOG.md`, `LICENSE`, `TASK_BACKLOG.md`, `pyproject.toml`, `.gitignore`, `.gitattributes`, `.pre-commit-config.yaml`, `.env.example`, `Dockerfile`, `Dockerfile.gpu`, `.dockerignore`
+
+**Tracked directories:**
+
+| Directory | Purpose |
+|-----------|---------|
+| `src/` | All source code (engine, workers, TM, models, CLI) |
+| `tests/` | Test suites: `unit/`, `integration/`, `regression/`, `e2e/`, `smoke/`, `contract/` |
+| `config/` | Configuration: `global.yaml`, `model_registry.yaml`, `site_profiles/`, `terminology/` |
+| `scripts/` | Operational scripts (setup, workers, CI gates, health checks) |
+| `docs/` | Architecture docs, guides, reference |
+| `specs/` | Technical specifications |
+| `requirements/` | Python dependency files (`base.txt`, `cpu.txt`, `gpu.txt`, `dev.txt`) |
+| `models/` | Model metadata only — binaries downloaded at runtime |
+| `data/benchmark_corpus/` | Tracked benchmark test data |
+| `.github/workflows/` | CI/CD pipelines |
+
+**Local-only directories** (gitignored, never committed):
+
+| Directory | Purpose |
+|-----------|---------|
+| `reports/` | Agent reports, translation logs, evidence bundles |
+| `plans/` | Task plans and working documents |
+| `logs/` | Runtime logs, heartbeats, PID files |
+| `runs/` | Translation run outputs |
+| `output/` | Test translation outputs |
+| `data/` (except benchmark_corpus) | TM caches, model caches, runtime data |
+| `scripts/archived/` | Old one-off scripts preserved locally |
+| `.translation_progress/` | Batch progress tracking |
+| `telemetry_buffer/` | Telemetry event queue |
+
+**Models:** Binary model files (M2M100, NLLB, FastText) are ~14 GB and are never committed. They are downloaded at first run. See `models/README.md`.
+
 ## Architecture
 
 - `src/translation_engine/` — core translation pipeline (engine, extractor, reconstructor, validation)
@@ -53,8 +91,11 @@ pytest tests/unit/workers/ -v            # Worker tests only
 
 ## Repository Hygiene
 
+- **Keep the root clean.** Only the ~13 files listed above belong at root. Do not add scripts, reports, logs, or temp files at root.
 - **Never commit hardcoded personal paths** (e.g., `D:\onedrive`, `C:\Users\<name>`). The pre-commit hook blocks these in Python, YAML, shell, and batch files.
-- **Personal utility scripts** should not be tracked. Keep them untracked or in a local-only directory.
+- **Scripts** go in `scripts/`. One-off or experimental scripts go in `scripts/archived/` (gitignored).
 - **Test scripts** go under `tests/`, not at the project root or in `src/`.
+- **Reports, plans, logs** are local-only — they are gitignored and should never be committed.
+- **Config backups** — do not commit `model_registry.backup.yaml` or similar variants. Only `model_registry.yaml` is canonical.
 - **Pre-commit hooks are mandatory** — run `pre-commit install` after cloning.
 - Run `bash scripts/check_share_safe.sh` before pushing to verify no private data leaks.

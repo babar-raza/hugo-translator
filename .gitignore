@@ -1,3 +1,5 @@
+# ROOT: Only ~13 files belong at root. See CONTRIBUTING.md for repo structure.
+
 # Python
 __pycache__/
 *.py[cod]
@@ -188,6 +190,12 @@ tests/logs/
 # Local telemetry buffer (runtime data)
 /telemetry_buffer/
 
+# Runtime state directories
+/MagicMock/
+/agents/
+/waves/
+/failures/
+
 # Test output artifacts
 m2m100_test_output.txt
 *_test_output.txt
@@ -295,8 +303,12 @@ docs/_audit/
 # Config variants and backups (not canonical)
 /config/model_registry.backup.yaml
 /config/model_registry.local.yaml
+/config/model_registry.opus_autogen.yaml
 /config/model_registry_*.yaml
+/config/model_registry.yaml.backup
 /config/custom_*.yaml
+/config/test_*.yaml
+/config/segment_sorting_example.yaml
 
 # Dependency lock file (requirements.lock is tracked for reproducibility)
 /requirements_*.txt
@@ -317,6 +329,9 @@ tests/regression/telemetry_buffer/
 
 # Mangled pytest collection output
 *test_collect*
+
+# Archived one-off scripts (local dev history)
+scripts/archived/
 
 # Personal utility scripts removed from tracking
 scripts/check_conda.bat
