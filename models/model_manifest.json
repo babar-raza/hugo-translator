@@ -1,0 +1,32 @@
+{
+  "version": "1.0",
+  "last_updated": "2026-01-17T18:14:54.810055+00:00",
+  "models": [
+    {
+      "model_id": "nllb_200_600m__int8_ct2",
+      "local_path": "models\\ct2\\nllb_200_600m__int8",
+      "download_source": "ct2_conversion:nllb_200_600m",
+      "backend": "ctranslate2",
+      "size_mb": 599.65,
+      "files": [
+        {
+          "name": "config.json",
+          "relative_path": "config.json",
+          "size_bytes": 233
+        },
+        {
+          "name": "model.bin",
+          "relative_path": "model.bin",
+          "size_bytes": 622596105
+        },
+        {
+          "name": "shared_vocabulary.json",
+          "relative_path": "shared_vocabulary.json",
+          "size_bytes": 6177383
+        }
+      ],
+      "downloaded_at": "2026-01-17T18:14:54.809905+00:00",
+      "verified": true
+    }
+  ]
+}

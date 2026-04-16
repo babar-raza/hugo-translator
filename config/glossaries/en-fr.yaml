@@ -1,0 +1,57 @@
+# Technical Terms Glossary: English -> French
+# Post-translation corrections for known MT vocabulary errors
+
+version: "1.0"
+language_pair: ["en", "fr"]
+
+# Corrections: incorrect_translation -> correct_translation
+# Applied as post-processing after MT translation
+# Uses word-boundary matching to avoid partial replacements
+
+corrections:
+  # Issue: "merge" translated as "métrage" (footage) instead of "fusion"
+  # Source: PHASE10_PROD_FORCE_TRANSLATE.md, line 167
+  # Context: "merge multiple files" -> "Métrage plusieurs fichiers" (WRONG)
+  # Expected: "Fusion plusieurs fichiers" or "Fusionner plusieurs fichiers"
+  "métrage": "fusion"
+  "Métrage": "Fusion"
+
+  # Issue: "textual" translated as "textile" (fabric) instead of "textuel"
+  # Source: PHASE10_PROD_FORCE_TRANSLATE.md, line 168
+  # Context: "textual content" -> "contenu textile" (WRONG)
+  # Expected: "contenu textuel"
+  "textile": "textuel"
+  "Textile": "Textuel"
+
+  # Issue: "scanning" translated as "escanner" (anglicism) instead of "analyse"
+  # Source: PHASE10_PROD_FORCE_TRANSLATE.md, line 170
+  # Context: "security scanning" -> "escanner de la sécurité" (WRONG)
+  # Expected: "analyse de sécurité"
+  "escanner": "analyser"
+  "Escanner": "Analyser"
+
+  # Issue: "slider" appears in translations (should be avoided)
+  # Context: "slide decks" -> "slider des plaques" (WRONG)
+  # Note: This is a partial fix; full context-aware replacement would be better
+  "slider": "diapositive"
+  "Slider": "Diapositive"
+
+# Future: Add context-sensitive patterns for more sophisticated corrections
+# patterns:
+#   - match: "métrage des fichiers"
+#     replace: "fusion des fichiers"
+#   - match: "textile (content|data)"
+#     replace: "textuel $1"
+
+# Glossary Terms (for reference, not currently used for pre-translation)
+# These are correct translations that MT should ideally produce
+terms:
+  "merge": "fusionner"
+  "merging": "fusion"
+  "merged": "fusionné"
+  "textual": "textuel"
+  "textual content": "contenu textuel"
+  "slide deck": "jeu de diapositives"
+  "slide decks": "jeux de diapositives"
+  "security scanning": "analyse de sécurité"
+  "vulnerability scanning": "analyse de vulnérabilités"

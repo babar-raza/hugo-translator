@@ -1,0 +1,88 @@
+{
+  "description": "Strict configuration contract for an LLM provider endpoint.\n\nValidated at initialization time to catch misconfigurations early.",
+  "properties": {
+    "provider": {
+      "description": "LLM provider type",
+      "enum": [
+        "ollama",
+        "openai",
+        "anthropic",
+        "openai_compatible"
+      ],
+      "title": "Provider",
+      "type": "string"
+    },
+    "model_name": {
+      "description": "Provider-specific model name (e.g., 'qwen3:14b', 'gpt-4o')",
+      "title": "Model Name",
+      "type": "string"
+    },
+    "base_url": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "API base URL. Required for ollama and openai_compatible providers.",
+      "title": "Base Url"
+    },
+    "api_key_env": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Environment variable name holding the API key (e.g., 'OPENAI_API_KEY')",
+      "title": "Api Key Env"
+    },
+    "temperature": {
+      "default": 0.1,
+      "description": "Sampling temperature. Low values (0.0-0.2) for deterministic translation.",
+      "maximum": 2.0,
+      "minimum": 0.0,
+      "title": "Temperature",
+      "type": "number"
+    },
+    "max_tokens": {
+      "default": 4096,
+      "description": "Maximum tokens per translation response",
+      "exclusiveMinimum": 0,
+      "title": "Max Tokens",
+      "type": "integer"
+    },
+    "timeout_seconds": {
+      "default": 120,
+      "description": "Request timeout in seconds",
+      "exclusiveMinimum": 0,
+      "title": "Timeout Seconds",
+      "type": "integer"
+    },
+    "system_prompt_template": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Custom system prompt template. Use {src_lang_name} and {tgt_lang_name} as placeholders. If None, uses built-in default.",
+      "title": "System Prompt Template"
+    }
+  },
+  "required": [
+    "provider",
+    "model_name"
+  ],
+  "title": "LLMProviderConfig",
+  "type": "object"
+}

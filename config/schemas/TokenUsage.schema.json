@@ -1,0 +1,17 @@
+{
+  "description": "Token usage metrics from an LLM call.",
+  "properties": {
+    "input_tokens": {
+      "default": 0,
+      "title": "Input Tokens",
+      "type": "integer"
+    },
+    "output_tokens": {
+      "default": 0,
+      "title": "Output Tokens",
+      "type": "integer"
+    }
+  },
+  "title": "TokenUsage",
+  "type": "object"
+}

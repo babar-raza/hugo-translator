@@ -1,0 +1,70 @@
+{
+  "$defs": {
+    "TokenUsage": {
+      "description": "Token usage metrics from an LLM call.",
+      "properties": {
+        "input_tokens": {
+          "default": 0,
+          "title": "Input Tokens",
+          "type": "integer"
+        },
+        "output_tokens": {
+          "default": 0,
+          "title": "Output Tokens",
+          "type": "integer"
+        }
+      },
+      "title": "TokenUsage",
+      "type": "object"
+    }
+  },
+  "description": "Strict output contract for a translation call.",
+  "properties": {
+    "translations": {
+      "description": "Translated texts (same order as input)",
+      "items": {
+        "type": "string"
+      },
+      "title": "Translations",
+      "type": "array"
+    },
+    "model_id": {
+      "description": "Model identifier used for translation",
+      "title": "Model Id",
+      "type": "string"
+    },
+    "backend_type": {
+      "description": "Backend type",
+      "enum": [
+        "mt",
+        "llm"
+      ],
+      "title": "Backend Type",
+      "type": "string"
+    },
+    "provider": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "LLM provider name (None for MT backends)",
+      "title": "Provider"
+    },
+    "token_usage": {
+      "$ref": "#/$defs/TokenUsage",
+      "description": "Token usage metrics"
+    }
+  },
+  "required": [
+    "translations",
+    "model_id",
+    "backend_type"
+  ],
+  "title": "TranslationResponse",
+  "type": "object"
+}

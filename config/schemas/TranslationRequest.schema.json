@@ -1,0 +1,56 @@
+{
+  "description": "Strict input contract for a translation call.",
+  "properties": {
+    "texts": {
+      "description": "Source texts to translate",
+      "items": {
+        "type": "string"
+      },
+      "title": "Texts",
+      "type": "array"
+    },
+    "src_lang": {
+      "description": "Source language code (ISO 639-1, e.g., 'en')",
+      "title": "Src Lang",
+      "type": "string"
+    },
+    "tgt_lang": {
+      "description": "Target language code (ISO 639-1, e.g., 'fr')",
+      "title": "Tgt Lang",
+      "type": "string"
+    },
+    "max_tokens": {
+      "anyOf": [
+        {
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Override max tokens per response",
+      "title": "Max Tokens"
+    },
+    "temperature": {
+      "anyOf": [
+        {
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Override sampling temperature",
+      "title": "Temperature"
+    }
+  },
+  "required": [
+    "texts",
+    "src_lang",
+    "tgt_lang"
+  ],
+  "title": "TranslationRequest",
+  "type": "object"
+}
