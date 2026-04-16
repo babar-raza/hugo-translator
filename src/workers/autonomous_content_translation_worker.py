@@ -272,12 +272,15 @@ class AutonomousContentTranslationWorker:
 
         # Initialize TranslationEngine
         try:
+            global_config = self.config_service.get_config()
+            content_hash_enabled = global_config.get('features', {}).get('enable_content_hash_tracking', False)
             self.translation_engine = TranslationEngine(
                 config_service=self.config_service,
                 tm=tm,
                 model_loader=model_loader,
                 enable_telemetry=True,  # Always enable telemetry for autonomous workers
-                model_id=self.config_service.get_config().get('model_defaults', {}).get('fallback_model', 'm2m100_1.2b'),
+                model_id=global_config.get('model_defaults', {}).get('fallback_model', 'm2m100_1.2b'),
+                enable_content_hash_tracking=content_hash_enabled,
             )
             logger.info("Initialized TranslationEngine")
         except Exception as e:
@@ -690,6 +693,11 @@ class AutonomousContentTranslationWorker:
         for content_root in site_profile.content_roots:
             try:
                 self._translate_content_root(site_id, content_root, site_profile.target_langs)
+            except (TypeError, AttributeError) as e:
+                logger.critical(
+                    "Code error in content_root %s for site %s (will recur on retry): %s",
+                    content_root, site_id, e, exc_info=True,
+                )
             except Exception as e:
                 logger.error(
                     f"Failed to translate content_root {content_root} for site {site_id}: {e}",

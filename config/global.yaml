@@ -174,7 +174,7 @@ git_commit:
   co_author_email: "noreply@aspose.com"
   timeout_seconds: 60  # Maximum time for git operations
   block_signals: true  # Block SIGINT/SIGTERM during commit to prevent partial commits
-  files_per_commit: 3  # Commit every N files for incremental batching (0 = commit all at end)
+  files_per_commit: 25  # Commit every N files for incremental batching (0 = commit all at end)
 
 # Output Layout (defaults for all sites)
 default_output_layout:
@@ -405,8 +405,8 @@ autonomous_recovery:
 
 # Content hash tracking (file-level change detection)
 content_hash_tracking:
-  # Master toggle (redundant with features.enable_content_hash_tracking, but explicit)
-  enabled: false
+  # Activation controlled by features.enable_content_hash_tracking
+  # Settings below configure behavior when enabled
 
   # Hash algorithm: md5 (fast) or sha256 (secure but slower)
   hash_algorithm: "md5"
@@ -575,11 +575,20 @@ translation_engine:
 
   max_batch_purity_failure_rate: 0.10  # Block write if >10% of batches fail language purity checks
 
+  # Languages where batch-level purity checks are skipped (document-level check still enforced).
+  # Arabic frequently embeds English technical terms — batch purity splitting wastes API calls.
+  batch_purity_skip_langs: [ar, bg, ca, cs, da, de, el, es, fa, fi, fr, he, hi, hr, hu, id, it, ja, ko, lt, lv, ms, nl, no, pl, pt, ro, ru, sk, sr, sv, th, tr, uk, vi, zh]  # All 36 target langs: technical docs with English product names ("Document Comparer", "Document Merger", API names) cause FastText false positives at ~27-30% confidence. Document-level purity check still enforced. Batch-level check caused 18,797+ fallbacks and translation failures (ja: exit_code=1). 2026-04-12.
+
   min_file_purity_percentage: 0.95  # Require 95% of segments match target language (5% tolerance for mixed content)
 
   allow_quality_downgrades: false  # Never overwrite existing good translations with lower quality output
 
   # Thresholds for language detection and quality assessment
-  language_detection_confidence_threshold: 0.70  # Minimum confidence to flag wrong-language segments (70% = high precision)
+  language_detection_confidence_threshold: 0.80  # Minimum confidence to flag wrong-language segments (raised from 0.70 — technical docs with product names score ~74% English even when correctly translated)
 
   existing_file_confidence_delta: 0.05  # Quality improvement required to overwrite existing file (5% minimum gain)
+
+  # Per-language purity threshold overrides (default: 0.06 = 6%)
+  # Only add languages with observed FP rate >= 15% in production logs.
+  purity_threshold_overrides:
+    lt: 0.30  # Lithuanian: high FP rate due to English technical terms in docs

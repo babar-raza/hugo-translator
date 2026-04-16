@@ -214,7 +214,7 @@ class GitCommitter:
                     error="No files staged (all unchanged or ignored)",
                 )
 
-            # Step 2: Build commit message
+            # Step 2: Build commit message (use staged_count for accuracy)
             message = self._build_commit_message(
                 output_files=output_files,
                 file_count=staged_count,
@@ -278,7 +278,6 @@ class GitCommitter:
         Returns:
             Number of files staged (may be less than input if some unchanged)
         """
-        staged = 0
         for file_path in files:
             if not file_path.exists():
                 logger.warning(f"Skipping non-existent file: {file_path}")
@@ -299,12 +298,23 @@ class GitCommitter:
                     text=True,
                     timeout=self._timeout,
                 )
-                if result.returncode == 0:
-                    staged += 1
-                else:
+                if result.returncode != 0:
                     logger.warning(f"Failed to stage {file_path}: {result.stderr}")
             except subprocess.TimeoutExpired:
                 logger.warning(f"Timeout staging {file_path}")
+
+        # Count files actually staged (git add on unchanged file returns 0 but stages nothing)
+        try:
+            diff_result = subprocess.run(
+                ["git", "diff", "--cached", "--name-only"],
+                cwd=str(git_root),
+                capture_output=True,
+                text=True,
+                timeout=self._timeout,
+            )
+            staged = len([l for l in diff_result.stdout.splitlines() if l.strip()])
+        except Exception:
+            staged = len(files)  # Fallback to input count if query fails
 
         return staged
 
@@ -357,7 +367,7 @@ class GitCommitter:
             except Exception as e:
                 logger.warning(f"Failed to load site profile for {site_id}: {e}")
 
-            # Use enhanced commit message generator
+            # Use enhanced commit message generator (pass file_count = actual staged count)
             generator = CommitMessageGenerator()
             subject, body = generator.generate(
                 output_files=output_files,
@@ -368,6 +378,7 @@ class GitCommitter:
                 translation_result=translation_result,
                 model_id=model_id,
                 tm_stats=tm_stats,
+                file_count=file_count,
             )
 
             # Combine subject and body

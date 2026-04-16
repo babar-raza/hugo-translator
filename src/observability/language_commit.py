@@ -65,9 +65,6 @@ def commit_language_translations(
         return False
 
     try:
-        # Generate commit message
-        message = _generate_commit_message(target_lang, len(translated_files), stats, config)
-
         # Stage files
         logger.debug(f"Staging {len(translated_files)} files for {target_lang}")
         file_paths_str = [str(f) for f in translated_files]
@@ -84,6 +81,22 @@ def commit_language_translations(
             timeout=timeout,
         )
 
+        # Count files actually staged (git add on unchanged file returns 0 but stages nothing)
+        diff_result = subprocess.run(
+            ["git", "diff", "--cached", "--name-only"],
+            cwd=git_repo_root,
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+        )
+        staged_count = len([l for l in diff_result.stdout.splitlines() if l.strip()])
+        if staged_count == 0:
+            logger.info(f"No files actually staged for {target_lang} (all unchanged)")
+            return False
+
+        # Generate commit message using actual staged count
+        message = _generate_commit_message(target_lang, staged_count, stats, config)
+
         # Create commit with HEREDOC-style message
         logger.debug(f"Creating commit for {target_lang}")
         result = subprocess.run(
@@ -95,7 +108,7 @@ def commit_language_translations(
             timeout=timeout,
         )
 
-        logger.info(f"✓ Committed {len(translated_files)} files for language {target_lang}")
+        logger.info(f"✓ Committed {staged_count} files for language {target_lang}")
 
         # Push if enabled
         if auto_push:

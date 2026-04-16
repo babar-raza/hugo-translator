@@ -31,6 +31,7 @@ class TranslationStats:
     """
 
     total_segments: int = 0
+    total_lookups: int = 0  # TM lookups attempted (segments × languages)
     tm_hits: int = 0  # Segments found in TM
     l1_hits: int = 0  # L1 cache hits
     l2_hits: int = 0  # L2 persistent hits
@@ -148,6 +149,9 @@ class TranslationResult:
 
     # TC-GIT-01: Telemetry context for git commit association
     telemetry_context: Optional[Any] = None  # RunContext from telemetry tracking
+
+    # OW-01: Overwrite-protection tracking
+    overwrite_blocked: bool = False  # True when write was blocked to protect an existing translation
 
     def __str__(self) -> str:
         """Human-readable summary."""

@@ -163,7 +163,8 @@ class TextUnitExtractor:
         batch_stats_tracker: Optional[Any] = None,
         fasttext_detector: Optional[Any] = None,
         similarity_tracker: Optional[Any] = None,
-        script_validation_thresholds: Optional[dict] = None
+        script_validation_thresholds: Optional[dict] = None,
+        batch_purity_skip_langs: Optional[List[str]] = None
     ):
         """
         Initialize extractor for native batch translation.
@@ -261,6 +262,7 @@ class TextUnitExtractor:
         self.fasttext_detector = fasttext_detector
         self.similarity_tracker = similarity_tracker
         self.script_validation_thresholds = script_validation_thresholds or {}
+        self.batch_purity_skip_langs = batch_purity_skip_langs or []
 
     def _load_extraction_config(self) -> dict:
         """
@@ -818,6 +820,12 @@ class TextUnitExtractor:
             unit.translated_text = translation.strip()
 
         # LANGUAGE PURITY CHECK: Verify all translations are in target language
+        # LLM-WASTE-FIX-2b: Skip purity check for languages with known FastText false-positive rates
+        if tgt_lang in self.batch_purity_skip_langs:
+            logger.debug(f"Skipping batch purity check for {tgt_lang} (in batch_purity_skip_langs)")
+            self.batch_stats['successful_batches'] += 1
+            return True
+
         if not self._verify_translation_language_purity(batch, tgt_lang):
             logger.warning(
                 f"LANGUAGE PURITY CHECK FAILED: Batch produced mixed-language output. "

@@ -214,8 +214,21 @@ class L2PersistentTM:
                 detector = FastTextDetector(cache_dir=cache_dir)
                 detected_lang, confidence = detector.detect(translation)
 
+                # Similarity groups: languages FastText confuses at high confidence
+                # (mutually intelligible or script-similar pairs — false positive protection)
+                _TM_SIMILAR_GROUPS = [
+                    {"ms", "id"},        # Malay/Indonesian
+                    {"cs", "sk"},        # Czech/Slovak
+                    {"hr", "sr", "bs"},  # South Slavic
+                    {"nb", "da", "no"},  # North Germanic
+                ]
+                _in_same_group = any(
+                    tgt_lang in grp and detected_lang in grp
+                    for grp in _TM_SIMILAR_GROUPS
+                )
+
                 # Block storage only on high-confidence mismatch (>80%)
-                if detected_lang != tgt_lang and confidence > 0.80:
+                if detected_lang != tgt_lang and confidence > 0.80 and not _in_same_group:
                     logger.error(
                         f"TM STORE BLOCKED: Translation language mismatch! "
                         f"Site: {site_id}, Expected: {tgt_lang}, Detected: {detected_lang} ({confidence:.2%}). "
@@ -224,7 +237,7 @@ class L2PersistentTM:
                     )
                     # Don't raise - just return False to indicate not stored
                     return False
-                elif detected_lang != tgt_lang and confidence > 0.70:
+                elif detected_lang != tgt_lang and confidence > 0.70 and not _in_same_group:
                     # Log warning for moderate confidence mismatches
                     logger.warning(
                         f"TM language concern: Expected {tgt_lang}, detected {detected_lang} ({confidence:.2%}). "

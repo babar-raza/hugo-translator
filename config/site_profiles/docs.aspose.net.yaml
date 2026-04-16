@@ -1,7 +1,7 @@
 site_id: docs.aspose.net
 display_name: Documentation
 content_roots:
-- D:\onedrive\Documents\GitHub\aspose.net\content\docs.aspose.net
+- ${ASPOSE_NET_CONTENT}/docs.aspose.net
 default_source_lang: en
 target_langs:
   - ar

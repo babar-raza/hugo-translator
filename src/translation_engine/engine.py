@@ -2848,6 +2848,20 @@ class TranslationEngine:
 
         logger.info(f"Written translated file: {output_path}")
 
+    def _get_purity_threshold(self, lang: str) -> float:
+        """Per-language purity threshold. Falls back to 0.06 default."""
+        try:
+            overrides = self.config.get_config().get(
+                'translation_engine', {}
+            ).get('purity_threshold_overrides', {})
+            threshold = overrides.get(lang, 0.06)
+            if not isinstance(threshold, (int, float)) or not (0.0 <= threshold <= 0.50):
+                logger.warning("Invalid purity threshold %.2f for %s, using 0.06", threshold, lang)
+                return 0.06
+            return float(threshold)
+        except Exception:
+            return 0.06
+
     def _verify_final_file_purity(
         self,
         content: str,
@@ -2934,17 +2948,17 @@ class TranslationEngine:
 
         wrong_percentage = wrong_lang_count / total_count
 
-        # 6% threshold: allows for English API names and inline code identifiers in
-        # technical docs. Lowered from 10% because inline script mixing (e.g. Arabic
-        # phrases inside Bulgarian text) evades fasttext paragraph detection — the
-        # dominant language still wins. Primary defence is now the Unicode-range
-        # _check_script_mixing() in LanguageConsistencyValidator; this is the backstop.
-        if wrong_percentage > 0.06:
+        # Per-language threshold: default 6%, configurable via purity_threshold_overrides.
+        # Allows for English API names and inline code identifiers in technical docs.
+        # Primary defence is now the Unicode-range _check_script_mixing() in
+        # LanguageConsistencyValidator; this is the backstop.
+        purity_threshold = self._get_purity_threshold(expected_lang)
+        if wrong_percentage > purity_threshold:
             return {
                 "passed": False,
                 "wrong_lang_percentage": wrong_percentage,
                 "detected_languages": detected_languages,
-                "reason": f"{wrong_lang_count}/{total_count} paragraphs wrong language"
+                "reason": f"{wrong_lang_count}/{total_count} paragraphs wrong language (threshold: {purity_threshold:.0%})"
             }
 
         return {
@@ -3058,6 +3072,7 @@ class TranslationEngine:
         skip_site_lock: bool = False,
         trigger_type: str = "cli",
         max_files: int = 0,
+        skip_first: int = 0,
         run_deadline: Optional[float] = None,
     ) -> DirectoryResult:
         """
@@ -3073,6 +3088,7 @@ class TranslationEngine:
             skip_site_lock: If True, skip lock acquisition (parent holds lock) - TC1
             trigger_type: How translation was triggered ("cli", "scheduled", "web", etc.)
             max_files: Maximum number of files to process (0=unlimited, default: 0)
+            skip_first: Number of files to skip from the start (for chunked pagination, default: 0)
 
         Returns:
             DirectoryResult with outcomes for all files
@@ -3097,7 +3113,7 @@ class TranslationEngine:
         if skip_site_lock:
             logger.info(f"Skipping site lock acquisition (parent holds lock for {site_id})")
             return self._translate_directory_locked(
-                site_id, directory, target_langs, recursive, parallel, max_workers, trigger_type, max_files, run_deadline
+                site_id, directory, target_langs, recursive, parallel, max_workers, trigger_type, max_files, skip_first, run_deadline
             )
 
         # RES-08: Create lock to prevent concurrent translations of same site
@@ -3118,7 +3134,7 @@ class TranslationEngine:
 
         try:
             return self._translate_directory_locked(
-                site_id, directory, target_langs, recursive, parallel, max_workers, trigger_type, max_files, run_deadline
+                site_id, directory, target_langs, recursive, parallel, max_workers, trigger_type, max_files, skip_first, run_deadline
             )
         finally:
             # RES-08: Always release lock
@@ -3134,6 +3150,7 @@ class TranslationEngine:
         max_workers: Optional[int] = None,
         trigger_type: str = "cli",
         max_files: int = 0,
+        skip_first: int = 0,
         run_deadline: Optional[float] = None,
     ) -> DirectoryResult:
         """
@@ -3145,6 +3162,7 @@ class TranslationEngine:
         Args:
             max_files: Maximum number of files to process (0=unlimited, default: 0).
                       Files are selected deterministically (sorted by path).
+            skip_first: Number of files to skip from the start (for chunked pagination, default: 0).
         """
         # TEL-04: Start telemetry tracking for batch operation
         # SR-01: Find representative file for business context extraction
@@ -3203,11 +3221,21 @@ class TranslationEngine:
                     f"After filtering: {len(md_files)} source files to translate"
                 )
 
-            # Apply max_files limit if specified (deterministic selection)
-            if max_files and max_files > 0 and len(md_files) > max_files:
-                md_files = sorted(md_files, key=str)[:max_files]
+            # Sort deterministically for pagination
+            md_files = sorted(md_files, key=str)
+
+            # Apply skip_first for chunked pagination
+            if skip_first > 0:
+                md_files = md_files[skip_first:]
                 logger.info(
-                    f"Limited to first {max_files} files for sampling (deterministic selection)"
+                    f"Skipped first {skip_first} files for chunked pagination ({len(md_files)} remaining)"
+                )
+
+            # Apply max_files limit if specified
+            if max_files and max_files > 0 and len(md_files) > max_files:
+                md_files = md_files[:max_files]
+                logger.info(
+                    f"Limited to first {max_files} files (deterministic selection)"
                 )
 
             result.total_files = len(md_files)

@@ -4,7 +4,7 @@
 site_id: blog-test
 display_name: Blog Posts (2 lang test)
 content_roots:
-- D:\onedrive\Documents\GitHub\aspose.net\content\blog.aspose.net
+- ${ASPOSE_NET_CONTENT}/blog.aspose.net
 default_source_lang: en
 target_langs:
   - fr

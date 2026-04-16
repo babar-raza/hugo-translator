@@ -391,6 +391,9 @@ class L3SemanticTM:
                 if idx == -1:  # FAISS padding
                     continue
 
+                if idx >= len(self.metadata):  # Desync guard: FAISS index ahead of metadata
+                    continue
+
                 meta = self.metadata[idx]
 
                 # Filter by criteria

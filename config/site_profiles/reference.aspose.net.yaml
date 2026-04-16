@@ -1,7 +1,7 @@
 site_id: reference.aspose.net
 display_name: API References
 content_roots:
-- D:\onedrive\Documents\GitHub\aspose.net\content\reference.aspose.net
+- ${ASPOSE_NET_CONTENT}/reference.aspose.net
 default_source_lang: en
 target_langs:
   - ar

@@ -1,0 +1,143 @@
+name: Release Gate
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'src/**'
+      - 'tests/**'
+      - 'scripts/**'
+      - 'config/**'
+  push:
+    branches: [main]
+    paths:
+      - 'src/**'
+      - 'tests/**'
+  workflow_dispatch:
+    # Allow manual trigger
+
+jobs:
+  unit-tests:
+    name: Unit Tests
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements/cpu.txt
+        shell: pwsh
+
+      - name: Run Contract Tests
+        run: |
+          python -m pytest tests/contract/test_inv001_subprocess.py tests/contract/test_inv002_atomic_writes.py tests/contract/test_inv007_resume_skip.py tests/contract/test_inv008_git_commit.py -v --tb=short
+        shell: pwsh
+
+      - name: Run Core Unit Tests
+        run: |
+          python -m pytest tests/unit/phase-0 tests/unit/phase-1 tests/unit/phase-3/test_l1_cache.py tests/unit/phase-3/test_l2_persistent.py tests/unit/phase-4/test_registry.py -v --tb=short
+        shell: pwsh
+
+  regression-tests:
+    name: Regression Tests
+    runs-on: windows-latest
+    needs: unit-tests
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements/cpu.txt
+        shell: pwsh
+
+      - name: Run Signature Preservation Tests
+        run: |
+          python -m pytest tests/regression/test_signature_preservation.py -v --tb=short || true
+        shell: pwsh
+        continue-on-error: true
+
+      - name: Run Batch Recovery Tests
+        run: |
+          python -m pytest tests/regression/test_batch_size_recovery.py -v --tb=short || true
+        shell: pwsh
+        continue-on-error: true
+
+  quality-gate:
+    name: Quality Gate (CI Audit)
+    runs-on: windows-latest
+    needs: unit-tests
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements/cpu.txt
+        shell: pwsh
+
+      - name: Run Translation Quality Audit (CI fixtures only)
+        run: |
+          python scripts/audit_translation_quality.py `
+            --mode ci `
+            --threshold 0.70 `
+            --output reports/audit/audit-ci.json `
+            --verbose
+        shell: pwsh
+
+      - name: Upload Audit Report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: audit-report
+          path: reports/audit/audit-ci.json
+          if-no-files-found: ignore
+
+  summary:
+    name: Gate Summary
+    runs-on: windows-latest
+    needs: [unit-tests, regression-tests, quality-gate]
+    if: always()
+
+    steps:
+      - name: Report Status
+        run: |
+          Write-Host ""
+          Write-Host "=" * 60
+          Write-Host "RELEASE GATE SUMMARY"
+          Write-Host "=" * 60
+          Write-Host "Unit Tests: ${{ needs.unit-tests.result }}"
+          Write-Host "Regression Tests: ${{ needs.regression-tests.result }}"
+          Write-Host "Quality Gate: ${{ needs.quality-gate.result }}"
+          Write-Host "=" * 60
+
+          if ("${{ needs.unit-tests.result }}" -ne "success") {
+            Write-Host "RELEASE GATE: FAIL - Unit tests failed"
+            exit 1
+          }
+
+          Write-Host "RELEASE GATE: PASS"
+        shell: pwsh

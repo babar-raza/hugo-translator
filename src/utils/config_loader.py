@@ -159,6 +159,8 @@ class ConfigService:
         """
         Resolve a site-profile content root to an absolute path.
 
+        Supports environment variable expansion (e.g., ${ASPOSE_NET_CONTENT}/blog.aspose.net).
+
         Resolution order for relative paths:
         1. Current working directory
         2. Project root inferred as `config_root.parent`
@@ -167,7 +169,7 @@ class ConfigService:
         If none exist, returns the first candidate (cwd-relative) for deterministic
         diagnostics.
         """
-        raw = Path(content_root).expanduser()
+        raw = Path(os.path.expandvars(content_root)).expanduser()
         if raw.is_absolute():
             return raw
 

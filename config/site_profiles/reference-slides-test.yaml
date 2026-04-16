@@ -3,7 +3,7 @@
 site_id: reference-slides-test
 display_name: API References (Slides only)
 content_roots:
-- D:\onedrive\Documents\GitHub\aspose.net\content\reference.aspose.net\slides
+- ${ASPOSE_NET_CONTENT}/reference.aspose.net/slides
 default_source_lang: en
 target_langs:
   - fr

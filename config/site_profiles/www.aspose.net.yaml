@@ -1,7 +1,7 @@
 site_id: www.aspose.net
 display_name: files
 content_roots:
-- D:\onedrive\Documents\GitHub\aspose.net\content\www.aspose.net
+- ${ASPOSE_NET_CONTENT}/www.aspose.net
 default_source_lang: en
 target_langs:
 - ar
@@ -134,8 +134,8 @@ body:
   - \{\{<.*?>\}\}
   - \{\{%.*?%\}\}
 output_layout:
-  per_language_folders: true
-  pattern: '{lang}/{path}'
+  per_language_folders: false
+  pattern: '{path_stem}.{lang}.md'
 tm_prefs:
   use_semantic_tm: true
   fallback_exact_only: false

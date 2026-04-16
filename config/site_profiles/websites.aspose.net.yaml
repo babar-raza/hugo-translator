@@ -1,6 +1,6 @@
 site_id: websites.aspose.net
 content_roots:
-- D:\onedrive\Documents\GitHub\aspose.net\content\websites.aspose.net
+- ${ASPOSE_NET_CONTENT}/websites.aspose.net
 default_source_lang: en
 target_langs:
   - ar

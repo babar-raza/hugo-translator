@@ -88,6 +88,7 @@ class CommitMessageGenerator:
         translation_result: Optional["DirectoryResult"] = None,
         model_id: Optional[str] = None,
         tm_stats: Optional[Dict] = None,
+        file_count: Optional[int] = None,
     ) -> Tuple[str, str]:
         """
         Generate commit message subject and body.
@@ -128,11 +129,14 @@ class CommitMessageGenerator:
         # Derive actual languages present in output files (not all configured langs)
         actual_langs = self._get_actual_languages(output_files, target_langs, translation_result)
 
+        # Use caller-provided staged count when available (more accurate than len(output_files))
+        _file_count = file_count if file_count is not None else len(output_files)
+
         # Build subject line
         subject = self._build_subject(
             analysis=analysis,
             target_langs=actual_langs,
-            file_count=len(output_files),
+            file_count=_file_count,
             site_ids=site_ids,
             site_display_name=site_display_name,
         )
@@ -142,7 +146,7 @@ class CommitMessageGenerator:
             output_files=output_files,
             analysis=analysis,
             target_langs=target_langs,
-            file_count=len(output_files),
+            file_count=_file_count,
             translation_result=translation_result,
             model_id=model_id,
             tm_stats=tm_stats,

@@ -17,7 +17,7 @@ services:
       - QUEUE_BACKEND=redis
     volumes:
       - ./config:/app/config:ro
-      - D:/onedrive/Documents/GitHub/aspose.net/content:/content
+      - ${CONTENT_ROOT:-./content}:/content
       - tm_data:/data/tm
       - model_cache:/data/models
       - artifacts:/data/artifacts
@@ -87,7 +87,7 @@ services:
       - USE_SHARED_ENGINES=true  # Phase 5.1: Enable SharedEngines
     volumes:
       - ./config:/app/config:ro
-      - D:/onedrive/Documents/GitHub/aspose.net/content:/content
+      - ${CONTENT_ROOT:-./content}:/content
       - tm_data:/data/tm
       - model_cache:/data/models
       - logs:/data/logs
@@ -139,7 +139,7 @@ services:
       - USE_SHARED_ENGINES=true  # Phase 5.1: Enable SharedEngines
     volumes:
       - ./config:/app/config:ro
-      - D:/onedrive/Documents/GitHub/aspose.net/content:/content
+      - ${CONTENT_ROOT:-./content}:/content
       - tm_data:/data/tm
       - model_cache:/data/models
       - logs:/data/logs
@@ -218,7 +218,7 @@ services:
     image: grafana/grafana:latest
     container_name: hugo-translator-grafana
     environment:
-      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD:-changeme}
       - GF_USERS_ALLOW_SIGN_UP=false
       - GF_PATHS_PROVISIONING=/etc/grafana/provisioning
     volumes:

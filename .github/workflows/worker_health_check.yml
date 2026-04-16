@@ -1,0 +1,111 @@
+name: Worker Health Check
+
+on:
+  workflow_dispatch:
+    # Manual trigger only - requires self-hosted runner with access to local paths
+    # Uncomment schedule below when self-hosted runner is configured:
+    # schedule:
+    #   - cron: '0 */6 * * *'  # Every 6 hours
+
+jobs:
+  check-health:
+    name: Worker Health Check
+    # Requires self-hosted runner - workers run on local machine, not GitHub-hosted runners
+    runs-on: self-hosted
+    timeout-minutes: 5
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements/cpu.txt
+        shell: pwsh
+
+      - name: Run system health check
+        run: python scripts/health_check.py --format text --verbose
+        shell: pwsh
+
+      - name: Check worker heartbeat files
+        run: |
+          Write-Host "=== Worker Heartbeat Status ==="
+
+          $heartbeatFiles = @(
+            "data/logs/content_worker.heartbeat",
+            "data/logs/tm_worker.heartbeat"
+          )
+
+          foreach ($file in $heartbeatFiles) {
+            if (Test-Path $file) {
+              $content = Get-Content $file | ConvertFrom-Json
+              $age = (Get-Date) - [datetime]$content.timestamp
+              Write-Host "$file : status=$($content.status), age=$($age.TotalMinutes.ToString('F1')) min, pid=$($content.pid)"
+              if ($age.TotalMinutes -gt 30) {
+                Write-Host "  WARNING: Heartbeat stale (>30 min)" -ForegroundColor Yellow
+              }
+            } else {
+              Write-Host "$file : NOT FOUND" -ForegroundColor Yellow
+            }
+          }
+        shell: pwsh
+
+      - name: Check worker PID files
+        run: |
+          Write-Host "=== Worker Process Status ==="
+
+          $pidFiles = @(
+            @{ Name = "Content Worker"; File = "data/logs/content_worker.pid" },
+            @{ Name = "TM Worker"; File = "data/logs/tm_worker.pid" }
+          )
+
+          foreach ($worker in $pidFiles) {
+            if (Test-Path $worker.File) {
+              $pid = [int](Get-Content $worker.File)
+              $proc = Get-Process -Id $pid -ErrorAction SilentlyContinue
+              if ($proc) {
+                Write-Host "$($worker.Name): ALIVE (PID $pid, CPU=$($proc.CPU)s)"
+              } else {
+                Write-Host "$($worker.Name): DEAD (PID $pid no longer exists)" -ForegroundColor Red
+              }
+            } else {
+              Write-Host "$($worker.Name): No PID file" -ForegroundColor Yellow
+            }
+          }
+        shell: pwsh
+
+      - name: Check GPU status
+        run: |
+          try {
+            nvidia-smi --query-gpu=name,memory.used,memory.free,utilization.gpu --format=csv
+          } catch {
+            Write-Host "nvidia-smi not available" -ForegroundColor Yellow
+          }
+        shell: pwsh
+        continue-on-error: true
+
+      - name: Check watchdog state
+        run: |
+          $stateFile = "data/logs/watchdog_state.json"
+          if (Test-Path $stateFile) {
+            Write-Host "=== Watchdog State ==="
+            Get-Content $stateFile | ConvertFrom-Json | Format-List
+          } else {
+            Write-Host "No watchdog state file found"
+          }
+        shell: pwsh
+        continue-on-error: true
+
+      - name: Health summary
+        run: |
+          Write-Host ""
+          Write-Host ("=" * 60)
+          Write-Host "WORKER HEALTH CHECK COMPLETE"
+          Write-Host ("=" * 60)
+        shell: pwsh

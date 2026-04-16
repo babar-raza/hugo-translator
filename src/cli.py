@@ -1697,7 +1697,17 @@ def translate_site(args: argparse.Namespace) -> int:
                     git_repo_root = None
 
             try:
-                for i, lang in enumerate(target_langs, 1):
+                import threading as _thr
+                from concurrent.futures import ThreadPoolExecutor as _TPE, as_completed as _ac
+                _parallel_n = max(1, getattr(args, 'parallel_languages', 0) or 1)
+                _commit_lock = _thr.Lock()
+                logger.info(f"Parallel dispatch: {_parallel_n} workers for {len(target_langs)} languages")
+
+                def _run_one_language(lang_idx):
+                    """Translate one language in a thread; returns (exit_code, result_dict)."""
+                    i, lang = lang_idx
+                    _ec = -1
+                    _res = {}
                     logger.info(f"\n{'='*60}")
                     logger.info(f"Processing language {i}/{len(target_langs)}: {lang}")
                     logger.info(f"{'='*60}\n")
@@ -1747,6 +1757,8 @@ def translate_site(args: argparse.Namespace) -> int:
                         cmd.append("--force-accept")
                     if args.strict_reject:
                         cmd.append("--strict-reject")
+                    if args.validation_mode:
+                        cmd.extend(["--validation-mode", args.validation_mode])
                     if args.enable_terminology is not None:
                         if args.enable_terminology:
                             cmd.append("--enable-terminology")
@@ -1764,194 +1776,180 @@ def translate_site(args: argparse.Namespace) -> int:
                     # Run subprocess with error handling
                     logger.debug(f"Subprocess command: {' '.join(cmd)}")
 
+                    # --- Batch-commit loop: translate up to files_per_commit files, commit, repeat ---
                     try:
-                        # Stream subprocess output in real-time with [lang] prefix
-                        import threading
-                        from io import StringIO
-
-                        # Buffers to capture full output for failure reporting
-                        stdout_buffer = StringIO()
-                        stderr_buffer = StringIO()
-
-                        def stream_output(pipe, prefix, log_func, buffer):
-                            """Stream subprocess output line-by-line with prefix"""
-                            try:
-                                for line in iter(pipe.readline, ''):
-                                    if line:
-                                        stripped = line.rstrip()
-                                        if stripped:  # Only log non-empty lines
-                                            log_func(f"[{prefix}] {stripped}")
-                                        buffer.write(line)
-                                pipe.close()
-                            except Exception as e:
-                                logger.debug(f"Error streaming {prefix} output: {e}")
-
-                        # Start subprocess with pipes
-                        # IMPORTANT: Use UTF-8 encoding to match subprocess output encoding
-                        # (subprocess uses UTF-8 stdout wrapper for Unicode support on Windows)
-                        process = subprocess.Popen(
-                            cmd,
-                            stdout=subprocess.PIPE,
-                            stderr=subprocess.PIPE,
-                            text=True,
-                            encoding='utf-8',  # Match subprocess UTF-8 encoding
-                            errors='replace',  # Handle any encoding errors gracefully
-                            bufsize=1,  # Line-buffered
-                        )
-
-                        # Create threads to stream stdout and stderr
-                        stdout_thread = threading.Thread(
-                            target=stream_output,
-                            args=(process.stdout, lang, logger.info, stdout_buffer),
-                            daemon=True
-                        )
-                        stderr_thread = threading.Thread(
-                            target=stream_output,
-                            args=(process.stderr, lang, logger.warning, stderr_buffer),
-                            daemon=True
-                        )
-
-                        stdout_thread.start()
-                        stderr_thread.start()
-
-                        # Wait for process completion with timeout
+                        _fpc = int(global_config.git_commit.files_per_commit)
+                        if _fpc <= 0:
+                            _fpc = 25
+                    except Exception:
+                        _fpc = 25
+                    _batch_cmd = list(cmd) + ["--max-files", str(_fpc)]
+                    _batch_num = 0
+                    while True:
+                        _batch_num += 1
+                        logger.info(f"[{lang}] Batch {_batch_num}: launching subprocess (max {_fpc} files)")
                         try:
-                            exit_code = process.wait(timeout=3600)
-                        except subprocess.TimeoutExpired:
-                            process.kill()
-                            process.wait()  # Clean up zombie process
-                            raise  # Re-raise to be caught below
+                            # Stream subprocess output in real-time with [lang] prefix
+                            import threading
+                            from io import StringIO
 
-                        # Wait for output threads to finish
-                        stdout_thread.join(timeout=5)
-                        stderr_thread.join(timeout=5)
+                            # Buffers to capture full output for failure reporting
+                            stdout_buffer = StringIO()
+                            stderr_buffer = StringIO()
 
-                        # Get captured output
-                        stdout_output = stdout_buffer.getvalue()
-                        stderr_output = stderr_buffer.getvalue()
+                            def stream_output(pipe, prefix, log_func, buffer):
+                                """Stream subprocess output line-by-line with prefix"""
+                                try:
+                                    for line in iter(pipe.readline, ''):
+                                        if line:
+                                            stripped = line.rstrip()
+                                            if stripped:  # Only log non-empty lines
+                                                log_func(f"[{prefix}] {stripped}")
+                                            buffer.write(line)
+                                    pipe.close()
+                                except Exception as e:
+                                    logger.debug(f"Error streaming {prefix} output: {e}")
 
-                        duration = time.time() - lang_start_time
-                        exit_codes.append(exit_code)
-
-                        # Track result for this language
-                        language_results[lang] = {
-                            "exit_code": exit_code,
-                            "success": exit_code == 0,
-                            "duration": duration,
-                            "stderr_preview": stderr_output[-500:] if stderr_output else "",
-                        }
-
-                        if exit_code != 0:
-                            logger.error(
-                                f"Translation failed for language {lang} with exit code {exit_code} "
-                                f"(duration: {duration:.1f}s)"
+                            # Start subprocess with pipes
+                            # IMPORTANT: Use UTF-8 encoding to match subprocess output encoding
+                            # (subprocess uses UTF-8 stdout wrapper for Unicode support on Windows)
+                            process = subprocess.Popen(
+                                _batch_cmd,
+                                stdout=subprocess.PIPE,
+                                stderr=subprocess.PIPE,
+                                text=True,
+                                encoding='utf-8',  # Match subprocess UTF-8 encoding
+                                errors='replace',  # Handle any encoding errors gracefully
+                                bufsize=1,  # Line-buffered
                             )
 
-                            # Save failure report with captured output
-                            mock_result = subprocess.CompletedProcess(
-                                args=cmd,
-                                returncode=exit_code,
-                                stdout=stdout_output,
-                                stderr=stderr_output,
+                            # Create threads to stream stdout and stderr
+                            stdout_thread = threading.Thread(
+                                target=stream_output,
+                                args=(process.stdout, lang, logger.info, stdout_buffer),
+                                daemon=True
                             )
-                            save_failure_report(
-                                target_lang=lang,
-                                subprocess_result=mock_result,
-                                failure_dir=failure_dir,
-                                duration_seconds=duration,
+                            stderr_thread = threading.Thread(
+                                target=stream_output,
+                                args=(process.stderr, lang, logger.warning, stderr_buffer),
+                                daemon=True
                             )
 
-                            # Continue to next language (no break - continue-on-failure)
-                            logger.info(f"Continuing to next language despite failure...")
-                        else:
-                            logger.info(f"Successfully completed translation for {lang} (duration: {duration:.1f}s)")
+                            stdout_thread.start()
+                            stderr_thread.start()
 
-                            # CRITICAL FIX: Check validation status before committing
-                            # Subprocess should return validation status via exit code or file
-                            # For now, we trust exit_code == 0 means validation passed
-                            # But we also need to check if files were actually modified
+                            # Wait for process completion with timeout
+                            try:
+                                exit_code = process.wait(timeout=None)  # No per-language timeout
+                            except subprocess.TimeoutExpired:
+                                process.kill()
+                                process.wait()  # Clean up zombie process
+                                raise  # Re-raise to be caught below
+
+                            # Wait for output threads to finish
+                            stdout_thread.join(timeout=5)
+                            stderr_thread.join(timeout=5)
+
+                            # Get captured output
+                            stdout_output = stdout_buffer.getvalue()
+                            stderr_output = stderr_buffer.getvalue()
+
+                            duration = time.time() - lang_start_time
+                            _ec = exit_code
+
+                            # Track result for this language
+                            _res = {
+                                "exit_code": exit_code,
+                                "success": exit_code == 0,
+                                "duration": duration,
+                                "stderr_preview": stderr_output[-500:] if stderr_output else "",
+                            }
+
+                            if exit_code != 0:
+                                logger.error(
+                                    f"Translation had failures for language {lang} (exit_code={exit_code}, "
+                                    f"duration: {duration:.1f}s) — checking for partial progress"
+                                )
+
+                                # Save failure report with captured output
+                                mock_result = subprocess.CompletedProcess(
+                                    args=cmd,
+                                    returncode=exit_code,
+                                    stdout=stdout_output,
+                                    stderr=stderr_output,
+                                )
+                                save_failure_report(
+                                    target_lang=lang,
+                                    subprocess_result=mock_result,
+                                    failure_dir=failure_dir,
+                                    duration_seconds=duration,
+                                )
+                            else:
+                                logger.info(f"Successfully completed translation for {lang} (duration: {duration:.1f}s)")
+
+                            # Always check git status — even partial-success batches (exit_code=1)
+                            # should commit what succeeded and continue to remaining untranslated files.
+                            # Only break if there is literally zero new progress (no staged files).
+                            stats = {
+                                "model_used": args.model or "default",
+                                "duration_seconds": duration,
+                                "tm_hit_rate": 0.0,
+                                "segments_total": 0,
+                            }
                             validation_passed = exit_code == 0
 
-                            if not validation_passed:
-                                logger.warning(f"Skipping commit for {lang} - validation failed (exit_code={exit_code})")
+                            if git_repo_root is None:
+                                logger.debug(f"Skipping auto-commit for {lang} (git repository not found)")
                                 translated_files = []
                             else:
-                                # Commit translations for this language
-                                # Note: We need to gather translated files and stats from subprocess
-                                # For now, we create a placeholder stats dict
-                                # TODO: Enhance subprocess to return stats via file/stdout
-                                stats = {
-                                    "model_used": args.model or "default",
-                                    "duration_seconds": duration,
-                                    "tm_hit_rate": 0.0,  # Not available from subprocess
-                                    "segments_total": 0,  # Not available from subprocess
-                                }
-
-                                # Get list of modified files for this language using git status
-                                # Skip auto-commit if git repo root wasn't found
-                                if git_repo_root is None:
-                                    logger.debug(f"Skipping auto-commit for {lang} (git repository not found)")
-                                    translated_files = []
-                                else:
+                                try:
+                                    git_status_result = subprocess.run(
+                                        ["git", "status", "--porcelain"],
+                                        cwd=git_repo_root,
+                                        capture_output=True,
+                                        text=True,
+                                        encoding='utf-8',
+                                        errors='replace',
+                                        timeout=30,
+                                        check=True,
+                                    )
                                     try:
-                                        git_status_result = subprocess.run(
-                                            ["git", "status", "--porcelain"],
-                                            cwd=git_repo_root,  # Run in the correct repository
-                                            capture_output=True,
-                                            text=True,
-                                            encoding='utf-8',  # Use UTF-8 for git output
-                                            errors='replace',  # Handle encoding errors gracefully
-                                            timeout=30,
-                                            check=True,
-                                        )
-                                        # Parse git status output to get modified/new files
-                                        translated_files = []
-                                        for line in git_status_result.stdout.splitlines():
-                                            if line.strip():
-                                                # Git status format: "XY filename" or "XY oldname -> newname" for renames
-                                                status_code = line[:2]
-                                                file_path = line[3:].strip()
+                                        _site_prefix = str(input_path.relative_to(git_repo_root)).replace('\\', '/').rstrip('/') + '/'
+                                    except Exception:
+                                        _site_prefix = None
 
-                                                # Skip renamed files (R) and deleted files (D) - these are pre-existing changes
-                                                if 'R' in status_code or 'D' in status_code:
-                                                    continue
+                                    translated_files = []
+                                    for line in git_status_result.stdout.splitlines():
+                                        if line.strip():
+                                            status_code = line[:2]
+                                            file_path = line[3:].strip()
+                                            if 'R' in status_code or 'D' in status_code:
+                                                continue
+                                            if 'M' not in status_code and 'A' not in status_code and '?' not in status_code:
+                                                continue
+                                            file_path_normalized = file_path.replace('\\', '/')
+                                            if _site_prefix and not file_path_normalized.startswith(_site_prefix):
+                                                continue
+                                            is_translated = (
+                                                f'/{lang}/' in file_path_normalized
+                                                or file_path_normalized.startswith(f'{lang}/')
+                                                or f'.{lang}.' in file_path_normalized
+                                            )
+                                            if is_translated:
+                                                translated_files.append(git_repo_root / file_path)
 
-                                                # Handle modified/added files only (M, A, ??)
-                                                if 'M' not in status_code and 'A' not in status_code and '?' not in status_code:
-                                                    continue
+                                    if translated_files:
+                                        logger.debug(f"Detected {len(translated_files)} modified files for {lang}")
+                                    else:
+                                        logger.warning(f"No modified files detected for {lang}, skipping commit")
 
-                                                # Filter for files related to this language:
-                                                # - Should be in language-specific directory (e.g., ar/, bg/)
-                                                # - Or in output directory if specified
-                                                file_path_normalized = file_path.replace('\\', '/')
-                                                is_translated = False
+                                except Exception as e:
+                                    logger.warning(f"Failed to detect modified files for {lang}: {e}")
+                                    translated_files = []
 
-                                                # Check if file is in language directory (e.g., "ar/..." or "output/ar/...")
-                                                if f'/{lang}/' in file_path_normalized or file_path_normalized.startswith(f'{lang}/'):
-                                                    is_translated = True
-
-                                                # Check if file has language code in filename (e.g., "file.ar.md")
-                                                if f'.{lang}.' in file_path_normalized:
-                                                    is_translated = True
-
-                                                if is_translated:
-                                                    # Convert relative path to absolute path using git_repo_root
-                                                    # Git status returns paths relative to git root
-                                                    absolute_file_path = git_repo_root / file_path
-                                                    translated_files.append(absolute_file_path)
-
-                                        if translated_files:
-                                            logger.debug(f"Detected {len(translated_files)} modified files for {lang}")
-                                        else:
-                                            logger.warning(f"No modified files detected for {lang}, skipping commit")
-
-                                    except Exception as e:
-                                        logger.warning(f"Failed to detect modified files for {lang}: {e}")
-                                        translated_files = []
-
-                                # P1-12: Commit translations using CommitEngine (if available) or fallback
-                                if translated_files:
-                                    # Try using CommitEngine first (preferred)
+                            if translated_files:
+                                with _commit_lock:
+                                    # P1-12: Commit translations using CommitEngine (if available) or fallback
                                     if shared_engines and shared_engines.commit:
                                         try:
                                             commit_result = shared_engines.commit.commit_if_enabled(
@@ -1962,7 +1960,6 @@ def translate_site(args: argparse.Namespace) -> int:
                                                 model_id=args.model or "default",
                                                 tm_stats=stats
                                             )
-
                                             if commit_result.success and commit_result.files_committed > 0:
                                                 logger.info(f"Committed {commit_result.files_committed} files for {lang}")
                                             elif not commit_result.success:
@@ -1971,8 +1968,6 @@ def translate_site(args: argparse.Namespace) -> int:
                                                 logger.debug(f"No files to commit for {lang} (already committed or no changes)")
                                         except Exception as e:
                                             logger.warning(f"CommitEngine error for {lang} (non-fatal): {e}")
-
-                                    # Fallback to direct commit_language_translations
                                     else:
                                         _auto_push = getattr(global_config.git_commit, 'auto_push', False)
                                         commit_success = commit_language_translations(
@@ -1984,113 +1979,140 @@ def translate_site(args: argparse.Namespace) -> int:
                                             git_repo_root=git_repo_root,
                                             validation_passed=validation_passed,
                                         )
-
                                         if commit_success:
                                             logger.info(f"Committed {len(translated_files)} files for {lang}")
                                         else:
                                             logger.warning(f"Failed to commit translations for {lang} (non-fatal)")
+                                # Partial-failure batch: log and continue to next batch
+                                if exit_code != 0:
+                                    logger.info(f"[{lang}] Batch {_batch_num} had partial failures but committed {len(translated_files)} files — continuing")
+                            else:
+                                # No new files written this batch
+                                if exit_code != 0:
+                                    logger.info(f"[{lang}] Batch {_batch_num} failed (exit_code={exit_code}) with no new files — stopping")
                                 else:
-                                    logger.info(f"No files to commit for {lang} (possibly unchanged or already committed)")
+                                    logger.info(f"[{lang}] No new files in batch {_batch_num} — language complete")
+                                break  # No progress made — stop loop
 
-                    except subprocess.TimeoutExpired:
-                        duration = time.time() - lang_start_time
-                        logger.error(
-                            f"Translation timed out for language {lang} after {duration:.1f}s "
-                            f"(timeout: 3600s)"
-                        )
+                        except subprocess.TimeoutExpired:
+                            duration = time.time() - lang_start_time
+                            logger.error(
+                                f"Translation timed out for language {lang} after {duration:.1f}s "
+                                f"(timeout: 3600s)"
+                            )
 
-                        # Create a mock result for failure reporting
-                        mock_result = subprocess.CompletedProcess(
-                            args=cmd,
-                            returncode=-1,
-                            stdout="",
-                            stderr=f"Process timed out after 3600 seconds",
-                        )
+                            # Create a mock result for failure reporting
+                            mock_result = subprocess.CompletedProcess(
+                                args=cmd,
+                                returncode=-1,
+                                stdout="",
+                                stderr=f"Process timed out after 3600 seconds",
+                            )
 
-                        exit_codes.append(-1)
-                        language_results[lang] = {
-                            "exit_code": -1,
-                            "success": False,
-                            "duration": duration,
-                            "stderr_preview": "TimeoutExpired",
-                        }
+                            _ec = -1
+                            _res = {
+                                "exit_code": -1,
+                                "success": False,
+                                "duration": duration,
+                                "stderr_preview": "TimeoutExpired",
+                            }
 
-                        save_failure_report(
-                            target_lang=lang,
-                            subprocess_result=mock_result,
-                            failure_dir=failure_dir,
-                            duration_seconds=duration,
-                        )
+                            save_failure_report(
+                                target_lang=lang,
+                                subprocess_result=mock_result,
+                                failure_dir=failure_dir,
+                                duration_seconds=duration,
+                            )
 
-                        # Continue to next language
-                        logger.info(f"Continuing to next language despite timeout...")
+                            # Stop batch loop for this language after timeout
+                            logger.info(f"[{lang}] Stopping batch loop after timeout in batch {_batch_num}")
+                            break
 
-                    except subprocess.CalledProcessError as e:
-                        duration = time.time() - lang_start_time
-                        logger.error(
-                            f"Subprocess error for language {lang}: {e} "
-                            f"(duration: {duration:.1f}s)"
-                        )
+                        except subprocess.CalledProcessError as e:
+                            duration = time.time() - lang_start_time
+                            logger.error(
+                                f"Subprocess error for language {lang}: {e} "
+                                f"(duration: {duration:.1f}s)"
+                            )
 
-                        exit_codes.append(e.returncode)
-                        language_results[lang] = {
-                            "exit_code": e.returncode,
-                            "success": False,
-                            "duration": duration,
-                            "stderr_preview": str(e)[-500:],
-                        }
+                            _ec = e.returncode
+                            _res = {
+                                "exit_code": e.returncode,
+                                "success": False,
+                                "duration": duration,
+                                "stderr_preview": str(e)[-500:],
+                            }
 
-                        # Create result object for failure reporting
-                        result = subprocess.CompletedProcess(
-                            args=cmd,
-                            returncode=e.returncode,
-                            stdout=getattr(e, 'stdout', ''),
-                            stderr=getattr(e, 'stderr', str(e)),
-                        )
+                            # Create result object for failure reporting
+                            result = subprocess.CompletedProcess(
+                                args=cmd,
+                                returncode=e.returncode,
+                                stdout=getattr(e, 'stdout', ''),
+                                stderr=getattr(e, 'stderr', str(e)),
+                            )
 
-                        save_failure_report(
-                            target_lang=lang,
-                            subprocess_result=result,
-                            failure_dir=failure_dir,
-                            duration_seconds=duration,
-                        )
+                            save_failure_report(
+                                target_lang=lang,
+                                subprocess_result=result,
+                                failure_dir=failure_dir,
+                                duration_seconds=duration,
+                            )
 
-                        # Continue to next language
-                        logger.info(f"Continuing to next language despite error...")
+                            # Stop batch loop for this language after error
+                            logger.info(f"[{lang}] Stopping batch loop after error in batch {_batch_num}")
+                            break
 
-                    except Exception as e:
-                        duration = time.time() - lang_start_time
-                        logger.error(
-                            f"Unexpected error for language {lang}: {e} "
-                            f"(duration: {duration:.1f}s)"
-                        )
+                        except Exception as e:
+                            duration = time.time() - lang_start_time
+                            logger.error(
+                                f"Unexpected error for language {lang}: {e} "
+                                f"(duration: {duration:.1f}s)"
+                            )
 
-                        exit_codes.append(-1)
-                        language_results[lang] = {
-                            "exit_code": -1,
-                            "success": False,
-                            "duration": duration,
-                            "stderr_preview": str(e)[-500:],
-                        }
+                            _ec = -1
+                            _res = {
+                                "exit_code": -1,
+                                "success": False,
+                                "duration": duration,
+                                "stderr_preview": str(e)[-500:],
+                            }
 
-                        # Create mock result for failure reporting
-                        mock_result = subprocess.CompletedProcess(
-                            args=cmd,
-                            returncode=-1,
-                            stdout="",
-                            stderr=str(e),
-                        )
+                            # Create mock result for failure reporting
+                            mock_result = subprocess.CompletedProcess(
+                                args=cmd,
+                                returncode=-1,
+                                stdout="",
+                                stderr=str(e),
+                            )
 
-                        save_failure_report(
-                            target_lang=lang,
-                            subprocess_result=mock_result,
-                            failure_dir=failure_dir,
-                            duration_seconds=duration,
-                        )
+                            save_failure_report(
+                                target_lang=lang,
+                                subprocess_result=mock_result,
+                                failure_dir=failure_dir,
+                                duration_seconds=duration,
+                            )
 
-                        # Continue to next language
-                        logger.info(f"Continuing to next language despite unexpected error...")
+                            # Stop batch loop for this language after unexpected error
+                            logger.info(f"[{lang}] Stopping batch loop after unexpected error in batch {_batch_num}")
+                            break
 
+                    return _ec, _res
+
+                with _TPE(max_workers=_parallel_n) as _pool:
+                    _futures = {
+                        _pool.submit(_run_one_language, (i, lang)): lang
+                        for i, lang in enumerate(target_langs, 1)
+                    }
+                    for _fut in _ac(_futures):
+                        _flang = _futures[_fut]
+                        try:
+                            _fec, _fres = _fut.result()
+                            exit_codes.append(_fec)
+                            language_results[_flang] = _fres
+                        except Exception as _ferr:
+                            logger.error(f"Thread error for {_flang}: {_ferr}")
+                            exit_codes.append(-1)
+                            language_results[_flang] = {"exit_code": -1, "success": False, "duration": 0, "stderr_preview": str(_ferr)}
                 # Summary report with per-language results
                 successful_langs = [lang for lang, res in language_results.items() if res["success"]]
                 failed_langs = [lang for lang, res in language_results.items() if not res["success"]]

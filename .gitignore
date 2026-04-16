@@ -135,8 +135,7 @@ ehthumbs.db
 Desktop.ini
 $RECYCLE.BIN/
 
-# Pre-commit
-.pre-commit-config.yaml
+# Pre-commit (config is now tracked)
 
 # Backup files
 *.bak
@@ -257,3 +256,51 @@ docs/_audit/
 
 # Platform-specific virtual environments
 /venv_wsl/
+
+# Root-level ad-hoc scripts (dev/debugging, not part of system)
+/run_*.ps1
+/run_*.sh
+/setup_*.ps1
+/create_*.ps1
+/create_*.py
+/discover_*.ps1
+/monitor_*.ps1
+/wait_for_*.ps1
+/select_*.ps1
+/copy_*.ps1
+/gate_*.ps1
+/gate_*.py
+/gate_*.txt
+/verify_*.py
+/test_*.py
+/test_*.md
+/test_*.txt
+
+# Root-level status/report markdown (dev artifacts)
+/*_REPORT.md
+/*_SUMMARY.md
+/*_STATUS.md
+/*_PLAN.md
+/*_COMPLETE.md
+/*_READY.md
+/*_FINDINGS.md
+/*_VERIFICATION.md
+/*_SCOPE.md
+/*_INDEX.md
+/*_FIX_*.md
+/LOG_ANALYSIS.md
+
+# Config variants and backups (not canonical)
+/config/model_registry.backup.yaml
+/config/model_registry.local.yaml
+/config/model_registry_*.yaml
+/config/custom_*.yaml
+
+# Dependency lock file (requirements.lock is tracked for reproducibility)
+/requirements_*.txt
+
+# Archive directory
+/archive/
+
+# Tools directory (ad-hoc utilities)
+/tools/

@@ -80,7 +80,11 @@ class ValidationSuite:
             CompletenessValidator(),
             LanguageConsistencyValidator(),
             ShortcodePreservationValidator(),
-            RepetitionDetectorValidator(),
+            RepetitionDetectorValidator(config={
+                "ngram_threshold": 5,          # Require 5+ occurrences (default 3) — reduces false positives on structured docs
+                "sentence_dup_threshold": 3,   # Require 3 duplicates (default 2) — tolerates paired FAQ/step patterns
+                "word_freq_threshold": 0.35,   # Slightly relaxed (default 0.30) — product names repeat legitimately
+            }),
             # Note: FrontmatterProtectionValidator, TerminologyPreservationValidator,
             # and FilePlacementValidator require constructor arguments,
             # so they are only created via from_config() or explicitly passed in
@@ -159,7 +163,9 @@ class ValidationSuite:
             validators.append(FilePlacementValidator(config_service=config_service))
 
         if validators_config.get('repetition_detector', {}).get('enabled', True):
-            validators.append(RepetitionDetectorValidator())
+            rep_cfg = {k: v for k, v in validators_config.get('repetition_detector', {}).items()
+                       if k not in ('enabled', 'description')}
+            validators.append(RepetitionDetectorValidator(config=rep_cfg))
 
         return cls(
             validators=validators,

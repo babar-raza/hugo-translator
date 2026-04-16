@@ -3,7 +3,7 @@
 site_id: products-test
 display_name: Landing Pages (2 lang test)
 content_roots:
-- D:\onedrive\Documents\GitHub\aspose.net\content\products.aspose.net
+- ${ASPOSE_NET_CONTENT}/products.aspose.net
 default_source_lang: en
 target_langs:
   - fr

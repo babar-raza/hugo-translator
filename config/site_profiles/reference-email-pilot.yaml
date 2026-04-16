@@ -4,7 +4,7 @@
 site_id: reference-email-pilot
 display_name: API References - Email (Pilot)
 content_roots:
-- D:\onedrive\Documents\GitHub\aspose.net\content\reference.aspose.net\email
+- ${ASPOSE_NET_CONTENT}/reference.aspose.net/email
 default_source_lang: en
 target_langs:
   - fr
