@@ -209,13 +209,42 @@ body_rules:
 
 📚 **Full Documentation**: [Segment Sorting Guide](docs/features/segment-sorting.md)
 
+## Quick Start for Colleagues
+
+The fastest way to get running after cloning:
+
+```bash
+# 1. Run the bootstrap script (creates venv, installs deps, copies .env)
+python scripts/setup_dev_env.py
+
+# 2. Activate the virtual environment
+# Windows:
+.venv\Scripts\activate
+# Linux/macOS:
+source .venv/bin/activate
+
+# 3. Edit .env — set paths to your content repository clones
+#    ASPOSE_NET_CONTENT=/path/to/aspose.net/content
+#    ASPOSE_ORG_CONTENT=/path/to/aspose.org/content
+
+# 4. Run the test suite to verify setup
+python -m pytest tests/unit -x -q
+
+# 5. Try a dry-run translation
+translate-hugo --site products.aspose.net --max-files 5 --dry-run
+```
+
+Translation models download automatically from HuggingFace on first use (1-5 GB depending on model). No manual model downloads needed.
+
+For GPU acceleration, also run: `pip install -r requirements/gpu.txt`
+
 ## Quick Start
 
 ### First-Time Setup
 
 New to the project? Start here:
 
-- **[⚡ Setup Guide](docs/user-guide/setup.md)** - First-time installation for Windows, Linux, and macOS
+- **[Setup Guide](docs/user-guide/setup.md)** - First-time installation for Windows, Linux, and macOS
   - Automated setup scripts with GPU auto-detection
   - Prerequisites, troubleshooting, and verification
   - Platform-specific instructions (including WSL)

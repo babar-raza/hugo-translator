@@ -5,10 +5,10 @@
 ```bash
 git clone <repo-url>
 cd hugo-translator
-python -m venv .venv
-.venv/Scripts/activate  # Windows
-pip install -r requirements.txt
-cp .env.example .env    # Edit paths for your environment
+python scripts/setup_dev_env.py   # Creates venv, installs deps, copies .env
+.venv/Scripts/activate             # Windows
+# source .venv/bin/activate        # Linux/macOS
+# Edit .env with your content repo paths
 ```
 
 ## Environment Variables
@@ -50,3 +50,11 @@ pytest tests/unit/workers/ -v            # Worker tests only
 2. Keep changes focused — one concern per PR
 3. Ensure `pytest tests/unit/ -q` passes
 4. Do not commit `.env`, credentials, or model binaries
+
+## Repository Hygiene
+
+- **Never commit hardcoded personal paths** (e.g., `D:\onedrive`, `C:\Users\<name>`). The pre-commit hook blocks these in Python, YAML, shell, and batch files.
+- **Personal utility scripts** should not be tracked. Keep them untracked or in a local-only directory.
+- **Test scripts** go under `tests/`, not at the project root or in `src/`.
+- **Pre-commit hooks are mandatory** — run `pre-commit install` after cloning.
+- Run `bash scripts/check_share_safe.sh` before pushing to verify no private data leaks.
