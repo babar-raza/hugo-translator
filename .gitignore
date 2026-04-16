@@ -253,6 +253,7 @@ docs/_audit/
 /tests/work/
 /test_e2e_*/
 /test_slides_translation/
+/test_*/
 
 # Platform-specific virtual environments
 /venv_wsl/
@@ -275,6 +276,7 @@ docs/_audit/
 /test_*.py
 /test_*.md
 /test_*.txt
+/test_*.ps1
 
 # Root-level status/report markdown (dev artifacts)
 /*_REPORT.md
@@ -304,3 +306,24 @@ docs/_audit/
 
 # Tools directory (ad-hoc utilities)
 /tools/
+
+# Source-level ad-hoc test scripts (not proper tests)
+/src/test_*.py
+
+# Test regression artifacts (generated during test runs)
+tests/regression/.translation_progress/
+tests/regression/MagicMock/
+tests/regression/telemetry_buffer/
+
+# Mangled pytest collection output
+*test_collect*
+
+# Personal utility scripts removed from tracking
+scripts/check_conda.bat
+scripts/check_env_packages.py
+scripts/clone_conda_env.py
+scripts/install_faiss.py
+scripts/install_missing_packages.py
+scripts/list_conda_envs.py
+scripts/inspect_l3.bat
+scripts/inspect_cache.py

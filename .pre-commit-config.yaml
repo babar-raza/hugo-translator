@@ -24,7 +24,7 @@ repos:
     hooks:
       - id: no-hardcoded-paths
         name: Check for hardcoded user paths
-        entry: 'D:\\onedrive|D:/onedrive|C:\\Users\\prora'
+        entry: 'D:\\onedrive|D:/onedrive|C:\\Users\\prora|C:/Users/prora'
         language: pygrep
-        types: [yaml]
+        types_or: [yaml, python, shell, batch]
         exclude: '\.env'
