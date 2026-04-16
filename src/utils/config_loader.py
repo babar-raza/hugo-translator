@@ -109,6 +109,12 @@ class ConfigService:
                             f"{type(model_default).__name__}, expected str. Ignoring."
                         )
             profile = SiteProfile(**data)
+            # Expand env vars in content_roots once at load time so all consumers
+            # receive resolved paths (e.g. ${ASPOSE_NET_CONTENT}/blog.aspose.net
+            # → D:/onedrive/.../content/blog.aspose.net)
+            profile.content_roots = [
+                os.path.expandvars(r) for r in profile.content_roots
+            ]
             self._profile_cache[site_id] = profile
             return profile
         except Exception as e:
