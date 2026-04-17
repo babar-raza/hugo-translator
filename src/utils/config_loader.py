@@ -6,7 +6,7 @@ Provides centralized access to site profiles with validation and caching.
 import logging
 import os
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -16,8 +16,8 @@ from pydantic import ValidationError
 from .models import (
     GlobalConfig,
     SiteProfile,
-    ValidationConfig,
     TerminologyConfig,
+    ValidationConfig,
 )
 
 
@@ -40,25 +40,37 @@ class ConfigService:
         if not self.config_root.exists():
             raise ConfigLoadError(f"Config root does not exist: {self.config_root}")
 
+        # Load .env file so env vars (e.g. ASPOSE_NET_CONTENT) are available in all
+        # execution contexts, including Task Scheduler → bat → Python paths where the
+        # shell does not inherit user-level exports.
+        _env_file = self.config_root.parent / ".env"
+        if _env_file.exists():
+            try:
+                from dotenv import load_dotenv
+                load_dotenv(_env_file, override=False)
+                logger.debug("Loaded env vars from %s", _env_file)
+            except ImportError:
+                logger.debug("python-dotenv not available; env vars must be set externally")
+
         self.site_profiles_dir = self.config_root / "site_profiles"
         self.global_config_path = self.config_root / "global.yaml"
         self.validation_config_path = self.config_root / "validation.yaml"
         self.terminology_config_path = self.config_root / "terminology.yaml"
         self.metrics_config_path = self.config_root / "metrics.yaml"
 
-        self._profile_cache: Dict[str, SiteProfile] = {}
-        self._global_config: Optional[GlobalConfig] = None
-        self._validation_config: Optional[ValidationConfig] = None
-        self._terminology_config: Optional[TerminologyConfig] = None
-        self._metrics_config: Optional[Dict[str, Any]] = None
-        self._raw_global_config: Dict[str, Any] = {}
+        self._profile_cache: dict[str, SiteProfile] = {}
+        self._global_config: GlobalConfig | None = None
+        self._validation_config: ValidationConfig | None = None
+        self._terminology_config: TerminologyConfig | None = None
+        self._metrics_config: dict[str, Any] | None = None
+        self._raw_global_config: dict[str, Any] = {}
         self._load_global_config()
 
     def _load_global_config(self) -> None:
         """Load global configuration with defaults."""
         if self.global_config_path.exists():
             try:
-                with open(self.global_config_path, "r", encoding="utf-8") as f:
+                with open(self.global_config_path, encoding="utf-8") as f:
                     data = yaml.safe_load(f)
                     self._raw_global_config = data or {}
                     self._global_config = GlobalConfig(**data) if data else GlobalConfig()
@@ -75,7 +87,7 @@ class ConfigService:
             self._load_global_config()
         return self._global_config
 
-    def get_config(self) -> Dict[str, Any]:
+    def get_config(self) -> dict[str, Any]:
         """
         Return raw global configuration dictionary.
 
@@ -93,7 +105,7 @@ class ConfigService:
             raise ConfigLoadError(f"Profile not found: {site_id}")
 
         try:
-            with open(profile_path, "r", encoding="utf-8") as f:
+            with open(profile_path, encoding="utf-8") as f:
                 data = yaml.safe_load(f)
             data = self._apply_env_overrides(site_id, data)
             # Map legacy model.default to default_model for backward compatibility
@@ -123,18 +135,18 @@ class ConfigService:
     def _apply_env_overrides(self, site_id: str, data: dict) -> dict:
         """Apply environment variable overrides to profile data."""
         env_prefix = f"SITE_{site_id.upper().replace('.', '_').replace('-', '_')}_"
-        
+
         if f"{env_prefix}DEFAULT_SOURCE_LANG" in os.environ:
             data["default_source_lang"] = os.environ[f"{env_prefix}DEFAULT_SOURCE_LANG"]
-        
+
         if f"{env_prefix}TARGET_LANGS" in os.environ:
             data["target_langs"] = [
                 lang.strip() for lang in os.environ[f"{env_prefix}TARGET_LANGS"].split(",")
             ]
-        
+
         return data
 
-    def list_sites(self, autonomous_only: bool = True) -> List[str]:
+    def list_sites(self, autonomous_only: bool = True) -> list[str]:
         """List configured site IDs.
 
         Args:
@@ -153,7 +165,7 @@ class ConfigService:
         for stem in all_stems:
             profile_path = self.site_profiles_dir / f"{stem}.yaml"
             try:
-                with open(profile_path, "r", encoding="utf-8") as _f:
+                with open(profile_path, encoding="utf-8") as _f:
                     raw = _yaml.safe_load(_f) or {}
                 if raw.get("autonomous_enabled", True):
                     enabled.append(stem)
@@ -190,13 +202,13 @@ class ConfigService:
                 return candidate
         return candidates[0]
 
-    def resolve_content_roots(self, content_roots: List[str]) -> List[Path]:
+    def resolve_content_roots(self, content_roots: list[str]) -> list[Path]:
         """Resolve multiple content-root entries using `resolve_content_root`."""
         return [self.resolve_content_root(root) for root in content_roots]
 
-    def validate_all_profiles(self) -> Dict[str, List[str]]:
+    def validate_all_profiles(self) -> dict[str, list[str]]:
         """Validate all profiles and return errors per site."""
-        errors: Dict[str, List[str]] = {}
+        errors: dict[str, list[str]] = {}
         for site_id in self.list_sites():
             try:
                 self.get_site_profile(site_id, use_cache=False)
@@ -225,7 +237,7 @@ class ConfigService:
             )
 
         try:
-            with open(self.validation_config_path, "r", encoding="utf-8") as f:
+            with open(self.validation_config_path, encoding="utf-8") as f:
                 data = yaml.safe_load(f)
 
             if not data:
@@ -255,7 +267,7 @@ class ConfigService:
             )
 
         try:
-            with open(self.terminology_config_path, "r", encoding="utf-8") as f:
+            with open(self.terminology_config_path, encoding="utf-8") as f:
                 data = yaml.safe_load(f)
 
             if not data:
@@ -284,7 +296,7 @@ class ConfigService:
         self._terminology_config = None
         return self.get_terminology_config(use_cache=False)
 
-    def get_metrics_config(self, use_cache: bool = True) -> Dict[str, Any]:
+    def get_metrics_config(self, use_cache: bool = True) -> dict[str, Any]:
         """Load and validate the metrics configuration.
 
         Supports environment variable overrides:
@@ -302,7 +314,7 @@ class ConfigService:
         # Load from file or use defaults
         if self.metrics_config_path.exists():
             try:
-                with open(self.metrics_config_path, "r", encoding="utf-8") as f:
+                with open(self.metrics_config_path, encoding="utf-8") as f:
                     data = yaml.safe_load(f)
 
                 if not data:
@@ -388,7 +400,7 @@ class ConfigService:
         self._metrics_config = config
         return config
 
-    def _deep_merge(self, base: Dict, override: Dict) -> None:
+    def _deep_merge(self, base: dict, override: dict) -> None:
         """Deep merge override dict into base dict."""
         for key, value in override.items():
             if key in base and isinstance(base[key], dict) and isinstance(value, dict):
@@ -396,14 +408,14 @@ class ConfigService:
             else:
                 base[key] = value
 
-    def reload_metrics_config(self) -> Dict[str, Any]:
+    def reload_metrics_config(self) -> dict[str, Any]:
         """Reload metrics config from disk, bypassing cache."""
         self._metrics_config = None
         return self.get_metrics_config(use_cache=False)
 
     def get_merged_validation_config(
         self, site_profile: "SiteProfile"
-    ) -> Dict[str, any]:
+    ) -> dict[str, any]:
         """
         Merge global validation config with site-specific overrides.
 
@@ -449,7 +461,7 @@ class ConfigService:
 
     def get_merged_terminology_config(
         self, site_profile: "SiteProfile"
-    ) -> Dict[str, any]:
+    ) -> dict[str, any]:
         """
         Merge global terminology config with site-specific overrides.
 
@@ -502,10 +514,10 @@ class ConfigService:
 
 
 # Standalone helper for global configuration
-_global_config_cache: Optional[Dict[str, Any]] = None
+_global_config_cache: dict[str, Any] | None = None
 
 
-def get_global_config() -> Dict[str, Any]:
+def get_global_config() -> dict[str, Any]:
     """Get global configuration (standalone helper).
 
     This is a convenience function for components that need global config
@@ -543,10 +555,10 @@ def get_global_config() -> Dict[str, Any]:
 
 
 # Standalone helper for metrics configuration
-_metrics_config_cache: Optional[Dict[str, Any]] = None
+_metrics_config_cache: dict[str, Any] | None = None
 
 
-def get_metrics_config() -> Dict[str, Any]:
+def get_metrics_config() -> dict[str, Any]:
     """Get metrics configuration (standalone helper).
 
     This is a convenience function for components that need metrics config

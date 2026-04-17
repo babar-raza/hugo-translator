@@ -1,6 +1,5 @@
 """Test env-var expansion in ConfigService.resolve_content_root."""
 import os
-from pathlib import Path
 from unittest.mock import patch
 
 import pytest
@@ -38,3 +37,26 @@ def test_plain_path_unchanged(config_service, tmp_path):
     target.mkdir()
     result = config_service.resolve_content_root(str(target))
     assert result == target
+
+
+def test_dotenv_loaded_at_init(tmp_path):
+    """ConfigService.__init__ loads .env so env vars are available without shell export."""
+    env_file = tmp_path / ".env"
+    env_file.write_text("HUGO_TEST_DOTENV_VAR=resolved_from_dotenv\n")
+
+    # Ensure the var is NOT in the environment before init
+    os.environ.pop("HUGO_TEST_DOTENV_VAR", None)
+
+    # ConfigService expects config_root; point it at the real one but .env at tmp_path
+    # We monkey-patch the _env_file resolution by creating a minimal config root
+    config_root = tmp_path / "config"
+    config_root.mkdir()
+    (config_root / "site_profiles").mkdir()
+    (config_root / "global.yaml").write_text("{}\n")
+
+    ConfigService(str(config_root))
+
+    assert os.environ.get("HUGO_TEST_DOTENV_VAR") == "resolved_from_dotenv"
+
+    # Cleanup
+    os.environ.pop("HUGO_TEST_DOTENV_VAR", None)

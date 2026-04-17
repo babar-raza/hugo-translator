@@ -3,17 +3,20 @@ Unified Translation Memory Interface.
 
 Coordinates L1 (cache), L2 (persistent), and L3 (semantic) layers.
 """
-from typing import Any, Dict, List, Optional
+from __future__ import annotations
+
+from typing import Any
 
 from .l1_cache import L1Cache
 from .l2_persistent import L2PersistentTM, TranslationEntry
+
 try:
     from .l3_semantic import L3SemanticTM
 except Exception:
     L3SemanticTM = None  # type: ignore
-from .models import LookupRequest, LookupResult, TMStats
-from .override_controller import OverrideController, OverrideConfig, OverrideMode
 from .improvement_queue import ImprovementQueue
+from .models import LookupRequest, LookupResult, TMStats
+from .override_controller import OverrideConfig, OverrideController, OverrideMode
 
 
 class TranslationMemory:
@@ -39,9 +42,9 @@ class TranslationMemory:
         self,
         l1_cache: L1Cache,
         l2_persistent: L2PersistentTM,
-        l3_semantic: Optional[L3SemanticTM] = None,
-        override_controller: Optional[OverrideController] = None,
-        improvement_queue: Optional[ImprovementQueue] = None,
+        l3_semantic: L3SemanticTM | None = None,
+        override_controller: OverrideController | None = None,
+        improvement_queue: ImprovementQueue | None = None,
     ):
         """
         Initialize unified TM.
@@ -70,10 +73,10 @@ class TranslationMemory:
         src_lang: str,
         tgt_lang: str,
         text: str,
-        context: Optional[str] = None,
+        context: str | None = None,
         use_semantic: bool = True,
         semantic_threshold: float = 0.80,
-        lookup_context: Optional[Dict[str, Any]] = None,
+        lookup_context: dict[str, Any] | None = None,
     ) -> LookupResult:
         """
         Unified lookup across all TM layers.
@@ -170,10 +173,11 @@ class TranslationMemory:
         tgt_lang: str,
         text: str,
         translation: str,
-        context: Optional[str] = None,
-        metadata: Optional[Dict] = None,
-        store_context: Optional[Dict[str, Any]] = None,
+        context: str | None = None,
+        metadata: dict | None = None,
+        store_context: dict[str, Any] | None = None,
         force_update: bool = False,
+        skip_l3: bool = False,
     ) -> bool:
         """
         Store translation in all applicable layers.
@@ -188,6 +192,7 @@ class TranslationMemory:
             metadata: Optional metadata
             store_context: Optional context for override filtering (e.g., frontmatter_key)
             force_update: If True, overwrite existing entries; if False, skip existing
+            skip_l3: If True, skip L3 add_entry (caller already updated L3 in-place)
 
         Returns:
             True if stored, False if skipped (entry exists and not force_update)
@@ -213,7 +218,7 @@ class TranslationMemory:
         )
 
         # Store in L3 semantic (if available and L2 was stored)
-        if stored and self.l3 is not None:
+        if stored and self.l3 is not None and not skip_l3:
             # Generate entry_id for L3 (same format as batch_store)
             entry_id = f"{site_id}:{src_lang}:{tgt_lang}:{hash(text)}"
             self.l3.add_entry(
@@ -254,10 +259,10 @@ class TranslationMemory:
 
     def batch_lookup(
         self,
-        requests: List[LookupRequest],
+        requests: list[LookupRequest],
         use_semantic: bool = True,
         semantic_threshold: float = 0.80,
-    ) -> List[LookupResult]:
+    ) -> list[LookupResult]:
         """
         Optimize bulk lookups.
 
@@ -285,7 +290,7 @@ class TranslationMemory:
 
         return results
 
-    def batch_store(self, entries: List[TranslationEntry]) -> int:
+    def batch_store(self, entries: list[TranslationEntry]) -> int:
         """
         Efficiently store many entries at once.
 
@@ -379,7 +384,7 @@ class TranslationMemory:
     def set_override_mode(
         self,
         mode: OverrideMode,
-        filters: Optional[Dict[str, Any]] = None,
+        filters: dict[str, Any] | None = None,
     ) -> None:
         """
         Set the override mode for TM operations.
@@ -391,7 +396,7 @@ class TranslationMemory:
                 - target_langs: List of target language codes
                 - frontmatter_keys: List of frontmatter keys to match
         """
-        from .override_controller import OverrideConfig, OverrideFilter
+        from .override_controller import OverrideFilter
 
         config = OverrideConfig(mode=mode)
 
@@ -404,7 +409,7 @@ class TranslationMemory:
 
         self.override = OverrideController(config)
 
-    def get_override_stats(self) -> Dict[str, Any]:
+    def get_override_stats(self) -> dict[str, Any]:
         """
         Get override-related statistics.
 

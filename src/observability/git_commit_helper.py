@@ -27,12 +27,12 @@ Usage:
         config_service=config_service,
     )
 """
-from pathlib import Path
-from typing import Dict, List, Optional, Union
 import logging
-import signal
 import platform
+import signal
 import subprocess
+from pathlib import Path
+from typing import Union
 
 logger = logging.getLogger(__name__)
 
@@ -318,8 +318,8 @@ class _SignalBlocker:
 def collect_modified_files_from_git(
     output_dir: Path,
     dir_result: "DirectoryResult",
-    content_root: Optional[Path] = None,
-) -> List[Path]:
+    content_root: Path | None = None,
+) -> list[Path]:
     """
     Fallback: Collect uncommitted .md files using git status.
 
@@ -394,10 +394,10 @@ def collect_modified_files_from_git(
 
 
 def _write_pending_commit_fallback(
-    output_files: List[Path],
+    output_files: list[Path],
     git_root: Path,
     site_id: str,
-    target_langs: List[str],
+    target_langs: list[str],
 ) -> bool:
     """Write .pending_commit.json for SEO-PendingCommitWatcher to pick up within 30s.
 
@@ -460,7 +460,7 @@ def recover_pending_commits(git_root: Path) -> int:
     import time
 
     # Collect candidates
-    candidates: List[Path] = []
+    candidates: list[Path] = []
     active = git_root / ".pending_commit.json"
     if active.exists():
         age = time.time() - active.stat().st_mtime
@@ -479,7 +479,7 @@ def recover_pending_commits(git_root: Path) -> int:
     for pf in candidates:
         try:
             payload = json.loads(pf.read_text(encoding="utf-8"))
-            rel_files: List[str] = payload.get("files", [])
+            rel_files: list[str] = payload.get("files", [])
             commit_msg: str = (payload.get("commit_message") or "").strip()
             author_name: str = payload.get("author_name") or "Hugo Translator"
             author_email: str = payload.get("author_email") or "hugo-translator@aspose.net"
@@ -583,10 +583,10 @@ def recover_pending_commits(git_root: Path) -> int:
 def auto_commit_translations(
     result: Union["TranslationResult", "DirectoryResult"],
     site_id: str,
-    target_langs: List[str],
+    target_langs: list[str],
     run_id: str,
     config_service: "ConfigService",
-    commit_message_override: Optional[str] = None,
+    commit_message_override: str | None = None,
     no_commit: bool = False,
     require_verification_pass: bool = True,
     require_telemetry_success: bool = False,
@@ -629,9 +629,9 @@ def auto_commit_translations(
 
     try:
         # Import here to avoid circular dependencies
-        from .git_commit import GitCommitter, GitCommitConfig, collect_output_files
-        from ..translation_engine.models import TranslationResult, DirectoryResult
         from ..benchmarking.storage import BenchmarkDatabase
+        from ..translation_engine.models import DirectoryResult, TranslationResult
+        from .git_commit import GitCommitConfig, GitCommitter, collect_output_files
 
         # Wrap TranslationResult in DirectoryResult if needed
         if isinstance(result, TranslationResult):
@@ -890,7 +890,7 @@ def auto_commit_translations(
 def _load_git_config(
     config_service: "ConfigService",
     site_id: str,
-    commit_message_override: Optional[str],
+    commit_message_override: str | None,
 ) -> "GitCommitConfig":
     """
     Load git config from site profile or global defaults.
@@ -962,7 +962,7 @@ def _save_commit_telemetry(
     run_id: str,
     site_id: str,
     commit_result: "GitCommitResult",
-    target_langs: List[str],
+    target_langs: list[str],
 ) -> None:
     """
     Save commit telemetry to benchmark database.
@@ -990,7 +990,7 @@ def _save_commit_telemetry(
         logger.debug(f"Commit telemetry save failed: {e}")
 
 
-def _extract_model_id(dir_result: "DirectoryResult", config: Optional[Dict] = None) -> Optional[str]:
+def _extract_model_id(dir_result: "DirectoryResult", config: dict | None = None) -> str | None:
     """
     Extract model ID from translation result with 3-tier fallback.
 
@@ -1060,7 +1060,7 @@ def _extract_model_id(dir_result: "DirectoryResult", config: Optional[Dict] = No
                     fallback = model_defaults.get("fallback_model", "m2m100_418m")
                 else:
                     # Handle case where model_defaults is a Pydantic model
-                    logger.debug(f"[Tier 3] model_defaults is not dict, attempting attribute access")
+                    logger.debug("[Tier 3] model_defaults is not dict, attempting attribute access")
                     fallback = getattr(model_defaults, "fallback_model", "m2m100_418m")
             else:
                 logger.warning("[Tier 3] Config missing 'model_defaults' key - using hardcoded default")
@@ -1096,7 +1096,7 @@ def _extract_model_id(dir_result: "DirectoryResult", config: Optional[Dict] = No
         return None
 
 
-def _extract_tm_stats(dir_result: "DirectoryResult") -> Optional[dict]:
+def _extract_tm_stats(dir_result: "DirectoryResult") -> dict | None:
     """
     Extract TM statistics from translation result.
 
@@ -1174,7 +1174,7 @@ def _check_verification_failures(dir_result: "DirectoryResult") -> int:
     return failed_count
 
 
-def _check_telemetry_failure(dir_result: "DirectoryResult") -> Optional[str]:
+def _check_telemetry_failure(dir_result: "DirectoryResult") -> str | None:
     """
     Check if telemetry post failed.
 
@@ -1207,6 +1207,23 @@ def _check_telemetry_failure(dir_result: "DirectoryResult") -> Optional[str]:
     except Exception as e:
         logger.debug(f"Failed to check telemetry status: {e}")
         return None
+
+
+def recover_orphaned_commit_manifests(
+    git_root: "Path",
+    stale_ready_seconds: int = 300,
+) -> int:
+    """Stub: orphan-manifest recovery is currently disabled.
+
+    The worker calls this function before each run to commit any translation
+    files that were written but not committed in a prior interrupted run.
+    The active implementation was disabled (commit c784792) pending root-cause
+    investigation into corrupted file writes.
+
+    Returns:
+        0  (no manifests processed)
+    """
+    return 0
 
 
 def _save_commit_hash_to_reports(commit_result: "GitCommitResult") -> None:

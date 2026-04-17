@@ -11,35 +11,49 @@ Orchestrates the complete translation workflow:
 """
 import logging
 import math
-import os
 import re
 import time
 from collections import deque
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 from threading import Lock
-from typing import Dict, List, Optional
+from typing import Optional
 
 from ..model_runtime import ModelLoader
-from ..observability.telemetry_integration import get_telemetry, _safe_duration_ms
 from ..observability.progress import get_progress_tracker
+from ..observability.telemetry_integration import _safe_duration_ms, get_telemetry
 from ..tm import TranslationMemory
-from ..utils.metrics import calc_stats
-from .extractor.placeholder_manager import PlaceholderManager
-from ..tm.override_controller import OverrideController, OverrideConfig, OverrideMode
-from ..utils.config_loader import ConfigService
+from ..tm.override_controller import OverrideMode
+from ..tm.retranslate_queue import (
+    add_to_queue as _rtq_add,
+)
+from ..tm.retranslate_queue import (
+    increment_retry as _rtq_increment,
+)
+from ..tm.retranslate_queue import (
+    load_queued_paths as _rtq_load,
+)
+from ..tm.retranslate_queue import (
+    remove_from_queue as _rtq_remove,
+)
 from ..utils.atomic_write import (
-    atomic_write,
     AtomicWriteError,
     DiskFullError,
     InvalidPathError,
     ReadOnlyFilesystemError,
+    atomic_write,
 )
+from ..utils.config_loader import ConfigService
 from ..utils.file_filters import filter_source_files
 from ..utils.file_lock import FileLock, LockError
 from ..utils.metadata_tracker import MetadataTracker
+from ..utils.metrics import calc_stats
 from .exceptions import TranslationRejectedError, TranslationRetryableError
 from .extractor import SegmentExtractor
+from .extractor.placeholder_manager import PlaceholderManager
+from .handlers.multiline_handler import MultilineHandler
+from .language_detection.fasttext_detector import FastTextDetector
+from .language_detection.similarity_tracker import SimilarityTracker
 from .models import (
     DirectoryResult,
     TranslationResult,
@@ -50,13 +64,10 @@ from .models import (
 )
 from .parser import HugoParser
 from .reconstructor import MarkdownReconstructor
+from .retry_handler import RetryHandler
 from .validation import ValidationSuite
 from .validation.decision_engine import ValidationDecisionEngine
 from .validation.post_translation_validator import ValidationDecision as PostValidationDecision
-from .handlers.multiline_handler import MultilineHandler
-from .language_detection.fasttext_detector import FastTextDetector
-from .language_detection.similarity_tracker import SimilarityTracker
-from .retry_handler import RetryHandler
 
 logger = logging.getLogger(__name__)
 
@@ -72,9 +83,9 @@ _ALL_LANGUAGE_CODES = frozenset([
 
 def _is_translated_filename(
     filename: str,
-    target_langs: List[str],
+    target_langs: list[str],
     source_lang: str = 'en'
-) -> tuple[bool, Optional[str]]:
+) -> tuple[bool, str | None]:
     """
     Check if filename appears to be a translated file based on language code pattern.
 
@@ -195,21 +206,21 @@ class TranslationEngine:
         model_loader: ModelLoader,
         enable_validation: bool = True,  # Always validate in production
         enable_telemetry: bool = True,
-        validation_suite: Optional[ValidationSuite] = None,
-        decision_engine: Optional[ValidationDecisionEngine] = None,
-        validation_mode: Optional[str] = None,
-        enable_terminology: Optional[bool] = None,
-        terminology_mode: Optional[str] = None,
-        max_retries: Optional[int] = None,
+        validation_suite: ValidationSuite | None = None,
+        decision_engine: ValidationDecisionEngine | None = None,
+        validation_mode: str | None = None,
+        enable_terminology: bool | None = None,
+        terminology_mode: str | None = None,
+        max_retries: int | None = None,
         dry_run: bool = False,
         save_rejected: bool = False,
-        override_mode: Optional[str] = None,
-        override_filters: Optional[Dict] = None,
+        override_mode: str | None = None,
+        override_filters: dict | None = None,
         batch_size: int = 16,
         enable_verification: bool = False,
         enable_verification_fix: bool = False,
-        output_dir_override: Optional[Path] = None,
-        input_root: Optional[Path] = None,
+        output_dir_override: Path | None = None,
+        input_root: Path | None = None,
         progress_tracker: Optional["ProgressTracker"] = None,
         production_ingestor: Optional["ProductionMetricsIngestor"] = None,
         sort_segments_by_length: bool = False,
@@ -389,7 +400,7 @@ class TranslationEngine:
         # RES-06: Graceful shutdown coordination
         self._shutdown_requested = False
         self._shutdown_lock = Lock()
-        self._current_file: Optional[Path] = None
+        self._current_file: Path | None = None
         self._shutdown_callbacks: list = []
 
         # RES-02: Progress tracker for crash recovery
@@ -407,13 +418,13 @@ class TranslationEngine:
         }
         self._retry_metrics_lock = Lock()
 
-        # Content hash tracking for change detection
-        self.enable_content_hash = kwargs.get('enable_content_hash_tracking', False)
-        if self.enable_content_hash:
-            # Will be initialized per-site in translate_file
-            self.metadata_tracker = None
-        else:
-            self.metadata_tracker = None
+        # Content hash tracking for change detection.
+        # Default True matches global.yaml features.enable_content_hash_tracking: true
+        # and CLI default (enabled unless --disable-content-hash is passed).
+        # Workers that create the engine directly inherit this default correctly.
+        self.enable_content_hash = kwargs.get('enable_content_hash_tracking', True)
+        # Actual MetadataTracker instance is lazily initialized per-site in translate_file
+        self.metadata_tracker = None
 
         # Adaptive batch translation (reactive system)
         self.batch_stats_tracker = None
@@ -714,8 +725,8 @@ class TranslationEngine:
         Returns:
             Free space in bytes, or 0 if unable to determine
         """
-        import time
         import shutil
+        import time
 
         # D3: Check cache first (60-second TTL)
         path_str = str(path)
@@ -761,7 +772,7 @@ class TranslationEngine:
             logger.warning(f"Could not determine free space for {path}: {e}")
             return 0
 
-    def _get_model_id(self, site_profile, src_lang: Optional[str] = None, tgt_lang: Optional[str] = None):
+    def _get_model_id(self, site_profile, src_lang: str | None = None, tgt_lang: str | None = None):
         """
         Get model ID with CLI override, dynamic selection, and site profile fallback support.
 
@@ -827,7 +838,7 @@ class TranslationEngine:
         output_path: Path,
         force_retranslate: bool = False,
         use_mtime_check: bool = True,
-        target_lang: Optional[str] = None,
+        target_lang: str | None = None,
     ) -> tuple:
         """
         RES-05: Determine if translation can be skipped.
@@ -933,7 +944,7 @@ class TranslationEngine:
                 return False
 
             # Check readability
-            with open(output_path, 'r', encoding='utf-8') as f:
+            with open(output_path, encoding='utf-8') as f:
                 content = f.read(1024)  # Read first 1KB
 
             # Basic validation: has some content
@@ -963,8 +974,8 @@ class TranslationEngine:
 
     def _discover_all_segments(
         self,
-        files: List[Path],
-        target_langs: List[str],
+        files: list[Path],
+        target_langs: list[str],
         site_id: str,
         source_lang: str = "en",
     ) -> int:
@@ -1001,7 +1012,7 @@ class TranslationEngine:
 
             try:
                 # Parse file (quick read + parse, no translation)
-                with open(file_path, "r", encoding="utf-8") as f:
+                with open(file_path, encoding="utf-8") as f:
                     content = f.read()
                 doc = self.parser.parse_string(content)
 
@@ -1025,9 +1036,9 @@ class TranslationEngine:
         self,
         site_id: str,
         file_path: Path,
-        target_langs: List[str],
+        target_langs: list[str],
         force: bool = False,
-        validate: Optional[bool] = None,
+        validate: bool | None = None,
         trigger_type: str = "cli",
     ) -> TranslationResult:
         """
@@ -1084,6 +1095,7 @@ class TranslationEngine:
             # Initialize metadata tracker for content hash tracking (if enabled)
             if self.enable_content_hash and not self.metadata_tracker:
                 from pathlib import Path
+
                 from ..utils.config_loader import get_global_config
                 global_config = get_global_config()
 
@@ -1147,7 +1159,7 @@ class TranslationEngine:
             # Parse file
             logger.info(f"Parsing {file_path}")
             try:
-                with open(file_path, "r", encoding="utf-8") as f:
+                with open(file_path, encoding="utf-8") as f:
                     content = f.read()
                 doc = self.parser.parse_string(content)
                 doc.source_path = file_path  # Set source path for output routing
@@ -1411,7 +1423,7 @@ class TranslationEngine:
                                         if issue.severity == "error"
                                     ]
                                     retry_feedback = (
-                                        f"Previous translation had verification errors:\n"
+                                        "Previous translation had verification errors:\n"
                                         + "\n".join(error_messages[:5])  # Limit to 5 issues
                                         + "\n\nPlease fix these issues in the translation."
                                     )
@@ -1550,7 +1562,7 @@ class TranslationEngine:
                                             elif (existing_lang == target_lang and detected_lang == target_lang and
                                                 existing_conf > confidence + 0.05):  # 5% threshold to avoid churn
                                                 validation_passed = False
-                                                validation_error = f"Blocked overwrite: existing quality higher"
+                                                validation_error = "Blocked overwrite: existing quality higher"
                                                 logger.warning(
                                                     f"OVERWRITE BLOCKED: Existing file has higher quality "
                                                     f"({existing_lang} {existing_conf:.2%}) than new translation "
@@ -1575,8 +1587,14 @@ class TranslationEngine:
                                                     f"({detected_lang}) are wrong language. Expected {target_lang}. "
                                                     f"Blocking to prevent further corruption of {output_path.name}."
                                                 )
+                                                # Add to retranslate queue so next run bypasses completion filter.
+                                                # This allows TM improvements to eventually reach this stuck file.
+                                                try:
+                                                    _rtq_add(output_path, target_lang)
+                                                except Exception:
+                                                    pass
 
-                                        except (IOError, OSError) as existing_check_error:
+                                        except OSError as existing_check_error:
                                             # Existing file read error - non-fatal, allow write (new translation)
                                             logger.warning(f"Could not read existing file for comparison (allowing write): {existing_check_error}")
                                         except ValueError as existing_check_error:
@@ -1609,7 +1627,7 @@ class TranslationEngine:
                                 validation_passed = False
                                 validation_error = "Language validation unavailable"
                                 logger.error(f"Language detector unavailable: {e}")
-                            except (IOError, OSError) as e:
+                            except OSError as e:
                                 # File I/O error during validation - non-fatal for new files
                                 logger.warning(f"I/O error during language validation: {e}")
                                 # Continue to write (new translation)
@@ -1695,10 +1713,23 @@ class TranslationEngine:
                             # OW-01: Mark as overwrite-protected so directory counter treats it as a skip
                             if "Blocked overwrite:" in validation_error:
                                 result.overwrite_blocked = True
+                            # If this file was in the retranslate queue and is still failing,
+                            # increment its retry count (drops permanently after MAX_RETRIES).
+                            if "both translations wrong" in validation_error:
+                                try:
+                                    _rtq_increment(output_path)
+                                except Exception:
+                                    pass
                             break  # Exit retry loop - validation failure is deterministic
 
                         # File successfully written - add to outputs
                         result.outputs[target_lang] = output_path
+
+                        # Clear from retranslate queue if it was queued (CASE 4 recovery)
+                        try:
+                            _rtq_remove(output_path)
+                        except Exception:
+                            pass
 
                         # Update content hash metadata (if enabled)
                         if self.enable_content_hash and self.metadata_tracker:
@@ -1986,8 +2017,8 @@ class TranslationEngine:
                         )
                         # SR-03: Use helper functions for RunRecord fields (TEL-05-B)
                         from ..observability.telemetry_integration import (
-                            build_output_summary,
                             build_error_summary,
+                            build_output_summary,
                             calculate_items_metrics,
                         )
                         items_metrics = calculate_items_metrics(
@@ -2100,8 +2131,8 @@ class TranslationEngine:
         target_lang: str,
         site_profile,
         stats: TranslationStats,
-        segments: Optional[List] = None,
-        translations: Optional[Dict[str, str]] = None
+        segments: list | None = None,
+        translations: dict[str, str] | None = None
     ) -> str:
         """
         Translate document body using AST-based node-addressed translation.
@@ -2131,9 +2162,10 @@ class TranslationEngine:
         Raises:
             RuntimeError: If AST translation fails
         """
+        from pathlib import Path
+
         from .extractor import TextUnitExtractor
         from .reconstructor import ASTRenderer
-        from pathlib import Path
 
         try:
             # Step 1: Load translation model for AST path
@@ -2396,12 +2428,12 @@ class TranslationEngine:
         site_id: str,
         site_profile,
         doc,
-        segments: List,
+        segments: list,
         source_lang: str,
         target_lang: str,
         force: bool,
         stats: TranslationStats,
-        retry_feedback: Optional[str] = None,
+        retry_feedback: str | None = None,
         retry_count: int = 0,
     ) -> str:
         """
@@ -2607,7 +2639,7 @@ class TranslationEngine:
 
                 # Store results in translations map and TM
                 for seg_idx, (segment, translation) in enumerate(
-                    zip(segments_to_translate, translated_texts), 1
+                    zip(segments_to_translate, translated_texts, strict=False), 1
                 ):
                     translation = self._restore_placeholders(translation, segment)
                     # Use segment.id as key (must match reconstructor lookup)
@@ -2810,7 +2842,7 @@ class TranslationEngine:
                 fsync=True,
                 create_parents=True
             )
-        except DiskFullError as e:
+        except DiskFullError:
             # RES-09: Provide helpful disk full message
             free_space = self._get_free_space(output_path.parent)
             logger.error(
@@ -2819,7 +2851,7 @@ class TranslationEngine:
                 f"needed: ~{content_size / 1024:.1f}KB"
             )
             raise
-        except PermissionError as e:
+        except PermissionError:
             # RES-09: Clear permission error message
             logger.error(
                 f"Permission denied: {output_path}. "
@@ -2830,7 +2862,7 @@ class TranslationEngine:
             # RES-09: Clear invalid path message
             logger.error(f"Invalid path: {e}")
             raise
-        except ReadOnlyFilesystemError as e:
+        except ReadOnlyFilesystemError:
             # RES-09: Clear read-only filesystem message
             logger.error(f"Read-only filesystem: {output_path}")
             raise
@@ -3065,15 +3097,15 @@ class TranslationEngine:
         self,
         site_id: str,
         directory: Path,
-        target_langs: List[str],
+        target_langs: list[str],
         recursive: bool = True,
         parallel: bool = True,
-        max_workers: Optional[int] = None,
+        max_workers: int | None = None,
         skip_site_lock: bool = False,
         trigger_type: str = "cli",
         max_files: int = 0,
         skip_first: int = 0,
-        run_deadline: Optional[float] = None,
+        run_deadline: float | None = None,
     ) -> DirectoryResult:
         """
         Translate all eligible files in a directory.
@@ -3144,14 +3176,14 @@ class TranslationEngine:
         self,
         site_id: str,
         directory: Path,
-        target_langs: List[str],
+        target_langs: list[str],
         recursive: bool = True,
         parallel: bool = True,
-        max_workers: Optional[int] = None,
+        max_workers: int | None = None,
         trigger_type: str = "cli",
         max_files: int = 0,
         skip_first: int = 0,
-        run_deadline: Optional[float] = None,
+        run_deadline: float | None = None,
     ) -> DirectoryResult:
         """
         Internal implementation of translate_directory (called while holding lock).
@@ -3220,6 +3252,61 @@ class TranslationEngine:
                 logger.info(
                     f"After filtering: {len(md_files)} source files to translate"
                 )
+
+            # Completion-aware filtering: skip files where all target language outputs already
+            # exist AND are newer than the source (i.e., source has not changed since translation).
+            # This breaks the alphabetical ordering trap where files with complete outputs
+            # consume max_files slots and block alphabetically-later files from being reached.
+            # - force_retranslate bypasses this check (CLI: --force-retranslate)
+            # - Files where source mtime > any output mtime are included (detected as changed)
+            # - Files whose outputs are in the retranslate queue are force-included (CASE 4 recovery)
+            if site_profile and md_files and not self.force_retranslate:
+                # Load retranslate queue once for this filter pass (empty set if queue absent)
+                try:
+                    _queued_output_paths = _rtq_load()
+                except Exception:
+                    _queued_output_paths = set()
+
+                incomplete_files = []
+                skipped_complete = 0
+                queued_force_included = 0
+                for f in md_files:
+                    try:
+                        source_mtime = f.stat().st_mtime
+                    except OSError:
+                        incomplete_files.append(f)
+                        continue
+
+                    all_outputs_current = True
+                    any_output_queued = False
+                    for lang in target_langs:
+                        output_p = self._get_output_path(f, lang, site_profile)
+                        if _queued_output_paths and str(output_p.resolve()) in _queued_output_paths:
+                            any_output_queued = True
+                        try:
+                            if not output_p.exists() or output_p.stat().st_mtime < source_mtime:
+                                all_outputs_current = False
+                        except OSError:
+                            all_outputs_current = False
+
+                    if any_output_queued:
+                        # Force-include: this file has a queued output (stuck CASE 4 file).
+                        # TM improvements may now produce a correct translation.
+                        incomplete_files.append(f)
+                        queued_force_included += 1
+                    elif all_outputs_current:
+                        skipped_complete += 1
+                    else:
+                        incomplete_files.append(f)
+
+                if skipped_complete > 0 or queued_force_included > 0:
+                    logger.info(
+                        f"Completion check: skipped {skipped_complete} up-to-date files, "
+                        f"force-included {queued_force_included} queued files, "
+                        f"{len(incomplete_files)} files need work. "
+                        f"Use --force-retranslate to reprocess all completed files."
+                    )
+                md_files = incomplete_files
 
             # Sort deterministically for pagination
             md_files = sorted(md_files, key=str)
@@ -3312,8 +3399,8 @@ class TranslationEngine:
 
                     # SR-03: Use helper functions for RunRecord fields (TEL-05-B)
                     from ..observability.telemetry_integration import (
-                        build_output_summary,
                         build_error_summary,
+                        build_output_summary,
                         calculate_items_metrics,
                     )
 
@@ -3377,10 +3464,10 @@ class TranslationEngine:
     def _translate_directory_sequential(
         self,
         site_id: str,
-        md_files: List[Path],
-        target_langs: List[str],
+        md_files: list[Path],
+        target_langs: list[str],
         result: DirectoryResult,
-        run_deadline: Optional[float] = None,
+        run_deadline: float | None = None,
     ) -> DirectoryResult:
         """
         Translate files sequentially.
@@ -3555,11 +3642,11 @@ class TranslationEngine:
     def _translate_directory_parallel(
         self,
         site_id: str,
-        md_files: List[Path],
-        target_langs: List[str],
+        md_files: list[Path],
+        target_langs: list[str],
         result: DirectoryResult,
-        max_workers: Optional[int] = None,
-        run_deadline: Optional[float] = None,
+        max_workers: int | None = None,
+        run_deadline: float | None = None,
     ) -> DirectoryResult:
         """
         Translate files in parallel using ThreadPoolExecutor.
@@ -3656,7 +3743,7 @@ class TranslationEngine:
         return result
 
     def _translate_file_safe(
-        self, site_id: str, file_path: Path, target_langs: List[str]
+        self, site_id: str, file_path: Path, target_langs: list[str]
     ) -> TranslationResult:
         """
         Thread-safe wrapper for translate_file.
@@ -3765,7 +3852,7 @@ class TranslationEngine:
 
     def extract_segments(
         self, site_id: str, file_path: Path
-    ) -> List:
+    ) -> list:
         """
         Extract segments from a file without translating.
 
@@ -3783,7 +3870,7 @@ class TranslationEngine:
             raise ValueError(f"Site profile not found: {site_id}")
 
         # Parse file
-        with open(file_path, "r", encoding="utf-8") as f:
+        with open(file_path, encoding="utf-8") as f:
             content = f.read()
         doc = self.parser.parse_string(content)
 
@@ -3798,8 +3885,8 @@ class TranslationEngine:
         self,
         file_path: Path,
         doc,
-        segments: List,
-        outputs: Dict[str, Path],
+        segments: list,
+        outputs: dict[str, Path],
         source_lang: str,
     ):
         """
@@ -3832,7 +3919,7 @@ class TranslationEngine:
                     continue
 
                 # Read translated file
-                with open(output_path, "r", encoding="utf-8") as f:
+                with open(output_path, encoding="utf-8") as f:
                     translated_content = f.read()
 
                 # Parse translated document
@@ -3859,7 +3946,7 @@ class TranslationEngine:
 
         return aggregate_result
 
-    def get_tm_stats(self, site_id: str) -> Dict:
+    def get_tm_stats(self, site_id: str) -> dict:
         """
         Get Translation Memory statistics for a site.
 
@@ -3874,8 +3961,8 @@ class TranslationEngine:
     def clear_tm(
         self,
         site_id: str,
-        src_lang: Optional[str] = None,
-        tgt_lang: Optional[str] = None,
+        src_lang: str | None = None,
+        tgt_lang: str | None = None,
     ) -> None:
         """
         Clear Translation Memory entries.
@@ -4088,7 +4175,7 @@ class TranslationEngine:
     def set_override_mode(
         self,
         mode: str,
-        filters: Optional[Dict] = None,
+        filters: dict | None = None,
     ) -> None:
         """
         Set the TM cache override mode at runtime.
@@ -4112,7 +4199,7 @@ class TranslationEngine:
         self.tm.set_override_mode(override_mode, filters)
         logger.info(f"TM override mode set to: {mode}")
 
-    def get_override_stats(self) -> Dict:
+    def get_override_stats(self) -> dict:
         """
         Get TM cache override statistics.
 
@@ -4123,7 +4210,7 @@ class TranslationEngine:
         """
         return self.tm.get_override_stats()
 
-    def get_retry_timing_metrics(self) -> Dict:
+    def get_retry_timing_metrics(self) -> dict:
         """
         Get retry timing metrics for performance monitoring (BM-08).
 
@@ -4180,12 +4267,12 @@ class TranslationEngine:
     def _translate_with_multiline_support(
         self,
         backend,
-        segments: List,
-        texts: List[str],
+        segments: list,
+        texts: list[str],
         source_lang: str,
         target_lang: str,
         stats: TranslationStats,
-    ) -> List[str]:
+    ) -> list[str]:
         """
         Translate texts with multiline structure preservation.
 
@@ -4216,7 +4303,7 @@ class TranslationEngine:
         singleline_indices = []
         singleline_texts = []
 
-        for idx, (segment, text) in enumerate(zip(segments, texts)):
+        for idx, (segment, text) in enumerate(zip(segments, texts, strict=False)):
             # Check the original segment source_text for multiline content
             # (not the possibly-modified text which may have feedback prefix)
             if self.multiline_handler.is_multiline(segment.source_text):
