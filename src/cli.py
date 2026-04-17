@@ -14,6 +14,8 @@ Note: Heavy ML dependencies (torch, transformers) are lazily imported to allow
 """
 import argparse
 import atexit
+import importlib.metadata
+import json
 import logging
 import os
 import shutil
@@ -21,22 +23,15 @@ import signal
 import subprocess
 import sys
 import time
-import importlib.metadata
 from pathlib import Path
-from typing import Dict, List, Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING
 
-import json
 import yaml
 
 # TYPE_CHECKING guard: These imports are only used for type hints
 # and won't be executed at runtime, allowing --help to work without torch
 if TYPE_CHECKING:
     from .translation_engine import TranslationEngine
-    from .translation_engine.models import TranslationResult, DirectoryResult
-    from .translation_engine.progress import ProgressTracker
-    from .tm import TranslationMemory
-    from .model_runtime import ModelLoader
-    from .model_runtime.registry import ModelRegistry
     from .utils.config_loader import ConfigService
 
 logger = logging.getLogger(__name__)
@@ -66,38 +61,38 @@ def _import_heavy_deps():
 
     try:
         # Try relative imports first (when used as package)
-        from .translation_engine import TranslationEngine
-        from .translation_engine.models import TranslationResult, DirectoryResult
-        from .translation_engine.progress import ProgressTracker
+        from .model_runtime import ModelLoader
+        from .model_runtime.cpu_optimizer import CPUOptimizer
+        from .model_runtime.gpu_optimizer import GPUOptimizer
+        from .model_runtime.registry import ModelRegistry
         from .tm import TranslationMemory
         from .tm.l1_cache import L1Cache
         from .tm.l2_persistent import L2PersistentTM
         from .tm.l3_semantic import L3SemanticTM
-        from .model_runtime import ModelLoader
-        from .model_runtime.registry import ModelRegistry
-        from .model_runtime.cpu_optimizer import CPUOptimizer
-        from .model_runtime.gpu_optimizer import GPUOptimizer
+        from .translation_engine import TranslationEngine
+        from .translation_engine.models import DirectoryResult, TranslationResult
+        from .translation_engine.progress import ProgressTracker
         from .utils.config_loader import ConfigService
         from .utils.file_filters import filter_source_files
-        from .utils.models import ValidationSettings, TerminologySettings
+        from .utils.models import TerminologySettings, ValidationSettings
         from .verification.report import write_report
     except ImportError:
         # Try absolute imports (when run directly)
         try:
-            from translation_engine import TranslationEngine
-            from translation_engine.models import TranslationResult, DirectoryResult
-            from translation_engine.progress import ProgressTracker
+            from model_runtime import ModelLoader
+            from model_runtime.cpu_optimizer import CPUOptimizer
+            from model_runtime.gpu_optimizer import GPUOptimizer
+            from model_runtime.registry import ModelRegistry
             from tm import TranslationMemory
             from tm.l1_cache import L1Cache
             from tm.l2_persistent import L2PersistentTM
             from tm.l3_semantic import L3SemanticTM
-            from model_runtime import ModelLoader
-            from model_runtime.registry import ModelRegistry
-            from model_runtime.cpu_optimizer import CPUOptimizer
-            from model_runtime.gpu_optimizer import GPUOptimizer
+            from translation_engine import TranslationEngine
+            from translation_engine.models import DirectoryResult, TranslationResult
+            from translation_engine.progress import ProgressTracker
             from utils.config_loader import ConfigService
             from utils.file_filters import filter_source_files
-            from utils.models import ValidationSettings, TerminologySettings
+            from utils.models import TerminologySettings, ValidationSettings
             from verification.report import write_report
         except ImportError as e:
             # Provide helpful error message about missing dependencies
@@ -163,35 +158,35 @@ class CLIConfigOverrides:
 
     def __init__(self, args: argparse.Namespace):
         """Initialize from parsed CLI arguments."""
-        self.validation_mode: Optional[str] = args.validation_mode
+        self.validation_mode: str | None = args.validation_mode
         self.disable_validation: bool = args.disable_validation
         self.force_accept: bool = args.force_accept
         self.strict_reject: bool = args.strict_reject
-        self.enable_terminology: Optional[bool] = (
+        self.enable_terminology: bool | None = (
             True if args.enable_terminology else (False if args.disable_terminology else None)
         )
-        self.terminology_mode: Optional[str] = args.terminology_mode
-        self.max_retries: Optional[int] = args.max_retries
-        self.validation_config_path: Optional[str] = args.validation_config
-        self.terminology_config_path: Optional[str] = args.terminology_config
+        self.terminology_mode: str | None = args.terminology_mode
+        self.max_retries: int | None = args.max_retries
+        self.validation_config_path: str | None = args.validation_config
+        self.terminology_config_path: str | None = args.terminology_config
         self.dry_run: bool = args.dry_run
         self.save_rejected: bool = args.save_rejected
         # VA-03: Post-translation verification flags
         self.verify: bool = args.verify
         self.fix: bool = args.fix
         # VA-04: Verification report output
-        self.verification_report: Optional[str] = args.verification_report
+        self.verification_report: str | None = args.verification_report
         # TR-01: Token limit configurability
-        self.max_tokens: Optional[int] = args.max_tokens
+        self.max_tokens: int | None = args.max_tokens
         # Model override
-        self.model: Optional[str] = args.model
+        self.model: str | None = args.model
         # TC-CPU-02: Batch size override
-        self.batch_size: Optional[int] = args.batch_size
+        self.batch_size: int | None = args.batch_size
         # SR-02: Segment sorting control
-        self.sort_segments_by_length: Optional[bool] = args.sort_segments_by_length
+        self.sort_segments_by_length: bool | None = args.sort_segments_by_length
         # Device and load mode overrides (federated-splashing-panda: T101)
-        self.device: Optional[str] = None if args.device == "auto" else args.device
-        self.load_mode: Optional[str] = None if args.load_mode == "auto" else args.load_mode
+        self.device: str | None = None if args.device == "auto" else args.device
+        self.load_mode: str | None = None if args.load_mode == "auto" else args.load_mode
         # Cache behavior control (federated-splashing-panda: Phase 2 redesign)
         self.force_retranslate: bool = args.force_retranslate
         self.cache_write_mode: str = args.cache_write_mode
@@ -200,7 +195,7 @@ class CLIConfigOverrides:
         self.global_lang_rounds: int = args.global_lang_rounds
         self.global_lang_sort: str = args.global_lang_sort
         # Progress and metrics control
-        self.metrics_file: Optional[str] = args.metrics_file
+        self.metrics_file: str | None = args.metrics_file
         self.metrics_interval: float = args.metrics_interval
         self.metrics_only: bool = args.metrics_only
         self.no_progress: bool = args.no_progress
@@ -228,7 +223,7 @@ class CLIConfigOverrides:
         if self.terminology_config_path:
             config_service.terminology_config_path = Path(self.terminology_config_path)
 
-    def get_engine_overrides(self) -> Dict[str, any]:
+    def get_engine_overrides(self) -> dict[str, any]:
         """
         Get dictionary of overrides for TranslationEngine initialization.
 
@@ -852,7 +847,7 @@ Examples:
     return parser
 
 
-def _load_benchmarking_yaml() -> Dict:
+def _load_benchmarking_yaml() -> dict:
     """
     Load and parse benchmarking.yaml, return empty dict if not found.
 
@@ -879,7 +874,7 @@ def _load_benchmarking_yaml() -> Dict:
         return {}
 
 
-def load_benchmarking_config() -> Dict:
+def load_benchmarking_config() -> dict:
     """
     Load benchmarking configuration from config/benchmarking.yaml.
 
@@ -913,7 +908,7 @@ def load_benchmarking_config() -> Dict:
     return validate_benchmarking_config(config)
 
 
-def validate_benchmarking_config(config: Dict) -> Dict:
+def validate_benchmarking_config(config: dict) -> dict:
     """
     Validate benchmarking config types and ranges, return sanitized config.
 
@@ -1084,7 +1079,7 @@ def _cleanup_progress(progress_dir: Path, site_id: str) -> int:
     removed = 0
     for pf in progress_dir.glob("progress_*.json"):
         try:
-            with open(pf, 'r', encoding='utf-8') as f:
+            with open(pf, encoding='utf-8') as f:
                 data = json.load(f)
             if data.get('site_id') == site_id:
                 pf.unlink()
@@ -1097,7 +1092,7 @@ def _cleanup_progress(progress_dir: Path, site_id: str) -> int:
     return removed
 
 
-def setup_logging(log_level: str, log_file: Optional[str] = None, config_root: Optional[str] = None) -> None:
+def setup_logging(log_level: str, log_file: str | None = None, config_root: str | None = None) -> None:
     """
     Configure structured logging for CLI.
 
@@ -1110,7 +1105,9 @@ def setup_logging(log_level: str, log_file: Optional[str] = None, config_root: O
         config_root: Configuration root directory (defaults to ./config)
     """
     from pathlib import Path
+
     import yaml
+
     from src.observability.logger import setup_structured_logging
 
     # Use provided config_root or default
@@ -1123,7 +1120,7 @@ def setup_logging(log_level: str, log_file: Optional[str] = None, config_root: O
 
     if config_path.exists():
         try:
-            with open(config_path, "r", encoding="utf-8") as f:
+            with open(config_path, encoding="utf-8") as f:
                 global_config = yaml.safe_load(f)
                 logging_config = global_config.get("observability", {}).get("logging", {})
         except Exception as e:
@@ -1226,6 +1223,7 @@ def setup_unified_signal_handler(engine: "TranslationEngine") -> None:
         engine: The TranslationEngine instance to coordinate shutdown with
     """
     import platform as platform_mod
+
     from .observability.graceful_shutdown import cleanup_telemetry_contexts
 
     # Track number of interrupt signals received
@@ -1291,7 +1289,7 @@ def setup_signal_handlers(engine: "TranslationEngine") -> None:
     setup_unified_signal_handler(engine)
 
 
-def _log_startup_configuration(args: argparse.Namespace, site_profile, global_config, target_langs: List[str]) -> None:
+def _log_startup_configuration(args: argparse.Namespace, site_profile, global_config, target_langs: list[str]) -> None:
     """
     Log comprehensive startup configuration at INFO level (WS3, Requirement 10).
 
@@ -1309,7 +1307,7 @@ def _log_startup_configuration(args: argparse.Namespace, site_profile, global_co
     if args.output:
         logger.info(f"Output: {args.output}")
     else:
-        logger.info(f"Output: (default from site profile)")
+        logger.info("Output: (default from site profile)")
 
     logger.info(f"Target Languages: {', '.join(target_langs)} ({len(target_langs)} total)")
 
@@ -1324,16 +1322,16 @@ def _log_startup_configuration(args: argparse.Namespace, site_profile, global_co
     if args.batch_size:
         logger.info(f"Batch Size: {args.batch_size}")
     else:
-        logger.info(f"Batch Size: auto-optimized")
+        logger.info("Batch Size: auto-optimized")
 
     if args.max_tokens:
         logger.info(f"Max Tokens: {args.max_tokens}")
 
     # Cache settings
     if args.force_retranslate:
-        logger.info(f"Force Retranslate: ENABLED (cache reads disabled)")
+        logger.info("Force Retranslate: ENABLED (cache reads disabled)")
     else:
-        logger.info(f"Force Retranslate: DISABLED (cache enabled)")
+        logger.info("Force Retranslate: DISABLED (cache enabled)")
 
     if hasattr(args, 'cache_write_mode') and args.cache_write_mode:
         logger.info(f"Cache Write Mode: {args.cache_write_mode}")
@@ -1358,7 +1356,7 @@ def _log_startup_configuration(args: argparse.Namespace, site_profile, global_co
 
     # Processing settings
     if hasattr(args, 'sort_segments_by_length') and args.sort_segments_by_length:
-        logger.info(f"Sort Segments: ENABLED (by length)")
+        logger.info("Sort Segments: ENABLED (by length)")
 
     if args.dry_run:
         logger.info("Dry Run: ENABLED (no files will be written)")
@@ -1394,39 +1392,44 @@ def translate_site(args: argparse.Namespace) -> int:
     """
     # Import all dependencies needed for translation
     try:
-        from .observability.progress import init_progress_tracker, stop_progress_tracker, get_progress_tracker
-        from .observability.graceful_shutdown import setup_graceful_shutdown
-        from .observability.telemetry_cleanup import cleanup_stale_runs
-        from .translation_engine.progress import ProgressTracker
-        from .translation_engine import TranslationEngine
-        from .utils.config_loader import ConfigService
-        from .utils.file_filters import filter_source_files
+        from .model_runtime import ModelLoader
         from .model_runtime.cpu_optimizer import CPUOptimizer
         from .model_runtime.gpu_optimizer import GPUOptimizer
-        from .model_runtime import ModelLoader
         from .model_runtime.registry import ModelRegistry
-        from .verification.report import write_report
+        from .observability.graceful_shutdown import setup_graceful_shutdown
+        from .observability.progress import (
+            get_progress_tracker,
+            init_progress_tracker,
+            stop_progress_tracker,
+        )
+        from .observability.telemetry_cleanup import cleanup_stale_runs
         from .tm import TranslationMemory
         from .tm.l1_cache import L1Cache
         from .tm.l2_persistent import L2PersistentTM
         from .tm.l3_semantic import L3SemanticTM
+        from .translation_engine import TranslationEngine
+        from .translation_engine.progress import ProgressTracker
+        from .utils.config_loader import ConfigService
+        from .utils.file_filters import filter_source_files
+        from .verification.report import write_report
     except ImportError:
-        from observability.progress import init_progress_tracker, stop_progress_tracker, get_progress_tracker
-        from observability.graceful_shutdown import setup_graceful_shutdown
-        from observability.telemetry_cleanup import cleanup_stale_runs
-        from translation_engine.progress import ProgressTracker
-        from translation_engine import TranslationEngine
-        from utils.config_loader import ConfigService
-        from utils.file_filters import filter_source_files
+        from model_runtime import ModelLoader
         from model_runtime.cpu_optimizer import CPUOptimizer
         from model_runtime.gpu_optimizer import GPUOptimizer
-        from model_runtime import ModelLoader
         from model_runtime.registry import ModelRegistry
+        from observability.progress import (
+            init_progress_tracker,
+            stop_progress_tracker,
+        )
+        from observability.telemetry_cleanup import cleanup_stale_runs
         from tm import TranslationMemory
         from tm.l1_cache import L1Cache
         from tm.l2_persistent import L2PersistentTM
         from tm.l3_semantic import L3SemanticTM
-        from verification.report import write_report
+        from translation_engine import TranslationEngine
+        from translation_engine.progress import ProgressTracker
+        from utils.config_loader import ConfigService
+        from utils.file_filters import filter_source_files
 
     progress_tracker = None
 
@@ -1610,9 +1613,15 @@ def translate_site(args: argparse.Namespace) -> int:
 
             # Import per-language commit and failure tracking functions
             try:
-                from src.observability.language_commit import commit_language_translations, save_failure_report
+                from src.observability.language_commit import (
+                    commit_language_translations,
+                    save_failure_report,
+                )
             except ImportError:
-                from observability.language_commit import commit_language_translations, save_failure_report
+                from observability.language_commit import (
+                    commit_language_translations,
+                    save_failure_report,
+                )
 
             # TC1: Acquire site lock in PARENT before spawning subprocesses
             from src.translation_engine.engine import get_site_lock
@@ -1638,7 +1647,7 @@ def translate_site(args: argparse.Namespace) -> int:
                 logger.info(f"Acquiring site lock for {args.site}...")
                 # NO timeout parameter here - it's set in FileLock constructor above
                 if not site_lock.acquire(blocking=True):
-                    logger.error(f"Failed to acquire site lock. Another translation may be running.")
+                    logger.error("Failed to acquire site lock. Another translation may be running.")
                     logger.info(f"Run 'python -m src.cli diagnose-lock --site {args.site}' for details")
                     return 1
 
@@ -1698,7 +1707,8 @@ def translate_site(args: argparse.Namespace) -> int:
 
             try:
                 import threading as _thr
-                from concurrent.futures import ThreadPoolExecutor as _TPE, as_completed as _ac
+                from concurrent.futures import ThreadPoolExecutor as _TPE
+                from concurrent.futures import as_completed as _ac
                 _parallel_n = max(1, getattr(args, 'parallel_languages', 0) or 1)
                 _commit_lock = _thr.Lock()
                 logger.info(f"Parallel dispatch: {_parallel_n} workers for {len(target_langs)} languages")
@@ -2006,7 +2016,7 @@ def translate_site(args: argparse.Namespace) -> int:
                                 args=cmd,
                                 returncode=-1,
                                 stdout="",
-                                stderr=f"Process timed out after 3600 seconds",
+                                stderr="Process timed out after 3600 seconds",
                             )
 
                             _ec = -1
@@ -2118,7 +2128,7 @@ def translate_site(args: argparse.Namespace) -> int:
                 failed_langs = [lang for lang, res in language_results.items() if not res["success"]]
 
                 logger.info(f"\n{'='*60}")
-                logger.info(f"Multi-Language Translation Summary")
+                logger.info("Multi-Language Translation Summary")
                 logger.info(f"{'='*60}")
                 logger.info(f"Total languages: {len(target_langs)}")
                 logger.info(f"Successful: {len(successful_langs)}/{len(target_langs)}")
@@ -2141,7 +2151,7 @@ def translate_site(args: argparse.Namespace) -> int:
                     # Show where failure reports are saved
                     if failure_dir.exists():
                         logger.info(f"\nFailure reports saved to: {failure_dir.absolute()}")
-                        logger.info(f"Review reports for detailed error information and retry commands")
+                        logger.info("Review reports for detailed error information and retry commands")
 
                 logger.info(f"{'='*60}\n")
 
@@ -2164,7 +2174,7 @@ def translate_site(args: argparse.Namespace) -> int:
                     logger.error(f"Translation completed with {len(failed_langs)} failure(s). Exiting with code 1.")
                     return 1
                 else:
-                    logger.info(f"All translations completed successfully!")
+                    logger.info("All translations completed successfully!")
                     return 0
 
             finally:
@@ -2293,7 +2303,6 @@ def translate_site(args: argparse.Namespace) -> int:
 
             # If not set in hardware config, compute from execution mode percent
             if max_gpu_memory_mb is None:
-                import os
                 exec_mode = os.getenv("EXECUTION_MODE", "windows_cuda")
                 exec_mode_config = raw_config.get("execution", {}).get("modes", {}).get(exec_mode, {})
                 max_gpu_memory_percent = exec_mode_config.get("max_gpu_memory_percent")
@@ -2428,13 +2437,13 @@ def translate_site(args: argparse.Namespace) -> int:
             try:
                 # Import only when needed (try relative first, fallback to absolute)
                 try:
-                    from .benchmarking.storage import BenchmarkDatabase
-                    from .benchmarking.production_ingestor import ProductionMetricsIngestor
                     from .benchmarking.cli import get_benchmark_db_path
+                    from .benchmarking.production_ingestor import ProductionMetricsIngestor
+                    from .benchmarking.storage import BenchmarkDatabase
                 except ImportError:
-                    from benchmarking.storage import BenchmarkDatabase
-                    from benchmarking.production_ingestor import ProductionMetricsIngestor
                     from benchmarking.cli import get_benchmark_db_path
+                    from benchmarking.production_ingestor import ProductionMetricsIngestor
+                    from benchmarking.storage import BenchmarkDatabase
 
                 # Get database path from config
                 db_path = get_benchmark_db_path(purpose="production")
@@ -2482,11 +2491,11 @@ def translate_site(args: argparse.Namespace) -> int:
             logger.info("Auto-selection enabled - will select best model for target language(s)")
             # Import selector module
             try:
-                from .model_runtime.selector import LanguageAwareModelSelector
                 from .model_runtime.hardware import HardwareDetector
+                from .model_runtime.selector import LanguageAwareModelSelector
             except ImportError:
-                from model_runtime.selector import LanguageAwareModelSelector
                 from model_runtime.hardware import HardwareDetector
+                from model_runtime.selector import LanguageAwareModelSelector
 
             # Detect hardware for selector
             hardware_detector = HardwareDetector()
