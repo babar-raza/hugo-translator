@@ -107,6 +107,7 @@ jobs:
 
       - name: Run Translation Quality Audit (CI fixtures only)
         run: |
+          New-Item -ItemType Directory -Force -Path reports/audit | Out-Null
           python scripts/audit_translation_quality.py `
             --mode ci `
             --threshold 0.70 `
