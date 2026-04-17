@@ -6,11 +6,27 @@
 
 ## Files
 
-| File | Segments | Tokens | Purpose |
-|------|----------|--------|---------|
-| [tiny.json](tiny.json) | 10 | ~25 | Smoke tests, quick validation |
-| [small.json](small.json) | 50 | ~287 | Unit tests, model validation |
-| [medium.json](medium.json) | 200 | ~1068 | Integration tests, benchmarking |
+### Tracked (committed to git)
+
+| File | Type | Purpose |
+|------|------|---------|
+| [tiny.json](tiny.json) | Static fixture | Smoke tests, quick validation (~10 segments) |
+| [small.json](small.json) | Static fixture | Unit tests, model validation (~50 segments) |
+| [medium.json](medium.json) | Static fixture | Integration tests, benchmarking (~200 segments) |
+| [metadata.yaml](metadata.yaml) | Manual annotation | Corpus metadata and provenance |
+| [aspose_sample_metadata.yaml](aspose_sample_metadata.yaml) | Manual annotation | Aspose-specific sample metadata |
+| [test_metadata.yaml](test_metadata.yaml) | Manual annotation | Test fixture metadata |
+
+### Generated (gitignored, local only)
+
+| File | Generator | Notes |
+|------|-----------|-------|
+| `stratified_manifest.yaml` | `scripts/create_stratified_corpus.py` | Point-in-time snapshot of content repo samples. Regenerate before benchmarking if stale (dated in the file header). Do not commit — reflects local content repo state, not a canonical corpus artifact. |
+
+To regenerate the manifest:
+```bash
+python scripts/create_stratified_corpus.py
+```
 
 ---
 

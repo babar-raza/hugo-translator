@@ -71,6 +71,7 @@ dmypy.json
 # Data directories (ignore contents, allow benchmark corpus)
 data/*
 !data/benchmark_corpus/
+data/benchmark_corpus/stratified_manifest.yaml
 logs/
 *.lmdb
 *.lmdb-lock
