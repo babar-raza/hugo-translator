@@ -9,13 +9,13 @@ Tests CT2 conversion workflow including:
 """
 import tempfile
 from pathlib import Path
-from unittest.mock import MagicMock, Mock, patch
+from unittest.mock import Mock, patch
 
 import pytest
 
 from src.model_runtime.ct2_manager import CT2ConversionManager, CT2ConversionResult
-from src.model_runtime.registry import ModelInfo, ModelRegistry
 from src.model_runtime.model_store import ModelManifest
+from src.model_runtime.registry import ModelInfo, ModelRegistry
 
 
 @pytest.fixture
@@ -49,10 +49,10 @@ def sample_model_info():
 def mock_registry(sample_model_info):
     """Create mock registry."""
     registry = Mock(spec=ModelRegistry)
-    registry.get_model = Mock(return_value=sample_model_info)
+    registry.models = {sample_model_info.model_id: sample_model_info}
+    registry.get_model = Mock(side_effect=lambda model_id: registry.models.get(model_id))
     registry.list_models = Mock(return_value=[sample_model_info])
     registry.register_model = Mock()
-    registry.models = {sample_model_info.model_id: sample_model_info}
     return registry
 
 

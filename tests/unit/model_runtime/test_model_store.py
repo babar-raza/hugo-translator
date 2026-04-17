@@ -7,17 +7,15 @@ Tests:
 - Manifest CRUD operations
 - Download plan generation
 """
-import json
 from pathlib import Path
-from unittest.mock import Mock, patch, MagicMock
+from unittest.mock import Mock, patch
 
 import pytest
 
 from src.model_runtime.model_store import (
-    ModelStore,
     ModelManifest,
-    ModelDownloadError,
     ModelNotFoundError,
+    ModelStore,
 )
 from src.model_runtime.registry import ModelInfo, ModelRegistry
 
@@ -47,7 +45,7 @@ def mock_registry():
         min_ram_gb=4.0,
         optimal_device="cuda",
         hf_model_id="facebook/m2m100_418M",
-        local_path=Path("models/m2m100_418M")
+        local_path=Path("m2m100_418M")
     )
 
     # Opus bilingual model
@@ -60,7 +58,7 @@ def mock_registry():
         min_ram_gb=1.0,
         optimal_device="cpu",
         hf_model_id="Helsinki-NLP/opus-mt-en-fr",
-        local_path=Path("models/opus/opus-mt-en-fr")
+        local_path=Path("opus/opus-mt-en-fr")
     )
 
     # CT2 model
@@ -72,7 +70,7 @@ def mock_registry():
         model_size_mb=250,
         min_ram_gb=1.5,
         optimal_device="cpu",
-        local_path=Path("models/ct2/m2m100_418m_int8")
+        local_path=Path("ct2/m2m100_418m_int8")
     )
 
     registry.models = {
@@ -270,7 +268,7 @@ class TestModelStore:
 
         assert "downloads are disabled" in str(exc_info.value).lower()
 
-    @patch("src.model_runtime.model_store.snapshot_download")
+    @patch("huggingface_hub.snapshot_download")
     def test_download_model_success(
         self, mock_snapshot_download, mock_registry, temp_models_dir
     ):

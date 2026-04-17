@@ -1,7 +1,7 @@
 """Unit tests for tokenizer access methods in model backends."""
-import pytest
-from unittest.mock import Mock, MagicMock
-from src.model_runtime.loader import HuggingFaceBackend, CTranslate2Backend, ModelLoader
+from unittest.mock import Mock
+
+from src.model_runtime.loader import CTranslate2Backend, HuggingFaceBackend, ModelLoader
 from src.model_runtime.registry import ModelInfo
 
 
@@ -14,8 +14,10 @@ class TestHuggingFaceBackendTokenizer:
             model_id="test-model",
             name="Test Model",
             backend="huggingface",
-            source_lang="en",
-            target_langs=["es"]
+            supported_pairs="all",
+            model_size_mb=500,
+            min_ram_gb=2.0,
+            optimal_device="cpu",
         )
         backend = HuggingFaceBackend(model_info, device="cpu")
 
@@ -28,8 +30,10 @@ class TestHuggingFaceBackendTokenizer:
             model_id="test-model",
             name="Test Model",
             backend="huggingface",
-            source_lang="en",
-            target_langs=["es"]
+            supported_pairs="all",
+            model_size_mb=500,
+            min_ram_gb=2.0,
+            optimal_device="cpu",
         )
         backend = HuggingFaceBackend(model_info, device="cpu")
 
@@ -48,8 +52,10 @@ class TestHuggingFaceBackendTokenizer:
             model_id="test-model",
             name="Test Model",
             backend="huggingface",
-            source_lang="en",
-            target_langs=["es"]
+            supported_pairs="all",
+            model_size_mb=500,
+            min_ram_gb=2.0,
+            optimal_device="cpu",
         )
         backend = HuggingFaceBackend(model_info, device="cpu")
 
@@ -67,8 +73,10 @@ class TestHuggingFaceBackendTokenizer:
             model_id="test-model",
             name="Test Model",
             backend="huggingface",
-            source_lang="en",
-            target_langs=["es"]
+            supported_pairs="all",
+            model_size_mb=500,
+            min_ram_gb=2.0,
+            optimal_device="cpu",
         )
         backend = HuggingFaceBackend(model_info, device="cpu")
 
@@ -89,8 +97,10 @@ class TestHuggingFaceBackendTokenizer:
             model_id="test-model",
             name="Test Model",
             backend="huggingface",
-            source_lang="en",
-            target_langs=["es"]
+            supported_pairs="all",
+            model_size_mb=500,
+            min_ram_gb=2.0,
+            optimal_device="cpu",
         )
         backend = HuggingFaceBackend(model_info, device="cpu")
 
@@ -113,8 +123,10 @@ class TestCTranslate2BackendTokenizer:
             model_id="test-model",
             name="Test Model",
             backend="ctranslate2",
-            source_lang="en",
-            target_langs=["es"]
+            supported_pairs="all",
+            model_size_mb=300,
+            min_ram_gb=1.5,
+            optimal_device="cpu",
         )
         backend = CTranslate2Backend(model_info, device="cpu")
 
@@ -127,8 +139,10 @@ class TestCTranslate2BackendTokenizer:
             model_id="test-model",
             name="Test Model",
             backend="ctranslate2",
-            source_lang="en",
-            target_langs=["es"]
+            supported_pairs="all",
+            model_size_mb=300,
+            min_ram_gb=1.5,
+            optimal_device="cpu",
         )
         backend = CTranslate2Backend(model_info, device="cpu")
 
@@ -146,8 +160,10 @@ class TestCTranslate2BackendTokenizer:
             model_id="test-model",
             name="Test Model",
             backend="ctranslate2",
-            source_lang="en",
-            target_langs=["es"]
+            supported_pairs="all",
+            model_size_mb=300,
+            min_ram_gb=1.5,
+            optimal_device="cpu",
         )
         backend = CTranslate2Backend(model_info, device="cpu")
 
