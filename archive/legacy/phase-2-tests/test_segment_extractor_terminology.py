@@ -9,27 +9,22 @@ Tests the integration of TerminologyManager with SegmentExtractor:
 """
 import sys
 from pathlib import Path
-from typing import List, Optional
 
 import pytest
 
 sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent / "src"))
 
 from translation_engine.extractor import (
-    Segment,
-    SegmentContext,
-    SegmentContextType,
     SegmentExtractor,
 )
 from translation_engine.parser import HugoParser
 from translation_engine.terminology.models import (
-    TermRule,
-    PreserveMode,
-    TermSeverity,
     DetectedTerm,
+    PreserveMode,
     ProtectedSegment,
+    TermRule,
+    TermSeverity,
 )
-from translation_engine.terminology.terminology_manager import TerminologyManager
 from utils.models import BodyRules, FrontmatterMode, FrontmatterRule, SiteProfile
 
 
@@ -37,11 +32,11 @@ from utils.models import BodyRules, FrontmatterMode, FrontmatterRule, SiteProfil
 class MockTerminologyManager:
     """Mock manager that protects specific test terms."""
 
-    def __init__(self, terms_to_protect: Optional[List[str]] = None):
+    def __init__(self, terms_to_protect: list[str] | None = None):
         """Initialize with optional list of terms to protect."""
         self.terms_to_protect = terms_to_protect or ["Aspose", ".NET", "Aspose.Words"]
 
-    def protect(self, text: str, site: Optional[str] = None) -> ProtectedSegment:
+    def protect(self, text: str, site: str | None = None) -> ProtectedSegment:
         """Mock protect that replaces known terms with placeholders."""
         protected_text = text
         term_mapping = {}

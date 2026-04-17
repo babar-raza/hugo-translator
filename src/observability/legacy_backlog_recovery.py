@@ -5,9 +5,9 @@ from __future__ import annotations
 import json
 import subprocess
 from collections import defaultdict
+from collections.abc import Callable, Iterable
 from dataclasses import asdict, dataclass
 from pathlib import Path
-from typing import Callable, Dict, Iterable, List, Optional, Tuple
 
 from src.observability.git_commit import GitCommitConfig, GitCommitter
 
@@ -29,15 +29,15 @@ class LegacyRecoverySkipped:
 class LegacyRecoveryCommit:
     site_id: str
     file_count: int
-    commit_hash: Optional[str]
+    commit_hash: str | None
 
 
 @dataclass
 class LegacyRecoveryReport:
     repo: str
-    accepted: Dict[str, List[str]]
-    skipped: List[LegacyRecoverySkipped]
-    commits: List[LegacyRecoveryCommit]
+    accepted: dict[str, list[str]]
+    skipped: list[LegacyRecoverySkipped]
+    commits: list[LegacyRecoveryCommit]
 
     def to_json(self) -> str:
         return json.dumps(
@@ -52,7 +52,7 @@ class LegacyRecoveryReport:
         )
 
 
-def _git_status_entries(repo: Path) -> List[str]:
+def _git_status_entries(repo: Path) -> list[str]:
     result = subprocess.run(
         ["git", "status", "--porcelain"],
         cwd=str(repo),
@@ -64,14 +64,14 @@ def _git_status_entries(repo: Path) -> List[str]:
     return [line for line in result.stdout.splitlines() if line.strip()]
 
 
-def _site_from_relpath(relpath: Path) -> Optional[str]:
+def _site_from_relpath(relpath: Path) -> str | None:
     parts = relpath.parts
     if len(parts) >= 2 and parts[0] == "content":
         return parts[1]
     return None
 
 
-def _is_translation_output(relpath: Path, site_profile) -> Tuple[bool, str]:
+def _is_translation_output(relpath: Path, site_profile) -> tuple[bool, str]:
     if relpath.suffix.lower() != ".md":
         return False, "not markdown"
 
@@ -119,8 +119,8 @@ def recover_legacy_translation_backlog(
     repo: Path,
     config_service,
     validate_fn: Callable[[Path, Path, str, bool], bool],
-    build_message_fn: Callable[[List[Path], str, GitCommitConfig], str],
-    site_ids: Optional[List[str]] = None,
+    build_message_fn: Callable[[list[Path], str, GitCommitConfig], str],
+    site_ids: list[str] | None = None,
     apply: bool = True,
 ) -> LegacyRecoveryReport:
     """Recover safe pre-manifest translation leftovers.
@@ -130,9 +130,9 @@ def recover_legacy_translation_backlog(
     - only target-language outputs per site profile
     - only files that pass the structural integrity gate
     """
-    candidates: List[LegacyRecoveryCandidate] = []
-    skipped: List[LegacyRecoverySkipped] = []
-    commits: List[LegacyRecoveryCommit] = []
+    candidates: list[LegacyRecoveryCandidate] = []
+    skipped: list[LegacyRecoverySkipped] = []
+    commits: list[LegacyRecoveryCommit] = []
     seen: set[Path] = set()
     allowed_sites = set(site_ids or [])
 
@@ -169,7 +169,7 @@ def recover_legacy_translation_backlog(
 
             candidates.append(LegacyRecoveryCandidate(path=abs_path, site_id=site_id, reason=reason))
 
-    accepted_by_site: Dict[str, List[Path]] = defaultdict(list)
+    accepted_by_site: dict[str, list[Path]] = defaultdict(list)
     for item in candidates:
         profile = config_service.get_site_profile(item.site_id)
         output_layout = getattr(profile, "output_layout", None)

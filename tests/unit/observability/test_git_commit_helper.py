@@ -4,10 +4,9 @@ Unit tests for git_commit_helper._extract_model_id.
 Tests all 3 tiers of model_id extraction and edge cases.
 """
 import unittest
-from pathlib import Path
-from unittest.mock import Mock, MagicMock
 from dataclasses import dataclass
-from typing import List, Optional
+from pathlib import Path
+from unittest.mock import Mock
 
 from src.observability.git_commit_helper import _extract_model_id
 
@@ -16,26 +15,26 @@ from src.observability.git_commit_helper import _extract_model_id
 @dataclass
 class MockAggregateStats:
     """Mock AggregateStats for testing."""
-    model_used: Optional[str] = None
+    model_used: str | None = None
 
 
 @dataclass
 class MockTranslationStats:
     """Mock TranslationStats for testing."""
-    model_used: Optional[str] = None
+    model_used: str | None = None
 
 
 @dataclass
 class MockFileResult:
     """Mock file result for testing."""
-    stats: Optional[MockTranslationStats] = None
+    stats: MockTranslationStats | None = None
 
 
 @dataclass
 class MockDirectoryResult:
     """Mock DirectoryResult for testing."""
-    aggregate_stats: Optional[MockAggregateStats] = None
-    file_results: List[MockFileResult] = None
+    aggregate_stats: MockAggregateStats | None = None
+    file_results: list[MockFileResult] = None
 
     def __post_init__(self):
         if self.file_results is None:
@@ -339,8 +338,9 @@ class TestCollectModifiedFilesFromGit(unittest.TestCase):
     @unittest.mock.patch("src.observability.git_context.find_git_root")
     def test_catches_untracked_files(self, mock_find_root, mock_run):
         """Untracked (??) .md files must be collected."""
-        import tempfile, os
+        import tempfile
         from pathlib import Path
+
         from src.observability.git_commit_helper import collect_modified_files_from_git
 
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -373,6 +373,7 @@ class TestCollectModifiedFilesFromGit(unittest.TestCase):
         """Modified (M) .md files must be collected."""
         import tempfile
         from pathlib import Path
+
         from src.observability.git_commit_helper import collect_modified_files_from_git
 
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -404,6 +405,7 @@ class TestCollectModifiedFilesFromGit(unittest.TestCase):
         """Non-.md files must NOT be collected."""
         import tempfile
         from pathlib import Path
+
         from src.observability.git_commit_helper import collect_modified_files_from_git
 
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -437,6 +439,7 @@ class TestCollectModifiedFilesFromGit(unittest.TestCase):
         """content_root should be used as scan directory, not output_dir."""
         import tempfile
         from pathlib import Path
+
         from src.observability.git_commit_helper import collect_modified_files_from_git
 
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -469,6 +472,7 @@ class TestCollectModifiedFilesFromGit(unittest.TestCase):
         """Empty git status output should return empty list."""
         import tempfile
         from pathlib import Path
+
         from src.observability.git_commit_helper import collect_modified_files_from_git
 
         with tempfile.TemporaryDirectory() as tmpdir:

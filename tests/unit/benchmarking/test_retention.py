@@ -7,11 +7,11 @@ Tests the RetentionEngine class:
 - Status reporting
 """
 
-import pytest
 import tempfile
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from typing import Optional
+
+import pytest
 
 from src.benchmarking.retention import (
     RetentionEngine,
@@ -20,8 +20,8 @@ from src.benchmarking.retention import (
 )
 from src.benchmarking.storage import (
     BenchmarkDatabase,
-    BenchmarkRun,
     BenchmarkResult,
+    BenchmarkRun,
     SystemInfo,
 )
 
@@ -102,7 +102,7 @@ class TestRetentionEngine:
         model_id: str = "test_model",
         device: str = "cpu",
         num_results: int = 5,
-        timestamp: Optional[datetime] = None,
+        timestamp: datetime | None = None,
     ) -> str:
         """Create a test benchmark run.
 

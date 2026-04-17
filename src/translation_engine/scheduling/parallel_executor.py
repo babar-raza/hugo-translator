@@ -5,9 +5,9 @@ T303: federated-splashing-panda
 """
 import logging
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -26,9 +26,9 @@ class LanguageExecutionResult:
     """
     language_code: str
     success: bool
-    output_path: Optional[Path] = None
-    error: Optional[str] = None
-    stats: Optional[Any] = None
+    output_path: Path | None = None
+    error: str | None = None
+    stats: Any | None = None
 
 
 class ParallelLanguageExecutor:
@@ -66,9 +66,9 @@ class ParallelLanguageExecutor:
         self,
         site_id: str,
         file_path: Path,
-        target_langs: List[str],
+        target_langs: list[str],
         force: bool = False,
-    ) -> Dict[str, LanguageExecutionResult]:
+    ) -> dict[str, LanguageExecutionResult]:
         """
         Execute translations for multiple languages in parallel.
 
@@ -86,7 +86,7 @@ class ParallelLanguageExecutor:
             f"{self.max_workers} workers, file={file_path}"
         )
 
-        results: Dict[str, LanguageExecutionResult] = {}
+        results: dict[str, LanguageExecutionResult] = {}
 
         # Use ThreadPoolExecutor for concurrent execution
         with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
@@ -185,7 +185,7 @@ class ParallelLanguageExecutor:
                 error=str(e),
             )
 
-    def get_stats_summary(self, results: Dict[str, LanguageExecutionResult]) -> Dict[str, Any]:
+    def get_stats_summary(self, results: dict[str, LanguageExecutionResult]) -> dict[str, Any]:
         """
         Get aggregate statistics from parallel execution results.
 

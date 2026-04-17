@@ -5,8 +5,9 @@ This prevents silent no-op successes that can hide configuration errors.
 """
 import subprocess
 import sys
-from pathlib import Path
 import tempfile
+from pathlib import Path
+
 import pytest
 
 

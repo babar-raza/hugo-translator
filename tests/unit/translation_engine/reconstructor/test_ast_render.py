@@ -10,18 +10,18 @@ Tests cover:
 - Markdown validity (roundtrip)
 """
 
+
 import pytest
-from typing import List
 
 from src.translation_engine.extractor.text_unit import TextUnit, TextUnitKind
-from src.translation_engine.reconstructor.ast_renderer import ASTRenderer
 from src.translation_engine.parser.ast_nodes import (
     ASTNode,
     NodeType,
-    text_node,
+    heading_node,
     paragraph_node,
-    heading_node
+    text_node,
 )
+from src.translation_engine.reconstructor.ast_renderer import ASTRenderer
 
 
 class TestApplyTranslations:

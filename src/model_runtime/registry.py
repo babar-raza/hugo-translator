@@ -4,10 +4,11 @@ Model Registry for translation model catalog and selection.
 Manages available translation models with metadata.
 """
 import logging
-import yaml
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, List, Literal, Optional, Tuple
+from typing import Any, Literal
+
+import yaml
 
 from .hardware import HardwareInfo
 
@@ -21,28 +22,28 @@ class ModelInfo:
     model_id: str
     name: str
     backend: Literal["huggingface", "ctranslate2", "opus", "llm", "local_llm"]
-    supported_pairs: List[Tuple[str, str]] | Literal["all"]  # (src, tgt) lang pairs
+    supported_pairs: list[tuple[str, str]] | Literal["all"]  # (src, tgt) lang pairs
     model_size_mb: int
     min_ram_gb: float
     optimal_device: str
-    parameters: Optional[int] = None  # Model param count
+    parameters: int | None = None  # Model param count
     license: str = "unknown"
-    local_path: Optional[Path] = None
-    hf_model_id: Optional[str] = None  # HuggingFace model ID
-    description: Optional[str] = None
+    local_path: Path | None = None
+    hf_model_id: str | None = None  # HuggingFace model ID
+    description: str | None = None
     max_new_tokens: int = 256  # TR-01: Reduced from 512 to 256 for memory efficiency
 
     # LLM-specific fields (only used when backend="llm" or "local_llm")
-    provider: Optional[str] = None          # "ollama" | "openai" | "anthropic" | "openai_compatible"
-    model_name: Optional[str] = None        # Provider model name (e.g., "qwen3:14b", "gpt-4o")
-    base_url: Optional[str] = None          # API endpoint URL
-    api_key_env: Optional[str] = None       # Env var name for API key (e.g., "OPENAI_API_KEY")
-    temperature: Optional[float] = None     # Sampling temperature (default: 0.1 for translation)
-    max_tokens: Optional[int] = None        # Max response tokens (default: 4096)
-    timeout_seconds: Optional[int] = None   # Request timeout (default: 120)
-    system_prompt_template: Optional[str] = None  # Custom system prompt
+    provider: str | None = None          # "ollama" | "openai" | "anthropic" | "openai_compatible"
+    model_name: str | None = None        # Provider model name (e.g., "qwen3:14b", "gpt-4o")
+    base_url: str | None = None          # API endpoint URL
+    api_key_env: str | None = None       # Env var name for API key (e.g., "OPENAI_API_KEY")
+    temperature: float | None = None     # Sampling temperature (default: 0.1 for translation)
+    max_tokens: int | None = None        # Max response tokens (default: 4096)
+    timeout_seconds: int | None = None   # Request timeout (default: 120)
+    system_prompt_template: str | None = None  # Custom system prompt
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary."""
         # Convert supported_pairs tuples to lists for YAML serialization
         supported_pairs = self.supported_pairs
@@ -79,7 +80,7 @@ class ModelInfo:
         return result
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "ModelInfo":
+    def from_dict(cls, data: dict[str, Any]) -> "ModelInfo":
         """Create from dictionary."""
         # Handle local_path
         local_path = data.get("local_path")
@@ -145,7 +146,7 @@ class ModelRegistry:
 
         self.registry_paths = registry_paths
         self.registry_path = registry_paths[0]
-        self.models: Dict[str, ModelInfo] = {}
+        self.models: dict[str, ModelInfo] = {}
         self._load_registry()
 
     def _load_registry(self) -> None:
@@ -156,7 +157,7 @@ class ModelRegistry:
                     f"Registry file not found: {registry_path}"
                 )
 
-            with open(registry_path, "r", encoding="utf-8") as f:
+            with open(registry_path, encoding="utf-8") as f:
                 data = yaml.safe_load(f)
 
             if not data or "models" not in data:
@@ -170,8 +171,8 @@ class ModelRegistry:
                 self.models[model.model_id] = model
 
     def list_models(
-        self, lang_pair: Optional[Tuple[str, str]] = None
-    ) -> List[ModelInfo]:
+        self, lang_pair: tuple[str, str] | None = None
+    ) -> list[ModelInfo]:
         """
         List available models, optionally filtered by language pair.
 
@@ -193,7 +194,7 @@ class ModelRegistry:
         return models
 
     def _supports_lang_pair(
-        self, model: ModelInfo, lang_pair: Tuple[str, str]
+        self, model: ModelInfo, lang_pair: tuple[str, str]
     ) -> bool:
         """
         Check if model supports language pair.
@@ -293,7 +294,7 @@ class ModelRegistry:
 
     def _select_best(
         self,
-        candidates: List[ModelInfo],
+        candidates: list[ModelInfo],
         hardware: HardwareInfo,
         prefer_quality: bool,
     ) -> ModelInfo:
@@ -415,7 +416,7 @@ class ModelRegistry:
 
         del self.models[model_id]
 
-    def save_registry(self, output_path: Optional[Path] = None) -> None:
+    def save_registry(self, output_path: Path | None = None) -> None:
         """
         Save registry to YAML file.
 

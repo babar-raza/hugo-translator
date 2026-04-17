@@ -6,7 +6,6 @@ Tests connection pooling, health checks, and concurrent access.
 import sqlite3
 import threading
 import time
-from pathlib import Path
 
 import pytest
 

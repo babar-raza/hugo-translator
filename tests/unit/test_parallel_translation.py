@@ -7,11 +7,11 @@ from pathlib import Path
 
 import pytest
 
+from src.model_runtime import HardwareDetector, ModelLoader, ModelRegistry
+from src.tm import L1Cache, L2PersistentTM, TranslationMemory
 from src.translation_engine.engine import TranslationEngine
 from src.translation_engine.models import DirectoryResult
 from src.utils.config_loader import ConfigService
-from src.tm import TranslationMemory, L1Cache, L2PersistentTM
-from src.model_runtime import ModelLoader, ModelRegistry, HardwareDetector
 
 
 @pytest.fixture
@@ -160,7 +160,7 @@ class TestParallelTranslation:
         # Parallel should be faster (allowing for overhead in small batches)
         # For 20 files with 4 workers, we expect at least some improvement
         speedup = time_sequential / time_parallel if time_parallel > 0 else 1.0
-        print(f"\nPerformance comparison:")
+        print("\nPerformance comparison:")
         print(f"  Sequential: {time_sequential:.2f}s")
         print(f"  Parallel (4 workers): {time_parallel:.2f}s")
         print(f"  Speedup: {speedup:.2f}x")

@@ -20,9 +20,9 @@ import yaml
 
 from src.feature_flags import (
     FeatureFlags,
+    feature_enabled,
     get_feature_flags,
     reset_feature_flags,
-    feature_enabled,
 )
 
 

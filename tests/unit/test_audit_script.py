@@ -1,8 +1,9 @@
 """Tests for audit script."""
 
-from pathlib import Path
 import tempfile
-from scripts.audit_codebase import CodebaseAuditor, Issue
+from pathlib import Path
+
+from scripts.audit_codebase import CodebaseAuditor
 
 
 def test_detects_stub_function():

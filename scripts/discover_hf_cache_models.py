@@ -15,7 +15,6 @@ from __future__ import annotations
 import argparse
 import re
 from pathlib import Path
-from typing import Dict, List, Optional
 
 import yaml
 
@@ -31,24 +30,24 @@ def _parse_hf_id(dir_name: str) -> str | None:
     return f"{org}/{model}"
 
 
-def _is_candidate_model(hf_id: str, patterns: List[str]) -> bool:
+def _is_candidate_model(hf_id: str, patterns: list[str]) -> bool:
     lower = hf_id.lower()
     return any(pattern in lower for pattern in patterns)
 
 
-def _load_existing_registry(path: Path) -> Dict[str, Dict]:
+def _load_existing_registry(path: Path) -> dict[str, dict]:
     if not path.exists():
         return {}
-    with open(path, "r", encoding="utf-8") as f:
+    with open(path, encoding="utf-8") as f:
         data = yaml.safe_load(f) or {}
     models = data.get("models", [])
     return {model.get("model_id"): model for model in models if model.get("model_id")}
 
 
-def _load_main_registry_ids(path: Path) -> Dict[str, str]:
+def _load_main_registry_ids(path: Path) -> dict[str, str]:
     if not path.exists():
         return {}
-    with open(path, "r", encoding="utf-8") as f:
+    with open(path, encoding="utf-8") as f:
         data = yaml.safe_load(f) or {}
     models = data.get("models", [])
     return {
@@ -62,7 +61,7 @@ def _model_id_from_hf_id(hf_id: str) -> str:
     return hf_id.replace("/", "_").replace("-", "_")
 
 
-def _parse_opus_language_pair(hf_id: str) -> Optional[tuple[str, str]]:
+def _parse_opus_language_pair(hf_id: str) -> tuple[str, str] | None:
     """
     Parse Opus model HF ID to extract language pair.
 
@@ -101,7 +100,7 @@ def _compute_directory_size_mb(directory: Path) -> float:
     return total_bytes / (1024 ** 2)
 
 
-def _get_cache_directory(cache_dir: Path, hf_id: str) -> Optional[Path]:
+def _get_cache_directory(cache_dir: Path, hf_id: str) -> Path | None:
     """
     Get cache directory for HF model.
 
@@ -129,7 +128,7 @@ def _get_cache_directory(cache_dir: Path, hf_id: str) -> Optional[Path]:
     return None
 
 
-def _check_model_in_organized_layout(hf_id: str, models_dir: Path = Path("models")) -> Optional[Path]:
+def _check_model_in_organized_layout(hf_id: str, models_dir: Path = Path("models")) -> Path | None:
     """
     Check if model exists in organized models/ layout.
 
@@ -157,7 +156,7 @@ def _check_model_in_organized_layout(hf_id: str, models_dir: Path = Path("models
     return None
 
 
-def discover_models(cache_dir: Path, patterns: List[str]) -> List[str]:
+def discover_models(cache_dir: Path, patterns: list[str]) -> list[str]:
     if not cache_dir.exists():
         return []
     hf_ids = []
@@ -202,7 +201,7 @@ def main() -> int:
     main_registry_ids = _load_main_registry_ids(Path("config/model_registry.yaml"))
     existing_local = _load_existing_registry(output_path)
 
-    models: Dict[str, Dict] = dict(existing_local)
+    models: dict[str, dict] = dict(existing_local)
 
     for hf_id in hf_ids:
         model_id = _model_id_from_hf_id(hf_id)

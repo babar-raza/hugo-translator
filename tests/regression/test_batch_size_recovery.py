@@ -7,8 +7,9 @@ preventing the integer rounding bug where int(4 * 1.10) = 4 (no increase).
 The fix uses math.ceil + max(current+1, ...) to guarantee at least +1 increase.
 """
 
-import pytest
 import math
+
+import pytest
 
 
 class TestBatchSizeRecoveryFormula:
@@ -112,8 +113,8 @@ class TestBatchSizeRecoveryFormula:
         # Only increase if under baseline
         if current < baseline:
             assert new_size > current or new_size == baseline, \
-                f"Should increase or be at baseline"
-        assert new_size <= baseline, f"Should not exceed baseline"
+                "Should increase or be at baseline"
+        assert new_size <= baseline, "Should not exceed baseline"
 
 
 class TestBatchFormulaEdgeCases:

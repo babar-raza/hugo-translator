@@ -9,9 +9,10 @@ Tests verify that:
 5. Callback is optional (backward compatibility)
 """
 
+from unittest.mock import Mock, patch
+
 import pytest
-from pathlib import Path
-from unittest.mock import Mock, MagicMock, patch
+
 from src.translation_engine.retry_handler import RetryHandler
 
 

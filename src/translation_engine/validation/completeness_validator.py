@@ -5,7 +5,7 @@ This module validates that all source segments have been translated with 100% co
 """
 
 import re
-from typing import Any, Dict, Optional
+from typing import Any
 
 from .base import ValidationIssue, ValidationResult, ValidationSeverity
 from .post_translation_validator import PostTranslationValidator
@@ -35,7 +35,7 @@ class CompletenessValidator(PostTranslationValidator):
         self,
         source: str,
         translation: str,
-        context: Optional[Dict[str, Any]] = None,
+        context: dict[str, Any] | None = None,
     ) -> ValidationResult:
         """Validate translation completeness.
 

@@ -4,17 +4,14 @@ Integration tests for CLI flags (CFG-03).
 Tests that CLI flags correctly override configuration settings
 and are passed to the TranslationEngine.
 """
-import argparse
-import sys
 from pathlib import Path
-from unittest.mock import MagicMock, Mock, patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 
 from src.cli import (
     CLIConfigOverrides,
     create_parser,
-    main,
     translate_site,
 )
 

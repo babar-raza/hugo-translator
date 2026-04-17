@@ -20,14 +20,14 @@ Safety Monitoring:
 """
 
 import argparse
-import psutil
 import subprocess
 import sys
 import time
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import List, Optional
+
+import psutil
 
 PROJECT_ROOT = Path(__file__).parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
@@ -44,8 +44,8 @@ class BenchmarkConfig:
     name: str
     model: str
     device: str
-    batch_size: Optional[int] = None
-    parallel_languages: Optional[int] = None
+    batch_size: int | None = None
+    parallel_languages: int | None = None
     load_mode: str = "fp32"
     experimental: bool = False
     description: str = ""
@@ -59,15 +59,15 @@ class BenchmarkResult:
     languages_count: int
 
     success: bool = False
-    error: Optional[str] = None
+    error: str | None = None
 
     total_duration: float = 0.0
     throughput_files_per_min: float = 0.0
     throughput_file_langs_per_min: float = 0.0
 
-    peak_vram_mb: Optional[float] = None
-    peak_ram_mb: Optional[float] = None
-    avg_cpu_pct: Optional[float] = None
+    peak_vram_mb: float | None = None
+    peak_ram_mb: float | None = None
+    avg_cpu_pct: float | None = None
 
     safety_abort: bool = False
 
@@ -76,9 +76,9 @@ class SafetyMonitor:
     """Monitor system resources and enforce safety thresholds."""
 
     def __init__(self):
-        self.vram_samples: List[float] = []
-        self.ram_samples: List[float] = []
-        self.cpu_samples: List[float] = []
+        self.vram_samples: list[float] = []
+        self.ram_samples: list[float] = []
+        self.cpu_samples: list[float] = []
 
     def check_vram(self) -> tuple[bool, str]:
         """Check VRAM usage."""
@@ -143,7 +143,7 @@ class SafetyMonitor:
 class ProductionBenchmarker:
     """Production-optimized benchmarking."""
 
-    def __init__(self, corpus_size: int = 5, target_langs: List[str] = None):
+    def __init__(self, corpus_size: int = 5, target_langs: list[str] = None):
         self.corpus_size = corpus_size
         self.target_langs = target_langs or ["de", "fr"]
         self.cli_path = PROJECT_ROOT / ".venv" / "Scripts" / "python.exe"
@@ -152,9 +152,9 @@ class ProductionBenchmarker:
         self.corpus = self._collect_corpus()
 
         # Results storage
-        self.results: List[BenchmarkResult] = []
+        self.results: list[BenchmarkResult] = []
 
-    def _collect_corpus(self) -> List[Path]:
+    def _collect_corpus(self) -> list[Path]:
         """Collect test files."""
         kb_slides = Path("D:/onedrive/Documents/GitHub/aspose.net/content/kb.aspose.net/slides/en")
 
@@ -343,7 +343,7 @@ class ProductionBenchmarker:
             report += f"| {i} | {r.config.name} | {r.config.model} | {r.config.device} | {r.config.batch_size or 'auto'} | {r.config.parallel_languages or '0'} | {r.config.load_mode} | {r.total_duration:.1f}s | {r.throughput_file_langs_per_min:.2f} | {vram} | {ram} | {cpu} |\n"
 
         if experimental:
-            report += f"""
+            report += """
 
 ---
 
@@ -360,7 +360,7 @@ class ProductionBenchmarker:
                 report += f"| {r.config.name} | {r.config.model} | {r.config.device} | {throughput} | {status} |\n"
 
         if failed:
-            report += f"""
+            report += """
 
 ---
 
@@ -420,7 +420,7 @@ python -m src.cli \\
                 speedup = best_fp16.throughput_file_langs_per_min / best_fp32.throughput_file_langs_per_min
                 report += f"- FP16 is {speedup:.1f}x faster than FP32\n"
 
-        report += f"""
+        report += """
 
 ---
 
@@ -597,7 +597,7 @@ def main():
     report_path.write_text(report, encoding='utf-8')
 
     print(f"\n{'='*80}")
-    print(f"Benchmark complete!")
+    print("Benchmark complete!")
     print(f"Report: {report_path}")
     print(f"{'='*80}\n")
     print(report)

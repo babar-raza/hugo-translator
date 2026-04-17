@@ -7,15 +7,11 @@ management, and telemetry context cleanup.
 This addresses CF-03: Add Integration Tests for Full Shutdown Flow
 """
 
-import json
-import os
 import signal
 import subprocess
 import sys
-import tempfile
 import time
 from pathlib import Path
-from unittest.mock import Mock, patch
 
 import pytest
 

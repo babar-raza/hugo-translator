@@ -26,7 +26,6 @@ from collections import defaultdict
 from dataclasses import asdict, dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, List, Optional, Set, Tuple
 
 
 @dataclass
@@ -41,7 +40,7 @@ class FileInfo:
     comment_lines: int
     blank_lines: int
     modified_time: str
-    hash: Optional[str] = None
+    hash: str | None = None
 
 
 @dataclass
@@ -54,8 +53,8 @@ class InventoryStats:
     total_code_lines: int
     total_comment_lines: int
     total_blank_lines: int
-    files_by_category: Dict[str, int]
-    lines_by_category: Dict[str, int]
+    files_by_category: dict[str, int]
+    lines_by_category: dict[str, int]
     scan_time: str
 
 
@@ -63,7 +62,7 @@ class InventoryStats:
 class Inventory:
     """Complete file inventory."""
     project_root: str
-    files: List[FileInfo]
+    files: list[FileInfo]
     stats: InventoryStats
     version: str = "1.0"
 
@@ -140,7 +139,7 @@ class FileScanner:
         else:
             return 'other'
 
-    def scan(self) -> List[Tuple[Path, str]]:
+    def scan(self) -> list[tuple[Path, str]]:
         """
         Scan the directory tree and return list of (file_path, category) tuples.
 
@@ -202,7 +201,7 @@ class LineCounter:
         ],
     }
 
-    def count_lines(self, file_path: Path) -> Tuple[int, int, int, int]:
+    def count_lines(self, file_path: Path) -> tuple[int, int, int, int]:
         """
         Count lines in a file.
 
@@ -211,7 +210,7 @@ class LineCounter:
         """
         try:
             # Try to read as text file
-            with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
+            with open(file_path, encoding='utf-8', errors='ignore') as f:
                 lines = f.readlines()
         except Exception:
             # If we can't read it, treat as binary
@@ -369,7 +368,7 @@ class InventoryManager:
 
     def load_inventory(self, input_path: str) -> Inventory:
         """Load inventory from JSON file."""
-        with open(input_path, 'r', encoding='utf-8') as f:
+        with open(input_path, encoding='utf-8') as f:
             data = json.load(f)
 
         # Reconstruct dataclasses
@@ -426,7 +425,7 @@ class InventoryManager:
 
         return False
 
-    def compare_inventories(self, baseline_path: str, current_path: str) -> Dict:
+    def compare_inventories(self, baseline_path: str, current_path: str) -> dict:
         """Compare two inventories and generate diff."""
         baseline = self.load_inventory(baseline_path)
         current = self.load_inventory(current_path)
@@ -545,7 +544,7 @@ class Reporter:
         return '\n'.join(lines)
 
     @staticmethod
-    def print_diff(diff: Dict):
+    def print_diff(diff: dict):
         """Print a comparison diff."""
         print("\nInventory Comparison")
         print("=" * 60)

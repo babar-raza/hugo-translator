@@ -9,15 +9,11 @@ Tests focus on:
 """
 from pathlib import Path
 
-import pytest
-
 from src.translation_engine.models import (
     DirectoryResult,
     TranslationResult,
     TranslationStats,
     ValidationDecision,
-    ValidationIssue,
-    ValidationResult,
 )
 
 

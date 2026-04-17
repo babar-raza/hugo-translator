@@ -10,12 +10,13 @@ Tests cover:
 """
 
 import pytest
+
 from src.translation_engine.exceptions import (
     TranslationError,
     TranslationRejectedError,
     TranslationRetryableError,
 )
-from src.translation_engine.models import ValidationResult, ValidationIssue
+from src.translation_engine.models import ValidationIssue, ValidationResult
 
 
 class TestTranslationError:

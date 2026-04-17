@@ -2,8 +2,8 @@
 import os
 import sys
 import time
-from pathlib import Path
-from unittest.mock import patch, mock_open, MagicMock
+from unittest.mock import patch
+
 import pytest
 
 from src.utils.file_lock import FileLock, LockError
@@ -90,7 +90,7 @@ def test_json_metadata_written(lock_file):
     lock.acquire(blocking=True)
 
     # Read lock file
-    with open(lock_file, 'r') as f:
+    with open(lock_file) as f:
         content = f.read()
 
     # Should be valid JSON
@@ -205,7 +205,7 @@ def test_lock_file_permissions(lock_file):
     assert lock_file.is_file()
 
     # Should be readable
-    with open(lock_file, 'r') as f:
+    with open(lock_file) as f:
         content = f.read()
         assert len(content) > 0
 

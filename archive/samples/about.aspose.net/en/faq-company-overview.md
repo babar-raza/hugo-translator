@@ -34,4 +34,3 @@ This background information comes from the “Our story” section of the public
 **Q6. Which industries use Aspose products?**  
 Customer stories and marketing pages highlight usage across finance, healthcare, education, government, and software vendors, among others.  
 Representative customer success stories are linked from the [Success Stories](https://about.aspose.com/customers/success-stories/) page.
-

@@ -32,4 +32,3 @@ Buttons and links encourage users to “Read More,” start from a specific pric
 
 These calls to action connect the home marketing view with deeper documentation, online apps, and purchase flows.
 They align with the overall experience described across localized `_index` files under `content/www.aspose.net/`.
-

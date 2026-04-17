@@ -10,12 +10,9 @@ Tests cover:
 - Negative cases (structure drift detection)
 """
 
-import pytest
 
 from src.translation_engine.handlers.multiline_handler import (
     MultilineHandler,
-    MultilineResult,
-    LineInfo,
     normalize_newlines,
     translate_multiline,
 )

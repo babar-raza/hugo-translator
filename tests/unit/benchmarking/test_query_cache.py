@@ -4,7 +4,6 @@ Tests LRU cache with TTL for benchmark analytics queries.
 """
 
 import time
-from unittest.mock import Mock
 
 import pytest
 

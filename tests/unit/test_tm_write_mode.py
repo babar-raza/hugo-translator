@@ -3,9 +3,9 @@ Unit tests for cache_write_mode in TM layers (T203: federated-splashing-panda).
 
 Tests that --cache-write-mode flag controls cache write behavior.
 """
-import pytest
 from pathlib import Path
-from unittest.mock import Mock, MagicMock, patch, call
+from unittest.mock import Mock, patch
+
 from src.translation_engine.engine import TranslationEngine
 
 

@@ -8,8 +8,8 @@ This test validates that the run_batch23.py script properly:
 """
 import json
 import tempfile
-from pathlib import Path
 from collections import Counter
+from pathlib import Path
 
 
 def test_progress_file_cleared_not_appended():
@@ -24,7 +24,7 @@ def test_progress_file_cleared_not_appended():
                 f.write(json.dumps({"id": i, "file": f"file{i}.md"}) + '\n')
 
         # Verify first run
-        with open(progress_file, 'r', encoding='utf-8') as f:
+        with open(progress_file, encoding='utf-8') as f:
             records = [json.loads(line) for line in f]
         assert len(records) == 3
 
@@ -45,7 +45,7 @@ def test_progress_file_cleared_not_appended():
                 f.write(json.dumps({"id": i, "file": f"file{i}.md"}) + '\n')
 
         # Verify second run (should have exactly 3, not 6)
-        with open(progress_file, 'r', encoding='utf-8') as f:
+        with open(progress_file, encoding='utf-8') as f:
             records = [json.loads(line) for line in f]
 
         assert len(records) == 3, f"Expected 3 records, got {len(records)}"
@@ -158,7 +158,7 @@ def test_phase6_duplication_scenario():
                 f.write(json.dumps({"source_path": file, "status": "PASS"}) + '\n')
 
         # Verify first run
-        with open(progress_file, 'r', encoding='utf-8') as f:
+        with open(progress_file, encoding='utf-8') as f:
             records = [json.loads(line) for line in f]
 
         assert len(records) == 248
@@ -175,7 +175,7 @@ def test_phase6_duplication_scenario():
                 f.write(json.dumps({"source_path": file, "status": "FAIL_OTHER"}) + '\n')
 
         # Count records
-        with open(progress_file, 'r', encoding='utf-8') as f:
+        with open(progress_file, encoding='utf-8') as f:
             records = [json.loads(line) for line in f]
 
         assert len(records) == 410  # 248 + 162 = 410 (Phase 6 bug!)
@@ -197,7 +197,7 @@ def test_phase6_duplication_scenario():
                 f.write(json.dumps({"source_path": file, "status": "PASS"}) + '\n')
 
         # Verify fixed version
-        with open(progress_file, 'r', encoding='utf-8') as f:
+        with open(progress_file, encoding='utf-8') as f:
             records = [json.loads(line) for line in f]
 
         assert len(records) == 248  # Exactly 248, no duplicates!

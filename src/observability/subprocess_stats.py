@@ -42,13 +42,11 @@ Usage:
 """
 import logging
 import subprocess
-import time
-from collections import Counter, defaultdict
-from dataclasses import dataclass, field
+from collections import Counter
+from dataclasses import dataclass
 from datetime import datetime
-from pathlib import Path
 from threading import Lock
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -70,11 +68,11 @@ class SubprocessExecutionRecord:
     success: bool  # True if exit_code == 0
     stdout_length: int = 0  # Length of stdout in bytes
     stderr_length: int = 0  # Length of stderr in bytes
-    error: Optional[str] = None  # Error message if failed
-    cwd: Optional[str] = None  # Working directory
-    timeout: Optional[float] = None  # Timeout value if set
+    error: str | None = None  # Error message if failed
+    cwd: str | None = None  # Working directory
+    timeout: float | None = None  # Timeout value if set
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert record to dictionary for telemetry."""
         return {
             "command": self.command,
@@ -129,7 +127,7 @@ class SubprocessStats:
         self.enable_telemetry = enable_telemetry
 
         # Execution records (limited to last 1000 for memory efficiency)
-        self._executions: List[SubprocessExecutionRecord] = []
+        self._executions: list[SubprocessExecutionRecord] = []
         self._max_records = 1000
 
         # Aggregate counters
@@ -151,7 +149,7 @@ class SubprocessStats:
         self._command_failures: Counter = Counter()
 
         # Error tracking
-        self._errors: List[Tuple[str, str]] = []  # (command, error) pairs
+        self._errors: list[tuple[str, str]] = []  # (command, error) pairs
         self._max_errors = 100
 
         # Last summary log timestamp
@@ -206,7 +204,7 @@ class SubprocessStats:
         if self.total_count % self.summary_interval == 0:
             self._log_summary()
 
-    def get_summary(self) -> Dict[str, Any]:
+    def get_summary(self) -> dict[str, Any]:
         """
         Get aggregate statistics summary.
 
@@ -275,7 +273,7 @@ class SubprocessStats:
             self._errors.clear()
             self._last_summary_log = 0
 
-    def get_command_stats(self, command: str) -> Dict[str, Any]:
+    def get_command_stats(self, command: str) -> dict[str, Any]:
         """
         Get statistics for a specific command.
 
@@ -401,7 +399,7 @@ class SubprocessStats:
 
 
 # Global stats instance for convenience
-_global_stats: Optional[SubprocessStats] = None
+_global_stats: SubprocessStats | None = None
 
 
 def get_global_stats() -> SubprocessStats:
@@ -418,10 +416,10 @@ def get_global_stats() -> SubprocessStats:
 
 
 def run_with_stats(
-    args: List[str],
-    stats_tracker: Optional[SubprocessStats] = None,
-    timeout: Optional[float] = None,
-    cwd: Optional[str] = None,
+    args: list[str],
+    stats_tracker: SubprocessStats | None = None,
+    timeout: float | None = None,
+    cwd: str | None = None,
     capture_output: bool = True,
     text: bool = True,
     check: bool = False,

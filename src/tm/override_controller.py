@@ -7,7 +7,8 @@ import re
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
-from typing import Any, Dict, List, Optional, Pattern
+from re import Pattern
+from typing import Any
 
 
 class OverrideMode(str, Enum):
@@ -21,13 +22,13 @@ class OverrideMode(str, Enum):
 @dataclass
 class OverrideFilter:
     """Filters to selectively apply override."""
-    source_patterns: List[str] = field(default_factory=list)
-    frontmatter_keys: List[str] = field(default_factory=list)
-    target_langs: List[str] = field(default_factory=list)
-    modified_after: Optional[datetime] = None
+    source_patterns: list[str] = field(default_factory=list)
+    frontmatter_keys: list[str] = field(default_factory=list)
+    target_langs: list[str] = field(default_factory=list)
+    modified_after: datetime | None = None
 
     # Compiled patterns (internal)
-    _compiled_patterns: List[Pattern] = field(default_factory=list, repr=False)
+    _compiled_patterns: list[Pattern] = field(default_factory=list, repr=False)
 
     def __post_init__(self):
         """Compile regex patterns."""
@@ -59,7 +60,7 @@ class OverrideController:
     based on configured mode and filters.
     """
 
-    def __init__(self, config: Optional[OverrideConfig] = None):
+    def __init__(self, config: OverrideConfig | None = None):
         """
         Initialize override controller.
 
@@ -80,11 +81,11 @@ class OverrideController:
         return self.config.mode
 
     @property
-    def stats(self) -> Dict[str, int]:
+    def stats(self) -> dict[str, int]:
         """Get override statistics."""
         return dict(self._stats)
 
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         """Return stats with configuration details for reporting."""
         filters = self.config.filters
         return {
@@ -104,7 +105,7 @@ class OverrideController:
         self,
         source_text: str,
         target_lang: str,
-        context: Optional[Dict[str, Any]] = None,
+        context: dict[str, Any] | None = None,
     ) -> bool:
         """
         Determine if TM lookup should be bypassed for this segment.
@@ -148,7 +149,7 @@ class OverrideController:
         self,
         source_text: str,
         target_lang: str,
-        context: Optional[Dict[str, Any]] = None,
+        context: dict[str, Any] | None = None,
     ) -> bool:
         """
         Determine if TM cache should be updated with new translation.
@@ -183,7 +184,7 @@ class OverrideController:
         self,
         source_text: str,
         target_lang: str,
-        context: Optional[Dict[str, Any]] = None,
+        context: dict[str, Any] | None = None,
     ) -> bool:
         """
         Determine if fresh translation should be forced regardless of cache.
@@ -208,7 +209,7 @@ class OverrideController:
         self,
         source_text: str,
         target_lang: str,
-        context: Optional[Dict[str, Any]] = None,
+        context: dict[str, Any] | None = None,
     ) -> bool:
         """
         Check if segment matches override filters.
@@ -257,7 +258,7 @@ class OverrideController:
         }
 
     @classmethod
-    def from_dict(cls, config_dict: Dict[str, Any]) -> "OverrideController":
+    def from_dict(cls, config_dict: dict[str, Any]) -> "OverrideController":
         """
         Create controller from configuration dictionary.
 

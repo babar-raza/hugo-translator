@@ -8,11 +8,11 @@ Ensures that translation preserves the structure of the source:
 
 import re
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 import structlog
 
-from .base import Validator, ValidationResult, ValidationSeverity
+from .base import ValidationResult, ValidationSeverity, Validator
 
 logger = structlog.get_logger(__name__)
 
@@ -33,7 +33,7 @@ class StructureValidator(Validator):
         self,
         source: str,
         translation: str,
-        context: Optional[Dict[str, Any]] = None,
+        context: dict[str, Any] | None = None,
     ) -> ValidationResult:
         """
         Validate markdown structure preservation.
@@ -96,7 +96,7 @@ class StructureValidator(Validator):
         # Check levels
         if len(source_headings) == len(translation_headings):
             for i, (source_level, translation_level) in enumerate(
-                zip(source_headings, translation_headings)
+                zip(source_headings, translation_headings, strict=False)
             ):
                 if source_level != translation_level:
                     result.issues.append(
@@ -111,7 +111,7 @@ class StructureValidator(Validator):
                         )
                     )
 
-    def _extract_headings(self, text: str) -> List[int]:
+    def _extract_headings(self, text: str) -> list[int]:
         """
         Extract heading levels from markdown.
 
@@ -333,7 +333,7 @@ class YAMLStructureValidationResult:
     source_lines: int
     target_lines: int
     line_drift_percent: float
-    issues: List[YAMLStructureIssue] = field(default_factory=list)
+    issues: list[YAMLStructureIssue] = field(default_factory=list)
 
     @property
     def is_valid(self) -> bool:
@@ -395,7 +395,7 @@ class YAMLStructureValidator:
             abs(source_lines - target_lines) / max(source_lines, 1) * 100
         )
 
-        issues: List[YAMLStructureIssue] = []
+        issues: list[YAMLStructureIssue] = []
 
         # Check line count drift
         if drift > self.error_threshold:
@@ -450,7 +450,7 @@ class YAMLStructureValidator:
         self,
         source: str,
         target: str,
-        issues: List[YAMLStructureIssue],
+        issues: list[YAMLStructureIssue],
     ) -> None:
         """Check that YAML section comments are preserved."""
         # Extract comments from source (lines starting with #)
@@ -471,7 +471,7 @@ class YAMLStructureValidator:
         self,
         source: str,
         target: str,
-        issues: List[YAMLStructureIssue],
+        issues: list[YAMLStructureIssue],
     ) -> None:
         """Check that literal block scalars (|) are preserved."""
         source_literals = source.count(": |")

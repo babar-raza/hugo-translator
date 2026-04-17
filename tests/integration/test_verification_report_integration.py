@@ -12,7 +12,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 from src.verification.checks.base import VerificationIssue, VerificationResult
-from src.verification.report import write_report, VerificationReporter
+from src.verification.report import VerificationReporter, write_report
 
 
 def test_end_to_end_json_report():
@@ -49,7 +49,7 @@ def test_end_to_end_json_report():
         # Verify report exists and is valid JSON
         assert report_path.exists()
 
-        with open(report_path, "r", encoding="utf-8") as f:
+        with open(report_path, encoding="utf-8") as f:
             report_data = json.load(f)
 
         # Validate structure
@@ -141,7 +141,7 @@ def test_batch_report_multiple_files():
         report_path = Path(tmpdir) / "batch_report.json"
         write_report(report_path, results)
 
-        with open(report_path, "r", encoding="utf-8") as f:
+        with open(report_path, encoding="utf-8") as f:
             report_data = json.load(f)
 
         # Validate summary

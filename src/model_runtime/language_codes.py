@@ -9,14 +9,12 @@ Different translation models use different language code formats:
 This module provides mapping between these formats.
 """
 
-from typing import Dict, Optional
-
 
 # ISO 639-1 to NLLB-200 language code mapping
 # NLLB uses language_Script format where Script is usually "Latn" for Latin-based,
 # "Cyrl" for Cyrillic, "Arab" for Arabic, etc.
 # Reference: https://github.com/facebookresearch/flores/blob/main/flores200/README.md
-ISO_TO_NLLB: Dict[str, str] = {
+ISO_TO_NLLB: dict[str, str] = {
     # Major European languages
     "en": "eng_Latn",  # English
     "es": "spa_Latn",  # Spanish
@@ -96,10 +94,10 @@ ISO_TO_NLLB: Dict[str, str] = {
 }
 
 # Reverse mapping: NLLB to ISO 639-1
-NLLB_TO_ISO: Dict[str, str] = {v: k for k, v in ISO_TO_NLLB.items()}
+NLLB_TO_ISO: dict[str, str] = {v: k for k, v in ISO_TO_NLLB.items()}
 
 
-def is_nllb_model(model_id: str, hf_model_id: Optional[str] = None) -> bool:
+def is_nllb_model(model_id: str, hf_model_id: str | None = None) -> bool:
     """
     Check if a model is an NLLB model.
 
@@ -121,7 +119,7 @@ def is_nllb_model(model_id: str, hf_model_id: Optional[str] = None) -> bool:
 def map_language_code(
     lang_code: str,
     model_id: str,
-    hf_model_id: Optional[str] = None
+    hf_model_id: str | None = None
 ) -> str:
     """
     Map language code to the format expected by the model.
@@ -152,7 +150,7 @@ def map_language_code(
     return lang_code
 
 
-def get_supported_languages(model_id: str, hf_model_id: Optional[str] = None) -> list[str]:
+def get_supported_languages(model_id: str, hf_model_id: str | None = None) -> list[str]:
     """
     Get list of supported ISO 639-1 language codes for a model.
 

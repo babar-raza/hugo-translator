@@ -19,13 +19,13 @@ Task: SPEC-TOOL-SPECSCAN
 """
 
 import argparse
-import sys
-import yaml
-from pathlib import Path
-from dataclasses import dataclass, field
-from typing import List, Dict, Optional, Tuple
-from datetime import datetime
 import re
+import sys
+from dataclasses import dataclass, field
+from datetime import datetime
+from pathlib import Path
+
+import yaml
 
 
 @dataclass
@@ -34,7 +34,7 @@ class SpecScanResult:
     spec_type: str  # "runtime_unit", "feature", "entrypoint", "evidence", etc.
     spec_id: str
     status: str  # "PASS", "FAIL", "WARNING"
-    messages: List[str] = field(default_factory=list)
+    messages: list[str] = field(default_factory=list)
     location: str = ""  # file:line
 
 
@@ -45,7 +45,7 @@ class ScanSummary:
     passed: int = 0
     failed: int = 0
     warnings: int = 0
-    results: List[SpecScanResult] = field(default_factory=list)
+    results: list[SpecScanResult] = field(default_factory=list)
 
 
 class SpecScanner:
@@ -56,7 +56,7 @@ class SpecScanner:
         self.report_dir = report_dir
         self.project_root = project_root
         self.summary = ScanSummary()
-        self.evidence_registry: Dict[str, Dict] = {}
+        self.evidence_registry: dict[str, dict] = {}
 
     def scan_all(self) -> int:
         """
@@ -106,7 +106,7 @@ class SpecScanner:
             return
 
         try:
-            with open(evidence_file, 'r', encoding='utf-8') as f:
+            with open(evidence_file, encoding='utf-8') as f:
                 data = yaml.safe_load(f)
 
             if data and 'evidence' in data:
@@ -138,7 +138,7 @@ class SpecScanner:
         print("Scanning runtime_units.yml...")
 
         try:
-            with open(runtime_file, 'r', encoding='utf-8') as f:
+            with open(runtime_file, encoding='utf-8') as f:
                 data = yaml.safe_load(f)
         except Exception as e:
             result = SpecScanResult(
@@ -181,7 +181,7 @@ class SpecScanner:
 
         print(f"  Scanned {len(data['runtime_units'])} runtime units")
 
-    def _verify_runtime_unit(self, unit: Dict, file_path: Path, idx: int) -> SpecScanResult:
+    def _verify_runtime_unit(self, unit: dict, file_path: Path, idx: int) -> SpecScanResult:
         """Verify a single runtime unit."""
         unit_id = unit.get('id', f'<unknown_{idx}>')
         messages = []
@@ -295,7 +295,7 @@ class SpecScanner:
         status = "PASS"
 
         try:
-            with open(file_path, 'r', encoding='utf-8') as f:
+            with open(file_path, encoding='utf-8') as f:
                 content = f.read()
         except Exception as e:
             return SpecScanResult(
@@ -357,7 +357,7 @@ class SpecScanner:
         print("Scanning entrypoints.md...")
 
         try:
-            with open(entrypoints_file, 'r', encoding='utf-8') as f:
+            with open(entrypoints_file, encoding='utf-8') as f:
                 content = f.read()
         except Exception as e:
             result = SpecScanResult(
@@ -451,7 +451,7 @@ class SpecScanner:
 
         print(f"  Verified {len(self.evidence_registry)} evidence entries")
 
-    def _verify_evidence(self, evidence_id: str, evidence_data: Dict) -> SpecScanResult:
+    def _verify_evidence(self, evidence_id: str, evidence_data: dict) -> SpecScanResult:
         """Verify a single evidence entry."""
         messages = []
         status = "PASS"
@@ -514,7 +514,7 @@ class SpecScanner:
         self.report_dir.mkdir(parents=True, exist_ok=True)
 
         # Group results by spec type
-        results_by_type: Dict[str, List[SpecScanResult]] = {}
+        results_by_type: dict[str, list[SpecScanResult]] = {}
         for result in self.summary.results:
             if result.spec_type not in results_by_type:
                 results_by_type[result.spec_type] = []

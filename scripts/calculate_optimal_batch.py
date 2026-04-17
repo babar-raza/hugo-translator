@@ -8,15 +8,15 @@ Usage:
 """
 
 import argparse
-import torch
 import sys
 from pathlib import Path
+
+import torch
 
 # Add src to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from src.hardware.gpu_manager import GPUManager
-
 
 # VRAM requirements per batch item (empirical estimates in MB)
 VRAM_PER_ITEM = {
@@ -190,7 +190,7 @@ def main():
 
     # Display results
     print(f"RECOMMENDED BATCH SIZE: {result['batch_size']}")
-    print(f"\nEstimated VRAM Usage:")
+    print("\nEstimated VRAM Usage:")
     print(f"  - Base Model:    {MODEL_BASE_VRAM[model_size][args.precision]:,.0f} MB")
     print(f"  - CUDA Reserved: {CUDA_RESERVED_MB:,.0f} MB")
     print(f"  - Batch Data:    {VRAM_PER_ITEM[model_size][args.precision] * result['batch_size']:,.0f} MB "
@@ -210,15 +210,15 @@ def main():
     load_mode_map = {"fp32": "fp32", "fp16": "fp16", "int8": "int8"}
     load_mode = load_mode_map.get(args.precision, "fp16")
 
-    print(f"\npython -m src.cli \\")
-    print(f"  --site kb.aspose.net \\")
-    print(f'  --input "D:\\onedrive\\Documents\\GitHub\\aspose.net\\content\\kb.aspose.net\\slides\\en" \\')
-    print(f"  --target-langs ar bg cs da de el es et fa fi fr he hi hr hu id it ja ko lt lv nl pl pt ro ru sk sl sr sv th tr uk vi zh \\")
-    print(f"  --enable-terminology \\")
-    print(f"  --terminology-mode both \\")
+    print("\npython -m src.cli \\")
+    print("  --site kb.aspose.net \\")
+    print('  --input "D:\\onedrive\\Documents\\GitHub\\aspose.net\\content\\kb.aspose.net\\slides\\en" \\')
+    print("  --target-langs ar bg cs da de el es et fa fi fr he hi hr hu id it ja ko lt lv nl pl pt ro ru sk sl sr sv th tr uk vi zh \\")
+    print("  --enable-terminology \\")
+    print("  --terminology-mode both \\")
     print(f"  --load-mode {load_mode} \\")
     print(f"  --batch-size {result['batch_size']} \\")
-    print(f"  --sort-segments-by-length")
+    print("  --sort-segments-by-length")
     print()
 
     # Additional recommendations

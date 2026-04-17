@@ -14,7 +14,6 @@ import re
 import sys
 from dataclasses import dataclass
 from pathlib import Path
-from typing import List, Optional
 
 PROJECT_ROOT = Path(__file__).parent.parent
 
@@ -25,16 +24,16 @@ class BenchmarkConfig:
     name: str
     model: str = ""
     device: str = ""
-    batch_size: Optional[int] = None
-    parallel_langs: Optional[int] = None
+    batch_size: int | None = None
+    parallel_langs: int | None = None
     load_mode: str = ""
 
     duration: float = 0.0
     throughput_file_langs_per_min: float = 0.0
 
-    peak_vram_mb: Optional[float] = None
-    peak_ram_mb: Optional[float] = None
-    avg_cpu_pct: Optional[float] = None
+    peak_vram_mb: float | None = None
+    peak_ram_mb: float | None = None
+    avg_cpu_pct: float | None = None
 
     success: bool = True
     experimental: bool = False
@@ -46,7 +45,7 @@ class BenchmarkAnalyzer:
     def __init__(self, report_path: Path):
         self.report_path = report_path
         self.report_text = report_path.read_text(encoding='utf-8')
-        self.configs: List[BenchmarkConfig] = []
+        self.configs: list[BenchmarkConfig] = []
 
     def parse_report(self):
         """Parse benchmark report markdown."""
@@ -104,7 +103,7 @@ class BenchmarkAnalyzer:
                 print(f"Warning: Could not parse row: {row[:50]}... ({e})")
                 continue
 
-    def get_best_production_config(self) -> Optional[BenchmarkConfig]:
+    def get_best_production_config(self) -> BenchmarkConfig | None:
         """Get the best production-ready configuration."""
         production_configs = [c for c in self.configs if c.success and not c.experimental]
 
@@ -247,7 +246,7 @@ Based on {best.throughput_file_langs_per_min:.2f} file-langs/min:
 
 """
 
-        report += f"""---
+        report += """---
 
 ## All Tested Configurations (Ranked)
 

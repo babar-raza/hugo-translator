@@ -5,13 +5,10 @@ Tests backup creation, restoration, integrity verification, rotation,
 and failure scenarios.
 """
 
-import json
-import os
 import sys
 import tarfile
 import tempfile
 from pathlib import Path
-from unittest import mock
 
 import pytest
 
@@ -381,7 +378,7 @@ class TestBackupRestoreIntegration:
         backup_file = temp_dirs["backups"] / "test_backup.tar.gz"
 
         # Simulate concurrent file access
-        with open(temp_dirs["l2_lmdb"] / "data.mdb", 'r') as f:
+        with open(temp_dirs["l2_lmdb"] / "data.mdb") as f:
             # Create backup while file is open
             success, message = backup_tm.create_backup(
                 output_path=backup_file,

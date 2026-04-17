@@ -15,12 +15,11 @@ import re
 import sys
 import unicodedata
 from pathlib import Path
-from typing import Dict, List
 
 
 class InvariantCheckResult:
     """Result of a single invariant check"""
-    def __init__(self, name: str, passed: bool, message: str, details: Dict = None):
+    def __init__(self, name: str, passed: bool, message: str, details: dict = None):
         self.name = name
         self.passed = passed
         self.message = message
@@ -127,7 +126,7 @@ class PlaceholderInvariantChecker:
             }
         )
 
-    def run_all(self, source: str, translated: str) -> List[InvariantCheckResult]:
+    def run_all(self, source: str, translated: str) -> list[InvariantCheckResult]:
         """Run all placeholder invariant checks"""
         return [
             self.check_exact_count(source, translated),
@@ -187,7 +186,7 @@ class BoundaryInvariantChecker:
             details={'violations': violations[:10]}  # Limit to first 10
         )
 
-    def run_all(self, text: str) -> List[InvariantCheckResult]:
+    def run_all(self, text: str) -> list[InvariantCheckResult]:
         """Run all boundary checks"""
         return [
             self.check_left_boundary(text),
@@ -211,7 +210,7 @@ class CodeBlockPolicyChecker:
 
         # Match blocks by index (assume same order)
         for idx, ((src_lang, src_code), (trans_lang, trans_code)) in enumerate(
-            zip(source_blocks, translated_blocks)
+            zip(source_blocks, translated_blocks, strict=False)
         ):
             if src_lang and src_lang.lower() in self.FULL_BYPASS_LANGUAGES:
                 if src_code != trans_code:
@@ -233,7 +232,7 @@ class CodeBlockPolicyChecker:
             details={'violations': violations[:10]}  # Limit to first 10
         )
 
-    def run_all(self, source: str, translated: str) -> List[InvariantCheckResult]:
+    def run_all(self, source: str, translated: str) -> list[InvariantCheckResult]:
         """Run all code block policy checks"""
         return [
             self.check_full_bypass_unchanged(source, translated)
@@ -245,7 +244,7 @@ class StructuralIntegrityChecker:
 
     def check_frontmatter_keys(self, source: str, translated: str) -> InvariantCheckResult:
         """Invariant: Frontmatter keys must be identical"""
-        def extract_frontmatter_keys(text: str) -> List[str]:
+        def extract_frontmatter_keys(text: str) -> list[str]:
             if not text.startswith('---\n'):
                 return []
             end = text.find('\n---\n', 4)
@@ -294,7 +293,7 @@ class StructuralIntegrityChecker:
             details={'violations': violations[:10]}
         )
 
-    def run_all(self, source: str, translated: str) -> List[InvariantCheckResult]:
+    def run_all(self, source: str, translated: str) -> list[InvariantCheckResult]:
         """Run all structural checks"""
         return [
             self.check_frontmatter_keys(source, translated),
@@ -343,12 +342,12 @@ class BasicTerminologyChecker:
             details={'violations': violations[:10]}  # Limit to first 10
         )
 
-    def run_all(self, source: str, translated: str) -> List[InvariantCheckResult]:
+    def run_all(self, source: str, translated: str) -> list[InvariantCheckResult]:
         """Run all terminology checks"""
         return [self.check_common_terms(source, translated)]
 
 
-def run_invariant_checks(source_file: Path, translated_file: Path) -> Dict:
+def run_invariant_checks(source_file: Path, translated_file: Path) -> dict:
     """Run all invariant checks on a source/translated pair"""
     source = source_file.read_text(encoding='utf-8')
     translated = translated_file.read_text(encoding='utf-8')
@@ -407,7 +406,7 @@ def main():
     # Print human-readable summary
     if not args.quiet:
         print(f"\n{'='*60}")
-        print(f"INVARIANT CHECK RESULTS")
+        print("INVARIANT CHECK RESULTS")
         print(f"{'='*60}")
         print(f"Total Checks: {result['summary']['total_checks']}")
         print(f"Passed: {result['summary']['passed']} [OK]")

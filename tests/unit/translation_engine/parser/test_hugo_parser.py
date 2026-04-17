@@ -7,7 +7,6 @@ Tests list token handling:
 - List items (list_item_open/close)
 - Nested lists
 """
-import pytest
 
 from src.translation_engine.parser import HugoParser
 from src.translation_engine.parser.ast_nodes import NodeType

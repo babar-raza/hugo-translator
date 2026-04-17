@@ -16,7 +16,7 @@ if errorlevel 1 (
 )
 
 REM --- aspose.net sites (ordered smallest to largest) ---
-set SITES=www.aspose.net about.aspose.net blog.aspose.net kb.aspose.net docs.aspose.net products.aspose.net websites.aspose.net reference.aspose.net
+set SITES=www.aspose.net about.aspose.net blog.aspose.net kb.aspose.net docs.aspose.net products.aspose.net websites.aspose.net
 
 for %%S in (%SITES%) do (
     echo(

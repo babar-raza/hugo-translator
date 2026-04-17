@@ -4,11 +4,10 @@ Tests for AST body reconstruction feature flag toggle (SR-02).
 Verifies that use_ast_body_reconstruction flag correctly controls
 which code path is used for translation.
 """
-import pytest
-from unittest.mock import Mock, patch
-from pathlib import Path
 
-from src.utils.models import BodyRules, SiteProfile, FrontmatterRule
+import pytest
+
+from src.utils.models import BodyRules, SiteProfile
 
 
 class TestFeatureFlagToggle:
@@ -137,7 +136,7 @@ class TestASTMethodExists:
 
         # Check method exists on class (not instance, since instantiation requires deps)
         assert hasattr(TranslationEngine, '_translate_body_ast')
-        assert callable(getattr(TranslationEngine, '_translate_body_ast'))
+        assert callable(TranslationEngine._translate_body_ast)
 
 
 class TestFlagInEngineLogic:

@@ -14,9 +14,7 @@ import os
 import threading
 import time
 from collections import deque
-from dataclasses import dataclass, field
-from pathlib import Path
-from typing import Dict, List, Optional, Tuple
+from dataclasses import dataclass
 
 from src.utils.metrics import calc_stats
 
@@ -33,11 +31,11 @@ class BatchConfig:
     max_batch_size: int = 128
 
     # Resource limits
-    target_memory_mb: Optional[int] = None  # Auto-detect if None
-    target_gpu_memory_mb: Optional[int] = None  # Auto-detect if None
+    target_memory_mb: int | None = None  # Auto-detect if None
+    target_gpu_memory_mb: int | None = None  # Auto-detect if None
 
     # Parallelism
-    num_workers: Optional[int] = None  # Auto-detect if None
+    num_workers: int | None = None  # Auto-detect if None
     prefetch_batches: int = 2
 
     # Optimization strategies
@@ -167,9 +165,9 @@ class BatchOptimizer:
 
     def prepare_batches(
         self,
-        items: List[str],
-        sort_by_length: Optional[bool] = None,
-    ) -> List[List[str]]:
+        items: list[str],
+        sort_by_length: bool | None = None,
+    ) -> list[list[str]]:
         """
         Prepare items into optimized batches.
 
@@ -219,11 +217,11 @@ class BatchOptimizer:
 
     def process_batch_with_monitoring(
         self,
-        batch: List[str],
+        batch: list[str],
         process_func,
         *args,
         **kwargs
-    ) -> Tuple[any, bool]:
+    ) -> tuple[any, bool]:
         """
         Process a batch with resource monitoring and error handling.
 
@@ -297,11 +295,11 @@ class BatchOptimizer:
 
     def _handle_oom(
         self,
-        batch: List[str],
+        batch: list[str],
         process_func,
         *args,
         **kwargs
-    ) -> Tuple[any, bool]:
+    ) -> tuple[any, bool]:
         """
         Handle out-of-memory error by reducing batch size and retrying.
 
@@ -462,8 +460,9 @@ class BatchOptimizer:
     def _get_current_memory_mb(self) -> float:
         """Get current process memory usage in MB."""
         try:
-            import psutil
             import os
+
+            import psutil
             process = psutil.Process(os.getpid())
             return process.memory_info().rss / 1024 / 1024
         except ImportError:
@@ -508,7 +507,7 @@ class BatchOptimizer:
 
         return stats
 
-    def get_timing_metrics(self) -> Dict:
+    def get_timing_metrics(self) -> dict:
         """
         Get timing metrics for performance monitoring (BM-08).
 
@@ -577,7 +576,7 @@ if __name__ == "__main__":
 
     # Get stats
     stats = optimizer.get_stats()
-    print(f"\nStats:")
+    print("\nStats:")
     print(f"  Batches: {stats.batches_processed}")
     print(f"  Avg batch size: {stats.avg_batch_size:.1f}")
     print(f"  Peak memory: {stats.peak_memory_mb:.1f} MB")

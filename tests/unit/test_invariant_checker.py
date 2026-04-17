@@ -5,7 +5,6 @@ Run with:
     pytest tests/unit/test_invariant_checker.py -v
 """
 
-import pytest
 import sys
 from pathlib import Path
 
@@ -13,11 +12,11 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / 'scripts'))
 
 from check_invariants import (
-    PlaceholderInvariantChecker,
+    BasicTerminologyChecker,
     BoundaryInvariantChecker,
     CodeBlockPolicyChecker,
+    PlaceholderInvariantChecker,
     StructuralIntegrityChecker,
-    BasicTerminologyChecker
 )
 
 

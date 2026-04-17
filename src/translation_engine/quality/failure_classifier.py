@@ -5,8 +5,6 @@ This module provides classification logic that detects ALL failures in a verific
 result, not just the first match. This addresses the Phase 6 issue where 70% of
 failures were classified as FAIL_OTHER due to incomplete classification.
 """
-from typing import Dict, List, Optional, Tuple
-
 
 # Failure category severity ranking (highest to lowest priority)
 SEVERITY_RANK = {
@@ -23,7 +21,7 @@ SEVERITY_RANK = {
 class FailureInfo:
     """Information about a detected failure."""
 
-    def __init__(self, category: str, reason: str, details: Optional[Dict] = None):
+    def __init__(self, category: str, reason: str, details: dict | None = None):
         """
         Initialize failure info.
 
@@ -40,7 +38,7 @@ class FailureInfo:
     def __repr__(self):
         return f"FailureInfo(category={self.category}, reason={self.reason})"
 
-    def to_dict(self) -> Dict:
+    def to_dict(self) -> dict:
         """Convert to dictionary."""
         return {
             "category": self.category,
@@ -49,7 +47,7 @@ class FailureInfo:
         }
 
 
-def classify_all_failures(verify_data: Optional[Dict]) -> Tuple[str, str, List[FailureInfo]]:
+def classify_all_failures(verify_data: dict | None) -> tuple[str, str, list[FailureInfo]]:
     """
     Classify ALL failures in verification data.
 
@@ -175,7 +173,7 @@ def classify_all_failures(verify_data: Optional[Dict]) -> Tuple[str, str, List[F
     return primary.category, primary.reason, all_failures
 
 
-def classify_failure_legacy(verify_data: Optional[Dict]) -> Tuple[str, str]:
+def classify_failure_legacy(verify_data: dict | None) -> tuple[str, str]:
     """
     Legacy classification function (single failure detection).
 

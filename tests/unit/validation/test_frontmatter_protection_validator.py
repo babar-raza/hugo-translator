@@ -10,18 +10,18 @@ Tests cover:
 - 100% code coverage
 """
 
-import pytest
-from datetime import datetime
 
+import pytest
+
+from src.translation_engine.validation.base import ValidationSeverity
 from src.translation_engine.validation.frontmatter_protection_validator import (
     FrontmatterProtectionValidator,
 )
-from src.translation_engine.validation.base import ValidationSeverity
 from src.utils.models import (
-    SiteProfile,
-    FrontmatterRule,
-    FrontmatterMode,
     BodyRules,
+    FrontmatterMode,
+    FrontmatterRule,
+    SiteProfile,
 )
 
 

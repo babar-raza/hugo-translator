@@ -14,7 +14,6 @@ import json
 import logging
 import sys
 from pathlib import Path
-from typing import Dict, List
 
 import sacrebleu
 
@@ -46,7 +45,7 @@ class ReferenceCorpusCreator:
         testset: str,
         lang_pair: str,
         max_samples: int = None
-    ) -> List[Dict]:
+    ) -> list[dict]:
         """
         Download WMT test set for a language pair.
 
@@ -106,10 +105,10 @@ class ReferenceCorpusCreator:
 
     def create_corpus(
         self,
-        testsets: List[str],
-        lang_pairs: List[str],
+        testsets: list[str],
+        lang_pairs: list[str],
         max_samples_per_pair: int = 100
-    ) -> Dict[str, List[Dict]]:
+    ) -> dict[str, list[dict]]:
         """
         Create reference corpus from multiple test sets and language pairs.
 
@@ -138,8 +137,8 @@ class ReferenceCorpusCreator:
 
     def save_corpus(
         self,
-        corpus_by_lang: Dict[str, List[Dict]],
-        metadata: Dict = None
+        corpus_by_lang: dict[str, list[dict]],
+        metadata: dict = None
     ):
         """
         Save corpus to JSON files (one per language pair).
@@ -173,10 +172,10 @@ class ReferenceCorpusCreator:
 
     def create_metadata(
         self,
-        testsets: List[str],
-        lang_pairs: List[str],
+        testsets: list[str],
+        lang_pairs: list[str],
         max_samples: int
-    ) -> Dict:
+    ) -> dict:
         """
         Create metadata for corpus files.
 
@@ -281,7 +280,7 @@ def main() -> int:
     # Create language pairs (always EN→target)
     lang_pairs = [f"en-{lang}" for lang in languages]
 
-    logger.info(f"Creating reference corpus:")
+    logger.info("Creating reference corpus:")
     logger.info(f"  Test sets: {testsets}")
     logger.info(f"  Language pairs: {lang_pairs}")
     logger.info(f"  Max samples per pair: {args.samples}")
@@ -311,7 +310,7 @@ def main() -> int:
         # Print summary
         total_samples = sum(len(corpus) for corpus in corpus_by_lang.values())
         logger.info(f"\n{'='*60}")
-        logger.info(f"Reference corpus created successfully!")
+        logger.info("Reference corpus created successfully!")
         logger.info(f"  Total samples: {total_samples}")
         logger.info(f"  Language pairs: {len(corpus_by_lang)}")
         logger.info(f"  Output directory: {output_dir}")

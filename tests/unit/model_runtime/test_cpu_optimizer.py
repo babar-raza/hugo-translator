@@ -10,8 +10,6 @@ Tests cover:
 import os
 from unittest.mock import MagicMock, patch
 
-import pytest
-
 from src.model_runtime.cpu_optimizer import CPUOptimizer, RuntimeConfig
 
 

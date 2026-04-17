@@ -10,11 +10,12 @@ Tests the spec verification functionality including:
 - Exit codes
 """
 
-import pytest
-import tempfile
-import yaml
 from pathlib import Path
-from scripts.specscan import SpecScanner, SpecScanResult, ScanSummary
+
+import pytest
+import yaml
+
+from scripts.specscan import ScanSummary, SpecScanner, SpecScanResult
 
 
 class TestSpecScanner:

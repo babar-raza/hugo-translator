@@ -4,11 +4,6 @@ Unit tests for default_model resolution feature (SR-DEFAULT-MODEL).
 Tests the priority hierarchy:
   CLI --model > site_profile.default_model > system default (m2m100_418m)
 """
-import pytest
-from unittest.mock import Mock, patch, MagicMock
-import tempfile
-import os
-from pathlib import Path
 
 import yaml
 
@@ -18,7 +13,7 @@ class TestSiteProfileDefaultModel:
 
     def test_profile_accepts_none_default_model(self):
         """SR-01: Field accepts None (uses system default)."""
-        from src.utils.models import SiteProfile, BodyRules
+        from src.utils.models import BodyRules, SiteProfile
 
         profile = SiteProfile(
             site_id="test.site",
@@ -32,7 +27,7 @@ class TestSiteProfileDefaultModel:
 
     def test_profile_accepts_valid_model_id(self):
         """SR-01: Field accepts valid model ID strings."""
-        from src.utils.models import SiteProfile, BodyRules
+        from src.utils.models import BodyRules, SiteProfile
 
         profile = SiteProfile(
             site_id="test.site",
@@ -46,7 +41,7 @@ class TestSiteProfileDefaultModel:
 
     def test_profile_model_overrides_default(self):
         """SR-01: Profile default_model takes precedence over system default."""
-        from src.utils.models import SiteProfile, BodyRules
+        from src.utils.models import BodyRules, SiteProfile
 
         profile = SiteProfile(
             site_id="test.site",
@@ -63,7 +58,7 @@ class TestSiteProfileDefaultModel:
 
     def test_system_default_when_none_set(self):
         """SR-01/SR-02: Falls back to m2m100_418m when nothing set."""
-        from src.utils.models import SiteProfile, BodyRules
+        from src.utils.models import BodyRules, SiteProfile
 
         profile = SiteProfile(
             site_id="test.site",
@@ -239,7 +234,7 @@ class TestCLIModelPriority:
 
     def test_cli_model_overrides_profile(self):
         """SR-02: CLI --model takes precedence over profile."""
-        from src.utils.models import SiteProfile, BodyRules
+        from src.utils.models import BodyRules, SiteProfile
 
         profile = SiteProfile(
             site_id="test.site",
@@ -258,7 +253,7 @@ class TestCLIModelPriority:
 
     def test_cli_none_uses_profile(self):
         """SR-02: When CLI --model is None, use profile default_model."""
-        from src.utils.models import SiteProfile, BodyRules
+        from src.utils.models import BodyRules, SiteProfile
 
         profile = SiteProfile(
             site_id="test.site",
@@ -276,7 +271,7 @@ class TestCLIModelPriority:
 
     def test_full_priority_chain(self):
         """SR-02: Full priority: CLI > profile > system default."""
-        from src.utils.models import SiteProfile, BodyRules
+        from src.utils.models import BodyRules, SiteProfile
 
         profile_with_model = SiteProfile(
             site_id="test.site",
@@ -314,7 +309,7 @@ class TestEdgeCases:
 
     def test_empty_string_falls_through_to_default(self):
         """Empty string should fall through to system default."""
-        from src.utils.models import SiteProfile, BodyRules
+        from src.utils.models import BodyRules, SiteProfile
 
         profile = SiteProfile(
             site_id="test.site",
@@ -331,7 +326,7 @@ class TestEdgeCases:
 
     def test_whitespace_only_falls_through_to_default(self):
         """SR-P01: Whitespace-only string is normalized to None, falls through."""
-        from src.utils.models import SiteProfile, BodyRules
+        from src.utils.models import BodyRules, SiteProfile
 
         profile = SiteProfile(
             site_id="test.site",
@@ -350,7 +345,7 @@ class TestEdgeCases:
 
     def test_explicit_none_falls_through_to_default(self):
         """Explicit None should fall through to system default."""
-        from src.utils.models import SiteProfile, BodyRules
+        from src.utils.models import BodyRules, SiteProfile
 
         profile = SiteProfile(
             site_id="test.site",

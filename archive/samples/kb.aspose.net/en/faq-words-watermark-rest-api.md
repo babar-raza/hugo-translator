@@ -34,4 +34,3 @@ You can verify that the resulting documents contain the expected watermarks and 
 **Q6. What deployment considerations should I keep in mind?**  
 Recommended practices include enabling HTTPS, restricting access to authorized clients, and monitoring performance when processing large documents.  
 The KB article also notes that reverse proxies like IIS or Nginx can be used to front the API in production environments.
-

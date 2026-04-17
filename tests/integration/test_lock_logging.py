@@ -2,7 +2,6 @@
 import subprocess
 import sys
 from pathlib import Path
-import pytest
 
 
 def test_parent_lock_logging(tmp_path):

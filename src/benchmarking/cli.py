@@ -20,24 +20,13 @@ import logging
 import os
 import sys
 from pathlib import Path
-from typing import List, Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING
 
 import yaml
 
 # TYPE_CHECKING guard for type hints only
 if TYPE_CHECKING:
-    from .recommender import ModelRecommender as BenchmarkRecommender
-    from .reporter import BenchmarkReporter
-    from .runner import BenchmarkRunner
-    from .storage import BenchmarkDatabase
-    from .schema_migrations import MigrationManager
-    from .aggregation import TimeSeriesAggregator
-    from .analytics import AnalyticsQueryAPI
-    from .retention import RetentionEngine
-    from .exporter import BenchmarkExporter, ExportFilter
-    from .archiver import BenchmarkArchiver
-    from ..model_runtime.recommender import ModelRecommender
-    from ..model_runtime.registry import ModelRegistry
+    pass
 
 # Module-level cache for lazy-loaded heavy dependencies
 _heavy_deps_loaded = False
@@ -63,18 +52,18 @@ def _import_heavy_deps():
         return _heavy_deps_cache
 
     try:
-        from .recommender import ModelRecommender as BenchmarkRecommender
-        from .reporter import BenchmarkReporter
-        from .runner import BenchmarkRunner, load_corpus
-        from .storage import BenchmarkDatabase
-        from .schema_migrations import MigrationManager
-        from .aggregation import TimeSeriesAggregator
-        from .analytics import AnalyticsQueryAPI
-        from .retention import RetentionEngine
-        from .exporter import BenchmarkExporter, ExportFilter
-        from .archiver import BenchmarkArchiver
         from ..model_runtime.recommender import ModelRecommender
         from ..model_runtime.registry import ModelRegistry
+        from .aggregation import TimeSeriesAggregator
+        from .analytics import AnalyticsQueryAPI
+        from .archiver import BenchmarkArchiver
+        from .exporter import BenchmarkExporter, ExportFilter
+        from .recommender import ModelRecommender as BenchmarkRecommender
+        from .reporter import BenchmarkReporter
+        from .retention import RetentionEngine
+        from .runner import BenchmarkRunner, load_corpus
+        from .schema_migrations import MigrationManager
+        from .storage import BenchmarkDatabase
     except ImportError as e:
         error_msg = str(e)
         if 'torch' in error_msg.lower() or "No module named 'torch'" in error_msg:
@@ -185,7 +174,7 @@ def get_benchmark_db_path(purpose: str = "benchmark") -> Path:
     return Path(default_path)
 
 
-def load_target_languages() -> List[str]:
+def load_target_languages() -> list[str]:
     """Load target language codes from target_languages.yaml.
 
     Returns:
@@ -198,7 +187,7 @@ def load_target_languages() -> List[str]:
     if not config_path.exists():
         raise FileNotFoundError(f"Target languages config not found: {config_path}")
 
-    with open(config_path, 'r', encoding='utf-8') as f:
+    with open(config_path, encoding='utf-8') as f:
         config = yaml.safe_load(f)
 
     languages = [lang['iso_code'] for lang in config['languages']]
@@ -369,7 +358,7 @@ def cmd_list(args: argparse.Namespace) -> int:
     if not db_path.exists():
         logger.error(f"Database not found: {db_path}")
         print(f"ERROR: Benchmark database not found at {db_path}", file=sys.stderr)
-        print(f"HINT: Run a benchmark first with:", file=sys.stderr)
+        print("HINT: Run a benchmark first with:", file=sys.stderr)
         print(f"  python -m src.benchmarking.cli run --model opus_en_fr --device cpu --save-to-db {db_path}", file=sys.stderr)
         return 1
 
@@ -442,7 +431,7 @@ def cmd_report(args: argparse.Namespace) -> int:
         if run is None:
             logger.error(f"Run not found: {args.run}")
             print(f"ERROR: Benchmark run '{args.run}' not found in database", file=sys.stderr)
-            print(f"HINT: List available runs with:", file=sys.stderr)
+            print("HINT: List available runs with:", file=sys.stderr)
             print(f"  python -m src.benchmarking.cli list --db {db_path}", file=sys.stderr)
             return 1
 
@@ -537,7 +526,7 @@ def cmd_recommend(args: argparse.Namespace) -> int:
 
             if not db_path.exists():
                 print(f"ERROR: Benchmark database not found at {db_path}", file=sys.stderr)
-                print(f"HINT: Run GPU benchmarks first:", file=sys.stderr)
+                print("HINT: Run GPU benchmarks first:", file=sys.stderr)
                 print(f"  python -m src.benchmarking.cli run --model m2m100_418m --device {args.device} --batch-sizes 8,16,32 --save-to-db {db_path}", file=sys.stderr)
                 return 1
 
@@ -685,7 +674,7 @@ def cmd_migrate(args: argparse.Namespace) -> int:
             if not args.dry_run:
                 print(f"✓ Migration to v{args.to} completed successfully")
             else:
-                print(f"✓ Migration validation passed (dry run)")
+                print("✓ Migration validation passed (dry run)")
 
             return 0
 
@@ -698,7 +687,7 @@ def cmd_migrate(args: argparse.Namespace) -> int:
             if not args.dry_run:
                 print(f"✓ Rollback to v{args.rollback} completed successfully")
             else:
-                print(f"✓ Rollback validation passed (dry run)")
+                print("✓ Rollback validation passed (dry run)")
 
             return 0
 

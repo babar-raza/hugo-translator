@@ -1,8 +1,9 @@
 """Test the nested array reconstruction fix."""
 import yaml
-from src.translation_engine.reconstructor.markdown_reconstructor import MarkdownReconstructor
+
 from src.translation_engine.extractor import Segment, SegmentContext, SegmentContextType
-from src.utils.models import SiteProfile, FrontmatterRule, FrontmatterMode
+from src.translation_engine.reconstructor.markdown_reconstructor import MarkdownReconstructor
+from src.utils.models import FrontmatterMode, FrontmatterRule, SiteProfile
 
 # Create a minimal site profile matching products.aspose.net
 profile_data = {

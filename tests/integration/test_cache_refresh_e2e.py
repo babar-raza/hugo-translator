@@ -3,10 +3,10 @@ Integration tests for cache refresh functionality (T205: federated-splashing-pan
 
 End-to-end tests for --force-retranslate and --cache-write-mode flags.
 """
-import pytest
 import subprocess
-import tempfile
 from pathlib import Path
+
+import pytest
 
 
 class TestCacheRefreshE2E:

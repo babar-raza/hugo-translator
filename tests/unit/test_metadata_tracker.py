@@ -1,10 +1,9 @@
 """Unit tests for metadata tracker."""
 
 import json
-import pytest
 from pathlib import Path
-from datetime import datetime, timezone
-from src.utils.metadata_tracker import MetadataTracker, FileMetadata
+
+from src.utils.metadata_tracker import MetadataTracker
 
 
 def test_metadata_tracker_init(tmp_path):

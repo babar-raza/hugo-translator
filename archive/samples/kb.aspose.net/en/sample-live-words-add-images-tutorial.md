@@ -34,4 +34,3 @@ The KB text also discusses best practices like separating configuration (file pa
 Developers are encouraged to combine this pattern with other Aspose.Words features such as mail merge or templating.
 
 The full tutorial and code snippets are available in the original KB article under the Words section on [kb.aspose.com](https://kb.aspose.com/words/).
-

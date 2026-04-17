@@ -7,6 +7,7 @@ Verification Report:
 - Feature flag source: config/global.yaml line 113
 """
 from pathlib import Path
+
 import yaml
 
 try:

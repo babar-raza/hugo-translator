@@ -6,7 +6,7 @@ Uses Google's langdetect library for language detection with deterministic seedi
 """
 
 import re
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 import langdetect
 from langdetect import DetectorFactory
@@ -33,7 +33,7 @@ _SCRIPT_THAI       = re.compile(r'[\u0E00-\u0E7F]')
 
 # For each target language, the list of Unicode-script patterns that must NOT
 # appear in translated content (outside code blocks / frontmatter).
-_FORBIDDEN_SCRIPTS: Dict[str, List[re.Pattern]] = {
+_FORBIDDEN_SCRIPTS: dict[str, list[re.Pattern]] = {
     # Cyrillic-script languages
     'bg': [_SCRIPT_ARABIC, _SCRIPT_HEBREW, _SCRIPT_CHINESE, _SCRIPT_JAPANESE, _SCRIPT_KOREAN, _SCRIPT_DEVANAGARI, _SCRIPT_THAI],
     'ru': [_SCRIPT_ARABIC, _SCRIPT_HEBREW, _SCRIPT_CHINESE, _SCRIPT_JAPANESE, _SCRIPT_KOREAN, _SCRIPT_DEVANAGARI, _SCRIPT_THAI],
@@ -122,7 +122,7 @@ class LanguageConsistencyValidator(PostTranslationValidator):
         self,
         source: str,
         translation: str,
-        context: Optional[Dict[str, Any]] = None,
+        context: dict[str, Any] | None = None,
     ) -> ValidationResult:
         """Validate language consistency.
 
@@ -277,7 +277,7 @@ class LanguageConsistencyValidator(PostTranslationValidator):
         self,
         text: str,
         target_lang: str,
-    ) -> List[ValidationIssue]:
+    ) -> list[ValidationIssue]:
         """Detect Unicode script contamination using character-range analysis.
 
         Unlike langdetect / fasttext which return the *dominant* language and
@@ -314,7 +314,7 @@ class LanguageConsistencyValidator(PostTranslationValidator):
         if not lines:
             return []
 
-        contaminated: List[str] = []
+        contaminated: list[str] = []
         for line in lines:
             for pattern in forbidden:
                 if pattern.search(line):

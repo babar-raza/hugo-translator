@@ -9,22 +9,21 @@ Tests cover:
 - Site override merging
 - Default values
 """
+from pathlib import Path
+
 import pytest
 import yaml
-from pathlib import Path
-from pydantic import ValidationError
 
 from src.utils.config_loader import (
-    ConfigService,
     ConfigLoadError,
+    ConfigService,
     ConfigValidationError,
 )
 from src.utils.models import (
-    ValidationConfig,
-    TerminologyConfig,
-    GlobalConfig,
-    ValidationMode,
     DecisionRules,
+    TerminologyConfig,
+    ValidationConfig,
+    ValidationMode,
 )
 
 
@@ -441,7 +440,7 @@ class TestConfigYAMLValidity:
         """Test that validation.yaml is valid YAML."""
         validation_path = config_root / "validation.yaml"
 
-        with open(validation_path, "r", encoding="utf-8") as f:
+        with open(validation_path, encoding="utf-8") as f:
             data = yaml.safe_load(f)
 
         assert data is not None
@@ -454,7 +453,7 @@ class TestConfigYAMLValidity:
         """Test that terminology.yaml is valid YAML."""
         terminology_path = config_root / "terminology.yaml"
 
-        with open(terminology_path, "r", encoding="utf-8") as f:
+        with open(terminology_path, encoding="utf-8") as f:
             data = yaml.safe_load(f)
 
         assert data is not None
@@ -467,7 +466,7 @@ class TestConfigYAMLValidity:
         """Test that global.yaml has validation_defaults section."""
         global_path = config_root / "global.yaml"
 
-        with open(global_path, "r", encoding="utf-8") as f:
+        with open(global_path, encoding="utf-8") as f:
             data = yaml.safe_load(f)
 
         assert data is not None
@@ -486,7 +485,7 @@ class TestConfigYAMLValidity:
         """Test that global.yaml has top-level validation section."""
         global_path = config_root / "global.yaml"
 
-        with open(global_path, "r", encoding="utf-8") as f:
+        with open(global_path, encoding="utf-8") as f:
             data = yaml.safe_load(f)
 
         assert data is not None
@@ -499,7 +498,7 @@ class TestConfigYAMLValidity:
         """Test that global.yaml has top-level terminology section."""
         global_path = config_root / "global.yaml"
 
-        with open(global_path, "r", encoding="utf-8") as f:
+        with open(global_path, encoding="utf-8") as f:
             data = yaml.safe_load(f)
 
         assert data is not None
@@ -512,7 +511,7 @@ class TestConfigYAMLValidity:
         """Test that global.yaml has telemetry.validation_metrics."""
         global_path = config_root / "global.yaml"
 
-        with open(global_path, "r", encoding="utf-8") as f:
+        with open(global_path, encoding="utf-8") as f:
             data = yaml.safe_load(f)
 
         assert data is not None

@@ -3,24 +3,29 @@ Unit tests for TranslationEngine.
 
 INT-01: Added comprehensive tests for retry loop with validation and decision engine.
 """
-import tempfile
 from pathlib import Path
-from unittest.mock import MagicMock, Mock, patch
+from unittest.mock import Mock, patch
 
 import pytest
 
+from src.tm.models import LookupResult
 from src.translation_engine import (
     TranslationEngine,
     TranslationRejectedError,
-    TranslationRetryableError,
 )
-from src.translation_engine.extractor import Segment, SegmentContext, SegmentContextType
+from src.translation_engine.extractor import Segment
 from src.translation_engine.parser import HugoDocument
-from src.translation_engine.validation.base import ValidationResult, ValidationIssue, ValidationSeverity
-from src.translation_engine.validation.decision_engine import ValidationDecisionEngine
-from src.translation_engine.validation.post_translation_validator import DecisionResult, ValidationDecision as PostValidationDecision
 from src.translation_engine.validation import ValidationSuite
-from src.tm.models import LookupResult
+from src.translation_engine.validation.base import (
+    ValidationIssue,
+    ValidationResult,
+    ValidationSeverity,
+)
+from src.translation_engine.validation.decision_engine import ValidationDecisionEngine
+from src.translation_engine.validation.post_translation_validator import DecisionResult
+from src.translation_engine.validation.post_translation_validator import (
+    ValidationDecision as PostValidationDecision,
+)
 
 
 @pytest.fixture

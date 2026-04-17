@@ -7,7 +7,7 @@ Supports JSON and Markdown output formats.
 import json
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Tuple
+from typing import Any
 
 from .checks.base import VerificationResult
 
@@ -32,7 +32,7 @@ class VerificationReporter:
 
     def to_json(
         self,
-        results: List[Tuple[Path, VerificationResult]],
+        results: list[tuple[Path, VerificationResult]],
         include_issues: bool = True,
     ) -> str:
         """
@@ -68,7 +68,7 @@ class VerificationReporter:
               ]
             }
         """
-        report: Dict[str, Any] = {}
+        report: dict[str, Any] = {}
 
         # Add timestamp
         if self.include_timestamps:
@@ -122,7 +122,7 @@ class VerificationReporter:
 
     def to_markdown(
         self,
-        results: List[Tuple[Path, VerificationResult]],
+        results: list[tuple[Path, VerificationResult]],
         include_issues: bool = True,
     ) -> str:
         """
@@ -265,7 +265,7 @@ class VerificationReporter:
 
     def to_console_summary(
         self,
-        results: List[Tuple[Path, VerificationResult]],
+        results: list[tuple[Path, VerificationResult]],
     ) -> str:
         """
         Generate concise console summary.
@@ -299,7 +299,7 @@ class VerificationReporter:
 
 def write_report(
     report_path: Path,
-    results: List[Tuple[Path, VerificationResult]],
+    results: list[tuple[Path, VerificationResult]],
     format_type: str = "auto",
     include_issues: bool = True,
 ) -> None:

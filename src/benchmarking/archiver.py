@@ -12,13 +12,12 @@ Phase 4.3: Data Retention & Export
 import gzip
 import json
 import logging
-import os
 import shutil
 import sqlite3
 from dataclasses import dataclass
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import TYPE_CHECKING, Dict, List, Optional, Tuple
+from typing import TYPE_CHECKING, Optional
 
 if TYPE_CHECKING:
     from src.shared_engines.composition_root import SharedEngines
@@ -48,15 +47,15 @@ class ArchiveMetadata:
     archive_path: str
     created_at: str
     source_database: str
-    data_start_date: Optional[str]
-    data_end_date: Optional[str]
+    data_start_date: str | None
+    data_end_date: str | None
     total_runs: int
     total_results: int
     file_size_bytes: int
     compressed: bool
     schema_version: int
 
-    def to_dict(self) -> Dict:
+    def to_dict(self) -> dict:
         """Convert to dictionary."""
         return {
             "archive_id": self.archive_id,
@@ -73,7 +72,7 @@ class ArchiveMetadata:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict) -> "ArchiveMetadata":
+    def from_dict(cls, data: dict) -> "ArchiveMetadata":
         """Create from dictionary."""
         return cls(**data)
 
@@ -93,14 +92,14 @@ class ArchiveResult:
     """
 
     success: bool
-    archive_path: Optional[str]
-    metadata: Optional[ArchiveMetadata]
+    archive_path: str | None
+    metadata: ArchiveMetadata | None
     rows_archived: int
     rows_deleted: int
     duration_seconds: float
-    error: Optional[str] = None
+    error: str | None = None
 
-    def to_dict(self) -> Dict:
+    def to_dict(self) -> dict:
         """Convert to dictionary."""
         return {
             "success": self.success,
@@ -129,11 +128,11 @@ class RestoreResult:
     success: bool
     archive_path: str
     rows_restored: int
-    tables_restored: List[str]
+    tables_restored: list[str]
     duration_seconds: float
-    error: Optional[str] = None
+    error: str | None = None
 
-    def to_dict(self) -> Dict:
+    def to_dict(self) -> dict:
         """Convert to dictionary."""
         return {
             "success": self.success,
@@ -193,7 +192,7 @@ class BenchmarkArchiver:
     def __init__(
         self,
         db_path: Path | str,
-        archive_dir: Optional[Path | str] = None,
+        archive_dir: Path | str | None = None,
         engines: Optional["SharedEngines"] = None,
     ):
         """Initialize archiver.
@@ -219,7 +218,7 @@ class BenchmarkArchiver:
         if engines:
             logger.info("BenchmarkArchiver initialized with SharedEngines support")
 
-    def _create_connection(self, db_path: Optional[Path] = None) -> sqlite3.Connection:
+    def _create_connection(self, db_path: Path | None = None) -> sqlite3.Connection:
         """Create database connection with proper settings.
 
         Args:
@@ -249,7 +248,7 @@ class BenchmarkArchiver:
         before_date: str,
         compress: bool = False,
         delete_after_archive: bool = False,
-        archive_name: Optional[str] = None,
+        archive_name: str | None = None,
     ) -> ArchiveResult:
         """Create archive of benchmark data before a specific date.
 
@@ -296,7 +295,7 @@ class BenchmarkArchiver:
                 metadata = self._create_archive_database(
                     temp_archive_path, before_date
                 )
-            except Exception as e:
+            except Exception:
                 if temp_archive_path.exists():
                     temp_archive_path.unlink()
                 raise
@@ -571,7 +570,7 @@ class BenchmarkArchiver:
         with open(metadata_path, "w") as f:
             json.dump(metadata.to_dict(), f, indent=2)
 
-    def _load_archive_metadata(self, archive_path: Path) -> Optional[ArchiveMetadata]:
+    def _load_archive_metadata(self, archive_path: Path) -> ArchiveMetadata | None:
         """Load archive metadata from JSON sidecar file.
 
         Args:
@@ -596,7 +595,7 @@ class BenchmarkArchiver:
 
     def _extract_metadata_from_archive(
         self, archive_path: Path
-    ) -> Optional[ArchiveMetadata]:
+    ) -> ArchiveMetadata | None:
         """Extract metadata from archive database.
 
         Args:
@@ -663,7 +662,7 @@ class BenchmarkArchiver:
         finally:
             conn.close()
 
-    def list_archives(self) -> List[ArchiveMetadata]:
+    def list_archives(self) -> list[ArchiveMetadata]:
         """List all archives in archive directory.
 
         Returns:
@@ -701,7 +700,7 @@ class BenchmarkArchiver:
         archives.sort(key=lambda a: a.created_at, reverse=True)
         return archives
 
-    def get_archive(self, archive_name: str) -> Optional[ArchiveMetadata]:
+    def get_archive(self, archive_name: str) -> ArchiveMetadata | None:
         """Get metadata for a specific archive.
 
         Args:
@@ -832,7 +831,7 @@ class BenchmarkArchiver:
 
     def _restore_data(
         self, archive_db_path: Path, skip_duplicates: bool
-    ) -> Tuple[int, List[str]]:
+    ) -> tuple[int, list[str]]:
         """Restore data from archive database.
 
         Args:
@@ -999,7 +998,7 @@ class BenchmarkArchiver:
             logger.error(f"Failed to delete archive {archive_name}: {e}")
             return False
 
-    def get_archive_summary(self) -> Dict:
+    def get_archive_summary(self) -> dict:
         """Get summary of all archives.
 
         Returns:

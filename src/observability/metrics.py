@@ -5,12 +5,14 @@ Provides Prometheus-compatible metrics for monitoring translation
 operations, TM performance, and system health.
 """
 
+import json
 import logging
+import os
 import threading
-import time
-from collections import defaultdict
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -21,7 +23,7 @@ class Metric:
 
     name: str
     help_text: str
-    labels: Dict[str, str] = field(default_factory=dict)
+    labels: dict[str, str] = field(default_factory=dict)
 
 
 @dataclass
@@ -66,9 +68,9 @@ class Gauge(Metric):
 class Histogram(Metric):
     """Histogram metric for tracking distributions."""
 
-    buckets: List[float] = field(default_factory=lambda: [0.01, 0.1, 0.5, 1.0, 5.0, 10.0, 30.0, 60.0])
-    values: List[float] = field(default_factory=list)
-    bucket_counts: Dict[float, int] = field(default_factory=dict)
+    buckets: list[float] = field(default_factory=lambda: [0.01, 0.1, 0.5, 1.0, 5.0, 10.0, 30.0, 60.0])
+    values: list[float] = field(default_factory=list)
+    bucket_counts: dict[float, int] = field(default_factory=dict)
     sum: float = 0.0
     count: int = 0
 
@@ -88,7 +90,7 @@ class Histogram(Metric):
             if value <= bucket:
                 self.bucket_counts[bucket] += 1
 
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         """Get histogram statistics."""
         if not self.values:
             return {
@@ -119,10 +121,10 @@ class MetricsCollector:
 
     def __init__(
         self,
-        worker_id: Optional[str] = None,
+        worker_id: str | None = None,
         push_interval: int = 60,
         enable_push: bool = False,
-        pushgateway_url: Optional[str] = None,
+        pushgateway_url: str | None = None,
     ):
         """
         Initialize metrics collector.
@@ -139,13 +141,13 @@ class MetricsCollector:
         self.pushgateway_url = pushgateway_url
 
         # Metric storage
-        self._counters: Dict[str, Counter] = {}
-        self._gauges: Dict[str, Gauge] = {}
-        self._histograms: Dict[str, Histogram] = {}
+        self._counters: dict[str, Counter] = {}
+        self._gauges: dict[str, Gauge] = {}
+        self._histograms: dict[str, Histogram] = {}
         self._lock = threading.Lock()
 
         # Push thread
-        self._push_thread: Optional[threading.Thread] = None
+        self._push_thread: threading.Thread | None = None
         self._stop_push = threading.Event()
 
         # Initialize core metrics
@@ -423,7 +425,7 @@ class MetricsCollector:
         self,
         name: str,
         help_text: str,
-        labels: Optional[Dict[str, str]] = None,
+        labels: dict[str, str] | None = None,
     ) -> Counter:
         """Register a new counter metric."""
         with self._lock:
@@ -440,7 +442,7 @@ class MetricsCollector:
         self,
         name: str,
         help_text: str,
-        labels: Optional[Dict[str, str]] = None,
+        labels: dict[str, str] | None = None,
     ) -> Gauge:
         """Register a new gauge metric."""
         with self._lock:
@@ -457,8 +459,8 @@ class MetricsCollector:
         self,
         name: str,
         help_text: str,
-        labels: Optional[Dict[str, str]] = None,
-        buckets: Optional[List[float]] = None,
+        labels: dict[str, str] | None = None,
+        buckets: list[float] | None = None,
     ) -> Histogram:
         """Register a new histogram metric."""
         with self._lock:
@@ -479,7 +481,7 @@ class MetricsCollector:
         self,
         name: str,
         amount: float = 1.0,
-        labels: Optional[Dict[str, str]] = None,
+        labels: dict[str, str] | None = None,
     ) -> None:
         """Increment a counter."""
         labels_with_worker = {"worker_id": self.worker_id}
@@ -502,7 +504,7 @@ class MetricsCollector:
         self,
         name: str,
         value: float,
-        labels: Optional[Dict[str, str]] = None,
+        labels: dict[str, str] | None = None,
     ) -> None:
         """Set a gauge value."""
         labels_with_worker = {"worker_id": self.worker_id}
@@ -525,7 +527,7 @@ class MetricsCollector:
         self,
         name: str,
         value: float,
-        labels: Optional[Dict[str, str]] = None,
+        labels: dict[str, str] | None = None,
     ) -> None:
         """Record an observation in a histogram."""
         labels_with_worker = {"worker_id": self.worker_id}
@@ -544,7 +546,7 @@ class MetricsCollector:
                 else:
                     logger.warning(f"Histogram {name} not registered")
 
-    def get_all(self) -> Dict[str, Any]:
+    def get_all(self) -> dict[str, Any]:
         """Get all metrics."""
         with self._lock:
             metrics = {}
@@ -672,14 +674,14 @@ class MetricsCollector:
             self._stop_push.wait(self.push_interval)
 
     @staticmethod
-    def _make_key(name: str, labels: Dict[str, str]) -> str:
+    def _make_key(name: str, labels: dict[str, str]) -> str:
         """Create unique key for metric with labels."""
         label_items = sorted(labels.items())
         label_str = ",".join(f"{k}={v}" for k, v in label_items)
         return f"{name}{{{label_str}}}" if label_str else name
 
     @staticmethod
-    def _format_labels(labels: Dict[str, str]) -> str:
+    def _format_labels(labels: dict[str, str]) -> str:
         """Format labels for Prometheus export."""
         if not labels:
             return ""
@@ -730,7 +732,7 @@ class MetricsCollector:
             failed = self._counters.get(failed_key, Counter("", "")).get()
             return failed / total
 
-    def get_stats_summary(self) -> Dict[str, Any]:
+    def get_stats_summary(self) -> dict[str, Any]:
         """
         Get a summary of key metrics and statistics.
 
@@ -821,7 +823,7 @@ class MetricsCollector:
 
 
 # Global metrics instance
-_global_metrics: Optional[MetricsCollector] = None
+_global_metrics: MetricsCollector | None = None
 
 
 def get_metrics() -> MetricsCollector:
@@ -833,10 +835,10 @@ def get_metrics() -> MetricsCollector:
 
 
 def init_metrics(
-    worker_id: Optional[str] = None,
+    worker_id: str | None = None,
     push_interval: int = 60,
     enable_push: bool = False,
-    pushgateway_url: Optional[str] = None,
+    pushgateway_url: str | None = None,
 ) -> MetricsCollector:
     """
     Initialize global metrics collector.
@@ -858,3 +860,76 @@ def init_metrics(
         pushgateway_url=pushgateway_url,
     )
     return _global_metrics
+
+
+def record_coverage_snapshot(
+    site_id: str,
+    target_langs: list[str],
+    total_files: int,
+    successful_files: int,
+    completion_filter_skipped: int,
+    coverage_file: Path | None = None,
+) -> None:
+    """
+    WS-COMP-8: Write a per-site translation coverage snapshot to data/metrics/coverage.json.
+
+    The file is a JSON array; each call appends one record so the dashboard can track
+    coverage trends over time.  Old entries are kept (max 500 per site×lang pair).
+
+    Args:
+        site_id: Site identifier (e.g. "docs.aspose.net")
+        target_langs: Target language codes translated in this run
+        total_files: Files that were selected for translation (after completion filter)
+        successful_files: Files that were successfully translated
+        completion_filter_skipped: Files skipped as already up-to-date (completion filter)
+        coverage_file: Override path for the JSON file (default: data/metrics/coverage.json)
+    """
+    if coverage_file is None:
+        coverage_file = Path(os.getcwd()) / "data" / "metrics" / "coverage.json"
+
+    try:
+        coverage_file.parent.mkdir(parents=True, exist_ok=True)
+
+        # Load existing records
+        records: list[dict] = []
+        if coverage_file.exists():
+            try:
+                with open(coverage_file, encoding="utf-8") as fh:
+                    records = json.load(fh)
+                if not isinstance(records, list):
+                    records = []
+            except (json.JSONDecodeError, OSError):
+                records = []
+
+        timestamp = datetime.now(tz=timezone.utc).isoformat()
+
+        new_entry: dict[str, Any] = {
+            "timestamp": timestamp,
+            "site_id": site_id,
+            "target_langs": target_langs,
+            "total_files": total_files,
+            "successful_files": successful_files,
+            "completion_filter_skipped": completion_filter_skipped,
+            # Effective coverage denominator = files needing work + files already current
+            "denominator": total_files + completion_filter_skipped,
+            # coverage_pct = successful / (total_needing_work + already_current)
+            "coverage_pct": round(
+                successful_files / (total_files + completion_filter_skipped) * 100, 1
+            ) if (total_files + completion_filter_skipped) > 0 else None,
+        }
+        records.append(new_entry)
+
+        # Prune to keep only last 500 records to prevent unbounded growth
+        if len(records) > 500:
+            records = records[-500:]
+
+        with open(coverage_file, "w", encoding="utf-8") as fh:
+            json.dump(records, fh, indent=2)
+
+        logger.debug(
+            "Coverage snapshot written: site=%s langs=%d total=%d succeeded=%d skipped=%d coverage=%.1f%%",
+            site_id, len(target_langs), total_files, successful_files,
+            completion_filter_skipped, new_entry.get("coverage_pct") or 0.0,
+        )
+    except Exception as exc:
+        logger.warning("Failed to write coverage snapshot for %s: %s", site_id, exc)

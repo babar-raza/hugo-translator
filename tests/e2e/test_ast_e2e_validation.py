@@ -12,13 +12,14 @@ Tests run full CLI translation with --use-ast-body-reconstruction=true and verif
 SR-01: GAP-01 remediation - No end-to-end translation executed through AST pipeline
 """
 
-import pytest
+import re
+import shutil
 import subprocess
 import tempfile
-import shutil
 from pathlib import Path
-from typing import Dict, Any
-import re
+from typing import Any
+
+import pytest
 
 
 @pytest.fixture(scope="module")
@@ -51,8 +52,8 @@ def check_m2m100_available() -> bool:
         True if model is available, False otherwise
     """
     try:
-        from transformers import M2M100ForConditionalGeneration
         import torch
+        from transformers import M2M100ForConditionalGeneration
 
         # Try to load model metadata (lightweight check)
         # This will fail if model files are missing
@@ -81,7 +82,7 @@ class TestASTEndToEnd:
         target_lang: str,
         output_dir: Path,
         config_root: Path
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Run translation via CLI with AST enabled.
 
@@ -169,11 +170,12 @@ class TestASTEndToEnd:
         Returns:
             Translated content as string
         """
+        from pathlib import Path
+
+        from src.model_runtime import ModelLoader, ModelRegistry
+        from src.tm import L1Cache, L2PersistentTM, TranslationMemory
         from src.translation_engine.engine import TranslationEngine
         from src.utils.config_loader import ConfigService
-        from src.tm import TranslationMemory, L1Cache, L2PersistentTM
-        from src.model_runtime import ModelLoader, ModelRegistry
-        from pathlib import Path
 
         # Setup
         config_root = Path(__file__).parent.parent.parent / "config"
@@ -285,7 +287,7 @@ class TestASTEndToEnd:
             f"Code block count mismatch: {len(source_code_blocks)} -> {len(trans_code_blocks)}"
 
         # 3. Code content unchanged
-        for i, (source_code, trans_code) in enumerate(zip(source_code_blocks, trans_code_blocks)):
+        for i, (source_code, trans_code) in enumerate(zip(source_code_blocks, trans_code_blocks, strict=False)):
             # Normalize whitespace for comparison
             source_normalized = source_code.strip()
             trans_normalized = trans_code.strip()

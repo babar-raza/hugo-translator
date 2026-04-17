@@ -7,14 +7,12 @@ Verifies the .active → .ready → .synced state machine works correctly.
 These tests replace the removed direct-DB tests (test_telemetry_pragma_settings.py,
 test_telemetry_concurrent_access.py) with tests focused on the new HTTP API + buffer architecture.
 """
-import tempfile
 import json
+import tempfile
 import time
 from pathlib import Path
-from unittest.mock import patch, MagicMock
 
 import pytest
-
 
 # Skip all tests if telemetry module not available
 pytest.importorskip("telemetry", reason="telemetry module not installed")
@@ -90,7 +88,7 @@ class TestBufferFileAppend:
             buffer.append(event)
 
             # Read file contents
-            with open(buffer.current_file, 'r') as f:
+            with open(buffer.current_file) as f:
                 line = f.readline()
 
             parsed = json.loads(line)
@@ -110,7 +108,7 @@ class TestBufferFileAppend:
                 buffer.append(event)
 
             # Read all lines
-            with open(buffer.current_file, 'r') as f:
+            with open(buffer.current_file) as f:
                 lines = f.readlines()
 
             assert len(lines) == 5
@@ -127,7 +125,7 @@ class TestBufferFileAppend:
             buffer.append(event)
 
             # File should be readable immediately (flushed)
-            with open(buffer.current_file, 'r') as f:
+            with open(buffer.current_file) as f:
                 line = f.readline()
                 parsed = json.loads(line)
                 assert parsed["event_id"] == "test-123"
@@ -195,7 +193,7 @@ class TestBufferFileRotation:
             ready_files = list(Path(tmpdir).glob("*.jsonl.ready"))
             assert len(ready_files) == 1
 
-            with open(ready_files[0], 'r') as f:
+            with open(ready_files[0]) as f:
                 lines = f.readlines()
 
             assert len(lines) == 1  # First event
@@ -216,7 +214,7 @@ class TestBufferFileStates:
             buffer.append({"event_id": "test-1"})
             buffer.append({"event_id": "test-2"})
 
-            with open(buffer.current_file, 'r') as f:
+            with open(buffer.current_file) as f:
                 lines = f.readlines()
 
             assert len(lines) == 2
@@ -236,7 +234,7 @@ class TestBufferFileStates:
             # Subsequent appends go to new .active file
             buffer.append({"event_id": "test-3"})
 
-            with open(buffer.current_file, 'r') as f:
+            with open(buffer.current_file) as f:
                 lines = f.readlines()
 
             assert len(lines) == 2  # test-2 and test-3
@@ -310,7 +308,7 @@ class TestBufferFileFailureModes:
             # Subsequent appends should still work
             buffer.append({"event_id": "test-1"})
 
-            with open(buffer.current_file, 'r') as f:
+            with open(buffer.current_file) as f:
                 lines = f.readlines()
 
             # Should have both lines (corrupted + valid)
@@ -337,7 +335,7 @@ class TestBufferFileFormat:
                 buffer.append(event)
 
             # Verify NDJSON format
-            with open(buffer.current_file, 'r') as f:
+            with open(buffer.current_file) as f:
                 for i, line in enumerate(f):
                     parsed = json.loads(line)  # Should not raise
                     assert parsed["event_id"] == f"test-{i}"
@@ -362,7 +360,7 @@ class TestBufferFileFormat:
 
             buffer.append(event)
 
-            with open(buffer.current_file, 'r') as f:
+            with open(buffer.current_file) as f:
                 line = f.readline()
 
             # Line should not contain literal newlines (JSON-escaped)
@@ -381,7 +379,7 @@ class TestBufferFileFormat:
                 buffer.append({"event_id": f"test-{i}"})
 
             # Read entire file
-            with open(buffer.current_file, 'r') as f:
+            with open(buffer.current_file) as f:
                 content = f.read()
 
             # Should not have trailing comma

@@ -42,12 +42,11 @@ import argparse
 import difflib
 import logging
 import os
+import re
 import sys
+from collections import defaultdict
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, List, Tuple, Optional
-from collections import defaultdict
-import re
 
 import frontmatter
 
@@ -86,7 +85,7 @@ class SystemComparator:
         if not self.new_dir.exists():
             raise ValueError(f"New directory not found: {new_dir}")
 
-    def find_markdown_files(self, directory: Path) -> List[Path]:
+    def find_markdown_files(self, directory: Path) -> list[Path]:
         """Find all markdown files in directory"""
         patterns = ['*.md', '*.markdown']
         files = []
@@ -101,16 +100,16 @@ class SystemComparator:
         matcher = difflib.SequenceMatcher(None, text1, text2)
         return matcher.ratio()
 
-    def extract_frontmatter(self, file_path: Path) -> Tuple[Dict, str]:
+    def extract_frontmatter(self, file_path: Path) -> tuple[dict, str]:
         """Extract frontmatter and content from markdown file"""
         try:
-            with open(file_path, 'r', encoding='utf-8') as f:
+            with open(file_path, encoding='utf-8') as f:
                 post = frontmatter.load(f)
                 return dict(post.metadata), post.content
         except Exception as e:
             logger.warning(f"Failed to parse frontmatter in {file_path}: {e}")
             # Fallback to reading as plain text
-            with open(file_path, 'r', encoding='utf-8') as f:
+            with open(file_path, encoding='utf-8') as f:
                 content = f.read()
                 return {}, content
 
@@ -118,7 +117,7 @@ class SystemComparator:
         self,
         legacy_content: str,
         new_content: str
-    ) -> Dict[str, bool]:
+    ) -> dict[str, bool]:
         """Compare structural elements"""
         checks = {}
 
@@ -149,7 +148,7 @@ class SystemComparator:
         legacy_file: Path,
         new_file: Path,
         relative_path: str
-    ) -> Dict:
+    ) -> dict:
         """Compare a single file from both systems"""
         result = {
             'file': relative_path,
@@ -204,7 +203,7 @@ class SystemComparator:
         self.file_comparisons.append(result)
         return result
 
-    def compare_all(self) -> Dict:
+    def compare_all(self) -> dict:
         """Compare all files from both systems"""
         logger.info("=" * 60)
         logger.info("System Comparison")
@@ -277,7 +276,7 @@ class SystemComparator:
         os.makedirs(self.output_report.parent, exist_ok=True)
 
         with open(self.output_report, 'w', encoding='utf-8') as f:
-            f.write(f"# System Comparison Report\n\n")
+            f.write("# System Comparison Report\n\n")
             f.write(f"**Generated:** {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n")
             f.write(f"**Legacy System:** `{self.legacy_dir}`\n\n")
             f.write(f"**New System:** `{self.new_dir}`\n\n")

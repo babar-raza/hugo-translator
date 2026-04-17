@@ -3,9 +3,10 @@ Tests for batch optimizer.
 """
 
 import pytest
+
 from src.orchestration.batch_optimizer import (
-    BatchOptimizer,
     BatchConfig,
+    BatchOptimizer,
     create_batch_optimizer,
 )
 

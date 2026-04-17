@@ -5,24 +5,21 @@ Tests that metrics are produced correctly and values are monotonic.
 """
 
 import json
-import tempfile
-import time
-from pathlib import Path
-from typing import List
-from unittest.mock import Mock, patch
-
-import pytest
 
 # Add src to path for imports
 import sys
+import tempfile
+import time
+from pathlib import Path
+
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
 
 from observability.progress import (
-    ProgressTracker,
     ProgressSnapshot,
+    ProgressTracker,
+    get_progress_tracker,
     init_progress_tracker,
     stop_progress_tracker,
-    get_progress_tracker,
 )
 
 
@@ -32,7 +29,7 @@ class MockTranslationPipeline:
     def __init__(self, progress: ProgressTracker):
         self.progress = progress
 
-    def translate_files(self, files: List[dict], batch_size: int = 10):
+    def translate_files(self, files: list[dict], batch_size: int = 10):
         """
         Simulate translating multiple files.
 

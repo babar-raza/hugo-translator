@@ -24,7 +24,6 @@ Usage:
 
 import gc
 import logging
-from typing import Optional
 
 logger = logging.getLogger(__name__)
 
@@ -218,7 +217,7 @@ class GPUCacheManager:
 
         return False
 
-    def _get_fragmentation_ratio(self, device_id: int = 0) -> Optional[float]:
+    def _get_fragmentation_ratio(self, device_id: int = 0) -> float | None:
         """
         Calculate GPU memory fragmentation ratio.
 

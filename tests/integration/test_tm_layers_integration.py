@@ -10,20 +10,16 @@ Tests cover:
 - Real data from migration
 """
 
-import json
 import sys
-import tempfile
 import threading
-import time
 from pathlib import Path
-from unittest.mock import MagicMock, patch
 
 import pytest
 
 # Add project root to path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
-from tm import TranslationMemory, L1Cache, L2PersistentTM, L3SemanticTM, TranslationEntry
+from tm import L1Cache, L2PersistentTM, L3SemanticTM, TranslationEntry, TranslationMemory
 
 
 class TestTMLayerIntegration:

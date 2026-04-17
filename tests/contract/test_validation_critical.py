@@ -10,16 +10,15 @@ regardless of validation mode (strict/normal/lenient).
 
 import pytest
 
-from src.translation_engine.validation.decision_engine import (
-    ValidationDecisionEngine,
-    ValidationDecision,
-)
 from src.translation_engine.validation.base import (
-    ValidationResult,
     ValidationIssue,
+    ValidationResult,
     ValidationSeverity,
 )
-
+from src.translation_engine.validation.decision_engine import (
+    ValidationDecision,
+    ValidationDecisionEngine,
+)
 
 # ==============================================================================
 # PlaceholderValidator Tests

@@ -34,4 +34,3 @@ Additional guidance covers downloading the resulting DOCX and reviewing the conv
 The article also mentions that developers can automate similar conversions using the Aspose.TeX .NET API.
 
 These instructions are drawn from the “How to Convert LaTeX to Word Online (Step-by-Step)” section of the article at [blog.aspose.com](https://blog.aspose.com/tex/convert-latex-to-word-online/).
-

@@ -14,20 +14,17 @@ Key Guarantees:
 5. Lock is released on completion (even on exception)
 """
 
-import pytest
 import os
 import sys
 import time
-import tempfile
-import threading
-import multiprocessing
 from pathlib import Path
-from unittest.mock import Mock, patch
+from unittest.mock import patch
+
+import pytest
 
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 from src.utils.file_lock import FileLock, LockError
-
 
 # ==============================================================================
 # Fixtures
@@ -272,8 +269,6 @@ def test_lock_file_contains_metadata(lock_dir):
     else:
         # On Windows, verify metadata structure via mock
         # This ensures the metadata dict is constructed correctly
-        import socket
-        from datetime import datetime
 
         written_data = []
 

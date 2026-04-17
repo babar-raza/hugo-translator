@@ -4,18 +4,18 @@ Provides job queue management and resource-aware scheduling to prevent
 system choking from concurrent or resource-heavy benchmarks.
 """
 
-import os
+import logging
 import uuid
 import warnings
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, List, Optional, Any, TYPE_CHECKING
-import logging
+from typing import TYPE_CHECKING, Any, Optional
+
 import yaml
 
+from src.benchmarking.resource_monitor import ResourceEstimate, ResourceMonitor
 from src.benchmarking.storage import BenchmarkDatabase, BenchmarkRun
-from src.benchmarking.resource_monitor import ResourceMonitor, ResourceEstimate, ResourceSnapshot
 from src.benchmarking.system_info import SystemInfo, SystemInfoCollector
 
 if TYPE_CHECKING:
@@ -29,20 +29,20 @@ class ScheduledBenchmark:
     """A benchmark job in the scheduler queue."""
 
     job_id: str
-    config: Dict[str, Any]  # Benchmark configuration
+    config: dict[str, Any]  # Benchmark configuration
     priority: int  # Lower = higher priority (0 is highest)
     estimated_resources: ResourceEstimate
     status: str  # "pending", "running", "completed", "failed", "cancelled"
     queued_at: datetime
-    started_at: Optional[datetime]
-    completed_at: Optional[datetime]
+    started_at: datetime | None
+    completed_at: datetime | None
 
 
 class ResourceEstimator:
     """Estimates resource requirements for benchmark configurations."""
 
     def estimate(
-        self, config: Dict[str, Any], system_info: SystemInfo
+        self, config: dict[str, Any], system_info: SystemInfo
     ) -> ResourceEstimate:
         """Estimate resource requirements for a benchmark configuration.
 
@@ -113,7 +113,7 @@ class BenchmarkScheduler:
     def __init__(
         self,
         db: BenchmarkDatabase,
-        config_path: Optional[Path] = None,
+        config_path: Path | None = None,
         engines: Optional["SharedEngines"] = None,
     ):
         """Initialize benchmark scheduler.
@@ -149,7 +149,7 @@ class BenchmarkScheduler:
 
             # Use logging from SharedEngines
             # Note: Logger is already configured by SharedEngines
-            logger.info(f"Using shared logging from SharedEngines")
+            logger.info("Using shared logging from SharedEngines")
 
             # Emit telemetry event for scheduler startup
             try:
@@ -176,7 +176,7 @@ class BenchmarkScheduler:
         # Initialize queue table
         self._ensure_queue_table()
 
-    def _load_config(self, config_path: Optional[Path]) -> Dict[str, Any]:
+    def _load_config(self, config_path: Path | None) -> dict[str, Any]:
         """Load scheduler configuration."""
         default_config = {
             "max_cpu_percent": 80,
@@ -189,7 +189,7 @@ class BenchmarkScheduler:
 
         if config_path and config_path.exists():
             try:
-                with open(config_path, "r") as f:
+                with open(config_path) as f:
                     loaded = yaml.safe_load(f)
                     scheduler_config = loaded.get("scheduler", {})
                     default_config.update(scheduler_config)
@@ -233,7 +233,7 @@ class BenchmarkScheduler:
             logger.error(f"Failed to create queue table: {e}")
 
     def schedule(
-        self, config: Dict[str, Any], priority: int = 5
+        self, config: dict[str, Any], priority: int = 5
     ) -> str:
         """Schedule a benchmark job.
 
@@ -338,7 +338,7 @@ class BenchmarkScheduler:
             logger.error(f"Failed to check if job can run: {e}")
             return False
 
-    def get_queue_status(self) -> List[ScheduledBenchmark]:
+    def get_queue_status(self) -> list[ScheduledBenchmark]:
         """Get current queue status.
 
         Returns:
@@ -424,7 +424,7 @@ class BenchmarkScheduler:
             logger.error(f"Failed to cancel job: {e}")
             return False
 
-    def run_next(self) -> Optional[BenchmarkRun]:
+    def run_next(self) -> BenchmarkRun | None:
         """Run the next pending job if resources allow.
 
         Returns:
@@ -512,7 +512,7 @@ class BenchmarkScheduler:
 
             return None
 
-    def run_all(self, max_concurrent: int = 1) -> List[BenchmarkRun]:
+    def run_all(self, max_concurrent: int = 1) -> list[BenchmarkRun]:
         """Run all pending jobs (respecting max concurrency).
 
         Args:
@@ -537,7 +537,7 @@ class BenchmarkScheduler:
 
         return completed
 
-    def _get_job(self, job_id: str) -> Optional[ScheduledBenchmark]:
+    def _get_job(self, job_id: str) -> ScheduledBenchmark | None:
         """Get job by ID."""
         jobs = self.get_queue_status()
         for job in jobs:
@@ -549,8 +549,8 @@ class BenchmarkScheduler:
         self,
         job_id: str,
         status: str,
-        started_at: Optional[datetime] = None,
-        completed_at: Optional[datetime] = None,
+        started_at: datetime | None = None,
+        completed_at: datetime | None = None,
     ) -> None:
         """Update job status in queue."""
         try:

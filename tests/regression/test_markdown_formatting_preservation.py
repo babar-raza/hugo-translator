@@ -5,10 +5,10 @@ These tests ensure that bold, italic, links, headings, and lists are preserved
 during AST-based translation, addressing Phase 6 markdown fidelity failures.
 """
 import pytest
-from src.translation_engine.parser import HugoParser, NodeType
-from src.translation_engine.reconstructor.ast_renderer import ASTRenderer
+
 from src.translation_engine.extractor.text_unit_extractor import TextUnitExtractor
-from src.translation_engine.extractor.text_unit import TextUnit
+from src.translation_engine.parser import HugoParser
+from src.translation_engine.reconstructor.ast_renderer import ASTRenderer
 
 
 class TestBoldItalicPreservation:

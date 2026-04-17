@@ -19,11 +19,9 @@ import argparse
 import json
 import subprocess
 import sys
-import time
 from dataclasses import asdict, dataclass, field
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
 
 
 @dataclass
@@ -34,9 +32,9 @@ class CheckItem:
     automated: bool
     required: bool
     status: str = 'pending'  # pending, passed, failed, skipped, manual
-    evidence: Optional[str] = None
-    error: Optional[str] = None
-    timestamp: Optional[str] = None
+    evidence: str | None = None
+    error: str | None = None
+    timestamp: str | None = None
 
     def to_dict(self) -> dict:
         """Convert to dictionary."""
@@ -55,8 +53,8 @@ class ChecklistReport:
     pending: int
     manual_review: int
     ready_for_deployment: bool
-    items: List[CheckItem] = field(default_factory=list)
-    warnings: List[str] = field(default_factory=list)
+    items: list[CheckItem] = field(default_factory=list)
+    warnings: list[str] = field(default_factory=list)
 
     def to_dict(self) -> dict:
         """Convert to dictionary."""
@@ -71,7 +69,7 @@ class ChecklistLoader:
     def __init__(self):
         self.checklist_items = self._define_checklist()
 
-    def _define_checklist(self) -> List[CheckItem]:
+    def _define_checklist(self) -> list[CheckItem]:
         """Define checklist items."""
         items = []
 
@@ -124,7 +122,7 @@ class ChecklistLoader:
 
         return items
 
-    def get_checklist(self) -> List[CheckItem]:
+    def get_checklist(self) -> list[CheckItem]:
         """Get checklist items."""
         return self.checklist_items
 
@@ -136,7 +134,7 @@ class AutomatedChecker:
         self.project_root = project_root
         self.python_executable = python_executable
 
-    def check_all_tests_pass(self) -> Tuple[bool, str, str]:
+    def check_all_tests_pass(self) -> tuple[bool, str, str]:
         """Check if all tests pass."""
         try:
             result = subprocess.run(
@@ -159,7 +157,7 @@ class AutomatedChecker:
         except Exception as e:
             return False, f"Failed to run tests: {e}", ""
 
-    def check_test_coverage(self) -> Tuple[bool, str, str]:
+    def check_test_coverage(self) -> tuple[bool, str, str]:
         """Check if test coverage meets threshold."""
         try:
             result = subprocess.run(
@@ -193,7 +191,7 @@ class AutomatedChecker:
         except Exception as e:
             return False, f"Coverage check failed: {e}", ""
 
-    def check_smoke_tests(self) -> Tuple[bool, str, str]:
+    def check_smoke_tests(self) -> tuple[bool, str, str]:
         """Check if smoke tests pass."""
         smoke_script = self.project_root / 'scripts' / 'run_smoke_tests.py'
 
@@ -219,7 +217,7 @@ class AutomatedChecker:
         except Exception as e:
             return False, f"Smoke tests failed: {e}", ""
 
-    def check_static_analysis(self) -> Tuple[bool, str, str]:
+    def check_static_analysis(self) -> tuple[bool, str, str]:
         """Check static analysis (simplified - checks imports work)."""
         try:
             # Simple check: can we import the main modules?
@@ -242,7 +240,7 @@ class AutomatedChecker:
         except Exception as e:
             return False, f"Static analysis failed: {e}", ""
 
-    def check_dependencies_secure(self) -> Tuple[bool, str, str]:
+    def check_dependencies_secure(self) -> tuple[bool, str, str]:
         """Check for dependency vulnerabilities (simplified)."""
         try:
             # Check if requirements files exist
@@ -260,7 +258,7 @@ class AutomatedChecker:
         except Exception as e:
             return False, f"Dependency check failed: {e}", ""
 
-    def check_no_secrets(self) -> Tuple[bool, str, str]:
+    def check_no_secrets(self) -> tuple[bool, str, str]:
         """Check for exposed secrets (simplified)."""
         try:
             # Check for common secret patterns in git
@@ -285,7 +283,7 @@ class AutomatedChecker:
         except Exception as e:
             return True, f"Secret scan skipped: {e}", ""
 
-    def check_performance_baseline(self) -> Tuple[bool, str, str]:
+    def check_performance_baseline(self) -> tuple[bool, str, str]:
         """Check performance baseline exists."""
         benchmark_script = self.project_root / 'scripts' / 'benchmark_production.py'
 
@@ -300,7 +298,7 @@ class AutomatedChecker:
         else:
             return False, "No performance baseline found", ""
 
-    def check_performance_regressions(self) -> Tuple[bool, str, str]:
+    def check_performance_regressions(self) -> tuple[bool, str, str]:
         """Check for performance regressions (simplified)."""
         # This would compare current performance to baseline
         # For now, just check if benchmark can run
@@ -311,7 +309,7 @@ class AutomatedChecker:
 
         return True, "Performance regression check skipped (manual review required)", ""
 
-    def check_resource_requirements(self) -> Tuple[bool, str, str]:
+    def check_resource_requirements(self) -> tuple[bool, str, str]:
         """Check resource requirements are met."""
         try:
             import psutil
@@ -335,7 +333,7 @@ class AutomatedChecker:
         except Exception as e:
             return True, f"Resource check skipped: {e}", ""
 
-    def check_production_readiness(self) -> Tuple[bool, str, str]:
+    def check_production_readiness(self) -> tuple[bool, str, str]:
         """Run production readiness check."""
         readiness_script = self.project_root / 'scripts' / 'production_readiness_check.py'
 
@@ -361,7 +359,7 @@ class AutomatedChecker:
         except Exception as e:
             return False, f"Production readiness check failed: {e}", ""
 
-    def check_rollback_tested(self) -> Tuple[bool, str, str]:
+    def check_rollback_tested(self) -> tuple[bool, str, str]:
         """Check if rollback can be executed (dry-run)."""
         rollback_script = self.project_root / 'scripts' / 'rollback.py'
 
@@ -387,7 +385,7 @@ class AutomatedChecker:
         except Exception as e:
             return False, f"Rollback dry-run failed: {e}", ""
 
-    def run_all_checks(self, items: List[CheckItem]) -> List[CheckItem]:
+    def run_all_checks(self, items: list[CheckItem]) -> list[CheckItem]:
         """Run all automated checks."""
         check_map = {
             'All tests pass': self.check_all_tests_pass,
@@ -439,7 +437,7 @@ class AutomatedChecker:
 class ChecklistValidator:
     """Validates checklist completion."""
 
-    def validate(self, items: List[CheckItem], strict: bool = False) -> Tuple[bool, List[str]]:
+    def validate(self, items: list[CheckItem], strict: bool = False) -> tuple[bool, list[str]]:
         """
         Validate checklist completion.
 
@@ -486,7 +484,7 @@ class ApprovalReporter:
     def generate_report(
         self,
         checklist_report: ChecklistReport,
-        output_path: Optional[Path] = None
+        output_path: Path | None = None
     ) -> str:
         """Generate approval report in JSON format."""
         report_dict = checklist_report.to_dict()
@@ -526,7 +524,7 @@ class ApprovalReporter:
             lines.append("")
 
         # Group by category
-        by_category: Dict[str, List[CheckItem]] = {}
+        by_category: dict[str, list[CheckItem]] = {}
         for item in checklist_report.items:
             if item.category not in by_category:
                 by_category[item.category] = []
@@ -633,7 +631,7 @@ Examples:
         print("=" * 70)
         print()
 
-        by_category: Dict[str, List[CheckItem]] = {}
+        by_category: dict[str, list[CheckItem]] = {}
         for item in items:
             if item.category not in by_category:
                 by_category[item.category] = []

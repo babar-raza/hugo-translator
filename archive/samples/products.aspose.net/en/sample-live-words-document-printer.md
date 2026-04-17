@@ -34,4 +34,3 @@ Deployment scenarios described in the product materials include services that ru
 The product page encourages testing with evaluation or trial licenses before rolling out to production.
 
 For pricing and license terms, the product page links to the Aspose purchase portal for the Document Printer plugin.
-

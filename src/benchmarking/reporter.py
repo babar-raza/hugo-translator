@@ -5,7 +5,7 @@ Provides reusable formatting utilities for CLI and scripts to generate
 human-readable reports and machine-parseable JSON outputs.
 """
 import json
-from typing import Any, Dict, List, Literal, Optional
+from typing import Any
 
 from .storage import BenchmarkRun
 
@@ -164,7 +164,7 @@ class BenchmarkReporter:
         return json.dumps(run.to_dict(), indent=indent)
 
     @staticmethod
-    def format_comparison_markdown(comparison: Dict[str, Any]) -> str:
+    def format_comparison_markdown(comparison: dict[str, Any]) -> str:
         """
         Format benchmark comparison as Markdown table.
 
@@ -232,7 +232,7 @@ class BenchmarkReporter:
         return "\n".join(lines)
 
     @staticmethod
-    def format_recommendation_markdown(recommendation: Dict[str, Any]) -> str:
+    def format_recommendation_markdown(recommendation: dict[str, Any]) -> str:
         """
         Format model recommendation as Markdown.
 
@@ -267,7 +267,7 @@ class BenchmarkReporter:
         return "\n".join(lines)
 
     @staticmethod
-    def format_run_list_markdown(runs: List[tuple], title: str = "Benchmark Runs") -> str:
+    def format_run_list_markdown(runs: list[tuple], title: str = "Benchmark Runs") -> str:
         """
         Format list of benchmark runs as Markdown table.
 

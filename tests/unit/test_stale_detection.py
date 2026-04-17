@@ -4,7 +4,8 @@ import os
 import sys
 import time
 from pathlib import Path
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
+
 import pytest
 
 from src.utils.file_lock import FileLock

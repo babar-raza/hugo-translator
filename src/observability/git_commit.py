@@ -31,16 +31,15 @@ Usage:
     )
 """
 import logging
-import os
 import subprocess
 import time
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Dict, List, Optional
+from typing import TYPE_CHECKING, Optional
 
-from .git_context import find_git_root, get_git_branch, get_git_repo
-from .commit_message_generator import CommitMessageGenerator
 from ..translation_engine.models import ValidationDecision
+from .commit_message_generator import CommitMessageGenerator
+from .git_context import find_git_root, get_git_branch, get_git_repo
 
 if TYPE_CHECKING:
     from src.translation_engine.models import DirectoryResult
@@ -84,15 +83,15 @@ class GitCommitResult:
     """Result of git commit operation."""
 
     success: bool
-    commit_hash: Optional[str] = None
-    commit_hash_short: Optional[str] = None
-    remote_url: Optional[str] = None
-    branch: Optional[str] = None
+    commit_hash: str | None = None
+    commit_hash_short: str | None = None
+    remote_url: str | None = None
+    branch: str | None = None
     files_committed: int = 0
     push_success: bool = False
-    error: Optional[str] = None
-    commit_author: Optional[str] = None  # Git commit author (e.g., "Name <email>")
-    commit_timestamp: Optional[str] = None  # ISO timestamp of commit
+    error: str | None = None
+    commit_author: str | None = None  # Git commit author (e.g., "Name <email>")
+    commit_timestamp: str | None = None  # ISO timestamp of commit
 
 
 class GitCommitter:
@@ -114,7 +113,7 @@ class GitCommitter:
         """
         self.config = config
         self._timeout = config.timeout_seconds
-        self._last_error: Optional[str] = None  # Track last error for better reporting
+        self._last_error: str | None = None  # Track last error for better reporting
 
     def is_git_repo(self, path: Path) -> bool:
         """Check if path is within a git repository.
@@ -159,13 +158,13 @@ class GitCommitter:
 
     def commit_translation_outputs(
         self,
-        output_files: List[Path],
+        output_files: list[Path],
         site_id: str,
-        target_langs: List[str],
+        target_langs: list[str],
         run_id: str,
         translation_result: Optional["DirectoryResult"] = None,
-        model_id: Optional[str] = None,
-        tm_stats: Optional[Dict] = None,
+        model_id: str | None = None,
+        tm_stats: dict | None = None,
     ) -> GitCommitResult:
         """
         Stage, commit, and push translation output files.
@@ -267,7 +266,7 @@ class GitCommitter:
             logger.error(f"Git commit operation failed: {e}")
             return GitCommitResult(success=False, error=str(e))
 
-    def _stage_files(self, files: List[Path], git_root: Path) -> int:
+    def _stage_files(self, files: list[Path], git_root: Path) -> int:
         """
         Stage specific files for commit.
 
@@ -320,14 +319,14 @@ class GitCommitter:
 
     def _build_commit_message(
         self,
-        output_files: List[Path],
+        output_files: list[Path],
         file_count: int,
-        languages: List[str],
+        languages: list[str],
         site_id: str,
         run_id: str,
         translation_result: Optional["DirectoryResult"] = None,
-        model_id: Optional[str] = None,
-        tm_stats: Optional[Dict] = None,
+        model_id: str | None = None,
+        tm_stats: dict | None = None,
     ) -> str:
         """Build enhanced commit message with detailed information.
 
@@ -406,7 +405,7 @@ class GitCommitter:
 
         return message + co_author
 
-    def _create_commit(self, message: str, git_root: Path) -> Optional[str]:
+    def _create_commit(self, message: str, git_root: Path) -> str | None:
         """Create commit and return commit hash.
 
         Args:
@@ -464,7 +463,7 @@ class GitCommitter:
             logger.error(self._last_error)
             return None
 
-    def _get_commit_author(self, git_root: Path) -> Optional[str]:
+    def _get_commit_author(self, git_root: Path) -> str | None:
         """
         Get the author of the most recent commit.
 
@@ -493,7 +492,7 @@ class GitCommitter:
             logger.warning(f"Error getting commit author: {e}")
             return None
 
-    def _get_commit_timestamp(self, git_root: Path) -> Optional[str]:
+    def _get_commit_timestamp(self, git_root: Path) -> str | None:
         """
         Get the timestamp of the most recent commit in ISO format.
 
@@ -522,7 +521,7 @@ class GitCommitter:
             logger.warning(f"Error getting commit timestamp: {e}")
             return None
 
-    def _push(self, git_root: Path, branch: Optional[str]) -> bool:
+    def _push(self, git_root: Path, branch: str | None) -> bool:
         """Push to remote origin.
 
         Args:
@@ -586,7 +585,7 @@ def _is_file_modified_in_git(file_path: Path) -> bool:
         return False
 
 
-def collect_output_files(result: "DirectoryResult") -> List[Path]:
+def collect_output_files(result: "DirectoryResult") -> list[Path]:
     """
     Collect output file paths that were actually written during this translation run.
 
@@ -653,7 +652,7 @@ def collect_output_files(result: "DirectoryResult") -> List[Path]:
                         logger.warning(f"[collect_output_files] File doesn't exist: {output_path}")
 
     # Log diagnostic summary
-    logger.info(f"[collect_output_files] Collection summary:")
+    logger.info("[collect_output_files] Collection summary:")
     logger.info(f"  - Total file_results: {total_results}")
     logger.info(f"  - Successful results: {successful_results}")
     logger.info(f"  - Total outputs: {total_outputs}")

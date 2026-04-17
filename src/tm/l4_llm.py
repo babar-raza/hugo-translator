@@ -8,9 +8,8 @@ to better fit the specific context.
 import logging
 import time
 from dataclasses import dataclass
-from typing import Optional
 
-from ..intelligence.llm_client import LLMClient, LLMConfig, create_llm_client
+from ..intelligence.llm_client import LLMClient, LLMConfig
 from .models import TMResult
 
 logger = logging.getLogger(__name__)
@@ -23,8 +22,8 @@ class L4Config:
     enabled: bool = False
     provider: str = "ollama"
     model: str = "llama2"
-    api_key: Optional[str] = None
-    base_url: Optional[str] = None
+    api_key: str | None = None
+    base_url: str | None = None
     min_similarity: float = 0.75  # Only adapt matches above this threshold
     max_similarity: float = 0.95  # Don't adapt matches above this (already good)
     timeout_seconds: int = 30
@@ -48,7 +47,7 @@ class L4LLMLayer:
             config: L4 configuration
         """
         self.config = config
-        self._llm_client: Optional[LLMClient] = None
+        self._llm_client: LLMClient | None = None
         self._available = False
 
         # Initialize LLM client if enabled
@@ -91,8 +90,8 @@ class L4LLMLayer:
         tm_result: TMResult,
         source_lang: str,
         target_lang: str,
-        context: Optional[str] = None,
-    ) -> Optional[TMResult]:
+        context: str | None = None,
+    ) -> TMResult | None:
         """
         Adapt a fuzzy TM match using LLM.
 
@@ -259,7 +258,7 @@ if __name__ == "__main__":
     print("✓ L4 layer available")
 
     # Test adaptation
-    print(f"\nTesting adaptation:")
+    print("\nTesting adaptation:")
     print(f"  Source: {args.test_query}")
     print(f"  Fuzzy Match: {args.fuzzy_match}")
     print(f"  Similarity: {args.similarity:.0%}")
@@ -281,7 +280,7 @@ if __name__ == "__main__":
     )
 
     if adapted:
-        print(f"\n✓ Adaptation successful:")
+        print("\n✓ Adaptation successful:")
         print(f"  Adapted: {adapted.translation}")
         print(f"  Latency: {adapted.metadata.get('latency_ms', 0):.0f}ms")
     else:

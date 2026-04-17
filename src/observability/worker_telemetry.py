@@ -23,11 +23,11 @@ import os
 import socket
 import uuid
 from datetime import datetime, timezone
-from typing import Any, Dict, Optional
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
-_TELEMETRY_API_URL: Optional[str] = None
+_TELEMETRY_API_URL: str | None = None
 
 
 def _get_api_url() -> str:
@@ -38,7 +38,7 @@ def _get_api_url() -> str:
     return _TELEMETRY_API_URL
 
 
-def _post_run(run_data: dict) -> Optional[str]:
+def _post_run(run_data: dict) -> str | None:
     """POST a run to the telemetry API. Returns event_id on success, None on failure."""
     try:
         import requests as _requests
@@ -103,14 +103,14 @@ def emit_worker_event(
     job_type: str,
     trigger_type: str = "scheduled",
     status: str = "success",
-    metrics: Optional[Dict[str, Any]] = None,
-    context: Optional[Dict[str, Any]] = None,
-    error_summary: Optional[str] = None,
+    metrics: dict[str, Any] | None = None,
+    context: dict[str, Any] | None = None,
+    error_summary: str | None = None,
     duration_ms: int = 0,
     items_discovered: int = 0,
     items_succeeded: int = 0,
     items_failed: int = 0,
-) -> Optional[str]:
+) -> str | None:
     """
     Emit a completed worker lifecycle event (fire-and-forget).
 
@@ -144,8 +144,8 @@ def start_worker_run(
     agent_name: str,
     job_type: str,
     trigger_type: str = "scheduled",
-    context: Optional[Dict[str, Any]] = None,
-) -> Optional[str]:
+    context: dict[str, Any] | None = None,
+) -> str | None:
     """
     Start a long-running worker telemetry run.
 
@@ -166,9 +166,9 @@ def complete_worker_run(
     event_id: str,
     status: str = "success",
     duration_ms: int = 0,
-    metrics: Optional[Dict[str, Any]] = None,
-    error_summary: Optional[str] = None,
-    output_summary: Optional[str] = None,
+    metrics: dict[str, Any] | None = None,
+    error_summary: str | None = None,
+    output_summary: str | None = None,
     items_succeeded: int = 0,
     items_failed: int = 0,
 ) -> bool:
@@ -181,7 +181,7 @@ def complete_worker_run(
         True on success, False on failure.
     """
     now = datetime.now(timezone.utc).isoformat()
-    update: Dict[str, Any] = {
+    update: dict[str, Any] = {
         "status": status,
         "end_time": now,
         "duration_ms": duration_ms,

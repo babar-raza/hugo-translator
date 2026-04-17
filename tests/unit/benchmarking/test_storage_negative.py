@@ -2,11 +2,10 @@
 import sqlite3
 import tempfile
 from pathlib import Path
-from unittest.mock import patch
 
 import pytest
 
-from src.benchmarking.storage import BenchmarkDatabase, BenchmarkRun, BenchmarkResult
+from src.benchmarking.storage import BenchmarkDatabase, BenchmarkRun
 from src.benchmarking.system_info import SystemInfo
 
 

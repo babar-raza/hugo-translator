@@ -7,22 +7,20 @@ Verifies that events are buffered locally and synced when API recovers.
 These tests replace the removed direct-DB tests with tests focused on
 the new HTTP API + buffer architecture.
 """
-import tempfile
 import json
+import tempfile
 from pathlib import Path
-from unittest.mock import Mock, patch, MagicMock
-import time
+from unittest.mock import patch
 
 import pytest
-
 
 # Skip all tests if telemetry module not available
 pytest.importorskip("telemetry", reason="telemetry module not installed")
 
+from telemetry.buffer import BufferFile
 from telemetry.client import TelemetryClient
 from telemetry.config import TelemetryConfig
 from telemetry.http_client import APIUnavailableError
-from telemetry.buffer import BufferFile
 
 
 class TestTelemetryClientFailover:
@@ -56,7 +54,7 @@ class TestTelemetryClientFailover:
                 assert len(buffer_files) >= 1
 
                 # Read buffer file
-                with open(buffer_files[0], 'r') as f:
+                with open(buffer_files[0]) as f:
                     lines = f.readlines()
 
                 # Should have at least one event
@@ -122,7 +120,7 @@ class TestTelemetryClientFailover:
                 assert len(buffer_files) >= 1
 
                 # Read buffer file
-                with open(buffer_files[0], 'r') as f:
+                with open(buffer_files[0]) as f:
                     event = json.loads(f.readline())
 
                 assert event["agent_name"] == "test-agent"
@@ -156,7 +154,7 @@ class TestTelemetryClientFailover:
                 assert len(buffer_files) >= 1
 
                 # Read buffer file
-                with open(buffer_files[0], 'r') as f:
+                with open(buffer_files[0]) as f:
                     lines = f.readlines()
 
                 # Should have 2 events (start + end)
@@ -191,7 +189,7 @@ class TestTelemetryClientFailover:
                 assert len(buffer_files) >= 1
 
                 # Read buffer file
-                with open(buffer_files[0], 'r') as f:
+                with open(buffer_files[0]) as f:
                     lines = f.readlines()
 
                 # Should have 2 events (start + end)
@@ -251,7 +249,7 @@ class TestBufferFileFailoverIntegration:
                 assert len(buffer_files) >= 1
 
                 # Read buffer file
-                with open(buffer_files[0], 'r') as f:
+                with open(buffer_files[0]) as f:
                     lines = f.readlines()
 
                 # Should have 6 events (3 starts + 3 ends)
@@ -358,7 +356,7 @@ class TestFailoverRecovery:
                 buffer_files = list(Path(config.buffer_dir).glob("*.jsonl.active"))
                 assert len(buffer_files) >= 1
 
-                with open(buffer_files[0], 'r') as f:
+                with open(buffer_files[0]) as f:
                     lines = f.readlines()
 
                 assert len(lines) >= 20
@@ -389,7 +387,7 @@ class TestFailoverErrorHandling:
             try:
                 client = TelemetryClient(config=config)
                 # Mock API unavailable and buffer write fails
-                with patch.object(client.buffer, 'append', side_effect=IOError("Permission denied")):
+                with patch.object(client.buffer, 'append', side_effect=OSError("Permission denied")):
                     run_id = client.start_run(
                         agent_name="test-agent",
                         job_type="test-job",
@@ -416,7 +414,7 @@ class TestFailoverErrorHandling:
             buffer.append({"event_id": "test-123", "agent_name": "test"})
 
             # Verify new event was appended
-            with open(buffer.current_file, 'r') as f:
+            with open(buffer.current_file) as f:
                 lines = f.readlines()
 
             # Should have both lines (corrupted + valid)
@@ -490,7 +488,7 @@ class TestNDJSONBackup:
                 assert len(ndjson_files) >= 1
 
                 # Read NDJSON file
-                with open(ndjson_files[0], 'r') as f:
+                with open(ndjson_files[0]) as f:
                     lines = f.readlines()
 
                 assert len(lines) >= 1
@@ -525,7 +523,7 @@ class TestNDJSONBackup:
                 assert len(ndjson_files) >= 1
 
                 # Read NDJSON file
-                with open(ndjson_files[0], 'r') as f:
+                with open(ndjson_files[0]) as f:
                     event = json.loads(f.readline())
 
                 assert event["agent_name"] == "test-agent"

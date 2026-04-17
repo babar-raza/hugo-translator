@@ -17,9 +17,10 @@ MUST translate cases (should NOT be protected):
 - "Notes (Important)" (sentence with parentheses, not API signature)
 """
 
-import pytest
 import sys
 from pathlib import Path
+
+import pytest
 
 # Add project root to path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))

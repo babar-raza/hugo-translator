@@ -1,5 +1,35 @@
 # Task Backlog - Phase 6 Remediation
 
+---
+
+## WS-PRODREADY-20260417 — Production Readiness Final Sprint (stateless-drifting-mccarthy)
+
+**Plan**: `C:\Users\prora\.claude\plans\stateless-drifting-mccarthy.md` (Sections O-Q)
+**Added**: 2026-04-17
+**Status**: IN_PROGRESS (1 item remaining)
+
+### TC-N-ENV: Fix env-var availability in Task Scheduler context
+**Status**: CLOSED — 2026-04-17
+**Fix**: `src/utils/config_loader.py` — dotenv loaded at `ConfigService.__init__()`. `ASPOSE_NET_CONTENT` resolves without bash export.
+**Commit**: `37b8dc3`
+**Evidence**: `python -c "import os; os.environ.pop('ASPOSE_NET_CONTENT',None); from src.utils.config_loader import ConfigService; ConfigService('config/'); print(os.environ['ASPOSE_NET_CONTENT'])"` → `D:/onedrive/Documents/GitHub/aspose.net/content`
+
+### TC-N-PC: Pre-commit hooks
+**Status**: CLOSED — 2026-04-17
+**Result**: `ruff` and `ruff-format` failed on pre-existing code only. Zero failures in sprint-changed files. Acceptable per plan guardrail K3.
+
+### TC-N-F2: Worker oneshot — skip_first pagination live proof
+**Status**: IN_PROGRESS — worker running, chunk 0 translating 25 files
+**Precondition**: TC-N-ENV (closed). Worker started: `2026-04-17 11:24:47`.
+**Required evidence**: "Chunk 0: N/25" + "Chunk 1: N/25" in worker log; no TypeError
+
+### [Supporting] recover_orphaned_commit_manifests stub
+**Status**: CLOSED — 2026-04-17
+**Fix**: Added stub to `src/observability/git_commit_helper.py` so worker no longer fails with ImportError on startup
+**Commit**: `37b8dc3`
+
+---
+
 **Plan**: [20260129_003000_phase6_remediation.md](plans/from_chat/20260129_003000_phase6_remediation.md)
 **Created**: 2026-01-29 00:30:00 UTC
 **Status**: IN_PROGRESS
@@ -3881,3 +3911,45 @@ _Spawned by: Orchestrator | Owner-agent: B (Implementation)_
 - Scope: Run setup_task_scheduler.ps1 with elevation
 - Action: Verify via PowerShell evidence commands
 - Acceptance: All 4 tasks Ready, heartbeats fresh after simulated start
+
+---
+
+# Workstream: Publish-Readiness Remediation
+**Plan**: [20260417_publish_readiness.md](plans/from_chat/20260417_publish_readiness.md)
+**Added**: 2026-04-17
+**Status**: IN_PROGRESS
+
+## Stage 1 — Confirmed Pipeline Bugs
+
+### TASK-S1A: Remove hardcoded Ollama args from start_workers.ps1
+**File**: `scripts/start_workers.ps1:102-103`
+**Owner**: Agent B
+**Priority**: CRITICAL — silently misconfigures every TM worker run
+**Status**: PENDING
+
+### TASK-S1B: Fix content hash tracker initialization in engine.py
+**File**: `src/translation_engine/engine.py:411-416`
+**Owner**: Agent B
+**Priority**: HIGH — feature documented as "enabled by default" is dead code
+**Status**: PENDING
+
+### TASK-S1D: Fix CI regression gate
+**File**: `.github/workflows/release_gate.yml`
+**Owner**: Agent B
+**Priority**: HIGH — regression tests silently pass regardless of outcome
+**Status**: PENDING
+
+## Stage 3 — Documentation
+
+### TASK-S3A: Rewrite README.md architecture + fix content-hash claim
+### TASK-S3B: Create AGENTS.md
+### TASK-S3C: Create docs/getting-started/ONBOARDING.md
+### TASK-S3D: Create docs/operations/windows-native-deployment.md
+### TASK-S3E: Archive docs/_audit/, stale reports
+### TASK-S3F: CHANGELOG disclaimer + scripts/README.md
+
+## Stage 2 — Pipeline Architecture
+
+### TASK-S2A: Completion-aware file selection
+### TASK-S2B: L3 FAISS delete-before-add
+### TASK-S2C: Retranslate queue

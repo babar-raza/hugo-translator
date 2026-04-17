@@ -1,10 +1,9 @@
 """
 Pytest configuration and shared fixtures for the translation system tests.
 """
-import os
 import sys
+from collections.abc import Generator
 from pathlib import Path
-from typing import Generator, List
 
 import pytest
 import yaml
@@ -81,7 +80,7 @@ def setup_test_env(monkeypatch: pytest.MonkeyPatch) -> None:
 
 # Model-related fixtures for BM-05: Parameterized Model Testing
 @pytest.fixture(scope="session")
-def available_models(config_dir: Path) -> List[str]:
+def available_models(config_dir: Path) -> list[str]:
     """
     Load list of available models from model registry.
 
@@ -92,7 +91,7 @@ def available_models(config_dir: Path) -> List[str]:
     if not registry_path.exists():
         return ["m2m100_418m"]  # Fallback default
 
-    with open(registry_path, "r") as f:
+    with open(registry_path) as f:
         registry_data = yaml.safe_load(f)
 
     models = registry_data.get("models", [])
@@ -114,7 +113,7 @@ def test_model(request) -> str:
 
 
 @pytest.fixture(scope="session")
-def test_models(request, available_models: List[str]) -> List[str]:
+def test_models(request, available_models: list[str]) -> list[str]:
     """
     Get list of model IDs for parameterized testing.
 
@@ -133,7 +132,7 @@ def test_models(request, available_models: List[str]) -> List[str]:
 
 
 @pytest.fixture(scope="session")
-def small_test_models(available_models: List[str]) -> List[str]:
+def small_test_models(available_models: list[str]) -> list[str]:
     """
     Get list of small/fast models suitable for quick testing.
 

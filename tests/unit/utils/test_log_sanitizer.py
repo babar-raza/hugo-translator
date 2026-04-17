@@ -23,7 +23,8 @@ Framework: ORCHESTRATOR (Evidence-Based Development)
 """
 
 import pytest
-from src.utils.log_sanitizer import sanitize_for_log, _detect_script, _format_placeholder
+
+from src.utils.log_sanitizer import _detect_script, _format_placeholder, sanitize_for_log
 
 
 class TestASCIIFastPath:

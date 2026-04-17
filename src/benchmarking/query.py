@@ -8,7 +8,7 @@ common query patterns.
 import logging
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 from .storage import BenchmarkDatabase, BenchmarkRun, SystemInfo
 
@@ -39,10 +39,10 @@ class BenchmarkQueryBuilder:
     """
 
     def __init__(self):
-        self._filters: List[QueryFilter] = []
-        self._sort_field: Optional[str] = None
+        self._filters: list[QueryFilter] = []
+        self._sort_field: str | None = None
         self._sort_ascending: bool = True
-        self._limit_n: Optional[int] = None
+        self._limit_n: int | None = None
         self._offset_n: int = 0
 
     def by_model(self, model_id: str) -> "BenchmarkQueryBuilder":
@@ -73,10 +73,10 @@ class BenchmarkQueryBuilder:
 
     def by_hardware(
         self,
-        cpu_cores: Optional[int] = None,
-        ram_gb_min: Optional[float] = None,
-        ram_gb_max: Optional[float] = None,
-        gpu_model: Optional[str] = None,
+        cpu_cores: int | None = None,
+        ram_gb_min: float | None = None,
+        ram_gb_max: float | None = None,
+        gpu_model: str | None = None,
     ) -> "BenchmarkQueryBuilder":
         """Filter by hardware configuration."""
         if cpu_cores is not None:
@@ -90,7 +90,7 @@ class BenchmarkQueryBuilder:
         return self
 
     def by_throughput_range(
-        self, min_tps: Optional[float] = None, max_tps: Optional[float] = None
+        self, min_tps: float | None = None, max_tps: float | None = None
     ) -> "BenchmarkQueryBuilder":
         """Filter by throughput range (requires aggregation in query execution)."""
         # This will be handled by the API layer via subquery
@@ -105,7 +105,7 @@ class BenchmarkQueryBuilder:
         return self
 
     def by_date_range(
-        self, start: Optional[datetime] = None, end: Optional[datetime] = None
+        self, start: datetime | None = None, end: datetime | None = None
     ) -> "BenchmarkQueryBuilder":
         """Filter by timestamp range."""
         if start is not None:
@@ -143,7 +143,7 @@ class BenchmarkQueryBuilder:
         self._offset_n = n
         return self
 
-    def build(self) -> Tuple[str, List[Any]]:
+    def build(self) -> tuple[str, list[Any]]:
         """Build SQL query and parameters.
 
         Returns:
@@ -155,7 +155,7 @@ class BenchmarkQueryBuilder:
 
         # Base query
         query = "SELECT DISTINCT r.* FROM benchmark_runs r"
-        params: List[Any] = []
+        params: list[Any] = []
 
         # Add joins
         if needs_system_join:
@@ -215,7 +215,7 @@ class BenchmarkQueryAPI:
         """
         self.db = db
 
-    def query(self, builder: BenchmarkQueryBuilder) -> List[BenchmarkRun]:
+    def query(self, builder: BenchmarkQueryBuilder) -> list[BenchmarkRun]:
         """Execute a query built with BenchmarkQueryBuilder.
 
         Args:
@@ -241,7 +241,7 @@ class BenchmarkQueryAPI:
 
     def aggregate(
         self, builder: BenchmarkQueryBuilder, metric: str, func: str = "avg"
-    ) -> Optional[float]:
+    ) -> float | None:
         """Aggregate a metric across query results.
 
         Args:
@@ -284,7 +284,7 @@ class BenchmarkQueryAPI:
 
     def group_by(
         self, builder: BenchmarkQueryBuilder, group_field: str, metric: str
-    ) -> Dict[str, float]:
+    ) -> dict[str, float]:
         """Group results and aggregate by field.
 
         Args:
@@ -300,7 +300,7 @@ class BenchmarkQueryAPI:
             return {}
 
         # Group runs by field
-        groups: Dict[str, List[float]] = {}
+        groups: dict[str, list[float]] = {}
         for run in runs:
             if hasattr(run, group_field):
                 group_val = getattr(run, group_field)
@@ -323,10 +323,10 @@ class BenchmarkQueryAPI:
 
     def find_best(
         self,
-        hardware_profile: Optional[Dict[str, Any]] = None,
+        hardware_profile: dict[str, Any] | None = None,
         metric: str = "throughput_tokens_per_sec",
         limit: int = 1,
-    ) -> List[BenchmarkRun]:
+    ) -> list[BenchmarkRun]:
         """Find best performing runs for a hardware profile.
 
         Args:
@@ -366,7 +366,7 @@ class BenchmarkQueryAPI:
 
     def find_similar_hardware(
         self, system_info: SystemInfo, tolerance: float = 0.2
-    ) -> List[BenchmarkRun]:
+    ) -> list[BenchmarkRun]:
         """Find runs on similar hardware.
 
         Args:

@@ -9,6 +9,8 @@ Orchestrates the complete translation workflow:
 5. Reconstruct translated documents
 6. Write output files
 """
+import hashlib
+import json
 import logging
 import math
 import re
@@ -32,6 +34,9 @@ from ..tm.retranslate_queue import (
 )
 from ..tm.retranslate_queue import (
     load_queued_paths as _rtq_load,
+)
+from ..tm.retranslate_queue import (
+    load_queued_llm_paths as _rtq_load_llm,
 )
 from ..tm.retranslate_queue import (
     remove_from_queue as _rtq_remove,
@@ -796,6 +801,24 @@ class TranslationEngine:
         if self.model_id_override:
             return self.model_id_override
 
+        # Priority 1b: WS-COMP-7 — per-language routing override from config.
+        # Allows routing high-failure languages (fa, he) to LLM backend without changing global fallback.
+        # Config: translation_engine.language_routing_overrides: {fa: "professionalize_llm"}
+        # Only active when tgt_lang is explicitly provided.
+        if tgt_lang:
+            try:
+                _te_cfg_lr = self.config.get_config().get("translation_engine", {}) if hasattr(self.config, "get_config") else {}
+                _lang_routing = _te_cfg_lr.get("language_routing_overrides", {})
+                if _lang_routing and tgt_lang in _lang_routing:
+                    _routed_model = _lang_routing[tgt_lang]
+                    logger.info(
+                        f"Language routing override: {tgt_lang} → '{_routed_model}' "
+                        f"(from translation_engine.language_routing_overrides)"
+                    )
+                    return _routed_model
+            except Exception:
+                pass
+
         # Priority 2: Dynamic selection via model_selector (CT2-002)
         # Only if both languages provided and selector available
         if src_lang and tgt_lang and self.model_selector:
@@ -956,6 +979,158 @@ class TranslationEngine:
         except Exception as e:
             logger.warning(f"Output validation failed for {output_path}: {e}")
             return False
+
+    def _quality_check_complete_file(
+        self,
+        source_path: Path,
+        target_langs: list[str],
+        site_profile,
+        ttl_days: int = 7,
+        confidence: float = 0.80,
+        max_paragraphs: int = 2,
+    ) -> bool:
+        """
+        WS-COMP-6: Quality-aware completion filter check.
+
+        For a file the mtime check would skip, sample a few paragraphs from each
+        target-language output and check if the body is in the correct language.
+        Uses a per-file marker cache to avoid re-checking within ttl_days.
+
+        Returns:
+            True if ANY output fails the language check (file should be retranslated).
+            False if all outputs pass or cannot be checked.
+        """
+        import datetime
+
+        marker_dir = Path("data/quality_scan_markers")
+        try:
+            marker_dir.mkdir(parents=True, exist_ok=True)
+        except Exception:
+            return False
+
+        # Per-file marker: keyed by source path hash
+        file_key = hashlib.sha256(str(source_path.resolve()).encode()).hexdigest()[:24]
+        marker_path = marker_dir / f"{file_key}.json"
+
+        # Load existing marker
+        marker: dict = {}
+        if marker_path.exists():
+            try:
+                marker = json.loads(marker_path.read_text(encoding="utf-8"))
+            except Exception:
+                marker = {}
+
+        now_ts = datetime.datetime.utcnow().timestamp()
+        ttl_seconds = ttl_days * 86400
+
+        # Check if all langs are recently validated and passed
+        all_cached_pass = all(
+            marker.get(f"lang_{lang}", {}).get("result") == "pass"
+            and now_ts - marker.get(f"lang_{lang}", {}).get("validated_at", 0) < ttl_seconds
+            for lang in target_langs
+        )
+        if all_cached_pass:
+            return False  # All outputs verified good recently
+
+        # Load fasttext model lazily
+        ft_model = getattr(self, '_quality_filter_ft_model', None)
+        if ft_model is None:
+            try:
+                import fasttext as _ft  # type: ignore
+                _ft_path = Path("data/models/fasttext/lid.176.bin")
+                if _ft_path.exists():
+                    ft_model = _ft.load_model(str(_ft_path))
+                    self._quality_filter_ft_model = ft_model
+            except Exception:
+                return False  # fasttext unavailable — skip check
+
+        if ft_model is None:
+            return False
+
+        # Similar lang pairs — skip flagging for these
+        _similar_pairs: set[frozenset] = {
+            frozenset({"hr", "sr"}), frozenset({"hr", "bs"}), frozenset({"sr", "bs"}),
+            frozenset({"ms", "id"}), frozenset({"cs", "sk"}), frozenset({"nb", "no"}),
+        }
+
+        any_failed = False
+        updated_marker = dict(marker)
+
+        for lang in target_langs:
+            lang_key = f"lang_{lang}"
+            cached = updated_marker.get(lang_key, {})
+            if (
+                cached.get("result") == "pass"
+                and now_ts - cached.get("validated_at", 0) < ttl_seconds
+            ):
+                continue  # Recently validated — skip
+
+            output_path = self._get_output_path(source_path, lang, site_profile)
+            if not output_path.exists():
+                continue  # Missing output — already caught by mtime check
+
+            try:
+                content = output_path.read_text(encoding="utf-8", errors="replace")
+            except Exception:
+                continue
+
+            # Strip frontmatter and sample body paragraphs
+            body = content
+            if body.startswith("---"):
+                end = body.find("\n---", 3)
+                if end != -1:
+                    body = body[end + 4:]
+            # Remove code blocks
+            body = re.sub(r"```[\s\S]*?```", "", body)
+            body = re.sub(r"\{\{[<%][^}]*[>%]\}\}", "", body)
+            # Extract paragraphs
+            paragraphs = []
+            for para in re.split(r"\n\n+", body):
+                para = para.strip()
+                if para.startswith("#"):
+                    para = re.sub(r"^#+\s*", "", para)
+                if len(para) < 30:
+                    continue
+                letter_ratio = sum(1 for c in para if c.isalpha()) / max(len(para), 1)
+                if letter_ratio < 0.5:
+                    continue
+                paragraphs.append(para)
+                if len(paragraphs) >= max_paragraphs:
+                    break
+
+            if not paragraphs:
+                continue
+
+            sample_text = " ".join(paragraphs).replace("\n", " ")[:500]
+            try:
+                preds = ft_model.predict(sample_text, k=1)
+                detected_lang = preds[0][0].replace("__label__", "")
+                det_confidence = float(preds[1][0])
+            except Exception:
+                continue
+
+            if (
+                detected_lang != lang
+                and det_confidence >= confidence
+                and frozenset({detected_lang, lang}) not in _similar_pairs
+            ):
+                logger.info(
+                    f"Quality filter: {output_path.name} detected as '{detected_lang}' "
+                    f"(expected '{lang}', conf={det_confidence:.2f}) — flagging for retranslation"
+                )
+                updated_marker[lang_key] = {"result": "fail", "validated_at": now_ts,
+                                            "detected": detected_lang, "confidence": round(det_confidence, 3)}
+                any_failed = True
+            else:
+                updated_marker[lang_key] = {"result": "pass", "validated_at": now_ts}
+
+        # Persist marker
+        try:
+            marker_path.write_text(json.dumps(updated_marker), encoding="utf-8")
+        except Exception:
+            pass
+
+        return any_failed
 
     def _get_output_dir(self, site_profile) -> Path:
         """Get output directory for the site profile.
@@ -1244,6 +1419,22 @@ class TranslationEngine:
                 # BM-08: Track retry timing
                 retry_start_time = time.perf_counter()
 
+                # WS-COMP-4: LLM escalation — check if this output file is in the LLM escalation
+                # set (MT has failed repeatedly). If so AND config enables it, override model to LLM.
+                _llm_model_override: str | None = None
+                _rtq_llm_paths = getattr(self, '_rtq_llm_output_paths', None)
+                if _rtq_llm_paths and str(output_path.resolve()) in _rtq_llm_paths:
+                    try:
+                        _te_cfg = self.config.get_config().get('translation_engine', {}) if hasattr(self.config, 'get_config') else {}
+                        if _te_cfg.get('llm_escalation_enabled', False):
+                            _llm_model_override = _te_cfg.get('llm_escalation_model', 'professionalize_llm')
+                            logger.info(
+                                f"LLM escalation: overriding model to '{_llm_model_override}' "
+                                f"for stuck CASE 4 file {output_path.name} ({target_lang})"
+                            )
+                    except Exception:
+                        pass
+
                 while retry_count <= max_retry_attempts:
                     try:
                         # Translate (returns content, doesn't write yet)
@@ -1258,6 +1449,7 @@ class TranslationEngine:
                             stats=result.stats,
                             retry_feedback=retry_feedback,
                             retry_count=retry_count,
+                            model_id_override=_llm_model_override,
                         )
 
                         # Pre-write validation (if enabled)
@@ -2435,6 +2627,7 @@ class TranslationEngine:
         stats: TranslationStats,
         retry_feedback: str | None = None,
         retry_count: int = 0,
+        model_id_override: str | None = None,
     ) -> str:
         """
         Translate document to a specific target language.
@@ -2475,7 +2668,8 @@ class TranslationEngine:
         extractor = SegmentExtractor(site_profile, terminology_manager=self.terminology_manager)
 
         # CT2-002: Get model_id with language-aware selection (early for accurate token counting)
-        model_id = self._get_model_id(site_profile, src_lang=source_lang, tgt_lang=target_lang)
+        # WS-COMP-4: model_id_override is set by LLM escalation logic when MT has failed repeatedly.
+        model_id = model_id_override or self._get_model_id(site_profile, src_lang=source_lang, tgt_lang=target_lang)
 
         # Step 1: TM lookup (unless force=True)
         if not force:
@@ -3267,49 +3461,131 @@ class TranslationEngine:
                 except Exception:
                     _queued_output_paths = set()
 
-                incomplete_files = []
+                # Load LLM escalation set: outputs where MT has failed >= threshold times.
+                # Stored on self so translate_file() can apply a model override per output path.
+                try:
+                    self._rtq_llm_output_paths: set = _rtq_load_llm()
+                except Exception:
+                    self._rtq_llm_output_paths = set()
+
+                # WS-COMP-6: Load quality-aware filter settings from config (feature-flagged).
+                _quality_filter_enabled = False
+                _quality_filter_ttl_days = 7
+                _quality_filter_confidence = 0.80
+                _quality_filter_paragraphs = 2
+                try:
+                    _te_cfg_qf = self.config.get_config().get("translation_engine", {}) if hasattr(self.config, "get_config") else {}
+                    _feat_cfg = self.config.get_config().get("features", {}) if hasattr(self.config, "get_config") else {}
+                    _quality_filter_enabled = _feat_cfg.get("enable_quality_aware_completion_filter", False)
+                    if _quality_filter_enabled:
+                        _quality_filter_ttl_days = _feat_cfg.get("quality_aware_filter_ttl_days", 7)
+                        _quality_filter_confidence = _feat_cfg.get("quality_aware_filter_confidence", 0.80)
+                        _quality_filter_paragraphs = _feat_cfg.get("quality_aware_filter_paragraphs", 2)
+                except Exception:
+                    pass
+
+                # _incomplete_with_priority tracks (file, has_any_missing_output) for priority sort.
+                # has_any_missing_output=True  → at least one target lang has NO output file
+                # has_any_missing_output=False → all outputs exist but at least one is stale
+                _incomplete_with_priority: list[tuple] = []
                 skipped_complete = 0
                 queued_force_included = 0
                 for f in md_files:
                     try:
                         source_mtime = f.stat().st_mtime
                     except OSError:
-                        incomplete_files.append(f)
+                        _incomplete_with_priority.append((f, True))
                         continue
 
                     all_outputs_current = True
                     any_output_queued = False
+                    any_output_missing = False
                     for lang in target_langs:
                         output_p = self._get_output_path(f, lang, site_profile)
                         if _queued_output_paths and str(output_p.resolve()) in _queued_output_paths:
                             any_output_queued = True
                         try:
-                            if not output_p.exists() or output_p.stat().st_mtime < source_mtime:
+                            if not output_p.exists():
+                                any_output_missing = True
+                                all_outputs_current = False
+                            elif output_p.stat().st_mtime < source_mtime:
                                 all_outputs_current = False
                         except OSError:
+                            any_output_missing = True
                             all_outputs_current = False
 
                     if any_output_queued:
                         # Force-include: this file has a queued output (stuck CASE 4 file).
                         # TM improvements may now produce a correct translation.
-                        incomplete_files.append(f)
+                        _incomplete_with_priority.append((f, True))
                         queued_force_included += 1
                     elif all_outputs_current:
-                        skipped_complete += 1
+                        # WS-COMP-6: Quality-aware filter — optionally check if "complete" outputs
+                        # are actually in the correct language (catches wrong-lang invisible to mtime).
+                        _quality_filter_failed = False
+                        if _quality_filter_enabled:
+                            try:
+                                _quality_filter_failed = self._quality_check_complete_file(
+                                    source_path=f,
+                                    target_langs=target_langs,
+                                    site_profile=site_profile,
+                                    ttl_days=_quality_filter_ttl_days,
+                                    confidence=_quality_filter_confidence,
+                                    max_paragraphs=_quality_filter_paragraphs,
+                                )
+                            except Exception as _qe:
+                                logger.debug(f"Quality filter check failed for {f.name}: {_qe}")
+                        if _quality_filter_failed:
+                            _incomplete_with_priority.append((f, False))  # stale-tier (wrong lang)
+                        else:
+                            skipped_complete += 1
                     else:
-                        incomplete_files.append(f)
+                        _incomplete_with_priority.append((f, any_output_missing))
 
                 if skipped_complete > 0 or queued_force_included > 0:
                     logger.info(
                         f"Completion check: skipped {skipped_complete} up-to-date files, "
                         f"force-included {queued_force_included} queued files, "
-                        f"{len(incomplete_files)} files need work. "
+                        f"{len(_incomplete_with_priority)} files need work. "
                         f"Use --force-retranslate to reprocess all completed files."
                     )
-                md_files = incomplete_files
+                md_files = [f for f, _ in _incomplete_with_priority]
+                _priority_flags = {f: has_missing for f, has_missing in _incomplete_with_priority}
+                # WS-COMP-8: Record completion-filter skip count for telemetry
+                result.completion_filter_skipped = skipped_complete
+            else:
+                # No completion filter active — all files are candidates; treat as missing
+                _priority_flags = {f: True for f in md_files}
 
-            # Sort deterministically for pagination
-            md_files = sorted(md_files, key=str)
+            # Sort deterministically for pagination.
+            # file_priority_strategy="missing_first" (default): files with ANY missing output
+            # are sorted before files that merely need re-translation (stale but existing outputs).
+            # This ensures never-translated files are processed before alphabetically-earlier stale
+            # files consume the entire max_files budget.
+            _file_priority_strategy = "alphabetical"
+            if site_profile:
+                try:
+                    _te_cfg = self.config.get_config().get("translation_engine", {}) if hasattr(self.config, "get_config") else {}
+                    _file_priority_strategy = _te_cfg.get("file_priority_strategy", "missing_first")
+                except Exception:
+                    _file_priority_strategy = "missing_first"
+
+            if _file_priority_strategy == "missing_first" and _priority_flags:
+                # Tier 0: files with any missing output (never translated or partially done)
+                # Tier 1: files where all outputs exist but at least one is stale
+                md_files = sorted(
+                    md_files,
+                    key=lambda f: (0 if _priority_flags.get(f, True) else 1, str(f)),
+                )
+                _missing_count = sum(1 for f in md_files if _priority_flags.get(f, True))
+                _stale_count = len(md_files) - _missing_count
+                if _missing_count or _stale_count:
+                    logger.info(
+                        f"Priority sort (missing_first): {_missing_count} files with missing outputs, "
+                        f"{_stale_count} files with stale outputs"
+                    )
+            else:
+                md_files = sorted(md_files, key=str)
 
             # Apply skip_first for chunked pagination
             if skip_first > 0:

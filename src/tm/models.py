@@ -2,7 +2,7 @@
 Shared data models for Translation Memory system.
 """
 from dataclasses import asdict, dataclass, field
-from typing import Any, Dict, List, Literal, Optional
+from typing import Any, Literal
 
 try:
     from .l3_semantic import SemanticMatch  # type: ignore
@@ -18,7 +18,7 @@ class LookupRequest:
     src_lang: str
     tgt_lang: str
     text: str
-    context: Optional[str] = None
+    context: str | None = None
 
 
 @dataclass
@@ -26,13 +26,13 @@ class LookupResult:
     """Result of TM lookup with provenance."""
 
     hit: bool
-    translation: Optional[str] = None
+    translation: str | None = None
     source: Literal["l1_cache", "l2_exact", "l3_semantic", "none"] = "none"
     confidence: float = 0.0  # 1.0 for exact, <1.0 for semantic
-    candidates: List[SemanticMatch] = field(default_factory=list)
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    candidates: list[SemanticMatch] = field(default_factory=list)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary."""
         result = asdict(self)
         # Convert SemanticMatch objects to dicts
@@ -45,12 +45,12 @@ class TMResult:
     """Simplified TM result for L4 LLM adaptation."""
 
     hit: bool
-    translation: Optional[str] = None
+    translation: str | None = None
     source: str = "none"
     similarity_score: float = 0.0
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary."""
         return asdict(self)
 
@@ -78,6 +78,6 @@ class TMStats:
     total_hits: int
     overall_hit_rate: float
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary."""
         return asdict(self)

@@ -9,16 +9,16 @@ import logging
 import os
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional, Dict, Any
+from typing import Any
 
-from src.shared_engines.profile_engine import ProfileEngine
-from src.shared_engines.logging_engine import LoggingEngine
-from src.shared_engines.telemetry_engine import TelemetryEngine
-from src.shared_engines.job_engine import JobEngine
 from src.shared_engines.commit_engine import CommitEngine
-from src.shared_engines.limiting_engine import LimitingEngine, ResourceLimits
 from src.shared_engines.healing_engine import HealingEngine
-from src.shared_engines.translation_backends import TranslationBackend, MTBackend, LLMBackend
+from src.shared_engines.job_engine import JobEngine
+from src.shared_engines.limiting_engine import LimitingEngine, ResourceLimits
+from src.shared_engines.logging_engine import LoggingEngine
+from src.shared_engines.profile_engine import ProfileEngine
+from src.shared_engines.telemetry_engine import TelemetryEngine
+from src.shared_engines.translation_backends import LLMBackend, MTBackend, TranslationBackend
 
 logger = logging.getLogger(__name__)
 
@@ -90,7 +90,7 @@ class CompositionRoot:
     """
 
     @staticmethod
-    def _load_execution_mode_config(config_root: str) -> Dict[str, Any]:
+    def _load_execution_mode_config(config_root: str) -> dict[str, Any]:
         """
         Load execution mode configuration from global.yaml.
 
@@ -120,7 +120,7 @@ class CompositionRoot:
 
         if global_yaml_path.exists():
             try:
-                with open(global_yaml_path, "r", encoding="utf-8") as f:
+                with open(global_yaml_path, encoding="utf-8") as f:
                     global_config = yaml.safe_load(f)
 
                 # Extract execution mode defaults
@@ -146,7 +146,7 @@ class CompositionRoot:
         return mode_config
 
     @staticmethod
-    def _load_queue_config(config_root: str, caller_config: Dict[str, Any]) -> Dict[str, Any]:
+    def _load_queue_config(config_root: str, caller_config: dict[str, Any]) -> dict[str, Any]:
         """
         Load queue configuration from global.yaml with 4-tier precedence.
 
@@ -195,7 +195,7 @@ class CompositionRoot:
 
         if global_yaml_path.exists():
             try:
-                with open(global_yaml_path, "r", encoding="utf-8") as f:
+                with open(global_yaml_path, encoding="utf-8") as f:
                     global_config = yaml.safe_load(f)
 
                 # Extract queue section
@@ -264,7 +264,7 @@ class CompositionRoot:
         return queue_config
 
     @staticmethod
-    def create_from_config(config: Optional[Dict[str, Any]] = None) -> SharedEngines:
+    def create_from_config(config: dict[str, Any] | None = None) -> SharedEngines:
         """
         Create all shared engines from configuration.
 

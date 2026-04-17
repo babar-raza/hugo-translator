@@ -4,11 +4,9 @@ Verifies that _extract_translatable_frontmatter_text correctly extracts
 frontmatter values for validation, and that frontmatter-only files are
 no longer invisible to the purity check.
 """
-import pytest
 from unittest.mock import MagicMock
 
 from src.translation_engine.engine import _extract_translatable_frontmatter_text
-
 
 # ── _extract_translatable_frontmatter_text ──────────────────────────────
 

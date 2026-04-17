@@ -4,10 +4,10 @@ Unit tests for LimitingEngine.
 Tests resource limiting wrapper with mocked GPUManager and ResourceMonitor.
 """
 
-import unittest
-from unittest.mock import Mock, patch, MagicMock
-from pathlib import Path
 import sys
+import unittest
+from pathlib import Path
+from unittest.mock import MagicMock, Mock, patch
 
 # Add src to path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent / "src"))
@@ -16,10 +16,11 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent / "src"))
 sys.modules['psutil'] = MagicMock()
 sys.modules['torch'] = MagicMock()
 
-from src.shared_engines.limiting_engine import LimitingEngine, ResourceLimits
+from datetime import datetime
+
 from src.benchmarking.resource_monitor import ResourceSnapshot
 from src.hardware.gpu_manager import GPUMemoryInfo
-from datetime import datetime
+from src.shared_engines.limiting_engine import LimitingEngine, ResourceLimits
 
 
 class TestLimitingEngine(unittest.TestCase):

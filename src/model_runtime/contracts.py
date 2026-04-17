@@ -12,7 +12,7 @@ JSON Schema for documentation and external tooling.
 
 from __future__ import annotations
 
-from typing import List, Literal, Optional
+from typing import Literal
 
 from pydantic import BaseModel, Field
 
@@ -36,11 +36,11 @@ class LLMProviderConfig(BaseModel):
     model_name: str = Field(
         description="Provider-specific model name (e.g., 'qwen3:14b', 'gpt-4o')"
     )
-    base_url: Optional[str] = Field(
+    base_url: str | None = Field(
         default=None,
         description="API base URL. Required for ollama and openai_compatible providers.",
     )
-    api_key_env: Optional[str] = Field(
+    api_key_env: str | None = Field(
         default=None,
         description="Environment variable name holding the API key (e.g., 'OPENAI_API_KEY')",
     )
@@ -60,7 +60,7 @@ class LLMProviderConfig(BaseModel):
         gt=0,
         description="Request timeout in seconds",
     )
-    system_prompt_template: Optional[str] = Field(
+    system_prompt_template: str | None = Field(
         default=None,
         description=(
             "Custom system prompt template. Use {src_lang_name} and {tgt_lang_name} "
@@ -69,7 +69,7 @@ class LLMProviderConfig(BaseModel):
     )
 
     @classmethod
-    def from_model_info(cls, model_info) -> "LLMProviderConfig":
+    def from_model_info(cls, model_info) -> LLMProviderConfig:
         """Construct from a ModelInfo dataclass.
 
         Args:
@@ -93,13 +93,13 @@ class LLMProviderConfig(BaseModel):
 class TranslationRequest(BaseModel):
     """Strict input contract for a translation call."""
 
-    texts: List[str] = Field(description="Source texts to translate")
+    texts: list[str] = Field(description="Source texts to translate")
     src_lang: str = Field(description="Source language code (ISO 639-1, e.g., 'en')")
     tgt_lang: str = Field(description="Target language code (ISO 639-1, e.g., 'fr')")
-    max_tokens: Optional[int] = Field(
+    max_tokens: int | None = Field(
         default=None, description="Override max tokens per response"
     )
-    temperature: Optional[float] = Field(
+    temperature: float | None = Field(
         default=None, description="Override sampling temperature"
     )
 
@@ -107,10 +107,10 @@ class TranslationRequest(BaseModel):
 class TranslationResponse(BaseModel):
     """Strict output contract for a translation call."""
 
-    translations: List[str] = Field(description="Translated texts (same order as input)")
+    translations: list[str] = Field(description="Translated texts (same order as input)")
     model_id: str = Field(description="Model identifier used for translation")
     backend_type: Literal["mt", "llm"] = Field(description="Backend type")
-    provider: Optional[str] = Field(
+    provider: str | None = Field(
         default=None, description="LLM provider name (None for MT backends)"
     )
     token_usage: TokenUsage = Field(

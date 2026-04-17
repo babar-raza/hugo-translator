@@ -11,7 +11,6 @@ Tests the BenchmarkExporter class:
 import csv
 import gzip
 import json
-import pytest
 import tempfile
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -24,8 +23,8 @@ from src.benchmarking.exporter import (
 )
 from src.benchmarking.storage import (
     BenchmarkDatabase,
-    BenchmarkRun,
     BenchmarkResult,
+    BenchmarkRun,
     SystemInfo,
 )
 

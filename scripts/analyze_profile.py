@@ -1,6 +1,5 @@
 """Analyze cProfile stats and generate comparison report."""
 import pstats
-from pathlib import Path
 
 # Analyze parallel mode profile
 print("=" * 80)

@@ -5,12 +5,12 @@ Tests benchmark orchestration, token counting, error handling, and result persis
 """
 
 import json
+from unittest.mock import Mock, mock_open, patch
+
 import pytest
-from pathlib import Path
-from unittest.mock import MagicMock, Mock, patch, mock_open
 
 from src.benchmarking.runner import BenchmarkRunner, load_corpus
-from src.benchmarking.storage import BenchmarkDatabase, BenchmarkResult, BenchmarkRun, SystemInfo
+from src.benchmarking.storage import BenchmarkDatabase, SystemInfo
 from src.model_runtime.registry import ModelInfo, ModelRegistry
 
 

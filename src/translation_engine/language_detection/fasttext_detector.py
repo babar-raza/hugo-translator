@@ -7,10 +7,9 @@ for distinguishing similar languages (Romance, Cyrillic, Arabic script, etc.).
 """
 
 import logging
-import re
 import urllib.request
 from pathlib import Path
-from typing import Optional, Tuple, TYPE_CHECKING
+from typing import TYPE_CHECKING, Optional
 
 if TYPE_CHECKING:
     from .similarity_tracker import SimilarityTracker
@@ -47,8 +46,8 @@ class FastTextDetector:
     def __init__(
         self,
         cache_dir: Path,
-        model_url: Optional[str] = None,
-        model_filename: Optional[str] = None,
+        model_url: str | None = None,
+        model_filename: str | None = None,
         min_confidence: float = 0.70,
         auto_download: bool = True,
         download_retries: int = 3,
@@ -114,7 +113,7 @@ class FastTextDetector:
             # Suppress FastText warnings
             logger.debug(f"Loading FastText model from {self.model_path}...")
             self._model = self._fasttext.load_model(str(self.model_path))
-            logger.info(f"FastText model loaded successfully (176 languages)")
+            logger.info("FastText model loaded successfully (176 languages)")
         except Exception as e:
             logger.error(f"Failed to load FastText model: {e}")
             self._try_langdetect_fallback()
@@ -181,7 +180,7 @@ class FastTextDetector:
         except ImportError:
             logger.error("Neither fasttext nor langdetect available. Language detection disabled.")
 
-    def detect(self, text: str, min_length: int = 10) -> Tuple[str, float]:
+    def detect(self, text: str, min_length: int = 10) -> tuple[str, float]:
         """
         Detect language of text with confidence score.
 
@@ -241,7 +240,7 @@ class FastTextDetector:
         text: str,
         expected_lang: str,
         similarity_tracker: Optional["SimilarityTracker"] = None,
-        script_validation_thresholds: Optional[dict] = None,
+        script_validation_thresholds: dict | None = None,
     ) -> bool:
         """
         Verify text is in expected language (or similar language).

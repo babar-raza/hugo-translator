@@ -6,11 +6,7 @@ Tests concurrent metadata updates with Redis coordination.
 
 import json
 import threading
-import time
-from pathlib import Path
-from unittest.mock import MagicMock, Mock, patch
-
-import pytest
+from unittest.mock import MagicMock, patch
 
 from src.utils.metadata_tracker import MetadataTracker
 

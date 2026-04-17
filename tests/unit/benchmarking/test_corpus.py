@@ -11,13 +11,11 @@ Validates:
 
 import json
 import re
-import tempfile
 from pathlib import Path
-from typing import List, Dict, Any
+from typing import Any
 
 import pytest
 import yaml
-
 
 # Corpus file paths
 CORPUS_DIR = Path(__file__).parent.parent.parent.parent / "data" / "benchmark_corpus"
@@ -26,12 +24,12 @@ SMALL_CORPUS = CORPUS_DIR / "small.json"
 MEDIUM_CORPUS = CORPUS_DIR / "medium.json"
 
 
-def load_corpus(corpus_path: Path) -> List[Dict[str, Any]]:
+def load_corpus(corpus_path: Path) -> list[dict[str, Any]]:
     """Load and parse corpus JSON file."""
     if not corpus_path.exists():
         pytest.skip(f"Corpus file not found: {corpus_path}")
 
-    with open(corpus_path, 'r', encoding='utf-8') as f:
+    with open(corpus_path, encoding='utf-8') as f:
         return json.load(f)
 
 

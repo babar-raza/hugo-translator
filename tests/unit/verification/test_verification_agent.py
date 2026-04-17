@@ -9,8 +9,9 @@ Tests:
 - Fail-fast mode
 - Error handling for check failures
 """
+from typing import Any
+
 import pytest
-from typing import Any, Dict, List, Optional
 
 from src.verification import (
     VerificationAgent,
@@ -30,11 +31,11 @@ class PassingCheck(VerificationCheck):
 
     def run(
         self,
-        source: Dict[str, Any],
-        translated: Dict[str, Any],
+        source: dict[str, Any],
+        translated: dict[str, Any],
         target_lang: str,
-        context: Optional[Dict[str, Any]] = None,
-    ) -> List[VerificationIssue]:
+        context: dict[str, Any] | None = None,
+    ) -> list[VerificationIssue]:
         return []
 
 
@@ -47,11 +48,11 @@ class WarningCheck(VerificationCheck):
 
     def run(
         self,
-        source: Dict[str, Any],
-        translated: Dict[str, Any],
+        source: dict[str, Any],
+        translated: dict[str, Any],
         target_lang: str,
-        context: Optional[Dict[str, Any]] = None,
-    ) -> List[VerificationIssue]:
+        context: dict[str, Any] | None = None,
+    ) -> list[VerificationIssue]:
         return [
             VerificationIssue(
                 severity="warning",
@@ -71,11 +72,11 @@ class ErrorCheck(VerificationCheck):
 
     def run(
         self,
-        source: Dict[str, Any],
-        translated: Dict[str, Any],
+        source: dict[str, Any],
+        translated: dict[str, Any],
         target_lang: str,
-        context: Optional[Dict[str, Any]] = None,
-    ) -> List[VerificationIssue]:
+        context: dict[str, Any] | None = None,
+    ) -> list[VerificationIssue]:
         return [
             VerificationIssue(
                 severity="error",
@@ -97,11 +98,11 @@ class ExceptionCheck(VerificationCheck):
 
     def run(
         self,
-        source: Dict[str, Any],
-        translated: Dict[str, Any],
+        source: dict[str, Any],
+        translated: dict[str, Any],
         target_lang: str,
-        context: Optional[Dict[str, Any]] = None,
-    ) -> List[VerificationIssue]:
+        context: dict[str, Any] | None = None,
+    ) -> list[VerificationIssue]:
         raise ValueError("Simulated check failure")
 
 
@@ -112,16 +113,16 @@ class DisabledCheck(VerificationCheck):
     def name(self) -> str:
         return "disabled_check"
 
-    def is_enabled(self, context: Optional[Dict[str, Any]] = None) -> bool:
+    def is_enabled(self, context: dict[str, Any] | None = None) -> bool:
         return False
 
     def run(
         self,
-        source: Dict[str, Any],
-        translated: Dict[str, Any],
+        source: dict[str, Any],
+        translated: dict[str, Any],
         target_lang: str,
-        context: Optional[Dict[str, Any]] = None,
-    ) -> List[VerificationIssue]:
+        context: dict[str, Any] | None = None,
+    ) -> list[VerificationIssue]:
         return [
             VerificationIssue(
                 severity="error",
@@ -510,11 +511,11 @@ class TestVerificationAgent:
 
             def run(
                 self,
-                source: Dict[str, Any],
-                translated: Dict[str, Any],
+                source: dict[str, Any],
+                translated: dict[str, Any],
                 target_lang: str,
-                context: Optional[Dict[str, Any]] = None,
-            ) -> List[VerificationIssue]:
+                context: dict[str, Any] | None = None,
+            ) -> list[VerificationIssue]:
                 if context and context.get("skip"):
                     return []
                 return [

@@ -25,10 +25,10 @@ import logging
 import sqlite3
 import threading
 import time
+from collections.abc import Generator
 from contextlib import contextmanager
 from pathlib import Path
 from queue import Empty, Queue
-from typing import Generator, Optional
 
 logger = logging.getLogger(__name__)
 

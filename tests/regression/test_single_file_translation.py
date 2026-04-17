@@ -1,6 +1,6 @@
 """Test single file translation with array reconstruction fix."""
-import sys
 import os
+import sys
 from pathlib import Path
 
 # Add src to path
@@ -9,6 +9,7 @@ sys.path.insert(0, str(REPO_ROOT))
 os.chdir(str(REPO_ROOT))
 
 import logging
+
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(levelname)s - %(message)s'
@@ -17,15 +18,16 @@ logger = logging.getLogger(__name__)
 
 def test_single_translation():
     """Test translating the presentation-to-pdf-converter file."""
-    from src.translation_engine import TranslationEngine
-    from src.utils.config_loader import ConfigService
+    import torch
+
+    from src.model_runtime import ModelLoader
+    from src.model_runtime.registry import ModelRegistry
     from src.tm import TranslationMemory
     from src.tm.l1_cache import L1Cache
     from src.tm.l2_persistent import L2PersistentTM
     from src.tm.l3_semantic import L3SemanticTM
-    from src.model_runtime import ModelLoader
-    from src.model_runtime.registry import ModelRegistry
-    import torch
+    from src.translation_engine import TranslationEngine
+    from src.utils.config_loader import ConfigService
 
     print("=" * 80)
     print("TESTING: Single File Translation with Array Fix")
@@ -82,9 +84,9 @@ def test_single_translation():
     # Test file
     test_file = Path(r"D:\onedrive\Documents\GitHub\aspose.net\content\products.aspose.net\slides\en\presentation-to-pdf-converter\_index.md")
 
-    print(f"\n[2/4] Translating test file...")
+    print("\n[2/4] Translating test file...")
     print(f"   Source: {test_file}")
-    print(f"   Target: de (German)")
+    print("   Target: de (German)")
 
     result = engine.translate_file(
         site_id="products.aspose.net",
@@ -92,7 +94,7 @@ def test_single_translation():
         target_langs=["de"],
     )
 
-    print(f"\n[3/4] Translation Results:")
+    print("\n[3/4] Translation Results:")
     print(f"   Success: {result.success}")
     print(f"   Duration: {result.stats.duration_seconds:.2f}s")
     print(f"   Segments: {result.stats.total_segments}")
@@ -100,7 +102,7 @@ def test_single_translation():
         print(f"   {lang}: {output_path}")
 
     # Verify output
-    print(f"\n[4/4] Verifying output...")
+    print("\n[4/4] Verifying output...")
     if result.success and "de" in result.outputs:
         output_file = result.outputs["de"]
         if output_file.exists():
@@ -135,7 +137,7 @@ def test_single_translation():
                                     content_val = first_block["content_left"]
                                     if isinstance(content_val, str):
                                         if "Add the Aspose" in content_val:
-                                            print(f"   [FAIL] content_left NOT translated")
+                                            print("   [FAIL] content_left NOT translated")
                                         else:
                                             print(f"   [PASS] content_left translated: {content_val[:50]}...")
                             else:

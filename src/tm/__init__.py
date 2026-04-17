@@ -3,6 +3,7 @@ Translation Memory module.
 """
 from .l1_cache import L1Cache
 from .l2_persistent import L2PersistentTM, TranslationEntry
+
 try:
     from .l3_semantic import L3SemanticTM, SemanticMatch
 except Exception:

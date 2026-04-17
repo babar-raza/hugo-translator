@@ -4,10 +4,9 @@ import argparse
 import json
 import subprocess
 import sys
+from dataclasses import asdict, dataclass
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import List, Dict, Optional
-from dataclasses import dataclass, asdict
-from datetime import datetime, UTC
 
 
 @dataclass
@@ -16,8 +15,8 @@ class CheckResult:
     check_name: str
     passed: bool
     message: str
-    details: Optional[str] = None
-    duration_seconds: Optional[float] = None
+    details: str | None = None
+    duration_seconds: float | None = None
 
     def to_dict(self) -> dict:
         return asdict(self)
@@ -33,7 +32,7 @@ class QualityChecker:
             project_root: Root directory of project
         """
         self.project_root = Path(project_root)
-        self.results: List[CheckResult] = []
+        self.results: list[CheckResult] = []
 
     def check_todos(self) -> CheckResult:
         """Check for TODO/FIXME comments in source code."""
@@ -245,8 +244,8 @@ class QualityChecker:
 
     def check_python_syntax(self) -> CheckResult:
         """Check Python files for syntax errors."""
-        import time
         import py_compile
+        import time
         start = time.time()
 
         python_files = list(self.project_root.glob("src/**/*.py"))
@@ -320,7 +319,7 @@ class QualityChecker:
                 duration_seconds=time.time() - start
             )
 
-    def run_all_checks(self, checks: Optional[List[str]] = None) -> List[CheckResult]:
+    def run_all_checks(self, checks: list[str] | None = None) -> list[CheckResult]:
         """Run all quality checks.
 
         Args:

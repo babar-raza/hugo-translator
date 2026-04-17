@@ -7,20 +7,20 @@ Verifies POST, retry logic, error handling, and idempotency.
 These tests replace the removed direct-DB tests with tests focused on
 the new HTTP API architecture.
 """
+import json
+from unittest.mock import Mock, patch
+
 import pytest
 import requests
-from unittest.mock import Mock, patch, MagicMock
-import json
-
 
 # Skip all tests if telemetry module not available
 pytest.importorskip("telemetry", reason="telemetry module not installed")
 
 from telemetry.http_client import (
-    HTTPAPIClient,
+    APIError,
     APIUnavailableError,
     APIValidationError,
-    APIError,
+    HTTPAPIClient,
 )
 
 

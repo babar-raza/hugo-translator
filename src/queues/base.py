@@ -6,7 +6,7 @@ job queue operations.
 """
 
 from abc import ABC, abstractmethod
-from typing import Optional, Dict, Any, List
+from typing import Any
 
 
 class QueueBackend(ABC):
@@ -40,7 +40,7 @@ class QueueBackend(ABC):
     """
 
     @abstractmethod
-    def push(self, queue_name: str, item: Dict[str, Any]) -> None:
+    def push(self, queue_name: str, item: dict[str, Any]) -> None:
         """
         Push item to queue.
 
@@ -62,7 +62,7 @@ class QueueBackend(ABC):
         pass
 
     @abstractmethod
-    def pop(self, queue_name: str, timeout: float = 0) -> Optional[Dict[str, Any]]:
+    def pop(self, queue_name: str, timeout: float = 0) -> dict[str, Any] | None:
         """
         Pop item from queue.
 
@@ -123,7 +123,7 @@ class QueueBackend(ABC):
         """
         pass
 
-    def peek(self, queue_name: str, n: int = 10) -> List[Dict[str, Any]]:
+    def peek(self, queue_name: str, n: int = 10) -> list[dict[str, Any]]:
         """
         Look at next N items without removing them (optional).
 

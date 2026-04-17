@@ -21,11 +21,8 @@ Usage:
 import argparse
 import json
 import logging
-import os
 import sys
-from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Dict, List, Optional
 
 import numpy as np
 from tqdm import tqdm
@@ -191,7 +188,7 @@ class L3IndexPopulator:
             return False
         return True
 
-    def process_batch(self, batch: List[Dict]) -> int:
+    def process_batch(self, batch: list[dict]) -> int:
         """
         Process a batch of entries and add to L3 index.
 
@@ -247,7 +244,7 @@ class L3IndexPopulator:
         self.stats['batches_processed'] += 1
         return added_count
 
-    def populate(self, resume: bool = False, rebuild: bool = False) -> Dict:
+    def populate(self, resume: bool = False, rebuild: bool = False) -> dict:
         """
         Populate L3 index from L2 database.
 

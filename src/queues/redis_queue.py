@@ -8,7 +8,7 @@ Uses Redis sorted sets for priority queue operations.
 import json
 import logging
 import time
-from typing import Optional, Dict, Any, List
+from typing import Any
 
 from .base import QueueBackend
 
@@ -61,7 +61,7 @@ class RedisQueueBackend(QueueBackend):
         host: str = "localhost",
         port: int = 6379,
         db: int = 0,
-        password: Optional[str] = None,
+        password: str | None = None,
         key_prefix: str = "hugo_translation",
         max_retries: int = 3,
         retry_delay: float = 1.0
@@ -76,7 +76,7 @@ class RedisQueueBackend(QueueBackend):
         self.retry_delay = retry_delay
 
         # Redis client (lazy initialization)
-        self._redis: Optional[Any] = None
+        self._redis: Any | None = None
         self._closed = False
 
         logger.info(
@@ -144,7 +144,7 @@ class RedisQueueBackend(QueueBackend):
         """Get Redis key for job data hash."""
         return f"{self.key_prefix}:{queue_name}:data"
 
-    def push(self, queue_name: str, item: Dict[str, Any]) -> None:
+    def push(self, queue_name: str, item: dict[str, Any]) -> None:
         """
         Push item to Redis queue.
 
@@ -197,7 +197,7 @@ class RedisQueueBackend(QueueBackend):
             f"job_id={job_id}, priority={priority}"
         )
 
-    def pop(self, queue_name: str, timeout: float = 0) -> Optional[Dict[str, Any]]:
+    def pop(self, queue_name: str, timeout: float = 0) -> dict[str, Any] | None:
         """
         Pop item from Redis queue.
 
@@ -311,7 +311,7 @@ class RedisQueueBackend(QueueBackend):
 
             self._closed = True
 
-    def peek(self, queue_name: str, n: int = 10) -> List[Dict[str, Any]]:
+    def peek(self, queue_name: str, n: int = 10) -> list[dict[str, Any]]:
         """
         Look at next N items without removing them.
 

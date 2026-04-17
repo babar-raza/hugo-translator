@@ -4,15 +4,15 @@ Unit tests for VRAM enforcer.
 Tests VRAMEnforcer class with mocked torch.cuda to avoid requiring actual GPU hardware.
 """
 
-import pytest
 from unittest.mock import MagicMock, patch
+
+import pytest
 
 from src.hardware.vram_enforcer import (
     VRAMEnforcer,
     ensure_vram_budget,
     reset_enforcement_state,
 )
-from src.hardware.vram_budget import VRAMBudget
 
 
 @pytest.fixture(autouse=True)

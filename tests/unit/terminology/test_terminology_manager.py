@@ -7,12 +7,14 @@ Tests cover:
 - Error handling
 """
 
-import pytest
-import tempfile
 import os
+import tempfile
 from pathlib import Path
-from src.translation_engine.terminology.terminology_manager import TerminologyManager
+
+import pytest
+
 from src.translation_engine.terminology.models import PreserveMode, TermSeverity
+from src.translation_engine.terminology.terminology_manager import TerminologyManager
 
 
 class TestTerminologyManager:

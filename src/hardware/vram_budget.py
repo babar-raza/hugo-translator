@@ -6,7 +6,6 @@ Provides dataclasses and utilities for computing VRAM budgets from percent/MB li
 
 import logging
 from dataclasses import dataclass
-from typing import Optional, Tuple
 
 import torch
 
@@ -51,9 +50,9 @@ class VRAMBudget:
 
 def resolve_vram_budget_mb(
     total_mb: float,
-    max_gpu_memory_percent: Optional[int] = None,
-    max_gpu_memory_mb: Optional[int] = None,
-) -> Tuple[int, VRAMBudget]:
+    max_gpu_memory_percent: int | None = None,
+    max_gpu_memory_mb: int | None = None,
+) -> tuple[int, VRAMBudget]:
     """
     Resolve VRAM budget from configuration with precedence:
     1. max_gpu_memory_mb (explicit MB limit - highest priority)

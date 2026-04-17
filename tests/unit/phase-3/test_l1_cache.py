@@ -6,8 +6,6 @@ import threading
 import time
 from pathlib import Path
 
-import pytest
-
 sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent / "src"))
 
 from tm.l1_cache import CacheStats, L1Cache

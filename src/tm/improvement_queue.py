@@ -11,10 +11,10 @@ Implements a JSONL-based queue with:
 import hashlib
 import json
 import logging
-from dataclasses import dataclass, asdict
+from dataclasses import asdict, dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import List, Optional, Dict, Any
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -40,10 +40,10 @@ class ImprovementCandidate:
     tgt_lang: str
     text: str
     translation: str
-    context: Optional[str] = None
-    added_at: Optional[str] = None
-    metadata: Optional[Dict[str, Any]] = None
-    candidate_hash: Optional[str] = None
+    context: str | None = None
+    added_at: str | None = None
+    metadata: dict[str, Any] | None = None
+    candidate_hash: str | None = None
 
     def __post_init__(self):
         """Generate hash and timestamp if not provided."""
@@ -131,7 +131,7 @@ class ImprovementQueue:
             return set()
 
         try:
-            with open(self.seen_file, "r", encoding="utf-8") as f:
+            with open(self.seen_file, encoding="utf-8") as f:
                 data = json.load(f)
                 seen = set(data.get("seen_hashes", []))
                 logger.debug(f"Loaded {len(seen)} seen hashes from {self.seen_file}")
@@ -156,8 +156,8 @@ class ImprovementQueue:
         tgt_lang: str,
         text: str,
         translation: str,
-        context: Optional[str] = None,
-        metadata: Optional[Dict[str, Any]] = None,
+        context: str | None = None,
+        metadata: dict[str, Any] | None = None,
     ) -> bool:
         """
         Append a candidate to the improvement queue.
@@ -212,7 +212,7 @@ class ImprovementQueue:
             logger.error(f"Failed to append candidate to queue: {e}")
             return False
 
-    def pop_candidates(self, limit: int = 50) -> List[ImprovementCandidate]:
+    def pop_candidates(self, limit: int = 50) -> list[ImprovementCandidate]:
         """
         Pop candidates from the queue for processing.
 
@@ -233,7 +233,7 @@ class ImprovementQueue:
             candidates = []
             remaining = []
 
-            with open(self.queue_file, "r", encoding="utf-8") as f:
+            with open(self.queue_file, encoding="utf-8") as f:
                 for i, line in enumerate(f):
                     line = line.strip()
                     if not line:
@@ -284,7 +284,7 @@ class ImprovementQueue:
             return 0
 
         try:
-            with open(self.queue_file, "r", encoding="utf-8") as f:
+            with open(self.queue_file, encoding="utf-8") as f:
                 count = sum(1 for line in f if line.strip())
             return count
         except Exception as e:
@@ -301,7 +301,7 @@ class ImprovementQueue:
 
         logger.info("Cleared improvement queue")
 
-    def stats(self) -> Dict[str, Any]:
+    def stats(self) -> dict[str, Any]:
         """
         Get queue statistics.
 

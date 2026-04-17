@@ -1,8 +1,7 @@
 """Shared metrics calculation utilities."""
-from typing import Dict, List
 
 
-def calc_stats(values: List[float]) -> Dict[str, float]:
+def calc_stats(values: list[float]) -> dict[str, float]:
     """Calculate statistics for a list of values.
 
     Provides comprehensive statistics including basic measures (count, mean, min, max),

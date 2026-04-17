@@ -66,4 +66,3 @@ def test_oneshot_failure_sets_last_error_without_success(tmp_path: Path, monkeyp
     assert payload["state"] == "stopped"
     assert payload["last_error_ts"]
     assert "last_success_ts" not in payload
-

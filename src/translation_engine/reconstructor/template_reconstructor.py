@@ -6,7 +6,7 @@ while preserving all comments, whitespace, quotes, and structure.
 """
 import re
 from io import StringIO
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 import structlog
 from ruamel.yaml import YAML
@@ -43,8 +43,8 @@ class TemplateReconstructor:
     def reconstruct_from_template(
         self,
         source_content: str,
-        translations: Dict[str, str],
-        segment_map: Dict[str, Segment],
+        translations: dict[str, str],
+        segment_map: dict[str, Segment],
     ) -> str:
         """
         Reconstruct translated file using source as template.
@@ -107,8 +107,8 @@ class TemplateReconstructor:
     def _apply_frontmatter_translations(
         self,
         data: CommentedMap,
-        translations: Dict[str, str],
-        segment_map: Dict[str, Segment],
+        translations: dict[str, str],
+        segment_map: dict[str, Segment],
     ) -> None:
         """Apply translations to frontmatter, preserving structure."""
         for segment_id, translated_text in translations.items():
@@ -140,8 +140,8 @@ class TemplateReconstructor:
     def _apply_body_translations(
         self,
         body_content: str,
-        translations: Dict[str, str],
-        segment_map: Dict[str, Segment],
+        translations: dict[str, str],
+        segment_map: dict[str, Segment],
     ) -> str:
         """Apply translations to body content.
 
@@ -235,7 +235,7 @@ class TemplateReconstructor:
 
         return has_list_markers or has_multiple_paragraphs or has_numbered_list
 
-    def _parse_key_path(self, key: str) -> List[Dict[str, Any]]:
+    def _parse_key_path(self, key: str) -> list[dict[str, Any]]:
         """Parse key path like 'body.block[0].title' into components."""
         pattern = re.compile(r"^([^\[]+)(?:\[(\d+)\])?$")
 

@@ -4,8 +4,9 @@ Unit tests for empty translation fallback mechanism (Iter6 fix).
 Tests the fallback ladder that recovers empty translations by retrying
 with safer generation parameters.
 """
+from unittest.mock import MagicMock, Mock, patch
+
 import pytest
-from unittest.mock import Mock, MagicMock, patch
 import torch
 
 

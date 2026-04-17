@@ -15,7 +15,6 @@ import os
 import sqlite3
 import subprocess
 import sys
-import tempfile
 from datetime import datetime, timedelta
 from pathlib import Path
 

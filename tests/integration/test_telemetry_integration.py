@@ -4,18 +4,16 @@ Tests for telemetry_integration module (TEL-05-A, TEL-05-C).
 Tests business context extraction and telemetry wiring.
 """
 from pathlib import Path
-from unittest.mock import MagicMock, patch
-
-import pytest
+from unittest.mock import MagicMock
 
 from src.observability.telemetry_integration import (
+    DummyRunContext,
+    TranslationTelemetry,
+    build_error_summary,
     extract_business_context,
     extract_website,
-    map_website_section,
     get_item_name,
-    build_error_summary,
-    TranslationTelemetry,
-    DummyRunContext,
+    map_website_section,
 )
 from src.translation_engine.models import DirectoryResult, TranslationResult, TranslationStats
 

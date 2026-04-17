@@ -4,9 +4,11 @@ Unit tests for TranslationEngine._get_output_path() method.
 Tests SR-02 implementation: output_dir_override parameter and path resolution logic.
 """
 
-import pytest
 from pathlib import Path
-from unittest.mock import MagicMock, Mock
+from unittest.mock import MagicMock
+
+import pytest
+
 from src.translation_engine.engine import TranslationEngine
 
 

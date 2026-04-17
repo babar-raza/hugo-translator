@@ -9,7 +9,7 @@ import logging
 import time
 from dataclasses import dataclass
 from enum import Enum
-from typing import Optional, Dict, Any
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -28,9 +28,9 @@ class LLMConfig:
 
     provider: str = "ollama"
     model: str = "qwen3:14b"
-    base_url: Optional[str] = None
-    api_key: Optional[str] = None
-    api_key_env: Optional[str] = None
+    base_url: str | None = None
+    api_key: str | None = None
+    api_key_env: str | None = None
     timeout_seconds: int = 30
     max_retries: int = 2
     temperature: float = 0.3
@@ -60,6 +60,7 @@ class LLMClient:
     def _initialize_provider(self):
         """Initialize the unified LLM provider."""
         import os
+
         from src.model_runtime.contracts import LLMProviderConfig
         from src.model_runtime.llm_providers import create_provider
 
@@ -95,9 +96,9 @@ class LLMClient:
         fuzzy_translation: str,
         source_lang: str,
         target_lang: str,
-        context: Optional[str] = None,
+        context: str | None = None,
         similarity_score: float = 0.0,
-    ) -> Optional[str]:
+    ) -> str | None:
         """
         Adapt a fuzzy translation match to better fit the context.
 
@@ -144,7 +145,7 @@ class LLMClient:
         fuzzy_translation: str,
         source_lang: str,
         target_lang: str,
-        context: Optional[str],
+        context: str | None,
         similarity_score: float,
     ) -> str:
         """Build prompt for translation adaptation."""
@@ -208,7 +209,7 @@ Adapted Translation:"""
         self._available = True
         return True
 
-    def test_connection(self) -> Dict[str, Any]:
+    def test_connection(self) -> dict[str, Any]:
         """Test LLM connection."""
         result = {
             "available": self._available,
@@ -239,8 +240,8 @@ Adapted Translation:"""
 def create_llm_client(
     provider: str = "ollama",
     model: str = "qwen3:14b",
-    api_key: Optional[str] = None,
-    base_url: Optional[str] = None,
+    api_key: str | None = None,
+    base_url: str | None = None,
     **kwargs,
 ) -> LLMClient:
     """

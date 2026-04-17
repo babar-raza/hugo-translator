@@ -17,14 +17,14 @@ import argparse
 import re
 import sys
 from pathlib import Path
-from typing import List, Tuple, Optional
+
 import yaml
 
 
 class Violation:
     """Represents a spec-lint violation."""
 
-    def __init__(self, rule: str, file: Path, line: Optional[int], message: str, fixable: bool = False):
+    def __init__(self, rule: str, file: Path, line: int | None, message: str, fixable: bool = False):
         self.rule = rule
         self.file = file
         self.line = line
@@ -41,7 +41,7 @@ class SpecLinter:
     """Automated spec linter."""
 
     def __init__(self):
-        self.violations: List[Violation] = []
+        self.violations: list[Violation] = []
 
     def check_naming(self, spec_path: Path) -> None:
         """RULE-S1: Check filename follows {category}-{number}-{slug}.md"""
@@ -213,7 +213,7 @@ class SpecLinter:
                 fixable=False
             ))
 
-    def lint_file(self, spec_path: Path, inventory_path: Optional[Path] = None) -> None:
+    def lint_file(self, spec_path: Path, inventory_path: Path | None = None) -> None:
         """Run all lint checks on a single spec file."""
         self.check_naming(spec_path)
         self.check_frontmatter(spec_path)
@@ -261,7 +261,7 @@ Examples:
     if args.all:
         specs_dir = Path('specs/features')
         if not specs_dir.exists():
-            print(f"Error: specs/features directory not found", file=sys.stderr)
+            print("Error: specs/features directory not found", file=sys.stderr)
             return 2
         spec_files = sorted(specs_dir.glob('*.md'))
     elif args.files:

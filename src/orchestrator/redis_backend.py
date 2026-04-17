@@ -7,7 +7,6 @@ Provides persistent, distributed queue using Redis as the backend.
 import json
 import logging
 import uuid
-from typing import Dict, List, Optional
 
 from .models import JobStats, JobStatus, TranslationJob
 
@@ -26,7 +25,7 @@ class RedisQueueBackend:
         host: str = "localhost",
         port: int = 6379,
         db: int = 0,
-        password: Optional[str] = None,
+        password: str | None = None,
         key_prefix: str = "hugo_translation",
     ):
         """
@@ -46,7 +45,7 @@ class RedisQueueBackend:
         self.key_prefix = key_prefix
 
         # Redis client (lazy initialization)
-        self._redis: Optional[any] = None
+        self._redis: any | None = None
 
         # Redis keys
         self.queue_key = f"{key_prefix}:queue"  # Sorted set for priority queue
@@ -127,7 +126,7 @@ class RedisQueueBackend:
 
         return job.job_id
 
-    def dequeue(self) -> Optional[TranslationJob]:
+    def dequeue(self) -> TranslationJob | None:
         """
         Get highest priority pending job from Redis.
 
@@ -175,7 +174,7 @@ class RedisQueueBackend:
 
         return job
 
-    def get_job(self, job_id: str) -> Optional[TranslationJob]:
+    def get_job(self, job_id: str) -> TranslationJob | None:
         """
         Get job by ID.
 
@@ -197,8 +196,8 @@ class RedisQueueBackend:
         self,
         job_id: str,
         status: JobStatus,
-        error_message: Optional[str] = None,
-        result_summary: Optional[Dict] = None,
+        error_message: str | None = None,
+        result_summary: dict | None = None,
     ) -> bool:
         """
         Update job status in Redis.
@@ -251,7 +250,7 @@ class RedisQueueBackend:
 
         return True
 
-    def peek(self, n: int = 10) -> List[TranslationJob]:
+    def peek(self, n: int = 10) -> list[TranslationJob]:
         """
         Look at next N pending jobs without removing.
 
@@ -346,7 +345,7 @@ class RedisJobQueue:
         host: str = "localhost",
         port: int = 6379,
         db: int = 0,
-        password: Optional[str] = None,
+        password: str | None = None,
     ):
         """
         Initialize Redis job queue.
@@ -368,15 +367,15 @@ class RedisJobQueue:
         """Add job to queue."""
         return self.backend.enqueue(job)
 
-    def dequeue(self) -> Optional[TranslationJob]:
+    def dequeue(self) -> TranslationJob | None:
         """Get next job from queue."""
         return self.backend.dequeue()
 
-    def peek(self, n: int = 10) -> List[TranslationJob]:
+    def peek(self, n: int = 10) -> list[TranslationJob]:
         """Look at next N jobs without removing."""
         return self.backend.peek(n)
 
-    def get_job(self, job_id: str) -> Optional[TranslationJob]:
+    def get_job(self, job_id: str) -> TranslationJob | None:
         """Get job by ID."""
         return self.backend.get_job(job_id)
 
@@ -384,8 +383,8 @@ class RedisJobQueue:
         self,
         job_id: str,
         status: JobStatus,
-        error_message: Optional[str] = None,
-        result_summary: Optional[Dict] = None,
+        error_message: str | None = None,
+        result_summary: dict | None = None,
     ) -> bool:
         """Update job status."""
         return self.backend.update_job_status(

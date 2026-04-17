@@ -1,7 +1,5 @@
 """Integration tests for translation statistics accuracy."""
-import pytest
-import time
-from src.observability.progress import ProgressTracker, AdaptiveEMACalculator
+from src.observability.progress import AdaptiveEMACalculator, ProgressTracker
 
 
 class TestETAAdaptation:

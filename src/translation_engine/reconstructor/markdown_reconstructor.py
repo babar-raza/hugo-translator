@@ -4,17 +4,15 @@ Markdown reconstruction from translated segments and original AST.
 import logging
 from copy import deepcopy
 from io import StringIO
-from pathlib import Path
-from typing import Any, Dict, List, Optional, Union
+from typing import Any
 
 from ruamel.yaml import YAML
 from ruamel.yaml.comments import CommentedMap
 
+from ...utils.models import FrontmatterMode, SiteProfile
 from ..extractor import PlaceholderManager, Segment, SegmentContextType
 from ..parser import ASTNode, HugoDocument, NodeType
 from ..quality.glossary_corrector import get_glossary_corrector
-from ...utils.models import FrontmatterMode, SiteProfile
-
 from .yaml_formatter import YAMLFormatter
 
 logger = logging.getLogger(__name__)
@@ -42,9 +40,9 @@ class MarkdownReconstructor:
     def reconstruct_document(
         self,
         doc: HugoDocument,
-        translations: Dict[str, str],
+        translations: dict[str, str],
         target_lang: str,
-        segment_map: Optional[Dict[str, str]] = None,
+        segment_map: dict[str, str] | None = None,
     ) -> str:
         """
         Reconstruct complete Hugo Markdown document.
@@ -75,7 +73,7 @@ class MarkdownReconstructor:
         # Combine
         return f"{fm_yaml}\n{body}" if body else fm_yaml
 
-    def _copy_commented_map(self, original: Union[Dict[str, Any], CommentedMap]) -> Union[Dict[str, Any], CommentedMap]:
+    def _copy_commented_map(self, original: dict[str, Any] | CommentedMap) -> dict[str, Any] | CommentedMap:
         """
         Create a deep copy of frontmatter that preserves CommentedMap structure.
 
@@ -101,10 +99,10 @@ class MarkdownReconstructor:
 
     def reconstruct_frontmatter(
         self,
-        original: Union[Dict[str, Any], CommentedMap],
-        translations: Dict[str, str],
+        original: dict[str, Any] | CommentedMap,
+        translations: dict[str, str],
         target_lang: str,
-    ) -> Union[Dict[str, Any], CommentedMap]:
+    ) -> dict[str, Any] | CommentedMap:
         """
         Reconstruct frontmatter with translations.
 
@@ -175,8 +173,8 @@ class MarkdownReconstructor:
 
     def reconstruct_body(
         self,
-        original_ast: List[ASTNode],
-        translations: Dict[str, str],
+        original_ast: list[ASTNode],
+        translations: dict[str, str],
         target_lang: str,
     ) -> str:
         """
@@ -220,7 +218,7 @@ class MarkdownReconstructor:
         return reconstructed
 
     def _reconstruct_node(
-        self, node: ASTNode, translations: Dict[str, str]
+        self, node: ASTNode, translations: dict[str, str]
     ) -> str:
         """Reconstruct Markdown for a single AST node."""
 
@@ -289,7 +287,7 @@ class MarkdownReconstructor:
         return ""
 
     def _reconstruct_list(
-        self, list_node: ASTNode, translations: Dict[str, str]
+        self, list_node: ASTNode, translations: dict[str, str]
     ) -> str:
         """Reconstruct a list from AST node."""
         items = []
@@ -308,7 +306,7 @@ class MarkdownReconstructor:
         return "\n".join(items)
 
     def _reconstruct_table(
-        self, table_node: ASTNode, translations: Dict[str, str]
+        self, table_node: ASTNode, translations: dict[str, str]
     ) -> str:
         """Reconstruct a markdown table from AST node."""
         if not table_node.children:
@@ -363,7 +361,7 @@ class MarkdownReconstructor:
 
         return "\n".join(lines)
 
-    def _reconstruct_inline_children(self, children: List[ASTNode]) -> str:
+    def _reconstruct_inline_children(self, children: list[ASTNode]) -> str:
         """Reconstruct inline content from child nodes."""
         parts = []
 
@@ -414,8 +412,8 @@ class MarkdownReconstructor:
         return "".join(parts)
 
     def _find_frontmatter_translation(
-        self, key: str, translations: Dict[str, str], original: Dict[str, Any]
-    ) -> Optional[str]:
+        self, key: str, translations: dict[str, str], original: dict[str, Any]
+    ) -> str | None:
         """
         Find translation for frontmatter field.
 
@@ -436,7 +434,7 @@ class MarkdownReconstructor:
         # Look for translation by segment ID
         # The segment ID is generated from text + context, so we need to
         # recreate it to look up the translation
-        from ..extractor import Segment, SegmentContext, SegmentContextType
+        from ..extractor import SegmentContext
 
         context = SegmentContext(
             context_type=SegmentContextType.FRONTMATTER,
@@ -454,8 +452,8 @@ class MarkdownReconstructor:
         return None
 
     def _find_body_translation(
-        self, node_id: Optional[str], translations: Dict[str, str]
-    ) -> Optional[str]:
+        self, node_id: str | None, translations: dict[str, str]
+    ) -> str | None:
         """
         Find translation for body node.
 
@@ -482,8 +480,8 @@ class MarkdownReconstructor:
         return None
 
     def _compute_field(
-        self, key: str, frontmatter: Dict[str, Any], target_lang: str
-    ) -> Optional[Any]:
+        self, key: str, frontmatter: dict[str, Any], target_lang: str
+    ) -> Any | None:
         """
         Compute derived frontmatter field.
 
@@ -507,7 +505,7 @@ class MarkdownReconstructor:
         # This is a simplified implementation
         return None
 
-    def _remove_nested_key(self, data: Dict[str, Any], key: str) -> None:
+    def _remove_nested_key(self, data: dict[str, Any], key: str) -> None:
         """Remove a nested key from dictionary."""
         parts = key.split(".")
         current = data
@@ -523,8 +521,8 @@ class MarkdownReconstructor:
             del current[parts[-1]]
 
     def _find_indexed_keys(
-        self, generic_key: str, original: Dict[str, Any], translations: Dict[str, str]
-    ) -> List[str]:
+        self, generic_key: str, original: dict[str, Any], translations: dict[str, str]
+    ) -> list[str]:
         """
         Find all indexed versions of a generic key that have translations.
 
@@ -563,8 +561,8 @@ class MarkdownReconstructor:
         return result
 
     def _expand_arrays_in_key(
-        self, parts: List[str], data: Any, current_path: List[str]
-    ) -> List[str]:
+        self, parts: list[str], data: Any, current_path: list[str]
+    ) -> list[str]:
         """
         Recursively expand a key pattern to find all indexed versions.
 

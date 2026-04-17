@@ -4,16 +4,15 @@ Integration tests for segment sorting end-to-end functionality (SR-04).
 Tests verify that segment sorting works correctly in real translation workflows
 with actual file I/O, document parsing, and output generation.
 """
-import pytest
-from pathlib import Path
-import tempfile
 import shutil
+from pathlib import Path
 from unittest.mock import Mock
 
-from src.translation_engine import TranslationEngine
-from src.tm import TranslationMemory
-from src.tm.l1_cache import L1Cache
+import pytest
+
 from src.model_runtime import ModelLoader
+from src.tm import TranslationMemory
+from src.translation_engine import TranslationEngine
 from src.utils.config_loader import ConfigService
 
 

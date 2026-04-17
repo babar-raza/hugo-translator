@@ -10,11 +10,10 @@ Test coverage:
 - Restoration failure handling: missing placeholders
 """
 
-import pytest
 from src.translation_engine.terminology.models import (
-    TermRule,
     DetectedTerm,
     PreserveMode,
+    TermRule,
     TermSeverity,
 )
 from src.translation_engine.terminology.terminology_protector import TerminologyProtector

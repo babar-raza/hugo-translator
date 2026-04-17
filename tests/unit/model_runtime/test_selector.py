@@ -13,18 +13,17 @@ Tests cover:
 7. Prefer quality flag behavior
 8. No suitable model error handling
 """
+from unittest.mock import Mock
+
 import pytest
-from unittest.mock import Mock, MagicMock
-from pathlib import Path
+
+from src.model_runtime.hardware import HardwareInfo
+from src.model_runtime.registry import ModelInfo, ModelRegistry
 
 # Import classes under test
 from src.model_runtime.selector import (
     LanguageAwareModelSelector,
-    ModelSelection,
 )
-from src.model_runtime.registry import ModelInfo, ModelRegistry
-from src.model_runtime.hardware import HardwareInfo
-
 
 # === Fixtures ===
 

@@ -7,10 +7,11 @@ Tests the AnalyticsQueryAPI class:
 - Model/device comparisons
 """
 
-import pytest
 import tempfile
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
+
+import pytest
 
 # Check if pandas is available
 try:
@@ -19,14 +20,9 @@ try:
 except ImportError:
     PANDAS_AVAILABLE = False
 
-from src.benchmarking.analytics import AnalyticsQueryAPI
 from src.benchmarking.aggregation import TimeSeriesAggregator
-from src.benchmarking.storage import (
-    BenchmarkDatabase,
-    BenchmarkRun,
-    BenchmarkResult,
-    SystemInfo
-)
+from src.benchmarking.analytics import AnalyticsQueryAPI
+from src.benchmarking.storage import BenchmarkDatabase, BenchmarkResult, BenchmarkRun, SystemInfo
 
 
 @pytest.mark.skipif(not PANDAS_AVAILABLE, reason="pandas not available")

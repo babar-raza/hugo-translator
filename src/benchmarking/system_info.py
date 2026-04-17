@@ -10,10 +10,10 @@ import logging
 import platform
 import re
 import sys
-from dataclasses import asdict, dataclass, field
+from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from src.model_runtime.hardware import HardwareDetector
 
@@ -34,11 +34,11 @@ class SystemInfo:
     total_ram_gb: float
 
     # GPU (optional)
-    gpu_model: Optional[str] = None
-    gpu_memory_gb: Optional[float] = None
-    gpu_compute_capability: Optional[str] = None
+    gpu_model: str | None = None
+    gpu_memory_gb: float | None = None
+    gpu_compute_capability: str | None = None
     has_cuda: bool = False
-    cuda_version: Optional[str] = None
+    cuda_version: str | None = None
 
     # Platform
     os_name: str = ""
@@ -51,30 +51,30 @@ class SystemInfo:
     python_implementation: str = ""
 
     # PyTorch
-    torch_version: Optional[str] = None
+    torch_version: str | None = None
     torch_cuda_available: bool = False
 
     # BM-09: Extended hardware context for better learning
-    cpu_frequency_mhz: Optional[float] = None  # Current CPU frequency
-    cpu_frequency_max_mhz: Optional[float] = None  # Max CPU frequency
-    cpu_tdp_watts: Optional[float] = None  # Thermal Design Power
-    memory_bandwidth_gbps: Optional[float] = None  # Memory bandwidth
+    cpu_frequency_mhz: float | None = None  # Current CPU frequency
+    cpu_frequency_max_mhz: float | None = None  # Max CPU frequency
+    cpu_tdp_watts: float | None = None  # Thermal Design Power
+    memory_bandwidth_gbps: float | None = None  # Memory bandwidth
     numa_nodes: int = 1  # NUMA node count
 
-    gpu_driver_version: Optional[str] = None  # GPU driver version
+    gpu_driver_version: str | None = None  # GPU driver version
 
-    power_management_state: Optional[str] = None  # "performance", "balanced", "power_saver"
+    power_management_state: str | None = None  # "performance", "balanced", "power_saver"
 
     # Metadata
     collected_at_utc: str = ""
     collector_version: str = "1.0.1"  # BM-09: Bumped for new fields
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to JSON-serializable dictionary."""
         return asdict(self)
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "SystemInfo":
+    def from_dict(cls, data: dict[str, Any]) -> "SystemInfo":
         """Create from dictionary."""
         return cls(**data)
 
@@ -101,7 +101,7 @@ class SystemInfoCollector:
         self.hardware_detector = HardwareDetector()
 
     @staticmethod
-    def get_available_gpu_memory_mb(device_id: int = 0) -> Optional[float]:
+    def get_available_gpu_memory_mb(device_id: int = 0) -> float | None:
         """Get currently available GPU memory in MB.
 
         Args:
@@ -134,7 +134,7 @@ class SystemInfoCollector:
             return None
 
     @staticmethod
-    def get_gpu_memory_stats(device_id: int = 0) -> Optional[Dict[str, float]]:
+    def get_gpu_memory_stats(device_id: int = 0) -> dict[str, float] | None:
         """Get comprehensive GPU memory statistics.
 
         Args:
@@ -270,7 +270,7 @@ class SystemInfoCollector:
             logger.warning(f"Failed to get CPU model: {e}")
             return "Unknown CPU"
 
-    def _collect_gpu_info(self, hardware_info) -> Dict[str, Optional[Any]]:
+    def _collect_gpu_info(self, hardware_info) -> dict[str, Any | None]:
         """
         Collect GPU information from hardware detection.
 
@@ -309,7 +309,7 @@ class SystemInfoCollector:
 
         return gpu_info
 
-    def _collect_platform_info(self) -> Dict[str, str]:
+    def _collect_platform_info(self) -> dict[str, str]:
         """
         Collect platform and OS information.
 
@@ -336,7 +336,7 @@ class SystemInfoCollector:
                 "platform_release": "Unknown",
             }
 
-    def _collect_python_info(self) -> Dict[str, str]:
+    def _collect_python_info(self) -> dict[str, str]:
         """
         Collect Python environment information.
 
@@ -355,7 +355,7 @@ class SystemInfoCollector:
                 "python_implementation": "Unknown",
             }
 
-    def _collect_torch_info(self) -> Dict[str, Optional[Any]]:
+    def _collect_torch_info(self) -> dict[str, Any | None]:
         """
         Collect PyTorch information.
 
@@ -380,7 +380,7 @@ class SystemInfoCollector:
 
         return torch_info
 
-    def _collect_extended_hardware_info(self) -> Dict[str, Optional[Any]]:
+    def _collect_extended_hardware_info(self) -> dict[str, Any | None]:
         """
         Collect extended hardware information (BM-09).
 

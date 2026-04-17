@@ -1,10 +1,9 @@
 #!/usr/bin/env python3
 """Extract benchmark corpus from Aspose content (READ-ONLY)."""
 import json
+import re
 import sys
 from pathlib import Path
-import re
-from typing import List, Dict
 
 ASPOSE_CONTENT_DIR = Path(r"D:\onedrive\Documents\GitHub\aspose.net\content")
 
@@ -27,7 +26,7 @@ def clean_text(text: str) -> str:
     return text.strip()
 
 
-def extract_text_segments(file_path: Path, content_type: str) -> List[Dict]:
+def extract_text_segments(file_path: Path, content_type: str) -> list[dict]:
     """Extract clean text segments from markdown file.
 
     Args:
@@ -38,7 +37,7 @@ def extract_text_segments(file_path: Path, content_type: str) -> List[Dict]:
         List of segments with metadata
     """
     try:
-        with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
+        with open(file_path, encoding='utf-8', errors='ignore') as f:
             content = f.read()
     except Exception as e:
         print(f"Warning: Could not read {file_path}: {e}")
@@ -103,8 +102,8 @@ def determine_content_type(file_path: Path) -> str:
 def main():
     if not ASPOSE_CONTENT_DIR.exists():
         print(f"✗ Aspose content directory not found: {ASPOSE_CONTENT_DIR}")
-        print(f"  This directory is required for extracting benchmark corpus.")
-        print(f"  If running in different environment, update ASPOSE_CONTENT_DIR in script.")
+        print("  This directory is required for extracting benchmark corpus.")
+        print("  If running in different environment, update ASPOSE_CONTENT_DIR in script.")
         return 1
 
     print(f"Scanning {ASPOSE_CONTENT_DIR} (READ-ONLY)...")

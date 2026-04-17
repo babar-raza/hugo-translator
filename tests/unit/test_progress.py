@@ -11,13 +11,11 @@ Tests cover:
 - Atomic write guarantees
 """
 
-import json
 import sys
 import time
-import pytest
 from pathlib import Path
-from unittest import mock
-from datetime import datetime, timezone
+
+import pytest
 
 # Add src to path for imports
 src_path = Path(__file__).parent.parent.parent / "src"

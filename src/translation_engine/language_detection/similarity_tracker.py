@@ -14,7 +14,7 @@ import logging
 from collections import deque
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Set, Tuple
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -41,7 +41,7 @@ class SimilarityTracker:
         "chinese": ["zh-CN", "zh-TW", "zh-HK", "zh"],
     }
 
-    def __init__(self, config: Dict[str, Any]):
+    def __init__(self, config: dict[str, Any]):
         """
         Initialize similarity tracker.
 
@@ -65,8 +65,8 @@ class SimilarityTracker:
         self.baseline_groups = config.get("baseline_groups", self.DEFAULT_BASELINE_GROUPS)
 
         # Runtime state
-        self.learned_pairs: Dict[str, Dict[str, Any]] = {}  # Pairs added via adaptation
-        self.rolling_stats: Dict[str, deque] = {}  # Rolling window per pair
+        self.learned_pairs: dict[str, dict[str, Any]] = {}  # Pairs added via adaptation
+        self.rolling_stats: dict[str, deque] = {}  # Rolling window per pair
 
         # Ensure stats directory exists
         self.stats_file.parent.mkdir(parents=True, exist_ok=True)
@@ -83,7 +83,7 @@ class SimilarityTracker:
             return
 
         try:
-            with open(self.stats_file, "r", encoding="utf-8") as f:
+            with open(self.stats_file, encoding="utf-8") as f:
                 data = json.load(f)
 
             # Load learned pairs
@@ -99,7 +99,7 @@ class SimilarityTracker:
                 f"{len(self.rolling_stats)} tracked pairs"
             )
 
-        except (json.JSONDecodeError, IOError) as e:
+        except (OSError, json.JSONDecodeError) as e:
             logger.error(f"Failed to load similarity stats from {self.stats_file}: {e}")
             logger.warning("Starting with empty statistics")
 
@@ -127,7 +127,7 @@ class SimilarityTracker:
 
             logger.debug(f"Saved similarity statistics: {len(self.learned_pairs)} learned pairs")
 
-        except IOError as e:
+        except OSError as e:
             logger.error(f"Failed to save similarity stats to {self.stats_file}: {e}")
 
     def are_similar(self, lang1: str, lang2: str) -> bool:
@@ -205,7 +205,7 @@ class SimilarityTracker:
             f"confidence={confidence:.2f} (total_samples={len(self.rolling_stats[pair_key])})"
         )
 
-    def adapt(self) -> List[Tuple[str, str, float, str]]:
+    def adapt(self) -> list[tuple[str, str, float, str]]:
         """
         Analyze statistics and add new similarity pairs when needed.
 
@@ -253,7 +253,7 @@ class SimilarityTracker:
 
         return newly_added
 
-    def get_statistics(self) -> Dict[str, Any]:
+    def get_statistics(self) -> dict[str, Any]:
         """
         Get current statistics for all tracked pairs.
 

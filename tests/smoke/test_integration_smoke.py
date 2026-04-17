@@ -21,6 +21,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 from src.model_runtime.hardware import HardwareDetector
 from src.tm import L1Cache, L2PersistentTM, TranslationMemory
+
 try:
     from src.tm import L3SemanticTM
 except ImportError:
@@ -29,7 +30,7 @@ from src.translation_engine.parser import HugoParser
 from src.translation_engine.validation import (
     PlaceholderValidator,
     StructureValidator,
-    YAMLValidator
+    YAMLValidator,
 )
 
 
@@ -340,7 +341,6 @@ def test_config_tm_integration():
     """Smoke test: Config can work with TM setup."""
     with tempfile.TemporaryDirectory() as tmpdir:
         try:
-            from src.utils.config_loader import ConfigService
 
             config_root = Path(__file__).parent.parent.parent / "config"
 

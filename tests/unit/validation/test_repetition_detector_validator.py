@@ -10,13 +10,11 @@ Tests cover:
 - Configuration overrides
 """
 
-import pytest
-from pathlib import Path
 
+from src.translation_engine.validation.base import ValidationSeverity
 from src.translation_engine.validation.repetition_detector_validator import (
     RepetitionDetectorValidator,
 )
-from src.translation_engine.validation.base import ValidationSeverity
 
 
 class TestRepetitionDetectorValidator:

@@ -4,16 +4,16 @@ Unit tests for CommitEngine.
 Tests git commit wrapper with mocked GitCommitter.
 """
 
-import unittest
-from unittest.mock import Mock, patch, MagicMock
-from pathlib import Path
 import sys
+import unittest
+from pathlib import Path
+from unittest.mock import Mock, patch
 
 # Add src to path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent / "src"))
 
-from src.shared_engines.commit_engine import CommitEngine
 from src.observability.git_commit import GitCommitConfig, GitCommitResult
+from src.shared_engines.commit_engine import CommitEngine
 
 
 class TestCommitEngine(unittest.TestCase):

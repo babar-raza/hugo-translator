@@ -7,12 +7,12 @@ Tests the MigrationManager class:
 - Migration idempotency
 """
 
-import pytest
-import sqlite3
 import tempfile
 from pathlib import Path
 
-from src.benchmarking.schema_migrations import MigrationManager, MigrationError
+import pytest
+
+from src.benchmarking.schema_migrations import MigrationManager
 from src.benchmarking.storage import BenchmarkDatabase
 
 # Current schema version in storage.py

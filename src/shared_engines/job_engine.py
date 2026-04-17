@@ -8,11 +8,11 @@ Version 2: Adds backend switching, health checks, and auto-failover support.
 """
 
 import logging
-from typing import Optional, List, Dict, Any
+from typing import Any
 
+from src.orchestrator.models import JobStats, JobStatus, TranslationJob
 from src.orchestrator.queue import JobQueue
 from src.orchestrator.redis_backend import RedisJobQueue
-from src.orchestrator.models import TranslationJob, JobStatus, JobStats
 
 logger = logging.getLogger(__name__)
 
@@ -55,9 +55,9 @@ class JobEngine:
 
     def __init__(
         self,
-        backend: Optional[str] = None,
-        redis_config: Optional[Dict[str, Any]] = None,
-        config: Optional[Dict[str, Any]] = None
+        backend: str | None = None,
+        redis_config: dict[str, Any] | None = None,
+        config: dict[str, Any] | None = None
     ):
         """Initialize job queue engine."""
         # Determine initialization mode
@@ -70,7 +70,7 @@ class JobEngine:
             self._use_v2 = False
             self._init_legacy(backend, redis_config)
 
-    def _init_legacy(self, backend: Optional[str], redis_config: Optional[Dict[str, Any]]):
+    def _init_legacy(self, backend: str | None, redis_config: dict[str, Any] | None):
         """Initialize using legacy API (backward compatible)."""
         self.backend_type = backend or "memory"
         self.redis_config = redis_config or {}
@@ -99,7 +99,7 @@ class JobEngine:
                 f"Unsupported backend: {self.backend_type}. Use 'memory' or 'redis'."
             )
 
-    def _init_v2(self, config: Dict[str, Any]):
+    def _init_v2(self, config: dict[str, Any]):
         """Initialize using V2 API with backend switching."""
         from src.shared_engines.job_engine_v2 import JobEngineV2
 
@@ -147,7 +147,7 @@ class JobEngine:
         )
         return job_id
 
-    def dequeue(self) -> Optional[TranslationJob]:
+    def dequeue(self) -> TranslationJob | None:
         """
         Get next highest-priority job from queue.
 
@@ -176,7 +176,7 @@ class JobEngine:
             logger.debug("Queue is empty, no job dequeued")
         return job
 
-    def get_status(self, job_id: str) -> Optional[TranslationJob]:
+    def get_status(self, job_id: str) -> TranslationJob | None:
         """
         Get job by ID (check status).
 
@@ -200,7 +200,7 @@ class JobEngine:
             logger.debug(f"Job {job_id} not found")
         return job
 
-    def list_pending(self, limit: int = 10) -> List[TranslationJob]:
+    def list_pending(self, limit: int = 10) -> list[TranslationJob]:
         """
         List pending jobs in priority order.
 
@@ -224,8 +224,8 @@ class JobEngine:
         self,
         job_id: str,
         status: JobStatus,
-        error_message: Optional[str] = None,
-        result_summary: Optional[Dict] = None
+        error_message: str | None = None,
+        result_summary: dict | None = None
     ) -> bool:
         """
         Update job status.
@@ -289,9 +289,9 @@ class JobEngine:
 
     def list_jobs(
         self,
-        status: Optional[JobStatus] = None,
+        status: JobStatus | None = None,
         limit: int = 100
-    ) -> List[TranslationJob]:
+    ) -> list[TranslationJob]:
         """
         List all jobs, optionally filtered by status.
 
@@ -384,7 +384,7 @@ class JobEngine:
             return self._engine_v2.get_backend_type()
         return self.backend_type
 
-    def get_backend_stats(self) -> Optional[Dict[str, Any]]:
+    def get_backend_stats(self) -> dict[str, Any] | None:
         """
         Get backend statistics (V2 only).
 

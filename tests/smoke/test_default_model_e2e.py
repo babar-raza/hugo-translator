@@ -6,9 +6,9 @@ real site profiles and exercising the CLI code path.
 """
 import subprocess
 import sys
+from pathlib import Path
 
 import pytest
-from pathlib import Path
 
 
 class TestDefaultModelE2E:

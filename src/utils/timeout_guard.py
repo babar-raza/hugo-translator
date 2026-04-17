@@ -12,7 +12,6 @@ import sys
 import threading
 import traceback
 from contextlib import contextmanager
-from typing import Optional
 
 logger = logging.getLogger(__name__)
 
@@ -70,7 +69,7 @@ def timeout_guard(seconds: int, operation_name: str = "operation"):
                     )
                     logger.error("Timeout: async exception affected multiple threads, cleared")
                 else:
-                    logger.warning(f"Timeout: injected TimeoutError into main thread")
+                    logger.warning("Timeout: injected TimeoutError into main thread")
             except Exception as e:
                 logger.error(f"Timeout: failed to inject async exception: {e}")
 

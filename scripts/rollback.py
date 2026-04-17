@@ -25,7 +25,6 @@ import time
 from dataclasses import asdict, dataclass, field
 from datetime import datetime
 from pathlib import Path
-from typing import List, Optional, Tuple
 
 
 @dataclass
@@ -35,9 +34,9 @@ class RollbackPlan:
     target_commit: str
     current_branch: str
     target_ref: str
-    changes: List[str] = field(default_factory=list)
-    warnings: List[str] = field(default_factory=list)
-    backup_path: Optional[Path] = None
+    changes: list[str] = field(default_factory=list)
+    warnings: list[str] = field(default_factory=list)
+    backup_path: Path | None = None
     timestamp: str = field(default_factory=lambda: datetime.now().isoformat())
 
     def to_dict(self) -> dict:
@@ -55,8 +54,8 @@ class RollbackResult:
     plan: RollbackPlan
     execution_time: float
     verification_passed: bool
-    errors: List[str] = field(default_factory=list)
-    rollback_commit: Optional[str] = None
+    errors: list[str] = field(default_factory=list)
+    rollback_commit: str | None = None
 
     def to_dict(self) -> dict:
         """Convert to dictionary."""
@@ -71,7 +70,7 @@ class GitManager:
     def __init__(self, repo_path: Path):
         self.repo_path = repo_path
 
-    def run_git_command(self, args: List[str], check: bool = True) -> Tuple[int, str, str]:
+    def run_git_command(self, args: list[str], check: bool = True) -> tuple[int, str, str]:
         """
         Run a git command.
 
@@ -124,7 +123,7 @@ class GitManager:
         """Get previous commit (HEAD~1)."""
         return self.resolve_ref('HEAD~1')
 
-    def get_diff_summary(self, from_commit: str, to_commit: str) -> List[str]:
+    def get_diff_summary(self, from_commit: str, to_commit: str) -> list[str]:
         """Get summary of changes between commits."""
         _, stdout, _ = self.run_git_command(
             ['diff', '--stat', f'{from_commit}...{to_commit}']

@@ -1,15 +1,12 @@
 """Shared pytest fixtures for benchmarking tests."""
 import gc
-import os
-import sqlite3
 import tempfile
-import time
-from pathlib import Path
 from datetime import datetime, timezone
+from pathlib import Path
 
 import pytest
 
-from src.benchmarking.storage import BenchmarkDatabase, BenchmarkRun, BenchmarkResult
+from src.benchmarking.storage import BenchmarkDatabase, BenchmarkResult, BenchmarkRun
 from src.benchmarking.system_info import SystemInfo
 
 

@@ -2,14 +2,11 @@
 Unit tests for validation suite.
 """
 
-import pytest
 
 from src.translation_engine.validation import (
     LinkValidator,
     PlaceholderValidator,
-    StructureValidator,
     ValidationResult,
-    ValidationSeverity,
     ValidationSuite,
     Validator,
     YAMLValidator,

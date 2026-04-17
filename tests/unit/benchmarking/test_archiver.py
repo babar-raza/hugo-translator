@@ -7,23 +7,20 @@ Tests the BenchmarkArchiver class:
 - Compression support
 """
 
-import gzip
-import json
-import pytest
 import tempfile
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 from src.benchmarking.archiver import (
-    BenchmarkArchiver,
     ArchiveMetadata,
     ArchiveResult,
+    BenchmarkArchiver,
     RestoreResult,
 )
 from src.benchmarking.storage import (
     BenchmarkDatabase,
-    BenchmarkRun,
     BenchmarkResult,
+    BenchmarkRun,
     SystemInfo,
 )
 

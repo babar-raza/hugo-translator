@@ -6,14 +6,13 @@ Works on both Unix/Linux (fcntl) and Windows (msvcrt).
 """
 
 import json
+import logging
 import os
 import socket
 import sys
 import time
-import logging
 from datetime import datetime
 from pathlib import Path
-from typing import Optional
 
 logger = logging.getLogger(__name__)
 
@@ -75,7 +74,7 @@ def diagnose_lock(site_id: str) -> None:
     # Try to read content
     print("\nLock Content:")
     try:
-        with open(lock_file, 'r') as f:
+        with open(lock_file) as f:
             content = f.read().strip()
 
         # Try JSON format first, fallback to text
@@ -167,7 +166,7 @@ class FileLock:
         self.lock_file = Path(lock_file)
         self.timeout = timeout
         self.poll_interval = poll_interval
-        self._fd: Optional[int] = None
+        self._fd: int | None = None
         self._locked = False
 
         # Create lock directory
@@ -221,7 +220,7 @@ class FileLock:
                 logger.debug(f"Lock acquired: {self.lock_file}")
                 return True
 
-            except (IOError, OSError) as e:
+            except OSError:
                 # Lock is held by another process
                 if self._fd is not None:
                     try:
@@ -336,7 +335,7 @@ class FileLock:
                 return False
 
             # Read lock file
-            with open(self.lock_file, 'r') as f:
+            with open(self.lock_file) as f:
                 content = f.read().strip()
 
             # Try JSON format first (new format)
@@ -421,7 +420,7 @@ class FileLock:
         # Safety check: Verify process not alive (unless forced)
         if check_pid:
             try:
-                with open(self.lock_file, 'r') as f:
+                with open(self.lock_file) as f:
                     content = f.read().strip()
 
                 # Parse PID from either format

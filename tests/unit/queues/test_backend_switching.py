@@ -4,14 +4,14 @@ Unit tests for backend switching and failover functionality.
 Tests JobEngineV2 backend selection, health checks, and auto-failover.
 """
 
-import pytest
-import time
-from unittest.mock import Mock, patch, MagicMock
+from unittest.mock import MagicMock, Mock, patch
 
-from src.shared_engines.job_engine_v2 import JobEngineV2
-from src.shared_engines.job_engine import JobEngine
+import pytest
+
+from src.orchestrator.models import JobStatus, JobType, TranslationJob
 from src.queues import MemoryQueueBackend, RedisQueueBackend
-from src.orchestrator.models import TranslationJob, JobType, JobStatus
+from src.shared_engines.job_engine import JobEngine
+from src.shared_engines.job_engine_v2 import JobEngineV2
 
 
 class TestBackendSelection:

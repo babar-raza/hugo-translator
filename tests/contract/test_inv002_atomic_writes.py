@@ -13,13 +13,11 @@ Key Guarantees:
 4. Temp files cleaned up on success and failure
 """
 
-import pytest
-import os
-import tempfile
 import errno
 from pathlib import Path
-from unittest.mock import Mock, patch, MagicMock
+from unittest.mock import patch
 
+import pytest
 
 # ==============================================================================
 # Fixtures
@@ -168,7 +166,7 @@ def test_no_temp_files_remain_after_failed_write(atomic_write_test_dir):
     CONTRACT: INV-002 - Temp files cleaned up on failure
     Evidence: src/utils/atomic_write.py lines 182-194 (finally block cleanup)
     """
-    from src.utils.atomic_write import atomic_write, AtomicWriteError
+    from src.utils.atomic_write import AtomicWriteError, atomic_write
 
     # Arrange - Create a scenario that will fail
     # Use a file in a read-only directory (simulated)
@@ -205,7 +203,7 @@ def test_original_file_preserved_on_write_error(existing_file, atomic_write_test
     CONTRACT: INV-002 - Original file unchanged on error
     Evidence: src/utils/atomic_write.py atomic rename guarantees this
     """
-    from src.utils.atomic_write import atomic_write, AtomicWriteError
+    from src.utils.atomic_write import AtomicWriteError, atomic_write
 
     # Arrange
     file_path = existing_file["path"]

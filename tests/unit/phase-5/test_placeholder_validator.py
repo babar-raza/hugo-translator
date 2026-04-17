@@ -6,7 +6,6 @@ import pytest
 
 from src.translation_engine.validation import (
     PlaceholderValidator,
-    ValidationSeverity,
 )
 
 

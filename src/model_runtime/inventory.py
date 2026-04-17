@@ -1,10 +1,9 @@
 """Model inventory management and tracking system."""
 import json
 import logging
+from dataclasses import asdict, dataclass
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Dict, List, Optional
-from dataclasses import dataclass, asdict
-from datetime import datetime, UTC
 
 logger = logging.getLogger(__name__)
 
@@ -17,11 +16,11 @@ class ModelEntry:
     local_path: str
     size_mb: float
     downloaded_at: str
-    last_verified: Optional[str] = None
-    verification_status: Optional[str] = None
-    hf_model_id: Optional[str] = None
-    supported_pairs: Optional[str] = None
-    license: Optional[str] = None
+    last_verified: str | None = None
+    verification_status: str | None = None
+    hf_model_id: str | None = None
+    supported_pairs: str | None = None
+    license: str | None = None
 
     def to_dict(self) -> dict:
         return {k: v for k, v in asdict(self).items() if v is not None}
@@ -33,15 +32,15 @@ class InventoryStats:
     total_models: int
     total_size_mb: float
     total_size_gb: float
-    models_by_backend: Dict[str, int]
-    models_by_status: Dict[str, int]
+    models_by_backend: dict[str, int]
+    models_by_status: dict[str, int]
     last_updated: str
 
 
 class ModelInventory:
     """Manage model inventory database."""
 
-    def __init__(self, models_dir: Path, inventory_file: Optional[Path] = None):
+    def __init__(self, models_dir: Path, inventory_file: Path | None = None):
         """Initialize inventory manager.
 
         Args:
@@ -51,7 +50,7 @@ class ModelInventory:
         self.models_dir = Path(models_dir)
         self.inventory_file = inventory_file or (self.models_dir / "inventory.json")
 
-    def scan(self) -> List[ModelEntry]:
+    def scan(self) -> list[ModelEntry]:
         """Scan models directory and build inventory.
 
         Returns:
@@ -112,7 +111,7 @@ class ModelInventory:
 
         return entries
 
-    def update(self, entries: Optional[List[ModelEntry]] = None) -> None:
+    def update(self, entries: list[ModelEntry] | None = None) -> None:
         """Update inventory file.
 
         Args:
@@ -138,7 +137,7 @@ class ModelInventory:
 
         logger.info(f"Updated inventory: {len(entries)} models, {inventory['total_size_mb']:.1f} MB")
 
-    def load(self) -> List[ModelEntry]:
+    def load(self) -> list[ModelEntry]:
         """Load inventory from file.
 
         Returns:
@@ -206,12 +205,12 @@ class ModelInventory:
 
     def find(
         self,
-        model_id: Optional[str] = None,
-        backend: Optional[str] = None,
-        min_size_mb: Optional[float] = None,
-        max_size_mb: Optional[float] = None,
-        verification_status: Optional[str] = None
-    ) -> List[ModelEntry]:
+        model_id: str | None = None,
+        backend: str | None = None,
+        min_size_mb: float | None = None,
+        max_size_mb: float | None = None,
+        verification_status: str | None = None
+    ) -> list[ModelEntry]:
         """Find models matching criteria.
 
         Args:

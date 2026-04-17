@@ -1,14 +1,15 @@
 """Tests for foreign key constraints (SR-08)."""
 
-import pytest
 import sqlite3
 import tempfile
 from pathlib import Path
 
+import pytest
+
 from src.benchmarking.storage import (
     BenchmarkDatabase,
-    BenchmarkRun,
     BenchmarkResult,
+    BenchmarkRun,
     SystemInfo,
 )
 

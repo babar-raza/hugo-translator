@@ -13,8 +13,8 @@ project_root = Path(__file__).parent.parent.parent.parent
 sys.path.insert(0, str(project_root))
 
 from unittest.mock import Mock, patch
-from src.translation_engine import TranslationEngine
 
+from src.translation_engine import TranslationEngine
 
 # Configure logging to see debug output
 logging.basicConfig(level=logging.DEBUG, format='%(levelname)s: %(message)s')

@@ -1,17 +1,16 @@
 """Unit tests for benchmark scheduler (BM-04)."""
 
-import pytest
 from pathlib import Path
-import tempfile
 
+import pytest
+
+from src.benchmarking.resource_monitor import ResourceEstimate
 from src.benchmarking.scheduler import (
     BenchmarkScheduler,
     ResourceEstimator,
     ScheduledBenchmark,
 )
-from src.benchmarking.storage import BenchmarkDatabase
 from src.benchmarking.system_info import SystemInfo
-from src.benchmarking.resource_monitor import ResourceEstimate
 
 # temp_db fixture imported from conftest.py
 
@@ -509,7 +508,7 @@ class TestSchedulerRunNext:
 
     def test_run_next_executes_highest_priority(self, temp_db):
         """Test run_next picks highest priority job."""
-        from unittest.mock import patch, MagicMock
+        from unittest.mock import patch
 
         scheduler = BenchmarkScheduler(temp_db)
 
@@ -547,7 +546,7 @@ class TestSchedulerRunNext:
 
     def test_run_next_updates_job_status_to_running(self, temp_db):
         """Test run_next updates job status to running."""
-        from unittest.mock import patch, MagicMock
+        from unittest.mock import patch
 
         scheduler = BenchmarkScheduler(temp_db)
         job_id = scheduler.schedule({"model_id": "test"})
@@ -575,7 +574,7 @@ class TestSchedulerRunAll:
 
     def test_run_all_processes_multiple_jobs(self, temp_db):
         """Test run_all processes multiple pending jobs."""
-        from unittest.mock import patch, MagicMock
+        from unittest.mock import MagicMock, patch
 
         scheduler = BenchmarkScheduler(temp_db)
 
@@ -701,7 +700,7 @@ class TestSchedulerCanRunNow:
 
     def test_can_run_now_with_mock_monitor(self, temp_db):
         """Test can_run_now uses resource monitor correctly."""
-        from unittest.mock import patch, MagicMock
+        from unittest.mock import patch
 
         scheduler = BenchmarkScheduler(temp_db)
         job_id = scheduler.schedule({"model_id": "test"})

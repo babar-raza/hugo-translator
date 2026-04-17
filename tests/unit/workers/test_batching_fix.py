@@ -47,8 +47,8 @@ def _make_dir_result(total_files, successful_files=None, translated_segments=Non
 
 def _make_worker(files_per_commit, max_seconds_per_run=None):
     from src.workers.autonomous_content_translation_worker import (
-        AutonomousWorkerConfig,
         AutonomousContentTranslationWorker,
+        AutonomousWorkerConfig,
     )
     cfg = AutonomousWorkerConfig(max_seconds_per_run=max_seconds_per_run)
     worker = AutonomousContentTranslationWorker.__new__(AutonomousContentTranslationWorker)
@@ -177,7 +177,7 @@ def test_deadline_stops_loop_between_chunks():
 
 # ── D ──────────────────────────────────────────────────────────────────────
 def test_production_config_values():
-    """global.yaml has the expected files_per_commit and per-site limit."""
+    """global.yaml has the expected files_per_commit."""
     from src.utils.config_loader import ConfigService
     cs = ConfigService("config/")
     raw = cs.get_config()
@@ -185,22 +185,21 @@ def test_production_config_values():
     fpc = raw.get("git_commit", {}).get("files_per_commit")
     assert fpc == 25, f"Expected files_per_commit=25, got {fpc}"
 
-    limit = (
+    # per_site_limits key exists (may be empty after reference.aspose.net pilot removal)
+    assert isinstance(
         raw.get("autonomous_content_translation", {})
         .get("execution", {})
-        .get("per_site_limits", {})
-        .get("reference.aspose.net", {})
-        .get("max_seconds_per_run")
+        .get("per_site_limits", {}),
+        dict,
     )
-    assert limit == 28800, f"Expected 28800 for reference.aspose.net, got {limit}"
 
 
 # ── E: per-site limit is applied when available ────────────────────────────
 def test_per_site_limit_overrides_global():
     """Worker picks up per_site_limits from config rather than global max_seconds_per_run."""
     from src.workers.autonomous_content_translation_worker import (
-        AutonomousWorkerConfig,
         AutonomousContentTranslationWorker,
+        AutonomousWorkerConfig,
     )
     cfg = AutonomousWorkerConfig(max_seconds_per_run=3600)  # global = 1h
     worker = AutonomousContentTranslationWorker.__new__(AutonomousContentTranslationWorker)
@@ -354,6 +353,7 @@ def test_run_new_files_populated_after_legacy_translation():
 def test_translate_directory_accepts_skip_first():
     """Verify engine signature accepts skip_first (chunked commit contract)."""
     import inspect
+
     from src.translation_engine.engine import TranslationEngine
     sig = inspect.signature(TranslationEngine.translate_directory)
     assert "skip_first" in sig.parameters, (
@@ -366,8 +366,8 @@ def test_execute_translation_run_initializes_run_start_and_run_new_files():
     and _run_start=float so deadline enforcement and health tracking work correctly.
     """
     from src.workers.autonomous_content_translation_worker import (
-        AutonomousWorkerConfig,
         AutonomousContentTranslationWorker,
+        AutonomousWorkerConfig,
     )
     cfg = AutonomousWorkerConfig()
     worker = AutonomousContentTranslationWorker.__new__(AutonomousContentTranslationWorker)

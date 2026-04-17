@@ -61,4 +61,3 @@ def test_record_worker_state_tracks_error_without_erasing_success(tmp_path: Path
     assert state["last_error_ts"] == t2.isoformat()
     assert state["last_error"] == "llm unavailable"
     assert state["state"] == "run_failed"
-

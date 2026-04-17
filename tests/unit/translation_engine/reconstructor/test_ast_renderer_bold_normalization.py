@@ -5,6 +5,7 @@ Tests the post-translation normalization that fixes corrupted bold markers
 from MT models like m2m100_418m.
 """
 import pytest
+
 from src.translation_engine.reconstructor.ast_renderer import ASTRenderer
 
 

@@ -3,8 +3,6 @@ Unit tests for translation engine result models.
 """
 from pathlib import Path
 
-import pytest
-
 from src.translation_engine.models import (
     DirectoryResult,
     TranslationResult,

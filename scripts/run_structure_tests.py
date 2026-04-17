@@ -1,12 +1,13 @@
 """Run structure preservation tests and write results to file."""
-import sys
 import os
+import sys
 
 # Set up paths
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 os.chdir(os.path.dirname(os.path.abspath(__file__)))
 
 from io import StringIO
+
 from ruamel.yaml import YAML
 from ruamel.yaml.comments import CommentedMap
 
@@ -128,7 +129,7 @@ def run_tests():
                 comments_found.append(comment)
 
         if len(comments_found) == 4:
-            results.append(f"✓ PASS: _copy_commented_map preserves all 4 comments")
+            results.append("✓ PASS: _copy_commented_map preserves all 4 comments")
             passed += 1
         else:
             results.append(f"✗ FAIL: Only {len(comments_found)}/4 comments preserved: {comments_found}")
@@ -161,7 +162,7 @@ def run_tests():
             results.append("✓ PASS: Literal block style preserved in output")
             passed += 1
         else:
-            results.append(f"✗ FAIL: No literal block style found in output")
+            results.append("✗ FAIL: No literal block style found in output")
             failed += 1
     except Exception as e:
         results.append(f"✗ ERROR: Literal block test failed: {e}")
@@ -210,7 +211,7 @@ def run_tests():
             results.append("✓ PASS: Structure drift < 20%")
             passed += 1
         else:
-            results.append(f"✗ FAIL: Structure drift > 20%")
+            results.append("✗ FAIL: Structure drift > 20%")
             failed += 1
     except Exception as e:
         results.append(f"✗ ERROR: Structure drift test failed: {e}")
@@ -226,9 +227,9 @@ def compare_real_files():
     bg_file = r"D:\onedrive\Documents\GitHub\aspose.net\content\products.aspose.net\slides\bg\presentation-converter\_index.md"
 
     try:
-        with open(en_file, 'r', encoding='utf-8') as f:
+        with open(en_file, encoding='utf-8') as f:
             en_content = f.read()
-        with open(bg_file, 'r', encoding='utf-8') as f:
+        with open(bg_file, encoding='utf-8') as f:
             bg_content = f.read()
 
         # Count structures in EN

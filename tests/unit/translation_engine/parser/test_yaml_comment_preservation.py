@@ -6,12 +6,10 @@ Verifies SD-01 acceptance checks:
 - Quote styles preserved in round-trip
 - Fallback works when ruamel.yaml unavailable
 """
-import pytest
 from ruamel.yaml.comments import CommentedMap
 
 from src.translation_engine.parser.hugo_parser import HugoParser
 from src.translation_engine.reconstructor.yaml_formatter import YAMLFormatter
-
 
 SAMPLE_WITH_COMMENTS = '''---
 # Static

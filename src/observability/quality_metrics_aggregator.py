@@ -15,7 +15,7 @@ Example:
 """
 
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 
 @dataclass
@@ -24,9 +24,9 @@ class QualityMetrics:
 
     repetition_detected_count: int = 0
     max_ngram_frequency: int = 0
-    length_ratio_mean: Optional[float] = None
-    length_ratio_max: Optional[float] = None
-    validation_rejection_by_validator: Dict[str, int] = None
+    length_ratio_mean: float | None = None
+    length_ratio_max: float | None = None
+    validation_rejection_by_validator: dict[str, int] = None
     segments_checked: int = 0
     total_validation_issues: int = 0
     error_count: int = 0
@@ -37,7 +37,7 @@ class QualityMetrics:
         if self.validation_rejection_by_validator is None:
             self.validation_rejection_by_validator = {}
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert metrics to dictionary for logging."""
         return {
             "repetition_detected_count": self.repetition_detected_count,
@@ -65,8 +65,8 @@ class QualityMetricsAggregator:
     def __init__(self):
         """Initialize metrics aggregator."""
         self.metrics = QualityMetrics()
-        self._length_ratios: List[float] = []
-        self._validator_results: Dict[str, Dict[str, int]] = {}
+        self._length_ratios: list[float] = []
+        self._validator_results: dict[str, dict[str, int]] = {}
 
     def add_validation_result(self, result: Any) -> None:
         """
@@ -103,7 +103,7 @@ class QualityMetricsAggregator:
         if hasattr(result, 'issues'):
             self._track_validator_rejections(result)
 
-    def _process_metadata(self, metadata: Dict[str, Any], result: Any) -> None:
+    def _process_metadata(self, metadata: dict[str, Any], result: Any) -> None:
         """
         Process metadata from validation result to extract quality metrics.
 

@@ -3,9 +3,7 @@ Unit tests for structured logging.
 """
 
 import tempfile
-from datetime import datetime
 from pathlib import Path
-from unittest.mock import Mock
 
 import pytest
 import structlog

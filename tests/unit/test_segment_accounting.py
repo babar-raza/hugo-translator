@@ -4,7 +4,6 @@ Tests for SR-03: Fix segment accounting discrepancy.
 Verifies that cache_hits + cache_misses = segments_done + segments_failed.
 """
 
-import pytest
 from src.observability.progress import ProgressTracker
 
 

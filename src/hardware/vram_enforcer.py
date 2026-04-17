@@ -8,7 +8,6 @@ and context manager for "enforce once per process" semantics.
 import logging
 import threading
 from contextlib import contextmanager
-from typing import Dict, Optional, Tuple
 
 import torch
 
@@ -19,7 +18,7 @@ logger = logging.getLogger(__name__)
 
 # Global state to track enforcement (per-process singleton)
 _enforcement_lock = threading.Lock()
-_enforcement_state: Dict[int, bool] = {}  # device_id -> enforced
+_enforcement_state: dict[int, bool] = {}  # device_id -> enforced
 
 
 class VRAMEnforcer:
@@ -53,9 +52,9 @@ class VRAMEnforcer:
 
     def enforce_from_config(
         self,
-        hardware_config: Dict,
+        hardware_config: dict,
         device: str = "cuda:0",
-    ) -> Tuple[int, Optional[VRAMBudget]]:
+    ) -> tuple[int, VRAMBudget | None]:
         """
         Enforce VRAM budget from hardware configuration.
 
@@ -237,7 +236,7 @@ class VRAMEnforcer:
 
 @contextmanager
 def ensure_vram_budget(
-    hardware_config: Dict,
+    hardware_config: dict,
     device: str = "cuda:0",
 ):
     """

@@ -5,10 +5,8 @@ Tests that shutdown requests are checked periodically during file translation,
 not just between files, enabling CTRL+C to work during long-running translations.
 """
 
-import time
 from pathlib import Path
-from unittest.mock import Mock, patch, MagicMock
-import pytest
+from unittest.mock import Mock
 
 
 def test_shutdown_exception_attributes():
@@ -56,7 +54,6 @@ def test_shutdown_checked_every_10_segments_tm_loop():
 
 def test_shutdown_exception_propagates_through_translate_file():
     """Test that ShutdownRequested propagates up from translate_to_language."""
-    from src.translation_engine.engine import TranslationEngine
     from src.translation_engine.exceptions import ShutdownRequested
 
     # This is an integration-style unit test that mocks the internals

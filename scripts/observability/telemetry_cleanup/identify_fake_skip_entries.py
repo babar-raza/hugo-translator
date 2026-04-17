@@ -35,13 +35,12 @@ import sqlite3
 import sys
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
 
 
 class FakeEntryDetector:
     """Detects and exports fake skip entries from telemetry database."""
 
-    def __init__(self, db_path: Optional[str] = None, cutoff_date: str = "2026-01-11T00:00:00"):
+    def __init__(self, db_path: str | None = None, cutoff_date: str = "2026-01-11T00:00:00"):
         """
         Initialize detector.
 
@@ -86,7 +85,7 @@ class FakeEntryDetector:
             self.conn.close()
             print("✅ Disconnected from database")
 
-    def detect_fake_entries(self) -> List[Dict]:
+    def detect_fake_entries(self) -> list[dict]:
         """
         Detect fake skip entries using detection criteria.
 
@@ -139,7 +138,7 @@ class FakeEntryDetector:
 
         return fake_entries
 
-    def _determine_reason(self, row: sqlite3.Row, metrics: Dict) -> str:
+    def _determine_reason(self, row: sqlite3.Row, metrics: dict) -> str:
         """Determine why entry is considered fake."""
         if "langs_translated" not in metrics:
             return "langs_translated field missing (pre-fix version)"
@@ -148,7 +147,7 @@ class FakeEntryDetector:
         else:
             return "unknown"
 
-    def export_to_json(self, entries: List[Dict], output_path: str) -> None:
+    def export_to_json(self, entries: list[dict], output_path: str) -> None:
         """
         Export fake entries to JSON file.
 
@@ -175,10 +174,10 @@ class FakeEntryDetector:
 
         print(f"✅ Exported {len(entries)} fake entries to: {output_path}")
 
-    def print_summary(self, entries: List[Dict]) -> None:
+    def print_summary(self, entries: list[dict]) -> None:
         """Print summary of detected fake entries."""
         print("\n" + "=" * 80)
-        print(f"FAKE SKIP ENTRY DETECTION SUMMARY")
+        print("FAKE SKIP ENTRY DETECTION SUMMARY")
         print("=" * 80)
         print(f"Database: {self.db_path}")
         print(f"Cutoff Date: {self.cutoff_date}")
@@ -186,7 +185,7 @@ class FakeEntryDetector:
         print("=" * 80)
 
         if entries:
-            print(f"\nSample Entries (first 5):")
+            print("\nSample Entries (first 5):")
             for i, entry in enumerate(entries[:5], 1):
                 print(f"\n{i}. Event ID: {entry['event_id']}")
                 print(f"   Timestamp: {entry['timestamp']}")

@@ -8,10 +8,8 @@ These tests verify that the engine blocks writes when language detection
 is unavailable or fails, rather than allowing unvalidated content through.
 """
 
-from unittest.mock import Mock, patch, MagicMock
-from pathlib import Path
+from unittest.mock import Mock
 
-from src.utils.models import GlobalConfig
 from src.translation_engine.engine import TranslationEngine
 
 
@@ -105,7 +103,7 @@ class TestDetectorExceptionBlocksWrite:
         """
         engine = _make_engine()
         mock_detector = Mock()
-        mock_detector.detect.side_effect = IOError("Model file corrupted")
+        mock_detector.detect.side_effect = OSError("Model file corrupted")
         engine.fasttext_detector = mock_detector
 
         validation_passed = True
@@ -116,7 +114,7 @@ class TestDetectorExceptionBlocksWrite:
 
         try:
             detected_lang, confidence = detector.detect("some content")
-        except (IOError, OSError) as e:
+        except OSError as e:
             validation_passed = False
             validation_error = f"I/O error during language validation: {e}"
 
@@ -135,7 +133,7 @@ class TestDetectorExceptionBlocksWrite:
 
         try:
             detected_lang, confidence = detector.detect("some content")
-        except (IOError, OSError) as e:
+        except OSError:
             validation_passed = False
 
         assert validation_passed is False

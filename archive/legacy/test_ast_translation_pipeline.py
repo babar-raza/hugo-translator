@@ -8,16 +8,16 @@ Tests that AST-based translation pipeline is correctly integrated into Translati
 - Fallback to legacy works on errors
 """
 # import pytest  # Optional - not needed for standalone execution
+# Import modules
+import sys
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
-# Import modules
-import sys
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
 
 from translation_engine.engine import TranslationEngine
 from translation_engine.models import TranslationStats
-from utils.models import SiteProfile, BodyRules, FrontmatterRule, FrontmatterMode
+from utils.models import BodyRules, FrontmatterMode, FrontmatterRule, SiteProfile
 
 
 def test_ast_translation_flag_disabled_uses_legacy():
@@ -49,8 +49,8 @@ def test_ast_translation_flag_disabled_uses_legacy():
     )
 
     # Create mock document
+    from translation_engine.parser.ast_nodes import paragraph_node, text_node
     from translation_engine.parser.hugo_parser import HugoDocument
-    from translation_engine.parser.ast_nodes import ASTNode, NodeType, text_node, paragraph_node
 
     doc = HugoDocument(
         frontmatter={"title": "Test Title"},
@@ -94,7 +94,7 @@ def test_ast_translation_flag_disabled_uses_legacy():
             assert mock_reconstructor.called
             assert not stats.ast_translation_enabled
 
-        except Exception as e:
+        except Exception:
             # Expected: may fail due to mocking, but we verified the code path
             pass
 
@@ -130,8 +130,8 @@ def test_ast_translation_flag_enabled_uses_ast():
     )
 
     # Create mock document
+    from translation_engine.parser.ast_nodes import paragraph_node, text_node
     from translation_engine.parser.hugo_parser import HugoDocument
-    from translation_engine.parser.ast_nodes import text_node, paragraph_node
 
     doc = HugoDocument(
         frontmatter={"title": "Test Title"},
@@ -148,7 +148,11 @@ def test_ast_translation_flag_enabled_uses_ast():
             mock_extractor = MagicMock()
             mock_extractor_class.return_value = mock_extractor
 
-            from translation_engine.extractor.text_unit import TextUnit, TextUnitKind, BodyTranslationPlan
+            from translation_engine.extractor.text_unit import (
+                BodyTranslationPlan,
+                TextUnit,
+                TextUnitKind,
+            )
 
             mock_plan = BodyTranslationPlan(
                 units=[
@@ -193,7 +197,7 @@ def test_ast_translation_flag_enabled_uses_ast():
                 assert stats.ast_units_translatable == 1
                 assert result == "Hola mundo\n\n"
 
-            except Exception as e:
+            except Exception:
                 # Expected: may fail due to mocking, but we verified the code path
                 pass
 
@@ -248,8 +252,8 @@ def test_ast_translation_fallback_on_error():
     )
 
     # Create mock document
+    from translation_engine.parser.ast_nodes import paragraph_node, text_node
     from translation_engine.parser.hugo_parser import HugoDocument
-    from translation_engine.parser.ast_nodes import text_node, paragraph_node
 
     doc = HugoDocument(
         frontmatter={"title": "Test Title"},

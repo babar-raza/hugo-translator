@@ -30,4 +30,3 @@ Guidance on deployment and performance considerations is provided in the Word Pr
 **Q5. How is the Document Printer plugin licensed?**
 Licensing is managed through the Aspose.Words plugin family, with options outlined on the purchase portal linked from the product page.
 Metered licensing may be used to align costs with document processing volume.
-

@@ -5,24 +5,22 @@ Tests ETA calculation, rolling throughput, and metrics snapshots.
 """
 
 import json
-import tempfile
-import time
-from pathlib import Path
-from unittest.mock import patch
-
-import pytest
 
 # Add src to path for imports
 import sys
+import tempfile
+import time
+from pathlib import Path
+
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
 
 from observability.progress import (
     EMACalculator,
     ProgressSnapshot,
     ProgressTracker,
+    get_progress_tracker,
     init_progress_tracker,
     stop_progress_tracker,
-    get_progress_tracker,
 )
 
 

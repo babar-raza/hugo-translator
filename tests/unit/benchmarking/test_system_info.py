@@ -9,10 +9,7 @@ Tests cover:
 5. Path sanitization (no username leakage)
 """
 import json
-import platform
-from datetime import datetime, timezone
-from pathlib import Path
-from unittest.mock import MagicMock, Mock, patch
+from unittest.mock import Mock, patch
 
 import pytest
 

@@ -4,12 +4,12 @@ Integration tests for real-time repetition detection (TASK-4.1).
 Tests the real-time repetition detection and retry mechanism in batch translation.
 """
 
-import pytest
-from unittest.mock import Mock, MagicMock, patch, call
-from typing import List
+from unittest.mock import Mock
 
-from src.translation_engine.extractor.text_unit_extractor import TextUnitExtractor
+import pytest
+
 from src.translation_engine.extractor.text_unit import TextUnit
+from src.translation_engine.extractor.text_unit_extractor import TextUnitExtractor
 
 
 class TestRealtimeRepetitionDetection:
@@ -41,7 +41,7 @@ class TestRealtimeRepetitionDetection:
         return model
 
     @pytest.fixture
-    def sample_units(self) -> List[TextUnit]:
+    def sample_units(self) -> list[TextUnit]:
         """Create sample TextUnits for testing."""
         units = []
         for i in range(3):

@@ -25,7 +25,6 @@ from collections import Counter
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, List, Tuple, Optional, Pattern
 
 # Langdetect imports with error handling
 try:
@@ -77,7 +76,7 @@ _SCRIPT_KOREAN     = re.compile(r'[\uAC00-\uD7AF]')
 _SCRIPT_DEVANAGARI = re.compile(r'[\u0900-\u097F]')
 _SCRIPT_THAI       = re.compile(r'[\u0E00-\u0E7F]')
 
-_FORBIDDEN_SCRIPTS: Dict[str, List] = {
+_FORBIDDEN_SCRIPTS: dict[str, list] = {
     'bg': [_SCRIPT_ARABIC, _SCRIPT_HEBREW, _SCRIPT_CHINESE, _SCRIPT_JAPANESE, _SCRIPT_KOREAN, _SCRIPT_DEVANAGARI, _SCRIPT_THAI],
     'ru': [_SCRIPT_ARABIC, _SCRIPT_HEBREW, _SCRIPT_CHINESE, _SCRIPT_JAPANESE, _SCRIPT_KOREAN, _SCRIPT_DEVANAGARI, _SCRIPT_THAI],
     'uk': [_SCRIPT_ARABIC, _SCRIPT_HEBREW, _SCRIPT_CHINESE, _SCRIPT_JAPANESE, _SCRIPT_KOREAN, _SCRIPT_DEVANAGARI, _SCRIPT_THAI],
@@ -149,11 +148,11 @@ class FileAnalysis:
     total_sentences: int
     correct_lang_count: int
     purity_percentage: float
-    wrong_lang_samples: List[dict]
-    script_mixing_issues: List[str] = field(default_factory=list)
-    repetition_issues: List[str] = field(default_factory=list)
+    wrong_lang_samples: list[dict]
+    script_mixing_issues: list[str] = field(default_factory=list)
+    repetition_issues: list[str] = field(default_factory=list)
     action_taken: str = ""   # "deleted" or "" (scan only)
-    error: Optional[str] = None
+    error: str | None = None
 
     @property
     def has_quality_issues(self) -> bool:
@@ -175,7 +174,7 @@ class ScanResult:
     clean_files: int
     error_files: int
     deleted_files: int
-    analyses: List[FileAnalysis]
+    analyses: list[FileAnalysis]
     target_lang: str
     scan_timestamp: str
     repo_path: str
@@ -202,7 +201,7 @@ class LanguageContaminationScanner:
         all_languages: bool = False,
         check_repetition: bool = False,
         repair: bool = False,
-        since_commit: Optional[str] = None,
+        since_commit: str | None = None,
         fast_mode: bool = False,
     ) -> ScanResult:
         """
@@ -321,7 +320,7 @@ class LanguageContaminationScanner:
     # File discovery
     # ------------------------------------------------------------------
 
-    def _find_all_translated_files(self, repo_path: Path) -> List[Tuple[Path, str]]:
+    def _find_all_translated_files(self, repo_path: Path) -> list[tuple[Path, str]]:
         """Find ALL translated markdown files using both naming strategies.
 
         Strategy 1 — file-based (blog.aspose.net):
@@ -332,7 +331,7 @@ class LanguageContaminationScanner:
             /bg/products/slides/…/*.md  →  detected lang = 'bg'
             /en/products/slides/…/*.md  →  source file, skip
         """
-        results: List[Tuple[Path, str]] = []
+        results: list[tuple[Path, str]] = []
         seen: set = set()
 
         for md in repo_path.rglob("*.md"):
@@ -360,9 +359,9 @@ class LanguageContaminationScanner:
 
     def _find_translated_files_for_lang(
         self, repo_path: Path, lang: str
-    ) -> List[Tuple[Path, str]]:
+    ) -> list[tuple[Path, str]]:
         """Find translated files for a specific target language."""
-        results: List[Tuple[Path, str]] = []
+        results: list[tuple[Path, str]] = []
         seen: set = set()
 
         # Strategy 1: file-based  (*.{lang}.md)
@@ -435,7 +434,7 @@ class LanguageContaminationScanner:
             script_mixing_issues = self._check_script_mixing_unicode(content, target_lang)
 
             # --- Repetition check (optional, inline implementation) ---
-            repetition_issues: List[str] = []
+            repetition_issues: list[str] = []
             if check_repetition:
                 repetition_issues = self._check_repetition(content)
 
@@ -543,7 +542,7 @@ class LanguageContaminationScanner:
 
     def _check_script_mixing_unicode(
         self, content: str, target_lang: str
-    ) -> List[str]:
+    ) -> list[str]:
         """Check for Unicode-script contamination (no ML required).
 
         Returns a list of human-readable issue descriptions, empty if clean.
@@ -562,7 +561,7 @@ class LanguageContaminationScanner:
         if not lines:
             return []
 
-        contaminated: List[str] = []
+        contaminated: list[str] = []
         for line in lines:
             for pattern in forbidden:
                 if pattern.search(line):
@@ -582,7 +581,7 @@ class LanguageContaminationScanner:
             f"First example: {contaminated[0]}"
         ] + [f"  Line: {c}" for c in contaminated[1:3]]
 
-    def _check_repetition(self, content: str) -> List[str]:
+    def _check_repetition(self, content: str) -> list[str]:
         """Check for excessive word repetition (inline, no external imports).
 
         Returns a list of human-readable issue descriptions, empty if clean.
@@ -592,7 +591,7 @@ class LanguageContaminationScanner:
         clean = re.sub(r'`[^`]+`', '', clean)
         clean = re.sub(r'^---.*?^---', '', clean, flags=re.DOTALL | re.MULTILINE)
 
-        issues: List[str] = []
+        issues: list[str] = []
 
         # 1. Heading-word repetition (> 4× same word in a heading line)
         heading_threshold = 4
@@ -627,7 +626,7 @@ class LanguageContaminationScanner:
 
         return issues
 
-    def _split_into_sentences(self, text: str) -> List[str]:
+    def _split_into_sentences(self, text: str) -> list[str]:
         """
         Split text into sentences using simple heuristic.
 
@@ -722,19 +721,19 @@ class ReportGenerator:
 
         # Generate report content
         lines = []
-        lines.append(f"# Translation Quality Scan Report")
-        lines.append(f"")
+        lines.append("# Translation Quality Scan Report")
+        lines.append("")
         lines.append(f"**Generated:** {result.scan_timestamp}")
         lines.append(f"**Repository:** {result.repo_path}")
         lines.append(f"**Target Language:** {result.target_lang if result.target_lang != 'all' else 'all languages'}")
-        lines.append(f"**Minimum Purity Threshold:** 95.0%  |  **Script-mixing threshold:** 6%")
-        lines.append(f"")
+        lines.append("**Minimum Purity Threshold:** 95.0%  |  **Script-mixing threshold:** 6%")
+        lines.append("")
 
         # Executive Summary
-        lines.append(f"## Executive Summary")
-        lines.append(f"")
-        lines.append(f"| Metric | Count |")
-        lines.append(f"|--------|-------|")
+        lines.append("## Executive Summary")
+        lines.append("")
+        lines.append("| Metric | Count |")
+        lines.append("|--------|-------|")
         lines.append(f"| Total Files Found | {result.total_files} |")
         lines.append(f"| Successfully Scanned | {result.scanned_files} |")
         lines.append(f"| Clean Files | {result.clean_files} |")
@@ -752,25 +751,25 @@ class ReportGenerator:
             contamination_rate = (bad_total / result.scanned_files) * 100
             lines.append(f"| Overall Bad-Quality Rate | {contamination_rate:.1f}% |")
 
-        lines.append(f"")
+        lines.append("")
 
         # Priority Summary
-        lines.append(f"## Priority Summary")
-        lines.append(f"")
-        lines.append(f"| Priority | Range | Count |")
-        lines.append(f"|----------|-------|-------|")
+        lines.append("## Priority Summary")
+        lines.append("")
+        lines.append("| Priority | Range | Count |")
+        lines.append("|----------|-------|-------|")
         lines.append(f"| Critical | < 50% | {len(critical)} |")
         lines.append(f"| High | 50-75% | {len(high)} |")
         lines.append(f"| Medium | 75-90% | {len(medium)} |")
         lines.append(f"| Low | 90-95% | {len(low)} |")
-        lines.append(f"")
+        lines.append("")
 
         # Detailed Findings
         if contaminated_sorted:
-            lines.append(f"## Detailed Contamination Findings")
-            lines.append(f"")
-            lines.append(f"Files sorted by contamination severity (worst first).")
-            lines.append(f"")
+            lines.append("## Detailed Contamination Findings")
+            lines.append("")
+            lines.append("Files sorted by contamination severity (worst first).")
+            lines.append("")
 
             for i, analysis in enumerate(contaminated_sorted, 1):
                 # Determine priority
@@ -784,119 +783,119 @@ class ReportGenerator:
                     priority = "LOW"
 
                 lines.append(f"### {i}. {analysis.relative_path}")
-                lines.append(f"")
+                lines.append("")
                 lines.append(f"**Priority:** {priority}")
                 lines.append(f"**Purity:** {analysis.purity_percentage:.1f}%")
                 lines.append(f"**Sentences:** {analysis.total_sentences} total, {analysis.correct_lang_count} correct")
-                lines.append(f"")
+                lines.append("")
 
                 if analysis.wrong_lang_samples:
-                    lines.append(f"**Sample Contaminated Content:**")
-                    lines.append(f"")
+                    lines.append("**Sample Contaminated Content:**")
+                    lines.append("")
                     for sample in analysis.wrong_lang_samples[:3]:  # Show first 3
                         snippet = sample['snippet'][:200]  # Limit to 200 chars
                         lines.append(f"- Detected: `{sample['detected']}` (confidence: {sample['confidence']:.2f})")
-                        lines.append(f"  ```")
+                        lines.append("  ```")
                         lines.append(f"  {snippet}")
-                        lines.append(f"  ```")
-                        lines.append(f"")
+                        lines.append("  ```")
+                        lines.append("")
 
-                lines.append(f"---")
-                lines.append(f"")
+                lines.append("---")
+                lines.append("")
 
         else:
-            lines.append(f"## Detailed Contamination Findings")
-            lines.append(f"")
+            lines.append("## Detailed Contamination Findings")
+            lines.append("")
             lines.append(f"No contaminated files found. All scanned files meet the {95.0}% purity threshold.")
-            lines.append(f"")
+            lines.append("")
 
         # Script-mixing findings
         if script_only:
-            lines.append(f"## Script-Mixing Issues (Unicode analysis)")
-            lines.append(f"")
-            lines.append(f"These files contain characters from an incompatible Unicode script "
-                         f"(e.g. Arabic text inside a Bulgarian translation). "
-                         f"The langdetect purity score passed, but script analysis flagged them.")
-            lines.append(f"")
+            lines.append("## Script-Mixing Issues (Unicode analysis)")
+            lines.append("")
+            lines.append("These files contain characters from an incompatible Unicode script "
+                         "(e.g. Arabic text inside a Bulgarian translation). "
+                         "The langdetect purity score passed, but script analysis flagged them.")
+            lines.append("")
             for i, analysis in enumerate(script_only, 1):
                 action = f" — **{analysis.action_taken.upper()}**" if analysis.action_taken else ""
                 lines.append(f"### {i}. {analysis.relative_path}{action}")
-                lines.append(f"")
+                lines.append("")
                 lines.append(f"**Language:** {analysis.target_lang}")
-                lines.append(f"")
+                lines.append("")
                 for issue in analysis.script_mixing_issues:
                     lines.append(f"- {issue}")
-                lines.append(f"")
-                lines.append(f"---")
-                lines.append(f"")
+                lines.append("")
+                lines.append("---")
+                lines.append("")
 
         # Repetition findings
         if repetition_only:
-            lines.append(f"## Repetition Issues")
-            lines.append(f"")
-            lines.append(f"These files contain excessive word repetition (likely model hallucination).")
-            lines.append(f"")
+            lines.append("## Repetition Issues")
+            lines.append("")
+            lines.append("These files contain excessive word repetition (likely model hallucination).")
+            lines.append("")
             for i, analysis in enumerate(repetition_only, 1):
                 action = f" — **{analysis.action_taken.upper()}**" if analysis.action_taken else ""
                 lines.append(f"### {i}. {analysis.relative_path}{action}")
-                lines.append(f"")
+                lines.append("")
                 lines.append(f"**Language:** {analysis.target_lang}")
-                lines.append(f"")
+                lines.append("")
                 for issue in analysis.repetition_issues:
                     lines.append(f"- {issue}")
-                lines.append(f"")
-                lines.append(f"---")
-                lines.append(f"")
+                lines.append("")
+                lines.append("---")
+                lines.append("")
 
         # Errors
         error_analyses = [a for a in result.analyses if a.error and not a.has_quality_issues]
         if error_analyses:
-            lines.append(f"## Errors and Warnings")
-            lines.append(f"")
-            lines.append(f"The following files encountered errors during analysis:")
-            lines.append(f"")
+            lines.append("## Errors and Warnings")
+            lines.append("")
+            lines.append("The following files encountered errors during analysis:")
+            lines.append("")
 
             for analysis in error_analyses:
                 lines.append(f"- **{analysis.relative_path}**")
                 lines.append(f"  - Error: {analysis.error}")
-                lines.append(f"")
+                lines.append("")
 
         # Recommendations
-        lines.append(f"## Recommendations")
-        lines.append(f"")
+        lines.append("## Recommendations")
+        lines.append("")
 
         if len(critical) > 0:
-            lines.append(f"### Critical Action Required")
-            lines.append(f"")
+            lines.append("### Critical Action Required")
+            lines.append("")
             lines.append(f"{len(critical)} file(s) have severe contamination (<50% purity). These files are mostly in the wrong language and require immediate re-translation.")
-            lines.append(f"")
+            lines.append("")
 
         if len(high) > 0:
-            lines.append(f"### High Priority")
-            lines.append(f"")
+            lines.append("### High Priority")
+            lines.append("")
             lines.append(f"{len(high)} file(s) have significant contamination (50-75% purity). Review and re-translate affected sections.")
-            lines.append(f"")
+            lines.append("")
 
         if len(medium) > 0:
-            lines.append(f"### Medium Priority")
-            lines.append(f"")
+            lines.append("### Medium Priority")
+            lines.append("")
             lines.append(f"{len(medium)} file(s) have moderate contamination (75-90% purity). Review contaminated sentences and correct as needed.")
-            lines.append(f"")
+            lines.append("")
 
         if len(low) > 0:
-            lines.append(f"### Low Priority")
-            lines.append(f"")
+            lines.append("### Low Priority")
+            lines.append("")
             lines.append(f"{len(low)} file(s) have minor contamination (90-95% purity). These are close to the threshold and may contain technical terms or proper nouns detected as other languages.")
-            lines.append(f"")
+            lines.append("")
 
         if result.contaminated_files == 0:
-            lines.append(f"All scanned files are clean. No action required.")
-            lines.append(f"")
+            lines.append("All scanned files are clean. No action required.")
+            lines.append("")
 
         # Footer
-        lines.append(f"---")
-        lines.append(f"")
-        lines.append(f"**Report generated by:** Language Contamination Scanner (Agent-ML-D, Task ML-004)")
+        lines.append("---")
+        lines.append("")
+        lines.append("**Report generated by:** Language Contamination Scanner (Agent-ML-D, Task ML-004)")
         lines.append(f"**Scan completed:** {result.scan_timestamp}")
 
         # Write report

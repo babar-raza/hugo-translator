@@ -7,14 +7,9 @@ across execution modes with correlation tracking and NDJSON output.
 
 import logging
 from pathlib import Path
-from typing import Dict, Any, Optional
+from typing import Any
 
-from src.observability.logger import (
-    StructuredLogger,
-    LogContext,
-    setup_structured_logging,
-    get_logger as get_structured_logger
-)
+from src.observability.logger import LogContext, StructuredLogger, setup_structured_logging
 
 logger = logging.getLogger(__name__)
 
@@ -59,7 +54,7 @@ class LoggingEngine:
         self,
         name: str = "translation_system",
         log_level: str = "INFO",
-        log_file: Optional[Path] = None,
+        log_file: Path | None = None,
         console_output: bool = True
     ):
         """Initialize logging engine."""
@@ -71,18 +66,18 @@ class LoggingEngine:
 
         # Set up structured logging
         if log_file or console_output:
-            print(f"DEBUG: About to call setup_structured_logging", flush=True)
+            print("DEBUG: About to call setup_structured_logging", flush=True)
             setup_structured_logging(
                 log_level=log_level,
                 log_file=log_file,
                 console_output=console_output
             )
-            print(f"DEBUG: setup_structured_logging completed", flush=True)
+            print("DEBUG: setup_structured_logging completed", flush=True)
 
         # Get structured logger
-        print(f"DEBUG: About to create StructuredLogger", flush=True)
+        print("DEBUG: About to create StructuredLogger", flush=True)
         self.logger = StructuredLogger(name=name)
-        print(f"DEBUG: StructuredLogger created", flush=True)
+        print("DEBUG: StructuredLogger created", flush=True)
 
         logger.info(
             f"LoggingEngine initialized: name={name}, level={log_level}, "
@@ -150,9 +145,9 @@ class LoggingEngine:
 
     def with_context(
         self,
-        correlation_id: Optional[str] = None,
-        job_id: Optional[str] = None,
-        worker_id: Optional[str] = None
+        correlation_id: str | None = None,
+        job_id: str | None = None,
+        worker_id: str | None = None
     ) -> LogContext:
         """
         Create context manager for correlation tracking.
@@ -217,13 +212,13 @@ class LoggingEngine:
 
 
 # Global logging engine instance
-_global_logging_engine: Optional[LoggingEngine] = None
+_global_logging_engine: LoggingEngine | None = None
 
 
 def get_logging_engine(
     name: str = "translation_system",
     log_level: str = "INFO",
-    log_file: Optional[Path] = None,
+    log_file: Path | None = None,
     console_output: bool = True
 ) -> LoggingEngine:
     """

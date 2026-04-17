@@ -8,7 +8,6 @@ import logging
 import sys
 import time
 from pathlib import Path
-from typing import Dict, List
 
 # Add parent directory to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -34,7 +33,7 @@ class TranslationBenchmark:
         self.gpu_manager = GPUManager()
         self.results = []
 
-    def create_test_texts(self, count: int) -> List[str]:
+    def create_test_texts(self, count: int) -> list[str]:
         """
         Create test texts for benchmarking.
 
@@ -67,7 +66,7 @@ class TranslationBenchmark:
         device: str,
         batch_size: int,
         max_memory_mb: int = None,
-    ) -> Dict:
+    ) -> dict:
         """
         Benchmark a specific model configuration.
 
@@ -214,7 +213,7 @@ class TranslationBenchmark:
         hf_model_id: str,
         batch_size: int,
         max_memory_mb: int = None,
-    ) -> Dict:
+    ) -> dict:
         """
         Compare GPU vs CPU performance.
 
@@ -262,7 +261,7 @@ class TranslationBenchmark:
 
         return results
 
-    def generate_report(self, results: Dict, output_path: Path) -> None:
+    def generate_report(self, results: dict, output_path: Path) -> None:
         """
         Generate markdown report.
 
@@ -283,7 +282,7 @@ class TranslationBenchmark:
             gpu = results["gpu"]
             lines.append("## GPU Performance")
             lines.append("")
-            lines.append(f"- Device: CUDA")
+            lines.append("- Device: CUDA")
             lines.append(f"- Load Time: {gpu['load_time']:.2f}s")
             lines.append(f"- Avg Translation Time: {gpu['avg_translation_time']:.3f}s")
             lines.append(f"- Throughput: {gpu['throughput']:.1f} texts/sec")
@@ -299,7 +298,7 @@ class TranslationBenchmark:
             cpu = results["cpu"]
             lines.append("## CPU Performance")
             lines.append("")
-            lines.append(f"- Device: CPU")
+            lines.append("- Device: CPU")
             lines.append(f"- Load Time: {cpu['load_time']:.2f}s")
             lines.append(f"- Avg Translation Time: {cpu['avg_translation_time']:.3f}s")
             lines.append(f"- Throughput: {cpu['throughput']:.1f} texts/sec")

@@ -29,7 +29,7 @@ Example:
 import re
 from collections import Counter
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Set
+from typing import Any
 
 import yaml
 
@@ -63,24 +63,23 @@ class RepetitionDetectorValidator(PostTranslationValidator):
         'a', 'an', 'and', 'are', 'as', 'at', 'be', 'by', 'for', 'from',
         'has', 'he', 'in', 'is', 'it', 'its', 'of', 'on', 'that', 'the',
         'to', 'was', 'will', 'with', 'we', 'you', 'they', 'this', 'these',
-        'those', 'have', 'had', 'been', 'has', 'have', 'do', 'does', 'did',
+        'those', 'have', 'had', 'been', 'do', 'does', 'did',
         # German
         'der', 'die', 'das', 'den', 'dem', 'des', 'ein', 'eine', 'einer',
         'einem', 'einen', 'und', 'oder', 'aber', 'wenn', 'als', 'wie',
-        'auch', 'noch', 'nur', 'von', 'zu', 'mit', 'auf', 'für', 'an',
-        'bei', 'nach', 'über', 'unter', 'durch', 'ist', 'sind', 'war',
+        'auch', 'noch', 'nur', 'von', 'zu', 'mit', 'auf', 'für', 'bei', 'nach', 'über', 'unter', 'durch', 'ist', 'sind', 'war',
         'waren', 'hat', 'haben', 'wird', 'werden', 'sich', 'nicht',
         # French
-        'le', 'la', 'les', 'un', 'une', 'des', 'et', 'ou', 'mais', 'si',
+        'le', 'la', 'les', 'un', 'une', 'et', 'ou', 'mais', 'si',
         'comme', 'dans', 'de', 'du', 'pour', 'avec', 'sans', 'sur', 'sous',
-        'par', 'est', 'sont', 'était', 'étaient', 'a', 'ont', 'se', 'ne',
+        'par', 'est', 'sont', 'était', 'étaient', 'ont', 'se', 'ne',
         # Spanish
-        'el', 'la', 'los', 'las', 'un', 'una', 'unos', 'unas', 'y', 'o',
-        'pero', 'si', 'como', 'en', 'de', 'del', 'para', 'con', 'sin',
-        'sobre', 'por', 'es', 'son', 'era', 'eran', 'ha', 'han', 'se', 'no',
+        'el', 'los', 'las', 'una', 'unos', 'unas', 'y', 'o',
+        'pero', 'como', 'en', 'del', 'para', 'con', 'sin',
+        'sobre', 'por', 'es', 'son', 'era', 'eran', 'ha', 'han', 'no',
     }
 
-    def __init__(self, config: Optional[Dict[str, Any]] = None):
+    def __init__(self, config: dict[str, Any] | None = None):
         """Initialize repetition detector validator.
 
         Args:
@@ -111,7 +110,7 @@ class RepetitionDetectorValidator(PostTranslationValidator):
         # Load technical terms whitelist
         self.whitelist_terms = self._load_whitelist(config)
 
-    def _load_whitelist(self, config: Dict[str, Any]) -> Set[str]:
+    def _load_whitelist(self, config: dict[str, Any]) -> set[str]:
         """Load technical terms whitelist from YAML file.
 
         Args:
@@ -132,7 +131,7 @@ class RepetitionDetectorValidator(PostTranslationValidator):
         terms = set()
         try:
             if Path(terminology_file).exists():
-                with open(terminology_file, 'r', encoding='utf-8') as f:
+                with open(terminology_file, encoding='utf-8') as f:
                     data = yaml.safe_load(f)
                     if data and 'terms' in data:
                         # Normalize to lowercase for case-insensitive matching
@@ -217,7 +216,7 @@ class RepetitionDetectorValidator(PostTranslationValidator):
         self,
         source: str,
         translation: str,
-        context: Optional[Dict[str, Any]] = None,
+        context: dict[str, Any] | None = None,
     ) -> ValidationResult:
         """Validate translation for repetition issues.
 
@@ -290,7 +289,7 @@ class RepetitionDetectorValidator(PostTranslationValidator):
 
     def _check_ngram_repetition(
         self, text: str, segment_id: str, source_ngram_ceiling: int = 0
-    ) -> List[ValidationIssue]:
+    ) -> list[ValidationIssue]:
         """Check for n-gram repetition in text.
 
         Args:
@@ -378,7 +377,7 @@ class RepetitionDetectorValidator(PostTranslationValidator):
     def _check_word_frequency(
         self, text: str, segment_id: str,
         source_word_freq_ceiling: float = 0.0
-    ) -> List[ValidationIssue]:
+    ) -> list[ValidationIssue]:
         """Check for excessive word frequency in text.
 
         Args:
@@ -466,7 +465,7 @@ class RepetitionDetectorValidator(PostTranslationValidator):
 
     def _check_sentence_duplication(
         self, text: str, segment_id: str
-    ) -> List[ValidationIssue]:
+    ) -> list[ValidationIssue]:
         """Check for duplicate sentences in text.
 
         Args:
@@ -524,7 +523,7 @@ class RepetitionDetectorValidator(PostTranslationValidator):
 
         return issues
 
-    def _tokenize(self, text: str) -> List[str]:
+    def _tokenize(self, text: str) -> list[str]:
         """Tokenize text into words.
 
         Args:
@@ -538,7 +537,7 @@ class RepetitionDetectorValidator(PostTranslationValidator):
         words = re.findall(r'\b[\w]+\b', text.lower())
         return words
 
-    def _split_sentences(self, text: str) -> List[str]:
+    def _split_sentences(self, text: str) -> list[str]:
         """Split text into sentences.
 
         Args:
@@ -571,7 +570,7 @@ class RepetitionDetectorValidator(PostTranslationValidator):
 
     def _check_heading_repetition(
         self, text: str, segment_id: str
-    ) -> List[ValidationIssue]:
+    ) -> list[ValidationIssue]:
         """Check heading lines for excessive single-word repetition.
 
         This check bypasses the 20-character segment minimum so that short

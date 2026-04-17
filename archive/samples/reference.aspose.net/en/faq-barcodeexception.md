@@ -31,4 +31,3 @@ This supports scenarios where exceptions must be serialized or remoted.
 **Q5. When should I catch `BarCodeException` in my code?**
 You should catch it when performing barcode generation or recognition operations that might fail due to invalid data or configuration.
 Catching this type specifically allows your application to provide better error messages and recovery paths.
-

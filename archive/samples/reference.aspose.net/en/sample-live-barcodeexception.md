@@ -32,4 +32,3 @@ This allows applications to provide targeted error messages when invalid input o
 
 The reference content encourages developers to consult related documentation and examples for recommended patterns when generating barcodes.
 By examining the members listed in the reference, developers can also override or extend behavior where appropriate in derived types.
-

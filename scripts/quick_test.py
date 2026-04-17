@@ -7,8 +7,8 @@ def test():
     print("="*80)
 
     try:
-        from transformers import M2M100ForConditionalGeneration, M2M100Tokenizer
         import torch
+        from transformers import M2M100ForConditionalGeneration, M2M100Tokenizer
 
         print("\n[1/4] Loading model...")
         model = M2M100ForConditionalGeneration.from_pretrained("facebook/m2m100_418M")
@@ -55,7 +55,7 @@ def test():
             translations = tokenizer.batch_decode(generated, skip_special_tokens=True)
 
             # Check each translation
-            for i, (src, tgt) in enumerate(zip(test_texts, translations), 1):
+            for i, (src, tgt) in enumerate(zip(test_texts, translations, strict=False), 1):
                 # Check for contamination markers
                 markers = {
                     'Czech': ['Zkouska', 'zkouskou'],

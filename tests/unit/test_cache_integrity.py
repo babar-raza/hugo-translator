@@ -4,11 +4,12 @@ Unit tests for cache integrity safeguards (T204: federated-splashing-panda).
 Tests validation, error handling, and corruption detection in L2PersistentTM.
 """
 import json
-import pytest
 import tempfile
 import threading
-from pathlib import Path
-from unittest.mock import patch, Mock
+from unittest.mock import patch
+
+import pytest
+
 from src.tm.l2_persistent import L2PersistentTM, TranslationEntry
 
 

@@ -120,4 +120,3 @@ Für mehr Informationen:
 
 - [Aspose.Slides Documentation](https://docs.aspose.net/slides/)
 - [Feuer Referenz](https://reference.aspose.net/slides/)
-

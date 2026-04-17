@@ -7,11 +7,10 @@ Tests the early validation logic for --output argument to ensure:
 3. Both CLI and engine-level validation
 """
 
-import os
-import pytest
-import tempfile
 from pathlib import Path
 from unittest.mock import MagicMock, patch
+
+import pytest
 
 from src.cli import validate_output_path
 from src.translation_engine.engine import TranslationEngine

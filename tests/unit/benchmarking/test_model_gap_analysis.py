@@ -1,8 +1,7 @@
 """Tests for model_gap_analysis.py - Model recommendation for coverage gaps."""
 
-import pytest
 
-from src.benchmarking.model_gap_analysis import analyze_gaps, ModelRecommendation
+from src.benchmarking.model_gap_analysis import ModelRecommendation, analyze_gaps
 
 
 class TestModelRecommendation:

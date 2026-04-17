@@ -9,12 +9,10 @@ For a full translation with TM caching, fix the cffi dependency:
     pip install cffi
 """
 import os
-import sys
-import time
 import re
-from pathlib import Path
+import sys
 from io import StringIO
-from typing import Dict, List, Any, Optional
+from pathlib import Path
 
 # Add src to path
 REPO_ROOT = Path(__file__).parent
@@ -38,12 +36,11 @@ class MockL2Persistent:
 sys.modules['lmdb'] = MockLMDB
 sys.modules['cffi'] = type(sys)('cffi')
 
-from ruamel.yaml import YAML
-from ruamel.yaml.comments import CommentedMap
-from ruamel.yaml.scalarstring import LiteralScalarString
-
 # Setup logging
 import logging
+
+from ruamel.yaml import YAML
+
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 

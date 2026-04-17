@@ -2,13 +2,13 @@
 Model Runtime module for translation model management.
 """
 from .hardware import HardwareDetector, HardwareInfo
+from .llm_backend import LLMModelBackend
 from .loader import (
     CTranslate2Backend,
     HuggingFaceBackend,
     ModelBackend,
     ModelLoader,
 )
-from .llm_backend import LLMModelBackend
 from .registry import ModelInfo, ModelRegistry
 
 __all__ = [

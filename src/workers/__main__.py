@@ -94,17 +94,17 @@ if __name__ == "__main__":
     worker_mode = os.getenv("WORKER_MODE", "mcp").lower()
 
     if worker_mode == "processor":
-        print(f"Starting worker in PROCESSOR mode", file=sys.stderr)
+        print("Starting worker in PROCESSOR mode", file=sys.stderr)
         run_processor_mode()
     elif worker_mode == "autonomous_translate":
-        print(f"Starting worker in AUTONOMOUS TRANSLATE mode", file=sys.stderr)
+        print("Starting worker in AUTONOMOUS TRANSLATE mode", file=sys.stderr)
         run_autonomous_translate_mode()
     elif worker_mode == "tm_improve":
-        print(f"Starting worker in TM IMPROVE mode", file=sys.stderr)
+        print("Starting worker in TM IMPROVE mode", file=sys.stderr)
         run_tm_improve_mode()
     elif worker_mode == "autonomous_verification":
-        print(f"Starting worker in AUTONOMOUS VERIFICATION mode", file=sys.stderr)
+        print("Starting worker in AUTONOMOUS VERIFICATION mode", file=sys.stderr)
         run_autonomous_verification_mode()
     else:
-        print(f"Starting worker in MCP mode", file=sys.stderr)
+        print("Starting worker in MCP mode", file=sys.stderr)
         run_mcp_mode()

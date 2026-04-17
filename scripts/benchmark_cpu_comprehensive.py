@@ -41,7 +41,7 @@ import time
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 import psutil
 
@@ -67,13 +67,13 @@ class CPUBenchmarkRunner:
 
     def __init__(
         self,
-        model_ids: List[str],
-        batch_sizes: List[int],
-        thread_counts: Optional[List[int]] = None,
+        model_ids: list[str],
+        batch_sizes: list[int],
+        thread_counts: list[int] | None = None,
         iterations: int = 3,
-        corpus_path: Optional[Path] = None,
-        db_path: Optional[Path] = None,
-        target_languages: Optional[List[str]] = None,
+        corpus_path: Path | None = None,
+        db_path: Path | None = None,
+        target_languages: list[str] | None = None,
         device: str = "cpu",
     ):
         """
@@ -125,7 +125,7 @@ class CPUBenchmarkRunner:
         config = optimizer.optimize()
         return config.num_threads
 
-    def _load_corpus(self) -> List[Dict[str, Any]]:
+    def _load_corpus(self) -> list[dict[str, Any]]:
         """
         Load benchmark corpus from JSON file.
 
@@ -145,7 +145,7 @@ class CPUBenchmarkRunner:
             ]
 
         try:
-            with open(self.corpus_path, "r", encoding="utf-8") as f:
+            with open(self.corpus_path, encoding="utf-8") as f:
                 samples = json.load(f)
 
             if not samples:
@@ -161,7 +161,7 @@ class CPUBenchmarkRunner:
             logger.error(f"Failed to parse corpus JSON: {e}")
             raise ValueError(f"Invalid corpus JSON: {e}")
 
-    def run_all_benchmarks(self) -> List[BenchmarkRun]:
+    def run_all_benchmarks(self) -> list[BenchmarkRun]:
         """
         Run all benchmark configurations.
 
@@ -387,7 +387,7 @@ class CPUBenchmarkRunner:
         self,
         model: Any,
         tokenizer: Any,
-        sample: Dict[str, Any],
+        sample: dict[str, Any],
         model_id: str,
         batch_size: int,
         target_language: str = "en",
@@ -501,7 +501,7 @@ class CPUBenchmarkRunner:
 
     def _get_target_language_token_id(
         self, tokenizer: Any, model_id: str, target_language: str
-    ) -> Optional[int]:
+    ) -> int | None:
         """
         Get the forced_bos_token_id for the target language.
 
@@ -627,7 +627,7 @@ class CPUBenchmarkRunner:
             collected_at_utc=datetime.now(timezone.utc).isoformat(),
         )
 
-    def print_summary(self, runs: List[BenchmarkRun]) -> None:
+    def print_summary(self, runs: list[BenchmarkRun]) -> None:
         """
         Print benchmark summary to console.
 
@@ -645,7 +645,7 @@ class CPUBenchmarkRunner:
         print("=" * 80)
 
         # Group by model
-        by_model: Dict[str, List[BenchmarkRun]] = {}
+        by_model: dict[str, list[BenchmarkRun]] = {}
         for run in runs:
             if run.model_id not in by_model:
                 by_model[run.model_id] = []

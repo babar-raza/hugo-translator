@@ -3,18 +3,20 @@ Unit tests for TextUnitExtractor site profile configuration loading.
 
 Tests TASK-B002: Resolve TODOs in text_unit_extractor.py
 """
-import pytest
-from unittest.mock import Mock
 from types import SimpleNamespace
+from unittest.mock import Mock
+
+import pytest
+
 from src.translation_engine.extractor.text_unit_extractor import (
-    TextUnitExtractor,
-    TRANSLATABLE_FRONTMATTER_FIELDS,
-    NON_TRANSLATABLE_FRONTMATTER_FIELDS,
+    FALLBACK_RATE_THRESHOLD,
     LANGUAGE_PURITY_MIN_LENGTH,
     LANGUAGE_PURITY_MIN_SCRIPT_RATIO,
-    FALLBACK_RATE_THRESHOLD,
-    TOKEN_PER_WORD_ESTIMATE,
+    NON_TRANSLATABLE_FRONTMATTER_FIELDS,
     SCRIPT_SIMILAR_LANGUAGES,
+    TOKEN_PER_WORD_ESTIMATE,
+    TRANSLATABLE_FRONTMATTER_FIELDS,
+    TextUnitExtractor,
 )
 
 
@@ -300,7 +302,6 @@ class TestIntegrationWithExtraction:
 
     def test_frontmatter_extraction_uses_site_profile(self):
         """Test that frontmatter extraction respects site profile configuration."""
-        from src.translation_engine.parser.ast_nodes import ASTNode, NodeType
 
         # Create site profile with custom fields
         mock_profile = Mock()
@@ -335,7 +336,6 @@ class TestIntegrationWithExtraction:
 
     def test_default_frontmatter_extraction_unchanged(self):
         """Test that default frontmatter extraction still works without site profile."""
-        from src.translation_engine.parser.ast_nodes import ASTNode, NodeType
 
         extractor = TextUnitExtractor(segmentation_strategy="leaf_only")
 

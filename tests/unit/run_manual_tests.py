@@ -4,9 +4,10 @@ Runs basic smoke tests to verify core functionality.
 """
 
 import sys
+
 sys.path.insert(0, '.')
 
-from src.observability.progress import ProgressTracker, ProgressSnapshot
+from src.observability.progress import ProgressSnapshot, ProgressTracker
 
 
 def test_error_count_zero_on_all_success():

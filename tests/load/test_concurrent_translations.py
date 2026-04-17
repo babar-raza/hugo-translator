@@ -8,12 +8,10 @@ import concurrent.futures
 import logging
 import os
 import statistics
-import tempfile
 import threading
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Dict, List, Optional
 
 import pytest
 
@@ -35,7 +33,7 @@ class LoadTestMetrics:
     failed_requests: int = 0
 
     # Timing metrics (seconds)
-    latencies: List[float] = field(default_factory=list)
+    latencies: list[float] = field(default_factory=list)
     start_time: float = 0.0
     end_time: float = 0.0
 
@@ -51,13 +49,13 @@ class LoadTestMetrics:
     avg_cpu_percent: float = 0.0
 
     # Error tracking
-    errors: List[str] = field(default_factory=list)
+    errors: list[str] = field(default_factory=list)
 
     def add_latency(self, latency: float):
         """Add a latency measurement."""
         self.latencies.append(latency)
 
-    def get_summary(self) -> Dict:
+    def get_summary(self) -> dict:
         """Get summary statistics."""
         duration = self.end_time - self.start_time if self.end_time > 0 else 0
 
@@ -121,8 +119,8 @@ class LoadTestConfig:
 
     num_workers: int = 10
     duration_seconds: int = 60
-    test_files: List[Path] = field(default_factory=list)
-    target_langs: List[str] = field(default_factory=lambda: ["es", "fr"])
+    test_files: list[Path] = field(default_factory=list)
+    target_langs: list[str] = field(default_factory=lambda: ["es", "fr"])
     ramp_up_seconds: int = 0
     enable_tm: bool = True
     force_retranslation: bool = False
@@ -253,9 +251,9 @@ class LoadTestRunner:
 
         try:
             # Import here to avoid circular dependencies
-            from src.translation_engine import TranslationEngine
-            from src.tm import TranslationMemory
             from src.model_runtime import ModelLoader
+            from src.tm import TranslationMemory
+            from src.translation_engine import TranslationEngine
             from src.utils.config_loader import ConfigService
 
             # Create minimal components for test

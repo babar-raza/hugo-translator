@@ -15,12 +15,10 @@ Task: P0-02-GOLDEN-TESTS
 Date: 2026-01-14
 """
 import json
-import os
 import re
 import subprocess
 import sys
 from pathlib import Path
-from typing import Dict, List, Optional
 
 import pytest
 
@@ -34,7 +32,7 @@ class CLIResult:
         stdout: str,
         stderr: str,
         duration: float,
-        files_written: Optional[List[str]] = None
+        files_written: list[str] | None = None
     ):
         self.exit_code = exit_code
         self.stdout = stdout
@@ -84,9 +82,9 @@ class GoldenTestBase:
 
     def run_cli(
         self,
-        args: List[str],
+        args: list[str],
         capture_files: bool = False,
-        cwd: Optional[Path] = None
+        cwd: Path | None = None
     ) -> CLIResult:
         """
         Execute CLI via subprocess and capture result.
@@ -275,7 +273,7 @@ class GoldenTestBase:
         with open(snapshot_file, 'w', encoding='utf-8') as f:
             json.dump(result.to_dict(), f, indent=2, ensure_ascii=False)
 
-    def load_snapshot(self, test_name: str) -> Optional[CLIResult]:
+    def load_snapshot(self, test_name: str) -> CLIResult | None:
         """
         Load baseline snapshot from JSON.
 
@@ -289,7 +287,7 @@ class GoldenTestBase:
         if not snapshot_file.exists():
             return None
 
-        with open(snapshot_file, 'r', encoding='utf-8') as f:
+        with open(snapshot_file, encoding='utf-8') as f:
             data = json.load(f)
             return CLIResult.from_dict(data)
 

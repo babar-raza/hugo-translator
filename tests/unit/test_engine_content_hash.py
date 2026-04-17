@@ -1,8 +1,6 @@
 """Unit tests for engine content hash integration."""
 
-import pytest
-from pathlib import Path
-from unittest.mock import Mock, MagicMock
+from unittest.mock import Mock
 
 
 def test_should_skip_translation_with_hash_enabled(tmp_path):

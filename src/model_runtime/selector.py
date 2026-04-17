@@ -17,11 +17,10 @@ Priority order:
 PROD-004: Language-Aware Model Selection (Agent-E)
 """
 import logging
-from typing import Optional, List, Tuple
 from dataclasses import dataclass
 
-from .registry import ModelRegistry, ModelInfo
 from .hardware import HardwareInfo
+from .registry import ModelInfo, ModelRegistry
 
 logger = logging.getLogger(__name__)
 
@@ -73,7 +72,7 @@ class LanguageAwareModelSelector:
         self,
         registry: ModelRegistry,
         hardware_info: HardwareInfo,
-        fallback_model: Optional[str] = None,
+        fallback_model: str | None = None,
     ):
         """
         Initialize language-aware model selector.
@@ -165,7 +164,7 @@ class LanguageAwareModelSelector:
         logger.error(error_msg)
         raise ValueError(error_msg)
 
-    def _try_opus_model(self, src_lang: str, tgt_lang: str) -> Optional[ModelSelection]:
+    def _try_opus_model(self, src_lang: str, tgt_lang: str) -> ModelSelection | None:
         """
         Try to find language-specific Opus model for this language pair.
 
@@ -220,7 +219,7 @@ class LanguageAwareModelSelector:
             hardware_fit=True,
         )
 
-    def _try_multilingual_fallback(self, prefer_quality: bool = False) -> Optional[ModelSelection]:
+    def _try_multilingual_fallback(self, prefer_quality: bool = False) -> ModelSelection | None:
         """
         Try to find suitable multilingual model as fallback.
 
@@ -282,7 +281,7 @@ class LanguageAwareModelSelector:
             hardware_fit=True,
         )
 
-    def _try_global_fallback(self) -> Optional[ModelSelection]:
+    def _try_global_fallback(self) -> ModelSelection | None:
         """
         Try to use global fallback model from configuration.
 
@@ -363,7 +362,7 @@ class LanguageAwareModelSelector:
 
     def get_available_models_for_language_pair(
         self, src_lang: str, tgt_lang: str
-    ) -> List[Tuple[str, str]]:
+    ) -> list[tuple[str, str]]:
         """
         Get list of all available models for a language pair.
 

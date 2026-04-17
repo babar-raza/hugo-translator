@@ -9,11 +9,15 @@ import threading
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 import lmdb
 
-from .normalization import make_tm_key, normalize_text
+from .normalization import make_tm_key
+
+# Canonical sub-directory name for the L2 LMDB database.
+# All callers must use this constant so the path is never mis-typed.
+L2_DB_NAME = "l2.lmdb"
 
 # T204: Integrity safeguards (federated-splashing-panda)
 logger = logging.getLogger(__name__)
@@ -28,9 +32,9 @@ class TranslationEntry:
     site_id: str
     src_lang: str
     tgt_lang: str
-    context: Optional[str] = None
-    timestamp: Optional[str] = None
-    metadata: Dict[str, Any] = None
+    context: str | None = None
+    timestamp: str | None = None
+    metadata: dict[str, Any] = None
 
     def __post_init__(self):
         """Initialize defaults."""
@@ -39,12 +43,12 @@ class TranslationEntry:
         if self.metadata is None:
             self.metadata = {}
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary."""
         return asdict(self)
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "TranslationEntry":
+    def from_dict(cls, data: dict[str, Any]) -> "TranslationEntry":
         """Create from dictionary."""
         return cls(**data)
 
@@ -117,8 +121,8 @@ class L2PersistentTM:
         src_lang: str,
         tgt_lang: str,
         text: str,
-        context: Optional[str] = None,
-    ) -> Optional[TranslationEntry]:
+        context: str | None = None,
+    ) -> TranslationEntry | None:
         """
         Find exact match for text with corruption detection (T204: federated-splashing-panda).
 
@@ -176,8 +180,8 @@ class L2PersistentTM:
         tgt_lang: str,
         text: str,
         translation: str,
-        context: Optional[str] = None,
-        metadata: Optional[Dict[str, Any]] = None,
+        context: str | None = None,
+        metadata: dict[str, Any] | None = None,
         overwrite: bool = True,
     ) -> bool:
         """
@@ -204,8 +208,9 @@ class L2PersistentTM:
         # This is a conservative check - only blocks on high-confidence mismatches
         try:
             # Import here to avoid circular dependencies
-            from src.translation_engine.language_detection.fasttext_detector import FastTextDetector
             from pathlib import Path
+
+            from src.translation_engine.language_detection.fasttext_detector import FastTextDetector
 
             # Only validate if translation is long enough for accurate detection
             if len(translation.strip()) > 50:
@@ -300,7 +305,7 @@ class L2PersistentTM:
             )
             raise
 
-    def batch_store(self, entries: List[TranslationEntry]) -> int:
+    def batch_store(self, entries: list[TranslationEntry]) -> int:
         """
         Efficiently store many entries at once with integrity safeguards (T204: federated-splashing-panda).
 
@@ -399,9 +404,9 @@ class L2PersistentTM:
 
     def export_all(
         self,
-        site_id: Optional[str] = None,
-        tgt_lang: Optional[str] = None
-    ) -> List[TranslationEntry]:
+        site_id: str | None = None,
+        tgt_lang: str | None = None
+    ) -> list[TranslationEntry]:
         """
         Export all entries from L2 cache.
 

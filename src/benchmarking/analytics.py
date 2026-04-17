@@ -17,10 +17,9 @@ from __future__ import annotations
 
 import logging
 import sqlite3
-from dataclasses import dataclass
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import TYPE_CHECKING, Dict, List, Optional, Tuple
+from typing import TYPE_CHECKING
 
 try:
     import pandas as pd
@@ -32,9 +31,9 @@ except ImportError:
 if TYPE_CHECKING:
     from src.shared_engines.composition_root import SharedEngines
 
-from src.benchmarking.query_cache import QueryCache, make_cache_key
 from src.benchmarking.connection_pool import ConnectionPool
 from src.benchmarking.performance_monitor import PerformanceMonitor
+from src.benchmarking.query_cache import QueryCache, make_cache_key
 
 logger = logging.getLogger(__name__)
 
@@ -78,7 +77,7 @@ class AnalyticsQueryAPI:
     def __init__(
         self,
         db_path: Path | str,
-        engines: Optional["SharedEngines"] = None,
+        engines: SharedEngines | None = None,
         cache_max_size: int = 100,
         cache_ttl_seconds: int = 300,
         pool_size: int = 5,
@@ -116,19 +115,19 @@ class AnalyticsQueryAPI:
         self._enable_monitoring = enable_monitoring
 
         # Initialize query cache
-        self._cache: Optional[QueryCache] = None
+        self._cache: QueryCache | None = None
         if enable_caching:
             self._cache = QueryCache(max_size=cache_max_size, ttl_seconds=cache_ttl_seconds)
             logger.info(f"Query cache enabled: max_size={cache_max_size}, ttl={cache_ttl_seconds}s")
 
         # Initialize connection pool
-        self._pool: Optional[ConnectionPool] = None
+        self._pool: ConnectionPool | None = None
         if enable_pooling and db_path != ":memory:":
             self._pool = ConnectionPool(db_path, pool_size=pool_size)
             logger.info(f"Connection pool enabled: pool_size={pool_size}")
 
         # Initialize performance monitor
-        self._monitor: Optional[PerformanceMonitor] = None
+        self._monitor: PerformanceMonitor | None = None
         if enable_monitoring:
             self._monitor = PerformanceMonitor(slow_threshold_ms=500.0, engines=engines)
             logger.info("Performance monitoring enabled")
@@ -164,7 +163,7 @@ class AnalyticsQueryAPI:
             self._pool.close_all()
             logger.info("Connection pool closed")
 
-    def get_cache_stats(self) -> Optional[Dict]:
+    def get_cache_stats(self) -> dict | None:
         """Get query cache statistics.
 
         Returns:
@@ -174,7 +173,7 @@ class AnalyticsQueryAPI:
             return self._cache.get_stats()
         return None
 
-    def get_monitor_stats(self) -> Optional[Dict]:
+    def get_monitor_stats(self) -> dict | None:
         """Get performance monitor statistics.
 
         Returns:
@@ -184,7 +183,7 @@ class AnalyticsQueryAPI:
             return self._monitor.get_stats()
         return None
 
-    def invalidate_cache(self, pattern: Optional[str] = None) -> int:
+    def invalidate_cache(self, pattern: str | None = None) -> int:
         """Invalidate cached query results.
 
         Args:
@@ -347,7 +346,7 @@ class AnalyticsQueryAPI:
         self,
         model_id: str,
         device: str,
-        baseline_type: Optional[str] = None
+        baseline_type: str | None = None
     ) -> pd.DataFrame:
         """Get performance baselines for model/device.
 
@@ -463,8 +462,8 @@ class AnalyticsQueryAPI:
         model_id: str,
         device: str,
         baseline_date: str,
-        current_date: Optional[str] = None
-    ) -> Dict[str, float]:
+        current_date: str | None = None
+    ) -> dict[str, float]:
         """Compare current performance against baseline.
 
         Args:
@@ -718,7 +717,7 @@ class AnalyticsQueryAPI:
 
     def get_model_comparison(
         self,
-        model_ids: List[str],
+        model_ids: list[str],
         device: str,
         days: int = 30
     ) -> pd.DataFrame:
@@ -812,7 +811,7 @@ class AnalyticsQueryAPI:
     def get_device_comparison(
         self,
         model_id: str,
-        devices: List[str],
+        devices: list[str],
         days: int = 30
     ) -> pd.DataFrame:
         """Compare model performance across devices.
@@ -900,7 +899,7 @@ class AnalyticsQueryAPI:
 
         return df
 
-    def _percentile(self, values: List[float], percentile: int) -> float:
+    def _percentile(self, values: list[float], percentile: int) -> float:
         """Calculate percentile.
 
         Args:

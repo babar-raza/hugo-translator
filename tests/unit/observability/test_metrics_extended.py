@@ -1,6 +1,5 @@
 """Unit tests for extended metrics (BM-08)."""
 
-import pytest
 
 from src.observability.metrics import MetricsCollector
 

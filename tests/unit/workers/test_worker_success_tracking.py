@@ -8,13 +8,9 @@ successful translation.
 from __future__ import annotations
 
 import json
-import time
 from pathlib import Path
 from typing import Any
-from unittest.mock import MagicMock, patch, call
-
-import pytest
-
+from unittest.mock import MagicMock
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -162,8 +158,9 @@ class TestRecordWorkerStateLedger:
 
     def test_success_false_does_not_advance_last_success_ts(self, tmp_path):
         """success=False must NOT update last_success_ts in state file."""
-        from src.workers.worker_state import record_worker_state, load_worker_state
         from datetime import datetime, timezone
+
+        from src.workers.worker_state import load_worker_state, record_worker_state
 
         old_ts = "2026-02-26T18:55:24+00:00"
         # Pre-seed state with an existing success
@@ -197,8 +194,9 @@ class TestRecordWorkerStateLedger:
 
     def test_success_true_advances_last_success_ts(self, tmp_path):
         """success=True must update last_success_ts to the current timestamp."""
-        from src.workers.worker_state import record_worker_state, load_worker_state
         from datetime import datetime, timezone
+
+        from src.workers.worker_state import load_worker_state, record_worker_state
 
         old_ts = "2026-02-26T18:55:24+00:00"
         initial = {

@@ -24,9 +24,10 @@ import json
 import subprocess
 import sys
 import time
-from dataclasses import dataclass, asdict
+from dataclasses import asdict, dataclass
 from pathlib import Path
-from typing import List, Dict, Any, Optional
+from typing import Any
+
 import yaml
 
 
@@ -41,7 +42,7 @@ class GateResult:
     message: str
     duration: float = 0.0
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for JSON serialization."""
         return asdict(self)
 
@@ -49,7 +50,7 @@ class GateResult:
 class QualityGate:
     """Base class for quality gates."""
 
-    def __init__(self, name: str, config: Dict[str, Any], project_root: Path):
+    def __init__(self, name: str, config: dict[str, Any], project_root: Path):
         self.name = name
         self.config = config
         self.project_root = project_root
@@ -176,7 +177,7 @@ class SyntaxValidGate(QualityGate):
                 continue
 
             try:
-                with open(full_path, 'r', encoding='utf-8') as f:
+                with open(full_path, encoding='utf-8') as f:
                     source_code = f.read()
                 compile(source_code, str(full_path), 'exec')
                 valid_files += 1
@@ -353,19 +354,19 @@ class GateRunner:
         self.project_root = project_root
         self.config = self._load_config()
 
-    def _load_config(self) -> Dict[str, Any]:
+    def _load_config(self) -> dict[str, Any]:
         """Load configuration from YAML file."""
         if not self.config_file.exists():
             raise FileNotFoundError(f"Config file not found: {self.config_file}")
 
-        with open(self.config_file, 'r', encoding='utf-8') as f:
+        with open(self.config_file, encoding='utf-8') as f:
             return yaml.safe_load(f)
 
     def execute_gates(
         self,
-        gate_filter: Optional[str] = None,
+        gate_filter: str | None = None,
         fail_fast: bool = False
-    ) -> List[GateResult]:
+    ) -> list[GateResult]:
         """
         Execute quality gates.
 
@@ -417,7 +418,7 @@ class GateRunner:
 
         return results
 
-    def generate_summary(self, results: List[GateResult]) -> Dict[str, Any]:
+    def generate_summary(self, results: list[GateResult]) -> dict[str, Any]:
         """Generate summary of gate results."""
         total_gates = len(results)
         passed_gates = sum(1 for r in results if r.passed)
@@ -449,23 +450,23 @@ class GateRunner:
             "ready_for_production": all_critical_passed
         }
 
-    def print_summary(self, results: List[GateResult], summary: Dict[str, Any]):
+    def print_summary(self, results: list[GateResult], summary: dict[str, Any]):
         """Print summary of gate results."""
         print("\n" + "="*70)
         print("QUALITY GATES SUMMARY")
         print("="*70)
 
-        print(f"\nOverall:")
+        print("\nOverall:")
         print(f"  Total Gates:     {summary['total_gates']}")
         print(f"  Passed:          {summary['passed_gates']}")
         print(f"  Failed:          {summary['failed_gates']}")
 
-        print(f"\nCritical Gates:")
+        print("\nCritical Gates:")
         print(f"  Total:           {summary['critical_gates']['total']}")
         print(f"  Passed:          {summary['critical_gates']['passed']}")
         print(f"  Failed:          {summary['critical_gates']['failed']}")
 
-        print(f"\nWarning Gates:")
+        print("\nWarning Gates:")
         print(f"  Total:           {summary['warning_gates']['total']}")
         print(f"  Passed:          {summary['warning_gates']['passed']}")
         print(f"  Failed:          {summary['warning_gates']['failed']}")
@@ -473,7 +474,7 @@ class GateRunner:
         print(f"\nProduction Ready: {'[YES]' if summary['ready_for_production'] else '[NO]'}")
         print("="*70 + "\n")
 
-    def generate_report(self, results: List[GateResult], summary: Dict[str, Any], output_file: Path):
+    def generate_report(self, results: list[GateResult], summary: dict[str, Any], output_file: Path):
         """Generate JSON report of gate results."""
         report = {
             "summary": summary,

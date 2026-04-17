@@ -9,9 +9,9 @@ This is a SKELETON implementation. Full implementation in TC-03 after TextUnitEx
 **Target**: ≥95% delimiter survival rate across all adversarial test cases.
 """
 
-import pytest
 from dataclasses import dataclass
-from typing import List, Optional
+
+import pytest
 
 
 # Skeleton data models (will be replaced with real models from TC-01)
@@ -20,7 +20,7 @@ class TextUnit:
     """Skeleton TextUnit for testing."""
     unit_id: str
     source_text: str
-    translated_text: Optional[str] = None
+    translated_text: str | None = None
     do_not_translate: bool = False
 
 
@@ -47,9 +47,9 @@ class SkeletonBatcher:
 
     def batch_translate_units(
         self,
-        units: List[TextUnit],
+        units: list[TextUnit],
         batch_size: int = 50
-    ) -> List[TextUnit]:
+    ) -> list[TextUnit]:
         """
         Batch translate units with delimiter protection.
 

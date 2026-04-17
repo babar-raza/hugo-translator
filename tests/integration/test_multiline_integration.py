@@ -5,11 +5,9 @@ MSP-02: Tests that the MultilineHandler is properly integrated into the
 TranslationEngine and preserves structure during translation.
 """
 
-import pytest
-from unittest.mock import Mock, MagicMock, patch
-from pathlib import Path
-
 import sys
+from unittest.mock import Mock
+
 sys.path.insert(0, '.')
 
 from src.translation_engine.handlers.multiline_handler import MultilineHandler

@@ -9,10 +9,7 @@ Tests cover:
 
 import json
 import sys
-import pytest
-import logging
 from pathlib import Path
-from typing import Tuple, Optional, Dict, List
 
 # Add src directory to path for direct imports
 src_path = Path(__file__).parent.parent.parent / "src"
@@ -20,6 +17,7 @@ sys.path.insert(0, str(src_path))
 
 # Import ProgressTracker directly (avoid translation_engine __init__ which imports engine)
 import importlib.util
+
 _progress_module_path = src_path / "translation_engine" / "progress.py"
 _spec = importlib.util.spec_from_file_location("progress_module", _progress_module_path)
 _progress_module = importlib.util.module_from_spec(_spec)
@@ -28,10 +26,10 @@ ProgressTracker = _progress_module.ProgressTracker
 
 
 # Test validation logic directly without importing the full module
-def _validate_progress_file(progress_file: Path) -> Tuple[bool, str, bool]:
+def _validate_progress_file(progress_file: Path) -> tuple[bool, str, bool]:
     """Copy of validation logic for testing purposes."""
     try:
-        with open(progress_file, 'r', encoding='utf-8') as f:
+        with open(progress_file, encoding='utf-8') as f:
             data = json.load(f)
     except json.JSONDecodeError as e:
         return (False, f"Invalid JSON: {e}", False)

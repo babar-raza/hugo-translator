@@ -197,7 +197,7 @@ def main() -> int:
     )
 
     # Load registry
-    with open(args.registry, "r") as f:
+    with open(args.registry) as f:
         registry_data = yaml.safe_load(f)
 
     all_models = registry_data.get("models", [])
@@ -312,7 +312,7 @@ def main() -> int:
 
     # Print summary
     logger.info(f"\n{'=' * 60}")
-    logger.info(f"Comprehensive Benchmarking Complete")
+    logger.info("Comprehensive Benchmarking Complete")
     logger.info(f"{'=' * 60}")
     logger.info(f"Models benchmarked: {successful}/{len(models_to_benchmark)}")
     logger.info(f"Successful: {successful}")

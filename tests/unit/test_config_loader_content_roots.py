@@ -2,7 +2,6 @@
 Unit tests for content-root path resolution in ConfigService.
 """
 
-from pathlib import Path
 
 from src.utils.config_loader import ConfigService
 
@@ -57,4 +56,3 @@ def test_ws5_content_root_resolves_in_repo():
     profile = service.get_site_profile("ws5-test")
     resolved = service.resolve_content_root(profile.content_roots[0])
     assert resolved.exists()
-

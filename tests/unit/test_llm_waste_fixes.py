@@ -10,9 +10,7 @@ import re
 import sys
 import types
 from pathlib import Path
-from unittest.mock import MagicMock, patch, PropertyMock
-
-import pytest
+from unittest.mock import MagicMock, patch
 
 
 # ---------------------------------------------------------------------------
@@ -284,7 +282,7 @@ class TestFix2aSplitDepthCap:
             call_depths.append(_split_depth)
             if _split_depth == 0:
                 # First call fails purity, triggers split
-                for u, t in zip(batch, model.translate([""] * len(batch), src, tgt)):
+                for u, t in zip(batch, model.translate([""] * len(batch), src, tgt), strict=False):
                     u.translated_text = t
                 return original_translate(batch, model, src, tgt, _split_depth=_split_depth)
             # Deeper calls succeed

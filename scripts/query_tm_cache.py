@@ -1,9 +1,11 @@
 """Query TM cache for NuGet-related Bulgarian translations."""
 import sys
+
 sys.path.insert(0, 'src')
-from pathlib import Path
-import lmdb
 import json
+from pathlib import Path
+
+import lmdb
 
 search_text = 'NuGet'
 db_path = Path('data/tm/l2_lmdb')
@@ -34,7 +36,7 @@ with env.begin() as txn:
                     'site_id': entry.get('site_id', 'unknown')
                 })
             count += 1
-        except Exception as e:
+        except Exception:
             pass
 
     # Write results to file

@@ -15,7 +15,6 @@ import json
 import sqlite3
 import tempfile
 import threading
-import time
 from pathlib import Path
 
 import pytest

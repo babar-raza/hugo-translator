@@ -11,9 +11,7 @@ Note: This test uses minimal dependencies and mocks external services.
 """
 
 import tempfile
-import shutil
 from pathlib import Path
-from unittest.mock import Mock, patch
 
 
 def test_tm_improvement_integration_basic():
@@ -31,7 +29,7 @@ def test_tm_improvement_integration_basic():
 
         # Import modules (may fail if dependencies not installed)
         try:
-            from src.tm.improvement_queue import ImprovementQueue, ImprovementCandidate
+            from src.tm.improvement_queue import ImprovementCandidate, ImprovementQueue
         except ImportError as e:
             print(f"⚠ Skipping integration test: {e}")
             return

@@ -3,9 +3,7 @@ Tests for L3 Semantic TM with GPU acceleration.
 
 Tests GPU-accelerated embeddings and FAISS GPU index.
 """
-import shutil
 import tempfile
-from pathlib import Path
 
 import pytest
 import torch

@@ -9,8 +9,8 @@ This module defines the core data models for terminology detection and protectio
 """
 
 from dataclasses import dataclass, field
-from typing import Dict, List, Optional, Any
 from enum import Enum
+from typing import Any
 
 
 class PreserveMode(str, Enum):
@@ -55,10 +55,10 @@ class TermRule:
     category: str
     preserve_mode: PreserveMode
     severity: TermSeverity
-    term: Optional[str] = None
-    pattern: Optional[str] = None
+    term: str | None = None
+    pattern: str | None = None
     case_sensitive: bool = True
-    description: Optional[str] = None
+    description: str | None = None
 
     def __post_init__(self):
         """Validate that either term or pattern is specified."""
@@ -98,7 +98,7 @@ class ProtectedSegment:
     """
     original_text: str
     protected_text: str
-    term_mapping: Dict[int, DetectedTerm] = field(default_factory=dict)
+    term_mapping: dict[int, DetectedTerm] = field(default_factory=dict)
 
 
 @dataclass
@@ -112,6 +112,6 @@ class TerminologyConfig:
         auto_discovery: Auto-discovery settings
     """
     version: str
-    global_rules: List[TermRule] = field(default_factory=list)
-    site_overrides: Dict[str, List[TermRule]] = field(default_factory=dict)
-    auto_discovery: Dict[str, Any] = field(default_factory=dict)
+    global_rules: list[TermRule] = field(default_factory=list)
+    site_overrides: dict[str, list[TermRule]] = field(default_factory=dict)
+    auto_discovery: dict[str, Any] = field(default_factory=dict)

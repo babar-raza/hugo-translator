@@ -7,11 +7,10 @@ Tests that the unified signal handler properly coordinates:
 3. Force-exit on second signal
 """
 
-import os
 import signal
-import sys
 import time
-from unittest.mock import Mock, patch, MagicMock, call
+from unittest.mock import Mock, patch
+
 import pytest
 
 
@@ -197,9 +196,9 @@ def test_cleanup_error_handling():
 def test_graceful_shutdown_cleanup_function():
     """Test the cleanup_telemetry_contexts function directly."""
     from src.observability.graceful_shutdown import (
+        _active_contexts,
         cleanup_telemetry_contexts,
         register_active_context,
-        _active_contexts
     )
 
     # Clear any existing contexts

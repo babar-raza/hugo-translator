@@ -6,8 +6,9 @@ automatic recovery from failures with exponential backoff.
 """
 
 import logging
+from collections.abc import Callable
 from pathlib import Path
-from typing import Any, Callable, Optional, Dict
+from typing import Any
 
 from src.translation_engine.retry_handler import RetryHandler
 
@@ -85,7 +86,7 @@ class HealingEngine:
         func: Callable,
         file_path: Path,
         initial_batch_size: int,
-        on_oom_recovery: Optional[Callable[[int, int], None]] = None,
+        on_oom_recovery: Callable[[int, int], None] | None = None,
         **kwargs: Any
     ) -> Any:
         """

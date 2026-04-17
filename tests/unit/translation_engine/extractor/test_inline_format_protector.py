@@ -4,6 +4,7 @@ Unit tests for InlineFormatProtector (HP-05).
 Tests inline markdown formatting protection and restoration during translation.
 """
 import pytest
+
 from src.translation_engine.extractor.inline_format_protector import (
     InlineFormatProtector,
     ProtectedInlineSegment,

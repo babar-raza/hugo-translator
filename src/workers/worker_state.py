@@ -12,7 +12,7 @@ import json
 import os
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any
 
 
 def get_worker_log_dir() -> Path:
@@ -22,13 +22,13 @@ def get_worker_log_dir() -> Path:
     return log_dir
 
 
-def get_worker_state_path(worker_id: str, log_dir: Optional[Path] = None) -> Path:
+def get_worker_state_path(worker_id: str, log_dir: Path | None = None) -> Path:
     """Return the JSON state file path for a worker."""
     base = log_dir or get_worker_log_dir()
     return base / f"{worker_id}.state.json"
 
 
-def load_worker_state(worker_id: str, log_dir: Optional[Path] = None) -> Dict[str, Any]:
+def load_worker_state(worker_id: str, log_dir: Path | None = None) -> dict[str, Any]:
     """Load worker state JSON if present; return empty dict when unavailable."""
     state_path = get_worker_state_path(worker_id, log_dir=log_dir)
     if not state_path.exists():
@@ -39,7 +39,7 @@ def load_worker_state(worker_id: str, log_dir: Optional[Path] = None) -> Dict[st
         return {}
 
 
-def _atomic_write_json(path: Path, payload: Dict[str, Any]) -> None:
+def _atomic_write_json(path: Path, payload: dict[str, Any]) -> None:
     """Atomically write JSON payload to disk."""
     tmp_path = path.with_suffix(path.suffix + ".tmp")
     tmp_path.write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
@@ -51,11 +51,11 @@ def record_worker_state(
     state: str,
     *,
     success: bool = False,
-    error: Optional[str] = None,
-    log_path: Optional[str] = None,
-    log_dir: Optional[Path] = None,
-    now: Optional[datetime] = None,
-) -> Dict[str, Any]:
+    error: str | None = None,
+    log_path: str | None = None,
+    log_dir: Path | None = None,
+    now: datetime | None = None,
+) -> dict[str, Any]:
     """
     Update durable worker state.
 
@@ -92,4 +92,3 @@ def record_worker_state(
 
     _atomic_write_json(state_path, payload)
     return payload
-

@@ -7,7 +7,6 @@ in different execution contexts.
 This addresses CF-05: Fix Import Path Issues
 """
 
-import sys
 import unittest
 from pathlib import Path
 
@@ -18,12 +17,12 @@ class TestImportPaths(unittest.TestCase):
     def test_absolute_import_graceful_shutdown(self):
         """Test absolute import: src.observability.graceful_shutdown"""
         from src.observability.graceful_shutdown import (
-            setup_graceful_shutdown,
-            register_active_context,
-            unregister_active_context,
-            register_shutdown_handler,
             get_active_context_count,
+            register_active_context,
+            register_shutdown_handler,
             reset_for_testing,
+            setup_graceful_shutdown,
+            unregister_active_context,
         )
 
         # Verify all functions are callable
@@ -110,14 +109,13 @@ class TestImportPaths(unittest.TestCase):
         assert count_before == 0, "Importing should not register contexts"
 
         # Import again (should be idempotent)
-        from src.observability.graceful_shutdown import setup_graceful_shutdown
         count_after = get_active_context_count()
         assert count_after == 0, "Multiple imports should not register contexts"
 
     def test_cross_module_import_consistency(self):
         """Test that the same module is imported across different import paths."""
-        from src.observability.graceful_shutdown import setup_graceful_shutdown as setup1
         from src.observability import graceful_shutdown
+        from src.observability.graceful_shutdown import setup_graceful_shutdown as setup1
         setup2 = graceful_shutdown.setup_graceful_shutdown
 
         # Both should point to the same function
@@ -140,6 +138,7 @@ class TestImportPaths(unittest.TestCase):
             os.chdir(project_root / "src")
             # Re-import to test
             import importlib
+
             import src.observability.graceful_shutdown
             importlib.reload(src.observability.graceful_shutdown)
             assert callable(src.observability.graceful_shutdown.setup_graceful_shutdown)

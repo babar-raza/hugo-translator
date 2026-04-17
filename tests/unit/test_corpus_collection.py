@@ -1,7 +1,5 @@
 """Test corpus collection for both localization patterns."""
 
-import pytest
-from pathlib import Path
 from scripts.analyze_ast_corpus import collect_english_files, identify_site_localization_pattern
 
 

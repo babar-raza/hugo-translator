@@ -10,9 +10,8 @@ Discovery uses frequency analysis and confidence scoring to identify
 likely terminology that should be protected during translation.
 """
 
-import re
 import os
-from typing import List, Dict
+import re
 from collections import Counter
 from dataclasses import dataclass
 
@@ -32,7 +31,7 @@ class DiscoveredTerm:
     category: str
     frequency: int
     confidence: float
-    examples: List[str]
+    examples: list[str]
 
 
 class TerminologyDiscovery:
@@ -51,7 +50,7 @@ class TerminologyDiscovery:
         discovery.save_discovered_terms(discovered, "data/terminology/discovered_terms.yaml")
     """
 
-    def __init__(self, config: Dict):
+    def __init__(self, config: dict):
         """Initialize discovery with configuration.
 
         Args:
@@ -104,7 +103,7 @@ class TerminologyDiscovery:
             'NET', 'COM', 'EXE', 'DLL',
         }
 
-    def discover_terms(self, corpus: List[str]) -> List[DiscoveredTerm]:
+    def discover_terms(self, corpus: list[str]) -> list[DiscoveredTerm]:
         """Discover terminology from corpus.
 
         Args:
@@ -136,7 +135,7 @@ class TerminologyDiscovery:
 
         return discovered
 
-    def _extract_candidates(self, corpus: List[str]) -> Dict[str, List[str]]:
+    def _extract_candidates(self, corpus: list[str]) -> dict[str, list[str]]:
         """Extract candidate terms using patterns.
 
         Args:
@@ -155,7 +154,7 @@ class TerminologyDiscovery:
 
         return candidates
 
-    def _filter_by_frequency(self, candidates: Dict[str, List[str]]) -> Dict[str, Counter]:
+    def _filter_by_frequency(self, candidates: dict[str, list[str]]) -> dict[str, Counter]:
         """Filter candidates by minimum frequency.
 
         Args:
@@ -182,9 +181,9 @@ class TerminologyDiscovery:
 
     def _score_confidence(
         self,
-        candidates: Dict[str, Counter],
-        corpus: List[str]
-    ) -> List[DiscoveredTerm]:
+        candidates: dict[str, Counter],
+        corpus: list[str]
+    ) -> list[DiscoveredTerm]:
         """Score confidence for each candidate.
 
         Confidence based on:
@@ -236,9 +235,9 @@ class TerminologyDiscovery:
     def _extract_examples(
         self,
         term: str,
-        corpus: List[str],
+        corpus: list[str],
         max_examples: int = 3
-    ) -> List[str]:
+    ) -> list[str]:
         """Extract example contexts for term.
 
         Args:
@@ -267,7 +266,7 @@ class TerminologyDiscovery:
 
     def save_discovered_terms(
         self,
-        discovered: List[DiscoveredTerm],
+        discovered: list[DiscoveredTerm],
         output_path: str
     ):
         """Save discovered terms to YAML for manual review.

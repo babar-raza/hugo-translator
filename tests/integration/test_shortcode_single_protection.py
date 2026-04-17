@@ -8,11 +8,10 @@ Author: SHORTCODE-007-P3
 Date: 2026-01-20
 """
 
-import pytest
 
-from src.translation_engine.parser.hugo_parser import HugoParser
-from src.translation_engine.extractor.text_unit_extractor import TextUnitExtractor
 from src.translation_engine.extractor.inline_format_protector import InlineFormatProtector
+from src.translation_engine.extractor.text_unit_extractor import TextUnitExtractor
+from src.translation_engine.parser.hugo_parser import HugoParser
 
 
 class TestShortcodeSingleProtection:
@@ -74,7 +73,7 @@ The **Aspose.Slides** plugins provide features for {{< callout >}}presentations{
         # CRITICAL ASSERTION 1: NO PlaceholderManager tokens
         assert "{PLACEHOLDER_" not in all_text, (
             "PlaceholderManager should NOT create tokens when preserve_patterns: []. "
-            f"Found {{PLACEHOLDER_}} in extracted units."
+            "Found {PLACEHOLDER_} in extracted units."
         )
 
         # CRITICAL ASSERTION 2: Original shortcodes preserved

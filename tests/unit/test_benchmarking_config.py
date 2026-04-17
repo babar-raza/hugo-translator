@@ -4,9 +4,6 @@ import os
 from pathlib import Path
 from unittest.mock import mock_open, patch
 
-import pytest
-import yaml
-
 from src.benchmarking.cli import get_benchmark_db_path
 
 

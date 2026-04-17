@@ -14,9 +14,8 @@ Usage:
 import argparse
 import re
 import sys
-from pathlib import Path
-from typing import List, Dict, Tuple, Optional
 from dataclasses import dataclass
+from pathlib import Path
 
 
 @dataclass
@@ -24,22 +23,22 @@ class EvidenceCitation:
     """Represents an evidence citation from a spec."""
     spec_file: Path
     file_path: str
-    line_start: Optional[int]
-    line_end: Optional[int]
+    line_start: int | None
+    line_end: int | None
     context: str  # The line of text containing the citation
     valid: bool = True
-    reason: Optional[str] = None
+    reason: str | None = None
 
 
 class EvidenceValidator:
     """Validates evidence citations in specs."""
 
     def __init__(self):
-        self.citations: List[EvidenceCitation] = []
+        self.citations: list[EvidenceCitation] = []
         self.valid_count = 0
         self.invalid_count = 0
 
-    def extract_citations(self, spec_path: Path) -> List[EvidenceCitation]:
+    def extract_citations(self, spec_path: Path) -> list[EvidenceCitation]:
         """Extract evidence citations from a spec file."""
         citations = []
 
@@ -183,7 +182,7 @@ class EvidenceValidator:
             self.validate_citation(citation)
             self.citations.append(citation)
 
-    def generate_report(self, output_path: Optional[Path] = None) -> str:
+    def generate_report(self, output_path: Path | None = None) -> str:
         """Generate validation report."""
         report = f"""# Evidence Citation Validation Report
 
@@ -229,7 +228,7 @@ class EvidenceValidator:
 """
 
         # Group valid citations by spec
-        valid_by_spec: Dict[Path, List[EvidenceCitation]] = {}
+        valid_by_spec: dict[Path, list[EvidenceCitation]] = {}
         for citation in self.citations:
             if citation.valid:
                 if citation.spec_file not in valid_by_spec:
@@ -291,7 +290,7 @@ def main():
     if args.all:
         specs_dir = Path('specs/features')
         if not specs_dir.exists():
-            print(f"Error: specs/features not found", file=sys.stderr)
+            print("Error: specs/features not found", file=sys.stderr)
             return 2
         spec_files = sorted(specs_dir.glob('*.md'))
 

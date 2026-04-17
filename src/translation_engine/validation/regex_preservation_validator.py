@@ -7,9 +7,9 @@ This replaces PlaceholderManager's in-band protection with post-translation vali
 If patterns are not preserved, the validation fails and triggers retry/fallback.
 """
 import re
-from typing import Any, Dict, List, Optional
+from typing import Any
 
-from .base import Validator, ValidationResult, ValidationSeverity, ValidationIssue
+from .base import ValidationResult, ValidationSeverity, Validator
 
 
 class RegexPreservationValidator(Validator):
@@ -32,8 +32,8 @@ class RegexPreservationValidator(Validator):
 
     def __init__(
         self,
-        preserve_patterns: Optional[List[str]] = None,
-        name: Optional[str] = None,
+        preserve_patterns: list[str] | None = None,
+        name: str | None = None,
         strict_mode: bool = False
     ):
         """
@@ -52,7 +52,7 @@ class RegexPreservationValidator(Validator):
         self,
         source: str,
         translation: str,
-        context: Optional[Dict[str, Any]] = None,
+        context: dict[str, Any] | None = None,
     ) -> ValidationResult:
         """
         Validate that preserve_patterns are preserved in translation.
@@ -171,7 +171,7 @@ class ShortcodePreservationValidator(RegexPreservationValidator):
         r'\{\{/\*.*?\*/\}\}',  # {{/* comment */}}
     ]
 
-    def __init__(self, name: Optional[str] = None):
+    def __init__(self, name: str | None = None):
         """Initialize shortcode preservation validator with default patterns."""
         super().__init__(
             preserve_patterns=self.SHORTCODE_PATTERNS,
@@ -183,7 +183,7 @@ class ShortcodePreservationValidator(RegexPreservationValidator):
         self,
         source: str,
         translation: str,
-        context: Optional[Dict[str, Any]] = None,
+        context: dict[str, Any] | None = None,
     ) -> ValidationResult:
         """
         Validate that Hugo shortcodes are preserved byte-for-byte.

@@ -5,7 +5,7 @@ Detects when translated content is not in the expected target language,
 which indicates untranslated or mixed-language content.
 """
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from .base import VerificationCheck, VerificationIssue
 
@@ -97,11 +97,11 @@ class LanguageDetectionCheck(VerificationCheck):
 
     def run(
         self,
-        source: Dict[str, Any],
-        translated: Dict[str, Any],
+        source: dict[str, Any],
+        translated: dict[str, Any],
         target_lang: str,
-        context: Optional[Dict[str, Any]] = None,
-    ) -> List[VerificationIssue]:
+        context: dict[str, Any] | None = None,
+    ) -> list[VerificationIssue]:
         """
         Check all text fields for wrong-language content.
 
@@ -141,10 +141,10 @@ class LanguageDetectionCheck(VerificationCheck):
 
     def _check_dict_fields(
         self,
-        data: Dict[str, Any],
+        data: dict[str, Any],
         target_lang: str,
         path: str,
-    ) -> List[VerificationIssue]:
+    ) -> list[VerificationIssue]:
         """
         Recursively check dictionary fields for language issues.
 
@@ -194,7 +194,7 @@ class LanguageDetectionCheck(VerificationCheck):
         text: str,
         target_lang: str,
         location: str,
-    ) -> List[VerificationIssue]:
+    ) -> list[VerificationIssue]:
         """
         Check a single text field for language issues.
 
@@ -240,7 +240,7 @@ class LanguageDetectionCheck(VerificationCheck):
 
         return []
 
-    def _detect_language(self, text: str) -> tuple[Optional[str], float]:
+    def _detect_language(self, text: str) -> tuple[str | None, float]:
         """
         Detect language of text.
 
@@ -309,7 +309,7 @@ class LanguageDetectionCheck(VerificationCheck):
 
         return detected_base == expected_base
 
-    def is_enabled(self, context: Optional[Dict[str, Any]] = None) -> bool:
+    def is_enabled(self, context: dict[str, Any] | None = None) -> bool:
         """Check if language detection is enabled."""
         if context and "disable_language_check" in context:
             return not context["disable_language_check"]

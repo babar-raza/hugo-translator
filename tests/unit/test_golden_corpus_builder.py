@@ -5,20 +5,18 @@ Run with:
     pytest tests/unit/test_golden_corpus_builder.py -v
 """
 
-import pytest
 import sys
 import tempfile
-import shutil
 from pathlib import Path
 
 # Add scripts to path to import build_golden_corpus
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / 'scripts'))
 
 from build_golden_corpus import (
+    build_corpus,
     classify_document_complexity,
-    stable_hash,
     detect_language_focus,
-    build_corpus
+    stable_hash,
 )
 
 

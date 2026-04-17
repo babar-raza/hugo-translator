@@ -20,16 +20,12 @@ Key Guarantees:
 6. Thread-safe index access - MUST acquire lock before FAISS operations
 """
 
-import pytest
+import json
 import threading
 import time
-import json
-import numpy as np
-from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from typing import List
-from unittest.mock import Mock, patch, MagicMock
 
+import pytest
 
 # ==============================================================================
 # Skip if dependencies not available
@@ -562,7 +558,7 @@ def test_concurrent_adds_are_thread_safe(tmp_path, check_deps):
 
     num_threads = 5
     entries_per_thread = 10
-    errors: List[Exception] = []
+    errors: list[Exception] = []
 
     def add_entries(thread_id: int):
         try:
@@ -608,7 +604,7 @@ def test_concurrent_reads_and_writes_are_safe(l3_tm, check_deps):
     for i in range(20):
         l3_tm.add_entry(f"init_{i}", "site", "en", "de", f"Initial text {i}", f"Initial trans {i}")
 
-    errors: List[Exception] = []
+    errors: list[Exception] = []
 
     def writer(thread_id: int):
         try:

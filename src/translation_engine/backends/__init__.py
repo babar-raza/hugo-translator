@@ -18,8 +18,8 @@ Usage:
 """
 
 from .interface import ITranslationBackend
-from .mt_backend import MTBackend
 from .llm_backend import LLMBackend
+from .mt_backend import MTBackend
 
 __all__ = [
     "ITranslationBackend",

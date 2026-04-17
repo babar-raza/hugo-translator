@@ -4,11 +4,10 @@ Translation Quality Analyzer
 Compares EN source files against DE/FR translations to find structural drift and gaps.
 """
 
-import os
 import re
-import sys
-from pathlib import Path
 from collections import defaultdict
+from pathlib import Path
+
 import frontmatter
 
 # Base paths
@@ -286,7 +285,7 @@ class TranslationAnalyzer:
         print("ISSUE SUMMARY")
         print("=" * 70)
         print(f"\nFiles with issues: {len(files_with_issues)} / {len(en_files)}")
-        print(f"\nIssue breakdown:")
+        print("\nIssue breakdown:")
         for issue_type, count in sorted(issue_counts.items(), key=lambda x: -x[1]):
             print(f"  - {issue_type}: {count}")
 

@@ -11,10 +11,11 @@ Tests cover:
 
 import os
 import sys
-import time
-import pytest
 import threading
+import time
 from pathlib import Path
+
+import pytest
 
 # Add src directory to path for direct imports
 src_path = Path(__file__).parent.parent.parent / "src"
@@ -22,6 +23,7 @@ sys.path.insert(0, str(src_path))
 
 # Import directly from file to avoid package import issues
 import importlib.util
+
 _file_lock_path = src_path / "utils" / "file_lock.py"
 _spec = importlib.util.spec_from_file_location("file_lock_module", _file_lock_path)
 _file_lock_module = importlib.util.module_from_spec(_spec)

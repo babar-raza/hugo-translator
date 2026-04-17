@@ -7,11 +7,11 @@ Tests the 2-tier fallback implementation:
 3. ValueError (only when no models available at all)
 """
 import logging
-import pytest
-from pathlib import Path
 
-from src.model_runtime.registry import ModelRegistry, ModelInfo
+import pytest
+
 from src.model_runtime.hardware import HardwareInfo
+from src.model_runtime.registry import ModelRegistry
 
 
 @pytest.fixture

@@ -29,10 +29,10 @@ Example Usage:
     # 3. New active file is created: hugo-translator.ndjson (clean name)
 """
 
+import os
 from datetime import datetime
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
-import os
 
 
 class TimestampedRotatingFileHandler(RotatingFileHandler):

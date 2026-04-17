@@ -3,8 +3,8 @@ Unit tests for PR-04: Telemetry API 422 Error Fix.
 
 Tests that duration_ms is never None when passed to telemetry API.
 """
-import pytest
 from unittest.mock import MagicMock
+
 from src.observability.telemetry_integration import TranslationTelemetry
 from src.translation_engine.models import TranslationStats
 

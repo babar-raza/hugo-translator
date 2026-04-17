@@ -7,7 +7,7 @@ dataclasses for verification issues and results.
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Dict, List, Literal, Optional
+from typing import Any, Literal
 
 
 class IssueSeverity(str, Enum):
@@ -37,11 +37,11 @@ class VerificationIssue:
     check_name: str
     location: str
     message: str
-    source_text: Optional[str] = None
-    translated_text: Optional[str] = None
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    source_text: str | None = None
+    translated_text: str | None = None
+    metadata: dict[str, Any] = field(default_factory=dict)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for serialization."""
         result = {
             "severity": self.severity,
@@ -70,9 +70,9 @@ class VerificationResult:
         metadata: Additional result metadata
     """
 
-    issues: List[VerificationIssue] = field(default_factory=list)
-    check_results: Dict[str, Dict[str, Any]] = field(default_factory=dict)
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    issues: list[VerificationIssue] = field(default_factory=list)
+    check_results: dict[str, dict[str, Any]] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
     @property
     def passed(self) -> bool:
@@ -105,7 +105,7 @@ class VerificationResult:
         self.issues.extend(other.issues)
         self.check_results.update(other.check_results)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for serialization."""
         return {
             "passed": self.passed,
@@ -141,11 +141,11 @@ class VerificationCheck(ABC):
     @abstractmethod
     def run(
         self,
-        source: Dict[str, Any],
-        translated: Dict[str, Any],
+        source: dict[str, Any],
+        translated: dict[str, Any],
         target_lang: str,
-        context: Optional[Dict[str, Any]] = None,
-    ) -> List[VerificationIssue]:
+        context: dict[str, Any] | None = None,
+    ) -> list[VerificationIssue]:
         """
         Run verification check on translated content.
 
@@ -160,7 +160,7 @@ class VerificationCheck(ABC):
         """
         pass
 
-    def is_enabled(self, context: Optional[Dict[str, Any]] = None) -> bool:
+    def is_enabled(self, context: dict[str, Any] | None = None) -> bool:
         """
         Check if this verification is enabled.
 

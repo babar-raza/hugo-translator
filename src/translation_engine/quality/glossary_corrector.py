@@ -7,7 +7,6 @@ for known vocabulary errors.
 import logging
 import re
 from pathlib import Path
-from typing import Dict, List, Tuple
 
 import yaml
 
@@ -49,10 +48,10 @@ class GlossaryCorrector:
             f"with {len(self.corrections)} correction rules"
         )
 
-    def _load_glossary(self) -> Dict:
+    def _load_glossary(self) -> dict:
         """Load and validate glossary from YAML file."""
         try:
-            with open(self.glossary_path, "r", encoding="utf-8") as f:
+            with open(self.glossary_path, encoding="utf-8") as f:
                 glossary = yaml.safe_load(f)
 
             if not isinstance(glossary, dict):
@@ -74,7 +73,7 @@ class GlossaryCorrector:
         text: str,
         src_lang: str | None = None,
         tgt_lang: str | None = None
-    ) -> Tuple[str, List[str]]:
+    ) -> tuple[str, list[str]]:
         """
         Apply glossary corrections to translated text.
 
@@ -153,13 +152,13 @@ class GlossaryCorrector:
         """Get number of correction rules in glossary."""
         return len(self.corrections)
 
-    def get_language_pair(self) -> Tuple[str, str]:
+    def get_language_pair(self) -> tuple[str, str]:
         """Get source and target language codes."""
         return self.language_pair
 
 
 # Singleton-style glossary cache to avoid reloading files
-_glossary_cache: Dict[str, GlossaryCorrector] = {}
+_glossary_cache: dict[str, GlossaryCorrector] = {}
 
 
 def get_glossary_corrector(

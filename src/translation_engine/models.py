@@ -4,7 +4,7 @@ Data models for translation engine results and statistics.
 from dataclasses import dataclass, field
 from enum import IntEnum
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Optional
 
 
 class ValidationDecision(IntEnum):
@@ -40,7 +40,7 @@ class TranslationStats:
     skipped_segments: int = 0  # Skipped (excluded by rules)
     duration_seconds: float = 0.0
     words_translated: int = 0  # Approximate word count
-    model_used: Optional[str] = None
+    model_used: str | None = None
 
     # Token tracking (TEL-04 integration)
     tokens_input: int = 0  # Tokens sent to model for translation
@@ -128,27 +128,27 @@ class TranslationResult:
 
     success: bool
     file_path: Path
-    outputs: Dict[str, Path] = field(default_factory=dict)  # lang -> output path
+    outputs: dict[str, Path] = field(default_factory=dict)  # lang -> output path
     stats: TranslationStats = field(default_factory=TranslationStats)
-    errors: List[str] = field(default_factory=list)
-    warnings: List[str] = field(default_factory=list)
+    errors: list[str] = field(default_factory=list)
+    warnings: list[str] = field(default_factory=list)
     validation_result: Optional["ValidationResult"] = None  # Validation result if validation enabled
 
     # Decision state (INF-03: Validation decision tracking)
-    validation_decision: Optional[ValidationDecision] = None  # Final validation decision
-    decision_reason: Optional[str] = None  # Human-readable reason for the decision
+    validation_decision: ValidationDecision | None = None  # Final validation decision
+    decision_reason: str | None = None  # Human-readable reason for the decision
     retry_attempts: int = 0  # Number of retry attempts made
-    retry_history: List[Dict[str, Any]] = field(default_factory=list)  # History of retry attempts
+    retry_history: list[dict[str, Any]] = field(default_factory=list)  # History of retry attempts
 
     # VA-03: Post-translation verification result
-    verification_result: Optional[Any] = None  # VerificationResult from verification agent
+    verification_result: Any | None = None  # VerificationResult from verification agent
 
     # RES-05: Skip tracking for existing outputs
-    skipped_langs: List[str] = field(default_factory=list)  # Languages skipped due to existing output
-    skip_reasons: Dict[str, str] = field(default_factory=dict)  # {lang: reason} for skipped languages
+    skipped_langs: list[str] = field(default_factory=list)  # Languages skipped due to existing output
+    skip_reasons: dict[str, str] = field(default_factory=dict)  # {lang: reason} for skipped languages
 
     # TC-GIT-01: Telemetry context for git commit association
-    telemetry_context: Optional[Any] = None  # RunContext from telemetry tracking
+    telemetry_context: Any | None = None  # RunContext from telemetry tracking
 
     # OW-01: Overwrite-protection tracking
     overwrite_blocked: bool = False  # True when write was blocked to protect an existing translation
@@ -166,14 +166,17 @@ class DirectoryResult:
 
     success: bool
     directory: Path
-    file_results: List[TranslationResult] = field(default_factory=list)
+    file_results: list[TranslationResult] = field(default_factory=list)
     total_files: int = 0
     successful_files: int = 0
     failed_files: int = 0
     duration_seconds: float = 0.0
 
+    # WS-COMP-8: Completion-filter telemetry — how many files were skipped as already current
+    completion_filter_skipped: int = 0
+
     # TC-GIT-01: Telemetry context for git commit association
-    telemetry_context: Optional[Any] = None  # RunContext from telemetry tracking
+    telemetry_context: Any | None = None  # RunContext from telemetry tracking
 
     @property
     def aggregate_stats(self) -> TranslationStats:
@@ -232,7 +235,7 @@ class ValidationIssue:
     severity: str  # "error", "warning", "info"
     rule: str  # Name of validation rule
     message: str  # Human-readable description
-    location: Optional[str] = None  # File path or segment ID
+    location: str | None = None  # File path or segment ID
 
     def __str__(self) -> str:
         """Human-readable representation."""
@@ -245,20 +248,20 @@ class ValidationResult:
     """Result of validation."""
 
     valid: bool  # True if no errors
-    issues: List[ValidationIssue] = field(default_factory=list)
+    issues: list[ValidationIssue] = field(default_factory=list)
 
     @property
-    def errors(self) -> List[ValidationIssue]:
+    def errors(self) -> list[ValidationIssue]:
         """Get only errors."""
         return [i for i in self.issues if i.severity == "error"]
 
     @property
-    def warnings(self) -> List[ValidationIssue]:
+    def warnings(self) -> list[ValidationIssue]:
         """Get only warnings."""
         return [i for i in self.issues if i.severity == "warning"]
 
     @property
-    def info(self) -> List[ValidationIssue]:
+    def info(self) -> list[ValidationIssue]:
         """Get only info messages."""
         return [i for i in self.issues if i.severity == "info"]
 
@@ -280,7 +283,7 @@ class LanguageProgress:
     total_texts: int = 0
     completed_texts: int = 0
     success: bool = False
-    error: Optional[str] = None
+    error: str | None = None
 
     @property
     def progress_percentage(self) -> float:
@@ -297,7 +300,7 @@ class MultiLanguageProgress:
 
     T304: Multi-language progress tracking (federated-splashing-panda).
     """
-    languages: Dict[str, LanguageProgress] = field(default_factory=dict)
+    languages: dict[str, LanguageProgress] = field(default_factory=dict)
     mode: str = "serial"  # serial, parallel, roundrobin
     current_round: int = 0
 

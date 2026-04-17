@@ -3,12 +3,11 @@ Unit tests for force_retranslate parameter in TranslationEngine (T202: federated
 
 Tests that --force-retranslate flag bypasses cache lookup and forces fresh translation.
 """
-import pytest
 from pathlib import Path
-from unittest.mock import Mock, MagicMock, patch, call
-from src.translation_engine.engine import TranslationEngine
-from src.translation_engine.models import TranslationResult, TranslationStats
+from unittest.mock import Mock, patch
+
 from src.tm.translation_memory import TMResult
+from src.translation_engine.engine import TranslationEngine
 
 
 class TestForceRetranslate:

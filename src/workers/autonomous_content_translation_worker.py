@@ -21,14 +21,17 @@ import time
 import uuid
 from datetime import datetime
 from pathlib import Path
-from typing import List, Optional
 
 from src.hardware.vram_enforcer import VRAMEnforcer
 from src.observability.git_commit_helper import auto_commit_translations
-from src.observability.worker_telemetry import emit_worker_event, start_worker_run, complete_worker_run
+from src.observability.worker_telemetry import (
+    complete_worker_run,
+    emit_worker_event,
+    start_worker_run,
+)
 from src.translation_engine.engine import TranslationEngine
 from src.utils.config_loader import ConfigService
-from src.utils.timeout_guard import timeout_guard, TimeoutError
+from src.utils.timeout_guard import TimeoutError, timeout_guard
 from src.workers.window_scheduler import ScheduleConfig, WindowScheduler
 from src.workers.worker_state import record_worker_state
 
@@ -57,16 +60,16 @@ class AutonomousWorkerConfig:
     def __init__(
         self,
         config_root: str = "config/",
-        site: Optional[str] = None,
+        site: str | None = None,
         mode: str = "oneshot",
         runs_per_day: int = 5,
         window_start: str = "10:00",
         window_end: str = "22:00",
         timezone: str = "America/Los_Angeles",
         jitter_minutes: int = 10,
-        max_sites_per_run: Optional[int] = None,
-        max_seconds_per_run: Optional[int] = None,
-        max_gpu_memory_percent: Optional[int] = 60,
+        max_sites_per_run: int | None = None,
+        max_seconds_per_run: int | None = None,
+        max_gpu_memory_percent: int | None = 60,
         device: str = "auto",
         file_timeout_seconds: int = 600,
     ):
@@ -200,7 +203,7 @@ class AutonomousContentTranslationWorker:
         try:
             from src.tm import TranslationMemory
             from src.tm.l1_cache import L1Cache
-            from src.tm.l2_persistent import L2PersistentTM
+            from src.tm.l2_persistent import L2PersistentTM, L2_DB_NAME
             try:
                 from src.tm.l3_semantic import L3SemanticTM
             except ImportError:
@@ -218,7 +221,8 @@ class AutonomousContentTranslationWorker:
 
             # Create TM components
             l1_cache = L1Cache(max_size=10000)
-            l2_persistent = L2PersistentTM(db_path=tm_data_dir / "l2.lmdb")
+            l2_max_size_mb = raw_config.get("tm_defaults", {}).get("l2_max_size_mb", 2048)
+            l2_persistent = L2PersistentTM(db_path=tm_data_dir / L2_DB_NAME, max_size_mb=l2_max_size_mb)
 
             # Try to initialize L3 semantic TM (optional)
             l3_semantic = None
@@ -253,9 +257,10 @@ class AutonomousContentTranslationWorker:
 
         # Initialize ModelLoader
         try:
+            import os
+
             from src.model_runtime import ModelLoader
             from src.model_runtime.registry import ModelRegistry
-            import os
 
             registry_path = os.path.join(self.config.config_root, "model_registry.yaml")
             model_registry = ModelRegistry(registry_path)
@@ -324,7 +329,7 @@ class AutonomousContentTranslationWorker:
             "status": status,
         }))
 
-    def _record_state(self, state: str, *, success: bool = False, error: Optional[str] = None) -> None:
+    def _record_state(self, state: str, *, success: bool = False, error: str | None = None) -> None:
         """Persist durable worker state for health audit tooling."""
         try:
             record_worker_state(
@@ -721,7 +726,7 @@ class AutonomousContentTranslationWorker:
                 raise
         return self._site_profile_cache[site_id]
 
-    def _iter_recovery_git_roots(self) -> List[Path]:
+    def _iter_recovery_git_roots(self) -> list[Path]:
         """Discover git roots relevant to this worker run without reloading profiles."""
         from src.observability.git_context import find_git_root
 
@@ -750,11 +755,11 @@ class AutonomousContentTranslationWorker:
 
         return sorted(git_roots)
 
-    def _site_ids_for_git_root(self, git_root: Path) -> List[str]:
+    def _site_ids_for_git_root(self, git_root: Path) -> list[str]:
         """Return configured sites whose content roots live under this git root."""
         from src.observability.git_context import find_git_root
 
-        site_ids: List[str] = []
+        site_ids: list[str] = []
         sites = [self.config.site] if self.config.site else self.config_service.list_sites()
         if (
             not self.config.site
@@ -781,7 +786,7 @@ class AutonomousContentTranslationWorker:
         return site_ids
 
     def _translate_content_root(
-        self, site_id: str, content_root: str, target_langs: List[str],
+        self, site_id: str, content_root: str, target_langs: list[str],
         batch_idx: int = 1,
     ) -> None:
         """
@@ -839,6 +844,11 @@ class AutonomousContentTranslationWorker:
         logger.info(f"Translating content_root: {resolved_content_dir}")
         logger.info(f"Target languages: {', '.join(target_langs)}")
 
+        # WS-COMP-8: Accumulators for coverage telemetry emitted at end of this method.
+        _cov_total_needing_work = 0
+        _cov_successful = 0
+        _cov_skipped = 0
+
         timeout_seconds = self.config.file_timeout_seconds * len(target_langs)
         operation_name = f"translate_directory({resolved_content_dir.name}, {len(target_langs)} langs)"
 
@@ -892,6 +902,11 @@ class AutonomousContentTranslationWorker:
                     "Chunk %d: %d/%d files succeeded, %d failed",
                     chunk_idx, result.successful_files, result.total_files, result.failed_files,
                 )
+
+                # WS-COMP-8: Accumulate coverage counters across chunks
+                _cov_total_needing_work += result.total_files
+                _cov_successful += result.successful_files
+                _cov_skipped += getattr(result, "completion_filter_skipped", 0)
 
                 # Log rejection rate for validation monitoring
                 try:
@@ -967,6 +982,11 @@ class AutonomousContentTranslationWorker:
                 f"{result.failed_files} failed"
             )
 
+            # WS-COMP-8: Accumulate coverage counters (single-pass mode)
+            _cov_total_needing_work += result.total_files
+            _cov_successful += result.successful_files
+            _cov_skipped += getattr(result, "completion_filter_skipped", 0)
+
             # Log rejection rate for validation monitoring
             try:
                 agg = result.aggregate_stats
@@ -1015,6 +1035,38 @@ class AutonomousContentTranslationWorker:
             else:
                 logger.info("No successful translations, skipping git commit")
 
+        # WS-COMP-8: Emit structured coverage telemetry for this content root.
+        # Runs after both chunked and single-pass modes so the snapshot always fires.
+        try:
+            from src.observability.metrics import record_coverage_snapshot
+            record_coverage_snapshot(
+                site_id=site_id,
+                target_langs=target_langs,
+                total_files=_cov_total_needing_work,
+                successful_files=_cov_successful,
+                completion_filter_skipped=_cov_skipped,
+            )
+        except Exception as _cov_exc:
+            logger.debug("Coverage snapshot skipped: %s", _cov_exc)
+
+        try:
+            emit_worker_event(
+                agent_name="content_worker",
+                job_type="worker_coverage_metrics",
+                items_discovered=_cov_total_needing_work + _cov_skipped,
+                items_succeeded=_cov_successful,
+                metrics={
+                    "site_id": site_id,
+                    "content_root": str(content_root),
+                    "target_langs": target_langs,
+                    "total_needing_work": _cov_total_needing_work,
+                    "successful": _cov_successful,
+                    "completion_filter_skipped": _cov_skipped,
+                },
+            )
+        except Exception as _ev_exc:
+            logger.debug("Coverage event skipped: %s", _ev_exc)
+
     def _offload_models(self) -> None:
         """Unload translation model weights and free VRAM between daemon runs."""
         if self.translation_engine is None:
@@ -1037,7 +1089,7 @@ class AutonomousContentTranslationWorker:
 
     @staticmethod
     def _build_orphan_commit_message(
-        files: List[Path],
+        files: list[Path],
         site_id: str,
         config: "GitCommitConfig",
     ) -> str:
@@ -1275,7 +1327,8 @@ class AutonomousContentTranslationWorker:
         logger.warning("[orphan_sweep] DISABLED — orphan recovery is suspended pending root cause fix")
         return 0
         import subprocess
-        from src.observability.git_commit import GitCommitter, GitCommitConfig
+
+        from src.observability.git_commit import GitCommitConfig, GitCommitter
         from src.observability.git_context import find_git_root
 
         total_committed = 0
@@ -1355,7 +1408,7 @@ class AutonomousContentTranslationWorker:
                     source_lang = getattr(profile, 'default_source_lang', 'en')
                     target_langs = getattr(profile, 'target_langs', None) or []
 
-                    orphaned: List[Path] = []
+                    orphaned: list[Path] = []
                     for line in status_result.stdout.splitlines():
                         status_code = line[:2]
                         file_rel = line[3:].strip()

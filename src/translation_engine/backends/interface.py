@@ -6,7 +6,7 @@ enabling pluggable translation engines (MT models, LLM APIs, etc.).
 """
 
 from abc import ABC, abstractmethod
-from typing import List, Optional, Dict, Any
+from typing import Any
 
 
 class ITranslationBackend(ABC):
@@ -50,11 +50,11 @@ class ITranslationBackend(ABC):
 
     def translate_batch(
         self,
-        texts: List[str],
+        texts: list[str],
         src_lang: str,
         tgt_lang: str,
         **kwargs: Any
-    ) -> List[str]:
+    ) -> list[str]:
         """
         Translate multiple text segments in one call.
 
@@ -76,7 +76,7 @@ class ITranslationBackend(ABC):
         return [self.translate(text, src_lang, tgt_lang, **kwargs) for text in texts]
 
     @abstractmethod
-    def get_model_info(self) -> Dict[str, Any]:
+    def get_model_info(self) -> dict[str, Any]:
         """
         Return backend metadata for telemetry and logging.
 

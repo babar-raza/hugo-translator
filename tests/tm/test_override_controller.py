@@ -1,8 +1,7 @@
 """Tests for OverrideController."""
-import pytest
 from src.tm.override_controller import (
-    OverrideController,
     OverrideConfig,
+    OverrideController,
     OverrideFilter,
     OverrideMode,
 )

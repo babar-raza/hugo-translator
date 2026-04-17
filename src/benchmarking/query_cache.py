@@ -31,7 +31,7 @@ import threading
 import time
 from collections import OrderedDict
 from dataclasses import dataclass
-from typing import Any, Dict, Optional
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -93,7 +93,7 @@ class QueryCache:
             f"QueryCache initialized: max_size={max_size}, ttl={ttl_seconds}s"
         )
 
-    def get(self, key: str) -> Optional[Any]:
+    def get(self, key: str) -> Any | None:
         """Retrieve cached value.
 
         Args:
@@ -219,7 +219,7 @@ class QueryCache:
                 logger.debug(f"Cache cleanup: {count} expired entries removed")
             return count
 
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         """Get cache statistics.
 
         Returns:

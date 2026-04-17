@@ -17,12 +17,12 @@ Last Validation: Never
 These tests call the real telemetry API to ensure the fix works in production.
 Tests are skipped if TELEMETRY_API_URL is not configured.
 """
-import pytest
 import os
-from pathlib import Path
+
+import pytest
+
 from src.observability.telemetry_integration import TranslationTelemetry
 from src.translation_engine.models import TranslationStats
-
 
 # Skip all tests if telemetry API not configured
 pytestmark = pytest.mark.skipif(

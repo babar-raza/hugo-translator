@@ -5,7 +5,7 @@ Verifies that every call to record_error() produces a corresponding ERROR log en
 """
 
 import logging
-import pytest
+
 from src.observability.progress import ProgressTracker
 
 

@@ -51,7 +51,7 @@ tm_defaults:
   semantic_threshold: 0.80
   fallback_exact_only: false
   l1_cache_size: 10000
-  l2_max_size_mb: 1024
+  l2_max_size_mb: 2048  # Post-merge (2026-04-17): 696K entries @ 878 MB used; raised from 1024 for growth headroom
   l3_embedding_model: "sentence-transformers/paraphrase-multilingual-mpnet-base-v2"
   l3_index_type: "IVFFlat"  # Flat, IVFFlat, HNSW
 
@@ -228,6 +228,16 @@ features:
   enable_auto_model_selection: true
   enable_quality_scoring: false
   enable_content_hash_tracking: true  # Content-based change detection (recommended for production)
+
+  # WS-COMP-6: Quality-aware completion filter.
+  # When enabled, files that the mtime-based filter would skip ("all outputs current") are
+  # additionally checked via fasttext language sampling to detect wrong-language outputs.
+  # Results are cached per-file for quality_aware_filter_ttl_days days to keep overhead low.
+  # Default: off. Enable in off-peak windows; monitor with scan_wrong_language_outputs.py.
+  enable_quality_aware_completion_filter: false
+  quality_aware_filter_ttl_days: 7      # Re-validate each "complete" file every N days
+  quality_aware_filter_confidence: 0.80  # fasttext confidence threshold for flagging
+  quality_aware_filter_paragraphs: 2     # Max body paragraphs to sample per output file
 
 # Language Detection Configuration
 # FastText-based detection with adaptive similarity learning
@@ -480,9 +490,7 @@ autonomous_content_translation:
     max_sites_per_run: null  # Process all sites (null = no limit)
     # Per-site run time limit overrides (override global --max-seconds-per-run for specific sites).
     # Useful for sites with very large or very small files.
-    per_site_limits:
-      reference.aspose.net:
-        max_seconds_per_run: 28800  # 8h — API reference files are large (1000+ lines x 36 langs)
+    per_site_limits: {}
 
   # Git commit configuration (uses global git_commit settings)
   # Auto-commits are enabled via git_commit.enabled and git_commit.auto_push
@@ -592,3 +600,29 @@ translation_engine:
   # Only add languages with observed FP rate >= 15% in production logs.
   purity_threshold_overrides:
     lt: 0.30  # Lithuanian: high FP rate due to English technical terms in docs
+
+  # WS-COMP-7: Per-language model routing overrides.
+  # Routes specific target languages to a different model instead of the global fallback.
+  # Only add languages with confirmed systematic failures (>30% coverage gap after 1+ weeks of data
+  # from WS-COMP-1: python scripts/measure_completeness.py).
+  # Commented out by default — enable after baseline shows consistent language-specific failures.
+  # language_routing_overrides:
+  #   fa: "professionalize_llm"   # Persian: RTL + systematic M2M100 failures
+  #   he: "professionalize_llm"   # Hebrew: RTL + systematic M2M100 failures
+
+  # LLM escalation for CASE 4 stuck files (both translations wrong, max MT retries exceeded).
+  # When enabled, files in the retranslate queue with retry_count >= llm_escalation_after_retries
+  # are translated using the LLM backend instead of M2M100, breaking the MT failure loop.
+  # Gate: set to true only after verifying professionalize_llm is available and costs are acceptable.
+  llm_escalation_enabled: false
+  llm_escalation_after_retries: 2  # Escalate after this many MT failures (see retranslate_queue.py)
+  llm_escalation_model: "professionalize_llm"  # Model ID to use for escalated files
+
+  # File selection priority strategy for _translate_directory_locked().
+  # Controls sort order of incomplete files AFTER the completion filter.
+  # Options:
+  #   "missing_first" (default): Files with ANY missing output come before stale files.
+  #                               Ensures never-translated files are reached before
+  #                               re-translating already-translated-but-stale files.
+  #   "alphabetical": Legacy behaviour — pure alphabetical order within each batch.
+  file_priority_strategy: "missing_first"

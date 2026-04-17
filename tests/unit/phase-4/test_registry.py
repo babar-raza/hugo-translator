@@ -312,7 +312,7 @@ class TestRegistryPersistence:
             assert temp_path.exists()
 
             # Verify content
-            with open(temp_path, "r", encoding="utf-8") as f:
+            with open(temp_path, encoding="utf-8") as f:
                 data = yaml.safe_load(f)
 
             assert "models" in data

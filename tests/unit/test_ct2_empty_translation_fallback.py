@@ -6,9 +6,11 @@ by falling back to source text when the model produces empty translations
 (e.g., for placeholder-only content).
 """
 
-import pytest
-from src.model_runtime.loader import CTranslate2Backend
 from pathlib import Path
+
+import pytest
+
+from src.model_runtime.loader import CTranslate2Backend
 
 
 @pytest.fixture
@@ -66,7 +68,7 @@ def test_ct2_empty_translation_fallback(ct2_model_path):
         # This is acceptable behavior - we're verifying fallback works
         assert translations[1], "Translation should not be empty"
 
-        print(f"✅ Test passed:")
+        print("✅ Test passed:")
         print(f"  Placeholder: '{placeholder_text}' → '{translations[0]}'")
         print(f"  Normal text: '{normal_text}' → '{translations[1]}'")
 
@@ -121,8 +123,8 @@ def test_ct2_mixed_empty_and_valid(ct2_model_path):
         assert translations[1], "Translation 1 should not be empty"
         assert translations[3], "Translation 3 should not be empty"
 
-        print(f"✅ Test passed with mixed content:")
-        for i, (src, tgt) in enumerate(zip(texts, translations)):
+        print("✅ Test passed with mixed content:")
+        for i, (src, tgt) in enumerate(zip(texts, translations, strict=False)):
             print(f"  [{i}] '{src}' → '{tgt}'")
 
     finally:
@@ -168,11 +170,11 @@ def test_ct2_all_normal_text(ct2_model_path):
         # Expect at least one actual translation (not source text)
         # This is weak assertion since model might fail, but fallback should still work
         at_least_one_translated = any(
-            trans != src for trans, src in zip(translations, texts)
+            trans != src for trans, src in zip(translations, texts, strict=False)
         )
 
-        print(f"✅ Test passed with normal text:")
-        for src, tgt in zip(texts, translations):
+        print("✅ Test passed with normal text:")
+        for src, tgt in zip(texts, translations, strict=False):
             status = "translated" if tgt != src else "fallback"
             print(f"  '{src}' → '{tgt}' ({status})")
 

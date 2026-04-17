@@ -8,10 +8,11 @@ Tests end-to-end workflow:
 5. Create baselines
 """
 
-import pytest
 import tempfile
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
+
+import pytest
 
 # Check if pandas is available
 try:
@@ -20,12 +21,10 @@ try:
 except ImportError:
     PANDAS_AVAILABLE = False
 
-from src.benchmarking.runner import BenchmarkRunner
-from src.benchmarking.storage import BenchmarkDatabase, BenchmarkRun, BenchmarkResult, SystemInfo
-from src.benchmarking.schema_migrations import MigrationManager
 from src.benchmarking.aggregation import TimeSeriesAggregator
 from src.benchmarking.analytics import AnalyticsQueryAPI
-from src.model_runtime.registry import ModelRegistry
+from src.benchmarking.schema_migrations import MigrationManager
+from src.benchmarking.storage import BenchmarkDatabase, BenchmarkResult, BenchmarkRun, SystemInfo
 
 # Current schema version from BenchmarkDatabase class
 CURRENT_SCHEMA_VERSION = BenchmarkDatabase.SCHEMA_VERSION

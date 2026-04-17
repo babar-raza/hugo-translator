@@ -1,7 +1,6 @@
 """Analyze model coverage gaps and recommend downloads."""
-from dataclasses import dataclass
-from typing import List, Dict, Set
 import logging
+from dataclasses import dataclass
 
 logger = logging.getLogger(__name__)
 
@@ -11,7 +10,7 @@ class ModelRecommendation:
     model_id: str
     hf_model_id: str
     size_mb: int
-    languages_covered: List[str]
+    languages_covered: list[str]
     license: str
     priority: int
     backend: str
@@ -19,9 +18,9 @@ class ModelRecommendation:
 
 
 def analyze_gaps(
-    current_coverage: Dict[str, List[str]],
-    target_languages: Set[str]
-) -> List[ModelRecommendation]:
+    current_coverage: dict[str, list[str]],
+    target_languages: set[str]
+) -> list[ModelRecommendation]:
     """Find optimal models to fill coverage gaps.
 
     Args:

@@ -8,7 +8,7 @@ decision-making (ACCEPT/RETRY/REJECT) in the hugo-translator validation engine.
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from enum import IntEnum
-from typing import Any, Dict, Optional
+from typing import Any
 
 from .base import ValidationResult
 
@@ -63,7 +63,7 @@ class DecisionResult:
 
     decision: ValidationDecision
     decision_reason: str
-    retry_feedback: Optional[str]
+    retry_feedback: str | None
     validation_result: ValidationResult
 
 
@@ -88,7 +88,7 @@ class PostTranslationValidator(ABC):
         ...         return ValidationResult(success=True)
     """
 
-    def __init__(self, name: Optional[str] = None):
+    def __init__(self, name: str | None = None):
         """
         Initialize validator.
 
@@ -102,7 +102,7 @@ class PostTranslationValidator(ABC):
         self,
         source: str,
         translation: str,
-        context: Optional[Dict[str, Any]] = None,
+        context: dict[str, Any] | None = None,
     ) -> ValidationResult:
         """Validate translation quality.
 

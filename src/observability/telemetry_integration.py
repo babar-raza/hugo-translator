@@ -6,21 +6,20 @@ to track translation metrics, token usage, cache performance, and file operation
 """
 import logging
 import os
+import re
 import sys
 import time
 import weakref
 from pathlib import Path
-from typing import Optional, Dict, Any, List
 from threading import Lock
-
-import re
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
 from src.observability.git_context import get_git_context
 
 
-def extract_website(site_id: Optional[str]) -> str:
+def extract_website(site_id: str | None) -> str:
     """
     Extract root domain from site_id for the 'website' telemetry field.
 
@@ -48,7 +47,7 @@ def extract_website(site_id: Optional[str]) -> str:
     return site_id
 
 
-def map_website_section(subdomain: Optional[str]) -> str:
+def map_website_section(subdomain: str | None) -> str:
     """
     Map subdomain to website_section for telemetry field.
 
@@ -117,7 +116,7 @@ PRODUCT_FAMILY_MAP = {
 }
 
 
-def get_product_family_name(product_key: Optional[str]) -> Optional[str]:
+def get_product_family_name(product_key: str | None) -> str | None:
     """
     Map product key to capitalized product family name (TFR-02).
 
@@ -157,13 +156,13 @@ def get_item_name(job_type: str) -> str:
 
 def build_output_summary(
     job_type: str,
-    outputs: Optional[Dict] = None,
-    successful_files: Optional[int] = None,
-    total_files: Optional[int] = None,
-    files_generated: Optional[int] = None,
-    errors: Optional[List] = None,
-    skipped_langs: Optional[List] = None,
-    skip_reasons: Optional[Dict] = None,
+    outputs: dict | None = None,
+    successful_files: int | None = None,
+    total_files: int | None = None,
+    files_generated: int | None = None,
+    errors: list | None = None,
+    skipped_langs: list | None = None,
+    skip_reasons: dict | None = None,
 ) -> str:
     """
     Build standardized output_summary string for RunRecord (SR-03, TEL-05-B, RES-05).
@@ -209,7 +208,7 @@ def build_output_summary(
         return f"Job completed, {error_count} errors"
 
 
-def build_error_summary(errors: List[str], max_errors: int = 5) -> str:
+def build_error_summary(errors: list[str], max_errors: int = 5) -> str:
     """
     Build standardized error_summary string for RunRecord (SR-03, TEL-05-B).
 
@@ -236,12 +235,12 @@ def build_error_summary(errors: List[str], max_errors: int = 5) -> str:
 
 def calculate_items_metrics(
     job_type: str,
-    stats: Optional[Any] = None,
-    total_files: Optional[int] = None,
-    successful_files: Optional[int] = None,
-    failed_files: Optional[int] = None,
+    stats: Any | None = None,
+    total_files: int | None = None,
+    successful_files: int | None = None,
+    failed_files: int | None = None,
     skip_count: int = 0,
-) -> Dict[str, int]:
+) -> dict[str, int]:
     """
     Calculate items_discovered, items_succeeded, items_failed for RunRecord (SR-03, TEL-05-B).
 
@@ -310,9 +309,9 @@ def calculate_items_metrics(
 
 
 def extract_business_context(
-    file_path: Optional[Path] = None,
-    site_id: Optional[str] = None,
-) -> Dict[str, Optional[str]]:
+    file_path: Path | None = None,
+    site_id: str | None = None,
+) -> dict[str, str | None]:
     """
     Extract business context dimensions from file path and site_id (TEL-05-A).
 
@@ -337,7 +336,7 @@ def extract_business_context(
         >>> extract_business_context(Path("/slides/net/guide.md"), "products.aspose.com")
         {'product_family': 'slides', 'subdomain': 'products', 'platform': '.NET', 'product': 'slides'}
     """
-    result: Dict[str, Optional[str]] = {
+    result: dict[str, str | None] = {
         "product_family": None,
         "subdomain": None,
         "platform": None,
@@ -425,7 +424,7 @@ except ImportError:
             return cls()
 
 
-def _safe_duration_ms(stats: Optional[Any], context: str = "") -> tuple:
+def _safe_duration_ms(stats: Any | None, context: str = "") -> tuple:
     """
     Safely calculate duration_ms from TranslationStats.
 
@@ -441,7 +440,6 @@ def _safe_duration_ms(stats: Optional[Any], context: str = "") -> tuple:
         - duration_ms: Always an integer (never None)
         - used_fallback: True if fallback to 0 was used, False for legitimate values
     """
-    from src.translation_engine.models import TranslationStats
 
     # Handle None stats
     if stats is None:
@@ -509,7 +507,7 @@ class TranslationTelemetry:
         self,
         agent_name: str = "hugo-translator",
         enabled: bool = True,
-        config: Optional[Any] = None,
+        config: Any | None = None,
     ):
         """
         Initialize telemetry integration.
@@ -675,9 +673,9 @@ class TranslationTelemetry:
         self,
         job_type: str,
         trigger_type: str = "cli",
-        file_path: Optional[Path] = None,
-        target_langs: Optional[list] = None,
-        errors: Optional[List[str]] = None,
+        file_path: Path | None = None,
+        target_langs: list | None = None,
+        errors: list[str] | None = None,
         **additional_context
     ):
         """
@@ -772,9 +770,9 @@ class TranslationTelemetry:
         self,
         job_type: str,
         trigger_type: str = "cli",
-        file_path: Optional[Path] = None,
-        target_langs: Optional[list] = None,
-        errors: Optional[List[str]] = None,
+        file_path: Path | None = None,
+        target_langs: list | None = None,
+        errors: list[str] | None = None,
         **additional_context
     ):
         """
@@ -867,9 +865,9 @@ class TranslationTelemetry:
         self,
         job_type: str,
         trigger_type: str = "cli",
-        file_path: Optional[Path] = None,
-        target_langs: Optional[list] = None,
-        errors: Optional[List[str]] = None,
+        file_path: Path | None = None,
+        target_langs: list | None = None,
+        errors: list[str] | None = None,
         **additional_context
     ):
         """
@@ -926,7 +924,7 @@ class TranslationTelemetry:
         self,
         run_context,
         status: str = "success",
-        error_summary: Optional[str] = None
+        error_summary: str | None = None
     ):
         """
         Complete a translation session with explicit PATCH to telemetry API.
@@ -979,7 +977,7 @@ class TranslationTelemetry:
         run_context,
         stats,
         job_type: str = "translate_file",
-        output_paths: Optional[Dict[str, Path]] = None
+        output_paths: dict[str, Path] | None = None
     ):
         """
         Set translation statistics as metrics on a run context.
@@ -1111,8 +1109,8 @@ class TranslationTelemetry:
         run_context,
         commit_hash: str,
         commit_source: str = "llm",
-        commit_author: Optional[str] = None,
-        commit_timestamp: Optional[str] = None
+        commit_author: str | None = None,
+        commit_timestamp: str | None = None
     ) -> bool:
         """
         Associate git commit with telemetry run via API.
@@ -1222,7 +1220,7 @@ class TranslationTelemetry:
         retry_count: int,
         error_count: int,
         warning_count: int,
-        validator_results: Dict[str, bool],
+        validator_results: dict[str, bool],
         feedback_provided: bool,
     ):
         """
@@ -1314,7 +1312,7 @@ class DummyRunContext:
         """No-op set_metrics."""
         pass
 
-    def log_event(self, event_type: str, payload: Optional[Dict[str, Any]] = None):
+    def log_event(self, event_type: str, payload: dict[str, Any] | None = None):
         """No-op log_event."""
         pass
 
@@ -1322,7 +1320,7 @@ class DummyRunContext:
         """No-op increment_counter."""
         pass
 
-    def get_partial_metrics(self) -> Dict[str, Any]:
+    def get_partial_metrics(self) -> dict[str, Any]:
         """
         Get partial metrics captured so far (GS-04, GS-05).
 
@@ -1336,7 +1334,7 @@ class DummyRunContext:
 
 
 # Global telemetry instance (can be configured once and reused)
-_global_telemetry: Optional[TranslationTelemetry] = None
+_global_telemetry: TranslationTelemetry | None = None
 
 
 def get_telemetry(
@@ -1369,7 +1367,7 @@ def get_telemetry(
 def configure_telemetry(
     agent_name: str = "hugo-translator",
     enabled: bool = True,
-    config: Optional[Any] = None,
+    config: Any | None = None,
 ) -> TranslationTelemetry:
     """
     Configure global telemetry instance.
@@ -1391,7 +1389,7 @@ def configure_telemetry(
     return _global_telemetry
 
 
-def emit_event(event_type: str, payload: Optional[Dict[str, Any]] = None) -> None:
+def emit_event(event_type: str, payload: dict[str, Any] | None = None) -> None:
     """
     Emit a telemetry event using the global telemetry instance.
 

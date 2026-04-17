@@ -1,12 +1,9 @@
 """Unit tests for statistical analysis (BM-02)."""
 
-import math
 import pytest
 
 from src.benchmarking.statistics import (
     BenchmarkStatistics,
-    StatisticalSummary,
-    ComparisonResult,
 )
 
 

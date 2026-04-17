@@ -12,15 +12,11 @@ Usage:
 """
 
 import argparse
-import hashlib
-import json
 import logging
 import re
-from collections import defaultdict
-from dataclasses import dataclass, field, asdict
+from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
 
 logger = logging.getLogger(__name__)
 
@@ -137,7 +133,7 @@ class DocumentAnalysis:
 
     # Product names (potential protected terms)
     aspose_mentions: int = 0
-    product_names: List[str] = field(default_factory=list)
+    product_names: list[str] = field(default_factory=list)
 
     # Complexity indicators
     complexity_score: int = 0  # Higher = more complex
@@ -186,7 +182,7 @@ class CorpusStatistics:
     low_risk_docs: int = 0
 
     # Detailed metrics per document
-    documents: List[DocumentAnalysis] = field(default_factory=list)
+    documents: list[DocumentAnalysis] = field(default_factory=list)
 
 
 class DocumentAnalyzer:
@@ -346,7 +342,7 @@ class CorpusCollector:
         self.corpus_size = corpus_size
         self.analyzer = DocumentAnalyzer()
 
-    def collect_corpus(self) -> List[Path]:
+    def collect_corpus(self) -> list[Path]:
         """
         Collect validation corpus from real production data.
 
@@ -388,7 +384,7 @@ class CorpusCollector:
         logger.info(f"Final corpus size: {len(corpus)} documents")
         return corpus
 
-    def analyze_corpus(self, corpus: List[Path]) -> CorpusStatistics:
+    def analyze_corpus(self, corpus: list[Path]) -> CorpusStatistics:
         """
         Analyze all documents in corpus.
 
@@ -688,7 +684,7 @@ Based on this corpus analysis, the validation will verify:
 
         return report_path
 
-    def _get_example_doc(self, documents: List[DocumentAnalysis], category: str) -> str:
+    def _get_example_doc(self, documents: list[DocumentAnalysis], category: str) -> str:
         """Get example document path for a category."""
         if category == 'simple':
             docs = [d for d in documents if d.complexity_score < 10]

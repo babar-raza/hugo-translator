@@ -34,4 +34,3 @@ The article encourages experimentation with sample images and suggests comparing
 Links to code samples and documentation help readers implement these techniques in their own applications.
 
 The overall guidance is summarized from the optimization-focused OCR blog article on [blog.aspose.com](https://blog.aspose.com/ocr/optimize-ocr-accuracy-aspose-ocr-dotnet/).
-

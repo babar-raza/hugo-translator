@@ -3,7 +3,7 @@
 import hashlib
 import time
 from pathlib import Path
-from typing import Literal, Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING, Literal, Optional
 
 if TYPE_CHECKING:
     from ..observability.metrics import MetricsCollector
@@ -65,7 +65,7 @@ def compute_file_hash(
             metrics.observe("content_hash_compute_duration_seconds", duration)
 
         return hash_digest
-    except (IOError, OSError) as e:
+    except OSError as e:
         raise ContentHashError(f"Failed to hash {file_path}: {e}") from e
 
 

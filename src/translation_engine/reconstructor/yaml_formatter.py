@@ -5,7 +5,7 @@ Uses ruamel.yaml to preserve comments, quote styles, and literal block scalars.
 """
 import re
 from io import StringIO
-from typing import Any, Dict, List, Union
+from typing import Any
 
 import structlog
 import yaml
@@ -37,7 +37,7 @@ class YAMLFormatter:
     INDEX_PATTERN = re.compile(r'^([^\[]+)(?:\[(\d+)\])?$')
 
     @staticmethod
-    def format_frontmatter(data: Union[Dict[str, Any], CommentedMap]) -> str:
+    def format_frontmatter(data: dict[str, Any] | CommentedMap) -> str:
         """
         Format frontmatter dictionary as YAML with Hugo conventions.
 
@@ -139,7 +139,7 @@ class YAMLFormatter:
         return value
 
     @staticmethod
-    def set_nested_value(data: Dict[str, Any], key: str, value: Any) -> None:
+    def set_nested_value(data: dict[str, Any], key: str, value: Any) -> None:
         """
         Set value in nested dictionary using dot notation with array index support.
 
@@ -227,7 +227,7 @@ class YAMLFormatter:
             current[field] = final_value
 
     @staticmethod
-    def get_nested_value(data: Dict[str, Any], key: str, default: Any = None) -> Any:
+    def get_nested_value(data: dict[str, Any], key: str, default: Any = None) -> Any:
         """
         Get value from nested dictionary using dot notation with array index support.
 

@@ -5,10 +5,10 @@ Ensures that links in translations are valid and properly formed.
 """
 
 import re
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 from urllib.parse import urlparse
 
-from .base import Validator, ValidationResult, ValidationSeverity
+from .base import ValidationResult, ValidationSeverity, Validator
 
 
 class LinkValidator(Validator):
@@ -23,7 +23,7 @@ class LinkValidator(Validator):
     """
 
     def __init__(
-        self, check_url_changes: bool = True, allow_url_translation: bool = False, name: Optional[str] = None
+        self, check_url_changes: bool = True, allow_url_translation: bool = False, name: str | None = None
     ):
         """
         Initialize link validator.
@@ -41,7 +41,7 @@ class LinkValidator(Validator):
         self,
         source: str,
         translation: str,
-        context: Optional[Dict[str, Any]] = None,
+        context: dict[str, Any] | None = None,
     ) -> ValidationResult:
         """
         Validate link integrity.
@@ -84,7 +84,7 @@ class LinkValidator(Validator):
 
         return result
 
-    def _extract_links(self, text: str) -> List[Tuple[str, str]]:
+    def _extract_links(self, text: str) -> list[tuple[str, str]]:
         """
         Extract markdown links and images.
 
@@ -157,8 +157,8 @@ class LinkValidator(Validator):
 
     def _check_url_preservation(
         self,
-        source_links: List[Tuple[str, str]],
-        translation_links: List[Tuple[str, str]],
+        source_links: list[tuple[str, str]],
+        translation_links: list[tuple[str, str]],
         result: ValidationResult,
     ) -> None:
         """

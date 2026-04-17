@@ -11,8 +11,8 @@ import logging
 import random
 import time
 from dataclasses import dataclass
-from datetime import datetime, time as dt_time, timedelta
-from typing import List, Optional
+from datetime import datetime, timedelta
+from datetime import time as dt_time
 from zoneinfo import ZoneInfo
 
 logger = logging.getLogger(__name__)
@@ -128,7 +128,7 @@ class WindowScheduler:
         self.config = config
         self.tz = ZoneInfo(config.timezone)
         self.min_gap_seconds = min_gap_seconds
-        self._last_run_end: Optional[datetime] = None
+        self._last_run_end: datetime | None = None
 
         logger.info(
             f"Initialized WindowScheduler: {config.runs_per_day} runs/day, "
@@ -140,7 +140,7 @@ class WindowScheduler:
         """Record that a run has completed, for overlap protection."""
         self._last_run_end = datetime.now(self.tz)
 
-    def get_base_run_times_today(self) -> List[datetime]:
+    def get_base_run_times_today(self) -> list[datetime]:
         """
         Get base run times for today (without jitter).
 
@@ -206,7 +206,7 @@ class WindowScheduler:
 
         return jittered_time
 
-    def get_next_run_time(self, apply_jitter: bool = True) -> Optional[datetime]:
+    def get_next_run_time(self, apply_jitter: bool = True) -> datetime | None:
         """
         Get the next scheduled run time.
 
@@ -297,7 +297,7 @@ class WindowScheduler:
 
         return next_run
 
-    def is_within_window(self, check_time: Optional[datetime] = None) -> bool:
+    def is_within_window(self, check_time: datetime | None = None) -> bool:
         """
         Check if a given time is within the daily window.
 

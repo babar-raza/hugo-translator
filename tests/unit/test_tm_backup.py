@@ -12,23 +12,20 @@ Tests cover:
 
 import sys
 import time
-import shutil
-import pytest
-from pathlib import Path
 from datetime import datetime, timedelta
-from unittest import mock
+from pathlib import Path
+
+import pytest
 
 # Add src to path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
 
 from tm.backup import (
-    CacheBackupManager,
-    BackupInfo,
     BackupError,
-    RestoreError,
+    BackupInfo,
+    CacheBackupManager,
     InsufficientSpaceError,
-    IntegrityCheckError,
-    create_backup_manager
+    create_backup_manager,
 )
 from tm.l2_persistent import L2PersistentTM
 

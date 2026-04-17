@@ -4,22 +4,23 @@ Tests for documentation validation tool
 Tests claim detection, evidence checking, and language validation.
 """
 
-import pytest
 import sys
 from pathlib import Path
+
+import pytest
 
 # Add scripts directory to path
 scripts_dir = Path(__file__).parent.parent.parent / 'scripts'
 sys.path.insert(0, str(scripts_dir))
 
 from validate_documentation import (
+    Claim,
     ClaimDetector,
+    ClaimType,
+    DocumentationValidator,
     EvidenceChecker,
     LanguageValidator,
-    DocumentationValidator,
-    ClaimType,
     Severity,
-    Claim,
     ValidationIssue,
     ValidationReport,
 )

@@ -6,9 +6,10 @@ and error handling for all CLI commands.
 """
 import argparse
 import json
-import pytest
 from pathlib import Path
-from unittest.mock import MagicMock, Mock, patch
+from unittest.mock import MagicMock, patch
+
+import pytest
 
 from src.benchmarking.cli import (
     cmd_aggregate,

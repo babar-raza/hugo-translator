@@ -7,7 +7,6 @@ for optimal GPU performance while avoiding OOM errors.
 import logging
 import re
 from dataclasses import dataclass
-from typing import Optional
 
 try:
     import torch
@@ -64,12 +63,12 @@ class GPUOptimizer:
 
     def __init__(
         self,
-        model_name: Optional[str] = None,
+        model_name: str | None = None,
         precision: str = "fp16",
-        batch_size_override: Optional[int] = None,
+        batch_size_override: int | None = None,
         target_utilization: float = 0.40,
         device_id: int = 0,
-        max_vram_mb: Optional[float] = None,
+        max_vram_mb: float | None = None,
     ):
         """
         Initialize GPU optimizer.
@@ -182,7 +181,7 @@ class GPUOptimizer:
 
         return total_mb
 
-    def _infer_model_size(self, model_name: Optional[str]) -> str:
+    def _infer_model_size(self, model_name: str | None) -> str:
         """
         Infer model size category from model name.
 

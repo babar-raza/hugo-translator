@@ -3,8 +3,8 @@ import logging
 import os
 import sys
 from pathlib import Path
+
 import pytest
-from unittest.mock import patch
 
 
 @pytest.fixture
@@ -38,7 +38,6 @@ def test_logs_info_for_valid_path(clean_env, capture_logs, tmp_path, monkeypatch
 
     # Import the module to trigger path loading
     # We'll simulate the logic here since we can't easily reload the module
-    from pathlib import Path
     import logging
 
     logger = logging.getLogger('test_telemetry')
@@ -66,7 +65,6 @@ def test_logs_warning_for_missing_path(clean_env, capture_logs, monkeypatch):
 
     # Simulate the logic
     import logging
-    from pathlib import Path
 
     logger = logging.getLogger('test_telemetry')
     TELEMETRY_SRC_PATH = Path(os.getenv('TELEMETRY_SRC_PATH'))
@@ -99,7 +97,6 @@ def test_logs_debug_for_existing_syspath(clean_env, capture_logs, tmp_path, monk
 
     # Simulate the logic
     import logging
-    from pathlib import Path
 
     logger = logging.getLogger('test_telemetry')
     TELEMETRY_SRC_PATH = Path(os.getenv('TELEMETRY_SRC_PATH'))
@@ -132,7 +129,6 @@ def test_log_includes_path_value(clean_env, capture_logs, tmp_path, monkeypatch)
 
     # Simulate the logic
     import logging
-    from pathlib import Path
 
     logger = logging.getLogger('test_telemetry')
     TELEMETRY_SRC_PATH = Path(os.getenv('TELEMETRY_SRC_PATH'))

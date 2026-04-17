@@ -2,10 +2,12 @@
 Unit tests for WindowScheduler - Timezone-aware scheduling logic.
 """
 
-import pytest
-from datetime import datetime, timedelta, time as dt_time
+from datetime import datetime, timedelta
+from datetime import time as dt_time
 from unittest.mock import patch
 from zoneinfo import ZoneInfo
+
+import pytest
 
 from src.workers.window_scheduler import ScheduleConfig, WindowScheduler
 
@@ -139,7 +141,7 @@ class TestWindowScheduler:
             dt_time(22, 0),
         ]
 
-        for run_time, expected_time in zip(run_times, expected_times):
+        for run_time, expected_time in zip(run_times, expected_times, strict=False):
             assert run_time.time() == expected_time
 
     def test_get_base_run_times_single_run(self):

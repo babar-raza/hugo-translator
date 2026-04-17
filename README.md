@@ -388,15 +388,46 @@ print('Model cached successfully')
 
 ## Architecture
 
-### System Components
+### Deployment Models
 
-The system uses a **distributed architecture** with three main components:
+The system supports two deployment paths. The **Windows-native** path is the current production deployment. The **Docker** path enables optional scale-out with Redis and containerized workers.
 
-- **Orchestrator** - Monitors content, creates translation jobs, manages job queue
-- **Redis Queue** - Distributed job queue for orchestrator-worker communication
-- **Workers** - Process translation jobs from queue, write translated output
+#### Windows-Native (Current Production Path)
 
-See [Redis Queue Architecture](docs/architecture/redis-queue.md) for detailed documentation on the distributed job queue system, scaling, and troubleshooting.
+Two autonomous worker processes run as Windows Task Scheduler jobs:
+
+- **Content Worker** (`src/workers/autonomous_content_translation_worker.py`) — Scheduled translation daemon. Runs 4–12 times per day on a configurable window, translates Hugo markdown files, commits results to git.
+- **TM Improvement Worker** (`src/workers/tm_improvement_worker.py`) — Scheduled LLM improvement daemon. Consumes the improvement queue, refines low-quality translations in the TM database.
+
+Both workers are started via `scripts/start_workers.ps1` and registered with Task Scheduler via `scripts/setup_task_scheduler.ps1`. No Redis or Docker required.
+
+See [Windows-Native Deployment](docs/operations/windows-native-deployment.md) for setup instructions.
+
+#### Docker / Distributed (Optional Scale-Out)
+
+An orchestrator + Redis queue + containerized workers path is also implemented:
+
+- **Orchestrator** — Monitors content directories, creates translation jobs, manages the Redis job queue
+- **Redis Queue** — Distributed job queue for orchestrator-worker communication
+- **Workers** — Process translation jobs from queue, write translated output
+
+See [Redis Queue Architecture](docs/architecture/redis-queue.md) and `docker-compose.yml` for details.
+
+### Translation Pipeline
+
+Every file processed by either deployment path goes through the same core pipeline:
+
+```
+Hugo Markdown
+    → HugoParser (frontmatter, shortcodes, code blocks)
+    → SegmentExtractor (translatable text units + placeholders)
+    → Translation Memory lookup (L1 in-memory → L2 LMDB → L3 FAISS GPU)
+    → MT Model (M2M100 / NLLB / Opus) for cache misses
+    → 10-validator Quality Suite (ACCEPT / RETRY / REJECT)
+    → MarkdownReconstructor
+    → Atomic file write
+    → Git auto-commit
+```
 
 ### Directory Structure
 
@@ -467,11 +498,9 @@ For first-time setup with automated scripts and GPU detection, see the **[Setup 
 ### Prerequisites
 
 - **Python 3.10+**
-- **Redis 7+** - Required for distributed job queue (orchestrator-worker communication)
-  - Docker: Included in `docker-compose.yml`
-  - Manual: `apt install redis-server` or `brew install redis`
-- **Docker** (optional) - For containerized deployment
-- **CUDA 12.1+** (optional) - For GPU acceleration
+- **CUDA 12.1+** (optional) — GPU acceleration; CPU fallback is automatic
+- **Redis 7+** (optional, Docker deployment only) — Required only for the distributed orchestrator path, not for Windows-native workers. Docker includes it via `docker-compose.yml`; otherwise `apt install redis-server` or `brew install redis`
+- **Docker** (optional) — For containerized scale-out deployment only
 
 ### Manual Installation (Advanced Users)
 

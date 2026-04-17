@@ -15,9 +15,9 @@ import json
 import shutil
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Dict, List, Tuple
 
-def classify_document_complexity(file_path: Path) -> Tuple[str, Dict]:
+
+def classify_document_complexity(file_path: Path) -> tuple[str, dict]:
     """Classify document and return (tier, features)"""
     try:
         content = file_path.read_text(encoding='utf-8', errors='ignore')
@@ -49,7 +49,7 @@ def classify_document_complexity(file_path: Path) -> Tuple[str, Dict]:
 
 def stable_hash(path: Path, seed: int) -> int:
     """Deterministic hash for sampling"""
-    h = hashlib.md5(f"{path}:{seed}".encode('utf-8')).digest()
+    h = hashlib.md5(f"{path}:{seed}".encode()).digest()
     return int.from_bytes(h[:4], 'big')
 
 def detect_language_focus(file_path: Path) -> str:
@@ -157,7 +157,7 @@ def build_corpus(source_dir: Path, output_dir: Path, target_count: int, seed: in
     manifest_file = output_dir / 'manifest.json'
     manifest_file.write_text(json.dumps(manifest, indent=2))
 
-    print(f"\n[OK] Golden corpus built:")
+    print("\n[OK] Golden corpus built:")
     print(f"   Files: {len(manifest['documents'])}")
     print(f"   Output: {output_dir}")
     print(f"   Manifest: {manifest_file}")

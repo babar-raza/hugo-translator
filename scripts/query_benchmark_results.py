@@ -4,6 +4,7 @@
 import sqlite3
 from pathlib import Path
 
+
 def main():
     db_path = Path("data/benchmarks/benchmarks.db")
 

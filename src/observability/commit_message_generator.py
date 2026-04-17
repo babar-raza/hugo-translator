@@ -27,10 +27,10 @@ Example output:
 import logging
 from collections import defaultdict
 from pathlib import Path
-from typing import Dict, List, Optional, Set, Tuple, TYPE_CHECKING
+from typing import TYPE_CHECKING, Optional
 
 if TYPE_CHECKING:
-    from src.translation_engine.models import DirectoryResult, TranslationResult
+    from src.translation_engine.models import DirectoryResult
 
 logger = logging.getLogger(__name__)
 
@@ -80,16 +80,16 @@ class CommitMessageGenerator:
 
     def generate(
         self,
-        output_files: List[Path],
-        target_langs: List[str],
+        output_files: list[Path],
+        target_langs: list[str],
         site_id: str,
         run_id: str,
-        site_profile: Optional[Dict] = None,
+        site_profile: dict | None = None,
         translation_result: Optional["DirectoryResult"] = None,
-        model_id: Optional[str] = None,
-        tm_stats: Optional[Dict] = None,
-        file_count: Optional[int] = None,
-    ) -> Tuple[str, str]:
+        model_id: str | None = None,
+        tm_stats: dict | None = None,
+        file_count: int | None = None,
+    ) -> tuple[str, str]:
         """
         Generate commit message subject and body.
 
@@ -158,9 +158,9 @@ class CommitMessageGenerator:
 
     def _detect_sites_from_paths(
         self,
-        output_files: List[Path],
+        output_files: list[Path],
         primary_site_id: str,
-    ) -> List[str]:
+    ) -> list[str]:
         """
         Detect which sites the output files belong to.
 
@@ -242,7 +242,7 @@ class CommitMessageGenerator:
             logger.warning(f"Failed to detect sites from paths: {e}")
             return [primary_site_id]  # Fallback to single site
 
-    def _analyze_paths(self, output_files: List[Path]) -> Dict:
+    def _analyze_paths(self, output_files: list[Path]) -> dict:
         """
         Analyze output file paths to extract structure and patterns.
 
@@ -352,11 +352,11 @@ class CommitMessageGenerator:
 
     def _build_subject(
         self,
-        analysis: Dict,
-        target_langs: List[str],
+        analysis: dict,
+        target_langs: list[str],
         file_count: int,
-        site_ids: List[str],
-        site_display_name: Optional[str] = None,
+        site_ids: list[str],
+        site_display_name: str | None = None,
     ) -> str:
         """
         Build commit subject line.
@@ -461,7 +461,7 @@ class CommitMessageGenerator:
 
         return prefix + lang_str
 
-    def _is_home_family(self, analysis: Dict, output_files: Optional[List[Path]]) -> bool:
+    def _is_home_family(self, analysis: dict, output_files: list[Path] | None) -> bool:
         """
         Check if files belong to 'home' product family.
 
@@ -492,13 +492,13 @@ class CommitMessageGenerator:
 
     def _build_body(
         self,
-        output_files: List[Path],
-        analysis: Dict,
-        target_langs: List[str],
+        output_files: list[Path],
+        analysis: dict,
+        target_langs: list[str],
         file_count: int,
         translation_result: Optional["DirectoryResult"],
-        model_id: Optional[str],
-        tm_stats: Optional[Dict],
+        model_id: str | None,
+        tm_stats: dict | None,
         site_id: str,
         run_id: str,
     ) -> str:
@@ -584,13 +584,13 @@ class CommitMessageGenerator:
 
     def _count_files_by_lang(
         self,
-        output_files: List[Path],
-        target_langs: List[str],
+        output_files: list[Path],
+        target_langs: list[str],
         translation_result: Optional["DirectoryResult"] = None,
-    ) -> Dict[str, int]:
+    ) -> dict[str, int]:
         """Count output files per language using structured data with path fallbacks."""
         output_set = set(output_files)
-        counts: Dict[str, int] = {}
+        counts: dict[str, int] = {}
 
         # Tier 1: Use structured data from translation_result (most reliable)
         if translation_result and hasattr(translation_result, 'file_results'):
@@ -624,10 +624,10 @@ class CommitMessageGenerator:
 
     def _get_actual_languages(
         self,
-        output_files: List[Path],
-        target_langs: List[str],
+        output_files: list[Path],
+        target_langs: list[str],
         translation_result: Optional["DirectoryResult"] = None,
-    ) -> List[str]:
+    ) -> list[str]:
         """Derive actual languages present in output files (not all configured langs)."""
         lang_counts = self._count_files_by_lang(output_files, target_langs, translation_result)
         if lang_counts:
@@ -636,7 +636,7 @@ class CommitMessageGenerator:
         # Fallback: return target_langs as-is if detection fails
         return target_langs
 
-    def _get_language_names(self, lang_codes: List[str]) -> List[str]:
+    def _get_language_names(self, lang_codes: list[str]) -> list[str]:
         """
         Convert language codes to full names.
 
@@ -709,15 +709,15 @@ class CommitMessageGenerator:
 
 
 def generate_commit_message(
-    output_files: List[Path],
-    target_langs: List[str],
+    output_files: list[Path],
+    target_langs: list[str],
     site_id: str,
     run_id: str,
-    site_profile: Optional[Dict] = None,
+    site_profile: dict | None = None,
     translation_result: Optional["DirectoryResult"] = None,
-    model_id: Optional[str] = None,
-    tm_stats: Optional[Dict] = None,
-) -> Tuple[str, str]:
+    model_id: str | None = None,
+    tm_stats: dict | None = None,
+) -> tuple[str, str]:
     """
     Convenience function to generate commit message.
 

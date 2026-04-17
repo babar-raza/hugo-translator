@@ -9,15 +9,16 @@ Tests cover:
 """
 
 import sys
-import pytest
 from pathlib import Path
 from unittest import mock
+
+import pytest
 
 # Add src to path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
 
-from tm.monitoring import CacheMonitor, CacheSizeReport, create_monitor_from_path
 from tm.l2_persistent import L2PersistentTM
+from tm.monitoring import CacheMonitor, CacheSizeReport, create_monitor_from_path
 
 
 class TestCacheSizeReport:

@@ -9,10 +9,8 @@ Tests the complete flow:
 """
 
 import os
-import tempfile
-import time
+from collections.abc import Generator
 from pathlib import Path
-from typing import Generator
 
 import pytest
 
@@ -253,6 +251,7 @@ class TestJobDataSerialization:
     def test_complex_job_roundtrip(self, redis_queue: RedisJobQueue):
         """Test complex job with all fields serializes correctly."""
         from datetime import datetime
+
         from src.orchestrator.models import JobMode
 
         job = TranslationJob(

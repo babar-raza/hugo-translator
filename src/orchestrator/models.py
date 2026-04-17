@@ -6,7 +6,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 
 class JobType(str, Enum):
@@ -41,20 +41,20 @@ class TranslationJob:
     job_id: str
     job_type: JobType
     site_id: str
-    target_langs: List[str]
-    input_paths: List[Path]
+    target_langs: list[str]
+    input_paths: list[Path]
     priority: int = 5  # Lower = higher priority (1-10)
     created_at: datetime = field(default_factory=datetime.now)
-    started_at: Optional[datetime] = None
-    completed_at: Optional[datetime] = None
+    started_at: datetime | None = None
+    completed_at: datetime | None = None
     status: JobStatus = JobStatus.PENDING
     mode: JobMode = JobMode.MANUAL
-    metadata: Dict[str, Any] = field(default_factory=dict)
-    error_message: Optional[str] = None
-    result_summary: Optional[Dict[str, Any]] = None
+    metadata: dict[str, Any] = field(default_factory=dict)
+    error_message: str | None = None
+    result_summary: dict[str, Any] | None = None
 
     @property
-    def duration_seconds(self) -> Optional[float]:
+    def duration_seconds(self) -> float | None:
         """Calculate job duration if started."""
         if not self.started_at:
             return None
@@ -68,7 +68,7 @@ class TranslationJob:
         # If same priority, FIFO (older jobs first)
         return self.created_at < other.created_at
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert job to dictionary for serialization."""
         return {
             "job_id": self.job_id,
@@ -88,7 +88,7 @@ class TranslationJob:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "TranslationJob":
+    def from_dict(cls, data: dict[str, Any]) -> "TranslationJob":
         """Create job from dictionary."""
         return cls(
             job_id=data["job_id"],

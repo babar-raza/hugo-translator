@@ -13,10 +13,11 @@ adding analytics and time-series tables to the benchmark database.
 
 import logging
 import sqlite3
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import TYPE_CHECKING, Callable, List, Optional
+from typing import TYPE_CHECKING, Optional
 
 if TYPE_CHECKING:
     from src.shared_engines.composition_root import SharedEngines
@@ -39,10 +40,10 @@ class Migration:
 
     version: int
     description: str
-    up_sql: List[str]
-    down_sql: List[str]
-    pre_check: Optional[Callable[[sqlite3.Connection], bool]] = None
-    post_check: Optional[Callable[[sqlite3.Connection], bool]] = None
+    up_sql: list[str]
+    down_sql: list[str]
+    pre_check: Callable[[sqlite3.Connection], bool] | None = None
+    post_check: Callable[[sqlite3.Connection], bool] | None = None
 
 
 class MigrationError(Exception):
@@ -79,7 +80,7 @@ class MigrationManager:
         """
         self.db_path = Path(db_path) if db_path != ":memory:" else db_path
         self.engines = engines
-        self._migrations: List[Migration] = []
+        self._migrations: list[Migration] = []
         self._register_migrations()
 
         if engines:
@@ -604,7 +605,7 @@ class MigrationManager:
 
         logger.info(f"Migration v{migration.version} rolled back successfully")
 
-    def list_migrations(self) -> List[dict]:
+    def list_migrations(self) -> list[dict]:
         """List all available migrations with status.
 
         Returns:

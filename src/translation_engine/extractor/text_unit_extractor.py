@@ -10,11 +10,12 @@ import hashlib
 import logging
 import re
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from src.utils.log_sanitizer import sanitize_for_log
-from .text_unit import BodyTranslationPlan, TextUnit, TextUnitKind
+
 from ..parser.ast_nodes import ASTNode, NodeType
+from .text_unit import BodyTranslationPlan, TextUnit, TextUnitKind
 
 logger = logging.getLogger(__name__)
 
@@ -84,7 +85,7 @@ if not (0.5 <= TOKEN_PER_WORD_ESTIMATE <= 3.0):
     )
 
 
-def analyze_segment_variance(segments: List[str]) -> Dict[str, Any]:
+def analyze_segment_variance(segments: list[str]) -> dict[str, Any]:
     """
     Analyze segment length distribution for batch optimization.
 
@@ -156,15 +157,15 @@ class TextUnitExtractor:
     def __init__(
         self,
         segmentation_strategy: str = "sentence_only",
-        terminology_file: Optional[Path] = None,
-        mt_model: Optional[Any] = None,
-        preserve_patterns: Optional[List[str]] = None,
-        site_profile: Optional[Any] = None,
-        batch_stats_tracker: Optional[Any] = None,
-        fasttext_detector: Optional[Any] = None,
-        similarity_tracker: Optional[Any] = None,
-        script_validation_thresholds: Optional[dict] = None,
-        batch_purity_skip_langs: Optional[List[str]] = None
+        terminology_file: Path | None = None,
+        mt_model: Any | None = None,
+        preserve_patterns: list[str] | None = None,
+        site_profile: Any | None = None,
+        batch_stats_tracker: Any | None = None,
+        fasttext_detector: Any | None = None,
+        similarity_tracker: Any | None = None,
+        script_validation_thresholds: dict | None = None,
+        batch_purity_skip_langs: list[str] | None = None
     ):
         """
         Initialize extractor for native batch translation.
@@ -221,7 +222,7 @@ class TextUnitExtractor:
         # Load terminology dictionary (product names, etc.)
         self.terminology_dict = set()
         if terminology_file and terminology_file.exists():
-            with open(terminology_file, 'r', encoding='utf-8') as f:
+            with open(terminology_file, encoding='utf-8') as f:
                 for line in f:
                     term = line.strip()
                     if term:
@@ -271,7 +272,7 @@ class TextUnitExtractor:
         Returns:
             Dictionary with extraction configuration, or empty dict if not available.
         """
-        def _normalize_section(section: Any, seen: Optional[set[int]] = None) -> Any:
+        def _normalize_section(section: Any, seen: set[int] | None = None) -> Any:
             if seen is None:
                 seen = set()
 
@@ -363,12 +364,13 @@ class TextUnitExtractor:
             Set of technical terms (case-sensitive)
         """
         from pathlib import Path
+
         import yaml
 
         config_path = Path("config/terminology/technical_terms.yaml")
         if config_path.exists():
             try:
-                with open(config_path, 'r', encoding='utf-8') as f:
+                with open(config_path, encoding='utf-8') as f:
                     data = yaml.safe_load(f)
                     terms = set(data.get('terms', []))
                     logger.info(f"Loaded {len(terms)} technical terms from {config_path}")
@@ -607,10 +609,10 @@ class TextUnitExtractor:
 
     def _yield_safe_batches(
         self,
-        units: List[TextUnit],
+        units: list[TextUnit],
         max_units: int,
         max_tokens: int
-    ) -> List[List[TextUnit]]:
+    ) -> list[list[TextUnit]]:
         """
         Split units into batches respecting both unit count and token limits.
 
@@ -678,7 +680,7 @@ class TextUnitExtractor:
 
     def _fallback_to_individual(
         self,
-        batch: List[TextUnit],
+        batch: list[TextUnit],
         mt_model: Any,
         src_lang: str,
         tgt_lang: str
@@ -742,11 +744,11 @@ class TextUnitExtractor:
 
     def _translate_single_batch(
         self,
-        batch: List[TextUnit],
+        batch: list[TextUnit],
         mt_model: Any,
         src_lang: str,
         tgt_lang: str,
-        generation_params: Optional[Dict[str, Any]] = None
+        generation_params: dict[str, Any] | None = None
     ) -> bool:
         """
         Translate a single batch using native list-based batching.
@@ -816,7 +818,7 @@ class TextUnitExtractor:
             return False
 
         # SUCCESS: Apply translations (perfect 1:1 mapping)
-        for unit, translation in zip(batch, translations):
+        for unit, translation in zip(batch, translations, strict=False):
             unit.translated_text = translation.strip()
 
         # LANGUAGE PURITY CHECK: Verify all translations are in target language
@@ -894,7 +896,7 @@ class TextUnitExtractor:
         )
 
     def _verify_translation_language_purity(
-        self, units: List[TextUnit], target_lang: str
+        self, units: list[TextUnit], target_lang: str
     ) -> bool:
         """
         Verify all translated units are in target language.
@@ -1116,7 +1118,7 @@ class TextUnitExtractor:
         script_count = len(pattern.findall(text))
         return script_count / letter_count
 
-    def extract_from_ast(self, ast: List[ASTNode], frontmatter: Optional[Dict[str, Any]] = None) -> BodyTranslationPlan:
+    def extract_from_ast(self, ast: list[ASTNode], frontmatter: dict[str, Any] | None = None) -> BodyTranslationPlan:
         """
         Extract all translatable TextUnits from AST and frontmatter.
 
@@ -1127,7 +1129,7 @@ class TextUnitExtractor:
         Returns:
             BodyTranslationPlan with units and AST reference
         """
-        units: List[TextUnit] = []
+        units: list[TextUnit] = []
 
         # Extract frontmatter fields (FIX-BT-03)
         if frontmatter:
@@ -1154,7 +1156,7 @@ class TextUnitExtractor:
             }
         )
 
-    def _traverse_node(self, node: ASTNode, units: List[TextUnit]) -> None:
+    def _traverse_node(self, node: ASTNode, units: list[TextUnit]) -> None:
         """
         Recursively traverse node and emit TextUnits.
 
@@ -1199,7 +1201,7 @@ class TextUnitExtractor:
             for child in node.children:
                 self._traverse_node(child, units)
 
-    def _extract_text_node(self, node: ASTNode, units: List[TextUnit]) -> None:
+    def _extract_text_node(self, node: ASTNode, units: list[TextUnit]) -> None:
         """Extract text node with whitespace preservation."""
         if not node.raw:
             return
@@ -1277,7 +1279,7 @@ class TextUnitExtractor:
         )
         units.append(unit)
 
-    def _extract_code_span(self, node: ASTNode, units: List[TextUnit]) -> None:
+    def _extract_code_span(self, node: ASTNode, units: list[TextUnit]) -> None:
         """Extract code span as non-translatable."""
         if not node.raw:
             return
@@ -1299,7 +1301,7 @@ class TextUnitExtractor:
         )
         units.append(unit)
 
-    def _extract_code_block(self, node: ASTNode, units: List[TextUnit]) -> None:
+    def _extract_code_block(self, node: ASTNode, units: list[TextUnit]) -> None:
         """Extract code block as non-translatable."""
         if not node.raw:
             return
@@ -1323,7 +1325,7 @@ class TextUnitExtractor:
         )
         units.append(unit)
 
-    def _extract_link(self, node: ASTNode, units: List[TextUnit]) -> None:
+    def _extract_link(self, node: ASTNode, units: list[TextUnit]) -> None:
         """Extract link text content (not URL)."""
         # Traverse children for link text
         for child in node.children:
@@ -1345,7 +1347,7 @@ class TextUnitExtractor:
 
         # URL is stored in node.attrs['url'] - preserved, not extracted
 
-    def _extract_image(self, node: ASTNode, units: List[TextUnit]) -> None:
+    def _extract_image(self, node: ASTNode, units: list[TextUnit]) -> None:
         """Extract image alt text (not src)."""
         alt_text = node.attrs.get('alt', '').strip()
         if alt_text:
@@ -1360,7 +1362,7 @@ class TextUnitExtractor:
 
         # src is stored in node.attrs['src'] - preserved, not extracted
 
-    def _extract_full_sentence(self, node: ASTNode, units: List[TextUnit]) -> None:
+    def _extract_full_sentence(self, node: ASTNode, units: list[TextUnit]) -> None:
         """Extract entire node content as single translatable unit."""
         # Collect all text from children
         full_text = self._collect_text_from_node(node)
@@ -1738,7 +1740,7 @@ class TextUnitExtractor:
 
         return False
 
-    def _tokenize_for_repetition_check(self, text: str) -> List[str]:
+    def _tokenize_for_repetition_check(self, text: str) -> list[str]:
         """
         Tokenize text into words for repetition detection.
 
@@ -1755,8 +1757,8 @@ class TextUnitExtractor:
         return words
 
     def _detect_batch_repetition(
-        self, units: List[TextUnit], threshold: int = 3
-    ) -> tuple[bool, List[TextUnit]]:
+        self, units: list[TextUnit], threshold: int = 3
+    ) -> tuple[bool, list[TextUnit]]:
         """
         Quick repetition detection for batch translations.
 
@@ -1807,8 +1809,8 @@ class TextUnitExtractor:
         return len(problematic) > 0, problematic
 
     def _detect_cross_unit_duplicates(
-        self, units: List[TextUnit], min_length: int = 5
-    ) -> List[TextUnit]:
+        self, units: list[TextUnit], min_length: int = 5
+    ) -> list[TextUnit]:
         """
         Detect when different source texts produce the same translation.
 
@@ -1826,7 +1828,7 @@ class TextUnitExtractor:
         from collections import defaultdict
 
         # Group units by their normalized translation
-        translation_groups: dict[str, List[TextUnit]] = defaultdict(list)
+        translation_groups: dict[str, list[TextUnit]] = defaultdict(list)
 
         for unit in units:
             if not unit.translated_text or len(unit.translated_text.strip()) < min_length:
@@ -1863,7 +1865,7 @@ class TextUnitExtractor:
 
     def _translate_single_batch_with_repetition_check(
         self,
-        batch: List[TextUnit],
+        batch: list[TextUnit],
         mt_model: Any,
         src_lang: str,
         tgt_lang: str,
@@ -1957,7 +1959,7 @@ class TextUnitExtractor:
 
         # Step 6: Final fallback to individual translation
         logger.error(
-            f"Repetition could not be resolved. Falling back to individual translation."
+            "Repetition could not be resolved. Falling back to individual translation."
         )
         self.batch_stats['repetition_fallback_count'] = \
             self.batch_stats.get('repetition_fallback_count', 0) + 1
@@ -1966,13 +1968,13 @@ class TextUnitExtractor:
 
     def batch_translate_units(
         self,
-        units: List[TextUnit],
+        units: list[TextUnit],
         mt_model: Any,
         src_lang: str,
         tgt_lang: str,
         batch_size: int = 20,
         max_tokens_per_batch: int = 512
-    ) -> List[TextUnit]:
+    ) -> list[TextUnit]:
         """
         Batch translate multiple TextUnits using native list-based batching.
 
@@ -2115,7 +2117,7 @@ class TextUnitExtractor:
 
         return units
 
-    def _calculate_ast_fingerprint(self, ast: List[ASTNode]) -> str:
+    def _calculate_ast_fingerprint(self, ast: list[ASTNode]) -> str:
         """Calculate fingerprint of AST structure for sanity checks."""
         def node_signature(node: ASTNode) -> str:
             """Get structural signature of node (type + children count)."""

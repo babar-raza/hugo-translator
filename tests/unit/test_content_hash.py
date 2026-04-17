@@ -1,12 +1,14 @@
 """Unit tests for content hash computation."""
 
 import hashlib
-import pytest
 from pathlib import Path
+
+import pytest
+
 from src.utils.content_hash import (
+    ContentHashError,
     compute_file_hash,
     quick_hash_check,
-    ContentHashError,
 )
 
 

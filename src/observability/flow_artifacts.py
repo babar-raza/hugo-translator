@@ -10,7 +10,7 @@ import logging
 from datetime import datetime
 from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any
 
 from src.orchestrator.models import TranslationJob
 from src.tm.models import LookupResult
@@ -58,8 +58,8 @@ class FlowArtifactWriter:
         self.artifacts_dir.mkdir(parents=True, exist_ok=True)
 
         # Track open files
-        self._open_files: Dict[str, Any] = {}
-        self._segment_counts: Dict[str, int] = {}
+        self._open_files: dict[str, Any] = {}
+        self._segment_counts: dict[str, int] = {}
 
     def start_job(self, job: TranslationJob) -> None:
         """
@@ -124,7 +124,7 @@ class FlowArtifactWriter:
         segment: Segment,
         tm_result: LookupResult,
         translation: str,
-        model_used: Optional[str] = None,
+        model_used: str | None = None,
     ) -> None:
         """
         Record segment translation details.
@@ -198,7 +198,7 @@ class FlowArtifactWriter:
         }
         self._write_event(job_id, event)
 
-    def finalize_job(self, job_id: str, stats: Optional[TranslationStats], success: bool) -> None:
+    def finalize_job(self, job_id: str, stats: TranslationStats | None, success: bool) -> None:
         """
         Close artifact file and write summary.
 
@@ -242,7 +242,7 @@ class FlowArtifactWriter:
             except Exception as e:
                 logger.error(f"Failed to finalize flow artifact for job {job_id}: {e}")
 
-    def _write_event(self, job_id: str, event: Dict[str, Any]) -> None:
+    def _write_event(self, job_id: str, event: dict[str, Any]) -> None:
         """
         Write event to artifact file.
 
@@ -275,7 +275,7 @@ class FlowArtifactWriter:
         self._segment_counts.clear()
 
 
-def read_flow_artifact(artifact_path: Path) -> list[Dict[str, Any]]:
+def read_flow_artifact(artifact_path: Path) -> list[dict[str, Any]]:
     """
     Read and parse a flow artifact file.
 
@@ -288,7 +288,7 @@ def read_flow_artifact(artifact_path: Path) -> list[Dict[str, Any]]:
     events = []
 
     try:
-        with open(artifact_path, "r", encoding="utf-8") as f:
+        with open(artifact_path, encoding="utf-8") as f:
             for line in f:
                 line = line.strip()
                 if line:
@@ -300,7 +300,7 @@ def read_flow_artifact(artifact_path: Path) -> list[Dict[str, Any]]:
     return events
 
 
-def get_job_summary(artifact_path: Path) -> Optional[Dict[str, Any]]:
+def get_job_summary(artifact_path: Path) -> dict[str, Any] | None:
     """
     Extract job summary from flow artifact.
 

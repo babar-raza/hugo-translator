@@ -4,9 +4,10 @@ Unit tests for verification reporting module.
 Tests JSON and Markdown report generation.
 """
 import json
-import pytest
 from pathlib import Path
 from tempfile import TemporaryDirectory
+
+import pytest
 
 from src.verification.checks.base import VerificationIssue, VerificationResult
 from src.verification.report import (
@@ -251,7 +252,7 @@ class TestWriteReport:
             assert report_path.exists()
 
             # Verify it's valid JSON
-            with open(report_path, "r", encoding="utf-8") as f:
+            with open(report_path, encoding="utf-8") as f:
                 report = json.load(f)
                 assert "summary" in report
                 assert "files" in report
@@ -280,7 +281,7 @@ class TestWriteReport:
             assert report_path.exists()
 
             # Verify it's valid JSON
-            with open(report_path, "r", encoding="utf-8") as f:
+            with open(report_path, encoding="utf-8") as f:
                 report = json.load(f)
                 assert "summary" in report
 

@@ -13,9 +13,9 @@ import logging
 import sys
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, List, Literal, Optional
+from typing import Any, Literal
 
-from .hardware import HardwareDetector, HardwareInfo
+from .hardware import HardwareDetector
 from .registry import ModelRegistry
 
 logger = logging.getLogger(__name__)
@@ -28,12 +28,12 @@ class ModelRecommendation:
     model_id: str
     backend: str
     device: str
-    expected_throughput: Optional[float]  # tokens/sec
-    expected_memory_mb: Optional[float]  # MB
+    expected_throughput: float | None  # tokens/sec
+    expected_memory_mb: float | None  # MB
     confidence: Literal["high", "medium", "low"]
     rationale: str  # Explanation of why this model was chosen
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for JSON serialization."""
         return {
             "model_id": self.model_id,
@@ -59,8 +59,8 @@ class ModelRecommender:
     def __init__(
         self,
         registry: ModelRegistry,
-        benchmark_storage: Optional[Any] = None,
-        hardware_detector: Optional[HardwareDetector] = None,
+        benchmark_storage: Any | None = None,
+        hardware_detector: HardwareDetector | None = None,
     ):
         """
         Initialize model recommender.
@@ -81,9 +81,9 @@ class ModelRecommender:
 
     def recommend(
         self,
-        target_throughput: Optional[float] = None,
-        max_memory_gb: Optional[float] = None,
-        device_preference: Optional[str] = None,
+        target_throughput: float | None = None,
+        max_memory_gb: float | None = None,
+        device_preference: str | None = None,
     ) -> ModelRecommendation:
         """
         Recommend best model for given constraints.
@@ -124,10 +124,10 @@ class ModelRecommender:
 
     def _recommend_from_benchmarks(
         self,
-        target_throughput: Optional[float],
-        max_memory_gb: Optional[float],
-        device_preference: Optional[str],
-    ) -> Optional[ModelRecommendation]:
+        target_throughput: float | None,
+        max_memory_gb: float | None,
+        device_preference: str | None,
+    ) -> ModelRecommendation | None:
         """
         Recommend model based on historical benchmark data.
 
@@ -214,9 +214,9 @@ class ModelRecommender:
 
     def _recommend_from_heuristics(
         self,
-        target_throughput: Optional[float],
-        max_memory_gb: Optional[float],
-        device_preference: Optional[str],
+        target_throughput: float | None,
+        max_memory_gb: float | None,
+        device_preference: str | None,
     ) -> ModelRecommendation:
         """
         Recommend model using registry heuristics.
@@ -461,14 +461,14 @@ Examples:
             if recommendation.expected_throughput:
                 print(f"Throughput:    ~{recommendation.expected_throughput:.1f} tokens/sec")
             else:
-                print(f"Throughput:    (not estimated)")
+                print("Throughput:    (not estimated)")
 
             if recommendation.expected_memory_mb:
                 print(f"Memory:        ~{recommendation.expected_memory_mb:.0f}MB")
             else:
-                print(f"Memory:        (not estimated)")
+                print("Memory:        (not estimated)")
 
-            print(f"\nRationale:")
+            print("\nRationale:")
             print(f"  {recommendation.rationale}")
             print("=" * 70 + "\n")
 

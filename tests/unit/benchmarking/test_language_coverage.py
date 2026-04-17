@@ -1,9 +1,7 @@
 """Tests for language coverage validation."""
-import tempfile
-from pathlib import Path
 import yaml
-import pytest
-from src.benchmarking.language_coverage import check_language_coverage, CoverageReport
+
+from src.benchmarking.language_coverage import check_language_coverage
 
 
 def test_full_coverage_with_multilingual_model(tmp_path):

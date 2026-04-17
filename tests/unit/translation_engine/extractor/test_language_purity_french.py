@@ -10,10 +10,12 @@ Framework: ORCHESTRATOR (Evidence-Based Development)
 Task: LP-004 (Language Purity Tests - French)
 """
 
+from unittest.mock import Mock
+
 import pytest
-from unittest.mock import Mock, patch, MagicMock
-from src.translation_engine.extractor.text_unit_extractor import TextUnitExtractor
+
 from src.translation_engine.extractor.text_unit import TextUnit, TextUnitKind
+from src.translation_engine.extractor.text_unit_extractor import TextUnitExtractor
 
 
 class TestFrenchLanguagePurity:

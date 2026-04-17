@@ -16,7 +16,6 @@ import sys
 import time
 import uuid
 from pathlib import Path
-from typing import Dict, List
 
 # Add src to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -54,7 +53,7 @@ class QualityBenchmark:
         registry = ModelRegistry(registry_path)
         self.model_loader = ModelLoader(registry=registry)
 
-    def load_reference_corpus(self, corpus_path: Path) -> List[Dict]:
+    def load_reference_corpus(self, corpus_path: Path) -> list[dict]:
         """
         Load reference corpus from JSON file.
 
@@ -64,7 +63,7 @@ class QualityBenchmark:
         Returns:
             List of corpus samples with source and reference translations
         """
-        with open(corpus_path, "r", encoding="utf-8") as f:
+        with open(corpus_path, encoding="utf-8") as f:
             data = json.load(f)
 
         logger.info(
@@ -362,7 +361,7 @@ def main() -> int:
             avg_comet = sum(comet_results) / len(comet_results) if comet_results else None
 
             logger.info(f"\n{'=' * 60}")
-            logger.info(f"Quality Benchmark Results")
+            logger.info("Quality Benchmark Results")
             logger.info(f"{'=' * 60}")
             logger.info(f"Model: {args.model}")
             logger.info(f"Corpus: {corpus_path.name}")

@@ -107,24 +107,7 @@ global:
 
 # Site-specific terminology overrides
 # These extend or override global rules for specific sites
-site_overrides:
-  # Reference documentation site has additional API terminology requirements
-  reference.aspose.net:
-    inherit_global: true  # Inherit all global rules
-    patterns:
-      # PascalCase identifiers (C# class/method names)
-      - pattern: "\\b[A-Z][a-z]+(?:[A-Z][a-z]+)+\\b"
-        category: pascal_case_identifier
-        description: "PascalCase API identifiers"
-        preserve_mode: protect
-        severity: error
-
-      # UPPER_CASE constants
-      - pattern: "\\b[A-Z_]+\\b"
-        category: constant_name
-        description: "UPPER_CASE constants"
-        preserve_mode: protect
-        severity: warning
+site_overrides: {}
 
 # Auto-discovery settings for terminology extraction
 # (Disabled for initial phase - will be enabled in future iterations)

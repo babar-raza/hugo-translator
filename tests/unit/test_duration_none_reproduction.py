@@ -11,8 +11,9 @@ handles all scenarios where duration_seconds could be None or invalid.
 """
 
 import pytest
-from src.translation_engine.models import TranslationStats
+
 from src.observability.telemetry_integration import _safe_duration_ms
+from src.translation_engine.models import TranslationStats
 
 
 class TestDurationNoneReproduction:

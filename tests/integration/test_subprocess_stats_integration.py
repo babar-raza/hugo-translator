@@ -8,15 +8,14 @@ Tests subprocess stats module in real-world scenarios:
 - Real error scenarios
 - Telemetry integration
 """
-import pytest
 import subprocess
-import time
-from pathlib import Path
+
+import pytest
 
 from src.observability.subprocess_stats import (
     SubprocessStats,
-    run_with_stats,
     get_global_stats,
+    run_with_stats,
 )
 
 

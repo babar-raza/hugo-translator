@@ -1,13 +1,12 @@
 """Tests for progress tracker integration in translation engine."""
-from unittest.mock import Mock, MagicMock, patch, call
 from pathlib import Path
-import pytest
+from unittest.mock import Mock, patch
 
 
 def test_engine_marks_completed_on_success():
     """Verify engine marks progress on successful translation."""
     from src.translation_engine import TranslationEngine
-    from src.translation_engine.models import TranslationResult, DirectoryResult
+    from src.translation_engine.models import DirectoryResult, TranslationResult
 
     # Setup mocks
     mock_tracker = Mock()
@@ -50,7 +49,7 @@ def test_engine_marks_completed_on_success():
 def test_engine_marks_failed_on_error():
     """Verify engine marks failures with error message."""
     from src.translation_engine import TranslationEngine
-    from src.translation_engine.models import TranslationResult, DirectoryResult
+    from src.translation_engine.models import DirectoryResult, TranslationResult
 
     # Setup mocks
     mock_tracker = Mock()
@@ -133,7 +132,7 @@ def test_engine_marks_failed_on_exception():
 def test_engine_handles_none_progress_tracker():
     """Verify engine works without progress tracker (backward compat)."""
     from src.translation_engine import TranslationEngine
-    from src.translation_engine.models import TranslationResult, DirectoryResult
+    from src.translation_engine.models import DirectoryResult, TranslationResult
 
     # Setup mocks
     mock_config = Mock()
@@ -177,7 +176,7 @@ def test_engine_handles_none_progress_tracker():
 def test_engine_handles_mark_exception():
     """Verify engine continues if mark_completed throws exception."""
     from src.translation_engine import TranslationEngine
-    from src.translation_engine.models import TranslationResult, DirectoryResult
+    from src.translation_engine.models import DirectoryResult, TranslationResult
 
     # Setup mocks
     mock_tracker = Mock()

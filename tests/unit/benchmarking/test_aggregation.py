@@ -8,18 +8,12 @@ Tests the TimeSeriesAggregator class:
 - Cleanup old trends
 """
 
-import pytest
 import tempfile
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
-from src.benchmarking.aggregation import TimeSeriesAggregator, AGGREGATION_WINDOWS
-from src.benchmarking.storage import (
-    BenchmarkDatabase,
-    BenchmarkRun,
-    BenchmarkResult,
-    SystemInfo
-)
+from src.benchmarking.aggregation import AGGREGATION_WINDOWS, TimeSeriesAggregator
+from src.benchmarking.storage import BenchmarkDatabase, BenchmarkResult, BenchmarkRun, SystemInfo
 
 
 class TestTimeSeriesAggregator:

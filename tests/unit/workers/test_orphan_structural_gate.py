@@ -9,10 +9,7 @@ Run: pytest tests/unit/workers/test_orphan_structural_gate.py -v
 import subprocess
 import sys
 import types
-from pathlib import Path
 from unittest.mock import MagicMock, patch
-
-import pytest
 
 
 # ---------------------------------------------------------------------------
@@ -33,11 +30,10 @@ def _ensure_stubs():
 
 _ensure_stubs()
 
+from src.translation_engine.engine import _is_translated_filename  # noqa: E402
 from src.workers.autonomous_content_translation_worker import (  # noqa: E402
     AutonomousContentTranslationWorker as W,
 )
-from src.translation_engine.engine import _is_translated_filename  # noqa: E402
-
 
 # ---------------------------------------------------------------------------
 # Shared fixtures / constants

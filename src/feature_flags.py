@@ -40,7 +40,7 @@ Related:
 
 import os
 from pathlib import Path
-from typing import Dict, Optional, Any
+
 import yaml
 
 
@@ -52,7 +52,7 @@ class FeatureFlags:
     variable overrides for deployment-time configuration changes.
     """
 
-    def __init__(self, config_path: Optional[str] = None):
+    def __init__(self, config_path: str | None = None):
         """
         Initialize feature flag system.
 
@@ -60,7 +60,7 @@ class FeatureFlags:
             config_path: Path to global.yaml config file.
                         Defaults to config/global.yaml relative to project root.
         """
-        self._flags: Dict[str, bool] = {}
+        self._flags: dict[str, bool] = {}
         self._config_path = config_path or "config/global.yaml"
         self._load_flags()
 
@@ -69,7 +69,7 @@ class FeatureFlags:
         # Load from config file
         config_file = Path(self._config_path)
         if config_file.exists():
-            with open(config_file, "r", encoding="utf-8") as f:
+            with open(config_file, encoding="utf-8") as f:
                 try:
                     config = yaml.safe_load(f)
                     self._flags = config.get("features", {})
@@ -83,7 +83,7 @@ class FeatureFlags:
         # Apply environment variable overrides
         self._apply_env_overrides()
 
-    def _default_flags(self) -> Dict[str, bool]:
+    def _default_flags(self) -> dict[str, bool]:
         """
         Default feature flag values (used when config file is missing).
 
@@ -179,7 +179,7 @@ class FeatureFlags:
         """
         return self.is_enabled(flag_name, default)
 
-    def get_all(self) -> Dict[str, bool]:
+    def get_all(self) -> dict[str, bool]:
         """
         Get all feature flags as a dictionary.
 
@@ -203,10 +203,10 @@ class FeatureFlags:
 
 
 # Global singleton instance
-_feature_flags: Optional[FeatureFlags] = None
+_feature_flags: FeatureFlags | None = None
 
 
-def get_feature_flags(config_path: Optional[str] = None) -> FeatureFlags:
+def get_feature_flags(config_path: str | None = None) -> FeatureFlags:
     """
     Get the global FeatureFlags instance (singleton pattern).
 

@@ -9,12 +9,12 @@ Tests cover:
 - Engine disk space checking
 """
 
-import os
-import sys
 import errno
-import pytest
+import sys
 from pathlib import Path
 from unittest import mock
+
+import pytest
 
 # Add src directory to path for direct imports
 src_path = Path(__file__).parent.parent.parent / "src"
@@ -22,6 +22,7 @@ sys.path.insert(0, str(src_path))
 
 # Import directly to avoid package import issues
 import importlib.util
+
 _atomic_write_path = src_path / "utils" / "atomic_write.py"
 _spec = importlib.util.spec_from_file_location("atomic_write_module", _atomic_write_path)
 _atomic_write_module = importlib.util.module_from_spec(_spec)

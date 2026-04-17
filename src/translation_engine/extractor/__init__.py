@@ -1,17 +1,17 @@
 """
 Segment extraction module.
 """
+from .placeholder_manager import PlaceholderManager
 from .segment_extractor import (
     Segment,
     SegmentContext,
     SegmentContextType,
     SegmentExtractor,
 )
-from .placeholder_manager import PlaceholderManager
 from .text_unit import (
+    BodyTranslationPlan,
     TextUnit,
     TextUnitKind,
-    BodyTranslationPlan,
 )
 from .text_unit_extractor import TextUnitExtractor
 

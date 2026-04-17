@@ -25,8 +25,8 @@ Requirements:
 """
 
 import logging
-from datetime import datetime, timezone, timedelta
-from typing import Dict, List, Any
+from datetime import datetime, timedelta, timezone
+from typing import Any
 
 try:
     import requests
@@ -45,7 +45,7 @@ def cleanup_stale_runs(
     dry_run: bool = False,
     timeout: int = 5,
     quiet: bool = False,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """
     Clean up stale "running" telemetry records via API.
 
@@ -79,7 +79,7 @@ def cleanup_stale_runs(
         - Gracefully handles API unavailability (returns empty stats)
         - Does NOT access database directly (respects single-writer pattern)
     """
-    stats: Dict[str, Any] = {
+    stats: dict[str, Any] = {
         "stale_runs_found": 0,
         "updated": 0,
         "errors": [],

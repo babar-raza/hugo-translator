@@ -13,7 +13,7 @@ No real CUDA, Ollama, or FAISS is required — all dependencies are MagicMock.
 import sys
 import types
 import unittest
-from unittest.mock import MagicMock, patch, call
+from unittest.mock import MagicMock, patch
 
 
 # ---------------------------------------------------------------------------

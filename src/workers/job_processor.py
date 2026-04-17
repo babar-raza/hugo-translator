@@ -39,7 +39,7 @@ class JobProcessor:
         redis_host: str = "localhost",
         redis_port: int = 6379,
         redis_db: int = 0,
-        redis_password: Optional[str] = None,
+        redis_password: str | None = None,
         poll_interval: float = 5.0,
         max_retries: int = 3,
         config_path: str = "./config",
@@ -90,11 +90,11 @@ class JobProcessor:
         self.tm_path = tm_path
 
         # Initialize components (will be set in setup())
-        self.queue: Optional[RedisJobQueue] = None
-        self.tm: Optional[TranslationMemory] = None
-        self.model_loader: Optional[ModelLoader] = None
-        self.engine: Optional[TranslationEngine] = None
-        self.config_service: Optional[ConfigService] = None
+        self.queue: RedisJobQueue | None = None
+        self.tm: TranslationMemory | None = None
+        self.model_loader: ModelLoader | None = None
+        self.engine: TranslationEngine | None = None
+        self.config_service: ConfigService | None = None
 
         # Control flags
         self._running = False
@@ -150,9 +150,12 @@ class JobProcessor:
         l1_cache = L1Cache(max_size=10000)  # Per-worker cache
 
         # Setup L2 persistent TM path
-        l2_path = Path(self.tm_path) / "l2_lmdb"
+        from src.tm.l2_persistent import L2_DB_NAME
+        _l2_cfg = self.config_service.get_config() if self.config_service else {}
+        _l2_max_mb = _l2_cfg.get("tm_defaults", {}).get("l2_max_size_mb", 2048)
+        l2_path = Path(self.tm_path) / L2_DB_NAME
         l2_path.mkdir(parents=True, exist_ok=True)
-        l2_persistent = L2PersistentTM(str(l2_path))
+        l2_persistent = L2PersistentTM(str(l2_path), max_size_mb=_l2_max_mb)
 
         # Setup L3 semantic TM (optional)
         l3_path = Path(self.tm_path) / "l3_faiss"
@@ -193,8 +196,9 @@ class JobProcessor:
                 hardware_config = global_config.get("hardware", {})
 
                 # Use VRAM budget resolution logic
-                from src.hardware.vram_budget import resolve_vram_budget_mb
                 import torch
+
+                from src.hardware.vram_budget import resolve_vram_budget_mb
 
                 if hardware.recommended_device.startswith("cuda") and torch.cuda.is_available():
                     device_id = 0

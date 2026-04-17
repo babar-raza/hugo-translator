@@ -10,7 +10,6 @@ Robust placeholder strategy:
 """
 import re
 from dataclasses import dataclass, field
-from typing import Dict, List, Tuple, Optional
 
 
 @dataclass
@@ -19,8 +18,8 @@ class ProtectedInlineSegment:
 
     original: str
     protected: str
-    placeholder_map: Dict[str, str] = field(default_factory=dict)
-    url_map: Dict[str, str] = field(default_factory=dict)
+    placeholder_map: dict[str, str] = field(default_factory=dict)
+    url_map: dict[str, str] = field(default_factory=dict)
 
 
 class InlineFormatProtector:
@@ -57,8 +56,8 @@ class InlineFormatProtector:
             use_unicode: If True, use Unicode brackets. If False, use ASCII markers.
         """
         self._counter = 0
-        self._url_map: Dict[str, str] = {}
-        self._code_map: Dict[str, str] = {}
+        self._url_map: dict[str, str] = {}
+        self._code_map: dict[str, str] = {}
         self._use_unicode = use_unicode
 
         if use_unicode:
@@ -170,7 +169,7 @@ class InlineFormatProtector:
 
     # === LINK PROTECTION ===
 
-    def _protect_links(self, text: str) -> Tuple[str, Dict[str, str]]:
+    def _protect_links(self, text: str) -> tuple[str, dict[str, str]]:
         """
         Protect markdown links [text](url) or [text](url "title").
 
@@ -198,7 +197,7 @@ class InlineFormatProtector:
         result = pattern.sub(replace_link, text)
         return result, placeholder_map
 
-    def _restore_links(self, text: str, url_map: Dict[str, str]) -> str:
+    def _restore_links(self, text: str, url_map: dict[str, str]) -> str:
         """
         Restore markdown links from placeholders with robust corruption handling.
 
@@ -253,7 +252,7 @@ class InlineFormatProtector:
 
     # === IMAGE PROTECTION ===
 
-    def _protect_images(self, text: str) -> Tuple[str, Dict[str, str]]:
+    def _protect_images(self, text: str) -> tuple[str, dict[str, str]]:
         """Protect markdown images ![alt](src)."""
         placeholder_map = {}
 
@@ -273,7 +272,7 @@ class InlineFormatProtector:
         result = pattern.sub(replace_image, text)
         return result, placeholder_map
 
-    def _restore_images(self, text: str, url_map: Dict[str, str]) -> str:
+    def _restore_images(self, text: str, url_map: dict[str, str]) -> str:
         """
         Restore markdown images from placeholders with robust corruption handling.
 
@@ -321,7 +320,7 @@ class InlineFormatProtector:
 
     # === INLINE CODE PROTECTION ===
 
-    def _protect_inline_code(self, text: str) -> Tuple[str, Dict[str, str]]:
+    def _protect_inline_code(self, text: str) -> tuple[str, dict[str, str]]:
         """Protect inline code `code`."""
         placeholder_map = {}
 
@@ -368,7 +367,7 @@ class InlineFormatProtector:
 
     # === BOLD-ITALIC PROTECTION ===
 
-    def _protect_bold_italic(self, text: str) -> Tuple[str, Dict[str, str]]:
+    def _protect_bold_italic(self, text: str) -> tuple[str, dict[str, str]]:
         """Protect bold-italic ***text***."""
         placeholder_map = {}
 
@@ -389,7 +388,7 @@ class InlineFormatProtector:
 
     # === BOLD PROTECTION ===
 
-    def _protect_bold(self, text: str) -> Tuple[str, Dict[str, str]]:
+    def _protect_bold(self, text: str) -> tuple[str, dict[str, str]]:
         """Protect bold **text** or __text__."""
         placeholder_map = {}
 
@@ -437,7 +436,7 @@ class InlineFormatProtector:
 
     # === ITALIC PROTECTION ===
 
-    def _protect_italic(self, text: str) -> Tuple[str, Dict[str, str]]:
+    def _protect_italic(self, text: str) -> tuple[str, dict[str, str]]:
         """
         Protect italic *text* (single asterisk only).
 
@@ -578,7 +577,7 @@ class InlineFormatProtector:
 
         return pattern.sub(replace_code, text)
 
-    def _restore_urls_v2(self, text: str, url_map: Dict[str, str]) -> str:
+    def _restore_urls_v2(self, text: str, url_map: dict[str, str]) -> str:
         """
         Restore URLs from token placeholders with fuzzy matching.
 

@@ -8,13 +8,12 @@ Verifies SD-03 acceptance checks:
 - Blank lines preserved
 - Indentation preserved
 """
-import pytest
-from dataclasses import dataclass, field
-from typing import Any, Dict, Optional
-from enum import Enum
-
 # Import directly to avoid full package import chain
 import sys
+from dataclasses import dataclass, field
+from enum import Enum
+from typing import Any
+
 sys.path.insert(0, ".")
 
 
@@ -28,8 +27,8 @@ class SegmentContextType(str, Enum):
 class SegmentContext:
     """Context information for a translatable segment."""
     context_type: SegmentContextType
-    frontmatter_key: Optional[str] = None
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    frontmatter_key: str | None = None
+    metadata: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass

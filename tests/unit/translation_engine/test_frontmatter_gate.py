@@ -14,7 +14,6 @@ Root cause of incident 6837f6671:
 These tests simulate the exact gate logic from engine.py:1913-1925 to verify
 the gate condition fires and does not fire in all three relevant scenarios.
 """
-import pytest
 
 
 def _run_frontmatter_gate(source: str, translated: str, validation_passed: bool = True):

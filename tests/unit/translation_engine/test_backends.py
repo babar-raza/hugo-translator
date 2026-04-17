@@ -4,15 +4,15 @@ Unit tests for translation backends (ITranslationBackend, MTBackend, LLMBackend)
 Tests backend interface contract and implementation behavior with mocked dependencies.
 """
 
-import unittest
-from unittest.mock import Mock, patch, MagicMock
 import sys
+import unittest
 from pathlib import Path
+from unittest.mock import Mock, patch
 
 # Add src to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent / "src"))
 
-from src.translation_engine.backends import ITranslationBackend, MTBackend, LLMBackend
+from src.translation_engine.backends import ITranslationBackend, LLMBackend, MTBackend
 
 
 class TestITranslationBackend(unittest.TestCase):

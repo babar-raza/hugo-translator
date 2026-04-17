@@ -11,18 +11,18 @@ Validates:
 - Correct output pattern used
 """
 
-import pytest
-import sys
 import shutil
+import sys
 from pathlib import Path
 from unittest.mock import MagicMock, patch
+
+import pytest
 
 # Add src to path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 from src.translation_engine.engine import TranslationEngine
-from src.utils.config_loader import ConfigService
-from src.utils.models import SiteProfile, OutputLayout, BodyRules, FrontmatterMode
+from src.utils.models import BodyRules, OutputLayout, SiteProfile
 
 
 @pytest.fixture
@@ -75,7 +75,6 @@ def mock_translation_engine(blog_site_profile):
 
     def mock_translate(file_path, target_lang, **kwargs):
         """Mock translation that just adds language suffix to content."""
-        from src.translation_engine.models import TranslationResult
 
         # Call original to get filtering logic, but mock the actual translation
         with patch.object(engine, '_translate_content') as mock_content:

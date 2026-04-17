@@ -3,10 +3,10 @@
 Profiles benchmark database queries without requiring full project imports.
 """
 
+import json
 import sqlite3
 import time
-import json
-from datetime import datetime, timedelta, UTC
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 
@@ -221,7 +221,7 @@ def main():
     # Create fresh database
     if Path(test_db_path).exists():
         Path(test_db_path).unlink()
-        print(f"Removed existing database")
+        print("Removed existing database")
 
     create_test_database(test_db_path, num_runs=500)
 

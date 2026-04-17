@@ -4,14 +4,16 @@ Integration tests for Autonomous Content Translation Worker.
 Tests the full worker flow with mocked TranslationEngine and git operations.
 """
 
-import pytest
 from pathlib import Path
-from unittest.mock import Mock, patch, MagicMock
+from unittest.mock import Mock, patch
+
+import pytest
+
+from src.translation_engine.models import DirectoryResult
 from src.workers.autonomous_content_translation_worker import (
-    AutonomousWorkerConfig,
     AutonomousContentTranslationWorker,
+    AutonomousWorkerConfig,
 )
-from src.translation_engine.models import DirectoryResult, TranslationResult
 
 
 @pytest.fixture
@@ -415,4 +417,3 @@ class TestAutonomousWorkerDaemonMode:
 
             # Verify translation was executed
             assert mock_translation_engine.translate_directory.call_count >= 1
-

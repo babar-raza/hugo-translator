@@ -1,7 +1,7 @@
 from unittest.mock import Mock
 
-from src.utils.models import GlobalConfig
 from src.translation_engine.engine import TranslationEngine
+from src.utils.models import GlobalConfig
 
 
 class _DummyConfigService:

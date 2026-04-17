@@ -8,10 +8,9 @@ Tests cover:
 - Edge cases (empty text, no matches, invalid patterns)
 """
 
-import pytest
 from src.translation_engine.terminology.models import (
-    TermRule,
     PreserveMode,
+    TermRule,
     TermSeverity,
 )
 from src.translation_engine.terminology.terminology_detector import TerminologyDetector

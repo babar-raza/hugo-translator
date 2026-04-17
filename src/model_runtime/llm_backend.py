@@ -13,7 +13,7 @@ import logging
 import re
 import time
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 from .contracts import LLMProviderConfig
 from .llm_providers import BaseLLMProvider, create_provider
@@ -79,7 +79,7 @@ class LLMModelBackend:
         self.device = "api"
         self.loaded = False
 
-        self._provider: Optional[BaseLLMProvider] = None
+        self._provider: BaseLLMProvider | None = None
         self._terminology_manager = None  # lazy-loaded on first translate() call
 
         # TEL-04 token tracking compatibility
@@ -93,7 +93,9 @@ class LLMModelBackend:
         """Lazy-load TerminologyManager for placeholder-based term protection."""
         if self._terminology_manager is None:
             try:
-                from src.translation_engine.terminology.terminology_manager import TerminologyManager
+                from src.translation_engine.terminology.terminology_manager import (
+                    TerminologyManager,
+                )
                 _cfg = Path("config/terminology.yaml")
                 if not _cfg.exists():
                     # Fallback: resolve relative to this source file
@@ -122,12 +124,12 @@ class LLMModelBackend:
 
     def translate(
         self,
-        texts: List[str],
+        texts: list[str],
         src_lang: str,
         tgt_lang: str,
-        max_new_tokens: Optional[int] = None,
-        generation_params: Optional[Dict[str, Any]] = None,
-    ) -> List[str]:
+        max_new_tokens: int | None = None,
+        generation_params: dict[str, Any] | None = None,
+    ) -> list[str]:
         """Translate a batch of texts.
 
         Args:
@@ -152,12 +154,12 @@ class LLMModelBackend:
 
     def translate_with_token_counts(
         self,
-        texts: List[str],
+        texts: list[str],
         src_lang: str,
         tgt_lang: str,
-        max_new_tokens: Optional[int] = None,
-        generation_params: Optional[Dict[str, Any]] = None,
-    ) -> Tuple[List[str], int, int]:
+        max_new_tokens: int | None = None,
+        generation_params: dict[str, Any] | None = None,
+    ) -> tuple[list[str], int, int]:
         """Translate texts and return token counts.
 
         LLM-WASTE-FIX-3: packs multiple segments into a single prompt using
@@ -179,7 +181,7 @@ class LLMModelBackend:
         if not texts:
             return [], 0, 0
 
-        translations: List[str] = [""] * len(texts)
+        translations: list[str] = [""] * len(texts)
         total_input = 0
         total_output = 0
         start_time = time.perf_counter()
@@ -234,8 +236,8 @@ class LLMModelBackend:
         src_lang: str,
         tgt_lang: str,
         tm,
-        translations: List[str],
-    ) -> Tuple[int, int]:
+        translations: list[str],
+    ) -> tuple[int, int]:
         """Translate a single segment via one LLM call.
 
         Returns (input_tokens, output_tokens).
@@ -282,13 +284,13 @@ class LLMModelBackend:
 
     def _translate_packed_batch(
         self,
-        texts: List[str],
-        indices: List[int],
+        texts: list[str],
+        indices: list[int],
         src_lang: str,
         tgt_lang: str,
         tm,
-        translations: List[str],
-    ) -> Tuple[int, int]:
+        translations: list[str],
+    ) -> tuple[int, int]:
         """Pack multiple segments into one numbered prompt, parse results back.
 
         Falls back to per-segment calls if output parsing fails.
@@ -358,7 +360,7 @@ class LLMModelBackend:
             return total_in, total_out
 
     @staticmethod
-    def _parse_packed_output(raw: str, expected_count: int) -> Optional[List[str]]:
+    def _parse_packed_output(raw: str, expected_count: int) -> list[str] | None:
         """Parse numbered LLM output back into individual translations.
 
         Expected format:

@@ -11,17 +11,15 @@ Validates that the system is ready for production deployment:
 """
 
 import argparse
-import sys
 import shutil
+import sys
 from pathlib import Path
-from typing import List, Tuple
 
 # Add src to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from src.tm import L1Cache, L2PersistentTM, L3SemanticTM, TranslationMemory
-from src.model_runtime import ModelRegistry, HardwareDetector
-from src.utils.config_loader import ConfigService
+from src.model_runtime import HardwareDetector
+from src.tm import L1Cache, L2PersistentTM
 
 
 class ReadinessCheck:
@@ -32,7 +30,7 @@ class ReadinessCheck:
         self.strict = strict
         self.checks = []
 
-    def check_directories(self) -> Tuple[bool, str]:
+    def check_directories(self) -> tuple[bool, str]:
         """Check required directories exist."""
         required_dirs = [
             self.project_root / "config",
@@ -46,7 +44,7 @@ class ReadinessCheck:
             return False, f"Missing directories: {', '.join(str(d) for d in missing)}"
         return True, "All required directories exist"
 
-    def check_config_files(self) -> Tuple[bool, str]:
+    def check_config_files(self) -> tuple[bool, str]:
         """Check config files are valid."""
         config_dir = self.project_root / "config"
 
@@ -69,7 +67,7 @@ class ReadinessCheck:
         except Exception as e:
             return False, f"Failed to load model registry: {e}"
 
-    def check_dependencies(self) -> Tuple[bool, str]:
+    def check_dependencies(self) -> tuple[bool, str]:
         """Check critical dependencies are installed."""
         required_packages = [
             "yaml",
@@ -89,7 +87,7 @@ class ReadinessCheck:
             return False, f"Missing packages: {', '.join(missing)}"
         return True, "All required packages installed"
 
-    def check_tm_functionality(self) -> Tuple[bool, str]:
+    def check_tm_functionality(self) -> tuple[bool, str]:
         """Check TM layers are functional."""
         try:
             # Create temporary TM
@@ -119,7 +117,7 @@ class ReadinessCheck:
         except Exception as e:
             return False, f"TM functionality check failed: {e}"
 
-    def check_disk_space(self) -> Tuple[bool, str]:
+    def check_disk_space(self) -> tuple[bool, str]:
         """Check available disk space."""
         try:
             usage = shutil.disk_usage(self.project_root)
@@ -133,7 +131,7 @@ class ReadinessCheck:
         except Exception as e:
             return False, f"Failed to check disk space: {e}"
 
-    def check_memory_available(self) -> Tuple[bool, str]:
+    def check_memory_available(self) -> tuple[bool, str]:
         """Check available memory."""
         try:
             import psutil
@@ -150,7 +148,7 @@ class ReadinessCheck:
         except Exception as e:
             return False, f"Failed to check memory: {e}"
 
-    def check_hardware(self) -> Tuple[bool, str]:
+    def check_hardware(self) -> tuple[bool, str]:
         """Check hardware configuration."""
         try:
             detector = HardwareDetector()
@@ -169,7 +167,7 @@ class ReadinessCheck:
         except Exception as e:
             return False, f"Hardware detection failed: {e}"
 
-    def run_all_checks(self) -> List[dict]:
+    def run_all_checks(self) -> list[dict]:
         """Run all readiness checks."""
         checks = [
             ("Directories", self.check_directories),

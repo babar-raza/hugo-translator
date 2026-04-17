@@ -1,12 +1,9 @@
 """Unit tests for benchmarking observability logging (TC-BM-07)."""
 
 import logging
-import os
 import sys
 from pathlib import Path
 from unittest.mock import mock_open, patch
-
-import pytest
 
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
 

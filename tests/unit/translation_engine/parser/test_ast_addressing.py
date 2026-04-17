@@ -4,17 +4,16 @@ Unit tests for AST node addressing system (HP-06 TC-02).
 Tests stable node address assignment and retrieval for deterministic
 TextUnit mapping.
 """
-import pytest
 from src.translation_engine.parser.ast_nodes import (
     ASTNode,
     NodeType,
-    text_node,
-    paragraph_node,
+    code_block_node,
     heading_node,
     link_node,
-    code_block_node,
-    list_node,
     list_item_node,
+    list_node,
+    paragraph_node,
+    text_node,
 )
 from src.translation_engine.parser.hugo_parser import HugoParser
 

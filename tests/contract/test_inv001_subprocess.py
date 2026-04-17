@@ -13,11 +13,11 @@ Key Guarantees:
 4. Parent process coordinates subprocesses and holds site lock
 """
 
-import pytest
-from unittest.mock import Mock, MagicMock, patch, call
-import sys
 import argparse
+import sys
+from unittest.mock import Mock, patch
 
+import pytest
 
 # ==============================================================================
 # Fixtures

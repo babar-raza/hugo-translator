@@ -7,11 +7,10 @@ Verifies that after calling unload():
   - torch.cuda.empty_cache() is called when device=='cuda' and CUDA is available
 """
 
-import gc
 import sys
 import types
 import unittest
-from unittest.mock import MagicMock, patch, call
+from unittest.mock import MagicMock, patch
 
 
 def _make_model_info():

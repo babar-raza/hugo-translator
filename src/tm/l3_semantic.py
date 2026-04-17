@@ -15,17 +15,17 @@ import pickle
 import threading
 import time
 from collections import deque
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import asdict, dataclass
 from pathlib import Path
-from typing import Any, Dict, List, Optional
-from concurrent.futures import ThreadPoolExecutor, TimeoutError as FutureTimeoutError
+from typing import Any
 
 import faiss
 import numpy as np
 from sentence_transformers import SentenceTransformer
 
-from src.utils.metrics import calc_stats
 from src.utils.file_lock import FileLock
+from src.utils.metrics import calc_stats
 
 logger = logging.getLogger(__name__)
 
@@ -41,10 +41,10 @@ class SemanticMatch:
     site_id: str
     src_lang: str
     tgt_lang: str
-    context: Optional[str] = None
-    metadata: Dict[str, Any] = None
+    context: str | None = None
+    metadata: dict[str, Any] = None
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary."""
         return asdict(self)
 
@@ -94,7 +94,7 @@ class L3SemanticTM:
         self._additions_since_save = 0
         self._total_additions = 0
         self._save_failures = 0
-        self._last_save_time: Optional[float] = None
+        self._last_save_time: float | None = None
 
         # BM-08: Timing instrumentation (TM-07: bounded to prevent memory leak, CFG-01: configurable)
         from src.utils.config_loader import get_metrics_config
@@ -110,7 +110,7 @@ class L3SemanticTM:
         }
 
         # RES-04: Thread pool for async saves
-        self._executor: Optional[ThreadPoolExecutor] = None
+        self._executor: ThreadPoolExecutor | None = None
         if async_save:
             self._executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="l3_save")
 
@@ -132,10 +132,15 @@ class L3SemanticTM:
         self.use_faiss_gpu = use_faiss_gpu and device == "cuda"
 
         # FAISS index (L2 distance)
-        self.index: Optional[faiss.Index] = None
+        self.index: faiss.Index | None = None
 
         # Metadata storage (maps index position to entry data)
-        self.metadata: List[Dict[str, Any]] = []
+        self.metadata: list[dict[str, Any]] = []
+
+        # entry_id → list of metadata positions for fast update lookup.
+        # Allows update_entry() to improve translations in-place without touching
+        # FAISS vectors (embeddings are of source text, which is unchanged on improvement).
+        self._entry_id_to_positions: dict[str, list[int]] = {}
 
         # Lock for thread safety
         self._lock = threading.RLock()
@@ -184,8 +189,8 @@ class L3SemanticTM:
         tgt_lang: str,
         source_text: str,
         translation: str,
-        context: Optional[str] = None,
-        metadata: Optional[Dict[str, Any]] = None,
+        context: str | None = None,
+        metadata: dict[str, Any] | None = None,
     ) -> None:
         """
         Embed source text and add to index with periodic save.
@@ -213,6 +218,7 @@ class L3SemanticTM:
             self.index.add(np.array([embedding], dtype=np.float32))
 
             # Store metadata at same position
+            position = len(self.metadata)
             entry_metadata = {
                 "entry_id": entry_id,
                 "site_id": site_id,
@@ -224,6 +230,11 @@ class L3SemanticTM:
                 "metadata": metadata or {},
             }
             self.metadata.append(entry_metadata)
+
+            # Maintain entry_id → positions lookup for update_entry()
+            if entry_id not in self._entry_id_to_positions:
+                self._entry_id_to_positions[entry_id] = []
+            self._entry_id_to_positions[entry_id].append(position)
 
             # RES-04: Update counters and check for periodic save
             self._additions_since_save += 1
@@ -241,6 +252,48 @@ class L3SemanticTM:
         if self.save_interval > 0 and self._additions_since_save >= self.save_interval:
             self._trigger_save()
 
+    def update_entry(
+        self,
+        entry_id: str,
+        new_translation: str,
+        new_metadata: dict[str, Any] | None = None,
+    ) -> bool:
+        """
+        Update the translation for an existing entry in-place.
+
+        This is the correct way to handle TM improvements. Since embeddings are
+        generated from SOURCE TEXT (not the translation), the FAISS vector does
+        not change when a translation is improved. Only the metadata is updated.
+
+        This avoids the duplicate-vector problem: if add_entry() were called
+        instead, a second vector for the same source text would be appended,
+        causing non-deterministic search results.
+
+        Args:
+            entry_id: Entry to update (must have been added via add_entry())
+            new_translation: Improved translation text
+            new_metadata: Optional updated metadata dict (merged with existing)
+
+        Returns:
+            True if the entry was found and updated, False if not found
+        """
+        with self._lock:
+            positions = self._entry_id_to_positions.get(entry_id, [])
+            if not positions:
+                # Entry not in L3 — caller should use add_entry() instead
+                return False
+
+            for pos in positions:
+                if pos < len(self.metadata):
+                    self.metadata[pos]["translation"] = new_translation
+                    if new_metadata:
+                        self.metadata[pos]["metadata"].update(new_metadata)
+
+            logger.debug(
+                f"L3 update_entry: updated {len(positions)} position(s) for entry_id={entry_id}"
+            )
+            return True
+
     def _trigger_save(self) -> bool:
         """
         Trigger periodic save (sync or async based on configuration).
@@ -257,7 +310,7 @@ class L3SemanticTM:
             if self.async_save and self._executor:
                 # Submit save to background thread
                 future = self._executor.submit(self._do_save)
-                logger.debug(f"Periodic save submitted to background thread")
+                logger.debug("Periodic save submitted to background thread")
                 # Don't wait - let it run in background
                 return True
             else:
@@ -298,7 +351,7 @@ class L3SemanticTM:
             )
             return False
 
-    def get_save_stats(self) -> Dict[str, Any]:
+    def get_save_stats(self) -> dict[str, Any]:
         """
         Get statistics about periodic saves.
 
@@ -314,7 +367,7 @@ class L3SemanticTM:
             "async_save": self.async_save,
         }
 
-    def get_timing_metrics(self) -> Dict[str, Any]:
+    def get_timing_metrics(self) -> dict[str, Any]:
         """
         Get timing metrics for performance monitoring (BM-08).
 
@@ -343,7 +396,7 @@ class L3SemanticTM:
         query_text: str,
         k: int = 10,
         threshold: float = 0.75,
-    ) -> List[SemanticMatch]:
+    ) -> list[SemanticMatch]:
         """
         Find top K similar entries above similarity threshold.
 
@@ -387,7 +440,7 @@ class L3SemanticTM:
 
             # Filter by site_id, language pair, and threshold
             matches = []
-            for idx, similarity in zip(indices[0], similarities):
+            for idx, similarity in zip(indices[0], similarities, strict=False):
                 if idx == -1:  # FAISS padding
                     continue
 
@@ -435,7 +488,7 @@ class L3SemanticTM:
 
         return matches
 
-    def batch_add(self, entries: List[Dict[str, Any]]) -> int:
+    def batch_add(self, entries: list[dict[str, Any]]) -> int:
         """
         Efficiently add many entries at once.
 
@@ -642,7 +695,7 @@ class L3SemanticTM:
             else:
                 self.metadata = []
 
-    def rebuild_index(self, entries: List[Dict[str, Any]]) -> None:
+    def rebuild_index(self, entries: list[dict[str, Any]]) -> None:
         """
         Rebuild index from scratch with given entries.
 

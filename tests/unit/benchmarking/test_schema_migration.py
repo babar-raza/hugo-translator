@@ -1,6 +1,5 @@
 """Tests for database schema migrations (SR-05)."""
 
-import pytest
 import sqlite3
 import tempfile
 from pathlib import Path

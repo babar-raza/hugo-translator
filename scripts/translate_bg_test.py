@@ -1,9 +1,8 @@
 #!/usr/bin/env python
 """Quick BG translation test to verify structure preservation fix."""
 
-import sys
-import os
 import logging
+import sys
 from pathlib import Path
 
 # Configure logging
@@ -21,14 +20,15 @@ SOURCE_DIR = Path("D:/onedrive/Documents/GitHub/aspose.net/content/products.aspo
 
 def main():
     import torch
-    from src.translation_engine import TranslationEngine
-    from src.utils.config_loader import ConfigService
+
+    from src.model_runtime import ModelLoader
+    from src.model_runtime.registry import ModelRegistry
     from src.tm import TranslationMemory
     from src.tm.l1_cache import L1Cache
     from src.tm.l2_persistent import L2PersistentTM
     from src.tm.l3_semantic import L3SemanticTM
-    from src.model_runtime import ModelLoader
-    from src.model_runtime.registry import ModelRegistry
+    from src.translation_engine import TranslationEngine
+    from src.utils.config_loader import ConfigService
 
     print("=" * 70)
     print("BG TRANSLATION TEST - Structure Preservation Verification")

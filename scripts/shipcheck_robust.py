@@ -19,18 +19,18 @@ import os
 import platform
 import subprocess
 import sys
-import time
 import threading
+import time
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 
 def _now_run_id() -> str:
     return datetime.now().strftime("%Y%m%d-%H%M%S")
 
 
-def _ensure_dirs(run_root: Path) -> Dict[str, Path]:
+def _ensure_dirs(run_root: Path) -> dict[str, Path]:
     logs_dir = run_root / "logs"
     evidence_dir = run_root / "evidence"
     run_root.mkdir(parents=True, exist_ok=True)
@@ -45,11 +45,11 @@ def _write_text(path: Path, content: str) -> None:
 
 
 def _run_command_streaming(
-    cmd: List[str],
+    cmd: list[str],
     log_path: Path,
-    env: Optional[Dict[str, str]] = None,
+    env: dict[str, str] | None = None,
     timeout_sec: int = 180,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """
     Run command with streaming output to file and timeout.
 
@@ -98,8 +98,8 @@ def _run_command_streaming(
 
             with open(log_path, "a", encoding="utf-8") as f:
                 f.write(f"\n\n*** TIMEOUT after {timeout_sec}s ***\n")
-                f.write(f"Process killed.\n")
-                f.write(f"\nReproduction command:\n")
+                f.write("Process killed.\n")
+                f.write("\nReproduction command:\n")
                 f.write(f"{' '.join(cmd)}\n")
 
             exit_code = 124  # Standard timeout exit code
@@ -111,7 +111,7 @@ def _run_command_streaming(
             f.write(f"\nexit_code={exit_code}\n")
             f.write(f"duration={duration:.3f}s\n")
             if timed_out:
-                f.write(f"status=TIMEOUT\n")
+                f.write("status=TIMEOUT\n")
 
         return {
             "exit_code": exit_code,
@@ -123,9 +123,9 @@ def _run_command_streaming(
     except Exception as exc:
         duration = time.perf_counter() - start
         with open(log_path, "a", encoding="utf-8") as f:
-            f.write(f"\n\n*** EXCEPTION ***\n")
+            f.write("\n\n*** EXCEPTION ***\n")
             f.write(f"{type(exc).__name__}: {exc}\n")
-            f.write(f"\nexit_code=1\n")
+            f.write("\nexit_code=1\n")
             f.write(f"duration={duration:.3f}s\n")
 
         return {
@@ -136,7 +136,7 @@ def _run_command_streaming(
         }
 
 
-def _capture_env(log_path: Path) -> Dict[str, Any]:
+def _capture_env(log_path: Path) -> dict[str, Any]:
     start = time.perf_counter()
     lines = [
         f"python_executable={sys.executable}",
@@ -150,9 +150,9 @@ def _capture_env(log_path: Path) -> Dict[str, Any]:
     return {"exit_code": 0, "duration_sec": round(duration, 3), "log": str(log_path)}
 
 
-def _import_check(log_path: Path) -> Dict[str, Any]:
+def _import_check(log_path: Path) -> dict[str, Any]:
     start = time.perf_counter()
-    errors: List[str] = []
+    errors: list[str] = []
     modules = ["src.cli", "src.translation_engine.engine"]
     for module_name in modules:
         try:
@@ -175,7 +175,7 @@ def _import_check(log_path: Path) -> Dict[str, Any]:
     }
 
 
-def _cli_help_checks(log_path: Path, timeout_sec: int = 30) -> Dict[str, Any]:
+def _cli_help_checks(log_path: Path, timeout_sec: int = 30) -> dict[str, Any]:
     """Check CLI help commands with timeout."""
     cmd_1 = [sys.executable, "-m", "src.cli", "--help"]
     cmd_2 = [sys.executable, "-m", "src.cli", "translate", "--help"]
@@ -242,7 +242,7 @@ def _build_summary(
     mode: str,
     started_at: str,
     finished_at: str,
-    steps: List[Dict[str, Any]],
+    steps: list[dict[str, Any]],
     success: bool,
 ) -> str:
     lines = [
@@ -270,7 +270,7 @@ def _build_summary(
     return "\n".join(lines) + "\n"
 
 
-def _write_triage(triage_path: Path, steps: List[Dict[str, Any]]) -> None:
+def _write_triage(triage_path: Path, steps: list[dict[str, Any]]) -> None:
     lines = ["# Triage", ""]
     failures = [step for step in steps if step["status"] == "fail"]
     if not failures:
@@ -292,7 +292,7 @@ def _write_triage(triage_path: Path, steps: List[Dict[str, Any]]) -> None:
     _write_text(triage_path, "\n".join(lines) + "\n")
 
 
-def main(argv: Optional[List[str]] = None) -> int:
+def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Run shipcheck gates (ROBUST).")
     parser.add_argument("--run-id", help="Optional run ID (YYYYMMDD-HHMMSS)")
     parser.add_argument(
@@ -328,7 +328,7 @@ def main(argv: Optional[List[str]] = None) -> int:
     test_env["SHIPCHECK_MODE"] = "full" if args.full else "quick"
 
     started_at = datetime.now().isoformat()
-    steps: List[Dict[str, Any]] = []
+    steps: list[dict[str, Any]] = []
 
     # Step 1: Capture environment
     env_log = dirs["logs"] / "env.txt"

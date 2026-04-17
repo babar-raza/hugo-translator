@@ -7,7 +7,7 @@ then renders the complete AST to valid Markdown with all formatting preserved.
 
 import logging
 import re
-from typing import List, Dict, Any, Optional
+from typing import Any
 
 from ..extractor.text_unit import TextUnit
 from ..parser.ast_nodes import ASTNode, NodeType
@@ -29,12 +29,12 @@ class ASTRenderer:
 
     def __init__(self):
         """Initialize AST renderer."""
-        self.unit_map: Dict[str, TextUnit] = {}
+        self.unit_map: dict[str, TextUnit] = {}
         self.applied_units: set = set()
         # Lazy-initialize PlaceholderManager for placeholder restoration
         self._placeholder_manager = None
 
-    def _restore_placeholders(self, text: str, placeholder_map: Dict[str, str]) -> str:
+    def _restore_placeholders(self, text: str, placeholder_map: dict[str, str]) -> str:
         """
         Restore placeholders in translated text back to original content.
 
@@ -148,7 +148,7 @@ class ASTRenderer:
 
         return cleaned
 
-    def _reparse_inline_markdown(self, text: str, parent_node_addr: str) -> List[ASTNode]:
+    def _reparse_inline_markdown(self, text: str, parent_node_addr: str) -> list[ASTNode]:
         """
         Re-parse translated text containing markdown syntax back into AST nodes.
 
@@ -199,7 +199,7 @@ class ASTRenderer:
         # Parse inline tokens into AST nodes
         return self._parse_inline_tokens_to_ast(inline_tokens, parent_node_addr)
 
-    def _parse_inline_tokens_to_ast(self, tokens: List, parent_node_addr: str) -> List[ASTNode]:
+    def _parse_inline_tokens_to_ast(self, tokens: list, parent_node_addr: str) -> list[ASTNode]:
         """
         Convert markdown_it inline tokens to AST nodes.
 
@@ -357,7 +357,7 @@ class ASTRenderer:
 
         return nodes
 
-    def _apply_frontmatter_translations(self, frontmatter_dict: Dict[str, Any], text_units: List[TextUnit]) -> None:
+    def _apply_frontmatter_translations(self, frontmatter_dict: dict[str, Any], text_units: list[TextUnit]) -> None:
         """
         Apply translations to frontmatter fields (FIX-BT-03).
 
@@ -402,7 +402,7 @@ class ASTRenderer:
 
         logger.info(f"Applied {applied_count} frontmatter translations")
 
-    def apply_translations(self, ast: List[ASTNode], units: List[TextUnit], frontmatter: Optional[Dict[str, Any]] = None) -> None:
+    def apply_translations(self, ast: list[ASTNode], units: list[TextUnit], frontmatter: dict[str, Any] | None = None) -> None:
         """
         Apply translated TextUnits back to AST nodes and frontmatter.
 
@@ -505,14 +505,14 @@ class ASTRenderer:
                 # FIX-B: STRONG nodes must never be flattened
                 # Apply translation to TEXT children only, preserve STRONG wrapper
                 if debug_mode:
-                    logger.info(f"[HARDENING-FIX-B] Preserving STRONG node, processing children")
+                    logger.info("[HARDENING-FIX-B] Preserving STRONG node, processing children")
                 # Don't mark as applied - let children be processed
                 pass
             elif node.type == NodeType.EMPHASIS:
                 # FIX-B: EMPHASIS nodes must never be flattened
                 # Apply translation to TEXT children only, preserve EMPHASIS wrapper
                 if debug_mode:
-                    logger.info(f"[HARDENING-FIX-B] Preserving EMPHASIS node, processing children")
+                    logger.info("[HARDENING-FIX-B] Preserving EMPHASIS node, processing children")
                 # Don't mark as applied - let children be processed
                 pass
             elif node.type == NodeType.HEADING:
@@ -579,7 +579,7 @@ class ASTRenderer:
                     # FIX-MARKDOWN-PRESERVATION: Re-parse translated text with markdown
                     # Instead of skipping, re-parse the translation to reconstruct inline formatting
                     if debug_mode and node.type == NodeType.PARAGRAPH:
-                        logger.info(f"[FIX-MARKDOWN-PRESERVATION] Re-parsing translated text with inline formatting")
+                        logger.info("[FIX-MARKDOWN-PRESERVATION] Re-parsing translated text with inline formatting")
                         logger.info(f"[FIX-MARKDOWN-PRESERVATION]   Original children: {len(node.children)}")
                         logger.info(f"[FIX-MARKDOWN-PRESERVATION]   Text preview: {final_text[:100]}")
 
@@ -603,7 +603,7 @@ class ASTRenderer:
 
                     # INSTRUMENTATION: Log before flattening
                     if debug_mode and node.type == NodeType.PARAGRAPH:
-                        logger.info(f"[HARDENING-FIX-A] FLATTENING (no inline formatting)")
+                        logger.info("[HARDENING-FIX-A] FLATTENING (no inline formatting)")
 
                     text_node = ASTNode(
                         type=NodeType.TEXT,
@@ -629,7 +629,7 @@ class ASTRenderer:
         for child in node.children:
             self._apply_to_node(child)
 
-    def render_to_markdown(self, ast: List[ASTNode]) -> str:
+    def render_to_markdown(self, ast: list[ASTNode]) -> str:
         """
         Render AST to Markdown string.
 

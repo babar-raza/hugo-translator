@@ -1,11 +1,10 @@
 """End-to-end integration tests for content hash tracking (CHT-06)."""
 
-import pytest
 import time
-from pathlib import Path
-from unittest.mock import Mock, MagicMock, patch
-from src.utils.metadata_tracker import MetadataTracker
+from unittest.mock import patch
+
 from src.utils.content_hash import compute_file_hash
+from src.utils.metadata_tracker import MetadataTracker
 
 
 def test_e2e_touch_without_changes_skip(tmp_path):

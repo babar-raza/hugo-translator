@@ -10,13 +10,14 @@ Tests cover:
 """
 
 import pytest
+
 from src.translation_engine.terminology.models import (
-    PreserveMode,
-    TermSeverity,
-    TermRule,
     DetectedTerm,
+    PreserveMode,
     ProtectedSegment,
     TerminologyConfig,
+    TermRule,
+    TermSeverity,
 )
 
 

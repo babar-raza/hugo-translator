@@ -16,12 +16,11 @@ import logging
 import socket
 import subprocess
 from pathlib import Path
-from typing import Dict, Optional, Union
 
 logger = logging.getLogger(__name__)
 
 
-def find_git_root(path: Union[str, Path]) -> Optional[Path]:
+def find_git_root(path: str | Path) -> Path | None:
     """
     Find the git repository root containing the given path (TFR-03).
 
@@ -68,7 +67,7 @@ def find_git_root(path: Union[str, Path]) -> Optional[Path]:
             logger.debug(f"Found git root: {git_root}")
             return git_root
         else:
-            logger.debug(f"Git command failed or returned empty output")
+            logger.debug("Git command failed or returned empty output")
     except (subprocess.TimeoutExpired, FileNotFoundError, OSError) as e:
         logger.error(f"find_git_root exception for {path}: {e}")
     except Exception as e:
@@ -78,7 +77,7 @@ def find_git_root(path: Union[str, Path]) -> Optional[Path]:
     return None
 
 
-def get_git_repo(cwd: Optional[Union[str, Path]] = None) -> Optional[str]:
+def get_git_repo(cwd: str | Path | None = None) -> str | None:
     """
     Get the git remote origin URL or local repo path (TFR-03).
 
@@ -111,7 +110,7 @@ def get_git_repo(cwd: Optional[Union[str, Path]] = None) -> Optional[str]:
     return None
 
 
-def get_git_branch(cwd: Optional[Union[str, Path]] = None) -> Optional[str]:
+def get_git_branch(cwd: str | Path | None = None) -> str | None:
     """
     Get the current git branch name (TFR-03).
 
@@ -144,7 +143,7 @@ def get_git_branch(cwd: Optional[Union[str, Path]] = None) -> Optional[str]:
     return None
 
 
-def get_git_run_tag(cwd: Optional[Union[str, Path]] = None) -> Optional[str]:
+def get_git_run_tag(cwd: str | Path | None = None) -> str | None:
     """
     Get the short SHA of HEAD commit (TFR-03).
 
@@ -190,7 +189,7 @@ def get_host() -> str:
         return "unknown"
 
 
-def get_git_context(input_path: Optional[Union[str, Path]] = None) -> Dict[str, Optional[str]]:
+def get_git_context(input_path: str | Path | None = None) -> dict[str, str | None]:
     """
     Get all git and environment context in a single dict (TFR-03).
 

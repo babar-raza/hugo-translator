@@ -19,7 +19,6 @@ import time
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, Optional
 
 from src.observability.worker_telemetry import (
     complete_worker_run,
@@ -45,7 +44,7 @@ class AutonomousVerificationWorkerConfig:
     jitter_minutes: int = 15
 
     @classmethod
-    def from_args(cls, args: argparse.Namespace) -> "AutonomousVerificationWorkerConfig":
+    def from_args(cls, args: argparse.Namespace) -> AutonomousVerificationWorkerConfig:
         """Create worker config from CLI arguments."""
         return cls(
             config_root=args.config_root,
@@ -66,10 +65,10 @@ class AutonomousVerificationWorker:
 
     def __init__(self, config: AutonomousVerificationWorkerConfig):
         self.config = config
-        self.scheduler: Optional[WindowScheduler] = None
-        self._heartbeat_stop_event: Optional[threading.Event] = None
-        self._heartbeat_thread: Optional[threading.Thread] = None
-        self._lifecycle_event_id: Optional[str] = None
+        self.scheduler: WindowScheduler | None = None
+        self._heartbeat_stop_event: threading.Event | None = None
+        self._heartbeat_thread: threading.Thread | None = None
+        self._lifecycle_event_id: str | None = None
         self._daemon_start_time: float = 0.0
 
     def setup(self) -> None:
@@ -103,7 +102,7 @@ class AutonomousVerificationWorker:
         }
         heartbeat_path.write_text(json.dumps(payload), encoding="utf-8")
 
-    def _record_state(self, state: str, *, success: bool = False, error: Optional[str] = None) -> None:
+    def _record_state(self, state: str, *, success: bool = False, error: str | None = None) -> None:
         record_worker_state(
             self._worker_id,
             state,
@@ -136,7 +135,7 @@ class AutonomousVerificationWorker:
         if self._heartbeat_thread is not None:
             self._heartbeat_thread.join(timeout=5)
 
-    def _run_verification_pass(self) -> Dict[str, object]:
+    def _run_verification_pass(self) -> dict[str, object]:
         """
         Execute one deterministic verification pass.
 

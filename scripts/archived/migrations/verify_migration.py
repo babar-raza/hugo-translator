@@ -26,7 +26,6 @@ import sys
 from collections import defaultdict
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
 
 # Add src to path
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
@@ -37,7 +36,6 @@ except ImportError:
     print("ERROR: lmdb not installed. Run: pip install lmdb")
     sys.exit(1)
 
-from tm.normalization import normalize_text
 
 logging.basicConfig(
     level=logging.INFO,
@@ -76,7 +74,7 @@ class MigrationVerifier:
         if not self.db_path.exists():
             raise ValueError(f"Database not found: {self.db_path}")
 
-    def get_db_info(self) -> Dict:
+    def get_db_info(self) -> dict:
         """
         Get database information and statistics.
 
@@ -109,7 +107,7 @@ class MigrationVerifier:
         env.close()
         return db_info
 
-    def validate_entry(self, key: bytes, value: bytes) -> Tuple[bool, Optional[str]]:
+    def validate_entry(self, key: bytes, value: bytes) -> tuple[bool, str | None]:
         """
         Validate a single database entry.
 
@@ -166,7 +164,7 @@ class MigrationVerifier:
         except Exception as e:
             return False, f"Validation exception: {e}"
 
-    def sample_entries(self, num_samples: int) -> List[Tuple[bytes, bytes]]:
+    def sample_entries(self, num_samples: int) -> list[tuple[bytes, bytes]]:
         """
         Randomly sample entries from database.
 
@@ -210,7 +208,7 @@ class MigrationVerifier:
         env.close()
         return samples
 
-    def verify_database(self) -> Dict:
+    def verify_database(self) -> dict:
         """
         Perform comprehensive database verification.
 
@@ -287,7 +285,7 @@ class MigrationVerifier:
 
         return db_info
 
-    def print_report(self, db_info: Dict) -> None:
+    def print_report(self, db_info: dict) -> None:
         """
         Print verification report to console.
 
@@ -359,7 +357,7 @@ class MigrationVerifier:
         print("=" * 80)
         print()
 
-    def generate_markdown_report(self, output_path: Path, db_info: Dict) -> None:
+    def generate_markdown_report(self, output_path: Path, db_info: dict) -> None:
         """
         Generate markdown verification report.
 

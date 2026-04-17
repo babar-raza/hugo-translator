@@ -6,9 +6,9 @@ Monitors content directories for changes and automatically enqueues translation 
 
 import logging
 import threading
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Callable, Dict, List, Optional, Set
 
 from watchdog.events import FileSystemEvent, FileSystemEventHandler
 from watchdog.observers import Observer
@@ -28,7 +28,7 @@ class WatchConfig:
     site_id: str
     content_dir: Path
     source_lang: str
-    target_langs: List[str]
+    target_langs: list[str]
 
 
 class ContentFileHandler(FileSystemEventHandler):
@@ -58,9 +58,9 @@ class ContentFileHandler(FileSystemEventHandler):
         self.debounce_seconds = debounce_seconds
 
         # Debounce tracking
-        self._pending_changes: Dict[Path, str] = {}  # path -> event_type
+        self._pending_changes: dict[Path, str] = {}  # path -> event_type
         self._lock = threading.Lock()
-        self._debounce_timer: Optional[threading.Timer] = None
+        self._debounce_timer: threading.Timer | None = None
 
     def on_created(self, event: FileSystemEvent) -> None:
         """Handle file creation."""
@@ -176,8 +176,8 @@ class FileWatcher:
         self.debounce_seconds = debounce_seconds
 
         self._observer = Observer()
-        self._handlers: Dict[str, ContentFileHandler] = {}  # site_id -> handler
-        self._watched_dirs: Set[str] = set()
+        self._handlers: dict[str, ContentFileHandler] = {}  # site_id -> handler
+        self._watched_dirs: set[str] = set()
         self._running = False
         self._lock = threading.Lock()
 
@@ -292,7 +292,7 @@ class FileWatcher:
                 logger.info(f"Watching {watch_path} for site {site_id}")
 
     def _on_file_change(
-        self, site_id: str, target_langs: List[str], file_path: Path, event_type: str
+        self, site_id: str, target_langs: list[str], file_path: Path, event_type: str
     ) -> None:
         """
         Handle file change by enqueueing translation job.

@@ -11,13 +11,14 @@ Tests the complete pipeline:
 Without requiring the actual M2M100 model.
 """
 
-import pytest
-from pathlib import Path
-from unittest.mock import Mock, MagicMock
 import re
+from pathlib import Path
+from unittest.mock import MagicMock, Mock
 
-from src.translation_engine.parser.hugo_parser import HugoParser
+import pytest
+
 from src.translation_engine.extractor.text_unit_extractor import TextUnitExtractor
+from src.translation_engine.parser.hugo_parser import HugoParser
 from src.translation_engine.reconstructor.ast_renderer import ASTRenderer
 
 
@@ -128,7 +129,7 @@ class TestASTBatchTranslationE2E:
         # 1. PARSE: Read and parse the test fixture
         assert test_fixture_path.exists(), f"Test fixture not found: {test_fixture_path}"
 
-        with open(test_fixture_path, 'r', encoding='utf-8') as f:
+        with open(test_fixture_path, encoding='utf-8') as f:
             source_content = f.read()
 
         parser = HugoParser()
@@ -230,7 +231,7 @@ class TestASTBatchTranslationE2E:
         - fallback_batches tracked (if any)
         - No double-counting (SR-02 fix)
         """
-        with open(test_fixture_path, 'r', encoding='utf-8') as f:
+        with open(test_fixture_path, encoding='utf-8') as f:
             source_content = f.read()
 
         parser = HugoParser()
@@ -278,7 +279,7 @@ class TestASTBatchTranslationE2E:
         - PUA characters used
         - Triple repetition
         """
-        with open(test_fixture_path, 'r', encoding='utf-8') as f:
+        with open(test_fixture_path, encoding='utf-8') as f:
             source_content = f.read()
 
         parser = HugoParser()
@@ -338,7 +339,7 @@ class TestASTBatchTranslationE2E:
         - Batch size respects unit limits
         - Batch size respects token limits (estimated)
         """
-        with open(test_fixture_path, 'r', encoding='utf-8') as f:
+        with open(test_fixture_path, encoding='utf-8') as f:
             source_content = f.read()
 
         parser = HugoParser()

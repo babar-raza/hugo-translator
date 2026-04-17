@@ -6,11 +6,12 @@ is preserved correctly in translations according to terminology.yaml rules.
 """
 
 import re
-import yaml
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Set
+from typing import Any
 
-from .base import Validator, ValidationResult, ValidationSeverity
+import yaml
+
+from .base import ValidationResult, ValidationSeverity, Validator
 
 
 class TerminologyPreservationValidator(Validator):
@@ -26,8 +27,8 @@ class TerminologyPreservationValidator(Validator):
 
     def __init__(
         self,
-        terminology_config_path: Optional[Path] = None,
-        name: Optional[str] = None,
+        terminology_config_path: Path | None = None,
+        name: str | None = None,
     ):
         """
         Initialize terminology preservation validator.
@@ -47,8 +48,8 @@ class TerminologyPreservationValidator(Validator):
             terminology_config_path = project_root / "config" / "terminology.yaml"
 
         self.terminology_config_path = terminology_config_path
-        self.exact_matches: List[Dict[str, Any]] = []
-        self.patterns: List[Dict[str, Any]] = []
+        self.exact_matches: list[dict[str, Any]] = []
+        self.patterns: list[dict[str, Any]] = []
 
         self._load_terminology()
 
@@ -59,7 +60,7 @@ class TerminologyPreservationValidator(Validator):
                 f"Terminology config not found: {self.terminology_config_path}"
             )
 
-        with open(self.terminology_config_path, 'r', encoding='utf-8') as f:
+        with open(self.terminology_config_path, encoding='utf-8') as f:
             config = yaml.safe_load(f)
 
         # Load global terminology
@@ -78,7 +79,7 @@ class TerminologyPreservationValidator(Validator):
         self,
         source: str,
         translation: str,
-        context: Optional[Dict[str, Any]] = None,
+        context: dict[str, Any] | None = None,
     ) -> ValidationResult:
         """
         Validate terminology preservation.
@@ -137,7 +138,7 @@ class TerminologyPreservationValidator(Validator):
         self,
         source: str,
         translation: str,
-        term_config: Dict[str, Any],
+        term_config: dict[str, Any],
         result: ValidationResult,
     ) -> None:
         """
@@ -198,7 +199,7 @@ class TerminologyPreservationValidator(Validator):
         self,
         source: str,
         translation: str,
-        pattern_config: Dict[str, Any],
+        pattern_config: dict[str, Any],
         result: ValidationResult,
     ) -> None:
         """
@@ -232,9 +233,9 @@ class TerminologyPreservationValidator(Validator):
                     details={
                         "pattern": pattern,
                         "category": category,
-                        "missing_terms": list(sorted(missing_terms)),
-                        "source_matches": list(sorted(source_matches)),
-                        "translation_matches": list(sorted(translation_matches)),
+                        "missing_terms": sorted(missing_terms),
+                        "source_matches": sorted(source_matches),
+                        "translation_matches": sorted(translation_matches),
                     },
                 )
             )
@@ -287,7 +288,7 @@ class TerminologyPreservationValidator(Validator):
         else:
             return len(re.findall(pattern, text, re.IGNORECASE))
 
-    def _find_pattern_matches(self, text: str, pattern: str) -> Set[str]:
+    def _find_pattern_matches(self, text: str, pattern: str) -> set[str]:
         """
         Find all unique matches for a pattern in text.
 

@@ -5,12 +5,13 @@ Tests to validate migration from legacy JSON cache to new LMDB Translation Memor
 and ensure compatibility between old and new systems.
 """
 
-import pytest
 import json
-import tempfile
 import shutil
-from pathlib import Path
 import sys
+import tempfile
+from pathlib import Path
+
+import pytest
 
 # Add src to path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
@@ -82,7 +83,7 @@ class TestLegacyCacheMigration:
     def test_legacy_cache_loading(self, legacy_cache_dir):
         """Test loading legacy cache JSON files"""
         cache_file = legacy_cache_dir / "cache_de.json"
-        with open(cache_file, 'r', encoding='utf-8') as f:
+        with open(cache_file, encoding='utf-8') as f:
             cache_data = json.load(f)
 
         assert isinstance(cache_data, dict)
@@ -94,7 +95,7 @@ class TestLegacyCacheMigration:
         """Test migrating legacy cache to new TM"""
         # Load legacy cache
         cache_file = legacy_cache_dir / "cache_de.json"
-        with open(cache_file, 'r', encoding='utf-8') as f:
+        with open(cache_file, encoding='utf-8') as f:
             legacy_data = json.load(f)
 
         # Initialize new TM
@@ -132,7 +133,7 @@ class TestLegacyCacheMigration:
         # Load all legacy caches
         total_entries = 0
         for cache_file in legacy_cache_dir.glob("cache_*.json"):
-            with open(cache_file, 'r', encoding='utf-8') as f:
+            with open(cache_file, encoding='utf-8') as f:
                 cache_data = json.load(f)
                 total_entries += len(cache_data)
 
@@ -150,7 +151,7 @@ class TestLegacyCacheMigration:
         for cache_file in legacy_cache_dir.glob("cache_*.json"):
             lang_code = cache_file.stem.replace("cache_", "")
 
-            with open(cache_file, 'r', encoding='utf-8') as f:
+            with open(cache_file, encoding='utf-8') as f:
                 cache_data = json.load(f)
 
             for source_text, translation in cache_data.items():
@@ -186,7 +187,7 @@ class TestLegacyCacheMigration:
         )
 
         # Should not crash on empty cache
-        with open(cache_file, 'r', encoding='utf-8') as f:
+        with open(cache_file, encoding='utf-8') as f:
             cache_data = json.load(f)
 
         assert len(cache_data) == 0
@@ -223,7 +224,7 @@ class TestLegacyCacheMigration:
         )
 
         # Migrate, skipping invalid entries
-        with open(cache_file, 'r', encoding='utf-8') as f:
+        with open(cache_file, encoding='utf-8') as f:
             cache_data = json.load(f)
 
         valid_count = 0
@@ -270,7 +271,7 @@ class TestSystemCompatibility:
         """Test that translations match between legacy and new system"""
         # Load legacy cache
         cache_file = legacy_cache_dir / "cache_de.json"
-        with open(cache_file, 'r', encoding='utf-8') as f:
+        with open(cache_file, encoding='utf-8') as f:
             legacy_cache = json.load(f)
 
         # Initialize new TM and migrate

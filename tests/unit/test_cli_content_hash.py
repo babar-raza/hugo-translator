@@ -1,9 +1,7 @@
 """Unit tests for CLI content hash tracking integration (CHT-04)."""
 
 import argparse
-import pytest
-from pathlib import Path
-from unittest.mock import Mock, patch, MagicMock
+from unittest.mock import MagicMock, patch
 
 
 def test_cli_flags_parsed():
@@ -198,7 +196,6 @@ def test_engine_overrides_disables_content_hash():
 @patch("src.cli.logger")
 def test_rebuild_content_hashes_deletes_metadata(mock_logger, mock_path_class):
     """Test --rebuild-content-hashes deletes metadata file before engine creation."""
-    from src.cli import translate_site
 
     # This is a complex integration test that would require significant mocking
     # Testing the core logic: metadata file deletion

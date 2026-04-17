@@ -19,7 +19,7 @@ import logging
 import math
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Dict, Optional, Any
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -48,7 +48,7 @@ class BatchStatsTracker:
     CYRILLIC_LANGUAGES = {'bg', 'ru', 'mk', 'uk', 'sr', 'be'}  # Cyrillic script
     ARABIC_SCRIPT_LANGUAGES = {'ar', 'fa', 'ur', 'ps'}  # Arabic script
 
-    def __init__(self, config: Dict[str, Any], hardware_baseline: Optional[int] = None):
+    def __init__(self, config: dict[str, Any], hardware_baseline: int | None = None):
         """
         Initialize batch statistics tracker.
 
@@ -68,7 +68,7 @@ class BatchStatsTracker:
         self.config = config
         self.hardware_baseline = hardware_baseline
         self.stats_file = Path(config.get('stats_file', '.translation_progress/batch_stats.json'))
-        self.languages: Dict[str, Dict[str, Any]] = {}
+        self.languages: dict[str, dict[str, Any]] = {}
 
         # Adaptation parameters
         self.fallback_rate_threshold = config.get('fallback_rate_threshold', 0.05)
@@ -98,7 +98,7 @@ class BatchStatsTracker:
             return
 
         try:
-            with open(self.stats_file, 'r', encoding='utf-8') as f:
+            with open(self.stats_file, encoding='utf-8') as f:
                 data = json.load(f)
 
             self.languages = data.get('languages', {})
@@ -111,7 +111,7 @@ class BatchStatsTracker:
                 f"Loaded batch statistics (v{version}): "
                 f"{len(self.languages)} languages tracked"
             )
-        except (json.JSONDecodeError, IOError) as e:
+        except (OSError, json.JSONDecodeError) as e:
             logger.error(f"Failed to load batch stats from {self.stats_file}: {e}")
             logger.warning("Starting with empty statistics")
             self._initialize_empty_stats()
@@ -138,7 +138,7 @@ class BatchStatsTracker:
             temp_file.replace(self.stats_file)
 
             logger.debug(f"Saved batch statistics: {len(self.languages)} languages")
-        except IOError as e:
+        except OSError as e:
             logger.error(f"Failed to save batch stats to {self.stats_file}: {e}")
 
     def get_batch_size(self, target_lang: str) -> int:
@@ -180,7 +180,7 @@ class BatchStatsTracker:
         language: str,
         batch_size: int,
         success: bool,
-        fallback_reason: Optional[str] = None
+        fallback_reason: str | None = None
     ) -> None:
         """
         Record batch translation result.
@@ -390,7 +390,7 @@ class BatchStatsTracker:
         # Priority 4: Hardcoded fallback for Latin-based and other languages
         return 20
 
-    def _create_language_entry(self, language: str) -> Dict[str, Any]:
+    def _create_language_entry(self, language: str) -> dict[str, Any]:
         """
         Create new language entry with baseline values.
 

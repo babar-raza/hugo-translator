@@ -4,8 +4,6 @@ import subprocess
 import sys
 from pathlib import Path
 
-import pytest
-
 
 def test_cli_module_mode_help():
     """Test CLI works when invoked as module (python -m src.cli)."""

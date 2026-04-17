@@ -57,9 +57,9 @@ def check_pytest_available() -> bool:
     except ImportError:
         print_error("pytest is not installed")
         print(f"\n{BOLD}pytest is required to run the smoke tests.{RESET}")
-        print(f"\nInstall it with:")
+        print("\nInstall it with:")
         print(f"  {YELLOW}pip install pytest{RESET}")
-        print(f"\nOr install all test dependencies:")
+        print("\nOr install all test dependencies:")
         print(f"  {YELLOW}pip install -r requirements-dev.txt{RESET}")
         return False
 
@@ -77,10 +77,10 @@ def test_module_import() -> bool:
     try:
         # Import the module - this triggers constant validation
         from src.translation_engine.extractor.text_unit_extractor import (
-            TextUnitExtractor,
-            LANGUAGE_PURITY_MIN_LENGTH,
             FALLBACK_RATE_THRESHOLD,
+            LANGUAGE_PURITY_MIN_LENGTH,
             TOKEN_PER_WORD_ESTIMATE,
+            TextUnitExtractor,
         )
 
         print_success("Module imports successfully")
@@ -257,7 +257,7 @@ def test_vld_validation_complete() -> bool:
             all_passed = False
         else:
             # Check it's callable
-            if not callable(getattr(extractor, '_is_tokenizer_available')):
+            if not callable(extractor._is_tokenizer_available):
                 print_error("VLD-03: _is_tokenizer_available is not callable")
                 all_passed = False
             else:

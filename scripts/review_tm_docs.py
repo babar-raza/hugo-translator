@@ -5,7 +5,6 @@ This script performs automated quality checks on all TM documentation.
 """
 import re
 from pathlib import Path
-from typing import Dict, List, Set, Tuple
 
 
 class TMDocReviewer:
@@ -15,7 +14,7 @@ class TMDocReviewer:
         self.repo_root = repo_root
         self.issues = []
 
-    def find_tm_docs(self) -> List[Path]:
+    def find_tm_docs(self) -> list[Path]:
         """Find all TM documentation files."""
         tm_docs = []
         tm_docs.extend((self.repo_root / "docs" / "guides").glob("tm-*.md"))
@@ -26,7 +25,7 @@ class TMDocReviewer:
         )
         return sorted(tm_docs)
 
-    def check_frontmatter(self, file_path: Path) -> List[str]:
+    def check_frontmatter(self, file_path: Path) -> list[str]:
         """Check document has proper version and date headers."""
         content = file_path.read_text(encoding="utf-8")
         issues = []
@@ -45,7 +44,7 @@ class TMDocReviewer:
 
         return issues
 
-    def check_cross_references(self, file_path: Path) -> List[str]:
+    def check_cross_references(self, file_path: Path) -> list[str]:
         """Check markdown links resolve to existing files in filesystem."""
         content = file_path.read_text(encoding="utf-8")
         issues = []
@@ -101,7 +100,7 @@ class TMDocReviewer:
 
         return issues
 
-    def check_consistency(self, docs: List[Path]) -> List[str]:
+    def check_consistency(self, docs: list[Path]) -> list[str]:
         """Check terminology and naming consistency across docs."""
         issues = []
 
@@ -137,7 +136,7 @@ class TMDocReviewer:
 
         return issues
 
-    def check_code_blocks(self, file_path: Path) -> List[str]:
+    def check_code_blocks(self, file_path: Path) -> list[str]:
         """Check code blocks are properly formatted."""
         content = file_path.read_text(encoding="utf-8")
         issues = []
@@ -177,7 +176,7 @@ class TMDocReviewer:
 
         return issues
 
-    def check_headings(self, file_path: Path) -> List[str]:
+    def check_headings(self, file_path: Path) -> list[str]:
         """Check heading hierarchy is correct."""
         content = file_path.read_text(encoding="utf-8")
         issues = []
@@ -216,7 +215,7 @@ class TMDocReviewer:
 
         return issues
 
-    def check_completeness(self, docs: List[Path]) -> List[str]:
+    def check_completeness(self, docs: list[Path]) -> list[str]:
         """Check all expected sections are present."""
         issues = []
 
@@ -423,7 +422,7 @@ The TM documentation comprehensive suite is complete and meets all quality stand
         report_path.parent.mkdir(parents=True, exist_ok=True)
         report_path.write_text(report, encoding="utf-8")
 
-        print(f"\n[COMPLETE] Review complete!")
+        print("\n[COMPLETE] Review complete!")
         print(f"Report: {report_path}")
         print(f"\nIssues found: {len(self.issues)}")
 

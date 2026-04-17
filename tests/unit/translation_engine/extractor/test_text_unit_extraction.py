@@ -11,25 +11,19 @@ Tests cover:
 - Batch translation with delimiter protection
 """
 
-import pytest
 from pathlib import Path
-from typing import List
-from unittest.mock import Mock, MagicMock
+from unittest.mock import MagicMock, Mock
 
-from src.translation_engine.extractor.text_unit import (
-    TextUnit,
-    TextUnitKind,
-    BodyTranslationPlan
-)
+import pytest
+
+from src.translation_engine.extractor.text_unit import TextUnit, TextUnitKind
 from src.translation_engine.extractor.text_unit_extractor import TextUnitExtractor
 from src.translation_engine.parser.ast_nodes import (
     ASTNode,
     NodeType,
-    text_node,
-    paragraph_node,
     heading_node,
-    link_node,
-    code_span_node
+    paragraph_node,
+    text_node,
 )
 
 
@@ -754,7 +748,6 @@ class TestBatchTranslation:
         mt_model.translate = Mock(side_effect=mock_translate)
 
         # Mock langdetect using monkeypatch (VLD-06: proper test isolation)
-        from unittest.mock import MagicMock
 
         # Create mock langdetect module
         mock_langdetect = MagicMock()
@@ -1040,7 +1033,6 @@ class TestConstantValidation:
         import subprocess
         import sys
         import tempfile
-        from pathlib import Path
 
         # Create a test script that imports the module with invalid constants
         test_script = '''
@@ -1107,9 +1099,8 @@ sys.exit(0)
         """Test that module imports successfully with valid constants."""
         # This should not raise any exception
         from src.translation_engine.extractor.text_unit_extractor import (
-            TextUnitExtractor,
-            LANGUAGE_PURITY_MIN_LENGTH,
             FALLBACK_RATE_THRESHOLD,
+            LANGUAGE_PURITY_MIN_LENGTH,
             TOKEN_PER_WORD_ESTIMATE,
         )
 

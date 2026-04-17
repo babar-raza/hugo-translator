@@ -6,9 +6,9 @@ correctly in translations.
 """
 
 import re
-from typing import Any, Dict, List, Optional, Set
+from typing import Any
 
-from .base import Validator, ValidationResult, ValidationSeverity
+from .base import ValidationResult, ValidationSeverity, Validator
 
 
 class PlaceholderValidator(Validator):
@@ -26,7 +26,7 @@ class PlaceholderValidator(Validator):
         self,
         placeholder_pattern: str = r"\{\{([A-Z_]+)_(\d+)\}\}",
         strict_order: bool = False,
-        name: Optional[str] = None,
+        name: str | None = None,
     ):
         """
         Initialize placeholder validator.
@@ -44,7 +44,7 @@ class PlaceholderValidator(Validator):
         self,
         source: str,
         translation: str,
-        context: Optional[Dict[str, Any]] = None,
+        context: dict[str, Any] | None = None,
     ) -> ValidationResult:
         """
         Validate placeholder integrity.
@@ -98,7 +98,7 @@ class PlaceholderValidator(Validator):
 
         return result
 
-    def _extract_placeholders(self, text: str) -> Set[str]:
+    def _extract_placeholders(self, text: str) -> set[str]:
         """
         Extract all placeholders from text.
 
@@ -154,8 +154,8 @@ class PlaceholderValidator(Validator):
             translation: Translation text
             result: ValidationResult to add issues to
         """
-        source_counts: Dict[str, int] = {}
-        translation_counts: Dict[str, int] = {}
+        source_counts: dict[str, int] = {}
+        translation_counts: dict[str, int] = {}
 
         # Count occurrences
         for match in re.finditer(self.placeholder_pattern, source):

@@ -7,7 +7,7 @@ import re
 import uuid
 from io import StringIO
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any
 
 import frontmatter as fm
 from markdown_it import MarkdownIt
@@ -15,9 +15,15 @@ from ruamel.yaml import YAML
 from ruamel.yaml.comments import CommentedMap
 
 from .ast_nodes import (
-    ASTNode, NodeType, SourceLocation,
-    code_block_node, heading_node, link_node,
-    list_item_node, list_node, paragraph_node, text_node,
+    ASTNode,
+    NodeType,
+    code_block_node,
+    heading_node,
+    link_node,
+    list_item_node,
+    list_node,
+    paragraph_node,
+    text_node,
 )
 
 # Module-level ruamel.yaml instance for comment/quote preservation
@@ -32,9 +38,9 @@ class HugoDocument:
 
     def __init__(
         self,
-        frontmatter: Dict[str, Any],
-        ast: List[ASTNode],
-        source_path: Optional[Path] = None,
+        frontmatter: dict[str, Any],
+        ast: list[ASTNode],
+        source_path: Path | None = None,
         encoding: str = "utf-8",
     ):
         self.frontmatter = frontmatter
@@ -42,7 +48,7 @@ class HugoDocument:
         self.source_path = source_path
         self.encoding = encoding
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary representation."""
         return {
             "frontmatter": self.frontmatter,
@@ -75,11 +81,11 @@ class HugoParser:
             raise FileNotFoundError(f"File not found: {path}")
 
         try:
-            with open(path, "r", encoding="utf-8") as f:
+            with open(path, encoding="utf-8") as f:
                 content = f.read()
             encoding = "utf-8"
         except UnicodeDecodeError:
-            with open(path, "r", encoding="latin-1") as f:
+            with open(path, encoding="latin-1") as f:
                 content = f.read()
             encoding = "latin-1"
 
@@ -118,7 +124,7 @@ class HugoParser:
 
         # AST Translation: Assign stable node addresses to AST for deterministic translation
         # Use per-type counters for addresses like "body.heading[0]", "body.paragraph[0]", etc.
-        type_counters: Dict[str, int] = {}
+        type_counters: dict[str, int] = {}
         for node in ast:
             type_name = node.type.value.replace('_', '')
             idx = type_counters.get(type_name, 0)
@@ -127,7 +133,7 @@ class HugoParser:
 
         return HugoDocument(frontmatter=frontmatter_dict, ast=ast)
 
-    def _parse_yaml_with_comments(self, content: str) -> Optional[Union[CommentedMap, Dict[str, Any]]]:
+    def _parse_yaml_with_comments(self, content: str) -> CommentedMap | dict[str, Any] | None:
         """Extract and parse YAML frontmatter using ruamel.yaml for comment preservation.
 
         Args:
@@ -150,7 +156,7 @@ class HugoParser:
         except Exception:
             return None
 
-    def _parse_markdown_to_ast(self, markdown: str) -> List[ASTNode]:
+    def _parse_markdown_to_ast(self, markdown: str) -> list[ASTNode]:
         """Parse Markdown content to AST."""
         tokens = self.md.parse(markdown)
         ast = []
@@ -208,7 +214,7 @@ class HugoParser:
 
         return ast
 
-    def _parse_inline_content(self, inline_token) -> List[ASTNode]:
+    def _parse_inline_content(self, inline_token) -> list[ASTNode]:
         """Parse inline token children to AST nodes with proper nesting."""
         if not inline_token.children:
             return [text_node(inline_token.content, self._generate_node_id())]
@@ -216,8 +222,8 @@ class HugoParser:
         return self._parse_inline_tokens(inline_token.children, 0, None)[0]
 
     def _parse_inline_tokens(
-        self, tokens: List, start: int, close_type: Optional[str]
-    ) -> Tuple[List[ASTNode], int]:
+        self, tokens: list, start: int, close_type: str | None
+    ) -> tuple[list[ASTNode], int]:
         """
         Parse inline tokens with support for nested elements.
 
@@ -323,7 +329,7 @@ class HugoParser:
                     return val
         return default
 
-    def _parse_list(self, tokens: List, start_idx: int, ordered: bool) -> Tuple[ASTNode, int]:
+    def _parse_list(self, tokens: list, start_idx: int, ordered: bool) -> tuple[ASTNode, int]:
         """Parse a list from tokens.
 
         Args:
@@ -370,7 +376,7 @@ class HugoParser:
 
         return list_node(items, ordered=ordered, node_id=self._generate_node_id()), i + 1
 
-    def _parse_list_item(self, tokens: List, start_idx: int) -> Tuple[Optional[ASTNode], int]:
+    def _parse_list_item(self, tokens: list, start_idx: int) -> tuple[ASTNode | None, int]:
         """Parse a list item from tokens.
 
         Args:
@@ -407,7 +413,7 @@ class HugoParser:
 
         return list_item_node(children, node_id=self._generate_node_id()), i + 1
 
-    def _parse_table(self, tokens: List, start_idx: int) -> Tuple[ASTNode, int]:
+    def _parse_table(self, tokens: list, start_idx: int) -> tuple[ASTNode, int]:
         """Parse a table from tokens.
 
         Args:
@@ -455,7 +461,7 @@ class HugoParser:
 
         return ASTNode(type=NodeType.TABLE, children=rows, node_id=self._generate_node_id()), i + 1
 
-    def _parse_table_row(self, tokens: List, start_idx: int, is_header: bool) -> Tuple[Optional[ASTNode], int]:
+    def _parse_table_row(self, tokens: list, start_idx: int, is_header: bool) -> tuple[ASTNode | None, int]:
         """Parse a table row from tokens.
 
         Args:
@@ -493,7 +499,7 @@ class HugoParser:
         attrs = {"is_header": is_header}
         return ASTNode(type=NodeType.TABLE_ROW, children=cells, attrs=attrs, node_id=self._generate_node_id()), i + 1
 
-    def _parse_table_cell(self, tokens: List, start_idx: int, is_header: bool) -> Tuple[Optional[ASTNode], int]:
+    def _parse_table_cell(self, tokens: list, start_idx: int, is_header: bool) -> tuple[ASTNode | None, int]:
         """Parse a table cell from tokens.
 
         Args:

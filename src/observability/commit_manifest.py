@@ -15,8 +15,6 @@ import re
 from dataclasses import asdict, dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import List, Optional
-
 
 logger = logging.getLogger(__name__)
 
@@ -31,7 +29,7 @@ def _safe_name(run_id: str) -> str:
     return f"{slug[:80] or 'run'}_{digest}.json"
 
 
-def _hash_file(path: Path) -> Optional[str]:
+def _hash_file(path: Path) -> str | None:
     try:
         return hashlib.sha256(path.read_bytes()).hexdigest()
     except OSError:
@@ -41,7 +39,7 @@ def _hash_file(path: Path) -> Optional[str]:
 @dataclass
 class CommitManifestFile:
     path: str
-    sha256: Optional[str] = None
+    sha256: str | None = None
 
 
 @dataclass
@@ -49,14 +47,14 @@ class CommitManifest:
     schema_version: str
     run_id: str
     site_id: str
-    target_langs: List[str]
+    target_langs: list[str]
     status: str
-    files: List[CommitManifestFile] = field(default_factory=list)
+    files: list[CommitManifestFile] = field(default_factory=list)
     created_at: str = field(default_factory=_utc_now)
     updated_at: str = field(default_factory=_utc_now)
-    committed_at: Optional[str] = None
-    commit_hash: Optional[str] = None
-    last_error: Optional[str] = None
+    committed_at: str | None = None
+    commit_hash: str | None = None
+    last_error: str | None = None
 
 
 class CommitManifestStore:
@@ -71,11 +69,11 @@ class CommitManifestStore:
         self,
         run_id: str,
         site_id: str,
-        target_langs: List[str],
-        files: List[Path],
+        target_langs: list[str],
+        files: list[Path],
         status: str,
         *,
-        last_error: Optional[str] = None,
+        last_error: str | None = None,
     ) -> Path:
         self.root.mkdir(parents=True, exist_ok=True)
         manifest = CommitManifest(
@@ -123,8 +121,8 @@ class CommitManifestStore:
         path: Path,
         *,
         status: str,
-        commit_hash: Optional[str] = None,
-        last_error: Optional[str] = None,
+        commit_hash: str | None = None,
+        last_error: str | None = None,
     ) -> CommitManifest:
         manifest = self.load_manifest(path)
         manifest.status = status
@@ -139,7 +137,7 @@ class CommitManifestStore:
         )
         return manifest
 
-    def list_manifests(self) -> List[Path]:
+    def list_manifests(self) -> list[Path]:
         if not self.root.exists():
             return []
         return sorted(self.root.glob("*.json"))

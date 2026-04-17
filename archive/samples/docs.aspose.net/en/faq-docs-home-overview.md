@@ -34,4 +34,3 @@ Release notes and version‑specific sections in the docs highlight recent addit
 **Q6. Is localized documentation available?**  
 Yes. The repository structure and live site both show localized variants for multiple languages, with language‑specific folders and URLs.  
 Where available, localized pages mirror the structure and content of the English documentation on [docs.aspose.com](https://docs.aspose.com/).
-

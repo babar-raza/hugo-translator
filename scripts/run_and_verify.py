@@ -1,15 +1,15 @@
 """
 Run translation and verify structure drift.
 """
-import sys
 import os
+import sys
 
 # Set up paths
 os.chdir(r"C:\Users\prora\OneDrive\Documents\GitHub\hugo-translator")
 sys.path.insert(0, 'src')
 
-from pathlib import Path
 from io import StringIO
+from pathlib import Path
 
 print("=" * 70)
 print("TRANSLATION AND STRUCTURE VERIFICATION")
@@ -80,13 +80,14 @@ print(f"\nRound-trip test: {tests_passed}/{tests_total} passed")
 print("\n### Step 2: Testing MarkdownReconstructor ###\n")
 
 try:
-    from translation_engine.reconstructor.markdown_reconstructor import MarkdownReconstructor
-    from translation_engine.parser.hugo_parser import HugoParser
-    from utils.models import SiteProfile
     import yaml as pyyaml
 
+    from translation_engine.parser.hugo_parser import HugoParser
+    from translation_engine.reconstructor.markdown_reconstructor import MarkdownReconstructor
+    from utils.models import SiteProfile
+
     # Load site profile
-    with open('config/site_profiles/products.aspose.net.yaml', 'r', encoding='utf-8') as f:
+    with open('config/site_profiles/products.aspose.net.yaml', encoding='utf-8') as f:
         profile_data = pyyaml.safe_load(f)
 
     site_profile = SiteProfile.from_config(profile_data)
@@ -124,7 +125,7 @@ try:
     en_file = Path(r"D:\onedrive\Documents\GitHub\aspose.net\content\products.aspose.net\slides\en\presentation-converter\_index.md")
 
     if en_file.exists():
-        with open(en_file, 'r', encoding='utf-8') as f:
+        with open(en_file, encoding='utf-8') as f:
             content = f.read()
 
         doc = parser.parse(content)
@@ -198,7 +199,7 @@ bg_file = Path(r"D:\onedrive\Documents\GitHub\aspose.net\content\products.aspose
 def analyze_structure(filepath):
     if not filepath.exists():
         return None
-    with open(filepath, 'r', encoding='utf-8') as f:
+    with open(filepath, encoding='utf-8') as f:
         content = f.read()
     lines = content.split('\n')
     return {

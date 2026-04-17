@@ -17,13 +17,13 @@ Exit codes:
 
 import argparse
 import json
+import re
 import subprocess
 import sys
 import time
-from dataclasses import dataclass, asdict
+from dataclasses import asdict, dataclass
 from pathlib import Path
-from typing import List, Dict, Any, Optional
-import re
+from typing import Any
 
 
 @dataclass
@@ -39,7 +39,7 @@ class TestResult:
     exit_code: int
     details: str = ""
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for JSON serialization."""
         return asdict(self)
 
@@ -53,7 +53,7 @@ class PytestResultParser:
     """Parse pytest output to extract test results."""
 
     @staticmethod
-    def parse_output(output: str) -> Dict[str, Any]:
+    def parse_output(output: str) -> dict[str, Any]:
         """
         Parse pytest output to extract test counts.
 
@@ -163,7 +163,7 @@ class TestRunner:
     def execute_suite(
         self,
         suite_name: str,
-        timeout: Optional[int] = 600,
+        timeout: int | None = 600,
         parallel: bool = False,
         verbose: bool = False,
         capture_output: bool = True
@@ -297,11 +297,11 @@ class TestRunner:
 
     def execute_multiple_suites(
         self,
-        suite_names: List[str],
-        timeout: Optional[int] = 600,
+        suite_names: list[str],
+        timeout: int | None = 600,
         parallel: bool = False,
         verbose: bool = False
-    ) -> List[TestResult]:
+    ) -> list[TestResult]:
         """
         Execute multiple test suites.
 
@@ -343,7 +343,7 @@ class TestReporter:
     """Generate test execution reports."""
 
     @staticmethod
-    def print_summary(results: List[TestResult]):
+    def print_summary(results: list[TestResult]):
         """Print summary of test execution."""
         print("\n" + "="*70)
         print("TEST EXECUTION SUMMARY")
@@ -358,7 +358,7 @@ class TestReporter:
 
         all_passed = all(r.success for r in results)
 
-        print(f"\nOverall Results:")
+        print("\nOverall Results:")
         print(f"  Total Tests:  {total_tests}")
         print(f"  Passed:       {total_passed}")
         print(f"  Failed:       {total_failed}")
@@ -367,7 +367,7 @@ class TestReporter:
         print(f"  Duration:     {total_duration:.2f}s")
         print(f"  Status:       {'[PASS]' if all_passed else '[FAIL]'}")
 
-        print(f"\nPer-Suite Results:")
+        print("\nPer-Suite Results:")
         for result in results:
             status = "[PASS]" if result.success else "[FAIL]"
             print(f"  {status} {result.suite_name}: {result.passed}/{result.total_tests} passed ({result.duration:.2f}s)")
@@ -375,7 +375,7 @@ class TestReporter:
         print("="*70 + "\n")
 
     @staticmethod
-    def generate_json_report(results: List[TestResult], output_file: Path):
+    def generate_json_report(results: list[TestResult], output_file: Path):
         """Generate JSON report of test execution."""
         report = {
             "summary": {

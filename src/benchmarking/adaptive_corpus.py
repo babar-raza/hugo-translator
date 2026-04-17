@@ -5,11 +5,11 @@ on fresh setups while supporting comprehensive analysis when needed.
 """
 
 import hashlib
+import logging
 import random
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, List, Optional, Set
-import logging
+
 import yaml
 
 logger = logging.getLogger(__name__)
@@ -22,7 +22,7 @@ class CorpusSample:
     sample_id: str
     category: str
     content: str
-    metadata: Dict[str, str]
+    metadata: dict[str, str]
 
 
 @dataclass
@@ -39,10 +39,10 @@ class CorpusTier:
 class SamplingResult:
     """Result of corpus sampling operation."""
 
-    samples: List[CorpusSample]
+    samples: list[CorpusSample]
     tier: str
     coverage_score: float  # 0-1, how representative the sample is
-    categories_covered: List[str]
+    categories_covered: list[str]
     estimated_duration_seconds: float
     corpus_version: str  # Hash of corpus for tracking
 
@@ -56,7 +56,7 @@ class AdaptiveCorpusManager:
     - Comprehensive: Thorough analysis (~2 hours)
     """
 
-    def __init__(self, corpus_manager: Optional[object] = None, config_path: Optional[Path] = None):
+    def __init__(self, corpus_manager: object | None = None, config_path: Path | None = None):
         """Initialize adaptive corpus manager.
 
         Args:
@@ -69,7 +69,7 @@ class AdaptiveCorpusManager:
         # Mock corpus samples for now (would use real corpus_manager if available)
         self._samples = self._generate_mock_samples()
 
-    def _load_config(self, config_path: Optional[Path]) -> Dict:
+    def _load_config(self, config_path: Path | None) -> dict:
         """Load corpus configuration."""
         default_config = {
             "tiers": {
@@ -86,7 +86,7 @@ class AdaptiveCorpusManager:
 
         if config_path and config_path.exists():
             try:
-                with open(config_path, "r") as f:
+                with open(config_path) as f:
                     loaded = yaml.safe_load(f)
                     if loaded:
                         # Merge loaded config with defaults
@@ -97,7 +97,7 @@ class AdaptiveCorpusManager:
 
         return default_config
 
-    def _generate_mock_samples(self) -> List[CorpusSample]:
+    def _generate_mock_samples(self) -> list[CorpusSample]:
         """Generate mock corpus samples for testing."""
         categories = self.config["categories"]
         samples = []
@@ -197,7 +197,7 @@ class AdaptiveCorpusManager:
         return self.stratified_sample(new_target)
 
     def stratified_sample(
-        self, n: int, categories: Optional[List[str]] = None
+        self, n: int, categories: list[str] | None = None
     ) -> SamplingResult:
         """Sample proportionally from each category.
 
@@ -275,7 +275,7 @@ class AdaptiveCorpusManager:
         hash_obj = hashlib.sha256(content.encode())
         return hash_obj.hexdigest()[:12]
 
-    def validate_representativeness(self, samples: List[CorpusSample]) -> float:
+    def validate_representativeness(self, samples: list[CorpusSample]) -> float:
         """Score how representative a sample set is.
 
         Args:

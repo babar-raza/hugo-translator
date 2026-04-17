@@ -5,8 +5,9 @@ Verifies that fixes work together in realistic translation scenarios.
 Simulates production issue: 63 files, all succeed, but reported 63 errors.
 """
 
-import sys
 import logging
+import sys
+
 sys.path.insert(0, '.')
 
 from src.observability.progress import ProgressTracker
@@ -141,7 +142,6 @@ def test_validation_catches_contradictions():
     print("\n[TEST] Validation catches contradictions")
 
     # Setup logging capture
-    import logging
     logging.basicConfig(level=logging.WARNING)
 
     # Create custom handler to capture warnings

@@ -7,8 +7,8 @@ during the translation pipeline.
 MISSION: Reproduce and fix the nested list corruption bug identified in
 PHASE10_PROD_FORCE_TRANSLATE.md
 """
-import sys
 import os
+import sys
 from pathlib import Path
 
 # Add src to path
@@ -16,12 +16,11 @@ REPO_ROOT = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(REPO_ROOT))
 os.chdir(str(REPO_ROOT))
 
-import pytest
-from src.translation_engine.parser.hugo_parser import HugoParser
-from src.translation_engine.parser.ast_nodes import NodeType
 from src.translation_engine.extractor.text_unit_extractor import TextUnitExtractor
+from src.translation_engine.parser.ast_nodes import NodeType
+from src.translation_engine.parser.hugo_parser import HugoParser
 from src.translation_engine.reconstructor.ast_renderer import ASTRenderer
-from src.utils.models import SiteProfile, BodyRules
+from src.utils.models import BodyRules, SiteProfile
 
 
 def count_list_items(ast_node):
@@ -72,14 +71,14 @@ def test_nested_list_structure_preserved():
     # Parse source
     parser = HugoParser()
     source_doc = parser.parse_string(source_content)
-    print(f"[2/5] Source parsed into AST")
+    print("[2/5] Source parsed into AST")
 
     # Count list structures in source (need to traverse the whole AST)
     source_list_items = sum(count_list_items(node) for node in source_doc.ast)
     source_list_containers = sum(count_list_containers(node) for node in source_doc.ast)
     source_lines = len(source_content.strip().split('\n'))
 
-    print(f"      Source metrics:")
+    print("      Source metrics:")
     print(f"      - List items: {source_list_items}")
     print(f"      - List containers: {source_list_containers}")
     print(f"      - Line count: {source_lines}")
@@ -136,7 +135,7 @@ def test_nested_list_structure_preserved():
     output_list_containers = sum(count_list_containers(node) for node in output_doc.ast)
     output_lines = len(output_content.strip().split('\n'))
 
-    print(f"\n      Output metrics:")
+    print("\n      Output metrics:")
     print(f"      - List items: {output_list_items}")
     print(f"      - List containers: {output_list_containers}")
     print(f"      - Line count: {output_lines}")
@@ -145,7 +144,7 @@ def test_nested_list_structure_preserved():
     line_retention = output_lines / source_lines if source_lines > 0 else 0
     item_retention = output_list_items / source_list_items if source_list_items > 0 else 0
 
-    print(f"\n      Retention ratios:")
+    print("\n      Retention ratios:")
     print(f"      - Line retention: {line_retention:.1%} ({output_lines}/{source_lines})")
     print(f"      - Item retention: {item_retention:.1%} ({output_list_items}/{source_list_items})")
 
@@ -199,7 +198,7 @@ def test_nested_list_structure_preserved():
     assert nested_pattern_found, (
         "No nested indentation found in output. Lists may have been flattened."
     )
-    print(f"[PASS] Nested indentation patterns found in output")
+    print("[PASS] Nested indentation patterns found in output")
 
     print("\n" + "=" * 80)
     print("TEST PASSED: Nested list structure preserved!")
@@ -228,7 +227,7 @@ title: Test
 - ✔ Fifth feature
 """
 
-    print(f"\n[1/4] Testing checklist with 5 items")
+    print("\n[1/4] Testing checklist with 5 items")
 
     # Parse
     parser = HugoParser()
@@ -283,7 +282,7 @@ title: Test
         f"Expected 5 checklist lines, got {len(checklist_lines)}. "
         f"Items may have been concatenated."
     )
-    print(f"[PASS] All 5 checklist items on separate lines")
+    print("[PASS] All 5 checklist items on separate lines")
 
     # Each checklist line should have exactly one ✔
     for i, line in enumerate(checklist_lines, 1):
@@ -292,7 +291,7 @@ title: Test
             f"Checklist line {i} has {check_count} checkmarks (expected 1). "
             f"Line: {line[:50]}..."
         )
-    print(f"[PASS] Each checklist line has exactly one checkmark")
+    print("[PASS] Each checklist line has exactly one checkmark")
 
     print("\n" + "=" * 80)
     print("TEST PASSED: Checklist items properly separated!")

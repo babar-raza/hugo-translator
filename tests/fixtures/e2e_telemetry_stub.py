@@ -4,25 +4,24 @@ Minimal telemetry stub server for E2E testing.
 Runs on localhost:8765 and logs all received events to a JSONL file.
 """
 import json
-import sys
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict
+from typing import Any
 
 try:
-    from fastapi import FastAPI, Request
     import uvicorn
+    from fastapi import FastAPI, Request
     FASTAPI_AVAILABLE = True
 except ImportError:
     FASTAPI_AVAILABLE = False
     # Fallback to simple HTTP server
-    from http.server import HTTPServer, BaseHTTPRequestHandler
+    from http.server import BaseHTTPRequestHandler, HTTPServer
 
 # Output file for telemetry events
 TELEMETRY_LOG = Path("reports/e2e/20260116_225809/LOGS/telemetry_events.jsonl")
 TELEMETRY_LOG.parent.mkdir(parents=True, exist_ok=True)
 
-def log_event(event: Dict[str, Any]) -> None:
+def log_event(event: dict[str, Any]) -> None:
     """Log telemetry event to JSONL file."""
     with open(TELEMETRY_LOG, "a", encoding="utf-8") as f:
         json.dump(event, f)
@@ -59,7 +58,7 @@ if FASTAPI_AVAILABLE:
         return {"status": "ok", "service": "e2e-telemetry-stub"}
 
     def run_server():
-        print(f"Starting E2E telemetry stub on http://localhost:8765")
+        print("Starting E2E telemetry stub on http://localhost:8765")
         print(f"Logging events to: {TELEMETRY_LOG}")
         uvicorn.run(app, host="127.0.0.1", port=8765, log_level="warning")
 
@@ -101,7 +100,7 @@ else:
             pass  # Suppress request logging
 
     def run_server():
-        print(f"Starting E2E telemetry stub (simple HTTP) on http://localhost:8765")
+        print("Starting E2E telemetry stub (simple HTTP) on http://localhost:8765")
         print(f"Logging events to: {TELEMETRY_LOG}")
         server = HTTPServer(('127.0.0.1', 8765), TelemetryHandler)
         try:

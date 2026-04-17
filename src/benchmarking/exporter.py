@@ -19,11 +19,11 @@ import json
 import logging
 import shutil
 import sqlite3
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime
-from io import StringIO
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Callable, Dict, Iterator, List, Optional, Union
+from typing import TYPE_CHECKING, Optional
 
 if TYPE_CHECKING:
     from src.shared_engines.composition_root import SharedEngines
@@ -43,13 +43,13 @@ class ExportFilter:
         tables: List of tables to export (None = all exportable)
     """
 
-    start_date: Optional[str] = None
-    end_date: Optional[str] = None
-    model_ids: Optional[List[str]] = None
-    devices: Optional[List[str]] = None
-    tables: Optional[List[str]] = None
+    start_date: str | None = None
+    end_date: str | None = None
+    model_ids: list[str] | None = None
+    devices: list[str] | None = None
+    tables: list[str] | None = None
 
-    def to_dict(self) -> Dict:
+    def to_dict(self) -> dict:
         """Convert to dictionary."""
         return {
             "start_date": self.start_date,
@@ -76,7 +76,7 @@ class ExportProgress:
     total_rows: int
     percent_complete: float
 
-    def to_dict(self) -> Dict:
+    def to_dict(self) -> dict:
         """Convert to dictionary."""
         return {
             "table": self.table,
@@ -104,13 +104,13 @@ class ExportResult:
     format: str
     output_path: str
     rows_exported: int
-    tables_exported: List[str]
+    tables_exported: list[str]
     file_size_bytes: int
     compressed: bool
     duration_seconds: float
-    error: Optional[str] = None
+    error: str | None = None
 
-    def to_dict(self) -> Dict:
+    def to_dict(self) -> dict:
         """Convert to dictionary."""
         return {
             "format": self.format,
@@ -202,10 +202,10 @@ class BenchmarkExporter:
 
     def export_csv(
         self,
-        output_path: Union[str, Path],
-        filter: Optional[ExportFilter] = None,
+        output_path: str | Path,
+        filter: ExportFilter | None = None,
         compress: bool = False,
-        progress_callback: Optional[Callable[[ExportProgress], None]] = None,
+        progress_callback: Callable[[ExportProgress], None] | None = None,
     ) -> ExportResult:
         """Export benchmark data to CSV format.
 
@@ -315,9 +315,9 @@ class BenchmarkExporter:
         conn: sqlite3.Connection,
         table: str,
         output_path: Path,
-        filter: Optional[ExportFilter],
+        filter: ExportFilter | None,
         compress: bool,
-        progress_callback: Optional[Callable[[ExportProgress], None]],
+        progress_callback: Callable[[ExportProgress], None] | None,
     ) -> int:
         """Export a single table to CSV.
 
@@ -375,10 +375,10 @@ class BenchmarkExporter:
 
     def export_json(
         self,
-        output_path: Union[str, Path],
-        filter: Optional[ExportFilter] = None,
+        output_path: str | Path,
+        filter: ExportFilter | None = None,
         compress: bool = False,
-        progress_callback: Optional[Callable[[ExportProgress], None]] = None,
+        progress_callback: Callable[[ExportProgress], None] | None = None,
         pretty_print: bool = False,
     ) -> ExportResult:
         """Export benchmark data to JSON format.
@@ -498,9 +498,9 @@ class BenchmarkExporter:
         self,
         conn: sqlite3.Connection,
         table: str,
-        filter: Optional[ExportFilter],
-        progress_callback: Optional[Callable[[ExportProgress], None]],
-    ) -> List[Dict]:
+        filter: ExportFilter | None,
+        progress_callback: Callable[[ExportProgress], None] | None,
+    ) -> list[dict]:
         """Export a single table to JSON format.
 
         Args:
@@ -525,7 +525,7 @@ class BenchmarkExporter:
 
         total_rows = len(rows)
         for i, row in enumerate(rows):
-            result.append(dict(zip(columns, row)))
+            result.append(dict(zip(columns, row, strict=False)))
 
             if progress_callback and (i + 1) % 1000 == 0:
                 progress_callback(ExportProgress(
@@ -539,9 +539,9 @@ class BenchmarkExporter:
 
     def export_sqlite(
         self,
-        output_path: Union[str, Path],
-        filter: Optional[ExportFilter] = None,
-        progress_callback: Optional[Callable[[ExportProgress], None]] = None,
+        output_path: str | Path,
+        filter: ExportFilter | None = None,
+        progress_callback: Callable[[ExportProgress], None] | None = None,
     ) -> ExportResult:
         """Export benchmark database to SQLite backup.
 
@@ -602,7 +602,7 @@ class BenchmarkExporter:
         self,
         output_path: Path,
         start_time: datetime,
-        progress_callback: Optional[Callable[[ExportProgress], None]],
+        progress_callback: Callable[[ExportProgress], None] | None,
     ) -> ExportResult:
         """Perform full database backup.
 
@@ -671,7 +671,7 @@ class BenchmarkExporter:
         output_path: Path,
         filter: ExportFilter,
         start_time: datetime,
-        progress_callback: Optional[Callable[[ExportProgress], None]],
+        progress_callback: Callable[[ExportProgress], None] | None,
     ) -> ExportResult:
         """Perform filtered database export.
 
@@ -767,7 +767,7 @@ class BenchmarkExporter:
         dest_conn: sqlite3.Connection,
         table: str,
         filter: ExportFilter,
-        progress_callback: Optional[Callable[[ExportProgress], None]],
+        progress_callback: Callable[[ExportProgress], None] | None,
     ) -> int:
         """Copy filtered data from source to destination.
 
@@ -812,7 +812,7 @@ class BenchmarkExporter:
 
         return len(rows)
 
-    def _get_export_tables(self, filter: Optional[ExportFilter]) -> List[str]:
+    def _get_export_tables(self, filter: ExportFilter | None) -> list[str]:
         """Get list of tables to export.
 
         Args:
@@ -826,7 +826,7 @@ class BenchmarkExporter:
         return self.EXPORTABLE_TABLES
 
     def _build_export_query(
-        self, table: str, filter: Optional[ExportFilter]
+        self, table: str, filter: ExportFilter | None
     ) -> tuple[str, list]:
         """Build SQL query with filters.
 
@@ -908,7 +908,7 @@ class BenchmarkExporter:
 
         return query, params
 
-    def get_export_estimate(self, filter: Optional[ExportFilter] = None) -> Dict:
+    def get_export_estimate(self, filter: ExportFilter | None = None) -> dict:
         """Estimate export size and row counts.
 
         Args:

@@ -5,17 +5,18 @@ Tests ExecutionMode, WorkerConfig, DevicePolicy, and WorkerRunner base class.
 """
 
 import os
-import pytest
 import warnings
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
+
+import pytest
 
 from src.workers.runner import (
+    DevicePolicy,
     ExecutionMode,
     WorkerConfig,
-    DevicePolicy,
     WorkerRunner,
     detect_legacy_mode,
-    warn_legacy_mode
+    warn_legacy_mode,
 )
 
 

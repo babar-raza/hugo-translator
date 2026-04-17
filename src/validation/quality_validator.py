@@ -11,14 +11,14 @@ Provides comprehensive validation for translated Hugo markdown files including:
 """
 
 import re
-import yaml
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Set, Tuple
+from typing import Any
+
+import yaml
 
 from ..translation_engine.validation import (
-    Validator,
-    ValidationResult,
     ValidationIssue,
+    ValidationResult,
     ValidationSeverity,
 )
 
@@ -36,7 +36,7 @@ class QualityValidator:
     - List structure
     """
 
-    def __init__(self, base_dir: Optional[Path] = None):
+    def __init__(self, base_dir: Path | None = None):
         """
         Initialize quality validator.
 
@@ -66,7 +66,7 @@ class QualityValidator:
 
         # Read files
         try:
-            with open(source_path, 'r', encoding='utf-8') as f:
+            with open(source_path, encoding='utf-8') as f:
                 source_content = f.read()
         except Exception as e:
             result.issues.append(
@@ -81,7 +81,7 @@ class QualityValidator:
             return result
 
         try:
-            with open(translation_path, 'r', encoding='utf-8') as f:
+            with open(translation_path, encoding='utf-8') as f:
                 translation_content = f.read()
         except Exception as e:
             result.issues.append(
@@ -110,7 +110,7 @@ class QualityValidator:
         self,
         source: str,
         translation: str,
-        context: Optional[Dict[str, Any]] = None,
+        context: dict[str, Any] | None = None,
     ) -> ValidationResult:
         """
         Validate translated content against source.
@@ -159,7 +159,7 @@ class QualityValidator:
 
         return result
 
-    def _split_frontmatter(self, content: str) -> Tuple[str, str]:
+    def _split_frontmatter(self, content: str) -> tuple[str, str]:
         """
         Split content into frontmatter and body.
 
@@ -179,7 +179,7 @@ class QualityValidator:
         self,
         source_fm: str,
         trans_fm: str,
-        context: Dict[str, Any],
+        context: dict[str, Any],
     ) -> ValidationResult:
         """Validate frontmatter YAML syntax and structure."""
         result = ValidationResult(success=True)
@@ -252,7 +252,7 @@ class QualityValidator:
         self,
         source: str,
         translation: str,
-        context: Dict[str, Any],
+        context: dict[str, Any],
     ) -> ValidationResult:
         """Validate placeholder balance."""
         result = ValidationResult(success=True)
@@ -300,7 +300,7 @@ class QualityValidator:
         self,
         source: str,
         translation: str,
-        context: Dict[str, Any],
+        context: dict[str, Any],
     ) -> ValidationResult:
         """Validate code block balance."""
         result = ValidationResult(success=True)
@@ -347,13 +347,13 @@ class QualityValidator:
         self,
         source: str,
         translation: str,
-        context: Dict[str, Any],
+        context: dict[str, Any],
     ) -> ValidationResult:
         """Validate heading structure is preserved."""
         result = ValidationResult(success=True)
 
         # Extract heading levels
-        def get_heading_levels(text: str) -> List[int]:
+        def get_heading_levels(text: str) -> list[int]:
             levels = []
             for line in text.split('\n'):
                 match = re.match(r'^(#{1,6})\s+', line)
@@ -384,7 +384,7 @@ class QualityValidator:
         self,
         source: str,
         translation: str,
-        context: Dict[str, Any],
+        context: dict[str, Any],
     ) -> ValidationResult:
         """Validate list structure is preserved."""
         result = ValidationResult(success=True)
@@ -420,7 +420,7 @@ class QualityValidator:
     def _validate_links(
         self,
         translation: str,
-        context: Dict[str, Any],
+        context: dict[str, Any],
     ) -> ValidationResult:
         """Validate link structure and relative paths."""
         result = ValidationResult(success=True)
@@ -464,7 +464,7 @@ class QualityValidator:
         translation_dir: Path,
         target_lang: str,
         recursive: bool = True,
-    ) -> Dict[str, ValidationResult]:
+    ) -> dict[str, ValidationResult]:
         """
         Validate all translated files in a directory.
 

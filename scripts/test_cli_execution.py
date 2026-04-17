@@ -11,14 +11,12 @@ Each test documents:
 - Actual result (PASS/FAIL)
 - Error details if any
 """
+import os
 import subprocess
 import sys
-import os
-from pathlib import Path
 from dataclasses import dataclass
-from typing import Optional, List
-import json
 from datetime import datetime
+from pathlib import Path
 
 # Ensure we're in project root
 PROJECT_ROOT = Path(__file__).parent.parent
@@ -33,9 +31,9 @@ class TestResult:
     stdout: str
     stderr: str
     passed: bool
-    error: Optional[str] = None
+    error: str | None = None
 
-def run_cli(args: List[str], timeout: int = 30) -> tuple:
+def run_cli(args: list[str], timeout: int = 30) -> tuple:
     """Run CLI command and return (exit_code, stdout, stderr)."""
     cmd = [sys.executable, "-m", "src.cli"] + args
     try:
@@ -346,7 +344,7 @@ def test_benchmarking_cli_version() -> TestResult:
             error=str(e)
         )
 
-def run_all_tests() -> List[TestResult]:
+def run_all_tests() -> list[TestResult]:
     """Run all CLI execution tests."""
     tests = [
         test_help,
@@ -375,7 +373,7 @@ def run_all_tests() -> List[TestResult]:
 
     return results
 
-def generate_report(results: List[TestResult]) -> str:
+def generate_report(results: list[TestResult]) -> str:
     """Generate markdown report of test results."""
     passed = sum(1 for r in results if r.passed)
     failed = sum(1 for r in results if not r.passed)

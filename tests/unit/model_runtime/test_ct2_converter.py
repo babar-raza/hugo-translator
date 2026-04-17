@@ -5,10 +5,9 @@ Tests marked with @pytest.mark.slow require downloading real models.
 """
 import sys
 from pathlib import Path
-from unittest.mock import MagicMock, Mock, patch
+from unittest.mock import MagicMock, patch
 
 import pytest
-
 
 # Mock ctranslate2 module for testing
 sys.modules["ctranslate2"] = MagicMock()
@@ -48,6 +47,7 @@ class TestCT2ConversionPipeline:
         try:
             # Reload the module to trigger import check
             import importlib
+
             import src.model_runtime.ct2_converter
             importlib.reload(src.model_runtime.ct2_converter)
 

@@ -11,10 +11,10 @@ not mocks, to ensure the guard would hold against actual backends.
 """
 
 import unittest
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 from src.model_runtime.llm_backend import LLMModelBackend
-from src.model_runtime.loader import ModelBackend, HuggingFaceBackend
+from src.model_runtime.loader import HuggingFaceBackend, ModelBackend
 
 
 class TestRetryFeedbackGuard(unittest.TestCase):

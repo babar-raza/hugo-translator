@@ -22,16 +22,20 @@ import threading
 import time
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, Any, Optional, List
+from typing import Any
 
 import torch
 
-from src.observability.worker_telemetry import emit_worker_event, start_worker_run, complete_worker_run
-from src.hardware.vram_enforcer import VRAMEnforcer
 from src.hardware.gpu_manager import GPUManager
+from src.hardware.vram_enforcer import VRAMEnforcer
 from src.intelligence.llm_client import LLMClient, LLMConfig
+from src.observability.worker_telemetry import (
+    complete_worker_run,
+    emit_worker_event,
+    start_worker_run,
+)
 from src.tm import TranslationMemory
-from src.tm.improvement_queue import ImprovementQueue, ImprovementCandidate
+from src.tm.improvement_queue import ImprovementCandidate, ImprovementQueue
 from src.tm.l1_cache import L1Cache
 from src.tm.l2_persistent import L2PersistentTM
 from src.utils.config_loader import ConfigService
@@ -94,9 +98,9 @@ class TMImprovementWorkerConfig:
         max_seconds_per_run: int = 900,
         llm_provider: str = "ollama",
         llm_model: str = "qwen3:14b",
-        llm_base_url: Optional[str] = "http://localhost:11434",
-        llm_api_key: Optional[str] = None,
-        llm_api_key_env: Optional[str] = None,
+        llm_base_url: str | None = "http://localhost:11434",
+        llm_api_key: str | None = None,
+        llm_api_key_env: str | None = None,
         llm_timeout_seconds: int = 30,
         llm_temperature: float = 0.3,
         max_gpu_memory_percent: int = 60,
@@ -301,7 +305,10 @@ class TMImprovementWorker:
             l1_cache = L1Cache(max_size=10000)
 
             # Create L2 persistent store
-            l2_store = L2PersistentTM(db_path=self.config.tm_path / "l2.lmdb")
+            from src.tm.l2_persistent import L2_DB_NAME
+            _raw_cfg = self.config_service.get_config() if self.config_service else {}
+            _l2_max_mb = _raw_cfg.get("tm_defaults", {}).get("l2_max_size_mb", 2048)
+            l2_store = L2PersistentTM(db_path=self.config.tm_path / L2_DB_NAME, max_size_mb=_l2_max_mb)
 
             # Create L3 semantic store (optional)
             l3_store = None
@@ -422,7 +429,7 @@ class TMImprovementWorker:
 
         logger.info("Setup complete")
 
-    def _discover_available_model(self) -> Optional[str]:
+    def _discover_available_model(self) -> str | None:
         """Query Ollama for available models and return the first suitable one."""
         try:
             import requests
@@ -485,6 +492,7 @@ class TMImprovementWorker:
         # 3. Force CUDA cache flush
         try:
             import gc
+
             import torch
             gc.collect()
             if torch.cuda.is_available():
@@ -502,7 +510,7 @@ class TMImprovementWorker:
             "status": status,
         }))
 
-    def _record_state(self, state: str, *, success: bool = False, error: Optional[str] = None) -> None:
+    def _record_state(self, state: str, *, success: bool = False, error: str | None = None) -> None:
         """Persist durable worker state for health audit tooling."""
         try:
             record_worker_state(
@@ -762,7 +770,7 @@ class TMImprovementWorker:
                     output_summary=f"Interrupted after {run_count} runs",
                 )
 
-    def _check_gpu_usage(self) -> Optional[float]:
+    def _check_gpu_usage(self) -> float | None:
         """
         Check current GPU usage as percentage of total.
 
@@ -782,7 +790,7 @@ class TMImprovementWorker:
 
         return None
 
-    def _execute_improvement_run_with_telemetry(self) -> Dict[str, Any]:
+    def _execute_improvement_run_with_telemetry(self) -> dict[str, Any]:
         """Execute improvement run wrapped in telemetry tracking."""
         if not (self.telemetry and self.telemetry.is_available()):
             return self._execute_improvement_run()
@@ -807,7 +815,7 @@ class TMImprovementWorker:
             )
             return result
 
-    def _execute_improvement_run(self) -> Dict[str, Any]:
+    def _execute_improvement_run(self) -> dict[str, Any]:
         """
         Execute a single improvement run.
 
@@ -994,6 +1002,57 @@ class TMImprovementWorker:
             except Exception as e:
                 logger.warning(f"L3 index flush failed (non-fatal): {e}")
 
+        # WS-COMP-5: Nightly TM language validity scan — detect and optionally remove
+        # L2 entries where the cached translation is in the wrong language.
+        # Guarded: only runs if l2 is available and fasttext model exists.
+        _lang_validity_results: dict = {}
+        try:
+            _l2 = getattr(self.tm, 'l2', None) if self.tm else None
+            _ft_model_path = Path("data/models/fasttext/lid.176.bin")
+            if _l2 is not None and _ft_model_path.exists():
+                from ..tm.integrity import CacheIntegrityChecker
+                _checker = CacheIntegrityChecker(_l2)
+                # Get target languages from config (if available)
+                _tm_langs: list[str] = []
+                try:
+                    _cfg_raw = self.config.get_config() if hasattr(self.config, 'get_config') else {}
+                    _site_profiles_dir = Path(_cfg_raw.get('paths', {}).get('config_dir', 'config')) / 'site_profiles'
+                    if _site_profiles_dir.exists():
+                        import yaml as _yaml
+                        for _p in _site_profiles_dir.glob("*.aspose.net.yaml"):
+                            _sp = _yaml.safe_load(_p.read_text(encoding="utf-8"))
+                            _tm_langs.extend(_sp.get("target_langs", []))
+                        _tm_langs = list(set(_tm_langs))  # dedup
+                except Exception:
+                    pass
+                if not _tm_langs:
+                    _tm_langs = ["de", "fr", "es", "it", "pt", "nl", "ru", "ja", "zh", "ar"]
+                # Scan each lang; repair=True with max 100 deletions/run (prevents mass deletion)
+                for _lang in _tm_langs:
+                    try:
+                        _report = _checker.scan_language_validity(
+                            tgt_lang=_lang,
+                            fasttext_model_path=_ft_model_path,
+                            sample_rate=0.05,
+                            confidence_threshold=0.85,
+                            repair=True,
+                            max_deletions_per_run=100,
+                            dry_run=False,
+                        )
+                        if _report.stale_found > 0:
+                            logger.warning(
+                                f"TM integrity scan [{_lang}]: "
+                                f"{_report.stale_found}/{_report.total_sampled} sampled entries "
+                                f"were wrong-language; deleted {_report.repaired_count}"
+                            )
+                            _lang_validity_results[_lang] = _report.to_dict()
+                    except Exception as _e:
+                        logger.debug(f"TM language validity scan failed for {_lang}: {_e}")
+            else:
+                logger.debug("TM language validity scan skipped: l2 unavailable or fasttext model missing")
+        except Exception as _e:
+            logger.warning(f"TM language validity scan error (non-fatal): {_e}")
+
         return {
             "status": "success",
             "candidates_pulled": len(candidates),
@@ -1002,6 +1061,7 @@ class TMImprovementWorker:
             "failed_count": failed_count,
             "llm_calls": llm_calls,
             "elapsed_seconds": elapsed,
+            "lang_validity_scan": _lang_validity_results,
         }
 
     def _improve_candidate(self, candidate: ImprovementCandidate) -> str:
@@ -1056,6 +1116,26 @@ class TMImprovementWorker:
                 "llm_model": self.config.llm_model,
             }
 
+            # Attempt in-place L3 metadata update first (avoids duplicate vectors).
+            # The entry_id format matches translation_memory.py:218.
+            l3_updated = False
+            if self.tm is not None and self.tm.l3 is not None:
+                entry_id = (
+                    f"{candidate.site_id}:{candidate.src_lang}:"
+                    f"{candidate.tgt_lang}:{hash(candidate.text)}"
+                )
+                l3_updated = self.tm.l3.update_entry(
+                    entry_id=entry_id,
+                    new_translation=improved_translation,
+                    new_metadata=metadata,
+                )
+                if l3_updated:
+                    logger.debug(
+                        f"L3 in-place update: entry_id={entry_id[:60]}"
+                    )
+
+            # Always store to L2 (LMDB). If L3 was updated in-place, pass
+            # skip_l3=True so tm.store() does not append a duplicate vector.
             stored = self.tm.store(
                 site_id=candidate.site_id,
                 src_lang=candidate.src_lang,
@@ -1065,6 +1145,7 @@ class TMImprovementWorker:
                 context=candidate.context,
                 metadata=metadata,
                 force_update=True,
+                skip_l3=l3_updated,
             )
 
             if stored:

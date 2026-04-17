@@ -3,11 +3,11 @@ YAML syntax validator for frontmatter validation.
 """
 
 import re
-from typing import Any, Dict, Optional
+from typing import Any
 
 import yaml
 
-from .base import Validator, ValidationResult, ValidationSeverity
+from .base import ValidationResult, ValidationSeverity, Validator
 
 
 class YAMLValidator(Validator):
@@ -25,7 +25,7 @@ class YAMLValidator(Validator):
         self,
         source: str,
         translation: str,
-        context: Optional[Dict[str, Any]] = None,
+        context: dict[str, Any] | None = None,
     ) -> ValidationResult:
         """
         Validate YAML frontmatter.
@@ -66,7 +66,7 @@ class YAMLValidator(Validator):
 
     def _parse_yaml(
         self, yaml_str: str, label: str, result: ValidationResult
-    ) -> Optional[Dict[str, Any]]:
+    ) -> dict[str, Any] | None:
         """
         Parse YAML string and report errors.
 
@@ -105,8 +105,8 @@ class YAMLValidator(Validator):
 
     def _check_structure(
         self,
-        source: Dict[str, Any],
-        translation: Dict[str, Any],
+        source: dict[str, Any],
+        translation: dict[str, Any],
         result: ValidationResult,
     ) -> None:
         """
@@ -146,8 +146,8 @@ class YAMLValidator(Validator):
 
     def _check_type_consistency(
         self,
-        source: Dict[str, Any],
-        translation: Dict[str, Any],
+        source: dict[str, Any],
+        translation: dict[str, Any],
         result: ValidationResult,
     ) -> None:
         """
@@ -221,7 +221,7 @@ class YAMLValidator(Validator):
                         result.issues.append(
                             self.create_issue(
                                 ValidationSeverity.WARNING,
-                                f"Unquoted colon in value may cause parsing issues",
+                                "Unquoted colon in value may cause parsing issues",
                                 location=f"line {line_num}",
                                 details={"line": line.strip()},
                             )

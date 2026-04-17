@@ -1,17 +1,15 @@
 """Unit tests for recommendation feedback loop (BM-03)."""
 
-import pytest
-from pathlib import Path
-import tempfile
 from datetime import datetime
 
+import pytest
+
 from src.benchmarking.feedback import (
-    FeedbackCollector,
     AdaptiveWeightLearner,
+    FeedbackCollector,
     RecommendationFeedback,
-    RecommendationAccuracy,
 )
-from src.benchmarking.storage import BenchmarkDatabase, BenchmarkRun
+from src.benchmarking.storage import BenchmarkRun
 from src.benchmarking.system_info import SystemInfo
 
 # temp_db fixture imported from conftest.py

@@ -3,16 +3,17 @@
 import json
 import logging
 import time
+from dataclasses import asdict, dataclass
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Dict, Optional, TYPE_CHECKING
-from dataclasses import dataclass, asdict
-from datetime import datetime, timezone, timedelta
+from typing import TYPE_CHECKING, Optional
 
 from src.utils.atomic_write import atomic_write
-from src.utils.content_hash import compute_file_hash, HashAlgorithm
+from src.utils.content_hash import HashAlgorithm, compute_file_hash
 
 if TYPE_CHECKING:
     from redis import Redis
+
     from ..observability.metrics import MetricsCollector
 
 logger = logging.getLogger(__name__)
@@ -43,7 +44,7 @@ class OutputFileMetadata:
 class FileMetadata:
     """Complete metadata for source file + all translations."""
     source: SourceFileMetadata
-    outputs: Dict[str, OutputFileMetadata]  # {lang_code: metadata}
+    outputs: dict[str, OutputFileMetadata]  # {lang_code: metadata}
 
 
 class MetadataTracker:
@@ -59,11 +60,11 @@ class MetadataTracker:
         self,
         metadata_file: Path,
         hash_algorithm: HashAlgorithm = "md5",
-        site_id: Optional[str] = None,
+        site_id: str | None = None,
         redis_client: Optional["Redis"] = None,
         lock_timeout: int = 30,
         metrics: Optional["MetricsCollector"] = None,
-        auto_cleanup_config: Optional[Dict] = None,
+        auto_cleanup_config: dict | None = None,
     ):
         self.metadata_file = metadata_file
         self.hash_algorithm = hash_algorithm
@@ -72,7 +73,7 @@ class MetadataTracker:
         self.lock_timeout = lock_timeout
         self.metrics = metrics  # CHH-04: Metrics collector
         self.auto_cleanup_config = auto_cleanup_config or {}  # CHH-05: Automatic cleanup config
-        self._data: Dict[str, FileMetadata] = {}
+        self._data: dict[str, FileMetadata] = {}
         self._loaded = False
 
     def load(self) -> None:
@@ -83,7 +84,7 @@ class MetadataTracker:
             return
 
         try:
-            with open(self.metadata_file, "r", encoding="utf-8") as f:
+            with open(self.metadata_file, encoding="utf-8") as f:
                 raw = json.load(f)
 
             # Validate schema version
@@ -207,7 +208,7 @@ class MetadataTracker:
         content = json.dumps(output, indent=2, ensure_ascii=False)
         atomic_write(self.metadata_file, content, fsync=True)
 
-    def get_source_hash(self, source_path: Path) -> Optional[str]:
+    def get_source_hash(self, source_path: Path) -> str | None:
         """Get stored hash for source file."""
         if not self._loaded:
             self.load()

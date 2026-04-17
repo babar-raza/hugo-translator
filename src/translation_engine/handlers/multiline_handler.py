@@ -7,8 +7,8 @@ to preserve bullet point structure, indentation, and newlines during translation
 
 import logging
 import re
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import Callable, List, Optional, Tuple
 
 logger = logging.getLogger(__name__)
 
@@ -60,7 +60,7 @@ class MultilineResult:
     line_count_source: int
     line_count_translated: int
     structure_preserved: bool
-    lines_info: List[LineInfo] = field(default_factory=list)
+    lines_info: list[LineInfo] = field(default_factory=list)
 
 
 class MultilineHandler:
@@ -105,7 +105,7 @@ class MultilineHandler:
         """
         return '\n' in text or '\\n' in text
 
-    def parse_lines(self, text: str) -> List[LineInfo]:
+    def parse_lines(self, text: str) -> list[LineInfo]:
         """
         Parse multiline text into structured line information.
 

@@ -7,13 +7,13 @@ automated git commits of translation outputs.
 
 import logging
 from pathlib import Path
-from typing import List, Optional, Dict, Any
+from typing import Any
 
 from src.observability.git_commit import (
-    GitCommitter,
     GitCommitConfig,
     GitCommitResult,
-    collect_output_files
+    GitCommitter,
+    collect_output_files,
 )
 
 logger = logging.getLogger(__name__)
@@ -58,8 +58,8 @@ class CommitEngine:
 
     def __init__(
         self,
-        config: Optional[GitCommitConfig] = None,
-        working_dir: Optional[Path] = None
+        config: GitCommitConfig | None = None,
+        working_dir: Path | None = None
     ):
         """Initialize commit engine."""
         self.config = config or GitCommitConfig()
@@ -76,13 +76,13 @@ class CommitEngine:
 
     def commit_if_enabled(
         self,
-        output_files: List[Path],
+        output_files: list[Path],
         site_id: str,
-        target_langs: List[str],
+        target_langs: list[str],
         run_id: str,
-        translation_result: Optional[Any] = None,
-        model_id: Optional[str] = None,
-        tm_stats: Optional[Dict] = None,
+        translation_result: Any | None = None,
+        model_id: str | None = None,
+        tm_stats: dict | None = None,
     ) -> GitCommitResult:
         """
         Commit translation outputs if commits are enabled.
@@ -152,8 +152,8 @@ class CommitEngine:
     def collect_output_files(
         self,
         output_root: Path,
-        target_langs: List[str]
-    ) -> List[Path]:
+        target_langs: list[str]
+    ) -> list[Path]:
         """
         Collect all output files for specified target languages.
 

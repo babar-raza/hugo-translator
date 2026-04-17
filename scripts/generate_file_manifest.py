@@ -21,15 +21,13 @@ Categories:
 
 import argparse
 import json
-import os
 import sys
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Set
-
+from typing import Any
 
 # Patterns to ignore (not counted in manifest)
-IGNORE_PATTERNS: Set[str] = {
+IGNORE_PATTERNS: set[str] = {
     ".git",
     "__pycache__",
     ".pytest_cache",
@@ -79,7 +77,7 @@ def should_ignore(path: Path) -> bool:
     return False
 
 
-def analyze_file(path: Path, repo_root: Path) -> Dict[str, Any]:
+def analyze_file(path: Path, repo_root: Path) -> dict[str, Any]:
     """Analyze file metadata."""
     try:
         stat = path.stat()
@@ -147,11 +145,11 @@ def categorize_file(path: Path, repo_root: Path) -> str:
     return "artifacts"
 
 
-def generate_manifest(repo_root: str, verbose: bool = False) -> Dict[str, Any]:
+def generate_manifest(repo_root: str, verbose: bool = False) -> dict[str, Any]:
     """Generate comprehensive file manifest."""
     root = Path(repo_root).resolve()
 
-    manifest: Dict[str, List[Dict[str, Any]]] = {
+    manifest: dict[str, list[dict[str, Any]]] = {
         "source_code": [],
         "tests": [],
         "config": [],
@@ -237,7 +235,7 @@ def format_size(size_bytes: int) -> str:
     return f"{size_bytes:.2f} PB"
 
 
-def generate_summary_markdown(manifest: Dict[str, Any]) -> str:
+def generate_summary_markdown(manifest: dict[str, Any]) -> str:
     """Generate human-readable summary in Markdown format."""
     lines = [
         "# File Manifest Summary",
@@ -317,8 +315,8 @@ def generate_summary_markdown(manifest: Dict[str, Any]) -> str:
     ])
 
     # Count extensions
-    ext_counts: Dict[str, int] = {}
-    ext_sizes: Dict[str, int] = {}
+    ext_counts: dict[str, int] = {}
+    ext_sizes: dict[str, int] = {}
     for category, files in manifest["categories"].items():
         if category != "ignore":
             for f in files:

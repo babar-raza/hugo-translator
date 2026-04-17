@@ -14,14 +14,13 @@ Key Guarantees:
 5. Async save option supported
 """
 
-import pytest
-import time
-import tempfile
 import json
-from pathlib import Path
-from unittest.mock import Mock, patch, MagicMock
-
 import sys
+import time
+from pathlib import Path
+
+import pytest
+
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 
@@ -361,7 +360,7 @@ def test_save_failure_increments_counter(l3_index_dir, check_deps):
     original_save = tm.save_index
 
     def failing_save():
-        raise IOError("Simulated disk error")
+        raise OSError("Simulated disk error")
 
     tm.save_index = failing_save
 

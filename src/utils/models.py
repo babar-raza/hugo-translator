@@ -6,7 +6,7 @@ These models provide runtime validation and type safety for configuration data.
 from __future__ import annotations
 
 from enum import Enum
-from typing import Dict, List, Literal, Optional
+from typing import Literal
 
 from pydantic import BaseModel, Field, field_validator
 
@@ -27,7 +27,7 @@ class FrontmatterRule(BaseModel):
     mode: FrontmatterMode = Field(
         ..., description="How to handle this frontmatter field"
     )
-    strategy: Optional[str] = Field(
+    strategy: str | None = Field(
         None,
         description="Optional translation strategy (e.g., preserve_case, technical_terms)",
     )
@@ -41,15 +41,15 @@ class BodyRules(BaseModel):
     translate_markdown: bool = Field(
         ..., description="Whether to translate markdown body content"
     )
-    preserve_blocks: List[str] = Field(
+    preserve_blocks: list[str] = Field(
         default_factory=list,
         description="Block types to preserve (not translate), e.g., block_code",
     )
-    preserve_patterns: List[str] = Field(
+    preserve_patterns: list[str] = Field(
         default_factory=list,
         description="Regex patterns for content to preserve (e.g., Hugo shortcodes)",
     )
-    placeholder_syntax: List[str] = Field(
+    placeholder_syntax: list[str] = Field(
         default_factory=list,
         description="Hugo shortcode/placeholder patterns to protect during translation",
     )
@@ -136,10 +136,10 @@ class SiteValidationConfig(BaseModel):
     """Site-specific validation configuration."""
 
     enabled: bool = Field(default=True, description="Enable validation for this site")
-    validation_mode: Optional[Literal["strict", "normal", "lenient", "off"]] = Field(
+    validation_mode: Literal["strict", "normal", "lenient", "off"] | None = Field(
         None, description="Override global validation mode"
     )
-    validators: Optional[Dict[str, ValidatorConfig]] = Field(
+    validators: dict[str, ValidatorConfig] | None = Field(
         None, description="Validator-specific settings"
     )
     post_write_validation: bool = Field(
@@ -151,13 +151,13 @@ class SiteTerminologyConfig(BaseModel):
     """Site-specific terminology configuration."""
 
     enabled: bool = Field(default=True, description="Enable terminology preservation")
-    preserve_mode: Optional[Literal["PROTECT", "VALIDATE", "BOTH", "NONE"]] = Field(
+    preserve_mode: Literal["PROTECT", "VALIDATE", "BOTH", "NONE"] | None = Field(
         None, description="Override global preserve mode"
     )
     inherit_global: bool = Field(
         default=True, description="Inherit global terminology rules"
     )
-    custom_terms: List[TermMatch] = Field(
+    custom_terms: list[TermMatch] = Field(
         default_factory=list, description="Site-specific custom terms"
     )
 
@@ -170,11 +170,11 @@ class SiteProfile(BaseModel):
         description="Unique identifier for the site (e.g., products.aspose.net)",
         pattern=r"^[a-z0-9.-]+$",
     )
-    display_name: Optional[str] = Field(
+    display_name: str | None = Field(
         default=None,
         description="Human-readable content type name for commit messages (e.g., 'Documentation', 'blog posts')",
     )
-    content_roots: List[str] = Field(
+    content_roots: list[str] = Field(
         ...,
         min_length=1,
         description="List of content root directories to watch/translate",
@@ -184,33 +184,33 @@ class SiteProfile(BaseModel):
         description="Default source language code (e.g., en)",
         pattern=r"^[a-z]{2}(-[A-Z]{2})?$",
     )
-    target_langs: List[str] = Field(
+    target_langs: list[str] = Field(
         ...,
         min_length=1,
         description="List of target language codes",
     )
-    frontmatter: Dict[str, FrontmatterRule] = Field(
+    frontmatter: dict[str, FrontmatterRule] = Field(
         default_factory=dict,
         description="Frontmatter field rules (field_name -> rule)",
     )
     body: BodyRules = Field(..., description="Body translation rules")
-    output_layout: Optional[OutputLayout] = Field(
+    output_layout: OutputLayout | None = Field(
         default_factory=lambda: OutputLayout(
             per_language_folders=True, pattern="{lang}/{path}"
         ),
         description="Output file path layout",
     )
-    tm_prefs: Optional[TMPreferences] = Field(
+    tm_prefs: TMPreferences | None = Field(
         default_factory=TMPreferences,
         description="Translation Memory preferences",
     )
-    validation: Optional[SiteValidationConfig] = Field(
+    validation: SiteValidationConfig | None = Field(
         None, description="Site-specific validation configuration"
     )
-    terminology: Optional[SiteTerminologyConfig] = Field(
+    terminology: SiteTerminologyConfig | None = Field(
         None, description="Site-specific terminology configuration"
     )
-    default_model: Optional[str] = Field(
+    default_model: str | None = Field(
         default=None,
         description="Default translation model ID (e.g., m2m100_418m, m2m100_1.2b). Falls back to system default if not set."
     )
@@ -221,7 +221,7 @@ class SiteProfile(BaseModel):
 
     @field_validator("target_langs", mode="before")
     @classmethod
-    def validate_target_langs(cls, v: List[str]) -> List[str]:
+    def validate_target_langs(cls, v: list[str]) -> list[str]:
         """Validate target language codes."""
         import re
 
@@ -236,8 +236,8 @@ class SiteProfile(BaseModel):
     @field_validator("frontmatter")
     @classmethod
     def validate_frontmatter_not_empty(
-        cls, v: Dict[str, FrontmatterRule]
-    ) -> Dict[str, FrontmatterRule]:
+        cls, v: dict[str, FrontmatterRule]
+    ) -> dict[str, FrontmatterRule]:
         """Ensure at least some frontmatter rules are defined."""
         if not v:
             # Allow empty frontmatter, but warn in logs
@@ -246,7 +246,7 @@ class SiteProfile(BaseModel):
 
     @field_validator("default_model", mode="before")
     @classmethod
-    def normalize_default_model(cls, v: Optional[str]) -> Optional[str]:
+    def normalize_default_model(cls, v: str | None) -> str | None:
         """Normalize empty/whitespace-only strings to None."""
         if isinstance(v, str) and not v.strip():
             return None
@@ -257,7 +257,7 @@ class ValidatorConfig(BaseModel):
     """Configuration for an individual validator."""
 
     enabled: bool = Field(default=True, description="Whether this validator is enabled")
-    confidence_threshold: Optional[float] = Field(
+    confidence_threshold: float | None = Field(
         None,
         ge=0.0,
         le=1.0,
@@ -336,7 +336,7 @@ class ValidationConfig(BaseModel):
     retry_strategy: RetryStrategy = Field(
         default_factory=RetryStrategy, description="Retry strategy configuration"
     )
-    validation_modes: Dict[str, ValidationMode] = Field(
+    validation_modes: dict[str, ValidationMode] = Field(
         default_factory=dict, description="Named validation mode profiles"
     )
 
@@ -360,7 +360,7 @@ class TermPattern(BaseModel):
 
     pattern: str = Field(..., description="Regular expression pattern")
     category: str = Field(..., description="Term category")
-    description: Optional[str] = Field(None, description="Pattern description")
+    description: str | None = Field(None, description="Pattern description")
     preserve_mode: Literal["protect", "validate", "both", "none"] = Field(
         default="both", description="Preservation mode"
     )
@@ -372,10 +372,10 @@ class TermPattern(BaseModel):
 class GlobalTerminology(BaseModel):
     """Global terminology configuration."""
 
-    exact_matches: List[TermMatch] = Field(
+    exact_matches: list[TermMatch] = Field(
         default_factory=list, description="Exact term matches"
     )
-    patterns: List[TermPattern] = Field(
+    patterns: list[TermPattern] = Field(
         default_factory=list, description="Pattern-based matches"
     )
 
@@ -386,7 +386,7 @@ class SiteTerminologyOverride(BaseModel):
     inherit_global: bool = Field(
         default=True, description="Inherit global terminology rules"
     )
-    patterns: List[TermPattern] = Field(
+    patterns: list[TermPattern] = Field(
         default_factory=list, description="Site-specific patterns"
     )
 
@@ -417,7 +417,7 @@ class TerminologyConfig(BaseModel):
         alias="global",
         description="Global terminology rules",
     )
-    site_overrides: Dict[str, SiteTerminologyOverride] = Field(
+    site_overrides: dict[str, SiteTerminologyOverride] = Field(
         default_factory=dict, description="Site-specific overrides"
     )
     auto_discovery: AutoDiscovery = Field(
@@ -453,7 +453,7 @@ class ValidationDefaults(BaseModel):
     post_write: PostWriteValidation = Field(
         default_factory=PostWriteValidation, description="Post-write validation configuration"
     )
-    validators: Dict[str, ValidatorConfig] = Field(
+    validators: dict[str, ValidatorConfig] = Field(
         default_factory=dict, description="Validator configurations"
     )
 
@@ -536,19 +536,19 @@ class GlobalConfig(BaseModel):
     tm_data_dir: str = Field(
         default="./data/tm", description="Directory for translation memory data"
     )
-    validation: Optional[ValidationSettings] = Field(
+    validation: ValidationSettings | None = Field(
         None, description="Top-level validation settings"
     )
-    terminology: Optional[TerminologySettings] = Field(
+    terminology: TerminologySettings | None = Field(
         None, description="Top-level terminology settings"
     )
-    telemetry: Optional[TelemetrySettings] = Field(
+    telemetry: TelemetrySettings | None = Field(
         None, description="Telemetry settings"
     )
-    validation_defaults: Optional[ValidationDefaults] = Field(
+    validation_defaults: ValidationDefaults | None = Field(
         None, description="Validation configuration defaults"
     )
-    model_defaults: Optional[ModelDefaults] = Field(
+    model_defaults: ModelDefaults | None = Field(
         default_factory=ModelDefaults,
         description="Model configuration defaults"
     )

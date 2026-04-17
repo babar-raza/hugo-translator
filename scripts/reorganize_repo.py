@@ -18,14 +18,12 @@ Date: 2026-01-15
 
 import argparse
 import json
-import os
 import shutil
 import subprocess
 import sys
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, List, Optional, Set
 
 
 @dataclass
@@ -34,11 +32,11 @@ class Action:
     phase: int
     action_type: str  # DELETE, MOVE, CREATE, ARCHIVE
     source: str
-    destination: Optional[str] = None
+    destination: str | None = None
     success: bool = True
-    error: Optional[str] = None
+    error: str | None = None
     skipped: bool = False
-    skip_reason: Optional[str] = None
+    skip_reason: str | None = None
 
 
 @dataclass
@@ -46,15 +44,15 @@ class MigrationReport:
     """Collects and formats migration results."""
     timestamp: str = field(default_factory=lambda: datetime.now().isoformat())
     dry_run: bool = False
-    phases_executed: List[int] = field(default_factory=list)
-    actions: List[Action] = field(default_factory=list)
-    backup_branch: Optional[str] = None
+    phases_executed: list[int] = field(default_factory=list)
+    actions: list[Action] = field(default_factory=list)
+    backup_branch: str | None = None
 
     def add_action(self, action: Action):
         """Add an action to the report."""
         self.actions.append(action)
 
-    def get_summary(self) -> Dict:
+    def get_summary(self) -> dict:
         """Generate summary statistics by phase."""
         summary = {}
         for action in self.actions:
@@ -201,7 +199,7 @@ class RepoReorganizer:
         self,
         repo_root: Path,
         dry_run: bool = False,
-        phases: Optional[Set[int]] = None,
+        phases: set[int] | None = None,
         auto_confirm: bool = False,
     ):
         self.repo_root = repo_root

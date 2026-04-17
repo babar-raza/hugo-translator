@@ -5,8 +5,8 @@ E2E Dry Run Script for slides translation test.
 Tests translation pipeline on a single file to one locale.
 """
 
-import sys
 import os
+import sys
 import time
 from pathlib import Path
 
@@ -17,6 +17,7 @@ os.chdir(str(REPO_ROOT))
 
 # Set up logging
 import logging
+
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
@@ -33,15 +34,16 @@ def run_dry_run():
     # Import components
     print("\n[1/5] Importing components...")
     try:
-        from src.translation_engine import TranslationEngine
-        from src.utils.config_loader import ConfigService
+        import torch
+
+        from src.model_runtime import ModelLoader
+        from src.model_runtime.registry import ModelRegistry
         from src.tm import TranslationMemory
         from src.tm.l1_cache import L1Cache
         from src.tm.l2_persistent import L2PersistentTM
         from src.tm.l3_semantic import L3SemanticTM
-        from src.model_runtime import ModelLoader
-        from src.model_runtime.registry import ModelRegistry
-        import torch
+        from src.translation_engine import TranslationEngine
+        from src.utils.config_loader import ConfigService
         print("   OK: All components imported successfully")
     except ImportError as e:
         print(f"   ERROR: Import failed: {e}")
@@ -128,7 +130,7 @@ def run_dry_run():
         )
         duration = time.time() - start_time
 
-        print(f"\n   Results:")
+        print("\n   Results:")
         print(f"   - Success: {result.success}")
         print(f"   - Duration: {duration:.2f}s")
         print(f"   - Total segments: {result.stats.total_segments}")
@@ -154,7 +156,7 @@ def run_dry_run():
         return False
 
     # Verify output
-    print(f"\n[5/5] Verifying output...")
+    print("\n[5/5] Verifying output...")
     if result.success and result.outputs:
         output_path = result.outputs.get(target_lang)
         if output_path and output_path.exists():
@@ -173,7 +175,7 @@ def run_dry_run():
                 print("   WARNING: Content seems too short")
 
             # Show preview
-            print(f"\n   Preview (first 500 chars):")
+            print("\n   Preview (first 500 chars):")
             print("-" * 40)
             print(content[:500])
             print("-" * 40)
@@ -183,7 +185,7 @@ def run_dry_run():
             print(f"   ERROR: Output file not found at {output_path}")
             return False
     else:
-        print(f"   ERROR: Translation failed")
+        print("   ERROR: Translation failed")
         return False
 
 

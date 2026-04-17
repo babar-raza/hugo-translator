@@ -11,7 +11,7 @@ import shutil
 import time
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from .l2_persistent import L2PersistentTM
@@ -31,7 +31,7 @@ class RebuildResult:
     entries_exported: int
     entries_indexed: int
     duration_seconds: float
-    backup_path: Optional[Path] = None
+    backup_path: Path | None = None
 
     @property
     def success(self) -> bool:
@@ -81,7 +81,7 @@ class L3IndexRebuilder:
         self,
         l2: 'L2PersistentTM',
         l3: 'L3SemanticTM',
-        backup_dir: Optional[Path] = None
+        backup_dir: Path | None = None
     ):
         """
         Initialize index rebuilder.
@@ -97,8 +97,8 @@ class L3IndexRebuilder:
 
     def rebuild(
         self,
-        site_id: Optional[str] = None,
-        tgt_lang: Optional[str] = None,
+        site_id: str | None = None,
+        tgt_lang: str | None = None,
         backup_existing: bool = True,
         batch_size: int = 1000
     ) -> RebuildResult:
@@ -181,7 +181,7 @@ class L3IndexRebuilder:
         except Exception:
             return False
 
-    def _backup_index(self) -> Optional[Path]:
+    def _backup_index(self) -> Path | None:
         """Create backup of existing L3 index."""
         try:
             index_path = getattr(self.l3, 'index_path', None)
@@ -243,8 +243,8 @@ class L3IndexRebuilder:
 def rebuild_l3_from_l2(
     l2_path: Path,
     l3_path: Path,
-    site_id: Optional[str] = None,
-    tgt_lang: Optional[str] = None,
+    site_id: str | None = None,
+    tgt_lang: str | None = None,
     backup_existing: bool = True
 ) -> RebuildResult:
     """

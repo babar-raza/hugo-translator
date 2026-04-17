@@ -7,8 +7,6 @@ SR-04: High-concurrency stress testing to expose race conditions and deadlocks.
 """
 import threading
 import time
-import pytest
-from pathlib import Path
 
 
 class TestAtomicWriteStress:

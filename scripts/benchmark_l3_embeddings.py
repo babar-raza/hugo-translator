@@ -6,10 +6,9 @@ Compares GPU vs CPU performance for semantic embedding generation.
 import argparse
 import logging
 import sys
+import tempfile
 import time
 from pathlib import Path
-from typing import Dict, List
-import tempfile
 
 # Add parent directory to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -28,7 +27,7 @@ logger = logging.getLogger(__name__)
 class L3Benchmark:
     """Benchmark L3 semantic embeddings."""
 
-    def create_test_entries(self, count: int) -> List[Dict]:
+    def create_test_entries(self, count: int) -> list[dict]:
         """
         Create test entries for benchmarking.
 
@@ -69,7 +68,7 @@ class L3Benchmark:
         use_gpu: bool,
         batch_size: int,
         num_entries: int,
-    ) -> Dict:
+    ) -> dict:
         """
         Benchmark embedding generation.
 
@@ -152,7 +151,7 @@ class L3Benchmark:
 
             return result
 
-    def compare_devices(self, batch_size: int, num_entries: int) -> Dict:
+    def compare_devices(self, batch_size: int, num_entries: int) -> dict:
         """
         Compare GPU vs CPU performance.
 
@@ -199,7 +198,7 @@ class L3Benchmark:
 
         return results
 
-    def generate_report(self, results: Dict, output_path: Path) -> None:
+    def generate_report(self, results: dict, output_path: Path) -> None:
         """
         Generate markdown report.
 
@@ -218,7 +217,7 @@ class L3Benchmark:
             gpu = results["gpu"]
             lines.append("## GPU Performance")
             lines.append("")
-            lines.append(f"- Device: CUDA")
+            lines.append("- Device: CUDA")
             lines.append(f"- Initialization Time: {gpu['init_time']:.2f}s")
             lines.append(f"- Encoding Time: {gpu['encoding_time']:.3f}s")
             lines.append(f"- Encoding Throughput: {gpu['throughput']:.1f} entries/sec")
@@ -231,7 +230,7 @@ class L3Benchmark:
             cpu = results["cpu"]
             lines.append("## CPU Performance")
             lines.append("")
-            lines.append(f"- Device: CPU")
+            lines.append("- Device: CPU")
             lines.append(f"- Initialization Time: {cpu['init_time']:.2f}s")
             lines.append(f"- Encoding Time: {cpu['encoding_time']:.3f}s")
             lines.append(f"- Encoding Throughput: {cpu['throughput']:.1f} entries/sec")

@@ -4,10 +4,9 @@ import argparse
 import json
 import subprocess
 import sys
+from dataclasses import asdict, dataclass
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import List, Dict
-from dataclasses import dataclass, asdict
-from datetime import datetime, UTC
 
 
 @dataclass
@@ -37,7 +36,7 @@ class ProductionReadinessChecker:
         """
         self.project_root = Path(project_root)
         self.strict = strict
-        self.results: List[CheckResult] = []
+        self.results: list[CheckResult] = []
 
     def check_python_syntax(self) -> CheckResult:
         """Check all Python files have valid syntax."""
@@ -356,7 +355,7 @@ class ProductionReadinessChecker:
             message=f"All {len(required_configs)} required config files exist"
         )
 
-    def run_all_checks(self) -> List[CheckResult]:
+    def run_all_checks(self) -> list[CheckResult]:
         """Run all automated production readiness checks.
 
         Returns:
@@ -419,7 +418,7 @@ def main():
     automated = sum(1 for r in results if r.automated)
 
     # Group by category
-    by_category: Dict[str, List[CheckResult]] = {}
+    by_category: dict[str, list[CheckResult]] = {}
     for result in results:
         if result.category not in by_category:
             by_category[result.category] = []

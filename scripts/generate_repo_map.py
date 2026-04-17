@@ -2,12 +2,12 @@
 """
 Repo Cartographer - Generate comprehensive repository map and cleanup plan
 """
-import json
 import csv
-from pathlib import Path
-from datetime import datetime
-from collections import defaultdict
+import json
 import os
+from collections import defaultdict
+from datetime import datetime
+from pathlib import Path
 
 # Repository root
 REPO_ROOT = Path(__file__).parent.parent
@@ -72,7 +72,7 @@ def load_import_data():
     """Load import reference data from CSV."""
     import_data = {}
     if IMPORT_CSV.exists():
-        with open(IMPORT_CSV, 'r', encoding='utf-8') as f:
+        with open(IMPORT_CSV, encoding='utf-8') as f:
             reader = csv.DictReader(f)
             for row in reader:
                 try:
@@ -402,7 +402,7 @@ def generate_cleanup_plan(inventory):
         f.write("\n")
 
         f.write("## Phase 3: Consolidate Test Fixtures (LOW PRIORITY)\n\n")
-        f.write(f"Move all test fixtures to `tests/fixtures/` for consistency.\n\n")
+        f.write("Move all test fixtures to `tests/fixtures/` for consistency.\n\n")
         root_fixtures = [f for f in test_only if not f['path'].startswith('tests/')]
         for item in root_fixtures[:10]:
             f.write(f"- `{item['path']}` → `tests/fixtures/{item['path']}`\n")
@@ -473,7 +473,7 @@ def generate_evidence_log(inventory):
         f.write("ANALYSIS STEPS:\n\n")
         f.write("1. File Discovery\n")
         f.write(f"   - Walked repository tree: {REPO_ROOT}\n")
-        f.write(f"   - Excluded: venv/, __pycache__/, .git/, etc.\n")
+        f.write("   - Excluded: venv/, __pycache__/, .git/, etc.\n")
         f.write(f"   - Found {len(inventory)} tracked files\n\n")
 
         f.write("2. Classification\n")
@@ -533,23 +533,23 @@ def generate_evidence_log(inventory):
         src_files = [f for f in inventory if f['type'] == 'source_code' and f['language'] == 'python']
         test_files = [f for f in inventory if f['type'] == 'tests' and f['language'] == 'python']
 
-        f.write(f"1. Source Code Health:\n")
+        f.write("1. Source Code Health:\n")
         f.write(f"   - Total Python modules: {len(src_files)}\n")
         f.write(f"   - Active modules: {len([f for f in src_files if f['status'] == 'active'])}\n")
         f.write(f"   - Deprecated modules: {len([f for f in src_files if f['status'] == 'deprecated'])}\n")
         f.write(f"   - Orphaned modules: {len([f for f in src_files if f['action'] == 'delete_candidate'])}\n\n")
 
-        f.write(f"2. Test Coverage:\n")
+        f.write("2. Test Coverage:\n")
         f.write(f"   - Total test files: {len(test_files)}\n")
         f.write(f"   - Test fixtures: {len([f for f in inventory if f['type'] == 'data' and f['status'] == 'test_only'])}\n\n")
 
-        f.write(f"3. Configuration:\n")
+        f.write("3. Configuration:\n")
         config_files = [f for f in inventory if f['type'] == 'configuration']
         f.write(f"   - Configuration files: {len(config_files)}\n")
         yaml_configs = [f for f in config_files if f['language'] == 'yaml']
         f.write(f"   - YAML configs: {len(yaml_configs)}\n\n")
 
-        f.write(f"4. Documentation:\n")
+        f.write("4. Documentation:\n")
         doc_files = [f for f in inventory if f['type'] == 'documentation']
         f.write(f"   - Documentation files: {len(doc_files)}\n")
         f.write(f"   - Markdown docs: {len([f for f in doc_files if f['language'] == 'markdown'])}\n")

@@ -15,12 +15,11 @@ import hashlib
 import json
 import logging
 import os
-import shutil
 import sys
 import tarfile
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple, TYPE_CHECKING
+from typing import TYPE_CHECKING, Optional
 
 if TYPE_CHECKING:
     from src.shared_engines.composition_root import SharedEngines
@@ -86,7 +85,7 @@ def create_backup_metadata(
     tm_data_dir: Path,
     config_dir: Path,
     version: str = "1.0.0"
-) -> Dict:
+) -> dict:
     """
     Create metadata for backup.
 
@@ -151,10 +150,10 @@ def create_backup(
     output_path: Path,
     tm_data_dir: Path,
     config_dir: Path,
-    rotate: Optional[int] = None,
+    rotate: int | None = None,
     compression: str = "gz",
     engines: Optional["SharedEngines"] = None,
-) -> Tuple[bool, str]:
+) -> tuple[bool, str]:
     """
     Create compressed backup of TM and configs.
 

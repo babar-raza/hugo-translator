@@ -34,4 +34,3 @@ For deployment, the article mentions hosting the service on Windows, Linux, or m
 It encourages securing the API with authentication and HTTPS and monitoring performance when processing large or numerous documents.
 
 These recommendations are summarized from the deployment and configuration sections of the KB article on [kb.aspose.com](https://kb.aspose.com/words/).
-

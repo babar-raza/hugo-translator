@@ -3,15 +3,14 @@ Unit tests for TM admin interface.
 """
 
 import csv
-import json
 import tempfile
 from pathlib import Path
-from unittest.mock import Mock, patch
+from unittest.mock import Mock
 
 import pytest
 
 from src.observability.tm_admin import TranslationMemoryAdmin
-from src.tm.l1_cache import L1Cache, CacheStats
+from src.tm.l1_cache import L1Cache
 from src.tm.l2_persistent import L2PersistentTM
 from src.tm.l3_semantic import L3SemanticTM
 from src.tm.translation_memory import TranslationMemory
@@ -158,7 +157,7 @@ class TestDumpEntriesToFile:
         assert error is None
 
         # Verify CSV structure
-        with open(out_path, "r", encoding="utf-8") as f:
+        with open(out_path, encoding="utf-8") as f:
             reader = csv.DictReader(f)
             fieldnames = reader.fieldnames
             assert "site_id" in fieldnames

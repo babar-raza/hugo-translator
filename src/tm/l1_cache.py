@@ -7,7 +7,7 @@ import hashlib
 import threading
 from collections import OrderedDict
 from dataclasses import dataclass
-from typing import Any, Dict, Optional
+from typing import Any
 
 
 @dataclass
@@ -26,7 +26,7 @@ class CacheStats:
         total = self.hits + self.misses
         return (self.hits / total * 100) if total > 0 else 0.0
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary."""
         return {
             "hits": self.hits,
@@ -80,7 +80,7 @@ class L1Cache:
 
     def get(
         self, site_id: str, src_lang: str, tgt_lang: str, text: str
-    ) -> Optional[str]:
+    ) -> str | None:
         """
         Retrieve cached translation.
 
@@ -147,7 +147,7 @@ class L1Cache:
             self._cache.clear()
             self._stats = CacheStats(max_size=self.max_size)
 
-    def stats(self) -> Dict[str, Any]:
+    def stats(self) -> dict[str, Any]:
         """
         Get cache statistics.
 

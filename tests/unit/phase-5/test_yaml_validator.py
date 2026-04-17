@@ -5,7 +5,6 @@ Unit tests for YAML validator.
 import pytest
 
 from src.translation_engine.validation import (
-    ValidationSeverity,
     YAMLValidator,
 )
 

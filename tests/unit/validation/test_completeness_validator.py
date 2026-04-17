@@ -12,10 +12,10 @@ Tests cover:
 
 import pytest
 
+from src.translation_engine.validation.base import ValidationSeverity
 from src.translation_engine.validation.completeness_validator import (
     CompletenessValidator,
 )
-from src.translation_engine.validation.base import ValidationSeverity
 
 
 class TestCompletenessValidator:

@@ -12,7 +12,6 @@ Tests cover:
 - Telemetry integration (DEC-03)
 """
 
-import pytest
 from unittest.mock import Mock, call
 
 from src.translation_engine.validation.base import (
@@ -22,7 +21,6 @@ from src.translation_engine.validation.base import (
 )
 from src.translation_engine.validation.decision_engine import ValidationDecisionEngine
 from src.translation_engine.validation.post_translation_validator import (
-    DecisionResult,
     ValidationDecision,
 )
 

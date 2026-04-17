@@ -2,7 +2,6 @@
 Tests for metrics collection system.
 """
 
-import pytest
 
 from src.observability.metrics import (
     Counter,

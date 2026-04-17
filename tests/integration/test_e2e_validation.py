@@ -4,23 +4,19 @@ End-to-End Validation Integration Tests
 Tests the complete translation pipeline: parse → extract → translate → reconstruct → validate
 """
 
-import pytest
 import sys
 from pathlib import Path
-from typing import Dict, List
+
+import pytest
 
 # Add src to path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
-from src.translation_engine.parser import HugoParser
 from src.translation_engine.extractor import SegmentExtractor
+from src.translation_engine.parser import HugoParser
 from src.translation_engine.reconstructor import MarkdownReconstructor
-from src.translation_engine.validation import ValidationSuite, ValidationSeverity
-from src.tm.l1_cache import L1Cache
-from src.tm.l2_persistent import L2PersistentTM
-from src.tm.l3_semantic import L3SemanticTM
-from src.tm.translation_memory import TranslationMemory
-from src.utils.models import SiteProfile, BodyRules, FrontmatterMode, FrontmatterRule
+from src.translation_engine.validation import ValidationSeverity, ValidationSuite
+from src.utils.models import BodyRules, FrontmatterMode, FrontmatterRule, SiteProfile
 
 
 # Test fixtures
@@ -311,7 +307,7 @@ class TestE2EFullPipeline:
         sample_file = sample_files[0]
 
         # Read file
-        with open(sample_file, 'r', encoding='utf-8') as f:
+        with open(sample_file, encoding='utf-8') as f:
             content = f.read()
 
         # Parse

@@ -14,11 +14,11 @@ Key Guarantees:
 5. Cache warming: hits promoted up the hierarchy
 """
 
-import pytest
-from unittest.mock import Mock, MagicMock, patch
 from dataclasses import dataclass
-from typing import Optional, List, Dict, Any
+from typing import Any
+from unittest.mock import Mock
 
+import pytest
 
 # ==============================================================================
 # Mock Classes for Testing
@@ -30,7 +30,7 @@ class MockSemanticMatch:
     """Mock for L3 semantic search result."""
     translation: str
     similarity: float
-    metadata: Optional[Dict[str, Any]] = None
+    metadata: dict[str, Any] | None = None
 
 
 # ==============================================================================

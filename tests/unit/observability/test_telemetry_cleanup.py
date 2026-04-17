@@ -5,9 +5,9 @@ Tests the API-based cleanup functionality for stale telemetry runs.
 All tests use mocked HTTP requests - no actual network calls or database access.
 """
 
-import pytest
-from datetime import datetime, timezone, timedelta
 from unittest.mock import Mock, patch
+
+import pytest
 import requests
 
 from src.observability.telemetry_cleanup import cleanup_stale_runs

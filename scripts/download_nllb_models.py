@@ -34,13 +34,13 @@ def download_nllb_600m():
     logger.info("Downloading tokenizer...")
     tokenizer = AutoTokenizer.from_pretrained(model_id)
     tokenizer.save_pretrained(save_dir)
-    logger.info(f"✓ Tokenizer saved")
+    logger.info("✓ Tokenizer saved")
 
     # Download model
     logger.info("Downloading model weights... (this will take several minutes)")
     model = AutoModelForSeq2SeqLM.from_pretrained(model_id)
     model.save_pretrained(save_dir)
-    logger.info(f"✓ Model saved")
+    logger.info("✓ Model saved")
 
     # Calculate size
     total_size = sum(f.stat().st_size for f in save_dir.rglob('*') if f.is_file())
@@ -71,13 +71,13 @@ def download_nllb_1_3b():
     logger.info("Downloading tokenizer...")
     tokenizer = AutoTokenizer.from_pretrained(model_id)
     tokenizer.save_pretrained(save_dir)
-    logger.info(f"✓ Tokenizer saved")
+    logger.info("✓ Tokenizer saved")
 
     # Download model
     logger.info("Downloading model weights... (this will take several minutes)")
     model = AutoModelForSeq2SeqLM.from_pretrained(model_id)
     model.save_pretrained(save_dir)
-    logger.info(f"✓ Model saved")
+    logger.info("✓ Model saved")
 
     # Calculate size
     total_size = sum(f.stat().st_size for f in save_dir.rglob('*') if f.is_file())

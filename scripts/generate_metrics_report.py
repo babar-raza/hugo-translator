@@ -11,7 +11,7 @@ import json
 import sys
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any
 
 # Add src to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -74,7 +74,7 @@ def format_duration(seconds: float) -> str:
         return f"{seconds/3600:.2f} hours"
 
 
-def generate_text_report(stats: Dict[str, Any], metrics: MetricsCollector) -> str:
+def generate_text_report(stats: dict[str, Any], metrics: MetricsCollector) -> str:
     """
     Generate human-readable text report.
 
@@ -181,7 +181,7 @@ def generate_text_report(stats: Dict[str, Any], metrics: MetricsCollector) -> st
     return "\n".join(lines)
 
 
-def generate_json_report(stats: Dict[str, Any], metrics: MetricsCollector) -> str:
+def generate_json_report(stats: dict[str, Any], metrics: MetricsCollector) -> str:
     """
     Generate JSON report.
 

@@ -5,11 +5,10 @@ tracking which recommendations were followed, measuring accuracy, and
 adapting scoring weights over time.
 """
 
+import logging
 import uuid
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Dict, List, Optional
-import logging
 
 from src.benchmarking.storage import BenchmarkDatabase
 from src.benchmarking.system_info import SystemInfo
@@ -32,8 +31,8 @@ class RecommendationFeedback:
     predicted_memory_mb: float
     actual_memory_mb: float
     success: bool  # True if run completed without errors
-    quality_score: Optional[float]  # Translation quality if measured (0-1)
-    failure_reason: Optional[str]  # Error message if failed
+    quality_score: float | None  # Translation quality if measured (0-1)
+    failure_reason: str | None  # Error message if failed
     timestamp_utc: str
     system_info: SystemInfo
 
@@ -121,7 +120,7 @@ class FeedbackCollector:
 
     def get_feedback_for_recommendation(
         self, recommendation_id: str
-    ) -> Optional[RecommendationFeedback]:
+    ) -> RecommendationFeedback | None:
         """Get feedback for a specific recommendation.
 
         Args:
@@ -176,7 +175,7 @@ class FeedbackCollector:
             return None
 
     def get_accuracy_metrics(
-        self, model_id: Optional[str] = None
+        self, model_id: str | None = None
     ) -> RecommendationAccuracy:
         """Calculate accuracy metrics for recommendations.
 
@@ -272,7 +271,7 @@ class FeedbackCollector:
                 avg_memory_error_percent=0.0,
             )
 
-    def get_feedback_history(self, limit: int = 100) -> List[RecommendationFeedback]:
+    def get_feedback_history(self, limit: int = 100) -> list[RecommendationFeedback]:
         """Get recent feedback history.
 
         Args:
@@ -353,7 +352,7 @@ class AdaptiveWeightLearner:
 
     def update_weights(
         self, feedback: RecommendationFeedback
-    ) -> Dict[str, float]:
+    ) -> dict[str, float]:
         """Update weights based on feedback.
 
         Uses gradient descent-like update:
@@ -420,7 +419,7 @@ class AdaptiveWeightLearner:
             logger.error(f"Failed to update weights: {e}")
             return self.get_current_weights()
 
-    def get_current_weights(self) -> Dict[str, float]:
+    def get_current_weights(self) -> dict[str, float]:
         """Get current recommendation weights.
 
         Returns:
@@ -452,7 +451,7 @@ class AdaptiveWeightLearner:
             "historical_success": 0.4,
         }
 
-    def _store_weights(self, weights: Dict[str, float]) -> None:
+    def _store_weights(self, weights: dict[str, float]) -> None:
         """Store weights to database."""
         try:
             import json
@@ -473,7 +472,7 @@ class AdaptiveWeightLearner:
         except Exception as e:
             logger.error(f"Failed to store weights: {e}")
 
-    def get_weight_history(self) -> List[tuple[str, Dict[str, float]]]:
+    def get_weight_history(self) -> list[tuple[str, dict[str, float]]]:
         """Get historical weight updates.
 
         Returns:

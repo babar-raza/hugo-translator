@@ -38,4 +38,3 @@ Users are advised to review cookie‑related details and can adjust browser sett
 **Q7. How will I know if the Privacy Policy changes?**  
 Any updates to the Privacy Policy are reflected in the “Last Updated” date at the top of the document.  
 Aspose recommends that users periodically review the policy text at [about.aspose.com/legal/privacy-policy/](https://about.aspose.com/legal/privacy-policy/) to stay informed.
-

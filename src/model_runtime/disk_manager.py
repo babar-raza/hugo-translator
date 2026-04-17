@@ -1,10 +1,9 @@
 """Disk space management for model storage."""
-import shutil
 import logging
-from pathlib import Path
-from typing import List, Dict, Optional, Tuple
+import shutil
 from dataclasses import dataclass
 from datetime import datetime
+from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
@@ -48,8 +47,8 @@ class ModelDiskInfo:
     model_id: str
     path: Path
     size_mb: float
-    last_accessed: Optional[str] = None
-    backend: Optional[str] = None
+    last_accessed: str | None = None
+    backend: str | None = None
 
     @property
     def size_gb(self) -> float:
@@ -99,7 +98,7 @@ class DiskManager:
             percent_used=(stat.used / stat.total) * 100
         )
 
-    def get_models_usage(self) -> List[ModelDiskInfo]:
+    def get_models_usage(self) -> list[ModelDiskInfo]:
         """Get disk usage for each model.
 
         Returns:
@@ -159,7 +158,7 @@ class DiskManager:
 
         return total / (1024 * 1024)
 
-    def estimate_space_needed(self, model_sizes_mb: List[float]) -> float:
+    def estimate_space_needed(self, model_sizes_mb: list[float]) -> float:
         """Estimate space needed for downloading models.
 
         Args:
@@ -172,7 +171,7 @@ class DiskManager:
         # Add 10% buffer for temporary files, metadata, etc.
         return total * 1.1
 
-    def check_space_available(self, needed_mb: float) -> Tuple[bool, str]:
+    def check_space_available(self, needed_mb: float) -> tuple[bool, str]:
         """Check if sufficient space is available.
 
         Args:
@@ -210,8 +209,8 @@ class DiskManager:
     def find_cleanup_candidates(
         self,
         min_size_mb: float = 100,
-        days_since_access: Optional[int] = None
-    ) -> List[ModelDiskInfo]:
+        days_since_access: int | None = None
+    ) -> list[ModelDiskInfo]:
         """Find models that could be cleaned up.
 
         Args:
@@ -253,7 +252,7 @@ class DiskManager:
         total_mb = sum(m.size_mb for m in models)
         return total_mb / 1024
 
-    def get_usage_by_backend(self) -> Dict[str, float]:
+    def get_usage_by_backend(self) -> dict[str, float]:
         """Get disk usage grouped by backend.
 
         Returns:

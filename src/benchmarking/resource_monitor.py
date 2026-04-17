@@ -4,11 +4,10 @@ Monitors system resources to prevent benchmarks from choking the system.
 Provides real-time resource snapshots and safety checks.
 """
 
+import logging
 import time
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Optional
-import logging
 
 logger = logging.getLogger(__name__)
 
@@ -20,8 +19,8 @@ class ResourceSnapshot:
     cpu_percent: float  # Overall CPU usage (0-100)
     memory_percent: float  # Overall memory usage (0-100)
     memory_available_mb: float  # Available memory in MB
-    gpu_memory_used_mb: Optional[float]  # GPU memory used (None if no GPU)
-    gpu_memory_available_mb: Optional[float]  # GPU memory available (None if no GPU)
+    gpu_memory_used_mb: float | None  # GPU memory used (None if no GPU)
+    gpu_memory_available_mb: float | None  # GPU memory available (None if no GPU)
     timestamp: datetime
 
 
@@ -203,7 +202,6 @@ class ResourceMonitor:
 
 # Import here to avoid circular dependency
 from dataclasses import dataclass as _dataclass
-from typing import Optional as _Optional
 
 
 @_dataclass
@@ -211,7 +209,7 @@ class ResourceEstimate:
     """Estimated resource requirements for a benchmark."""
 
     estimated_memory_mb: float
-    estimated_gpu_memory_mb: _Optional[float]
+    estimated_gpu_memory_mb: float | None
     estimated_duration_seconds: float
     device_required: str  # "cpu", "cuda", "auto"
     confidence: float  # 0-1, how confident is the estimate

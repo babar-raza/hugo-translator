@@ -4,10 +4,10 @@ Unit tests for HealingEngine.
 Tests retry and recovery wrapper with mocked RetryHandler.
 """
 
-import unittest
-from unittest.mock import Mock, patch, MagicMock
-from pathlib import Path
 import sys
+import unittest
+from pathlib import Path
+from unittest.mock import MagicMock, Mock, patch
 
 # Add src to path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent / "src"))

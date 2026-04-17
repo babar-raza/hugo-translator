@@ -76,7 +76,7 @@ def main():
 
     # Detect GPU
     caps = gpu_manager.detect()
-    logger.info(f"\nGPU Detection:")
+    logger.info("\nGPU Detection:")
     logger.info(f"  CUDA Available: {caps.has_cuda}")
     if caps.has_cuda:
         logger.info(f"  Device Count: {caps.device_count}")

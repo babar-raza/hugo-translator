@@ -7,6 +7,7 @@ Downloads M2M100-1.2B and NLLB-200 models to models/ directory.
 import logging
 import sys
 from pathlib import Path
+
 from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
 
 # Setup logging

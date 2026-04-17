@@ -4,7 +4,6 @@ Tests that production metrics work through actual CLI invocation (subprocess),
 not just component testing. Validates real user workflows.
 """
 
-import json
 import os
 import subprocess
 import sys

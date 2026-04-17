@@ -5,7 +5,6 @@ Verifies that health monitor, L3SemanticTM, and scripts all resolve
 to the same canonical L3 path.
 """
 import sys
-import tempfile
 from pathlib import Path
 
 import pytest

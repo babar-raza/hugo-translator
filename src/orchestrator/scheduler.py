@@ -7,10 +7,10 @@ Scans content directories for files that need translation or updating.
 import logging
 import threading
 import time
+from collections.abc import Callable
 from dataclasses import dataclass
-from datetime import datetime, timedelta
+from datetime import datetime
 from pathlib import Path
-from typing import Callable, Dict, List, Optional
 
 from src.utils.config_loader import ConfigService
 from src.utils.models import SiteProfile
@@ -58,10 +58,10 @@ class SweepScheduler:
         self.sweep_interval_minutes = sweep_interval_minutes
 
         self._running = False
-        self._thread: Optional[threading.Thread] = None
+        self._thread: threading.Thread | None = None
         self._stop_event = threading.Event()
-        self._last_sweep: Dict[str, datetime] = {}  # site_id -> last_sweep_time
-        self._sweep_stats: List[SweepStats] = []
+        self._last_sweep: dict[str, datetime] = {}  # site_id -> last_sweep_time
+        self._sweep_stats: list[SweepStats] = []
         self._lock = threading.Lock()
 
     def start(self) -> None:
@@ -97,7 +97,7 @@ class SweepScheduler:
 
             logger.info("SweepScheduler stopped")
 
-    def trigger_sweep(self, site_id: Optional[str] = None) -> None:
+    def trigger_sweep(self, site_id: str | None = None) -> None:
         """
         Manually trigger a sweep operation.
 
@@ -113,7 +113,7 @@ class SweepScheduler:
         else:
             self._sweep_all_sites()
 
-    def get_stats(self, limit: int = 10) -> List[SweepStats]:
+    def get_stats(self, limit: int = 10) -> list[SweepStats]:
         """
         Get recent sweep statistics.
 
@@ -231,7 +231,7 @@ class SweepScheduler:
             f"({duration:.2f}s)"
         )
 
-    def _is_target_lang_file(self, file_path: Path, target_langs: List[str]) -> bool:
+    def _is_target_lang_file(self, file_path: Path, target_langs: list[str]) -> bool:
         """
         Check if file is in a target language directory.
 
@@ -320,7 +320,7 @@ class SweepScheduler:
         return content_root / target_lang / rel_path
 
     def _create_batch_jobs(
-        self, site_id: str, site_profile: SiteProfile, files: List[Path]
+        self, site_id: str, site_profile: SiteProfile, files: list[Path]
     ) -> int:
         """
         Create batch translation jobs.

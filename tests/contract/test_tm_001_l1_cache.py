@@ -19,14 +19,12 @@ Key Guarantees:
 6. Statistics accurately track hits, misses, and evictions
 """
 
-import pytest
 import threading
-import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from typing import List, Tuple
 
-from src.tm.l1_cache import L1Cache, CacheStats
+import pytest
 
+from src.tm.l1_cache import L1Cache
 
 # ==============================================================================
 # Fixtures
@@ -407,7 +405,7 @@ def test_concurrent_reads_and_writes_are_thread_safe():
     """
     cache = L1Cache(max_size=100)
     num_operations = 500
-    errors: List[Exception] = []
+    errors: list[Exception] = []
 
     # Pre-populate cache
     for i in range(50):

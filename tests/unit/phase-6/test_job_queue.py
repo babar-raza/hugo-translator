@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-from src.orchestrator.models import JobMode, JobStatus, JobType, TranslationJob
+from src.orchestrator.models import JobStatus, JobType, TranslationJob
 from src.orchestrator.queue import JobQueue
 
 

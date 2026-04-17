@@ -21,7 +21,6 @@ import sys
 import time
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Dict, Optional
 
 # Add src to path
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
@@ -57,7 +56,7 @@ class MigrationMonitor:
         if not self.db_path.exists():
             raise ValueError(f"Database not found: {self.db_path}")
 
-    def get_db_stats(self) -> Dict:
+    def get_db_stats(self) -> dict:
         """
         Get current database statistics.
 
@@ -99,7 +98,7 @@ class MigrationMonitor:
             logger.error(f"Failed to get database stats: {e}")
             raise
 
-    def calculate_progress(self, current_entries: int) -> Dict:
+    def calculate_progress(self, current_entries: int) -> dict:
         """
         Calculate migration progress metrics.
 

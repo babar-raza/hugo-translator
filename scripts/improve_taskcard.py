@@ -2,11 +2,10 @@
 """Guide user through iterative improvement workflow."""
 import argparse
 import json
-import sys
 import subprocess
+import sys
+from datetime import UTC, datetime
 from pathlib import Path
-from datetime import datetime, UTC
-from typing import Dict, List, Optional
 
 
 class ImprovementTracker:
@@ -26,7 +25,7 @@ class ImprovementTracker:
         self.history_dir.mkdir(parents=True, exist_ok=True)
         self.history_file = self.history_dir / f"{taskcard_id}.json"
 
-    def load_history(self) -> List[Dict]:
+    def load_history(self) -> list[dict]:
         """Load improvement history.
 
         Returns:
@@ -38,7 +37,7 @@ class ImprovementTracker:
         with open(self.history_file) as f:
             return json.load(f)
 
-    def save_history(self, history: List[Dict]):
+    def save_history(self, history: list[dict]):
         """Save improvement history.
 
         Args:
@@ -50,7 +49,7 @@ class ImprovementTracker:
     def add_iteration(
         self,
         iteration: int,
-        ratings: Dict[str, int],
+        ratings: dict[str, int],
         overall: float,
         changes_made: str,
         automated_checks_passed: int,
@@ -144,7 +143,7 @@ class ImprovementTracker:
             elif delta < 0:
                 print(f"📉 Warning: {delta:.2f} points over {len(history)} iteration(s)")
             else:
-                print(f"➡️  No change in overall score")
+                print("➡️  No change in overall score")
 
             print()
 
@@ -174,7 +173,7 @@ def run_automated_checks() -> tuple:
     return 0, 0
 
 
-def identify_lowest_dimension(ratings: Dict[str, int]) -> str:
+def identify_lowest_dimension(ratings: dict[str, int]) -> str:
     """Identify the lowest-rated dimension.
 
     Args:
@@ -262,7 +261,7 @@ def main():
 
     print()
     print("=" * 70)
-    print(f"ITERATIVE IMPROVEMENT WORKFLOW")
+    print("ITERATIVE IMPROVEMENT WORKFLOW")
     print("=" * 70)
     print(f"\nTaskcard: {args.taskcard_id}")
     print(f"Iteration: {current_iteration}/{tracker.MAX_ITERATIONS}")

@@ -5,18 +5,16 @@ All tests mock the HTTP layer to verify correct payload shape,
 non-fatal failure handling, and lifecycle (POST + PATCH) flows.
 """
 
-import json
 import unittest
-from unittest.mock import patch, Mock, MagicMock
-from pathlib import Path
+from unittest.mock import Mock, patch
 
 from src.observability.worker_telemetry import (
+    _build_base_run,
+    _patch_run,
+    _post_run,
+    complete_worker_run,
     emit_worker_event,
     start_worker_run,
-    complete_worker_run,
-    _post_run,
-    _patch_run,
-    _build_base_run,
 )
 
 

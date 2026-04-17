@@ -14,18 +14,14 @@ Key Guarantees:
 5. Completion tracking is per-file, per-language
 """
 
-import pytest
-import json
-import tempfile
-from pathlib import Path
-from datetime import datetime
-from unittest.mock import Mock, patch
-
 import sys
+from pathlib import Path
+
+import pytest
+
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
-from src.translation_engine.progress import ProgressTracker, ProgressState
-
+from src.translation_engine.progress import ProgressTracker
 
 # ==============================================================================
 # Fixtures

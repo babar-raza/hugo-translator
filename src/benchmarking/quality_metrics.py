@@ -7,7 +7,6 @@ against reference translations.
 
 import logging
 from dataclasses import dataclass
-from typing import List, Optional
 
 import sacrebleu
 
@@ -27,7 +26,7 @@ class QualityScore:
     """
 
     bleu_score: float
-    comet_score: Optional[float] = None
+    comet_score: float | None = None
     reference_text: str = ""
     hypothesis_text: str = ""
 
@@ -92,8 +91,8 @@ class QualityMetrics:
 
     def calculate_corpus_bleu(
         self,
-        hypotheses: List[str],
-        references: List[str],
+        hypotheses: list[str],
+        references: list[str],
         tokenize: str = "13a",
     ) -> float:
         """
@@ -119,7 +118,7 @@ class QualityMetrics:
 
     def calculate_comet(
         self, hypothesis: str, reference: str, source: str
-    ) -> Optional[float]:
+    ) -> float | None:
         """
         Calculate COMET score for a single translation.
 
@@ -152,11 +151,11 @@ class QualityMetrics:
 
     def calculate_corpus_comet(
         self,
-        hypotheses: List[str],
-        references: List[str],
-        sources: List[str],
+        hypotheses: list[str],
+        references: list[str],
+        sources: list[str],
         batch_size: int = 8,
-    ) -> Optional[float]:
+    ) -> float | None:
         """
         Calculate corpus-level COMET score.
 
@@ -175,7 +174,7 @@ class QualityMetrics:
         try:
             data = [
                 {"src": src, "mt": hyp, "ref": ref}
-                for src, hyp, ref in zip(sources, hypotheses, references)
+                for src, hyp, ref in zip(sources, hypotheses, references, strict=False)
             ]
             output = self.comet_model.predict(
                 data, batch_size=batch_size, gpus=0
@@ -190,7 +189,7 @@ class QualityMetrics:
         self,
         hypothesis: str,
         reference: str,
-        source: Optional[str] = None,
+        source: str | None = None,
         tokenize: str = "13a",
     ) -> QualityScore:
         """
@@ -220,9 +219,9 @@ class QualityMetrics:
 
     def evaluate_corpus(
         self,
-        hypotheses: List[str],
-        references: List[str],
-        sources: Optional[List[str]] = None,
+        hypotheses: list[str],
+        references: list[str],
+        sources: list[str] | None = None,
         tokenize: str = "13a",
         batch_size: int = 8,
     ) -> QualityScore:

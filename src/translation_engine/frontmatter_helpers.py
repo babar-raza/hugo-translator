@@ -7,14 +7,14 @@ mutate nested YAML frontmatter structures via dot-separated key paths
 """
 
 import re
-from typing import Any, Dict, List, Tuple
+from typing import Any
 
 _BRACKET_RE = re.compile(r'^(.+?)\[(\d+)\]$')
 
 
 def get_all_nested_values(
-    data: Dict[str, Any], key_pattern: str
-) -> List[Tuple[str, Any]]:
+    data: dict[str, Any], key_pattern: str
+) -> list[tuple[str, Any]]:
     """
     Resolve a dot-separated key pattern through nested dicts/lists.
 
@@ -29,9 +29,9 @@ def get_all_nested_values(
                  ("body.block[1].title_left", "B")]
     """
     parts = key_pattern.split(".")
-    results: List[Tuple[str, Any]] = []
+    results: list[tuple[str, Any]] = []
 
-    def _traverse(current: Any, remaining: List[str], path: str) -> None:
+    def _traverse(current: Any, remaining: list[str], path: str) -> None:
         if not remaining:
             if current is not None:
                 results.append((path, current))
@@ -56,7 +56,7 @@ def get_all_nested_values(
 
 
 def set_nested_value(
-    data: Dict[str, Any], indexed_key: str, value: Any
+    data: dict[str, Any], indexed_key: str, value: Any
 ) -> None:
     """
     Write *value* into *data* at the dot/bracket path *indexed_key*.

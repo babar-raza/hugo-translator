@@ -8,6 +8,7 @@ from .exceptions import (
     TranslationRejectedError,
     TranslationRetryableError,
 )
+from .extractor import SegmentExtractor
 from .models import (
     DirectoryResult,
     TranslationResult,
@@ -17,7 +18,6 @@ from .models import (
     ValidationResult,
 )
 from .parser import HugoParser
-from .extractor import SegmentExtractor
 from .reconstructor import MarkdownReconstructor
 
 __all__ = [

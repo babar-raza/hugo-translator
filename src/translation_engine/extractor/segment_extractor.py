@@ -2,14 +2,12 @@
 Segment extraction from HugoDocument based on Site Profile rules.
 """
 import hashlib
-import re
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Dict, List, Optional
+from typing import Any
 
-from ..parser import ASTNode, HugoDocument, NodeType
 from ...utils.models import FrontmatterMode, SiteProfile
-
+from ..parser import ASTNode, HugoDocument, NodeType
 from .placeholder_manager import PlaceholderManager
 
 
@@ -27,11 +25,11 @@ class SegmentContext:
     """Context information for a translatable segment."""
 
     context_type: SegmentContextType
-    node_id: Optional[str] = None
-    frontmatter_key: Optional[str] = None
-    parent_node_type: Optional[NodeType] = None
+    node_id: str | None = None
+    frontmatter_key: str | None = None
+    parent_node_type: NodeType | None = None
     depth: int = 0
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
@@ -43,12 +41,12 @@ class Segment:
     context: SegmentContext
     site_id: str
     source_lang: str
-    placeholder_map: Dict[str, str] = field(default_factory=dict)
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    placeholder_map: dict[str, str] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
     # Terminology protection fields (TRM-05)
-    protected_terms: List[Any] = field(default_factory=list)  # List[ProtectedSegment]
-    protection_metadata: Dict[str, Any] = field(default_factory=dict)
+    protected_terms: list[Any] = field(default_factory=list)  # List[ProtectedSegment]
+    protection_metadata: dict[str, Any] = field(default_factory=dict)
 
     @classmethod
     def create_id(cls, text: str, context: SegmentContext, site_id: str) -> str:
@@ -66,7 +64,7 @@ class Segment:
 class SegmentExtractor:
     """Extracts translatable segments from HugoDocument."""
 
-    def __init__(self, site_profile: SiteProfile, terminology_manager: Optional[Any] = None):
+    def __init__(self, site_profile: SiteProfile, terminology_manager: Any | None = None):
         """
         Initialize segment extractor.
 
@@ -89,8 +87,8 @@ class SegmentExtractor:
         ]
 
     def extract_all(
-        self, doc: HugoDocument, source_lang: Optional[str] = None
-    ) -> List[Segment]:
+        self, doc: HugoDocument, source_lang: str | None = None
+    ) -> list[Segment]:
         """
         Extract all translatable segments from document.
 
@@ -116,8 +114,8 @@ class SegmentExtractor:
         return segments
 
     def extract_from_frontmatter(
-        self, frontmatter: Dict[str, Any], source_lang: str
-    ) -> List[Segment]:
+        self, frontmatter: dict[str, Any], source_lang: str
+    ) -> list[Segment]:
         """
         Extract segments from frontmatter based on rules.
 
@@ -197,8 +195,8 @@ class SegmentExtractor:
         return segments
 
     def extract_from_body(
-        self, ast: List[ASTNode], source_lang: str
-    ) -> List[Segment]:
+        self, ast: list[ASTNode], source_lang: str
+    ) -> list[Segment]:
         """
         Extract text nodes from AST per body rules.
 
@@ -215,11 +213,11 @@ class SegmentExtractor:
 
     def _extract_from_nodes(
         self,
-        nodes: List[ASTNode],
-        segments: List[Segment],
+        nodes: list[ASTNode],
+        segments: list[Segment],
         source_lang: str,
         depth: int,
-        parent_type: Optional[NodeType] = None,
+        parent_type: NodeType | None = None,
     ):
         """Recursively extract segments from AST nodes."""
         for node in nodes:
@@ -280,7 +278,7 @@ class SegmentExtractor:
                     node.type,
                 )
 
-    def _extract_text_from_children(self, children: List[ASTNode]) -> str:
+    def _extract_text_from_children(self, children: list[ASTNode]) -> str:
         """Extract concatenated text from child nodes."""
         text_parts = []
 
@@ -340,7 +338,7 @@ class SegmentExtractor:
         context_type: SegmentContextType,
         source_lang: str,
         depth: int,
-        parent_type: Optional[NodeType],
+        parent_type: NodeType | None,
     ) -> Segment:
         """Create a segment from body text."""
         # Protect shortcodes and patterns
@@ -374,7 +372,7 @@ class SegmentExtractor:
 
         return segment
 
-    def _protect_content(self, text: str) -> tuple[str, Dict[str, str]]:
+    def _protect_content(self, text: str) -> tuple[str, dict[str, str]]:
         """Protect non-translatable content with placeholders."""
         # Combine shortcode patterns with preserve patterns
         all_patterns = self.shortcode_patterns + self.preserve_patterns
@@ -454,8 +452,8 @@ class SegmentExtractor:
         return restored_text
 
     def _get_nested_value(
-        self, data: Dict[str, Any], key: str
-    ) -> Optional[Any]:
+        self, data: dict[str, Any], key: str
+    ) -> Any | None:
         """
         Get value from nested dictionary using dot notation.
 
@@ -482,8 +480,8 @@ class SegmentExtractor:
         return current
 
     def _get_all_nested_values(
-        self, data: Dict[str, Any], key_pattern: str
-    ) -> List[tuple[str, Any]]:
+        self, data: dict[str, Any], key_pattern: str
+    ) -> list[tuple[str, Any]]:
         """
         Get all values matching a key pattern, handling arrays in the path.
 
@@ -503,9 +501,9 @@ class SegmentExtractor:
             List of (indexed_key, value) tuples for all matching values
         """
         parts = key_pattern.split(".")
-        results: List[tuple[str, Any]] = []
+        results: list[tuple[str, Any]] = []
 
-        def traverse(current: Any, remaining_parts: List[str], current_path: str):
+        def traverse(current: Any, remaining_parts: list[str], current_path: str):
             """Recursively traverse the structure, handling arrays."""
             if not remaining_parts:
                 # Reached the end of the path

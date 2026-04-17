@@ -9,17 +9,15 @@ Tests cover:
 - Configuration loading
 """
 
-import pytest
-import tempfile
 from pathlib import Path
-from typing import Any, Dict
 
+import pytest
+
+from src.translation_engine.validation.base import (
+    ValidationSeverity,
+)
 from src.translation_engine.validation.terminology_preservation_validator import (
     TerminologyPreservationValidator,
-)
-from src.translation_engine.validation.base import (
-    ValidationResult,
-    ValidationSeverity,
 )
 
 

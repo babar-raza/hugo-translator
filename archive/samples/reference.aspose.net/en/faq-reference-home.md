@@ -31,4 +31,3 @@ Language-specific tabs or sections indicate when multiple platforms are document
 **Q5. How often is reference content updated?**
 Reference pages are updated as new versions of the libraries are released, ensuring that API signatures match current versions.
 Assembly version information, such as the numbers shown in type pages, helps developers confirm which version a reference applies to.
-

@@ -8,14 +8,13 @@ Tests cover:
 - Validation config merging
 - Validator-specific settings
 """
-import pytest
-import argparse
 from pathlib import Path
-from unittest.mock import Mock, patch
+from unittest.mock import Mock
+
+import pytest
 
 from src.cli import CLIConfigOverrides, create_parser
 from src.utils.config_loader import ConfigService
-from src.utils.models import ValidationSettings, SiteProfile
 
 
 @pytest.fixture

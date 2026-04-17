@@ -9,7 +9,7 @@ from pathlib import Path
 
 import pytest
 
-from src.benchmarking.storage import BenchmarkDatabase, BenchmarkRun, SystemInfo, BenchmarkResult
+from src.benchmarking.storage import BenchmarkDatabase, BenchmarkResult, BenchmarkRun, SystemInfo
 
 # Current schema version from BenchmarkDatabase class
 CURRENT_SCHEMA_VERSION = BenchmarkDatabase.SCHEMA_VERSION

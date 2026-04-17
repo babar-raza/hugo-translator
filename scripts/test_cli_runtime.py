@@ -14,18 +14,13 @@ Run: python scripts/test_cli_runtime.py [--quick] [--full]
 
 Results are saved to: reports/cli_runtime_test_report.md
 """
+import argparse
+import os
 import subprocess
 import sys
-import os
-import json
-import argparse
-from pathlib import Path
 from dataclasses import dataclass, field
-from typing import List, Optional, Tuple, Dict
 from datetime import datetime
-from itertools import product
-import tempfile
-import shutil
+from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).parent.parent
 os.chdir(PROJECT_ROOT)
@@ -33,18 +28,18 @@ os.chdir(PROJECT_ROOT)
 @dataclass
 class TestResult:
     name: str
-    command: List[str]
+    command: list[str]
     exit_code: int
     stdout: str
     stderr: str
     passed: bool
-    error_type: Optional[str] = None
+    error_type: str | None = None
     duration_ms: float = 0.0
 
 @dataclass
 class TestSuite:
     name: str
-    results: List[TestResult] = field(default_factory=list)
+    results: list[TestResult] = field(default_factory=list)
 
     @property
     def passed(self) -> int:
@@ -55,7 +50,7 @@ class TestSuite:
         return sum(1 for r in self.results if not r.passed)
 
 
-def run_cli(args: List[str], timeout: int = 60, env_override: dict = None) -> Tuple[int, str, str, float]:
+def run_cli(args: list[str], timeout: int = 60, env_override: dict = None) -> tuple[int, str, str, float]:
     """Run CLI command and return (exit_code, stdout, stderr, duration_ms)."""
     cmd = [sys.executable, "-m"] + args
     env = os.environ.copy()
@@ -82,7 +77,7 @@ def run_cli(args: List[str], timeout: int = 60, env_override: dict = None) -> Tu
         return -1, "", str(e), 0
 
 
-def classify_error(stderr: str) -> Optional[str]:
+def classify_error(stderr: str) -> str | None:
     """Classify the type of error from stderr."""
     error_patterns = [
         ("NameError", "NameError"),
@@ -445,7 +440,7 @@ def test_option_matrix() -> TestSuite:
 
     count = 0
 
-    print(f"\n  Phase 1a: Individual option tests (each option in isolation)...")
+    print("\n  Phase 1a: Individual option tests (each option in isolation)...")
 
     # Phase 1a: Test each individual option in isolation first
     all_individual_opts = (
@@ -481,7 +476,7 @@ def test_option_matrix() -> TestSuite:
         print("PASS" if passed else f"FAIL ({error_type})")
         count += 1
 
-    print(f"\n  Phase 1b: Pairwise option combinations...")
+    print("\n  Phase 1b: Pairwise option combinations...")
 
     # Phase 1b: Pairwise combinations (each validation with each terminology, etc.)
     # This is more efficient than full cartesian product
@@ -522,7 +517,7 @@ def test_option_matrix() -> TestSuite:
                     print("PASS" if passed else f"FAIL ({error_type})")
                     count += 1
 
-    print(f"\n  Phase 2: Resume and cache options...")
+    print("\n  Phase 2: Resume and cache options...")
 
     # Phase 2: Resume and cache options
     for resume_opt in resume_opts:
@@ -551,7 +546,7 @@ def test_option_matrix() -> TestSuite:
             print("PASS" if passed else f"FAIL ({error_type})")
             count += 1
 
-    print(f"\n  Phase 3: Verification and output options...")
+    print("\n  Phase 3: Verification and output options...")
 
     # Phase 3: Verification and output
     for verif_opt in verification_opts:
@@ -580,7 +575,7 @@ def test_option_matrix() -> TestSuite:
             print("PASS" if passed else f"FAIL ({error_type})")
             count += 1
 
-    print(f"\n  Phase 4: Logging, metrics, commit, benchmark options...")
+    print("\n  Phase 4: Logging, metrics, commit, benchmark options...")
 
     # Phase 4: Logging, metrics, commit, benchmark
     for log_opt in logging_opts:
@@ -611,7 +606,7 @@ def test_option_matrix() -> TestSuite:
                     print("PASS" if passed else f"FAIL ({error_type})")
                     count += 1
 
-    print(f"\n  Phase 5: Production-like combinations...")
+    print("\n  Phase 5: Production-like combinations...")
 
     # Phase 5: Production-like realistic combinations
     production_combos = [
@@ -670,7 +665,7 @@ def test_option_matrix() -> TestSuite:
     return suite
 
 
-def generate_report(suites: List[TestSuite]) -> str:
+def generate_report(suites: list[TestSuite]) -> str:
     """Generate markdown report."""
     total_passed = sum(s.passed for s in suites)
     total_failed = sum(s.failed for s in suites)

@@ -14,11 +14,12 @@ import logging
 import os
 import threading
 import time
+from collections import deque
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
-from collections import deque
-from typing import Any, Callable, Deque, Dict, List, Optional
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -31,7 +32,7 @@ class ProgressSnapshot:
     timestamp: float
     start_time: float
     elapsed_s: float
-    eta_s: Optional[float] = None
+    eta_s: float | None = None
 
     # ETA uncertainty tracking
     eta_confidence: str = "calculating"  # "high", "medium", "low"
@@ -83,20 +84,20 @@ class ProgressSnapshot:
     error_count: int = 0
     last_error: str = ""
     last_failed_file: str = ""
-    errors_by_type: Dict[str, int] = field(default_factory=dict)
+    errors_by_type: dict[str, int] = field(default_factory=dict)
 
     # Language tracking (NEW)
-    target_langs: List[str] = field(default_factory=list)
-    completed_langs: List[str] = field(default_factory=list)
-    remaining_langs: List[str] = field(default_factory=list)
+    target_langs: list[str] = field(default_factory=list)
+    completed_langs: list[str] = field(default_factory=list)
+    remaining_langs: list[str] = field(default_factory=list)
     langs_translated_count: int = 0
     langs_skipped_count: int = 0
 
     # Skip reasons (NEW)
-    skip_reasons: Dict[str, int] = field(default_factory=dict)  # {reason: count}
+    skip_reasons: dict[str, int] = field(default_factory=dict)  # {reason: count}
 
     # Batch stats loaded from file (NEW)
-    batch_stats: Dict[str, Any] = field(default_factory=dict)
+    batch_stats: dict[str, Any] = field(default_factory=dict)
 
     # Progress
     percent_complete_files: float = 0.0
@@ -113,7 +114,7 @@ class ProgressSnapshot:
     # NEW: For rate suppression logic
     sample_count: int = 0  # Number of segment timing samples collected
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for JSON serialization."""
         return {
             "timestamp": self.timestamp,
@@ -242,8 +243,8 @@ class AdaptiveEMACalculator:
         self.volatility_threshold = volatility_threshold
         self.window_size = window_size
 
-        self._ema_value: Optional[float] = None
-        self._samples: Deque[float] = deque(maxlen=window_size)
+        self._ema_value: float | None = None
+        self._samples: deque[float] = deque(maxlen=window_size)
         self._current_alpha = baseline_alpha
         self._lock = threading.Lock()
 
@@ -336,11 +337,11 @@ class ProgressTracker:
     def __init__(
         self,
         update_interval: float = 3.0,
-        metrics_file: Optional[Path] = None,
+        metrics_file: Path | None = None,
         metrics_only: bool = False,
         show_progress: bool = True,
         ema_alpha: float = 0.3,
-        milestone_callback: Optional[Callable[[ProgressSnapshot], None]] = None,
+        milestone_callback: Callable[[ProgressSnapshot], None] | None = None,
     ):
         """
         Initialize progress tracker.
@@ -407,30 +408,30 @@ class ProgressTracker:
         self._error_count = 0
         self._last_error = ""
         self._last_failed_file = ""
-        self._errors_by_type: Dict[str, int] = {}
+        self._errors_by_type: dict[str, int] = {}
 
         # Language tracking (NEW)
-        self._target_langs: List[str] = []  # All requested target languages
+        self._target_langs: list[str] = []  # All requested target languages
         self._completed_langs: set[str] = set()  # Languages fully completed
-        self._skip_reasons_count: Dict[str, int] = {}  # Aggregate skip reasons
+        self._skip_reasons_count: dict[str, int] = {}  # Aggregate skip reasons
 
         # Timing accumulators for averages (OBS-03: use deque for O(1) eviction)
-        self._segment_times: Deque[float] = deque(maxlen=100)
-        self._batch_times: Deque[float] = deque(maxlen=50)
+        self._segment_times: deque[float] = deque(maxlen=100)
+        self._batch_times: deque[float] = deque(maxlen=50)
 
         # EMA calculators (adaptive for volatility detection)
         self._segment_rate_ema = AdaptiveEMACalculator(baseline_alpha=ema_alpha)
         self._file_rate_ema = AdaptiveEMACalculator(baseline_alpha=ema_alpha)
 
         # Background update thread
-        self._update_thread: Optional[threading.Thread] = None
+        self._update_thread: threading.Thread | None = None
         self._stop_event = threading.Event()
         self._running = False
 
         # NDJSON stream file handle
-        self._ndjson_file: Optional[Any] = None
+        self._ndjson_file: Any | None = None
 
-    def start(self, files_total: int = 0, target_langs: Optional[List[str]] = None) -> None:
+    def start(self, files_total: int = 0, target_langs: list[str] | None = None) -> None:
         """
         Start progress tracking.
 
@@ -600,7 +601,7 @@ class ProgressTracker:
                 # batch_stats will be added in stop() method
             )
 
-    def _calculate_eta(self) -> Optional[float]:
+    def _calculate_eta(self) -> float | None:
         """Calculate ETA with volatility-based confidence adjustment."""
         if self._segments_total == 0:
             return None
@@ -1388,7 +1389,7 @@ class ProgressTracker:
             self._ndjson_file = None
 
 
-def _load_batch_stats_summary() -> Dict[str, Any]:
+def _load_batch_stats_summary() -> dict[str, Any]:
     """
     Load batch statistics for final summary.
 
@@ -1401,7 +1402,7 @@ def _load_batch_stats_summary() -> Dict[str, Any]:
 
     try:
         import json
-        with open(batch_file, 'r', encoding='utf-8') as f:
+        with open(batch_file, encoding='utf-8') as f:
             data = json.load(f)
 
         summary = {
@@ -1444,17 +1445,17 @@ def _load_batch_stats_summary() -> Dict[str, Any]:
 
 
 # Global progress tracker instance
-_global_tracker: Optional[ProgressTracker] = None
+_global_tracker: ProgressTracker | None = None
 
 
-def get_progress_tracker() -> Optional[ProgressTracker]:
+def get_progress_tracker() -> ProgressTracker | None:
     """Get the global progress tracker instance."""
     return _global_tracker
 
 
 def init_progress_tracker(
     update_interval: float = 2.0,
-    metrics_file: Optional[Path] = None,
+    metrics_file: Path | None = None,
     metrics_only: bool = False,
     show_progress: bool = True,
 ) -> ProgressTracker:
@@ -1480,7 +1481,7 @@ def init_progress_tracker(
     return _global_tracker
 
 
-def stop_progress_tracker() -> Optional[ProgressSnapshot]:
+def stop_progress_tracker() -> ProgressSnapshot | None:
     """Stop and clean up global progress tracker."""
     global _global_tracker
     if _global_tracker:

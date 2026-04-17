@@ -3,15 +3,16 @@ Unit tests for engine multi-mode support (T304: federated-splashing-panda).
 
 Tests TranslationEngine with serial, parallel, and round-robin modes.
 """
-import pytest
 from pathlib import Path
-from unittest.mock import Mock, MagicMock, patch
+from unittest.mock import Mock, patch
+
+import pytest
+
 from src.translation_engine.engine import TranslationEngine
 from src.translation_engine.models import (
     LanguageProgress,
     MultiLanguageProgress,
     TranslationResult,
-    TranslationStats,
 )
 
 

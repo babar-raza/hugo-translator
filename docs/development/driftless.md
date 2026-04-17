@@ -390,4 +390,3 @@ Log notes in the session folder.
 3. Add `pytest.ini` markers.
 4. Add the pre-commit hook and a CI check for contract/spec/golden changes.
 5. Add `llm/sessions/` and require a session charter per LLM run.
-

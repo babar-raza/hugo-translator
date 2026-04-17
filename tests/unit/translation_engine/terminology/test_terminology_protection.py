@@ -1,7 +1,9 @@
 """Tests for terminology protection (HP-04)."""
 
-import pytest
 from pathlib import Path
+
+import pytest
+
 from src.translation_engine.terminology import TerminologyManager
 
 

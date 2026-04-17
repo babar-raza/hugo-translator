@@ -1,7 +1,7 @@
 """Quick test script for FilePlacementValidator."""
 
-import sys
 import importlib.util
+import sys
 from pathlib import Path
 
 # Add repo root to path for 'src.*' imports

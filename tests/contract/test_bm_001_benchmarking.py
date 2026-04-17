@@ -12,16 +12,12 @@ Verifies core benchmarking system invariants:
 BM-001 Core Feature: Model Benchmarking System
 """
 
-import pytest
-import os
 import sys
-import json
-import tempfile
 import threading
-import time
+from dataclasses import fields
 from pathlib import Path
-from dataclasses import dataclass, fields
-from typing import Optional, List, Dict, Any
+
+import pytest
 
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
@@ -198,7 +194,6 @@ def test_benchmark_run_has_required_fields():
     Evidence: src/benchmarking/storage.py lines 57-72
     """
     from src.benchmarking.storage import BenchmarkRun
-    from src.benchmarking.system_info import SystemInfo
 
     # Check field names exist
     field_names = {f.name for f in fields(BenchmarkRun)}

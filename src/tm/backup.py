@@ -11,7 +11,6 @@ import shutil
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import List, Optional
 
 import lmdb
 
@@ -224,7 +223,7 @@ class CacheBackupManager:
         backup_path: Path,
         force: bool = False,
         create_safety_backup: bool = True
-    ) -> Optional[BackupInfo]:
+    ) -> BackupInfo | None:
         """
         Restore from backup (DESTRUCTIVE operation).
 
@@ -305,7 +304,7 @@ class CacheBackupManager:
         except Exception as e:
             raise RestoreError(f"Restore failed: {e}") from e
 
-    def list_backups(self) -> List[BackupInfo]:
+    def list_backups(self) -> list[BackupInfo]:
         """
         List all available backups sorted by timestamp (newest first).
 
@@ -363,7 +362,7 @@ class CacheBackupManager:
         logger.info(f"Deleting backup: {backup_path}")
         shutil.rmtree(backup_path)
 
-    def get_backup_by_timestamp(self, timestamp_str: str) -> Optional[BackupInfo]:
+    def get_backup_by_timestamp(self, timestamp_str: str) -> BackupInfo | None:
         """
         Find backup by timestamp string.
 
@@ -390,7 +389,7 @@ class CacheBackupManager:
 
         return None
 
-    def get_latest_backup(self) -> Optional[BackupInfo]:
+    def get_latest_backup(self) -> BackupInfo | None:
         """
         Get the most recent backup.
 
@@ -487,7 +486,7 @@ class CacheBackupManager:
 
 def create_backup_manager(
     tm_path: Path,
-    backup_dir: Optional[Path] = None,
+    backup_dir: Path | None = None,
     max_backups: int = 5,
     min_free_space_gb: float = 5.0
 ) -> CacheBackupManager:

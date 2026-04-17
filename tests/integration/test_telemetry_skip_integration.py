@@ -14,10 +14,11 @@ CRITICAL: Per user requirement "if no work then no entry", when all
 languages are skipped (no work done), NO telemetry entry is created.
 """
 
-import pytest
-import os
 from pathlib import Path
-from unittest.mock import MagicMock, patch, call
+from unittest.mock import MagicMock
+
+import pytest
+
 from src.observability.telemetry_integration import TranslationTelemetry
 from src.translation_engine.models import TranslationResult, TranslationStats
 
@@ -322,7 +323,6 @@ class TestTelemetrySkipIntegration:
         - items_skipped = skip_count (number of languages skipped)
         """
         from src.observability.telemetry_integration import calculate_items_metrics
-        from src.translation_engine.models import TranslationStats
 
         # Mixed scenario: some work done, some languages skipped
         stats = TranslationStats(
@@ -356,9 +356,8 @@ class TestTelemetrySkipIntegration:
         """
         from src.observability.telemetry_integration import (
             build_output_summary,
-            calculate_items_metrics
+            calculate_items_metrics,
         )
-        from src.translation_engine.models import TranslationStats
 
         # Old-style result (no skip data)
         stats = TranslationStats(
@@ -430,7 +429,6 @@ class TestTelemetrySkipIntegration:
         - All skipped → "completed_no_changes"
         - Mixed/none skipped → "completed"
         """
-        from src.translation_engine.models import TranslationStats
 
         # Scenario 1: All skipped
         stats_all_skipped = TranslationStats()
@@ -474,7 +472,6 @@ class TestTelemetrySkipIntegration:
         - Segment-level work should be tracked separately
         """
         from src.observability.telemetry_integration import calculate_items_metrics
-        from src.translation_engine.models import TranslationStats
 
         # Test case: 200 segments, 3 languages (2 translated, 1 skipped)
         stats = TranslationStats(

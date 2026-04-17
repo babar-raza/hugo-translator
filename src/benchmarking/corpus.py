@@ -24,11 +24,9 @@ Usage:
 import json
 import logging
 import random
-import re
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
 
 import yaml
 
@@ -57,9 +55,9 @@ class CorpusSample:
     id: str
     text_en: str
     domain: str
-    tokens: Optional[int] = None
-    source_path: Optional[str] = None
-    metadata: Dict = field(default_factory=dict)
+    tokens: int | None = None
+    source_path: str | None = None
+    metadata: dict = field(default_factory=dict)
 
 
 @dataclass
@@ -69,7 +67,7 @@ class CorpusMetadata:
     version: str
     collected: str
     total_files: int
-    samples: List[Dict]
+    samples: list[dict]
 
 
 class CorpusManager:
@@ -81,7 +79,7 @@ class CorpusManager:
     2. Markdown corpus: Real content from aspose.net via metadata.yaml
     """
 
-    def __init__(self, corpus_dir: Optional[Path | str] = None):
+    def __init__(self, corpus_dir: Path | str | None = None):
         """
         Initialize corpus manager.
 
@@ -96,12 +94,12 @@ class CorpusManager:
     def load_samples(
         self,
         source: str = "json",
-        size: Optional[str] = None,
-        path: Optional[str | Path] = None,
-        category: Optional[str] = None,
-        token_range: Optional[Tuple[int, int]] = None,
-        limit: Optional[int] = None,
-    ) -> List[Dict]:
+        size: str | None = None,
+        path: str | Path | None = None,
+        category: str | None = None,
+        token_range: tuple[int, int] | None = None,
+        limit: int | None = None,
+    ) -> list[dict]:
         """
         Load corpus samples from JSON or markdown sources.
 
@@ -147,10 +145,10 @@ class CorpusManager:
 
     def _load_json_corpus(
         self,
-        size: Optional[str] = None,
-        category: Optional[str] = None,
-        limit: Optional[int] = None,
-    ) -> List[Dict]:
+        size: str | None = None,
+        category: str | None = None,
+        limit: int | None = None,
+    ) -> list[dict]:
         """
         Load corpus from JSON files (existing behavior).
 
@@ -170,7 +168,7 @@ class CorpusManager:
         if not corpus_path.exists():
             raise FileNotFoundError(f"Corpus file not found: {corpus_path}")
 
-        with open(corpus_path, 'r', encoding='utf-8') as f:
+        with open(corpus_path, encoding='utf-8') as f:
             corpus = json.load(f)
 
         if not corpus:
@@ -191,11 +189,11 @@ class CorpusManager:
 
     def _load_markdown_corpus(
         self,
-        path: Optional[str | Path] = None,
-        category: Optional[str] = None,
-        token_range: Optional[Tuple[int, int]] = None,
-        limit: Optional[int] = None,
-    ) -> List[Dict]:
+        path: str | Path | None = None,
+        category: str | None = None,
+        token_range: tuple[int, int] | None = None,
+        limit: int | None = None,
+    ) -> list[dict]:
         """
         Load corpus from markdown files via metadata.yaml.
 
@@ -221,7 +219,7 @@ class CorpusManager:
             )
 
         # Load metadata
-        with open(metadata_path, 'r', encoding='utf-8') as f:
+        with open(metadata_path, encoding='utf-8') as f:
             metadata_dict = yaml.safe_load(f)
 
         samples_data = metadata_dict.get('samples', [])
@@ -290,11 +288,11 @@ class CorpusManager:
         self,
         content_dir: str | Path,
         output_metadata: str | Path,
-        sample_size: Optional[int] = None,
-        categories: Optional[List[str]] = None,
-        token_range: Optional[Tuple[int, int]] = None,
+        sample_size: int | None = None,
+        categories: list[str] | None = None,
+        token_range: tuple[int, int] | None = None,
         seed: int = 42,
-    ) -> Dict:
+    ) -> dict:
         """
         Scan markdown directory and build metadata.yaml.
 
@@ -438,7 +436,7 @@ class CorpusManager:
 
         return f"{category}_{path_hash}"
 
-    def validate(self, source: str = "json", path: Optional[str | Path] = None) -> bool:
+    def validate(self, source: str = "json", path: str | Path | None = None) -> bool:
         """
         Validate corpus integrity.
 
@@ -475,7 +473,7 @@ class CorpusManager:
                     return False
 
                 # Load and validate metadata structure
-                with open(metadata_path, 'r', encoding='utf-8') as f:
+                with open(metadata_path, encoding='utf-8') as f:
                     metadata = yaml.safe_load(f)
 
                 required_fields = ['source', 'version', 'collected', 'samples']
@@ -516,7 +514,7 @@ class CorpusManager:
             logger.error(f"Corpus validation failed: {e}")
             return False
 
-    def _validate_samples(self, samples: List[Dict]) -> bool:
+    def _validate_samples(self, samples: list[dict]) -> bool:
         """Validate sample list structure."""
         if not samples:
             logger.error("Samples list is empty")

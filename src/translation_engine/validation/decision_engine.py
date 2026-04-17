@@ -15,7 +15,7 @@ Decision Rules:
 Implemented in taskcards DEC-01, DEC-02, and DEC-03.
 """
 
-from typing import Any, Dict, Optional
+from typing import Any
 
 from .base import ValidationResult, ValidationSeverity
 from .post_translation_validator import DecisionResult, ValidationDecision
@@ -63,7 +63,7 @@ class ValidationDecisionEngine:
         "StructureValidator",
     }
 
-    def __init__(self, config: Dict[str, Any], telemetry=None, run_context=None) -> None:
+    def __init__(self, config: dict[str, Any], telemetry=None, run_context=None) -> None:
         """Initialize decision engine with configuration.
 
         Args:
@@ -197,7 +197,7 @@ class ValidationDecisionEngine:
             self._track_validation_errors(validation_result)
             return decision_result
 
-    def _check_critical_failure(self, validation_result: ValidationResult) -> Optional[str]:
+    def _check_critical_failure(self, validation_result: ValidationResult) -> str | None:
         """Check if any critical validator failed.
 
         Args:
@@ -330,7 +330,7 @@ class ValidationDecisionEngine:
         retry_count: int,
         error_count: int,
         warning_count: int,
-        validator_results: Dict[str, bool],
+        validator_results: dict[str, bool],
     ) -> None:
         """Track validation decision via telemetry.
 

@@ -8,9 +8,10 @@ Tests:
 - clear()
 """
 
+
 import pytest
-from pathlib import Path
-from src.tm.improvement_queue import ImprovementQueue, ImprovementCandidate
+
+from src.tm.improvement_queue import ImprovementCandidate, ImprovementQueue
 
 
 @pytest.fixture

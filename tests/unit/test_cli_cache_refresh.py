@@ -3,7 +3,6 @@ Unit tests for cache refresh CLI flags (Phase 2 redesign: federated-splashing-pa
 
 Tests --force-retranslate and --cache-write-mode flags.
 """
-import argparse
 
 import pytest
 

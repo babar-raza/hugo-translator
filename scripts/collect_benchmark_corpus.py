@@ -31,25 +31,19 @@ Pattern matching (follows scripts/analyze_ast_corpus.py):
 """
 
 import argparse
-import hashlib
 import logging
-import random
 import sys
-from datetime import datetime
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
-
-import yaml
 
 # Import from project
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from src.benchmarking.corpus import CorpusManager, estimate_token_count
+from src.benchmarking.corpus import CorpusManager
 
 logger = logging.getLogger(__name__)
 
 
-def parse_token_range(token_range_str: str) -> Tuple[int, int]:
+def parse_token_range(token_range_str: str) -> tuple[int, int]:
     """
     Parse token range string like "50-500" into (min, max) tuple.
 
@@ -263,16 +257,16 @@ Examples:
             logger.info("")
             logger.info("Next steps:")
             logger.info("  1. Validate metadata:")
-            logger.info(f"     python -c \"from src.benchmarking.corpus import CorpusManager; ")
+            logger.info("     python -c \"from src.benchmarking.corpus import CorpusManager; ")
             logger.info(f"     m = CorpusManager(); print('Valid:', m.validate('markdown', '{args.output}'))\"")
             logger.info("")
             logger.info("  2. Test loading samples:")
-            logger.info(f"     python -c \"from src.benchmarking.corpus import CorpusManager; ")
+            logger.info("     python -c \"from src.benchmarking.corpus import CorpusManager; ")
             logger.info(f"     m = CorpusManager(); s = m.load_samples('markdown', path='{args.output}', limit=10); ")
-            logger.info(f"     print(f'Loaded {{len(s)}} samples')\"")
+            logger.info("     print(f'Loaded {len(s)} samples')\"")
             logger.info("")
             logger.info("  3. Run benchmark with markdown corpus:")
-            logger.info(f"     python -m src.benchmarking.runner --model m2m100_418m --device cpu ")
+            logger.info("     python -m src.benchmarking.runner --model m2m100_418m --device cpu ")
             logger.info(f"     --corpus-source markdown --corpus-path {args.output} --max-samples 10")
         else:
             logger.info("")

@@ -34,4 +34,3 @@ These links help readers move from conceptual explanations and tutorials to hand
 The blog also announces new features, releases, and best practices drawn from support and customer feedback.
 
 This close connection between blog content and product capabilities is reflected in the markdown files stored under `content/blog.aspose.net/`.
-

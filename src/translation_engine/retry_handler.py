@@ -9,11 +9,12 @@ Strategy: When OOM occurs, reduce batch size by 50% and retry (9→4→2→1).
 """
 
 import logging
+from collections.abc import Callable
 from pathlib import Path
-from typing import Any, Callable, Dict, Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
-    from ..extractor.batch_stats_tracker import BatchStatsTracker
+    pass
 
 logger = logging.getLogger(__name__)
 
@@ -64,7 +65,7 @@ class RetryHandler:
         translate_func: callable,
         file_path: Path,
         initial_batch_size: int,
-        on_oom_recovery: Optional[Callable[[int, int], None]] = None,
+        on_oom_recovery: Callable[[int, int], None] | None = None,
         **kwargs
     ) -> Any:
         """

@@ -10,13 +10,12 @@ Scans for:
 """
 
 import ast
+import json
 import re
 import sys
-from pathlib import Path
-from typing import List, Dict
-from dataclasses import dataclass, asdict
 from collections import defaultdict
-import json
+from dataclasses import asdict, dataclass
+from pathlib import Path
 
 
 @dataclass
@@ -59,7 +58,7 @@ class CodebaseAuditor:
         r'print\(.*DEBUG',
     ]
 
-    def __init__(self, root_dir: Path, exclude_patterns: List[str] = None):
+    def __init__(self, root_dir: Path, exclude_patterns: list[str] = None):
         self.root_dir = root_dir
         self.exclude_patterns = exclude_patterns or [
             '*/venv/*',
@@ -74,7 +73,7 @@ class CodebaseAuditor:
             '*/htmlcov/*',
             '*/audit_report.*',  # Don't audit the audit report
         ]
-        self.issues: List[Issue] = []
+        self.issues: list[Issue] = []
 
     def should_exclude(self, file_path: Path) -> bool:
         """Check if file should be excluded from audit."""
@@ -84,7 +83,7 @@ class CodebaseAuditor:
                 return True
         return False
 
-    def audit(self) -> List[Issue]:
+    def audit(self) -> list[Issue]:
         """Run full audit and return issues."""
         # Scan Python files
         for py_file in self.root_dir.rglob('*.py'):
@@ -127,7 +126,7 @@ class CodebaseAuditor:
         except Exception as e:
             print(f"Error auditing {file_path}: {e}", file=sys.stderr)
 
-    def _check_ast_issues(self, tree: ast.AST, file_path: Path, lines: List[str]):
+    def _check_ast_issues(self, tree: ast.AST, file_path: Path, lines: list[str]):
         """Check for AST-level issues (stubs, NotImplementedError)."""
         for node in ast.walk(tree):
             # Check for stub functions/methods

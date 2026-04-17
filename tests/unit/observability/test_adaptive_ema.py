@@ -1,5 +1,4 @@
 """Unit tests for AdaptiveEMACalculator."""
-import pytest
 from src.observability.progress import AdaptiveEMACalculator
 
 

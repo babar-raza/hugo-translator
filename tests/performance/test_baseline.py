@@ -4,18 +4,19 @@ Performance Baseline Tests
 Verifies that performance meets minimum requirements.
 """
 
-import pytest
 import sys
 import time
 from pathlib import Path
 
+import pytest
+
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
-from src.translation_engine.parser import HugoParser
+from src.tm import L1Cache
 from src.translation_engine.extractor import SegmentExtractor
+from src.translation_engine.parser import HugoParser
 from src.translation_engine.reconstructor import MarkdownReconstructor
-from src.tm import L1Cache, L2PersistentTM, L3SemanticTM, TranslationMemory
-from src.utils.models import SiteProfile, BodyRules, FrontmatterMode, FrontmatterRule
+from src.utils.models import BodyRules, FrontmatterMode, FrontmatterRule, SiteProfile
 
 
 @pytest.fixture

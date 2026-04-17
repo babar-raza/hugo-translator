@@ -4,6 +4,13 @@ All notable changes to the Hugo Translation System are documented in this file.
 
 ## [Unreleased]
 
+> **Deployment note**: The features below are fully implemented. However, CHH-02 through CHH-05
+> (Redis locking, Docker metadata volume, Prometheus metrics, automatic cleanup) are only
+> active in the **Docker / distributed deployment** path. The default **Windows-native deployment**
+> (Task Scheduler + autonomous workers) does not use Redis or Docker — those features are
+> silently no-op'd in that configuration, which is safe and correct. CHH-01 and the benchmarking
+> system work in both deployment paths.
+
 ### Changed (BREAKING)
 
 - **Content hash tracking now enabled by default** (GAP-01, CHH-01)

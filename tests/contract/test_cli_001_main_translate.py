@@ -22,17 +22,12 @@ Never Invariants:
 - NEVER allow both --parallel-languages AND --global-lang-rounds together
 """
 
-import pytest
 import argparse
-import subprocess
 import sys
-import signal
-import os
-import tempfile
-from pathlib import Path
-from unittest.mock import Mock, MagicMock, patch, call
-import yaml
+from unittest.mock import Mock, patch
 
+import pytest
+import yaml
 
 # ==============================================================================
 # Fixtures
@@ -305,8 +300,9 @@ class TestAtomicOutputWrites:
 
         Evidence: src/utils/atomic_write.py - os.replace is atomic
         """
-        from src.utils.atomic_write import atomic_write, AtomicWriteError
         import errno
+
+        from src.utils.atomic_write import AtomicWriteError, atomic_write
 
         # Arrange - Create existing file
         output_file = tmp_path / "existing.md"
@@ -339,7 +335,7 @@ class TestSiteProfileValidation:
 
         Evidence: src/utils/config_loader.py lines 92-93
         """
-        from src.utils.config_loader import ConfigService, ConfigLoadError
+        from src.utils.config_loader import ConfigLoadError, ConfigService
 
         # Arrange
         config_service = ConfigService(str(temp_config_dir))
@@ -375,7 +371,7 @@ class TestSiteProfileValidation:
 
         Evidence: src/utils/config_loader.py lines 40-41
         """
-        from src.utils.config_loader import ConfigService, ConfigLoadError
+        from src.utils.config_loader import ConfigLoadError, ConfigService
 
         # Arrange
         nonexistent_path = tmp_path / "nonexistent_config"

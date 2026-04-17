@@ -14,10 +14,10 @@ import hashlib
 import json
 import logging
 import time
-from datetime import datetime, UTC
-from pathlib import Path
-from typing import Dict, List, Optional, Any
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from datetime import UTC, datetime
+from pathlib import Path
+from typing import Any
 
 from .registry import ModelInfo, ModelRegistry
 
@@ -67,9 +67,9 @@ class ModelManifest:
             manifest_path: Path to manifest JSON file
         """
         self.manifest_path = manifest_path
-        self._data: Dict[str, Any] = self._load()
+        self._data: dict[str, Any] = self._load()
 
-    def _load(self) -> Dict[str, Any]:
+    def _load(self) -> dict[str, Any]:
         """Load manifest from disk or create empty."""
         if not self.manifest_path.exists():
             return {
@@ -79,7 +79,7 @@ class ModelManifest:
             }
 
         try:
-            with open(self.manifest_path, "r", encoding="utf-8") as f:
+            with open(self.manifest_path, encoding="utf-8") as f:
                 return json.load(f)
         except json.JSONDecodeError as e:
             logger.error(f"Invalid manifest JSON at {self.manifest_path}: {e}")
@@ -116,9 +116,9 @@ class ModelManifest:
         except Exception as e:
             if temp_path.exists():
                 temp_path.unlink()
-            raise IOError(f"Failed to save manifest: {e}") from e
+            raise OSError(f"Failed to save manifest: {e}") from e
 
-    def get_model_entry(self, model_id: str) -> Optional[Dict[str, Any]]:
+    def get_model_entry(self, model_id: str) -> dict[str, Any] | None:
         """Get manifest entry for model."""
         for entry in self._data["models"]:
             if entry["model_id"] == model_id:
@@ -132,7 +132,7 @@ class ModelManifest:
         download_source: str,
         backend: str,
         size_mb: float,
-        files: List[Dict[str, Any]]
+        files: list[dict[str, Any]]
     ) -> None:
         """
         Add or update model entry in manifest.
@@ -173,7 +173,7 @@ class ModelManifest:
         ]
         logger.info(f"Manifest entry removed: {model_id}")
 
-    def list_models(self) -> List[str]:
+    def list_models(self) -> list[str]:
         """List all model IDs in manifest."""
         return [entry["model_id"] for entry in self._data["models"]]
 
@@ -523,9 +523,9 @@ class ModelStore:
 
     def download_all_models(
         self,
-        language_filter: Optional[List[str]] = None,
+        language_filter: list[str] | None = None,
         max_workers: int = 3
-    ) -> Dict[str, bool]:
+    ) -> dict[str, bool]:
         """
         Download all models in registry (or filtered subset).
 
@@ -586,11 +586,11 @@ class ModelStore:
 
         return results
 
-    def list_downloaded_models(self) -> List[str]:
+    def list_downloaded_models(self) -> list[str]:
         """List models that are downloaded and verified."""
         return self.manifest.list_models()
 
-    def get_download_plan(self) -> Dict[str, Any]:
+    def get_download_plan(self) -> dict[str, Any]:
         """
         Generate download plan showing what needs to be downloaded.
 

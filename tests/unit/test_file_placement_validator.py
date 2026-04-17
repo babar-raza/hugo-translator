@@ -4,11 +4,13 @@ Unit tests for FilePlacementValidator.
 Tests the fix for file-based vs folder-based localization detection.
 Ensures blog.aspose.net (file-based) doesn't warn about missing /en/ folder.
 """
-import pytest
 from pathlib import Path
-from src.translation_engine.validation.file_placement_validator import FilePlacementValidator
+
+import pytest
+
 from src.translation_engine.validation.base import ValidationSeverity
-from src.utils.models import SiteProfile, OutputLayout, BodyRules, FrontmatterRule, FrontmatterMode
+from src.translation_engine.validation.file_placement_validator import FilePlacementValidator
+from src.utils.models import BodyRules, FrontmatterMode, FrontmatterRule, OutputLayout, SiteProfile
 
 
 @pytest.fixture
@@ -299,7 +301,6 @@ class TestValidateWrittenFile:
 
         # Create the file temporarily for testing
         import tempfile
-        import os
         with tempfile.TemporaryDirectory() as tmpdir:
             test_file = Path(tmpdir) / "content" / "blog" / "post" / "index.es.md"
             test_file.parent.mkdir(parents=True, exist_ok=True)

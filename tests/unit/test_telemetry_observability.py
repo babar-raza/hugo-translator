@@ -4,8 +4,8 @@ Unit tests for TI-01: Telemetry Fallback Observability.
 Tests that _safe_duration_ms() emits metrics and structured logs when
 fallback scenarios occur (None stats, None duration_seconds, invalid types).
 """
-import pytest
 from unittest.mock import MagicMock, patch
+
 from src.observability.telemetry_integration import _safe_duration_ms
 from src.translation_engine.models import TranslationStats
 

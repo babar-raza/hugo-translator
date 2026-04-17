@@ -34,4 +34,3 @@ The product page also references sample code and GitHub repositories where devel
 This content helps teams evaluate performance and behavior before moving into production.
 
 For licensing specifics and trial options, the product page links to the Aspose purchase portal associated with the Word Processor plugin.
-

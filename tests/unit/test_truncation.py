@@ -8,7 +8,7 @@ Tests focus on:
 - Metrics surfaced via stats object
 """
 import logging
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 import pytest
 import torch

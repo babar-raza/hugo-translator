@@ -20,13 +20,14 @@ jobs:
   unit-tests:
     name: Unit Tests
     runs-on: windows-latest
+    timeout-minutes: 20
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Setup Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
           python-version: '3.10'
 
@@ -50,13 +51,14 @@ jobs:
     name: Regression Tests
     runs-on: windows-latest
     needs: unit-tests
+    timeout-minutes: 20
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Setup Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
           python-version: '3.10'
 
@@ -68,15 +70,13 @@ jobs:
 
       - name: Run Signature Preservation Tests
         run: |
-          python -m pytest tests/regression/test_signature_preservation.py -v --tb=short || true
+          python -m pytest tests/regression/test_signature_preservation.py -v --tb=short
         shell: pwsh
-        continue-on-error: true
 
       - name: Run Batch Recovery Tests
         run: |
-          python -m pytest tests/regression/test_batch_size_recovery.py -v --tb=short || true
+          python -m pytest tests/regression/test_batch_size_recovery.py -v --tb=short
         shell: pwsh
-        continue-on-error: true
 
   quality-gate:
     name: Quality Gate (CI Audit)

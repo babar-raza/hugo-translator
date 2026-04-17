@@ -1,7 +1,8 @@
 """Tests for quality_metrics.py - BLEU and COMET translation metrics."""
 
-import pytest
 from unittest.mock import MagicMock, patch
+
+import pytest
 
 from src.benchmarking.quality_metrics import QualityMetrics, QualityScore
 

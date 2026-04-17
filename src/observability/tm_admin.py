@@ -7,9 +7,8 @@ Provides tools to inspect and manage TM entries.
 import csv
 import json
 import logging
-from dataclasses import asdict
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 from src.tm.translation_memory import TranslationMemory
 
@@ -33,7 +32,7 @@ class TranslationMemoryAdmin:
         """
         self.tm = tm
 
-    def get_stats(self, site_id: Optional[str] = None) -> Dict[str, Any]:
+    def get_stats(self, site_id: str | None = None) -> dict[str, Any]:
         """
         Get TM statistics.
 
@@ -74,10 +73,10 @@ class TranslationMemoryAdmin:
     def dump_entries_to_file(
         self,
         out_path: Path,
-        site_id: Optional[str] = None,
+        site_id: str | None = None,
         format: str = "ndjson",
         limit: int = 10000,
-    ) -> Tuple[int, Optional[str]]:
+    ) -> tuple[int, str | None]:
         """
         Export TM entries to file.
 
@@ -129,7 +128,7 @@ class TranslationMemoryAdmin:
 
         return count, error
 
-    def clear_cache(self) -> Dict[str, bool]:
+    def clear_cache(self) -> dict[str, bool]:
         """
         Clear all TM caches.
 

@@ -7,12 +7,12 @@ Implementation follows RES-01 from the translation resilience plan.
 """
 
 import json
-import uuid
 import logging
-from dataclasses import dataclass, asdict, field
+import uuid
+from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Dict, List, Tuple, Optional, Any
+from typing import Any, Optional
 
 # Handle both package imports and direct imports for testing
 try:
@@ -55,12 +55,12 @@ class ProgressState:
     site_id: str = ""
     source_dir: str = ""
     output_dir: str = ""
-    target_langs: List[str] = field(default_factory=list)
+    target_langs: list[str] = field(default_factory=list)
 
     # Progress tracking
     total_files: int = 0
-    completed_files: Dict[str, List[str]] = field(default_factory=dict)  # {file_path: [completed_langs]}
-    failed_files: Dict[str, Dict[str, str]] = field(default_factory=dict)  # {file_path: {lang: error_msg}}
+    completed_files: dict[str, list[str]] = field(default_factory=dict)  # {file_path: [completed_langs]}
+    failed_files: dict[str, dict[str, str]] = field(default_factory=dict)  # {file_path: {lang: error_msg}}
 
     # Statistics
     files_processed: int = 0
@@ -72,14 +72,14 @@ class ProgressState:
     last_updated: str = ""
 
     # Configuration snapshot
-    config_snapshot: Optional[Dict[str, Any]] = None
+    config_snapshot: dict[str, Any] | None = None
 
-    def to_dict(self) -> Dict:
+    def to_dict(self) -> dict:
         """Convert to JSON-serializable dict."""
         return asdict(self)
 
     @classmethod
-    def from_dict(cls, data: Dict) -> 'ProgressState':
+    def from_dict(cls, data: dict) -> 'ProgressState':
         """
         Load from dict with validation.
 
@@ -152,11 +152,11 @@ class ProgressTracker:
     def __init__(
         self,
         progress_dir: Path,
-        run_id: Optional[str] = None,
+        run_id: str | None = None,
         site_id: str = "",
         source_dir: Path = Path("."),
         output_dir: Path = Path("output"),
-        target_langs: Optional[List[str]] = None
+        target_langs: list[str] | None = None
     ):
         """
         Initialize progress tracker.
@@ -205,7 +205,7 @@ class ProgressTracker:
             ProgressCorruptionError: If file is corrupted
         """
         try:
-            with open(self.progress_file, 'r', encoding='utf-8') as f:
+            with open(self.progress_file, encoding='utf-8') as f:
                 data = json.load(f)
             return ProgressState.from_dict(data)
         except json.JSONDecodeError as e:
@@ -223,7 +223,7 @@ class ProgressTracker:
         json_content = json.dumps(self.state.to_dict(), indent=2, ensure_ascii=False)
         atomic_write(self.progress_file, json_content)
 
-    def initialize(self, all_files: List[Path]) -> None:
+    def initialize(self, all_files: list[Path]) -> None:
         """
         Initialize progress tracking for a batch of files.
 
@@ -286,7 +286,7 @@ class ProgressTracker:
 
         self._save_state()
 
-    def get_pending(self, all_files: List[Path]) -> List[Tuple[Path, str]]:
+    def get_pending(self, all_files: list[Path]) -> list[tuple[Path, str]]:
         """
         Get list of (file, lang) pairs that still need translation.
 
@@ -308,7 +308,7 @@ class ProgressTracker:
 
         return pending
 
-    def get_statistics(self) -> Dict[str, Any]:
+    def get_statistics(self) -> dict[str, Any]:
         """
         Get current progress statistics.
 
@@ -379,7 +379,7 @@ class ProgressTracker:
 
         for pf in progress_files:
             try:
-                with open(pf, 'r', encoding='utf-8') as f:
+                with open(pf, encoding='utf-8') as f:
                     data = json.load(f)
 
                 if data.get('site_id') == site_id:
@@ -401,7 +401,7 @@ class ProgressTracker:
         return None
 
     @classmethod
-    def list_all(cls, progress_dir: Path) -> List[Dict[str, Any]]:
+    def list_all(cls, progress_dir: Path) -> list[dict[str, Any]]:
         """
         List all progress files with their statistics.
 
@@ -418,7 +418,7 @@ class ProgressTracker:
         results = []
         for pf in progress_dir.glob("progress_*.json"):
             try:
-                with open(pf, 'r', encoding='utf-8') as f:
+                with open(pf, encoding='utf-8') as f:
                     data = json.load(f)
 
                 results.append({
@@ -437,7 +437,7 @@ class ProgressTracker:
         return results
 
     @staticmethod
-    def validate_progress_file(progress_file: Path) -> Tuple[bool, str, bool]:
+    def validate_progress_file(progress_file: Path) -> tuple[bool, str, bool]:
         """
         RES-07: Validate progress file integrity.
 
@@ -455,7 +455,7 @@ class ProgressTracker:
             (is_valid: bool, error_message: str, is_recoverable: bool)
         """
         try:
-            with open(progress_file, 'r', encoding='utf-8') as f:
+            with open(progress_file, encoding='utf-8') as f:
                 data = json.load(f)
         except json.JSONDecodeError as e:
             return (False, f"Invalid JSON: {e}", False)
@@ -519,7 +519,7 @@ class ProgressTracker:
         logger.warning(f"Attempting to recover progress file: {progress_file}")
 
         try:
-            with open(progress_file, 'r', encoding='utf-8') as f:
+            with open(progress_file, encoding='utf-8') as f:
                 data = json.load(f)
         except json.JSONDecodeError:
             logger.error("Progress file has invalid JSON - unrecoverable")

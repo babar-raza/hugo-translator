@@ -10,7 +10,7 @@ Orchestrates pluggable verification checks to detect:
 The agent runs after translation but before writing output files.
 """
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from .checks.base import VerificationCheck, VerificationIssue, VerificationResult
 
@@ -45,7 +45,7 @@ class VerificationAgent:
 
     def __init__(
         self,
-        checks: Optional[List[VerificationCheck]] = None,
+        checks: list[VerificationCheck] | None = None,
         fail_fast: bool = False,
     ):
         """
@@ -85,10 +85,10 @@ class VerificationAgent:
 
     def verify(
         self,
-        source_doc: Dict[str, Any],
-        translated_doc: Dict[str, Any],
+        source_doc: dict[str, Any],
+        translated_doc: dict[str, Any],
         target_lang: str,
-        context: Optional[Dict[str, Any]] = None,
+        context: dict[str, Any] | None = None,
     ) -> VerificationResult:
         """
         Run all verification checks on translated document.
@@ -172,7 +172,7 @@ class VerificationAgent:
 
         return result
 
-    def get_check_names(self) -> List[str]:
+    def get_check_names(self) -> list[str]:
         """Get names of all registered checks."""
         return [check.name for check in self.checks]
 

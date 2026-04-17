@@ -10,8 +10,7 @@ from pathlib import Path
 
 import pytest
 
-from src.observability.telemetry_integration import TranslationTelemetry, DummyRunContext
-
+from src.observability.telemetry_integration import DummyRunContext, TranslationTelemetry
 
 # ==============================================================================
 # Phase 2: Session Lifecycle Tests

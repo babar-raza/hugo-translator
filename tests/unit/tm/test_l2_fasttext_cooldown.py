@@ -6,6 +6,7 @@ lifetime. The fix adds a 60-second cooldown: after the cooldown expires the
 function re-attempts initialization.
 """
 import time
+
 import pytest
 
 

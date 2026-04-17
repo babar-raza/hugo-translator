@@ -6,7 +6,7 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 
 class ValidationSeverity(str, Enum):
@@ -24,8 +24,8 @@ class ValidationIssue:
     severity: ValidationSeverity
     validator: str  # Name of validator that found this issue
     message: str
-    location: Optional[str] = None  # Where in the document (e.g., "frontmatter.title", "line 42")
-    details: Optional[Dict[str, Any]] = None
+    location: str | None = None  # Where in the document (e.g., "frontmatter.title", "line 42")
+    details: dict[str, Any] | None = None
 
     def __str__(self) -> str:
         """Human-readable representation."""
@@ -40,9 +40,9 @@ class ValidationResult:
     """Result of validating a translation."""
 
     success: bool
-    issues: List[ValidationIssue] = field(default_factory=list)
-    file_path: Optional[Path] = None
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    issues: list[ValidationIssue] = field(default_factory=list)
+    file_path: Path | None = None
+    metadata: dict[str, Any] = field(default_factory=dict)
 
     @property
     def error_count(self) -> int:
@@ -59,7 +59,7 @@ class ValidationResult:
         """Count of info-level issues."""
         return sum(1 for issue in self.issues if issue.severity == ValidationSeverity.INFO)
 
-    def filter_by_severity(self, severity: ValidationSeverity) -> List[ValidationIssue]:
+    def filter_by_severity(self, severity: ValidationSeverity) -> list[ValidationIssue]:
         """Get issues of specific severity."""
         return [issue for issue in self.issues if issue.severity == severity]
 
@@ -90,7 +90,7 @@ class Validator(ABC):
     - Link validity
     """
 
-    def __init__(self, name: Optional[str] = None):
+    def __init__(self, name: str | None = None):
         """
         Initialize validator.
 
@@ -104,7 +104,7 @@ class Validator(ABC):
         self,
         source: str,
         translation: str,
-        context: Optional[Dict[str, Any]] = None,
+        context: dict[str, Any] | None = None,
     ) -> ValidationResult:
         """
         Validate a translation against its source.
@@ -123,8 +123,8 @@ class Validator(ABC):
         self,
         severity: ValidationSeverity,
         message: str,
-        location: Optional[str] = None,
-        details: Optional[Dict[str, Any]] = None,
+        location: str | None = None,
+        details: dict[str, Any] | None = None,
     ) -> ValidationIssue:
         """
         Helper to create a validation issue.

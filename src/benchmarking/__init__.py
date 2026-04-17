@@ -20,8 +20,8 @@ if TYPE_CHECKING:
     from src.benchmarking.query import BenchmarkQueryAPI, BenchmarkQueryBuilder
     from src.benchmarking.statistics import (
         BenchmarkStatistics,
-        StatisticalSummary,
         ComparisonResult,
+        StatisticalSummary,
     )
     from src.benchmarking.storage import BenchmarkDatabase
 

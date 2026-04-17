@@ -7,13 +7,8 @@ Tests cover:
 - Integration with translate_file
 """
 
-import sys
 import time
-import pytest
-import logging
 from pathlib import Path
-from typing import Tuple
-
 
 # Test the skip logic functions directly without importing the full engine
 # This avoids complex import chain issues
@@ -24,7 +19,7 @@ def _should_skip_translation(
     output_path: Path,
     force_retranslate: bool = False,
     use_mtime_check: bool = True,
-) -> Tuple[bool, str]:
+) -> tuple[bool, str]:
     """
     RES-05: Determine if translation can be skipped.
 
@@ -53,7 +48,7 @@ def _should_skip_translation(
             else:
                 return (False, "source has been modified")
 
-        except OSError as e:
+        except OSError:
             return (False, "mtime check failed")
 
     # Default: don't skip
@@ -73,7 +68,7 @@ def _is_valid_output(output_path: Path) -> bool:
             return False
 
         # Check readability
-        with open(output_path, 'r', encoding='utf-8') as f:
+        with open(output_path, encoding='utf-8') as f:
             content = f.read(1024)
 
         # Basic validation: has some content
@@ -82,7 +77,7 @@ def _is_valid_output(output_path: Path) -> bool:
 
         return True
 
-    except Exception as e:
+    except Exception:
         return False
 
 
@@ -359,7 +354,6 @@ class TestSkipTelemetry:
         Verifies that langs_skipped and langs_translated are properly
         captured in TranslationStats and tracked in telemetry.
         """
-        from unittest.mock import MagicMock
         from src.translation_engine.models import TranslationStats
 
         stats = TranslationStats(
@@ -421,6 +415,7 @@ class TestSkipTelemetry:
         without recording any event, and only a log message is recorded.
         """
         from unittest.mock import MagicMock
+
         from src.translation_engine.models import TranslationStats
 
         # Mock telemetry run context
@@ -520,7 +515,7 @@ class TestSkipTelemetry:
         """
         from src.observability.telemetry_integration import (
             build_output_summary,
-            calculate_items_metrics
+            calculate_items_metrics,
         )
         from src.translation_engine.models import TranslationStats
 
@@ -603,8 +598,9 @@ class TestSkipTelemetry:
         langs_translated = len(outputs) (which is 2)
         langs_skipped = len(skipped_langs) (which is 1)
         """
-        from src.translation_engine.models import TranslationResult, TranslationStats
         from pathlib import Path
+
+        from src.translation_engine.models import TranslationResult
 
         # Create a translation result with skip data
         # outputs contains only successfully translated languages

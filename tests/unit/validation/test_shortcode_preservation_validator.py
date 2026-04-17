@@ -10,15 +10,15 @@ Tests cover:
 - Edge cases: whitespace normalization, multiple shortcodes, nested content
 """
 
-import pytest
-from typing import Any, Dict, Optional
 
-from src.translation_engine.validation.shortcode_preservation_validator import (
-    ShortcodePreservationValidator,
-)
+import pytest
+
 from src.translation_engine.validation.base import (
     ValidationResult,
     ValidationSeverity,
+)
+from src.translation_engine.validation.shortcode_preservation_validator import (
+    ShortcodePreservationValidator,
 )
 
 

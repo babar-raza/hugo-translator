@@ -3,9 +3,6 @@ Unit tests for CLI parser without full dependency chain (CFG-03).
 
 Tests the argument parser in isolation.
 """
-import argparse
-import sys
-from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -213,7 +210,7 @@ def test_parser_help_text(mock_dependencies):
 
 def test_cli_config_overrides_initialization(mock_dependencies):
     """Test CLIConfigOverrides initialization."""
-    from src.cli import create_parser, CLIConfigOverrides
+    from src.cli import CLIConfigOverrides, create_parser
 
     parser = create_parser()
     args = parser.parse_args([
@@ -230,7 +227,7 @@ def test_cli_config_overrides_initialization(mock_dependencies):
 
 def test_cli_config_overrides_terminology(mock_dependencies):
     """Test CLIConfigOverrides terminology handling."""
-    from src.cli import create_parser, CLIConfigOverrides
+    from src.cli import CLIConfigOverrides, create_parser
 
     parser = create_parser()
 
@@ -252,7 +249,7 @@ def test_cli_config_overrides_terminology(mock_dependencies):
 
 def test_cli_config_overrides_engine_dict(mock_dependencies):
     """Test CLIConfigOverrides.get_engine_overrides()."""
-    from src.cli import create_parser, CLIConfigOverrides
+    from src.cli import CLIConfigOverrides, create_parser
 
     parser = create_parser()
 
@@ -278,7 +275,7 @@ def test_cli_config_overrides_engine_dict(mock_dependencies):
 
 def test_cli_config_overrides_max_retries(mock_dependencies):
     """Test max-retries override."""
-    from src.cli import create_parser, CLIConfigOverrides
+    from src.cli import CLIConfigOverrides, create_parser
 
     parser = create_parser()
     args = parser.parse_args(["--site", "test", "--max-retries", "5"])
@@ -289,7 +286,7 @@ def test_cli_config_overrides_max_retries(mock_dependencies):
 
 def test_cli_config_overrides_terminology_mode(mock_dependencies):
     """Test terminology mode override."""
-    from src.cli import create_parser, CLIConfigOverrides
+    from src.cli import CLIConfigOverrides, create_parser
 
     parser = create_parser()
     args = parser.parse_args([
@@ -305,7 +302,7 @@ def test_cli_config_overrides_terminology_mode(mock_dependencies):
 
 def test_cli_config_overrides_dry_run(mock_dependencies):
     """Test dry-run and save-rejected flags."""
-    from src.cli import create_parser, CLIConfigOverrides
+    from src.cli import CLIConfigOverrides, create_parser
 
     parser = create_parser()
     args = parser.parse_args(["--site", "test", "--dry-run", "--save-rejected"])
@@ -340,7 +337,7 @@ def test_parser_max_tokens_default_none(mock_dependencies):
 
 def test_cli_config_overrides_max_tokens(mock_dependencies):
     """Test max-tokens override (TR-01)."""
-    from src.cli import create_parser, CLIConfigOverrides
+    from src.cli import CLIConfigOverrides, create_parser
 
     parser = create_parser()
 
@@ -355,7 +352,7 @@ def test_cli_config_overrides_max_tokens(mock_dependencies):
 
 def test_cli_config_overrides_max_tokens_not_in_dict_when_none(mock_dependencies):
     """Test that max_tokens is not in engine overrides when None."""
-    from src.cli import create_parser, CLIConfigOverrides
+    from src.cli import CLIConfigOverrides, create_parser
 
     parser = create_parser()
 
@@ -424,7 +421,7 @@ def test_load_mode_flag_fp32(mock_dependencies):
 
 def test_device_override_stores_correctly(mock_dependencies):
     """Test that device override stores None for 'auto' and actual value otherwise (T101)."""
-    from src.cli import create_parser, CLIConfigOverrides
+    from src.cli import CLIConfigOverrides, create_parser
 
     parser = create_parser()
 
@@ -446,7 +443,7 @@ def test_device_override_stores_correctly(mock_dependencies):
 
 def test_load_mode_override_stores_correctly(mock_dependencies):
     """Test that load_mode override stores None for 'auto' and actual value otherwise (T101)."""
-    from src.cli import create_parser, CLIConfigOverrides
+    from src.cli import CLIConfigOverrides, create_parser
 
     parser = create_parser()
 

@@ -9,7 +9,7 @@ Implementation follows TM-04 from the TM cache integrity plan.
 import logging
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from .l2_persistent import L2PersistentTM
@@ -25,7 +25,7 @@ class CacheSizeReport:
     usage_percent: float
     entry_count: int
     warning: bool
-    recommendation: Optional[str] = None
+    recommendation: str | None = None
 
     @property
     def current_mb(self) -> float:

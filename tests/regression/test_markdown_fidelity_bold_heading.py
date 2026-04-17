@@ -11,16 +11,16 @@ Example failure case:
     Target (correct): **Plateformes soutenues** (bold preserved)
 """
 
-import pytest
-from pathlib import Path
 import sys
-import tempfile
+from pathlib import Path
+
+import pytest
 
 # Add src to path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
-from src.translation_engine.parser.hugo_parser import HugoParser
 from src.translation_engine.parser.ast_nodes import NodeType
+from src.translation_engine.parser.hugo_parser import HugoParser
 
 
 @pytest.fixture

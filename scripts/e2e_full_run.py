@@ -5,11 +5,11 @@ E2E Full Run Script for slides translation.
 Translates all 10 markdown files in en/ to 35 locales.
 """
 
-import sys
 import os
+import sys
 import time
-from pathlib import Path
 from datetime import datetime
+from pathlib import Path
 
 # Add src to path
 REPO_ROOT = Path(__file__).parent.parent
@@ -18,6 +18,7 @@ os.chdir(str(REPO_ROOT))
 
 # Set up logging
 import logging
+
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
@@ -45,15 +46,16 @@ def run_full_translation():
     # Import components
     print("\n[1/5] Importing components...")
     try:
-        from src.translation_engine import TranslationEngine
-        from src.utils.config_loader import ConfigService
+        import torch
+
+        from src.model_runtime import ModelLoader
+        from src.model_runtime.registry import ModelRegistry
         from src.tm import TranslationMemory
         from src.tm.l1_cache import L1Cache
         from src.tm.l2_persistent import L2PersistentTM
         from src.tm.l3_semantic import L3SemanticTM
-        from src.model_runtime import ModelLoader
-        from src.model_runtime.registry import ModelRegistry
-        import torch
+        from src.translation_engine import TranslationEngine
+        from src.utils.config_loader import ConfigService
         print("   OK: All components imported")
     except ImportError as e:
         print(f"   ERROR: Import failed: {e}")
@@ -103,7 +105,7 @@ def run_full_translation():
     # Source directory
     source_dir = Path(r"D:\onedrive\Documents\GitHub\aspose.net\content\products.aspose.net\slides\en")
 
-    print(f"\n[3/5] Scanning source directory...")
+    print("\n[3/5] Scanning source directory...")
     print(f"   Path: {source_dir}")
 
     # Find all markdown files (recursive)
@@ -219,7 +221,7 @@ def run_full_translation():
     end_time = datetime.now()
     duration = (end_time - start_time).total_seconds()
 
-    print(f"\n[5/5] Summary")
+    print("\n[5/5] Summary")
     print("=" * 70)
     print(f"Duration: {duration:.1f}s ({duration/60:.1f} minutes)")
     print(f"Files processed: {len(md_files)}")
@@ -227,14 +229,14 @@ def run_full_translation():
     print(f"Expected outputs: {results['expected_outputs']}")
     print(f"Successful: {results['successful']}")
     print(f"Failed: {results['failed']}")
-    print(f"\nSegment Statistics:")
+    print("\nSegment Statistics:")
     print(f"  Total segments: {results['total_segments']}")
     print(f"  TM hits: {results['total_tm_hits']}")
     print(f"  Model translated: {results['total_translated']}")
     if results['total_segments'] > 0:
         tm_rate = results['total_tm_hits'] / results['total_segments'] * 100
         print(f"  TM hit rate: {tm_rate:.1f}%")
-    print(f"\nToken Usage:")
+    print("\nToken Usage:")
     print(f"  Input tokens: {results['total_tokens_in']}")
     print(f"  Output tokens: {results['total_tokens_out']}")
 

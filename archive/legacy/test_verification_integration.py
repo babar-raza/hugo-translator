@@ -8,25 +8,23 @@ Tests that:
 - Mixed-language content is detected and reported
 """
 
-import pytest
 import sys
 import tempfile
 from pathlib import Path
-from typing import Dict
+
+import pytest
 
 # Add src to path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
-from src.translation_engine import TranslationEngine
-from src.translation_engine.models import TranslationResult
+from src.model_runtime import ModelLoader
+from src.model_runtime.backends.mock_backend import MockTranslationBackend
+from src.model_runtime.registry import ModelRegistry
 from src.tm.l1_cache import L1Cache
 from src.tm.l2_persistent import L2PersistentTM
 from src.tm.translation_memory import TranslationMemory
-from src.model_runtime import ModelLoader
-from src.model_runtime.registry import ModelRegistry
-from src.model_runtime.backends.mock_backend import MockTranslationBackend
+from src.translation_engine import TranslationEngine
 from src.utils.config_loader import ConfigService
-from src.utils.models import SiteProfile, BodyRules, FrontmatterMode, FrontmatterRule
 
 
 @pytest.fixture

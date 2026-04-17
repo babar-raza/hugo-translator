@@ -5,10 +5,10 @@ Tests Hugo shortcodes ({{% %}}, {{< >}}) preservation through:
 AST extraction → TextUnit creation → Translation → Reconstruction → Markdown output
 """
 
-import pytest
 from pathlib import Path
-from src.translation_engine.parser.hugo_parser import HugoParser
+
 from src.translation_engine.extractor.text_unit_extractor import TextUnitExtractor
+from src.translation_engine.parser.hugo_parser import HugoParser
 from src.translation_engine.reconstructor.markdown_reconstructor import MarkdownReconstructor
 from src.utils.config_loader import ConfigService
 

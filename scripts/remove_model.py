@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 """Safely remove a specific model."""
 import argparse
+import importlib.util
 import json
 import shutil
 import sys
-from pathlib import Path
 from datetime import datetime
-import importlib.util
+from pathlib import Path
 
 
 def load_module_directly(module_name, module_path):
@@ -95,7 +95,7 @@ def create_backup(model_path: Path, backup_dir: Path) -> Path:
 
     print(f"Creating backup at {backup_path}...")
     shutil.copytree(model_path, backup_path)
-    print(f"✓ Backup created")
+    print("✓ Backup created")
 
     return backup_path
 

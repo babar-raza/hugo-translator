@@ -15,7 +15,7 @@ import warnings
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Optional, Dict, Any
+from typing import Any
 
 import torch
 
@@ -79,7 +79,7 @@ class WorkerConfig:
     redis_host: str = "localhost"
     redis_port: int = 6379
     redis_db: int = 0
-    redis_password: Optional[str] = None
+    redis_password: str | None = None
     poll_interval: float = 5.0
     max_retries: int = 3
     config_path: str = "./config"
@@ -87,10 +87,10 @@ class WorkerConfig:
     device: str = "auto"
     use_shared_engines: bool = True
     log_level: str = "INFO"
-    mode_config: Dict[str, Any] = field(default_factory=dict)
+    mode_config: dict[str, Any] = field(default_factory=dict)
 
     @classmethod
-    def from_env(cls, mode_defaults: Optional[Dict[str, Any]] = None) -> "WorkerConfig":
+    def from_env(cls, mode_defaults: dict[str, Any] | None = None) -> "WorkerConfig":
         """
         Create WorkerConfig from environment variables with mode defaults.
 
@@ -156,7 +156,7 @@ class WorkerConfig:
 
         return cls(**config_dict)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary representation."""
         return {
             "execution_mode": self.execution_mode.value,

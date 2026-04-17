@@ -2,7 +2,6 @@
 Placeholder management for protecting non-translatable content.
 """
 import re
-from typing import Dict, List, Tuple
 
 
 class PlaceholderManager:
@@ -10,10 +9,10 @@ class PlaceholderManager:
 
     def __init__(self):
         """Initialize placeholder manager."""
-        self.placeholder_map: Dict[str, str] = {}
+        self.placeholder_map: dict[str, str] = {}
         self.counter = 0
 
-    def protect(self, text: str, patterns: List[str]) -> Tuple[str, Dict[str, str]]:
+    def protect(self, text: str, patterns: list[str]) -> tuple[str, dict[str, str]]:
         """
         Replace protected content with placeholders.
 
@@ -48,7 +47,7 @@ class PlaceholderManager:
             # If pattern is invalid, return text unchanged
             return text
 
-    def restore(self, text: str, placeholder_map: Dict[str, str]) -> str:
+    def restore(self, text: str, placeholder_map: dict[str, str]) -> str:
         """
         Restore placeholders to original content.
 
@@ -75,7 +74,7 @@ class PlaceholderManager:
         restored = re.sub(r"\{[^{}]*?(\d+)\}", fuzzy_replace, restored)
         return restored
 
-    def extract_placeholders(self, text: str) -> List[str]:
+    def extract_placeholders(self, text: str) -> list[str]:
         """
         Extract all placeholder tokens from text.
 

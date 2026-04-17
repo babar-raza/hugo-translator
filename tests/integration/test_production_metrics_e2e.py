@@ -4,7 +4,6 @@ Tests the complete integration of production metrics from CLI flag through
 to database recording, ensuring OPT-IN behavior and PII sanitization.
 """
 
-import json
 import os
 import sys
 from pathlib import Path

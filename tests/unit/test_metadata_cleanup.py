@@ -1,13 +1,12 @@
 """Unit tests for MetadataTracker automatic cleanup (CHH-05)."""
 
 import json
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Dict
 
 import pytest
 
-from src.utils.metadata_tracker import MetadataTracker, SourceFileMetadata, FileMetadata
+from src.utils.metadata_tracker import MetadataTracker
 
 
 @pytest.fixture
@@ -27,7 +26,7 @@ def sample_files(tmp_path):
     return files
 
 
-def create_metadata_with_ages(metadata_file: Path, ages_days: Dict[str, int], sample_files: Dict[str, Path]):
+def create_metadata_with_ages(metadata_file: Path, ages_days: dict[str, int], sample_files: dict[str, Path]):
     """
     Create metadata file with entries of specified ages.
 

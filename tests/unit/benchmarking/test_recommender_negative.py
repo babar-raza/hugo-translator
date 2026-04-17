@@ -1,10 +1,9 @@
 """Negative test cases and edge cases for ModelRecommender."""
-from datetime import datetime, UTC
-import pytest
+from datetime import UTC, datetime
 
 from src.benchmarking.feedback import RecommendationFeedback
-from src.benchmarking.recommender import ModelRecommender, ModelRecommendation
-from src.benchmarking.storage import BenchmarkRun, BenchmarkResult
+from src.benchmarking.recommender import ModelRecommendation, ModelRecommender
+from src.benchmarking.storage import BenchmarkResult, BenchmarkRun
 from src.benchmarking.system_info import SystemInfo
 
 
@@ -357,7 +356,7 @@ class TestGPUMemoryDetection:
 
     def test_detect_gpu_memory_cuda_not_available(self, temp_db):
         """Memory detection returns None when CUDA is not available."""
-        from unittest.mock import patch, MagicMock
+        from unittest.mock import MagicMock, patch
 
         recommender = ModelRecommender(temp_db)
 

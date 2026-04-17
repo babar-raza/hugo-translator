@@ -9,15 +9,15 @@ Tests:
 - Time and call limits
 """
 
-import pytest
-from unittest.mock import Mock, MagicMock, patch
-from pathlib import Path
+from unittest.mock import Mock, patch
 
+import pytest
+
+from src.tm.improvement_queue import ImprovementCandidate
 from src.workers.tm_improvement_worker import (
     TMImprovementWorker,
     TMImprovementWorkerConfig,
 )
-from src.tm.improvement_queue import ImprovementCandidate
 
 
 @pytest.fixture

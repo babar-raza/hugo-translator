@@ -9,13 +9,13 @@ import logging
 import os
 import uuid
 from datetime import datetime, timezone
-from typing import Optional, Dict, Any, List
 from pathlib import Path
+from typing import Any
 
 from src.observability.telemetry_integration import (
     TranslationTelemetry,
+    configure_telemetry,
     get_telemetry,
-    configure_telemetry
 )
 
 logger = logging.getLogger(__name__)
@@ -50,7 +50,7 @@ class TelemetryEngine:
         self,
         agent_name: str = "hugo-translator",
         enabled: bool = True,
-        config: Optional[Any] = None
+        config: Any | None = None
     ):
         """Initialize telemetry engine."""
         self.agent_name = agent_name
@@ -74,9 +74,9 @@ class TelemetryEngine:
         self,
         job_type: str,
         trigger_type: str = "cli",
-        file_path: Optional[Path] = None,
-        target_langs: Optional[List[str]] = None,
-        errors: Optional[List[str]] = None,
+        file_path: Path | None = None,
+        target_langs: list[str] | None = None,
+        errors: list[str] | None = None,
         **additional_context
     ):
         """
@@ -161,7 +161,7 @@ class TelemetryEngine:
         except Exception as exc:
             logger.debug(f"track_event failed (non-fatal): {exc}")
 
-    def emit(self, event_type: str, data: Dict[str, Any]) -> None:
+    def emit(self, event_type: str, data: dict[str, Any]) -> None:
         """
         Emit a telemetry event.
 
@@ -192,7 +192,7 @@ class TelemetryEngine:
         """
         return self.enabled and self.telemetry.enabled
 
-    def get_telemetry_client(self) -> Optional[TranslationTelemetry]:
+    def get_telemetry_client(self) -> TranslationTelemetry | None:
         """
         Get underlying telemetry client for advanced usage.
 

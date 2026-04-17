@@ -6,8 +6,8 @@ This script checks if the corrupted translations were stored in TM
 and are being served back instead of being freshly translated.
 """
 
-import sys
 import sqlite3
+import sys
 from pathlib import Path
 
 # Add src to path
@@ -102,11 +102,11 @@ def check_tm_contamination():
         except Exception as e:
             print(f"  ⚠ Error reading {db_file}: {e}")
 
-    print(f"\n[3/3] Results:")
+    print("\n[3/3] Results:")
     print("="*80)
 
     if total_contaminated > 0:
-        print(f"\n✗ TM CONTAMINATION DETECTED!")
+        print("\n✗ TM CONTAMINATION DETECTED!")
         print(f"\n  Total contaminated entries: {total_contaminated}")
         print(f"  Contaminated databases: {len(contaminated_dbs)}")
         print("\n  Affected databases:")

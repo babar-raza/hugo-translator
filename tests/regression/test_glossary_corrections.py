@@ -6,8 +6,8 @@ Tests that known mistranslations are corrected using glossary post-processing.
 MISSION: Implement translation quality mitigation for vocabulary errors
 identified in PHASE10_PROD_FORCE_TRANSLATE.md
 """
-import sys
 import os
+import sys
 from pathlib import Path
 
 # Add src to path
@@ -15,10 +15,9 @@ REPO_ROOT = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(REPO_ROOT))
 os.chdir(str(REPO_ROOT))
 
-import pytest
 from src.translation_engine.quality.glossary_corrector import (
     GlossaryCorrector,
-    get_glossary_corrector
+    get_glossary_corrector,
 )
 
 
@@ -56,7 +55,7 @@ def test_metrage_correction():
     assert corrected == expected_text, (
         f"Expected '{expected_text}', got '{corrected}'"
     )
-    print(f"[PASS] 'Métrage' correctly replaced with 'Fusion'")
+    print("[PASS] 'Métrage' correctly replaced with 'Fusion'")
 
     assert "métrage -> fusion" in changes, (
         f"Correction not recorded in changes: {changes}"
@@ -87,7 +86,7 @@ def test_textile_correction():
     expected_text = "Extrait de contenu textuel des slides"
 
     corrected, changes = corrector.apply_corrections(wrong_text, "en", "fr")
-    print(f"[2/2] Corrected: textile -> textuel")
+    print("[2/2] Corrected: textile -> textuel")
 
     # ASSERTIONS
     print("\n" + "=" * 80)
@@ -97,10 +96,10 @@ def test_textile_correction():
     assert corrected == expected_text, (
         f"Expected '{expected_text}', got '{corrected}'"
     )
-    print(f"[PASS] 'textile' correctly replaced with 'textuel'")
+    print("[PASS] 'textile' correctly replaced with 'textuel'")
 
     assert "textile -> textuel" in changes
-    print(f"[PASS] Correction logged")
+    print("[PASS] Correction logged")
 
     print("\n" + "=" * 80)
     print("TEST PASSED: textile -> textuel correction works!")
@@ -126,7 +125,7 @@ def test_escanner_correction():
     expected_text = "analyser de la sécurité et des vulnérabilités"
 
     corrected, changes = corrector.apply_corrections(wrong_text, "en", "fr")
-    print(f"[2/2] Corrected: escanner -> analyser")
+    print("[2/2] Corrected: escanner -> analyser")
 
     # ASSERTIONS
     print("\n" + "=" * 80)
@@ -136,7 +135,7 @@ def test_escanner_correction():
     assert corrected == expected_text, (
         f"Expected '{expected_text}', got '{corrected}'"
     )
-    print(f"[PASS] 'escanner' correctly replaced with 'analyser'")
+    print("[PASS] 'escanner' correctly replaced with 'analyser'")
 
     print("\n" + "=" * 80)
     print("TEST PASSED: escanner -> analyser correction works!")
@@ -178,14 +177,14 @@ def test_word_boundary_matching():
     assert corrected_1 == "estimation textuel de la capacité", (
         f"Expected 'textile' to be replaced, got '{corrected_1}'"
     )
-    print(f"[PASS] Whole word 'textile' replaced")
+    print("[PASS] Whole word 'textile' replaced")
 
     # Test 2: "pourcentage métrique" should NOT be changed (no matching words)
     assert corrected_2 == text_with_partial, (
         f"Expected no change, but got '{corrected_2}'"
     )
     assert len(changes_2) == 0, f"Expected no corrections, got {changes_2}"
-    print(f"[PASS] No partial word replacements")
+    print("[PASS] No partial word replacements")
 
     print("\n" + "=" * 80)
     print("TEST PASSED: Word boundary matching works correctly!")
@@ -221,7 +220,7 @@ def test_case_preservation():
     assert corrected_caps == expected_caps, (
         f"Expected '{expected_caps}', got '{corrected_caps}'"
     )
-    print(f"[PASS] Capitalization preserved: Métrage -> Fusion")
+    print("[PASS] Capitalization preserved: Métrage -> Fusion")
 
     print("\n" + "=" * 80)
     print("TEST PASSED: Case preservation works!")
@@ -258,7 +257,7 @@ def test_multiple_corrections_in_one_text():
     assert corrected_multi == expected_multi, (
         f"Expected '{expected_multi}', got '{corrected_multi}'"
     )
-    print(f"[PASS] All corrections applied")
+    print("[PASS] All corrections applied")
 
     assert len(changes_multi) == 3, (
         f"Expected 3 corrections, got {len(changes_multi)}: {changes_multi}"
@@ -297,10 +296,10 @@ def test_get_glossary_corrector_cache():
 
     assert corrector1 is not None, "First corrector is None"
     assert corrector2 is not None, "Second corrector is None"
-    print(f"[PASS] Both correctors loaded")
+    print("[PASS] Both correctors loaded")
 
     assert corrector1 is corrector2, "Correctors are not the same instance (cache failed)"
-    print(f"[PASS] Corrector cached (same instance returned)")
+    print("[PASS] Corrector cached (same instance returned)")
 
     print("\n" + "=" * 80)
     print("TEST PASSED: Caching works!")

@@ -12,17 +12,14 @@ CLI usage:
 """
 
 import argparse
-import json
 import logging
 import sys
 import time
 import uuid
-from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
 
 from src.benchmarking.corpus import CorpusManager
-from src.benchmarking.storage import BenchmarkDatabase, BenchmarkResult, BenchmarkRun, SystemInfo
+from src.benchmarking.storage import BenchmarkDatabase, BenchmarkResult, BenchmarkRun
 from src.benchmarking.system_info import SystemInfoCollector
 from src.model_runtime.loader import ModelLoader
 from src.model_runtime.registry import ModelRegistry
@@ -40,8 +37,8 @@ logger = logging.getLogger(__name__)
 def load_corpus(
     corpus_filter: str,
     corpus_source: str = "json",
-    corpus_path: Optional[str | Path] = None,
-) -> List[Dict[str, str]]:
+    corpus_path: str | Path | None = None,
+) -> list[dict[str, str]]:
     """
     Load benchmark corpus from JSON or markdown files.
 
@@ -112,7 +109,7 @@ class BenchmarkRunner:
     def __init__(
         self,
         registry: ModelRegistry,
-        db_path: Optional[Path | str] = None
+        db_path: Path | str | None = None
     ):
         """
         Initialize benchmark runner.
@@ -131,14 +128,14 @@ class BenchmarkRunner:
         self,
         model_id: str,
         device: str,
-        batch_sizes: List[int],
+        batch_sizes: list[int],
         iterations: int,
-        corpus_filter: Optional[str] = None,
+        corpus_filter: str | None = None,
         corpus_source: str = "json",
-        corpus_path: Optional[str | Path] = None,
+        corpus_path: str | Path | None = None,
         purpose: str = "benchmark",
-        tags: Optional[List[str]] = None,
-        max_samples: Optional[int] = None,
+        tags: list[str] | None = None,
+        max_samples: int | None = None,
         src_lang: str = 'en',
         tgt_lang: str = 'ru',
     ) -> BenchmarkRun:
@@ -209,7 +206,7 @@ class BenchmarkRunner:
         loader = ModelLoader(self.registry)
 
         # Track results
-        all_results: List[BenchmarkResult] = []
+        all_results: list[BenchmarkResult] = []
         total_start = time.time()
 
         try:
@@ -300,14 +297,14 @@ class BenchmarkRunner:
     def _benchmark_translation(
         self,
         backend,
-        texts: List[str],
-        sample_ids: List[str],
+        texts: list[str],
+        sample_ids: list[str],
         model_id: str,
         device: str,
         batch_size: int,
         src_lang: str = 'en',
         tgt_lang: str = 'ru',
-    ) -> List[BenchmarkResult]:
+    ) -> list[BenchmarkResult]:
         """
         Benchmark a single translation batch.
 
@@ -361,7 +358,7 @@ class BenchmarkRunner:
                 logger.debug(f"Peak GPU memory for batch_size={batch_size}: {peak_memory_mb:.2f} MB")
 
             # Create results for each sample
-            for idx, (sample_id, text, translation) in enumerate(zip(sample_ids, texts, translations)):
+            for idx, (sample_id, text, translation) in enumerate(zip(sample_ids, texts, translations, strict=False)):
                 # Calculate per-sample metrics
                 sample_duration = duration / len(texts)
                 throughput = (tokens_per_sample_in + tokens_per_sample_out) / sample_duration if sample_duration > 0 else 0

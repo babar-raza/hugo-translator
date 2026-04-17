@@ -4,8 +4,7 @@ Round-robin language scheduler for multi-language processing.
 T302: federated-splashing-panda
 """
 import logging
-from dataclasses import dataclass, field
-from typing import Dict, List, Optional, Tuple
+from dataclasses import dataclass
 
 logger = logging.getLogger(__name__)
 
@@ -45,9 +44,9 @@ class LanguageWorkload:
 
 
 def sort_languages_by_missing_count(
-    workloads: List[LanguageWorkload],
+    workloads: list[LanguageWorkload],
     order: str = "desc"
-) -> List[LanguageWorkload]:
+) -> list[LanguageWorkload]:
     """
     Sort languages by missing translation count.
 
@@ -90,12 +89,12 @@ class RoundRobinScheduler:
 
     def __init__(
         self,
-        languages: List[str],
+        languages: list[str],
         total_texts: int,
         texts_per_round: int,
         sort_order: str,
-        tm: Optional[object] = None,
-        site_id: Optional[str] = None,
+        tm: object | None = None,
+        site_id: str | None = None,
     ):
         """
         Initialize round-robin scheduler.
@@ -116,12 +115,12 @@ class RoundRobinScheduler:
         self.site_id = site_id
 
         # Initialize workloads
-        self.workloads: Dict[str, LanguageWorkload] = {}
+        self.workloads: dict[str, LanguageWorkload] = {}
         self._initialize_workloads()
 
         # Current round tracking
         self.current_round = 0
-        self._sorted_languages: List[str] = []
+        self._sorted_languages: list[str] = []
         self._update_sorted_languages()
 
         logger.info(
@@ -187,7 +186,7 @@ class RoundRobinScheduler:
         # Extract language codes
         self._sorted_languages = [w.language_code for w in sorted_workloads]
 
-    def get_next_batch(self) -> Optional[Tuple[str, int]]:
+    def get_next_batch(self) -> tuple[str, int] | None:
         """
         Get next batch of texts to process.
 
@@ -248,7 +247,7 @@ class RoundRobinScheduler:
         if workload.is_complete:
             logger.info(f"Language {language} complete: {workload.total_texts} texts")
 
-    def get_progress_summary(self) -> Dict[str, Dict[str, any]]:
+    def get_progress_summary(self) -> dict[str, dict[str, any]]:
         """
         Get progress summary for all languages.
 
@@ -277,7 +276,7 @@ class RoundRobinScheduler:
             }
         return summary
 
-    def get_overall_progress(self) -> Dict[str, any]:
+    def get_overall_progress(self) -> dict[str, any]:
         """
         Get overall progress across all languages.
 

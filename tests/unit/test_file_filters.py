@@ -4,9 +4,11 @@ Unit tests for file filtering utility.
 Tests both file-based and folder-based localization filtering strategies.
 """
 
-import pytest
 from pathlib import Path
 from unittest.mock import Mock
+
+import pytest
+
 from utils.file_filters import filter_source_files
 
 

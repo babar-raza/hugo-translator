@@ -7,12 +7,11 @@ Tests verify:
 - Config value is accessible through BodyRules
 - CLI flag overrides config value (tested in integration)
 """
-import pytest
-import tempfile
-import yaml
-from pathlib import Path
-from unittest.mock import Mock, MagicMock
 import sys
+import tempfile
+from pathlib import Path
+
+import yaml
 
 # Add src to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
@@ -102,7 +101,7 @@ def test_config_with_temp_yaml_file():
 
     try:
         # Load YAML
-        with open(temp_path, 'r') as f:
+        with open(temp_path) as f:
             config = yaml.safe_load(f)
 
         # Extract body_rules

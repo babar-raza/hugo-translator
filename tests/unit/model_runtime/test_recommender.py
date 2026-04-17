@@ -8,14 +8,14 @@ Tests cover:
 - Error cases (no models fit, missing benchmarks)
 - Confidence scoring
 """
-import pytest
-from pathlib import Path
-from unittest.mock import MagicMock, Mock, patch
+from unittest.mock import MagicMock
 
-from src.model_runtime.recommender import ModelRecommender, ModelRecommendation
-from src.model_runtime.registry import ModelRegistry, ModelInfo
+import pytest
+
+from src.benchmarking.storage import BenchmarkResult, BenchmarkRun, SystemInfo
 from src.model_runtime.hardware import HardwareDetector, HardwareInfo
-from src.benchmarking.storage import BenchmarkRun, BenchmarkResult, SystemInfo
+from src.model_runtime.recommender import ModelRecommender
+from src.model_runtime.registry import ModelInfo, ModelRegistry
 
 
 @pytest.fixture

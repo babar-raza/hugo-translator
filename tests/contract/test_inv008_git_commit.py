@@ -16,12 +16,10 @@ Note: The spec file defines INV-008 as "L2 Corruption Detection", but
 this test file implements the task-specified "Git Commit Isolation" invariant.
 """
 
-import pytest
 import subprocess
-from pathlib import Path
-from unittest.mock import Mock, patch, MagicMock
-from dataclasses import dataclass
+from unittest.mock import Mock, patch
 
+import pytest
 
 # ==============================================================================
 # Fixtures
@@ -389,7 +387,7 @@ def test_push_timeout_is_doubled():
     CONTRACT: INV-008 - Extended timeout for network
     Evidence: src/observability/git_commit.py line 423 (timeout * 2)
     """
-    from src.observability.git_commit import GitCommitter, GitCommitConfig
+    from src.observability.git_commit import GitCommitConfig, GitCommitter
 
     # Arrange
     config = GitCommitConfig(timeout_seconds=30)

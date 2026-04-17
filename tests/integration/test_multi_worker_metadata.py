@@ -13,7 +13,6 @@ import pytest
 
 from src.utils.metadata_tracker import MetadataTracker
 
-
 # Requires Redis to be running
 pytestmark = pytest.mark.integration
 
@@ -57,8 +56,9 @@ def worker_process(
             source_path = Path(f"/fake/source/file_{worker_id}_{i}.md")
             # Fake update (in real scenario, this would call update_source)
             # For test purposes, we'll manually update _data
-            from src.utils.metadata_tracker import SourceFileMetadata
             from datetime import datetime, timezone
+
+            from src.utils.metadata_tracker import SourceFileMetadata
 
             tracker._data[str(source_path)] = type('FileMetadata', (), {
                 'source': SourceFileMetadata(

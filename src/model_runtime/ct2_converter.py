@@ -8,7 +8,7 @@ import logging
 import shutil
 import sys
 from pathlib import Path
-from typing import Literal, Optional
+from typing import Literal
 
 logger = logging.getLogger(__name__)
 
@@ -139,7 +139,7 @@ class CT2ConversionPipeline:
             logger.error(f"Model validation failed: {e}")
             return False
 
-    def get_model_info(self, model_path: Path | str) -> Optional[dict]:
+    def get_model_info(self, model_path: Path | str) -> dict | None:
         """
         Get information about a CT2 model.
 
@@ -167,7 +167,7 @@ class CT2ConversionPipeline:
             # Try to read config
             config_path = model_path / "config.json"
             if config_path.exists():
-                with open(config_path, "r", encoding="utf-8") as f:
+                with open(config_path, encoding="utf-8") as f:
                     config = json.load(f)
                     info["config"] = config
 

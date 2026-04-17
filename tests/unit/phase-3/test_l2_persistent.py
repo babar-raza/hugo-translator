@@ -2,7 +2,6 @@
 Unit tests for L2 Persistent Translation Memory.
 """
 import sys
-import tempfile
 from pathlib import Path
 
 import pytest

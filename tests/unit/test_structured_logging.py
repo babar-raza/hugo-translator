@@ -10,18 +10,14 @@ Tests:
 """
 
 import logging
-import sys
-import tempfile
 from pathlib import Path
-from unittest.mock import MagicMock, Mock, patch
+from unittest.mock import Mock, patch
 
 import pytest
-import structlog
 
 from src.observability.logger import (
     DualOutputProcessor,
     LogContext,
-    StructuredLogger,
     correlation_id_var,
     get_logger,
     job_id_var,
@@ -101,7 +97,7 @@ class TestDualOutputProcessor:
         }
 
         # Use patch to mock the file logger - this ensures cleanup
-        with patch.object(processor.file_logger, 'log', side_effect=IOError("Disk full")) as mock_log:
+        with patch.object(processor.file_logger, 'log', side_effect=OSError("Disk full")) as mock_log:
             # Should not raise exception - errors are caught and logged to stderr
             result = processor(None, "info", event_dict)
 

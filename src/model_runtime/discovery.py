@@ -8,7 +8,6 @@ registers them to the model registry.
 import logging
 from dataclasses import dataclass
 from pathlib import Path
-from typing import List, Optional
 
 import yaml
 from huggingface_hub import HfApi
@@ -26,10 +25,10 @@ class DiscoveredModel:
     hf_model_name: str
     name: str
     backend: str
-    languages: List[str]
+    languages: list[str]
     downloads: int
     likes: int
-    tags: List[str]
+    tags: list[str]
     description: str
 
 
@@ -59,7 +58,7 @@ class ModelDiscovery:
         if not self.registry_path.exists():
             return set()
 
-        with open(self.registry_path, "r") as f:
+        with open(self.registry_path) as f:
             data = yaml.safe_load(f)
 
         models = data.get("models", [])
@@ -70,8 +69,8 @@ class ModelDiscovery:
         limit: int = 50,
         min_downloads: int = 1000,
         sort: str = "downloads",
-        languages: Optional[List[str]] = None,
-    ) -> List[DiscoveredModel]:
+        languages: list[str] | None = None,
+    ) -> list[DiscoveredModel]:
         """
         Discover translation models from HuggingFace Hub.
 
@@ -167,7 +166,7 @@ class ModelDiscovery:
         # Convert underscores/dashes to spaces, capitalize words
         return " ".join(word.capitalize() for word in name.replace("_", " ").replace("-", " ").split())
 
-    def _extract_languages(self, tags: List[str]) -> List[str]:
+    def _extract_languages(self, tags: list[str]) -> list[str]:
         """
         Extract language codes from model tags.
 
@@ -199,7 +198,7 @@ class ModelDiscovery:
 
     def register_models(
         self,
-        models: List[DiscoveredModel],
+        models: list[DiscoveredModel],
         dry_run: bool = False,
     ) -> int:
         """
@@ -217,7 +216,7 @@ class ModelDiscovery:
             return 0
 
         # Load existing registry
-        with open(self.registry_path, "r") as f:
+        with open(self.registry_path) as f:
             registry_data = yaml.safe_load(f)
 
         existing_count = len(registry_data.get("models", []))
@@ -269,7 +268,7 @@ class ModelDiscovery:
         limit: int = 10,
         min_downloads: int = 1000,
         dry_run: bool = False,
-        languages: Optional[List[str]] = None,
+        languages: list[str] | None = None,
     ) -> int:
         """
         Discover and register models in one step.

@@ -112,7 +112,7 @@ def main():
         return 1
 
     # Load data
-    with open(args.baseline, 'r') as f:
+    with open(args.baseline) as f:
         data = json.load(f)
 
     # Generate report

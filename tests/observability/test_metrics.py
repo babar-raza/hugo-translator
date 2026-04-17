@@ -4,7 +4,6 @@ Comprehensive tests for metrics collection system.
 Tests all metric types, derived metrics, and Prometheus export format.
 """
 
-import pytest
 import threading
 import time
 

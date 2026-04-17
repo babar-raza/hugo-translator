@@ -10,16 +10,17 @@ Tests validation of:
 - Links
 """
 
-import pytest
-import tempfile
 import sys
+import tempfile
 from pathlib import Path
+
+import pytest
 
 # Add src to path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
-from src.validation.quality_validator import QualityValidator
 from src.translation_engine.validation import ValidationSeverity
+from src.validation.quality_validator import QualityValidator
 
 
 class TestFrontmatterValidation:

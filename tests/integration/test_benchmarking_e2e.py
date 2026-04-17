@@ -10,11 +10,9 @@ Tests the complete workflow:
 import tempfile
 from pathlib import Path
 
-import pytest
-
-from src.benchmarking.storage import BenchmarkDatabase, BenchmarkRun, SystemInfo, BenchmarkResult
-from src.benchmarking.recommender import ModelRecommender
 from src.benchmarking.feedback import RecommendationFeedback
+from src.benchmarking.recommender import ModelRecommender
+from src.benchmarking.storage import BenchmarkDatabase, BenchmarkResult, BenchmarkRun, SystemInfo
 
 
 class TestBenchmarkingEndToEnd:

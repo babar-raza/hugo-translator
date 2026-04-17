@@ -17,7 +17,7 @@ import sqlite3
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from typing import TYPE_CHECKING, List, Optional, Tuple
+from typing import TYPE_CHECKING, Optional
 
 if TYPE_CHECKING:
     from src.shared_engines.composition_root import SharedEngines
@@ -98,13 +98,13 @@ class TimeSeriesAggregator:
         self._enable_monitoring = enable_monitoring
 
         # Initialize connection pool
-        self._pool: Optional[ConnectionPool] = None
+        self._pool: ConnectionPool | None = None
         if enable_pooling and db_path != ":memory:":
             self._pool = ConnectionPool(db_path, pool_size=pool_size)
             logger.info(f"Connection pool enabled for aggregator: pool_size={pool_size}")
 
         # Initialize performance monitor
-        self._monitor: Optional[PerformanceMonitor] = None
+        self._monitor: PerformanceMonitor | None = None
         if enable_monitoring:
             self._monitor = PerformanceMonitor(slow_threshold_ms=1000.0, engines=engines)
             logger.info("Performance monitoring enabled for aggregator")
@@ -139,7 +139,7 @@ class TimeSeriesAggregator:
             self._pool.close_all()
             logger.info("Aggregator connection pool closed")
 
-    def get_monitor_stats(self) -> Optional[dict]:
+    def get_monitor_stats(self) -> dict | None:
         """Get performance monitor statistics.
 
         Returns:
@@ -248,7 +248,7 @@ class TimeSeriesAggregator:
         model_id: str,
         device: str,
         lookback_days: int = 90,
-        conn: Optional[sqlite3.Connection] = None
+        conn: sqlite3.Connection | None = None
     ) -> int:
         """Aggregate benchmark results for a specific model/device.
 
@@ -283,7 +283,7 @@ class TimeSeriesAggregator:
 
             return total_trends
 
-        except Exception as e:
+        except Exception:
             if should_close:
                 conn.rollback()
             raise
@@ -400,7 +400,7 @@ class TimeSeriesAggregator:
         start: datetime,
         end: datetime,
         window_hours: int
-    ) -> List[Tuple[datetime, datetime]]:
+    ) -> list[tuple[datetime, datetime]]:
         """Generate time window boundaries.
 
         Args:
@@ -426,9 +426,9 @@ class TimeSeriesAggregator:
 
     def _calculate_statistics(
         self,
-        throughputs: List[float],
-        durations: List[float],
-        memories: List[float]
+        throughputs: list[float],
+        durations: list[float],
+        memories: list[float]
     ) -> dict:
         """Calculate aggregated statistics.
 
@@ -450,7 +450,7 @@ class TimeSeriesAggregator:
             "avg_memory_mb": sum(memories) / len(memories) if memories else None,
         }
 
-    def _percentile(self, values: List[float], percentile: int) -> float:
+    def _percentile(self, values: list[float], percentile: int) -> float:
         """Calculate percentile.
 
         Args:
@@ -480,7 +480,7 @@ class TimeSeriesAggregator:
         device: str,
         baseline_type: str,
         days_back: int = 30
-    ) -> Optional[int]:
+    ) -> int | None:
         """Create performance baseline from recent data.
 
         Args:

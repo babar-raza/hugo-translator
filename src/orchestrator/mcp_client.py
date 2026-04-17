@@ -6,7 +6,7 @@ Provides high-level interface for dispatching translation jobs to workers via MC
 
 import asyncio
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
@@ -21,7 +21,7 @@ class WorkerClient:
     Manages connection to worker and provides methods for invoking worker tools.
     """
 
-    def __init__(self, worker_id: str, command: str, args: Optional[List[str]] = None):
+    def __init__(self, worker_id: str, command: str, args: list[str] | None = None):
         """
         Initialize worker client.
 
@@ -35,9 +35,9 @@ class WorkerClient:
         self.args = args or []
 
         # MCP session
-        self.session: Optional[ClientSession] = None
-        self._read_stream: Optional[Any] = None
-        self._write_stream: Optional[Any] = None
+        self.session: ClientSession | None = None
+        self._read_stream: Any | None = None
+        self._write_stream: Any | None = None
 
         # Connection state
         self._connected = False
@@ -95,8 +95,8 @@ class WorkerClient:
         self,
         site_id: str,
         file_path: str,
-        target_langs: List[str],
-    ) -> Dict[str, Any]:
+        target_langs: list[str],
+    ) -> dict[str, Any]:
         """
         Translate a single file via worker.
 
@@ -131,9 +131,9 @@ class WorkerClient:
         self,
         site_id: str,
         directory_path: str,
-        target_langs: List[str],
+        target_langs: list[str],
         recursive: bool = True,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Translate directory via worker.
 
@@ -172,7 +172,7 @@ class WorkerClient:
         source_text: str,
         source_lang: str,
         target_lang: str,
-    ) -> Optional[str]:
+    ) -> str | None:
         """
         Look up exact translation in TM.
 
@@ -206,7 +206,7 @@ class WorkerClient:
             logger.error(f"Error in TM exact lookup via worker {self.worker_id}: {e}")
             return None
 
-    async def health_check(self) -> Dict[str, Any]:
+    async def health_check(self) -> dict[str, Any]:
         """
         Check worker health.
 
@@ -232,7 +232,7 @@ class WorkerClient:
                 "error": str(e),
             }
 
-    async def get_stats(self) -> Dict[str, Any]:
+    async def get_stats(self) -> dict[str, Any]:
         """
         Get worker statistics.
 
@@ -255,7 +255,7 @@ class WorkerClient:
             return {}
 
     @staticmethod
-    def _parse_result(result: Any) -> Dict[str, Any]:
+    def _parse_result(result: Any) -> dict[str, Any]:
         """Parse MCP result into dictionary."""
         import json
 
@@ -281,14 +281,14 @@ class WorkerPool:
     Manages multiple worker connections and distributes jobs across them.
     """
 
-    def __init__(self, workers: Optional[List[WorkerClient]] = None):
+    def __init__(self, workers: list[WorkerClient] | None = None):
         """
         Initialize worker pool.
 
         Args:
             workers: List of WorkerClient instances
         """
-        self.workers: List[WorkerClient] = workers or []
+        self.workers: list[WorkerClient] = workers or []
         self._current_index = 0
         self._lock = asyncio.Lock()
 
@@ -322,7 +322,7 @@ class WorkerPool:
                     return True
             return False
 
-    async def get_next_worker(self) -> Optional[WorkerClient]:
+    async def get_next_worker(self) -> WorkerClient | None:
         """
         Get next available worker (round-robin).
 
@@ -351,8 +351,8 @@ class WorkerPool:
         self,
         site_id: str,
         file_path: str,
-        target_langs: List[str],
-    ) -> Dict[str, Any]:
+        target_langs: list[str],
+    ) -> dict[str, Any]:
         """Translate file using next available worker."""
         worker = await self.get_next_worker()
         if not worker:
@@ -364,9 +364,9 @@ class WorkerPool:
         self,
         site_id: str,
         directory_path: str,
-        target_langs: List[str],
+        target_langs: list[str],
         recursive: bool = True,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Translate directory using next available worker."""
         worker = await self.get_next_worker()
         if not worker:
@@ -376,7 +376,7 @@ class WorkerPool:
             site_id, directory_path, target_langs, recursive
         )
 
-    async def health_check_all(self) -> Dict[str, Dict[str, Any]]:
+    async def health_check_all(self) -> dict[str, dict[str, Any]]:
         """
         Check health of all workers.
 

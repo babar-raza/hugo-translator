@@ -121,7 +121,7 @@ def main() -> int:
         logger.info(f"\n{'=' * 60}")
         if args.dry_run:
             logger.info(f"[DRY RUN] Would register {count} new models")
-            logger.info(f"Run without --dry-run to update registry")
+            logger.info("Run without --dry-run to update registry")
         else:
             logger.info(f"Successfully registered {count} new models!")
             logger.info(f"Registry updated: {args.registry}")

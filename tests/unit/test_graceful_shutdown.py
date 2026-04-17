@@ -7,13 +7,11 @@ Tests cover:
 - Directory translation shutdown integration
 """
 
-import signal
-import pytest
 import logging
+import signal
 from pathlib import Path
 from threading import Lock, Thread
-from typing import List
-from unittest.mock import Mock, MagicMock, patch
+from unittest.mock import Mock
 
 
 class TestShutdownCoordination:
@@ -75,7 +73,7 @@ class TestShutdownCoordination:
         """Test that registered callbacks are executed on shutdown."""
         class MockEngine:
             def __init__(self):
-                self._shutdown_callbacks: List = []
+                self._shutdown_callbacks: list = []
                 self.tm = None
 
             def register_shutdown_callback(self, callback):
@@ -109,7 +107,7 @@ class TestShutdownCoordination:
         """Test that callback errors don't prevent other callbacks from running."""
         class MockEngine:
             def __init__(self):
-                self._shutdown_callbacks: List = []
+                self._shutdown_callbacks: list = []
                 self.tm = None
 
             def register_shutdown_callback(self, callback):
@@ -404,9 +402,13 @@ class TestGracefulShutdownTelemetryFields:
 
     def test_shutdown_sets_cancelled_status(self):
         """GS-01: Verify run_status is set to 'cancelled' when signal received."""
-        from src.observability.graceful_shutdown import _perform_graceful_shutdown, _active_contexts, _shutdown_in_progress
-        from unittest.mock import Mock
         import signal
+        from unittest.mock import Mock
+
+        from src.observability.graceful_shutdown import (
+            _active_contexts,
+            _perform_graceful_shutdown,
+        )
 
         # Reset global state
         _active_contexts.clear()
@@ -436,11 +438,12 @@ class TestGracefulShutdownTelemetryFields:
 
     def test_shutdown_calculates_duration(self):
         """GS-02: Verify duration_ms is calculated from start_time."""
+        import signal
         import time
         from unittest.mock import Mock
-        from src.observability.graceful_shutdown import _perform_graceful_shutdown, _active_contexts
-        import signal
+
         import src.observability.graceful_shutdown as gs_module
+        from src.observability.graceful_shutdown import _active_contexts, _perform_graceful_shutdown
 
         # Reset global state
         _active_contexts.clear()
@@ -468,10 +471,11 @@ class TestGracefulShutdownTelemetryFields:
 
     def test_shutdown_calculates_duration_fallback(self):
         """GS-02: Verify duration_ms falls back to 0 if _start_time missing."""
-        from unittest.mock import Mock
-        from src.observability.graceful_shutdown import _perform_graceful_shutdown, _active_contexts
         import signal
+        from unittest.mock import Mock
+
         import src.observability.graceful_shutdown as gs_module
+        from src.observability.graceful_shutdown import _active_contexts, _perform_graceful_shutdown
 
         # Reset global state
         _active_contexts.clear()
@@ -498,11 +502,12 @@ class TestGracefulShutdownTelemetryFields:
 
     def test_shutdown_sets_end_time(self):
         """GS-03: Verify end_time is set to current UTC timestamp."""
+        import signal
         from datetime import datetime, timezone
         from unittest.mock import Mock
-        from src.observability.graceful_shutdown import _perform_graceful_shutdown, _active_contexts
-        import signal
+
         import src.observability.graceful_shutdown as gs_module
+        from src.observability.graceful_shutdown import _active_contexts, _perform_graceful_shutdown
 
         # Reset global state
         _active_contexts.clear()
@@ -531,7 +536,7 @@ class TestGracefulShutdownTelemetryFields:
         # Verify end_time is ISO 8601 UTC format and within range
         call_kwargs = mock_ctx.set_metrics.call_args[1]
         end_time_str = call_kwargs['end_time']
-        
+
         # Parse end_time (handle both Z and +00:00 suffixes)
         end_time = datetime.fromisoformat(end_time_str.replace('Z', '+00:00'))
 
@@ -541,11 +546,12 @@ class TestGracefulShutdownTelemetryFields:
 
     def test_shutdown_sets_all_fields_together(self):
         """GS-01/02/03: Verify all critical fields set together."""
+        import signal
         import time
         from unittest.mock import Mock
-        from src.observability.graceful_shutdown import _perform_graceful_shutdown, _active_contexts
-        import signal
+
         import src.observability.graceful_shutdown as gs_module
+        from src.observability.graceful_shutdown import _active_contexts, _perform_graceful_shutdown
 
         # Reset global state
         _active_contexts.clear()
@@ -578,10 +584,11 @@ class TestGracefulShutdownTelemetryFields:
 
     def test_shutdown_captures_partial_items_metrics(self):
         """GS-04: Verify partial items_* metrics are extracted and passed."""
-        from unittest.mock import Mock
-        from src.observability.graceful_shutdown import _perform_graceful_shutdown, _active_contexts
         import signal
+        from unittest.mock import Mock
+
         import src.observability.graceful_shutdown as gs_module
+        from src.observability.graceful_shutdown import _active_contexts, _perform_graceful_shutdown
 
         # Reset global state
         _active_contexts.clear()
@@ -617,10 +624,11 @@ class TestGracefulShutdownTelemetryFields:
 
     def test_shutdown_captures_partial_metrics_json(self):
         """GS-05: Verify partial metrics_json is extracted and passed."""
-        from unittest.mock import Mock
-        from src.observability.graceful_shutdown import _perform_graceful_shutdown, _active_contexts
         import signal
+        from unittest.mock import Mock
+
         import src.observability.graceful_shutdown as gs_module
+        from src.observability.graceful_shutdown import _active_contexts, _perform_graceful_shutdown
 
         # Reset global state
         _active_contexts.clear()
@@ -660,10 +668,11 @@ class TestGracefulShutdownTelemetryFields:
 
     def test_shutdown_handles_missing_get_partial_metrics(self):
         """GS-04/05: Verify graceful degradation if get_partial_metrics not available."""
-        from unittest.mock import Mock
-        from src.observability.graceful_shutdown import _perform_graceful_shutdown, _active_contexts
         import signal
+        from unittest.mock import Mock
+
         import src.observability.graceful_shutdown as gs_module
+        from src.observability.graceful_shutdown import _active_contexts, _perform_graceful_shutdown
 
         # Reset global state
         _active_contexts.clear()
@@ -692,10 +701,11 @@ class TestGracefulShutdownTelemetryFields:
 
     def test_shutdown_handles_get_partial_metrics_exception(self):
         """GS-04/05: Verify exception handling if get_partial_metrics fails."""
-        from unittest.mock import Mock
-        from src.observability.graceful_shutdown import _perform_graceful_shutdown, _active_contexts
         import signal
+        from unittest.mock import Mock
+
         import src.observability.graceful_shutdown as gs_module
+        from src.observability.graceful_shutdown import _active_contexts, _perform_graceful_shutdown
 
         # Reset global state
         _active_contexts.clear()

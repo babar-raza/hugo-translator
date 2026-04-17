@@ -3,8 +3,8 @@ Unit tests for quality gates.
 
 Tests each gate individually to ensure correct pass/warn/fail behavior.
 """
-import sys
 import os
+import sys
 from pathlib import Path
 
 # Add src to path
@@ -13,12 +13,13 @@ sys.path.insert(0, str(REPO_ROOT))
 os.chdir(str(REPO_ROOT))
 
 import pytest
+
 from src.translation_engine.quality.quality_gates import (
+    GateRunner,
     GateStatus,
     LineCountGate,
     ListStructureGate,
     MarkdownSyntaxGate,
-    GateRunner,
     get_default_gates,
 )
 

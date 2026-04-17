@@ -14,21 +14,22 @@ Outputs JSON for programmatic comparison.
 
 import argparse
 import json
-import psutil
 import statistics
+import sys
 import time
 from pathlib import Path
-import sys
+
+import psutil
 
 # Add src to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from src.translation_engine.parser import HugoParser
+from src.model_runtime import HardwareDetector
+from src.tm import L1Cache, L2PersistentTM, L3SemanticTM, TranslationMemory
 from src.translation_engine.extractor import SegmentExtractor
+from src.translation_engine.parser import HugoParser
 from src.translation_engine.reconstructor import MarkdownReconstructor
-from src.tm import TranslationMemory, L1Cache, L2PersistentTM, L3SemanticTM
-from src.model_runtime import ModelLoader, ModelRegistry, HardwareDetector
-from src.utils.models import SiteProfile, BodyRules, FrontmatterMode, FrontmatterRule
+from src.utils.models import BodyRules, FrontmatterMode, FrontmatterRule, SiteProfile
 
 
 def get_memory_usage():
@@ -58,7 +59,7 @@ def benchmark_tm_lookups(tm: TranslationMemory, iterations: int = 1000) -> dict:
     }
 
     # L1 Cache (warm cache)
-    print(f"\nL1 Cache Benchmark (warm)...")
+    print("\nL1 Cache Benchmark (warm)...")
     # Populate L1
     for i in range(iterations):
         tm.store('bench-site', 'en', 'es', f'test {i}', f'prueba {i}')
@@ -85,7 +86,7 @@ def benchmark_tm_lookups(tm: TranslationMemory, iterations: int = 1000) -> dict:
     print(f"  Throughput: {results['layers']['L1']['lookups_per_sec']:.0f} lookups/sec")
 
     # L2 Persistent (cold cache)
-    print(f"\nL2 Persistent Benchmark...")
+    print("\nL2 Persistent Benchmark...")
     # Clear L1, rely on L2
     tm.l1_cache.clear()
 
@@ -345,7 +346,7 @@ def main():
     hw_detector = HardwareDetector()
     hw_info = hw_detector.detect()
 
-    print(f"\nHardware:")
+    print("\nHardware:")
     print(f"  Device: {hw_info.recommended_device}")
     print(f"  CPUs: {hw_info.cpu_count}")
     print(f"  RAM: {hw_info.total_ram_gb:.1f}GB")

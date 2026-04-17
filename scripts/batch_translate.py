@@ -15,13 +15,13 @@ from pathlib import Path
 # Add src to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
+from src.model_runtime import ModelLoader
+from src.model_runtime.registry import ModelRegistry
 from src.orchestration import create_batch_optimizer
-from src.translation_engine import TranslationEngine
 from src.tm import TranslationMemory
 from src.tm.l1_cache import L1Cache
 from src.tm.l2_persistent import L2PersistentTM
-from src.model_runtime import ModelLoader
-from src.model_runtime.registry import ModelRegistry
+from src.translation_engine import TranslationEngine
 from src.utils.config_loader import ConfigService
 
 logging.basicConfig(level=logging.INFO, stream=sys.stdout)
@@ -195,7 +195,7 @@ def main():
 
     # Report
     print(f"\n{'='*60}")
-    print(f"Batch Translation Complete")
+    print("Batch Translation Complete")
     print(f"{'='*60}")
     print(f"Files processed: {result.successful_files}/{result.total_files}")
     print(f"Duration: {duration:.1f}s")
@@ -203,7 +203,7 @@ def main():
 
     if optimizer:
         stats = optimizer.get_stats()
-        print(f"\nOptimization Stats:")
+        print("\nOptimization Stats:")
         print(f"  Batches: {stats.batches_processed}")
         print(f"  Avg batch size: {stats.avg_batch_size:.1f}")
         print(f"  OOM events: {stats.oom_events}")
@@ -211,7 +211,7 @@ def main():
     # TMO-04: Show override stats if override mode was used
     if args.override_mode:
         override_stats = engine.get_override_stats()
-        print(f"\nTM Override Stats:")
+        print("\nTM Override Stats:")
         print(f"  Mode: {override_stats.get('mode', 'unknown')}")
         print(f"  Bypasses: {override_stats.get('override_bypasses', 0)}")
         print(f"  Force translates: {override_stats.get('force_translates', 0)}")

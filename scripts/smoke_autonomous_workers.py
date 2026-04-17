@@ -15,12 +15,8 @@ live models, Ollama, or GPU availability.
 
 import argparse
 import importlib
-import os
-import subprocess
 import sys
-import tempfile
 from pathlib import Path
-from typing import Dict, Any, List
 
 # Add project root to path for imports
 SCRIPT_DIR = Path(__file__).parent.resolve()
@@ -36,7 +32,7 @@ class SmokeTestResult:
         self.test_name = test_name
         self.passed = False
         self.message = ""
-        self.details: List[str] = []
+        self.details: list[str] = []
 
     def __str__(self) -> str:
         status = "[PASS]" if self.passed else "[FAIL]"
@@ -54,7 +50,7 @@ class AutonomousWorkerSmokeTest:
 
     def __init__(self, verbose: bool = False):
         self.verbose = verbose
-        self.results: List[SmokeTestResult] = []
+        self.results: list[SmokeTestResult] = []
 
     def log(self, message: str):
         """Log a message if verbose."""
@@ -86,7 +82,6 @@ class AutonomousWorkerSmokeTest:
 
             # Test workers __main__
             self.log("Importing workers.__main__...")
-            import src.workers.__main__ as workers_main
             result.details.append("[+] workers.__main__: OK")
 
             result.passed = True

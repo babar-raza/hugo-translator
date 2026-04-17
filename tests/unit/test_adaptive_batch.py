@@ -1,8 +1,8 @@
 """
 Quick test script to verify adaptive batch translation system.
 """
-import sys
 import logging
+import sys
 from pathlib import Path
 
 # Add src to path
@@ -11,6 +11,7 @@ sys.path.insert(0, str(Path(__file__).parent / "src"))
 logging.basicConfig(level=logging.DEBUG, format='%(levelname)s: %(message)s')
 
 from src.translation_engine.extractor.batch_stats_tracker import BatchStatsTracker
+
 
 def test_batch_stats_tracker():
     """Test BatchStatsTracker functionality."""
@@ -69,7 +70,7 @@ def test_batch_stats_tracker():
         print(f"   Batch {i+1}: {'SUCCESS' if success else 'FAILURE (language_purity)'}")
 
     stats = tracker.languages['bg']['rolling_stats']
-    print(f"\n   Results after 10 batches:")
+    print("\n   Results after 10 batches:")
     print(f"   - Total: {stats['total_batches']}")
     print(f"   - Successful: {stats['successful_batches']}")
     print(f"   - Fallback: {stats['fallback_batches']}")
@@ -91,7 +92,7 @@ def test_batch_stats_tracker():
         )
 
     stats_de = tracker.languages['de']['rolling_stats']
-    print(f"   German after 5 successes:")
+    print("   German after 5 successes:")
     print(f"   - Fallback rate: {stats_de['fallback_rate']:.2%}")
     print(f"   - Consecutive successes: {tracker.languages['de']['consecutive_successes']}")
 
@@ -112,7 +113,7 @@ def test_batch_stats_tracker():
 
         if 'bg' in tracker2.languages:
             loaded_stats = tracker2.languages['bg']['rolling_stats']
-            print(f"   OK Statistics preserved:")
+            print("   OK Statistics preserved:")
             print(f"     - Fallback rate: {loaded_stats['fallback_rate']:.2%}")
             print(f"     - EMA: {loaded_stats['ema_fallback_rate']:.2%}")
     except Exception as e:

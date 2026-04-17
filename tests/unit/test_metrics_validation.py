@@ -5,7 +5,7 @@ Verifies that contradictory metrics are detected and logged as warnings.
 """
 
 import logging
-import pytest
+
 from src.observability.progress import ProgressTracker
 
 

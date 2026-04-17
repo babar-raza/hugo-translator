@@ -14,7 +14,6 @@ All tests are marked with @pytest.mark.smoke and should complete in <30 seconds.
 import sys
 import tempfile
 from pathlib import Path
-from typing import Optional
 
 import pytest
 
@@ -22,8 +21,9 @@ import pytest
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 from src.hardware import GPUManager
-from src.model_runtime.hardware import HardwareDetector, HardwareInfo
+from src.model_runtime.hardware import HardwareDetector
 from src.tm import L1Cache, L2PersistentTM, TranslationMemory
+
 try:
     from src.tm import L3SemanticTM
 except ImportError:
@@ -620,16 +620,16 @@ def test_critical_imports():
     """Smoke test: All critical modules can be imported."""
     try:
         # Core modules
-        from src.tm import L1Cache, L2PersistentTM, TranslationMemory
         from src.model_runtime.hardware import HardwareDetector
+        from src.tm import L1Cache, L2PersistentTM, TranslationMemory
         from src.translation_engine.engine import TranslationEngine
         from src.translation_engine.parser import HugoParser
 
         # Validation modules
         from src.translation_engine.validation import (
             PlaceholderValidator,
+            StructureValidator,
             YAMLValidator,
-            StructureValidator
         )
 
         # All imports successful

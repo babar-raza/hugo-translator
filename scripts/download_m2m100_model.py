@@ -6,9 +6,9 @@ This script downloads the facebook/m2m100_418M model and caches it locally
 to avoid re-downloading on subsequent runs.
 """
 
-import os
 import sys
 from pathlib import Path
+
 from transformers import M2M100ForConditionalGeneration, M2M100Tokenizer
 
 
@@ -36,7 +36,7 @@ def download_and_cache_model(model_name: str = "facebook/m2m100_418M", cache_dir
         model_name,
         cache_dir=cache_dir
     )
-    print(f"   [OK] Tokenizer downloaded successfully")
+    print("   [OK] Tokenizer downloaded successfully")
     print(f"   Vocab size: {tokenizer.vocab_size}")
 
     # Download model
@@ -45,7 +45,7 @@ def download_and_cache_model(model_name: str = "facebook/m2m100_418M", cache_dir
         model_name,
         cache_dir=cache_dir
     )
-    print(f"   [OK] Model downloaded successfully")
+    print("   [OK] Model downloaded successfully")
     print(f"   Parameters: {model.num_parameters():,}")
 
     # Test the model with a simple translation
@@ -59,7 +59,7 @@ def download_and_cache_model(model_name: str = "facebook/m2m100_418M", cache_dir
     )
     translation = tokenizer.batch_decode(generated_tokens, skip_special_tokens=True)[0]
     print(f"   Test translation (EN->DE): 'Hello, world!' -> '{translation}'")
-    print(f"   [OK] Model is working correctly")
+    print("   [OK] Model is working correctly")
 
     print("\n" + "=" * 60)
     print("Model download and cache complete!")
@@ -91,7 +91,7 @@ def main():
         return 0
 
     except Exception as e:
-        print(f"\n[ERROR] Failed to download model", file=sys.stderr)
+        print("\n[ERROR] Failed to download model", file=sys.stderr)
         print(f"  {type(e).__name__}: {e}", file=sys.stderr)
         return 1
 

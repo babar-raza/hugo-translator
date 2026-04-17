@@ -21,17 +21,13 @@ Key Guarantees:
 """
 
 import json
-import pytest
 import threading
-import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from pathlib import Path
-from typing import List
-from unittest.mock import patch, MagicMock
+
+import pytest
 
 from src.tm.l2_persistent import L2PersistentTM, TranslationEntry
 from src.tm.normalization import make_tm_key
-
 
 # ==============================================================================
 # Fixtures
@@ -531,7 +527,7 @@ class TestThreadSafety:
         l2_tm = L2PersistentTM(db_path=tmp_path / "concurrent_lmdb", max_size_mb=50)
         num_threads = 8
         entries_per_thread = 50
-        errors: List[Exception] = []
+        errors: list[Exception] = []
 
         def writer(thread_id: int):
             try:
@@ -571,7 +567,7 @@ class TestThreadSafety:
         """
         l2_tm = L2PersistentTM(db_path=tmp_path / "mixed_lmdb", max_size_mb=50)
         num_operations = 200
-        errors: List[Exception] = []
+        errors: list[Exception] = []
 
         # Pre-populate
         for i in range(50):

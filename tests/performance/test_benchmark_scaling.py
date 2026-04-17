@@ -11,13 +11,12 @@ import logging
 import sqlite3
 import time
 from datetime import UTC, datetime, timedelta
-from pathlib import Path
 
 import pytest
 
-from src.benchmarking.query_cache import QueryCache, make_cache_key
 from src.benchmarking.connection_pool import ConnectionPool
 from src.benchmarking.performance_monitor import PerformanceMonitor
+from src.benchmarking.query_cache import QueryCache, make_cache_key
 
 logger = logging.getLogger(__name__)
 

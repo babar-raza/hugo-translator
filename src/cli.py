@@ -2220,9 +2220,12 @@ def translate_site(args: argparse.Namespace) -> int:
         # Initialize TM layers (use reasonable defaults)
         l1_cache = L1Cache(max_size=10000)  # Default L1 cache size
 
-        l2_path = tm_data_dir / "l2_lmdb"
+        from .tm.l2_persistent import L2_DB_NAME
+        _raw = config_service.get_config() if hasattr(config_service, "get_config") else {}
+        _l2_max_mb = _raw.get("tm_defaults", {}).get("l2_max_size_mb", 2048)
+        l2_path = tm_data_dir / L2_DB_NAME
         l2_path.mkdir(parents=True, exist_ok=True)
-        l2_persistent = L2PersistentTM(str(l2_path))
+        l2_persistent = L2PersistentTM(str(l2_path), max_size_mb=_l2_max_mb)
 
         l3_semantic = None
         if site_profile.tm_prefs.use_semantic_tm:

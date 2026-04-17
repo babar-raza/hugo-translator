@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """Find models needed to cover all 36 languages."""
+import importlib.util
 import json
 import sys
 from pathlib import Path
-import importlib.util
 
 
 def load_module_directly(module_name, module_path):

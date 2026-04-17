@@ -25,15 +25,15 @@ import signal
 import sys
 import time
 from datetime import datetime, timezone
-from typing import List, Optional, Any
 from threading import Lock
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
 # Global registry of active telemetry contexts
-_active_contexts: List[Any] = []
+_active_contexts: list[Any] = []
 _contexts_lock = Lock()
-_shutdown_handlers: List[callable] = []
+_shutdown_handlers: list[callable] = []
 _shutdown_in_progress = False
 
 

@@ -3,8 +3,8 @@ Simple integration test for glossary corrections.
 
 Tests that glossary corrections work by directly injecting mistranslations.
 """
-import sys
 import os
+import sys
 from pathlib import Path
 
 # Add src to path
@@ -12,9 +12,9 @@ REPO_ROOT = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(REPO_ROOT))
 os.chdir(str(REPO_ROOT))
 
-from src.translation_engine.reconstructor.markdown_reconstructor import MarkdownReconstructor
 from src.translation_engine.quality.glossary_corrector import get_glossary_corrector
-from src.utils.models import SiteProfile, BodyRules
+from src.translation_engine.reconstructor.markdown_reconstructor import MarkdownReconstructor
+from src.utils.models import BodyRules, SiteProfile
 
 
 def test_glossary_direct_application():
@@ -79,26 +79,26 @@ Utilisez escanner de sécurité pour détecter les problèmes.
 
     # Verify corrections were applied
     assert "métrage" not in corrected_markdown.lower(), (
-        f"Found 'métrage' in corrected output"
+        "Found 'métrage' in corrected output"
     )
     assert "fusion" in corrected_markdown.lower(), (
-        f"Did not find 'fusion' in corrected output"
+        "Did not find 'fusion' in corrected output"
     )
     print("[PASS] 'métrage' -> 'fusion' correction applied")
 
     assert "textile" not in corrected_markdown.lower(), (
-        f"Found 'textile' in corrected output"
+        "Found 'textile' in corrected output"
     )
     assert "textuel" in corrected_markdown.lower(), (
-        f"Did not find 'textuel' in corrected output"
+        "Did not find 'textuel' in corrected output"
     )
     print("[PASS] 'textile' -> 'textuel' correction applied")
 
     assert "escanner" not in corrected_markdown.lower(), (
-        f"Found 'escanner' in corrected output"
+        "Found 'escanner' in corrected output"
     )
     assert "analyser" in corrected_markdown.lower(), (
-        f"Did not find 'analyser' in corrected output"
+        "Did not find 'analyser' in corrected output"
     )
     print("[PASS] 'escanner' -> 'analyser' correction applied")
 

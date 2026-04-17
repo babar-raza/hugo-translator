@@ -16,7 +16,7 @@ import threading
 from dataclasses import asdict, dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 from src.benchmarking.system_info import SystemInfo
 
@@ -37,20 +37,20 @@ class BenchmarkResult:
     throughput_tokens_per_sec: float
     src_lang: str = "en"  # Source language (ISO 639-1 code)
     tgt_lang: str = "ru"  # Target language (ISO 639-1 code)
-    peak_memory_mb: Optional[float] = None
-    bleu_score: Optional[float] = None
-    comet_score: Optional[float] = None
+    peak_memory_mb: float | None = None
+    bleu_score: float | None = None
+    comet_score: float | None = None
     cache_status: str = "unknown"  # hit, miss, cold, disabled, unknown
     tm_level: str = "none"  # l1, l2, l3, none
     cache_hit_rate: float = 0.0  # 0.0 to 1.0
-    errors: List[str] = field(default_factory=list)
+    errors: list[str] = field(default_factory=list)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for JSON serialization."""
         return asdict(self)
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "BenchmarkResult":
+    def from_dict(cls, data: dict[str, Any]) -> "BenchmarkResult":
         """Create BenchmarkResult from dictionary."""
         return cls(**data)
 
@@ -62,20 +62,20 @@ class BenchmarkRun:
     run_id: str
     model_id: str
     device: str
-    batch_sizes: List[int]
+    batch_sizes: list[int]
     iterations: int
-    corpus_category: Optional[str]
+    corpus_category: str | None
     purpose: str
-    tags: List[str]
+    tags: list[str]
     system_info: SystemInfo
-    results: List[BenchmarkResult]
+    results: list[BenchmarkResult]
     total_duration_seconds: float
     src_lang: str = "en"  # Source language for this run
     tgt_lang: str = "ru"  # Target language for this run
     timestamp_utc: str = field(default_factory=lambda: datetime.now(UTC).isoformat())
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for JSON serialization."""
         data = asdict(self)
         data["system_info"] = self.system_info.to_dict()
@@ -83,7 +83,7 @@ class BenchmarkRun:
         return data
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "BenchmarkRun":
+    def from_dict(cls, data: dict[str, Any]) -> "BenchmarkRun":
         """Create BenchmarkRun from dictionary."""
         data = data.copy()
         data["system_info"] = SystemInfo.from_dict(data["system_info"])
@@ -703,11 +703,11 @@ class BenchmarkDatabase:
 
     def list_runs(
         self,
-        model_id: Optional[str] = None,
-        device: Optional[str] = None,
+        model_id: str | None = None,
+        device: str | None = None,
         limit: int = 100,
         offset: int = 0,
-    ) -> List[Tuple[str, str, str, str, int]]:
+    ) -> list[tuple[str, str, str, str, int]]:
         """List benchmark runs with optional filtering.
 
         Args:
@@ -732,7 +732,7 @@ class BenchmarkDatabase:
                 LEFT JOIN benchmark_results br ON r.run_id = br.run_id
                 WHERE 1=1
             """
-            params: List[Any] = []
+            params: list[Any] = []
 
             if model_id:
                 query += " AND r.model_id = ?"
@@ -753,7 +753,7 @@ class BenchmarkDatabase:
         finally:
             self._close_connection(conn)
 
-    def get_run(self, run_id: str) -> Optional[BenchmarkRun]:
+    def get_run(self, run_id: str) -> BenchmarkRun | None:
         """Retrieve a complete benchmark run.
 
         Args:
@@ -837,8 +837,8 @@ class BenchmarkDatabase:
             self._close_connection(conn)
 
     def compare_runs(
-        self, run_ids: List[str], metric: str = "throughput_tokens_per_sec"
-    ) -> Dict[str, Any]:
+        self, run_ids: list[str], metric: str = "throughput_tokens_per_sec"
+    ) -> dict[str, Any]:
         """Compare multiple benchmark runs on a specific metric.
 
         Args:
@@ -890,7 +890,7 @@ class BenchmarkDatabase:
 
         return comparison
 
-    def export_run(self, run_id: str) -> Optional[Dict[str, Any]]:
+    def export_run(self, run_id: str) -> dict[str, Any] | None:
         """Export a benchmark run as JSON-serializable dictionary.
 
         Args:
@@ -904,7 +904,7 @@ class BenchmarkDatabase:
             return None
         return run.to_dict()
 
-    def import_run(self, data: Dict[str, Any]) -> None:
+    def import_run(self, data: dict[str, Any]) -> None:
         """Import a benchmark run from JSON data.
 
         Args:
@@ -988,7 +988,7 @@ class BenchmarkDatabase:
     # Retention Policy Helpers (Phase 4.3)
     # -------------------------------------------------------------------------
 
-    def get_retention_policies(self, enabled_only: bool = False) -> List[Dict[str, Any]]:
+    def get_retention_policies(self, enabled_only: bool = False) -> list[dict[str, Any]]:
         """Get retention policies from database.
 
         Args:
@@ -1015,7 +1015,7 @@ class BenchmarkDatabase:
         finally:
             self._close_connection(conn)
 
-    def get_data_age_summary(self) -> Dict[str, Any]:
+    def get_data_age_summary(self) -> dict[str, Any]:
         """Get summary of data age across tables.
 
         Returns:
@@ -1087,7 +1087,7 @@ class BenchmarkDatabase:
         finally:
             self._close_connection(conn)
 
-    def get_database_stats(self) -> Dict[str, Any]:
+    def get_database_stats(self) -> dict[str, Any]:
         """Get database statistics including size and table counts.
 
         Returns:

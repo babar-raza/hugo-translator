@@ -12,15 +12,13 @@ import logging
 import sys
 import tempfile
 from pathlib import Path
-from typing import List, TYPE_CHECKING
+from typing import TYPE_CHECKING
 
 # Add src to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 if TYPE_CHECKING:
     from tests.load.test_concurrent_translations import (
-        LoadTestConfig,
-        LoadTestRunner,
         LoadTestMetrics,
     )
 
@@ -36,13 +34,13 @@ def _load_test_classes():
     """Import load test classes lazily to allow --help without pytest."""
     from tests.load.test_concurrent_translations import (
         LoadTestConfig,
-        LoadTestRunner,
         LoadTestMetrics,
+        LoadTestRunner,
     )
     return LoadTestConfig, LoadTestRunner, LoadTestMetrics
 
 
-def create_sample_files(num_files: int = 3) -> List[Path]:
+def create_sample_files(num_files: int = 3) -> list[Path]:
     """
     Create sample Hugo markdown files for testing.
 

@@ -2,12 +2,13 @@
 Tests for L4 LLM-based translation adaptation layer.
 """
 
-import pytest
-from unittest.mock import Mock, patch, MagicMock
+from unittest.mock import Mock, patch
 
-from src.tm.l4_llm import L4LLMLayer, L4Config, create_l4_layer
+import pytest
+
+from src.intelligence.llm_client import LLMClient
+from src.tm.l4_llm import L4Config, L4LLMLayer, create_l4_layer
 from src.tm.models import TMResult
-from src.intelligence.llm_client import LLMClient, LLMConfig
 
 
 @pytest.fixture

@@ -15,13 +15,12 @@ Default: src/cli.py
 This catches NameError issues BEFORE runtime.
 """
 import ast
-import sys
 import builtins
-from pathlib import Path
-from dataclasses import dataclass, field
-from typing import Set, List, Dict, Optional
+import sys
 from collections import defaultdict
-
+from dataclasses import dataclass, field
+from pathlib import Path
+from typing import Optional
 
 BUILTIN_NAMES = set(dir(builtins))
 # Add common typing names
@@ -40,12 +39,12 @@ class FunctionScope:
     name: str
     lineno: int
     qualified_name: str  # Full path like outer_func.inner_func
-    parameters: Set[str] = field(default_factory=set)
-    local_assignments: Set[str] = field(default_factory=set)
-    local_imports: Set[str] = field(default_factory=set)
-    names_used: Dict[str, int] = field(default_factory=dict)  # name -> first line used
-    comprehension_vars: Set[str] = field(default_factory=set)
-    nested_function_names: Set[str] = field(default_factory=set)
+    parameters: set[str] = field(default_factory=set)
+    local_assignments: set[str] = field(default_factory=set)
+    local_imports: set[str] = field(default_factory=set)
+    names_used: dict[str, int] = field(default_factory=dict)  # name -> first line used
+    comprehension_vars: set[str] = field(default_factory=set)
+    nested_function_names: set[str] = field(default_factory=set)
     parent_scope: Optional['FunctionScope'] = None
 
 
@@ -63,16 +62,16 @@ class ImportAnalyzer(ast.NodeVisitor):
 
     def __init__(self, source_code: str):
         self.source_lines = source_code.splitlines()
-        self.module_level_names: Set[str] = set()
-        self.type_checking_names: Set[str] = set()
-        self.function_scopes: List[FunctionScope] = []
-        self.scope_stack: List[FunctionScope] = []  # Stack for nested functions
+        self.module_level_names: set[str] = set()
+        self.type_checking_names: set[str] = set()
+        self.function_scopes: list[FunctionScope] = []
+        self.scope_stack: list[FunctionScope] = []  # Stack for nested functions
         self.in_type_checking_block = False
-        self.class_names: Set[str] = set()
-        self.undefined_names: List[UndefinedName] = []
+        self.class_names: set[str] = set()
+        self.undefined_names: list[UndefinedName] = []
 
     @property
-    def current_scope(self) -> Optional[FunctionScope]:
+    def current_scope(self) -> FunctionScope | None:
         return self.scope_stack[-1] if self.scope_stack else None
 
     def get_line_context(self, lineno: int) -> str:
@@ -142,7 +141,7 @@ class ImportAnalyzer(ast.NodeVisitor):
 
     visit_AsyncFunctionDef = visit_FunctionDef
 
-    def _extract_parameters(self, node: ast.FunctionDef) -> Set[str]:
+    def _extract_parameters(self, node: ast.FunctionDef) -> set[str]:
         params = set()
         args = node.args
         for arg in args.args:
@@ -216,7 +215,7 @@ class ImportAnalyzer(ast.NodeVisitor):
                 self._extract_assigned_names(gen.target, self.current_scope.comprehension_vars)
         self.generic_visit(node)
 
-    def _extract_assigned_names(self, node: ast.AST, target_set: Set[str]):
+    def _extract_assigned_names(self, node: ast.AST, target_set: set[str]):
         if isinstance(node, ast.Name):
             target_set.add(node.id)
         elif isinstance(node, (ast.Tuple, ast.List)):
@@ -243,7 +242,7 @@ class ImportAnalyzer(ast.NodeVisitor):
         else:
             self.generic_visit(node)
 
-    def _get_closure_names(self, scope: FunctionScope) -> Set[str]:
+    def _get_closure_names(self, scope: FunctionScope) -> set[str]:
         """Get all names available via closure from parent scopes."""
         closure_names = set()
         parent = scope.parent_scope
@@ -256,7 +255,7 @@ class ImportAnalyzer(ast.NodeVisitor):
             parent = parent.parent_scope
         return closure_names
 
-    def analyze(self) -> List[UndefinedName]:
+    def analyze(self) -> list[UndefinedName]:
         """Analyze all function scopes for undefined names."""
         for scope in self.function_scopes:
             # Collect all available names
@@ -284,7 +283,7 @@ class ImportAnalyzer(ast.NodeVisitor):
         return self.undefined_names
 
 
-def analyze_file(file_path: Path) -> List[UndefinedName]:
+def analyze_file(file_path: Path) -> list[UndefinedName]:
     """Analyze a Python file for undefined names."""
     source_code = file_path.read_text(encoding='utf-8')
 
@@ -320,7 +319,7 @@ def main():
         sys.exit(0)
 
     # Group by name
-    by_name: Dict[str, List[UndefinedName]] = defaultdict(list)
+    by_name: dict[str, list[UndefinedName]] = defaultdict(list)
     for undef in undefined:
         by_name[undef.name].append(undef)
 

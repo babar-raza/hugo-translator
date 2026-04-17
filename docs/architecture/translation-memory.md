@@ -1747,4 +1747,3 @@ A: Yes, modify `_build_adaptation_prompt()` in [`src/tm/l4_llm.py`](../../src/tm
 **Code Verified:** 2025-12-24
 **Real-World Tested:** 44,550 entries, crash recovery validated
 **Next Review:** When TM architecture changes
-

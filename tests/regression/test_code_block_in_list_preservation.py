@@ -12,21 +12,19 @@ Bug fixes covered:
            when a container had a TextUnit in unit_map
 """
 
-import sys
 import os
+import sys
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(REPO_ROOT))
 os.chdir(str(REPO_ROOT))
 
-import pytest
-from src.translation_engine.parser.hugo_parser import HugoParser
-from src.translation_engine.parser.ast_nodes import ASTNode, NodeType
-from src.translation_engine.extractor.text_unit_extractor import TextUnitExtractor
-from src.translation_engine.reconstructor.ast_renderer import ASTRenderer
 from src.translation_engine.extractor.text_unit import TextUnit, TextUnitKind
-
+from src.translation_engine.extractor.text_unit_extractor import TextUnitExtractor
+from src.translation_engine.parser.ast_nodes import ASTNode, NodeType
+from src.translation_engine.parser.hugo_parser import HugoParser
+from src.translation_engine.reconstructor.ast_renderer import ASTRenderer
 
 # ---------------------------------------------------------------------------
 # Helpers

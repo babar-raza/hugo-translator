@@ -1,8 +1,8 @@
 """Unit tests for content hash tracking configuration."""
 
-import pytest
-import yaml
 from pathlib import Path
+
+import yaml
 
 
 def test_global_yaml_valid_syntax():

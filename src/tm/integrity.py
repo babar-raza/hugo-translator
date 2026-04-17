@@ -4,13 +4,18 @@ This module provides integrity checking capabilities for the LMDB-based L2 cache
 including detection of corrupted entries and optional auto-repair.
 
 Implementation follows TM-01 from the TM cache integrity plan.
+
+WS-COMP-5 extension: scan_language_validity() detects and optionally removes L2 entries
+where the cached translation is in the wrong language (stale wrong-language entries from
+early M2M100 runs that can propagate bad translations to new files via cache hits).
 """
 
 import json
 import logging
+import random
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import List, Tuple, Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from .l2_persistent import L2PersistentTM
@@ -30,8 +35,8 @@ class IntegrityReport:
     valid_count: int
     corrupt_count: int
     repaired_count: int
-    corrupt_keys: List[bytes] = field(default_factory=list)
-    errors: List[Tuple[bytes, str]] = field(default_factory=list)
+    corrupt_keys: list[bytes] = field(default_factory=list)
+    errors: list[tuple[bytes, str]] = field(default_factory=list)
 
     @property
     def health_percentage(self) -> float:
@@ -66,6 +71,41 @@ class IntegrityReport:
                 {"key": key[:50].hex() if key else "", "message": msg}
                 for key, msg in self.errors[:10]  # Limit to first 10 errors
             ]
+        }
+
+
+@dataclass
+class LanguageValidityReport:
+    """Results from TM language validity scan (WS-COMP-5)."""
+    tgt_lang: str
+    total_entries: int       # Total entries for this tgt_lang in L2
+    total_sampled: int       # Entries actually checked (sample_rate % of total)
+    stale_found: int         # Entries where detected lang != tgt_lang
+    repaired_count: int      # Entries deleted (if repair=True)
+    stale_entries: list[dict] = field(default_factory=list)  # {key_hex, translation_snippet, detected_lang, confidence}
+
+    @property
+    def stale_rate(self) -> float:
+        if self.total_sampled == 0:
+            return 0.0
+        return self.stale_found / self.total_sampled
+
+    def __str__(self) -> str:
+        return (
+            f"LanguageValidityReport(lang={self.tgt_lang}, entries={self.total_entries}, "
+            f"sampled={self.total_sampled}, stale={self.stale_found} "
+            f"({self.stale_rate * 100:.1f}%), repaired={self.repaired_count})"
+        )
+
+    def to_dict(self) -> dict:
+        return {
+            "tgt_lang": self.tgt_lang,
+            "total_entries": self.total_entries,
+            "total_sampled": self.total_sampled,
+            "stale_found": self.stale_found,
+            "stale_rate_pct": round(self.stale_rate * 100, 2),
+            "repaired_count": self.repaired_count,
+            "stale_entries": self.stale_entries[:20],  # Cap for JSON output
         }
 
 
@@ -272,7 +312,7 @@ class CacheIntegrityChecker:
             if lang_lower not in self.VALID_LANG_CODES:
                 raise ValueError(f"Unknown language code for {lang_field}: {lang}")
 
-    def verify_entry(self, key: bytes, value: bytes) -> Tuple[bool, Optional[str]]:
+    def verify_entry(self, key: bytes, value: bytes) -> tuple[bool, str | None]:
         """
         Verify a single entry.
 
@@ -290,6 +330,154 @@ class CacheIntegrityChecker:
             return True, None
         except Exception as e:
             return False, str(e)
+
+
+    def scan_language_validity(
+        self,
+        tgt_lang: str,
+        fasttext_model_path: Path,
+        sample_rate: float = 0.05,
+        confidence_threshold: float = 0.85,
+        repair: bool = False,
+        max_deletions_per_run: int = 100,
+        dry_run: bool = False,
+    ) -> "LanguageValidityReport":
+        """
+        WS-COMP-5: Scan L2 entries for a target language and detect wrong-language translations.
+
+        Samples `sample_rate` fraction of entries where tgt_lang matches, runs FastText
+        language detection on the cached translation text, and flags entries where
+        detected language != expected tgt_lang with confidence >= confidence_threshold.
+
+        Args:
+            tgt_lang: Target language code to scan (e.g. "de")
+            fasttext_model_path: Path to lid.176.bin FastText model
+            sample_rate: Fraction of entries to check (0.0-1.0, default 0.05 = 5%)
+            confidence_threshold: Min confidence to flag an entry (default 0.85)
+            repair: If True AND not dry_run, delete flagged entries from L2
+            max_deletions_per_run: Cap on deletions per invocation (prevents mass deletion spike)
+            dry_run: If True, report but do not delete anything
+
+        Returns:
+            LanguageValidityReport with scan results.
+        """
+        try:
+            import fasttext as _ft  # type: ignore
+            model = _ft.load_model(str(fasttext_model_path))
+        except ImportError:
+            logger.error("fasttext-predict not installed — cannot scan language validity")
+            return LanguageValidityReport(tgt_lang=tgt_lang, total_entries=0, total_sampled=0,
+                                          stale_found=0, repaired_count=0)
+        except Exception as e:
+            logger.error(f"Failed to load FastText model {fasttext_model_path}: {e}")
+            return LanguageValidityReport(tgt_lang=tgt_lang, total_entries=0, total_sampled=0,
+                                          stale_found=0, repaired_count=0)
+
+        # Similar language pairs — fasttext may confuse these; don't flag them
+        _similar_pairs: set[frozenset] = {
+            frozenset({"hr", "sr"}), frozenset({"hr", "bs"}), frozenset({"sr", "bs"}),
+            frozenset({"ms", "id"}), frozenset({"cs", "sk"}), frozenset({"nb", "no"}),
+            frozenset({"no", "da"}),
+        }
+
+        # Pass 1: collect keys for this tgt_lang (read-only scan)
+        candidate_keys: list[bytes] = []
+        with self.l2.env.begin() as txn:
+            cursor = txn.cursor()
+            for key, value in cursor:
+                try:
+                    entry = json.loads(value.decode("utf-8"))
+                    if entry.get("tgt_lang") == tgt_lang:
+                        candidate_keys.append(key)
+                except Exception:
+                    pass
+
+        total_entries = len(candidate_keys)
+        if total_entries == 0:
+            return LanguageValidityReport(tgt_lang=tgt_lang, total_entries=0, total_sampled=0,
+                                          stale_found=0, repaired_count=0)
+
+        # Sample at sample_rate
+        sample_size = max(1, int(total_entries * sample_rate))
+        sampled_keys = random.sample(candidate_keys, min(sample_size, total_entries))
+
+        stale_keys: list[bytes] = []
+        stale_entries_info: list[dict] = []
+        total_sampled = 0
+
+        with self.l2.env.begin() as txn:
+            for key in sampled_keys:
+                value = txn.get(key)
+                if value is None:
+                    continue
+                try:
+                    entry = json.loads(value.decode("utf-8"))
+                    translation = entry.get("translation", "")
+                    if not translation or len(translation.strip()) < 20:
+                        continue
+                    total_sampled += 1
+
+                    # Run FastText detection on translation
+                    text_clean = translation.replace("\n", " ").strip()[:500]
+                    predictions = model.predict(text_clean, k=1)
+                    detected_lang = predictions[0][0].replace("__label__", "")
+                    confidence = float(predictions[1][0])
+
+                    if detected_lang == tgt_lang:
+                        continue  # Correct language
+                    if confidence < confidence_threshold:
+                        continue  # Not confident enough
+                    if frozenset({detected_lang, tgt_lang}) in _similar_pairs:
+                        continue  # Known similar pair
+
+                    stale_keys.append(key)
+                    stale_entries_info.append({
+                        "key_hex": key[:16].hex(),
+                        "translation_snippet": translation[:80],
+                        "detected_lang": detected_lang,
+                        "confidence": round(confidence, 3),
+                    })
+                    logger.debug(
+                        f"Stale TM entry: tgt={tgt_lang}, detected={detected_lang} "
+                        f"conf={confidence:.2f}: {translation[:40]!r}"
+                    )
+                except Exception as e:
+                    logger.debug(f"Error checking entry: {e}")
+
+        stale_found = len(stale_keys)
+        repaired_count = 0
+
+        if stale_found > 0:
+            logger.warning(
+                f"TM language validity scan [{tgt_lang}]: {stale_found} wrong-language entries "
+                f"found in {total_sampled} sampled ({total_entries} total). "
+                f"repair={repair}, dry_run={dry_run}"
+            )
+
+        if repair and stale_keys and not dry_run:
+            to_delete = stale_keys[:max_deletions_per_run]
+            with self.l2.env.begin(write=True) as txn:
+                for key in to_delete:
+                    try:
+                        txn.delete(key)
+                        repaired_count += 1
+                    except Exception as e:
+                        logger.error(f"Failed to delete stale key: {e}")
+            logger.info(
+                f"TM language validity repair [{tgt_lang}]: deleted {repaired_count} "
+                f"wrong-language entries (capped at {max_deletions_per_run}/run)"
+            )
+        elif dry_run and stale_found > 0:
+            logger.info(f"TM language validity dry-run [{tgt_lang}]: would delete {stale_found} entries")
+
+        return LanguageValidityReport(
+            tgt_lang=tgt_lang,
+            total_entries=total_entries,
+            total_sampled=total_sampled,
+            stale_found=stale_found,
+            repaired_count=repaired_count,
+            stale_entries=stale_entries_info,
+        )
 
 
 def check_cache_integrity(

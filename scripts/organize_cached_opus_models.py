@@ -10,18 +10,17 @@ from __future__ import annotations
 
 import argparse
 import shutil
-import sys
 from pathlib import Path
-from typing import List, Optional
 
-def find_hf_cache_dir() -> Optional[Path]:
+
+def find_hf_cache_dir() -> Path | None:
     """Find HuggingFace cache directory."""
     cache_dir = Path.home() / ".cache" / "huggingface" / "hub"
     if cache_dir.exists():
         return cache_dir
     return None
 
-def find_opus_models_in_cache(cache_dir: Path) -> List[tuple[str, Path]]:
+def find_opus_models_in_cache(cache_dir: Path) -> list[tuple[str, Path]]:
     """
     Find Opus models in HF cache.
 

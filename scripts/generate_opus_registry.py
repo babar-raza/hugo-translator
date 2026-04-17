@@ -17,7 +17,6 @@ from __future__ import annotations
 import argparse
 import logging
 from pathlib import Path
-from typing import Dict, List, Optional
 
 import yaml
 
@@ -25,7 +24,7 @@ logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 logger = logging.getLogger(__name__)
 
 
-def load_target_languages(config_path: Path = Path("config/target_languages.yaml")) -> List[str]:
+def load_target_languages(config_path: Path = Path("config/target_languages.yaml")) -> list[str]:
     """
     Load target language codes from config.
 
@@ -38,11 +37,11 @@ def load_target_languages(config_path: Path = Path("config/target_languages.yaml
     if not config_path.exists():
         raise FileNotFoundError(f"Target languages config not found: {config_path}")
 
-    with open(config_path, "r", encoding="utf-8") as f:
+    with open(config_path, encoding="utf-8") as f:
         data = yaml.safe_load(f)
 
     if not data or "languages" not in data:
-        raise ValueError(f"Invalid config format: missing 'languages' key")
+        raise ValueError("Invalid config format: missing 'languages' key")
 
     languages = data["languages"]
     return [lang["iso_code"] for lang in languages]
@@ -52,7 +51,7 @@ def check_opus_model_exists(
     src_lang: str,
     tgt_lang: str,
     timeout: int = 10
-) -> tuple[bool, Optional[str]]:
+) -> tuple[bool, str | None]:
     """
     Check if Opus model exists on HuggingFace Hub.
 
@@ -90,7 +89,7 @@ def generate_opus_model_entry(
     src_lang: str,
     tgt_lang: str,
     check_online: bool = False
-) -> Optional[Dict]:
+) -> dict | None:
     """
     Generate Opus model registry entry.
 

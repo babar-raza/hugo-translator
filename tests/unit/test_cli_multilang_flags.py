@@ -4,7 +4,8 @@ Unit tests for multi-language CLI flags (T301: federated-splashing-panda).
 Tests --parallel-languages, --global-lang-rounds, and --global-lang-sort flags.
 """
 import pytest
-from src.cli import create_parser, CLIConfigOverrides
+
+from src.cli import CLIConfigOverrides, create_parser
 
 
 class TestMultiLanguageFlags:

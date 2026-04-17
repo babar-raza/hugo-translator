@@ -5,11 +5,12 @@ Wraps the existing ModelLoader to provide ITranslationBackend interface.
 """
 
 import logging
-from typing import List, Dict, Any, Optional
+from typing import Any
 
-from .interface import ITranslationBackend
 from src.model_runtime.loader import ModelLoader
 from src.model_runtime.registry import ModelRegistry
+
+from .interface import ITranslationBackend
 
 logger = logging.getLogger(__name__)
 
@@ -37,9 +38,9 @@ class MTBackend(ITranslationBackend):
         self,
         model_id: str,
         device: str = "cuda",
-        max_memory_mb: Optional[int] = None,
-        load_mode: Optional[str] = None,
-        config: Optional[Dict] = None
+        max_memory_mb: int | None = None,
+        load_mode: str | None = None,
+        config: dict | None = None
     ):
         """Initialize MT backend with model configuration."""
         self.model_id = model_id
@@ -111,11 +112,11 @@ class MTBackend(ITranslationBackend):
 
     def translate_batch(
         self,
-        texts: List[str],
+        texts: list[str],
         src_lang: str,
         tgt_lang: str,
         **kwargs: Any
-    ) -> List[str]:
+    ) -> list[str]:
         """
         Translate multiple texts in one batch (optimized).
 
@@ -145,7 +146,7 @@ class MTBackend(ITranslationBackend):
 
         return translations
 
-    def get_model_info(self) -> Dict[str, Any]:
+    def get_model_info(self) -> dict[str, Any]:
         """
         Return backend metadata for telemetry.
 

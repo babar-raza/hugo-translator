@@ -10,24 +10,20 @@ Tests cover:
 - 100% coverage
 """
 
-import pytest
 from pathlib import Path
-from unittest.mock import MagicMock, patch, mock_open
-from typing import Dict, Any
+from typing import Any
+from unittest.mock import MagicMock, mock_open, patch
 
 from src.translation_engine.validation.base import (
-    Validator,
-    ValidationResult,
     ValidationIssue,
+    ValidationResult,
     ValidationSeverity,
+    Validator,
+)
+from src.translation_engine.validation.language_consistency_validator import (
+    LanguageConsistencyValidator,
 )
 from src.translation_engine.validation.validation_suite import ValidationSuite
-from src.translation_engine.validation.completeness_validator import CompletenessValidator
-from src.translation_engine.validation.language_consistency_validator import LanguageConsistencyValidator
-from src.translation_engine.validation.shortcode_preservation_validator import ShortcodePreservationValidator
-from src.translation_engine.validation.placeholder_validator import PlaceholderValidator
-from src.translation_engine.validation.structure_validator import StructureValidator
-from src.translation_engine.validation.link_validator import LinkValidator
 
 
 class MockValidator(Validator):
@@ -39,7 +35,7 @@ class MockValidator(Validator):
         self.has_errors_flag = has_errors
         self.validate_called = False
 
-    def validate(self, source: str, translation: str, context: Dict[str, Any] = None) -> ValidationResult:
+    def validate(self, source: str, translation: str, context: dict[str, Any] = None) -> ValidationResult:
         self.validate_called = True
         result = ValidationResult(success=self.return_success)
         if self.has_errors_flag:

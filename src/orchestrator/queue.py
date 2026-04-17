@@ -8,7 +8,6 @@ import heapq
 import logging
 import threading
 import uuid
-from typing import Dict, List, Optional
 
 from .models import JobStats, JobStatus, TranslationJob
 
@@ -32,8 +31,8 @@ class JobQueue:
         """
         self.backend = backend
         self._lock = threading.RLock()
-        self._heap: List[TranslationJob] = []
-        self._jobs: Dict[str, TranslationJob] = {}  # job_id -> job
+        self._heap: list[TranslationJob] = []
+        self._jobs: dict[str, TranslationJob] = {}  # job_id -> job
 
         if backend == "redis":
             logger.warning("Redis backend not yet implemented, falling back to memory")
@@ -72,7 +71,7 @@ class JobQueue:
 
             return job.job_id
 
-    def dequeue(self) -> Optional[TranslationJob]:
+    def dequeue(self) -> TranslationJob | None:
         """
         Get highest priority pending job.
 
@@ -96,7 +95,7 @@ class JobQueue:
 
             return None
 
-    def peek(self, n: int = 10) -> List[TranslationJob]:
+    def peek(self, n: int = 10) -> list[TranslationJob]:
         """
         Look at next N pending jobs without removing.
 
@@ -114,7 +113,7 @@ class JobQueue:
             ]
             return pending[:n]
 
-    def get_job(self, job_id: str) -> Optional[TranslationJob]:
+    def get_job(self, job_id: str) -> TranslationJob | None:
         """
         Get job by ID.
 
@@ -131,8 +130,8 @@ class JobQueue:
         self,
         job_id: str,
         status: JobStatus,
-        error_message: Optional[str] = None,
-        result_summary: Optional[Dict] = None,
+        error_message: str | None = None,
+        result_summary: dict | None = None,
     ) -> bool:
         """
         Update job status.
@@ -197,8 +196,8 @@ class JobQueue:
             return True
 
     def list_jobs(
-        self, status: Optional[JobStatus] = None, limit: int = 100
-    ) -> List[TranslationJob]:
+        self, status: JobStatus | None = None, limit: int = 100
+    ) -> list[TranslationJob]:
         """
         List all jobs, optionally filtered by status.
 

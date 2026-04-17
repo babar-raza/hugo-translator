@@ -8,11 +8,7 @@ entry point via subprocess.
 Gap Resolution: GAP-SR-02 - Missing CLI workflow integration tests
 """
 import subprocess
-import json
 import sys
-import pytest
-from pathlib import Path
-
 
 # Get the Python executable from the current environment
 PYTHON_EXE = sys.executable

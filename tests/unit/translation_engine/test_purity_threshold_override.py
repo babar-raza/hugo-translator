@@ -13,9 +13,9 @@ Key behavioural facts confirmed by reading the source:
   - Per-language overrides: translation_engine.purity_threshold_overrides.
 """
 
-import pytest
 from unittest.mock import MagicMock
 
+import pytest
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -368,8 +368,9 @@ class TestLithuanianThresholdConfig:
 
         Reads the actual config file (not mocked) so YAML parse errors are caught here.
         """
-        import yaml
         from pathlib import Path
+
+        import yaml
         raw = yaml.safe_load(Path("config/global.yaml").read_text(encoding="utf-8"))
         overrides = (
             raw.get("translation_engine", {})
@@ -461,6 +462,7 @@ class TestPurityGateRetryable:
     def test_purity_check_sets_retryable_gate_failure(self):
         """engine.py purity check block must set retryable_gate_failure = True."""
         import inspect
+
         from src.translation_engine import engine as eng_module
         source = inspect.getsource(eng_module)
         # Find the purity check block

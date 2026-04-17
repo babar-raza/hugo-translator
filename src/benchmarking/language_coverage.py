@@ -1,16 +1,16 @@
 """Language coverage validation for model registry."""
 from dataclasses import dataclass
-from typing import Dict, List, Set
+
 import yaml
 
 
 @dataclass
 class CoverageReport:
     total_languages: int
-    covered_languages: Set[str]
-    missing_languages: Set[str]
+    covered_languages: set[str]
+    missing_languages: set[str]
     coverage_percentage: float
-    models_per_language: Dict[str, List[str]]
+    models_per_language: dict[str, list[str]]
 
     def is_complete(self) -> bool:
         return len(self.missing_languages) == 0

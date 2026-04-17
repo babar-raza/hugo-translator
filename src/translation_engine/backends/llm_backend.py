@@ -9,11 +9,12 @@ Supports all providers: Ollama, OpenAI, Anthropic, OpenAI-compatible.
 
 import logging
 import os
-from typing import List, Dict, Any, Optional
+from typing import Any
+
+from src.model_runtime.llm_backend import LLMModelBackend
+from src.model_runtime.registry import ModelInfo
 
 from .interface import ITranslationBackend
-from src.model_runtime.registry import ModelInfo
-from src.model_runtime.llm_backend import LLMModelBackend
 
 logger = logging.getLogger(__name__)
 
@@ -54,11 +55,11 @@ class LLMBackend(ITranslationBackend):
         self,
         model_id: str = "claude-sonnet-4",
         provider: str = "anthropic",
-        api_key: Optional[str] = None,
-        base_url: Optional[str] = None,
+        api_key: str | None = None,
+        base_url: str | None = None,
         max_tokens: int = 4096,
         temperature: float = 0.1,
-        api_key_env: Optional[str] = None,
+        api_key_env: str | None = None,
     ):
         # If api_key provided directly, set it in env for the provider to find
         if api_key and not api_key_env:
@@ -106,14 +107,14 @@ class LLMBackend(ITranslationBackend):
 
     def translate_batch(
         self,
-        texts: List[str],
+        texts: list[str],
         src_lang: str,
         tgt_lang: str,
         **kwargs: Any,
-    ) -> List[str]:
+    ) -> list[str]:
         return self._backend.translate(texts, src_lang, tgt_lang)
 
-    def get_model_info(self) -> Dict[str, Any]:
+    def get_model_info(self) -> dict[str, Any]:
         return {
             "backend_type": "llm",
             "model_id": self.model_id,

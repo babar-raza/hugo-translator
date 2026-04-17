@@ -24,10 +24,11 @@ Example:
 
 import logging
 import time
+from collections.abc import Generator
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING, Dict, Generator, List, Optional
+from typing import TYPE_CHECKING, Optional
 
 if TYPE_CHECKING:
     from src.shared_engines.composition_root import SharedEngines
@@ -41,8 +42,8 @@ class QueryMetric:
     name: str
     duration_ms: float
     timestamp: str
-    params: Dict[str, any] = field(default_factory=dict)
-    row_count: Optional[int] = None
+    params: dict[str, any] = field(default_factory=dict)
+    row_count: int | None = None
     cache_hit: bool = False
 
 
@@ -84,8 +85,8 @@ class PerformanceMonitor:
         self.engines = engines
 
         # Query metrics storage
-        self._metrics: List[QueryMetric] = []
-        self._slow_queries: List[QueryMetric] = []
+        self._metrics: list[QueryMetric] = []
+        self._slow_queries: list[QueryMetric] = []
 
         # Aggregated statistics
         self._total_queries = 0
@@ -140,7 +141,7 @@ class PerformanceMonitor:
         self,
         query_name: str,
         duration_ms: float,
-        row_count: Optional[int] = None,
+        row_count: int | None = None,
         cache_hit: bool = False,
         **params
     ) -> None:
@@ -216,7 +217,7 @@ class PerformanceMonitor:
         if len(self._metrics) > 1000:
             self._metrics = self._metrics[-1000:]
 
-    def get_stats(self) -> Dict[str, any]:
+    def get_stats(self) -> dict[str, any]:
         """Get performance statistics.
 
         Returns:
@@ -249,7 +250,7 @@ class PerformanceMonitor:
             "cache_hit_rate": cache_hit_rate,
         }
 
-    def get_slow_queries(self, limit: int = 10) -> List[Dict[str, any]]:
+    def get_slow_queries(self, limit: int = 10) -> list[dict[str, any]]:
         """Get list of slow queries.
 
         Args:
@@ -285,7 +286,7 @@ class PerformanceMonitor:
         """
         return len(self._slow_queries) > 0
 
-    def get_query_patterns(self) -> Dict[str, Dict[str, any]]:
+    def get_query_patterns(self) -> dict[str, dict[str, any]]:
         """Analyze query patterns and performance by query name.
 
         Returns:

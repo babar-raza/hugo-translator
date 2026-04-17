@@ -96,7 +96,12 @@ def test_benchmark_db_flag_is_optional():
 def test_benchmark_db_schema_compatibility():
     """Verify BenchmarkDatabase schema supports benchmark results."""
     try:
-        from src.benchmarking.storage import BenchmarkDatabase, BenchmarkRun, BenchmarkResult, SystemInfo
+        from src.benchmarking.storage import (
+            BenchmarkDatabase,
+            BenchmarkResult,
+            BenchmarkRun,
+            SystemInfo,
+        )
     except ImportError:
         pytest.skip("Benchmarking module not available")
 

@@ -9,10 +9,9 @@ import logging
 import os
 import platform
 import subprocess
-import sys
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 import psutil
 import torch
@@ -29,7 +28,7 @@ class GPUMemoryInfo:
     free_mb: float
     reserved_mb: float = 0.0
 
-    def to_dict(self) -> Dict[str, float]:
+    def to_dict(self) -> dict[str, float]:
         """Convert to dictionary."""
         return asdict(self)
 
@@ -42,14 +41,14 @@ class GPUInfo:
     name: str
     compute_capability: str
     total_memory_mb: float
-    cuda_cores: Optional[int] = None
-    driver_version: Optional[str] = None
-    pci_bus_id: Optional[str] = None
-    temperature: Optional[float] = None
-    power_limit: Optional[float] = None
-    current_memory: Optional[GPUMemoryInfo] = None
+    cuda_cores: int | None = None
+    driver_version: str | None = None
+    pci_bus_id: str | None = None
+    temperature: float | None = None
+    power_limit: float | None = None
+    current_memory: GPUMemoryInfo | None = None
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary."""
         data = asdict(self)
         if self.current_memory:
@@ -63,18 +62,18 @@ class GPUCapabilities:
 
     has_cuda: bool
     has_rocm: bool
-    cuda_version: Optional[str] = None
-    cudnn_version: Optional[str] = None
-    driver_version: Optional[str] = None
+    cuda_version: str | None = None
+    cudnn_version: str | None = None
+    driver_version: str | None = None
     device_count: int = 0
-    devices: List[GPUInfo] = field(default_factory=list)
+    devices: list[GPUInfo] = field(default_factory=list)
     recommended_device: str = "cpu"
     cpu_count: int = 0
     total_ram_gb: float = 0.0
     platform: str = ""
     python_version: str = ""
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary."""
         data = asdict(self)
         data["devices"] = [d.to_dict() for d in self.devices]
@@ -93,7 +92,7 @@ class GPUManager:
     - Real-time monitoring
     """
 
-    def __init__(self, config: Optional[Dict[str, Any]] = None):
+    def __init__(self, config: dict[str, Any] | None = None):
         """
         Initialize GPU Manager.
 
@@ -111,7 +110,7 @@ class GPUManager:
         self.allow_cpu_fallback = self.config.get("allow_cpu_fallback", True)
 
         # Cached capabilities
-        self._capabilities: Optional[GPUCapabilities] = None
+        self._capabilities: GPUCapabilities | None = None
 
     def detect(self) -> GPUCapabilities:
         """
@@ -248,7 +247,7 @@ class GPUManager:
         )
 
     def _recommend_device(
-        self, has_cuda: bool, has_rocm: bool, devices: List[GPUInfo]
+        self, has_cuda: bool, has_rocm: bool, devices: list[GPUInfo]
     ) -> str:
         """
         Recommend best device for inference.
@@ -309,7 +308,7 @@ class GPUManager:
         # CPU fallback
         return "cpu"
 
-    def get_gpu_memory(self, device_id: int = 0) -> Optional[GPUMemoryInfo]:
+    def get_gpu_memory(self, device_id: int = 0) -> GPUMemoryInfo | None:
         """
         Get current GPU memory usage.
 
@@ -341,7 +340,7 @@ class GPUManager:
             logger.error(f"Failed to get GPU memory info: {e}")
             return None
 
-    def get_all_gpu_memory(self) -> Dict[int, GPUMemoryInfo]:
+    def get_all_gpu_memory(self) -> dict[int, GPUMemoryInfo]:
         """
         Get memory info for all available GPUs.
 
@@ -398,7 +397,7 @@ class GPUManager:
             logger.error(f"Failed to enforce memory limit: {e}")
             return False
 
-    def clear_cache(self, device: Optional[str] = None) -> None:
+    def clear_cache(self, device: str | None = None) -> None:
         """
         Clear GPU memory cache.
 
@@ -435,7 +434,7 @@ class GPUManager:
 
         return self._capabilities.recommended_device if self._capabilities else "cpu"
 
-    def get_capabilities(self) -> Optional[GPUCapabilities]:
+    def get_capabilities(self) -> GPUCapabilities | None:
         """
         Get cached GPU capabilities.
 
@@ -489,7 +488,7 @@ class GPUManager:
 
         return device
 
-    def generate_report(self, output_path: Optional[Path] = None) -> str:
+    def generate_report(self, output_path: Path | None = None) -> str:
         """
         Generate detailed GPU capabilities report.
 

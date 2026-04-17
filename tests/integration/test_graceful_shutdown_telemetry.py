@@ -8,13 +8,13 @@ Validates that when translation is interrupted with SIGINT/SIGTERM:
 - items_* reflect partial progress (GS-04)
 - metrics_json contains partial token/TM stats (GS-05)
 """
-import subprocess
-import signal
-import time
-import sqlite3
 import json
-import os
+import signal
+import sqlite3
+import subprocess
+import time
 from pathlib import Path
+
 import pytest
 
 
@@ -181,9 +181,10 @@ def test_graceful_shutdown_telemetry_fields_integration():
 
     Tests the full flow without actual database access.
     """
-    from src.observability.graceful_shutdown import _perform_graceful_shutdown, _active_contexts
     from unittest.mock import Mock
+
     import src.observability.graceful_shutdown as gs_module
+    from src.observability.graceful_shutdown import _active_contexts, _perform_graceful_shutdown
 
     # Reset global state
     _active_contexts.clear()

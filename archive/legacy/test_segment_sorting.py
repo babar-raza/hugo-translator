@@ -7,16 +7,14 @@ Tests verify that:
 3. Sorting is disabled by default (backward compatibility)
 4. Sorting works correctly with TM cache
 """
-import pytest
-from pathlib import Path
-from unittest.mock import Mock, MagicMock
+from unittest.mock import Mock
 
+import pytest
+
+from src.model_runtime import ModelLoader
+from src.tm import TranslationMemory
 from src.translation_engine import TranslationEngine
 from src.translation_engine.models import Segment, TranslationStats
-from src.tm import TranslationMemory
-from src.tm.l1_cache import L1Cache
-from src.tm.l2_persistent import L2PersistentTM
-from src.model_runtime import ModelLoader
 from src.utils.config_loader import ConfigService
 
 

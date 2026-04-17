@@ -9,8 +9,8 @@ terminology based on exact string matches or regex patterns. It handles:
 """
 
 import re
-from typing import List
-from src.translation_engine.terminology.models import TermRule, DetectedTerm, PreserveMode
+
+from src.translation_engine.terminology.models import DetectedTerm, PreserveMode, TermRule
 
 
 class TerminologyDetector:
@@ -28,7 +28,7 @@ class TerminologyDetector:
         # Returns [DetectedTerm("Aspose.Words", ...), DetectedTerm(".NET", ...)]
     """
 
-    def __init__(self, rules: List[TermRule]):
+    def __init__(self, rules: list[TermRule]):
         """Initialize detector with terminology rules.
 
         Args:
@@ -37,7 +37,7 @@ class TerminologyDetector:
         # Filter out rules with PreserveMode.NONE as they don't need detection
         self.rules = [r for r in rules if r.preserve_mode != PreserveMode.NONE]
 
-    def detect(self, text: str) -> List[DetectedTerm]:
+    def detect(self, text: str) -> list[DetectedTerm]:
         """Detect all terminology in text.
 
         Args:
@@ -64,7 +64,7 @@ class TerminologyDetector:
 
         return detected
 
-    def _detect_exact(self, text: str, rule: TermRule) -> List[DetectedTerm]:
+    def _detect_exact(self, text: str, rule: TermRule) -> list[DetectedTerm]:
         """Detect exact term matches.
 
         Args:
@@ -99,7 +99,7 @@ class TerminologyDetector:
 
         return detected
 
-    def _detect_pattern(self, text: str, rule: TermRule) -> List[DetectedTerm]:
+    def _detect_pattern(self, text: str, rule: TermRule) -> list[DetectedTerm]:
         """Detect pattern matches.
 
         Args:
@@ -121,7 +121,7 @@ class TerminologyDetector:
                     end_pos=match.end(),
                     confidence=1.0
                 ))
-        except re.error as e:
+        except re.error:
             # Invalid regex pattern - log warning and skip
             # In production, this should log via logging module
             pass
@@ -156,7 +156,7 @@ class TerminologyDetector:
 
         return True
 
-    def _resolve_overlaps(self, detected: List[DetectedTerm]) -> List[DetectedTerm]:
+    def _resolve_overlaps(self, detected: list[DetectedTerm]) -> list[DetectedTerm]:
         """Resolve overlapping matches (keep longest).
 
         Args:

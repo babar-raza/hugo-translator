@@ -7,7 +7,6 @@ separating source files from already-translated files.
 
 import logging
 from pathlib import Path
-from typing import List, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -21,11 +20,11 @@ _ALL_LANGUAGE_CODES = frozenset([
 
 
 def filter_source_files(
-    files: List[Path],
+    files: list[Path],
     site_profile,
-    target_langs: List[str],
+    target_langs: list[str],
     source_lang: str = 'en'
-) -> List[Path]:
+) -> list[Path]:
     """
     Filter files to only include source files, excluding already-translated files.
 

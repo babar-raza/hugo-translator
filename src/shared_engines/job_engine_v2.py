@@ -13,12 +13,12 @@ import logging
 import os
 import threading
 import time
-from typing import Optional, List, Dict, Any
+from typing import Any
 
-from src.queues import QueueBackend, MemoryQueueBackend, RedisQueueBackend
+from src.orchestrator.models import JobStats, JobStatus, TranslationJob
 from src.orchestrator.queue import JobQueue
 from src.orchestrator.redis_backend import RedisJobQueue
-from src.orchestrator.models import TranslationJob, JobStatus, JobStats
+from src.queues import MemoryQueueBackend, QueueBackend, RedisQueueBackend
 
 logger = logging.getLogger(__name__)
 
@@ -84,7 +84,7 @@ class JobEngineV2:
         # Backend automatically recovers when Redis becomes available again
     """
 
-    def __init__(self, config: Optional[Dict[str, Any]] = None):
+    def __init__(self, config: dict[str, Any] | None = None):
         """Initialize job engine with backend switching."""
         self.config = config or {}
 
@@ -93,14 +93,14 @@ class JobEngineV2:
         self.fallback_backend_type = self._select_backend("fallback")
 
         # Backend instances
-        self.primary_backend: Optional[QueueBackend] = None
-        self.fallback_backend: Optional[QueueBackend] = None
-        self.current_backend: Optional[QueueBackend] = None
-        self.current_backend_type: Optional[str] = None
+        self.primary_backend: QueueBackend | None = None
+        self.fallback_backend: QueueBackend | None = None
+        self.current_backend: QueueBackend | None = None
+        self.current_backend_type: str | None = None
 
         # Legacy queue wrappers (for backward compatibility)
-        self.queue: Optional[Any] = None
-        self.backend_type: Optional[str] = None
+        self.queue: Any | None = None
+        self.backend_type: str | None = None
 
         # Health monitoring
         self.health_check_interval = self.config.get("redis", {}).get(
@@ -230,7 +230,7 @@ class JobEngineV2:
                 f"Failed to initialize fallback backend ({self.fallback_backend_type}): {e}"
             )
             raise RuntimeError(
-                f"Both primary and fallback backends failed to initialize"
+                "Both primary and fallback backends failed to initialize"
             )
 
     def _create_backend(self, backend_type: str) -> QueueBackend:
@@ -378,10 +378,10 @@ class JobEngineV2:
 
         else:
             logger.debug(
-                f"Primary backend still unhealthy, staying on fallback"
+                "Primary backend still unhealthy, staying on fallback"
             )
 
-    def _emit_telemetry(self, event_type: str, data: Dict[str, Any]):
+    def _emit_telemetry(self, event_type: str, data: dict[str, Any]):
         """Emit telemetry event (non-fatal)."""
         if not self.telemetry:
             return
@@ -435,7 +435,7 @@ class JobEngineV2:
 
             raise
 
-    def dequeue(self) -> Optional[TranslationJob]:
+    def dequeue(self) -> TranslationJob | None:
         """
         Get next highest-priority job from queue.
 
@@ -474,14 +474,14 @@ class JobEngineV2:
 
             raise
 
-    def get_status(self, job_id: str) -> Optional[TranslationJob]:
+    def get_status(self, job_id: str) -> TranslationJob | None:
         """Get job by ID (check status)."""
         if self._closed:
             raise RuntimeError("JobEngine is closed")
 
         return self.queue.get_job(job_id)
 
-    def list_pending(self, limit: int = 10) -> List[TranslationJob]:
+    def list_pending(self, limit: int = 10) -> list[TranslationJob]:
         """List pending jobs in priority order."""
         if self._closed:
             raise RuntimeError("JobEngine is closed")
@@ -492,8 +492,8 @@ class JobEngineV2:
         self,
         job_id: str,
         status: JobStatus,
-        error_message: Optional[str] = None,
-        result_summary: Optional[Dict] = None
+        error_message: str | None = None,
+        result_summary: dict | None = None
     ) -> bool:
         """Update job status."""
         if self._closed:
@@ -515,9 +515,9 @@ class JobEngineV2:
 
     def list_jobs(
         self,
-        status: Optional[JobStatus] = None,
+        status: JobStatus | None = None,
         limit: int = 100
-    ) -> List[TranslationJob]:
+    ) -> list[TranslationJob]:
         """List all jobs, optionally filtered by status."""
         if self._closed:
             raise RuntimeError("JobEngine is closed")
@@ -578,7 +578,7 @@ class JobEngineV2:
         """Get current backend type."""
         return self.current_backend_type
 
-    def get_backend_stats(self) -> Dict[str, Any]:
+    def get_backend_stats(self) -> dict[str, Any]:
         """
         Get backend statistics and health information.
 

@@ -10,13 +10,14 @@ Tests cover:
 - Help text for resume flags
 """
 
-import sys
+import importlib.util
 import json
-import argparse
-import pytest
+import sys
 from pathlib import Path
 from unittest import mock
-import importlib.util
+
+import pytest
+
 
 # Load cli module directly to avoid import chain issues
 def load_cli_module():

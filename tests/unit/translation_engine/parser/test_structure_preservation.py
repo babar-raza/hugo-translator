@@ -4,9 +4,9 @@ Tests for structure preservation through the full translation pipeline.
 Verifies that YAML comments, literal blocks, and quote styles are preserved
 through the HugoParser -> MarkdownReconstructor -> YAMLFormatter pipeline.
 """
-import pytest
 from io import StringIO
 
+import pytest
 from ruamel.yaml import YAML
 from ruamel.yaml.comments import CommentedMap
 
@@ -14,7 +14,6 @@ from src.translation_engine.parser.hugo_parser import HugoParser
 from src.translation_engine.reconstructor.markdown_reconstructor import MarkdownReconstructor
 from src.translation_engine.reconstructor.yaml_formatter import YAMLFormatter
 from src.utils.models import BodyRules, FrontmatterMode, FrontmatterRule, SiteProfile
-
 
 SAMPLE_WITH_FULL_STRUCTURE = '''---
 # Static

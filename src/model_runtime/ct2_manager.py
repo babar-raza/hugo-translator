@@ -10,10 +10,10 @@ Manages CTranslate2 model conversions with:
 import logging
 from dataclasses import dataclass
 from pathlib import Path
-from typing import List, Literal, Optional, Tuple
+from typing import Literal
 
 from .ct2_converter import CT2ConversionPipeline
-from .model_store import ModelManifest, ModelStore
+from .model_store import ModelManifest
 from .registry import ModelInfo, ModelRegistry
 
 logger = logging.getLogger(__name__)
@@ -29,7 +29,7 @@ class CT2ConversionResult:
     quantization: str
     size_mb: float
     success: bool
-    error: Optional[str] = None
+    error: str | None = None
 
 
 class CT2ConversionManager:
@@ -46,7 +46,7 @@ class CT2ConversionManager:
         self,
         registry: ModelRegistry,
         models_dir: Path = Path("models"),
-        manifest_path: Optional[Path] = None,
+        manifest_path: Path | None = None,
     ):
         """
         Initialize CT2 conversion manager.
@@ -144,7 +144,7 @@ class CT2ConversionManager:
                     success=True,
                 )
             else:
-                logger.warning(f"Existing CT2 model is invalid, will reconvert")
+                logger.warning("Existing CT2 model is invalid, will reconvert")
 
         # Get source model info
         source_model = self.registry.get_model(model_id)
@@ -232,7 +232,7 @@ class CT2ConversionManager:
             success=True,
         )
 
-    def _get_source_model_path(self, source_model: ModelInfo) -> Optional[Path]:
+    def _get_source_model_path(self, source_model: ModelInfo) -> Path | None:
         """
         Get source model path from manifest or registry.
 
@@ -362,7 +362,7 @@ class CT2ConversionManager:
         self.registry.register_model(ct2_model)
         logger.info(f"✓ Registry updated for {ct2_model_id}")
 
-    def list_ct2_models(self) -> List[Tuple[str, bool, Optional[Path]]]:
+    def list_ct2_models(self) -> list[tuple[str, bool, Path | None]]:
         """
         List all CT2 models (existing and potential).
 
@@ -389,9 +389,9 @@ class CT2ConversionManager:
 
     def plan_conversion(
         self,
-        model_ids: List[str],
+        model_ids: list[str],
         quantization: str = "int8",
-    ) -> List[dict]:
+    ) -> list[dict]:
         """
         Plan CT2 conversions without executing.
 

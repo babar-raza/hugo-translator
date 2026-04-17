@@ -11,18 +11,18 @@ import logging
 import subprocess
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
 
 def commit_language_translations(
     target_lang: str,
-    translated_files: List[Path],
-    stats: Dict[str, Any],
-    config: Dict[str, Any],
+    translated_files: list[Path],
+    stats: dict[str, Any],
+    config: dict[str, Any],
     auto_push: bool = False,
-    git_repo_root: Optional[Path] = None,
+    git_repo_root: Path | None = None,
     validation_passed: bool = True,
 ) -> bool:
     """
@@ -145,8 +145,8 @@ def commit_language_translations(
 def _generate_commit_message(
     target_lang: str,
     file_count: int,
-    stats: Dict[str, Any],
-    config: Dict[str, Any],
+    stats: dict[str, Any],
+    config: dict[str, Any],
 ) -> str:
     """
     Generate commit message for language completion.
@@ -234,7 +234,7 @@ def save_failure_report(
     subprocess_result: subprocess.CompletedProcess,
     failure_dir: Path,
     duration_seconds: float = 0,
-    last_file_processed: Optional[str] = None,
+    last_file_processed: str | None = None,
 ) -> bool:
     """
     Save detailed failure report for failed language translation.

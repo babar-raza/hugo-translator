@@ -4,16 +4,16 @@ Unit tests for ProfileEngine.
 Tests profile and configuration wrapper with mocked ConfigService.
 """
 
-import unittest
-from unittest.mock import Mock, patch, MagicMock
-from pathlib import Path
 import sys
+import unittest
+from pathlib import Path
+from unittest.mock import Mock, patch
 
 # Add src to path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent / "src"))
 
 from src.shared_engines.profile_engine import ProfileEngine
-from src.utils.models import SiteProfile, GlobalConfig, ValidationConfig, TerminologyConfig
+from src.utils.models import GlobalConfig, SiteProfile, TerminologyConfig, ValidationConfig
 
 
 class TestProfileEngine(unittest.TestCase):

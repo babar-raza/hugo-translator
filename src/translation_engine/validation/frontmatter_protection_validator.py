@@ -8,13 +8,13 @@ This validator ensures that frontmatter fields follow site profile rules:
 """
 
 import re
-from datetime import datetime, date
-from typing import Any, Dict, Optional
+from datetime import date, datetime
+from typing import Any
 
 import yaml
 
-from .base import Validator, ValidationResult, ValidationSeverity
 from ...utils.models import FrontmatterMode, SiteProfile
+from .base import ValidationResult, ValidationSeverity, Validator
 
 
 class FrontmatterProtectionValidator(Validator):
@@ -28,7 +28,7 @@ class FrontmatterProtectionValidator(Validator):
     - Disallowed translations (draft, url, date) are preserved
     """
 
-    def __init__(self, site_profile: SiteProfile, name: Optional[str] = None):
+    def __init__(self, site_profile: SiteProfile, name: str | None = None):
         """
         Initialize frontmatter protection validator.
 
@@ -44,7 +44,7 @@ class FrontmatterProtectionValidator(Validator):
         self,
         source: str,
         translation: str,
-        context: Optional[Dict[str, Any]] = None,
+        context: dict[str, Any] | None = None,
     ) -> ValidationResult:
         """
         Validate frontmatter fields against site profile rules.
@@ -90,7 +90,7 @@ class FrontmatterProtectionValidator(Validator):
 
     def _extract_frontmatter(
         self, content: str, label: str, result: ValidationResult
-    ) -> Optional[Dict[str, Any]]:
+    ) -> dict[str, Any] | None:
         """
         Extract and parse frontmatter from document.
 
@@ -150,8 +150,8 @@ class FrontmatterProtectionValidator(Validator):
 
     def _check_passthrough_fields(
         self,
-        source: Dict[str, Any],
-        translation: Dict[str, Any],
+        source: dict[str, Any],
+        translation: dict[str, Any],
         result: ValidationResult,
     ) -> None:
         """
@@ -202,7 +202,7 @@ class FrontmatterProtectionValidator(Validator):
                 )
 
     def _check_ignore_fields(
-        self, translation: Dict[str, Any], result: ValidationResult
+        self, translation: dict[str, Any], result: ValidationResult
     ) -> None:
         """
         Check that IGNORE fields are not present in translation.
@@ -227,10 +227,10 @@ class FrontmatterProtectionValidator(Validator):
 
     def _check_computed_fields(
         self,
-        source: Dict[str, Any],
-        translation: Dict[str, Any],
+        source: dict[str, Any],
+        translation: dict[str, Any],
         result: ValidationResult,
-        context: Dict[str, Any],
+        context: dict[str, Any],
     ) -> None:
         """
         Check that COMPUTED fields have valid computed values.
@@ -271,7 +271,7 @@ class FrontmatterProtectionValidator(Validator):
         field: str,
         value: Any,
         result: ValidationResult,
-        context: Dict[str, Any],
+        context: dict[str, Any],
     ) -> None:
         """
         Validate lastmod (last modified) field.
@@ -327,8 +327,8 @@ class FrontmatterProtectionValidator(Validator):
     def _validate_slug_field(
         self,
         field: str,
-        source: Dict[str, Any],
-        translation: Dict[str, Any],
+        source: dict[str, Any],
+        translation: dict[str, Any],
         value: Any,
         result: ValidationResult,
     ) -> None:
@@ -369,7 +369,7 @@ class FrontmatterProtectionValidator(Validator):
         field: str,
         value: Any,
         result: ValidationResult,
-        context: Dict[str, Any],
+        context: dict[str, Any],
     ) -> None:
         """
         Validate permalink field.

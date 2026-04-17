@@ -14,9 +14,10 @@ Expected behavior:
 - Language purity check should prevent storing English as French in TM
 """
 
-import pytest
-from pathlib import Path
 import sys
+from pathlib import Path
+
+import pytest
 
 # Add src to path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
@@ -66,7 +67,6 @@ def test_backend_output_language_detection():
     4. Assert output language != target language
     5. Do not store in TM
     """
-    from src.translation_engine.language_detection.fasttext_detector import FastTextDetector
 
     # Simple heuristic detection (if FastText not available)
     def detect_language_simple(text: str) -> str:
@@ -115,8 +115,9 @@ def test_generation_params_applied():
     3. Verify different params produce different outputs (indirect test)
     """
     # This would test the fix we just applied
-    from src.model_runtime.loader import NLLBBackend
     import inspect
+
+    from src.model_runtime.loader import NLLBBackend
 
     # Check signature includes generation_params
     sig = inspect.signature(NLLBBackend.translate)

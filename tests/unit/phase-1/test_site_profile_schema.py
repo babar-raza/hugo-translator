@@ -1,22 +1,14 @@
 """
 Unit tests for Site Profile Schema and Pydantic models.
 """
-import json
-import pytest
-from pathlib import Path
-from pydantic import ValidationError
-
 import sys
+from pathlib import Path
+
 sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent / "src"))
 
 from utils.models import (
-    FrontmatterMode,
-    FrontmatterRule,
     BodyRules,
-    OutputLayout,
-    TMPreferences,
     SiteProfile,
-    GlobalConfig,
 )
 
 

@@ -5,9 +5,10 @@ Verifies that sentence_only strategy now checks for formatting/technical content
 and falls back to leaf-level extraction when needed, preventing token leakage.
 """
 import pytest
-from src.translation_engine.parser.hugo_parser import HugoParser
-from src.translation_engine.parser.ast_nodes import NodeType
+
 from src.translation_engine.extractor.text_unit_extractor import TextUnitExtractor
+from src.translation_engine.parser.ast_nodes import NodeType
+from src.translation_engine.parser.hugo_parser import HugoParser
 
 
 class TestSentenceOnlySafeBehavior:

@@ -1,7 +1,7 @@
 """
 Unit tests for HuggingFaceBackend precision modes (T104: federated-splashing-panda).
 """
-from unittest.mock import MagicMock, Mock, patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 

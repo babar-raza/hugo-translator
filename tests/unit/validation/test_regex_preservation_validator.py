@@ -3,12 +3,10 @@ Unit tests for RegexPreservationValidator (SHORTCODE-007 Prompt 6).
 
 Tests post-translation validation of preserve_patterns.
 """
-import pytest
 from src.translation_engine.validation.regex_preservation_validator import (
     RegexPreservationValidator,
-    ShortcodePreservationValidator
+    ShortcodePreservationValidator,
 )
-from src.translation_engine.validation.base import ValidationSeverity
 
 
 class TestRegexPreservationValidator:

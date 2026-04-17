@@ -9,7 +9,6 @@ from first principles using standard mathematical definitions.
 
 import math
 from dataclasses import dataclass
-from typing import List, Tuple, Optional
 
 
 @dataclass
@@ -23,7 +22,7 @@ class StatisticalSummary:
     max: float
     median: float
     count: int
-    confidence_interval_95: Tuple[float, float]
+    confidence_interval_95: tuple[float, float]
     coefficient_of_variation: float  # std / mean
 
 
@@ -49,7 +48,7 @@ class BenchmarkStatistics:
     """
 
     @staticmethod
-    def summarize(values: List[float]) -> StatisticalSummary:
+    def summarize(values: list[float]) -> StatisticalSummary:
         """Compute comprehensive statistical summary of values.
 
         Args:
@@ -100,8 +99,8 @@ class BenchmarkStatistics:
 
     @staticmethod
     def confidence_interval(
-        values: List[float], confidence: float = 0.95
-    ) -> Tuple[float, float]:
+        values: list[float], confidence: float = 0.95
+    ) -> tuple[float, float]:
         """Calculate confidence interval using t-distribution.
 
         Formula: CI = mean ± t * (std / sqrt(n))
@@ -145,7 +144,7 @@ class BenchmarkStatistics:
 
     @staticmethod
     def compare_groups(
-        group_a: List[float], group_b: List[float], metric: str = "throughput"
+        group_a: list[float], group_b: list[float], metric: str = "throughput"
     ) -> ComparisonResult:
         """Compare two groups using Welch's t-test.
 
@@ -236,8 +235,8 @@ class BenchmarkStatistics:
 
     @staticmethod
     def detect_outliers(
-        values: List[float], method: str = "iqr"
-    ) -> List[int]:
+        values: list[float], method: str = "iqr"
+    ) -> list[int]:
         """Detect outliers using IQR or Z-score method.
 
         IQR method: Outliers are values < Q1 - 1.5*IQR or > Q3 + 1.5*IQR
@@ -267,7 +266,7 @@ class BenchmarkStatistics:
             raise ValueError(f"Unknown outlier detection method: {method}")
 
     @staticmethod
-    def _detect_outliers_iqr(values: List[float]) -> List[int]:
+    def _detect_outliers_iqr(values: list[float]) -> list[int]:
         """Detect outliers using IQR method."""
         if len(values) < 4:
             return []  # Need at least 4 values for meaningful quartiles
@@ -295,7 +294,7 @@ class BenchmarkStatistics:
         return outliers
 
     @staticmethod
-    def _detect_outliers_zscore(values: List[float]) -> List[int]:
+    def _detect_outliers_zscore(values: list[float]) -> list[int]:
         """Detect outliers using Z-score method."""
         if len(values) < 3:
             return []  # Need at least 3 values for meaningful z-scores
@@ -316,7 +315,7 @@ class BenchmarkStatistics:
         return outliers
 
     @staticmethod
-    def is_stable(values: List[float], cv_threshold: float = 0.1) -> bool:
+    def is_stable(values: list[float], cv_threshold: float = 0.1) -> bool:
         """Check if measurements are stable based on coefficient of variation.
 
         Stability criterion: CV (coefficient of variation) < threshold
@@ -385,7 +384,7 @@ class BenchmarkStatistics:
         return max(2, math.ceil(n))  # At least 2 samples
 
     @staticmethod
-    def percentile(values: List[float], p: float) -> float:
+    def percentile(values: list[float], p: float) -> float:
         """Calculate percentile using linear interpolation.
 
         Formula: Uses linear interpolation between closest ranks

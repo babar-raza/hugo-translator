@@ -11,11 +11,8 @@ by using telemetry in disabled mode or checking internal state.
 import json
 import os
 import tempfile
-from pathlib import Path
 from dataclasses import dataclass
-from typing import Optional
-
-import pytest
+from pathlib import Path
 
 from src.observability.telemetry_integration import TranslationTelemetry
 
@@ -32,7 +29,7 @@ class TranslationStatsFixture:
     duration_seconds: float = 0.0
 
     # Validation fields
-    validation_decision: Optional[str] = None
+    validation_decision: str | None = None
     validation_passed: int = 0
     validation_failed: int = 0
     validation_retried: int = 0
@@ -641,7 +638,6 @@ def test_field_filtering_in_context_builder():
 
 def test_no_version_defaults_to_conservative():
     """TC-VALID-01: Verify missing version defaults to v2.1.0 (conservative)."""
-    import logging
 
     # Create mock client with NO version attribute
     class MockClient:

@@ -34,4 +34,3 @@ Other product areas cover similar patterns—forinstance, exposing REST APIs for
 These articles are designed to be copy‑paste friendly and often include prerequisites, step lists, and code snippets.
 
 Representative Word KB articles are stored under `content/kb.aspose.net/words/en/` and are reflected in the live site content on [kb.aspose.com](https://kb.aspose.com/).
-

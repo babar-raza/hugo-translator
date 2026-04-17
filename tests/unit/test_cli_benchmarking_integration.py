@@ -3,8 +3,6 @@
 from pathlib import Path
 from unittest.mock import MagicMock, mock_open, patch
 
-import pytest
-
 from src.cli import load_benchmarking_config
 
 

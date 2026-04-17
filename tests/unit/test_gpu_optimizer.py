@@ -3,10 +3,11 @@ Unit tests for GPU optimizer.
 
 Tests batch size calculation based on VRAM, model size, and precision.
 """
-import pytest
-from unittest.mock import Mock, patch, MagicMock
+from unittest.mock import Mock, patch
 
-from src.model_runtime.gpu_optimizer import GPUOptimizer, GPUConfig
+import pytest
+
+from src.model_runtime.gpu_optimizer import GPUConfig, GPUOptimizer
 
 
 class TestGPUOptimizer:

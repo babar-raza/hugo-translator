@@ -5,8 +5,7 @@ Tests GPU detection, configuration, memory management, and fallback logic.
 """
 import json
 import platform
-from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import pytest
 import torch

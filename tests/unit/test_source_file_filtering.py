@@ -4,8 +4,9 @@ Unit tests for source file filtering logic.
 Tests the _is_translated_filename() helper function and _filter_source_files() method
 to ensure correct identification of source vs translated files for blog.aspose.net pattern.
 """
+
 import pytest
-from pathlib import Path
+
 from src.translation_engine.engine import _is_translated_filename
 
 
@@ -120,6 +121,7 @@ class TestFilterSourceFilesIntegration:
     def test_file_based_localization_filters_correctly(self, tmp_path):
         """Test filtering with file-based localization (blog.aspose.net pattern)."""
         from unittest.mock import MagicMock
+
         from src.translation_engine.engine import TranslationEngine
         from src.utils.config_loader import ConfigService
 
@@ -161,6 +163,7 @@ class TestFilterSourceFilesIntegration:
     def test_folder_based_localization_filters_correctly(self, tmp_path):
         """Test filtering with folder-based localization (/en/, /de/ pattern)."""
         from unittest.mock import MagicMock
+
         from src.translation_engine.engine import TranslationEngine
 
         # Create directory structure
@@ -215,6 +218,7 @@ class TestFilterSourceFilesIntegration:
     def test_empty_file_list(self):
         """Test filtering empty file list returns empty."""
         from unittest.mock import MagicMock
+
         from src.translation_engine.engine import TranslationEngine
 
         site_profile = MagicMock()
@@ -230,6 +234,7 @@ class TestFilterSourceFilesIntegration:
     def test_all_source_files_no_filtering_needed(self, tmp_path):
         """Test that all source files pass through when no translated files present."""
         from unittest.mock import MagicMock
+
         from src.translation_engine.engine import TranslationEngine
 
         # Only source files
@@ -381,6 +386,7 @@ class TestFilteringObservability:
         """Verify INFO log shows summary when files are filtered."""
         import logging
         from unittest.mock import MagicMock
+
         from src.translation_engine.engine import TranslationEngine
 
         # Create mixed source and translated files
@@ -417,6 +423,7 @@ class TestFilteringObservability:
         """Verify no INFO log when all files are source files."""
         import logging
         from unittest.mock import MagicMock
+
         from src.translation_engine.engine import TranslationEngine
 
         # Only source files
@@ -445,6 +452,7 @@ class TestFilteringObservability:
         """Verify WARNING log when unusually high percentage of files filtered."""
         import logging
         from unittest.mock import MagicMock
+
         from src.translation_engine.engine import TranslationEngine
 
         # Create scenario: 2 source files, 50 translated files (high filter rate)
@@ -477,6 +485,7 @@ class TestFilteringObservability:
         """Verify no WARNING when filter rate is normal."""
         import logging
         from unittest.mock import MagicMock
+
         from src.translation_engine.engine import TranslationEngine
 
         # Balanced: 5 source, 3 translated

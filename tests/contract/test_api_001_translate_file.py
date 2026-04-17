@@ -20,13 +20,13 @@ Key Guarantees:
 7. TM update only on ACCEPT decision
 """
 
-import pytest
 import time
-from pathlib import Path
-from unittest.mock import Mock, MagicMock, patch, PropertyMock
 from dataclasses import dataclass
-from typing import Optional, Dict, Any, List
+from pathlib import Path
+from typing import Any
+from unittest.mock import Mock, patch
 
+import pytest
 
 # ==============================================================================
 # Mock Classes for Testing
@@ -36,9 +36,9 @@ from typing import Optional, Dict, Any, List
 @dataclass
 class MockDocument:
     """Mock Hugo markdown document."""
-    frontmatter: Dict[str, Any]
+    frontmatter: dict[str, Any]
     body: str
-    source_path: Optional[Path] = None
+    source_path: Path | None = None
 
 
 @dataclass
@@ -53,7 +53,7 @@ class MockSegment:
 class MockLookupResult:
     """Mock TM lookup result."""
     hit: bool
-    translation: Optional[str]
+    translation: str | None
     source: str
     confidence: float
 
@@ -347,8 +347,9 @@ def test_atomic_write_preserves_original_on_failure(tmp_path):
     CONTRACT: specs/features/api-001-translate-file.md - Atomic Write Guarantee
     Evidence: src/utils/atomic_write.py (atomic rename pattern)
     """
-    from src.utils.atomic_write import atomic_write, AtomicWriteError
     import errno
+
+    from src.utils.atomic_write import AtomicWriteError, atomic_write
 
     # Arrange - Create existing file
     output_path = tmp_path / "existing.md"
@@ -825,7 +826,7 @@ def test_validation_result_structure():
     CONTRACT: specs/features/api-001-translate-file.md - ValidationResult
     Evidence: src/translation_engine/models.py lines 228-254
     """
-    from src.translation_engine.models import ValidationResult, ValidationIssue
+    from src.translation_engine.models import ValidationIssue, ValidationResult
 
     # Arrange
     issues = [

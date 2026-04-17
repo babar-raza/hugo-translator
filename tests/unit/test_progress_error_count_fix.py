@@ -5,8 +5,6 @@ Verifies that error count matches actual file failures, not intermediate errors
 that get recovered (e.g., one language fails but other languages succeed).
 """
 
-import logging
-import pytest
 from src.observability.progress import ProgressTracker
 
 
@@ -91,7 +89,7 @@ def test_no_error_without_record_error_call():
     # SR-01: Failing a file without record_error() should not increment error count
     # (Though in practice, record_error should always be called before file_completed(False))
     assert snapshot.files_failed == 1, "Expected 1 failed file"
-    assert snapshot.error_count == 0, f"Expected 0 errors (no record_error called)"
+    assert snapshot.error_count == 0, "Expected 0 errors (no record_error called)"
 
 
 def test_mixed_scenario_realistic():

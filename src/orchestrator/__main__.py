@@ -13,16 +13,15 @@ import argparse
 import importlib.metadata
 import logging
 import os
-import signal
 import sys
 import time
 from pathlib import Path
 
-from src.orchestrator.orchestrator import TranslationOrchestrator
 from src.observability.graceful_shutdown import (
-    setup_graceful_shutdown,
     register_shutdown_handler,
+    setup_graceful_shutdown,
 )
+from src.orchestrator.orchestrator import TranslationOrchestrator
 from src.utils.config_loader import ConfigService
 
 logger = logging.getLogger(__name__)

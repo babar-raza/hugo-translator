@@ -2,9 +2,9 @@
 import json
 import os
 import time
-from pathlib import Path
-from unittest.mock import patch
 from io import StringIO
+from unittest.mock import patch
+
 import pytest
 
 from src.utils.file_lock import diagnose_lock
@@ -29,7 +29,6 @@ def capture_stdout():
 
 def test_diagnose_no_lock(capture_stdout, tmp_path, monkeypatch):
     """Test diagnose_lock when no lock exists."""
-    from src.translation_engine.engine import get_site_lock_path
 
     # Mock get_site_lock_path to use tmp_path
     def mock_get_lock_path(site_id):
@@ -45,7 +44,6 @@ def test_diagnose_no_lock(capture_stdout, tmp_path, monkeypatch):
 
 def test_diagnose_dead_pid(capture_stdout, tmp_path, monkeypatch):
     """Test diagnose_lock with dead PID."""
-    from src.translation_engine.engine import get_site_lock_path
 
     lock_file = tmp_path / "test.example.net.lock"
     metadata = {

@@ -9,18 +9,17 @@ Tests cover:
 - run_with_stats wrapper function
 - Edge cases and error handling
 """
-import pytest
 import subprocess
-import time
 from datetime import datetime, timedelta
-from pathlib import Path
-from unittest.mock import Mock, patch, MagicMock
+from unittest.mock import patch
+
+import pytest
 
 from src.observability.subprocess_stats import (
-    SubprocessStats,
     SubprocessExecutionRecord,
-    run_with_stats,
+    SubprocessStats,
     get_global_stats,
+    run_with_stats,
 )
 
 

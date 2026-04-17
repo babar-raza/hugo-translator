@@ -7,13 +7,13 @@ for CPU, RAM, and GPU/VRAM resource limiting.
 
 import logging
 from dataclasses import dataclass
-from typing import Dict, Any, Optional
+from typing import Any
 
 import torch
 
+from src.benchmarking.resource_monitor import ResourceEstimate, ResourceMonitor, ResourceSnapshot
 from src.hardware.gpu_manager import GPUManager, GPUMemoryInfo
 from src.hardware.vram_budget import resolve_vram_budget_mb
-from src.benchmarking.resource_monitor import ResourceMonitor, ResourceSnapshot, ResourceEstimate
 
 logger = logging.getLogger(__name__)
 
@@ -23,15 +23,15 @@ class ResourceLimits:
     """Resource limits configuration."""
 
     # CPU limits
-    max_cpu_percent: Optional[float] = None  # Maximum CPU usage (0-100)
+    max_cpu_percent: float | None = None  # Maximum CPU usage (0-100)
 
     # RAM limits
-    min_memory_mb: Optional[float] = None  # Minimum available memory in MB
-    max_memory_percent: Optional[float] = None  # Maximum memory usage (0-100)
+    min_memory_mb: float | None = None  # Minimum available memory in MB
+    max_memory_percent: float | None = None  # Maximum memory usage (0-100)
 
     # GPU/VRAM limits
-    max_gpu_memory_percent: Optional[int] = None  # Maximum GPU memory as % of total (0-100)
-    max_gpu_memory_mb: Optional[int] = None  # Maximum GPU memory in MB (overrides percent)
+    max_gpu_memory_percent: int | None = None  # Maximum GPU memory as % of total (0-100)
+    max_gpu_memory_mb: int | None = None  # Maximum GPU memory in MB (overrides percent)
     gpu_device_id: int = -1  # GPU device ID (-1 = auto-select)
     enable_gpu: bool = True  # Whether to use GPU
 
@@ -76,8 +76,8 @@ class LimitingEngine:
 
     def __init__(
         self,
-        limits: Optional[ResourceLimits] = None,
-        gpu_config: Optional[Dict[str, Any]] = None
+        limits: ResourceLimits | None = None,
+        gpu_config: dict[str, Any] | None = None
     ):
         """Initialize limiting engine."""
         self.limits = limits or ResourceLimits()
@@ -139,8 +139,8 @@ class LimitingEngine:
 
     def check_resources_available(
         self,
-        required_memory_mb: Optional[float] = None,
-        required_gpu_memory_mb: Optional[float] = None,
+        required_memory_mb: float | None = None,
+        required_gpu_memory_mb: float | None = None,
         device_required: str = "auto"
     ) -> bool:
         """
@@ -221,10 +221,10 @@ class LimitingEngine:
 
     def wait_for_resources(
         self,
-        required_memory_mb: Optional[float] = None,
-        required_gpu_memory_mb: Optional[float] = None,
+        required_memory_mb: float | None = None,
+        required_gpu_memory_mb: float | None = None,
         device_required: str = "auto",
-        timeout: Optional[float] = None
+        timeout: float | None = None
     ) -> bool:
         """
         Wait for sufficient resources to become available.
@@ -292,7 +292,7 @@ class LimitingEngine:
         """
         return self.resource_monitor.get_current()
 
-    def get_gpu_memory(self, device_id: int = 0) -> Optional[GPUMemoryInfo]:
+    def get_gpu_memory(self, device_id: int = 0) -> GPUMemoryInfo | None:
         """
         Get GPU memory info for specific device.
 
@@ -309,7 +309,7 @@ class LimitingEngine:
         """
         return self.gpu_manager.get_gpu_memory(device_id=device_id)
 
-    def get_all_gpu_memory(self) -> Dict[int, GPUMemoryInfo]:
+    def get_all_gpu_memory(self) -> dict[int, GPUMemoryInfo]:
         """
         Get memory info for all available GPUs.
 
@@ -340,7 +340,7 @@ class LimitingEngine:
         """
         return self.gpu_manager.enforce_memory_limit(device=device)
 
-    def clear_gpu_cache(self, device: Optional[str] = None) -> None:
+    def clear_gpu_cache(self, device: str | None = None) -> None:
         """
         Clear GPU memory cache.
 

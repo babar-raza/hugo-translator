@@ -3,15 +3,11 @@ Integration tests for round-robin language processing mode (T305: federated-spla
 
 End-to-end tests for --global-lang-rounds and --global-lang-sort flags.
 """
-import pytest
 import subprocess
 import sys
-import tempfile
-import json
-import os
-import shutil
 from pathlib import Path
-from typing import List, Dict
+
+import pytest
 
 
 class TestRoundRobinModeE2E:
@@ -27,22 +23,14 @@ class TestRoundRobinModeE2E:
         return content_path
 
     @pytest.fixture
-    def temp_output_dir(self):
-        """Temporary directory for translation output."""
-        temp_dir = tempfile.mkdtemp(prefix="roundrobin_test_")
-        yield Path(temp_dir)
-        # Cleanup
-        if os.path.exists(temp_dir):
-            shutil.rmtree(temp_dir)
+    def temp_output_dir(self, tmp_path):
+        """Temporary directory for translation output (pytest-managed)."""
+        return tmp_path / "output"
 
     @pytest.fixture
-    def temp_tm_dir(self):
-        """Temporary directory for translation memory."""
-        temp_dir = tempfile.mkdtemp(prefix="tm_roundrobin_")
-        yield Path(temp_dir)
-        # Cleanup
-        if os.path.exists(temp_dir):
-            shutil.rmtree(temp_dir)
+    def temp_tm_dir(self, tmp_path):
+        """Temporary directory for translation memory (pytest-managed)."""
+        return tmp_path / "tm"
 
     def test_roundrobin_flag_integration(self):
         """Test that --global-lang-rounds flag is accepted by CLI."""

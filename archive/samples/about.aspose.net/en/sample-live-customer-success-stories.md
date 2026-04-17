@@ -32,4 +32,3 @@ The Success Stories page explains that sharing a story can help others evaluate 
 
 Customers who want to submit a story are directed to contact the Aspose sales team via the contact page.  
 The call‑to‑action links from the Success Stories page to [about.aspose.com/contact](https://about.aspose.com/contact) for further instructions.
-

@@ -9,7 +9,7 @@ import logging
 import queue
 import threading
 import time
-from typing import Optional, Dict, Any, List
+from typing import Any
 
 from .base import QueueBackend, QueueFullError
 
@@ -56,7 +56,7 @@ class MemoryQueueBackend(QueueBackend):
     def __init__(self, max_queue_size: int = 1000):
         """Initialize memory queue backend."""
         self.max_queue_size = max_queue_size
-        self._queues: Dict[str, queue.PriorityQueue] = {}
+        self._queues: dict[str, queue.PriorityQueue] = {}
         self._lock = threading.RLock()
         self._closed = False
 
@@ -73,7 +73,7 @@ class MemoryQueueBackend(QueueBackend):
                 logger.debug(f"Created queue: {queue_name} (maxsize={maxsize})")
             return self._queues[queue_name]
 
-    def push(self, queue_name: str, item: Dict[str, Any]) -> None:
+    def push(self, queue_name: str, item: dict[str, Any]) -> None:
         """
         Push item to queue.
 
@@ -120,7 +120,7 @@ class MemoryQueueBackend(QueueBackend):
                 f"Queue '{queue_name}' is full (max_queue_size={self.max_queue_size})"
             )
 
-    def pop(self, queue_name: str, timeout: float = 0) -> Optional[Dict[str, Any]]:
+    def pop(self, queue_name: str, timeout: float = 0) -> dict[str, Any] | None:
         """
         Pop item from queue.
 
@@ -205,7 +205,7 @@ class MemoryQueueBackend(QueueBackend):
 
                 logger.info("MemoryQueueBackend closed")
 
-    def peek(self, queue_name: str, n: int = 10) -> List[Dict[str, Any]]:
+    def peek(self, queue_name: str, n: int = 10) -> list[dict[str, Any]]:
         """
         Look at next N items without removing them.
 

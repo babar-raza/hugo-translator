@@ -12,10 +12,9 @@ Fix: Preserve nested LIST children when replacing LIST_ITEM content by
 extracting them first and appending after the text node.
 """
 
-import pytest
+from src.translation_engine.extractor.text_unit import TextUnit, TextUnitKind
 from src.translation_engine.parser.ast_nodes import ASTNode, NodeType
 from src.translation_engine.reconstructor.ast_renderer import ASTRenderer
-from src.translation_engine.extractor.text_unit import TextUnit, TextUnitKind
 
 
 class TestNestedListReconstruction:

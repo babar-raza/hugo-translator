@@ -6,13 +6,11 @@ be minimal, deterministic, and focused on user-visible behavior testing.
 """
 
 import logging
-import tempfile
 from pathlib import Path
-from typing import Dict, Any
+from typing import Any
 
 import pytest
 import yaml
-
 
 logger = logging.getLogger(__name__)
 
@@ -48,7 +46,7 @@ def golden_files_dir():
 
 
 @pytest.fixture
-def minimal_site_profile(temp_contract_dir) -> Dict[str, Any]:
+def minimal_site_profile(temp_contract_dir) -> dict[str, Any]:
     """
     Minimal valid site profile for contract testing.
 
@@ -92,7 +90,7 @@ def site_profile_file(temp_contract_dir, minimal_site_profile) -> Path:
 
 
 @pytest.fixture
-def validation_config_strict() -> Dict[str, Any]:
+def validation_config_strict() -> dict[str, Any]:
     """
     Strict validation configuration for testing critical validators.
 
@@ -109,7 +107,7 @@ def validation_config_strict() -> Dict[str, Any]:
 
 
 @pytest.fixture
-def validation_config_normal() -> Dict[str, Any]:
+def validation_config_normal() -> dict[str, Any]:
     """
     Normal validation configuration for testing standard behavior.
 
@@ -126,7 +124,7 @@ def validation_config_normal() -> Dict[str, Any]:
 
 
 @pytest.fixture
-def validation_config_lenient() -> Dict[str, Any]:
+def validation_config_lenient() -> dict[str, Any]:
     """
     Lenient validation configuration for testing tolerant behavior.
 

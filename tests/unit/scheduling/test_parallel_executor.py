@@ -3,10 +3,9 @@ Unit tests for parallel language executor (T303: federated-splashing-panda).
 
 Tests ParallelLanguageExecutor and LanguageExecutionResult.
 """
-import pytest
 from pathlib import Path
-from unittest.mock import Mock, MagicMock, patch
-from concurrent.futures import ThreadPoolExecutor
+from unittest.mock import MagicMock, Mock, patch
+
 from src.translation_engine.scheduling import (
     LanguageExecutionResult,
     ParallelLanguageExecutor,
@@ -428,8 +427,8 @@ class TestParallelLanguageExecutorConcurrency:
 
     def test_parallel_executor_actual_concurrency(self):
         """Test that executor actually runs tasks concurrently."""
-        import time
         import threading
+        import time
 
         mock_engine = Mock()
         execution_times = {}

@@ -7,7 +7,7 @@ enabling 100% structure preservation by decoupling translation from formatting.
 import hashlib
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 
 class TextUnitKind(str, Enum):
@@ -113,7 +113,7 @@ class TextUnit:
     When True, translation step copies source_text to translated_text unchanged.
     """
 
-    translated_text: Optional[str] = None
+    translated_text: str | None = None
     """
     Translated text (populated after translation).
 
@@ -121,7 +121,7 @@ class TextUnit:
     For translatable units, this is populated by the MT model.
     """
 
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
     """
     Optional metadata for context or debugging.
 
@@ -168,7 +168,7 @@ class TextUnit:
         content = f"{node_addr}:{kind}:{source_text}"
         return hashlib.sha256(content.encode('utf-8')).hexdigest()[:16]
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """
         Serialize to dictionary for JSON/YAML storage.
 
@@ -195,7 +195,7 @@ class TextUnit:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "TextUnit":
+    def from_dict(cls, data: dict[str, Any]) -> "TextUnit":
         """
         Deserialize from dictionary.
 
@@ -312,7 +312,7 @@ class BodyTranslationPlan:
     In practice, this is List[ASTNode] from the parser.
     """
 
-    units: List[TextUnit]
+    units: list[TextUnit]
     """All translatable text units extracted from the AST."""
 
     ast_fingerprint: str
@@ -326,7 +326,7 @@ class BodyTranslationPlan:
     NOT the text content (since content changes during translation).
     """
 
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
     """
     Optional metadata for the translation plan.
 
@@ -347,7 +347,7 @@ class BodyTranslationPlan:
         if not self.ast_fingerprint:
             raise ValueError("ast_fingerprint cannot be empty")
 
-    def get_translatable_units(self) -> List[TextUnit]:
+    def get_translatable_units(self) -> list[TextUnit]:
         """
         Get only units that need translation (do_not_translate=False).
 
@@ -362,7 +362,7 @@ class BodyTranslationPlan:
         """
         return [unit for unit in self.units if not unit.do_not_translate]
 
-    def get_non_translatable_units(self) -> List[TextUnit]:
+    def get_non_translatable_units(self) -> list[TextUnit]:
         """
         Get units that should be copied as-is (do_not_translate=True).
 
@@ -377,7 +377,7 @@ class BodyTranslationPlan:
         """
         return [unit for unit in self.units if unit.do_not_translate]
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """
         Serialize to dictionary for JSON/YAML storage.
 
@@ -400,7 +400,7 @@ class BodyTranslationPlan:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any], ast: Any) -> "BodyTranslationPlan":
+    def from_dict(cls, data: dict[str, Any], ast: Any) -> "BodyTranslationPlan":
         """
         Deserialize from dictionary.
 

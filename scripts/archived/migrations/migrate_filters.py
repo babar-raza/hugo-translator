@@ -5,19 +5,22 @@ Migration script to convert legacy filter.json to new site profile YAML format.
 import json
 import sys
 from pathlib import Path
-from typing import Dict, List, Any
+from typing import Any
 
 import yaml
 
 # Add src to path
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
+from utils.config_loader import ConfigLoadError, ConfigService
 from utils.models import (
-    SiteProfile, FrontmatterRule, FrontmatterMode,
-    BodyRules, OutputLayout, TMPreferences,
+    BodyRules,
+    FrontmatterMode,
+    FrontmatterRule,
+    OutputLayout,
+    SiteProfile,
+    TMPreferences,
 )
-from utils.config_loader import ConfigService, ConfigLoadError
-
 
 DEFAULT_TARGET_LANGS = ["de", "es", "fr", "ja", "ko", "ru", "zh", "ar", "it", "pt"]
 
@@ -33,7 +36,7 @@ CONTENT_ROOTS_MAP = {
 }
 
 
-def convert_metadata_to_frontmatter(metadata_fields: List[str]) -> Dict[str, FrontmatterRule]:
+def convert_metadata_to_frontmatter(metadata_fields: list[str]) -> dict[str, FrontmatterRule]:
     """Convert legacy metadata field list to frontmatter rules."""
     frontmatter = {}
 
@@ -52,7 +55,7 @@ def convert_metadata_to_frontmatter(metadata_fields: List[str]) -> Dict[str, Fro
     return frontmatter
 
 
-def convert_ast_to_body_rules(ast_config: Dict[str, Any]) -> BodyRules:
+def convert_ast_to_body_rules(ast_config: dict[str, Any]) -> BodyRules:
     """Convert legacy AST configuration to new BodyRules."""
     preserve_blocks = ast_config.get("excludeAncestors", [])
     preserve_patterns = ast_config.get("excludePatterns", [])
@@ -69,7 +72,7 @@ def convert_ast_to_body_rules(ast_config: Dict[str, Any]) -> BodyRules:
     )
 
 
-def migrate_site(site_id: str, legacy_config: Dict[str, Any], output_dir: Path) -> bool:
+def migrate_site(site_id: str, legacy_config: dict[str, Any], output_dir: Path) -> bool:
     """Migrate a single site configuration."""
     try:
         metadata_fields = legacy_config.get("metadata", [])
@@ -120,7 +123,7 @@ def main():
 
     print(f"Reading legacy filter from: {legacy_filter_path}")
     try:
-        with open(legacy_filter_path, "r", encoding="utf-8") as f:
+        with open(legacy_filter_path, encoding="utf-8") as f:
             legacy_data = json.load(f)
     except Exception as e:
         print(f"Error reading legacy filter.json: {e}", file=sys.stderr)

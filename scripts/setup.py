@@ -9,6 +9,7 @@ import argparse
 import sys
 from pathlib import Path
 
+
 def setup_directories(base_dir: Path) -> bool:
     """Create required directories."""
     print("Creating directories...")
@@ -104,7 +105,7 @@ def main():
     args = parser.parse_args()
     base_dir = args.base_dir.resolve()
 
-    print(f"Hugo Translation System Setup")
+    print("Hugo Translation System Setup")
     print(f"Base directory: {base_dir}\n")
 
     # Run setup steps

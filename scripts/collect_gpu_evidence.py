@@ -25,7 +25,7 @@ import sys
 from dataclasses import asdict, dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 
 @dataclass
@@ -34,9 +34,9 @@ class ModuleVerificationResult:
     module_name: str
     exists: bool
     importable: bool
-    error: Optional[str] = None
-    module_path: Optional[str] = None
-    attributes: Optional[List[str]] = None
+    error: str | None = None
+    module_path: str | None = None
+    attributes: list[str] | None = None
 
 
 @dataclass
@@ -53,27 +53,27 @@ class CLIExecutionResult:
 @dataclass
 class GPUInfo:
     """GPU device information."""
-    device_name: Optional[str] = None
-    device_index: Optional[int] = None
-    cuda_available: Optional[bool] = None
-    cuda_version: Optional[str] = None
-    vram_total_mb: Optional[int] = None
-    vram_free_mb: Optional[int] = None
-    compute_capability: Optional[str] = None
+    device_name: str | None = None
+    device_index: int | None = None
+    cuda_available: bool | None = None
+    cuda_version: str | None = None
+    vram_total_mb: int | None = None
+    vram_free_mb: int | None = None
+    compute_capability: str | None = None
 
 
 @dataclass
 class GPUEvidence:
     """Complete GPU evidence collection."""
     collection_time: str
-    system_info: Dict[str, Any]
-    module_verification: List[ModuleVerificationResult]
-    cli_execution: List[CLIExecutionResult]
+    system_info: dict[str, Any]
+    module_verification: list[ModuleVerificationResult]
+    cli_execution: list[CLIExecutionResult]
     gpu_info: GPUInfo
     has_gpu: bool
     evidence_valid: bool
-    errors: List[str]
-    warnings: List[str]
+    errors: list[str]
+    warnings: list[str]
 
 
 class ModuleVerifier:
@@ -130,7 +130,7 @@ class ModuleVerifier:
         )
 
     @staticmethod
-    def verify_multiple_modules(module_names: List[str]) -> List[ModuleVerificationResult]:
+    def verify_multiple_modules(module_names: list[str]) -> list[ModuleVerificationResult]:
         """Verify multiple modules."""
         return [ModuleVerifier.verify_module(name) for name in module_names]
 
@@ -139,7 +139,7 @@ class CLIExecutor:
     """Executes CLI commands and captures output."""
 
     @staticmethod
-    def execute_command(command: List[str], timeout: int = 30) -> CLIExecutionResult:
+    def execute_command(command: list[str], timeout: int = 30) -> CLIExecutionResult:
         """
         Execute a CLI command and capture output.
 
@@ -203,7 +203,7 @@ class GPUDetector:
     """Detects GPU availability and capabilities."""
 
     @staticmethod
-    def detect_gpu() -> Tuple[GPUInfo, List[str]]:
+    def detect_gpu() -> tuple[GPUInfo, list[str]]:
         """
         Detect GPU and collect information.
 
@@ -294,7 +294,7 @@ class GPUEvidenceCollector:
         self.errors = []
         self.warnings = []
 
-    def collect_system_info(self) -> Dict[str, Any]:
+    def collect_system_info(self) -> dict[str, Any]:
         """Collect system information."""
         import platform
 
@@ -307,8 +307,8 @@ class GPUEvidenceCollector:
 
     def collect_evidence(
         self,
-        verify_modules: Optional[List[str]] = None,
-        execute_commands: Optional[List[List[str]]] = None
+        verify_modules: list[str] | None = None,
+        execute_commands: list[list[str]] | None = None
     ) -> GPUEvidence:
         """
         Collect complete GPU evidence.

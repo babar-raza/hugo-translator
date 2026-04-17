@@ -10,12 +10,9 @@ import argparse
 import hashlib
 import json
 import logging
-import os
-import shutil
 import sys
 import tarfile
 from pathlib import Path
-from typing import Dict, Optional, Tuple
 
 # Add src to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -44,7 +41,7 @@ def calculate_checksum(file_path: Path) -> str:
     return sha256.hexdigest()
 
 
-def verify_backup_integrity(backup_path: Path) -> Tuple[bool, str]:
+def verify_backup_integrity(backup_path: Path) -> tuple[bool, str]:
     """
     Verify backup integrity using checksum.
 
@@ -61,7 +58,7 @@ def verify_backup_integrity(backup_path: Path) -> Tuple[bool, str]:
             return False, f"Checksum file not found: {checksum_path}"
 
         # Read expected checksum
-        with open(checksum_path, 'r') as f:
+        with open(checksum_path) as f:
             expected = f.read().strip().split()[0]
 
         # Calculate actual checksum
@@ -78,7 +75,7 @@ def verify_backup_integrity(backup_path: Path) -> Tuple[bool, str]:
         return False, f"Integrity verification failed: {e}"
 
 
-def read_backup_metadata(backup_path: Path) -> Optional[Dict]:
+def read_backup_metadata(backup_path: Path) -> dict | None:
     """
     Read metadata from backup.
 
@@ -108,10 +105,10 @@ def read_backup_metadata(backup_path: Path) -> Optional[Dict]:
 
 def restore_backup(
     backup_path: Path,
-    target_dir: Optional[Path] = None,
+    target_dir: Path | None = None,
     verify: bool = True,
     dry_run: bool = False
-) -> Tuple[bool, str]:
+) -> tuple[bool, str]:
     """
     Restore backup to target directory.
 
@@ -210,7 +207,7 @@ def restore_backup(
                     errors.append(error_msg)
 
             if errors:
-                return False, f"Verification failed:\n" + "\n".join(errors)
+                return False, "Verification failed:\n" + "\n".join(errors)
 
         return True, f"Backup restored successfully to: {target_dir or restore_path}"
 
@@ -219,7 +216,7 @@ def restore_backup(
         return False, f"Restore failed: {e}"
 
 
-def test_corrupted_backup(backup_path: Path) -> Tuple[bool, str]:
+def test_corrupted_backup(backup_path: Path) -> tuple[bool, str]:
     """
     Test if backup is corrupted.
 

@@ -4,16 +4,16 @@ Unit tests for JobEngine.
 Tests job queue wrapper with both memory and Redis backends (mocked).
 """
 
-import unittest
-from unittest.mock import Mock, patch, MagicMock
-from pathlib import Path
 import sys
+import unittest
+from pathlib import Path
+from unittest.mock import Mock, patch
 
 # Add src to path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent / "src"))
 
+from src.orchestrator.models import JobStats, JobStatus, JobType, TranslationJob
 from src.shared_engines.job_engine import JobEngine
-from src.orchestrator.models import TranslationJob, JobStatus, JobType, JobStats, JobMode
 
 
 class TestJobEngineMemoryBackend(unittest.TestCase):

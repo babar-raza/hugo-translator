@@ -141,7 +141,7 @@ def test_shortcode_preservation_with_translation():
 
     try:
         output_markdown = simulate_translation_pipeline(markdown_sample, model)
-        print(f"   OK: Translation completed without token leakage")
+        print("   OK: Translation completed without token leakage")
     except AssertionError as e:
         print(f"   ✗ FAIL: {e}")
         raise
@@ -162,7 +162,7 @@ def test_shortcode_preservation_with_translation():
     if shortcode_match:
         print(f"   ✓ PASS: Found shortcode: {shortcode_match.group()}")
     else:
-        print(f"   ✗ FAIL: Shortcode '{{{{< sections >}}}}' not found in output")
+        print("   ✗ FAIL: Shortcode '{{< sections >}}' not found in output")
         print(f"   Output: {repr(output_markdown)}")
         raise AssertionError("Shortcode not preserved in output")
 
@@ -190,9 +190,9 @@ def test_shortcode_preservation_with_translation():
     # Check 3: Translations were applied
     print("\n[Check 3] Translations applied:")
     if "TR(" in output_markdown:
-        print(f"   ✓ PASS: Found translated text with TR() wrapper")
+        print("   ✓ PASS: Found translated text with TR() wrapper")
     else:
-        print(f"   ✗ FAIL: Translations not applied to output")
+        print("   ✗ FAIL: Translations not applied to output")
         raise AssertionError("Translations not applied")
 
     print("\n" + "=" * 80)
@@ -225,11 +225,11 @@ def test_token_leakage_detection():
     print("\n[Test 2] Text with 'xifp' (should fail):")
     try:
         model.translate("This has xifp token")
-        print(f"   ✗ FAIL: Should have raised AssertionError for xifp")
+        print("   ✗ FAIL: Should have raised AssertionError for xifp")
         raise AssertionError("FakeMTModel failed to detect xifp token")
     except AssertionError as e:
         if "TOKEN LEAKAGE DETECTED" in str(e):
-            print(f"   ✓ PASS: Correctly detected xifp token")
+            print("   ✓ PASS: Correctly detected xifp token")
         else:
             raise
 
@@ -237,11 +237,11 @@ def test_token_leakage_detection():
     print("\n[Test 3] Text with 'XIFP' (should fail - case insensitive):")
     try:
         model.translate("This has XIFP token")
-        print(f"   ✗ FAIL: Should have raised AssertionError for XIFP")
+        print("   ✗ FAIL: Should have raised AssertionError for XIFP")
         raise AssertionError("FakeMTModel failed to detect XIFP token (case-insensitive)")
     except AssertionError as e:
         if "TOKEN LEAKAGE DETECTED" in str(e):
-            print(f"   ✓ PASS: Correctly detected XIFP token (case-insensitive)")
+            print("   ✓ PASS: Correctly detected XIFP token (case-insensitive)")
         else:
             raise
 
@@ -249,11 +249,11 @@ def test_token_leakage_detection():
     print("\n[Test 4] Text with '⟦' (should fail):")
     try:
         model.translate("This has ⟦bracket token")
-        print(f"   ✗ FAIL: Should have raised AssertionError for ⟦")
+        print("   ✗ FAIL: Should have raised AssertionError for ⟦")
         raise AssertionError("FakeMTModel failed to detect ⟦ token")
     except AssertionError as e:
         if "TOKEN LEAKAGE DETECTED" in str(e):
-            print(f"   ✓ PASS: Correctly detected ⟦ token")
+            print("   ✓ PASS: Correctly detected ⟦ token")
         else:
             raise
 

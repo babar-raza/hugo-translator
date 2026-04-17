@@ -5,7 +5,6 @@ Using hash() caused duplicate FAISS vectors to accumulate across daemon restarts
 hash_text() uses MD5 which is stable regardless of PYTHONHASHSEED.
 """
 import hashlib
-import pytest
 
 
 class TestHashTextDeterminism:

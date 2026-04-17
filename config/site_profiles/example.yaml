@@ -22,27 +22,27 @@ frontmatter:
   # Translate the title
   title:
     mode: "translate"
-    
+
   # Translate the description
   description:
     mode: "translate"
-    
+
   # Keep date unchanged
   date:
     mode: "passthrough"
-    
+
   # Keep draft status unchanged
   draft:
     mode: "passthrough"
-    
+
   # Keep tags unchanged (or use "translate" to translate tag names)
   tags:
     mode: "passthrough"
-    
+
   # Keep categories unchanged
   categories:
     mode: "passthrough"
-    
+
   # Translate custom excerpt field
   excerpt:
     mode: "translate"
@@ -87,11 +87,11 @@ body:
 output_layout:
   # Use per-language folders (e.g., content/fr/, content/es/)
   per_language_folders: true
-  
+
   # Output path pattern
   # Variables: {lang}, {relative_path}, {filename}, {ext}
   pattern: "/{lang}/{relative_path}"
-  
+
   # Preserve directory structure
   preserve_structure: true
 
@@ -99,10 +99,10 @@ output_layout:
 tm_preferences:
   # Minimum confidence for L3 semantic matches (0.0-1.0)
   semantic_threshold: 0.85
-  
+
   # Enable semantic search (L3) if available
   use_semantic: true
-  
+
   # Context matching for disambiguation
   use_context: true
 
@@ -110,12 +110,12 @@ tm_preferences:
 model:
   # Default model for all language pairs
   default: "m2m100_418m"
-  
+
   # Override model for specific language pairs
   overrides:
     # Use larger model for English to Japanese
     en-ja: "m2m100_1.2b"
-    
+
     # Use NLLB for English to French
     en-fr: "nllb_600m"
 
@@ -123,13 +123,13 @@ model:
 validation:
   # Enable placeholder validation
   check_placeholders: true
-  
+
   # Enable link validation
   check_links: true
-  
+
   # Enable YAML structure validation
   check_yaml_structure: true
-  
+
   # Fail on validation errors (or just warn)
   fail_on_error: false
 
@@ -137,7 +137,7 @@ validation:
 performance:
   # Maximum segments to translate in one batch
   batch_size: 50
-  
+
   # Enable caching of translations
   enable_cache: true
 
@@ -145,10 +145,10 @@ performance:
 logging:
   # Log level: DEBUG, INFO, WARNING, ERROR
   level: "INFO"
-  
+
   # Enable flow artifacts for this site
   flow_artifacts: true
-  
+
   # Flow artifact detail level: NONE, SUMMARY, SAMPLED, FULL
   artifact_detail: "SUMMARY"
 
@@ -156,7 +156,7 @@ logging:
 metadata:
   # Add translation metadata to frontmatter
   add_translation_info: true
-  
+
   # Custom fields to add
   custom_fields:
     translated_by: "Hugo Translation System"

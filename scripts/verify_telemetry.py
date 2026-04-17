@@ -10,13 +10,13 @@ Usage:
     python verify_telemetry.py --check   # Alias for --latest
 """
 import argparse
+import json
 import logging
 import os
-import sys
-import json
 import sqlite3
-from pathlib import Path
+import sys
 from datetime import datetime
+from pathlib import Path
 
 logging.basicConfig(level=logging.INFO, format='%(levelname)s: %(message)s')
 logger = logging.getLogger(__name__)
@@ -205,7 +205,7 @@ def verify_latest_record():
         print(f"\n[FAIL] {failed_count} verification(s) failed")
         return 1
     else:
-        print(f"\n[PASS] All verifications passed!")
+        print("\n[PASS] All verifications passed!")
         return 0
 
 
@@ -237,7 +237,7 @@ def main():
 
     config = TelemetryConfig.from_env()
 
-    print(f"\n[1] Telemetry Settings:")
+    print("\n[1] Telemetry Settings:")
     print(f"    Metrics directory: {config.metrics_dir}")
     print(f"    Database path: {config.database_path}")
     print(f"    NDJSON directory: {config.ndjson_dir}")
@@ -246,7 +246,7 @@ def main():
     # Check if directory exists
     data_dir = config.ndjson_dir
     if not data_dir.exists():
-        print(f"\n[WARN] Data directory does not exist yet")
+        print("\n[WARN] Data directory does not exist yet")
         data_dir.mkdir(parents=True, exist_ok=True)
         print(f"    Created: {data_dir}")
 
@@ -263,17 +263,18 @@ def main():
             print(f"    - {f.name} ({size} bytes, {mod_time})")
 
     # Run a single file translation test
-    print(f"\n[3] Testing Translation with Telemetry...")
+    print("\n[3] Testing Translation with Telemetry...")
 
-    from src.translation_engine import TranslationEngine
-    from src.utils.config_loader import ConfigService
+    import torch
+
+    from src.model_runtime import ModelLoader
+    from src.model_runtime.registry import ModelRegistry
     from src.tm import TranslationMemory
     from src.tm.l1_cache import L1Cache
     from src.tm.l2_persistent import L2PersistentTM
     from src.tm.l3_semantic import L3SemanticTM
-    from src.model_runtime import ModelLoader
-    from src.model_runtime.registry import ModelRegistry
-    import torch
+    from src.translation_engine import TranslationEngine
+    from src.utils.config_loader import ConfigService
 
     REPO_ROOT = Path(__file__).parent.parent
     config_path = REPO_ROOT / "config"
@@ -314,7 +315,7 @@ def main():
         return 1
 
     print(f"    Source: {test_file.name}")
-    print(f"    Target: de (German)")
+    print("    Target: de (German)")
 
     try:
         result = engine.translate_file(
@@ -336,7 +337,7 @@ def main():
         return 1
 
     # Check for new telemetry data
-    print(f"\n[4] Checking for New Telemetry Data...")
+    print("\n[4] Checking for New Telemetry Data...")
 
     new_run_files = list(data_dir.glob("*.ndjson"))
     new_files = set(new_run_files) - set(run_files)
@@ -346,16 +347,16 @@ def main():
         print(f"    [OK] Database file exists: {config.database_path}")
         print(f"    Database size: {config.database_path.stat().st_size} bytes")
     else:
-        print(f"    [INFO] Database file not yet created")
+        print("    [INFO] Database file not yet created")
 
     if new_files:
-        print(f"    [OK] New telemetry NDJSON file(s) created!")
+        print("    [OK] New telemetry NDJSON file(s) created!")
         for f in new_files:
             print(f"    File: {f.name}")
 
             # Read and validate the NDJSON file (each line is JSON)
             try:
-                with open(f, 'r') as fh:
+                with open(f) as fh:
                     lines = fh.readlines()
 
                 print(f"    Events in file: {len(lines)}")
@@ -363,7 +364,7 @@ def main():
                 if lines:
                     # Parse last event
                     last_event = json.loads(lines[-1])
-                    print(f"\n    Last Event:")
+                    print("\n    Last Event:")
                     print(f"      - event_type: {last_event.get('event_type', 'N/A')}")
                     print(f"      - run_id: {last_event.get('run_id', 'N/A')}")
                     print(f"      - timestamp: {last_event.get('timestamp', 'N/A')}")
@@ -378,7 +379,7 @@ def main():
             mod_time = datetime.fromtimestamp(most_recent.stat().st_mtime)
             print(f"    [INFO] Most recent file: {most_recent.name}")
             print(f"    [INFO] Last modified: {mod_time.strftime('%Y-%m-%d %H:%M:%S')}")
-        print(f"    [INFO] No new files created (may have appended to existing)")
+        print("    [INFO] No new files created (may have appended to existing)")
 
     print("\n" + "=" * 60)
     print("TELEMETRY VERIFICATION: PASSED")

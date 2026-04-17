@@ -5,8 +5,8 @@ Tests that glossary corrections are applied during document reconstruction.
 
 MISSION: Verify glossary corrections work end-to-end in the translation pipeline
 """
-import sys
 import os
+import sys
 from pathlib import Path
 
 # Add src to path
@@ -14,11 +14,10 @@ REPO_ROOT = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(REPO_ROOT))
 os.chdir(str(REPO_ROOT))
 
-import pytest
-from src.translation_engine.parser.hugo_parser import HugoParser
 from src.translation_engine.extractor.text_unit_extractor import TextUnitExtractor
+from src.translation_engine.parser.hugo_parser import HugoParser
 from src.translation_engine.reconstructor.markdown_reconstructor import MarkdownReconstructor
-from src.utils.models import SiteProfile, BodyRules
+from src.utils.models import BodyRules, SiteProfile
 
 
 class FakeMTModelWithErrors:
@@ -88,7 +87,7 @@ Use security scanning to detect issues.
     # Parse
     parser = HugoParser()
     source_doc = parser.parse_string(test_markdown)
-    print(f"[2/5] Parsed document into AST")
+    print("[2/5] Parsed document into AST")
 
     # Create site profile
     site_profile = SiteProfile(
@@ -117,7 +116,7 @@ Use security scanning to detect issues.
         translations[unit.unit_id] = translated_text
         print(f"      Unit '{source_text[:40]}...' -> '{translated_text[:40]}...'")
 
-    print(f"[4/5] Simulated translation with intentional errors")
+    print("[4/5] Simulated translation with intentional errors")
 
     # Reconstruct with glossary corrections
     reconstructor = MarkdownReconstructor(site_profile)

@@ -4,10 +4,8 @@ SR-06: Observability verification tests.
 Verify that key operations produce expected log output.
 This ensures proper debugging and monitoring capabilities in production.
 """
-import logging
-import pytest
-from pathlib import Path
 import json
+import logging
 
 
 class TestAtomicWriteLogging:
@@ -53,7 +51,7 @@ class TestAtomicWriteLogging:
 
     def test_error_handling_no_spurious_logs(self, tmp_path, caplog):
         """Verify error handling doesn't produce unexpected logs."""
-        from utils.atomic_write import atomic_write, InvalidPathError
+        from utils.atomic_write import InvalidPathError, atomic_write
 
         # Try to write to non-existent parent without create_parents
         bad_path = tmp_path / "nonexistent" / "deep" / "file.txt"
@@ -158,7 +156,7 @@ class TestFileLockLogging:
         # Stale lock removal is logged at INFO level
         if info_messages:
             assert any("removed" in msg.lower() and "stale" in msg.lower() for msg in info_messages), \
-                f"Expected stale removal message in info logs"
+                "Expected stale removal message in info logs"
 
     def test_lock_context_manager_cleanup(self, tmp_path, caplog):
         """Verify lock context manager cleans up properly."""

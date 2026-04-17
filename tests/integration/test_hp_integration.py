@@ -4,14 +4,14 @@ Integration tests for HP-01 through HP-05 fixes.
 Verifies that parser fixes are actually used in translation pipeline.
 """
 
-import pytest
 from pathlib import Path
 
+import pytest
+
 from src.translation_engine.engine import TranslationEngine
-from src.translation_engine.parser.hugo_parser import HugoParser
 from src.translation_engine.parser.ast_nodes import NodeType
+from src.translation_engine.parser.hugo_parser import HugoParser
 from src.utils.config_loader import ConfigService
-from pathlib import Path
 
 
 class TestHPIntegration:

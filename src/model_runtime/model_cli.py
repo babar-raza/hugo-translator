@@ -10,11 +10,10 @@ import argparse
 import logging
 import sys
 from pathlib import Path
-from typing import List, Optional
 
-from .model_store import ModelStore, ModelManifest
-from .registry import ModelRegistry
 from .ct2_manager import CT2ConversionManager
+from .model_store import ModelStore
+from .registry import ModelRegistry
 
 logger = logging.getLogger(__name__)
 
@@ -76,12 +75,12 @@ def cmd_sync_registry(args: argparse.Namespace) -> int:
 
     # Step 3: Display registry summary
     logger.info("\n=== Registry Summary ===")
-    logger.info(f"Main registry: config/model_registry.yaml")
+    logger.info("Main registry: config/model_registry.yaml")
     logger.info(f"Opus registry: {args.opus_output}")
     logger.info(f"Cache registry: {args.cache_output}")
     logger.info("\nTo use all registries, update your config to load:")
-    logger.info("  registry_path: config/model_registry.yaml,{},{}"
-                .format(args.opus_output, args.cache_output))
+    logger.info(f"  registry_path: config/model_registry.yaml,{args.opus_output},{args.cache_output}"
+                )
 
     return 0
 
@@ -149,7 +148,7 @@ def cmd_download(args: argparse.Namespace) -> int:
     success_count = sum(1 for success in results.values() if success)
     failure_count = len(results) - success_count
 
-    logger.info(f"\n=== Download Summary ===")
+    logger.info("\n=== Download Summary ===")
     logger.info(f"Total: {len(results)}")
     logger.info(f"Success: {success_count}")
     logger.info(f"Failed: {failure_count}")
@@ -222,7 +221,7 @@ def cmd_verify(args: argparse.Namespace) -> int:
     verified_count = sum(1 for v in results.values() if v)
     failed_count = len(results) - verified_count
 
-    logger.info(f"\n=== Verification Summary ===")
+    logger.info("\n=== Verification Summary ===")
     logger.info(f"Total: {len(results)}")
     logger.info(f"Verified: {verified_count}")
     logger.info(f"Failed: {failed_count}")
@@ -319,7 +318,7 @@ def cmd_plan(args: argparse.Namespace) -> int:
         print(f"  ⬇ {model_id} ({model_info.model_size_mb} MB)")
 
     print(f"\nTotal download size: {plan['total_size_mb']:.1f} MB")
-    print(f"\nTo download all: python -m src.model_runtime.model_cli download --all")
+    print("\nTo download all: python -m src.model_runtime.model_cli download --all")
 
     return 0
 
@@ -391,7 +390,7 @@ def cmd_convert_ct2(args: argparse.Namespace) -> int:
     failure_count = len(results) - success_count
     total_size_mb = sum(r.size_mb for r in results if r.success)
 
-    logger.info(f"\n=== Conversion Summary ===")
+    logger.info("\n=== Conversion Summary ===")
     logger.info(f"Total: {len(results)}")
     logger.info(f"Success: {success_count}")
     logger.info(f"Failed: {failure_count}")

@@ -4,9 +4,8 @@ Unit tests for CommitMessageGenerator.
 Tests path analysis, product/section detection, and message generation.
 """
 import unittest
-from pathlib import Path
 from dataclasses import dataclass, field
-from typing import List
+from pathlib import Path
 
 from src.observability.commit_message_generator import CommitMessageGenerator
 
@@ -35,7 +34,7 @@ class MockTranslationResult:
 @dataclass
 class MockDirectoryResult:
     """Mock DirectoryResult for testing."""
-    file_results: List[MockTranslationResult] = field(default_factory=list)
+    file_results: list[MockTranslationResult] = field(default_factory=list)
     success: bool = True
     directory: Path = Path(".")
     total_files: int = 0

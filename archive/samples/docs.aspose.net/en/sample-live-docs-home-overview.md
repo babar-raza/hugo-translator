@@ -34,4 +34,3 @@ Many articles include links to GitHub sample projects and related knowledge base
 This workflow is illustrated by guides like **Metered Licensing** and **How to Add Watermarks to Word Documents**, which connect narrative explanations with working C# samples.
 
 These usage patterns are evident across public content hosted on [docs.aspose.com](https://docs.aspose.com/) and the associated GitHub repositories.
-

@@ -11,7 +11,7 @@ unified TM caching and validation workflows.
 
 import logging
 from abc import ABC, abstractmethod
-from typing import Optional, Dict, Any
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -70,7 +70,7 @@ class TranslationBackend(ABC):
         """
         pass
 
-    def get_model_info(self) -> Dict[str, Any]:
+    def get_model_info(self) -> dict[str, Any]:
         """
         Get information about the model/backend.
 
@@ -167,7 +167,7 @@ class LLMBackend(TranslationBackend):
     def __init__(
         self,
         model_id: str = "claude-sonnet-4",
-        api_key: Optional[str] = None,
+        api_key: str | None = None,
         max_tokens: int = 4096,
         temperature: float = 0.3,
         **kwargs
@@ -282,7 +282,7 @@ class MockBackend(TranslationBackend):
 
 
 # Backend registry for discovery and creation
-_BACKEND_REGISTRY: Dict[str, type] = {
+_BACKEND_REGISTRY: dict[str, type] = {
     "mt": MTBackend,
     "llm": LLMBackend,
     "mock": MockBackend,
@@ -303,7 +303,7 @@ def register_backend(name: str, backend_class: type):
     logger.info(f"Registered translation backend: {name}")
 
 
-def get_backend(name: str) -> Optional[type]:
+def get_backend(name: str) -> type | None:
     """
     Get backend class by name.
 

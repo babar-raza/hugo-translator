@@ -7,12 +7,11 @@ Verifies SD-04 acceptance checks:
 - Validator detects literal block loss
 - Configurable thresholds work correctly
 """
-import pytest
 
 from src.translation_engine.validation.structure_validator import (
-    YAMLStructureValidator,
     YAMLStructureIssue,
     YAMLStructureValidationResult,
+    YAMLStructureValidator,
 )
 
 

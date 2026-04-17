@@ -1,12 +1,11 @@
 """Unit tests for resource monitor (BM-04)."""
 
-import pytest
 from datetime import datetime
 
 from src.benchmarking.resource_monitor import (
+    ResourceEstimate,
     ResourceMonitor,
     ResourceSnapshot,
-    ResourceEstimate,
 )
 
 

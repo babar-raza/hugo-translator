@@ -5,19 +5,20 @@ Tests cover ValidationDecision enum, DecisionResult dataclass,
 PostTranslationValidator abstract base class, and ValidationDecisionEngine stub.
 """
 
-import pytest
-from typing import Any, Dict, Optional
+from typing import Any
 
-from src.translation_engine.validation.post_translation_validator import (
-    ValidationDecision,
-    DecisionResult,
-    PostTranslationValidator,
+import pytest
+
+from src.translation_engine.validation.base import (
+    ValidationIssue,
+    ValidationResult,
+    ValidationSeverity,
 )
 from src.translation_engine.validation.decision_engine import ValidationDecisionEngine
-from src.translation_engine.validation.base import (
-    ValidationResult,
-    ValidationIssue,
-    ValidationSeverity,
+from src.translation_engine.validation.post_translation_validator import (
+    DecisionResult,
+    PostTranslationValidator,
+    ValidationDecision,
 )
 
 
@@ -272,7 +273,7 @@ class TestPostTranslationValidator:
                 self,
                 source: str,
                 translation: str,
-                context: Optional[Dict[str, Any]] = None,
+                context: dict[str, Any] | None = None,
             ) -> ValidationResult:
                 return ValidationResult(success=True)
 
@@ -287,7 +288,7 @@ class TestPostTranslationValidator:
                 self,
                 source: str,
                 translation: str,
-                context: Optional[Dict[str, Any]] = None,
+                context: dict[str, Any] | None = None,
             ) -> ValidationResult:
                 return ValidationResult(
                     success=True,
@@ -310,7 +311,7 @@ class TestPostTranslationValidator:
                 self,
                 source: str,
                 translation: str,
-                context: Optional[Dict[str, Any]] = None,
+                context: dict[str, Any] | None = None,
             ) -> ValidationResult:
                 if context and context.get("strict_mode"):
                     return ValidationResult(success=False, issues=[])
@@ -338,7 +339,7 @@ class TestPostTranslationValidator:
                 self,
                 source: str,
                 translation: str,
-                context: Optional[Dict[str, Any]] = None,
+                context: dict[str, Any] | None = None,
             ) -> ValidationResult:
                 return ValidationResult(
                     success=len(source) == len(translation),
@@ -359,7 +360,7 @@ class TestPostTranslationValidator:
                 self,
                 source: str,
                 translation: str,
-                context: Optional[Dict[str, Any]] = None,
+                context: dict[str, Any] | None = None,
             ) -> ValidationResult:
                 issues = []
                 if len(translation) == 0:

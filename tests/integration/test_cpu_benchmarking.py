@@ -7,7 +7,6 @@ and saves results to the database correctly.
 
 import json
 import sys
-import tempfile
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 

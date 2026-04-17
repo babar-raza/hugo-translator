@@ -144,7 +144,7 @@ class ShutdownRequested(TranslationError):
             file_path: Path to the file being translated
             segments_completed: Number of segments completed before shutdown
         """
-        message = f"Shutdown requested"
+        message = "Shutdown requested"
         if file_path:
             message += f" while translating {file_path}"
         if segments_completed > 0:

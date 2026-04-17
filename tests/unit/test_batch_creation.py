@@ -4,8 +4,9 @@ Unit tests for batch creation logic.
 Tests the batch boundary calculation and deduplication guards
 to prevent the bug found in Phase 6 where 248 files became 410 records.
 """
-import pytest
 from collections import Counter
+
+import pytest
 
 
 def create_batches(inventory: list, batch_size: int) -> list:

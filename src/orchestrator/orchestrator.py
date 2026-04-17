@@ -34,7 +34,7 @@ class TranslationOrchestrator:
         enable_file_watcher: bool = True,
         enable_sweep_scheduler: bool = True,
         sweep_interval_minutes: int = 60,
-        queue: Optional[JobQueue] = None,
+        queue: JobQueue | None = None,
         engines: Optional["SharedEngines"] = None,  # NEW: SharedEngines support
     ):
         """
@@ -92,7 +92,7 @@ class TranslationOrchestrator:
             self.queue = queue if queue is not None else JobQueue()
 
         # Initialize file watcher (if enabled)
-        self.file_watcher: Optional[FileWatcher] = None
+        self.file_watcher: FileWatcher | None = None
         if enable_file_watcher:
             self.file_watcher = FileWatcher(
                 config_service=self.config_service,
@@ -101,7 +101,7 @@ class TranslationOrchestrator:
             )
 
         # Initialize sweep scheduler (if enabled)
-        self.scheduler: Optional[SweepScheduler] = None
+        self.scheduler: SweepScheduler | None = None
         if enable_sweep_scheduler:
             self.scheduler = SweepScheduler(
                 config_service=self.config_service,
@@ -172,7 +172,7 @@ class TranslationOrchestrator:
         """
         return self.queue.enqueue(job)
 
-    def dequeue_job(self) -> Optional[TranslationJob]:
+    def dequeue_job(self) -> TranslationJob | None:
         """
         Get next job from queue.
 

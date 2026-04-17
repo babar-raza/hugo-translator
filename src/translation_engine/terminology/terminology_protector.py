@@ -7,7 +7,7 @@ This module provides the TerminologyProtector class which:
 """
 
 import re
-from typing import List
+
 from src.translation_engine.terminology.models import DetectedTerm, ProtectedSegment
 
 
@@ -32,7 +32,7 @@ class TerminologyProtector:
         """Initialize the terminology protector."""
         pass
 
-    def protect(self, text: str, detected_terms: List[DetectedTerm]) -> ProtectedSegment:
+    def protect(self, text: str, detected_terms: list[DetectedTerm]) -> ProtectedSegment:
         """Replace detected terms with placeholders.
 
         Args:

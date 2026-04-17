@@ -14,6 +14,7 @@ Bug context:
 import tempfile
 from pathlib import Path
 from unittest.mock import Mock
+
 import pytest
 
 
@@ -187,9 +188,10 @@ def test_output_path_collision_prevention():
     The engine has collision detection in _translate_directory_sequential that should
     catch issues. This test verifies the collision detection still works correctly.
     """
+    import platform
+
     from src.translation_engine.engine import TranslationEngine
     from src.utils.config_loader import ConfigService
-    import platform
 
     config_root = Path(__file__).parent.parent.parent / "config"
     config_service = ConfigService(config_root)

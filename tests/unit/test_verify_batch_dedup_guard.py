@@ -4,10 +4,10 @@ Test that verify_batch() runtime deduplication guard catches duplicates.
 
 This test validates TASK-5.3: Runtime deduplication guard in verify_batch().
 """
-import pytest
-from pathlib import Path
 import sys
-import tempfile
+from pathlib import Path
+
+import pytest
 
 # Add repo root to path
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -22,7 +22,7 @@ def test_verify_batch_dedup_guard_in_code():
         pytest.skip(f"Script not found: {script_path}")
 
     # Read the script and verify the guard is present
-    with open(script_path, 'r', encoding='utf-8') as f:
+    with open(script_path, encoding='utf-8') as f:
         content = f.read()
 
     # Check for the deduplication guard

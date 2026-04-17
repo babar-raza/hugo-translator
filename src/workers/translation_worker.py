@@ -9,23 +9,22 @@ to shared L2/L3 TM storage.
 import asyncio
 import logging
 import signal
-import sys
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from mcp.server import Server
 from mcp.server.stdio import stdio_server
-from mcp.types import Tool, TextContent
+from mcp.types import TextContent, Tool
 
 from src.model_runtime import HardwareDetector, ModelLoader, ModelRegistry
+from src.observability.logger import StructuredLogger
+from src.observability.metrics import MetricsCollector
 from src.tm import TranslationMemory
 from src.tm.l1_cache import L1Cache
 from src.tm.l2_persistent import L2PersistentTM
 from src.tm.l3_semantic import L3SemanticTM
 from src.translation_engine import TranslationEngine
 from src.utils.config_loader import ConfigService
-from src.observability.logger import StructuredLogger
-from src.observability.metrics import MetricsCollector
 
 logger = logging.getLogger(__name__)
 
@@ -46,7 +45,7 @@ class TranslationWorker:
         config_path: str = "config/global.yaml",
         site_profiles_dir: str = "config/site_profiles",
         tm_path: str = "data/tm",
-        worker_id: Optional[str] = None,
+        worker_id: str | None = None,
     ):
         """
         Initialize translation worker.
@@ -63,12 +62,12 @@ class TranslationWorker:
         self.tm_path = tm_path
 
         # Components (initialized in setup())
-        self.config_service: Optional[ConfigService] = None
-        self.tm: Optional[TranslationMemory] = None
-        self.model_loader: Optional[ModelLoader] = None
-        self.engine: Optional[TranslationEngine] = None
-        self.structured_logger: Optional[StructuredLogger] = None
-        self.metrics: Optional[MetricsCollector] = None
+        self.config_service: ConfigService | None = None
+        self.tm: TranslationMemory | None = None
+        self.model_loader: ModelLoader | None = None
+        self.engine: TranslationEngine | None = None
+        self.structured_logger: StructuredLogger | None = None
+        self.metrics: MetricsCollector | None = None
 
         # MCP Server
         self.mcp_server = Server("translation-worker")
@@ -109,9 +108,12 @@ class TranslationWorker:
             l1_cache = L1Cache(max_size=10000)  # Per-worker cache
 
             # Setup L2 persistent TM path
-            l2_path = Path(self.tm_path) / "l2_lmdb"
+            from src.tm.l2_persistent import L2_DB_NAME
+            _l2_cfg = self.config_service.get_config() if self.config_service else {}
+            _l2_max_mb = _l2_cfg.get("tm_defaults", {}).get("l2_max_size_mb", 2048)
+            l2_path = Path(self.tm_path) / L2_DB_NAME
             l2_path.mkdir(parents=True, exist_ok=True)
-            l2_persistent = L2PersistentTM(str(l2_path))
+            l2_persistent = L2PersistentTM(str(l2_path), max_size_mb=_l2_max_mb)
 
             # Setup L3 semantic TM (optional)
             l3_path = Path(self.tm_path) / "l3_faiss"
@@ -186,7 +188,7 @@ class TranslationWorker:
         """Register MCP tools for translation operations."""
 
         @self.mcp_server.list_tools()
-        async def list_tools() -> List[Tool]:
+        async def list_tools() -> list[Tool]:
             """List available translation tools."""
             return [
                 Tool(
@@ -292,7 +294,7 @@ class TranslationWorker:
             ]
 
         @self.mcp_server.call_tool()
-        async def call_tool(name: str, arguments: Dict[str, Any]) -> List[TextContent]:
+        async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
             """Handle tool calls."""
             if not self._initialized:
                 await self.setup()
@@ -354,8 +356,8 @@ class TranslationWorker:
         self,
         site_id: str,
         file_path: str,
-        target_langs: List[str],
-    ) -> Dict[str, Any]:
+        target_langs: list[str],
+    ) -> dict[str, Any]:
         """Translate a single file."""
         logger.info(f"Translating file: {file_path} for site {site_id}")
 
@@ -395,9 +397,9 @@ class TranslationWorker:
         self,
         site_id: str,
         directory_path: str,
-        target_langs: List[str],
+        target_langs: list[str],
         recursive: bool = True,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Translate all files in a directory."""
         logger.info(f"Translating directory: {directory_path} for site {site_id}")
 
@@ -438,7 +440,7 @@ class TranslationWorker:
         source_text: str,
         source_lang: str,
         target_lang: str,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Look up exact translation in TM."""
         from src.tm.models import LookupRequest
 
@@ -472,7 +474,7 @@ class TranslationWorker:
         source_lang: str,
         target_lang: str,
         k: int = 5,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Find similar translations using semantic search."""
         from src.tm.models import LookupRequest
 
@@ -499,7 +501,7 @@ class TranslationWorker:
             ],
         }
 
-    async def _health_check(self) -> Dict[str, Any]:
+    async def _health_check(self) -> dict[str, Any]:
         """Check worker health."""
         return {
             "status": "healthy" if self._initialized else "initializing",
@@ -510,7 +512,7 @@ class TranslationWorker:
             "model_loaded": self.model_loader.has_loaded_models() if self.model_loader else False,
         }
 
-    async def _get_stats(self) -> Dict[str, Any]:
+    async def _get_stats(self) -> dict[str, Any]:
         """Get worker statistics."""
         stats = {
             "worker_id": self.worker_id,

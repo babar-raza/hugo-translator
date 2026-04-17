@@ -2,9 +2,10 @@
 
 SR-01: Centralized test fixtures to eliminate repetitive imports.
 """
-import pytest
 import sys
 from pathlib import Path
+
+import pytest
 
 # Add src to path once for all integration tests
 src_path = Path(__file__).parent.parent.parent / "src"
@@ -30,11 +31,11 @@ def progress_tracker_class():
 def atomic_write_module():
     """Load atomic_write module components."""
     from utils.atomic_write import (
-        atomic_write,
         AtomicWriteError,
         DiskFullError,
         InvalidPathError,
         ReadOnlyFilesystemError,
+        atomic_write,
     )
     return {
         'atomic_write': atomic_write,

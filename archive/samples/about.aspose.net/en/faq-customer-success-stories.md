@@ -30,4 +30,3 @@ Specific incentives can be confirmed with the sales team when you submit your st
 **Q5. How are customer names and quotes used in success stories?**  
 Published success stories typically include the customer’s name, organization, and a short quote describing their experience using Aspose products.  
 These details are taken from submissions and are published with the customer’s consent, consistent with Aspose’s [Privacy Policy](https://about.aspose.com/legal/privacy-policy/).
-

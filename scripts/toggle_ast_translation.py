@@ -21,22 +21,22 @@ Usage:
 import argparse
 import sys
 from pathlib import Path
-from typing import List, Dict, Optional
+
 import yaml
 
 
-def find_site_profiles(config_dir: Path) -> List[Path]:
+def find_site_profiles(config_dir: Path) -> list[Path]:
     """Find all site profile YAML files."""
     return list(config_dir.glob("*.yaml"))
 
 
-def load_site_profile(profile_path: Path) -> Dict:
+def load_site_profile(profile_path: Path) -> dict:
     """Load a site profile YAML file."""
-    with open(profile_path, "r", encoding="utf-8") as f:
+    with open(profile_path, encoding="utf-8") as f:
         return yaml.safe_load(f)
 
 
-def save_site_profile(profile_path: Path, config: Dict) -> None:
+def save_site_profile(profile_path: Path, config: dict) -> None:
     """Save a site profile YAML file."""
     with open(profile_path, "w", encoding="utf-8") as f:
         yaml.safe_dump(config, f, default_flow_style=False, sort_keys=False, allow_unicode=True)
@@ -84,7 +84,7 @@ def toggle_ast_translation(profile_path: Path, enable: bool, dry_run: bool = Fal
     return True
 
 
-def get_ast_status(profile_path: Path) -> Dict[str, any]:
+def get_ast_status(profile_path: Path) -> dict[str, any]:
     """
     Get AST translation status for a site profile.
 
@@ -102,7 +102,7 @@ def get_ast_status(profile_path: Path) -> Dict[str, any]:
     }
 
 
-def print_status(status_list: List[Dict]) -> None:
+def print_status(status_list: list[dict]) -> None:
     """Print status of multiple sites in a formatted table."""
     print("\n{:<30} {:<12} {:<15} {:<12}".format("Site ID", "AST Enabled", "Strategy", "Batch Size"))
     print("-" * 70)
@@ -216,7 +216,7 @@ def main():
         target_profile = args.config_dir / f"{args.site}.yaml"
         if not target_profile.exists():
             print(f"ERROR: Site profile not found: {target_profile}")
-            print(f"\nAvailable sites:")
+            print("\nAvailable sites:")
             for profile in sorted(all_profiles):
                 print(f"  - {profile.stem}")
             sys.exit(1)
@@ -261,7 +261,7 @@ def main():
             print("  2. Monitor telemetry (ast_translation_* metrics)")
             print("  3. Check logs for errors or warnings")
             print("  4. Verify translation quality with spot checks")
-            print(f"\nSee docs/ast_translation_rollout.md for detailed rollout procedures.")
+            print("\nSee docs/ast_translation_rollout.md for detailed rollout procedures.")
         else:
             print("\nAST translation disabled. Sites will use legacy reconstruction.")
 

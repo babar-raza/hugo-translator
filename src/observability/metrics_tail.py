@@ -16,10 +16,10 @@ import json
 import sys
 import time
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any
 
 
-def format_eta(eta_s: Optional[float]) -> str:
+def format_eta(eta_s: float | None) -> str:
     """Format ETA as human-readable string."""
     if eta_s is None or eta_s < 0:
         return "calculating..."
@@ -48,7 +48,7 @@ def format_duration(seconds: float) -> str:
     return f"{hours}h {mins}m {secs}s"
 
 
-def format_compact(data: Dict[str, Any]) -> str:
+def format_compact(data: dict[str, Any]) -> str:
     """Format metrics as compact single line."""
     overall = data.get("overall", {})
     files = data.get("files", {})
@@ -78,7 +78,7 @@ def format_compact(data: Dict[str, Any]) -> str:
     )
 
 
-def format_detailed(data: Dict[str, Any]) -> str:
+def format_detailed(data: dict[str, Any]) -> str:
     """Format metrics as detailed multi-line output."""
     lines = []
 
@@ -95,13 +95,13 @@ def format_detailed(data: Dict[str, Any]) -> str:
     overall = data.get("overall", {})
     pct_files = overall.get("percent_complete_files", 0)
     pct_segs = overall.get("percent_complete_segments", 0)
-    lines.append(f"\nProgress:")
+    lines.append("\nProgress:")
     lines.append(f"  Files:    {pct_files:.1f}% complete")
     lines.append(f"  Segments: {pct_segs:.1f}% complete")
 
     # Files
     files = data.get("files", {})
-    lines.append(f"\nFiles:")
+    lines.append("\nFiles:")
     lines.append(f"  Total:   {files.get('total', 0)}")
     lines.append(f"  Done:    {files.get('done', 0)}")
     lines.append(f"  Failed:  {files.get('failed', 0)}")
@@ -111,14 +111,14 @@ def format_detailed(data: Dict[str, Any]) -> str:
 
     # Segments
     segments = data.get("segments", {})
-    lines.append(f"\nSegments:")
+    lines.append("\nSegments:")
     lines.append(f"  Total:  {segments.get('total', 0)}")
     lines.append(f"  Done:   {segments.get('done', 0)}")
     lines.append(f"  Failed: {segments.get('failed', 0)}")
 
     # Performance
     perf = data.get("performance", {})
-    lines.append(f"\nPerformance:")
+    lines.append("\nPerformance:")
     lines.append(f"  Rate (rolling):  {perf.get('segments_per_sec_rolling', 0):.2f} segs/sec")
     lines.append(f"  Rate (lifetime): {perf.get('segments_per_sec_lifetime', 0):.2f} segs/sec")
     lines.append(f"  Files/min:       {perf.get('files_per_min', 0):.2f}")
@@ -128,7 +128,7 @@ def format_detailed(data: Dict[str, Any]) -> str:
     # Cache
     cache = data.get("cache", {})
     hit_rate = cache.get("hit_rate", 0) * 100
-    lines.append(f"\nCache:")
+    lines.append("\nCache:")
     lines.append(f"  Hit Rate: {hit_rate:.1f}%")
     lines.append(f"  Hits:     {cache.get('hits', 0)} (L1: {cache.get('l1_hits', 0)}, L2: {cache.get('l2_hits', 0)}, L3: {cache.get('l3_hits', 0)})")
     lines.append(f"  Misses:   {cache.get('misses', 0)}")
@@ -136,7 +136,7 @@ def format_detailed(data: Dict[str, Any]) -> str:
     # Translation
     translation = data.get("translation", {})
     if translation.get("model"):
-        lines.append(f"\nTranslation:")
+        lines.append("\nTranslation:")
         lines.append(f"  Model:    {translation.get('model', 'unknown')}")
         lines.append(f"  Device:   {translation.get('device', 'unknown')}")
         lines.append(f"  Tokens:   {translation.get('tokens_in', 0):,} in, {translation.get('tokens_out', 0):,} out")
@@ -188,7 +188,7 @@ def tail_file(path: Path, mode: str = "detailed", poll_interval: float = 0.5) ->
                 last_mtime = current_mtime
 
                 # Read new lines
-                with open(path, "r", encoding="utf-8") as f:
+                with open(path, encoding="utf-8") as f:
                     f.seek(position)
                     new_lines = f.readlines()
                     position = f.tell()

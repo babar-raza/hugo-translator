@@ -7,10 +7,10 @@ site profiles, global config, validation/terminology config across execution mod
 
 import logging
 from pathlib import Path
-from typing import Dict, List, Optional, Any
+from typing import Any
 
 from src.utils.config_loader import ConfigService
-from src.utils.models import SiteProfile, GlobalConfig, ValidationConfig, TerminologyConfig
+from src.utils.models import GlobalConfig, SiteProfile, TerminologyConfig, ValidationConfig
 
 logger = logging.getLogger(__name__)
 
@@ -47,7 +47,7 @@ class ProfileEngine:
         )
     """
 
-    def __init__(self, config_root: Optional[str | Path] = None):
+    def __init__(self, config_root: str | Path | None = None):
         """Initialize profile engine."""
         # Default to config/ directory
         if config_root is None:
@@ -92,7 +92,7 @@ class ProfileEngine:
         )
         return profile
 
-    def list_sites(self) -> List[str]:
+    def list_sites(self) -> list[str]:
         """
         List all configured site IDs.
 
@@ -113,7 +113,7 @@ class ProfileEngine:
         site_id: str,
         config_type: str,
         use_cache: bool = True
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Resolve merged configuration for a site.
 
@@ -186,7 +186,7 @@ class ProfileEngine:
         logger.debug("Retrieved global config")
         return config
 
-    def get_raw_config(self) -> Dict[str, Any]:
+    def get_raw_config(self) -> dict[str, Any]:
         """
         Get raw global configuration dictionary.
 
@@ -232,7 +232,7 @@ class ProfileEngine:
         self.config_service.clear_cache()
         logger.debug("Cleared profile cache")
 
-    def validate_all_profiles(self) -> Dict[str, List[str]]:
+    def validate_all_profiles(self) -> dict[str, list[str]]:
         """
         Validate all site profiles.
 
@@ -253,7 +253,7 @@ class ProfileEngine:
         if errors:
             logger.warning(f"Found errors in {len(errors)} profiles")
         else:
-            logger.debug(f"Validated all profiles successfully")
+            logger.debug("Validated all profiles successfully")
         return errors
 
     def get_validation_config(
@@ -301,7 +301,7 @@ class ProfileEngine:
     def get_metrics_config(
         self,
         use_cache: bool = True
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Get metrics configuration.
 

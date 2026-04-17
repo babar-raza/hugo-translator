@@ -7,8 +7,6 @@ Tests verify that:
 3. Resume correctly identifies pending work
 """
 import json
-import pytest
-from pathlib import Path
 
 
 class TestGracefulShutdown:

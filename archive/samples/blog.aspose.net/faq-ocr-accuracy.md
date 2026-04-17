@@ -30,4 +30,3 @@ Metrics such as character or word accuracy can help quantify improvements.
 **Q5. Where can I find code samples to implement these recommendations?**
 The blog article links to Aspose.OCR documentation and sample projects that show preprocessing and recognition in code.
 These resources demonstrate how to integrate the suggested techniques into .NET applications.
-

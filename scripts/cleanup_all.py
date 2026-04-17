@@ -1,12 +1,11 @@
 #!/usr/bin/env python3
 """Comprehensive cleanup: remove all unused models and caches."""
 import argparse
+import importlib.util
 import json
 import shutil
 import sys
 from pathlib import Path
-from typing import List, Dict
-import importlib.util
 
 
 def load_module_directly(module_name, module_path):
@@ -17,7 +16,7 @@ def load_module_directly(module_name, module_path):
     return module
 
 
-def find_cache_directories(project_root: Path) -> List[Path]:
+def find_cache_directories(project_root: Path) -> list[Path]:
     """Find cache directories to clean.
 
     Args:
@@ -59,7 +58,7 @@ def find_cache_directories(project_root: Path) -> List[Path]:
     return cache_dirs
 
 
-def calculate_total_size(paths: List[Path]) -> float:
+def calculate_total_size(paths: list[Path]) -> float:
     """Calculate total size of paths in MB.
 
     Args:
@@ -83,7 +82,7 @@ def calculate_total_size(paths: List[Path]) -> float:
     return total / (1024 * 1024)
 
 
-def confirm_cleanup(plan: Dict):
+def confirm_cleanup(plan: dict):
     """Prompt user for confirmation.
 
     Args:
@@ -124,7 +123,7 @@ def confirm_cleanup(plan: Dict):
     return response in ['yes', 'y']
 
 
-def cleanup_caches(cache_paths: List[Path]) -> Dict:
+def cleanup_caches(cache_paths: list[Path]) -> dict:
     """Remove cache directories.
 
     Args:
@@ -161,7 +160,7 @@ def cleanup_caches(cache_paths: List[Path]) -> Dict:
     }
 
 
-def cleanup_models(models, disk_manager, inventory_manager=None) -> Dict:
+def cleanup_models(models, disk_manager, inventory_manager=None) -> dict:
     """Remove models.
 
     Args:

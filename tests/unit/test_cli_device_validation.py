@@ -3,9 +3,8 @@ Unit tests for CLI device validation logic (T102: federated-splashing-panda).
 
 Tests device override and CUDA availability validation in translate_site().
 """
-import argparse
-from pathlib import Path
-from unittest.mock import MagicMock, patch, call
+from unittest.mock import MagicMock, patch
+
 import pytest
 
 

@@ -5,7 +5,6 @@ Recommends optimal model configurations based on hardware and requirements.
 
 import logging
 from dataclasses import dataclass
-from typing import Dict, List, Optional
 
 from src.benchmarking.feedback import AdaptiveWeightLearner, RecommendationFeedback
 from src.benchmarking.storage import BenchmarkDatabase
@@ -40,12 +39,12 @@ class ModelRecommender:
         """
         self.db = db
         self.weight_learner = AdaptiveWeightLearner(db, learning_rate)
-        self._active_recommendations: Dict[str, ModelRecommendation] = {}
+        self._active_recommendations: dict[str, ModelRecommendation] = {}
 
     def recommend(
         self,
         system_info: SystemInfo,
-        requirements: Optional[Dict[str, any]] = None,
+        requirements: dict[str, any] | None = None,
     ) -> ModelRecommendation:
         """Generate a model recommendation based on system and requirements.
 
@@ -136,10 +135,10 @@ class ModelRecommender:
     def get_oom_safe_batch_size(
         self,
         device: str,
-        max_memory_mb: Optional[float] = None,
+        max_memory_mb: float | None = None,
         safety_margin: float = 0.20,
         min_samples: int = 3
-    ) -> Dict[str, any]:
+    ) -> dict[str, any]:
         """Recommend OOM-safe batch size based on historical peak memory.
 
         Args:
@@ -240,7 +239,7 @@ class ModelRecommender:
             'warning': 'Insufficient GPU memory - consider smaller model or CPU'
         }
 
-    def _detect_gpu_memory(self, device: str) -> Optional[float]:
+    def _detect_gpu_memory(self, device: str) -> float | None:
         """Auto-detect total GPU memory in MB.
 
         Args:
@@ -266,7 +265,7 @@ class ModelRecommender:
 
     def _conservative_fallback(
         self, device: str, max_memory_mb: float, safety_margin: float
-    ) -> Dict[str, any]:
+    ) -> dict[str, any]:
         """Ultra-conservative fallback when no safe batch size found.
 
         Args:
@@ -286,7 +285,7 @@ class ModelRecommender:
             'warning': 'No historical data within memory limit - using conservative defaults'
         }
 
-    def _find_similar_runs(self, system_info: SystemInfo) -> List:
+    def _find_similar_runs(self, system_info: SystemInfo) -> list:
         """Find benchmark runs from similar systems.
 
         Args:
@@ -314,7 +313,7 @@ class ModelRecommender:
         return similar_runs
 
     def _calculate_score(
-        self, run, weights: Dict[str, float], requirements: Dict[str, any]
+        self, run, weights: dict[str, float], requirements: dict[str, any]
     ) -> float:
         """Calculate weighted score for a benchmark run.
 
@@ -389,7 +388,7 @@ class ModelRecommender:
         return max((r.peak_memory_mb for r in run.results if r.peak_memory_mb), default=0.0)
 
     def _generate_reasoning(
-        self, run, score: float, weights: Dict[str, float]
+        self, run, score: float, weights: dict[str, float]
     ) -> str:
         """Generate human-readable reasoning for recommendation.
 
@@ -415,7 +414,7 @@ class ModelRecommender:
         return f"Recommended based on: {', '.join(reasons)}"
 
     def _default_recommendation(
-        self, system_info: SystemInfo, requirements: Dict[str, any]
+        self, system_info: SystemInfo, requirements: dict[str, any]
     ) -> ModelRecommendation:
         """Generate default recommendation when no historical data available.
 

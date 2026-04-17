@@ -10,11 +10,9 @@ Tests cover:
 - Edge cases (empty source, very short segments)
 """
 
-import pytest
-from typing import Any
 
-from src.translation_engine.validation.length_anomaly_validator import LengthAnomalyValidator
 from src.translation_engine.validation.base import ValidationSeverity
+from src.translation_engine.validation.length_anomaly_validator import LengthAnomalyValidator
 
 
 class TestLengthAnomalyValidator:

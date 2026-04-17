@@ -7,14 +7,12 @@ requiring full model loading.
 """
 
 import json
-import os
 import sys
-import time
 import threading
-import pytest
 from pathlib import Path
-from typing import Dict
 from unittest import mock
+
+import pytest
 
 # Add src directory to path
 src_path = Path(__file__).parent.parent.parent / "src"
@@ -198,8 +196,9 @@ class TestErrorHandlingIntegration:
 
     def test_disk_full_error_propagates(self, tmp_path):
         """Test disk full error propagates correctly."""
-        from utils.atomic_write import atomic_write, DiskFullError
         import errno
+
+        from utils.atomic_write import DiskFullError, atomic_write
 
         file_path = tmp_path / "test.txt"
 
@@ -212,8 +211,9 @@ class TestErrorHandlingIntegration:
 
     def test_invalid_path_error_propagates(self, tmp_path):
         """Test invalid path error propagates correctly."""
-        from utils.atomic_write import atomic_write, InvalidPathError
         import errno
+
+        from utils.atomic_write import InvalidPathError, atomic_write
 
         file_path = tmp_path / "test.txt"
 

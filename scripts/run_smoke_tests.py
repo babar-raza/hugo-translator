@@ -18,7 +18,6 @@ import subprocess
 import sys
 import time
 from pathlib import Path
-from typing import List, Optional, Tuple
 
 
 class SmokeTestRunner:
@@ -31,11 +30,11 @@ class SmokeTestRunner:
 
     def run_pytest(
         self,
-        test_files: Optional[List[str]] = None,
-        markers: Optional[str] = None,
+        test_files: list[str] | None = None,
+        markers: str | None = None,
         verbose: bool = True,
         parallel: bool = False
-    ) -> Tuple[int, str, float]:
+    ) -> tuple[int, str, float]:
         """
         Run pytest with specified options.
 

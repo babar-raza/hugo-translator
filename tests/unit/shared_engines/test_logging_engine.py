@@ -4,16 +4,15 @@ Unit tests for LoggingEngine.
 Tests logging wrapper with mocked StructuredLogger.
 """
 
-import unittest
-from unittest.mock import Mock, patch, MagicMock
-from pathlib import Path
 import sys
+import unittest
+from pathlib import Path
+from unittest.mock import Mock, patch
 
 # Add src to path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent / "src"))
 
 from src.shared_engines.logging_engine import LoggingEngine, get_logging_engine
-from src.observability.logger import LogContext
 
 
 class TestLoggingEngine(unittest.TestCase):

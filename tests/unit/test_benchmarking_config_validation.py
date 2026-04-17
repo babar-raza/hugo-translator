@@ -2,8 +2,6 @@
 
 import logging
 
-import pytest
-
 # Import the validation function
 import sys
 from pathlib import Path

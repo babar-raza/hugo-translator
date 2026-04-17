@@ -14,11 +14,12 @@ Key Guarantees:
 5. --force-accept accepts all translations without validation
 """
 
-import pytest
-from pathlib import Path
-from unittest.mock import Mock, MagicMock, patch
-from argparse import Namespace
 import sys
+from argparse import Namespace
+from pathlib import Path
+from unittest.mock import Mock
+
+import pytest
 
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 

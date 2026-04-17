@@ -7,8 +7,7 @@ import logging
 import re
 from dataclasses import dataclass, field
 from enum import Enum
-from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 import yaml
 
@@ -41,7 +40,7 @@ class GateResult:
     message: str
     """Human-readable description of the result."""
 
-    details: Dict[str, Any] = field(default_factory=dict)
+    details: dict[str, Any] = field(default_factory=dict)
     """Additional details about the check (metrics, thresholds, etc.)."""
 
     def __str__(self) -> str:
@@ -58,13 +57,13 @@ class GateResult:
 class GateReport:
     """Collection of quality gate results."""
 
-    results: List[GateResult]
+    results: list[GateResult]
     """Individual gate results."""
 
-    file_path: Optional[str] = None
+    file_path: str | None = None
     """File that was checked."""
 
-    target_lang: Optional[str] = None
+    target_lang: str | None = None
     """Target language code."""
 
     def has_failures(self) -> bool:
@@ -75,7 +74,7 @@ class GateReport:
         """Check if any gates warned."""
         return any(r.status == GateStatus.WARN for r in self.results)
 
-    def get_summary(self) -> Dict[str, int]:
+    def get_summary(self) -> dict[str, int]:
         """Get count of each status."""
         return {
             "pass": sum(1 for r in self.results if r.status == GateStatus.PASS),
@@ -128,7 +127,7 @@ class GateReport:
         lines.append("=" * 80)
         return "\n".join(lines)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert report to dictionary (for JSON serialization)."""
         return {
             "file_path": self.file_path,
@@ -165,8 +164,8 @@ class QualityGate:
         self,
         source_content: str,
         target_content: str,
-        source_doc: Optional[Any] = None,
-        target_doc: Optional[Any] = None,
+        source_doc: Any | None = None,
+        target_doc: Any | None = None,
         **kwargs
     ) -> GateResult:
         """
@@ -215,8 +214,8 @@ class LineCountGate(QualityGate):
         self,
         source_content: str,
         target_content: str,
-        source_doc: Optional[Any] = None,
-        target_doc: Optional[Any] = None,
+        source_doc: Any | None = None,
+        target_doc: Any | None = None,
         **kwargs
     ) -> GateResult:
         """Check line count ratio."""
@@ -376,8 +375,8 @@ class ListStructureGate(QualityGate):
         self,
         source_content: str,
         target_content: str,
-        source_doc: Optional[Any] = None,
-        target_doc: Optional[Any] = None,
+        source_doc: Any | None = None,
+        target_doc: Any | None = None,
         **kwargs
     ) -> GateResult:
         """Check list structure preservation."""
@@ -515,8 +514,8 @@ class MarkdownSyntaxGate(QualityGate):
         self,
         source_content: str,
         target_content: str,
-        source_doc: Optional[Any] = None,
-        target_doc: Optional[Any] = None,
+        source_doc: Any | None = None,
+        target_doc: Any | None = None,
         **kwargs
     ) -> GateResult:
         """Check markdown syntax validity."""
@@ -576,7 +575,7 @@ class MarkdownSyntaxGate(QualityGate):
 class GateRunner:
     """Runs multiple quality gates and generates a report."""
 
-    def __init__(self, gates: List[QualityGate]):
+    def __init__(self, gates: list[QualityGate]):
         """
         Initialize gate runner.
 
@@ -589,8 +588,8 @@ class GateRunner:
         self,
         source_content: str,
         target_content: str,
-        file_path: Optional[str] = None,
-        target_lang: Optional[str] = None,
+        file_path: str | None = None,
+        target_lang: str | None = None,
         **kwargs
     ) -> GateReport:
         """
@@ -637,7 +636,7 @@ class GateRunner:
         )
 
 
-def get_default_gates() -> List[QualityGate]:
+def get_default_gates() -> list[QualityGate]:
     """
     Get default quality gates with standard thresholds.
 

@@ -27,7 +27,7 @@ Example:
 """
 
 import re
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from .base import ValidationIssue, ValidationResult, ValidationSeverity
 from .post_translation_validator import PostTranslationValidator
@@ -68,7 +68,7 @@ class LengthAnomalyValidator(PostTranslationValidator):
         "zh": 0.7,  # Chinese is compact
     }
 
-    def __init__(self, config: Optional[Dict[str, Any]] = None):
+    def __init__(self, config: dict[str, Any] | None = None):
         """Initialize length anomaly validator.
 
         Args:
@@ -104,7 +104,7 @@ class LengthAnomalyValidator(PostTranslationValidator):
         self,
         source: str,
         translation: str,
-        context: Optional[Dict[str, Any]] = None,
+        context: dict[str, Any] | None = None,
     ) -> ValidationResult:
         """Validate translation for length anomalies.
 
@@ -180,7 +180,7 @@ class LengthAnomalyValidator(PostTranslationValidator):
         translation_text: str,
         multiplier: float,
         segment_id: int,
-    ) -> List[ValidationIssue]:
+    ) -> list[ValidationIssue]:
         """Check character-level length ratio for anomalies.
 
         Args:
@@ -250,7 +250,7 @@ class LengthAnomalyValidator(PostTranslationValidator):
         translation_text: str,
         multiplier: float,
         segment_id: int,
-    ) -> List[ValidationIssue]:
+    ) -> list[ValidationIssue]:
         """Check word-level length ratio for anomalies.
 
         Args:
@@ -314,7 +314,7 @@ class LengthAnomalyValidator(PostTranslationValidator):
 
         return issues
 
-    def _tokenize(self, text: str) -> List[str]:
+    def _tokenize(self, text: str) -> list[str]:
         """Tokenize text into words.
 
         Args:

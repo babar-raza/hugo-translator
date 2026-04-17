@@ -58,7 +58,7 @@ expected5 = {
         ]
     }
 }
-assert data5 == expected5, f"Test 5 failed"
+assert data5 == expected5, "Test 5 failed"
 print("[PASS] Test 5 passed\n")
 
 print("=" * 50)

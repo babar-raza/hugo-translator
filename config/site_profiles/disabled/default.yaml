@@ -317,7 +317,3 @@ schema:
     - site: docs.aspose.net
       description: "Technical documentation with normal validation"
       validation_mode: normal
-
-    - site: reference.aspose.net
-      description: "API reference with strict validation"
-      validation_mode: strict

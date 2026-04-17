@@ -10,9 +10,8 @@ import logging
 import sys
 import uuid
 from contextvars import ContextVar
-from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any
 
 import structlog
 
@@ -23,9 +22,9 @@ from src.translation_engine.extractor.segment_extractor import Segment
 from src.translation_engine.models import TranslationResult
 
 # Context variables for correlation tracking
-correlation_id_var: ContextVar[Optional[str]] = ContextVar("correlation_id", default=None)
-job_id_var: ContextVar[Optional[str]] = ContextVar("job_id", default=None)
-worker_id_var: ContextVar[Optional[str]] = ContextVar("worker_id", default=None)
+correlation_id_var: ContextVar[str | None] = ContextVar("correlation_id", default=None)
+job_id_var: ContextVar[str | None] = ContextVar("job_id", default=None)
+worker_id_var: ContextVar[str | None] = ContextVar("worker_id", default=None)
 
 
 def add_correlation_context(logger, method_name, event_dict):
@@ -117,7 +116,7 @@ _logging_configured = False
 
 def setup_structured_logging(
     log_level: str = "INFO",
-    log_file: Optional[Path] = None,
+    log_file: Path | None = None,
     console_output: bool = True,
     max_bytes: int = 100 * 1024 * 1024,  # 100MB default
     backup_count: int = 10,  # Keep 10 rotated files
@@ -228,9 +227,9 @@ class LogContext:
 
     def __init__(
         self,
-        correlation_id: Optional[str] = None,
-        job_id: Optional[str] = None,
-        worker_id: Optional[str] = None,
+        correlation_id: str | None = None,
+        job_id: str | None = None,
+        worker_id: str | None = None,
     ):
         """
         Initialize log context.
@@ -403,7 +402,7 @@ class StructuredLogger:
         segment: Segment,
         tm_result: LookupResult,
         translation: str,
-        model_used: Optional[str] = None,
+        model_used: str | None = None,
     ) -> None:
         """
         Log individual segment translation (for flow artifacts).
@@ -697,7 +696,7 @@ class StructuredLogger:
         model_name: str,
         device: str,
         load_time_seconds: float,
-        model_size_mb: Optional[float] = None,
+        model_size_mb: float | None = None,
     ) -> None:
         """
         Log model loading completion.
@@ -722,7 +721,7 @@ class StructuredLogger:
         model_name: str,
         batch_size: int,
         inference_time_seconds: float,
-        tokens_per_second: Optional[float] = None,
+        tokens_per_second: float | None = None,
     ) -> None:
         """
         Log model inference batch.
@@ -751,7 +750,7 @@ class StructuredLogger:
         memory_allocated_mb: float,
         memory_reserved_mb: float,
         memory_total_mb: float,
-        utilization_percent: Optional[float] = None,
+        utilization_percent: float | None = None,
     ) -> None:
         """
         Log GPU statistics.
@@ -787,7 +786,7 @@ class StructuredLogger:
         translation: str,
         passed: bool,
         severity: str,
-        message: Optional[str] = None,
+        message: str | None = None,
     ) -> None:
         """
         Log validation check result.
@@ -906,7 +905,7 @@ class StructuredLogger:
 
     # ===== Generic Logging Methods =====
 
-    def log_error(self, context: Dict[str, Any], error: Exception) -> None:
+    def log_error(self, context: dict[str, Any], error: Exception) -> None:
         """
         Log error with full context and stack trace.
 
@@ -956,7 +955,7 @@ class StructuredLogger:
 
 
 # Global logger instance
-_global_logger: Optional[StructuredLogger] = None
+_global_logger: StructuredLogger | None = None
 
 
 def get_logger(name: str = "translation_system") -> StructuredLogger:

@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """Update model inventory database."""
 import argparse
+import importlib.util
 import json
 import sys
 from pathlib import Path
-import importlib.util
 
 
 def load_module_directly(module_name, module_path):

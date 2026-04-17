@@ -11,10 +11,9 @@ Tests cover:
 
 import sys
 import time
-import pytest
-from pathlib import Path
 from unittest import mock
-import threading
+
+import pytest
 
 # Mock heavy dependencies before importing the module
 sys.modules['faiss'] = mock.MagicMock()

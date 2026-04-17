@@ -1,16 +1,17 @@
 """Tests for database concurrency and WAL mode (SR-06)."""
 
-import pytest
 import sqlite3
 import tempfile
 import threading
 import time
 from pathlib import Path
 
+import pytest
+
 from src.benchmarking.storage import (
     BenchmarkDatabase,
-    BenchmarkRun,
     BenchmarkResult,
+    BenchmarkRun,
     SystemInfo,
 )
 

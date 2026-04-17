@@ -10,15 +10,16 @@ Key test cases:
 3. End-to-end: Bold and italic counts are preserved in translation
 """
 
-import pytest
-from pathlib import Path
 import sys
+from pathlib import Path
+
+import pytest
 
 # Add src to path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
+from src.translation_engine.parser.ast_nodes import NodeType
 from src.translation_engine.parser.hugo_parser import HugoParser
-from src.translation_engine.parser.ast_nodes import ASTNode, NodeType
 
 
 @pytest.fixture

@@ -6,11 +6,11 @@ Translates markdown files from D:/onedrive/Documents/GitHub/aspose.net/content/p
 to all target locales with full telemetry tracking.
 """
 
-import sys
 import os
+import sys
 import time
-from pathlib import Path
 from datetime import datetime
+from pathlib import Path
 
 # Add src to path
 REPO_ROOT = Path(__file__).parent.parent
@@ -19,6 +19,7 @@ os.chdir(str(REPO_ROOT))
 
 # Set up logging
 import logging
+
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
@@ -51,16 +52,17 @@ def run_translation_with_telemetry():
     # Import components
     print("\n[1/6] Importing components...")
     try:
-        from src.translation_engine import TranslationEngine
-        from src.utils.config_loader import ConfigService
+        import torch
+
+        from src.model_runtime import ModelLoader
+        from src.model_runtime.registry import ModelRegistry
+        from src.observability.telemetry_integration import configure_telemetry, get_telemetry
         from src.tm import TranslationMemory
         from src.tm.l1_cache import L1Cache
         from src.tm.l2_persistent import L2PersistentTM
         from src.tm.l3_semantic import L3SemanticTM
-        from src.model_runtime import ModelLoader
-        from src.model_runtime.registry import ModelRegistry
-        from src.observability.telemetry_integration import get_telemetry, configure_telemetry
-        import torch
+        from src.translation_engine import TranslationEngine
+        from src.utils.config_loader import ConfigService
         print("   OK: All components imported")
     except ImportError as e:
         print(f"   ERROR: Import failed: {e}")
@@ -76,10 +78,10 @@ def run_translation_with_telemetry():
             enabled=True
         )
         if telemetry.is_available():
-            print(f"   OK: Telemetry ACTIVE (TEL-03 integration)")
+            print("   OK: Telemetry ACTIVE (TEL-03 integration)")
             print(f"   OK: Agent: {telemetry.agent_name}")
         else:
-            print(f"   WARNING: Telemetry not available (continuing without tracking)")
+            print("   WARNING: Telemetry not available (continuing without tracking)")
     except Exception as e:
         print(f"   WARNING: Telemetry initialization warning: {e}")
         telemetry = None
@@ -98,12 +100,12 @@ def run_translation_with_telemetry():
         lmdb_path = REPO_ROOT / "data" / "tm" / "l2_lmdb"
         lmdb_path.parent.mkdir(parents=True, exist_ok=True)
         l2_persistent = L2PersistentTM(str(lmdb_path))
-        print(f"   OK: L2PersistentTM initialized")
+        print("   OK: L2PersistentTM initialized")
 
         faiss_path = REPO_ROOT / "data" / "tm" / "l3_faiss"
         faiss_path.mkdir(parents=True, exist_ok=True)
         l3_semantic = L3SemanticTM(index_path=str(faiss_path))
-        print(f"   OK: L3SemanticTM initialized")
+        print("   OK: L3SemanticTM initialized")
 
         tm = TranslationMemory(l1_cache=l1_cache, l2_persistent=l2_persistent, l3_semantic=l3_semantic)
         print("   OK: TranslationMemory initialized (L1+L2+L3)")
@@ -135,11 +137,11 @@ def run_translation_with_telemetry():
         return None
 
     # Verify source directory
-    print(f"\n[4/6] Scanning source directory...")
+    print("\n[4/6] Scanning source directory...")
     print(f"   Path: {SOURCE_DIR}")
 
     if not SOURCE_DIR.exists():
-        print(f"   ERROR: Source directory does not exist!")
+        print("   ERROR: Source directory does not exist!")
         return None
 
     # Find all markdown files (recursive)
@@ -147,11 +149,11 @@ def run_translation_with_telemetry():
     print(f"   OK: Found {len(md_files)} markdown files")
 
     if len(md_files) == 0:
-        print(f"   ERROR: No markdown files found!")
+        print("   ERROR: No markdown files found!")
         return None
 
     # Show first 10 files
-    print(f"\n   Files to translate (showing first 10):")
+    print("\n   Files to translate (showing first 10):")
     for f in md_files[:10]:
         rel_path = f.relative_to(SOURCE_DIR)
         size_kb = f.stat().st_size / 1024
@@ -304,7 +306,7 @@ def run_translation_with_telemetry():
     results["end_time"] = end_time.isoformat()
     results["duration_seconds"] = duration
 
-    print(f"\n[6/6] Summary")
+    print("\n[6/6] Summary")
     print("=" * 80)
     print(f"Duration: {duration:.1f}s ({duration/60:.1f} minutes)")
     print(f"Files processed: {len(md_files)}")
@@ -313,7 +315,7 @@ def run_translation_with_telemetry():
     print(f"Successful: {results['successful']}")
     print(f"Failed: {results['failed']}")
 
-    print(f"\nSegment Statistics:")
+    print("\nSegment Statistics:")
     print(f"  Total segments: {results['total_segments']:,}")
     print(f"  TM hits: {results['total_tm_hits']:,}")
     print(f"    - L1 hits: {results['total_l1_hits']:,}")
@@ -324,7 +326,7 @@ def run_translation_with_telemetry():
         tm_rate = results['total_tm_hits'] / results['total_segments'] * 100
         print(f"  TM hit rate: {tm_rate:.1f}%")
 
-    print(f"\nToken Usage:")
+    print("\nToken Usage:")
     print(f"  Input tokens: {results['total_tokens_in']:,}")
     print(f"  Output tokens: {results['total_tokens_out']:,}")
     print(f"  Cached tokens: {results['total_tokens_cached']:,}")
@@ -341,9 +343,9 @@ def run_translation_with_telemetry():
             print(f"  ... and {len(results['errors']) - 10} more")
 
     if telemetry and telemetry.is_available():
-        print(f"\nTelemetry Status: ACTIVE - All metrics captured")
+        print("\nTelemetry Status: ACTIVE - All metrics captured")
     else:
-        print(f"\nTelemetry Status: Not available")
+        print("\nTelemetry Status: Not available")
 
     print("=" * 80)
 

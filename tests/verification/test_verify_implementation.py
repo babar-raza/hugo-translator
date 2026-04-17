@@ -11,20 +11,19 @@ Tests cover:
 """
 
 import json
-import tempfile
-from pathlib import Path
-from unittest.mock import Mock, patch, MagicMock
 import subprocess
 import sys
+from pathlib import Path
+from unittest.mock import Mock, patch
 
 import pytest
 
 # Import the verification script modules
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "scripts"))
 from verify_implementation import (
+    Reporter,
     VerificationResult,
     VerificationSuite,
-    Reporter,
 )
 
 

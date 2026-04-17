@@ -9,16 +9,16 @@ Tests verify language validation behavior:
 - Real contamination scenarios
 """
 
-import pytest
-from unittest.mock import Mock, patch, MagicMock
 from pathlib import Path
+from unittest.mock import Mock, patch
+
 from langdetect import DetectorFactory, LangDetectException
 
+from src.translation_engine.language_detection.fasttext_detector import FastTextDetector
+from src.translation_engine.validation.base import ValidationSeverity
 from src.translation_engine.validation.language_consistency_validator import (
     LanguageConsistencyValidator,
 )
-from src.translation_engine.validation.base import ValidationSeverity
-from src.translation_engine.language_detection.fasttext_detector import FastTextDetector
 
 # Set seed for deterministic results
 DetectorFactory.seed = 0
@@ -335,7 +335,7 @@ class TestMixedLanguageDetectionFixes:
         import yaml
         config_path = Path("c:/Users/prora/OneDrive/Documents/GitHub/hugo-translator/config/validation.yaml")
 
-        with open(config_path, 'r') as f:
+        with open(config_path) as f:
             config = yaml.safe_load(f)
 
         assert "accept_after_max_retries" in config["decision_rules"], \

@@ -3,15 +3,12 @@ Integration tests for parallel language processing mode (T306: federated-splashi
 
 End-to-end tests for --parallel-languages flag.
 """
-import pytest
 import subprocess
 import sys
-import tempfile
-import os
-import shutil
 import time
 from pathlib import Path
-from typing import List, Dict
+
+import pytest
 
 
 class TestParallelModeE2E:
@@ -27,22 +24,14 @@ class TestParallelModeE2E:
         return content_path
 
     @pytest.fixture
-    def temp_output_dir(self):
-        """Temporary directory for translation output."""
-        temp_dir = tempfile.mkdtemp(prefix="parallel_test_")
-        yield Path(temp_dir)
-        # Cleanup
-        if os.path.exists(temp_dir):
-            shutil.rmtree(temp_dir)
+    def temp_output_dir(self, tmp_path):
+        """Temporary directory for translation output (pytest-managed)."""
+        return tmp_path / "output"
 
     @pytest.fixture
-    def temp_tm_dir(self):
-        """Temporary directory for translation memory."""
-        temp_dir = tempfile.mkdtemp(prefix="tm_parallel_")
-        yield Path(temp_dir)
-        # Cleanup
-        if os.path.exists(temp_dir):
-            shutil.rmtree(temp_dir)
+    def temp_tm_dir(self, tmp_path):
+        """Temporary directory for translation memory (pytest-managed)."""
+        return tmp_path / "tm"
 
     def test_parallel_flag_integration(self):
         """Test that --parallel-languages flag is accepted by CLI."""

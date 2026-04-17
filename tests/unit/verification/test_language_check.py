@@ -9,9 +9,9 @@ Tests:
 - Short strings skipped
 - Confidence thresholds
 """
+from unittest.mock import patch
+
 import pytest
-from typing import Any, Dict
-from unittest.mock import patch, MagicMock
 
 from src.verification.checks import LanguageDetectionCheck
 

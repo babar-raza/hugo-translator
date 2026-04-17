@@ -886,4 +886,3 @@ Evidence:
 - `reports/agents/Agent_C/ORCH-AW-003/run_20260216_223609/artifacts/pytest_worker_slice.txt`
 - `reports/agents/Agent_C/ORCH-AW-003/run_20260216_223609/artifacts/content_worker_oneshot.txt`
 - `reports/agents/Agent_C/ORCH-AW-003/run_20260216_223609/artifacts/content_worker_new_blockers.txt`
-

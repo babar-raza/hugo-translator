@@ -14,11 +14,11 @@ Expected behavior:
 """
 
 import sys
-from pathlib import Path
 from unittest.mock import MagicMock
-from src.translation_engine.extractor.text_unit_extractor import TextUnitExtractor
+
 from src.translation_engine.extractor.text_unit import TextUnit, TextUnitKind
-from src.utils.models import SiteProfile, BodyRules, OutputLayout
+from src.translation_engine.extractor.text_unit_extractor import TextUnitExtractor
+from src.utils.models import BodyRules, OutputLayout, SiteProfile
 
 
 def _make_text_unit(unit_id: str, source_text: str, translated_text: str) -> TextUnit:

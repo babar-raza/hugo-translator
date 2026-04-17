@@ -4,16 +4,17 @@ End-to-end tests for HP fixes in translation pipeline.
 These tests translate actual documents and verify structure preservation.
 """
 
-import pytest
 from pathlib import Path
 
-from src.translation_engine.parser.hugo_parser import HugoParser
+import pytest
+
+from src.model_runtime import ModelLoader, ModelRegistry
+from src.tm import L1Cache, L2PersistentTM, TranslationMemory
+from src.translation_engine.engine import TranslationEngine
 from src.translation_engine.extractor import SegmentExtractor
 from src.translation_engine.models import TranslationStats
+from src.translation_engine.parser.hugo_parser import HugoParser
 from src.utils.config_loader import ConfigService
-from src.tm import TranslationMemory, L1Cache, L2PersistentTM
-from src.model_runtime import ModelLoader, ModelRegistry
-from src.translation_engine.engine import TranslationEngine
 
 
 @pytest.fixture(scope="module")

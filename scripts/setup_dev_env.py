@@ -87,7 +87,7 @@ def setup_env_file():
         print("WARNING: .env.example not found, skipping .env creation")
         return
     shutil.copy2(ENV_EXAMPLE, ENV_FILE)
-    print(f"Copied .env.example -> .env")
+    print("Copied .env.example -> .env")
     print("  >> Edit .env to set ASPOSE_NET_CONTENT and ASPOSE_ORG_CONTENT paths")
 
 

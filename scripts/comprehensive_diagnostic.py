@@ -11,7 +11,6 @@ This script will:
 """
 
 import sys
-import os
 from pathlib import Path
 
 # Add src to path
@@ -115,7 +114,7 @@ def diagnostic_test():
             batch_results[lang_code] = translations
 
             # Check each translation
-            for i, (text, translation) in enumerate(zip(test_texts, translations), 1):
+            for i, (text, translation) in enumerate(zip(test_texts, translations, strict=False), 1):
                 contaminants = []
                 if 'Zkouška' in translation:
                     contaminants.append('Czech')

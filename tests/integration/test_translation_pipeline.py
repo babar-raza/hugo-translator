@@ -5,8 +5,8 @@ Verifies that source → parsed → extracted → translated → reconstructed
 maintains structural fidelity.
 """
 
-import pytest
 from pathlib import Path
+
 from src.translation_engine.engine import TranslationEngine
 from src.utils.config_loader import ConfigService
 

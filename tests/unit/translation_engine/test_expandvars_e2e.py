@@ -1,6 +1,5 @@
 """Tests for env-var expansion at profile load time and in downstream consumers."""
 import os
-from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest

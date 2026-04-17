@@ -4,9 +4,9 @@ Test HP-05 robust placeholder protection.
 Tests that InlineFormatProtector v2 uses simple tokens that survive MT processing.
 """
 import pytest
+
 from src.translation_engine.extractor.inline_format_protector import (
     InlineFormatProtector,
-    ProtectedInlineSegment
 )
 
 
@@ -111,7 +111,7 @@ class TestHP05RobustProtection:
         url = protector._url_map[token]
 
         # Simulate translation with token corruption (spaces added)
-        corrupted = f"[Übersetzter Link]( ⟦ URL0000 ⟧ )"
+        corrupted = "[Übersetzter Link]( ⟦ URL0000 ⟧ )"
 
         # Manually set up the map for restoration
         segment.url_map = {token: url}

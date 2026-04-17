@@ -6,8 +6,6 @@ Tests git and environment context capture with mocked subprocess calls.
 import subprocess
 from unittest.mock import MagicMock, patch
 
-import pytest
-
 from src.observability.git_context import (
     get_git_branch,
     get_git_context,

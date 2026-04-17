@@ -5,7 +5,7 @@ Detects CPU, GPU (CUDA), and Apple Silicon (MPS) capabilities.
 """
 import platform
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 try:
     import psutil
@@ -23,13 +23,13 @@ class HardwareInfo:
     cpu_count: int
     total_ram_gb: float
     has_cuda: bool
-    cuda_devices: List[Dict[str, Any]] = field(default_factory=list)
+    cuda_devices: list[dict[str, Any]] = field(default_factory=list)
     has_mps: bool = False
     recommended_device: str = "cpu"
     platform: str = ""
     python_version: str = ""
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary."""
         return {
             "cpu_count": self.cpu_count,
@@ -109,7 +109,7 @@ class HardwareDetector:
         self,
         has_cuda: bool,
         has_mps: bool,
-        cuda_devices: List[Dict[str, Any]],
+        cuda_devices: list[dict[str, Any]],
     ) -> str:
         """
         Recommend best device for model inference.
@@ -140,7 +140,7 @@ class HardwareDetector:
         device: str,
         model_name: str = "sentence-transformers/all-MiniLM-L6-v2",
         num_iterations: int = 10,
-    ) -> Dict[str, float]:
+    ) -> dict[str, float]:
         """
         Benchmark model inference speed on device.
 
@@ -195,7 +195,7 @@ class HardwareDetector:
             "num_iterations": num_iterations,
         }
 
-    def get_recommendations(self, hardware: HardwareInfo) -> Dict[str, Any]:
+    def get_recommendations(self, hardware: HardwareInfo) -> dict[str, Any]:
         """
         Get hardware-specific recommendations.
 

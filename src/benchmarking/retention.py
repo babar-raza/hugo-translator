@@ -14,13 +14,12 @@ Provides:
 Phase 4.3: Data Retention & Export
 """
 
-import json
 import logging
 import sqlite3
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from typing import TYPE_CHECKING, Dict, List, Optional, Tuple
+from typing import TYPE_CHECKING, Optional
 
 if TYPE_CHECKING:
     from src.shared_engines.composition_root import SharedEngines
@@ -48,7 +47,7 @@ class RetentionPolicy:
     target_table: str
     retention_days: int
     enabled: bool
-    last_cleanup: Optional[str]
+    last_cleanup: str | None
     created_at: str
     updated_at: str
 
@@ -85,9 +84,9 @@ class RetentionResult:
     rows_deleted: int
     dry_run: bool
     cutoff_date: str
-    error: Optional[str] = None
+    error: str | None = None
 
-    def to_dict(self) -> Dict:
+    def to_dict(self) -> dict:
         """Convert to dictionary."""
         return {
             "policy_name": self.policy_name,
@@ -160,7 +159,7 @@ class RetentionEngine:
         conn.row_factory = sqlite3.Row
         return conn
 
-    def list_policies(self, enabled_only: bool = False) -> List[RetentionPolicy]:
+    def list_policies(self, enabled_only: bool = False) -> list[RetentionPolicy]:
         """List all retention policies.
 
         Args:
@@ -184,7 +183,7 @@ class RetentionEngine:
         finally:
             conn.close()
 
-    def get_policy(self, policy_name: str) -> Optional[RetentionPolicy]:
+    def get_policy(self, policy_name: str) -> RetentionPolicy | None:
         """Get a specific retention policy by name.
 
         Args:
@@ -207,8 +206,8 @@ class RetentionEngine:
     def update_policy(
         self,
         policy_name: str,
-        retention_days: Optional[int] = None,
-        enabled: Optional[bool] = None,
+        retention_days: int | None = None,
+        enabled: bool | None = None,
     ) -> bool:
         """Update a retention policy.
 
@@ -330,7 +329,7 @@ class RetentionEngine:
         finally:
             conn.close()
 
-    def get_retention_status(self) -> Dict:
+    def get_retention_status(self) -> dict:
         """Get overall retention status and statistics.
 
         Returns:
@@ -376,7 +375,7 @@ class RetentionEngine:
 
     def _get_table_statistics(
         self, conn: sqlite3.Connection, table_name: str
-    ) -> Dict:
+    ) -> dict:
         """Get statistics for a table.
 
         Args:
@@ -468,9 +467,9 @@ class RetentionEngine:
 
     def execute_retention(
         self,
-        policy_names: Optional[List[str]] = None,
+        policy_names: list[str] | None = None,
         dry_run: bool = False,
-    ) -> List[RetentionResult]:
+    ) -> list[RetentionResult]:
         """Execute retention policies.
 
         Args:

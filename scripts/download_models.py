@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Download translation models from HuggingFace Hub."""
 import argparse
-import sys
 import importlib.util
+import sys
 from pathlib import Path
 
 

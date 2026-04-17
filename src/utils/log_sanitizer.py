@@ -33,7 +33,6 @@ Task: UL-001 - Create Log Sanitizer Utility
 Framework: ORCHESTRATOR (Evidence-Based Development)
 """
 
-from typing import Tuple, Optional
 
 
 # Unicode ranges for 30+ supported languages
@@ -138,7 +137,7 @@ UNICODE_SCRIPT_RANGES = {
 for lang in ['BG', 'UK', 'SR']:
     UNICODE_SCRIPT_RANGES[lang] = UNICODE_SCRIPT_RANGES['RU']
 
-def _detect_script(char: str) -> Optional[str]:
+def _detect_script(char: str) -> str | None:
     """
     Detect the script/language of a single character using Unicode ranges.
 
@@ -221,7 +220,7 @@ def _detect_script(char: str) -> Optional[str]:
     return 'UNI'
 
 
-def _format_placeholder(chars: str, script: Optional[str]) -> str:
+def _format_placeholder(chars: str, script: str | None) -> str:
     """
     Format Unicode text segment as ASCII placeholder.
 

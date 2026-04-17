@@ -7,11 +7,11 @@ that must not be translated or modified.
 """
 
 import re
-from typing import Any, Dict, List, Optional
 from collections import Counter
+from typing import Any
 
+from .base import ValidationIssue, ValidationResult, ValidationSeverity
 from .post_translation_validator import PostTranslationValidator
-from .base import ValidationResult, ValidationIssue, ValidationSeverity
 
 
 class ShortcodePreservationValidator(PostTranslationValidator):
@@ -47,7 +47,7 @@ class ShortcodePreservationValidator(PostTranslationValidator):
         self,
         source: str,
         translation: str,
-        context: Optional[Dict[str, Any]] = None,
+        context: dict[str, Any] | None = None,
     ) -> ValidationResult:
         """Validate shortcode preservation.
 
@@ -113,7 +113,7 @@ class ShortcodePreservationValidator(PostTranslationValidator):
             }
         )
 
-    def _extract_shortcodes(self, text: str) -> List[str]:
+    def _extract_shortcodes(self, text: str) -> list[str]:
         """Extract all Hugo shortcodes from text.
 
         Args:

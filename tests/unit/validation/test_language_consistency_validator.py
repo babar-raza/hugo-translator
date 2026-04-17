@@ -5,13 +5,12 @@ Tests cover language detection, confidence thresholds, text cleaning,
 and edge cases. Ensures deterministic behavior with langdetect seed.
 """
 
-import pytest
 from langdetect import DetectorFactory
 
+from src.translation_engine.validation.base import ValidationSeverity
 from src.translation_engine.validation.language_consistency_validator import (
     LanguageConsistencyValidator,
 )
-from src.translation_engine.validation.base import ValidationSeverity
 
 # Set seed for deterministic language detection
 DetectorFactory.seed = 0

@@ -2,9 +2,9 @@
 """Rate a taskcard on quality dimensions."""
 import argparse
 import sys
+
 import yaml
-from pathlib import Path
-from typing import Dict
+
 
 def load_rubric() -> dict:
     """Load quality rubric from config."""
@@ -20,7 +20,7 @@ def rate_dimension(dimension_name: str, criteria: dict) -> int:
 
     while True:
         try:
-            rating = int(input(f"\nRating (1-5): "))
+            rating = int(input("\nRating (1-5): "))
             if 1 <= rating <= 5:
                 evidence = input("Evidence (brief): ")
                 return rating, evidence
@@ -28,7 +28,7 @@ def rate_dimension(dimension_name: str, criteria: dict) -> int:
             pass
         print("Invalid input. Please enter 1-5.")
 
-def calculate_overall(ratings: Dict[str, int], rubric: dict) -> float:
+def calculate_overall(ratings: dict[str, int], rubric: dict) -> float:
     """Calculate weighted overall score."""
     total = 0.0
     for dim_id, rating in ratings.items():

@@ -10,10 +10,9 @@ import logging
 import threading
 import time
 import uuid
-from typing import Optional
 
 from src.benchmarking.storage import BenchmarkDatabase, BenchmarkRun
-from src.benchmarking.system_info import SystemInfo, SystemInfoCollector
+from src.benchmarking.system_info import SystemInfoCollector
 
 logger = logging.getLogger(__name__)
 

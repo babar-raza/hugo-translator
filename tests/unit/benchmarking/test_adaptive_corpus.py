@@ -1,7 +1,5 @@
 """Unit tests for adaptive corpus management (BM-05)."""
 
-import pytest
-from pathlib import Path
 
 from src.benchmarking.adaptive_corpus import (
     AdaptiveCorpusManager,

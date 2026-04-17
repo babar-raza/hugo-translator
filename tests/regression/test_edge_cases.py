@@ -1,8 +1,8 @@
 """Test script to verify the 4 edge case test fixes."""
 
-import sys
 import re
-from typing import List
+import sys
+
 
 # Test 1: Markdown links text preservation
 def test_markdown_links():
@@ -14,7 +14,7 @@ def test_markdown_links():
     text = re.sub(r"https?://\S+", "", text)
 
     print("Test 1: test_markdown_links_text_preserved")
-    print(f"  Input: 'Dies ist [deutscher Linktext](https://example.com) im Text.'")
+    print("  Input: 'Dies ist [deutscher Linktext](https://example.com) im Text.'")
     print(f"  Cleaned: '{text}'")
     print(f"  'deutscher Linktext' in cleaned: {'deutscher Linktext' in text}")
     print(f"  'https://example.com' not in cleaned: {'https://example.com' not in text}")
@@ -73,7 +73,7 @@ def test_protect_terms():
         start = pos + 1
 
     print(f"  Found 'test' at positions: {positions}")
-    print(f"  Expected: (0, 4), (15, 19), (31, 35)")
+    print("  Expected: (0, 4), (15, 19), (31, 35)")
 
     assert positions[0] == (0, 4)
     assert positions[1] == (15, 19)

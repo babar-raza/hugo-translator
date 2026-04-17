@@ -1,8 +1,8 @@
 """Unit tests for benchmark query API."""
 
-import pytest
 from datetime import datetime, timedelta
-from pathlib import Path
+
+import pytest
 
 from src.benchmarking.query import BenchmarkQueryAPI, BenchmarkQueryBuilder
 from src.benchmarking.storage import (

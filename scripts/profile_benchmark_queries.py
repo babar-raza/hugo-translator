@@ -8,15 +8,15 @@ This script analyzes query performance for Phase 4.2 optimization by:
 """
 
 import sqlite3
+import sys
 import time
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
-import sys
 
 # Add project root to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from src.benchmarking.storage import BenchmarkDatabase, BenchmarkRun, BenchmarkResult
+from src.benchmarking.storage import BenchmarkDatabase, BenchmarkResult, BenchmarkRun
 from src.benchmarking.system_info import SystemInfo
 
 

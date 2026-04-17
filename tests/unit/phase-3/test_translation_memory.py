@@ -1,8 +1,6 @@
 """
 Unit tests for Unified Translation Memory Interface.
 """
-import shutil
-import tempfile
 from pathlib import Path
 
 import pytest
@@ -18,11 +16,9 @@ from src.tm import (
 
 
 @pytest.fixture
-def temp_tm_dir():
-    """Create temporary directory for TM storage."""
-    temp_dir = tempfile.mkdtemp()
-    yield Path(temp_dir)
-    shutil.rmtree(temp_dir, ignore_errors=True)
+def temp_tm_dir(tmp_path):
+    """Temporary directory for TM storage (pytest-managed, auto-cleaned)."""
+    return tmp_path
 
 
 @pytest.fixture

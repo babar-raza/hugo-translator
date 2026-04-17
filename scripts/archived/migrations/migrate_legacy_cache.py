@@ -44,10 +44,8 @@ import json
 import logging
 import os
 import sys
-from pathlib import Path
-from datetime import datetime
-from typing import Dict, List, Tuple
 from collections import defaultdict
+from pathlib import Path
 
 # Add src to path
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
@@ -89,7 +87,7 @@ class LegacyCacheMigrator:
             # L3 semantic search disabled during migration for speed
             self.tm = TranslationMemory(l1_cache=l1, l2_persistent=l2, l3_semantic=None)
 
-    def find_legacy_cache_files(self) -> List[Tuple[str, Path]]:
+    def find_legacy_cache_files(self) -> list[tuple[str, Path]]:
         """Find all legacy cache files and extract language codes"""
         cache_files = []
 
@@ -113,10 +111,10 @@ class LegacyCacheMigrator:
 
         return cache_files
 
-    def load_legacy_cache(self, file_path: Path) -> Dict[str, str]:
+    def load_legacy_cache(self, file_path: Path) -> dict[str, str]:
         """Load legacy JSON cache file"""
         try:
-            with open(file_path, 'r', encoding='utf-8') as f:
+            with open(file_path, encoding='utf-8') as f:
                 cache = json.load(f)
 
             if not isinstance(cache, dict):
@@ -131,7 +129,7 @@ class LegacyCacheMigrator:
     def migrate_language_cache(
         self,
         lang_code: str,
-        cache_data: Dict[str, str],
+        cache_data: dict[str, str],
         subdomain: str = "default"
     ) -> int:
         """Migrate cache entries for a single language"""
@@ -187,7 +185,7 @@ class LegacyCacheMigrator:
 
         return migrated_count
 
-    def migrate_all(self, subdomain: str = "default") -> Dict:
+    def migrate_all(self, subdomain: str = "default") -> dict:
         """Migrate all legacy cache files"""
         logger.info("=" * 60)
         logger.info("Starting Legacy Cache Migration")

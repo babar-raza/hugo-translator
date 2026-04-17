@@ -13,7 +13,6 @@ All providers implement BaseLLMProvider and return (text, input_tokens, output_t
 import logging
 import os
 from abc import ABC, abstractmethod
-from typing import Optional, Tuple
 
 from .contracts import LLMProviderConfig
 
@@ -24,7 +23,7 @@ class BaseLLMProvider(ABC):
     """Common interface for all LLM providers."""
 
     def __init__(self) -> None:
-        self._config: Optional[LLMProviderConfig] = None
+        self._config: LLMProviderConfig | None = None
 
     @abstractmethod
     def initialize(self, config: LLMProviderConfig) -> None:
@@ -38,7 +37,7 @@ class BaseLLMProvider(ABC):
         """
 
     @abstractmethod
-    def generate(self, system_prompt: str, user_text: str) -> Tuple[str, int, int]:
+    def generate(self, system_prompt: str, user_text: str) -> tuple[str, int, int]:
         """Generate a completion.
 
         Args:
@@ -71,7 +70,7 @@ class BaseLLMProvider(ABC):
     def shutdown(self) -> None:
         """Release provider resources. No-op by default."""
 
-    def _resolve_api_key(self) -> Optional[str]:
+    def _resolve_api_key(self) -> str | None:
         """Resolve API key from the configured environment variable."""
         if self._config and self._config.api_key_env:
             return os.environ.get(self._config.api_key_env)
@@ -94,7 +93,7 @@ class OllamaProvider(BaseLLMProvider):
         self._base_url = config.base_url or "http://localhost:11434"
         logger.info("OllamaProvider initialized: %s model=%s", self._base_url, config.model_name)
 
-    def generate(self, system_prompt: str, user_text: str) -> Tuple[str, int, int]:
+    def generate(self, system_prompt: str, user_text: str) -> tuple[str, int, int]:
         import requests
 
         url = f"{self._base_url}/api/chat"
@@ -161,7 +160,7 @@ class OpenAIProvider(BaseLLMProvider):
         self._client = openai.OpenAI(api_key=api_key)
         logger.info("OpenAIProvider initialized: model=%s", config.model_name)
 
-    def generate(self, system_prompt: str, user_text: str) -> Tuple[str, int, int]:
+    def generate(self, system_prompt: str, user_text: str) -> tuple[str, int, int]:
         response = self._client.chat.completions.create(
             model=self._config.model_name,
             messages=[
@@ -213,7 +212,7 @@ class AnthropicProvider(BaseLLMProvider):
         self._client = anthropic.Anthropic(api_key=api_key)
         logger.info("AnthropicProvider initialized: model=%s", config.model_name)
 
-    def generate(self, system_prompt: str, user_text: str) -> Tuple[str, int, int]:
+    def generate(self, system_prompt: str, user_text: str) -> tuple[str, int, int]:
         response = self._client.messages.create(
             model=self._config.model_name,
             system=system_prompt,
@@ -269,7 +268,7 @@ class OpenAICompatibleProvider(BaseLLMProvider):
             config.model_name,
         )
 
-    def generate(self, system_prompt: str, user_text: str) -> Tuple[str, int, int]:
+    def generate(self, system_prompt: str, user_text: str) -> tuple[str, int, int]:
         response = self._client.chat.completions.create(
             model=self._config.model_name,
             messages=[

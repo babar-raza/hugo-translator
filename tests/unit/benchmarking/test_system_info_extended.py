@@ -1,6 +1,5 @@
 """Unit tests for extended system info (BM-09)."""
 
-import pytest
 from dataclasses import fields
 
 from src.benchmarking.system_info import SystemInfo, SystemInfoCollector

@@ -6,20 +6,20 @@ and provides config-based validator loading from validation.yaml.
 """
 
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 import yaml
 
-from .base import Validator, ValidationResult, ValidationSeverity
+from .base import ValidationResult, Validator
 from .completeness_validator import CompletenessValidator
 from .file_placement_validator import FilePlacementValidator
 from .frontmatter_protection_validator import FrontmatterProtectionValidator
 from .language_consistency_validator import LanguageConsistencyValidator
 from .link_validator import LinkValidator
 from .placeholder_validator import PlaceholderValidator
+from .repetition_detector_validator import RepetitionDetectorValidator
 from .shortcode_preservation_validator import ShortcodePreservationValidator
 from .structure_validator import StructureValidator
-from .repetition_detector_validator import RepetitionDetectorValidator
 from .terminology_preservation_validator import TerminologyPreservationValidator
 from .yaml_validator import YAMLValidator
 
@@ -48,7 +48,7 @@ class ValidationSuite:
 
     def __init__(
         self,
-        validators: Optional[List[Validator]] = None,
+        validators: list[Validator] | None = None,
         fail_fast: bool = False,
         short_circuit_on_critical: bool = False,
     ):
@@ -64,7 +64,7 @@ class ValidationSuite:
         self.fail_fast = fail_fast
         self.short_circuit_on_critical = short_circuit_on_critical
 
-    def _create_default_validators(self) -> List[Validator]:
+    def _create_default_validators(self) -> list[Validator]:
         """
         Create default set of validators (all enabled).
 
@@ -93,7 +93,7 @@ class ValidationSuite:
     @classmethod
     def from_config(
         cls,
-        config_path: Optional[Path] = None,
+        config_path: Path | None = None,
         site_profile=None,
         config_service=None,
         short_circuit_on_critical: bool = False,
@@ -119,11 +119,11 @@ class ValidationSuite:
             config_path = project_root / "config" / "validation.yaml"
 
         # Load config
-        with open(config_path, 'r', encoding='utf-8') as f:
+        with open(config_path, encoding='utf-8') as f:
             config = yaml.safe_load(f)
 
         validators_config = config.get('validators', {})
-        validators: List[Validator] = []
+        validators: list[Validator] = []
 
         # Load validators based on enabled flag
         # Legacy validators
@@ -177,8 +177,8 @@ class ValidationSuite:
         self,
         source: str,
         translation: str,
-        context: Optional[Dict[str, Any]] = None,
-    ) -> List[ValidationResult]:
+        context: dict[str, Any] | None = None,
+    ) -> list[ValidationResult]:
         """
         Run all validators on a translation.
 
@@ -190,7 +190,7 @@ class ValidationSuite:
         Returns:
             List of ValidationResult objects from all validators
         """
-        results: List[ValidationResult] = []
+        results: list[ValidationResult] = []
         context = context or {}
 
         for validator in self.validators:
@@ -211,7 +211,7 @@ class ValidationSuite:
         self,
         source: str,
         translation: str,
-        context: Optional[Dict[str, Any]] = None,
+        context: dict[str, Any] | None = None,
     ) -> ValidationResult:
         """
         Run all validators and return a single aggregated result.
@@ -241,7 +241,7 @@ class ValidationSuite:
         translation_yaml: str,
         source_body: str,
         translation_body: str,
-        context: Optional[Dict[str, Any]] = None,
+        context: dict[str, Any] | None = None,
     ) -> ValidationResult:
         """
         Validate a complete Hugo document (frontmatter + body).
@@ -292,7 +292,7 @@ class ValidationSuite:
                 return True
         return False
 
-    def get_validator(self, validator_name: str) -> Optional[Validator]:
+    def get_validator(self, validator_name: str) -> Validator | None:
         """
         Get a validator by name.
 

@@ -4,7 +4,6 @@ End-to-End GPU Pipeline Integration Tests.
 Tests complete translation pipeline with GPU acceleration.
 """
 import tempfile
-from pathlib import Path
 
 import pytest
 import torch

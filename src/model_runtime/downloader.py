@@ -1,10 +1,9 @@
 """Model download and verification system."""
-import hashlib
 import json
 import logging
+from collections.abc import Callable
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Optional, Callable
-from datetime import datetime, UTC
 
 logger = logging.getLogger(__name__)
 
@@ -27,7 +26,7 @@ class ModelDownloader:
         hf_model_id: str,
         backend: str = "huggingface",
         force: bool = False,
-        progress_callback: Optional[Callable] = None
+        progress_callback: Callable | None = None
     ) -> Path:
         """Download a model from HuggingFace Hub.
 

@@ -5,21 +5,19 @@ Tests signal handling, context registration, and graceful shutdown behavior.
 All tests use mocked signals and contexts - no actual process termination.
 """
 
-import pytest
 import signal
-import time
 import threading
-from unittest.mock import Mock, patch, MagicMock
-from datetime import datetime, timezone
+import time
+from unittest.mock import MagicMock, Mock, patch
 
 from src.observability.graceful_shutdown import (
-    register_active_context,
-    unregister_active_context,
-    register_shutdown_handler,
-    get_active_context_count,
-    setup_graceful_shutdown,
     _perform_graceful_shutdown,
+    get_active_context_count,
+    register_active_context,
+    register_shutdown_handler,
     reset_for_testing,
+    setup_graceful_shutdown,
+    unregister_active_context,
 )
 
 

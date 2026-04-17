@@ -34,4 +34,3 @@ The guide warns that if communication fails for an extended period, the library 
 **Q6. How should I store my metered keys securely?**  
 The article recommends avoiding hard‑coding keys directly in source code or client‑side assets.  
 Instead, store keys in secure locations such as environment variables, configuration secrets, or dedicated secret management services, and load them at runtime.
-

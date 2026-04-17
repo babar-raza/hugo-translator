@@ -8,14 +8,12 @@ Tests cover:
 - YAML output generation
 """
 
-import pytest
 import os
 import tempfile
+
 import yaml
-from src.translation_engine.terminology.discovery import (
-    TerminologyDiscovery,
-    DiscoveredTerm
-)
+
+from src.translation_engine.terminology.discovery import DiscoveredTerm, TerminologyDiscovery
 
 
 class TestTerminologyDiscovery:
@@ -257,7 +255,7 @@ class TestTerminologyDiscovery:
             assert os.path.exists(output_path)
 
             # Load and verify structure
-            with open(output_path, 'r', encoding='utf-8') as f:
+            with open(output_path, encoding='utf-8') as f:
                 data = yaml.safe_load(f)
 
             assert data['version'] == '1.0'

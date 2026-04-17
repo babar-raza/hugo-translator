@@ -6,14 +6,15 @@ Manages loading, caching, and lifecycle of translation models across different b
 import gc
 import logging
 import time
-from pathlib import Path
 from abc import ABC, abstractmethod
-from typing import Any, Dict, List, Optional
+from pathlib import Path
+from typing import Any
 
-from .registry import ModelInfo, ModelRegistry
-from .language_codes import map_language_code
-from .gpu_cache_manager import GPUCacheManager  # D5: Import GPU cache manager
 from src.observability.metrics import get_metrics
+
+from .gpu_cache_manager import GPUCacheManager  # D5: Import GPU cache manager
+from .language_codes import map_language_code
+from .registry import ModelInfo, ModelRegistry
 
 # Conditional torch import — allows LLM-only usage without PyTorch installed.
 # HuggingFace and CT2 backends will fail at load() time if torch is missing.
@@ -48,12 +49,12 @@ class ModelBackend(ABC):
     @abstractmethod
     def translate(
         self,
-        texts: List[str],
+        texts: list[str],
         src_lang: str,
         tgt_lang: str,
-        max_new_tokens: Optional[int] = None,
-        generation_params: Optional[Dict[str, Any]] = None
-    ) -> List[str]:
+        max_new_tokens: int | None = None,
+        generation_params: dict[str, Any] | None = None
+    ) -> list[str]:
         """
         Translate batch of texts.
 
@@ -89,7 +90,7 @@ def _check_sentencepiece_available() -> bool:
         return False
 
 
-def _model_requires_sentencepiece(model_id: str, hf_model_id: Optional[str] = None) -> bool:
+def _model_requires_sentencepiece(model_id: str, hf_model_id: str | None = None) -> bool:
     """
     Check if a model requires sentencepiece for tokenization.
 
@@ -114,10 +115,10 @@ class HuggingFaceBackend(ModelBackend):
         self,
         model_info: ModelInfo,
         device: str,
-        max_memory_mb: Optional[int] = None,
-        use_fp16: Optional[bool] = None,
+        max_memory_mb: int | None = None,
+        use_fp16: bool | None = None,
         use_int8: bool = False,
-        generation_config: Optional[Dict] = None
+        generation_config: dict | None = None
     ):
         """
         Initialize HuggingFace backend.
@@ -253,7 +254,7 @@ class HuggingFaceBackend(ModelBackend):
                 logger.debug(f"Model load took {load_duration:.2f}s")
 
         except torch.cuda.OutOfMemoryError as e:
-            logger.error(f"GPU OOM loading model. Try reducing max_memory_mb or batch size.")
+            logger.error("GPU OOM loading model. Try reducing max_memory_mb or batch size.")
             raise RuntimeError(
                 f"GPU Out of Memory loading {self.model_info.model_id}. "
                 f"Reduce max_memory_mb or use CPU fallback."
@@ -264,9 +265,9 @@ class HuggingFaceBackend(ModelBackend):
             )
 
     def translate(
-        self, texts: List[str], src_lang: str, tgt_lang: str, max_new_tokens: Optional[int] = None,
-        generation_params: Optional[Dict[str, Any]] = None
-    ) -> List[str]:
+        self, texts: list[str], src_lang: str, tgt_lang: str, max_new_tokens: int | None = None,
+        generation_params: dict[str, Any] | None = None
+    ) -> list[str]:
         """
         Translate texts using HuggingFace model.
 
@@ -292,9 +293,9 @@ class HuggingFaceBackend(ModelBackend):
         return translations
 
     def translate_with_token_counts(
-        self, texts: List[str], src_lang: str, tgt_lang: str, max_new_tokens: Optional[int] = None,
-        generation_params: Optional[Dict[str, Any]] = None
-    ) -> tuple[List[str], int, int]:
+        self, texts: list[str], src_lang: str, tgt_lang: str, max_new_tokens: int | None = None,
+        generation_params: dict[str, Any] | None = None
+    ) -> tuple[list[str], int, int]:
         """
         Translate texts and return token counts.
 
@@ -428,8 +429,8 @@ class HuggingFaceBackend(ModelBackend):
                     )
             else:
                 logger.debug(
-                    f"Tokenizer doesn't use forced_bos_token_id. "
-                    f"Target language may be set via tokenizer.tgt_lang instead."
+                    "Tokenizer doesn't use forced_bos_token_id. "
+                    "Target language may be set via tokenizer.tgt_lang instead."
                 )
 
             # Generate translations (using settings from legacy/ast-translator.py)
@@ -504,7 +505,7 @@ class HuggingFaceBackend(ModelBackend):
             # EMPTY TRANSLATION FALLBACK (Iter6 empty-translation fix)
             # Detect empty translations and retry with safer generation parameters
             empty_indices = []
-            for idx, (translation, source_text) in enumerate(zip(translations, texts)):
+            for idx, (translation, source_text) in enumerate(zip(translations, texts, strict=False)):
                 source_stripped = source_text.strip()
                 translation_stripped = translation.strip()
                 # Check if source is non-empty but translation is empty
@@ -590,16 +591,16 @@ class HuggingFaceBackend(ModelBackend):
 
     def _recover_empty_translations(
         self,
-        texts: List[str],
-        empty_indices: List[int],
-        current_translations: List[str],
-        inputs: Dict,
+        texts: list[str],
+        empty_indices: list[int],
+        current_translations: list[str],
+        inputs: dict,
         src_lang: str,
         tgt_lang: str,
         mapped_src_lang: str,
         mapped_tgt_lang: str,
-        forced_bos_token_id: Optional[int]
-    ) -> tuple[List[str], int]:
+        forced_bos_token_id: int | None
+    ) -> tuple[list[str], int]:
         """
         Attempt to recover empty translations using a fallback ladder.
 
@@ -782,7 +783,7 @@ class HuggingFaceBackend(ModelBackend):
             logger.debug(f"Token count failed: {e}")
             return 0
 
-    def get_batch_token_counts(self, texts: List[str]) -> List[int]:
+    def get_batch_token_counts(self, texts: list[str]) -> list[int]:
         """
         Get token counts for multiple texts efficiently.
 
@@ -804,7 +805,7 @@ class HuggingFaceBackend(ModelBackend):
 class CTranslate2Backend(ModelBackend):
     """Backend for CTranslate2 optimized models."""
 
-    def __init__(self, model_info: ModelInfo, device: str, max_memory_mb: Optional[int] = None):
+    def __init__(self, model_info: ModelInfo, device: str, max_memory_mb: int | None = None):
         """
         Initialize CTranslate2 backend.
 
@@ -865,7 +866,7 @@ class CTranslate2Backend(ModelBackend):
             self.loaded = True
 
         except torch.cuda.OutOfMemoryError as e:
-            logger.error(f"GPU OOM loading CTranslate2 model.")
+            logger.error("GPU OOM loading CTranslate2 model.")
             raise RuntimeError(
                 f"GPU Out of Memory loading {self.model_info.model_id}. "
                 f"Reduce max_memory_mb or use CPU fallback."
@@ -898,12 +899,12 @@ class CTranslate2Backend(ModelBackend):
 
     def translate(
         self,
-        texts: List[str],
+        texts: list[str],
         src_lang: str,
         tgt_lang: str,
-        max_new_tokens: Optional[int] = None,
-        generation_params: Optional[Dict[str, Any]] = None
-    ) -> List[str]:
+        max_new_tokens: int | None = None,
+        generation_params: dict[str, Any] | None = None
+    ) -> list[str]:
         """
         Translate texts using CTranslate2.
 
@@ -982,7 +983,7 @@ class CTranslate2Backend(ModelBackend):
             # EMPTY TRANSLATION FALLBACK (parity with HuggingFaceBackend)
             # Detect empty translations and fall back to source text
             empty_indices = []
-            for idx, (translation, source_text) in enumerate(zip(translations, texts)):
+            for idx, (translation, source_text) in enumerate(zip(translations, texts, strict=False)):
                 source_stripped = source_text.strip()
                 translation_stripped = translation.strip()
                 # Check if source is non-empty but translation is empty
@@ -1081,9 +1082,9 @@ class ModelLoader:
         self,
         registry: ModelRegistry,
         device: str = "cpu",
-        max_memory_mb: Optional[int] = None,
-        load_mode: Optional[str] = None,
-        config: Optional[Dict] = None
+        max_memory_mb: int | None = None,
+        load_mode: str | None = None,
+        config: dict | None = None
     ):
         """
         Initialize model loader.
@@ -1100,7 +1101,7 @@ class ModelLoader:
         self.device = device
         self.max_memory_mb = max_memory_mb
         self.load_mode = load_mode
-        self.loaded_models: Dict[str, ModelBackend] = {}
+        self.loaded_models: dict[str, ModelBackend] = {}
 
         # D5: Initialize GPU cache manager with config
         self.config = config or {}
@@ -1111,7 +1112,7 @@ class ModelLoader:
         translation_config = self.config.get("translation") or {}
         self.generation_config = translation_config.get("generation") or {}
 
-    def load_model(self, model_id: str, device: Optional[str] = None) -> ModelBackend:
+    def load_model(self, model_id: str, device: str | None = None) -> ModelBackend:
         """
         Load model, return backend instance.
 
@@ -1188,7 +1189,7 @@ class ModelLoader:
                 f"Unsupported backend: {model_info.backend}"
             )
 
-    def get_loaded_model(self, model_id: str) -> Optional[ModelBackend]:
+    def get_loaded_model(self, model_id: str) -> ModelBackend | None:
         """
         Get already-loaded model.
 
@@ -1200,7 +1201,7 @@ class ModelLoader:
         """
         return self.loaded_models.get(model_id)
 
-    def get_tokenizer_for_counting(self, model_id: str) -> Optional[ModelBackend]:
+    def get_tokenizer_for_counting(self, model_id: str) -> ModelBackend | None:
         """
         Get backend with tokenizer for token counting (if loaded).
 
@@ -1230,7 +1231,7 @@ class ModelLoader:
         for model_id in model_ids:
             self.unload_model(model_id)
 
-    def preload_models(self, model_ids: List[str]) -> None:
+    def preload_models(self, model_ids: list[str]) -> None:
         """
         Preload multiple models.
 
@@ -1241,7 +1242,7 @@ class ModelLoader:
             if model_id not in self.loaded_models:
                 self.load_model(model_id)
 
-    def list_loaded_models(self) -> List[str]:
+    def list_loaded_models(self) -> list[str]:
         """
         Get list of currently loaded model IDs.
 
@@ -1250,7 +1251,7 @@ class ModelLoader:
         """
         return list(self.loaded_models.keys())
 
-    def get_memory_usage(self) -> Dict[str, Dict[str, any]]:
+    def get_memory_usage(self) -> dict[str, dict[str, any]]:
         """
         Get memory usage for loaded models.
 
@@ -1279,7 +1280,7 @@ class ModelLoader:
         """Check if any models are loaded."""
         return len(self.loaded_models) > 0
 
-    def get_loaded_models(self) -> List[str]:
+    def get_loaded_models(self) -> list[str]:
         """Get list of loaded model IDs."""
         return self.list_loaded_models()
 

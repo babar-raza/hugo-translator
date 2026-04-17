@@ -12,20 +12,17 @@ Verifies translate_directory() batch translation method invariants:
 API-002 Core Feature: Batch Translation of Directory
 """
 
-import pytest
 import os
 import sys
 import time
-import tempfile
-import threading
 from pathlib import Path
-from unittest.mock import Mock, MagicMock, patch
-from dataclasses import dataclass
+from unittest.mock import Mock
+
+import pytest
 
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 from src.translation_engine.models import DirectoryResult, TranslationResult
-
 
 # ==============================================================================
 # Fixtures
@@ -304,10 +301,10 @@ def test_skip_site_lock_parameter_exists():
     CONTRACT: API-002 - TC1: Skip lock when parent holds it
     Evidence: src/translation_engine/engine.py lines 2324-2328
     """
-    from src.translation_engine.engine import TranslationEngine
-
     # Verify the parameter exists in the method signature
     import inspect
+
+    from src.translation_engine.engine import TranslationEngine
     sig = inspect.signature(TranslationEngine.translate_directory)
     params = list(sig.parameters.keys())
 

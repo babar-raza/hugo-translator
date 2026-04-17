@@ -8,13 +8,14 @@ according to subdomain-specific rules and language folder conventions.
 import os
 import re
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 import structlog
 
 from src.utils.config_loader import ConfigService
 from src.utils.models import SiteProfile
-from .base import Validator, ValidationResult, ValidationSeverity
+
+from .base import ValidationResult, ValidationSeverity, Validator
 
 logger = structlog.get_logger(__name__)
 
@@ -32,8 +33,8 @@ class FilePlacementValidator(Validator):
 
     def __init__(
         self,
-        config_service: Optional[ConfigService] = None,
-        name: Optional[str] = None,
+        config_service: ConfigService | None = None,
+        name: str | None = None,
     ):
         """
         Initialize the file placement validator.
@@ -49,7 +50,7 @@ class FilePlacementValidator(Validator):
         self,
         source: str,
         translation: str,
-        context: Optional[Dict[str, Any]] = None,
+        context: dict[str, Any] | None = None,
     ) -> ValidationResult:
         """
         Validate file placement for a translation.
@@ -128,7 +129,7 @@ class FilePlacementValidator(Validator):
         source_lang: str,
         target_lang: str,
         result: ValidationResult,
-        site_profile: Optional[SiteProfile] = None,
+        site_profile: SiteProfile | None = None,
     ) -> None:
         """
         Validate that language substitution is correct based on localization strategy.
@@ -474,7 +475,7 @@ class FilePlacementValidator(Validator):
     def validate_written_file(
         self,
         file_path: Path,
-        context: Optional[Dict[str, Any]] = None,
+        context: dict[str, Any] | None = None,
     ) -> ValidationResult:
         """
         Validate a file that has been written to disk (post-write validation).
@@ -515,7 +516,7 @@ class FilePlacementValidator(Validator):
 
         # Check if file is readable
         try:
-            with open(file_path, "r", encoding="utf-8") as f:
+            with open(file_path, encoding="utf-8") as f:
                 content = f.read()
         except Exception as e:
             result.issues.append(

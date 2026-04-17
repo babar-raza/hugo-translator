@@ -8,19 +8,18 @@ Tests cover:
 - Invalid path detection
 """
 
-import pytest
-from pathlib import Path
-from typing import Any, Dict
-from unittest.mock import Mock, MagicMock
+from typing import Any
+from unittest.mock import Mock
 
+import pytest
+
+from src.translation_engine.validation.base import (
+    ValidationSeverity,
+)
 from src.translation_engine.validation.file_placement_validator import (
     FilePlacementValidator,
 )
-from src.translation_engine.validation.base import (
-    ValidationResult,
-    ValidationSeverity,
-)
-from src.utils.models import SiteProfile, OutputLayout, BodyRules
+from src.utils.models import BodyRules, OutputLayout, SiteProfile
 
 
 class TestFilePlacementValidator:
@@ -486,7 +485,7 @@ class TestFilePlacementValidator:
         """Test validation with empty context."""
         source = "/content/products/en/words/index.md"
         translation = "/content/products/de/words/index.md"
-        context: Dict[str, Any] = {}
+        context: dict[str, Any] = {}
 
         result = validator.validate(source, translation, context)
 

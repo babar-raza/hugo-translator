@@ -7,7 +7,6 @@ for optimal CPU performance.
 import logging
 import os
 from dataclasses import dataclass
-from typing import Optional
 
 import psutil
 
@@ -49,8 +48,8 @@ class CPUOptimizer:
 
     def __init__(
         self,
-        batch_size_override: Optional[int] = None,
-        num_threads_override: Optional[int] = None,
+        batch_size_override: int | None = None,
+        num_threads_override: int | None = None,
         memory_target_percent: float = 0.7,
     ):
         """

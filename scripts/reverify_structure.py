@@ -3,10 +3,9 @@
 Reverify structural element counts with precise pattern matching.
 """
 
-import os
 import re
-from pathlib import Path
 from collections import defaultdict
+from pathlib import Path
 
 BASE_PATH = Path("D:/onedrive/Documents/GitHub/aspose.net/content/kb.aspose.net/slides")
 

@@ -11,8 +11,6 @@ Tests the full translation pipeline with nested lists to verify:
 from src.translation_engine.extractor.text_unit_extractor import TextUnitExtractor
 from src.translation_engine.parser.hugo_parser import HugoParser
 from src.translation_engine.reconstructor.ast_renderer import ASTRenderer
-from src.translation_engine.validation.post_translation_validator import PostTranslationValidator
-
 
 # Sample nested list markdown for testing
 SIMPLE_NESTED_LIST = """

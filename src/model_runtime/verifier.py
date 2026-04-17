@@ -1,10 +1,9 @@
 """Model verification system to validate downloads and detect corruption."""
 import json
 import logging
-from pathlib import Path
-from typing import Dict, List, Optional
 from dataclasses import dataclass
-from datetime import datetime, UTC
+from datetime import UTC, datetime
+from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
@@ -15,11 +14,11 @@ class VerificationResult:
     model_id: str
     model_path: Path
     passed: bool
-    checks_performed: List[str]
-    checks_passed: List[str]
-    checks_failed: List[str]
-    error_message: Optional[str] = None
-    verification_time: Optional[str] = None
+    checks_performed: list[str]
+    checks_passed: list[str]
+    checks_failed: list[str]
+    error_message: str | None = None
+    verification_time: str | None = None
 
     def to_dict(self) -> dict:
         return {
@@ -178,10 +177,10 @@ class ModelVerifier:
         self,
         model_id: str,
         model_path: Path,
-        checks_performed: List[str],
-        checks_passed: List[str],
-        checks_failed: List[str],
-        error_message: Optional[str]
+        checks_performed: list[str],
+        checks_passed: list[str],
+        checks_failed: list[str],
+        error_message: str | None
     ) -> VerificationResult:
         """Create verification result."""
         passed = len(checks_failed) == 0
@@ -198,7 +197,7 @@ class ModelVerifier:
             verification_time=verification_time
         )
 
-    def verify_all(self, backend: Optional[str] = None) -> List[VerificationResult]:
+    def verify_all(self, backend: str | None = None) -> list[VerificationResult]:
         """Verify all models in models directory.
 
         Args:

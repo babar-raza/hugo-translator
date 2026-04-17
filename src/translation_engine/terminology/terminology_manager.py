@@ -7,14 +7,15 @@ This module provides the TerminologyManager class which:
 - Provides end-to-end protection/restoration workflow
 """
 
-import yaml
 from pathlib import Path
-from typing import List, Optional
+
+import yaml
+
 from src.translation_engine.terminology.models import (
-    TermRule,
     PreserveMode,
-    TermSeverity,
     ProtectedSegment,
+    TermRule,
+    TermSeverity,
 )
 from src.translation_engine.terminology.terminology_detector import TerminologyDetector
 from src.translation_engine.terminology.terminology_protector import TerminologyProtector
@@ -59,7 +60,7 @@ class TerminologyManager:
 
     def _load_config(self):
         """Load and parse terminology configuration from YAML."""
-        with open(self.config_path, 'r', encoding='utf-8') as f:
+        with open(self.config_path, encoding='utf-8') as f:
             config_data = yaml.safe_load(f)
 
         if not config_data:
@@ -83,7 +84,7 @@ class TerminologyManager:
         # Store auto-discovery settings (not used yet)
         self.auto_discovery = config_data.get('auto_discovery', {})
 
-    def _parse_rules(self, config_section: dict) -> List[TermRule]:
+    def _parse_rules(self, config_section: dict) -> list[TermRule]:
         """Parse term rules from configuration section.
 
         Args:
@@ -120,7 +121,7 @@ class TerminologyManager:
 
         return rules
 
-    def get_rules(self, site: Optional[str] = None) -> List[TermRule]:
+    def get_rules(self, site: str | None = None) -> list[TermRule]:
         """Get applicable terminology rules for a site.
 
         Merges global rules with site-specific overrides.
@@ -147,7 +148,7 @@ class TerminologyManager:
             # Site-only rules (don't inherit global)
             return site_config['rules']
 
-    def protect(self, text: str, site: Optional[str] = None) -> ProtectedSegment:
+    def protect(self, text: str, site: str | None = None) -> ProtectedSegment:
         """Detect and protect terminology in text.
 
         This is the main entry point for terminology protection.

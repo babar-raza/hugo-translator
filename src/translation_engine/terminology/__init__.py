@@ -7,18 +7,18 @@ This module provides data models and functionality for:
 - Auto-discovering new terminology from source corpus
 """
 
+from .discovery import DiscoveredTerm, TerminologyDiscovery
 from .models import (
-    PreserveMode,
-    TermSeverity,
-    TermRule,
     DetectedTerm,
+    PreserveMode,
     ProtectedSegment,
     TerminologyConfig,
+    TermRule,
+    TermSeverity,
 )
 from .terminology_detector import TerminologyDetector
-from .terminology_protector import TerminologyProtector
 from .terminology_manager import TerminologyManager
-from .discovery import TerminologyDiscovery, DiscoveredTerm
+from .terminology_protector import TerminologyProtector
 
 __all__ = [
     "PreserveMode",

@@ -6,14 +6,12 @@ Provides health check endpoint for load balancers and monitoring systems.
 """
 
 import logging
-import os
-import platform
 import shutil
 import time
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -31,7 +29,7 @@ class HealthCheckResult:
     component: str
     status: HealthStatus
     message: str
-    details: Dict[str, Any] = field(default_factory=dict)
+    details: dict[str, Any] = field(default_factory=dict)
     timestamp: float = field(default_factory=time.time)
 
 
@@ -54,8 +52,8 @@ class HealthMonitor:
 
     def __init__(
         self,
-        tm_data_dir: Optional[Path] = None,
-        config_root: Optional[Path] = None,
+        tm_data_dir: Path | None = None,
+        config_root: Path | None = None,
         timeout: float = 5.0,
         enable_auto_recovery: bool = True
     ):
@@ -72,9 +70,9 @@ class HealthMonitor:
         self.config_root = Path(config_root) if config_root is not None else Path("config")
         self.timeout = timeout
         self.enable_auto_recovery = enable_auto_recovery
-        self.recovery_attempts: List[RecoveryAction] = []
+        self.recovery_attempts: list[RecoveryAction] = []
 
-    def check_health(self) -> Tuple[HealthStatus, List[HealthCheckResult]]:
+    def check_health(self) -> tuple[HealthStatus, list[HealthCheckResult]]:
         """
         Perform comprehensive health check.
 
@@ -155,7 +153,8 @@ class HealthMonitor:
             Health check result
         """
         try:
-            l2_path = self.tm_data_dir / "l2_lmdb"
+            from src.tm.l2_persistent import L2_DB_NAME
+            l2_path = self.tm_data_dir / L2_DB_NAME
 
             if not l2_path.exists():
                 return HealthCheckResult(
@@ -411,7 +410,7 @@ class HealthMonitor:
 
     def _determine_overall_status(
         self,
-        results: List[HealthCheckResult]
+        results: list[HealthCheckResult]
     ) -> HealthStatus:
         """
         Determine overall health status from individual checks.
@@ -433,7 +432,7 @@ class HealthMonitor:
         # All components healthy
         return HealthStatus.HEALTHY
 
-    def _attempt_auto_recovery(self, results: List[HealthCheckResult]) -> None:
+    def _attempt_auto_recovery(self, results: list[HealthCheckResult]) -> None:
         """
         Attempt automatic recovery for failed components.
 
@@ -518,7 +517,7 @@ class HealthMonitor:
             self.recovery_attempts.append(action)
             logger.error(f"Recovery failed for {result.component}: {e}")
 
-    def get_recovery_history(self) -> List[RecoveryAction]:
+    def get_recovery_history(self) -> list[RecoveryAction]:
         """
         Get history of recovery actions.
 
@@ -527,7 +526,7 @@ class HealthMonitor:
         """
         return self.recovery_attempts.copy()
 
-    def export_health_status(self) -> Dict[str, Any]:
+    def export_health_status(self) -> dict[str, Any]:
         """
         Export health status for monitoring systems.
 

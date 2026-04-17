@@ -2,10 +2,11 @@
 Unit tests for TextUnit and BodyTranslationPlan data models (HP-06 TC-01).
 """
 import pytest
+
 from src.translation_engine.extractor.text_unit import (
+    BodyTranslationPlan,
     TextUnit,
     TextUnitKind,
-    BodyTranslationPlan,
 )
 
 

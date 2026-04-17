@@ -5,18 +5,17 @@ Tests the QualityMetricsAggregator and StructuredLogger.log_quality_metrics()
 to ensure quality metrics are properly captured and formatted for telemetry.
 """
 
-import pytest
-from dataclasses import dataclass
-from typing import Dict, Any
 
-from src.observability.quality_metrics_aggregator import (
-    QualityMetricsAggregator,
-    QualityMetrics,
-)
+import pytest
+
 from src.observability.logger import StructuredLogger
+from src.observability.quality_metrics_aggregator import (
+    QualityMetrics,
+    QualityMetricsAggregator,
+)
 from src.translation_engine.validation.base import (
-    ValidationResult,
     ValidationIssue,
+    ValidationResult,
     ValidationSeverity,
 )
 

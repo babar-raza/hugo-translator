@@ -1,7 +1,6 @@
 """Tests for progress summary artifact."""
 from pathlib import Path
 
-
 SUMMARY_PATH = Path("reports/user-guide/progress_summary.md")
 
 REQUIRED_HEADERS = [

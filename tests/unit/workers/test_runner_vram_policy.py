@@ -4,15 +4,16 @@ Unit tests for WorkerRunner VRAM policy enforcement.
 Tests that VRAM budgets are correctly applied in different execution modes.
 """
 
-import pytest
 from unittest.mock import MagicMock, patch
 
+import pytest
+
+from src.hardware.vram_enforcer import reset_enforcement_state
 from src.workers.runner import (
+    ExecutionMode,
     WorkerConfig,
     WorkerRunner,
-    ExecutionMode,
 )
-from src.hardware.vram_enforcer import reset_enforcement_state
 
 
 @pytest.fixture(autouse=True)

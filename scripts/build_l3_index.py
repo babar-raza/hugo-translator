@@ -11,7 +11,6 @@ import argparse
 import json
 import sys
 from pathlib import Path
-from typing import Optional
 
 import lmdb
 import structlog
@@ -274,7 +273,7 @@ class L3IndexBuilder:
             use_gpu=False,  # Use CPU for verification
         )
         index_size = l3_verify.index.ntotal if l3_verify.index else 0
-        logger.info(f"✓ Index loaded successfully")
+        logger.info("✓ Index loaded successfully")
         logger.info(f"✓ Vectors in index: {index_size:,}")
         logger.info(f"✓ Metadata entries: {len(l3_verify.metadata):,}")
 

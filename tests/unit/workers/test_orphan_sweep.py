@@ -10,9 +10,7 @@ import subprocess
 import sys
 import types
 from pathlib import Path
-from unittest.mock import MagicMock, patch, call
-
-import pytest
+from unittest.mock import MagicMock, patch
 
 
 # Stub heavy ML deps so the import is fast
@@ -130,8 +128,10 @@ class TestOrphanSweep:
 
     def test_detects_languages_from_filenames(self, tmp_path):
         """Verify language detection and commit message template from file stems."""
-        from src.workers.autonomous_content_translation_worker import AutonomousContentTranslationWorker
         from src.observability.git_commit import GitCommitConfig
+        from src.workers.autonomous_content_translation_worker import (
+            AutonomousContentTranslationWorker,
+        )
 
         files = [
             Path(tmp_path / "content" / "blog.aspose.net" / "barcode" / "art1" / "index.de.md"),
@@ -161,8 +161,10 @@ class TestOrphanSweep:
 
     def test_multi_product_uses_site_scope(self):
         """When files span multiple products, use site-level scope not product."""
-        from src.workers.autonomous_content_translation_worker import AutonomousContentTranslationWorker
         from src.observability.git_commit import GitCommitConfig
+        from src.workers.autonomous_content_translation_worker import (
+            AutonomousContentTranslationWorker,
+        )
 
         files = [
             Path("D:/repo/content/reference.aspose.net/barcode/ar/api.md"),
@@ -180,8 +182,10 @@ class TestOrphanSweep:
 
     def test_single_product_uses_product_scope(self):
         """When all files are from one product on a doc site, use product scope."""
-        from src.workers.autonomous_content_translation_worker import AutonomousContentTranslationWorker
         from src.observability.git_commit import GitCommitConfig
+        from src.workers.autonomous_content_translation_worker import (
+            AutonomousContentTranslationWorker,
+        )
 
         files = [
             Path("D:/repo/content/reference.aspose.net/slides/ar/api1.md"),

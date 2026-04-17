@@ -5,7 +5,7 @@ Defines the structure for representing parsed Markdown content.
 """
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Dict, List, Optional
+from typing import Any, Optional
 
 
 class NodeType(str, Enum):
@@ -13,7 +13,7 @@ class NodeType(str, Enum):
     # Document structure
     DOCUMENT = "document"
     PARAGRAPH = "paragraph"
-    
+
     # Block elements
     HEADING = "heading"
     LIST = "list"
@@ -25,7 +25,7 @@ class NodeType(str, Enum):
     TABLE_CELL = "table_cell"
     THEMATIC_BREAK = "thematic_break"
     BLOCK_HTML = "block_html"
-    
+
     # Inline elements
     TEXT = "text"
     STRONG = "strong"
@@ -50,39 +50,39 @@ class SourceLocation:
 class ASTNode:
     """Base class for all AST nodes."""
     type: NodeType
-    children: List["ASTNode"] = field(default_factory=list)
-    attrs: Dict[str, Any] = field(default_factory=dict)
-    raw: Optional[str] = None
-    location: Optional[SourceLocation] = None
-    node_id: Optional[str] = None
-    node_addr: Optional[str] = None  # AST Translation: Stable node address for deterministic translation
-    
-    def to_dict(self) -> Dict[str, Any]:
+    children: list["ASTNode"] = field(default_factory=list)
+    attrs: dict[str, Any] = field(default_factory=dict)
+    raw: str | None = None
+    location: SourceLocation | None = None
+    node_id: str | None = None
+    node_addr: str | None = None  # AST Translation: Stable node address for deterministic translation
+
+    def to_dict(self) -> dict[str, Any]:
         """Convert node to dictionary representation."""
         result = {"type": self.type.value}
-        
+
         if self.children:
             result["children"] = [child.to_dict() for child in self.children]
-        
+
         if self.attrs:
             result["attrs"] = self.attrs
-        
+
         if self.raw is not None:
             result["raw"] = self.raw
-        
+
         if self.node_id:
             result["id"] = self.node_id
-        
+
         if self.location:
             result["location"] = {
                 "line": self.location.line,
                 "column": self.location.column,
             }
-        
+
         return result
-    
+
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "ASTNode":
+    def from_dict(cls, data: dict[str, Any]) -> "ASTNode":
         """Create node from dictionary."""
         node = cls(
             type=NodeType(data["type"]),
@@ -90,16 +90,16 @@ class ASTNode:
             raw=data.get("raw"),
             node_id=data.get("id"),
         )
-        
+
         if "children" in data:
             node.children = [cls.from_dict(child) for child in data["children"]]
-        
+
         if "location" in data:
             node.location = SourceLocation(
                 line=data["location"]["line"],
                 column=data["location"]["column"],
             )
-        
+
         return node
 
     def assign_addresses(self, prefix: str = "body") -> None:
@@ -124,7 +124,7 @@ class ASTNode:
         self.node_addr = prefix
 
         # Group children by type to assign indices
-        type_counters: Dict[str, int] = {}
+        type_counters: dict[str, int] = {}
 
         for child in self.children:
             # Get type name (lowercase, remove underscores)
@@ -184,17 +184,17 @@ class ASTNode:
 
 # Convenience constructors for common node types
 
-def text_node(content: str, node_id: Optional[str] = None) -> ASTNode:
+def text_node(content: str, node_id: str | None = None) -> ASTNode:
     """Create a text node."""
     return ASTNode(type=NodeType.TEXT, raw=content, node_id=node_id)
 
 
-def paragraph_node(children: List[ASTNode], node_id: Optional[str] = None) -> ASTNode:
+def paragraph_node(children: list[ASTNode], node_id: str | None = None) -> ASTNode:
     """Create a paragraph node."""
     return ASTNode(type=NodeType.PARAGRAPH, children=children, node_id=node_id)
 
 
-def heading_node(level: int, children: List[ASTNode], node_id: Optional[str] = None) -> ASTNode:
+def heading_node(level: int, children: list[ASTNode], node_id: str | None = None) -> ASTNode:
     """Create a heading node."""
     return ASTNode(
         type=NodeType.HEADING,
@@ -204,7 +204,7 @@ def heading_node(level: int, children: List[ASTNode], node_id: Optional[str] = N
     )
 
 
-def link_node(url: str, children: List[ASTNode], title: Optional[str] = None, node_id: Optional[str] = None) -> ASTNode:
+def link_node(url: str, children: list[ASTNode], title: str | None = None, node_id: str | None = None) -> ASTNode:
     """Create a link node."""
     attrs = {"url": url}
     if title:
@@ -212,7 +212,7 @@ def link_node(url: str, children: List[ASTNode], title: Optional[str] = None, no
     return ASTNode(type=NodeType.LINK, children=children, attrs=attrs, node_id=node_id)
 
 
-def code_block_node(code: str, language: Optional[str] = None, node_id: Optional[str] = None) -> ASTNode:
+def code_block_node(code: str, language: str | None = None, node_id: str | None = None) -> ASTNode:
     """Create a code block node."""
     attrs = {}
     if language:
@@ -220,7 +220,7 @@ def code_block_node(code: str, language: Optional[str] = None, node_id: Optional
     return ASTNode(type=NodeType.CODE_BLOCK, raw=code, attrs=attrs, node_id=node_id)
 
 
-def list_node(items: List[ASTNode], ordered: bool = False, node_id: Optional[str] = None) -> ASTNode:
+def list_node(items: list[ASTNode], ordered: bool = False, node_id: str | None = None) -> ASTNode:
     """Create a list node."""
     return ASTNode(
         type=NodeType.LIST,
@@ -230,11 +230,11 @@ def list_node(items: List[ASTNode], ordered: bool = False, node_id: Optional[str
     )
 
 
-def list_item_node(children: List[ASTNode], node_id: Optional[str] = None) -> ASTNode:
+def list_item_node(children: list[ASTNode], node_id: str | None = None) -> ASTNode:
     """Create a list item node."""
     return ASTNode(type=NodeType.LIST_ITEM, children=children, node_id=node_id)
 
 
-def code_span_node(code: str, node_id: Optional[str] = None) -> ASTNode:
+def code_span_node(code: str, node_id: str | None = None) -> ASTNode:
     """Create an inline code span node."""
     return ASTNode(type=NodeType.CODE_SPAN, raw=code, node_id=node_id)

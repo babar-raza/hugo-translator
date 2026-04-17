@@ -5,12 +5,10 @@ import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
-import pytest
-
 from src.benchmarking.feedback import AdaptiveWeightLearner, RecommendationFeedback
 from src.benchmarking.production_ingestor import ProductionMetricsIngestor
 from src.benchmarking.recommender import ModelRecommender
-from src.benchmarking.storage import BenchmarkDatabase, BenchmarkRun, BenchmarkResult
+from src.benchmarking.storage import BenchmarkDatabase, BenchmarkResult, BenchmarkRun
 from src.benchmarking.system_info import SystemInfo, SystemInfoCollector
 
 

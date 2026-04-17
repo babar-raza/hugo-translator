@@ -7,11 +7,11 @@ Verifies SD-02 acceptance checks:
 - Single-line content stays plain
 - Literal style preserved in round-trip
 """
-import pytest
-from ruamel.yaml.scalarstring import LiteralScalarString
-
 # Import directly to avoid full package import chain
 import sys
+
+from ruamel.yaml.scalarstring import LiteralScalarString
+
 sys.path.insert(0, ".")
 
 
