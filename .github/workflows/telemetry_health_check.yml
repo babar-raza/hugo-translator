@@ -8,6 +8,9 @@ on:
   workflow_dispatch:
     # Allow manual trigger (requires self-hosted runner)
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+
 jobs:
   health-check:
     runs-on: self-hosted  # Requires self-hosted runner with local-telemetry repo clone
