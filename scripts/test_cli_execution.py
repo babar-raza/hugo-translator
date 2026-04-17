@@ -240,17 +240,17 @@ def test_resume_flags() -> TestResult:
     )
 
 def test_cache_write_mode() -> TestResult:
-    """TEST-011: --cache-write-mode should accept valid values."""
+    """TEST-011: --cache-write-mode should accept valid values (auto/always/never)."""
     exit_code, stdout, stderr = run_cli([
         "--site", "example",
-        "--cache-write-mode", "skip",
+        "--cache-write-mode", "never",
         "--dry-run"
     ], timeout=10)
     arg_error = "invalid choice" in stderr.lower()
     passed = not arg_error
     return TestResult(
         name="TEST-011: Cache write mode flag",
-        command="python -m src.cli --site example --cache-write-mode skip --dry-run",
+        command="python -m src.cli --site example --cache-write-mode never --dry-run",
         expected="No argument parsing errors",
         exit_code=exit_code,
         stdout=stdout[:300],
