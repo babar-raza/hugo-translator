@@ -8,12 +8,11 @@ Implementation follows RES-03 from the translation resilience plan.
 RES-09: Enhanced with comprehensive error detection and custom exceptions.
 """
 
-import os
 import errno
+import logging
+import os
 import tempfile
 from pathlib import Path
-from typing import Optional
-import logging
 
 logger = logging.getLogger(__name__)
 
@@ -30,6 +29,11 @@ class DiskFullError(AtomicWriteError):
 
 class InvalidPathError(AtomicWriteError):
     """RES-09: Raised when path is invalid or too long."""
+    pass
+
+
+class PermissionDeniedError(AtomicWriteError):
+    """RES-09: Raised when write is denied due to file/directory permissions."""
     pass
 
 
@@ -55,7 +59,7 @@ def _handle_os_error(path: Path, e: OSError) -> None:
 
     Raises:
         DiskFullError: No space left on device
-        PermissionError: Permission denied
+        PermissionDeniedError: Permission denied (EACCES/EPERM)
         ReadOnlyFilesystemError: Filesystem is read-only
         InvalidPathError: Path invalid or too long
         AtomicWriteError: Other write failures
@@ -71,7 +75,7 @@ def _handle_os_error(path: Path, e: OSError) -> None:
 
     # Permission denied
     if err in (errno.EACCES, errno.EPERM):
-        raise PermissionError(
+        raise PermissionDeniedError(
             f"Permission denied: {path}. "
             f"Check file permissions and ownership."
         ) from e
@@ -273,7 +277,7 @@ def verify_atomic_write(path: Path, expected_content: str) -> bool:
         True if content matches, False otherwise
     """
     try:
-        with open(path, 'r', encoding='utf-8') as f:
+        with open(path, encoding='utf-8') as f:
             actual_content = f.read()
         return actual_content == expected_content
     except Exception:

@@ -13,14 +13,20 @@ Tests cover:
 
 import os
 import sys
-import pytest
 from pathlib import Path
 from unittest import mock
+
+import pytest
 
 # Add src to path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
 
-from utils.atomic_write import atomic_write, atomic_write_binary, AtomicWriteError, verify_atomic_write
+from utils.atomic_write import (
+    AtomicWriteError,
+    atomic_write,
+    atomic_write_binary,
+    verify_atomic_write,
+)
 
 
 class TestAtomicWriteSuccess:
@@ -133,7 +139,7 @@ class TestAtomicWriteErrorHandling:
             raise OSError(28, "No space left on device")
 
         with mock.patch('os.fdopen', side_effect=mock_fdopen):
-            with pytest.raises(AtomicWriteError, match="Failed to write"):
+            with pytest.raises(AtomicWriteError, match="No space left on device"):
                 atomic_write(path, "content")
 
     def test_atomic_write_permission_denied_on_create(self, tmp_path):
