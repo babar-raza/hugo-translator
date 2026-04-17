@@ -10,9 +10,7 @@ Tests cover:
 - Error handling and fallback behavior
 """
 
-import os
-from pathlib import Path
-from unittest.mock import MagicMock, patch, PropertyMock
+from unittest.mock import MagicMock
 
 import pytest
 
@@ -22,17 +20,12 @@ from src.model_runtime.contracts import (
     TranslationRequest,
     TranslationResponse,
 )
-from src.model_runtime.llm_backend import LLMModelBackend, LANGUAGE_NAMES, DEFAULT_SYSTEM_PROMPT
+from src.model_runtime.llm_backend import LANGUAGE_NAMES, LLMModelBackend
 from src.model_runtime.llm_providers import (
-    BaseLLMProvider,
     OllamaProvider,
-    OpenAIProvider,
-    AnthropicProvider,
-    OpenAICompatibleProvider,
     create_provider,
 )
 from src.model_runtime.registry import ModelInfo
-
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -355,9 +348,9 @@ class TestLLMModelBackend:
         backend.loaded = True
 
         mock_provider = MagicMock()
-        # Packed prompt returns <<<SEG_N>>> numbered output (single call) — LWF-01 delimiter
+        # Packed prompt returns [N] numbered output (single call)
         mock_provider.generate.return_value = (
-            "<<<SEG_1>>> Bonjour\n<<<SEG_2>>> Au revoir", 10, 7,
+            "[1] Bonjour\n[2] Au revoir", 10, 7,
         )
         backend._provider = mock_provider
 
@@ -372,9 +365,9 @@ class TestLLMModelBackend:
         backend.loaded = True
 
         mock_provider = MagicMock()
-        # LWF-01: <<<SEG_N>>> delimiter
+        # Packed prompt returns [N] numbered output (single call)
         mock_provider.generate.return_value = (
-            "<<<SEG_1>>> Bonjour\n<<<SEG_2>>> Au revoir", 11, 7,
+            "[1] Bonjour\n[2] Au revoir", 11, 7,
         )
         backend._provider = mock_provider
 
