@@ -196,7 +196,7 @@ def recover_legacy_translation_backlog(
             commit_hash = None
             if staged > 0:
                 message = build_message_fn(files, site_id, config)
-                commit_hash = committer._create_commit(message, repo, files)
+                commit_hash = committer._create_commit(message, repo)
             commits.append(
                 LegacyRecoveryCommit(site_id=site_id, file_count=len(files), commit_hash=commit_hash)
             )

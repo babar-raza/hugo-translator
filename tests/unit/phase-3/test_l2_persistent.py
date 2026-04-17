@@ -8,7 +8,7 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent / "src"))
 
-from tm.l2_persistent import L2PersistentTM, TranslationEntry
+from tm.l2_persistent import L2_DB_NAME, L2PersistentTM, TranslationEntry
 from tm.normalization import hash_text, make_tm_key, normalize_text
 
 
@@ -254,3 +254,83 @@ class TestL2PersistentTM:
             entry = tm.exact_lookup("site1", "en", "es", "Hello")
             assert entry.metadata["source_file"] == "content/post.md"
             assert entry.metadata["segment_id"] == "abc123"
+
+
+class TestL2DBNameConstant:
+    """Tests for L2_DB_NAME constant and map_size wiring."""
+
+    def test_l2_db_name_constant(self) -> None:
+        """L2_DB_NAME must be the canonical 'l2.lmdb' to prevent split-database drift."""
+        assert L2_DB_NAME == "l2.lmdb"
+
+    def test_l2_db_name_is_string(self) -> None:
+        """L2_DB_NAME must be a plain string (used in path construction)."""
+        assert isinstance(L2_DB_NAME, str)
+
+    def test_l2_max_size_mb_wiring(self, tmp_path: Path) -> None:
+        """L2PersistentTM must honour an explicit max_size_mb argument."""
+        db_path = tmp_path / L2_DB_NAME
+        # 64 MB is the minimum sensible size; verify the argument is accepted
+        with L2PersistentTM(db_path=db_path, max_size_mb=64):
+            pass
+        assert db_path.exists()
+
+    def test_l2_default_max_size_mb_is_not_zero(self, tmp_path: Path) -> None:
+        """Ensure the default max_size_mb results in a non-empty LMDB file."""
+        import lmdb
+
+        db_path = tmp_path / L2_DB_NAME
+        with L2PersistentTM(db_path=db_path):
+            pass
+        env = lmdb.open(str(db_path), readonly=True, lock=False)
+        stats = env.stat()
+        env.close()
+        assert stats["psize"] > 0
+
+
+class TestGetStats:
+    """Tests for L2PersistentTM.get_stats()."""
+
+    @pytest.fixture
+    def temp_db(self, tmp_path: Path) -> Path:
+        return tmp_path / "stats_test.lmdb"
+
+    def test_get_stats_returns_required_fields(self, temp_db: Path) -> None:
+        """get_stats() must return all four required fields."""
+        with L2PersistentTM(temp_db, max_size_mb=64) as tm:
+            stats = tm.get_stats()
+        assert "map_size_mb" in stats
+        assert "used_mb" in stats
+        assert "used_pct" in stats
+        assert "entries" in stats
+
+    def test_get_stats_used_pct_in_range(self, temp_db: Path) -> None:
+        """used_pct must be within [0, 100] on an empty database."""
+        with L2PersistentTM(temp_db, max_size_mb=64) as tm:
+            stats = tm.get_stats()
+        assert 0.0 <= stats["used_pct"] <= 100.0
+
+    def test_get_stats_map_size_matches_arg(self, temp_db: Path) -> None:
+        """map_size_mb must equal the max_size_mb passed to __init__."""
+        with L2PersistentTM(temp_db, max_size_mb=64) as tm:
+            stats = tm.get_stats()
+        # LMDB rounds map_size to the nearest page boundary, so allow ±1 MiB tolerance
+        assert abs(stats["map_size_mb"] - 64) <= 1, (
+            f"Expected ~64 MiB, got {stats['map_size_mb']:.2f} MiB"
+        )
+
+    def test_get_stats_entries_increments_on_store(self, temp_db: Path) -> None:
+        """entries count must increase after storing a translation."""
+        with L2PersistentTM(temp_db, max_size_mb=64) as tm:
+            before = tm.get_stats()["entries"]
+            tm.store("site1", "en", "de", "Hello", "Hallo")
+            after = tm.get_stats()["entries"]
+        assert after == before + 1
+
+    def test_get_stats_used_pct_math(self, temp_db: Path) -> None:
+        """used_pct must equal used_mb / map_size_mb * 100 within floating-point tolerance."""
+        with L2PersistentTM(temp_db, max_size_mb=64) as tm:
+            stats = tm.get_stats()
+        if stats["map_size_mb"] > 0:
+            expected = stats["used_mb"] / stats["map_size_mb"] * 100
+            assert abs(stats["used_pct"] - expected) < 0.01

@@ -6,9 +6,7 @@ and ensure compatibility between old and new systems.
 """
 
 import json
-import shutil
 import sys
-import tempfile
 from pathlib import Path
 
 import pytest
@@ -24,10 +22,9 @@ class TestLegacyCacheMigration:
     """Test legacy cache migration functionality"""
 
     @pytest.fixture
-    def legacy_cache_dir(self):
-        """Create temporary legacy cache directory with sample data"""
-        tmpdir = tempfile.mkdtemp()
-        cache_dir = Path(tmpdir) / "translation"
+    def legacy_cache_dir(self, tmp_path):
+        """Temporary legacy cache directory with sample data (pytest-managed)."""
+        cache_dir = tmp_path / "translation"
         cache_dir.mkdir()
 
         # Create sample legacy cache files
@@ -60,17 +57,12 @@ class TestLegacyCacheMigration:
             with open(cache_file, 'w', encoding='utf-8') as f:
                 json.dump(cache_data, f, ensure_ascii=False, indent=2)
 
-        yield cache_dir
-
-        # Cleanup
-        shutil.rmtree(tmpdir)
+        return cache_dir
 
     @pytest.fixture
-    def tm_dir(self):
-        """Create temporary TM directory"""
-        tmpdir = tempfile.mkdtemp()
-        yield Path(tmpdir)
-        shutil.rmtree(tmpdir)
+    def tm_dir(self, tmp_path):
+        """Temporary TM directory (pytest-managed, auto-cleaned)."""
+        return tmp_path / "tm"
 
     def test_legacy_cache_file_discovery(self, legacy_cache_dir):
         """Test finding legacy cache files"""
@@ -166,10 +158,9 @@ class TestLegacyCacheMigration:
 
         assert migrated_count == total_entries
 
-    def test_migration_handles_empty_cache(self, tm_dir):
+    def test_migration_handles_empty_cache(self, tmp_path, tm_dir):
         """Test migration with empty legacy cache"""
-        tmpdir = tempfile.mkdtemp()
-        empty_cache_dir = Path(tmpdir) / "empty_cache"
+        empty_cache_dir = tmp_path / "empty_cache"
         empty_cache_dir.mkdir()
 
         # Create empty cache file
@@ -192,13 +183,9 @@ class TestLegacyCacheMigration:
 
         assert len(cache_data) == 0
 
-        # Cleanup
-        shutil.rmtree(tmpdir)
-
-    def test_migration_handles_invalid_entries(self, tm_dir):
+    def test_migration_handles_invalid_entries(self, tmp_path, tm_dir):
         """Test migration with invalid cache entries"""
-        tmpdir = tempfile.mkdtemp()
-        cache_dir = Path(tmpdir) / "cache"
+        cache_dir = tmp_path / "cache"
         cache_dir.mkdir()
 
         # Create cache with invalid entries
@@ -246,9 +233,6 @@ class TestLegacyCacheMigration:
 
         # Should only migrate 2 valid entries
         assert valid_count == 2
-
-        # Cleanup
-        shutil.rmtree(tmpdir)
 
 
 class TestSystemCompatibility:
@@ -305,10 +289,9 @@ class TestSystemCompatibility:
             assert result.target_text == expected_translation
 
     @pytest.fixture
-    def legacy_cache_dir(self):
-        """Create temporary legacy cache directory"""
-        tmpdir = tempfile.mkdtemp()
-        cache_dir = Path(tmpdir) / "translation"
+    def legacy_cache_dir(self, tmp_path):
+        """Temporary legacy cache directory (pytest-managed, auto-cleaned)."""
+        cache_dir = tmp_path / "translation"
         cache_dir.mkdir()
 
         legacy_cache = {
@@ -323,15 +306,12 @@ class TestSystemCompatibility:
         with open(cache_file, 'w', encoding='utf-8') as f:
             json.dump(legacy_cache, f, ensure_ascii=False)
 
-        yield cache_dir
-        shutil.rmtree(tmpdir)
+        return cache_dir
 
     @pytest.fixture
-    def tm_dir(self):
-        """Create temporary TM directory"""
-        tmpdir = tempfile.mkdtemp()
-        yield Path(tmpdir)
-        shutil.rmtree(tmpdir)
+    def tm_dir(self, tmp_path):
+        """Temporary TM directory (pytest-managed, auto-cleaned)."""
+        return tmp_path / "tm"
 
 
 class TestMigrationScriptIntegration:

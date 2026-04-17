@@ -153,7 +153,14 @@ class HealthMonitor:
             Health check result
         """
         try:
-            from src.tm.l2_persistent import L2_DB_NAME
+            try:
+                from src.tm.l2_persistent import L2_DB_NAME
+            except ImportError:
+                return HealthCheckResult(
+                    component="tm_l2_lmdb",
+                    status=HealthStatus.DEGRADED,
+                    message="L2 module unavailable (ImportError)",
+                )
             l2_path = self.tm_data_dir / L2_DB_NAME
 
             if not l2_path.exists():

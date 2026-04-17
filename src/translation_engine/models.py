@@ -85,6 +85,7 @@ class TranslationStats:
     ast_units_protected: int = 0  # TextUnits marked as do_not_translate
     ast_batch_calls: int = 0  # Number of batch translation calls
     ast_individual_fallbacks: int = 0  # Number of fallbacks to individual translation
+    ast_missing_nodes: int = 0  # TC-MLD-01: AST nodes with no matching TextUnit (source-text leakage risk)
 
     # MSP-02: Multiline batching metrics
     multiline_segments: int = 0  # Multiline segments translated
@@ -214,6 +215,7 @@ class DirectoryResult:
             agg.ast_units_protected += result.stats.ast_units_protected
             agg.ast_batch_calls += result.stats.ast_batch_calls
             agg.ast_individual_fallbacks += result.stats.ast_individual_fallbacks
+            agg.ast_missing_nodes += result.stats.ast_missing_nodes
 
         agg.duration_seconds = self.duration_seconds
         return agg

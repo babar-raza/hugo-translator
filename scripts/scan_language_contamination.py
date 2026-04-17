@@ -153,6 +153,11 @@ class FileAnalysis:
     repetition_issues: list[str] = field(default_factory=list)
     action_taken: str = ""   # "deleted" or "" (scan only)
     error: str | None = None
+    # TC-MLD-03: Multi-site and block-level additions
+    site_id: str = ""        # From site profile discovery
+    contaminated_blocks: list[dict] = field(default_factory=list)  # Block-level detail
+    dominant_lang: str = ""  # Most common wrong language detected
+    dominant_lang_confidence: float = 0.0
 
     @property
     def has_quality_issues(self) -> bool:
@@ -178,6 +183,102 @@ class ScanResult:
     target_lang: str
     scan_timestamp: str
     repo_path: str
+
+
+# ---------------------------------------------------------------------------
+# TC-MLD-03: Enhanced false-positive filter for technical identifiers
+# Applied before langdetect on both sentence and block level.
+# ---------------------------------------------------------------------------
+_RE_ASPOSE_PRODUCT = re.compile(r'Aspose\.[A-Z]\w+')
+_RE_PASCAL_CASE = re.compile(r'\b[A-Z][a-z]+(?:[A-Z][a-z]+)+\b')
+_RE_ALLCAPS_ACRONYM = re.compile(r'\b[A-Z]{2,8}\b')
+_RE_API_CALL = re.compile(r'\b[A-Z]\w+\.[a-zA-Z]\w+\(?[^)]*\)?')
+_RE_SHORT_TOKEN = re.compile(r'\b\w{1,3}\b')
+
+
+def _clean_technical_identifiers(text: str) -> str:
+    """
+    Strip technical identifiers from text before language detection.
+    Reduces false positives from English product names, class names, and API identifiers
+    appearing in otherwise correctly-translated documents.
+    """
+    text = _RE_ASPOSE_PRODUCT.sub(' ', text)   # Aspose.Words, Aspose.Cells…
+    text = _RE_API_CALL.sub(' ', text)         # ClassName.method() before PascalCase
+    text = _RE_PASCAL_CASE.sub(' ', text)      # PascalCase identifiers
+    text = _RE_ALLCAPS_ACRONYM.sub(' ', text)  # PDF, ZIP, API, HTML…
+    return text.strip()
+
+
+def _discover_files_from_profiles(
+    profiles_dir: Path,
+    workers_n: int = 1,
+) -> list[tuple[Path, str, str]]:
+    """
+    TC-MLD-03: Discover all translated files from site profile YAML configs.
+
+    Loads each non-disabled YAML profile, expands ${ASPOSE_NET_CONTENT} in content_roots,
+    and collects (file_path, lang, site_id) triples from both file-based and folder-based
+    naming strategies.
+
+    Args:
+        profiles_dir: Directory containing *.yaml site profiles
+        workers_n: Unused (for future parallel discovery); present for API consistency
+
+    Returns:
+        List of (file_path, lang_code, site_id) triples
+    """
+    import os
+    try:
+        from dotenv import load_dotenv
+        load_dotenv(override=False)
+    except ImportError:
+        pass  # dotenv optional; env vars must be set externally
+    try:
+        import yaml
+    except ImportError:
+        logger.error("PyYAML not installed. Install with: pip install pyyaml")
+        return []
+
+    results: list[tuple[Path, str, str]] = []
+
+    # Test/fixture profiles to skip (not production content)
+    _SKIP_PROFILES = {
+        'default', 'example', 'blog-test', 'products-test', 'golden-test',
+        'e2e-reference-fixture', 'nested-list-test', 'stage-b-canary',
+        'realworld_profile', 'realworld-release-candidate', 'ws5-test',
+    }
+
+    scanner = LanguageContaminationScanner()
+
+    for yaml_file in sorted(profiles_dir.glob('*.yaml')):
+        stem = yaml_file.stem
+        if stem in _SKIP_PROFILES:
+            logger.debug(f"Skipping non-production profile: {yaml_file.name}")
+            continue
+
+        try:
+            raw = yaml.safe_load(yaml_file.read_text(encoding='utf-8'))
+        except Exception as e:
+            logger.warning(f"Could not parse profile {yaml_file.name}: {e}")
+            continue
+
+        site_id = raw.get('site_id', stem)
+        content_roots = raw.get('content_roots', [])
+
+        for root_template in content_roots:
+            root = Path(os.path.expandvars(str(root_template)))
+            if not root.exists():
+                logger.warning(f"[{site_id}] content_root missing: {root}")
+                continue
+
+            # Use existing dual-strategy file discovery
+            pairs = scanner._find_all_translated_files(root)
+            logger.info(f"[{site_id}] {root.name}: {len(pairs)} translated files")
+            for fp, lang in pairs:
+                results.append((fp, lang, site_id))
+
+    logger.info(f"Profile discovery total: {len(results)} translated files from {profiles_dir}")
+    return results
 
 
 class LanguageContaminationScanner:
@@ -315,6 +416,255 @@ class LanguageContaminationScanner:
             scan_timestamp=datetime.now().isoformat(),
             repo_path=str(repo_path),
         )
+
+    # ------------------------------------------------------------------
+    # TC-MLD-03: Multi-site profile scan and JSON output
+    # ------------------------------------------------------------------
+
+    def scan_all_profiles(
+        self,
+        profiles_dir: Path,
+        block_level: bool = False,
+        workers: int = 8,
+        fast_mode: bool = False,
+        check_repetition: bool = False,
+    ) -> ScanResult:
+        """
+        Scan ALL production site profiles for contamination.
+
+        Discovers files from each site profile YAML and produces a unified
+        ScanResult. FileAnalysis entries include site_id for grouping.
+
+        Args:
+            profiles_dir: Directory containing site profile YAML files
+            block_level: If True, run block-level detection per file
+            workers: Number of parallel analysis threads
+            fast_mode: If True, skip langdetect (regex only)
+            check_repetition: If True, also run repetition detection
+        """
+        from concurrent.futures import ThreadPoolExecutor, as_completed
+
+        file_triples = _discover_files_from_profiles(profiles_dir)
+        if not file_triples:
+            logger.warning("No files discovered from profiles.")
+            return ScanResult(
+                total_files=0, scanned_files=0, contaminated_files=0,
+                script_mixing_files=0, repetition_files=0, clean_files=0,
+                error_files=0, deleted_files=0, analyses=[],
+                target_lang='all', scan_timestamp=datetime.now().isoformat(),
+                repo_path=str(profiles_dir),
+            )
+
+        logger.info(f"Starting multi-site scan: {len(file_triples)} files, {workers} workers")
+
+        analyses: list[FileAnalysis] = []
+        error_count = 0
+
+        def _analyze_one(fp: Path, lang: str, site_id: str) -> FileAnalysis:
+            try:
+                # Use a common dummy root for relative paths
+                root = fp.parent
+                analysis = self._analyze_file(
+                    fp, lang, root,
+                    check_repetition=check_repetition,
+                    fast_mode=fast_mode,
+                )
+                analysis.site_id = site_id
+                if block_level and not analysis.error and not fast_mode:
+                    analysis.contaminated_blocks = self._analyze_blocks(fp, lang)
+                    # Update dominant lang from blocks if available
+                    if analysis.contaminated_blocks:
+                        from collections import Counter
+                        lang_counts = Counter(b['detected_lang'] for b in analysis.contaminated_blocks)
+                        if lang_counts:
+                            top_lang, top_count = lang_counts.most_common(1)[0]
+                            analysis.dominant_lang = top_lang
+                return analysis
+            except Exception as e:
+                logger.error(f"Error analyzing {fp}: {e}")
+                return FileAnalysis(
+                    file_path=str(fp),
+                    relative_path=fp.name,
+                    target_lang=lang,
+                    total_sentences=0,
+                    correct_lang_count=0,
+                    purity_percentage=100.0,
+                    wrong_lang_samples=[],
+                    error=str(e),
+                    site_id=site_id,
+                )
+
+        with ThreadPoolExecutor(max_workers=workers) as pool:
+            futures = {
+                pool.submit(_analyze_one, fp, lang, site_id): (fp, lang, site_id)
+                for fp, lang, site_id in file_triples
+            }
+            completed = 0
+            for fut in as_completed(futures):
+                completed += 1
+                if completed % 1000 == 0:
+                    logger.info(f"Multi-site scan: {completed}/{len(file_triples)} files processed")
+                result = fut.result()
+                analyses.append(result)
+                if result.error:
+                    error_count += 1
+
+        successful = [a for a in analyses if not a.error]
+        contaminated = [a for a in successful if a.purity_percentage < self.min_purity and a.total_sentences > 0]
+        script_mixing = [a for a in successful if a.script_mixing_issues]
+        repetition = [a for a in successful if a.repetition_issues]
+        clean = [a for a in successful if not a.has_quality_issues]
+
+        return ScanResult(
+            total_files=len(file_triples),
+            scanned_files=len(successful),
+            contaminated_files=len(contaminated),
+            script_mixing_files=len(script_mixing),
+            repetition_files=len(repetition),
+            clean_files=len(clean),
+            error_files=error_count,
+            deleted_files=0,
+            analyses=analyses,
+            target_lang='all',
+            scan_timestamp=datetime.now().isoformat(),
+            repo_path=str(profiles_dir),
+        )
+
+    def _analyze_blocks(self, file_path: Path, target_lang: str) -> list[dict]:
+        """
+        TC-MLD-03: Block-level contamination detection.
+
+        Splits file into structural blocks (paragraph, heading, list item, table cell)
+        and runs langdetect on each. Returns list of contaminated block records.
+
+        Args:
+            file_path: Path to translated Markdown file
+            target_lang: Expected target language code
+
+        Returns:
+            List of dicts: {block_type, line_number, preview, detected_lang, confidence}
+        """
+        try:
+            content = file_path.read_text(encoding='utf-8', errors='replace')
+        except Exception:
+            return []
+
+        contaminated_blocks = []
+        lines = content.split('\n')
+        in_code_block = False
+        in_frontmatter = False
+        frontmatter_seen = False
+
+        for line_num, line in enumerate(lines, start=1):
+            stripped = line.strip()
+
+            # Track frontmatter
+            if stripped == '---' and not frontmatter_seen:
+                in_frontmatter = not in_frontmatter
+                if not in_frontmatter:
+                    frontmatter_seen = True
+                continue
+            if in_frontmatter:
+                continue
+
+            # Track code blocks
+            if stripped.startswith('```'):
+                in_code_block = not in_code_block
+                continue
+            if in_code_block:
+                continue
+
+            if not stripped or len(stripped) < 15:
+                continue
+
+            # Classify block type
+            if re.match(r'^#{1,6}\s', stripped):
+                block_type = 'heading'
+                text = re.sub(r'^#+\s+', '', stripped)
+            elif re.match(r'^[-*+]\s', stripped):
+                block_type = 'list_item'
+                text = re.sub(r'^[-*+]\s+', '', stripped)
+            elif re.match(r'^\d+\.\s', stripped):
+                block_type = 'list_item'
+                text = re.sub(r'^\d+\.\s+', '', stripped)
+            elif '|' in stripped and stripped.startswith('|'):
+                block_type = 'table_cell'
+                # Extract first non-empty cell
+                cells = [c.strip() for c in stripped.split('|') if c.strip() and c.strip() != '---']
+                text = cells[0] if cells else stripped
+            else:
+                block_type = 'paragraph'
+                text = stripped
+
+            if len(text) < 15:
+                continue
+
+            # Apply false-positive filter
+            cleaned = _clean_technical_identifiers(text)
+            if len(cleaned) < 15:
+                continue
+
+            # Detect language
+            try:
+                from langdetect import detect_langs
+                results = detect_langs(cleaned)
+                if not results:
+                    continue
+                detected_lang = str(results[0].lang)
+                conf = float(results[0].prob)
+
+                if detected_lang != target_lang and conf >= 0.70:
+                    contaminated_blocks.append({
+                        'block_type': block_type,
+                        'line_number': line_num,
+                        'preview': text[:120],
+                        'detected_lang': detected_lang,
+                        'confidence': round(conf, 3),
+                    })
+            except Exception:
+                continue
+
+        return contaminated_blocks
+
+    @staticmethod
+    def result_to_json(result: ScanResult, min_purity: float = 95.0) -> dict:
+        """
+        TC-MLD-03: Serialize ScanResult to JSON-compatible dict for --json-output.
+
+        Only includes files that have quality issues (contaminated or error files)
+        in the 'files' list to keep the output manageable.
+        """
+        contaminated_files = [
+            {
+                'file_path': a.file_path,
+                'site_id': a.site_id,
+                'target_lang': a.target_lang,
+                'purity_percentage': round(a.purity_percentage, 2),
+                'threshold': min_purity,
+                'dominant_lang': a.dominant_lang or (
+                    a.wrong_lang_samples[0].get('detected', a.wrong_lang_samples[0].get('detected_lang', ''))
+                    if a.wrong_lang_samples else ''
+                ),
+                'dominant_lang_confidence': a.dominant_lang_confidence,
+                'contaminated_blocks': a.contaminated_blocks,
+                'script_mixing': a.script_mixing_issues,
+                'repetition': a.repetition_issues,
+                'error': a.error,
+            }
+            for a in result.analyses
+            if a.has_quality_issues
+        ]
+
+        return {
+            'scan_timestamp': result.scan_timestamp,
+            'total_files': result.total_files,
+            'scanned_files': result.scanned_files,
+            'contaminated_count': result.contaminated_files,
+            'script_mixing_count': result.script_mixing_files,
+            'error_count': result.error_files,
+            'threshold': min_purity,
+            'files': contaminated_files,
+        }
 
     # ------------------------------------------------------------------
     # File discovery
@@ -929,8 +1279,19 @@ Examples:
     parser.add_argument(
         '--repo',
         type=str,
-        required=True,
-        help='Path to content repository root'
+        required=False,
+        default=None,
+        help='Path to content repository root (mutually exclusive with --profiles-dir)'
+    )
+
+    parser.add_argument(
+        '--profiles-dir',
+        type=str,
+        default=None,
+        metavar='DIR',
+        help='TC-MLD-03: Scan ALL production sites from profile YAMLs in DIR '
+             '(default: config/site_profiles/ when --repo is not given). '
+             'Mutually exclusive with --repo.'
     )
 
     parser.add_argument(
@@ -986,6 +1347,32 @@ Examples:
         help='Fast mode: skip langdetect sentence analysis (regex checks only). ~100x faster, suitable for large repos'
     )
 
+    # TC-MLD-03: New arguments for multi-site, block-level, parallelism, JSON output
+    parser.add_argument(
+        '--block-level',
+        action='store_true',
+        help='TC-MLD-03: Enable per-block (paragraph/heading/list/table) contamination detection. '
+             'Slower but gives contaminated_blocks detail in JSON output.'
+    )
+
+    parser.add_argument(
+        '--workers',
+        type=int,
+        default=8,
+        metavar='N',
+        help='TC-MLD-03: Number of parallel analysis threads when using --profiles-dir (default: 8). '
+             'Use --workers 32 in --fast mode for large repos.'
+    )
+
+    parser.add_argument(
+        '--json-output',
+        type=str,
+        default=None,
+        metavar='PATH',
+        help='TC-MLD-03: Write JSON inventory of contaminated files to this path. '
+             'Used as input for force_retranslate_contaminated.py.'
+    )
+
     parser.add_argument(
         '--verbose',
         action='store_true',
@@ -998,15 +1385,25 @@ Examples:
     if args.verbose:
         logging.getLogger().setLevel(logging.DEBUG)
 
-    # Validate repository path
-    repo_path = Path(args.repo)
-    if not repo_path.exists():
-        logger.error(f"Repository path does not exist: {repo_path}")
-        sys.exit(1)
+    # Determine scan mode: profile-based or single-repo
+    use_profiles = args.profiles_dir is not None or args.repo is None
 
-    if not repo_path.is_dir():
-        logger.error(f"Repository path is not a directory: {repo_path}")
-        sys.exit(1)
+    if not use_profiles:
+        # Original single-repo mode
+        repo_path = Path(args.repo)
+        if not repo_path.exists():
+            logger.error(f"Repository path does not exist: {repo_path}")
+            sys.exit(1)
+        if not repo_path.is_dir():
+            logger.error(f"Repository path is not a directory: {repo_path}")
+            sys.exit(1)
+    else:
+        # Profile-based mode — --repo not required
+        profiles_dir_str = args.profiles_dir or 'config/site_profiles'
+        profiles_dir = Path(profiles_dir_str)
+        if not profiles_dir.exists():
+            logger.error(f"Profiles directory does not exist: {profiles_dir}")
+            sys.exit(1)
 
     if args.repair:
         logger.warning("REPAIR MODE: bad translation files will be DELETED")
@@ -1022,20 +1419,43 @@ Examples:
     scanner = LanguageContaminationScanner(min_purity=args.min_purity)
 
     # Perform scan
-    logger.info("Starting translation quality scan...")
-    result = scanner.scan_repository(
-        repo_path=repo_path,
-        target_lang=args.lang,
-        all_languages=args.all_languages,
-        check_repetition=args.check_repetition,
-        repair=args.repair,
-        since_commit=args.since_commit,
-        fast_mode=args.fast,
-    )
+    if use_profiles:
+        logger.info(f"Starting multi-site profile scan from {profiles_dir} ...")
+        result = scanner.scan_all_profiles(
+            profiles_dir=profiles_dir,
+            block_level=args.block_level,
+            workers=args.workers,
+            fast_mode=args.fast,
+            check_repetition=args.check_repetition,
+        )
+    else:
+        logger.info("Starting translation quality scan...")
+        result = scanner.scan_repository(
+            repo_path=repo_path,
+            target_lang=args.lang,
+            all_languages=args.all_languages,
+            check_repetition=args.check_repetition,
+            repair=args.repair,
+            since_commit=args.since_commit,
+            fast_mode=args.fast,
+        )
 
-    # Generate report
+    # Generate Markdown report
     generator = ReportGenerator()
     generator.generate_report(result, output_path)
+
+    # TC-MLD-03: Write JSON inventory if requested
+    if args.json_output:
+        import json
+        json_path = Path(args.json_output)
+        json_path.parent.mkdir(parents=True, exist_ok=True)
+        json_data = LanguageContaminationScanner.result_to_json(result, min_purity=args.min_purity)
+        json_path.write_text(
+            json.dumps(json_data, indent=2, ensure_ascii=False),
+            encoding='utf-8',
+        )
+        logger.info(f"JSON inventory written to: {json_path}")
+        print(f"JSON inventory: {json_path.absolute()}")
 
     # Print summary
     bad_total = len({
@@ -1055,7 +1475,13 @@ Examples:
         print(f"Deleted (repair mode):        {result.deleted_files}")
     print(f"Error files:                  {result.error_files}")
     print(f"\nReport saved to: {output_path.absolute()}")
+    if args.json_output:
+        print(f"JSON inventory:    {Path(args.json_output).absolute()}")
     print("="*60)
+
+    if bad_total > 0 and args.json_output:
+        print(f"\nTo queue contaminated files for retranslation:")
+        print(f"  python scripts/force_retranslate_contaminated.py --inventory {args.json_output} --delete-outputs")
 
     # Exit with error code if any quality issues found (useful for CI)
     if bad_total > 0:

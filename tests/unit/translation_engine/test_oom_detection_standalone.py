@@ -22,9 +22,15 @@ logger = logging.getLogger(__name__)
 
 
 def create_test_engine():
-    """Create a minimal TranslationEngine instance for testing."""
+    """Create a minimal TranslationEngine instance for testing.
+
+    TranslationEngine.__init__ requires: config_service, tm, model_loader.
+    All heavy dependencies (HugoParser, ValidationSuite, etc.) are patched so
+    the constructor completes without touching real ML infrastructure.
+    """
     mock_config = Mock()
     mock_config.load_global_config.return_value = {}
+    mock_config.get_config.return_value = {}
 
     # Mock site profile
     mock_profile = Mock()
@@ -41,17 +47,18 @@ def create_test_engine():
 
     mock_config.get_site_profile.return_value = mock_profile
 
-    with patch('src.translation_engine.engine.ModelLoader'), \
-         patch('src.translation_engine.engine.TranslationMemory'), \
-         patch('src.translation_engine.engine.HugoParser'), \
+    mock_tm = Mock()
+    mock_loader = Mock()
+
+    with patch('src.translation_engine.engine.HugoParser'), \
          patch('src.translation_engine.engine.SegmentExtractor'), \
          patch('src.translation_engine.engine.ValidationSuite'), \
          patch('src.translation_engine.engine.MarkdownReconstructor'):
 
         engine = TranslationEngine(
             config_service=mock_config,
-            content_dir="/fake/content",
-            device="cpu"
+            tm=mock_tm,
+            model_loader=mock_loader,
         )
         return engine
 

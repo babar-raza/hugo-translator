@@ -2222,7 +2222,7 @@ def translate_site(args: argparse.Namespace) -> int:
 
         from .tm.l2_persistent import L2_DB_NAME
         _raw = config_service.get_config() if hasattr(config_service, "get_config") else {}
-        _l2_max_mb = _raw.get("tm_defaults", {}).get("l2_max_size_mb", 2048)
+        _l2_max_mb = _raw.get("tm_defaults", {}).get("l2_max_size_mb", 1536)
         l2_path = tm_data_dir / L2_DB_NAME
         l2_path.mkdir(parents=True, exist_ok=True)
         l2_persistent = L2PersistentTM(str(l2_path), max_size_mb=_l2_max_mb)

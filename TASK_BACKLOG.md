@@ -2,6 +2,45 @@
 
 ---
 
+## WS-MLD-20260417 — Mixed-Language Defect Detection, Healing & Prevention (harmonic-snacking-kernighan)
+
+**Plan**: `C:\Users\prora\.claude\plans\harmonic-snacking-kernighan.md`
+**Added**: 2026-04-17
+**Status**: IN_PROGRESS
+
+### TC-MLD-01: Prevention fixes + regression tests
+**Status**: IN_PROGRESS
+**Scope**:
+- `src/translation_engine/extractor/text_unit_extractor.py`: zip strict=True; fallback sets None not ""
+- `src/translation_engine/reconstructor/ast_renderer.py`: _missing_node_count; AST_FALLBACK warning; placeholder leak
+- `src/translation_engine/engine.py`: expose missing_node_count in stats; soft contamination queue
+- Tests: `tests/unit/translation_engine/extractor/test_fallback_empty_translation.py`
+- Tests: `tests/unit/translation_engine/reconstructor/test_ast_renderer_missing_node.py`
+- Tests: `tests/unit/translation_engine/reconstructor/test_placeholder_leak.py`
+- Tests: `tests/integration/test_mixed_language_detection.py`
+
+### TC-MLD-02: L2 cache audit + purge script
+**Status**: IN_PROGRESS
+**Scope**: `scripts/audit_l2_cache_contamination.py`
+
+### TC-MLD-03: Detection enhancement
+**Status**: IN_PROGRESS
+**Scope**: `scripts/scan_language_contamination.py` — multi-site profiles, block-level, JSON output, parallelism
+
+### TC-MLD-04: Force-retranslation script
+**Status**: IN_PROGRESS
+**Scope**: `scripts/force_retranslate_contaminated.py`
+
+### TC-MLD-05: Full scan run + cache repair + retranslation + verification
+**Status**: PENDING — requires all above complete + worker run
+**Required evidence**:
+- Before/after contaminated file counts from scan
+- L2 audit contaminated entry counts
+- Unit tests passing
+- Zero AST_FALLBACK / PLACEHOLDER_LEAK in clean run logs
+
+---
+
 ## WS-PRODREADY-20260417 — Production Readiness Final Sprint (stateless-drifting-mccarthy)
 
 **Plan**: `C:\Users\prora\.claude\plans\stateless-drifting-mccarthy.md` (Sections O-Q)

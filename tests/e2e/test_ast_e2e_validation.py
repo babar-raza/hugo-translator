@@ -13,9 +13,7 @@ SR-01: GAP-01 remediation - No end-to-end translation executed through AST pipel
 """
 
 import re
-import shutil
 import subprocess
-import tempfile
 from pathlib import Path
 from typing import Any
 
@@ -23,13 +21,9 @@ import pytest
 
 
 @pytest.fixture(scope="module")
-def test_output_dir():
-    """Create temporary output directory for test translations."""
-    temp_dir = Path(tempfile.mkdtemp(prefix="ast_e2e_"))
-    yield temp_dir
-    # Cleanup
-    if temp_dir.exists():
-        shutil.rmtree(temp_dir)
+def test_output_dir(tmp_path_factory):
+    """Temporary output directory for test translations (pytest-managed)."""
+    return tmp_path_factory.mktemp("ast_e2e")
 
 
 @pytest.fixture(scope="module")

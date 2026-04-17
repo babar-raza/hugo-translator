@@ -190,7 +190,10 @@ def run_audit(
     # Keys to delete in repair mode (collected first, deleted in a second pass)
     keys_to_delete: list[bytes] = []
 
-    env = lmdb.open(str(db_path), readonly=(not repair or dry_run), max_dbs=1)
+    _readonly = not repair or dry_run
+    # On Windows, opening writable after a readonly open in the same session can fail with
+    # ERROR_USER_MAPPED_FILE. Use lock=False to work around this OS-level restriction.
+    env = lmdb.open(str(db_path), readonly=_readonly, max_dbs=1, lock=not repair)
 
     start_time = time.time()
 

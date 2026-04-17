@@ -33,6 +33,8 @@ class ASTRenderer:
         self.applied_units: set = set()
         # Lazy-initialize PlaceholderManager for placeholder restoration
         self._placeholder_manager = None
+        # Counter for AST nodes that had no matching TextUnit (potential source-lang leakage)
+        self._missing_node_count: int = 0
 
     def _restore_placeholders(self, text: str, placeholder_map: dict[str, str]) -> str:
         """
@@ -417,6 +419,7 @@ class ASTRenderer:
         # Build unit map by node_addr for fast lookup
         self.unit_map = {unit.node_addr: unit for unit in units}
         self.applied_units = set()
+        self._missing_node_count = 0  # Reset per call
 
         # Separate frontmatter and body units (FIX-BT-03)
         frontmatter_units = [u for u in units if u.node_addr and u.node_addr.startswith('frontmatter.')]
@@ -440,6 +443,13 @@ class ASTRenderer:
                     f"{len(unapplied_non_frontmatter)} TextUnits were not applied to AST. "
                     f"Sample orphaned addresses: {unapplied_non_frontmatter[:5]}"
                 )
+
+        # Report missing nodes (AST nodes that had no matching TextUnit — source text rendered)
+        if self._missing_node_count > 0:
+            logger.error(
+                f"AST reconstruction: {self._missing_node_count} nodes had no translation unit. "
+                f"Output may contain source-language text (AST_FALLBACK path was taken)."
+            )
 
     def _apply_to_node(self, node: ASTNode) -> None:
         """
@@ -480,7 +490,18 @@ class ASTRenderer:
             # Restore placeholders (if any were applied during extraction)
             placeholder_map = unit.metadata.get('placeholder_map', {})
             if placeholder_map:
-                final_text = self._restore_placeholders(final_text, placeholder_map)
+                restored = self._restore_placeholders(final_text, placeholder_map)
+                # Detect unreplaced placeholder tokens — indicates partial restoration failure
+                remaining_placeholders = re.findall(r'\{PLACEHOLDER_\d+\}', restored)
+                if remaining_placeholders:
+                    logger.warning(
+                        f"PLACEHOLDER_LEAK: {len(remaining_placeholders)} token(s) not restored "
+                        f"for node_addr={node.node_addr!r}. "
+                        f"Tokens: {remaining_placeholders[:3]}. Using pre-restoration text."
+                    )
+                    # Keep final_text pre-restoration; purity gate will catch any stray tokens
+                else:
+                    final_text = restored
 
             # INSTRUMENTATION: Log translation application
             if debug_mode and node.type == NodeType.PARAGRAPH:
@@ -605,6 +626,16 @@ class ASTRenderer:
                     if debug_mode and node.type == NodeType.PARAGRAPH:
                         logger.info("[HARDENING-FIX-A] FLATTENING (no inline formatting)")
 
+                    # Bug 4: Preserve block-level children — flattening must not destroy them.
+                    # A container can have a full-sentence TextUnit for its inline text
+                    # AND also contain CODE_BLOCK or nested LIST children (which are either
+                    # extracted as do_not_translate units or have their own units). Keep
+                    # block-level children alongside the translated text node.
+                    block_children = [
+                        child for child in node.children
+                        if child.type in (NodeType.CODE_BLOCK, NodeType.LIST)
+                    ]
+
                     text_node = ASTNode(
                         type=NodeType.TEXT,
                         raw=final_text,
@@ -612,7 +643,7 @@ class ASTRenderer:
                         attrs={},
                         node_addr=f"{node.node_addr}.0"
                     )
-                    node.children = [text_node]
+                    node.children = [text_node] + block_children
 
                     # Mark as applied
                     self.applied_units.add(node.node_addr)
@@ -624,6 +655,27 @@ class ASTRenderer:
 
             # Note: For PARAGRAPH with inline formatting (FIX-A), we don't mark as applied
             # so children can be processed recursively
+
+        # TC-MLD-01: Detect nodes with an address but no matching TextUnit.
+        # These nodes will render their original source-language children as-is —
+        # the primary AST_FALLBACK path for mixed-language output.
+        if (node.node_addr
+                and node.node_addr not in self.unit_map
+                and node.node_addr not in self.applied_units
+                and not node.node_addr.startswith(('frontmatter.', '__'))):
+            has_prose = any(
+                c.type == NodeType.TEXT and c.raw and len(c.raw.strip()) > 5
+                for c in node.children
+            )
+            if has_prose and node.type not in (
+                NodeType.CODE_BLOCK, NodeType.CODE_SPAN, NodeType.INLINE_HTML
+            ):
+                self._missing_node_count += 1
+                logger.warning(
+                    f"AST_FALLBACK: node_addr={node.node_addr!r} not in unit_map "
+                    f"(type={node.type.name}). Source text will be rendered as-is. "
+                    f"May indicate extraction gap or segment mapping corruption."
+                )
 
         # Recursively apply to children
         for child in node.children:
@@ -801,9 +853,9 @@ class ASTRenderer:
                 first_line = marker + lines[0]
                 subsequent_lines = ['  ' + line for line in lines[1:]]  # Indent continuation
 
-                output.append(first_line)
-                output.extend(subsequent_lines)
-                output.append('\n')
+                output.append(first_line + '\n')
+                for sub_line in subsequent_lines:
+                    output.append(sub_line + '\n')
 
         output.append('\n')  # Extra newline after list
         return "".join(output)

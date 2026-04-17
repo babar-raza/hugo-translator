@@ -90,13 +90,16 @@ class L2PersistentTM:
     with fast lookups and batch operations.
     """
 
-    def __init__(self, db_path: Path | str, max_size_mb: int = 1024):
+    def __init__(self, db_path: Path | str, max_size_mb: int = 1536):
         """
         Initialize L2 persistent TM.
 
         Args:
             db_path: Path to LMDB database directory
-            max_size_mb: Maximum database size in MB (default: 1GB)
+            max_size_mb: Maximum database size in MB (default: 1536 MB, matches
+                config/global.yaml tm_defaults.l2_max_size_mb). Callers should
+                read this value from config; the default here is the fallback of
+                last resort so that bare instantiation never creates a 1 GB file.
         """
         self.db_path = Path(db_path)
         self.db_path.mkdir(parents=True, exist_ok=True)
@@ -440,6 +443,33 @@ class L2PersistentTM:
 
         logger.info(f"Exported {len(entries)} entries from L2")
         return entries
+
+    def get_stats(self) -> dict:
+        """
+        Return LMDB utilization stats (readonly, side-effect-free).
+
+        Returns:
+            dict with keys:
+                map_size_mb  – total allocated map size in MiB
+                used_mb      – estimated used space in MiB (live data pages only)
+                used_pct     – used_mb / map_size_mb * 100
+                entries      – number of stored key/value pairs
+        """
+        with self._lock:
+            info = self.env.info()
+            stat = self.env.stat()
+            map_size_bytes = info["map_size"]
+            page_size = stat["psize"]
+            used_pages = stat["branch_pages"] + stat["leaf_pages"] + stat["overflow_pages"]
+            used_bytes = used_pages * page_size
+            map_size_mb = map_size_bytes / 1024 / 1024
+            used_mb = used_bytes / 1024 / 1024
+            return {
+                "map_size_mb": map_size_mb,
+                "used_mb": used_mb,
+                "used_pct": (used_mb / map_size_mb * 100) if map_size_mb > 0 else 0.0,
+                "entries": stat["entries"],
+            }
 
     def close(self) -> None:
         """Close database connection."""

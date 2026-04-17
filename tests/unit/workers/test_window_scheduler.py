@@ -122,8 +122,12 @@ class TestWindowScheduler:
         # Mock current time to 2025-01-16 09:00 PST (before window)
         mock_now = datetime(2025, 1, 16, 9, 0, tzinfo=ZoneInfo("America/Los_Angeles"))
 
+        # datetime is selectively imported in window_scheduler (from datetime import datetime).
+        # Patching the class-level name mocks .now() but leaves timedelta unpatched.
+        # .combine() must delegate to the real impl to avoid MagicMock arithmetic TypeError.
         with patch("src.workers.window_scheduler.datetime") as mock_datetime:
             mock_datetime.now.return_value = mock_now
+            mock_datetime.combine.side_effect = datetime.combine
             run_times = scheduler.get_base_run_times_today()
 
         # Verify 5 runs
@@ -158,6 +162,7 @@ class TestWindowScheduler:
 
         with patch("src.workers.window_scheduler.datetime") as mock_datetime:
             mock_datetime.now.return_value = mock_now
+            mock_datetime.combine.side_effect = datetime.combine
             run_times = scheduler.get_base_run_times_today()
 
         assert len(run_times) == 1
@@ -216,6 +221,7 @@ class TestWindowScheduler:
 
         with patch("src.workers.window_scheduler.datetime") as mock_datetime:
             mock_datetime.now.return_value = mock_now
+            mock_datetime.combine.side_effect = datetime.combine
             next_run = scheduler.get_next_run_time(apply_jitter=False)
 
         # Should return first run of today (10:00)
@@ -237,6 +243,7 @@ class TestWindowScheduler:
 
         with patch("src.workers.window_scheduler.datetime") as mock_datetime:
             mock_datetime.now.return_value = mock_now
+            mock_datetime.combine.side_effect = datetime.combine
             next_run = scheduler.get_next_run_time(apply_jitter=False)
 
         # Should return next run (16:00)
@@ -258,6 +265,7 @@ class TestWindowScheduler:
 
         with patch("src.workers.window_scheduler.datetime") as mock_datetime:
             mock_datetime.now.return_value = mock_now
+            mock_datetime.combine.side_effect = datetime.combine
             next_run = scheduler.get_next_run_time(apply_jitter=False)
 
         # Should return first run of tomorrow (10:00)
@@ -349,6 +357,7 @@ class TestWindowScheduler:
 
         with patch("src.workers.window_scheduler.datetime") as mock_datetime:
             mock_datetime.now.return_value = mock_now_la
+            mock_datetime.combine.side_effect = datetime.combine
             next_run = scheduler.get_next_run_time(apply_jitter=False)
 
         # Should return next run in LA timezone (13:00 LA time)
@@ -372,6 +381,7 @@ class TestWindowScheduler:
 
         with patch("src.workers.window_scheduler.datetime") as mock_datetime:
             mock_datetime.now.return_value = mock_now
+            mock_datetime.combine.side_effect = datetime.combine
             run_times = scheduler.get_base_run_times_today()
 
         # Should still have 2 runs despite DST transition

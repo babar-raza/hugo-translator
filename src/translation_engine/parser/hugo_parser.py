@@ -408,6 +408,12 @@ class HugoParser:
                 nested_list, i = self._parse_list(tokens, i, ordered=is_ordered)
                 children.append(nested_list)
 
+            # Handle fenced/indented code block inside list item (Bug 1)
+            elif token.type in ("fence", "code_block"):
+                lang = token.info if hasattr(token, "info") else None
+                children.append(code_block_node(token.content, lang, self._generate_node_id()))
+                i += 1
+
             else:
                 i += 1
 

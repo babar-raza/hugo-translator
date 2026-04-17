@@ -14,7 +14,7 @@ REPO_ROOT = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(REPO_ROOT))
 os.chdir(str(REPO_ROOT))
 
-from src.translation_engine.extractor.text_unit_extractor import TextUnitExtractor
+from src.translation_engine.extractor.segment_extractor import SegmentExtractor
 from src.translation_engine.parser.hugo_parser import HugoParser
 from src.translation_engine.reconstructor.markdown_reconstructor import MarkdownReconstructor
 from src.utils.models import BodyRules, SiteProfile
@@ -99,28 +99,37 @@ Use security scanning to detect issues.
         frontmatter={}
     )
 
-    # Extract text units
-    extractor = TextUnitExtractor(site_profile)
-    translation_plan = extractor.extract_from_ast(source_doc.ast, source_doc.frontmatter)
-    text_units = translation_plan.units
+    # Extract segments (production path: SegmentExtractor, not TextUnitExtractor)
+    # MarkdownReconstructor._find_body_translation looks up by node_id via segment_map,
+    # so we must use the same extractor+segment_map pattern as the production engine.
+    extractor = SegmentExtractor(site_profile)
+    segments = extractor.extract_all(source_doc)
 
-    print(f"[3/5] Extracted {len(text_units)} text units")
+    print(f"[3/5] Extracted {len(segments)} segments")
 
     # "Translate" with fake backend that produces errors
     fake_backend = FakeMTModelWithErrors()
     translations = {}
 
-    for unit in text_units:
-        source_text = unit.source_text
+    for segment in segments:
+        source_text = segment.source_text
         translated_text = fake_backend.translate_batch([source_text], "en", "fr")[0]
-        translations[unit.unit_id] = translated_text
-        print(f"      Unit '{source_text[:40]}...' -> '{translated_text[:40]}...'")
+        translations[segment.id] = translated_text
+        print(f"      Segment '{source_text[:40]}...' -> '{translated_text[:40]}...'")
 
     print("[4/5] Simulated translation with intentional errors")
 
+    # Build segment_map (node_id -> segment_id), exactly like engine.py does
+    segment_map = {}
+    for segment in segments:
+        if segment.context and segment.context.node_id:
+            segment_map[segment.context.node_id] = segment.id
+
     # Reconstruct with glossary corrections
     reconstructor = MarkdownReconstructor(site_profile)
-    reconstructed_body = reconstructor.reconstruct_body(source_doc.ast, translations, "fr")
+    reconstructed_body = reconstructor.reconstruct_document(
+        source_doc, translations, "fr", segment_map=segment_map
+    )
 
     print(f"[5/5] Reconstructed document: {len(reconstructed_body)} characters")
 

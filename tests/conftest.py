@@ -12,6 +12,12 @@ import yaml
 project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root / "src"))
 
+# Standalone scripts that match test_*.py naming but are not pytest tests.
+# Importing them during collection causes StopIteration (module-level execution).
+collect_ignore = [
+    str(Path(__file__).parent / "regression" / "test_reconstruction_fix.py"),
+]
+
 
 # Pytest command-line options
 def pytest_addoption(parser):

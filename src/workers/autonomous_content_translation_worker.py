@@ -221,8 +221,13 @@ class AutonomousContentTranslationWorker:
 
             # Create TM components
             l1_cache = L1Cache(max_size=10000)
-            l2_max_size_mb = raw_config.get("tm_defaults", {}).get("l2_max_size_mb", 2048)
+            l2_max_size_mb = raw_config.get("tm_defaults", {}).get("l2_max_size_mb", 1536)
             l2_persistent = L2PersistentTM(db_path=tm_data_dir / L2_DB_NAME, max_size_mb=l2_max_size_mb)
+            _l2s = l2_persistent.get_stats()
+            logger.info(
+                "[L2] map used: %.0f / %.0f MiB (%.1f%%) — %d entries",
+                _l2s["used_mb"], _l2s["map_size_mb"], _l2s["used_pct"], _l2s["entries"],
+            )
 
             # Try to initialize L3 semantic TM (optional)
             l3_semantic = None
@@ -1277,6 +1282,19 @@ class AutonomousContentTranslationWorker:
     def _commit_orphaned_translations(self) -> int:
         from src.observability.git_commit_helper import recover_orphaned_commit_manifests
         from src.observability.legacy_backlog_recovery import recover_legacy_translation_backlog
+
+        # Respect global git_commit.enabled flag — if disabled, skip all orphan recovery.
+        try:
+            gc_cfg = self.config_service.global_config.git_commit
+            if isinstance(gc_cfg, dict):
+                enabled = gc_cfg.get("enabled", True)
+            else:
+                enabled = getattr(gc_cfg, "enabled", True)
+            if not enabled:
+                logger.debug("[orphan_sweep] git_commit disabled — skipping orphan recovery")
+                return 0
+        except Exception:
+            pass  # If config is unavailable, proceed with recovery
 
         try:
             git_roots = self._iter_recovery_git_roots()

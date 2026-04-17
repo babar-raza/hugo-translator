@@ -51,7 +51,7 @@ tm_defaults:
   semantic_threshold: 0.80
   fallback_exact_only: false
   l1_cache_size: 10000
-  l2_max_size_mb: 2048  # Post-merge (2026-04-17): 696K entries @ 878 MB used; raised from 1024 for growth headroom
+  l2_max_size_mb: 1536  # 2026-04-17: 696K entries @ 878 MB used; 1536 MiB = 658 MiB headroom. Run scripts/compact_l2_lmdb.py with workers stopped to reclaim 2 GB pre-alloc.
   l3_embedding_model: "sentence-transformers/paraphrase-multilingual-mpnet-base-v2"
   l3_index_type: "IVFFlat"  # Flat, IVFFlat, HNSW
 

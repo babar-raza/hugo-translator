@@ -5,7 +5,6 @@ Tests end-to-end flow with actual TranslationEngine and LLM translation.
 """
 
 import os
-import tempfile
 from pathlib import Path
 
 import pytest
@@ -14,7 +13,7 @@ import pytest
 SKIP_HEAVY_TESTS = os.getenv("SKIP_HEAVY_TESTS", "false").lower() == "true"
 
 @pytest.mark.skipif(SKIP_HEAVY_TESTS, reason="Heavy integration test - skipped in CI")
-def test_translate_file_with_telemetry_real_llm():
+def test_translate_file_with_telemetry_real_llm(tmp_path):
     """
     End-to-end test with real translation and telemetry.
 
@@ -43,12 +42,12 @@ This is a test document for verifying telemetry integration.
 - Field extraction
 """
 
-    with tempfile.NamedTemporaryFile(mode='w', suffix='.md', delete=False, encoding='utf-8') as f:
-        f.write(test_content)
-        test_file = Path(f.name)
+    test_file = tmp_path / "test_input.md"
+    test_file.write_text(test_content, encoding="utf-8")
 
     # Create output directory
-    output_dir = Path(tempfile.mkdtemp())
+    output_dir = tmp_path / "output"
+    output_dir.mkdir()
 
     try:
         # Load config
@@ -92,18 +91,7 @@ This is a test document for verifying telemetry integration.
         assert "---" in output_content  # Frontmatter preserved
 
     finally:
-        # Cleanup
-        if test_file.exists():
-            test_file.unlink()
-
-        if output_dir.exists():
-            for f in output_dir.rglob('*'):
-                if f.is_file():
-                    f.unlink()
-            for d in sorted(output_dir.rglob('*'), reverse=True):
-                if d.is_dir():
-                    d.rmdir()
-            output_dir.rmdir()
+        pass  # tmp_path is managed by pytest and auto-cleaned after the test
 
 
 def test_telemetry_graceful_degradation():

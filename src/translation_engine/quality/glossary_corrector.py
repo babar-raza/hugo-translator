@@ -117,28 +117,22 @@ class GlossaryCorrector:
             # Case-insensitive matching
             pattern = r'\b' + re.escape(incorrect) + r'\b'
 
-            # Find all matches (case-insensitive)
-            matches = re.finditer(pattern, corrected, flags=re.IGNORECASE)
-            match_found = False
+            # Use re.sub with a function to handle all occurrences safely.
+            # Iterating re.finditer while mutating the string causes off-by-one
+            # position errors when replacement and pattern have different lengths.
+            _match_found = False
 
-            for match in matches:
-                match_found = True
-                # Preserve original case if first letter was uppercase
+            def _replace(match, _correct=correct, _found=None):
+                nonlocal _match_found
+                _match_found = True
                 matched_text = match.group(0)
                 if matched_text and matched_text[0].isupper():
-                    # Capitalize replacement
-                    replacement = correct.capitalize()
-                else:
-                    replacement = correct
+                    return _correct.capitalize()
+                return _correct
 
-                # Replace this occurrence
-                corrected = (
-                    corrected[:match.start()] +
-                    replacement +
-                    corrected[match.end():]
-                )
+            corrected = re.sub(pattern, _replace, corrected, flags=re.IGNORECASE)
 
-            if match_found:
+            if _match_found:
                 corrections_applied.append(f"{incorrect} -> {correct}")
 
         if corrections_applied:

@@ -1,8 +1,6 @@
 """
 Unit tests for L3 Semantic Translation Memory.
 """
-import shutil
-import tempfile
 from pathlib import Path
 
 import pytest
@@ -11,11 +9,9 @@ from src.tm.l3_semantic import L3SemanticTM, SemanticMatch
 
 
 @pytest.fixture
-def temp_index_dir():
-    """Create temporary directory for FAISS index."""
-    temp_dir = tempfile.mkdtemp()
-    yield Path(temp_dir)
-    shutil.rmtree(temp_dir, ignore_errors=True)
+def temp_index_dir(tmp_path):
+    """Temporary directory for FAISS index (pytest-managed, auto-cleaned)."""
+    return tmp_path
 
 
 @pytest.fixture

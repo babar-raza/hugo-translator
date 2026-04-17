@@ -254,19 +254,21 @@ def test_disk_full_error_raises_specific_exception():
 @pytest.mark.contract
 def test_permission_error_raised_correctly():
     """
-    Verify PermissionError is raised for EACCES.
+    Verify PermissionDeniedError is raised for EACCES.
 
     CONTRACT: INV-002 / RES-09 - Specific error detection
-    Evidence: src/utils/atomic_write.py lines 72-77 (PermissionError)
+    Evidence: src/utils/atomic_write.py lines 35-37, 72-77 (PermissionDeniedError)
+    Note: atomic_write uses a custom PermissionDeniedError (subclass of AtomicWriteError),
+    not the builtin PermissionError.
     """
-    from src.utils.atomic_write import _handle_os_error
+    from src.utils.atomic_write import PermissionDeniedError, _handle_os_error
 
     # Arrange
     path = Path("/fake/path/file.md")
     permission_error = OSError(errno.EACCES, "Permission denied")
 
     # Act & Assert
-    with pytest.raises(PermissionError) as exc_info:
+    with pytest.raises(PermissionDeniedError) as exc_info:
         _handle_os_error(path, permission_error)
 
     assert "Permission denied" in str(exc_info.value)

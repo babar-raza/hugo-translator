@@ -1846,6 +1846,27 @@ class TranslationEngine:
                                         f"Detected languages: {purity_result['detected_languages']}. "
                                         f"Blocking write to prevent corruption of {output_path.name}."
                                     )
+                                else:
+                                    # TC-MLD-01: Soft contamination queue.
+                                    # File passed the purity gate but still has 2-N% wrong-language
+                                    # paragraphs — queue for eventual cleanup on a future worker run.
+                                    # Do NOT apply to languages with overrides > 0.10 (e.g. lt: 0.30)
+                                    # where high FP rates from FastText make the percentage misleading.
+                                    _wrong_pct = purity_result.get('wrong_lang_percentage', 0.0)
+                                    _soft_threshold = 0.02  # 2% floor — below this, not worth queuing
+                                    _purity_override = self._get_purity_threshold(target_lang)
+                                    if (_wrong_pct > _soft_threshold
+                                            and _purity_override <= 0.10
+                                            and output_path is not None):
+                                        try:
+                                            _rtq_add(output_path, target_lang)
+                                            logger.info(
+                                                f"SOFT_CONTAMINATION: {_wrong_pct:.1%} wrong-language "
+                                                f"paragraphs in {output_path.name} — passes purity gate "
+                                                f"but queued for cleanup on next worker run."
+                                            )
+                                        except Exception as _rtq_err:
+                                            logger.debug(f"soft contamination queue failed: {_rtq_err}")
 
                         # CODE BLOCK / HALLUCINATION GATE
                         # Blocks write if code blocks were lost or content was hallucinated
@@ -2593,6 +2614,16 @@ class TranslationEngine:
             logger.info("AST Translation: Applying translations to AST and frontmatter")
             renderer = ASTRenderer()
             renderer.apply_translations(doc.ast, translated_units, frontmatter=doc.frontmatter)
+
+            # TC-MLD-01: Expose missing node count in translation stats for monitoring
+            if renderer._missing_node_count > 0:
+                stats.ast_missing_nodes = renderer._missing_node_count
+                logger.warning(
+                    f"AST Translation: {renderer._missing_node_count} nodes had no translation unit "
+                    f"— source text may appear in output. File-level purity gate is the safety net."
+                )
+            else:
+                stats.ast_missing_nodes = 0
 
             # Step 4: Render to Markdown
             logger.info("AST Translation: Rendering AST to Markdown")

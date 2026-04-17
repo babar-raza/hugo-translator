@@ -42,10 +42,13 @@ def migrate(src_path: Path, dst_path: Path, dry_run: bool = False) -> None:
     src_stat = src_env.stat()
     print(f"Source entries: {src_stat['entries']}")
 
+    # Open destination with its existing map_size (do not grow the file).
+    # On Windows, lmdb.open() extends data.mdb to map_size — so passing a
+    # large value here would bloat the file.  Use 0 to inherit the existing
+    # map_size from the already-initialised destination database.
     dst_env = lmdb.open(
         str(dst_path),
-        map_size=src_stat["psize"] * src_stat["branch_pages"]
-        + 2 * 1024 * 1024 * 1024,  # 2 GB safety headroom
+        map_size=0,  # 0 = keep existing map_size (no file extension)
         max_dbs=1,
         readonly=dry_run,
     )

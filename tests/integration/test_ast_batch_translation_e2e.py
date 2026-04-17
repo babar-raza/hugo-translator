@@ -53,7 +53,7 @@ class TestASTBatchTranslationE2E:
         mt_model.tokenizer.decode = Mock(side_effect=mock_decode)
 
         # Mock translation function
-        def mock_translate(texts, src, tgt):
+        def mock_translate(texts, src, tgt, **kwargs):
             """Mock translation that preserves delimiters and translates text."""
             results = []
             for text in texts:

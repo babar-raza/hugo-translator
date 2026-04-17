@@ -719,9 +719,12 @@ class TextUnitExtractor:
                                 if not is_similar:
                                     logger.warning(
                                         f"Individual fallback failed purity: Expected {tgt_lang}, "
-                                        f"got {detected} ({conf:.2%}). Marking as empty."
+                                        f"got {detected} ({conf:.2%}). Marking as untranslated."
                                     )
-                                    unit.translated_text = ""  # Mark as failed
+                                    # Set None (not "") so get_final_text() returns source_text,
+                                    # making the failure visible to the file-level purity gate
+                                    # rather than silently writing a blank paragraph.
+                                    unit.translated_text = None  # Mark as failed — purity gate will catch
                                     self.batch_stats['individual_purity_failures'] = \
                                         self.batch_stats.get('individual_purity_failures', 0) + 1
                                     continue
@@ -733,11 +736,13 @@ class TextUnitExtractor:
                         self.batch_stats['individual_translation_errors'] += 1
                 else:
                     self.batch_stats['individual_translation_errors'] += 1
-                    unit.translated_text = ""
+                    # Set None so get_final_text() surfaces source_text to purity gate
+                    unit.translated_text = None
             except Exception as e:
                 logger.error(f"Individual translation failed for unit: {e}")
                 self.batch_stats['individual_translation_errors'] += 1
-                unit.translated_text = ""
+                # Set None so get_final_text() surfaces source_text to purity gate
+                unit.translated_text = None
 
         self.batch_stats['individual_translations'] = \
             self.batch_stats.get('individual_translations', 0) + len(batch)
@@ -818,7 +823,10 @@ class TextUnitExtractor:
             return False
 
         # SUCCESS: Apply translations (perfect 1:1 mapping)
-        for unit, translation in zip(batch, translations, strict=False):
+        # strict=True: the length check above guarantees equality before reaching here;
+        # if it ever fires unexpectedly, the except at the caller catches it and falls
+        # back to individual translation rather than silently dropping units.
+        for unit, translation in zip(batch, translations, strict=True):
             unit.translated_text = translation.strip()
 
         # LANGUAGE PURITY CHECK: Verify all translations are in target language
@@ -1486,6 +1494,13 @@ class TextUnitExtractor:
         elif node.type == NodeType.INLINE_HTML:
             return node.raw or ""
 
+        elif node.type == NodeType.CODE_BLOCK:
+            # Bug 2: CODE_BLOCK has no children — content is in node.raw.
+            # Return fenced representation with trailing \n\n to match renderer output.
+            lang = node.attrs.get("lang", "") if node.attrs else ""
+            code = node.raw or ""
+            return f"```{lang}\n{code}```\n\n"
+
         # Default: recurse through children
         text_parts = []
         for child in node.children:
@@ -1508,9 +1523,12 @@ class TextUnitExtractor:
             # FIX-B: Make sentence_only safe - check for inline formatting
             # If inline formatting is present, fall back to leaf extraction
             has_formatting = self._has_inline_formatting(node)
-            if has_formatting:
-                # Don't extract full sentence - inline formatting would be lost
-                logger.debug(f"FIX-B: Skipping full-sentence extraction for {node.node_addr} (has inline formatting)")
+            # Bug 3: Also fall back when block-level content (CODE_BLOCK) is present —
+            # full-sentence extraction cannot represent block children as plain text.
+            has_block = self._has_block_content(node)
+            if has_formatting or has_block:
+                # Don't extract full sentence - content would be lost
+                logger.debug(f"FIX-B: Skipping full-sentence extraction for {node.node_addr} (has inline formatting or block content)")
                 return False
             return True
         elif self.segmentation_strategy == "adaptive":
@@ -1542,6 +1560,14 @@ class TextUnitExtractor:
             if self._has_inline_formatting(child):
                 return True
 
+        return False
+
+    def _has_block_content(self, node: ASTNode) -> bool:
+        """Check if node has block-level children (CODE_BLOCK) that cannot be
+        represented as plain text in full-sentence extraction mode."""
+        for child in node.children:
+            if child.type == NodeType.CODE_BLOCK:
+                return True
         return False
 
     def _has_technical_content(self, node: ASTNode) -> bool:

@@ -47,6 +47,20 @@ def _make_worker(sites_config=None):
         for site_id, roots in sites_config.items():
             profile = MagicMock()
             profile.content_roots = roots
+            profile.default_source_lang = "en"
+            # output_layout=None ensures _is_translation_output uses filename-suffix
+            # detection (index.de.md) rather than per_language_folders detection
+            # (lang inferred from folder name). A bare MagicMock is truthy and
+            # would incorrectly activate the per_language_folders path.
+            profile.output_layout = None
+            # Explicit target_langs required: _is_translation_output() checks
+            # whether the file's language suffix is in this set.  A bare MagicMock
+            # iterates as empty, causing all files to be rejected as "unknown lang".
+            profile.target_langs = [
+                "de", "fr", "zh", "ar", "es", "pt", "ru", "ja", "ko",
+                "it", "nl", "pl", "tr", "sv", "da", "fi", "cs", "sk",
+                "hu", "ro", "bg", "hr", "sr", "sl", "uk", "ms", "id",
+            ]
             profiles[site_id] = profile
         config_service.get_site_profile.side_effect = lambda sid: profiles[sid]
         config_service.resolve_content_root.side_effect = lambda cr: Path(cr)
@@ -117,7 +131,9 @@ class TestOrphanSweep:
         worker = _make_worker({"blog.aspose.net": [str(content_root)]})
         result = worker._commit_orphaned_translations()
 
-        assert result >= 2
+        # Recovery counts commits (one per site), not individual files.
+        # Both orphaned files are in the same site → 1 commit expected.
+        assert result >= 1
 
         # Verify files are now committed (clean working tree)
         status = subprocess.run(

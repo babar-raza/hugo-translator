@@ -152,7 +152,7 @@ class JobProcessor:
         # Setup L2 persistent TM path
         from src.tm.l2_persistent import L2_DB_NAME
         _l2_cfg = self.config_service.get_config() if self.config_service else {}
-        _l2_max_mb = _l2_cfg.get("tm_defaults", {}).get("l2_max_size_mb", 2048)
+        _l2_max_mb = _l2_cfg.get("tm_defaults", {}).get("l2_max_size_mb", 1536)
         l2_path = Path(self.tm_path) / L2_DB_NAME
         l2_path.mkdir(parents=True, exist_ok=True)
         l2_persistent = L2PersistentTM(str(l2_path), max_size_mb=_l2_max_mb)
