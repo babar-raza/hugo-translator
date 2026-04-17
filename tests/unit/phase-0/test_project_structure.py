@@ -87,7 +87,7 @@ class TestConfigurationFiles:
     def test_readme_exists_and_not_empty(self, project_root_dir: Path) -> None:
         """Verify README exists and has content."""
         readme = project_root_dir / 'README.md'
-        content = readme.read_text()
+        content = readme.read_text(encoding='utf-8')
 
         assert len(content) > 100, "README should have substantial content"
         assert 'Hugo Translation System' in content
@@ -95,8 +95,9 @@ class TestConfigurationFiles:
     def test_gitignore_exists(self, project_root_dir: Path) -> None:
         """Verify .gitignore exists and has Python ignores."""
         gitignore = project_root_dir / '.gitignore'
-        content = gitignore.read_text()
+        content = gitignore.read_text(encoding='utf-8')
 
         assert '__pycache__' in content
         assert 'venv/' in content
-        assert '*.pyc' in content
+        # .gitignore uses *.py[cod] (covers .pyc/.pyo/.pyd) rather than *.pyc alone
+        assert '*.py' in content and ('*.pyc' in content or '*.py[cod]' in content)

@@ -67,6 +67,7 @@ class TestAddToQueue:
         rtq.add_to_queue(f, "de")
         entry = json.loads(rtq._queue_path().read_text().strip())
         assert "T" in entry["queued_at"]  # ISO 8601 contains 'T'
+        assert entry["queued_at"].endswith("+00:00")  # must be timezone-aware UTC
 
     def test_add_does_not_raise_on_io_error(self, tmp_path):
         """add_to_queue must not raise even if the write fails."""

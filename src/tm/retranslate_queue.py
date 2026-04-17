@@ -18,7 +18,7 @@ import json
 import logging
 import os
 import tempfile
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Set
 
@@ -54,7 +54,7 @@ def add_to_queue(output_path: Path, tgt_lang: str) -> None:
         entry = {
             "output_path": str(output_path.resolve()),
             "tgt_lang": tgt_lang,
-            "queued_at": datetime.utcnow().isoformat(),
+            "queued_at": datetime.now(timezone.utc).isoformat(),
             "retry_count": 1,
         }
         with queue_file.open("a", encoding="utf-8") as f:
