@@ -629,10 +629,11 @@ translation_engine:
   # PRODUCTION NOTE: Set to 0.5 because _missing_node_count includes false-positive
   # STRONG sub-nodes of full-sentence PARAGRAPH units (parent in unit_map, child counted
   # as gap because _has_descendant_in_unit_map only walks descendants not ancestors).
-  # Observed production case: barcode/add-barcode-in-asp-dotnet-mvc has 112/285 = 39.3%
-  # false-positive gaps. TRUE 100%-fallback files (AST completely failed) still rejected.
-  # TODO: fix _missing_node_count to skip nodes whose ancestor is already in unit_map.
-  ast_fallback_node_tolerance: 0.5  # float in [0.0, 1.0]
+  # TC-AST-03 (2026-04-18): ancestor-aware missing-node counting implemented in
+  # _apply_to_node(). STRONG/EMPHASIS nodes inside a Path A full-sentence PARAGRAPH
+  # are no longer counted as gaps. False-positive rate drops from 39.3% → 0%.
+  # Tolerance reset to 0.0 (intended strict production setting).
+  ast_fallback_node_tolerance: 0.0  # float in [0.0, 1.0]
 
   # TC-AST-02: LLM hallucination cap. Segments whose output exceeds this multiple
   # of their input length are truncated. Production observed: 11.4× (Hindi barcode).

@@ -4137,3 +4137,16 @@ _TM test fixes plan: `plans/healing/test-gaps-post-sprint.md`_
 
 ### Integration tests unblock dependency
 - `test_parallel_mode.py` + `test_roundrobin_mode.py` Fixes 1 & 2 will fully green after LMDB-04 releases the l2.lmdb lock
+
+---
+
+## WS-HEAL-20260418-AST (TC-AST-03) — Ancestor-Aware Gap Counting
+
+### TC-AST-03 (DONE — 2026-04-18, commit pending)
+- **Scope**: Make `_apply_to_node()` ancestor-aware so STRONG/EMPHASIS nodes inside Path A PARAGRAPH units are not counted as missing-node gaps
+- **Root cause**: `_has_descendant_in_unit_map()` (TC-MLD-06) only checks descendants; Path A PARAGRAPH ancestor coverage was not checked, producing 112 false-positive STRONG nodes (39.3%) on `barcode/add-barcode-in-asp-dotnet-mvc`
+- **Fix**: Added `ancestor_in_unit_map: bool = False` param to `_apply_to_node`; propagated through recursion; added `and not ancestor_in_unit_map` guard before `_missing_node_count += 1`
+- **Result**: `ast_fallback_node_tolerance` reset from 0.5 → 0.0 (intended strict production setting)
+- **Tests**: 5 new regression tests in `tests/unit/translation_engine/reconstructor/test_ast_renderer_ancestor_coverage.py` — all pass
+- **Files**: `src/translation_engine/reconstructor/ast_renderer.py`, `config/global.yaml`
+- **Plan ref**: `plans/healing/AUDIT-20260418-AST-translation-quality.md`

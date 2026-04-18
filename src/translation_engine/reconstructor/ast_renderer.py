@@ -502,11 +502,17 @@ class ASTRenderer:
                 f"Output may contain source-language text (AST_FALLBACK path was taken)."
             )
 
-    def _apply_to_node(self, node: ASTNode) -> None:
+    def _apply_to_node(self, node: ASTNode, ancestor_in_unit_map: bool = False) -> None:
         """
         Recursively apply translations to node and children.
 
         Args:
+            ancestor_in_unit_map: True when any ancestor of this node is already in
+                unit_map (Path A full-sentence extraction).  Inline formatting nodes
+                (STRONG, EM, CODE…) inside a translated PARAGRAPH must not be counted
+                as missing-node gaps even though they themselves have no TextUnit —
+                their content was already covered by the ancestor's translation.
+                Set by the parent call; do not pass this argument directly.
             node: ASTNode to update
         """
         import os
@@ -714,9 +720,9 @@ class ASTRenderer:
             # Note: For PARAGRAPH with inline formatting (FIX-A), we don't mark as applied
             # so children can be processed recursively
 
-        # TC-MLD-01/TC-MLD-06: Detect nodes with an address but no matching TextUnit.
-        # These nodes will render their original source-language children as-is —
-        # the primary AST_FALLBACK path for mixed-language output.
+        # TC-MLD-01/TC-MLD-06/TC-AST-03: Detect nodes with an address but no matching
+        # TextUnit.  These nodes will render their original source-language children
+        # as-is — the primary AST_FALLBACK path for mixed-language output.
         #
         # TC-MLD-06 refinement: the extractor has two paths for formatted containers:
         #   Path A (full-sentence): creates one TextUnit for the whole container.
@@ -725,8 +731,17 @@ class ASTRenderer:
         # translated at the child level.  Before firing a warning, check whether any
         # descendant is already in unit_map; if so this is a leaf-extraction container,
         # not a true gap.
+        #
+        # TC-AST-03 refinement: Path A full-sentence extraction translates the PARAGRAPH
+        # as a whole.  Its inline formatting children (STRONG, EM, CODE…) have addresses
+        # but are NOT in unit_map — their content IS covered by the ancestor PARAGRAPH.
+        # The ancestor_in_unit_map flag (propagated from the parent call) suppresses
+        # false-positive counting for these nodes.
+        this_in_unit_map = bool(node.node_addr and node.node_addr in self.unit_map)
+
         if (node.node_addr
-                and node.node_addr not in self.unit_map
+                and not this_in_unit_map
+                and not ancestor_in_unit_map                         # TC-AST-03 guard
                 and node.node_addr not in self.applied_units
                 and not node.node_addr.startswith(('frontmatter.', '__'))):
             has_prose = any(
@@ -742,8 +757,8 @@ class ASTRenderer:
                     return any(_has_descendant_in_unit_map(c) for c in n.children)
 
                 if not _has_descendant_in_unit_map(node):
-                    # True gap: prose container has no translated descendants —
-                    # source-language text WILL appear in the output.
+                    # True gap: prose container has no translated descendants AND no
+                    # ancestor in unit_map — source-language text WILL appear in output.
                     self._missing_node_count += 1
                     logger.warning(
                         f"AST_FALLBACK: node_addr={node.node_addr!r} not in unit_map "
@@ -752,9 +767,12 @@ class ASTRenderer:
                     )
                 # else: leaf-extraction case — content translated at child level, no warning needed
 
-        # Recursively apply to children
+        # Recursively apply to children.
+        # Propagate ancestor coverage: if THIS node is in unit_map (Path A), all
+        # descendants are covered — pass ancestor_in_unit_map=True downward.
+        child_ancestor_flag = ancestor_in_unit_map or this_in_unit_map
         for child in node.children:
-            self._apply_to_node(child)
+            self._apply_to_node(child, ancestor_in_unit_map=child_ancestor_flag)
 
     def render_to_markdown(self, ast: list[ASTNode]) -> str:
         """
