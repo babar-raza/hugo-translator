@@ -140,6 +140,7 @@ class TestParallelModeE2E:
 
         # Create a minimal test file
         test_file = Path(temp_tm_dir) / "test.md"
+        test_file.parent.mkdir(parents=True, exist_ok=True)
         test_file.write_text("---\ntitle: Test\n---\n\nTest content for parallel failure handling.")
 
         result = subprocess.run(
@@ -174,7 +175,7 @@ class TestParallelModeE2E:
 
         # Measure serial mode time
         serial_output_dir = temp_output_dir / "serial"
-        serial_output_dir.mkdir()
+        serial_output_dir.mkdir(parents=True, exist_ok=True)
 
         serial_start = time.time()
         serial_result = subprocess.run(
@@ -202,7 +203,7 @@ class TestParallelModeE2E:
 
         # Measure parallel mode time
         parallel_output_dir = temp_output_dir / "parallel"
-        parallel_output_dir.mkdir()
+        parallel_output_dir.mkdir(parents=True, exist_ok=True)
 
         parallel_start = time.time()
         parallel_result = subprocess.run(
@@ -450,8 +451,6 @@ class TestParallelModeMutualExclusion:
             text=True,
         )
 
-        # CLI accepts both flags, but engine should reject when invoked
-        # This test just verifies both flags are recognized at CLI level
-        assert result.returncode == 0
-        assert "--parallel-languages" in result.stdout
-        assert "--global-lang-rounds" in result.stdout
+        # Mutual exclusion is enforced at parse time by _MultiLangModeAction (src/cli.py:319)
+        assert result.returncode == 2
+        assert "--parallel-languages" in result.stderr or "not allowed with argument" in result.stderr

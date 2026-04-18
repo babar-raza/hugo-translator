@@ -613,8 +613,15 @@ class ASTRenderer:
                         strong_count = sum(1 for c in new_children if c.type == NodeType.STRONG)
                         logger.info(f"[FIX-MARKDOWN-PRESERVATION]   STRONG nodes: {strong_count}")
 
-                    # Replace children with re-parsed nodes
-                    node.children = new_children
+                    # Preserve block-level children (nested LIST, CODE_BLOCK) that
+                    # coexist with inline formatting — same fix as the flatten path below.
+                    block_children = [
+                        child for child in node.children
+                        if child.type in (NodeType.CODE_BLOCK, NodeType.LIST)
+                    ]
+
+                    # Replace children with re-parsed inline nodes + preserved block children
+                    node.children = new_children + block_children
 
                     # Mark as applied
                     self.applied_units.add(node.node_addr)
@@ -656,9 +663,17 @@ class ASTRenderer:
             # Note: For PARAGRAPH with inline formatting (FIX-A), we don't mark as applied
             # so children can be processed recursively
 
-        # TC-MLD-01: Detect nodes with an address but no matching TextUnit.
+        # TC-MLD-01/TC-MLD-06: Detect nodes with an address but no matching TextUnit.
         # These nodes will render their original source-language children as-is —
         # the primary AST_FALLBACK path for mixed-language output.
+        #
+        # TC-MLD-06 refinement: the extractor has two paths for formatted containers:
+        #   Path A (full-sentence): creates one TextUnit for the whole container.
+        #   Path B (leaf extraction): creates TextUnits only for leaf TEXT children.
+        # In Path B the container address is never in unit_map — the content IS still
+        # translated at the child level.  Before firing a warning, check whether any
+        # descendant is already in unit_map; if so this is a leaf-extraction container,
+        # not a true gap.
         if (node.node_addr
                 and node.node_addr not in self.unit_map
                 and node.node_addr not in self.applied_units
@@ -670,12 +685,21 @@ class ASTRenderer:
             if has_prose and node.type not in (
                 NodeType.CODE_BLOCK, NodeType.CODE_SPAN, NodeType.INLINE_HTML
             ):
-                self._missing_node_count += 1
-                logger.warning(
-                    f"AST_FALLBACK: node_addr={node.node_addr!r} not in unit_map "
-                    f"(type={node.type.name}). Source text will be rendered as-is. "
-                    f"May indicate extraction gap or segment mapping corruption."
-                )
+                def _has_descendant_in_unit_map(n) -> bool:
+                    if n.node_addr and n.node_addr in self.unit_map:
+                        return True
+                    return any(_has_descendant_in_unit_map(c) for c in n.children)
+
+                if not _has_descendant_in_unit_map(node):
+                    # True gap: prose container has no translated descendants —
+                    # source-language text WILL appear in the output.
+                    self._missing_node_count += 1
+                    logger.warning(
+                        f"AST_FALLBACK: node_addr={node.node_addr!r} not in unit_map "
+                        f"(type={node.type.name}) and no descendants translated. "
+                        f"Source text will render as-is."
+                    )
+                # else: leaf-extraction case — content translated at child level, no warning needed
 
         # Recursively apply to children
         for child in node.children:

@@ -278,9 +278,9 @@ class TestRoundRobinModeCLIValidation:
             text=True,
         )
 
-        # Should show both flags in help (no mutual exclusion at argparse level)
-        # Mutual exclusion is enforced at engine level
-        assert result.returncode == 0
+        # Mutual exclusion is enforced at parse time by _MultiLangModeAction (src/cli.py:319)
+        assert result.returncode == 2
+        assert "--parallel-languages" in result.stderr or "not allowed with argument" in result.stderr
 
 
 class TestRoundRobinModeHelp:

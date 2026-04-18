@@ -15,6 +15,8 @@ import pytest
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
 
 from tm import TranslationMemory
+from tm.l1_cache import L1Cache
+from tm.l2_persistent import L2PersistentTM, L2_DB_NAME
 from tm.normalization import normalize_text
 
 
@@ -90,35 +92,31 @@ class TestLegacyCacheMigration:
         with open(cache_file, encoding='utf-8') as f:
             legacy_data = json.load(f)
 
-        # Initialize new TM
-        tm = TranslationMemory(
-            lmdb_path=str(tm_dir / "lmdb"),
-            faiss_path=str(tm_dir / "faiss"),
-            l1_capacity=1000,
-            l2_enabled=True,
-            l3_enabled=False  # Disable for speed
-        )
+        # Initialize new TM using the actual dependency-injection API
+        l1 = L1Cache(max_size=1000)
+        l2 = L2PersistentTM(db_path=tm_dir / L2_DB_NAME, max_size_mb=64)
+        tm = TranslationMemory(l1_cache=l1, l2_persistent=l2)
 
         # Migrate entries
         for source_text, translation in legacy_data.items():
             tm.store(
-                source_text=source_text,
-                target_text=translation,
-                source_lang="en",
-                target_lang="de",
-                subdomain="default"
+                site_id="default",
+                src_lang="en",
+                tgt_lang="de",
+                text=source_text,
+                translation=translation,
             )
 
         # Verify migration
         result = tm.lookup(
-            source_text="Hello",
-            source_lang="en",
-            target_lang="de",
-            subdomain="default"
+            site_id="default",
+            src_lang="en",
+            tgt_lang="de",
+            text="Hello",
         )
 
         assert result is not None
-        assert result.target_text == "Hallo"
+        assert result.translation == "Hallo"
 
     def test_migration_preserves_all_entries(self, legacy_cache_dir, tm_dir):
         """Test that all legacy entries are preserved during migration"""
@@ -129,14 +127,10 @@ class TestLegacyCacheMigration:
                 cache_data = json.load(f)
                 total_entries += len(cache_data)
 
-        # Initialize TM
-        tm = TranslationMemory(
-            lmdb_path=str(tm_dir / "lmdb"),
-            faiss_path=str(tm_dir / "faiss"),
-            l1_capacity=1000,
-            l2_enabled=True,
-            l3_enabled=False
-        )
+        # Initialize TM using the actual dependency-injection API
+        l1 = L1Cache(max_size=1000)
+        l2 = L2PersistentTM(db_path=tm_dir / L2_DB_NAME, max_size_mb=64)
+        tm = TranslationMemory(l1_cache=l1, l2_persistent=l2)
 
         # Migrate all caches
         migrated_count = 0
@@ -148,11 +142,11 @@ class TestLegacyCacheMigration:
 
             for source_text, translation in cache_data.items():
                 tm.store(
-                    source_text=source_text,
-                    target_text=translation,
-                    source_lang="en",
-                    target_lang=lang_code,
-                    subdomain="default"
+                    site_id="default",
+                    src_lang="en",
+                    tgt_lang=lang_code,
+                    text=source_text,
+                    translation=translation,
                 )
                 migrated_count += 1
 
@@ -168,14 +162,10 @@ class TestLegacyCacheMigration:
         with open(cache_file, 'w', encoding='utf-8') as f:
             json.dump({}, f)
 
-        # Initialize TM
-        tm = TranslationMemory(
-            lmdb_path=str(tm_dir / "lmdb"),
-            faiss_path=str(tm_dir / "faiss"),
-            l1_capacity=1000,
-            l2_enabled=True,
-            l3_enabled=False
-        )
+        # Initialize TM using the actual dependency-injection API
+        l1 = L1Cache(max_size=1000)
+        l2 = L2PersistentTM(db_path=tm_dir / L2_DB_NAME, max_size_mb=64)
+        _tm = TranslationMemory(l1_cache=l1, l2_persistent=l2)
 
         # Should not crash on empty cache
         with open(cache_file, encoding='utf-8') as f:
@@ -201,14 +191,10 @@ class TestLegacyCacheMigration:
         with open(cache_file, 'w', encoding='utf-8') as f:
             json.dump(invalid_cache, f)
 
-        # Initialize TM
-        tm = TranslationMemory(
-            lmdb_path=str(tm_dir / "lmdb"),
-            faiss_path=str(tm_dir / "faiss"),
-            l1_capacity=1000,
-            l2_enabled=True,
-            l3_enabled=False
-        )
+        # Initialize TM using the actual dependency-injection API
+        l1 = L1Cache(max_size=1000)
+        l2 = L2PersistentTM(db_path=tm_dir / L2_DB_NAME, max_size_mb=64)
+        tm = TranslationMemory(l1_cache=l1, l2_persistent=l2)
 
         # Migrate, skipping invalid entries
         with open(cache_file, encoding='utf-8') as f:
@@ -223,16 +209,17 @@ class TestLegacyCacheMigration:
                 continue
 
             tm.store(
-                source_text=source_text,
-                target_text=translation,
-                source_lang="en",
-                target_lang="de",
-                subdomain="default"
+                site_id="default",
+                src_lang="en",
+                tgt_lang="de",
+                text=source_text,
+                translation=translation,
             )
             valid_count += 1
 
-        # Should only migrate 2 valid entries
-        assert valid_count == 2
+        # JSON serializes all keys as strings, so 123 becomes "123" (truthy, isinstance str)
+        # Valid entries after JSON round-trip: 'Valid', '123', 'Valid2' = 3
+        assert valid_count == 3
 
 
 class TestSystemCompatibility:
@@ -240,16 +227,18 @@ class TestSystemCompatibility:
 
     def test_normalization_compatibility(self):
         """Test that text normalization is compatible"""
+        # normalize_text does NOT lowercase; see src/tm/normalization.py
+        # It applies NFC normalization, whitespace collapsing, and trimming only.
         test_cases = [
-            ("Hello World", "hello world"),
-            ("  Extra   Spaces  ", "extra spaces"),
-            ("MixedCase", "mixedcase"),
-            ("With\nNewlines", "with newlines"),
+            ("Hello World", "Hello World"),
+            ("  Extra   Spaces  ", "Extra Spaces"),
+            ("MixedCase", "MixedCase"),
+            ("With\nNewlines", "With Newlines"),
         ]
 
         for input_text, expected_normalized in test_cases:
             normalized = normalize_text(input_text)
-            assert normalized.replace(" ", "") == expected_normalized.replace(" ", "")
+            assert normalized == expected_normalized
 
     def test_translation_equivalence(self, legacy_cache_dir, tm_dir):
         """Test that translations match between legacy and new system"""
@@ -258,35 +247,31 @@ class TestSystemCompatibility:
         with open(cache_file, encoding='utf-8') as f:
             legacy_cache = json.load(f)
 
-        # Initialize new TM and migrate
-        tm = TranslationMemory(
-            lmdb_path=str(tm_dir / "lmdb"),
-            faiss_path=str(tm_dir / "faiss"),
-            l1_capacity=1000,
-            l2_enabled=True,
-            l3_enabled=False
-        )
+        # Initialize new TM using the actual dependency-injection API
+        l1 = L1Cache(max_size=1000)
+        l2 = L2PersistentTM(db_path=tm_dir / L2_DB_NAME, max_size_mb=64)
+        tm = TranslationMemory(l1_cache=l1, l2_persistent=l2)
 
         for source_text, translation in legacy_cache.items():
             tm.store(
-                source_text=source_text,
-                target_text=translation,
-                source_lang="en",
-                target_lang="de",
-                subdomain="default"
+                site_id="default",
+                src_lang="en",
+                tgt_lang="de",
+                text=source_text,
+                translation=translation,
             )
 
         # Verify all translations match
         for source_text, expected_translation in legacy_cache.items():
             result = tm.lookup(
-                source_text=source_text,
-                source_lang="en",
-                target_lang="de",
-                subdomain="default"
+                site_id="default",
+                src_lang="en",
+                tgt_lang="de",
+                text=source_text,
             )
 
             assert result is not None
-            assert result.target_text == expected_translation
+            assert result.translation == expected_translation
 
     @pytest.fixture
     def legacy_cache_dir(self, tmp_path):
@@ -319,8 +304,8 @@ class TestMigrationScriptIntegration:
 
     def test_migration_script_exists(self):
         """Test that migration script exists"""
-        script_path = Path(__file__).parent.parent.parent / "scripts" / "migrate_legacy_cache.py"
-        assert script_path.exists(), "Migration script should exist"
+        script_path = Path(__file__).parent.parent.parent / "scripts" / "archived" / "migrations" / "migrate_legacy_cache.py"
+        assert script_path.exists(), "Migration script should exist at archived path"
 
     def test_comparison_script_exists(self):
         """Test that comparison script exists"""

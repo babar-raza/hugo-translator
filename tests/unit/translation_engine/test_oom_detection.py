@@ -20,6 +20,7 @@ class TestOOMDetection:
         """Create a minimal TranslationEngine instance for testing."""
         mock_config = Mock()
         mock_config.load_global_config.return_value = {}
+        mock_config.get_config.return_value = {}
 
         # Mock site profile
         mock_profile = Mock()
@@ -36,17 +37,18 @@ class TestOOMDetection:
 
         mock_config.get_site_profile.return_value = mock_profile
 
-        with patch('src.translation_engine.engine.ModelLoader'), \
-             patch('src.translation_engine.engine.TranslationMemory'), \
-             patch('src.translation_engine.engine.HugoParser'), \
+        mock_tm = Mock()
+        mock_loader = Mock()
+
+        with patch('src.translation_engine.engine.HugoParser'), \
              patch('src.translation_engine.engine.SegmentExtractor'), \
              patch('src.translation_engine.engine.ValidationSuite'), \
              patch('src.translation_engine.engine.MarkdownReconstructor'):
 
             engine = TranslationEngine(
                 config_service=mock_config,
-                content_dir="/fake/content",
-                device="cpu"
+                tm=mock_tm,
+                model_loader=mock_loader,
             )
             return engine
 
@@ -67,12 +69,13 @@ class TestOOMDetection:
             assert "pattern='out of memory'" in caplog.text
 
     def test_oom_pattern_gpu_out_of_memory(self, engine, caplog):
-        """Test detection of 'gpu out of memory during translation' pattern."""
+        """Test detection of OOM pattern in 'gpu out of memory during translation'."""
         with caplog.at_level(logging.DEBUG):
             error = Exception("GPU out of memory during translation")
             assert engine._is_oom_error(error) is True
             assert "OOM detected in Engine" in caplog.text
-            assert "pattern='gpu out of memory during translation'" in caplog.text
+            # "out of memory" pattern matches before "gpu out of memory during translation"
+            assert "pattern='out of memory'" in caplog.text
 
     def test_oom_pattern_reduce_batch_size(self, engine, caplog):
         """Test detection of 'reduce batch size' pattern."""
@@ -112,7 +115,8 @@ class TestOOMDetection:
             error = ValueError("Invalid batch size: must be positive")
             assert engine._is_oom_error(error) is False
             assert "NOT OOM in Engine" in caplog.text
-            assert "Invalid batch size" in caplog.text
+            # error_str is lowercased before logging
+            assert "invalid batch size" in caplog.text
 
     def test_non_oom_error_attribute_error(self, engine, caplog):
         """Test that AttributeError is not detected as OOM."""
@@ -120,7 +124,8 @@ class TestOOMDetection:
             error = AttributeError("'NoneType' object has no attribute 'translate'")
             assert engine._is_oom_error(error) is False
             assert "NOT OOM in Engine" in caplog.text
-            assert "NoneType" in caplog.text
+            # error_str is lowercased before logging
+            assert "nonetype" in caplog.text
 
     def test_long_error_message_truncation(self, engine, caplog):
         """Test that long non-OOM error messages are truncated in debug log."""

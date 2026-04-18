@@ -16,7 +16,7 @@ from src.benchmarking.schema_migrations import MigrationManager
 from src.benchmarking.storage import BenchmarkDatabase
 
 # Current schema version in storage.py
-CURRENT_SCHEMA_VERSION = 9
+CURRENT_SCHEMA_VERSION = 10
 
 
 class TestSchemaMigrationsV8:

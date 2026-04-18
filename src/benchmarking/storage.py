@@ -101,7 +101,7 @@ class BenchmarkDatabase:
     - JSON export/import
     """
 
-    SCHEMA_VERSION = 9
+    SCHEMA_VERSION = 10
 
     def __init__(self, db_path: Path | str):
         """Initialize database connection.
@@ -585,6 +585,30 @@ class BenchmarkDatabase:
                 (9, datetime.now(UTC).isoformat()),
             )
             logger.info("Applied schema migration to version 9 - query optimization indices (Phase 4.2)")
+
+        if from_version < 10:
+            # v10: Add src_lang and tgt_lang columns for multi-language benchmarking
+            conn.execute("ALTER TABLE benchmark_results ADD COLUMN src_lang TEXT DEFAULT 'en'")
+            conn.execute("ALTER TABLE benchmark_results ADD COLUMN tgt_lang TEXT DEFAULT 'ru'")
+            conn.execute("ALTER TABLE benchmark_runs ADD COLUMN src_lang TEXT DEFAULT 'en'")
+            conn.execute("ALTER TABLE benchmark_runs ADD COLUMN tgt_lang TEXT DEFAULT 'ru'")
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_results_lang_pair "
+                "ON benchmark_results(src_lang, tgt_lang)"
+            )
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_runs_lang_pair "
+                "ON benchmark_runs(src_lang, tgt_lang)"
+            )
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_results_model_lang "
+                "ON benchmark_results(model_id, src_lang, tgt_lang)"
+            )
+            conn.execute(
+                "INSERT INTO schema_version (version, applied_at) VALUES (?, ?)",
+                (10, datetime.now(UTC).isoformat()),
+            )
+            logger.info("Applied schema migration to version 10 - language pair columns")
 
     def create_tables(self) -> None:
         """Create database tables (idempotent).

@@ -455,7 +455,7 @@ def test_config_from_config_service():
     """Test creating worker config from ConfigService."""
     mock_config_service = Mock()
     mock_config_service.config_root = "config/"
-    mock_config_service.config = {
+    mock_config_service.get_config.return_value = {
         "paths": {"tm_data_dir": "data/tm"},
         "tm_improvement": {
             "schedule": {

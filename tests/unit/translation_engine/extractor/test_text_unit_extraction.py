@@ -522,7 +522,7 @@ class TestBatchTranslation:
         # Simulate successful translation with NEW delimiter format (no English text)
         # The batch will be: Hello{DELIMITER}World (no batch count header)
         # NEW delimiter: \uE000\uE000\uE000{uuid}\uE001\uE001\uE001
-        def mock_translate(texts, source_lang, target_lang):
+        def mock_translate(texts, source_lang, target_lang, **kwargs):
             text = texts[0] if isinstance(texts, list) else texts
             # Extract delimiter from input (NEW format)
             if "\uE000" in text:
@@ -584,7 +584,7 @@ class TestBatchTranslation:
 
         call_count = [0]
 
-        def mock_translate(texts, source_lang, target_lang):
+        def mock_translate(texts, source_lang, target_lang, **kwargs):
             call_count[0] += 1
             text = texts[0] if isinstance(texts, list) else texts
             if call_count[0] == 1:
@@ -649,7 +649,7 @@ class TestBatchTranslation:
         mt_model.tokenizer.encode = Mock(side_effect=lambda text, **kwargs: list(text.encode('utf-8')))
         mt_model.tokenizer.decode = Mock(side_effect=lambda tokens, **kwargs: bytes(tokens).decode('utf-8'))
 
-        def mock_translate(texts, source_lang, target_lang):
+        def mock_translate(texts, source_lang, target_lang, **kwargs):
             text = texts[0] if isinstance(texts, list) else texts
             # Ensure "myCode()" is never in the batch
             assert "myCode()" not in text
