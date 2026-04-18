@@ -1405,14 +1405,22 @@ def main():
     log_dir.mkdir(parents=True, exist_ok=True)
     log_path = log_dir / "tm_worker.log"
 
-    # Setup logging
+    # TC-SYS-02: Use RotatingFileHandler to prevent log files from growing unbounded.
+    try:
+        from src.utils.config_loader import get_global_config as _gcfg
+        _log_cfg = _gcfg().get('logging', {})
+    except Exception:
+        _log_cfg = {}
+    _max_bytes = int(_log_cfg.get('max_log_size_mb', 50)) * 1024 * 1024
+    _backup_count = int(_log_cfg.get('max_log_backups', 3))
+    from logging.handlers import RotatingFileHandler as _RFH
     logging.basicConfig(
         level=getattr(logging, args.log_level),
         format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
         datefmt="%Y-%m-%d %H:%M:%S",
         handlers=[
             logging.StreamHandler(),
-            logging.FileHandler(log_path, encoding="utf-8"),
+            _RFH(log_path, maxBytes=_max_bytes, backupCount=_backup_count, delay=True, encoding="utf-8"),
         ],
         force=True,
     )

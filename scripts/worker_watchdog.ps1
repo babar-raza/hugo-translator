@@ -45,6 +45,12 @@ $TelemetryWatchdogIntervalMinutes  = 15  # must match Task Scheduler trigger int
 $GitDirtyCheckEnabled    = $true
 $GitDirtyCheckTimeoutSec = 2
 
+# TC-SYS-03: Task Scheduler probe — expected HugoTranslator task names and path.
+# Tasks in $TaskSchedulerCampaignExempt are allowed to be Disabled (campaign-controlled).
+$TaskSchedulerPath            = '\HugoTranslator\'
+$TaskSchedulerExpectedTasks   = @('ContentWorker', 'TMWorker', 'Watchdog', 'AutonomousVerification')
+$TaskSchedulerCampaignExempt  = @('ContentWorker')   # may be Disabled during campaign pauses
+
 # Worker definitions -- each entry drives detection, heartbeat, and restart.
 $Workers = @(
     @{
@@ -443,6 +449,103 @@ function Invoke-GitDirtyCheck {
     }
 }
 
+function Invoke-VerificationIdleCheck {
+    <#
+    .SYNOPSIS
+        TC-VW-01: Warn if verification_worker last_success_ts is older than the
+        configured idle threshold (watchdog.verification_idle_warn_hours, default 4 h).
+        Non-fatal — a WARN is emitted but no restart is triggered.
+    #>
+    $stateFile = Join-Path $LogDir "verification_worker.state.json"
+    if (-not (Test-Path $stateFile)) {
+        Write-WatchdogLog "  verification_worker: no state file -- idle check skipped" -Level WARN
+        return
+    }
+
+    $idleWarnHours = 4  # TODO: read from config/global.yaml if exposed
+
+    try {
+        $state = Get-Content $stateFile -Raw | ConvertFrom-Json
+        $lastSuccessTs = $state.last_success_ts
+        if (-not $lastSuccessTs) {
+            Write-WatchdogLog "  verification_worker: last_success_ts absent -- idle check skipped" -Level WARN
+            return
+        }
+        $lastSuccess = [datetime]::Parse($lastSuccessTs, [System.Globalization.CultureInfo]::InvariantCulture, [System.Globalization.DateTimeStyles]::RoundtripKind)
+        $ageHours = ([datetime]::UtcNow - $lastSuccess.ToUniversalTime()).TotalHours
+
+        if ($ageHours -gt $idleWarnHours) {
+            Write-WatchdogLog (
+                "  [WARN] verification_worker idle: last_success_ts is ${ageHours:.1f}h ago " +
+                "(threshold=${idleWarnHours}h). Worker is running but not completing successful passes."
+            ) -Level WARN
+        } else {
+            Write-WatchdogLog ("  verification_worker last_success_ts age: ${ageHours:.1f}h (OK)")
+        }
+    } catch {
+        Write-WatchdogLog "  verification_worker idle check failed: $_ -- skipping" -Level WARN
+    }
+}
+
+function Invoke-TaskSchedulerProbe {
+    <#
+    .SYNOPSIS
+        TC-SYS-03: Check that all expected HugoTranslator Task Scheduler tasks are Ready.
+        Emits [WARN] for any non-exempt task that is Disabled or Unknown.
+        Gracefully degrades (WARN + return) if Get-ScheduledTask is unavailable.
+    #>
+    Write-WatchdogLog "Task Scheduler probe: checking $($TaskSchedulerExpectedTasks -join ', ')"
+    try {
+        $tasks = Get-ScheduledTask -TaskPath $TaskSchedulerPath -ErrorAction Stop
+    } catch {
+        Write-WatchdogLog "  [WARN] Task Scheduler probe unavailable: $_ -- skipping" -Level WARN
+        return
+    }
+
+    $taskMap = @{}
+    foreach ($t in $tasks) {
+        $taskMap[$t.TaskName] = $t.State.ToString()
+    }
+
+    $allOk = $true
+    foreach ($name in $TaskSchedulerExpectedTasks) {
+        if (-not $taskMap.ContainsKey($name)) {
+            Write-WatchdogLog "  [WARN] Task '$name' not found in $TaskSchedulerPath" -Level WARN
+            $allOk = $false
+            continue
+        }
+        $tState = $taskMap[$name]
+        $isExempt = $TaskSchedulerCampaignExempt -contains $name
+
+        # Check campaign-disabled sentinel to decide if a Disabled state is expected
+        $sentinel = Join-Path $LogDir ($name.ToLower().Replace('worker','').Trim('_') + '_worker.campaign_disabled')
+        # Simpler: check any sentinel file matching the task name pattern
+        $sentinelFiles = Get-ChildItem -Path $LogDir -Filter '*.campaign_disabled' -File -ErrorAction SilentlyContinue
+        $sentinelActive = $false
+        foreach ($sf in $sentinelFiles) {
+            if ($name -ilike "*$($sf.BaseName.Replace('.campaign_disabled','').Split('.')[0])*") {
+                $sentinelActive = $true
+                break
+            }
+        }
+
+        if ($tState -eq 'Ready' -or $tState -eq 'Running') {
+            Write-WatchdogLog "  [OK]   $name  $tState"
+        } elseif ($tState -eq 'Disabled' -and ($isExempt -or $sentinelActive)) {
+            Write-WatchdogLog "  [OK]   $name  Disabled (campaign-exempt)"
+        } else {
+            Write-WatchdogLog "  [WARN] $name  $tState -- expected Ready" -Level WARN
+            $allOk = $false
+        }
+    }
+
+    if ($allOk) {
+        Write-WatchdogLog "  Task Scheduler probe: all tasks OK"
+    } else {
+        Write-WatchdogLog "  Task Scheduler probe: one or more tasks in unexpected state" -Level WARN
+    }
+}
+
 function Invoke-HealthCheck {
     <#
     .SYNOPSIS
@@ -610,6 +713,12 @@ function Invoke-Watchdog {
 
     # TC-SYS-04: Warn if src/ has uncommitted modifications.
     Invoke-GitDirtyCheck
+
+    # TC-VW-01: Warn if verification_worker last_success_ts is stale.
+    Invoke-VerificationIdleCheck
+
+    # TC-SYS-03: Warn if any Task Scheduler task is not in Ready state.
+    Invoke-TaskSchedulerProbe
 
     # Run the system health check.
     Invoke-HealthCheck -State $state
