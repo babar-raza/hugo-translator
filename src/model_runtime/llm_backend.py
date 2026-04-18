@@ -88,6 +88,18 @@ class LLMModelBackend:
         self.last_truncation_detected: bool = False
         self.truncation_count: int = 0
 
+        # TC-AST-02: Configurable hallucination cap (default 4.0× input length).
+        # Read from global config so it survives model reloads without restarts.
+        try:
+            from src.utils.config_loader import get_global_config
+            self._max_hallucination_ratio: float = float(
+                get_global_config().get('translation_engine', {}).get(
+                    'max_llm_output_to_input_ratio', 4.0
+                )
+            )
+        except Exception:
+            self._max_hallucination_ratio = 4.0
+
     @property
     def _term_manager(self):
         """Lazy-load TerminologyManager for placeholder-based term protection."""
@@ -252,18 +264,19 @@ class LLMModelBackend:
                 user_text=input_text,
             )
 
-            # Hallucination length-ratio check
+            # TC-AST-02: Configurable hallucination cap (max_llm_output_to_input_ratio).
             input_len = len(input_text)
             output_len = len(result)
-            if input_len > 0 and output_len > 5 * input_len:
+            _max_ratio = self._max_hallucination_ratio  # default 4.0
+            if input_len > 0 and output_len > _max_ratio * input_len:
                 logger.error(
                     "LLM hallucination detected: segment %d/%d output is %.1fx input "
-                    "(%d→%d chars). Truncating to 2x source length.",
-                    idx + 1, total, output_len / input_len, input_len, output_len,
+                    "(%d→%d chars). Truncating to %.1fx source length (max_llm_output_to_input_ratio=%.1f).",
+                    idx + 1, total, output_len / input_len, input_len, output_len, _max_ratio, _max_ratio,
                 )
                 self.last_truncation_detected = True
                 self.truncation_count += 1
-                result = result[:input_len * 2]
+                result = result[:int(input_len * _max_ratio)]
             elif input_len > 0 and output_len > 3 * input_len:
                 logger.warning(
                     "LLM output unusually long: segment %d/%d is %.1fx input (%d→%d chars)",

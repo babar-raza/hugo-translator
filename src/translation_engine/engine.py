@@ -2616,14 +2616,28 @@ class TranslationEngine:
             renderer.apply_translations(doc.ast, translated_units, frontmatter=doc.frontmatter)
 
             # TC-MLD-01: Expose missing node count in translation stats for monitoring
+            stats.ast_missing_nodes = renderer._missing_node_count
             if renderer._missing_node_count > 0:
-                stats.ast_missing_nodes = renderer._missing_node_count
+                total_checked = len(renderer.applied_units) + renderer._missing_node_count
+                fallback_ratio = renderer._missing_node_count / total_checked if total_checked > 0 else 0.0
+                # TC-AST-01: Reject file if fallback ratio exceeds configured tolerance.
+                _te_cfg_ast01 = self.config.get_config().get('translation_engine', {}) if hasattr(self.config, 'get_config') else {}
+                _tolerance = float(_te_cfg_ast01.get('ast_fallback_node_tolerance', 0.0))
                 logger.warning(
-                    f"AST Translation: {renderer._missing_node_count} nodes had no translation unit "
-                    f"— source text may appear in output. File-level purity gate is the safety net."
+                    f"AST Translation: {renderer._missing_node_count}/{total_checked} nodes had no "
+                    f"translation unit (ratio={fallback_ratio:.1%}, tolerance={_tolerance:.1%}) "
+                    f"— source text may appear in output."
                 )
-            else:
-                stats.ast_missing_nodes = 0
+                if fallback_ratio > _tolerance:
+                    from .exceptions import TranslationIncomplete
+                    raise TranslationIncomplete(
+                        f"AST fallback ratio {fallback_ratio:.1%} exceeds tolerance {_tolerance:.1%} "
+                        f"({renderer._missing_node_count}/{total_checked} nodes missing translation unit)",
+                        missing_count=renderer._missing_node_count,
+                        total_count=total_checked,
+                        ratio=fallback_ratio,
+                        tolerance=_tolerance,
+                    )
 
             # Step 4: Render to Markdown
             logger.info("AST Translation: Rendering AST to Markdown")
@@ -2643,6 +2657,11 @@ class TranslationEngine:
         except TranslationRetryableError:
             raise
         except Exception as e:
+            # TC-AST-01: TranslationIncomplete is a named retryable failure — re-raise as-is
+            # so callers can catch it specifically without wrapping in RuntimeError.
+            from .exceptions import TranslationIncomplete
+            if isinstance(e, TranslationIncomplete):
+                raise
             logger.error(f"AST-based translation failed: {e}", exc_info=True)
             raise RuntimeError(f"AST-based translation failed: {e}")
 
@@ -4009,6 +4028,11 @@ class TranslationEngine:
                 logger.error(f"Failed to pre-load model {model_id}: {e}")
                 # Continue anyway - workers will try to load individually
 
+        # TC-CW-02: Per-file timeout to prevent a single stalled file from blocking the run.
+        import concurrent.futures as _cf
+        _te_cfg_cw02 = self.config.get_config().get('translation_engine', {}) if hasattr(self.config, 'get_config') else {}
+        _per_file_timeout_s = float(_te_cfg_cw02.get('per_file_timeout_s', 600))
+
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
             # Submit all translation jobs
             future_to_file = {
@@ -4041,7 +4065,7 @@ class TranslationEngine:
 
                 md_file = future_to_file[future]
                 try:
-                    file_result = future.result()
+                    file_result = future.result(timeout=_per_file_timeout_s)
                     result.file_results.append(file_result)
 
                     if file_result.success:
@@ -4053,6 +4077,15 @@ class TranslationEngine:
                     else:
                         result.failed_files += 1
                         logger.warning(f"✗ Failed {md_file.name}: {file_result.errors}")
+
+                except _cf.TimeoutError:
+                    # TC-CW-02: Per-file timeout fired — log and continue with remaining files.
+                    logger.warning(
+                        f"WARNING: per-file timeout for {md_file.name} after {_per_file_timeout_s:.0f}s "
+                        f"— cancelling and continuing with remaining files"
+                    )
+                    future.cancel()
+                    result.failed_files += 1
 
                 except Exception as e:
                     # SR-02: Handle shutdown request - break loop and cancel pending

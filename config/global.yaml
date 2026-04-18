@@ -618,6 +618,25 @@ translation_engine:
   llm_escalation_after_retries: 2  # Escalate after this many MT failures (see retranslate_queue.py)
   llm_escalation_model: "professionalize_llm"  # Model ID to use for escalated files
 
+  # TC-CW-02: Per-file timeout in parallel translation (seconds).
+  # Prevents a single stalled file (e.g. 36-lang run) from blocking the entire batch.
+  # When a future exceeds this budget it is cancelled and counted as a failed file;
+  # remaining files continue. Hard total-run timeout (run_deadline) remains as backstop.
+  per_file_timeout_s: 600  # float > 0; 10 min per file
+
+  # TC-AST-01: AST fallback node tolerance (0.0–1.0).
+  # 0.0 = reject any file where even 1 node lacked a translation unit (zero tolerance).
+  ast_fallback_node_tolerance: 0.0  # float in [0.0, 1.0]
+
+  # TC-AST-02: LLM hallucination cap. Segments whose output exceeds this multiple
+  # of their input length are truncated. Production observed: 11.4× (Hindi barcode).
+  max_llm_output_to_input_ratio: 4.0  # float > 0
+
+  # TC-AST-02: Purity backpressure threshold.
+  # After this many consecutive language-purity failures for the same language,
+  # the adaptive batch tracker reduces current_batch_size by 1 (minimum 1).
+  purity_failure_backpressure_threshold: 3  # integer >= 1
+
   # File selection priority strategy for _translate_directory_locked().
   # Controls sort order of incomplete files AFTER the completion filter.
   # Options:
@@ -626,3 +645,9 @@ translation_engine:
   #                               re-translating already-translated-but-stale files.
   #   "alphabetical": Legacy behaviour — pure alphabetical order within each batch.
   file_priority_strategy: "missing_first"
+
+# TC-SYS-02: Worker log rotation.
+# Workers use RotatingFileHandler with these limits so log files never grow unbounded.
+logging:
+  max_log_size_mb: 50     # Each log file rotates at this size (MB)
+  max_log_backups: 3      # Number of rotated backups kept (.log.1, .log.2, .log.3)

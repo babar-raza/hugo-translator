@@ -76,6 +76,11 @@ class BatchStatsTracker:
         self.increase_factor = config.get('increase_factor', 1.10)
         self.min_batches_before_increase = config.get('min_batches_before_increase', 5)
         self.stats_retention_days = config.get('stats_retention_days', 30)
+        # TC-AST-02: Purity backpressure — reduce batch size by 1 after this many
+        # consecutive purity failures for the same language (default: 3).
+        self.purity_failure_backpressure_threshold = int(
+            config.get('purity_failure_backpressure_threshold', 3)
+        )
 
         # Ensure stats directory exists
         self.stats_file.parent.mkdir(parents=True, exist_ok=True)
@@ -208,6 +213,7 @@ class BatchStatsTracker:
         if success:
             stats['successful_batches'] += 1
             self.languages[language]['consecutive_successes'] += 1
+            self.languages[language]['consecutive_purity_failures'] = 0  # reset on any success
         else:
             stats['fallback_batches'] += 1
             self.languages[language]['consecutive_successes'] = 0
@@ -215,6 +221,18 @@ class BatchStatsTracker:
             # Track failure reasons
             if fallback_reason == 'language_purity':
                 stats['language_purity_failures'] += 1
+                # TC-AST-02: Purity backpressure — decrement batch size after threshold consecutive failures.
+                purity_fail_count = self.languages[language].get('consecutive_purity_failures', 0) + 1
+                self.languages[language]['consecutive_purity_failures'] = purity_fail_count
+                if purity_fail_count >= self.purity_failure_backpressure_threshold:
+                    current_size = self.languages[language].get('current_batch_size', 20)
+                    new_size = max(1, current_size - 1)
+                    if new_size < current_size:
+                        self.languages[language]['current_batch_size'] = new_size
+                        logger.info(
+                            "Purity backpressure: %s batch_size %d→%d after %d consecutive purity failures",
+                            language, current_size, new_size, purity_fail_count,
+                        )
             elif fallback_reason == 'mapping':
                 stats['mapping_failures'] = stats.get('mapping_failures', 0) + 1
             elif fallback_reason == 'exception':
@@ -417,6 +435,7 @@ class BatchStatsTracker:
             },
             'adaptation_history': [],
             'consecutive_successes': 0,
+            'consecutive_purity_failures': 0,
             'last_batch_timestamp': None
         }
 

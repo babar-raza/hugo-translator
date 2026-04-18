@@ -112,6 +112,36 @@ class TranslationRetryableError(TranslationError):
         self.retry_count = retry_count
 
 
+class TranslationIncomplete(TranslationError):
+    """Raised when AST reconstruction leaves too many nodes without a translation unit.
+
+    TC-AST-01: When the fraction of fallback (untranslated) nodes exceeds
+    ``ast_fallback_node_tolerance`` in ``config/global.yaml``, the output would
+    contain source-language text mixed into the target-language document.
+    The engine must treat this as a retryable failure rather than writing the file.
+
+    Attributes:
+        missing_count: Number of AST nodes with no translation unit.
+        total_count: Total translatable AST nodes checked.
+        ratio: ``missing_count / total_count``.
+        tolerance: Configured tolerance threshold (0.0 = zero tolerance).
+    """
+
+    def __init__(
+        self,
+        message: str,
+        missing_count: int = 0,
+        total_count: int = 0,
+        ratio: float = 0.0,
+        tolerance: float = 0.0,
+    ):
+        super().__init__(message)
+        self.missing_count = missing_count
+        self.total_count = total_count
+        self.ratio = ratio
+        self.tolerance = tolerance
+
+
 class ShutdownRequested(TranslationError):
     """Raised when graceful shutdown is requested during translation.
 
