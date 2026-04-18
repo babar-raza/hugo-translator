@@ -139,10 +139,11 @@ class WorkerConfig:
             "redis_db": mode_defaults.get("redis_db", int(os.getenv("REDIS_DB", "0"))),
             "redis_password": mode_defaults.get("redis_password", os.getenv("REDIS_PASSWORD")),
             "poll_interval": mode_defaults.get("poll_interval", float(os.getenv("POLL_INTERVAL", "5.0"))),
-            "max_retries": mode_defaults.get("max_retries", int(os.getenv("MAX_RETRIES", "3"))),
+            # ENV wins over mode_defaults (tier 1 > tier 2 precedence)
+            "max_retries": int(os.getenv("MAX_RETRIES") or mode_defaults.get("max_retries", 3)),
             "config_path": mode_defaults.get("config_path", os.getenv("CONFIG_PATH", "./config")),
             "tm_path": mode_defaults.get("tm_path", os.getenv("TM_DATA_PATH", "./data/tm")),
-            "device": mode_defaults.get("device", os.getenv("DEVICE", "auto")),
+            "device": os.getenv("DEVICE") or mode_defaults.get("device", "auto"),
             "use_shared_engines": mode_defaults.get(
                 "use_shared_engines",
                 os.getenv("USE_SHARED_ENGINES", "true").lower() in ("true", "1", "yes")

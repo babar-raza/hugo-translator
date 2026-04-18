@@ -150,6 +150,57 @@ class ASTRenderer:
 
         return cleaned
 
+    def _normalize_bold_markers(self, text: str) -> str:
+        """
+        Fix M2M100 bold marker corruption in translated text (FIX-BOLD-01).
+
+        M2M100 and similar MT models sometimes produce asymmetric asterisk sequences
+        for bold markers, e.g. "* Texto*" instead of "**Texto**". This method
+        normalizes the five common corruption patterns.
+
+        Patterns (applied in order):
+        P4a: ***text*  → **text**  (triple opening, single closing)
+        P4b: *text***  → **text**  (single opening, triple closing)
+        P2:  * text**  → **text**  (single + space opening, double closing)
+        P3:  **text *  → **text**  (double opening, single + space closing)
+        P1:  * Uppercase text* → **Uppercase text** (heading-style corruption)
+
+        Args:
+            text: Translated text potentially containing corrupted bold markers
+
+        Returns:
+            Text with bold marker corruption fixed, or None/empty unchanged.
+        """
+        if not text:
+            return text
+
+        # P4a: Triple opening, single closing: ***text* → **text**
+        # Does NOT match ***text*** (valid bold-italic — (?!\*) prevents it)
+        text = re.sub(r'\*\*\*([^*\n]+)\*(?!\*)', r'**\1**', text)
+
+        # P4b: Single opening, triple closing: *text*** → **text**
+        # Does NOT match ***text*** ((?<!\*) at pos 1/2 fails)
+        text = re.sub(r'(?<!\*)\*([^*\n]+)\*\*\*', r'**\1**', text)
+
+        # P2: Asymmetric opening (single * + space, double closing): * text** → **text**
+        text = re.sub(r'(?<!\*)\*\s+([^*\n]+?)\s*\*\*(?!\*)', r'**\1**', text)
+
+        # P3: Asymmetric closing (double opening, single * + optional space): **text * → **text**
+        # (?<!\S) ensures ** is at start-of-string or after whitespace (opening position,
+        # not a closing ** from a prior valid bold). [^\n*] prevents cross-line matching.
+        text = re.sub(r'(?<!\S)\*\*\s*([^\n*]+?)\s*(?<!\*)\*(?!\*)', r'**\1**', text)
+
+        # P1: Heading-style corruption — single * with uppercase content: * Texto* → **Texto**
+        # Requires uppercase first character (Latin or Unicode) to avoid matching
+        # legitimate lowercase italic *word*. [^\n*] prevents cross-line matching.
+        text = re.sub(
+            r'(?<!\*)\*\s*([A-Z\u00C0-\u017F][^\n*]*?)\s*\*(?!\*)',
+            r'**\1**',
+            text
+        )
+
+        return text
+
     def _reparse_inline_markdown(self, text: str, parent_node_addr: str) -> list[ASTNode]:
         """
         Re-parse translated text containing markdown syntax back into AST nodes.

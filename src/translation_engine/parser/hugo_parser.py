@@ -28,6 +28,10 @@ from .ast_nodes import (
 
 # Module-level ruamel.yaml instance for comment/quote preservation
 _yaml_parser = YAML()
+
+# Pattern to detect and split Hugo shortcodes from surrounding text.
+# Matches {{< ... >}} (regular) and {{% ... %}} (markdown) shortcode forms.
+_SHORTCODE_RE = re.compile(r'({{[<%].*?[>%]}})', re.DOTALL)
 _yaml_parser.preserve_quotes = True
 _yaml_parser.width = 4096  # Prevent line wrapping
 _yaml_parser.allow_duplicate_keys = True  # Hugo files may have duplicate keys across sections
@@ -246,7 +250,8 @@ class HugoParser:
                 return nodes, i
 
             if token.type == "text":
-                nodes.append(text_node(token.content, self._generate_node_id()))
+                # Split shortcodes out of plain text tokens into INLINE_HTML nodes
+                nodes.extend(self._split_shortcodes(token.content))
                 i += 1
 
             elif token.type == "link_open":
@@ -317,6 +322,24 @@ class HugoParser:
                 i += 1
 
         return nodes, i
+
+    def _split_shortcodes(self, text: str) -> list[ASTNode]:
+        """Split a text string into TEXT and INLINE_HTML nodes at Hugo shortcode boundaries."""
+        if "{{" not in text:
+            return [text_node(text, self._generate_node_id())]
+        nodes = []
+        for part in _SHORTCODE_RE.split(text):
+            if not part:
+                continue
+            if _SHORTCODE_RE.fullmatch(part):
+                nodes.append(ASTNode(
+                    type=NodeType.INLINE_HTML,
+                    raw=part,
+                    node_id=self._generate_node_id()
+                ))
+            else:
+                nodes.append(text_node(part, self._generate_node_id()))
+        return nodes
 
     def _get_attr(self, token, name: str, default=None):
         """Get attribute from token safely."""

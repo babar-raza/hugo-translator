@@ -1546,10 +1546,10 @@ class TextUnitExtractor:
             return False
 
     def _has_inline_formatting(self, node: ASTNode) -> bool:
-        """Check if node contains inline formatting (strong/em/link/etc.)."""
+        """Check if node contains inline formatting (strong/em/link/shortcodes/etc.)."""
         formatting_types = {
             NodeType.STRONG, NodeType.EMPHASIS, NodeType.CODE_SPAN,
-            NodeType.LINK, NodeType.IMAGE
+            NodeType.LINK, NodeType.IMAGE, NodeType.INLINE_HTML
         }
 
         # Check children
@@ -1991,6 +1991,10 @@ class TextUnitExtractor:
             self.batch_stats.get('repetition_fallback_count', 0) + 1
         self._fallback_to_individual(batch, mt_model, src_lang, tgt_lang)
         return False
+
+    def _is_tokenizer_available(self, model: Any) -> bool:
+        """Check whether the model has a usable tokenizer attribute."""
+        return getattr(model, 'tokenizer', None) is not None
 
     def batch_translate_units(
         self,

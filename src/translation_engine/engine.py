@@ -3105,6 +3105,27 @@ class TranslationEngine:
 
         logger.info(f"Written translated file: {output_path}")
 
+    def _load_batch_purity_skip_langs(self) -> list[str]:
+        """Load batch_purity_skip_langs list from config.global_config."""
+        if not self.config:
+            return []
+        try:
+            gc = getattr(self.config, 'global_config', None)
+            if gc is None:
+                return []
+            if isinstance(gc, dict):
+                te = gc.get('translation_engine', {}) or {}
+                return te.get('batch_purity_skip_langs') or []
+            # Pydantic model or similar
+            te = getattr(gc, 'translation_engine', None)
+            if te is None:
+                return []
+            if isinstance(te, dict):
+                return te.get('batch_purity_skip_langs') or []
+            return getattr(te, 'batch_purity_skip_langs', None) or []
+        except Exception:
+            return []
+
     def _get_purity_threshold(self, lang: str) -> float:
         """Per-language purity threshold. Falls back to 0.06 default."""
         try:

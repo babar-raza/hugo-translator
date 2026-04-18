@@ -337,10 +337,12 @@ class YAMLStructureValidationResult:
 
     @property
     def is_valid(self) -> bool:
-        """Check if validation passed (no errors, acceptable drift)."""
-        return self.line_drift_percent < 20.0 and not any(
-            i.severity == "error" for i in self.issues
-        )
+        """Check if validation passed (no error-severity issues).
+
+        The issues list already reflects the validator's configured thresholds,
+        so is_valid is determined solely by whether any error-severity issues exist.
+        """
+        return not any(i.severity == "error" for i in self.issues)
 
 
 class YAMLStructureValidator:
