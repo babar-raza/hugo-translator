@@ -104,6 +104,12 @@ class L2PersistentTM:
         self.db_path = Path(db_path)
         self.db_path.mkdir(parents=True, exist_ok=True)
 
+        # TC-TM-02: Warn if a sibling LMDB directory exists next to the canonical
+        # path.  Two live L2 databases imply split writes and diverging caches.
+        # The canonical name is L2_DB_NAME ("l2.lmdb"); anything else alongside it
+        # is a migration artefact.  Run scripts/migrate_l2_lmdb.py to consolidate.
+        self._warn_on_sibling_l2_dirs()
+
         # Convert MB to bytes for LMDB
         max_size_bytes = max_size_mb * 1024 * 1024
 
@@ -117,6 +123,39 @@ class L2PersistentTM:
         )
 
         self._lock = threading.RLock()
+
+    def _warn_on_sibling_l2_dirs(self) -> None:
+        """Emit a UserWarning if sibling l2*.lmdb directories exist alongside the canonical path.
+
+        Two live LMDB databases imply split writes (TC-TM-02 gap).  This is a
+        warning, not a hard error, so the worker can still start.  To fix, run::
+
+            python scripts/migrate_l2_lmdb.py --dry-run
+            python scripts/migrate_l2_lmdb.py --apply
+        """
+        import warnings
+        parent = self.db_path.parent
+        canonical_name = self.db_path.name
+        # Match both "l2.lmdb" (dot-style) and "l2_lmdb" (underscore-style) variants.
+        siblings = [
+            p for p in parent.glob("l2*")
+            if p.is_dir() and p.name != canonical_name
+        ]
+        if siblings:
+            names = ", ".join(p.name for p in siblings)
+            warnings.warn(
+                f"L2PersistentTM: sibling LMDB director{'y' if len(siblings) == 1 else 'ies'} "
+                f"found alongside canonical '{canonical_name}': {names}. "
+                "This indicates split writes. Run scripts/migrate_l2_lmdb.py to consolidate.",
+                UserWarning,
+                stacklevel=3,
+            )
+            logger.warning(
+                "TC-TM-02: sibling L2 LMDB dir(s) detected: %s (canonical: %s). "
+                "Run scripts/migrate_l2_lmdb.py --apply to consolidate.",
+                names,
+                self.db_path,
+            )
 
     def exact_lookup(
         self,

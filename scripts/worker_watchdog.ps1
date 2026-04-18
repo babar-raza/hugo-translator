@@ -33,6 +33,18 @@ $CircuitBreakerMaxRestarts = 5
 $CircuitBreakerWindowMinutes = 60
 $TelemetryApiUrl = if ($env:TELEMETRY_API_URL) { $env:TELEMETRY_API_URL } else { "http://localhost:8765" }
 
+# Telemetry circuit breaker: after this many consecutive POST failures the
+# breaker opens and POSTs are suppressed for TelemetryBreakerSkipCycles cycles.
+# State is persisted across watchdog invocations in watchdog_state.json.
+$TelemetryBreakerFailureThreshold  = 3
+$TelemetryBreakerSkipCycles        = 5   # cycles × Task Scheduler interval = 75 min suppression
+$TelemetryWatchdogIntervalMinutes  = 15  # must match Task Scheduler trigger interval
+
+# TC-SYS-04: Git dirty check — warn if tracked files in src/ have uncommitted changes.
+# Set to $false to disable (e.g. during active development sessions).
+$GitDirtyCheckEnabled    = $true
+$GitDirtyCheckTimeoutSec = 2
+
 # Worker definitions -- each entry drives detection, heartbeat, and restart.
 $Workers = @(
     @{
@@ -67,13 +79,40 @@ function Send-TelemetryEvent {
     .SYNOPSIS
         Fire-and-forget POST to the local telemetry API.
         Non-fatal: errors are logged but never halt the watchdog.
+
+        Includes a persistent circuit breaker (TC-SYS-01):
+        After TelemetryBreakerFailureThreshold consecutive failures the breaker
+        opens and all POSTs are suppressed for TelemetryBreakerSkipCycles watchdog
+        cycles (~75 min by default).  The breaker state is carried in $State so it
+        survives across Task Scheduler invocations via watchdog_state.json.
     #>
     param(
         [Parameter(Mandatory)][string]$JobType,
         [string]$Status = "success",
         [hashtable]$Metrics = @{},
-        [string]$ErrorSummary = $null
+        [string]$ErrorSummary = $null,
+        # Pass the current watchdog $state hashtable so the breaker is persisted.
+        [hashtable]$State = $null
     )
+
+    # --- Circuit breaker gate ---
+    if ($State -ne $null -and $State.telemetry_skip_until) {
+        try {
+            $skipUntilUtc = [datetime]::Parse($State.telemetry_skip_until).ToUniversalTime()
+            if ([datetime]::UtcNow -lt $skipUntilUtc) {
+                # Breaker is open — suppress POST silently (no WARN spam)
+                return
+            } else {
+                # Window expired — reset and allow this attempt
+                $State.telemetry_skip_until = $null
+                $State.telemetry_failures   = 0
+            }
+        } catch {
+            # Corrupt skip_until value — reset and allow
+            $State.telemetry_skip_until = $null
+            $State.telemetry_failures   = 0
+        }
+    }
 
     $eventId = [guid]::NewGuid().ToString()
     $now = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ss.ffffffZ")
@@ -108,9 +147,27 @@ function Send-TelemetryEvent {
                          -Body $jsonBody `
                          -TimeoutSec 5 `
                          -ErrorAction Stop | Out-Null
+        # Success — reset circuit breaker counter
+        if ($State -ne $null) {
+            $State.telemetry_failures   = 0
+            $State.telemetry_skip_until = $null
+        }
     }
     catch {
         Write-WatchdogLog "Telemetry POST failed (non-fatal): $_" -Level WARN
+        if ($State -ne $null) {
+            $State.telemetry_failures = [int]$State.telemetry_failures + 1
+            if ([int]$State.telemetry_failures -ge $TelemetryBreakerFailureThreshold) {
+                $suppressMinutes = $TelemetryBreakerSkipCycles * $TelemetryWatchdogIntervalMinutes
+                $State.telemetry_skip_until = [datetime]::UtcNow.AddMinutes($suppressMinutes).ToString("o")
+                Write-WatchdogLog ("Telemetry circuit breaker OPEN: {0} consecutive failures. " +
+                    "Suppressing for {1} min (until {2} UTC)." -f
+                    $State.telemetry_failures,
+                    $suppressMinutes,
+                    $State.telemetry_skip_until) -Level WARN
+                $State.telemetry_failures = 0  # reset counter; skip_until is the guard now
+            }
+        }
     }
 }
 
@@ -150,13 +207,20 @@ function Get-WatchdogState {
                     }
                 }
             }
-            return @{ restarts = $restarts }
+            # Telemetry circuit breaker fields (added TC-SYS-01)
+            $telFailures  = if ($null -ne $state.telemetry_failures)  { [int]$state.telemetry_failures }  else { 0 }
+            $telSkipUntil = if ($state.telemetry_skip_until)          { $state.telemetry_skip_until }      else { $null }
+            return @{
+                restarts              = $restarts
+                telemetry_failures    = $telFailures
+                telemetry_skip_until  = $telSkipUntil
+            }
         } catch {
             $errMsg = "Failed to parse state file, reinitialising: $_"
             Write-WatchdogLog $errMsg -Level WARN
         }
     }
-    return @{ restarts = @() }
+    return @{ restarts = @(); telemetry_failures = 0; telemetry_skip_until = $null }
 }
 
 function Save-WatchdogState {
@@ -334,11 +398,57 @@ function Start-Worker {
     }
 }
 
+function Invoke-GitDirtyCheck {
+    <#
+    .SYNOPSIS
+        Warn if src/ contains uncommitted modifications to tracked files (TC-SYS-04).
+        Workers run against the working tree, so uncommitted src/ changes make bug
+        reproduction from git history impossible.
+        Times out after GitDirtyCheckTimeoutSec to avoid blocking the watchdog cycle.
+    #>
+    if (-not $GitDirtyCheckEnabled) { return }
+
+    try {
+        $gitExe = "git"
+        # Run git status with a hard timeout via a background job.
+        $job = Start-Job -ScriptBlock {
+            param($root)
+            Set-Location $root
+            & git status --porcelain -- src/ 2>&1
+        } -ArgumentList $ProjectRoot
+
+        $completed = Wait-Job $job -Timeout $GitDirtyCheckTimeoutSec
+        if ($null -eq $completed) {
+            Stop-Job $job | Out-Null
+            Remove-Job $job -Force | Out-Null
+            Write-WatchdogLog "  git-dirty check timed out after ${GitDirtyCheckTimeoutSec}s -- skipping" -Level WARN
+            return
+        }
+
+        $lines = Receive-Job $job
+        Remove-Job $job -Force | Out-Null
+
+        # Filter to modified tracked files only (M prefix in first or second column)
+        $dirtyLines = $lines | Where-Object { $_ -match '^.M|^M.' }
+        $count = ($dirtyLines | Measure-Object).Count
+
+        if ($count -gt 0) {
+            Write-WatchdogLog ("  [WARN] Working tree has $count uncommitted change(s) in src/ -- " +
+                "workers running against unreviewed code. Run: git diff --stat src/") -Level WARN
+        } else {
+            Write-WatchdogLog "  src/ working tree is clean"
+        }
+    } catch {
+        Write-WatchdogLog "  git-dirty check failed: $_ -- skipping" -Level WARN
+    }
+}
+
 function Invoke-HealthCheck {
     <#
     .SYNOPSIS
         Runs the Python health_check.py script and logs the result.
     #>
+    param([hashtable]$State = $null)
     if (-not (Test-Path $HealthCheckScript)) {
         $msg = "Health check script not found: $HealthCheckScript"
         Write-WatchdogLog $msg -Level WARN
@@ -370,7 +480,7 @@ function Invoke-HealthCheck {
         }
         $hcStatus = switch ($exitCode) { 0 { "success" } 1 { "partial" } default { "failure" } }
         Send-TelemetryEvent -JobType "watchdog_health_check" -Status $hcStatus `
-            -Metrics @{ exit_code = $exitCode }
+            -Metrics @{ exit_code = $exitCode } -State $State
     } catch {
         $errMsg = "Health check failed to execute: $_"
         Write-WatchdogLog $errMsg -Level ERROR
@@ -411,9 +521,10 @@ function Invoke-Watchdog {
         Write-WatchdogLog $msg -Level CRITICAL
         Send-TelemetryEvent -JobType "watchdog_circuit_breaker" -Status "failure" `
             -Metrics @{ restarts_count = $cbCount; window_minutes = $CircuitBreakerWindowMinutes } `
-            -ErrorSummary "Circuit breaker open: $cbCount restarts in $CircuitBreakerWindowMinutes minutes"
+            -ErrorSummary "Circuit breaker open: $cbCount restarts in $CircuitBreakerWindowMinutes minutes" `
+            -State $state
         Save-WatchdogState -State $state
-        Invoke-HealthCheck
+        Invoke-HealthCheck -State $state
         Write-WatchdogLog "======== Watchdog check finished - circuit breaker open ========"
         return
     }
@@ -465,7 +576,7 @@ function Invoke-Watchdog {
                     $msg = "  Restarted $wName - stuck recovery"
                     Write-WatchdogLog $msg
                     Send-TelemetryEvent -JobType "watchdog_restart" `
-                        -Metrics @{ worker = $wName; reason = "stuck_recovery" }
+                        -Metrics @{ worker = $wName; reason = "stuck_recovery" } -State $state
                 }
             }
         } else {
@@ -489,7 +600,7 @@ function Invoke-Watchdog {
                 $msg = "  Restarted $wName - dead recovery"
                 Write-WatchdogLog $msg
                 Send-TelemetryEvent -JobType "watchdog_restart" `
-                    -Metrics @{ worker = $wName; reason = "dead_recovery" }
+                    -Metrics @{ worker = $wName; reason = "dead_recovery" } -State $state
             }
         }
     }
@@ -497,8 +608,11 @@ function Invoke-Watchdog {
     # Persist updated state.
     Save-WatchdogState -State $state
 
+    # TC-SYS-04: Warn if src/ has uncommitted modifications.
+    Invoke-GitDirtyCheck
+
     # Run the system health check.
-    Invoke-HealthCheck
+    Invoke-HealthCheck -State $state
 
     Write-WatchdogLog "======== Watchdog check finished ========"
 }

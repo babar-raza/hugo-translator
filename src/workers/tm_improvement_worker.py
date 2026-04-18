@@ -693,6 +693,7 @@ class TMImprovementWorker:
                 # Release VRAM, then sleep until next run time
                 self._offload_resources()
                 self._write_heartbeat("sleeping")
+                self._record_state("sleeping")
                 next_run = self.scheduler.sleep_until_next_run()
                 run_count += 1
 

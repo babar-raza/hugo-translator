@@ -1,14 +1,19 @@
 """
-One-time migration: merge data/tm/l2_lmdb → data/tm/l2.lmdb
+TC-TM-02: Merge sibling l2*.lmdb databases into the canonical l2.lmdb.
 
-Copies all keys from the legacy l2_lmdb database into the canonical l2.lmdb
+Copies all keys from the legacy/sibling database into the canonical l2.lmdb
 database without overwriting entries that already exist in the destination.
+Idempotent — safe to run multiple times.
 
 Usage (run with both workers stopped):
-    python scripts/migrate_l2_lmdb.py [--dry-run]
+    python scripts/migrate_l2_lmdb.py --dry-run   # preview only, no writes
+    python scripts/migrate_l2_lmdb.py --apply      # apply the merge
 
 After a successful migration, delete the source manually:
     rmdir /s /q data\\tm\\l2_lmdb
+
+The L2PersistentTM startup warning that triggered TC-TM-02 will disappear
+once the sibling directory is removed.
 """
 
 import argparse
@@ -98,9 +103,19 @@ def migrate(src_path: Path, dst_path: Path, dry_run: bool = False) -> None:
         print("  Git Bash: rm -rf data/tm/l2_lmdb")
 
 
-def main() -> None:
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--dry-run", action="store_true", help="Count without writing")
+def main(argv: list[str] | None = None) -> None:
+    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    mode = parser.add_mutually_exclusive_group(required=False)
+    mode.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Count keys that would be copied without making any writes.",
+    )
+    mode.add_argument(
+        "--apply",
+        action="store_true",
+        help="Apply the merge (idempotent — same as running without --dry-run).",
+    )
     parser.add_argument(
         "--src",
         default="data/tm/l2_lmdb",
@@ -111,7 +126,10 @@ def main() -> None:
         default="data/tm/l2.lmdb",
         help="Dest LMDB directory (default: data/tm/l2.lmdb)",
     )
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
+
+    if not args.dry_run and not args.apply:
+        parser.error("Specify --dry-run to preview or --apply to execute the merge.")
 
     repo_root = Path(__file__).parent.parent
     src = (repo_root / args.src).resolve()
