@@ -193,3 +193,42 @@ def test_path_b_leaf_extraction_still_suppressed():
         f"Path B leaf-extraction STRONG should not be counted as a gap "
         f"(_has_descendant_in_unit_map should suppress it), got {r._missing_node_count}"
     )
+
+
+# ---------------------------------------------------------------------------
+# Test 6 -- Mixed: one covered PARAGRAPH, one uncovered PARAGRAPH in same AST
+# ---------------------------------------------------------------------------
+
+def test_mixed_covered_and_uncovered_paragraphs():
+    """
+    Two PARAGRAPHs in the same AST:
+      - PARAGRAPH[5]: in unit_map (Path A). Its STRONG child is suppressed by ancestor flag.
+      - PARAGRAPH[6]: NOT in unit_map. Its STRONG child has prose > 5 chars — TRUE gap.
+
+    Expected: _missing_node_count == 1 (only the uncovered STRONG counts).
+
+    This validates that tolerance 0.0 is safe: covered nodes are not inflating
+    the count, while real gaps are still detected.
+    """
+    # Covered paragraph (Path A)
+    strong_covered = _node(NodeType.STRONG, None,
+                           "body.paragraph[5].strong[0]",
+                           children=[_text("covered bold text")])
+    para_covered = _node(NodeType.PARAGRAPH, "covered bold text sentence",
+                         "body.paragraph[5]", children=[strong_covered])
+
+    # Uncovered paragraph — no unit, STRONG child is a true gap
+    strong_uncovered = _node(NodeType.STRONG, None,
+                             "body.paragraph[6].strong[0]",
+                             children=[_text("uncovered bold text")])
+    para_uncovered = ASTNode(type=NodeType.PARAGRAPH, raw=None,
+                             children=[strong_uncovered], attrs={})
+    para_uncovered.node_addr = ""  # not addressable → not in unit_map
+
+    units = [_unit("body.paragraph[5]", "covered bold text sentence")]
+    r = _apply(units, [para_covered, para_uncovered])
+
+    assert r._missing_node_count == 1, (
+        f"Expected exactly 1 missing node (the STRONG in the uncovered PARAGRAPH), "
+        f"got {r._missing_node_count}"
+    )

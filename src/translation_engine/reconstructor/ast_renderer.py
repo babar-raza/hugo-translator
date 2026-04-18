@@ -739,6 +739,15 @@ class ASTRenderer:
         # false-positive counting for these nodes.
         this_in_unit_map = bool(node.node_addr and node.node_addr in self.unit_map)
 
+        # TC-AST-03: log when ancestor coverage suppresses what would otherwise be a gap.
+        if (node.node_addr and not this_in_unit_map and ancestor_in_unit_map
+                and node.node_addr not in self.applied_units
+                and not node.node_addr.startswith(('frontmatter.', '__'))):
+            logger.debug(
+                "AST_ANCESTOR_SUPPRESSED: %s (type=%s) — covered by ancestor in unit_map",
+                node.node_addr, node.type.name,
+            )
+
         if (node.node_addr
                 and not this_in_unit_map
                 and not ancestor_in_unit_map                         # TC-AST-03 guard
