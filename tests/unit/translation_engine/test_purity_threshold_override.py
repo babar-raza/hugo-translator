@@ -469,10 +469,9 @@ class TestPurityGateRetryable:
         assert "purity_result['passed']" in source or "purity_result[\"passed\"]" in source, (
             "Purity check must exist in engine.py"
         )
-        # SW-2 fix: retryable_gate_failure must be set to True after purity failure
-        # The assignment must appear near the purity check comment
-        assert "SW-2 FIX" in source or "retryable_gate_failure = True" in source, (
-            "SW-2 fix marker or retryable_gate_failure=True must be in engine.py"
+        # Purity failure must block the write — validation_passed = False
+        assert "validation_passed = False" in source, (
+            "Purity check block must set validation_passed = False in engine.py"
         )
 
     def test_retryable_gate_failure_true_in_purity_block(self):
@@ -487,8 +486,8 @@ class TestPurityGateRetryable:
             None
         )
         assert purity_fail_line is not None, "Purity check line not found in engine.py"
-        # Within 10 lines after the purity check, retryable_gate_failure must be True
+        # Within 10 lines after the purity check, validation_passed must be set to False
         window = "\n".join(lines[purity_fail_line - 1: purity_fail_line + 10])
-        assert "retryable_gate_failure = True" in window, (
-            f"retryable_gate_failure=True not found near purity check (line {purity_fail_line})"
+        assert "validation_passed = False" in window, (
+            f"validation_passed=False not found near purity check (line {purity_fail_line})"
         )

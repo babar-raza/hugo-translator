@@ -166,12 +166,12 @@ class TestValidationDecisionEngine:
             issues=[
                 ValidationIssue(
                     severity=ValidationSeverity.ERROR,
-                    validator="StructureValidator",
+                    validator="CompletenessValidator",
                     message="Heading count mismatch",
                 ),
                 ValidationIssue(
                     severity=ValidationSeverity.ERROR,
-                    validator="StructureValidator",
+                    validator="CompletenessValidator",
                     message="List structure damaged",
                 ),
                 ValidationIssue(
@@ -205,12 +205,12 @@ class TestValidationDecisionEngine:
             issues=[
                 ValidationIssue(
                     severity=ValidationSeverity.ERROR,
-                    validator="StructureValidator",
+                    validator="CompletenessValidator",
                     message="Error 1",
                 ),
                 ValidationIssue(
                     severity=ValidationSeverity.ERROR,
-                    validator="StructureValidator",
+                    validator="CompletenessValidator",
                     message="Error 2",
                 ),
             ],
@@ -227,7 +227,7 @@ class TestValidationDecisionEngine:
             issues=[
                 ValidationIssue(
                     severity=ValidationSeverity.ERROR,
-                    validator="StructureValidator",
+                    validator="CompletenessValidator",
                     message="Heading mismatch: expected 3, got 2",
                     location="body",
                     details={"suggestion": "Add missing heading"},
@@ -297,7 +297,7 @@ class TestValidationDecisionEngine:
             issues=[
                 ValidationIssue(
                     severity=ValidationSeverity.ERROR,
-                    validator="StructureValidator",
+                    validator="CompletenessValidator",
                     message="Minor structure issue",
                 )
             ],
@@ -325,7 +325,7 @@ class TestValidationDecisionEngine:
             issues=[
                 ValidationIssue(
                     severity=ValidationSeverity.ERROR,
-                    validator="StructureValidator",
+                    validator="CompletenessValidator",
                     message="Persistent error",
                 )
             ],
@@ -371,7 +371,7 @@ class TestValidationDecisionEngine:
             issues=[
                 ValidationIssue(
                     severity=ValidationSeverity.ERROR,
-                    validator="StructureValidator",
+                    validator="CompletenessValidator",
                     message="Heading count mismatch",
                     location="body",
                     details={"suggestion": "Add missing heading"},
@@ -397,7 +397,7 @@ class TestValidationDecisionEngine:
             issues=[
                 ValidationIssue(
                     severity=ValidationSeverity.ERROR,
-                    validator="StructureValidator",
+                    validator="CompletenessValidator",
                     message="Heading count mismatch",
                     location="body section",
                     details={"suggestion": "Add missing heading"},
@@ -411,7 +411,7 @@ class TestValidationDecisionEngine:
         assert "CRITICAL VALIDATION FEEDBACK" in feedback
         assert "FINAL ATTEMPT" not in feedback
         # Second attempt: detailed with validator, location, fix
-        assert "[StructureValidator]" in feedback
+        assert "[CompletenessValidator]" in feedback
         assert "Location: body section" in feedback
         assert "Fix: Add missing heading" in feedback
 
@@ -422,7 +422,7 @@ class TestValidationDecisionEngine:
             issues=[
                 ValidationIssue(
                     severity=ValidationSeverity.ERROR,
-                    validator="StructureValidator",
+                    validator="CompletenessValidator",
                     message="Heading count mismatch",
                     location="body section",
                     details={"suggestion": "Add missing heading"},
@@ -459,7 +459,7 @@ class TestValidationDecisionEngine:
             issues=[
                 ValidationIssue(
                     severity=ValidationSeverity.ERROR,
-                    validator="StructureValidator",
+                    validator="CompletenessValidator",
                     message="Error message",
                 ),
                 ValidationIssue(
@@ -547,9 +547,9 @@ class TestValidationDecisionEngine:
                 )
             ],
         )
-        decision = self.engine.make_decision(result, retry_count=0, source="test")
-
-        feedback = decision.retry_feedback
+        # StructureValidator is now a critical validator, so make_decision returns REJECT
+        # with retry_feedback=None. Test the feedback method directly instead.
+        feedback = self.engine._generate_retry_feedback(result, retry_count=0)
         assert "⚠ STRUCTURE:" in feedback
         assert "Maintain the same number and level" in feedback
 
@@ -595,7 +595,7 @@ class TestValidationDecisionEngine:
             issues=[
                 ValidationIssue(
                     severity=ValidationSeverity.ERROR,
-                    validator="StructureValidator",
+                    validator="CompletenessValidator",
                     message="Single error",
                 )
             ],
@@ -622,7 +622,7 @@ class TestValidationDecisionEngine:
             issues=[
                 ValidationIssue(
                     severity=ValidationSeverity.ERROR,
-                    validator="StructureValidator",
+                    validator="CompletenessValidator",
                     message="Error",
                 )
             ],
@@ -691,7 +691,7 @@ class TestValidationDecisionEngine:
             issues=[
                 ValidationIssue(
                     severity=ValidationSeverity.ERROR,
-                    validator="StructureValidator",
+                    validator="CompletenessValidator",
                     message="Error",
                 )
             ],
@@ -712,7 +712,7 @@ class TestValidationDecisionEngine:
             issues=[
                 ValidationIssue(
                     severity=ValidationSeverity.ERROR,
-                    validator="StructureValidator",
+                    validator="CompletenessValidator",
                     message="Error 1",
                 ),
                 ValidationIssue(
@@ -814,7 +814,7 @@ class TestValidationDecisionEngine:
             issues=[
                 ValidationIssue(
                     severity=ValidationSeverity.ERROR,
-                    validator="StructureValidator",
+                    validator="CompletenessValidator",
                     message="Error",
                 )
             ],
@@ -832,7 +832,7 @@ class TestValidationDecisionEngine:
             issues=[
                 ValidationIssue(
                     severity=ValidationSeverity.ERROR,
-                    validator="StructureValidator",
+                    validator="CompletenessValidator",
                     message="Error without suggestion",
                     location="body",
                     details={},  # No suggestion
@@ -853,7 +853,7 @@ class TestValidationDecisionEngine:
             issues=[
                 ValidationIssue(
                     severity=ValidationSeverity.ERROR,
-                    validator="StructureValidator",
+                    validator="CompletenessValidator",
                     message="Error without location",
                     location=None,  # No location
                 )
@@ -895,7 +895,7 @@ class TestValidationDecisionEngine:
             issues=[
                 ValidationIssue(
                     severity=ValidationSeverity.ERROR,
-                    validator="StructureValidator",
+                    validator="CompletenessValidator",
                     message="Error",
                 )
             ],
@@ -969,7 +969,7 @@ class TestValidationDecisionEngineTelemetry:
             issues=[
                 ValidationIssue(
                     severity=ValidationSeverity.ERROR,
-                    validator="StructureValidator",
+                    validator="CompletenessValidator",
                     message="Structure error",
                 )
             ],
@@ -985,7 +985,7 @@ class TestValidationDecisionEngineTelemetry:
             retry_count=0,
             error_count=1,
             warning_count=0,
-            validator_results={"StructureValidator": False},
+            validator_results={"CompletenessValidator": False},
             feedback_provided=True,
         )
 
@@ -1035,7 +1035,7 @@ class TestValidationDecisionEngineTelemetry:
             issues=[
                 ValidationIssue(
                     severity=ValidationSeverity.ERROR,
-                    validator="StructureValidator",
+                    validator="CompletenessValidator",
                     message="Structure error",
                 ),
                 ValidationIssue(
@@ -1056,8 +1056,8 @@ class TestValidationDecisionEngineTelemetry:
         call_args_list = self.mock_telemetry.track_validation_error.call_args_list
         assert call_args_list[0] == call(
             run_context=self.mock_run_context,
-            validator_name="StructureValidator",
-            error_type="structure",
+            validator_name="CompletenessValidator",
+            error_type="completeness",
             severity="error",
             message="Structure error",
         )
@@ -1100,7 +1100,7 @@ class TestValidationDecisionEngineTelemetry:
             issues=[
                 ValidationIssue(
                     severity=ValidationSeverity.ERROR,
-                    validator="StructureValidator",
+                    validator="ShortcodePreservationValidator",
                     message="Error 1",
                 ),
                 ValidationIssue(
@@ -1127,7 +1127,7 @@ class TestValidationDecisionEngineTelemetry:
             error_count=2,
             warning_count=1,
             validator_results={
-                "StructureValidator": False,
+                "ShortcodePreservationValidator": False,
                 "CompletenessValidator": False,
             },
             feedback_provided=True,
@@ -1145,7 +1145,7 @@ class TestValidationDecisionEngineTelemetry:
             issues=[
                 ValidationIssue(
                     severity=ValidationSeverity.ERROR,
-                    validator="StructureValidator",
+                    validator="CompletenessValidator",
                     message="Error",
                 )
             ],
@@ -1168,7 +1168,7 @@ class TestValidationDecisionEngineTelemetry:
             issues=[
                 ValidationIssue(
                     severity=ValidationSeverity.ERROR,
-                    validator="StructureValidator",
+                    validator="CompletenessValidator",
                     message="Error",
                 )
             ],
@@ -1240,7 +1240,7 @@ class TestValidationDecisionEngineTelemetry:
             issues=[
                 ValidationIssue(
                     severity=ValidationSeverity.ERROR,
-                    validator="StructureValidator",
+                    validator="CompletenessValidator",
                     message="Error",
                 )
             ],

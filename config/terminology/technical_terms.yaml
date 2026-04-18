@@ -71,3 +71,9 @@ terms:
   # Non-translatable framework names (kb.aspose.net.words articles)
   - ASP.NET
   - REST
+  # Cloud infrastructure and ML terms (LP-001)
+  - Docker
+  - Kubernetes
+  - Cloud
+  - DataFrame
+  - Machine Learning

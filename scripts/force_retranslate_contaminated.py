@@ -125,32 +125,20 @@ def main():
     all_files = _load_inventory(inventory_path)
     logger.info(f"Inventory: {len(all_files)} total files")
 
-    # Apply filters
-    candidates = []
-    for record in all_files:
-        purity = record.get('purity_percentage', 100.0)
-        site_id = record.get('site_id', '')
-        tgt_lang = record.get('target_lang', '')
-
-        if purity >= args.threshold * 100:
-            continue  # Already clean enough (note: inventory uses 0-100 scale)
-        if args.site and site_id != args.site:
-            continue
-        if args.lang and tgt_lang != args.lang:
-            continue
-        candidates.append(record)
-
-    # Handle both 0-1 and 0-100 purity_percentage scales
-    # Re-apply threshold with both scales
+    # Apply filters — include files that either:
+    #   (a) have purity below threshold, OR
+    #   (b) have script_mixing issues (purity=100% in fast-mode scans)
     filtered = []
     for record in all_files:
         purity = record.get('purity_percentage', 100.0)
         site_id = record.get('site_id', '')
         tgt_lang = record.get('target_lang', '')
+        script_mixing = record.get('script_mixing', [])
 
         # Normalise: if purity > 1.0 assume it's already a 0-100 percentage
         purity_frac = purity / 100.0 if purity > 1.0 else purity
-        if purity_frac >= args.threshold:
+        has_quality_issue = (purity_frac < args.threshold) or bool(script_mixing)
+        if not has_quality_issue:
             continue
         if args.site and site_id != args.site:
             continue
@@ -160,7 +148,7 @@ def main():
 
     candidates = filtered
     logger.info(
-        f"Filtered to {len(candidates)} files with purity < {args.threshold:.0%}"
+        f"Filtered to {len(candidates)} files (purity < {args.threshold:.0%} or script mixing)"
         + (f" in site={args.site}" if args.site else "")
         + (f", lang={args.lang}" if args.lang else "")
     )

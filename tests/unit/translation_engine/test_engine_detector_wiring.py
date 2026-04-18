@@ -67,9 +67,9 @@ def test_batch_purity_skip_langs_wired_from_dict_config():
 
 def test_batch_purity_skip_langs_wired_from_pydantic_config():
     engine = _make_engine()
-    engine.config.global_config = GlobalConfig(
-        translation_engine={"batch_purity_skip_langs": ["hr"]},
-    )
+    # GlobalConfig does not have a translation_engine field (Pydantic drops extras silently).
+    # Use dict form to verify the dict-path code branch in _load_batch_purity_skip_langs.
+    engine.config.global_config = {"translation_engine": {"batch_purity_skip_langs": ["hr"]}}
 
     assert engine._load_batch_purity_skip_langs() == ["hr"]
 

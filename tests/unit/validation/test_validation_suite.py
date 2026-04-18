@@ -237,6 +237,8 @@ validators:
     enabled: false
   file_placement:
     enabled: false
+  repetition_detector:
+    enabled: false
 """
 
         with patch("builtins.open", mock_open(read_data=config_yaml)):

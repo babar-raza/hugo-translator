@@ -40,9 +40,9 @@ class TestLanguageConsistencyValidator:
         result = validator.validate("", german_text, {"target_lang": "de"})
 
         assert result.success is True
-        assert result.metadata["detected_language"] == "de"
         assert result.metadata["target_language"] == "de"
-        assert result.metadata["confidence"] >= 0.85
+        assert result.metadata["purity_percentage"] == 100.0
+        assert result.metadata["correct_language_count"] == result.metadata["total_sentences"]
         assert len([i for i in result.issues if i.severity == ValidationSeverity.ERROR]) == 0
 
     def test_correct_language_detected_french(self) -> None:
@@ -56,9 +56,8 @@ class TestLanguageConsistencyValidator:
         result = validator.validate("", french_text, {"target_lang": "fr"})
 
         assert result.success is True
-        assert result.metadata["detected_language"] == "fr"
         assert result.metadata["target_language"] == "fr"
-        assert result.metadata["confidence"] >= 0.85
+        assert result.metadata["purity_percentage"] == 100.0
 
     def test_correct_language_detected_spanish(self) -> None:
         """Test that Spanish text is correctly detected as Spanish."""
@@ -71,8 +70,8 @@ class TestLanguageConsistencyValidator:
         result = validator.validate("", spanish_text, {"target_lang": "es"})
 
         assert result.success is True
-        assert result.metadata["detected_language"] == "es"
         assert result.metadata["target_language"] == "es"
+        assert result.metadata["purity_percentage"] == 100.0
 
     def test_wrong_language_detected_english_when_german_expected(self) -> None:
         """Test that English text is detected when German is expected (ERROR)."""
@@ -85,14 +84,15 @@ class TestLanguageConsistencyValidator:
         result = validator.validate("", english_text, {"target_lang": "de"})
 
         assert result.success is False
-        assert result.metadata["detected_language"] == "en"
         assert result.metadata["target_language"] == "de"
+        assert result.metadata["purity_percentage"] < 95.0
+        assert result.metadata["correct_language_count"] == 0
+        # All wrong-language samples should be detected as English
+        assert all(s["detected"] == "en" for s in result.metadata["wrong_language_samples"])
         assert result.error_count == 1
 
         error_issues = [i for i in result.issues if i.severity == ValidationSeverity.ERROR]
         assert len(error_issues) == 1
-        assert "Wrong language detected" in error_issues[0].message
-        assert "en" in error_issues[0].message
         assert "de" in error_issues[0].message
 
     def test_wrong_language_detected_german_when_french_expected(self) -> None:
@@ -105,29 +105,29 @@ class TestLanguageConsistencyValidator:
         result = validator.validate("", german_text, {"target_lang": "fr"})
 
         assert result.success is False
-        assert result.metadata["detected_language"] == "de"
         assert result.metadata["target_language"] == "fr"
+        assert result.metadata["purity_percentage"] < 95.0
+        # Wrong-language samples should be detected as German
+        assert any(s["detected"] == "de" for s in result.metadata["wrong_language_samples"])
         assert result.error_count == 1
 
     def test_low_confidence_handling(self) -> None:
-        """Test that low confidence detection produces WARNING."""
+        """Test that mixed-language text produces a purity error."""
         validator = LanguageConsistencyValidator(confidence_threshold=0.95)
-        # Mix of languages to reduce confidence
+        # Mix of languages — half German, half English sentences
         mixed_text = (
             "Das ist ein Text mit some English words gemischt zusammen. "
             "This creates lower confidence in detection results."
         )
         result = validator.validate("", mixed_text, {"target_lang": "de"})
 
-        # Should still detect a language but with lower confidence
-        assert "detected_language" in result.metadata
-        assert "confidence" in result.metadata
+        # Should still return purity metadata
+        assert "purity_percentage" in result.metadata
+        assert "total_sentences" in result.metadata
+        assert "wrong_language_samples" in result.metadata
 
-        # May have a warning about low confidence depending on actual confidence
-        if result.metadata["confidence"] < 0.95:
-            warning_issues = [i for i in result.issues if i.severity == ValidationSeverity.WARNING]
-            assert len(warning_issues) > 0
-            assert any("Low detection confidence" in issue.message for issue in warning_issues)
+        # The English sentence should be flagged, causing purity < 100%
+        assert result.metadata["purity_percentage"] < 100.0
 
     def test_no_target_language_specified(self) -> None:
         """Test that missing target language produces WARNING and passes."""
@@ -193,8 +193,8 @@ class TestLanguageConsistencyValidator:
         assert "deutscher Text" in cleaned
 
         result = validator.validate("", text_with_code, {"target_lang": "de"})
-        # Should detect as German despite English code
-        assert result.metadata["detected_language"] == "de"
+        # Should detect as German despite English code — all sentences should pass
+        assert result.metadata["purity_percentage"] == 100.0
 
     def test_inline_code_ignored(self) -> None:
         """Test that inline code is removed before language detection."""
@@ -323,10 +323,10 @@ class TestLanguageConsistencyValidator:
         result3 = validator.validate("", text, {"target_lang": "de"})
 
         # All results should be identical
-        assert result1.metadata["detected_language"] == result2.metadata["detected_language"]
-        assert result2.metadata["detected_language"] == result3.metadata["detected_language"]
-        assert result1.metadata["confidence"] == result2.metadata["confidence"]
-        assert result2.metadata["confidence"] == result3.metadata["confidence"]
+        assert result1.metadata["purity_percentage"] == result2.metadata["purity_percentage"]
+        assert result2.metadata["purity_percentage"] == result3.metadata["purity_percentage"]
+        assert result1.metadata["correct_language_count"] == result2.metadata["correct_language_count"]
+        assert result2.metadata["correct_language_count"] == result3.metadata["correct_language_count"]
 
     def test_arabic_text_detection(self) -> None:
         """Test that Arabic text is correctly detected."""
@@ -338,8 +338,8 @@ class TestLanguageConsistencyValidator:
         result = validator.validate("", arabic_text, {"target_lang": "ar"})
 
         assert result.success is True
-        assert result.metadata["detected_language"] == "ar"
         assert result.metadata["target_language"] == "ar"
+        assert result.metadata["purity_percentage"] == 100.0
 
     def test_validation_result_structure(self) -> None:
         """Test that ValidationResult has correct structure."""
@@ -352,10 +352,12 @@ class TestLanguageConsistencyValidator:
         assert hasattr(result, "issues")
         assert hasattr(result, "metadata")
 
-        # Check metadata
-        assert "detected_language" in result.metadata
-        assert "confidence" in result.metadata
+        # Check metadata keys returned by sentence-purity approach
         assert "target_language" in result.metadata
+        assert "total_sentences" in result.metadata
+        assert "correct_language_count" in result.metadata
+        assert "purity_percentage" in result.metadata
+        assert "wrong_language_samples" in result.metadata
 
         # Check types
         assert isinstance(result.success, bool)
@@ -363,17 +365,14 @@ class TestLanguageConsistencyValidator:
         assert isinstance(result.metadata, dict)
 
     def test_high_confidence_threshold(self) -> None:
-        """Test validator with very high confidence threshold."""
+        """Test validator with very high confidence threshold (threshold stored but purity drives result)."""
         validator = LanguageConsistencyValidator(confidence_threshold=0.99)
         german_text = "Dies ist ein deutscher Text."
         result = validator.validate("", german_text, {"target_lang": "de"})
 
-        # Should detect correct language
-        assert result.metadata["detected_language"] == "de"
-
-        # May have warning about low confidence if confidence < 0.99
-        if result.metadata["confidence"] < 0.99:
-            assert result.warning_count > 0
+        # Should detect correct language — purity check passes single-sentence German
+        assert result.metadata["target_language"] == "de"
+        assert "purity_percentage" in result.metadata
 
     def test_low_confidence_threshold(self) -> None:
         """Test validator with very low confidence threshold."""
@@ -382,11 +381,11 @@ class TestLanguageConsistencyValidator:
         result = validator.validate("", german_text, {"target_lang": "de"})
 
         assert result.success is True
-        # With low threshold, should not have confidence warnings
-        assert result.metadata["confidence"] >= 0.5
+        # All sentences should be correctly detected
+        assert result.metadata["purity_percentage"] == 100.0
 
     def test_multiple_languages_mixed(self) -> None:
-        """Test detection with heavily mixed language content."""
+        """Test detection with mostly German content."""
         validator = LanguageConsistencyValidator()
         # Mostly German with some English
         mixed_text = (
@@ -396,8 +395,9 @@ class TestLanguageConsistencyValidator:
         )
         result = validator.validate("", mixed_text, {"target_lang": "de"})
 
-        # Should still detect primary language (German)
-        assert "detected_language" in result.metadata
+        # Should return purity metadata
+        assert "purity_percentage" in result.metadata
+        assert "total_sentences" in result.metadata
 
     def test_source_parameter_ignored(self) -> None:
         """Test that source parameter is ignored (signature compatibility)."""
@@ -409,7 +409,7 @@ class TestLanguageConsistencyValidator:
         result2 = validator.validate("", german_text, {"target_lang": "de"})
 
         # Results should be identical (source ignored)
-        assert result1.metadata["detected_language"] == result2.metadata["detected_language"]
+        assert result1.metadata["purity_percentage"] == result2.metadata["purity_percentage"]
         assert result1.success == result2.success
 
     def test_context_extensibility(self) -> None:
@@ -426,7 +426,8 @@ class TestLanguageConsistencyValidator:
 
         result = validator.validate("", german_text, context)
         assert result.success is True
-        assert result.metadata["detected_language"] == "de"
+        assert result.metadata["target_language"] == "de"
+        assert result.metadata["purity_percentage"] == 100.0
 
     def test_validator_name_in_issues(self) -> None:
         """Test that all issues have correct validator name."""

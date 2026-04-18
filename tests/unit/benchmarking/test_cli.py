@@ -6,6 +6,7 @@ and error handling for all CLI commands.
 """
 import argparse
 import json
+from contextlib import contextmanager
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -102,6 +103,39 @@ def sample_run():
     )
 
 
+_ALL_HEAVY_DEPS = [
+    'BenchmarkRecommender', 'BenchmarkReporter', 'BenchmarkRunner',
+    'load_corpus', 'BenchmarkDatabase', 'MigrationManager',
+    'TimeSeriesAggregator', 'AnalyticsQueryAPI', 'RetentionEngine',
+    'BenchmarkExporter', 'ExportFilter', 'BenchmarkArchiver',
+    'ModelRecommender', 'ModelRegistry',
+]
+
+
+@contextmanager
+def patch_deps(**instance_mocks):
+    """Patch _import_heavy_deps to return a mock deps dict.
+
+    Pass instance mocks as kwargs (ClassName=instance_mock). The helper
+    wraps each in a class-level mock whose return_value is the given
+    instance, so callers that do ``SomeClass(...)`` receive the instance.
+    All other deps keys are filled with fresh MagicMock()s.
+    Yields the full deps dict so tests can reach class-level mocks via
+    ``deps["ClassName"]``.
+    """
+    deps = {}
+    for key in _ALL_HEAVY_DEPS:
+        if key in instance_mocks:
+            cls_mock = MagicMock()
+            cls_mock.return_value = instance_mocks[key]
+            deps[key] = cls_mock
+        else:
+            deps[key] = MagicMock()
+
+    with patch('src.benchmarking.cli._import_heavy_deps', return_value=deps):
+        yield deps
+
+
 class TestCmdRun:
     """Tests for 'run' command."""
 
@@ -119,17 +153,21 @@ class TestCmdRun:
             max_samples=None,
             registry="config/model_registry.yaml",
             verbose=False,
+            all_languages=False,
+            target_lang="fr",
+            source_lang="en",
+            continue_on_error=False,
         )
 
-        with patch("src.benchmarking.cli.ModelRegistry", return_value=mock_registry):
-            with patch("src.benchmarking.cli.BenchmarkRunner") as MockRunner:
-                mock_runner = MockRunner.return_value
-                mock_runner.run_benchmark.return_value = sample_run
+        with patch_deps(ModelRegistry=mock_registry) as deps:
+            MockRunner = deps["BenchmarkRunner"]
+            mock_runner = MockRunner.return_value
+            mock_runner.run_benchmark.return_value = sample_run
 
-                result = cmd_run(args)
+            result = cmd_run(args)
 
-                assert result == 0
-                mock_runner.run_benchmark.assert_called_once()
+            assert result == 0
+            mock_runner.run_benchmark.assert_called_once()
 
     def test_run_invalid_batch_sizes(self, mock_registry):
         """Test run with invalid batch sizes."""
@@ -183,15 +221,19 @@ class TestCmdRun:
             max_samples=None,
             registry="config/model_registry.yaml",
             verbose=False,
+            all_languages=False,
+            target_lang="fr",
+            source_lang="en",
+            continue_on_error=False,
         )
 
-        with patch("src.benchmarking.cli.ModelRegistry", return_value=mock_registry):
-            with patch("src.benchmarking.cli.BenchmarkRunner") as MockRunner:
-                mock_runner = MockRunner.return_value
-                mock_runner.run_benchmark.side_effect = RuntimeError("Benchmark failed")
+        with patch_deps(ModelRegistry=mock_registry) as deps:
+            MockRunner = deps["BenchmarkRunner"]
+            mock_runner = MockRunner.return_value
+            mock_runner.run_benchmark.side_effect = RuntimeError("Benchmark failed")
 
-                result = cmd_run(args)
-                assert result == 1
+            result = cmd_run(args)
+            assert result == 1
 
 
 class TestCmdList:
@@ -217,7 +259,7 @@ class TestCmdList:
             ("run2", "m2m100_418m", "cpu", "2025-12-19T11:00:00", 5),
         ]
 
-        with patch("src.benchmarking.cli.BenchmarkDatabase", return_value=mock_db):
+        with patch_deps(BenchmarkDatabase=mock_db):
             result = cmd_list(args)
 
             assert result == 0
@@ -247,7 +289,7 @@ class TestCmdList:
             ("run1", "opus_en_fr", "cpu", "2025-12-19T10:00:00", 10),
         ]
 
-        with patch("src.benchmarking.cli.BenchmarkDatabase", return_value=mock_db):
+        with patch_deps(BenchmarkDatabase=mock_db):
             result = cmd_list(args)
 
             assert result == 0
@@ -286,7 +328,7 @@ class TestCmdList:
             ("run1", "opus_en_fr", "cpu", "2025-12-19T10:00:00", 10),
         ]
 
-        with patch("src.benchmarking.cli.BenchmarkDatabase", return_value=mock_db):
+        with patch_deps(BenchmarkDatabase=mock_db):
             result = cmd_list(args)
 
             assert result == 0
@@ -315,7 +357,7 @@ class TestCmdReport:
 
         mock_db.get_run.return_value = sample_run
 
-        with patch("src.benchmarking.cli.BenchmarkDatabase", return_value=mock_db):
+        with patch_deps(BenchmarkDatabase=mock_db):
             result = cmd_report(args)
 
             assert result == 0
@@ -335,7 +377,7 @@ class TestCmdReport:
 
         mock_db.get_run.return_value = sample_run
 
-        with patch("src.benchmarking.cli.BenchmarkDatabase", return_value=mock_db):
+        with patch_deps(BenchmarkDatabase=mock_db):
             result = cmd_report(args)
 
             assert result == 0
@@ -354,7 +396,7 @@ class TestCmdReport:
 
         mock_db.get_run.return_value = None
 
-        with patch("src.benchmarking.cli.BenchmarkDatabase", return_value=mock_db):
+        with patch_deps(BenchmarkDatabase=mock_db):
             result = cmd_report(args)
 
             assert result == 1
@@ -414,7 +456,7 @@ class TestCmdCompare:
             ],
         }
 
-        with patch("src.benchmarking.cli.BenchmarkDatabase", return_value=mock_db):
+        with patch_deps(BenchmarkDatabase=mock_db):
             result = cmd_compare(args)
 
             assert result == 0
@@ -464,7 +506,7 @@ class TestCmdCompare:
             "runs": [],
         }
 
-        with patch("src.benchmarking.cli.BenchmarkDatabase", return_value=mock_db):
+        with patch_deps(BenchmarkDatabase=mock_db):
             result = cmd_compare(args)
 
             assert result == 0
@@ -495,15 +537,15 @@ class TestCmdRecommend:
             rationale="Heuristic-based: CPU-optimized selection",
         )
 
-        with patch("src.benchmarking.cli.ModelRegistry", return_value=mock_registry):
-            with patch("src.benchmarking.cli.ModelRecommender") as MockRecommender:
-                mock_recommender = MockRecommender.return_value
-                mock_recommender.recommend.return_value = mock_recommendation
+        with patch_deps(ModelRegistry=mock_registry) as deps:
+            MockRecommender = deps["ModelRecommender"]
+            mock_recommender = MockRecommender.return_value
+            mock_recommender.recommend.return_value = mock_recommendation
 
-                result = cmd_recommend(args)
+            result = cmd_recommend(args)
 
-                assert result == 0
-                mock_recommender.recommend.assert_called_once()
+            assert result == 0
+            mock_recommender.recommend.assert_called_once()
 
     def test_recommend_with_benchmark_db(self, mock_registry, tmp_path):
         """Test recommendation with benchmark database."""
@@ -530,15 +572,14 @@ class TestCmdRecommend:
             rationale="Based on benchmark data",
         )
 
-        with patch("src.benchmarking.cli.ModelRegistry", return_value=mock_registry):
-            with patch("src.benchmarking.cli.BenchmarkDatabase") as MockDB:
-                with patch("src.benchmarking.cli.ModelRecommender") as MockRecommender:
-                    mock_recommender = MockRecommender.return_value
-                    mock_recommender.recommend.return_value = mock_recommendation
+        with patch_deps(ModelRegistry=mock_registry) as deps:
+            MockRecommender = deps["ModelRecommender"]
+            mock_recommender = MockRecommender.return_value
+            mock_recommender.recommend.return_value = mock_recommendation
 
-                    result = cmd_recommend(args)
+            result = cmd_recommend(args)
 
-                    assert result == 0
+            assert result == 0
 
     def test_recommend_missing_registry(self):
         """Test recommendation with missing registry."""
@@ -567,14 +608,14 @@ class TestCmdRecommend:
             verbose=False,
         )
 
-        with patch("src.benchmarking.cli.ModelRegistry", return_value=mock_registry):
-            with patch("src.benchmarking.cli.ModelRecommender") as MockRecommender:
-                mock_recommender = MockRecommender.return_value
-                mock_recommender.recommend.side_effect = ValueError("No suitable models")
+        with patch_deps(ModelRegistry=mock_registry) as deps:
+            MockRecommender = deps["ModelRecommender"]
+            mock_recommender = MockRecommender.return_value
+            mock_recommender.recommend.side_effect = ValueError("No suitable models")
 
-                result = cmd_recommend(args)
+            result = cmd_recommend(args)
 
-                assert result == 1
+            assert result == 1
 
 
 class TestMainCLI:
@@ -624,14 +665,15 @@ class TestMainCLI:
             "--batch-sizes", "8",
             "--corpus", "tiny",
             "--registry", "config/model_registry.yaml",
+            "--target-lang", "fr",
         ]):
-            with patch("src.benchmarking.cli.ModelRegistry", return_value=mock_registry):
-                with patch("src.benchmarking.cli.BenchmarkRunner") as MockRunner:
-                    mock_runner = MockRunner.return_value
-                    mock_runner.run_benchmark.return_value = sample_run
+            with patch_deps(ModelRegistry=mock_registry) as deps:
+                MockRunner = deps["BenchmarkRunner"]
+                mock_runner = MockRunner.return_value
+                mock_runner.run_benchmark.return_value = sample_run
 
-                    result = main()
-                    assert result == 0
+                result = main()
+                assert result == 0
 
 
 class TestArgumentParsing:
@@ -716,7 +758,10 @@ class TestCLIIntegrationReadiness:
 
         mock_db.get_run.return_value = sample_run
 
-        with patch("src.benchmarking.cli.BenchmarkDatabase", return_value=mock_db):
+        with patch_deps(BenchmarkDatabase=mock_db) as deps:
+            deps["BenchmarkReporter"].return_value.format_json.return_value = (
+                json.dumps({"run_id": "test123", "model_id": "opus_en_fr"})
+            )
             with patch("builtins.print") as mock_print:
                 result = cmd_report(args)
 
@@ -809,7 +854,7 @@ class TestCmdMigrate:
         ]
         mock_manager.get_current_version.return_value = 8
 
-        with patch("src.benchmarking.cli.MigrationManager", return_value=mock_manager):
+        with patch_deps(MigrationManager=mock_manager):
             result = cmd_migrate(args)
 
             assert result == 0
@@ -832,7 +877,7 @@ class TestCmdMigrate:
 
         mock_manager = MagicMock()
 
-        with patch("src.benchmarking.cli.MigrationManager", return_value=mock_manager):
+        with patch_deps(MigrationManager=mock_manager):
             result = cmd_migrate(args)
 
             assert result == 0
@@ -854,7 +899,7 @@ class TestCmdMigrate:
 
         mock_manager = MagicMock()
 
-        with patch("src.benchmarking.cli.MigrationManager", return_value=mock_manager):
+        with patch_deps(MigrationManager=mock_manager):
             result = cmd_migrate(args)
 
             assert result == 0
@@ -876,7 +921,7 @@ class TestCmdMigrate:
 
         mock_manager = MagicMock()
 
-        with patch("src.benchmarking.cli.MigrationManager", return_value=mock_manager):
+        with patch_deps(MigrationManager=mock_manager):
             result = cmd_migrate(args)
 
             assert result == 0
@@ -898,7 +943,7 @@ class TestCmdMigrate:
 
         mock_manager = MagicMock()
 
-        with patch("src.benchmarking.cli.MigrationManager", return_value=mock_manager):
+        with patch_deps(MigrationManager=mock_manager):
             result = cmd_migrate(args)
 
             assert result == 1
@@ -920,7 +965,7 @@ class TestCmdMigrate:
         mock_manager = MagicMock()
         mock_manager.migrate_to.side_effect = Exception("Migration failed")
 
-        with patch("src.benchmarking.cli.MigrationManager", return_value=mock_manager):
+        with patch_deps(MigrationManager=mock_manager):
             result = cmd_migrate(args)
 
             assert result == 1
@@ -948,7 +993,7 @@ class TestCmdAggregate:
         mock_aggregator = MagicMock()
         mock_aggregator.aggregate_all.return_value = 150
 
-        with patch("src.benchmarking.cli.TimeSeriesAggregator", return_value=mock_aggregator):
+        with patch_deps(TimeSeriesAggregator=mock_aggregator):
             result = cmd_aggregate(args)
 
             assert result == 0
@@ -973,7 +1018,7 @@ class TestCmdAggregate:
         mock_aggregator = MagicMock()
         mock_aggregator.aggregate_model.return_value = 25
 
-        with patch("src.benchmarking.cli.TimeSeriesAggregator", return_value=mock_aggregator):
+        with patch_deps(TimeSeriesAggregator=mock_aggregator):
             result = cmd_aggregate(args)
 
             assert result == 0
@@ -1002,7 +1047,7 @@ class TestCmdAggregate:
         mock_aggregator = MagicMock()
         mock_aggregator.create_baseline.return_value = "baseline_123"
 
-        with patch("src.benchmarking.cli.TimeSeriesAggregator", return_value=mock_aggregator):
+        with patch_deps(TimeSeriesAggregator=mock_aggregator):
             result = cmd_aggregate(args)
 
             assert result == 0
@@ -1031,7 +1076,7 @@ class TestCmdAggregate:
 
         mock_aggregator = MagicMock()
 
-        with patch("src.benchmarking.cli.TimeSeriesAggregator", return_value=mock_aggregator):
+        with patch_deps(TimeSeriesAggregator=mock_aggregator):
             result = cmd_aggregate(args)
 
             assert result == 1
@@ -1055,7 +1100,7 @@ class TestCmdAggregate:
         mock_aggregator = MagicMock()
         mock_aggregator.create_baseline.return_value = None
 
-        with patch("src.benchmarking.cli.TimeSeriesAggregator", return_value=mock_aggregator):
+        with patch_deps(TimeSeriesAggregator=mock_aggregator):
             result = cmd_aggregate(args)
 
             assert result == 1
@@ -1078,7 +1123,7 @@ class TestCmdAggregate:
 
         mock_aggregator = MagicMock()
 
-        with patch("src.benchmarking.cli.TimeSeriesAggregator", return_value=mock_aggregator):
+        with patch_deps(TimeSeriesAggregator=mock_aggregator):
             result = cmd_aggregate(args)
 
             assert result == 1
@@ -1120,7 +1165,7 @@ class TestCmdRetention:
             ]
         }
 
-        with patch("src.benchmarking.cli.RetentionEngine", return_value=mock_engine):
+        with patch_deps(RetentionEngine=mock_engine):
             result = cmd_retention(args)
 
             assert result == 0
@@ -1150,7 +1195,7 @@ class TestCmdRetention:
         mock_engine = MagicMock()
         mock_engine.execute_retention.return_value = [mock_result]
 
-        with patch("src.benchmarking.cli.RetentionEngine", return_value=mock_engine):
+        with patch_deps(RetentionEngine=mock_engine):
             result = cmd_retention(args)
 
             assert result == 0
@@ -1180,7 +1225,7 @@ class TestCmdRetention:
         mock_engine = MagicMock()
         mock_engine.execute_retention.return_value = [mock_result]
 
-        with patch("src.benchmarking.cli.RetentionEngine", return_value=mock_engine):
+        with patch_deps(RetentionEngine=mock_engine):
             result = cmd_retention(args)
 
             assert result == 0
@@ -1214,7 +1259,7 @@ class TestCmdRetention:
         mock_engine.execute_retention.return_value = [mock_result]
         mock_engine.vacuum_database.return_value = 1024000
 
-        with patch("src.benchmarking.cli.RetentionEngine", return_value=mock_engine):
+        with patch_deps(RetentionEngine=mock_engine):
             result = cmd_retention(args)
 
             assert result == 0
@@ -1252,7 +1297,7 @@ class TestCmdRetention:
 
         mock_engine = MagicMock()
 
-        with patch("src.benchmarking.cli.RetentionEngine", return_value=mock_engine):
+        with patch_deps(RetentionEngine=mock_engine):
             result = cmd_retention(args)
 
             assert result == 1
@@ -1293,7 +1338,7 @@ class TestCmdExport:
         mock_exporter = MagicMock()
         mock_exporter.export_csv.return_value = mock_result
 
-        with patch("src.benchmarking.cli.BenchmarkExporter", return_value=mock_exporter):
+        with patch_deps(BenchmarkExporter=mock_exporter):
             result = cmd_export(args)
 
             assert result == 0
@@ -1331,7 +1376,7 @@ class TestCmdExport:
         mock_exporter = MagicMock()
         mock_exporter.export_json.return_value = mock_result
 
-        with patch("src.benchmarking.cli.BenchmarkExporter", return_value=mock_exporter):
+        with patch_deps(BenchmarkExporter=mock_exporter):
             result = cmd_export(args)
 
             assert result == 0
@@ -1369,7 +1414,7 @@ class TestCmdExport:
         mock_exporter = MagicMock()
         mock_exporter.export_sqlite.return_value = mock_result
 
-        with patch("src.benchmarking.cli.BenchmarkExporter", return_value=mock_exporter):
+        with patch_deps(BenchmarkExporter=mock_exporter):
             result = cmd_export(args)
 
             assert result == 0
@@ -1407,17 +1452,17 @@ class TestCmdExport:
         mock_exporter = MagicMock()
         mock_exporter.export_json.return_value = mock_result
 
-        with patch("src.benchmarking.cli.BenchmarkExporter", return_value=mock_exporter):
-            with patch("src.benchmarking.cli.ExportFilter") as MockFilter:
-                result = cmd_export(args)
+        with patch_deps(BenchmarkExporter=mock_exporter) as deps:
+            MockFilter = deps["ExportFilter"]
+            result = cmd_export(args)
 
-                assert result == 0
-                MockFilter.assert_called_once_with(
-                    start_date="2024-01-01",
-                    end_date="2024-12-31",
-                    model_ids=["m2m100_418m", "opus_en_fr"],
-                    devices=["cpu", "cuda:0"],
-                )
+            assert result == 0
+            MockFilter.assert_called_once_with(
+                start_date="2024-01-01",
+                end_date="2024-12-31",
+                model_ids=["m2m100_418m", "opus_en_fr"],
+                devices=["cpu", "cuda:0"],
+            )
 
     def test_export_with_compression(self, tmp_path):
         """Test compressed export."""
@@ -1451,7 +1496,7 @@ class TestCmdExport:
         mock_exporter = MagicMock()
         mock_exporter.export_json.return_value = mock_result
 
-        with patch("src.benchmarking.cli.BenchmarkExporter", return_value=mock_exporter):
+        with patch_deps(BenchmarkExporter=mock_exporter):
             result = cmd_export(args)
 
             assert result == 0
@@ -1501,7 +1546,7 @@ class TestCmdExport:
         mock_exporter = MagicMock()
         mock_exporter.export_csv.return_value = mock_result
 
-        with patch("src.benchmarking.cli.BenchmarkExporter", return_value=mock_exporter):
+        with patch_deps(BenchmarkExporter=mock_exporter):
             result = cmd_export(args)
 
             assert result == 1
@@ -1547,7 +1592,7 @@ class TestCmdArchive:
             "total_size_bytes": 51200,
         }
 
-        with patch("src.benchmarking.cli.BenchmarkArchiver", return_value=mock_archiver):
+        with patch_deps(BenchmarkArchiver=mock_archiver):
             result = cmd_archive(args)
 
             assert result == 0
@@ -1576,7 +1621,7 @@ class TestCmdArchive:
         mock_archiver = MagicMock()
         mock_archiver.list_archives.return_value = []
 
-        with patch("src.benchmarking.cli.BenchmarkArchiver", return_value=mock_archiver):
+        with patch_deps(BenchmarkArchiver=mock_archiver):
             result = cmd_archive(args)
 
             assert result == 0
@@ -1615,7 +1660,7 @@ class TestCmdArchive:
         mock_archiver = MagicMock()
         mock_archiver.create_archive.return_value = mock_result
 
-        with patch("src.benchmarking.cli.BenchmarkArchiver", return_value=mock_archiver):
+        with patch_deps(BenchmarkArchiver=mock_archiver):
             result = cmd_archive(args)
 
             assert result == 0
@@ -1646,7 +1691,7 @@ class TestCmdArchive:
 
         mock_archiver = MagicMock()
 
-        with patch("src.benchmarking.cli.BenchmarkArchiver", return_value=mock_archiver):
+        with patch_deps(BenchmarkArchiver=mock_archiver):
             result = cmd_archive(args)
 
             assert result == 1
@@ -1685,7 +1730,7 @@ class TestCmdArchive:
         mock_archiver = MagicMock()
         mock_archiver.create_archive.return_value = mock_result
 
-        with patch("src.benchmarking.cli.BenchmarkArchiver", return_value=mock_archiver):
+        with patch_deps(BenchmarkArchiver=mock_archiver):
             result = cmd_archive(args)
 
             assert result == 0
@@ -1721,7 +1766,7 @@ class TestCmdArchive:
         mock_archiver = MagicMock()
         mock_archiver.create_archive.return_value = mock_result
 
-        with patch("src.benchmarking.cli.BenchmarkArchiver", return_value=mock_archiver):
+        with patch_deps(BenchmarkArchiver=mock_archiver):
             result = cmd_archive(args)
 
             assert result == 0
@@ -1755,7 +1800,7 @@ class TestCmdArchive:
         mock_archiver = MagicMock()
         mock_archiver.restore_archive.return_value = mock_result
 
-        with patch("src.benchmarking.cli.BenchmarkArchiver", return_value=mock_archiver):
+        with patch_deps(BenchmarkArchiver=mock_archiver):
             result = cmd_archive(args)
 
             assert result == 0
@@ -1787,7 +1832,7 @@ class TestCmdArchive:
         mock_archiver = MagicMock()
         mock_archiver.restore_archive.return_value = mock_result
 
-        with patch("src.benchmarking.cli.BenchmarkArchiver", return_value=mock_archiver):
+        with patch_deps(BenchmarkArchiver=mock_archiver):
             result = cmd_archive(args)
 
             assert result == 1
@@ -1814,7 +1859,7 @@ class TestCmdArchive:
         mock_archiver = MagicMock()
         mock_archiver.rotate_archives.return_value = 2
 
-        with patch("src.benchmarking.cli.BenchmarkArchiver", return_value=mock_archiver):
+        with patch_deps(BenchmarkArchiver=mock_archiver):
             result = cmd_archive(args)
 
             assert result == 0
@@ -1841,7 +1886,7 @@ class TestCmdArchive:
 
         mock_archiver = MagicMock()
 
-        with patch("src.benchmarking.cli.BenchmarkArchiver", return_value=mock_archiver):
+        with patch_deps(BenchmarkArchiver=mock_archiver):
             result = cmd_archive(args)
 
             assert result == 1

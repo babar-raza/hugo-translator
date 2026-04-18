@@ -72,8 +72,9 @@ class TestShortcodeProtection:
         assert extractor._is_non_translatable(multiline) == False
 
     def test_integration_with_full_unit_extraction(self, extractor):
-        """Integration test: shortcodes in AST should be marked do_not_translate."""
+        """Integration test: shortcode text must not appear in any translatable unit."""
         from src.translation_engine.parser.hugo_parser import HugoParser
+        from src.translation_engine.parser.ast_nodes import NodeType
 
         markdown = """---
 title: Test
@@ -93,10 +94,16 @@ Content here.
         for node in doc.ast:
             extractor._traverse_node(node, units)
 
-        # Find shortcode units
-        shortcode_units = [u for u in units if '{{% steps' in u.source_text or '{{% /steps' in u.source_text]
+        # Shortcode paragraphs are parsed as INLINE_HTML nodes in the AST.
+        # They do NOT produce TextUnits (renderer preserves them via node.raw directly).
+        # Verify no translatable unit contains raw shortcode syntax.
+        for unit in units:
+            if not unit.do_not_translate:
+                assert "{{% steps" not in unit.source_text, \
+                    f"Shortcode leaked into translatable unit: {unit.source_text}"
+                assert "{{% /steps" not in unit.source_text, \
+                    f"Shortcode leaked into translatable unit: {unit.source_text}"
 
-        # All shortcode units should be marked do_not_translate
-        assert len(shortcode_units) > 0, "No shortcode units found in extracted units"
-        for unit in shortcode_units:
-            assert unit.do_not_translate, f"Shortcode not protected: {unit.source_text}"
+        # Verify the plain content was extracted
+        content_units = [u for u in units if "Content here" in u.source_text]
+        assert len(content_units) >= 1, "Plain content should be extracted as a unit"

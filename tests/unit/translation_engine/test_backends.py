@@ -259,9 +259,9 @@ class TestLLMBackend(unittest.TestCase):
     def test_llm_backend_translate_batch(self, mock_create):
         """Test translate_batch() passes all texts through provider."""
         mock_provider = Mock()
+        # translate_batch uses a packed batch call with numbered format
         mock_provider.generate.side_effect = [
-            ("hola", 10, 5),
-            ("mundo", 10, 5),
+            ("[1] hola\n[2] mundo", 10, 5),  # Single packed call returns both translations
         ]
         mock_create.return_value = mock_provider
 
@@ -273,7 +273,7 @@ class TestLLMBackend(unittest.TestCase):
         results = backend.translate_batch(["hello", "world"], "en", "es")
 
         self.assertEqual(results, ["hola", "mundo"])
-        self.assertEqual(mock_provider.generate.call_count, 2)
+        self.assertEqual(mock_provider.generate.call_count, 1)  # One packed batch call
 
     @patch('src.model_runtime.llm_backend.create_provider')
     def test_llm_backend_get_model_info(self, mock_create):

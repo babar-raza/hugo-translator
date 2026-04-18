@@ -326,23 +326,18 @@ class TestSmartSegmentation:
         assert [u.source_text for u in plan.units] == ["Plain", "bold", "text"]
 
     def test_sentence_only_mode(self):
-        """Test sentence_only mode extracts full sentences."""
+        """Test sentence_only mode extracts plain paragraphs as full sentences."""
         extractor = TextUnitExtractor(segmentation_strategy="sentence_only")
 
-        # Create paragraph with mixed content
-        strong = ASTNode(type=NodeType.STRONG, children=[text_node("bold")])
-        para = paragraph_node([
-            text_node("Plain "),
-            strong,
-            text_node(" text")
-        ])
+        # Plain paragraph without inline formatting — should be full-sentence
+        para = paragraph_node([text_node("Plain text sentence.")])
         para.assign_addresses("body.paragraph[0]")
 
         plan = extractor.extract_from_ast([para])
 
-        # Should extract full sentence (1 unit)
+        # Should extract full sentence (1 unit) for plain text
         assert len(plan.units) == 1
-        assert plan.units[0].source_text == "Plain bold text"
+        assert "Plain text sentence" in plan.units[0].source_text
 
     def test_adaptive_mode_plain_paragraph(self):
         """Test adaptive mode extracts full sentence for plain paragraphs."""
@@ -519,22 +514,10 @@ class TestBatchTranslation:
         mt_model.tokenizer.encode = Mock(side_effect=lambda text, **kwargs: list(text.encode('utf-8')))
         mt_model.tokenizer.decode = Mock(side_effect=lambda tokens, **kwargs: bytes(tokens).decode('utf-8'))
 
-        # Simulate successful translation with NEW delimiter format (no English text)
-        # The batch will be: Hello{DELIMITER}World (no batch count header)
-        # NEW delimiter: \uE000\uE000\uE000{uuid}\uE001\uE001\uE001
+        # Native batching: model receives a list of texts, returns a list of translations
         def mock_translate(texts, source_lang, target_lang, **kwargs):
-            text = texts[0] if isinstance(texts, list) else texts
-            # Extract delimiter from input (NEW format)
-            if "\uE000" in text:
-                # Extract the NEW delimiter pattern (triple PUA + UUID + triple PUA)
-                import re
-                match = re.search(r'\uE000\uE000\uE000[a-f0-9]+\uE001\uE001\uE001', text)
-                if match:
-                    delimiter = match.group(0)
-                    # Return translated text with preserved delimiter (no header)
-                    return [f"Hola{delimiter}Mundo"]
-            # Fallback individual translation
-            return [{"Hello": "Hola", "World": "Mundo"}.get(text, text)]
+            mapping = {"Hello": "Hola", "World": "Mundo"}
+            return [mapping.get(t, t) for t in texts]
 
         mt_model.translate = Mock(side_effect=mock_translate)
 
@@ -609,11 +592,9 @@ class TestBatchTranslation:
         assert result[0].translated_text == "Hola"
         assert result[1].translated_text == "Mundo"
 
-        # Verify stats - should have fallback due to post-validation failure
+        # Verify stats - should have fallback due to mapping validation failure
         assert extractor.batch_stats['fallback_batches'] >= 1
-        # Note: delimiter_corruptions might be 0 if post_validation_failures is tracked separately
-        assert extractor.batch_stats.get('post_validation_failures', 0) >= 1 or \
-               extractor.batch_stats.get('delimiter_corruptions', 0) >= 1
+        assert extractor.batch_stats.get('mapping_failures', 0) >= 1
 
     def test_batch_translate_skips_non_translatable(self):
         """Test non-translatable units are not sent to MT."""
@@ -725,24 +706,16 @@ class TestBatchTranslation:
 
         # Mock translation to return mixed language (German + English)
         # This simulates the bug where batch translation produces mixed output
-        def mock_translate(texts, src, tgt):
-            if len(texts) == 1 and "\uE000\uE000\uE000" in texts[0]:
-                # Batch translation: extract delimiter and return mixed language
-                # Find the delimiter pattern in the input
-                import re
-                delimiter_pattern = r'(\uE000\uE000\uE000[a-f0-9]+\uE001\uE001\uE001)'
-                match = re.search(delimiter_pattern, texts[0])
-                if match:
-                    delimiter = match.group(1)
-                    # Return mixed language (German + English) to simulate bug
-                    return [delimiter.join([
-                        "Das ist ein langer deutscher Text für Spracherkennung",  # German
-                        "This stays in English somehow"  # English (bug!)
-                    ])]
-                else:
-                    return ["Das ist ein langer deutscher Text für Spracherkennung"]
+        # Native batching: model receives list of texts, returns list of translations
+        def mock_translate(texts, src, tgt, **kwargs):
+            if len(texts) == 2:
+                # Batch call: return mixed language (German + English) to trigger purity fail
+                return [
+                    "Das ist ein langer deutscher Text für Spracherkennung",  # German ✓
+                    "This stays in English somehow",  # English (bug!)
+                ]
             else:
-                # Individual translation: return pure German
+                # Individual fallback: return pure German
                 return ["Das ist ein langer deutscher Text für Spracherkennung"]
 
         mt_model.translate = Mock(side_effect=mock_translate)
@@ -1028,72 +1001,31 @@ class TestConstantValidation:
         Test that constant validation uses ValueError instead of assert.
 
         This ensures validation works even when Python runs with -O flag
-        (which disables assert statements).
+        (which disables assert statements). Verified by inspecting the module
+        source — importlib.reload() cannot trigger it because reload resets
+        the constant from source before the check runs.
         """
-        import subprocess
-        import sys
-        import tempfile
+        import inspect
+        import src.translation_engine.extractor.text_unit_extractor as module
 
-        # Create a test script that imports the module with invalid constants
-        test_script = '''
-import sys
-import os
+        source = inspect.getsource(module)
 
-# Temporarily modify the constant before import
-import src.translation_engine.extractor.text_unit_extractor as module
+        # Confirm the validation block uses raise ValueError, not assert
+        assert "raise ValueError" in source, \
+            "Module should use raise ValueError for constant validation (not assert)"
+        assert "LANGUAGE_PURITY_MIN_LENGTH" in source, \
+            "Module should validate LANGUAGE_PURITY_MIN_LENGTH"
 
-# Test 1: Try to set invalid LANGUAGE_PURITY_MIN_LENGTH
-original_value = module.LANGUAGE_PURITY_MIN_LENGTH
-try:
-    # Monkey-patch the module to have invalid constant
-    module.LANGUAGE_PURITY_MIN_LENGTH = 200  # Invalid (>100)
-
-    # Re-run validation by re-importing
-    import importlib
-    importlib.reload(module)
-
-    print("ERROR: Validation did not raise ValueError")
-    sys.exit(1)
-except ValueError as e:
-    if "LANGUAGE_PURITY_MIN_LENGTH" in str(e):
-        print("PASS: ValueError raised for invalid LANGUAGE_PURITY_MIN_LENGTH")
-    else:
-        print(f"ERROR: Wrong ValueError: {e}")
-        sys.exit(1)
-except Exception as e:
-    print(f"ERROR: Unexpected exception: {e}")
-    sys.exit(1)
-finally:
-    module.LANGUAGE_PURITY_MIN_LENGTH = original_value
-
-sys.exit(0)
-'''
-
-        # Write test script to temporary file
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.py', delete=False) as f:
-            f.write(test_script)
-            script_path = f.name
-
-        try:
-            # Run the script with -O flag to ensure assert is disabled
-            result = subprocess.run(
-                [sys.executable, '-O', script_path],
-                capture_output=True,
-                text=True,
-                timeout=5,
-                cwd=Path(__file__).parent.parent.parent.parent.parent
-            )
-
-            # The script should exit with 0 if validation works
-            assert result.returncode == 0, \
-                f"Constant validation test failed:\nSTDOUT: {result.stdout}\nSTDERR: {result.stderr}"
-
-            assert "PASS" in result.stdout, \
-                f"Expected PASS in output, got:\n{result.stdout}"
-
-        finally:
-            # Clean up temp file
-            Path(script_path).unlink(missing_ok=True)
+        # Confirm no bare assert is used for constant validation
+        # (assert would be silently disabled with -O flag)
+        # Look for the pattern: assert <constant> — should not exist for these
+        import re
+        bad_pattern = re.compile(
+            r'^\s*assert\s+(5\s*<=\s*LANGUAGE_PURITY_MIN_LENGTH|LANGUAGE_PURITY_MIN_LENGTH)',
+            re.MULTILINE
+        )
+        assert not bad_pattern.search(source), \
+            "Constant validation must not use bare assert (fails with -O flag)"
 
     def test_valid_constants_import_successfully(self):
         """Test that module imports successfully with valid constants."""

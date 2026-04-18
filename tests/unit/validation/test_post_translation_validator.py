@@ -478,8 +478,8 @@ class TestValidationDecisionEngine:
             source="test source",
         )
 
-        # Stub still returns ACCEPT regardless of validation result
-        assert decision.decision == ValidationDecision.ACCEPT
+        # With retry_count=0 and a retryable error, engine returns RETRY
+        assert decision.decision == ValidationDecision.RETRY
 
     def test_make_decision_with_retry_count(self, mock_validation_result: ValidationResult) -> None:
         """Test stub behavior with different retry counts."""
