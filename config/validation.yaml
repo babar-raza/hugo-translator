@@ -11,7 +11,7 @@ decision_rules:
   reject_on_placeholder_error: true  # Reject if placeholder integrity fails
   reject_on_code_block_error: true  # Reject if code blocks are corrupted
   reject_on_link_error: true  # Reject if links are broken
-  reject_on_repetition_error: false  # Allow retries before rejecting repetition errors (structured docs have legitimate repetition)
+  reject_on_repetition_error: true  # Hard-reject on repetition (7-12x word repetition detected in ES/CS/IT corrupted output)
 
   # Retry configuration - when to attempt re-translation
   max_retry_attempts: 2  # Maximum number of retry attempts
@@ -20,7 +20,7 @@ decision_rules:
 
   # Acceptance thresholds - when to accept despite issues
   accept_warnings: true  # Accept translation with warnings (non-critical issues)
-  accept_after_max_retries: true  # Accept after max retries even if issues remain
+  accept_after_max_retries: false  # Reject after max retries if quality errors remain (prevents publishing corrupted ES/CS/IT)
 
 # Retry Strategy: How to modify retry attempts
 retry_strategy:
@@ -79,6 +79,13 @@ validators:
     enabled: true
     confidence_threshold: 0.85
     description: "Validates target language consistency using langdetect"
+    # Per-language overrides for languages with known M2M100 corruption (ES, IT, CS).
+    # purity_threshold: min % of sentences that must be in target language (0-100).
+    # confidence_threshold: min langdetect confidence at sentence level.
+    per_language_overrides:
+      es: {purity_threshold: 98.0, confidence_threshold: 0.90}
+      it: {purity_threshold: 98.0, confidence_threshold: 0.90}
+      cs: {purity_threshold: 97.0, confidence_threshold: 0.88}
 
   shortcode_preservation:
     enabled: true
