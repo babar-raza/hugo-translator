@@ -110,8 +110,85 @@ class CompletenessValidator(PostTranslationValidator):
             (translated_segments / total_segments * 100) if total_segments > 0 else 0.0
         )
 
+        # Check 4: Document-level length ratio (detects severe truncation)
+        # Strip frontmatter (---...---) and code blocks (```...```) before comparing.
+        # Conservative floor: 0.30 (translation must be at least 30% of source length).
+        # CJK scripts are naturally compact; the 0.30 floor is intentionally loose.
+        self._check_length_ratio(source, translation, issues)
+
         return ValidationResult(
             success=len(issues) == 0,
             issues=issues,
             metadata={"coverage_percent": coverage},
         )
+
+    def _check_length_ratio(
+        self,
+        source: str,
+        translation: str,
+        issues: list,
+    ) -> None:
+        """Detect severe truncation by comparing document character lengths.
+
+        Strips frontmatter and fenced code blocks before comparing so that
+        code-heavy articles don't produce false positives. The min ratio (0.30)
+        is conservative enough to allow compact CJK output without flagging it.
+
+        Args:
+            source: Source document text
+            translation: Translated document text
+            issues: List to append ValidationIssue objects to
+        """
+        MIN_RATIO = 0.30
+        MAX_RATIO = 4.0
+        MIN_SOURCE_LEN = 100  # Skip very short documents
+
+        def _strip_boilerplate(text: str) -> str:
+            # Remove YAML frontmatter
+            text = re.sub(r'^---\s*\n.*?\n---\s*\n', '', text, flags=re.DOTALL)
+            # Remove fenced code blocks
+            text = re.sub(r'```.*?```', '', text, flags=re.DOTALL)
+            return text.strip()
+
+        src_clean = _strip_boilerplate(source)
+        trn_clean = _strip_boilerplate(translation)
+
+        src_len = len(src_clean)
+        trn_len = len(trn_clean)
+
+        if src_len < MIN_SOURCE_LEN:
+            return  # Too short to be meaningful
+
+        ratio = trn_len / src_len if src_len > 0 else 1.0
+
+        if ratio < MIN_RATIO:
+            issues.append(
+                ValidationIssue(
+                    validator="CompletenessValidator",
+                    severity=ValidationSeverity.ERROR,
+                    message=(
+                        f"Translation severely truncated: {trn_len} chars vs "
+                        f"{src_len} source chars (ratio {ratio:.2f}, min {MIN_RATIO})"
+                    ),
+                    location="document",
+                    details={
+                        "ratio": ratio,
+                        "src_len": src_len,
+                        "trn_len": trn_len,
+                        "suggestion": "Translation appears truncated — check for LLM cutoff",
+                    },
+                )
+            )
+        elif ratio > MAX_RATIO:
+            issues.append(
+                ValidationIssue(
+                    validator="CompletenessValidator",
+                    severity=ValidationSeverity.WARNING,
+                    message=(
+                        f"Translation unusually long: {trn_len} chars vs "
+                        f"{src_len} source chars (ratio {ratio:.2f})"
+                    ),
+                    location="document",
+                    details={"ratio": ratio, "src_len": src_len, "trn_len": trn_len},
+                )
+            )

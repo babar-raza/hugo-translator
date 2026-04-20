@@ -64,13 +64,39 @@ class ValidationSuite:
         self.fail_fast = fail_fast
         self.short_circuit_on_critical = short_circuit_on_critical
 
+    @staticmethod
+    def _load_lang_consistency_config() -> dict:
+        """Load language_consistency config from validation.yaml (best-effort, never raises).
+
+        Returns:
+            Dict with 'confidence_threshold' and 'per_language_overrides' keys.
+        """
+        defaults = {"confidence_threshold": 0.85, "per_language_overrides": {}}
+        try:
+            cfg_path = Path("config/validation.yaml")
+            if not cfg_path.exists():
+                return defaults
+            with cfg_path.open(encoding="utf-8") as fh:
+                cfg = yaml.safe_load(fh) or {}
+            lc = cfg.get("validators", {}).get("language_consistency", {})
+            defaults["confidence_threshold"] = lc.get("confidence_threshold", 0.85)
+            defaults["per_language_overrides"] = lc.get("per_language_overrides", {})
+        except Exception:
+            pass
+        return defaults
+
     def _create_default_validators(self) -> list[Validator]:
         """
         Create default set of validators (all enabled).
 
+        Per-language thresholds for LanguageConsistencyValidator are loaded lazily
+        from config/validation.yaml so that the default constructor picks up
+        production settings without requiring an explicit config path.
+
         Returns:
             List of validator instances
         """
+        lc_cfg = self._load_lang_consistency_config()
         return [
             # Legacy validators
             PlaceholderValidator(),
@@ -78,7 +104,10 @@ class ValidationSuite:
             LinkValidator(),
             # New post-translation validators (VAL-01 through VAL-06)
             CompletenessValidator(),
-            LanguageConsistencyValidator(),
+            LanguageConsistencyValidator(
+                confidence_threshold=lc_cfg["confidence_threshold"],
+                per_language_overrides=lc_cfg["per_language_overrides"],
+            ),
             ShortcodePreservationValidator(),
             RepetitionDetectorValidator(config={
                 "ngram_threshold": 5,          # Require 5+ occurrences (default 3) — reduces false positives on structured docs
@@ -144,10 +173,13 @@ class ValidationSuite:
             validators.append(CompletenessValidator())
 
         if validators_config.get('language_consistency', {}).get('enabled', True):
-            confidence_threshold = validators_config.get('language_consistency', {}).get(
-                'confidence_threshold', 0.85
-            )
-            validators.append(LanguageConsistencyValidator(confidence_threshold=confidence_threshold))
+            lc_cfg = validators_config.get('language_consistency', {})
+            confidence_threshold = lc_cfg.get('confidence_threshold', 0.85)
+            per_language_overrides = lc_cfg.get('per_language_overrides', {})
+            validators.append(LanguageConsistencyValidator(
+                confidence_threshold=confidence_threshold,
+                per_language_overrides=per_language_overrides,
+            ))
 
         if validators_config.get('shortcode_preservation', {}).get('enabled', True):
             validators.append(ShortcodePreservationValidator())

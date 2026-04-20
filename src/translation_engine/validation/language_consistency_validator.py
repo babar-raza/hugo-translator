@@ -109,14 +109,24 @@ class LanguageConsistencyValidator(PostTranslationValidator):
         )
     """
 
-    def __init__(self, confidence_threshold: float = 0.85):
+    def __init__(
+        self,
+        confidence_threshold: float = 0.85,
+        per_language_overrides: dict | None = None,
+    ):
         """Initialize language consistency validator.
 
         Args:
             confidence_threshold: Minimum confidence for language detection (default 0.85)
+            per_language_overrides: Optional dict mapping lang codes to override dicts.
+                Each override may contain:
+                  - purity_threshold (float): min % of sentences in target lang (0–100)
+                  - confidence_threshold (float): min langdetect confidence per sentence
+                Example: {'es': {'purity_threshold': 98.0, 'confidence_threshold': 0.90}}
         """
         super().__init__()
         self.confidence_threshold = confidence_threshold
+        self.per_language_overrides: dict = per_language_overrides or {}
 
     def validate(
         self,
@@ -151,6 +161,11 @@ class LanguageConsistencyValidator(PostTranslationValidator):
                 success=True,
                 issues=issues,
             )
+
+        # Resolve per-language overrides (ES/IT/CS have stricter thresholds)
+        lang_overrides = self.per_language_overrides.get(target_lang, {})
+        effective_confidence = lang_overrides.get('confidence_threshold', self.confidence_threshold)
+        effective_purity = lang_overrides.get('purity_threshold', 95.0)
 
         # Unicode script-mixing check (fast, no ML, catches inline foreign phrases).
         # Runs before the slower langdetect pass but does NOT short-circuit so that
@@ -200,7 +215,7 @@ class LanguageConsistencyValidator(PostTranslationValidator):
                     detected_code = top_lang.lang
                     confidence = top_lang.prob
 
-                    if detected_code == target_lang and confidence >= 0.7:
+                    if detected_code == target_lang and confidence >= effective_confidence:
                         correct_lang_count += 1
                     else:
                         # Log wrong language sentence (truncate for readability)
@@ -230,8 +245,9 @@ class LanguageConsistencyValidator(PostTranslationValidator):
             # Calculate purity percentage
             purity_pct = (correct_lang_count / total_sentences) * 100
 
-            # Require 95% of sentences to be in correct language
-            if purity_pct < 95.0:
+            # Require effective_purity% of sentences to be in correct language
+            # (default 95%; stricter for ES/IT/CS via per_language_overrides)
+            if purity_pct < effective_purity:
                 # Create detailed error message
                 examples = "; ".join([
                     f"Sent {s['sentence_num']}: '{s['snippet']}' ({s['detected']}, conf={s['confidence']:.2f})"

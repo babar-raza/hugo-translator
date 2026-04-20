@@ -86,7 +86,73 @@ class FrontmatterProtectionValidator(Validator):
             source_frontmatter, translation_frontmatter, result, context
         )
 
+        # Check that TRANSLATE fields are actually in the target language
+        self._check_translatable_field_language(
+            translation_frontmatter, result, context
+        )
+
         return result
+
+    def _check_translatable_field_language(
+        self,
+        translation: dict[str, Any],
+        result: ValidationResult,
+        context: dict[str, Any],
+    ) -> None:
+        """Check that TRANSLATE frontmatter fields are in the target language.
+
+        Detects mixed-language corruption in description, title, seoTitle, summary
+        fields (e.g., Greek text appearing in an ES translation).
+
+        Args:
+            translation: Translated frontmatter data
+            result: ValidationResult to add issues to
+            context: Validation context (must contain target_lang)
+        """
+        target_lang = context.get("target_lang") if context else None
+        if not target_lang:
+            return
+
+        # Only check these high-value display fields
+        CHECKED_FIELDS = {"title", "description", "seoTitle", "summary"}
+
+        try:
+            import langdetect
+            from langdetect import DetectorFactory
+            DetectorFactory.seed = 0
+        except ImportError:
+            return
+
+        for field, rule in self.frontmatter_rules.items():
+            if rule.mode not in (FrontmatterMode.TRANSLATE, FrontmatterMode.TRANSLATE_LIST):
+                continue
+            if field not in CHECKED_FIELDS:
+                continue
+            value = translation.get(field)
+            if not value or not isinstance(value, str) or len(value.strip()) < 20:
+                continue
+            try:
+                detected_langs = langdetect.detect_langs(value.strip())
+                if detected_langs:
+                    top = detected_langs[0]
+                    if top.lang != target_lang and top.prob > 0.65:
+                        result.issues.append(
+                            self.create_issue(
+                                ValidationSeverity.ERROR,
+                                f"Frontmatter field '{field}' detected as '{top.lang}' "
+                                f"(confidence {top.prob:.0%}) but expected '{target_lang}'. "
+                                f"Preview: '{value[:80]}'",
+                                location=f"frontmatter.{field}",
+                                details={
+                                    "field": field,
+                                    "detected_lang": top.lang,
+                                    "confidence": top.prob,
+                                    "expected_lang": target_lang,
+                                },
+                            )
+                        )
+            except Exception:
+                pass  # langdetect is probabilistic; silently skip on any error
 
     def _extract_frontmatter(
         self, content: str, label: str, result: ValidationResult
