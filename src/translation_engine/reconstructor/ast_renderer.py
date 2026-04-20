@@ -191,10 +191,11 @@ class ASTRenderer:
         text = re.sub(r'(?<!\S)\*\*\s*([^\n*]+?)\s*(?<!\*)\*(?!\*)', r'**\1**', text)
 
         # P1: Heading-style corruption — single * with uppercase content: * Texto* → **Texto**
-        # Requires uppercase first character (Latin or Unicode) to avoid matching
-        # legitimate lowercase italic *word*. [^\n*] prevents cross-line matching.
+        # Requires uppercase first character (Latin or Unicode) AND at least 3 words to avoid
+        # matching legitimate single-word accented italics like *Été* (French) or *Árbol* (Spanish).
+        # (?:[^\n*]*?\s){2,} requires ≥2 interior whitespace chars (i.e., ≥3 words total).
         text = re.sub(
-            r'(?<!\*)\*\s*([A-Z\u00C0-\u017F][^\n*]*?)\s*\*(?!\*)',
+            r'(?<!\*)\*\s*([A-Z\u00C0-\u017F](?:[^\n*]*?\s){2,}[^\n*]*?)\s*\*(?!\*)',
             r'**\1**',
             text
         )

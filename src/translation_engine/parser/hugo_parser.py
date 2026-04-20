@@ -201,6 +201,10 @@ class HugoParser:
                 ast.append(ASTNode(type=NodeType.BLOCK_HTML, raw=token.content, node_id=self._generate_node_id()))
                 i += 1
 
+            elif token.type == "blockquote_open":
+                node, i = self._parse_blockquote(tokens, i)
+                ast.append(node)
+
             elif token.type == "bullet_list_open":
                 node, i = self._parse_list(tokens, i, ordered=False)
                 ast.append(node)
@@ -398,6 +402,65 @@ class HugoParser:
             list_attrs["start"] = start_num
 
         return list_node(items, ordered=ordered, node_id=self._generate_node_id()), i + 1
+
+    def _parse_blockquote(self, tokens: list, start_idx: int) -> tuple[ASTNode, int]:
+        """Parse a blockquote from tokens.
+
+        markdown-it emits blockquote_open / [inner content]* / blockquote_close sequences.
+        Inner content can be paragraphs, nested blockquotes, code blocks, or lists.
+
+        Args:
+            tokens: Full token list
+            start_idx: Index of blockquote_open token
+
+        Returns:
+            Tuple of (blockquote ASTNode, end_index after blockquote_close)
+        """
+        children = []
+        i = start_idx + 1  # Skip blockquote_open
+
+        while i < len(tokens):
+            token = tokens[i]
+
+            if token.type == "blockquote_close":
+                i += 1
+                break
+
+            # Paragraph inside blockquote
+            if token.type == "paragraph_open":
+                if i + 1 < len(tokens) and tokens[i + 1].type == "inline":
+                    inline_children = self._parse_inline_content(tokens[i + 1])
+                    children.append(paragraph_node(inline_children, self._generate_node_id()))
+                i += 3  # Skip open, inline, close
+
+            # Nested blockquote (recursive)
+            elif token.type == "blockquote_open":
+                nested, i = self._parse_blockquote(tokens, i)
+                children.append(nested)
+
+            # Code block inside blockquote
+            elif token.type in ("fence", "code_block"):
+                lang = token.info if hasattr(token, "info") else None
+                children.append(code_block_node(token.content, lang, self._generate_node_id()))
+                i += 1
+
+            # List inside blockquote
+            elif token.type == "bullet_list_open":
+                nested_list, i = self._parse_list(tokens, i, ordered=False)
+                children.append(nested_list)
+
+            elif token.type == "ordered_list_open":
+                nested_list, i = self._parse_list(tokens, i, ordered=True)
+                children.append(nested_list)
+
+            else:
+                i += 1
+
+        return ASTNode(
+            type=NodeType.BLOCKQUOTE,
+            children=children,
+            node_id=self._generate_node_id(),
+        ), i
 
     def _parse_list_item(self, tokens: list, start_idx: int) -> tuple[ASTNode | None, int]:
         """Parse a list item from tokens.
