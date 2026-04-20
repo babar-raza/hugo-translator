@@ -508,7 +508,7 @@ tm_improvement:
   # T3-A: Consistency check — scan L2 after each improvement run for source phrases
   # that have been translated differently across sites. Divergences are logged to
   # data/logs/consistency_divergences.jsonl for operator review. Non-blocking.
-  consistency_check_enabled: false  # Enable after smoke-testing on full L2 store
+  consistency_check_enabled: true
 
   # Scheduling configuration (4+ runs/day with CUDA support)
   schedule:
@@ -643,6 +643,13 @@ translation_engine:
   # are no longer counted as gaps. False-positive rate drops from 39.3% → 0%.
   # Tolerance reset to 0.0 (intended strict production setting).
   ast_fallback_node_tolerance: 0.0  # float in [0.0, 1.0]
+
+  # T2-D: Terminology protection for M2M100 MT backend.
+  # When true, TerminologyManager.protect()/restore() wraps each segment before/after
+  # M2M100 translation to preserve Aspose product names, file format identifiers, etc.
+  # Disabled by default — M2M100 may drop OOV placeholder tokens. Enable after
+  # smoke-testing translate() output with --validation-mode strict on a small batch.
+  mt_terminology_protection: true
 
   # TC-AST-02: LLM hallucination cap. Segments whose output exceeds this multiple
   # of their input length are truncated. Production observed: 11.4× (Hindi barcode).
