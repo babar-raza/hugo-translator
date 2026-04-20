@@ -71,6 +71,7 @@ from .parser import HugoParser
 from .reconstructor import MarkdownReconstructor
 from .retry_handler import RetryHandler
 from .validation import ValidationSuite
+from .validation.base import ValidationIssue as _ValIssue, ValidationSeverity as _ValSeverity
 from .validation.decision_engine import ValidationDecisionEngine
 from .validation.post_translation_validator import ValidationDecision as PostValidationDecision
 
@@ -359,11 +360,11 @@ class TranslationEngine:
                 "max_retry_attempts": max_retries if max_retries is not None else 2,
                 "reject_on_error_count": 3,
                 "accept_warnings": True,
-                "accept_after_max_retries": True,
+                "accept_after_max_retries": False,
                 "reject_on_placeholder_error": True,
                 "reject_on_code_block_error": True,
                 "reject_on_link_error": True,
-                "reject_on_repetition_error": False,  # Allow retries before rejecting; structured docs repeat legitimately
+                "reject_on_repetition_error": True,  # Hard-reject on repetition (7-12x word repetition detected in ES/CS/IT)
                 "retry_on_structure_error": True,
                 "retry_on_terminology_warning": True,
             }
@@ -1484,6 +1485,14 @@ class TranslationEngine:
                                 },
                             )
 
+                            # Check that translatable frontmatter fields (title, description,
+                            # seoTitle, summary) are actually in the target language.
+                            # This catches mixed-language corruption (e.g., Greek/Arabic in ES output).
+                            _fm_issues = self._check_frontmatter_language(
+                                translated_content, target_lang
+                            )
+                            validation_result.issues.extend(_fm_issues)
+
                             # Make decision
                             decision_result = self.decision_engine.make_decision(
                                 validation_result=validation_result,
@@ -1493,6 +1502,31 @@ class TranslationEngine:
 
                             final_decision = decision_result
                             final_validation_result = validation_result
+
+                            # T3-D: Append to local validation metrics log (gated by config flag)
+                            try:
+                                from .validation.decision_engine import append_validation_metric
+                                _vr = {
+                                    i.validator: (i.severity.value != "error")
+                                    for i in validation_result.issues
+                                }
+                                append_validation_metric(
+                                    file_path=str(file_path),
+                                    lang=target_lang,
+                                    decision=decision_result.decision.value,
+                                    validator_results=_vr,
+                                    retry_count=retry_count,
+                                    error_count=sum(
+                                        1 for i in validation_result.issues
+                                        if i.severity.value == "error"
+                                    ),
+                                    warning_count=sum(
+                                        1 for i in validation_result.issues
+                                        if i.severity.value == "warning"
+                                    ),
+                                )
+                            except Exception:
+                                pass
 
                             # Handle decision
                             if decision_result.decision == PostValidationDecision.REJECT:
@@ -2145,6 +2179,18 @@ class TranslationEngine:
                     progress.file_completed(success=False, has_new_translations=False)
                 if telemetry_run:
                     telemetry_run.log_event("validation_rejected", {"reason": str(e)})
+                # Queue rejected file for retranslation on the next worker run so it
+                # is not silently skipped by the completion filter indefinitely.
+                try:
+                    _rejected_path = locals().get("output_path") or locals().get("expected_output_path")
+                    _rejected_lang = locals().get("target_lang")
+                    if _rejected_path and _rejected_lang:
+                        _rtq_add(_rejected_path, _rejected_lang)
+                        logger.info(
+                            f"Queued rejected translation for retry: {_rejected_path.name} ({_rejected_lang})"
+                        )
+                except Exception as _rtq_err:
+                    logger.debug(f"Failed to queue rejected file for retry: {_rtq_err}")
                 return result
 
             # OOM-01: Detect OOM errors and allow RetryHandler to engage (outer handler)
@@ -3144,6 +3190,75 @@ class TranslationEngine:
             return getattr(te, 'batch_purity_skip_langs', None) or []
         except Exception:
             return []
+
+    def _check_frontmatter_language(
+        self, translated_content: str, target_lang: str
+    ) -> list:
+        """Detect mixed-language corruption in translatable frontmatter fields.
+
+        Checks title, description, seoTitle, and summary fields to ensure they
+        are written in the target language, not a mix of Arabic, Greek, Catalan, etc.
+
+        Args:
+            translated_content: Full translated document including frontmatter
+            target_lang: Expected language code (e.g., 'es', 'it', 'cs')
+
+        Returns:
+            List of _ValIssue objects (empty if all fields are clean)
+        """
+        import re as _re
+        CHECKED_FIELDS = {"title", "description", "seoTitle", "summary"}
+        MIN_CHARS = 20
+        CONFIDENCE_THRESHOLD = 0.65
+
+        issues = []
+        # Extract frontmatter block
+        fm_match = _re.match(r'^---\s*\n(.*?)\n?---\s*\n', translated_content, _re.DOTALL)
+        if not fm_match:
+            return issues
+
+        try:
+            import yaml as _yaml
+            fm_data = _yaml.safe_load(fm_match.group(1).strip()) or {}
+        except Exception:
+            return issues
+
+        try:
+            import langdetect as _ld
+            from langdetect import DetectorFactory
+            DetectorFactory.seed = 0
+        except ImportError:
+            return issues
+
+        for field in CHECKED_FIELDS:
+            value = fm_data.get(field)
+            if not value or not isinstance(value, str) or len(value.strip()) < MIN_CHARS:
+                continue
+            try:
+                detected_langs = _ld.detect_langs(value.strip())
+                if detected_langs:
+                    top = detected_langs[0]
+                    if top.lang != target_lang and top.prob > CONFIDENCE_THRESHOLD:
+                        issues.append(_ValIssue(
+                            severity=_ValSeverity.ERROR,
+                            validator="FrontmatterLanguageCheck",
+                            message=(
+                                f"Frontmatter field '{field}' detected as '{top.lang}' "
+                                f"(confidence {top.prob:.0%}), expected '{target_lang}'. "
+                                f"Preview: '{value[:80]}'"
+                            ),
+                            location=f"frontmatter.{field}",
+                            details={
+                                "field": field,
+                                "detected_lang": top.lang,
+                                "confidence": top.prob,
+                                "expected_lang": target_lang,
+                            },
+                        ))
+            except Exception:
+                pass  # langdetect is probabilistic; silently skip on any detection error
+
+        return issues
 
     def _get_purity_threshold(self, lang: str) -> float:
         """Per-language purity threshold. Falls back to 0.06 default."""
