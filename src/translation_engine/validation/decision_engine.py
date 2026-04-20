@@ -15,7 +15,16 @@ Decision Rules:
 Implemented in taskcards DEC-01, DEC-02, and DEC-03.
 """
 
+import json
+import logging
+from datetime import datetime, timezone
+from pathlib import Path
 from typing import Any
+
+_metrics_logger = logging.getLogger(__name__)
+_METRICS_LOG = Path("data/logs/validation_metrics.jsonl")
+# Cached flag so the config is not re-read on every call
+_local_log_enabled: bool | None = None
 
 from .base import ValidationResult, ValidationSeverity
 from .post_translation_validator import DecisionResult, ValidationDecision
@@ -376,3 +385,58 @@ class ValidationDecisionEngine:
                     severity=issue.severity.value,
                     message=issue.message,
                 )
+
+
+def append_validation_metric(
+    *,
+    file_path: str,
+    lang: str,
+    decision: str,
+    validator_results: dict[str, bool],
+    retry_count: int,
+    error_count: int = 0,
+    warning_count: int = 0,
+) -> None:
+    """Append a validation outcome record to the local metrics log (T3-D).
+
+    Gated by ``telemetry.local_validation_log: true`` in config/global.yaml.
+    All exceptions are silently swallowed to remain non-blocking.
+
+    Args:
+        file_path: Relative or absolute path to the translated file.
+        lang: Target language code (e.g. 'es', 'de').
+        decision: 'accept', 'reject', or 'retry'.
+        validator_results: Mapping of validator name → passed (True/False).
+        retry_count: Number of retries used before this decision.
+        error_count: Total ERROR-severity issues.
+        warning_count: Total WARNING-severity issues.
+    """
+    global _local_log_enabled
+    try:
+        # Lazy read config flag — cache to avoid repeated YAML reads
+        if _local_log_enabled is None:
+            try:
+                from src.utils.config_loader import get_global_config
+                _local_log_enabled = bool(
+                    get_global_config().get("telemetry", {}).get("local_validation_log", False)
+                )
+            except Exception:
+                _local_log_enabled = False
+        if not _local_log_enabled:
+            return
+
+        record = {
+            "ts": datetime.now(timezone.utc).isoformat(),
+            "file": str(file_path),
+            "lang": lang,
+            "decision": decision,
+            "retry_count": retry_count,
+            "error_count": error_count,
+            "warning_count": warning_count,
+            "validator_results": validator_results,
+        }
+        _METRICS_LOG.parent.mkdir(parents=True, exist_ok=True)
+        with _METRICS_LOG.open("a", encoding="utf-8") as fh:
+            fh.write(json.dumps(record, ensure_ascii=False) + "\n")
+    except Exception as exc:
+        _metrics_logger.debug("append_validation_metric: write failed (non-fatal): %s", exc)

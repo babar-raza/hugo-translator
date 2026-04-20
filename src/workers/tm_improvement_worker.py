@@ -1054,6 +1054,20 @@ class TMImprovementWorker:
         except Exception as _e:
             logger.warning(f"TM language validity scan error (non-fatal): {_e}")
 
+        # T3-A: TM consistency check — gate-checked, non-blocking.
+        # Scans L2 for phrases translated differently across sites and logs divergences.
+        _consistency_result: dict = {}
+        try:
+            _l2_for_consistency = getattr(self.tm, 'l2', None) if self.tm else None
+            if _l2_for_consistency is not None:
+                from ..tm.consistency_warner import run_consistency_check
+                _consistency_result = run_consistency_check(
+                    _l2_for_consistency,
+                    run_id=f"tm_improvement:{int(start_time)}",
+                )
+        except Exception as _cw_err:
+            logger.debug("ConsistencyWarner wiring error (non-fatal): %s", _cw_err)
+
         return {
             "status": "success",
             "candidates_pulled": len(candidates),
@@ -1063,6 +1077,7 @@ class TMImprovementWorker:
             "llm_calls": llm_calls,
             "elapsed_seconds": elapsed,
             "lang_validity_scan": _lang_validity_results,
+            "consistency_check": _consistency_result,
         }
 
     def _improve_candidate(self, candidate: ImprovementCandidate) -> str:

@@ -25,6 +25,7 @@ from typing import Set
 logger = logging.getLogger(__name__)
 
 _QUEUE_FILE = Path("data/retranslate_queue.jsonl")
+_QUARANTINE_FILE = Path("data/quarantine.jsonl")
 _MAX_RETRIES = 3
 
 # After this many MT failures, the entry is flagged for LLM escalation.
@@ -179,9 +180,10 @@ def _rewrite_queue(remove_path: str | None, increment_path: str | None) -> None:
                     if entry["retry_count"] > _MAX_RETRIES:
                         logger.warning(
                             f"retranslate_queue: max retries ({_MAX_RETRIES}) exceeded for "
-                            f"{Path(path).name} — dropping permanently"
+                            f"{Path(path).name} — moving to quarantine"
                         )
-                        continue  # drop entry
+                        _quarantine_entry(entry)
+                        continue  # drop entry from active queue
                 kept.append(json.dumps(entry))
             except (json.JSONDecodeError, KeyError):
                 kept.append(line)  # preserve malformed lines
@@ -198,3 +200,62 @@ def _rewrite_queue(remove_path: str | None, increment_path: str | None) -> None:
         os.replace(tmp_path, queue_file)
     except Exception as e:
         logger.warning(f"retranslate_queue: failed to rewrite queue: {e}")
+
+
+def _quarantine_entry(entry: dict) -> None:
+    """Append a permanently dropped entry to the quarantine log.
+
+    The quarantine file is append-only and never cleaned by automation.
+    Operators review it manually to identify files that consistently fail
+    translation quality checks.
+
+    Args:
+        entry: The original retranslate queue entry dict.
+    """
+    try:
+        quarantine_file = _QUARANTINE_FILE
+        quarantine_file.parent.mkdir(parents=True, exist_ok=True)
+        record = {
+            **entry,
+            "quarantined_at": datetime.now(timezone.utc).isoformat(),
+            "reason": "max_retries_exceeded",
+        }
+        with quarantine_file.open("a", encoding="utf-8") as f:
+            f.write(json.dumps(record) + "\n")
+        logger.warning(
+            f"retranslate_queue: quarantined {Path(entry.get('output_path', '')).name} "
+            f"— requires manual review (data/quarantine.jsonl)"
+        )
+    except Exception as e:
+        logger.warning(f"retranslate_queue: failed to write quarantine entry: {e}")
+
+
+def load_quarantined_paths() -> Set[str]:
+    """Return the set of absolute output path strings in the quarantine log.
+
+    Used for monitoring and reporting. The quarantine log is never cleaned
+    automatically — operators must review and decide whether to manually
+    re-queue or permanently exclude files.
+
+    Returns:
+        Set of absolute output file path strings that have been quarantined.
+    """
+    quarantine_file = _QUARANTINE_FILE
+    if not quarantine_file.exists():
+        return set()
+    paths: Set[str] = set()
+    try:
+        with quarantine_file.open("r", encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    entry = json.loads(line)
+                    if "output_path" in entry:
+                        paths.add(entry["output_path"])
+                except (json.JSONDecodeError, KeyError):
+                    pass
+    except Exception as e:
+        logger.warning(f"retranslate_queue: failed to load quarantine: {e}")
+    return paths

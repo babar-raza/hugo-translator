@@ -164,6 +164,10 @@ observability:
 # Telemetry settings
 telemetry:
   validation_metrics: true  # Track validation metrics (decisions, retries, rejection rates)
+  # T3-D: Local validation metrics log — append one JSONL record per file decision to
+  # data/logs/validation_metrics.jsonl. Fields: ts, file, lang, decision, retry_count,
+  # error_count, warning_count, validator_results.
+  local_validation_log: true
 
 # Git commit automation
 git_commit:
@@ -500,6 +504,11 @@ autonomous_content_translation:
 tm_improvement:
   # Master toggle for TM improvement worker
   enabled: true
+
+  # T3-A: Consistency check — scan L2 after each improvement run for source phrases
+  # that have been translated differently across sites. Divergences are logged to
+  # data/logs/consistency_divergences.jsonl for operator review. Non-blocking.
+  consistency_check_enabled: false  # Enable after smoke-testing on full L2 store
 
   # Scheduling configuration (4+ runs/day with CUDA support)
   schedule:
