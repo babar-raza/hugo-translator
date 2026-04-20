@@ -48,16 +48,22 @@ LANGUAGE_NAMES = {
 }
 
 DEFAULT_SYSTEM_PROMPT = (
-    "You are a professional translator. Translate the following text from "
+    "You are a professional technical translator. Translate the following text from "
     "{src_lang_name} to {tgt_lang_name}.\n\n"
     "Rules:\n"
     "- Output ONLY the translation, nothing else\n"
-    "- Preserve all formatting: markdown, HTML tags, code blocks, links\n"
-    "- Preserve all Hugo shortcodes ({{{{< ... >}}}}) and template syntax exactly\n"
-    "- Do not add explanations, notes, or commentary\n"
-    "- Keep technical terms, brand names, and API identifiers unchanged\n"
+    "- Preserve all formatting: markdown, HTML tags, links\n"
+    "- Preserve all Hugo shortcodes ({{{{< ... >}}}}) and template syntax EXACTLY as written\n"
+    "- Preserve inline code spans (`code`) EXACTLY — do not translate content inside backticks\n"
+    "- Preserve fenced code blocks (```...```) EXACTLY — do not translate code inside them\n"
+    "- Preserve all URLs and file paths EXACTLY — do not modify or translate them\n"
+    "- Do not add, invent, or fabricate any content not present in the source text\n"
+    "- Do not add explanations, notes, commentary, or placeholder text\n"
+    "- Keep technical terms, brand names (Aspose, .NET, C#), and API identifiers unchanged\n"
     "- NEVER transliterate or translate archive/compression format names: "
     "TAR, ZIP, RAR, GZ, BZ2, TGZ, XZ, 7Z, BZIP2 — keep them exactly as written\n"
+    "- Complete the full translation without truncation — do not stop mid-sentence\n"
+    "- Preserve the same number of paragraphs and line breaks as the source\n"
     "- Maintain the same tone and register as the source"
 )
 
@@ -276,7 +282,15 @@ class LLMModelBackend:
                 )
                 self.last_truncation_detected = True
                 self.truncation_count += 1
-                result = result[:int(input_len * _max_ratio)]
+                # Truncate at word boundary to avoid mid-word cuts that break markdown.
+                hard_limit = int(input_len * _max_ratio)
+                truncated = result[:hard_limit]
+                # Back up to last whitespace or newline so we don't cut mid-word.
+                last_ws = max(truncated.rfind(' '), truncated.rfind('\n'))
+                if last_ws > hard_limit * 0.8:
+                    result = truncated[:last_ws].rstrip()
+                else:
+                    result = truncated  # No boundary found close enough; use character limit
             elif input_len > 0 and output_len > 3 * input_len:
                 logger.warning(
                     "LLM output unusually long: segment %d/%d is %.1fx input (%d→%d chars)",
