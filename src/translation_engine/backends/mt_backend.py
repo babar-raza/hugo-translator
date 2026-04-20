@@ -63,10 +63,50 @@ class MTBackend(ITranslationBackend):
         self.backend = None
         self._loaded = False
 
+        # Lazy-loaded TerminologyManager — None means "not yet attempted", False means "unavailable"
+        self._terminology_manager = None
+
         logger.info(
             f"MTBackend initialized: model={model_id}, device={device}, "
             f"max_memory={max_memory_mb}MB, load_mode={load_mode}"
         )
+
+    @property
+    def _term_manager(self):
+        """Lazy-load TerminologyManager for pre/post-translation term protection.
+
+        Gated by config flag `translation_engine.mt_terminology_protection` (default: false).
+        Disabled by default because M2M100 may drop OOV placeholder tokens.
+        Enable only after smoke-testing on real M2M100 output.
+        """
+        # Check feature gate first (avoid loading TM if disabled)
+        try:
+            from src.utils.config_loader import get_global_config
+            enabled = get_global_config().get('translation_engine', {}).get(
+                'mt_terminology_protection', False
+            )
+            if not enabled:
+                return None
+        except Exception:
+            return None
+
+        if self._terminology_manager is None:
+            try:
+                from pathlib import Path as _Path
+                from src.translation_engine.terminology.terminology_manager import (
+                    TerminologyManager,
+                )
+                _cfg = _Path("config/terminology.yaml")
+                if not _cfg.exists():
+                    _cfg = _Path(__file__).parent.parent.parent.parent / "config" / "terminology.yaml"
+                self._terminology_manager = TerminologyManager(str(_cfg))
+                logger.debug("TerminologyManager loaded for MT backend term protection")
+            except Exception as e:
+                logger.warning(
+                    "TerminologyManager unavailable for MT backend: %s — terms sent raw to model", e
+                )
+                self._terminology_manager = False  # sentinel: don't retry
+        return self._terminology_manager if self._terminology_manager else None
 
     def translate(
         self,
@@ -99,16 +139,38 @@ class MTBackend(ITranslationBackend):
         # Extract optional parameters
         max_new_tokens = kwargs.get("max_new_tokens", None)
 
+        # Optional terminology protect/restore (gated by mt_terminology_protection flag)
+        tm = self._term_manager
+        protected = None
+        input_text = text
+        if tm:
+            try:
+                protected = tm.protect(text)
+                input_text = protected.protected_text
+            except Exception as e:
+                logger.debug("MT term protection failed, sending raw text: %s", e)
+                protected = None
+                input_text = text
+
         # Translate using HuggingFace backend
         # Backend.translate() expects List[str], returns List[str]
         translations = self.backend.translate(
-            texts=[text],
+            texts=[input_text],
             src_lang=src_lang,
             tgt_lang=tgt_lang,
             max_new_tokens=max_new_tokens
         )
 
-        return translations[0] if translations else ""
+        result = translations[0] if translations else ""
+
+        if protected and tm:
+            try:
+                protected.protected_text = result
+                result = tm.restore(protected)
+            except Exception as e:
+                logger.debug("MT term restoration failed, using raw translation: %s", e)
+
+        return result
 
     def translate_batch(
         self,
@@ -136,13 +198,36 @@ class MTBackend(ITranslationBackend):
         # Extract optional parameters
         max_new_tokens = kwargs.get("max_new_tokens", None)
 
+        # Optional terminology protect/restore per segment (gated by config flag)
+        tm = self._term_manager
+        protected_segments = [None] * len(texts)
+        input_texts = list(texts)
+        if tm:
+            for idx, text in enumerate(texts):
+                try:
+                    ps = tm.protect(text)
+                    protected_segments[idx] = ps
+                    input_texts[idx] = ps.protected_text
+                except Exception as e:
+                    logger.debug("MT batch term protection failed for segment %d: %s", idx, e)
+
         # Batch translate using HuggingFace backend
         translations = self.backend.translate(
-            texts=texts,
+            texts=input_texts,
             src_lang=src_lang,
             tgt_lang=tgt_lang,
             max_new_tokens=max_new_tokens
         )
+
+        # Restore protected terms
+        if tm:
+            for idx, (ps, result) in enumerate(zip(protected_segments, translations)):
+                if ps is not None:
+                    try:
+                        ps.protected_text = result
+                        translations[idx] = tm.restore(ps)
+                    except Exception as e:
+                        logger.debug("MT batch term restoration failed for segment %d: %s", idx, e)
 
         return translations
 
