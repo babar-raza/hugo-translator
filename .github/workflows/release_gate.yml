@@ -96,13 +96,17 @@ jobs:
         shell: pwsh
 
       - name: Setup Hugo
-        uses: gohugoio/setup-hugo@v1
-        with:
-          hugo-version: '0.154.5'
-          extended: true
+        run: |
+          $version = "0.154.5"
+          $url = "https://github.com/gohugoio/hugo/releases/download/v${version}/hugo_extended_${version}_windows-amd64.zip"
+          Invoke-WebRequest -Uri $url -OutFile hugo.zip
+          Expand-Archive hugo.zip -DestinationPath "$env:RUNNER_TEMP\hugo"
+          echo "$env:RUNNER_TEMP\hugo" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+        shell: pwsh
 
       - name: Hugo Build Validation
         run: |
+          hugo version
           hugo build --source tests/fixtures/hugo_site/ 2>&1
           if ($LASTEXITCODE -ne 0) { exit 1 }
         shell: pwsh
