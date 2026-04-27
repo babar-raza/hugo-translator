@@ -96,7 +96,7 @@ jobs:
         shell: pwsh
 
       - name: Setup Hugo
-        uses: peaceiris/actions-hugo@v3
+        uses: gohugoio/setup-hugo@v1
         with:
           hugo-version: '0.154.5'
           extended: true
