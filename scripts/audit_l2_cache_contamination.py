@@ -275,7 +275,9 @@ def run_audit(
     # Second pass: delete contaminated entries
     if repair and not dry_run and keys_to_delete:
         logger.info(f"Deleting {len(keys_to_delete)} contaminated entries from L2...")
-        env = lmdb.open(str(db_path), readonly=False, max_dbs=1)
+        # TC-MLD-05: set map_size to 2 GiB so delete transactions don't hit MDB_MAP_FULL
+        # on a ~921 MiB database (default map_size is 10 MiB which is too small for writes)
+        env = lmdb.open(str(db_path), readonly=False, max_dbs=1, map_size=2 * 1024 ** 3)
         try:
             with env.begin(write=True) as txn:
                 for key in keys_to_delete:

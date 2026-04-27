@@ -4,6 +4,8 @@
 
 This comprehensive checklist ensures safe and reliable deployments of the Hugo Translation System. All items must be completed and verified before production deployment.
 
+Before approving real-file translation runs, review the [Hugo Translator Shipping Gates](../plans/hugo-translator-shipping-gates.md) and confirm all P0 gates are complete.
+
 **Purpose:** Prevent unsafe deployments and ensure production readiness
 **Audience:** DevOps engineers, Release managers, Technical leads
 **Maintenance:** Review and update after each deployment

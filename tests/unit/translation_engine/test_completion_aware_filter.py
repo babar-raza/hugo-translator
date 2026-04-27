@@ -14,10 +14,10 @@ Covers:
 """
 
 import time
-import pytest
 from pathlib import Path
 from unittest import mock
 
+import pytest
 
 # ---------------------------------------------------------------------------
 # Helpers — pure logic extracted from engine.py completion filter

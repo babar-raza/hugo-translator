@@ -76,7 +76,7 @@ class TestConfigurationFiles:
     def test_pyproject_toml_is_valid(self, project_root_dir: Path) -> None:
         """Verify pyproject.toml is valid TOML."""
         try:
-            import tomllib          # Python 3.11+
+            import tomllib  # Python 3.11+
         except ImportError:
             import tomli as tomllib  # backport for Python 3.10
 

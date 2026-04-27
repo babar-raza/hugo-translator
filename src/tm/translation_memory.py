@@ -5,6 +5,7 @@ Coordinates L1 (cache), L2 (persistent), and L3 (semantic) layers.
 """
 from __future__ import annotations
 
+import logging
 from typing import Any
 
 from .l1_cache import L1Cache
@@ -17,6 +18,8 @@ except Exception:
 from .improvement_queue import ImprovementQueue
 from .models import LookupRequest, LookupResult, TMStats
 from .override_controller import OverrideConfig, OverrideController, OverrideMode
+
+logger = logging.getLogger(__name__)
 
 
 class TranslationMemory:
@@ -45,6 +48,8 @@ class TranslationMemory:
         l3_semantic: L3SemanticTM | None = None,
         override_controller: OverrideController | None = None,
         improvement_queue: ImprovementQueue | None = None,
+        language_detector: Any | None = None,
+        similarity_tracker: Any | None = None,
     ):
         """
         Initialize unified TM.
@@ -55,17 +60,60 @@ class TranslationMemory:
             l3_semantic: Optional semantic search index
             override_controller: Optional override controller for cache bypass
             improvement_queue: Optional improvement queue for LLM-based improvements
+            language_detector: Optional FastTextDetector instance. When provided,
+                L2 and L3 hits are language-validated before being returned.
+                Hits in the wrong language are rejected (hit=False), forcing a
+                fresh translation and preventing cache-poisoning propagation.
+            similarity_tracker: Optional SimilarityTracker. Used to allow hits
+                where detected language is a known similar language (e.g., ms/id).
         """
         self.l1 = l1_cache
         self.l2 = l2_persistent
         self.l3 = l3_semantic
         self.override = override_controller or OverrideController()
         self.improvement_queue = improvement_queue
+        self._language_detector = language_detector
+        self._similarity_tracker = similarity_tracker
 
         # Statistics
         self._total_lookups = 0
         self._total_hits = 0
         self._override_bypasses = 0
+        self._poisoned_hits_rejected = 0
+
+    def _validate_hit_language(self, translation: str, tgt_lang: str) -> bool:
+        """
+        Return True if the translation appears to be in the expected target language.
+
+        Uses FastTextDetector when available. Rejects hits where the detected
+        language differs from tgt_lang and is not in a known similarity group.
+        Fails open (returns True) on any detection error or when detector is unavailable.
+        """
+        if self._language_detector is None:
+            return True
+        if not translation or len(translation) < 10:
+            return True  # too short for reliable detection
+        try:
+            detected_lang, confidence = self._language_detector.detect(translation)
+            if confidence < 0.70:
+                return True  # low confidence — benefit of the doubt
+            if detected_lang == tgt_lang:
+                return True
+            if self._similarity_tracker is not None:
+                try:
+                    if self._similarity_tracker.are_similar(detected_lang, tgt_lang):
+                        return True
+                except Exception:
+                    pass
+            logger.warning(
+                "TM cache hit language mismatch: expected=%s got=%s (conf=%.2f) "
+                "— rejecting poisoned entry, forcing fresh translation",
+                tgt_lang, detected_lang, confidence,
+            )
+            self._poisoned_hits_rejected += 1
+            return False
+        except Exception:
+            return True  # fail open — never block on detector errors
 
     def lookup(
         self,
@@ -119,16 +167,22 @@ class TranslationMemory:
         # Layer 2: Check persistent exact match
         entry = self.l2.exact_lookup(site_id, src_lang, tgt_lang, text, context)
         if entry:
-            # Populate L1 cache
-            self.l1.put(site_id, src_lang, tgt_lang, text, entry.translation)
-            self._total_hits += 1
-            return LookupResult(
-                hit=True,
-                translation=entry.translation,
-                source="l2_exact",
-                confidence=1.0,
-                metadata=entry.metadata,
-            )
+            # TC-12: Validate that the cached translation is actually in the target language.
+            # Rejects poisoned L2 entries (e.g., Bulgarian stored under a Malay key).
+            if not self._validate_hit_language(entry.translation, tgt_lang):
+                # Poisoned entry — fall through to L3 / fresh translation
+                pass
+            else:
+                # Populate L1 cache
+                self.l1.put(site_id, src_lang, tgt_lang, text, entry.translation)
+                self._total_hits += 1
+                return LookupResult(
+                    hit=True,
+                    translation=entry.translation,
+                    source="l2_exact",
+                    confidence=1.0,
+                    metadata=entry.metadata,
+                )
 
         # Layer 3: Try semantic search (if enabled)
         if use_semantic and self.l3 is not None:
@@ -144,20 +198,27 @@ class TranslationMemory:
             if matches:
                 best_match = matches[0]
 
-                # Populate L1 cache with best match
-                self.l1.put(
-                    site_id, src_lang, tgt_lang, text, best_match.translation
-                )
-                self._total_hits += 1
+                # TC-12: Validate that the semantically-matched translation is in
+                # the target language. At 0.80 similarity, semantic matches can return
+                # translations in sibling languages (e.g., Bulgarian when targeting Malay).
+                if not self._validate_hit_language(best_match.translation, tgt_lang):
+                    # Poisoned L3 entry — no hit, force fresh translation
+                    pass
+                else:
+                    # Populate L1 cache with best match
+                    self.l1.put(
+                        site_id, src_lang, tgt_lang, text, best_match.translation
+                    )
+                    self._total_hits += 1
 
-                return LookupResult(
-                    hit=True,
-                    translation=best_match.translation,
-                    source="l3_semantic",
-                    confidence=best_match.similarity,
-                    candidates=matches,
-                    metadata=best_match.metadata,
-                )
+                    return LookupResult(
+                        hit=True,
+                        translation=best_match.translation,
+                        source="l3_semantic",
+                        confidence=best_match.similarity,
+                        candidates=matches,
+                        metadata=best_match.metadata,
+                    )
 
         # No hit
         return LookupResult(

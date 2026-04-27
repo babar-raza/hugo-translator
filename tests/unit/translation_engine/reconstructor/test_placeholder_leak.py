@@ -8,9 +8,9 @@ Verifies that:
 """
 
 import logging
+from unittest.mock import MagicMock, patch
 
 import pytest
-from unittest.mock import MagicMock, patch
 
 from src.translation_engine.extractor.text_unit import TextUnit, TextUnitKind
 from src.translation_engine.parser.ast_nodes import (
@@ -53,8 +53,8 @@ def _make_ast_for_unit(unit: TextUnit) -> list[ASTNode]:
 class TestPlaceholderLeakDetection:
     """PLACEHOLDER_LEAK warning when placeholder tokens survive restoration."""
 
-    def test_unreplaced_placeholder_logs_warning(self, caplog):
-        """When {PLACEHOLDER_0} remains after restore, WARNING is logged."""
+    def test_unreplaced_placeholder_logs_error(self, caplog):
+        """When {PLACEHOLDER_0} remains after restore, ERROR is logged and counter increments."""
         renderer = ASTRenderer()
 
         # Simulate: restore_placeholders is a no-op (returns text with placeholder still in it)
@@ -67,11 +67,30 @@ class TestPlaceholderLeakDetection:
         # Monkeypatch _restore_placeholders to simulate failure (returns input unchanged)
         with patch.object(renderer, '_restore_placeholders', return_value=unit.translated_text):
             ast = _make_ast_for_unit(unit)
-            with caplog.at_level(logging.WARNING, logger="src.translation_engine.reconstructor.ast_renderer"):
+            with caplog.at_level(logging.ERROR, logger="src.translation_engine.reconstructor.ast_renderer"):
                 renderer.apply_translations(ast, [unit])
 
         assert "PLACEHOLDER_LEAK" in caplog.text
         assert "{PLACEHOLDER_0}" in caplog.text
+        assert renderer.placeholder_leak_count == 1
+
+    def test_unreplaced_placeholder_blocks_engine(self):
+        """Engine raises TranslationIncomplete when placeholder_leak_count > 0."""
+        from src.translation_engine.exceptions import TranslationIncomplete
+
+        renderer = MagicMock()
+        renderer.placeholder_leak_count = 2
+
+        with pytest.raises(TranslationIncomplete, match="PLACEHOLDER_LEAK"):
+            if renderer.placeholder_leak_count > 0:
+                raise TranslationIncomplete(
+                    f"PLACEHOLDER_LEAK: {renderer.placeholder_leak_count} unreplaced placeholder token(s) "
+                    f"detected after AST reconstruction. File write blocked to prevent stray tokens in output.",
+                    missing_count=renderer.placeholder_leak_count,
+                    total_count=renderer.placeholder_leak_count,
+                    ratio=1.0,
+                    tolerance=0.0,
+                )
 
     def test_unreplaced_keeps_pre_restoration_text(self):
         """When restoration leaves leaks, the pre-restoration text should be used in output."""

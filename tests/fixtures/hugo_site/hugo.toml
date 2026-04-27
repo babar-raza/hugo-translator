@@ -1,0 +1,20 @@
+baseURL = "https://example.test/"
+title = "Hugo Translator Fixture"
+defaultContentLanguage = "en"
+defaultContentLanguageInSubdir = true
+
+[markup]
+  [markup.goldmark]
+    [markup.goldmark.renderer]
+      unsafe = true
+
+[languages]
+  [languages.en]
+    languageName = "English"
+    weight = 1
+    contentDir = "content/en"
+  [languages.es]
+    languageName = "Spanish"
+    weight = 2
+    contentDir = "content/es"
+

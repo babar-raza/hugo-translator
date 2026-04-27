@@ -35,6 +35,13 @@ class ASTRenderer:
         self._placeholder_manager = None
         # Counter for AST nodes that had no matching TextUnit (potential source-lang leakage)
         self._missing_node_count: int = 0
+        # Counter for unreplaced placeholder tokens (stray {PLACEHOLDER_N} in output - blocking)
+        self._placeholder_leak_count: int = 0
+
+    @property
+    def placeholder_leak_count(self) -> int:
+        """Number of unreplaced {PLACEHOLDER_N} tokens detected during last apply_translations call."""
+        return self._placeholder_leak_count
 
     def _restore_placeholders(self, text: str, placeholder_map: dict[str, str]) -> str:
         """
@@ -191,12 +198,14 @@ class ASTRenderer:
         text = re.sub(r'(?<!\S)\*\*\s*([^\n*]+?)\s*(?<!\*)\*(?!\*)', r'**\1**', text)
 
         # P1: Heading-style corruption — single * with uppercase content: * Texto* → **Texto**
-        # Requires uppercase first character (Latin or Unicode) AND at least 3 words to avoid
+        # Requires uppercase first character (Latin or Unicode) AND at least 2 words to avoid
         # matching legitimate single-word accented italics like *Été* (French) or *Árbol* (Spanish).
-        # (?:[^\n*]*?\s){2,} requires ≥2 interior whitespace chars (i.e., ≥3 words total).
+        # (?:[^\n*]*?\s){1,} requires ≥1 interior whitespace char (i.e., ≥2 words total).
+        # Lambda strips trailing whitespace from the captured group because the greedy {1,}
+        # repetition can absorb the final space (leaving it in group(1)) before \s* fires.
         text = re.sub(
-            r'(?<!\*)\*\s*([A-Z\u00C0-\u017F](?:[^\n*]*?\s){2,}[^\n*]*?)\s*\*(?!\*)',
-            r'**\1**',
+            r'(?<!\*)\*\s*([A-Z\u00C0-\u017F](?:[^\n*]*?\s){1,}[^\n*]*?)\s*\*(?!\*)',
+            lambda m: f'**{m.group(1).rstrip()}**',
             text
         )
 
@@ -472,6 +481,7 @@ class ASTRenderer:
         self.unit_map = {unit.node_addr: unit for unit in units}
         self.applied_units = set()
         self._missing_node_count = 0  # Reset per call
+        self._placeholder_leak_count = 0  # Reset per call
 
         # Separate frontmatter and body units (FIX-BT-03)
         frontmatter_units = [u for u in units if u.node_addr and u.node_addr.startswith('frontmatter.')]
@@ -552,12 +562,13 @@ class ASTRenderer:
                 # Detect unreplaced placeholder tokens — indicates partial restoration failure
                 remaining_placeholders = re.findall(r'\{PLACEHOLDER_\d+\}', restored)
                 if remaining_placeholders:
-                    logger.warning(
+                    self._placeholder_leak_count += len(remaining_placeholders)
+                    logger.error(
                         f"PLACEHOLDER_LEAK: {len(remaining_placeholders)} token(s) not restored "
                         f"for node_addr={node.node_addr!r}. "
-                        f"Tokens: {remaining_placeholders[:3]}. Using pre-restoration text."
+                        f"Tokens: {remaining_placeholders[:3]}. File write will be blocked."
                     )
-                    # Keep final_text pre-restoration; purity gate will catch any stray tokens
+                    # Keep final_text pre-restoration; engine checks placeholder_leak_count and rejects file
                 else:
                     final_text = restored
 

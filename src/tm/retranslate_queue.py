@@ -20,7 +20,6 @@ import os
 import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Set
 
 logger = logging.getLogger(__name__)
 
@@ -68,7 +67,7 @@ def add_to_queue(output_path: Path, tgt_lang: str) -> None:
         logger.warning(f"retranslate_queue: failed to add {output_path}: {e}")
 
 
-def load_queued_paths() -> Set[str]:
+def load_queued_paths() -> set[str]:
     """
     Return the set of absolute output path strings that need retranslation.
 
@@ -80,7 +79,7 @@ def load_queued_paths() -> Set[str]:
     queue_file = _queue_path()
     if not queue_file.exists():
         return set()
-    queued: Set[str] = set()
+    queued: set[str] = set()
     try:
         with queue_file.open("r", encoding="utf-8") as f:
             for line in f:
@@ -98,7 +97,7 @@ def load_queued_paths() -> Set[str]:
     return queued
 
 
-def load_queued_llm_paths() -> Set[str]:
+def load_queued_llm_paths() -> set[str]:
     """
     Return the set of absolute output path strings that are eligible for LLM escalation.
 
@@ -115,7 +114,7 @@ def load_queued_llm_paths() -> Set[str]:
     queue_file = _queue_path()
     if not queue_file.exists():
         return set()
-    llm_paths: Set[str] = set()
+    llm_paths: set[str] = set()
     try:
         with queue_file.open("r", encoding="utf-8") as f:
             for line in f:
@@ -230,7 +229,7 @@ def _quarantine_entry(entry: dict) -> None:
         logger.warning(f"retranslate_queue: failed to write quarantine entry: {e}")
 
 
-def load_quarantined_paths() -> Set[str]:
+def load_quarantined_paths() -> set[str]:
     """Return the set of absolute output path strings in the quarantine log.
 
     Used for monitoring and reporting. The quarantine log is never cleaned
@@ -243,7 +242,7 @@ def load_quarantined_paths() -> Set[str]:
     quarantine_file = _QUARANTINE_FILE
     if not quarantine_file.exists():
         return set()
-    paths: Set[str] = set()
+    paths: set[str] = set()
     try:
         with quarantine_file.open("r", encoding="utf-8") as f:
             for line in f:

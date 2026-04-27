@@ -113,6 +113,7 @@ class LanguageConsistencyValidator(PostTranslationValidator):
         self,
         confidence_threshold: float = 0.85,
         per_language_overrides: dict | None = None,
+        min_sentence_length: int = 8,
     ):
         """Initialize language consistency validator.
 
@@ -123,10 +124,14 @@ class LanguageConsistencyValidator(PostTranslationValidator):
                   - purity_threshold (float): min % of sentences in target lang (0–100)
                   - confidence_threshold (float): min langdetect confidence per sentence
                 Example: {'es': {'purity_threshold': 98.0, 'confidence_threshold': 0.90}}
+            min_sentence_length: Minimum character count for a sentence to be language-checked.
+                Sentences shorter than this are skipped. Default 8 catches short bullets and
+                headings that were previously invisible at the old hardcoded threshold of 15.
         """
         super().__init__()
         self.confidence_threshold = confidence_threshold
         self.per_language_overrides: dict = per_language_overrides or {}
+        self.min_sentence_length = min_sentence_length
 
     def validate(
         self,
@@ -200,8 +205,8 @@ class LanguageConsistencyValidator(PostTranslationValidator):
 
         try:
             for i, sentence in enumerate(sentences):
-                # Skip very short sentences (< 15 chars) as they're unreliable
-                if len(sentence.strip()) < 15:
+                # Skip very short sentences as they're unreliable for language detection
+                if len(sentence.strip()) < self.min_sentence_length:
                     continue
 
                 total_sentences += 1

@@ -61,7 +61,7 @@ class TestSiblingDetectionWarning:
 
     def test_no_warning_when_only_canonical_present(self, tmp_path: Path):
         """No warning when only the canonical l2.lmdb directory exists."""
-        from src.tm.l2_persistent import L2PersistentTM, L2_DB_NAME
+        from src.tm.l2_persistent import L2_DB_NAME, L2PersistentTM
         db_path = tmp_path / L2_DB_NAME
         with warnings.catch_warnings(record=True) as caught:
             warnings.simplefilter("always")
@@ -75,7 +75,7 @@ class TestSiblingDetectionWarning:
 
     def test_warning_when_sibling_exists(self, tmp_path: Path):
         """UserWarning is emitted when a sibling l2*.lmdb directory exists."""
-        from src.tm.l2_persistent import L2PersistentTM, L2_DB_NAME
+        from src.tm.l2_persistent import L2_DB_NAME, L2PersistentTM
         db_path = tmp_path / L2_DB_NAME
         # Create a sibling directory BEFORE opening canonical
         sibling = tmp_path / "l2_lmdb"
@@ -101,7 +101,7 @@ class TestSiblingDetectionWarning:
 
     def test_warning_names_all_siblings(self, tmp_path: Path):
         """Warning message includes all sibling directory names."""
-        from src.tm.l2_persistent import L2PersistentTM, L2_DB_NAME
+        from src.tm.l2_persistent import L2_DB_NAME, L2PersistentTM
         db_path = tmp_path / L2_DB_NAME
         _make_lmdb(tmp_path / "l2_lmdb", {b"a": b"1"})
         _make_lmdb(tmp_path / "l2_lmdb_old", {b"b": b"2"})

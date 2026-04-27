@@ -16,7 +16,6 @@ import pytest
 
 from src.workers.worker_state import load_worker_state, record_worker_state
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -123,6 +122,7 @@ def test_verification_daemon_calls_record_state_sleeping():
     sleep_until_next_run. Guards against regression of TC-VW-01.
     """
     import inspect
+
     from src.workers.autonomous_verification_worker import AutonomousVerificationWorker
 
     source = inspect.getsource(AutonomousVerificationWorker._run_daemon)

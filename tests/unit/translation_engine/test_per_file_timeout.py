@@ -12,7 +12,6 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -74,6 +73,7 @@ def test_engine_parallel_uses_per_file_timeout():
     This guards against TC-CW-02 regression where the fix is accidentally removed.
     """
     import inspect
+
     from src.translation_engine.engine import TranslationEngine
 
     src = inspect.getsource(TranslationEngine._translate_directory_parallel)

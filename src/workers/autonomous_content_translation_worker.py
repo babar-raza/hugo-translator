@@ -203,7 +203,7 @@ class AutonomousContentTranslationWorker:
         try:
             from src.tm import TranslationMemory
             from src.tm.l1_cache import L1Cache
-            from src.tm.l2_persistent import L2PersistentTM, L2_DB_NAME
+            from src.tm.l2_persistent import L2_DB_NAME, L2PersistentTM
             try:
                 from src.tm.l3_semantic import L3SemanticTM
             except ImportError:
@@ -857,6 +857,10 @@ class AutonomousContentTranslationWorker:
         timeout_seconds = self.config.file_timeout_seconds * len(target_langs)
         operation_name = f"translate_directory({resolved_content_dir.name}, {len(target_langs)} langs)"
 
+        # Safe default — overwritten by both the chunked loop and single-pass branch below.
+        # Prevents UnboundLocalError if the chunked-mode deadline check fires before chunk 0.
+        run_id = f"{self.invocation_id}:{site_id}:{Path(content_root).name}"
+
         # Pre-loop remaining time check
         if run_deadline is not None:
             remaining = run_deadline - time.time()
@@ -1040,6 +1044,12 @@ class AutonomousContentTranslationWorker:
             else:
                 logger.info("No successful translations, skipping git commit")
 
+        # TC-14: Post-run contamination scan — catches files that slipped through validation.
+        self._run_post_contamination_scan(site_id=site_id, content_root=resolved_content_dir)
+
+        # TC-16: Write per-run quality metrics summary to data/metrics/.
+        self._write_run_metrics(site_id=site_id, run_id=run_id)
+
         # WS-COMP-8: Emit structured coverage telemetry for this content root.
         # Runs after both chunked and single-pass modes so the snapshot always fires.
         try:
@@ -1071,6 +1081,167 @@ class AutonomousContentTranslationWorker:
             )
         except Exception as _ev_exc:
             logger.debug("Coverage event skipped: %s", _ev_exc)
+
+    def _write_run_metrics(self, site_id: str, run_id: str) -> None:
+        """
+        TC-16: Write a per-run quality metrics summary to data/metrics/run_<timestamp>.json.
+
+        Collects MetricsCollector stats, retranslate queue size, files translated,
+        and per-language breakdown.  Wrapped in try/except — must never block the worker.
+        """
+        try:
+            raw_config = self.config_service.get_config() if self.config_service is not None else {}
+            metrics_cfg = raw_config.get("metrics", {})
+            if not metrics_cfg.get("enabled", True):
+                return
+            if not metrics_cfg.get("write_per_run_summary", True):
+                return
+
+            import json as _json
+
+            from src.observability.metrics import get_metrics
+            from src.tm.retranslate_queue import load_queued_paths
+
+            mc = get_metrics()
+            stats = mc.get_stats_summary()
+
+            # Retranslate queue size
+            try:
+                retranslate_queue_size = len(load_queued_paths())
+            except Exception:
+                retranslate_queue_size = -1
+
+            # Per-language files translated (from _run_new_files dict)
+            per_language_stats = dict(getattr(self, "_run_new_files", {}))
+
+            from datetime import timezone as _tz
+            _now = datetime.now(_tz.utc)
+            run_summary = {
+                "run_id": run_id,
+                "site_id": site_id,
+                "timestamp": _now.isoformat(),
+                "files_translated": sum(per_language_stats.values()),
+                "per_language_stats": per_language_stats,
+                "validation_failures": int(
+                    stats.get("translations", {}).get("failed", 0)
+                ),
+                "tm_hit_rates": stats.get("tm", {}),
+                "retranslate_queue_size": retranslate_queue_size,
+                "translations": stats.get("translations", {}),
+                "performance": stats.get("performance", {}),
+            }
+
+            output_dir = Path(metrics_cfg.get("output_dir", "data/metrics"))
+            output_dir.mkdir(parents=True, exist_ok=True)
+            ts = _now.strftime("%Y%m%dT%H%M%SZ")
+            run_file = output_dir / f"run_{ts}_{site_id}.json"
+            run_file.write_text(
+                _json.dumps(run_summary, indent=2, ensure_ascii=False),
+                encoding="utf-8",
+            )
+            logger.info("TC-16: Run metrics written to %s", run_file)
+        except Exception as _e:
+            logger.warning("TC-16: Failed to write run metrics (non-fatal): %s", _e)
+
+    def _run_post_contamination_scan(self, site_id: str, content_root: Path) -> None:
+        """
+        TC-14: Run full (non-fast) contamination scan on the just-translated content root.
+
+        Invokes scripts/scan_language_contamination.py WITHOUT --fast so langdetect
+        sentence analysis detects same-script contamination (e.g. English in Spanish/French).
+        Scoped to --repo <content_root> (not all profiles) to keep runtime bounded.
+        Parses the JSON output and adds contaminated files to the retranslate queue.
+
+        Wrapped in try/except — must never block the worker on failure.
+        TC-MLD-05: Removed --fast flag (was blind to same-script contamination, RC-2).
+        Timeout raised to 600 s (full langdetect scan needs more than 180 s for large sites).
+        """
+        import subprocess
+        import sys
+        import tempfile
+
+        raw_config = self.config_service.get_config() if self.config_service is not None else {}
+        if not raw_config.get("auto_scan_contamination", True):
+            return
+
+        if not content_root.exists():
+            logger.debug("TC-14: content_root %s not found — skipping post-run scan", content_root)
+            return
+
+        script = Path(__file__).parents[2] / "scripts" / "scan_language_contamination.py"
+        if not script.exists():
+            logger.warning("TC-14: scan_language_contamination.py not found — skipping post-run scan")
+            return
+
+        try:
+            with tempfile.NamedTemporaryFile(
+                prefix=f"scan_{site_id}_",
+                suffix=".json",
+                delete=False,
+            ) as tmp:
+                json_output_path = tmp.name
+
+            cmd = [
+                sys.executable,
+                str(script),
+                # TC-MLD-05: --fast removed — full langdetect scan detects same-script
+                # contamination (English in Spanish/French/German, etc.) that --fast misses.
+                "--all-languages",
+                "--repo", str(content_root),
+                "--workers", "16",
+                "--json-output", json_output_path,
+            ]
+
+            logger.info("TC-14: Running post-run contamination scan for site %s ...", site_id)
+            result = subprocess.run(
+                cmd,
+                capture_output=True,
+                text=True,
+                timeout=600,  # TC-MLD-05: raised from 180 — full langdetect scan needs more time
+            )
+
+            # Parse JSON output and queue contaminated files
+            try:
+                json_path = Path(json_output_path)
+                if json_path.exists() and json_path.stat().st_size > 0:
+                    import json as _json
+                    data = _json.loads(json_path.read_text(encoding="utf-8"))
+                    contaminated_files = data.get("files", [])
+                    queued = 0
+                    from src.tm.retranslate_queue import add_to_queue
+                    for entry in contaminated_files:
+                        file_path = entry.get("file_path")
+                        target_lang = entry.get("target_lang")
+                        if file_path and target_lang:
+                            try:
+                                add_to_queue(Path(file_path), target_lang)
+                                queued += 1
+                            except Exception as _qe:
+                                logger.debug("TC-14: failed to queue %s: %s", file_path, _qe)
+                    contaminated_count = data.get("contaminated_count", 0)
+                    logger.info(
+                        "TC-14: Post-run contamination scan complete — %d contaminated, %d queued for retranslation",
+                        contaminated_count,
+                        queued,
+                    )
+                else:
+                    logger.info("TC-14: Post-run contamination scan complete — no JSON output (no issues found)")
+            except Exception as _parse_err:
+                logger.warning("TC-14: Failed to parse scan JSON output: %s", _parse_err)
+            finally:
+                try:
+                    Path(json_output_path).unlink(missing_ok=True)
+                except Exception:
+                    pass
+
+            if result.returncode not in (0, 1):
+                # exit code 1 = quality issues found (normal); other codes = errors
+                logger.warning("TC-14: Contamination scan exited with code %d: %s", result.returncode, result.stderr.strip()[:200])
+
+        except subprocess.TimeoutExpired:
+            logger.warning("TC-14: Post-run contamination scan timed out after 180s — skipping")
+        except Exception as _e:
+            logger.warning("TC-14: Post-run contamination scan failed (non-fatal): %s", _e)
 
     def _offload_models(self) -> None:
         """Unload translation model weights and free VRAM between daemon runs."""

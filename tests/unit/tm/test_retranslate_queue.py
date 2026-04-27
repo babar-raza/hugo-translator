@@ -11,9 +11,10 @@ Covers:
 """
 
 import json
-import pytest
 from pathlib import Path
 from unittest import mock
+
+import pytest
 
 import src.tm.retranslate_queue as rtq
 

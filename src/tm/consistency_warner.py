@@ -10,8 +10,6 @@ Gate: config/global.yaml → tm_improvement.consistency_check_enabled: true
 
 import json
 import logging
-import os
-import tempfile
 from collections import defaultdict
 from datetime import datetime, timezone
 from pathlib import Path

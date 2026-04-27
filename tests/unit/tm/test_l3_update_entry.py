@@ -10,10 +10,11 @@ Covers:
 - Translation memory store with skip_l3=True does not call add_entry()
 """
 
-import numpy as np
-import pytest
 from pathlib import Path
 from unittest import mock
+
+import numpy as np
+import pytest
 
 from src.tm.l3_semantic import L3SemanticTM
 
@@ -162,8 +163,9 @@ class TestSkipL3Flag:
     def test_skip_l3_prevents_add_entry_call(self, tmp_path):
         """When skip_l3=True, tm.store() must not call l3.add_entry()."""
         # Import here to avoid circular-dependency issues in module-level mocking
-        from src.tm.translation_memory import TranslationMemory
         from unittest.mock import MagicMock, patch
+
+        from src.tm.translation_memory import TranslationMemory
 
         mock_l3 = MagicMock()
         mock_l3.add_entry = MagicMock()
@@ -196,8 +198,9 @@ class TestSkipL3Flag:
 
     def test_without_skip_l3_calls_add_entry(self, tmp_path):
         """When skip_l3=False (default), tm.store() calls l3.add_entry()."""
-        from src.tm.translation_memory import TranslationMemory
         from unittest.mock import MagicMock
+
+        from src.tm.translation_memory import TranslationMemory
 
         mock_l3 = MagicMock()
         mock_l3.add_entry = MagicMock()

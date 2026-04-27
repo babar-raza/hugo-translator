@@ -23,7 +23,7 @@ jobs:
   unit-tests:
     name: Unit Tests
     runs-on: windows-latest
-    timeout-minutes: 20
+    timeout-minutes: 45
 
     steps:
       - name: Checkout
@@ -39,6 +39,18 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements/cpu.txt
           pip install -r requirements/dev.txt
+        shell: pwsh
+
+      - name: Lint (ruff)
+        run: python -m ruff check src/ tests/ --output-format=concise
+        shell: pwsh
+
+      - name: Translation Engine Unit Tests
+        run: python -m pytest tests/unit/translation_engine/ -v --tb=short --timeout=120
+        shell: pwsh
+
+      - name: Validation Unit Tests
+        run: python -m pytest tests/unit/validation/ -v --tb=short --timeout=120
         shell: pwsh
 
       - name: Run Contract Tests
@@ -81,6 +93,18 @@ jobs:
       - name: Run Batch Recovery Tests
         run: |
           python -m pytest tests/regression/test_batch_size_recovery.py -v --tb=short
+        shell: pwsh
+
+      - name: Setup Hugo
+        uses: peaceiris/actions-hugo@v3
+        with:
+          hugo-version: '0.154.5'
+          extended: true
+
+      - name: Hugo Build Validation
+        run: |
+          hugo build --source tests/fixtures/hugo_site/ 2>&1
+          if ($LASTEXITCODE -ne 0) { exit 1 }
         shell: pwsh
 
   quality-gate:
@@ -141,8 +165,13 @@ jobs:
           Write-Host "Quality Gate: ${{ needs.quality-gate.result }}"
           Write-Host "=" * 60
 
-          if ("${{ needs.unit-tests.result }}" -ne "success") {
-            Write-Host "RELEASE GATE: FAIL - Unit tests failed"
+          if ("${{ needs.unit-tests.result }}" -ne "success" -or
+              "${{ needs.regression-tests.result }}" -ne "success" -or
+              "${{ needs.quality-gate.result }}" -ne "success") {
+            Write-Host "RELEASE GATE: FAIL"
+            Write-Host "  Unit Tests:       ${{ needs.unit-tests.result }}"
+            Write-Host "  Regression Tests: ${{ needs.regression-tests.result }}"
+            Write-Host "  Quality Gate:     ${{ needs.quality-gate.result }}"
             exit 1
           }
 

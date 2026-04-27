@@ -33,10 +33,10 @@ from ..tm.retranslate_queue import (
     increment_retry as _rtq_increment,
 )
 from ..tm.retranslate_queue import (
-    load_queued_paths as _rtq_load,
+    load_queued_llm_paths as _rtq_load_llm,
 )
 from ..tm.retranslate_queue import (
-    load_queued_llm_paths as _rtq_load_llm,
+    load_queued_paths as _rtq_load,
 )
 from ..tm.retranslate_queue import (
     remove_from_queue as _rtq_remove,
@@ -71,7 +71,8 @@ from .parser import HugoParser
 from .reconstructor import MarkdownReconstructor
 from .retry_handler import RetryHandler
 from .validation import ValidationSuite
-from .validation.base import ValidationIssue as _ValIssue, ValidationSeverity as _ValSeverity
+from .validation.base import ValidationIssue as _ValIssue
+from .validation.base import ValidationSeverity as _ValSeverity
 from .validation.decision_engine import ValidationDecisionEngine
 from .validation.post_translation_validator import ValidationDecision as PostValidationDecision
 
@@ -230,7 +231,7 @@ class TranslationEngine:
         progress_tracker: Optional["ProgressTracker"] = None,
         production_ingestor: Optional["ProductionMetricsIngestor"] = None,
         sort_segments_by_length: bool = False,
-        redis_client: Optional[any] = None,
+        redis_client: "Optional[any]" = None,
         **kwargs,
     ):
         """
@@ -377,7 +378,10 @@ class TranslationEngine:
         elif validation_mode == "lenient":
             decision_config["decision_rules"]["reject_on_error_count"] = 5
             decision_config["decision_rules"]["accept_warnings"] = True
-            decision_config["decision_rules"]["accept_after_max_retries"] = True
+            # TC-MLD-05: accept_after_max_retries=True REMOVED — this was silently writing
+            # wrong-language files to disk after all retries were exhausted (RC-1, primary
+            # cause of mixed-language contamination on blog.aspose.net). Files that fail all
+            # retries now go to the retranslate queue and receive LLM escalation instead.
 
         self.decision_engine = decision_engine or (ValidationDecisionEngine(decision_config) if enable_validation else None)
 
@@ -547,6 +551,34 @@ class TranslationEngine:
             logger.info("[DISABLED] OOM Retry Handler: enabled=false")
         else:
             logger.info("[DISABLED] OOM Retry Handler: missing config")
+
+        # TC-12: Wire language detector and similarity tracker into TM for cache hit validation.
+        # After init, inject the detector so TM can reject L2/L3 hits in the wrong language.
+        if self.tm is not None:
+            try:
+                _det = self._get_language_detector()
+                if _det is not None and getattr(self.tm, '_language_detector', None) is None:
+                    self.tm._language_detector = _det
+                _sim = getattr(self, 'similarity_tracker', None)
+                if _sim is not None and getattr(self.tm, '_similarity_tracker', None) is None:
+                    self.tm._similarity_tracker = _sim
+                if _det is not None:
+                    logger.info("Wired language detector into TM for cache hit validation")
+            except Exception as _tm_wire_err:
+                logger.debug(f"TM detector wiring failed (non-fatal): {_tm_wire_err}")
+
+        # TC-17: Inject L3 SentenceTransformer encoder into SemanticSimilarityValidator
+        # so all instances can perform cross-lingual similarity checks without loading
+        # a second model.  Non-fatal — validator silently skips if encoder is None.
+        try:
+            _l3_enc = getattr(getattr(self.tm, 'l3', None), 'encoder', None)
+            if _l3_enc is not None:
+                from src.translation_engine.validation.semantic_similarity_validator import (
+                    SemanticSimilarityValidator,
+                )
+                SemanticSimilarityValidator.set_encoder(_l3_enc)
+        except Exception as _sem_wire_err:
+            logger.debug("SemanticSimilarityValidator encoder wiring failed (non-fatal): %s", _sem_wire_err)
 
     def _load_adaptive_config(self) -> dict:
         """Load adaptive batching configuration from global config."""
@@ -1436,8 +1468,18 @@ class TranslationEngine:
                     except Exception:
                         pass
 
+                # TC-11: Per-file TM write buffer. Segments are collected here during
+                # _translate_to_language() and flushed to self.tm only after the file
+                # passes all purity and validation gates and is successfully written to disk.
+                # Prevents cache poisoning: rejected files no longer pollute the TM.
+                _tm_write_buffer: list = []
+
                 while retry_count <= max_retry_attempts:
                     try:
+                        # Clear buffer at each attempt start (discard any entries from
+                        # a failed previous attempt that triggered RETRY).
+                        _tm_write_buffer.clear()
+
                         # Translate (returns content, doesn't write yet)
                         translated_content = self._translate_to_language(
                             site_id=site_id,
@@ -1451,6 +1493,7 @@ class TranslationEngine:
                             retry_feedback=retry_feedback,
                             retry_count=retry_count,
                             model_id_override=_llm_model_override,
+                            tm_write_buffer=_tm_write_buffer,
                         )
 
                         # Pre-write validation (if enabled)
@@ -1880,6 +1923,8 @@ class TranslationEngine:
                                         f"Detected languages: {purity_result['detected_languages']}. "
                                         f"Blocking write to prevent corruption of {output_path.name}."
                                     )
+                                    # TC-11: Discard buffered TM entries — do not cache a bad translation
+                                    _tm_write_buffer.clear()
                                 else:
                                     # TC-MLD-01: Soft contamination queue.
                                     # File passed the purity gate but still has 2-N% wrong-language
@@ -1947,6 +1992,14 @@ class TranslationEngine:
                             try:
                                 self._write_output(translated_content, output_path, source_path, result.stats)
                                 logger.info(f"✓ Successfully wrote {output_path.name} after passing all validation checks")
+                                # TC-11: File written successfully — flush deferred TM entries now.
+                                # Only reached when all gates (validation, purity, code blocks) passed.
+                                for _entry in _tm_write_buffer:
+                                    try:
+                                        self.tm.store(**_entry)
+                                    except Exception as _tm_err:
+                                        logger.warning(f"TM deferred store failed for {output_path.name}: {_tm_err}")
+                                _tm_write_buffer.clear()
                             except Exception as write_error:
                                 # Write operation failed - handle separately from validation
                                 logger.error(f"Write operation failed for {output_path.name}: {write_error}")
@@ -2661,6 +2714,18 @@ class TranslationEngine:
             renderer = ASTRenderer()
             renderer.apply_translations(doc.ast, translated_units, frontmatter=doc.frontmatter)
 
+            # P0-D: Placeholder leak = blocking failure - file must not be written
+            if renderer.placeholder_leak_count > 0:
+                from .exceptions import TranslationIncomplete
+                raise TranslationIncomplete(
+                    f"PLACEHOLDER_LEAK: {renderer.placeholder_leak_count} unreplaced placeholder token(s) "
+                    f"detected after AST reconstruction. File write blocked to prevent stray tokens in output.",
+                    missing_count=renderer.placeholder_leak_count,
+                    total_count=renderer.placeholder_leak_count,
+                    ratio=1.0,
+                    tolerance=0.0,
+                )
+
             # TC-MLD-01: Expose missing node count in translation stats for monitoring
             stats.ast_missing_nodes = renderer._missing_node_count
             if renderer._missing_node_count > 0:
@@ -2724,6 +2789,7 @@ class TranslationEngine:
         retry_feedback: str | None = None,
         retry_count: int = 0,
         model_id_override: str | None = None,
+        tm_write_buffer: list | None = None,
     ) -> str:
         """
         Translate document to a specific target language.
@@ -2958,8 +3024,13 @@ class TranslationEngine:
                         else:  # "auto"
                             force_update = force  # Use force_retranslate parameter
 
-                        # Store in TM for future use (respects override mode)
-                        self.tm.store(
+                        # TC-11: Buffer TM writes until file-level purity passes.
+                        # If tm_write_buffer is provided, append the entry for deferred
+                        # storage. The caller flushes the buffer only after purity check
+                        # passes and the file is successfully written. This prevents
+                        # cache poisoning: bad segments are no longer cached when the file
+                        # is ultimately rejected by the purity gate.
+                        _tm_entry = dict(
                             site_id=site_id,
                             src_lang=source_lang,
                             tgt_lang=target_lang,
@@ -2975,6 +3046,10 @@ class TranslationEngine:
                             store_context=store_context,
                             force_update=force_update,
                         )
+                        if tm_write_buffer is not None:
+                            tm_write_buffer.append(_tm_entry)
+                        else:
+                            self.tm.store(**_tm_entry)
                         # TEL-04: Track TM entry storage
                         stats.tm_entries_stored += 1
 

@@ -18,6 +18,7 @@ from .language_consistency_validator import LanguageConsistencyValidator
 from .link_validator import LinkValidator
 from .placeholder_validator import PlaceholderValidator
 from .repetition_detector_validator import RepetitionDetectorValidator
+from .semantic_similarity_validator import SemanticSimilarityValidator
 from .shortcode_preservation_validator import ShortcodePreservationValidator
 from .structure_validator import StructureValidator
 from .terminology_preservation_validator import TerminologyPreservationValidator
@@ -176,9 +177,11 @@ class ValidationSuite:
             lc_cfg = validators_config.get('language_consistency', {})
             confidence_threshold = lc_cfg.get('confidence_threshold', 0.85)
             per_language_overrides = lc_cfg.get('per_language_overrides', {})
+            min_sentence_length = lc_cfg.get('min_sentence_length', 8)
             validators.append(LanguageConsistencyValidator(
                 confidence_threshold=confidence_threshold,
                 per_language_overrides=per_language_overrides,
+                min_sentence_length=min_sentence_length,
             ))
 
         if validators_config.get('shortcode_preservation', {}).get('enabled', True):
@@ -198,6 +201,14 @@ class ValidationSuite:
             rep_cfg = {k: v for k, v in validators_config.get('repetition_detector', {}).items()
                        if k not in ('enabled', 'description')}
             validators.append(RepetitionDetectorValidator(config=rep_cfg))
+
+        if validators_config.get('semantic_similarity', {}).get('enabled', False):
+            ss_cfg = validators_config.get('semantic_similarity', {})
+            validators.append(SemanticSimilarityValidator(
+                warn_threshold=ss_cfg.get('warn_threshold', SemanticSimilarityValidator.WARN_THRESHOLD_DEFAULT),
+                error_threshold=ss_cfg.get('error_threshold', SemanticSimilarityValidator.ERROR_THRESHOLD_DEFAULT),
+                min_body_chars=ss_cfg.get('min_body_chars', SemanticSimilarityValidator.MIN_BODY_CHARS_DEFAULT),
+            ))
 
         return cls(
             validators=validators,

@@ -15,7 +15,6 @@ import pytest
 
 from src.workers.worker_state import load_worker_state, record_worker_state
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -139,6 +138,7 @@ def test_record_state_sleeping_is_called_in_daemon_loop():
     or the state string is changed.
     """
     import inspect
+
     from src.workers.tm_improvement_worker import TMImprovementWorker
 
     source = inspect.getsource(TMImprovementWorker._run_daemon)

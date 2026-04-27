@@ -73,8 +73,8 @@ class TestShortcodeProtection:
 
     def test_integration_with_full_unit_extraction(self, extractor):
         """Integration test: shortcode text must not appear in any translatable unit."""
-        from src.translation_engine.parser.hugo_parser import HugoParser
         from src.translation_engine.parser.ast_nodes import NodeType
+        from src.translation_engine.parser.hugo_parser import HugoParser
 
         markdown = """---
 title: Test

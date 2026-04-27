@@ -3,6 +3,7 @@ Hugo Markdown Parser - converts Hugo MD files to internal AST representation.
 
 Uses ruamel.yaml for YAML parsing to preserve comments, quote styles, and formatting.
 """
+import logging
 import re
 import uuid
 from io import StringIO
@@ -13,6 +14,8 @@ import frontmatter as fm
 from markdown_it import MarkdownIt
 from ruamel.yaml import YAML
 from ruamel.yaml.comments import CommentedMap
+
+logger = logging.getLogger(__name__)
 
 from .ast_nodes import (
     ASTNode,
@@ -118,6 +121,12 @@ class HugoParser:
             # Extract raw YAML from the original content
             frontmatter_dict = self._parse_yaml_with_comments(content)
             if frontmatter_dict is None:
+                _fm_key_count = len(post.metadata) if post.metadata else 0
+                logger.warning(
+                    "YAML_FORMAT_FALLBACK: ruamel.yaml failed to parse frontmatter "
+                    f"(frontmatter keys: {_fm_key_count}); "
+                    "falling back to dict(post.metadata) - YAML comments and formatting will be lost."
+                )
                 frontmatter_dict = dict(post.metadata)
         except Exception:
             frontmatter_dict = {}
