@@ -44,13 +44,13 @@ observability:
 
 ```bash
 # Override log level via CLI
-python -m src.cli translate --log-level DEBUG
+translate-hugo --log-level DEBUG
 
 # Override log file location
-python -m src.cli translate --log-file custom-logs.ndjson
+translate-hugo --log-file custom-logs.ndjson
 
 # Both
-python -m src.cli translate --log-level DEBUG --log-file debug.ndjson
+translate-hugo --log-level DEBUG --log-file debug.ndjson
 ```
 
 ## Log Output Formats

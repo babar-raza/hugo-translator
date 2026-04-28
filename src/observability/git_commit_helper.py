@@ -501,9 +501,37 @@ def recover_pending_commits(git_root: Path) -> int:
             )
             staged_set = set(cached_result.stdout.splitlines())
 
+            def _validate_file_integrity(file_path: Path) -> bool:
+                """Basic structural integrity check for translation output files."""
+                try:
+                    if not file_path.exists():
+                        return False
+                    size = file_path.stat().st_size
+                    if size < 100:
+                        logger.warning(
+                            f"[pending_commit_recovery] Rejecting {file_path.name}: "
+                            f"too small ({size} bytes)"
+                        )
+                        return False
+                    content = file_path.read_text(encoding="utf-8", errors="replace")[:500]
+                    if "---" not in content:
+                        logger.warning(
+                            f"[pending_commit_recovery] Rejecting {file_path.name}: "
+                            f"missing Hugo front matter delimiter"
+                        )
+                        return False
+                    return True
+                except Exception as e:
+                    logger.warning(
+                        f"[pending_commit_recovery] Rejecting {file_path.name}: {e}"
+                    )
+                    return False
+
             to_add = [
                 r for r in rel_files
-                if r not in staged_set and (git_root / r).exists()
+                if r not in staged_set
+                and (git_root / r).exists()
+                and _validate_file_integrity(git_root / r)
             ]
             if to_add:
                 add_result = subprocess.run(

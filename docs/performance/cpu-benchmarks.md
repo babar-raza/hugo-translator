@@ -230,7 +230,7 @@ config = optimizer.optimize()
 
 ```bash
 # Set thread count explicitly
-python -m src.cli translate \
+translate-hugo \
     --site example \
     --source-lang en \
     --target-lang es \

@@ -115,7 +115,7 @@ Added SharedEngines initialization in CLI without breaking existing functionalit
 **Evidence:**
 ```bash
 # Verify CLI still works
-python -m src.cli translate --help
+translate-hugo --help
 # Exit code: 0 (success)
 ```
 
@@ -132,7 +132,7 @@ Replaced direct instantiations with SharedEngines where available:
 **Evidence:**
 ```bash
 # Test CLI with SharedEngines
-python -m src.cli translate ./test_content --target-langs es --dry-run
+translate-hugo --input ./test_content --target-langs es --dry-run
 # Check logs for "SharedEngines initialized successfully"
 ```
 

@@ -235,7 +235,7 @@ class AutonomousContentTranslationWorker:
                 try:
                     l3_semantic = L3SemanticTM(
                         index_path=tm_data_dir / "l3_faiss",
-                        use_gpu=False  # Use CPU for L3 to save GPU memory
+                        use_gpu=True  # TC-L3-002: ~80MB encoder, safe on RTX 4090; CPU fallback built-in
                     )
                 except Exception as e:
                     logger.warning(f"L3 semantic TM not available: {e}")
@@ -522,6 +522,14 @@ class AutonomousContentTranslationWorker:
                 self._write_heartbeat("sleeping")
                 next_run = self.scheduler.sleep_until_next_run()
                 run_count += 1
+
+                # TC-L3-007: Reload L3 encoder to GPU on wake
+                try:
+                    l3 = getattr(getattr(self.translation_engine, "tm", None), "l3", None)
+                    if l3 is not None and hasattr(l3, "reload_to_gpu"):
+                        l3.reload_to_gpu()
+                except Exception as e:
+                    logger.debug("[VRAM] L3 reload skipped: %s", e)
 
                 logger.info("=" * 80)
                 logger.info(f"SCHEDULED RUN #{run_count} at {next_run.strftime('%Y-%m-%d %H:%M:%S %Z')}")
@@ -845,6 +853,7 @@ class AutonomousContentTranslationWorker:
             if effective_max_seconds is not None and getattr(self, "_run_start", None) is not None
             else None
         )
+        self._run_deadline = run_deadline  # TC-06: expose for _run_post_contamination_scan
 
         logger.info(f"Translating content_root: {resolved_content_dir}")
         logger.info(f"Target languages: {', '.join(target_langs)}")
@@ -1159,6 +1168,13 @@ class AutonomousContentTranslationWorker:
         import subprocess
         import sys
         import tempfile
+        import time as _time
+
+        # TC-06: Skip scan if run deadline has already passed
+        run_deadline = getattr(self, "_run_deadline", None)
+        if run_deadline is not None and _time.time() >= run_deadline:
+            logger.info("TC-06: run deadline exceeded — skipping contamination scan")
+            return
 
         raw_config = self.config_service.get_config() if self.config_service is not None else {}
         if not raw_config.get("auto_scan_contamination", True):
@@ -1193,11 +1209,17 @@ class AutonomousContentTranslationWorker:
             ]
 
             logger.info("TC-14: Running post-run contamination scan for site %s ...", site_id)
+            # TC-06: Use CREATE_NEW_PROCESS_GROUP on Windows so the subprocess tree
+            # can be killed cleanly on timeout instead of leaving orphan python processes.
+            creation_flags = 0
+            if sys.platform == "win32":
+                creation_flags = subprocess.CREATE_NEW_PROCESS_GROUP
             result = subprocess.run(
                 cmd,
                 capture_output=True,
                 text=True,
                 timeout=600,  # TC-MLD-05: raised from 180 — full langdetect scan needs more time
+                creationflags=creation_flags,
             )
 
             # Parse JSON output and queue contaminated files
@@ -1262,6 +1284,15 @@ class AutonomousContentTranslationWorker:
                 torch.cuda.empty_cache()
         except ImportError:
             pass
+
+        # TC-L3-007: Offload L3 encoder to CPU (mirrors TM worker pattern)
+        try:
+            l3 = getattr(getattr(self.translation_engine, "tm", None), "l3", None)
+            if l3 is not None and hasattr(l3, "offload_to_cpu"):
+                l3.offload_to_cpu()
+                logger.debug("[VRAM] L3 encoder offloaded to CPU")
+        except Exception as e:
+            logger.debug("[VRAM] L3 offload skipped: %s", e)
 
     @staticmethod
     def _build_orphan_commit_message(
@@ -1501,193 +1532,6 @@ class AutonomousContentTranslationWorker:
                 logger.warning(f"[orphan_sweep] {git_root}: {exc}")
 
         return total_recovered
-        """Scan all configured content roots for .md files written but not committed
-        in previous runs, and commit them per-site.
-
-        This handles cases where a translation run wrote files to disk but the git
-        commit step failed or was interrupted (timeout, index.lock contention, etc.).
-
-        Returns:
-            Total number of files committed across all sites.
-        """
-        # DISABLED: orphan recovery is committing corrupted files (code blocks
-        # stripped, hallucinated content, even overwriting English source files).
-        # Root cause investigation in progress. See commit 3f90f922.
-        logger.warning("[orphan_sweep] DISABLED — orphan recovery is suspended pending root cause fix")
-        return 0
-        import subprocess
-
-        from src.observability.git_commit import GitCommitConfig, GitCommitter
-        from src.observability.git_context import find_git_root
-
-        total_committed = 0
-
-        try:
-            sites = self.config_service.list_sites()
-        except Exception as exc:
-            logger.warning(f"[orphan_sweep] Could not list sites: {exc}")
-            return 0
-
-        for site_id in sites:
-            try:
-                profile = self.config_service.get_site_profile(site_id)
-                content_roots = profile.content_roots or []
-            except Exception:
-                continue
-
-            for content_root_str in content_roots:
-                try:
-                    content_root = self.config_service.resolve_content_root(content_root_str)
-                    if not content_root.exists():
-                        continue
-
-                    git_root = find_git_root(content_root)
-                    if not git_root:
-                        continue
-
-                    # Check if git commit is enabled
-                    try:
-                        gc_cfg = self.config_service.global_config.git_commit
-                        if isinstance(gc_cfg, dict):
-                            enabled = gc_cfg.get("enabled", True)
-                            co_author = gc_cfg.get("co_author_name", "Hugo Translator")
-                            co_email = gc_cfg.get("co_author_email", "hugo-translator@aspose.net")
-                            timeout = gc_cfg.get("timeout_seconds", 60)
-                            auto_push = gc_cfg.get("auto_push", True)
-                        else:
-                            enabled = getattr(gc_cfg, "enabled", True)
-                            co_author = getattr(gc_cfg, "co_author_name", "Hugo Translator")
-                            co_email = getattr(gc_cfg, "co_author_email", "hugo-translator@aspose.net")
-                            timeout = getattr(gc_cfg, "timeout_seconds", 60)
-                            auto_push = getattr(gc_cfg, "auto_push", True)
-                    except Exception:
-                        enabled, co_author, co_email, timeout, auto_push = (
-                            True, "Hugo Translator", "hugo-translator@aspose.net", 60, True
-                        )
-
-                    if not enabled:
-                        logger.info(f"[orphan_sweep] Git commit disabled — skipping {site_id}")
-                        continue
-
-                    # Find orphaned .md files via git status
-                    try:
-                        rel_root = content_root.resolve().relative_to(git_root.resolve())
-                    except ValueError:
-                        rel_root = Path(".")
-
-                    status_result = subprocess.run(
-                        ["git", "status", "--porcelain", str(rel_root)],
-                        cwd=str(git_root),
-                        capture_output=True,
-                        text=True,
-                        timeout=30,
-                    )
-                    if status_result.returncode != 0:
-                        logger.warning(
-                            f"[orphan_sweep] git status failed for {site_id}: "
-                            f"{status_result.stderr.strip()}"
-                        )
-                        continue
-
-                    # Determine localization strategy to filter translation outputs
-                    output_layout = getattr(profile, 'output_layout', None)
-                    per_language_folders = False
-                    if output_layout:
-                        per_language_folders = getattr(output_layout, 'per_language_folders', False)
-                    source_lang = getattr(profile, 'default_source_lang', 'en')
-                    target_langs = getattr(profile, 'target_langs', None) or []
-
-                    orphaned: list[Path] = []
-                    for line in status_result.stdout.splitlines():
-                        status_code = line[:2]
-                        file_rel = line[3:].strip()
-                        if "M" in status_code or "A" in status_code or status_code == "??":
-                            abs_path = git_root / file_rel
-                            if abs_path.is_dir():
-                                # Untracked directory — git shows "?? dir/" for whole tree
-                                orphaned.extend(abs_path.rglob("*.md"))
-                            elif abs_path.suffix == ".md" and abs_path.exists():
-                                orphaned.append(abs_path)
-
-                    # Filter to translation outputs only — exclude source-language
-                    # files and files changed by other processes (e.g. example reviewer)
-                    if per_language_folders:
-                        # Folder-based: keep only files NOT in the source lang folder
-                        source_markers = [f'/{source_lang}/', f'\\{source_lang}\\']
-                        orphaned = [
-                            f for f in orphaned
-                            if not any(m in str(f) for m in source_markers)
-                        ]
-                    elif target_langs:
-                        # File-based: keep only files with a target-lang suffix
-                        from src.translation_engine.engine import _is_translated_filename
-                        orphaned = [
-                            f for f in orphaned
-                            if _is_translated_filename(f.name, target_langs, source_lang)[0]
-                        ]
-
-                    if not orphaned:
-                        continue
-
-                    # Structural integrity gate — reject orphans with code block
-                    # loss, hallucinated sections, or TITLE: prefix corruption
-                    pre_gate = len(orphaned)
-                    orphaned = [
-                        f for f in orphaned
-                        if self._validate_orphan_structural_integrity(
-                            f, git_root, source_lang, per_language_folders,
-                        )
-                    ]
-                    rejected = pre_gate - len(orphaned)
-                    if rejected:
-                        logger.warning(
-                            "[orphan_sweep] %s: structural gate rejected %d/%d file(s)",
-                            site_id, rejected, pre_gate,
-                        )
-
-                    if not orphaned:
-                        continue
-
-                    logger.info(
-                        f"[orphan_sweep] {site_id}: found {len(orphaned)} orphaned file(s)"
-                    )
-
-                    # Build config object for committer
-                    git_config = GitCommitConfig(
-                        enabled=True,
-                        auto_push=auto_push,
-                        co_author_name=co_author,
-                        co_author_email=co_email,
-                        timeout_seconds=timeout,
-                    )
-
-                    commit_msg = self._build_orphan_commit_message(orphaned, site_id, git_config)
-
-                    committer = GitCommitter(git_config)
-                    committer._recover_stale_index_lock(git_root)
-                    staged = committer._stage_files(orphaned, git_root)
-                    if staged == 0:
-                        logger.warning(f"[orphan_sweep] {site_id}: nothing staged — skipping commit")
-                        continue
-
-                    commit_hash = committer._create_commit(commit_msg, git_root)
-                    if commit_hash:
-                        logger.info(
-                            f"[orphan_sweep] ✓ {site_id}: committed {staged} orphaned file(s) "
-                            f"({commit_hash[:7]})"
-                        )
-                        total_committed += staged
-                    else:
-                        logger.warning(
-                            f"[orphan_sweep] {site_id}: commit failed — {committer._last_error}"
-                        )
-
-                except subprocess.TimeoutExpired:
-                    logger.warning(f"[orphan_sweep] {site_id}/{content_root_str}: git status timed out")
-                except Exception as exc:
-                    logger.warning(f"[orphan_sweep] {site_id}/{content_root_str}: {exc}")
-
-        return total_committed
 
     def _recover_pending_commits(self) -> None:
         """Retry any .pending_commit.json / .pending_commit.json.stale_* files left

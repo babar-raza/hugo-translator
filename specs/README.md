@@ -112,19 +112,20 @@ Standardized organization for all translation models.
 **Key Commands:**
 ```bash
 # Download all models
-python -m src.cli download-models --all
+translate-hugo download-models --all
 
 # Translate content
-python -m src.cli translate \
+translate-hugo \
   --source-root "D:\onedrive\Documents\GitHub\aspose.net\content" \
   --site-profile default \
   --languages fr es de
 
 # Run benchmarks
-python -m src.cli benchmark --all
+python -m src.benchmarking.cli run --all-languages
 
 # View dashboard
-python -m src.cli dashboard --port 8080
+# Dashboard (planned — not yet implemented)
+# python -m src.benchmarking.cli dashboard --port 8080
 ```
 
 ### For Performance Engineers
@@ -137,18 +138,18 @@ python -m src.cli dashboard --port 8080
 **Key Queries:**
 ```bash
 # Compare CPU vs GPU performance
-python -m src.cli benchmark query \
+python -m src.benchmarking.cli compare \
   --model m2m100_418m \
   --language fr \
   --compare-devices
 
 # Check cache impact
-python -m src.cli benchmark query \
+python -m src.benchmarking.cli compare \
   --model m2m100_418m \
   --compare-cache
 
 # Generate performance report
-python -m src.cli benchmark report \
+python -m src.benchmarking.cli report \
   --format pdf \
   --output benchmark_report.pdf
 ```

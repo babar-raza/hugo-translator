@@ -14,7 +14,7 @@ import logging
 import pickle
 import threading
 import time
-from collections import deque
+from collections import OrderedDict, deque
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import asdict, dataclass
 from pathlib import Path
@@ -100,6 +100,9 @@ class L3SemanticTM:
         from src.utils.config_loader import get_metrics_config
         metrics_config = get_metrics_config()
         timing_maxlen = metrics_config["metrics"]["storage"]["l3_semantic"]["timing_metrics_maxlen"]
+        self._search_warning_ms = metrics_config["metrics"]["thresholds"].get(
+            "l3_search_warning_ms", 50
+        )
 
         self._metrics = {
             "semantic_search_ms": deque(maxlen=timing_maxlen),  # Bounded by config
@@ -145,6 +148,10 @@ class L3SemanticTM:
         # Lock for thread safety
         self._lock = threading.RLock()
         self._save_lock = threading.Lock()
+
+        # Query embedding LRU cache (TC-L3-003)
+        self._query_cache: OrderedDict[str, np.ndarray] = OrderedDict()
+        self._query_cache_maxsize = 4096
 
         # Try to load existing index
         if (self.index_path / "index.faiss").exists():
@@ -388,6 +395,36 @@ class L3SemanticTM:
                 ),
             }
 
+    def _get_or_encode(self, query_text: str) -> "np.ndarray":
+        """Return cached embedding or encode and cache a new one (TC-L3-003).
+
+        Thread-safe via self._lock.  Returns an immutable *copy* so callers
+        cannot mutate the cache entry.
+        """
+        with self._lock:
+            cached = self._query_cache.get(query_text)
+            if cached is not None:
+                # Move to end (most-recently used)
+                self._query_cache.move_to_end(query_text)
+                return cached.copy()
+
+        # Encode outside the lock (this is the expensive part)
+        embedding = self.encoder.encode(
+            query_text, convert_to_numpy=True, show_progress_bar=False
+        )
+        # Store immutable copy in cache
+        embedding_copy = embedding.copy()
+
+        with self._lock:
+            if query_text not in self._query_cache:
+                if len(self._query_cache) >= self._query_cache_maxsize:
+                    self._query_cache.popitem(last=False)  # evict LRU
+                self._query_cache[query_text] = embedding_copy
+            else:
+                self._query_cache.move_to_end(query_text)
+
+        return embedding
+
     def semantic_search(
         self,
         site_id: str,
@@ -420,10 +457,8 @@ class L3SemanticTM:
                 self._metrics["cache_misses"] += 1
             return []
 
-        # Generate query embedding
-        query_embedding = self.encoder.encode(
-            query_text, convert_to_numpy=True, show_progress_bar=False
-        )
+        # Generate query embedding (with LRU cache — TC-L3-003)
+        query_embedding = self._get_or_encode(query_text)
 
         with self._lock:
             # Search for top K candidates (we'll filter after)
@@ -483,10 +518,137 @@ class L3SemanticTM:
         with self._lock:
             self._metrics["semantic_search_ms"].append(duration_ms)
 
-        if duration_ms > 100:
+        if duration_ms > self._search_warning_ms:
             logger.warning(f"Slow L3 semantic_search: {duration_ms:.1f}ms")
 
         return matches
+
+    def batch_semantic_search(
+        self,
+        queries: list[dict[str, Any]],
+    ) -> list[list[SemanticMatch]]:
+        """Batch semantic search — encode unique texts once, single FAISS search.
+
+        Each query dict must contain:
+            site_id, src_lang, tgt_lang, query_text
+        Optional keys:
+            k (default 10), threshold (default 0.75)
+
+        Returns:
+            List of match lists, one per input query, in input order.
+        """
+        if not queries:
+            return []
+
+        if self.index is None or self.index.ntotal == 0:
+            with self._lock:
+                self._metrics["cache_misses"] += len(queries)
+            return [[] for _ in queries]
+
+        # --- Step 1: deduplicate query texts and gather embeddings ---
+        unique_texts: dict[str, int] = {}  # text -> index in unique list
+        unique_list: list[str] = []
+        query_to_unique: list[int] = []  # maps each query -> unique index
+
+        for q in queries:
+            text = q["query_text"]
+            if text not in unique_texts:
+                unique_texts[text] = len(unique_list)
+                unique_list.append(text)
+            query_to_unique.append(unique_texts[text])
+
+        # --- Step 2: encode (cache-aware) ---
+        embeddings: list[np.ndarray] = []
+        texts_to_encode: list[str] = []
+        encode_indices: list[int] = []  # position in embeddings list
+
+        for i, text in enumerate(unique_list):
+            with self._lock:
+                cached = self._query_cache.get(text)
+                if cached is not None:
+                    self._query_cache.move_to_end(text)
+                    embeddings.append(cached.copy())
+                    continue
+            # Need encoding
+            texts_to_encode.append(text)
+            encode_indices.append(i)
+            embeddings.append(None)  # placeholder
+
+        if texts_to_encode:
+            new_embeddings = self.encoder.encode(
+                texts_to_encode,
+                convert_to_numpy=True,
+                show_progress_bar=False,
+                batch_size=64,
+            )
+            for j, idx in enumerate(encode_indices):
+                emb = new_embeddings[j].copy()
+                embeddings[idx] = emb
+                # Store in cache
+                with self._lock:
+                    if len(self._query_cache) >= self._query_cache_maxsize:
+                        self._query_cache.popitem(last=False)
+                    self._query_cache[unique_list[idx]] = emb
+
+        # --- Step 3: FAISS batch search ---
+        embedding_matrix = np.array(embeddings, dtype=np.float32)
+        max_k = max((q.get("k", 10) for q in queries), default=10)
+
+        with self._lock:
+            search_k = min(max_k * 10, self.index.ntotal)
+            distances, indices = self.index.search(embedding_matrix, search_k)
+
+        # --- Step 4: filter per query ---
+        all_results: list[list[SemanticMatch]] = []
+
+        for qi, q in enumerate(queries):
+            uid = query_to_unique[qi]
+            site_id = q["site_id"]
+            src_lang = q["src_lang"]
+            tgt_lang = q["tgt_lang"]
+            k = q.get("k", 10)
+            threshold = q.get("threshold", 0.75)
+
+            dists = distances[uid]
+            idxs = indices[uid]
+            sims = 1.0 / (1.0 + dists)
+
+            matches: list[SemanticMatch] = []
+            with self._lock:
+                for idx_val, similarity in zip(idxs, sims, strict=False):
+                    if idx_val == -1:
+                        continue
+                    if idx_val >= len(self.metadata):
+                        continue
+                    meta = self.metadata[idx_val]
+                    if (
+                        meta["site_id"] == site_id
+                        and meta["src_lang"] == src_lang
+                        and meta["tgt_lang"] == tgt_lang
+                        and similarity >= threshold
+                    ):
+                        matches.append(SemanticMatch(
+                            entry_id=meta["entry_id"],
+                            similarity=float(similarity),
+                            source_text=meta["source_text"],
+                            translation=meta["translation"],
+                            site_id=meta["site_id"],
+                            src_lang=meta["src_lang"],
+                            tgt_lang=meta["tgt_lang"],
+                            context=meta["context"],
+                            metadata=meta["metadata"],
+                        ))
+                        if len(matches) >= k:
+                            break
+
+                if matches:
+                    self._metrics["cache_hits"] += 1
+                else:
+                    self._metrics["cache_misses"] += 1
+
+            all_results.append(matches)
+
+        return all_results
 
     def batch_add(self, entries: list[dict[str, Any]]) -> int:
         """
@@ -563,6 +725,9 @@ class L3SemanticTM:
         VRAM is freed; reload is fast (no disk I/O needed).
         """
         with self._lock:
+            # TC-L3-003: Clear embedding cache (device change may invalidate tensors)
+            if hasattr(self, "_query_cache"):
+                self._query_cache.clear()
             # Move FAISS GPU index to CPU
             if self.use_faiss_gpu and self.index is not None:
                 try:

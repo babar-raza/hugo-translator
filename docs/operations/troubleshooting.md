@@ -771,9 +771,9 @@ translate-hugo --site products.aspose.net --validation-mode normal
 
 ### Q: How do I preview validation decisions without writing files?
 
-**A**: Use `--preview` flag:
+**A**: Use `--dry-run` flag:
 ```bash
-translate-hugo --site products.aspose.net --preview --validation-mode strict
+translate-hugo --site products.aspose.net --dry-run --validation-mode strict
 ```
 
 This shows what would happen without actually writing translated files.

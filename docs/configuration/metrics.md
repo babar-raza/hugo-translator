@@ -146,7 +146,7 @@ export METRICS_ENGINE_MAXLEN=2000
 export METRICS_L3_MAXLEN=20000
 export METRICS_BATCH_MAXLEN=10000
 
-python -m src.cli translate --site-id blog.example.com ...
+translate-hugo --site-id blog.example.com ...
 ```
 
 ## Usage in Code

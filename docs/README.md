@@ -34,7 +34,7 @@ Deploy, monitor, and maintain production systems.
 
 **Key Tasks:**
 - [Deploy with Docker](operations/deployment.md)
-- [Monitor performance](operations/monitoring.md)
+- [Monitor performance](operations/metrics.md)
 - [Troubleshoot issues](operations/troubleshooting.md)
 - [Backup and restore](operations/backup-restore.md)
 
@@ -46,13 +46,13 @@ Deploy, monitor, and maintain production systems.
 
 **Reference:**
 - [Deployment Guide](operations/deployment.md) - Production setup
-- [Monitoring](operations/monitoring.md) - Metrics and alerts
+- [Metrics](operations/metrics.md) - Metrics and alerts
 
 ### 💻 System Contributor (Engineer)
 Understand, extend, and contribute to the codebase.
 
 **Key Tasks:**
-- [Set up development](development/setup.md)
+- [Set up development](user-guide/setup.md)
 - [Run tests](development/testing.md)
 - [Understand architecture](architecture/translation-engine.md)
 - [Add features](development/scripts.md)
@@ -80,7 +80,7 @@ Understand, extend, and contribute to the codebase.
 
 ### 🔧 Operations
 - [Docker Deployment](operations/deployment.md) - Container setup
-- [Monitoring](operations/monitoring.md) - Observability
+- [Metrics](operations/metrics.md) - Observability
 - [Troubleshooting](operations/troubleshooting.md) - Problem solving
 - [Backup/Restore](operations/backup-restore.md) - Data management
 
@@ -88,7 +88,7 @@ Understand, extend, and contribute to the codebase.
 - [Translation Engine](architecture/translation-engine.md) - Core components
 - [Validation Pipeline](architecture/validation-pipeline.md) - Quality assurance
 - [Translation Memory](architecture/translation-memory.md) - Caching system
-- [Model Runtime](architecture/model-runtime.md) - AI integration
+- [LLM Backend](architecture/l4-llm.md) - AI integration
 
 ### 💾 Translation Memory (TM)
 - **Getting Started**: [TM Introduction](guides/tm-getting-started.md) - What is TM and how it saves time
@@ -110,7 +110,7 @@ Understand, extend, and contribute to the codebase.
 - **CPU Optimization**: [CPU Performance](performance/cpu-benchmarks.md) - CPU-specific tuning and recommendations
 
 ### 🧪 Development
-- [Setup](development/setup.md) - Development environment
+- [Setup](user-guide/setup.md) - Development environment
 - [Testing](development/testing.md) - Test suite and execution
 - [Scripts](development/scripts.md) - Development tooling
 - [Docs Standards](development/docs-standards.md) - Documentation guidelines
@@ -149,7 +149,7 @@ Code is the authoritative source. Documentation links to implementation:
 
 ## Contributing to Docs
 
-Follow the [style guide](_audit/style_guide.md) and [IA proposal](_audit/README_IA_PROPOSAL.md).
+Follow the [documentation standards](development/docs-standards.md).
 
 **Quick Edits:**
 - Reference updates: Edit `docs/reference/`
@@ -157,10 +157,9 @@ Follow the [style guide](_audit/style_guide.md) and [IA proposal](_audit/README_
 - New features: Add to appropriate section
 
 **Major Changes:**
-- Review [IA proposal](_audit/README_IA_PROPOSAL.md) for placement
-- Follow [migration plan](_audit/docs_migration_plan.md) for consistency
-- Update [traceability](_audit/traceability.md) for coverage
+- Follow [documentation standards](development/docs-standards.md) for consistency
+- See [CONTRIBUTING.md](../CONTRIBUTING.md) for PR guidelines
 
 ---
 
-**Version**: 1.1.0 | **Last Updated**: 2025-12-24
+**Version**: 0.1.0 | **Last Updated**: 2026-04-28

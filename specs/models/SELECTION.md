@@ -70,13 +70,13 @@ All 36 target languages supported via multilingual models:
 
 ```bash
 # Auto-select model for target language
-python -m src.cli translate --source input.md --target-langs fr --auto-select-model
+translate-hugo --source input.md --target-langs fr --auto-select-model
 
 # Auto-select for multiple languages
-python -m src.cli translate --source input.md --target-langs fr,hr,ko --auto-select-model
+translate-hugo --source input.md --target-langs fr,hr,ko --auto-select-model
 
 # Manual model override (backward compatible)
-python -m src.cli translate --source input.md --target-langs fr --model nllb_200_600m
+translate-hugo --source input.md --target-langs fr --model nllb_200_600m
 ```
 
 ### Programmatic Usage
@@ -149,7 +149,7 @@ For CPU systems, the selector strongly prefers CTranslate2 backend:
 ### Example 1: French Translation (Opus Available)
 
 ```bash
-$ python -m src.cli translate --source doc.md --target-langs fr --auto-select-model
+$ translate-hugo --source doc.md --target-langs fr --auto-select-model
 ```
 
 **Selection:**
@@ -160,7 +160,7 @@ $ python -m src.cli translate --source doc.md --target-langs fr --auto-select-mo
 ### Example 2: Croatian Translation (No Opus)
 
 ```bash
-$ python -m src.cli translate --source doc.md --target-langs hr --auto-select-model
+$ translate-hugo --source doc.md --target-langs hr --auto-select-model
 ```
 
 **Selection:**
@@ -171,7 +171,7 @@ $ python -m src.cli translate --source doc.md --target-langs hr --auto-select-mo
 ### Example 3: Multiple Languages
 
 ```bash
-$ python -m src.cli translate --source doc.md --target-langs fr,hr,ko --auto-select-model
+$ translate-hugo --source doc.md --target-langs fr,hr,ko --auto-select-model
 ```
 
 **Selections:**
@@ -291,21 +291,21 @@ model_defaults:
 
 ```bash
 # Still works - manual model specification
-python -m src.cli translate --source input.md --target-langs fr --model nllb_200_600m
+translate-hugo --source input.md --target-langs fr --model nllb_200_600m
 ```
 
 ### Default Behavior (Unchanged)
 
 ```bash
 # Still works - uses registry.recommend_model()
-python -m src.cli translate --source input.md --target-langs fr
+translate-hugo --source input.md --target-langs fr
 ```
 
 ### New Auto-Selection (Opt-In)
 
 ```bash
 # New feature - requires explicit --auto-select-model flag
-python -m src.cli translate --source input.md --target-langs fr --auto-select-model
+translate-hugo --source input.md --target-langs fr --auto-select-model
 ```
 
 ---
@@ -330,13 +330,13 @@ Tested with production registry and real hardware configurations:
 
 ```bash
 # Test 1: Auto-select for French (should use Opus)
-.venv/Scripts/python.exe -m src.cli translate --source input.md --target-langs fr --auto-select-model
+translate-hugo --source input.md --target-langs fr --auto-select-model
 
 # Test 2: Auto-select for Croatian (should use multilingual)
-.venv/Scripts/python.exe -m src.cli translate --source input.md --target-langs hr --auto-select-model
+translate-hugo --source input.md --target-langs hr --auto-select-model
 
 # Test 3: Manual override still works
-.venv/Scripts/python.exe -m src.cli translate --source input.md --target-langs fr --model nllb_200_600m
+translate-hugo --source input.md --target-langs fr --model nllb_200_600m
 ```
 
 ---

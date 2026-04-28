@@ -55,6 +55,11 @@ def record_worker_state(
     log_path: str | None = None,
     log_dir: Path | None = None,
     now: datetime | None = None,
+    useful_work_count: int | None = None,
+    no_work_count: int | None = None,
+    failure_count: int | None = None,
+    current_mode: str | None = None,
+    input_queue: str | None = None,
 ) -> dict[str, Any]:
     """
     Update durable worker state.
@@ -67,6 +72,11 @@ def record_worker_state(
         log_path: Optional worker log path for provenance.
         log_dir: Optional override for state-file directory.
         now: Optional timestamp override for deterministic tests.
+        useful_work_count: TC-12 — cumulative count of runs that produced output.
+        no_work_count: TC-12 — cumulative count of runs with nothing to do.
+        failure_count: TC-12 — cumulative count of unhandled exceptions.
+        current_mode: TC-12 — "daemon", "oneshot", or "manual".
+        input_queue: TC-12 — path or name of the worker's input source.
 
     Returns:
         The full updated state payload.
@@ -89,6 +99,18 @@ def record_worker_state(
     if error:
         payload["last_error_ts"] = timestamp
         payload["last_error"] = str(error)[:500]
+
+    # TC-12: New optional fields — only written when provided (additive, backward-compat)
+    if useful_work_count is not None:
+        payload["useful_work_count"] = useful_work_count
+    if no_work_count is not None:
+        payload["no_work_count"] = no_work_count
+    if failure_count is not None:
+        payload["failure_count"] = failure_count
+    if current_mode is not None:
+        payload["current_mode"] = current_mode
+    if input_queue is not None:
+        payload["input_queue"] = input_queue
 
     _atomic_write_json(state_path, payload)
     return payload

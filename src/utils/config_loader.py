@@ -554,6 +554,74 @@ def get_global_config() -> dict[str, Any]:
     return _global_config_cache
 
 
+# --- Worker registry ---
+
+_WORKER_REQUIRED_FIELDS = {
+    "enabled", "mode", "module", "cli_args", "trigger",
+    "cooldown_seconds", "max_concurrent", "safe_command",
+    "useful_work_criteria",
+}
+
+_VALID_TRIGGER_TYPES = {"queue_non_empty", "file_change", "worker_completed", "multi"}
+
+
+def load_worker_registry(path: str | Path | None = None) -> dict[str, Any]:
+    """Load and validate the worker registry from *config/workers.yaml*.
+
+    Args:
+        path: Optional explicit path.  Falls back to ``config/workers.yaml``
+              relative to the project root.
+
+    Returns:
+        Parsed dict with a ``workers`` key mapping worker names to configs.
+
+    Raises:
+        FileNotFoundError: Registry file does not exist.
+        ValueError: Registry has missing required fields or unknown trigger types.
+    """
+    if path is None:
+        path = Path(__file__).parent.parent.parent / "config" / "workers.yaml"
+    path = Path(path)
+
+    if not path.exists():
+        raise FileNotFoundError(f"Worker registry not found: {path}")
+
+    with open(path, encoding="utf-8") as f:
+        data = yaml.safe_load(f) or {}
+
+    workers = data.get("workers")
+    if not isinstance(workers, dict) or not workers:
+        raise ValueError("Worker registry must contain a non-empty 'workers' mapping")
+
+    for name, cfg in workers.items():
+        missing = _WORKER_REQUIRED_FIELDS - set(cfg.keys())
+        if missing:
+            raise ValueError(
+                f"Worker '{name}' missing required fields: {sorted(missing)}"
+            )
+        _validate_trigger(name, cfg["trigger"])
+
+    return data
+
+
+def _validate_trigger(worker_name: str, trigger: dict[str, Any]) -> None:
+    """Recursively validate a trigger definition."""
+    ttype = trigger.get("type")
+    if ttype not in _VALID_TRIGGER_TYPES:
+        raise ValueError(
+            f"Worker '{worker_name}' has unknown trigger type '{ttype}'. "
+            f"Valid types: {sorted(_VALID_TRIGGER_TYPES)}"
+        )
+    if ttype == "multi":
+        conditions = trigger.get("conditions")
+        if not isinstance(conditions, list) or not conditions:
+            raise ValueError(
+                f"Worker '{worker_name}': 'multi' trigger requires non-empty 'conditions' list"
+            )
+        for cond in conditions:
+            _validate_trigger(worker_name, cond)
+
+
 # Standalone helper for metrics configuration
 _metrics_config_cache: dict[str, Any] | None = None
 

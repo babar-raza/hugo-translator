@@ -1888,6 +1888,13 @@ class TranslationEngine:
                                                     f"OVERWRITE PROTECTED: New translation failed but existing "
                                                     f"{target_lang} file ({existing_conf:.2%}) is preserved for {output_path.name}"
                                                 )
+                                            else:
+                                                # TC-05: Existing is WRONG language + new also failed → stuck file.
+                                                # Queue for retranslation so it's not permanently abandoned.
+                                                try:
+                                                    _rtq_add(output_path, target_lang)
+                                                except Exception:
+                                                    pass
                                         except Exception:
                                             pass  # Cannot read existing — keep as real failure
 

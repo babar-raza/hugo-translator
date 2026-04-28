@@ -395,7 +395,7 @@ except torch.cuda.OutOfMemoryError:
    - [ ] Resume support: Interrupted benchmarks can continue
 
 7. **Usability**
-   - [ ] Single command runs full suite: `python -m src.cli benchmark --all`
+   - [ ] Single command runs full suite: `python -m src.benchmarking.cli run --all-languages`
    - [ ] Progress bar shows completion percentage
    - [ ] ETA displayed based on historical run times
 
@@ -482,22 +482,22 @@ CREATE INDEX idx_metrics_run_cache ON benchmark_metrics(run_id, cache_status);
 
 ```bash
 # Run full coverage benchmarks
-python -m src.cli benchmark --all
+python -m src.benchmarking.cli run --all-languages
 
 # Run specific language
-python -m src.cli benchmark --language fr
+python -m src.benchmarking.cli run --language fr
 
 # Run specific model
-python -m src.cli benchmark --model m2m100_418m
+python -m src.benchmarking.cli run --model m2m100_418m
 
 # Run CPU-only
-python -m src.cli benchmark --device cpu
+python -m src.benchmarking.cli run --device cpu
 
 # Run with custom corpus
-python -m src.cli benchmark --corpus config/custom_corpus.yaml
+python -m src.benchmarking.cli run --corpus config/custom_corpus.yaml
 
 # Query results
-python -m src.cli benchmark query \
+python -m src.benchmarking.cli compare \
     --model m2m100_418m \
     --language fr \
     --device gpu \

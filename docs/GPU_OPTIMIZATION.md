@@ -28,7 +28,7 @@ The system targets **85% VRAM utilization** by default. This leaves:
 Simply **omit the `--batch-size` flag** when running on GPU:
 
 ```bash
-python -m src.cli \
+translate-hugo \
   --site kb.aspose.net \
   --input "D:\path\to\content" \
   --target-langs ar bg cs de es fr \
@@ -42,7 +42,7 @@ The system will automatically calculate and apply the optimal batch size.
 You can still manually specify batch size if needed:
 
 ```bash
-python -m src.cli \
+translate-hugo \
   --site kb.aspose.net \
   --input "D:\path\to\content" \
   --target-langs ar bg cs de es fr \
@@ -209,7 +209,7 @@ gpu_optimizer = GPUOptimizer(
 The optimizer automatically detects the device ID from the device string:
 
 ```bash
-CUDA_VISIBLE_DEVICES=2 python -m src.cli ...
+CUDA_VISIBLE_DEVICES=2 translate-hugo ...
 ```
 
 Or in code, it will parse `cuda:2` to target GPU 2.

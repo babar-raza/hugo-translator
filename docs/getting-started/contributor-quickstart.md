@@ -16,7 +16,7 @@ For engineers extending the system.
    - Config: [reference/config.md](../reference/config.md)
    - CLI flags: [reference/cli.md](../reference/cli.md)
    - File contracts: [reference/file-contracts.md](../reference/file-contracts.md)
-4) Follow docs standards when adding docs: [development/docs-standards.md](../development/docs-standards.md) and `_audit/style_guide.md`.
+4) Follow docs standards when adding docs: [development/docs-standards.md](../development/docs-standards.md).
 
 ## Next Steps
 - Scripts catalog: [development/scripts.md](../development/scripts.md)

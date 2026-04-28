@@ -17,7 +17,7 @@ print('Database initialized')
 "
 
 # 2. Run benchmark
-python -m src.benchmarking.cli benchmark run \
+python -m src.benchmarking.cli run \
     --model facebook/m2m100_418M \
     --device cpu \
     --batch-size 8 \

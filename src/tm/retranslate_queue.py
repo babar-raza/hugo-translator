@@ -39,7 +39,8 @@ def _queue_path() -> Path:
 
 def add_to_queue(output_path: Path, tgt_lang: str) -> None:
     """
-    Add an output file to the retranslate queue.
+    Add an output file to the retranslate queue, or increment retry_count
+    if it already exists (dedup).
 
     Called when CASE 4 fires: both the existing and the new translation are
     wrong-language, so overwrite is blocked and the file is permanently stuck.
@@ -49,10 +50,31 @@ def add_to_queue(output_path: Path, tgt_lang: str) -> None:
         tgt_lang: Expected target language code.
     """
     try:
+        resolved = str(output_path.resolve())
         queue_file = _queue_path()
         queue_file.parent.mkdir(parents=True, exist_ok=True)
+
+        # Check if entry already exists — if so, increment retry_count instead
+        if queue_file.exists():
+            lines = queue_file.read_text(encoding="utf-8").splitlines()
+            for line in lines:
+                if not line.strip():
+                    continue
+                try:
+                    entry = json.loads(line)
+                    if entry.get("output_path") == resolved:
+                        # Already queued — use _rewrite_queue to increment
+                        increment_retry(output_path)
+                        logger.debug(
+                            f"retranslate_queue: dedup — incremented retry for "
+                            f"{output_path.name} ({tgt_lang})"
+                        )
+                        return
+                except (json.JSONDecodeError, KeyError):
+                    continue
+
         entry = {
-            "output_path": str(output_path.resolve()),
+            "output_path": resolved,
             "tgt_lang": tgt_lang,
             "queued_at": datetime.now(timezone.utc).isoformat(),
             "retry_count": 1,

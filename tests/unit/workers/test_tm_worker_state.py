@@ -72,23 +72,23 @@ def test_state_cycles_correctly_through_run_and_sleep(tmp_path: Path):
     )
 
 
-def test_empty_queue_run_advances_last_success_ts(tmp_path: Path):
+def test_empty_queue_run_does_not_advance_last_success_ts(tmp_path: Path):
     """
-    A queue-empty run (0 improved, 0 failed) must still advance last_success_ts.
-    The result is still 'success' — only run errors should leave last_success_ts unchanged.
+    A queue-empty run (0 improved, 0 failed) must NOT advance last_success_ts.
+    Only runs that produce useful work (improved > 0) should advance it.
     """
     t_prior = datetime(2026, 4, 17, 10, 0, 0, tzinfo=timezone.utc)
     t_empty_run = datetime(2026, 4, 18, 10, 0, 0, tzinfo=timezone.utc)
 
     record_worker_state("tm_worker", "run_completed", success=True, log_dir=tmp_path, now=t_prior)
     record_worker_state("tm_worker", "sleeping", log_dir=tmp_path, now=t_prior)
-    # Queue-empty run: result["status"] == "success", result["improved_count"] == 0
-    # Worker calls _record_state("run_completed", success=True) — same as non-empty
-    record_worker_state("tm_worker", "run_completed", success=True, log_dir=tmp_path, now=t_empty_run)
+    # Queue-empty run: result["improved_count"] == 0
+    # Worker calls _record_state("run_completed", success=False) — no useful work done
+    record_worker_state("tm_worker", "run_completed", success=False, log_dir=tmp_path, now=t_empty_run)
 
     state = load_worker_state("tm_worker", log_dir=tmp_path)
-    assert state["last_success_ts"] == t_empty_run.isoformat(), (
-        "Queue-empty run must advance last_success_ts (worker is healthy, just idle)."
+    assert state["last_success_ts"] == t_prior.isoformat(), (
+        "Queue-empty run must NOT advance last_success_ts (no useful work done)."
     )
 
 

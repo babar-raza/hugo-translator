@@ -29,7 +29,7 @@ This document provides:
 
 **Example**:
 ```
-User runs: python -m src.cli --target-langs ar
+User runs: translate-hugo --target-langs ar
 Result: 92 files skipped (Arabic outputs already exist)
 Telemetry logged: 92 "successful" translations (MISLEADING)
 ```

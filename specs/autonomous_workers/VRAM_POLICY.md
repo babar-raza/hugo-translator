@@ -268,10 +268,10 @@ All existing CLI usage continues to work:
 
 ```bash
 # Before: Used max_gpu_memory_mb directly
-python -m src.cli translate site.yaml -t de -t fr
+translate-hugo site.yaml -t de -t fr
 
 # After: Automatically uses max_gpu_memory_percent (60% default)
-python -m src.cli translate site.yaml -t de -t fr
+translate-hugo site.yaml -t de -t fr
 ```
 
 ### Legacy Configuration

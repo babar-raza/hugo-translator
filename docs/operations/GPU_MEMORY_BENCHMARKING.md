@@ -236,7 +236,7 @@ python -m src.benchmarking.runner \
 Enable production metrics to track GPU memory in production runs:
 
 ```bash
-python -m src.cli translate en ru \
+translate-hugo \
   --input content/ \
   --output translated/ \
   --device cuda \

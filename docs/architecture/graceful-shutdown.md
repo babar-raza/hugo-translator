@@ -111,7 +111,7 @@ No changes needed for normal usage. The system is automatically activated.
 ### Test 1: Normal Completion
 ```bash
 # Run translation
-python -m src.cli --site blog.aspose.net --input content/blog/example.md
+translate-hugo --site blog.aspose.net --input content/blog/example.md
 
 # Check telemetry - should show "success" status with full metrics
 docker exec local-telemetry-api python3 -c "
@@ -127,7 +127,7 @@ print(cursor.fetchone())
 ### Test 2: Graceful Interruption
 ```bash
 # Start translation
-python -m src.cli --site blog.aspose.net --input content/blog/ &
+translate-hugo --site blog.aspose.net --input content/blog/ &
 PID=$!
 
 # Wait a few seconds, then interrupt
@@ -173,7 +173,7 @@ print('Inserted stale run')
 # Run hugo-translator (triggers API-based cleanup)
 # Set TELEMETRY_API_URL if needed
 export TELEMETRY_API_URL=http://localhost:8765
-python -m src.cli --site blog.aspose.net --input content/blog/example.md
+translate-hugo --site blog.aspose.net --input content/blog/example.md
 
 # Check if stale run was cleaned up (via direct database access for verification)
 docker exec local-telemetry-api python3 -c "

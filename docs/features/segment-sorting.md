@@ -98,13 +98,13 @@ batch_3 = ["Very long paragraph..."]          # ~500 chars
 
 ```bash
 # Enable sorting for this run
-python -m src.cli translate \
+translate-hugo \
   --site mysite \
   --target-langs es,fr \
   --sort-segments-by-length
 
 # Explicitly disable sorting (override config)
-python -m src.cli translate \
+translate-hugo \
   --site mysite \
   --target-langs es,fr \
   --no-sort-segments-by-length
@@ -112,10 +112,10 @@ python -m src.cli translate \
 
 ### Via Configuration File (Recommended for Production)
 
-Edit `config/default.yaml` or your site-specific config:
+Edit `config/global.yaml` or your site-specific config:
 
 ```yaml
-# config/default.yaml
+# config/global.yaml
 body_rules:
   # Enable segment sorting for all translations
   sort_segments_by_length: true
@@ -181,7 +181,7 @@ Example: 10,000 segments
 
 ```bash
 # Benchmark without sorting
-python -m src.benchmarking.cli benchmark run \
+python -m src.benchmarking.cli run \
   --model facebook/m2m100_418M \
   --device cuda \
   --batch-size 16 \
@@ -189,7 +189,7 @@ python -m src.benchmarking.cli benchmark run \
 
 # Benchmark with sorting (add to config first)
 # Edit config: body_rules.sort_segments_by_length = true
-python -m src.benchmarking.cli benchmark run \
+python -m src.benchmarking.cli run \
   --model facebook/m2m100_418M \
   --device cuda \
   --batch-size 16 \
@@ -292,7 +292,7 @@ python -m src.benchmarking.cli query compare \
 Check if sorting is active in logs:
 
 ```bash
-python -m src.cli translate --site mysite --sort-segments-by-length 2>&1 | grep "SR-01"
+translate-hugo --site mysite --sort-segments-by-length 2>&1 | grep "SR-01"
 
 # Expected output:
 # SR-01: Sorting 1247 segments by length (range: 8-742 chars)
@@ -318,7 +318,7 @@ print(f"Average segment length: {result.stats.avg_segment_length}")
 Enable DEBUG logging to see batch composition:
 
 ```bash
-python -m src.cli translate \
+translate-hugo \
   --site mysite \
   --sort-segments-by-length \
   --log-level DEBUG 2>&1 | grep "Translated batch"

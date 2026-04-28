@@ -442,7 +442,7 @@ Preview validation decisions without writing files:
 
 ```bash
 # Preview what would happen without writing
-translate-hugo --site products.aspose.net --preview --validation-mode strict
+translate-hugo --site products.aspose.net --dry-run --validation-mode strict
 ```
 
 ## Validation Modes
@@ -667,7 +667,7 @@ translate-hugo --site blog.aspose.net --validation-mode normal
 translate-hugo --site kb.aspose.net --validation-mode lenient
 
 # Override for testing
-translate-hugo --site docs.aspose.net --validation-mode lenient --preview
+translate-hugo --site docs.aspose.net --validation-mode lenient --dry-run
 ```
 
 ## Examples

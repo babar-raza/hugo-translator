@@ -72,13 +72,13 @@ Override configuration at runtime:
 
 ```bash
 # Disable content hash tracking for this run
-python -m src.cli example.com --disable-content-hash
+translate-hugo --site example.com --disable-content-hash
 
 # Rebuild content hashes from scratch (ignores stored metadata)
-python -m src.cli example.com --rebuild-content-hashes
+translate-hugo --site example.com --rebuild-content-hashes
 
 # Enable output integrity validation
-python -m src.cli example.com --validate-output-integrity
+translate-hugo --site example.com --validate-output-integrity
 ```
 
 ## Use Cases
@@ -94,7 +94,7 @@ python -m src.cli example.com --validate-output-integrity
 git checkout feature-branch
 
 # Translate (skips files with unchanged content)
-python -m src.cli example.com
+translate-hugo --site example.com
 ```
 
 ### 2. CI/CD Pipelines
@@ -105,7 +105,7 @@ python -m src.cli example.com
 
 ```bash
 # First run: translate all files, create metadata
-python -m src.cli example.com
+translate-hugo --site example.com
 
 # Commit metadata
 git add output/.translation_metadata.json
@@ -125,7 +125,7 @@ git commit -m "Add translation metadata"
 make build
 
 # Translate (skips files with unchanged content)
-python -m src.cli example.com
+translate-hugo --site example.com
 ```
 
 ### 4. Collaborative Editing
@@ -139,7 +139,7 @@ python -m src.cli example.com
 touch content/blog/post.md
 
 # Editor 2: translates (skips unchanged file)
-python -m src.cli example.com
+translate-hugo --site example.com
 ```
 
 ## Performance Impact
@@ -179,7 +179,7 @@ With fast-path mtime optimization:
 rm output/.translation_metadata.json
 
 # Rebuild from scratch
-python -m src.cli example.com --rebuild-content-hashes
+translate-hugo --site example.com --rebuild-content-hashes
 ```
 
 ### Hash Mismatch (False Positives)
@@ -307,7 +307,7 @@ Both reduce redundant work.
 
 **A**: Use `--rebuild-content-hashes` flag:
 ```bash
-python -m src.cli example.com --rebuild-content-hashes
+translate-hugo --site example.com --rebuild-content-hashes
 ```
 
 This deletes existing metadata and recomputes all hashes.
@@ -324,7 +324,7 @@ This deletes existing metadata and recomputes all hashes.
 
 2. **First run**: All files will be hashed (one-time cost)
    ```bash
-   python -m src.cli example.com
+   translate-hugo --site example.com
    ```
 
 3. **Verify metadata created**:
@@ -344,7 +344,7 @@ This deletes existing metadata and recomputes all hashes.
 
 2. **Or use CLI flag**:
    ```bash
-   python -m src.cli example.com --disable-content-hash
+   translate-hugo --site example.com --disable-content-hash
    ```
 
 3. **Optional**: Delete metadata file to reclaim space:
@@ -372,7 +372,7 @@ Starting in v2.0, content hash tracking is **enabled by default**.
 If you experience issues, disable temporarily:
 ```bash
 # Option 1: CLI flag
-python -m src.cli example.com --disable-content-hash
+translate-hugo --site example.com --disable-content-hash
 
 # Option 2: Config change
 # In config/global.yaml, set:

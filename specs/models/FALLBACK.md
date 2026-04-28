@@ -557,7 +557,7 @@ model = registry.recommend_model("en", "hr", hardware, prefer_quality=True)
 
 **Scenario**: User specifies exact model ID via CLI:
 ```bash
-python -m src.cli translate --model opus_en_fr --site mysite
+translate-hugo --model opus_en_fr --site mysite
 ```
 
 **Behavior**: Model selection bypassed, specified model loaded directly. Fallback system NOT invoked.

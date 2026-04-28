@@ -252,6 +252,51 @@ try {
 Write-Host ""
 
 # ============================================================================
+# Task 5: Worker Orchestrator (trigger-based launcher)
+# Replaces blind periodic scheduling with intelligent trigger evaluation.
+# Pattern: python.exe -m module
+# ============================================================================
+Write-Host "[5/5] Creating task: HugoTranslator-Orchestrator" -ForegroundColor Cyan
+
+$orchestratorArgs = "-m src.workers.worker_orchestrator --config config/workers.yaml --check-interval 900 --log-level INFO"
+
+$action5 = New-ScheduledTaskAction `
+    -Execute $VenvPython `
+    -Argument $orchestratorArgs `
+    -WorkingDirectory $ProjectRoot
+
+# Dual trigger: first to start (30s delay) — lightweight, no CUDA
+$trigger5Logon = New-ScheduledTaskTrigger -AtLogon -User $currentUser
+$trigger5Logon.Delay = "PT30S"
+$trigger5Boot = New-ScheduledTaskTrigger -AtStartup
+$trigger5Boot.Delay = "PT30S"
+$principal5 = New-ScheduledTaskPrincipal -UserId $currentUser -LogonType Interactive -RunLevel Limited
+$settings5 = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -RestartCount 3 -RestartInterval (New-TimeSpan -Minutes 5)
+
+Write-Host "  Execute: $VenvPython"
+Write-Host "  Args: $orchestratorArgs"
+Write-Host "  WorkDir: $ProjectRoot"
+Write-Host "  User: $currentUser (Interactive)"
+
+try {
+    $existingTask5 = Get-ScheduledTask -TaskName "HugoTranslator-Orchestrator" -ErrorAction SilentlyContinue
+    if ($existingTask5) {
+        Write-Host "  Removing existing task..." -ForegroundColor Yellow
+        Unregister-ScheduledTask -TaskName "HugoTranslator-Orchestrator" -Confirm:$false
+    }
+
+    Register-ScheduledTask -TaskName "HugoTranslator-Orchestrator" `
+        -Action $action5 -Trigger @($trigger5Logon, $trigger5Boot) -Principal $principal5 -Settings $settings5 `
+        -Description "Worker Orchestrator - trigger-based launcher for oneshot workers" | Out-Null
+    Write-Host "  [OK] Task created successfully" -ForegroundColor Green
+} catch {
+    Write-Host "  [ERROR] Failed to create task: $_" -ForegroundColor Red
+    $failCount++
+}
+
+Write-Host ""
+
+# ============================================================================
 # Post-Registration Verification
 # ============================================================================
 Write-Host "================================================================================" -ForegroundColor Yellow
@@ -263,7 +308,8 @@ $expectedTasks = @(
     "HugoTranslator-ContentWorker",
     "HugoTranslator-TMWorker",
     "HugoTranslator-Watchdog",
-    "HugoTranslator-AutonomousVerification"
+    "HugoTranslator-AutonomousVerification",
+    "HugoTranslator-Orchestrator"
 )
 $verifiedCount = 0
 
@@ -300,15 +346,15 @@ if ($failCount -eq 0 -and $verifiedCount -eq $expectedTasks.Count) {
 Write-Host ""
 Write-Host "Scheduled Tasks:" -ForegroundColor Yellow
 Write-Host "  1. HugoTranslator-ContentWorker" -ForegroundColor White
-Write-Host "     - Runs: 4 times per day (08:00-23:00 Pacific Time)"
+Write-Host "     - Runs: 12 times per day (07:00-23:00 Asia/Karachi)"
 Write-Host "     - Device: CUDA (GPU)"
-Write-Host "     - Trigger: At system startup"
+Write-Host "     - Trigger: At logon (60s delay) + At startup (30s delay)"
 Write-Host ""
 Write-Host "  2. HugoTranslator-TMWorker" -ForegroundColor White
-Write-Host "     - Runs: 4 times per day (08:00-23:00 Pacific Time)"
+Write-Host "     - Runs: 12 times per day (07:00-23:00 Asia/Karachi)"
 Write-Host "     - Device: CUDA (GPU)"
-Write-Host "     - LLM: Ollama/qwen3:14b"
-Write-Host "     - Trigger: At system startup"
+Write-Host "     - LLM: professionalize_llm (config/global.yaml)"
+Write-Host "     - Trigger: At logon (90s delay) + At startup (60s delay)"
 Write-Host ""
 Write-Host "  3. HugoTranslator-Watchdog" -ForegroundColor White
 Write-Host "     - Runs: Every 15 minutes"
@@ -316,12 +362,18 @@ Write-Host "     - Checks worker liveness and auto-restarts dead workers"
 Write-Host "     - Circuit breaker: Max 5 restarts per hour"
 Write-Host ""
 Write-Host "  4. HugoTranslator-AutonomousVerification" -ForegroundColor White
-Write-Host "     - Runs: 4 times per day (08:00-23:00 Pacific Time)"
+Write-Host "     - Runs: 4 times per day (08:00-23:00 Asia/Karachi)"
 Write-Host "     - Verifies scheduled worker readiness and emits audit telemetry"
-Write-Host "     - Trigger: At system startup"
+Write-Host "     - Trigger: At logon (120s delay) + At startup (90s delay)"
+Write-Host ""
+Write-Host "  5. HugoTranslator-Orchestrator" -ForegroundColor White
+Write-Host "     - Polls every 15 minutes for trigger conditions"
+Write-Host "     - Launches workers as oneshot subprocesses when triggers fire"
+Write-Host "     - Config: config/workers.yaml"
+Write-Host "     - Trigger: At logon (30s delay) + At startup (30s delay)"
 Write-Host ""
 Write-Host "All tasks will:" -ForegroundColor Yellow
-Write-Host "  - Start automatically at boot AND when user logs on (dual trigger)"
+Write-Host "  - Start automatically at boot AND when user logs on (dual trigger, staggered delays)"
 Write-Host "  - Run as current user ($currentUser)"
 Write-Host "  - Restart automatically on failure (up to 3 times)"
 Write-Host "  - Self-schedule runs throughout the day"

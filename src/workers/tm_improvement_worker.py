@@ -38,9 +38,10 @@ from src.tm import TranslationMemory
 from src.tm.improvement_queue import ImprovementCandidate, ImprovementQueue
 from src.tm.l1_cache import L1Cache
 from src.tm.l2_persistent import L2PersistentTM
+from src.tm.normalization import hash_text
 from src.utils.config_loader import ConfigService
 from src.workers.window_scheduler import ScheduleConfig, WindowScheduler
-from src.workers.worker_state import record_worker_state
+from src.workers.worker_state import load_worker_state, record_worker_state
 
 try:
     from src.tm.l3_semantic import L3SemanticTM
@@ -519,6 +520,10 @@ class TMImprovementWorker:
                 success=success,
                 error=error,
                 log_path=self._worker_log_path,
+                useful_work_count=getattr(self, "_useful_work_count", None),
+                no_work_count=getattr(self, "_no_work_count", None),
+                failure_count=getattr(self, "_failure_count", None),
+                current_mode=getattr(self, "_current_mode", None),
             )
         except Exception as exc:
             logger.debug(f"Worker state write failed (non-fatal): {exc}")
@@ -617,6 +622,13 @@ class TMImprovementWorker:
         In oneshot mode: Executes one improvement run and exits
         In daemon mode: Continuously schedules and executes runs
         """
+        # TC-12: Initialize work counters (persisted via _record_state)
+        existing_state = load_worker_state(self._worker_id)
+        self._useful_work_count = existing_state.get("useful_work_count", 0)
+        self._no_work_count = existing_state.get("no_work_count", 0)
+        self._failure_count = existing_state.get("failure_count", 0)
+        self._current_mode = self.config.mode
+
         self._write_pid_file()
         self._write_heartbeat("starting")
         self._record_state("starting")
@@ -660,11 +672,12 @@ class TMImprovementWorker:
             result = self._execute_improvement_run_with_telemetry()
 
             if result["status"] == "success":
+                improved = result.get("improved_count", 0)
                 logger.info(
-                    f"Oneshot run completed: {result['improved_count']} improved, "
+                    f"Oneshot run completed: {improved} improved, "
                     f"{result['skipped_count']} skipped, {result['failed_count']} failed"
                 )
-                self._record_state("run_completed", success=True)
+                self._record_state("run_completed", success=(improved > 0))
             else:
                 logger.warning(f"Oneshot run completed with status: {result['status']}")
                 self._record_state("run_completed_non_success")
@@ -713,19 +726,27 @@ class TMImprovementWorker:
                     result = self._execute_improvement_run_with_telemetry()
 
                     if result["status"] == "success":
+                        improved = result.get("improved_count", 0)
                         logger.info(
-                            f"Run #{run_count} completed: {result['improved_count']} improved, "
+                            f"Run #{run_count} completed: {improved} improved, "
                             f"{result['skipped_count']} skipped, {result['failed_count']} failed"
                         )
-                        self._record_state("run_completed", success=True)
+                        # TC-12: Increment work counters
+                        if improved > 0:
+                            self._useful_work_count += 1
+                        else:
+                            self._no_work_count += 1
+                        self._record_state("run_completed", success=(improved > 0))
                     else:
                         logger.warning(f"Run #{run_count} status: {result['status']}")
+                        self._no_work_count += 1
                         self._record_state("run_completed_non_success")
 
                     consecutive_failures = 0
 
                 except Exception as e:
                     consecutive_failures += 1
+                    self._failure_count += 1  # TC-12
                     logger.error(
                         f"Run #{run_count} failed "
                         f"({consecutive_failures} consecutive): {e}",
@@ -1138,7 +1159,7 @@ class TMImprovementWorker:
             if self.tm is not None and self.tm.l3 is not None:
                 entry_id = (
                     f"{candidate.site_id}:{candidate.src_lang}:"
-                    f"{candidate.tgt_lang}:{hash(candidate.text)}"
+                    f"{candidate.tgt_lang}:{hash_text(candidate.text)}"
                 )
                 l3_updated = self.tm.l3.update_entry(
                     entry_id=entry_id,

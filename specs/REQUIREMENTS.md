@@ -290,8 +290,8 @@ Each requirement is evaluated on a 5/5 rating scale across these dimensions:
 ### 4. Usability (5/5)
 **Definition:** Non-experts can download models and run benchmarks
 **Measurement:**
-- [ ] Single command model download: `python -m src.cli download-models`
-- [ ] Single command benchmark: `python -m src.cli benchmark --all`
+- [ ] Single command model download: `translate-hugo download-models`
+- [ ] Single command benchmark: `python -m src.benchmarking.cli run --all-languages`
 - [ ] Dashboard accessible via web browser (no CLI required)
 
 ### 5. Maintainability (5/5)
