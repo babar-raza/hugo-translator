@@ -886,3 +886,67 @@ Evidence:
 - `reports/agents/Agent_C/ORCH-AW-003/run_20260216_223609/artifacts/pytest_worker_slice.txt`
 - `reports/agents/Agent_C/ORCH-AW-003/run_20260216_223609/artifacts/content_worker_oneshot.txt`
 - `reports/agents/Agent_C/ORCH-AW-003/run_20260216_223609/artifacts/content_worker_new_blockers.txt`
+
+---
+
+## Worker Ecosystem Operations (added 2026-04-29)
+
+### Duplicate Workers
+
+**Symptom**: Multiple instances of the same worker running (visible via `tasklist` or `psutil`).
+
+**Root cause**: Task Scheduler `AtLogon`/`AtStartup` triggers bypass the orchestrator's PID check. Workers previously had no startup self-guard.
+
+**Fix (code)**: All workers now call `acquire_pid_file()` from `src/workers/worker_state.py` which checks if the existing PID is alive before starting. Duplicate launches exit with code 1.
+
+**Fix (runtime)**: Kill orphan PIDs via `taskkill /PID <pid> /F`. Use `scripts/admin/apply_worker_scheduler_cleanup.ps1` to disable Task Scheduler tasks that auto-restart workers.
+
+### Queue Depth Monitoring
+
+The watchdog (`scripts/worker_watchdog.ps1`) now monitors:
+- **Retranslate queue depth** — WARNs if >10,000 entries
+- **Quarantine depth** — logged every cycle
+- **Campaign sentinel age** — WARNs if disabled >48 hours
+
+### Campaign Sentinel
+
+- File: `data/logs/<worker_id>.campaign_disabled`
+- When present, the worker is skipped by the watchdog
+- To re-enable: delete the sentinel file
+- Watchdog now logs sentinel age and warns if >48h (stale detection)
+
+### CUDA VRAM Cleanup
+
+Workers call `torch.cuda.empty_cache()` during model offload. If `torch` is not installed, this is now logged at DEBUG level (previously silent `pass`).
+
+### Orchestrator Status
+
+Check full system status:
+```bash
+python -m src.workers.worker_orchestrator --status         # human-readable
+python -m src.workers.worker_orchestrator --status --json   # machine-readable
+```
+
+Shows per-worker: PID liveness, trigger state, campaign sentinel, cooldown, queue depths, circuit breaker.
+
+### Task Scheduler
+
+Tasks are registered at `\` root (not `\HugoTranslator\`). Names use `HugoTranslator-` prefix:
+- `HugoTranslator-ContentWorker`
+- `HugoTranslator-TMWorker`
+- `HugoTranslator-Watchdog`
+- `HugoTranslator-AutonomousVerification`
+- `HugoTranslator-Orchestrator`
+
+To disable worker tasks (requires admin):
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts/admin/apply_worker_scheduler_cleanup.ps1 -Mode apply -WorkersToDisable ContentWorker,TMWorker,AutonomousVerification
+```
+
+### LMDB Maintenance
+
+Only one LMDB directory should exist: `data/tm/l2.lmdb/`. If siblings (`l2_lmdb/`) or old backups (`l2.lmdb.bak_*`) exist, run the migration:
+```bash
+python scripts/migrate_l2_lmdb.py --dry-run  # preview
+python scripts/migrate_l2_lmdb.py             # apply (stop workers first!)
+```
