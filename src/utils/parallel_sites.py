@@ -35,8 +35,9 @@ def build_site_cli_args(
         args.append("--auto-select-model")
     if device != "auto":
         args.extend(["--device", device])
-    if max_gpu_memory_percent > 0 and device != "cpu":
-        args.extend(["--max-gpu-memory-percent", str(max_gpu_memory_percent)])
+    # Note: GPU memory percent is controlled via config (global.yaml hardware
+    # section), not a CLI flag. The clamp_gpu_memory() function validates the
+    # budget but does not pass it to subprocesses.
     if dry_run:
         args.append("--dry-run")
     return args

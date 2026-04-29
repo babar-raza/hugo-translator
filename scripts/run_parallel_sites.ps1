@@ -137,9 +137,9 @@ foreach ($SiteId in $Sites) {
 
     if ($ForceNoGpu) {
         $null = $CliArgs.AddRange([string[]]@("--device", "cpu"))
-    } else {
-        $null = $CliArgs.AddRange([string[]]@("--max-gpu-memory-percent", "$EffectiveCap"))
     }
+    # Note: GPU memory percent is controlled via config (global.yaml hardware
+    # section), not a CLI flag. VRAM clamp warnings above are informational.
 
     if ($DryRun) {
         $null = $CliArgs.Add("--dry-run")
