@@ -51,7 +51,7 @@ PROD_SITES = [
 # 5 locales from distinct script families for cross-family coverage proof
 SAMPLE_LOCALES = ["de", "ar", "zh", "hi", "ru"]
 
-FILES_PER_SITE = 2  # keep verification fast; enough for proof
+FILES_PER_SITE = 3  # keep verification fast; enough for proof (skip + missing + stale)
 
 
 # ---------------------------------------------------------------------------
@@ -166,14 +166,24 @@ def _create_temp_fixture(tmp_root: Path) -> dict[str, Path]:
             src_a = site_root / "skip_me.md"
             src_a.write_text("# Skip me\n", encoding="utf-8")
             time.sleep(0.02)
-            out_de = site_root / "skip_me.de.md"
-            out_de.write_text("# Überspringe mich\n", encoding="utf-8")
-            # Ensure output mtime > source mtime
-            os.utime(out_de, (time.time() + 5, time.time() + 5))
+            for lang in SAMPLE_LOCALES:
+                out = site_root / f"skip_me.{lang}.md"
+                out.write_text(f"# {lang} Skip me\n", encoding="utf-8")
+                os.utime(out, (time.time() + 5, time.time() + 5))
 
             # File B: source exists, no output -> MISSING
             src_b = site_root / "translate_me.md"
             src_b.write_text("# Translate me\n", encoding="utf-8")
+
+            # File C: source newer than output -> STALE
+            src_c = site_root / "stale_me.md"
+            src_c.write_text("# Stale me\n", encoding="utf-8")
+            time.sleep(0.02)
+            for lang in SAMPLE_LOCALES:
+                out = site_root / f"stale_me.{lang}.md"
+                out.write_text(f"# {lang} Stale me\n", encoding="utf-8")
+            # Make source newer than all outputs
+            os.utime(src_c, (time.time() + 10, time.time() + 10))
 
             roots[site_id] = site_root
         else:
@@ -195,6 +205,18 @@ def _create_temp_fixture(tmp_root: Path) -> dict[str, Path]:
             # File B: source exists, no output -> MISSING
             src_b = en_dir / "translate_me.md"
             src_b.write_text("# Translate me\n", encoding="utf-8")
+
+            # File C: source newer than output -> STALE
+            src_c = en_dir / "stale_me.md"
+            src_c.write_text("# Stale me\n", encoding="utf-8")
+            time.sleep(0.02)
+            for lang in SAMPLE_LOCALES:
+                lang_dir = tmp_root / site_id / lang
+                lang_dir.mkdir(parents=True, exist_ok=True)
+                out = lang_dir / "stale_me.md"
+                out.write_text(f"# {lang} Stale me\n", encoding="utf-8")
+            # Make source newer than all outputs
+            os.utime(src_c, (time.time() + 10, time.time() + 10))
 
             roots[site_id] = tmp_root / site_id
 
@@ -306,7 +328,7 @@ def main() -> int:
         "B_stale_gets_selected": {
             "description": "Files where source mtime > output mtime -> SELECT_STALE",
             "count": stale_count,
-            "passed": True,  # pass regardless; stale count is data-dependent
+            "passed": stale_count > 0 if use_fixture else True,
         },
         "C_current_gets_skipped": {
             "description": "Files where all outputs are newer than source -> SKIP",

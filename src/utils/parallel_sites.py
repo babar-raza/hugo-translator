@@ -72,6 +72,10 @@ def launch_sites(
 
     Returns the list of Popen handles so the caller can wait on them.
     All processes are started before any blocking wait occurs.
+
+    When *log_dir* is given, log file handles are stored on each Popen
+    object as ``_log_handles`` so callers can close them after
+    ``.wait()``.
     """
     processes: list[subprocess.Popen] = []
     for site_id in sites:
@@ -84,12 +88,34 @@ def launch_sites(
             dry_run=dry_run,
             device=device,
         )
+        log_handles: list = []
         stdout_dest = subprocess.DEVNULL
         stderr_dest = subprocess.DEVNULL
         if log_dir is not None:
-            stdout_dest = open(log_dir / f"{site_id}.log", "w", encoding="utf-8")
-            stderr_dest = open(log_dir / f"{site_id}.err", "w", encoding="utf-8")
+            fout = open(log_dir / f"{site_id}.log", "w", encoding="utf-8")
+            ferr = open(log_dir / f"{site_id}.err", "w", encoding="utf-8")
+            stdout_dest = fout
+            stderr_dest = ferr
+            log_handles = [fout, ferr]
 
         proc = subprocess.Popen(cmd, stdout=stdout_dest, stderr=stderr_dest)
+        proc._log_handles = log_handles  # type: ignore[attr-defined]
         processes.append(proc)
     return processes
+
+
+def wait_and_cleanup(processes: list[subprocess.Popen]) -> list[int]:
+    """Wait for all processes and close any associated log file handles.
+
+    Returns list of exit codes (one per process, in order).
+    """
+    exit_codes: list[int] = []
+    for proc in processes:
+        proc.wait()
+        exit_codes.append(proc.returncode)
+        for fh in getattr(proc, "_log_handles", []):
+            try:
+                fh.close()
+            except Exception:
+                pass
+    return exit_codes
