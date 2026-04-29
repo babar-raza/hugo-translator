@@ -288,6 +288,121 @@ def run_check_cycle(
     return launched
 
 
+def print_status(
+    registry: dict[str, Any],
+    state: dict[str, Any],
+    *,
+    as_json: bool = False,
+) -> dict[str, Any]:
+    """Print a human-readable (or JSON) status report of all workers.
+
+    Returns the status payload dict.
+    """
+    from src.workers.worker_state import _is_process_alive, load_worker_state
+
+    workers = registry.get("workers", {})
+    now = time.time()
+    report: dict[str, Any] = {"timestamp": datetime.now(timezone.utc).isoformat(), "workers": {}}
+
+    for name, cfg in workers.items():
+        w: dict[str, Any] = {"enabled": cfg.get("enabled", True)}
+
+        # PID alive check
+        pid_file = None
+        for candidate in [
+            Path("data/logs") / f"{name}.pid",
+            Path("data/logs") / f"{name.replace('_worker', '')}_worker.pid",
+        ]:
+            if candidate.exists():
+                pid_file = candidate
+                break
+        if pid_file and pid_file.exists():
+            try:
+                pid = int(pid_file.read_text(encoding="utf-8").strip())
+                w["pid"] = pid
+                w["pid_alive"] = _is_process_alive(pid)
+            except (ValueError, OSError):
+                w["pid_alive"] = False
+        else:
+            w["pid_alive"] = False
+
+        # Last launch + cooldown
+        last_launch = state.get("last_launch", {}).get(name, 0.0)
+        cooldown = cfg.get("cooldown_seconds", 0)
+        if last_launch > 0:
+            w["last_launch"] = datetime.fromtimestamp(last_launch, tz=timezone.utc).isoformat()
+            remaining = max(0, int(cooldown - (now - last_launch)))
+            w["cooldown_remaining_s"] = remaining
+        else:
+            w["last_launch"] = None
+            w["cooldown_remaining_s"] = 0
+
+        # Campaign sentinel
+        sentinel = cfg.get("campaign_sentinel")
+        if sentinel and Path(sentinel).exists():
+            w["campaign_sentinel"] = True
+        else:
+            w["campaign_sentinel"] = False
+
+        # Trigger evaluation (safe)
+        try:
+            w["trigger_active"] = evaluate_trigger(cfg.get("trigger", {}), state)
+        except Exception:
+            w["trigger_active"] = False
+
+        # Worker state file
+        ws = load_worker_state(name)
+        if ws:
+            w["state"] = ws.get("state")
+            w["last_success"] = ws.get("last_success_ts")
+            w["last_error"] = ws.get("last_error_ts")
+
+        report["workers"][name] = w
+
+    # Queue depths
+    queues: dict[str, int] = {}
+    for qpath in ["data/retranslate_queue.jsonl", "data/quarantine.jsonl", "data/tm/improvement_queue.jsonl"]:
+        p = Path(qpath)
+        if p.exists():
+            try:
+                queues[qpath] = sum(1 for _ in p.open(encoding="utf-8"))
+            except OSError:
+                queues[qpath] = -1
+    report["queues"] = queues
+
+    # Circuit breaker
+    launches = state.get("launch_history", [])
+    hour_ago = now - 3600
+    recent = [ts for ts in launches if ts > hour_ago]
+    report["circuit_breaker"] = {
+        "launches_last_hour": len(recent),
+        "max_per_hour": _MAX_LAUNCHES_PER_HOUR,
+        "open": len(recent) >= _MAX_LAUNCHES_PER_HOUR,
+    }
+
+    if as_json:
+        print(json.dumps(report, indent=2, default=str))
+    else:
+        print(f"=== Orchestrator Status ({report['timestamp']}) ===\n")
+        for name, w in report["workers"].items():
+            alive = "ALIVE" if w.get("pid_alive") else "DEAD"
+            pid_str = f"PID {w['pid']}" if "pid" in w else "no PID file"
+            enabled = "enabled" if w.get("enabled") else "DISABLED"
+            trigger = "ACTIVE" if w.get("trigger_active") else "inactive"
+            campaign = " [CAMPAIGN]" if w.get("campaign_sentinel") else ""
+            cooldown = f" cooldown={w['cooldown_remaining_s']}s" if w.get("cooldown_remaining_s", 0) > 0 else ""
+            state_str = w.get("state", "unknown")
+            print(f"  {name}: {alive} ({pid_str}) {enabled} trigger={trigger}{campaign}{cooldown} state={state_str}")
+        print()
+        for qpath, depth in report.get("queues", {}).items():
+            print(f"  Queue {qpath}: {depth} entries")
+        cb = report["circuit_breaker"]
+        print(f"\n  Circuit breaker: {cb['launches_last_hour']}/{cb['max_per_hour']} launches/hour"
+              f" ({'OPEN' if cb['open'] else 'closed'})")
+
+    return report
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Worker orchestrator")
     parser.add_argument("--config", default="config/workers.yaml",
@@ -296,6 +411,10 @@ def main() -> None:
                         help="Seconds between check cycles (default: 900)")
     parser.add_argument("--once", action="store_true",
                         help="Run one check cycle and exit")
+    parser.add_argument("--status", action="store_true",
+                        help="Print worker status and exit")
+    parser.add_argument("--json", action="store_true",
+                        help="Output status as JSON (use with --status)")
     parser.add_argument("--dry-run", action="store_true",
                         help="Evaluate triggers but do not launch workers")
     parser.add_argument("--log-level", default="INFO",
@@ -309,6 +428,10 @@ def main() -> None:
 
     registry = load_worker_registry(args.config)
     state = _load_state()
+
+    if args.status:
+        print_status(registry, state, as_json=args.json)
+        sys.exit(0)
 
     if args.once:
         launched = run_check_cycle(registry, state, dry_run=args.dry_run)
