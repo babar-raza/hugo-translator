@@ -47,9 +47,9 @@ $GitDirtyCheckTimeoutSec = 2
 
 # TC-SYS-03: Task Scheduler probe — expected HugoTranslator task names and path.
 # Tasks in $TaskSchedulerCampaignExempt are allowed to be Disabled (campaign-controlled).
-$TaskSchedulerPath            = '\HugoTranslator\'
-$TaskSchedulerExpectedTasks   = @('ContentWorker', 'TMWorker', 'Watchdog', 'AutonomousVerification')
-$TaskSchedulerCampaignExempt  = @('ContentWorker')   # may be Disabled during campaign pauses
+$TaskSchedulerPath            = '\'
+$TaskSchedulerExpectedTasks   = @('HugoTranslator-ContentWorker', 'HugoTranslator-TMWorker', 'HugoTranslator-Watchdog', 'HugoTranslator-AutonomousVerification')
+$TaskSchedulerCampaignExempt  = @('HugoTranslator-ContentWorker')   # may be Disabled during campaign pauses
 
 # Worker definitions -- each entry drives detection, heartbeat, and restart.
 $Workers = @(
