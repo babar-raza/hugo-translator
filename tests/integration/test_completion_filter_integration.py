@@ -72,7 +72,8 @@ def _set_mtime(path: Path, delta_seconds: float) -> None:
 @pytest.fixture(autouse=True)
 def _redirect_queue(tmp_path):
     """Redirect queue file to tmp_path for every test."""
-    with mock.patch.object(rtq, "_QUEUE_FILE", tmp_path / "queue.jsonl"):
+    with mock.patch.object(rtq, "_QUEUE_FILE", tmp_path / "queue.jsonl"), \
+         mock.patch.object(rtq, "_QUARANTINE_FILE", tmp_path / "quarantine.jsonl"):
         yield
 
 
