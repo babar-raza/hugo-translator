@@ -504,7 +504,7 @@ class TMImprovementWorker:
             if torch.cuda.is_available():
                 torch.cuda.empty_cache()
         except ImportError:
-            pass
+            logger.debug("[VRAM] torch not available — skipping CUDA cache clear")
 
     def _write_heartbeat(self, status="alive"):
         """Write heartbeat file for watchdog monitoring."""

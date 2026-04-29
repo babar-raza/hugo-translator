@@ -981,6 +981,11 @@ class AutonomousContentTranslationWorker:
                 chunk_idx += 1
                 skip_first += result.total_files
 
+                # Zero-progress guard: break if chunk produced nothing useful
+                if result.successful_files == 0 and result.failed_files == 0:
+                    logger.warning("Chunk %d: zero progress (0 successful, 0 failed) — breaking loop", chunk_idx)
+                    break
+
                 # Exit when the slice was smaller than the chunk size (last slice)
                 if result.total_files < files_per_commit:
                     break
@@ -1303,7 +1308,7 @@ class AutonomousContentTranslationWorker:
             if torch.cuda.is_available():
                 torch.cuda.empty_cache()
         except ImportError:
-            pass
+            logger.debug("[VRAM] torch not available — skipping CUDA cache clear")
 
         # TC-L3-007: Offload L3 encoder to CPU (mirrors TM worker pattern)
         try:
