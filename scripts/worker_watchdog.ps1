@@ -487,6 +487,26 @@ function Invoke-VerificationIdleCheck {
     }
 }
 
+function Invoke-QueueDepthProbe {
+    Write-WatchdogLog "--- Queue Depth Probe ---"
+    $queueFile = Join-Path $ProjectRoot "data\retranslate_queue.jsonl"
+    if (Test-Path $queueFile) {
+        $depth = (Get-Content $queueFile | Measure-Object -Line).Lines
+        if ($depth -gt 10000) {
+            Write-WatchdogLog "  [WARN] Retranslate queue backlog: $depth entries (>10000)" -Level WARN
+        } else {
+            Write-WatchdogLog "  [OK]   Retranslate queue depth: $depth entries"
+        }
+    } else {
+        Write-WatchdogLog "  [OK]   Retranslate queue: file does not exist (empty)"
+    }
+    $quarFile = Join-Path $ProjectRoot "data\quarantine.jsonl"
+    if (Test-Path $quarFile) {
+        $qDepth = (Get-Content $quarFile | Measure-Object -Line).Lines
+        Write-WatchdogLog "  [INFO] Quarantine depth: $qDepth entries"
+    }
+}
+
 function Invoke-TaskSchedulerProbe {
     <#
     .SYNOPSIS
@@ -639,7 +659,12 @@ function Invoke-Watchdog {
         # Skip workers that are in campaign-mode (daemon disabled).
         $campaignFlag = Join-Path $LogDir "$wName.campaign_disabled"
         if (Test-Path $campaignFlag) {
-            Write-WatchdogLog "  ${wName}: campaign mode disabled - skipping"
+            $campaignAge = (Get-Date) - (Get-Item $campaignFlag).LastWriteTime
+            if ($campaignAge.TotalHours -gt 48) {
+                Write-WatchdogLog "  ${wName}: campaign disabled for $([int]$campaignAge.TotalHours)h (>48h) -- check if intentional" -Level WARN
+            } else {
+                Write-WatchdogLog "  ${wName}: campaign mode disabled ($([int]$campaignAge.TotalHours)h) - skipping"
+            }
             continue
         }
 
@@ -739,6 +764,9 @@ function Invoke-Watchdog {
 
     # TC-SYS-03: Warn if any Task Scheduler task is not in Ready state.
     Invoke-TaskSchedulerProbe
+
+    # TC-05: Queue depth and quarantine monitoring.
+    Invoke-QueueDepthProbe
 
     # Run the system health check.
     Invoke-HealthCheck -State $state
