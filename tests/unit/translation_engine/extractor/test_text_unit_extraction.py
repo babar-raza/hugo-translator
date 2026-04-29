@@ -1006,6 +1006,7 @@ class TestConstantValidation:
         the constant from source before the check runs.
         """
         import inspect
+
         import src.translation_engine.extractor.text_unit_extractor as module
 
         source = inspect.getsource(module)

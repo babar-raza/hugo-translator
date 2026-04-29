@@ -379,8 +379,10 @@ class TestLithuanianThresholdConfig:
         assert "lt" in overrides, (
             "Missing purity_threshold_overrides.lt in global.yaml — BUG-3 fix not applied"
         )
-        assert overrides["lt"] == pytest.approx(0.30, abs=0.001), (
-            f"Expected lt: 0.30, got {overrides['lt']}"
+        # TC-13 (2026-04-20) reduced lt from 0.30 to 0.15 — 30% was too permissive
+        # and allowed catastrophic contamination through; 0.15 is the current deliberate value.
+        assert overrides["lt"] == pytest.approx(0.15, abs=0.001), (
+            f"Expected lt: 0.15 (reduced from 0.30 per TC-13), got {overrides['lt']}"
         )
 
     def test_engine_reads_lt_threshold_as_030(self):

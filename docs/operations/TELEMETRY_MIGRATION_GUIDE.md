@@ -321,7 +321,7 @@ ls -l C:/telemetry/hugo-translator/buffer/
 
 ```bash
 # Run a single file translation
-python -m src.cli translate \
+translate-hugo \
   --site-id example.com \
   --file path/to/test.md \
   --target-langs de
@@ -348,7 +348,7 @@ python scripts/verify_telemetry.py --check
 # Stop API service (CTRL+C in API terminal)
 
 # Run a translation (should buffer locally)
-python -m src.cli translate --site-id example.com --file test.md --target-langs de
+translate-hugo --site-id example.com --file test.md --target-langs de
 
 # Check buffer file was created
 ls C:/telemetry/hugo-translator/buffer/*.jsonl.active

@@ -22,7 +22,6 @@ import src.tm.retranslate_queue as rtq
 from src.translation_engine.engine import TranslationEngine
 from src.translation_engine.models import DirectoryResult
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------

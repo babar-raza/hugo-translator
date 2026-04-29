@@ -16,9 +16,9 @@ from src.translation_engine.extractor.text_unit import TextUnit, TextUnitKind
 from src.translation_engine.parser.ast_nodes import (
     ASTNode,
     NodeType,
+    heading_node,
     paragraph_node,
     text_node,
-    heading_node,
 )
 from src.translation_engine.reconstructor.ast_renderer import ASTRenderer
 

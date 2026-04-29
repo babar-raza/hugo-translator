@@ -63,10 +63,10 @@ No code changes needed! Just translate as normal:
 
 ```bash
 # Single file
-python -m src.cli translate-file --site products.aspose.net path/to/file.md
+translate-hugo --site products.aspose.net path/to/file.md
 
 # Directory
-python -m src.cli translate-directory --site products.aspose.net path/to/content/
+translate-hugo --site products.aspose.net path/to/content/
 ```
 
 The engine automatically uses AST translation when `use_ast_body_reconstruction: true` in the site profile.
@@ -151,7 +151,7 @@ If you need to rollback:
 python scripts/toggle_ast_translation.py --site <site_id> --disable
 
 # Re-translate affected files with legacy approach
-python -m src.cli translate-file --site <site_id> --force path/to/file.md
+translate-hugo --site <site_id> --force path/to/file.md
 ```
 
 ---
@@ -197,7 +197,7 @@ When AST translation is enabled, you get:
 python scripts/toggle_ast_translation.py --site test.aspose.net --enable
 
 # 2. Translate test documents
-python -m src.cli translate-directory --site test.aspose.net /path/to/test/content/
+translate-hugo --site test.aspose.net /path/to/test/content/
 
 # 3. Check telemetry
 grep "AST Translation: Successfully translated" /var/log/hugo-translator.log | tail -5

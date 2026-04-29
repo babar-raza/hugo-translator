@@ -36,7 +36,7 @@ Segment sorting is an optional optimization that processes segments in length or
 
 **Via CLI flag:**
 ```bash
-python -m src.cli translate \
+translate-hugo \
   --site mysite \
   --target-langs es,fr \
   --sort-segments-by-length
@@ -44,7 +44,7 @@ python -m src.cli translate \
 
 **Via configuration:**
 ```yaml
-# config/default.yaml
+# config/global.yaml
 body_rules:
   sort_segments_by_length: true
 ```
@@ -55,7 +55,7 @@ Measure the impact of segment sorting on your specific corpus:
 
 **Step 1: Baseline benchmark (sorting disabled)**
 ```bash
-python -m src.benchmarking.cli benchmark run \
+python -m src.benchmarking.cli run \
   --model facebook/m2m100_418M \
   --device cuda \
   --batch-size 16 \
@@ -64,14 +64,14 @@ python -m src.benchmarking.cli benchmark run \
 
 **Step 2: Enable sorting in config**
 ```yaml
-# config/default.yaml
+# config/global.yaml
 body_rules:
   sort_segments_by_length: true
 ```
 
 **Step 3: Benchmark with sorting**
 ```bash
-python -m src.benchmarking.cli benchmark run \
+python -m src.benchmarking.cli run \
   --model facebook/m2m100_418M \
   --device cuda \
   --batch-size 16 \
@@ -133,7 +133,7 @@ Batch size affects memory usage and throughput. Larger batches improve GPU utili
 
 **Manual override:**
 ```bash
-python -m src.cli translate --batch-size 32
+translate-hugo --batch-size 32
 ```
 
 **Guidelines:**
@@ -148,13 +148,13 @@ For CUDA-accelerated translation:
 **Device selection:**
 ```bash
 # Auto-detect best device
-python -m src.cli translate --device auto
+translate-hugo --device auto
 
 # Force GPU
-python -m src.cli translate --device cuda
+translate-hugo --device cuda
 
 # Force CPU
-python -m src.cli translate --device cpu
+translate-hugo --device cpu
 ```
 
 ### Translation Memory Tuning
@@ -178,7 +178,7 @@ Translation Memory (TM) caching can dramatically reduce translation time:
 Enable telemetry to track performance:
 
 ```bash
-python -m src.cli translate --site mysite --log-level INFO
+translate-hugo --site mysite --log-level INFO
 ```
 
 **Key metrics:**
@@ -193,7 +193,7 @@ For detailed performance analysis:
 
 ```bash
 # Enable DEBUG logging
-python -m src.cli translate --log-level DEBUG > perf.log 2>&1
+translate-hugo --log-level DEBUG > perf.log 2>&1
 
 # Analyze bottlenecks
 grep "took.*seconds" perf.log

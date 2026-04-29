@@ -56,7 +56,7 @@ translate-hugo --site products.aspose.net --disable-validation
 translate-hugo --site products.aspose.net --validation-config ./custom-validation.yaml
 
 # Preview validation decisions without writing files
-translate-hugo --site products.aspose.net --preview
+translate-hugo --site products.aspose.net --dry-run
 ```
 
 ### Translation Memory (TM)
@@ -72,19 +72,10 @@ The system includes a 3-layer Translation Memory that dramatically reduces trans
 - 10-50x speedup vs. fresh translation
 - Automatic integrity checking and backup/restore
 
-**For Users:**
-```bash
-# Check TM status and hit rates
-python -c "from src.tm import create_translation_memory; from pathlib import Path; tm = create_translation_memory(Path('data/tm')); print(tm.get_stats())"
-```
-
 **For Operators:**
 ```bash
-# Run integrity check
+# Run integrity check on L2 LMDB
 python -c "from src.tm.integrity import check_cache_integrity; from pathlib import Path; report = check_cache_integrity(Path('data/tm/l2_lmdb')); print(f'Health: {report.health_percentage:.1f}%')"
-
-# Create backup
-python -c "from src.tm.backup import create_tm_backup; from pathlib import Path; backup_path = create_tm_backup(Path('data/tm'), Path('backups')); print(f'Backup: {backup_path}')"
 ```
 
 📚 **Full TM Documentation**: [Translation Memory Guide](docs/guides/tm-getting-started.md)
@@ -112,10 +103,10 @@ features:
   enable_content_hash_tracking: true
 
 # Or disable for a specific run
-python -m src.cli example.com --disable-content-hash
+translate-hugo --site example.com --disable-content-hash
 
 # Rebuild hashes from scratch
-python -m src.cli example.com --rebuild-content-hashes
+translate-hugo --site example.com --rebuild-content-hashes
 ```
 
 📚 **Full Documentation**: [Content Hash Tracking Guide](docs/guides/content-hash-tracking.md)
@@ -139,10 +130,10 @@ Comprehensive benchmarking system for performance measurement and ML-based model
 **Quick Start:**
 ```bash
 # Run benchmark
-python -m src.benchmarking.cli benchmark run \
+python -m src.benchmarking.cli run \
     --model facebook/m2m100_418M \
     --device cpu \
-    --batch-size 8 \
+    --batch-sizes 8 \
     --corpus tiny
 
 # Get recommendation
@@ -198,20 +189,16 @@ Optional performance optimization that sorts translation segments by length (sho
 **Quick Start:**
 ```bash
 # Enable via CLI flag
-python -m src.cli translate --site mysite --sort-segments-by-length
-
-# Or configure in config/default.yaml
-body_rules:
-  sort_segments_by_length: true
+translate-hugo --site mysite --sort-segments-by-length
 ```
 
 **Note:** Sorting overhead is typically <1% of total translation time. Output preserves original document structure exactly.
 
 📚 **Full Documentation**: [Segment Sorting Guide](docs/features/segment-sorting.md)
 
-## Quick Start for Colleagues
+## Quick Start
 
-The fastest way to get running after cloning:
+### First-Time Setup
 
 ```bash
 # 1. Run the bootstrap script (creates venv, installs deps, copies .env)
@@ -238,32 +225,31 @@ Translation models download automatically from HuggingFace on first use (1-5 GB 
 
 For GPU acceleration, also run: `pip install -r requirements/gpu.txt`
 
-## Quick Start
-
-### First-Time Setup
-
-New to the project? Start here:
-
-- **[Setup Guide](docs/user-guide/setup.md)** - First-time installation for Windows, Linux, and macOS
-  - Automated setup scripts with GPU auto-detection
-  - Prerequisites, troubleshooting, and verification
-  - Platform-specific instructions (including WSL)
+For detailed first-time installation (Windows, Linux, macOS), see the **[Setup Guide](docs/user-guide/setup.md)**.
 
 ### Documentation
 
-- **[📚 Full Documentation](docs/README.md)** - Complete docs home with navigation by persona
-- **[🚀 User Quickstart](docs/getting-started/user-quickstart.md)** - Translate your first Hugo site
-- **[⚙️ Operator Quickstart](docs/getting-started/operator-quickstart.md)** - Deploy and monitor
-- **[💻 Contributor Quickstart](docs/getting-started/contributor-quickstart.md)** - Development setup
+- **[Full Documentation](docs/README.md)** - Complete docs home with navigation by persona
+- **[User Quickstart](docs/getting-started/user-quickstart.md)** - Translate your first Hugo site
+- **[Operator Quickstart](docs/getting-started/operator-quickstart.md)** - Deploy and monitor
+- **[Contributor Quickstart](docs/getting-started/contributor-quickstart.md)** - Development setup
 
 ### Key Guides
 
-- [Translation Workflows](docs/guides/translation-workflows.md) - Basic to advanced usage
 - [Model Selection](docs/guides/model-selection.md) - Understanding models, downloads, and configuration
 - [Quality Improvement](docs/guides/quality-improvement.md) - Validation and terminology
 - [Configuration Reference](docs/reference/config.md) - All config options
 - [CLI Reference](docs/reference/cli.md) - Command-line usage
 - [Troubleshooting](docs/operations/troubleshooting.md) - Common issues and fixes
+
+### Running Tests
+
+```bash
+pytest tests/unit/ -q                    # Unit tests (~20s)
+pytest tests/regression/ -q              # Regression tests
+pytest tests/unit/workers/ -v            # Worker tests only
+pytest -q --cov=src                      # With coverage
+```
 
 ### Key Configuration Files
 
@@ -334,19 +320,19 @@ The system can recommend models based on your hardware:
 ```bash
 python -c "
 from src.model_runtime.registry import ModelRegistry
-from src.benchmarking.system_info import SystemInfoCollector
+from src.model_runtime.hardware import HardwareDetector
 
 registry = ModelRegistry()
-system_info = SystemInfoCollector().collect()
+hw = HardwareDetector().detect()
 
-# Get recommendation based on hardware
+# Get recommendation based on detected hardware
 rec = registry.recommend_model(
     src_lang='en',
     tgt_lang='fr',
-    hardware={'device': 'cuda', 'ram_gb': 16, 'gpu_vram_gb': 8},
+    hardware=hw,
     prefer_quality=True
 )
-print(f'Recommended: {rec}')
+print(f'Recommended: {rec.model_id}')
 "
 ```
 
@@ -371,7 +357,7 @@ default_model: "nllb_1.3b"  # Use higher quality model for this site
 **CLI override for testing:**
 ```bash
 # Try different models without changing config
-translate-hugo --site mysite --model m2m100_1.2b --source-lang en --target-lang fr
+translate-hugo --site mysite --model m2m100_1.2b --target-langs fr
 ```
 
 **Manual model pre-download (optional):**
@@ -479,7 +465,6 @@ hugo-translator/
 │   ├── verification/             # Output verification
 │   └── workers/                  # Worker processes
 └── tests/                        # Test suite
-    ├── adhoc/                    # Ad-hoc manual tests
     ├── contract/                 # Contract tests
     ├── fixtures/                 # Consolidated test fixtures
     ├── golden/                   # Golden tests
@@ -549,11 +534,6 @@ pip install -e ".[dev]"  # Install pytest, black, ruff, mypy, etc.
 pip install -e ".[gpu]"  # Install FAISS-GPU, CTranslate2
 ```
 
-#### Documentation
-
-```bash
-pip install -e ".[docs]"  # Install Sphinx and themes
-```
 
 ## Telemetry Health Monitoring
 
@@ -598,9 +578,15 @@ python scripts/check_db_integrity.py
 python scripts/validate_installation.py
 ```
 
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for development setup, code style, and PR guidelines.
+
+For autonomous agent guardrails, see [AGENTS.md](AGENTS.md) and [Agent Guardrails](docs/AGENT_GUARDRAILS.md).
+
 ## Version
 
-Current version: 1.0
+Current version: 0.1.0 (see pyproject.toml)
 
 ## License
 

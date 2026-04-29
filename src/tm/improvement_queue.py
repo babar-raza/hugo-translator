@@ -11,6 +11,9 @@ Implements a JSONL-based queue with:
 import hashlib
 import json
 import logging
+import os
+import tempfile
+import threading
 from dataclasses import asdict, dataclass
 from datetime import datetime
 from pathlib import Path
@@ -112,6 +115,9 @@ class ImprovementQueue:
         # Ensure directory exists
         self.tm_path.mkdir(parents=True, exist_ok=True)
 
+        # TC-08: Lock for atomic pop_candidates
+        self._lock = threading.Lock()
+
         # Load seen set for deduplication
         self._seen_hashes = self._load_seen_hashes()
 
@@ -140,9 +146,25 @@ class ImprovementQueue:
             logger.error(f"Failed to load seen hashes: {e}")
             return set()
 
+    # TC-07: Maximum size for _seen_hashes before rotation. When exceeded,
+    # the oldest half is discarded. This prevents unbounded memory growth
+    # while preserving recent dedup history.
+    _SEEN_HASHES_MAX = 50_000
+
     def _save_seen_hashes(self) -> None:
-        """Save seen hashes to disk."""
+        """Save seen hashes to disk, rotating if the set is too large."""
         try:
+            if len(self._seen_hashes) > self._SEEN_HASHES_MAX:
+                # Keep the most recent half (sets are unordered, so we just
+                # keep an arbitrary subset — sufficient for dedup purposes)
+                excess = len(self._seen_hashes) - self._SEEN_HASHES_MAX // 2
+                it = iter(self._seen_hashes)
+                to_remove = [next(it) for _ in range(excess)]
+                self._seen_hashes -= set(to_remove)
+                logger.info(
+                    f"TC-07: Rotated seen hashes — removed {excess}, "
+                    f"kept {len(self._seen_hashes)}"
+                )
             with open(self.seen_file, "w", encoding="utf-8") as f:
                 json.dump({"seen_hashes": list(self._seen_hashes)}, f)
             logger.debug(f"Saved {len(self._seen_hashes)} seen hashes to {self.seen_file}")
@@ -228,50 +250,61 @@ class ImprovementQueue:
             logger.debug("Queue file does not exist, returning empty list")
             return []
 
-        try:
-            # Read all candidates from queue
-            candidates = []
-            remaining = []
+        # TC-08: Lock the entire read-modify-write to prevent concurrent pops
+        # from returning the same candidates or losing entries.
+        with self._lock:
+            try:
+                # Read all candidates from queue
+                candidates = []
+                remaining = []
 
-            with open(self.queue_file, encoding="utf-8") as f:
-                for i, line in enumerate(f):
-                    line = line.strip()
-                    if not line:
-                        continue
+                with open(self.queue_file, encoding="utf-8") as f:
+                    for i, line in enumerate(f):
+                        line = line.strip()
+                        if not line:
+                            continue
 
-                    try:
-                        data = json.loads(line)
-                        candidate = ImprovementCandidate(**data)
+                        try:
+                            data = json.loads(line)
+                            candidate = ImprovementCandidate(**data)
 
-                        if len(candidates) < limit:
-                            candidates.append(candidate)
-                        else:
-                            # Keep for next time
+                            if len(candidates) < limit:
+                                candidates.append(candidate)
+                            else:
+                                # Keep for next time
+                                remaining.append(line)
+
+                        except Exception as e:
+                            logger.error(f"Failed to parse candidate at line {i}: {e}")
+                            # Keep in remaining to avoid data loss
                             remaining.append(line)
 
-                    except Exception as e:
-                        logger.error(f"Failed to parse candidate at line {i}: {e}")
-                        # Keep in remaining to avoid data loss
-                        remaining.append(line)
+                # TC-08: Atomic rewrite via temp file + os.replace()
+                if remaining:
+                    with tempfile.NamedTemporaryFile(
+                        mode="w",
+                        encoding="utf-8",
+                        dir=str(self.tm_path),
+                        delete=False,
+                        suffix=".tmp",
+                    ) as tmp:
+                        tmp.write("\n".join(remaining) + "\n")
+                        tmp_path = tmp.name
+                    os.replace(tmp_path, self.queue_file)
+                else:
+                    # Queue is now empty, remove file
+                    self.queue_file.unlink()
 
-            # Rewrite queue file with remaining candidates
-            if remaining:
-                with open(self.queue_file, "w", encoding="utf-8") as f:
-                    f.write("\n".join(remaining) + "\n")
-            else:
-                # Queue is now empty, remove file
-                self.queue_file.unlink()
+                logger.info(
+                    f"Popped {len(candidates)} candidates from queue "
+                    f"({len(remaining)} remaining)"
+                )
 
-            logger.info(
-                f"Popped {len(candidates)} candidates from queue "
-                f"({len(remaining)} remaining)"
-            )
+                return candidates
 
-            return candidates
-
-        except Exception as e:
-            logger.error(f"Failed to pop candidates from queue: {e}")
-            return []
+            except Exception as e:
+                logger.error(f"Failed to pop candidates from queue: {e}")
+                return []
 
     def count(self) -> int:
         """

@@ -253,7 +253,7 @@ export METRICS_API_URL=http://localhost:8765
 export TELEMETRY_BUFFER_DIR=C:/telemetry/hugo-translator/buffer
 
 # 3. Run translation
-python -m src.cli translate-file \
+translate-hugo \
     --file content/example.md \
     --target-langs es fr \
     --site-id my-site

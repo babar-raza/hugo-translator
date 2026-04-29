@@ -16,7 +16,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
 
 from tm import TranslationMemory
 from tm.l1_cache import L1Cache
-from tm.l2_persistent import L2PersistentTM, L2_DB_NAME
+from tm.l2_persistent import L2_DB_NAME, L2PersistentTM
 from tm.normalization import normalize_text
 
 

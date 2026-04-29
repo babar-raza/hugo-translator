@@ -13,7 +13,6 @@ import pytest
 
 from src.translation_engine.extractor.batch_stats_tracker import BatchStatsTracker
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------

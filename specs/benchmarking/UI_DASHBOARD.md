@@ -37,7 +37,7 @@ The dashboard MUST be accessible via web browser without CLI knowledge.
 
 **Launch Command:**
 ```bash
-python -m src.cli dashboard --port 8080
+python -m src.benchmarking.cli dashboard --port 8080
 ```
 
 **Expected Output:**

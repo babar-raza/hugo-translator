@@ -333,7 +333,7 @@ export METRICS_ENGINE_MAXLEN=2000
 export METRICS_L3_MAXLEN=20000
 export METRICS_BATCH_MAXLEN=10000
 
-python -m src.cli benchmark run --corpus production ...
+python -m src.benchmarking.cli run --corpus production ...
 ```
 
 **Trade-offs**:

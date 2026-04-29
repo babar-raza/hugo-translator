@@ -23,6 +23,7 @@ import signal
 import subprocess
 import sys
 import time
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -1380,6 +1381,120 @@ def _log_startup_configuration(args: argparse.Namespace, site_profile, global_co
     logger.info("=" * 80)
 
 
+def _write_dry_run_manifest(
+    *,
+    site_id: str,
+    site_profile,
+    input_path: Path,
+    target_langs: list[str],
+    model: str,
+    engine: "TranslationEngine",
+    filter_source_files_func,
+    max_files: int = 0,
+    force_retranslate: bool = False,
+) -> Path:
+    """Write a reviewable dry-run manifest without translating or writing output files."""
+    timestamp = datetime.now(timezone.utc)
+    timestamp_text = timestamp.isoformat().replace("+00:00", "Z")
+    filename_ts = timestamp.strftime("%Y%m%dT%H%M%SZ")
+    report_dir = Path("reports")
+    report_dir.mkdir(parents=True, exist_ok=True)
+    manifest_path = report_dir / f"dry-run-{filename_ts}.json"
+
+    would_translate: list[dict[str, str]] = []
+    would_skip: list[dict[str, str]] = []
+    would_fail: list[dict[str, str]] = []
+
+    if input_path.is_file():
+        all_files = [input_path]
+        source_files = [input_path]
+    elif input_path.is_dir():
+        all_files = sorted(input_path.glob("**/*.md"), key=lambda p: str(p))
+        try:
+            source_files = filter_source_files_func(all_files, site_profile, target_langs)
+            source_files = sorted(source_files, key=lambda p: str(p))
+        except (ValueError, TypeError, AttributeError) as exc:
+            source_files = all_files
+            would_fail.append({
+                "source_path": str(input_path),
+                "target_lang": "",
+                "reason": f"source filtering failed: {exc}",
+            })
+    else:
+        all_files = []
+        source_files = []
+        would_fail.append({
+            "source_path": str(input_path),
+            "target_lang": "",
+            "reason": "input path not found",
+        })
+
+    source_set = {Path(p) for p in source_files}
+    for skipped in (p for p in all_files if p not in source_set):
+        would_skip.append({
+            "source_path": str(skipped),
+            "reason": "filtered_or_translated",
+        })
+
+    if max_files and max_files > 0:
+        limited_files = source_files[:max_files]
+        for skipped in source_files[max_files:]:
+            would_skip.append({
+                "source_path": str(skipped),
+                "reason": "outside_max_files_limit",
+            })
+        source_files = limited_files
+
+    for source_file in source_files:
+        try:
+            source_mtime = source_file.stat().st_mtime
+        except OSError as exc:
+            for lang in target_langs:
+                would_fail.append({
+                    "source_path": str(source_file),
+                    "target_lang": lang,
+                    "reason": f"source stat failed: {exc}",
+                })
+            continue
+
+        for lang in target_langs:
+            output_path = engine._get_output_path(source_file, lang, site_profile)
+            if not force_retranslate and output_path.exists():
+                try:
+                    if output_path.stat().st_mtime >= source_mtime:
+                        would_skip.append({
+                            "source_path": str(source_file),
+                            "target_lang": lang,
+                            "output_path": str(output_path),
+                            "reason": "up_to_date",
+                        })
+                        continue
+                except OSError as exc:
+                    would_fail.append({
+                        "source_path": str(source_file),
+                        "target_lang": lang,
+                        "reason": f"output stat failed: {exc}",
+                    })
+                    continue
+
+            would_translate.append({
+                "source_path": str(source_file),
+                "target_lang": lang,
+                "output_path": str(output_path),
+            })
+
+    manifest = {
+        "site": site_id,
+        "would_translate": would_translate,
+        "would_skip": would_skip,
+        "would_fail": would_fail,
+        "model": model,
+        "dry_run_timestamp": timestamp_text,
+    }
+    manifest_path.write_text(json.dumps(manifest, indent=2), encoding="utf-8")
+    return manifest_path
+
+
 def translate_site(args: argparse.Namespace) -> int:
     """
     Execute translation for a site with CLI overrides.
@@ -2543,6 +2658,22 @@ def translate_site(args: argparse.Namespace) -> int:
 
         # Determine output directory
         output_dir = Path(args.output) if args.output else Path(site_profile.output_dir if hasattr(site_profile, 'output_dir') else "output")
+
+        if overrides.dry_run:
+            resolved_model = overrides.model or getattr(site_profile, 'default_model', None) or "m2m100_418m"
+            manifest_path = _write_dry_run_manifest(
+                site_id=args.site,
+                site_profile=site_profile,
+                input_path=input_path,
+                target_langs=target_langs,
+                model=resolved_model,
+                engine=engine,
+                filter_source_files_func=filter_source_files,
+                max_files=getattr(args, 'max_files', 0),
+                force_retranslate=overrides.force_retranslate,
+            )
+            logger.info(f"Dry-run manifest written: {manifest_path}")
+            return 0
 
         # RES-02: Initialize translation progress tracker for crash recovery
         if translation_progress_tracker is None and resume_enabled:

@@ -172,7 +172,7 @@ Users MUST be able to download all required models via a single CLI command.
 
 **Command:**
 ```bash
-python -m src.cli download-models --all
+translate-hugo download-models --all
 ```
 
 **Expected Output:**
@@ -224,18 +224,18 @@ Users MUST be able to download specific models:
 
 **By Model ID:**
 ```bash
-python -m src.cli download-models --model m2m100_418m
+translate-hugo download-models --model m2m100_418m
 ```
 
 **By Language Requirement:**
 ```bash
-python -m src.cli download-models --language fr
+translate-hugo download-models --language fr
 # Downloads all models supporting French
 ```
 
 **By Priority (Production Models Only):**
 ```bash
-python -m src.cli download-models --priority P0
+translate-hugo download-models --priority P0
 # Downloads only critical production models (m2m100_418m, nllb_200_600m, etc.)
 ```
 
@@ -251,11 +251,11 @@ Interrupted downloads MUST support resumption without re-downloading completed f
 **Example:**
 ```bash
 # First attempt (interrupted at 60%)
-python -m src.cli download-models --model m2m100_418m
+translate-hugo download-models --model m2m100_418m
 # Downloads 60% of pytorch_model.bin... [Network failure]
 
 # Resume (continues from 60%)
-python -m src.cli download-models --model m2m100_418m
+translate-hugo download-models --model m2m100_418m
 # Resuming download from 1006 MB / 1600 MB...
 # ████████████░░░░░░░░ 60% → 100% (594 MB remaining)
 ```
@@ -272,7 +272,7 @@ ERROR: Download timeout for m2m100_418m
   └─ Solution: Check network connection and retry with --retry
 
 Retry command:
-  python -m src.cli download-models --model m2m100_418m --retry 3
+  translate-hugo download-models --model m2m100_418m --retry 3
 ```
 
 **Disk Space Insufficient:**
@@ -283,7 +283,7 @@ ERROR: Insufficient disk space
   └─ Solution: Free up disk space or use --path to specify alternate location
 
 Alternate path:
-  python -m src.cli download-models --model m2m100_418m --path D:\models
+  translate-hugo download-models --model m2m100_418m --path D:\models
 ```
 
 **HuggingFace Rate Limit:**
@@ -295,7 +295,7 @@ ERROR: Rate limit exceeded
   └─ Solution: Wait 60 seconds or reduce --parallel flag
 
 Retry with reduced parallelism:
-  python -m src.cli download-models --all --parallel 5
+  translate-hugo download-models --all --parallel 5
 ```
 
 ---
@@ -602,7 +602,7 @@ def check_disk_space(model_size_mb, download_path):
 
 **Test:**
 ```bash
-python -m src.cli download-models --all --dry-run
+translate-hugo download-models --all --dry-run
 # Should list all 10 models as downloadable
 ```
 
@@ -664,7 +664,7 @@ def test_download_resumption():
   # ... other fields
 
 # Download immediately works
-python -m src.cli download-models --model new_model_123
+translate-hugo download-models --model new_model_123
 ```
 
 ---

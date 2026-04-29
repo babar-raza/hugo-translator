@@ -250,13 +250,13 @@ cd /path/to/hugo-translator
 # (adjust command for your deployment)
 systemctl start hugo-translator  # Linux
 # or
-python -m src.cli  # Manual startup
+translate-hugo  # Manual startup
 ```
 
 **Verification**:
 ```bash
 # Test single translation
-python -m src.cli translate \
+translate-hugo \
   --site-id example.com \
   --file path/to/test.md \
   --target-langs de
@@ -287,7 +287,7 @@ python scripts/verify_telemetry.py --check
 # Expected: Latest run visible
 
 # 4. Test translation
-python -m src.cli translate --site-id test --file test.md --target-langs de
+translate-hugo --site-id test --file test.md --target-langs de
 # Expected: Translation succeeds, telemetry written
 ```
 

@@ -82,6 +82,10 @@ The root should contain only essential project files (~13 files). Everything els
 - `src/observability/` — telemetry, git commit, metrics
 - `config/` — global config, site profiles, terminology
 
+## Autonomous Agents
+
+This project uses autonomous worker agents. See [AGENTS.md](AGENTS.md) for worker details and [Agent Guardrails](docs/AGENT_GUARDRAILS.md) for safety rules.
+
 ## Pull Requests
 
 1. Branch from `main`

@@ -11,8 +11,9 @@ source_text, making the failure visible to the file-level purity gate rather tha
 silently producing blank paragraphs in output.
 """
 
-import pytest
 from unittest.mock import MagicMock, patch
+
+import pytest
 
 from src.translation_engine.extractor.text_unit import TextUnit, TextUnitKind
 

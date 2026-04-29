@@ -156,3 +156,13 @@ Both workers offload models before sleeping:
 - TM worker: calls `_offload_resources()` before every sleep — moves L3 FAISS index and LLM client to CPU
 
 This ensures VRAM is free during the sleep window for other processes.
+
+---
+
+## Related Documentation
+
+- [Agent Guardrails](docs/AGENT_GUARDRAILS.md) - Safety rules and constraints for autonomous agents
+- [Worker Deployment](docs/workers/WORKER_DEPLOYMENT.md) - Detailed deployment procedures
+- [Windows-Native Deployment](docs/operations/windows-native-deployment.md) - Production deployment on Windows
+- [ONBOARDING.md](docs/getting-started/ONBOARDING.md) - New contributor onboarding
+- [VRAM Policy Spec](specs/autonomous_workers/VRAM_POLICY.md) - GPU memory management specification

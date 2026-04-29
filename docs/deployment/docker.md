@@ -277,7 +277,7 @@ docker exec hugo-translator-orchestrator \
 
 # Trigger rebuild by running translation
 docker exec hugo-translator-orchestrator \
-  python -m src.cli example.com --target-lang es --force-retranslate
+  translate-hugo --site example.com --target-lang es --force-retranslate
 ```
 
 ### Volume Full
@@ -335,3 +335,4 @@ All services (orchestrator + workers) mount volumes in **read-write** mode. This
 - Docker Compose Volumes: https://docs.docker.com/compose/compose-file/compose-file-v3/#volumes
 - Content Hash Tracking: [docs/architecture/content-hash-tracking.md](../architecture/content-hash-tracking.md)
 - Model Storage: [docs/deployment/MODEL_STORAGE.md](MODEL_STORAGE.md)
+- Docker Quick Start: [docs/operations/docker.md](../operations/docker.md) - CPU/GPU deployment, compose commands

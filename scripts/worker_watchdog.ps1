@@ -643,6 +643,26 @@ function Invoke-Watchdog {
             continue
         }
 
+        # TC-13: Usefulness gate -- skip monitoring workers that have done no useful work.
+        $stateJsonPath = Join-Path $LogDir "$wName.state.json"
+        if (Test-Path $stateJsonPath) {
+            try {
+                $workerState = Get-Content $stateJsonPath -Raw | ConvertFrom-Json
+                $noWorkCount = if ($null -ne $workerState.no_work_count) { [int]$workerState.no_work_count } else { 0 }
+                $currentMode = $workerState.current_mode
+                if ($currentMode -eq "disabled") {
+                    Write-WatchdogLog "  ${wName}: current_mode=disabled in state.json - skipping"
+                    continue
+                }
+                if ($noWorkCount -gt 24) {
+                    Write-WatchdogLog "  [IDLE] ${wName}: no useful work for $noWorkCount consecutive runs -- skipping restart" -Level WARN
+                    continue
+                }
+            } catch {
+                Write-WatchdogLog "  ${wName}: failed to read state.json for usefulness gate: $_ -- continuing" -Level WARN
+            }
+        }
+
         # 1. Is the process alive?
         $status = Test-ProcessAliveByPid -Worker $worker
 

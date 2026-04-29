@@ -209,7 +209,7 @@ Don't enable for all files immediately. Use phased approach:
 **Phase 1: Single File (1 hour)**
 ```bash
 # Test with single file
-python -m src.cli translate \
+translate-hugo \
   --input tests/fixtures/ast_integration_test.md \
   --output /tmp/test_output.md \
   --source-lang en \

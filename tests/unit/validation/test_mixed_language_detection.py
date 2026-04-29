@@ -333,7 +333,7 @@ class TestMixedLanguageDetectionFixes:
         The setting is intentionally toggled based on operational mode.
         """
         import yaml
-        config_path = Path("c:/Users/prora/OneDrive/Documents/GitHub/hugo-translator/config/validation.yaml")
+        config_path = Path(__file__).parents[3] / "config" / "validation.yaml"
 
         with open(config_path) as f:
             config = yaml.safe_load(f)

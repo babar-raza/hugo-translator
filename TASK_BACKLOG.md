@@ -4150,3 +4150,105 @@ _TM test fixes plan: `plans/healing/test-gaps-post-sprint.md`_
 - **Tests**: 5 new regression tests in `tests/unit/translation_engine/reconstructor/test_ast_renderer_ancestor_coverage.py` — all pass
 - **Files**: `src/translation_engine/reconstructor/ast_renderer.py`, `config/global.yaml`
 - **Plan ref**: `plans/healing/AUDIT-20260418-AST-translation-quality.md`
+
+---
+
+## WS-MLD-20260421 — Mixed-Language Contamination: Investigate, Fix, Heal, Verify (quiet-coalescing-pebble)
+
+**Plan**: `C:\Users\prora\.claude\plans\quiet-coalescing-pebble.md`
+**Added**: 2026-04-21
+**Status**: IN_PROGRESS
+
+### TC-FIX-01: Remove `accept_after_max_retries=True` from lenient mode
+**Status**: DONE — 2026-04-21
+**File**: `src/translation_engine/engine.py` (~line 378)
+**Root cause (RC-1)**: Lenient mode was writing wrong-language files to disk after all validation retries exhausted.
+**Fix**: Removed the `accept_after_max_retries: true` override from the lenient mode config dict. Lenient mode now inherits `accept_after_max_retries: false` from `validation.yaml`, consistent with all other modes.
+**Acceptance**: Line removed; stale lenient-mode unit test updated to match new behavior.
+
+### TC-FIX-02: Remove `--fast` from post-run contamination scan; raise timeout
+**Status**: DONE — 2026-04-21
+**File**: `src/workers/autonomous_content_translation_worker.py` (~line 1173)
+**Root cause (RC-2)**: `--fast` (regex-only) was blind to same-script contamination (English in Spanish/French/German).
+**Fix**: `--fast` removed; `--workers 16` added; timeout raised 180s → 600s.
+**Acceptance**: Post-run scan now runs langdetect sentence analysis. Same-script contamination detected.
+
+### TC-FIX-03: Enable LLM escalation for CASE 4 stuck files
+**Status**: DONE — 2026-04-21
+**File**: `config/global.yaml` (line 632)
+**Root cause (RC-3)**: CASE 4 files looped to quarantine without LLM fallback. 87 queue entries, 4 at retry≥2.
+**Fix**: `llm_escalation_enabled: false` → `true`
+**Acceptance**: On next worker run, files with retry_count≥2 receive LLM escalation via `professionalize_llm`.
+
+### TC-FIX-04: Enable SemanticSimilarityValidator
+**Status**: DONE — 2026-04-21
+**File**: `config/validation.yaml` (~line 126)
+**Change**: `enabled: false` → `true`; warn_threshold: 0.55; error_threshold: 0.40
+**Acceptance**: Validator runs in translation pipeline; warns on semantic drift; does not block passing translations.
+
+### TC-FIX-05: Bold normalization P1 pattern fix (ast_renderer.py)
+**Status**: DONE — 2026-04-21
+**File**: `src/translation_engine/reconstructor/ast_renderer.py`
+**Root cause**: P1 pattern `{2,}` required 3+ words; 2-word phrases (e.g. `* Exportação PDF*`) not normalized. Greedy repetition also captured trailing space into group → `**Text **` output.
+**Fix**: `{2,}` → `{1,}`; replaced `r'**\1**'` with `lambda m: f'**{m.group(1).rstrip()}**'`.
+**Tests**: All 23 bold normalization tests pass.
+
+### TC-FIX-06: Lithuanian threshold stale test fix
+**Status**: DONE — 2026-04-21
+**File**: `tests/unit/translation_engine/test_purity_threshold_override.py` (line 382)
+**Fix**: Updated expected value `0.30` → `0.15` (matches TC-13 config change from prior session).
+
+### TC-INV-02: Full contamination scan (background)
+**Status**: IN_PROGRESS
+**Command**: `scan_language_contamination.py --profiles-dir config/site_profiles --all-languages --block-level --check-repetition --workers 16 --json-output reports/agents/contamination_audit/inventory_20260421.json`
+**Output**: Pending — `reports/agents/contamination_audit/inventory_20260421.json`
+
+### TC-CLEAN-01: Repair L2 cache (937 contaminated entries)
+**Status**: BLOCKED — LMDB lock held by worker process
+**Pending**: Run `audit_l2_cache_contamination.py --repair` once lock is released.
+**Evidence (dry run)**: `reports/agents/contamination_audit/l2_audit_20260421.json` — 937 contaminated entries (Spanish→Arabic/Bulgarian key collision)
+
+### TC-CLEAN-02: Queue contaminated output files for retranslation
+**Status**: PENDING — depends on TC-INV-02 + TC-CLEAN-01
+
+### TC-CLEAN-03: Retranslate — worker oneshot per affected site
+**Status**: PENDING — depends on TC-CLEAN-02
+
+### TC-VFY-01: Second full scan — compare before/after contaminated counts
+**Status**: PENDING — depends on TC-CLEAN-03
+
+### TC-VFY-03: Unit test — lenient mode no longer accepts after max retries
+**Status**: PENDING
+
+### TC-VFY-06: Safety proof document
+**Status**: PENDING
+
+---
+
+## WS-P0-SHIPPING-20260425 — Shipping Gate P0 Fixes (peaceful-soaring-falcon)
+
+**Plan**: `C:\Users\prora\.claude\plans\peaceful-soaring-falcon.md`
+**Added**: 2026-04-25
+**Status**: COMPLETE
+
+### Summary
+
+All P0 shipping gate blockers verified complete as of 2026-04-25.
+
+| Task | Status | Files |
+|------|--------|-------|
+| P0-B: Baseline artifact | COMPLETE | `reports/baseline/gate-baseline-20260424.{txt,json}` |
+| P0-C: CI gate | COMPLETE | `.github/workflows/release_gate.yml` |
+| P0-D: Placeholder leak block | COMPLETE | `src/translation_engine/reconstructor/ast_renderer.py`, `src/translation_engine/engine.py`, `tests/unit/translation_engine/reconstructor/test_placeholder_leak.py` |
+| P0-E: Frontmatter fallback log | COMPLETE | `src/translation_engine/parser/hugo_parser.py`, `tests/unit/translation_engine/parser/test_hugo_parser.py` |
+| P0-F: Hugo build fixture | COMPLETE | `tests/fixtures/hugo_site/`, `.github/workflows/release_gate.yml`, `reports/audit/hugo_build_20260425.log` |
+| P0-G: Bold normalization | COMPLETE (prior) | `src/translation_engine/reconstructor/ast_renderer.py` |
+| P0-H: Dry-run manifest | COMPLETE (prior) | `src/cli.py:1384`, `tests/unit/test_cli_dry_run_manifest.py` |
+
+### Next steps (P1 focus)
+
+- WS-STALE-TEST-DEBT: Resolve remaining ~148 stale test failures (STE-01/02/04/05)
+- P1-3: Enable SemanticSimilarityValidator in validation.yaml (normal mode)
+- P1-4: Add ruff lint step to CI
+- P1-5: Expand CI test coverage to >7% (currently ~7% of test files)
+- GATE-09: Create more comprehensive test fixture content (5+ files per language, shortcodes, tables, code blocks)

@@ -471,14 +471,14 @@ def hash_files_parallel(files: List[Path], max_workers: int = 4):
 ```bash
 # Test git workflow
 git checkout feature-branch
-python -m src.cli example.com  # Should skip unchanged files
+translate-hugo --site example.com  # Should skip unchanged files
 
 # Test rebuild
-python -m src.cli example.com --rebuild-content-hashes
+translate-hugo --site example.com --rebuild-content-hashes
 
 # Test corruption recovery
 echo "{invalid}" > output/.translation_metadata.json
-python -m src.cli example.com  # Should recover gracefully
+translate-hugo --site example.com  # Should recover gracefully
 ```
 
 ## Security Considerations

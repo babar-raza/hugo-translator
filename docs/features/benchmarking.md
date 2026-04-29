@@ -165,7 +165,7 @@ corpus:
 
 ```bash
 # Quick benchmark with tiny corpus
-python -m src.benchmarking.cli benchmark run \
+python -m src.benchmarking.cli run \
     --model facebook/m2m100_418M \
     --device cpu \
     --batch-size 8 \
@@ -173,7 +173,7 @@ python -m src.benchmarking.cli benchmark run \
     --output data/benchmarks/benchmarks.db
 
 # Comprehensive benchmark
-python -m src.benchmarking.cli benchmark run \
+python -m src.benchmarking.cli run \
     --model facebook/m2m100_418M \
     --device cpu \
     --batch-sizes 4,8,16 \
@@ -359,7 +359,7 @@ Always benchmark on target hardware before deploying:
 
 ```bash
 # Benchmark all models you're considering
-python -m src.benchmarking.cli benchmark run \
+python -m src.benchmarking.cli run \
     --models facebook/m2m100_418M,ct2/m2m100_418m,ct2/m2m100_418m_int8 \
     --device cpu \
     --batch-sizes 4,8,16 \
@@ -478,7 +478,7 @@ database:
 **Solution**:
 ```bash
 # Run more benchmarks on similar hardware
-python -m src.benchmarking.cli benchmark run \
+python -m src.benchmarking.cli run \
     --iterations 10 \
     --corpus medium
 

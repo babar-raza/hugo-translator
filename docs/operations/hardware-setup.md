@@ -211,7 +211,7 @@ print(f"Thread count: {config.num_threads}")
 
 ```bash
 # Override batch size
-python -m src.cli translate \
+translate-hugo \
   --site example \
   --input content/ \
   --output translated/ \
@@ -578,7 +578,7 @@ Some content to translate.
 More content for testing." > test_content.md
 
 # Run translation test
-python -m src.cli translate \
+translate-hugo \
   --site default \
   --input test_content.md \
   --output test_translated.md \

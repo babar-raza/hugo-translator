@@ -121,7 +121,7 @@ class TranslationWorker:
             l3_semantic = L3SemanticTM(
                 index_path=str(l3_path),
                 embedding_model="sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2",
-                use_gpu=False
+                use_gpu=True  # TC-L3-002: GPU encode; CPU fallback built-in
             )
 
             self.tm = TranslationMemory(

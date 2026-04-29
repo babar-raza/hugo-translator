@@ -203,7 +203,7 @@ class AutonomousContentTranslationWorker:
         try:
             from src.tm import TranslationMemory
             from src.tm.l1_cache import L1Cache
-            from src.tm.l2_persistent import L2PersistentTM, L2_DB_NAME
+            from src.tm.l2_persistent import L2_DB_NAME, L2PersistentTM
             try:
                 from src.tm.l3_semantic import L3SemanticTM
             except ImportError:
@@ -235,7 +235,7 @@ class AutonomousContentTranslationWorker:
                 try:
                     l3_semantic = L3SemanticTM(
                         index_path=tm_data_dir / "l3_faiss",
-                        use_gpu=False  # Use CPU for L3 to save GPU memory
+                        use_gpu=True  # TC-L3-002: ~80MB encoder, safe on RTX 4090; CPU fallback built-in
                     )
                 except Exception as e:
                     logger.warning(f"L3 semantic TM not available: {e}")
@@ -522,6 +522,14 @@ class AutonomousContentTranslationWorker:
                 self._write_heartbeat("sleeping")
                 next_run = self.scheduler.sleep_until_next_run()
                 run_count += 1
+
+                # TC-L3-007: Reload L3 encoder to GPU on wake
+                try:
+                    l3 = getattr(getattr(self.translation_engine, "tm", None), "l3", None)
+                    if l3 is not None and hasattr(l3, "reload_to_gpu"):
+                        l3.reload_to_gpu()
+                except Exception as e:
+                    logger.debug("[VRAM] L3 reload skipped: %s", e)
 
                 logger.info("=" * 80)
                 logger.info(f"SCHEDULED RUN #{run_count} at {next_run.strftime('%Y-%m-%d %H:%M:%S %Z')}")
@@ -845,6 +853,7 @@ class AutonomousContentTranslationWorker:
             if effective_max_seconds is not None and getattr(self, "_run_start", None) is not None
             else None
         )
+        self._run_deadline = run_deadline  # TC-06: expose for _run_post_contamination_scan
 
         logger.info(f"Translating content_root: {resolved_content_dir}")
         logger.info(f"Target languages: {', '.join(target_langs)}")
@@ -856,6 +865,10 @@ class AutonomousContentTranslationWorker:
 
         timeout_seconds = self.config.file_timeout_seconds * len(target_langs)
         operation_name = f"translate_directory({resolved_content_dir.name}, {len(target_langs)} langs)"
+
+        # Safe default — overwritten by both the chunked loop and single-pass branch below.
+        # Prevents UnboundLocalError if the chunked-mode deadline check fires before chunk 0.
+        run_id = f"{self.invocation_id}:{site_id}:{Path(content_root).name}"
 
         # Pre-loop remaining time check
         if run_deadline is not None:
@@ -1040,6 +1053,12 @@ class AutonomousContentTranslationWorker:
             else:
                 logger.info("No successful translations, skipping git commit")
 
+        # TC-14: Post-run contamination scan — catches files that slipped through validation.
+        self._run_post_contamination_scan(site_id=site_id, content_root=resolved_content_dir)
+
+        # TC-16: Write per-run quality metrics summary to data/metrics/.
+        self._write_run_metrics(site_id=site_id, run_id=run_id)
+
         # WS-COMP-8: Emit structured coverage telemetry for this content root.
         # Runs after both chunked and single-pass modes so the snapshot always fires.
         try:
@@ -1072,6 +1091,180 @@ class AutonomousContentTranslationWorker:
         except Exception as _ev_exc:
             logger.debug("Coverage event skipped: %s", _ev_exc)
 
+    def _write_run_metrics(self, site_id: str, run_id: str) -> None:
+        """
+        TC-16: Write a per-run quality metrics summary to data/metrics/run_<timestamp>.json.
+
+        Collects MetricsCollector stats, retranslate queue size, files translated,
+        and per-language breakdown.  Wrapped in try/except — must never block the worker.
+        """
+        try:
+            raw_config = self.config_service.get_config() if self.config_service is not None else {}
+            metrics_cfg = raw_config.get("metrics", {})
+            if not metrics_cfg.get("enabled", True):
+                return
+            if not metrics_cfg.get("write_per_run_summary", True):
+                return
+
+            import json as _json
+
+            from src.observability.metrics import get_metrics
+            from src.tm.retranslate_queue import load_queued_paths
+
+            mc = get_metrics()
+            stats = mc.get_stats_summary()
+
+            # Retranslate queue size
+            try:
+                retranslate_queue_size = len(load_queued_paths())
+            except Exception:
+                retranslate_queue_size = -1
+
+            # Per-language files translated (from _run_new_files dict)
+            per_language_stats = dict(getattr(self, "_run_new_files", {}))
+
+            from datetime import timezone as _tz
+            _now = datetime.now(_tz.utc)
+            run_summary = {
+                "run_id": run_id,
+                "site_id": site_id,
+                "timestamp": _now.isoformat(),
+                "files_translated": sum(per_language_stats.values()),
+                "per_language_stats": per_language_stats,
+                "validation_failures": int(
+                    stats.get("translations", {}).get("failed", 0)
+                ),
+                "tm_hit_rates": stats.get("tm", {}),
+                "retranslate_queue_size": retranslate_queue_size,
+                "translations": stats.get("translations", {}),
+                "performance": stats.get("performance", {}),
+            }
+
+            output_dir = Path(metrics_cfg.get("output_dir", "data/metrics"))
+            output_dir.mkdir(parents=True, exist_ok=True)
+            ts = _now.strftime("%Y%m%dT%H%M%SZ")
+            run_file = output_dir / f"run_{ts}_{site_id}.json"
+            run_file.write_text(
+                _json.dumps(run_summary, indent=2, ensure_ascii=False),
+                encoding="utf-8",
+            )
+            logger.info("TC-16: Run metrics written to %s", run_file)
+        except Exception as _e:
+            logger.warning("TC-16: Failed to write run metrics (non-fatal): %s", _e)
+
+    def _run_post_contamination_scan(self, site_id: str, content_root: Path) -> None:
+        """
+        TC-14: Run full (non-fast) contamination scan on the just-translated content root.
+
+        Invokes scripts/scan_language_contamination.py WITHOUT --fast so langdetect
+        sentence analysis detects same-script contamination (e.g. English in Spanish/French).
+        Scoped to --repo <content_root> (not all profiles) to keep runtime bounded.
+        Parses the JSON output and adds contaminated files to the retranslate queue.
+
+        Wrapped in try/except — must never block the worker on failure.
+        TC-MLD-05: Removed --fast flag (was blind to same-script contamination, RC-2).
+        Timeout raised to 600 s (full langdetect scan needs more than 180 s for large sites).
+        """
+        import subprocess
+        import sys
+        import tempfile
+        import time as _time
+
+        # TC-06: Skip scan if run deadline has already passed
+        run_deadline = getattr(self, "_run_deadline", None)
+        if run_deadline is not None and _time.time() >= run_deadline:
+            logger.info("TC-06: run deadline exceeded — skipping contamination scan")
+            return
+
+        raw_config = self.config_service.get_config() if self.config_service is not None else {}
+        if not raw_config.get("auto_scan_contamination", True):
+            return
+
+        if not content_root.exists():
+            logger.debug("TC-14: content_root %s not found — skipping post-run scan", content_root)
+            return
+
+        script = Path(__file__).parents[2] / "scripts" / "scan_language_contamination.py"
+        if not script.exists():
+            logger.warning("TC-14: scan_language_contamination.py not found — skipping post-run scan")
+            return
+
+        try:
+            with tempfile.NamedTemporaryFile(
+                prefix=f"scan_{site_id}_",
+                suffix=".json",
+                delete=False,
+            ) as tmp:
+                json_output_path = tmp.name
+
+            cmd = [
+                sys.executable,
+                str(script),
+                # TC-MLD-05: --fast removed — full langdetect scan detects same-script
+                # contamination (English in Spanish/French/German, etc.) that --fast misses.
+                "--all-languages",
+                "--repo", str(content_root),
+                "--workers", "16",
+                "--json-output", json_output_path,
+            ]
+
+            logger.info("TC-14: Running post-run contamination scan for site %s ...", site_id)
+            # TC-06: Use CREATE_NEW_PROCESS_GROUP on Windows so the subprocess tree
+            # can be killed cleanly on timeout instead of leaving orphan python processes.
+            creation_flags = 0
+            if sys.platform == "win32":
+                creation_flags = subprocess.CREATE_NEW_PROCESS_GROUP
+            result = subprocess.run(
+                cmd,
+                capture_output=True,
+                text=True,
+                timeout=600,  # TC-MLD-05: raised from 180 — full langdetect scan needs more time
+                creationflags=creation_flags,
+            )
+
+            # Parse JSON output and queue contaminated files
+            try:
+                json_path = Path(json_output_path)
+                if json_path.exists() and json_path.stat().st_size > 0:
+                    import json as _json
+                    data = _json.loads(json_path.read_text(encoding="utf-8"))
+                    contaminated_files = data.get("files", [])
+                    queued = 0
+                    from src.tm.retranslate_queue import add_to_queue
+                    for entry in contaminated_files:
+                        file_path = entry.get("file_path")
+                        target_lang = entry.get("target_lang")
+                        if file_path and target_lang:
+                            try:
+                                add_to_queue(Path(file_path), target_lang)
+                                queued += 1
+                            except Exception as _qe:
+                                logger.debug("TC-14: failed to queue %s: %s", file_path, _qe)
+                    contaminated_count = data.get("contaminated_count", 0)
+                    logger.info(
+                        "TC-14: Post-run contamination scan complete — %d contaminated, %d queued for retranslation",
+                        contaminated_count,
+                        queued,
+                    )
+                else:
+                    logger.info("TC-14: Post-run contamination scan complete — no JSON output (no issues found)")
+            except Exception as _parse_err:
+                logger.warning("TC-14: Failed to parse scan JSON output: %s", _parse_err)
+            finally:
+                try:
+                    Path(json_output_path).unlink(missing_ok=True)
+                except Exception:
+                    pass
+
+            if result.returncode not in (0, 1):
+                # exit code 1 = quality issues found (normal); other codes = errors
+                logger.warning("TC-14: Contamination scan exited with code %d: %s", result.returncode, result.stderr.strip()[:200])
+
+        except subprocess.TimeoutExpired:
+            logger.warning("TC-14: Post-run contamination scan timed out after 180s — skipping")
+        except Exception as _e:
+            logger.warning("TC-14: Post-run contamination scan failed (non-fatal): %s", _e)
+
     def _offload_models(self) -> None:
         """Unload translation model weights and free VRAM between daemon runs."""
         if self.translation_engine is None:
@@ -1091,6 +1284,15 @@ class AutonomousContentTranslationWorker:
                 torch.cuda.empty_cache()
         except ImportError:
             pass
+
+        # TC-L3-007: Offload L3 encoder to CPU (mirrors TM worker pattern)
+        try:
+            l3 = getattr(getattr(self.translation_engine, "tm", None), "l3", None)
+            if l3 is not None and hasattr(l3, "offload_to_cpu"):
+                l3.offload_to_cpu()
+                logger.debug("[VRAM] L3 encoder offloaded to CPU")
+        except Exception as e:
+            logger.debug("[VRAM] L3 offload skipped: %s", e)
 
     @staticmethod
     def _build_orphan_commit_message(
@@ -1330,193 +1532,6 @@ class AutonomousContentTranslationWorker:
                 logger.warning(f"[orphan_sweep] {git_root}: {exc}")
 
         return total_recovered
-        """Scan all configured content roots for .md files written but not committed
-        in previous runs, and commit them per-site.
-
-        This handles cases where a translation run wrote files to disk but the git
-        commit step failed or was interrupted (timeout, index.lock contention, etc.).
-
-        Returns:
-            Total number of files committed across all sites.
-        """
-        # DISABLED: orphan recovery is committing corrupted files (code blocks
-        # stripped, hallucinated content, even overwriting English source files).
-        # Root cause investigation in progress. See commit 3f90f922.
-        logger.warning("[orphan_sweep] DISABLED — orphan recovery is suspended pending root cause fix")
-        return 0
-        import subprocess
-
-        from src.observability.git_commit import GitCommitConfig, GitCommitter
-        from src.observability.git_context import find_git_root
-
-        total_committed = 0
-
-        try:
-            sites = self.config_service.list_sites()
-        except Exception as exc:
-            logger.warning(f"[orphan_sweep] Could not list sites: {exc}")
-            return 0
-
-        for site_id in sites:
-            try:
-                profile = self.config_service.get_site_profile(site_id)
-                content_roots = profile.content_roots or []
-            except Exception:
-                continue
-
-            for content_root_str in content_roots:
-                try:
-                    content_root = self.config_service.resolve_content_root(content_root_str)
-                    if not content_root.exists():
-                        continue
-
-                    git_root = find_git_root(content_root)
-                    if not git_root:
-                        continue
-
-                    # Check if git commit is enabled
-                    try:
-                        gc_cfg = self.config_service.global_config.git_commit
-                        if isinstance(gc_cfg, dict):
-                            enabled = gc_cfg.get("enabled", True)
-                            co_author = gc_cfg.get("co_author_name", "Hugo Translator")
-                            co_email = gc_cfg.get("co_author_email", "hugo-translator@aspose.net")
-                            timeout = gc_cfg.get("timeout_seconds", 60)
-                            auto_push = gc_cfg.get("auto_push", True)
-                        else:
-                            enabled = getattr(gc_cfg, "enabled", True)
-                            co_author = getattr(gc_cfg, "co_author_name", "Hugo Translator")
-                            co_email = getattr(gc_cfg, "co_author_email", "hugo-translator@aspose.net")
-                            timeout = getattr(gc_cfg, "timeout_seconds", 60)
-                            auto_push = getattr(gc_cfg, "auto_push", True)
-                    except Exception:
-                        enabled, co_author, co_email, timeout, auto_push = (
-                            True, "Hugo Translator", "hugo-translator@aspose.net", 60, True
-                        )
-
-                    if not enabled:
-                        logger.info(f"[orphan_sweep] Git commit disabled — skipping {site_id}")
-                        continue
-
-                    # Find orphaned .md files via git status
-                    try:
-                        rel_root = content_root.resolve().relative_to(git_root.resolve())
-                    except ValueError:
-                        rel_root = Path(".")
-
-                    status_result = subprocess.run(
-                        ["git", "status", "--porcelain", str(rel_root)],
-                        cwd=str(git_root),
-                        capture_output=True,
-                        text=True,
-                        timeout=30,
-                    )
-                    if status_result.returncode != 0:
-                        logger.warning(
-                            f"[orphan_sweep] git status failed for {site_id}: "
-                            f"{status_result.stderr.strip()}"
-                        )
-                        continue
-
-                    # Determine localization strategy to filter translation outputs
-                    output_layout = getattr(profile, 'output_layout', None)
-                    per_language_folders = False
-                    if output_layout:
-                        per_language_folders = getattr(output_layout, 'per_language_folders', False)
-                    source_lang = getattr(profile, 'default_source_lang', 'en')
-                    target_langs = getattr(profile, 'target_langs', None) or []
-
-                    orphaned: list[Path] = []
-                    for line in status_result.stdout.splitlines():
-                        status_code = line[:2]
-                        file_rel = line[3:].strip()
-                        if "M" in status_code or "A" in status_code or status_code == "??":
-                            abs_path = git_root / file_rel
-                            if abs_path.is_dir():
-                                # Untracked directory — git shows "?? dir/" for whole tree
-                                orphaned.extend(abs_path.rglob("*.md"))
-                            elif abs_path.suffix == ".md" and abs_path.exists():
-                                orphaned.append(abs_path)
-
-                    # Filter to translation outputs only — exclude source-language
-                    # files and files changed by other processes (e.g. example reviewer)
-                    if per_language_folders:
-                        # Folder-based: keep only files NOT in the source lang folder
-                        source_markers = [f'/{source_lang}/', f'\\{source_lang}\\']
-                        orphaned = [
-                            f for f in orphaned
-                            if not any(m in str(f) for m in source_markers)
-                        ]
-                    elif target_langs:
-                        # File-based: keep only files with a target-lang suffix
-                        from src.translation_engine.engine import _is_translated_filename
-                        orphaned = [
-                            f for f in orphaned
-                            if _is_translated_filename(f.name, target_langs, source_lang)[0]
-                        ]
-
-                    if not orphaned:
-                        continue
-
-                    # Structural integrity gate — reject orphans with code block
-                    # loss, hallucinated sections, or TITLE: prefix corruption
-                    pre_gate = len(orphaned)
-                    orphaned = [
-                        f for f in orphaned
-                        if self._validate_orphan_structural_integrity(
-                            f, git_root, source_lang, per_language_folders,
-                        )
-                    ]
-                    rejected = pre_gate - len(orphaned)
-                    if rejected:
-                        logger.warning(
-                            "[orphan_sweep] %s: structural gate rejected %d/%d file(s)",
-                            site_id, rejected, pre_gate,
-                        )
-
-                    if not orphaned:
-                        continue
-
-                    logger.info(
-                        f"[orphan_sweep] {site_id}: found {len(orphaned)} orphaned file(s)"
-                    )
-
-                    # Build config object for committer
-                    git_config = GitCommitConfig(
-                        enabled=True,
-                        auto_push=auto_push,
-                        co_author_name=co_author,
-                        co_author_email=co_email,
-                        timeout_seconds=timeout,
-                    )
-
-                    commit_msg = self._build_orphan_commit_message(orphaned, site_id, git_config)
-
-                    committer = GitCommitter(git_config)
-                    committer._recover_stale_index_lock(git_root)
-                    staged = committer._stage_files(orphaned, git_root)
-                    if staged == 0:
-                        logger.warning(f"[orphan_sweep] {site_id}: nothing staged — skipping commit")
-                        continue
-
-                    commit_hash = committer._create_commit(commit_msg, git_root)
-                    if commit_hash:
-                        logger.info(
-                            f"[orphan_sweep] ✓ {site_id}: committed {staged} orphaned file(s) "
-                            f"({commit_hash[:7]})"
-                        )
-                        total_committed += staged
-                    else:
-                        logger.warning(
-                            f"[orphan_sweep] {site_id}: commit failed — {committer._last_error}"
-                        )
-
-                except subprocess.TimeoutExpired:
-                    logger.warning(f"[orphan_sweep] {site_id}/{content_root_str}: git status timed out")
-                except Exception as exc:
-                    logger.warning(f"[orphan_sweep] {site_id}/{content_root_str}: {exc}")
-
-        return total_committed
 
     def _recover_pending_commits(self) -> None:
         """Retry any .pending_commit.json / .pending_commit.json.stale_* files left

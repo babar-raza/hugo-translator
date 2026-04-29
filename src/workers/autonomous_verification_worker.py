@@ -139,18 +139,26 @@ class AutonomousVerificationWorker:
         """
         Execute one deterministic verification pass.
 
-        Current pass validates project config/profile presence so scheduler runs
-        have actionable success/failure semantics without network dependencies.
+        Two sub-passes:
+        1. Config validation — project config/profile presence.
+        2. Post-translation quality spot check — lightweight integrity check on
+           recently-translated files (only runs when content worker produced
+           output recently).
         """
         config_root = Path(self.config.config_root)
         site_profiles_dir = config_root / "site_profiles"
         profile_count = len(list(site_profiles_dir.glob("*.yaml"))) if site_profiles_dir.exists() else 0
 
-        checks = {
+        checks: dict[str, object] = {
             "config_root_exists": config_root.exists(),
             "site_profiles_dir_exists": site_profiles_dir.exists(),
             "site_profiles_count": profile_count,
         }
+
+        # Post-translation quality spot check
+        quality = self._run_quality_spot_check()
+        checks["quality_check"] = quality
+
         failed_checks = [name for name, ok in checks.items() if ok is False]
         status = "success" if not failed_checks else "failure"
 
@@ -166,6 +174,127 @@ class AutonomousVerificationWorker:
             raise RuntimeError(f"Verification checks failed: {', '.join(failed_checks)}")
 
         return checks
+
+    def _run_quality_spot_check(self, max_files: int = 20) -> dict[str, object]:
+        """Check recently-translated files for basic structural integrity.
+
+        Only runs when the content worker produced output within the last 2 hours.
+        Returns a dict with pass/fail counts and any anomalies found.
+        """
+        result: dict[str, object] = {
+            "ran": False,
+            "reason": "no recent content worker output",
+            "files_checked": 0,
+            "passed": 0,
+            "failed": 0,
+            "anomalies": [],
+        }
+
+        # Check content worker state for recent success
+        cw_state_path = Path("data/logs/content_worker.state.json")
+        if not cw_state_path.exists():
+            return result
+
+        try:
+            cw_state = json.loads(cw_state_path.read_text(encoding="utf-8"))
+        except Exception:
+            result["reason"] = "could not read content worker state"
+            return result
+
+        last_success = cw_state.get("last_success_ts")
+        if not last_success:
+            result["reason"] = "content worker has no last_success_ts"
+            return result
+
+        # Only check if content worker ran within last 2 hours
+        try:
+            from datetime import datetime as _dt
+            if isinstance(last_success, str):
+                ts = _dt.fromisoformat(last_success.replace("Z", "+00:00")).timestamp()
+            else:
+                ts = float(last_success)
+        except Exception:
+            result["reason"] = f"could not parse last_success_ts: {last_success}"
+            return result
+
+        age_seconds = time.time() - ts
+        if age_seconds > 7200:  # 2 hours
+            result["reason"] = f"content worker last success {int(age_seconds)}s ago (>2h)"
+            return result
+
+        # Find recently modified .md files in content output directories
+        result["ran"] = True
+        result["reason"] = "content worker ran recently"
+        anomalies: list[str] = []
+
+        output_dirs = self._find_output_dirs()
+        checked = 0
+        passed = 0
+
+        for output_dir in output_dirs:
+            if checked >= max_files:
+                break
+            if not output_dir.exists():
+                continue
+            for md_file in sorted(output_dir.rglob("*.md"), key=lambda p: p.stat().st_mtime, reverse=True):
+                if checked >= max_files:
+                    break
+                # Only check files modified since content worker last success
+                if md_file.stat().st_mtime < ts:
+                    continue
+                checked += 1
+                ok, issue = self._check_file_integrity(md_file)
+                if ok:
+                    passed += 1
+                else:
+                    anomalies.append(f"{md_file.name}: {issue}")
+
+        result["files_checked"] = checked
+        result["passed"] = passed
+        result["failed"] = checked - passed
+        result["anomalies"] = anomalies[:10]  # cap anomaly list
+        return result
+
+    @staticmethod
+    def _find_output_dirs() -> list[Path]:
+        """Return content output directories from environment or known defaults."""
+        dirs: list[Path] = []
+        for env_var in ("ASPOSE_NET_CONTENT", "ASPOSE_ORG_CONTENT"):
+            val = os.environ.get(env_var)
+            if val:
+                p = Path(val) / "content"
+                if p.exists():
+                    dirs.append(p)
+        return dirs
+
+    @staticmethod
+    def _check_file_integrity(path: Path) -> tuple[bool, str]:
+        """Basic structural integrity check for a translated .md file.
+
+        Returns (True, "") if OK, or (False, reason) if anomaly detected.
+        """
+        try:
+            content = path.read_text(encoding="utf-8")
+        except Exception as exc:
+            return False, f"read error: {exc}"
+
+        if len(content) < 50:
+            return False, f"too small ({len(content)} bytes)"
+
+        if not content.startswith("---"):
+            return False, "missing front matter (no leading ---)"
+
+        # Check front matter is closed
+        second_marker = content.find("---", 3)
+        if second_marker < 0:
+            return False, "front matter not closed"
+
+        # Check for obvious corruption patterns
+        body = content[second_marker + 3:]
+        if len(body.strip()) < 10:
+            return False, "body is empty or near-empty after front matter"
+
+        return True, ""
 
     def run(self) -> None:
         """Run oneshot or daemon verification workflow."""

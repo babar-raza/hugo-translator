@@ -8,8 +8,25 @@ Tests list token handling:
 - Nested lists
 """
 
+import logging
+from unittest.mock import patch
+
 from src.translation_engine.parser import HugoParser
 from src.translation_engine.parser.ast_nodes import NodeType
+
+
+def test_yaml_format_fallback_logs_warning(caplog):
+    """When _parse_yaml_with_comments returns None, WARNING with YAML_FORMAT_FALLBACK is emitted."""
+    parser = HugoParser()
+    content = "---\ntitle: Test Title\ndate: 2024-01-01\n---\n\nBody text."
+
+    with patch.object(parser, '_parse_yaml_with_comments', return_value=None):
+        with caplog.at_level(logging.WARNING, logger="src.translation_engine.parser.hugo_parser"):
+            doc = parser.parse_string(content)
+
+    assert "YAML_FORMAT_FALLBACK" in caplog.text
+    assert doc.frontmatter.get("title") == "Test Title"
+    assert doc.frontmatter.get("date") is not None
 
 
 class TestListParsing:

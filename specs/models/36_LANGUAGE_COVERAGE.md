@@ -533,7 +533,7 @@ class ModelSelector:
 
 ```bash
 # Query best model for language
-python -m src.cli model-query --language fr
+translate-hugo model-query --language fr
 # Output:
 # Best Model for French (fr):
 #   Model ID:     opus_en_fr
@@ -545,7 +545,7 @@ python -m src.cli model-query --language fr
 #   Fallback:     marian_en_romance, m2m100_418m_ct2_int8
 
 # Query with priority
-python -m src.cli model-query --language ja --priority quality
+translate-hugo model-query --language ja --priority quality
 # Output:
 # Best Model for Japanese (ja) [Quality Priority]:
 #   Model ID:     m2m100_1.2b
@@ -557,7 +557,7 @@ python -m src.cli model-query --language ja --priority quality
 #   Note:         Requires GPU with ≥6GB VRAM
 
 # Query all languages
-python -m src.cli model-query --all --format csv > language_coverage.csv
+translate-hugo model-query --all --format csv > language_coverage.csv
 ```
 
 ### Language Coverage Report

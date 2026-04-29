@@ -75,9 +75,9 @@ class TestValidationDecision:
         IntEnum returns integer value as string, not the full enum name.
         This is expected behavior for IntEnum.
         """
-        assert str(ValidationDecision.ACCEPT) == "0"
-        assert str(ValidationDecision.RETRY) == "1"
-        assert str(ValidationDecision.REJECT) == "2"
+        assert str(ValidationDecision.ACCEPT.value) == "0"
+        assert str(ValidationDecision.RETRY.value) == "1"
+        assert str(ValidationDecision.REJECT.value) == "2"
 
     def test_enum_name_access(self) -> None:
         """Test accessing enum by name."""

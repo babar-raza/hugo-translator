@@ -20,7 +20,6 @@ import pytest
 from src.tm.improvement_queue import ImprovementCandidate
 from src.workers.tm_improvement_worker import TMImprovementWorker, TMImprovementWorkerConfig
 
-
 # ---------------------------------------------------------------------------
 # Stub L3 — tracks update_entry / add_entry calls via an in-memory dict
 # ---------------------------------------------------------------------------

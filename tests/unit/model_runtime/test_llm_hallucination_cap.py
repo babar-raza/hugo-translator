@@ -11,7 +11,6 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-
 # ---------------------------------------------------------------------------
 # Config key tests
 # ---------------------------------------------------------------------------
@@ -58,6 +57,7 @@ def test_llm_backend_exposes_max_hallucination_ratio():
     Static inspection — no network calls needed.
     """
     import inspect
+
     from src.model_runtime.llm_backend import LLMModelBackend
 
     src = inspect.getsource(LLMModelBackend.__init__)
@@ -111,6 +111,7 @@ def test_truncation_result_length():
 def test_llm_backend_source_uses_configurable_ratio():
     """Static check: LLMModelBackend translate code must use _max_hallucination_ratio."""
     import inspect
+
     from src.model_runtime.llm_backend import LLMModelBackend
 
     # Find the method that does the per-segment translation

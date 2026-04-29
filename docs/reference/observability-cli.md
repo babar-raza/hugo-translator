@@ -20,7 +20,7 @@ Write metrics to file. Creates two files:
 - `<PATH>.ndjson` - Append-only stream (one JSON object per line)
 
 ```powershell
-python -m src.cli --site mysite --metrics-file ./metrics
+translate-hugo --site mysite --metrics-file ./metrics
 ```
 
 ### `--metrics-interval <SECS>`
@@ -28,7 +28,7 @@ python -m src.cli --site mysite --metrics-file ./metrics
 Metrics update interval in seconds (default: 2.0).
 
 ```powershell
-python -m src.cli --site mysite --metrics-interval 1.0
+translate-hugo --site mysite --metrics-interval 1.0
 ```
 
 ### `--metrics-only`
@@ -36,7 +36,7 @@ python -m src.cli --site mysite --metrics-interval 1.0
 Suppress normal logs, emit only compact metrics line. Useful for a dedicated metrics terminal.
 
 ```powershell
-python -m src.cli --site mysite --metrics-only
+translate-hugo --site mysite --metrics-only
 ```
 
 ### `--no-progress`
@@ -44,7 +44,7 @@ python -m src.cli --site mysite --metrics-only
 Disable progress tracking and ETA display entirely.
 
 ```powershell
-python -m src.cli --site mysite --no-progress
+translate-hugo --site mysite --no-progress
 ```
 
 ## Two-Terminal Setup
@@ -55,7 +55,7 @@ Run translation with verbose logs in one terminal while monitoring metrics in an
 
 **Terminal A** - Run translation with metrics enabled:
 ```powershell
-python -m src.cli --site mysite --input ./content --metrics-file ./metrics --log-level INFO
+translate-hugo --site mysite --input ./content --metrics-file ./metrics --log-level INFO
 ```
 
 **Terminal B** - Follow metrics stream (compact mode):
@@ -72,7 +72,7 @@ python -m src.observability.metrics_tail ./metrics.ndjson
 
 **Terminal A** - Run translation:
 ```bash
-python -m src.cli --site mysite --input ./content --metrics-file ./metrics
+translate-hugo --site mysite --input ./content --metrics-file ./metrics
 ```
 
 **Terminal B** - Tail metrics stream:

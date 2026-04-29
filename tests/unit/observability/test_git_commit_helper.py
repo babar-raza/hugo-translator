@@ -614,5 +614,62 @@ class TestWritePendingCommitFallback(unittest.TestCase):
             self.assertIn("+4 more", data["commit_message"])
 
 
+class TestValidateFileIntegrity(unittest.TestCase):
+    """Tests for _validate_file_integrity() nested in recover_pending_commits.
+
+    Since the function is defined inside recover_pending_commits and not
+    directly importable, we replicate its logic here for unit testing.
+    The rules are: exists, >100 bytes, contains '---' in first 500 chars.
+    """
+
+    @staticmethod
+    def _validate(file_path: Path) -> bool:
+        """Mirror of git_commit_helper._validate_file_integrity logic."""
+        try:
+            if not file_path.exists():
+                return False
+            size = file_path.stat().st_size
+            if size < 100:
+                return False
+            content = file_path.read_text(encoding="utf-8", errors="replace")[:500]
+            if "---" not in content:
+                return False
+            return True
+        except Exception:
+            return False
+
+    def test_small_file_rejected(self):
+        """File < 100 bytes must be rejected."""
+        import tempfile
+        with tempfile.TemporaryDirectory() as tmpdir:
+            f = Path(tmpdir) / "tiny.md"
+            f.write_text("---\ntitle: x\n---\n", encoding="utf-8")
+            self.assertFalse(self._validate(f))
+
+    def test_valid_md_passes(self):
+        """File with front matter + body > 100 bytes must pass."""
+        import tempfile
+        with tempfile.TemporaryDirectory() as tmpdir:
+            f = Path(tmpdir) / "good.md"
+            content = "---\ntitle: Test Article\ndate: 2026-01-01\n---\n" + "A" * 100
+            f.write_text(content, encoding="utf-8")
+            self.assertTrue(self._validate(f))
+
+    def test_no_front_matter_rejected(self):
+        """File > 100 bytes but without '---' must be rejected."""
+        import tempfile
+        with tempfile.TemporaryDirectory() as tmpdir:
+            f = Path(tmpdir) / "nofm.md"
+            f.write_text("A" * 200, encoding="utf-8")
+            self.assertFalse(self._validate(f))
+
+    def test_nonexistent_file_rejected(self):
+        """Missing file must be rejected."""
+        import tempfile
+        with tempfile.TemporaryDirectory() as tmpdir:
+            f = Path(tmpdir) / "ghost.md"
+            self.assertFalse(self._validate(f))
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -7,7 +7,7 @@ version: "1.0"
 # Decision Rules: Configure when to reject/retry translations
 decision_rules:
   # Rejection thresholds - when to reject a translation outright
-  reject_on_error_count: 3  # Reject if this many errors are detected
+  reject_on_error_count: 2  # Reject if this many errors are detected (reduced from 3)
   reject_on_placeholder_error: true  # Reject if placeholder integrity fails
   reject_on_code_block_error: true  # Reject if code blocks are corrupted
   reject_on_link_error: true  # Reject if links are broken
@@ -41,7 +41,7 @@ validation_modes:
   # Normal mode: Balanced validation (default)
   normal:
     accept_warnings: true  # Accept warnings
-    reject_on_error_count: 3  # Reject after 3 errors
+    reject_on_error_count: 2  # Reject after 2 errors (reduced from 3)
     max_retry_attempts: 2  # Two retry attempts
 
   # Lenient mode: Tolerant of issues, more retries
@@ -78,14 +78,21 @@ validators:
   language_consistency:
     enabled: true
     confidence_threshold: 0.85
+    min_sentence_length: 8  # reduced from 15 — catches short bullets, headings, list items
     description: "Validates target language consistency using langdetect"
-    # Per-language overrides for languages with known M2M100 corruption (ES, IT, CS).
+    # Per-language overrides for languages with known M2M100 corruption or high queue rates.
     # purity_threshold: min % of sentences that must be in target language (0-100).
     # confidence_threshold: min langdetect confidence at sentence level.
     per_language_overrides:
       es: {purity_threshold: 98.0, confidence_threshold: 0.90}
       it: {purity_threshold: 98.0, confidence_threshold: 0.90}
       cs: {purity_threshold: 97.0, confidence_threshold: 0.88}
+      # Added 2026-04-20: high queue counts (th:25, ar/bg/hi: cluster) — non-Latin scripts
+      # have low FP rates for English technical terms, can safely use strict thresholds
+      th: {purity_threshold: 99.0, confidence_threshold: 0.88}
+      ar: {purity_threshold: 97.0, confidence_threshold: 0.88}
+      bg: {purity_threshold: 97.0, confidence_threshold: 0.88}
+      hi: {purity_threshold: 97.0, confidence_threshold: 0.88}
 
   shortcode_preservation:
     enabled: true
@@ -110,3 +117,14 @@ validators:
     ngram_threshold: 5          # Require 5+ occurrences (was 3) — reduces false positives on structured docs
     sentence_dup_threshold: 3   # Require 3 duplicates (was 2) — allows paired FAQ patterns
     word_freq_threshold: 0.35   # Allow slightly higher word frequency (was 0.30)
+
+  # TC-17/TC-18: Semantic similarity validator.
+  # Detects major semantic drift using cross-lingual sentence embeddings.
+  # Disabled by default — enable via --validation-mode strict or by setting enabled: true.
+  # Reuses the L3SemanticTM encoder; does NOT load a second SentenceTransformer model.
+  semantic_similarity:
+    enabled: true               # TC-MLD-05: enabled — detects semantic drift before write; warns at 0.55, blocks at 0.40
+    min_body_chars: 200         # Skip documents shorter than this
+    warn_threshold: 0.55        # Cosine similarity below this → WARNING
+    error_threshold: 0.40       # Cosine similarity below this → ERROR
+    description: "Validates cross-lingual semantic equivalence using sentence embeddings"

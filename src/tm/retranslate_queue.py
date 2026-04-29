@@ -20,7 +20,6 @@ import os
 import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Set
 
 logger = logging.getLogger(__name__)
 
@@ -40,7 +39,8 @@ def _queue_path() -> Path:
 
 def add_to_queue(output_path: Path, tgt_lang: str) -> None:
     """
-    Add an output file to the retranslate queue.
+    Add an output file to the retranslate queue, or increment retry_count
+    if it already exists (dedup).
 
     Called when CASE 4 fires: both the existing and the new translation are
     wrong-language, so overwrite is blocked and the file is permanently stuck.
@@ -50,10 +50,31 @@ def add_to_queue(output_path: Path, tgt_lang: str) -> None:
         tgt_lang: Expected target language code.
     """
     try:
+        resolved = str(output_path.resolve())
         queue_file = _queue_path()
         queue_file.parent.mkdir(parents=True, exist_ok=True)
+
+        # Check if entry already exists — if so, increment retry_count instead
+        if queue_file.exists():
+            lines = queue_file.read_text(encoding="utf-8").splitlines()
+            for line in lines:
+                if not line.strip():
+                    continue
+                try:
+                    entry = json.loads(line)
+                    if entry.get("output_path") == resolved:
+                        # Already queued — use _rewrite_queue to increment
+                        increment_retry(output_path)
+                        logger.debug(
+                            f"retranslate_queue: dedup — incremented retry for "
+                            f"{output_path.name} ({tgt_lang})"
+                        )
+                        return
+                except (json.JSONDecodeError, KeyError):
+                    continue
+
         entry = {
-            "output_path": str(output_path.resolve()),
+            "output_path": resolved,
             "tgt_lang": tgt_lang,
             "queued_at": datetime.now(timezone.utc).isoformat(),
             "retry_count": 1,
@@ -68,7 +89,7 @@ def add_to_queue(output_path: Path, tgt_lang: str) -> None:
         logger.warning(f"retranslate_queue: failed to add {output_path}: {e}")
 
 
-def load_queued_paths() -> Set[str]:
+def load_queued_paths() -> set[str]:
     """
     Return the set of absolute output path strings that need retranslation.
 
@@ -80,7 +101,7 @@ def load_queued_paths() -> Set[str]:
     queue_file = _queue_path()
     if not queue_file.exists():
         return set()
-    queued: Set[str] = set()
+    queued: set[str] = set()
     try:
         with queue_file.open("r", encoding="utf-8") as f:
             for line in f:
@@ -98,7 +119,7 @@ def load_queued_paths() -> Set[str]:
     return queued
 
 
-def load_queued_llm_paths() -> Set[str]:
+def load_queued_llm_paths() -> set[str]:
     """
     Return the set of absolute output path strings that are eligible for LLM escalation.
 
@@ -115,7 +136,7 @@ def load_queued_llm_paths() -> Set[str]:
     queue_file = _queue_path()
     if not queue_file.exists():
         return set()
-    llm_paths: Set[str] = set()
+    llm_paths: set[str] = set()
     try:
         with queue_file.open("r", encoding="utf-8") as f:
             for line in f:
@@ -230,7 +251,7 @@ def _quarantine_entry(entry: dict) -> None:
         logger.warning(f"retranslate_queue: failed to write quarantine entry: {e}")
 
 
-def load_quarantined_paths() -> Set[str]:
+def load_quarantined_paths() -> set[str]:
     """Return the set of absolute output path strings in the quarantine log.
 
     Used for monitoring and reporting. The quarantine log is never cleaned
@@ -243,7 +264,7 @@ def load_quarantined_paths() -> Set[str]:
     quarantine_file = _QUARANTINE_FILE
     if not quarantine_file.exists():
         return set()
-    paths: Set[str] = set()
+    paths: set[str] = set()
     try:
         with quarantine_file.open("r", encoding="utf-8") as f:
             for line in f:

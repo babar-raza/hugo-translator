@@ -39,52 +39,222 @@ global:
       category: format
       case_sensitive: true
       preserve_mode: protect
-      severity: info
+      severity: error
 
     - term: "TAR"
       category: format
       case_sensitive: true
       preserve_mode: protect
-      severity: info
+      severity: error
 
     - term: "RAR"
       category: format
       case_sensitive: true
       preserve_mode: protect
-      severity: info
+      severity: error
 
     - term: "GZ"
       category: format
       case_sensitive: true
       preserve_mode: protect
-      severity: info
+      severity: error
 
     - term: "XZ"
       category: format
       case_sensitive: true
       preserve_mode: protect
-      severity: info
+      severity: error
 
     - term: "BZ2"
       category: format
       case_sensitive: true
       preserve_mode: protect
-      severity: info
+      severity: error
 
     - term: "TGZ"
       category: format
       case_sensitive: true
       preserve_mode: protect
-      severity: info
+      severity: error
 
     - term: "BZIP2"
       category: format
       case_sensitive: true
       preserve_mode: protect
-      severity: info
+      severity: error
 
     - term: "7Z"
       category: format
+      case_sensitive: true
+      preserve_mode: protect
+      severity: error
+
+    # Barcode symbology names — industry-standard identifiers, must never be transliterated
+    # Evidence: "EIN 13" (de), "Эйн 13" (ru), "第128章" (zh), "伊恩13" (zh) found in production
+    - term: "EAN-13"
+      category: barcode_symbology
+      case_sensitive: true
+      preserve_mode: protect
+      severity: error
+    - term: "EAN-8"
+      category: barcode_symbology
+      case_sensitive: true
+      preserve_mode: protect
+      severity: error
+    - term: "EAN-128"
+      category: barcode_symbology
+      case_sensitive: true
+      preserve_mode: protect
+      severity: error
+    - term: "UPC-A"
+      category: barcode_symbology
+      case_sensitive: true
+      preserve_mode: protect
+      severity: error
+    - term: "UPC-E"
+      category: barcode_symbology
+      case_sensitive: true
+      preserve_mode: protect
+      severity: error
+    - term: "Code 128"
+      category: barcode_symbology
+      case_sensitive: false
+      preserve_mode: protect
+      severity: error
+    - term: "Code 39"
+      category: barcode_symbology
+      case_sensitive: false
+      preserve_mode: protect
+      severity: error
+    - term: "Code 93"
+      category: barcode_symbology
+      case_sensitive: false
+      preserve_mode: protect
+      severity: error
+    - term: "Code 11"
+      category: barcode_symbology
+      case_sensitive: false
+      preserve_mode: protect
+      severity: error
+    - term: "QR Code"
+      category: barcode_symbology
+      case_sensitive: false
+      preserve_mode: protect
+      severity: error
+    - term: "QR"
+      category: barcode_symbology
+      case_sensitive: true
+      preserve_mode: protect
+      severity: warning
+    - term: "Data Matrix"
+      category: barcode_symbology
+      case_sensitive: false
+      preserve_mode: protect
+      severity: error
+    - term: "Aztec"
+      category: barcode_symbology
+      case_sensitive: true
+      preserve_mode: protect
+      severity: error
+    - term: "PDF417"
+      category: barcode_symbology
+      case_sensitive: true
+      preserve_mode: protect
+      severity: error
+    - term: "MaxiCode"
+      category: barcode_symbology
+      case_sensitive: true
+      preserve_mode: protect
+      severity: error
+    - term: "ITF-14"
+      category: barcode_symbology
+      case_sensitive: true
+      preserve_mode: protect
+      severity: error
+    - term: "GS1"
+      category: barcode_symbology
+      case_sensitive: true
+      preserve_mode: protect
+      severity: error
+    - term: "POSTNET"
+      category: barcode_symbology
+      case_sensitive: true
+      preserve_mode: protect
+      severity: error
+    - term: "DataBar"
+      category: barcode_symbology
+      case_sensitive: true
+      preserve_mode: protect
+      severity: error
+    - term: "MicroQR"
+      category: barcode_symbology
+      case_sensitive: true
+      preserve_mode: protect
+      severity: error
+    - term: "Han Xin"
+      category: barcode_symbology
+      case_sensitive: false
+      preserve_mode: protect
+      severity: error
+
+    # Programming languages and SDK terms — must not be transliterated
+    - term: "C#"
+      category: programming_language
+      case_sensitive: true
+      preserve_mode: protect
+      severity: warning
+    - term: "VB.NET"
+      category: programming_language
+      case_sensitive: true
+      preserve_mode: protect
+      severity: warning
+    - term: "ASP.NET"
+      category: platform
+      case_sensitive: true
+      preserve_mode: protect
+      severity: warning
+    - term: "ASP.NET MVC"
+      category: platform
+      case_sensitive: true
+      preserve_mode: protect
+      severity: warning
+    - term: "NuGet"
+      category: package_manager
+      case_sensitive: true
+      preserve_mode: protect
+      severity: warning
+    - term: "JSON"
+      category: format
+      case_sensitive: true
+      preserve_mode: protect
+      severity: warning
+    - term: "XML"
+      category: format
+      case_sensitive: true
+      preserve_mode: protect
+      severity: warning
+    - term: "REST API"
+      category: protocol
+      case_sensitive: false
+      preserve_mode: protect
+      severity: warning
+    - term: "HTTP"
+      category: protocol
+      case_sensitive: true
+      preserve_mode: protect
+      severity: info
+    - term: "HTTPS"
+      category: protocol
+      case_sensitive: true
+      preserve_mode: protect
+      severity: info
+    - term: "CSS"
+      category: web
+      case_sensitive: true
+      preserve_mode: protect
+      severity: info
+    - term: "HTML"
+      category: web
       case_sensitive: true
       preserve_mode: protect
       severity: info
@@ -112,6 +282,6 @@ site_overrides: {}
 # Auto-discovery settings for terminology extraction
 # (Disabled for initial phase - will be enabled in future iterations)
 auto_discovery:
-  enabled: false  # Enable automatic terminology discovery from source content
+  enabled: true  # Auto-protect high-confidence (>=0.85) Pascal-case, dotted, and UPPER_CASE terms
   min_frequency: 3  # Minimum occurrences to consider as terminology
   confidence_threshold: 0.8  # Minimum confidence score to auto-add term

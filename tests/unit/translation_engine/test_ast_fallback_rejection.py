@@ -12,9 +12,8 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from src.translation_engine.exceptions import TranslationIncomplete
-from src.translation_engine.reconstructor.ast_renderer import ASTRenderer
 from src.translation_engine.extractor.text_unit import TextUnit
-
+from src.translation_engine.reconstructor.ast_renderer import ASTRenderer
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -77,6 +76,7 @@ def test_engine_raises_translation_incomplete_on_fallback(tmp_path):
     must raise TranslationIncomplete (not silently write the file).
     """
     import inspect
+
     from src.translation_engine.engine import TranslationEngine
 
     # Verify the guard is present in source (static regression check)

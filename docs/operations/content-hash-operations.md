@@ -410,7 +410,7 @@ features:
 ```bash
 # Or via CLI (per-run override)
 docker exec hugo-translator-orchestrator \
-  python -m src.cli example.com --disable-content-hash
+  translate-hugo --site example.com --disable-content-hash
 ```
 
 **2. Adjust Cleanup Policy**:
@@ -455,7 +455,7 @@ content_hash_tracking:
      docker-compose up -d --scale worker=$workers
      # Run benchmark
      time docker exec hugo-translator-orchestrator \
-       python -m src.cli example.com
+       translate-hugo --site example.com
      # Monitor lock timeouts
      curl -s localhost:9091/metrics | grep metadata_lock_timeouts
    done
@@ -572,7 +572,7 @@ print(f'Loaded {len(tracker._data)} entries')
 
    # Next run will recreate
    docker exec hugo-translator-orchestrator \
-     python -m src.cli example.com --rebuild-content-hashes
+     translate-hugo --site example.com --rebuild-content-hashes
    ```
 
 **Prevention**:
@@ -637,7 +637,7 @@ docker exec hugo-translator-orchestrator \
   rm /data/metadata/.translation_metadata.json
 
 docker exec hugo-translator-orchestrator \
-  python -m src.cli example.com --rebuild-content-hashes
+  translate-hugo --site example.com --rebuild-content-hashes
 ```
 
 **Export Metadata for Analysis**:

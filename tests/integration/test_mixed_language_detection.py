@@ -16,7 +16,6 @@ from pathlib import Path
 
 import pytest
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -35,7 +34,7 @@ def _build_mixed_md(
 ) -> str:
     """Build a synthetic Markdown file with mixed language content."""
     all_paras = target_paras + contam_paras
-    return f"---\ntitle: Test\n---\n\n" + "\n\n".join(all_paras) + "\n"
+    return "---\ntitle: Test\n---\n\n" + "\n\n".join(all_paras) + "\n"
 
 
 def _write_tmp_file(tmp_path: Path, content: str, filename: str) -> Path:
@@ -172,12 +171,13 @@ class TestResultToJson:
 
     def test_json_structure_has_required_fields(self, tmp_path):
         """result_to_json() output contains all fields required by force_retranslate script."""
+        from datetime import datetime
+
         from scripts.scan_language_contamination import (
-            LanguageContaminationScanner,
             FileAnalysis,
+            LanguageContaminationScanner,
             ScanResult,
         )
-        from datetime import datetime
 
         # Build a synthetic ScanResult with one contaminated file
         analysis = FileAnalysis(
@@ -233,12 +233,13 @@ class TestResultToJson:
 
     def test_clean_files_not_in_json(self):
         """Clean files (no quality issues) are not included in JSON 'files' list."""
+        from datetime import datetime
+
         from scripts.scan_language_contamination import (
-            LanguageContaminationScanner,
             FileAnalysis,
+            LanguageContaminationScanner,
             ScanResult,
         )
-        from datetime import datetime
 
         clean = FileAnalysis(
             file_path="/path/clean.de.md",

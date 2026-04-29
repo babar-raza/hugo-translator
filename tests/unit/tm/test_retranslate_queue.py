@@ -11,9 +11,10 @@ Covers:
 """
 
 import json
-import pytest
 from pathlib import Path
 from unittest import mock
+
+import pytest
 
 import src.tm.retranslate_queue as rtq
 
@@ -271,3 +272,49 @@ class TestRoundTrip:
         assert len(remaining) == 2
         for f in files[3:]:
             assert str(f.resolve()) in remaining
+
+
+# ---------------------------------------------------------------------------
+# Dedup (TC-02)
+# ---------------------------------------------------------------------------
+
+class TestAddToQueueDedup:
+    def test_duplicate_add_increments_retry_instead_of_appending(self, tmp_path):
+        """Adding the same path twice must result in 1 entry with retry_count=2."""
+        f = tmp_path / "dup.ar.md"
+        f.touch()
+
+        rtq.add_to_queue(f, "ar")
+        rtq.add_to_queue(f, "ar")  # duplicate
+
+        lines = [l for l in rtq._queue_path().read_text().splitlines() if l.strip()]
+        assert len(lines) == 1, f"Expected 1 entry after dedup, got {len(lines)}"
+        entry = json.loads(lines[0])
+        assert entry["retry_count"] == 2
+
+    def test_different_paths_are_not_deduped(self, tmp_path):
+        """Two different paths must produce 2 separate entries."""
+        f1 = tmp_path / "a.ar.md"
+        f2 = tmp_path / "b.ar.md"
+        f1.touch()
+        f2.touch()
+
+        rtq.add_to_queue(f1, "ar")
+        rtq.add_to_queue(f2, "ar")
+
+        lines = [l for l in rtq._queue_path().read_text().splitlines() if l.strip()]
+        assert len(lines) == 2
+
+    def test_triple_add_increments_to_three(self, tmp_path):
+        """Adding the same path 3 times must result in retry_count=3."""
+        f = tmp_path / "triple.ar.md"
+        f.touch()
+
+        rtq.add_to_queue(f, "ar")
+        rtq.add_to_queue(f, "ar")
+        rtq.add_to_queue(f, "ar")
+
+        lines = [l for l in rtq._queue_path().read_text().splitlines() if l.strip()]
+        assert len(lines) == 1
+        entry = json.loads(lines[0])
+        assert entry["retry_count"] == 3

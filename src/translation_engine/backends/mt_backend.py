@@ -93,6 +93,7 @@ class MTBackend(ITranslationBackend):
         if self._terminology_manager is None:
             try:
                 from pathlib import Path as _Path
+
                 from src.translation_engine.terminology.terminology_manager import (
                     TerminologyManager,
                 )

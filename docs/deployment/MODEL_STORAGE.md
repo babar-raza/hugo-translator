@@ -368,9 +368,9 @@ ct2-transformers-converter \
     --quantization int8
 
 # Test new model
-python -m src.cli translate --model m2m100_418m_ct2 \
+translate-hugo --model m2m100_418m_ct2 \
     --model-path ./models/ct2/m2m100_418m_v2 \
-    test.md test_output.md
+    --input test.md --output test_output.md
 
 # If tests pass, replace old model
 rm -rf ./models/ct2/m2m100_418m
