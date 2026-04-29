@@ -9,10 +9,53 @@ ephemeral process liveness.
 from __future__ import annotations
 
 import json
+import logging
 import os
+import platform
+import subprocess
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
+
+logger = logging.getLogger(__name__)
+
+
+def _is_process_alive(pid: int) -> bool:
+    """Platform-safe check for process liveness."""
+    if platform.system() == "Windows":
+        try:
+            result = subprocess.run(
+                ["tasklist", "/FI", f"PID eq {pid}", "/NH"],
+                capture_output=True, text=True, timeout=5,
+            )
+            return str(pid) in result.stdout
+        except Exception:
+            return False
+    else:
+        try:
+            os.kill(pid, 0)
+            return True
+        except (OSError, ProcessLookupError):
+            return False
+
+
+def acquire_pid_file(worker_id: str, log_dir: Path | None = None) -> bool:
+    """Write PID file only if no live process holds it. Returns True if acquired."""
+    pid_path = (log_dir or Path("data/logs")) / f"{worker_id}.pid"
+    if pid_path.exists():
+        try:
+            existing_pid = int(pid_path.read_text(encoding="utf-8").strip())
+            if _is_process_alive(existing_pid):
+                logger.warning(
+                    "PID file %s held by live process %d — refusing to overwrite",
+                    pid_path, existing_pid,
+                )
+                return False
+        except (ValueError, OSError):
+            pass  # Stale/corrupt PID file — safe to overwrite
+    pid_path.parent.mkdir(parents=True, exist_ok=True)
+    pid_path.write_text(str(os.getpid()), encoding="utf-8")
+    return True
 
 
 def get_worker_log_dir() -> Path:

@@ -319,10 +319,15 @@ class AutonomousContentTranslationWorker:
         logger.info("Setup complete")
 
     def _write_pid_file(self):
-        """Write PID file for watchdog monitoring."""
-        pid_path = Path("data/logs") / f"{self._worker_id}.pid"
-        pid_path.parent.mkdir(parents=True, exist_ok=True)
-        pid_path.write_text(str(os.getpid()))
+        """Write PID file for watchdog monitoring (with single-instance guard)."""
+        from src.workers.worker_state import acquire_pid_file
+
+        if not acquire_pid_file(self._worker_id):
+            logger.critical(
+                "Another instance of %s is already running. Exiting.",
+                self._worker_id,
+            )
+            sys.exit(1)
 
     def _write_heartbeat(self, status="alive"):
         """Write heartbeat file for watchdog monitoring."""
@@ -466,6 +471,21 @@ class AutonomousContentTranslationWorker:
         )
         self._daemon_start_time = time.time()
         try:
+            # TC-REEXEC-06: Campaign config gate — daemon mode must not run
+            # unless scheduler.campaign_mode_enabled=true in global.yaml.
+            # This prevents accidental daemon spawning while scheduler safety
+            # gates (TC-SCHED-01..06) are incomplete. Oneshot is not gated.
+            if self.config.mode == "daemon":
+                _raw_cfg = getattr(self.config_service, '_raw_global_config', {})
+                _sched_cfg = _raw_cfg.get('scheduler', {})
+                if not _sched_cfg.get('campaign_mode_enabled', False):
+                    logger.info(
+                        "[SCHED] campaign_mode_enabled=false in config. "
+                        "Daemon exiting safely. Set scheduler.campaign_mode_enabled=true "
+                        "in global.yaml after TC-SCHED-01..06 pass all gates."
+                    )
+                    return
+
             if self.config.mode == "oneshot":
                 self._run_oneshot()
             elif self.config.mode == "daemon":
@@ -1729,6 +1749,30 @@ def main():
     # Ensure logs are flushed on any exit path (normal, exception, signal)
     import atexit
     atexit.register(logging.shutdown)
+
+    # TC-REEXEC-09 / RISK-09: Route structlog through stdlib logging so Windows
+    # pipe errors (OSError [Errno 22]) are swallowed by stdlib Handler.emit()
+    # instead of aborting translation. Without this, structlog's default
+    # PrintLoggerFactory calls print(msg, file=sys.stdout) directly, which
+    # crashes on restricted pipes (Task Scheduler, redirected stdout).
+    import structlog as _structlog
+    _structlog.configure(
+        processors=[
+            _structlog.stdlib.filter_by_level,
+            _structlog.stdlib.add_logger_name,
+            _structlog.stdlib.add_log_level,
+            _structlog.stdlib.PositionalArgumentsFormatter(),
+            _structlog.processors.TimeStamper(fmt="iso"),
+            _structlog.processors.StackInfoRenderer(),
+            _structlog.processors.format_exc_info,
+            _structlog.processors.UnicodeDecoder(),
+            _structlog.dev.ConsoleRenderer(),
+        ],
+        wrapper_class=_structlog.stdlib.BoundLogger,
+        context_class=dict,
+        logger_factory=_structlog.stdlib.LoggerFactory(),
+        cache_logger_on_first_use=True,
+    )
 
     logger.info("=" * 80)
     logger.info("AUTONOMOUS CONTENT TRANSLATION WORKER")
