@@ -1730,6 +1730,11 @@ Examples:
 
 def main():
     """Main entry point for autonomous worker."""
+    # Enable faulthandler so C-level crashes (segfault in PyTorch/HTTPX) produce
+    # a native stack trace to stderr rather than silently dying.
+    import faulthandler as _fh
+    _fh.enable()
+
     # Parse arguments
     args = parse_args()
 
