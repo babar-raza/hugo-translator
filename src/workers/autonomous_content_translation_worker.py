@@ -1169,11 +1169,17 @@ class AutonomousContentTranslationWorker:
             output_dir.mkdir(parents=True, exist_ok=True)
             ts = _now.strftime("%Y%m%dT%H%M%SZ")
             run_file = output_dir / f"run_{ts}_{site_id}.json"
-            run_file.write_text(
-                _json.dumps(run_summary, indent=2, ensure_ascii=False),
-                encoding="utf-8",
-            )
-            logger.info("TC-16: Run metrics written to %s", run_file)
+            # Use a thread with timeout to guard against OneDrive-sync file write hangs
+            # (Windows OneDrive can block write_text() indefinitely on synced paths).
+            import concurrent.futures as _cf
+            _content = _json.dumps(run_summary, indent=2, ensure_ascii=False)
+            with _cf.ThreadPoolExecutor(max_workers=1) as _ex:
+                _fut = _ex.submit(run_file.write_text, _content, "utf-8")
+                try:
+                    _fut.result(timeout=10)
+                    logger.info("TC-16: Run metrics written to %s", run_file)
+                except _cf.TimeoutError:
+                    logger.warning("TC-16: Run metrics write timed out (OneDrive sync?) — skipping")
         except Exception as _e:
             logger.warning("TC-16: Failed to write run metrics (non-fatal): %s", _e)
 
