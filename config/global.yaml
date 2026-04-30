@@ -636,6 +636,7 @@ translation_engine:
   # Only add languages with observed FP rate >= 15% in production logs.
   purity_threshold_overrides:
     lt: 0.15  # Lithuanian: reduced from 0.30 — 30% allowed catastrophic contamination through; 15% still generous for English product name FPs
+    bg: 0.50  # Bulgarian: barcode code-name passages ("Codabar: 0-9,A-D; Code 11: 0-9,-...") score 44.59% es-confidence in FastText; technical ASCII content not translatable; evidence: content_worker.log 2026-04-30 18:25-18:26
 
   # WS-COMP-7: Per-language model routing overrides.
   # Routes specific target languages to a different model instead of the global fallback.

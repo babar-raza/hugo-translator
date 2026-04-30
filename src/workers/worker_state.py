@@ -40,20 +40,73 @@ def _is_process_alive(pid: int) -> bool:
 
 
 def acquire_pid_file(worker_id: str, log_dir: Path | None = None) -> bool:
-    """Write PID file only if no live process holds it. Returns True if acquired."""
+    """Write PID file only if no live process holds it. Returns True if acquired.
+
+    Uses ``O_CREAT | O_EXCL`` atomic creation to close the startup race condition
+    where two instances launched simultaneously by duplicate Task Scheduler triggers
+    (AtLogon + AtStartup both fire at boot) both observe an absent PID file and both
+    try to write it.  Only the first ``os.open`` call wins; the second gets
+    ``FileExistsError`` and re-checks the holder's liveness before giving up.
+    """
     pid_path = (log_dir or Path("data/logs")) / f"{worker_id}.pid"
-    if pid_path.exists():
-        try:
-            existing_pid = int(pid_path.read_text(encoding="utf-8").strip())
-            if _is_process_alive(existing_pid):
-                logger.warning(
-                    "PID file %s held by live process %d — refusing to overwrite",
-                    pid_path, existing_pid,
-                )
-                return False
-        except (ValueError, OSError):
-            pass  # Stale/corrupt PID file — safe to overwrite
     pid_path.parent.mkdir(parents=True, exist_ok=True)
+    my_pid = str(os.getpid()).encode()
+
+    def _try_atomic_create() -> bool:
+        """Attempt O_CREAT|O_EXCL open. Returns True on success, False if file exists."""
+        try:
+            fd = os.open(str(pid_path), os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+            try:
+                os.write(fd, my_pid)
+            finally:
+                os.close(fd)
+            return True
+        except FileExistsError:
+            return False
+
+    # First attempt: atomic exclusive creation
+    if _try_atomic_create():
+        return True  # Won the race — file created exclusively
+
+    # File already exists — check who holds it
+    try:
+        existing_pid = int(pid_path.read_text(encoding="utf-8").strip())
+        if _is_process_alive(existing_pid):
+            logger.warning(
+                "PID file %s held by live process %d — refusing to overwrite",
+                pid_path, existing_pid,
+            )
+            return False
+        # Dead PID — clean up the stale file and retry
+        logger.info(
+            "PID file %s held dead PID %d — removing stale file",
+            pid_path, existing_pid,
+        )
+    except (ValueError, OSError):
+        pass  # Corrupt/unreadable — try to remove it
+
+    try:
+        pid_path.unlink(missing_ok=True)
+    except OSError:
+        pass
+
+    # Second attempt after stale cleanup — another concurrent instance may have
+    # created the file between our unlink and this retry; if so, they win.
+    if _try_atomic_create():
+        return True
+
+    try:
+        existing_pid = int(pid_path.read_text(encoding="utf-8").strip())
+        if _is_process_alive(existing_pid):
+            logger.warning(
+                "PID file %s claimed by PID %d during stale-cleanup retry — exiting",
+                pid_path, existing_pid,
+            )
+            return False
+    except (ValueError, OSError):
+        pass
+
+    # Fallback: file exists but is unreadable/empty — overwrite it
     pid_path.write_text(str(os.getpid()), encoding="utf-8")
     return True
 
