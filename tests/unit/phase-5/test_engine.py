@@ -8,6 +8,7 @@ from unittest.mock import Mock, patch
 
 import pytest
 
+import src.tm.retranslate_queue as _rtq
 from src.tm.models import LookupResult
 from src.translation_engine import (
     TranslationEngine,
@@ -97,6 +98,18 @@ def translation_engine(mock_config_service, mock_tm, mock_model_loader):
         tm=mock_tm,
         model_loader=mock_model_loader,
     )
+
+
+@pytest.fixture(autouse=True)
+def _isolate_retranslate_queue(tmp_path):
+    """Redirect queue/quarantine files to tmp_path for every test in this module.
+
+    Without this, engine tests that trigger REJECT decisions write to the live
+    production data/retranslate_queue.jsonl, contaminating it with pytest temp paths.
+    """
+    with patch.object(_rtq, "_QUEUE_FILE", tmp_path / "retranslate_queue.jsonl"), \
+         patch.object(_rtq, "_QUARANTINE_FILE", tmp_path / "quarantine.jsonl"):
+        yield
 
 
 @pytest.fixture

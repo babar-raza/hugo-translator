@@ -64,6 +64,27 @@ model_defaults:
   max_cached_models: 2
   allow_model_download: false  # Prevent automatic model downloads in production (default: false)
 
+# Asset synchronization for Hugo page bundles (per_language_folders sites only)
+# Copies non-markdown assets (images, PDFs) from source to target language folders.
+asset_sync:
+  enabled: false
+  extensions: [".png", ".jpg", ".jpeg", ".svg", ".gif", ".webp", ".pdf", ".zip"]
+  skip_if_exists: true
+
+# TC-05: File-level review cache — skip re-validation when source+translation
+# content pair was already validated and ACCEPTED in a previous run.
+review_cache:
+  enabled: false
+  max_entries: 10000
+  max_age_days: 14
+
+# TC-06: Correction pass — when validation rejects a translation, send the
+# failed output + validation issues to an LLM for targeted fixes before
+# final rejection. Only attempted once per file+lang per run.
+correction_pass:
+  enabled: false
+  model: professionalize_llm
+
 # Translation generation defaults
 translation:
   generation:
@@ -696,3 +717,10 @@ metrics:
 logging:
   max_log_size_mb: 50     # Each log file rotates at this size (MB)
   max_log_backups: 3      # Number of rotated backups kept (.log.1, .log.2, .log.3)
+
+# TC-REEXEC-06: Scheduler safety — campaign mode must not be restored until all
+# scheduler safety gates (TC-SCHED-01..06) pass. Setting campaign_mode_enabled=true
+# without passing those gates will allow daemon mode to run unsafely.
+scheduler:
+  campaign_mode_enabled: false  # Set true ONLY after TC-SCHED-01..06 pass all gates
+  max_queue_files_per_run: 2000 # TC-SCHED-06: cap per-run queue processing
