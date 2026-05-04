@@ -1,0 +1,6 @@
+agent: claude-opus-4-6-main
+project_id: 033
+intended_output: reviews/gitlab-translators/033-gai18n.md
+start_time: 2026-04-28T09:35:42Z
+source_repo: https://gitlab.recruitize.ai/kraik/spb-email/gai18n.git
+status: active

@@ -1,0 +1,6 @@
+agent: claude-opus-4-6-main
+project_id: 200
+intended_output: reviews/gitlab-translators/200-autonomous-multilingual-translation-agent.md
+start_time: 2026-04-28T09:35:42Z
+source_repo: https://gitlab.recruitize.ai/sialkot/lahore-aspose/lahore-kb-team/autonomous-multilingual-translation-agent.git
+status: active

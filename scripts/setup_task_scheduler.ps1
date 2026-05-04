@@ -81,12 +81,12 @@ $action1 = New-ScheduledTaskAction `
     -Argument $contentWorkerArgs `
     -WorkingDirectory $ProjectRoot
 
-# Dual trigger: AtLogon fires when user logs on (covers login-after-boot);
-# AtStartup fires at boot (covers auto-login). Together they are robust to both scenarios.
+# Single trigger: AtLogon only. AtLogon fires both on explicit logon and on
+# auto-login at boot (interactive session), so a second AtStartup trigger is
+# redundant and causes two instances to race at startup before the PID file
+# can be written. Removed AtStartup to prevent duplicate worker spawning.
 $trigger1Logon = New-ScheduledTaskTrigger -AtLogon -User $currentUser
 $trigger1Logon.Delay = "PT60S"   # 60s after logon — let system and OneDrive settle
-$trigger1Boot = New-ScheduledTaskTrigger -AtStartup
-$trigger1Boot.Delay = "PT30S"    # 30s after boot — stagger workers, ContentWorker goes first
 $principal1 = New-ScheduledTaskPrincipal -UserId $currentUser -LogonType Interactive -RunLevel Limited
 $settings1 = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -RestartCount 3 -RestartInterval (New-TimeSpan -Minutes 5)
 
@@ -105,7 +105,7 @@ try {
 
     # Create new task
     Register-ScheduledTask -TaskName "HugoTranslator-ContentWorker" `
-        -Action $action1 -Trigger @($trigger1Logon, $trigger1Boot) -Principal $principal1 -Settings $settings1 `
+        -Action $action1 -Trigger $trigger1Logon -Principal $principal1 -Settings $settings1 `
         -Description "Autonomous Content Translation Worker - Runs 12 times daily with CUDA support" | Out-Null
     Write-Host "  [OK] Task created successfully" -ForegroundColor Green
 } catch {
@@ -128,11 +128,10 @@ $action2 = New-ScheduledTaskAction `
     -Argument $tmWorkerArgs `
     -WorkingDirectory $ProjectRoot
 
-# Dual trigger: staggered 30s behind ContentWorker to avoid simultaneous VRAM load
+# Single trigger: AtLogon only (see Task 1 comment — AtStartup removed to prevent duplicates).
+# Staggered 30s behind ContentWorker to avoid simultaneous VRAM load.
 $trigger2Logon = New-ScheduledTaskTrigger -AtLogon -User $currentUser
 $trigger2Logon.Delay = "PT90S"   # 90s after logon (ContentWorker gets 60s head-start)
-$trigger2Boot = New-ScheduledTaskTrigger -AtStartup
-$trigger2Boot.Delay = "PT60S"    # 60s after boot (30s behind ContentWorker)
 $principal2 = New-ScheduledTaskPrincipal -UserId $currentUser -LogonType Interactive -RunLevel Limited
 $settings2 = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -RestartCount 3 -RestartInterval (New-TimeSpan -Minutes 5)
 
@@ -151,7 +150,7 @@ try {
 
     # Create new task
     Register-ScheduledTask -TaskName "HugoTranslator-TMWorker" `
-        -Action $action2 -Trigger @($trigger2Logon, $trigger2Boot) -Principal $principal2 -Settings $settings2 `
+        -Action $action2 -Trigger $trigger2Logon -Principal $principal2 -Settings $settings2 `
         -Description "TM Improvement Worker - Runs 12 times daily with CUDA and LLM via global.yaml config" | Out-Null
     Write-Host "  [OK] Task created successfully" -ForegroundColor Green
 } catch {
@@ -220,11 +219,10 @@ $action4 = New-ScheduledTaskAction `
     -Argument $verificationWorkerArgs `
     -WorkingDirectory $ProjectRoot
 
-# Dual trigger: staggered last (120s/90s) — lightest worker, no CUDA needed
+# Single trigger: AtLogon only (see Task 1 comment — AtStartup removed to prevent duplicates).
+# Staggered last — lightest worker, no CUDA needed.
 $trigger4Logon = New-ScheduledTaskTrigger -AtLogon -User $currentUser
 $trigger4Logon.Delay = "PT120S"  # 120s after logon (ContentWorker+TMWorker both settled)
-$trigger4Boot = New-ScheduledTaskTrigger -AtStartup
-$trigger4Boot.Delay = "PT90S"    # 90s after boot
 $principal4 = New-ScheduledTaskPrincipal -UserId $currentUser -LogonType Interactive -RunLevel Limited
 $settings4 = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -RestartCount 3 -RestartInterval (New-TimeSpan -Minutes 5)
 
@@ -241,7 +239,7 @@ try {
     }
 
     Register-ScheduledTask -TaskName "HugoTranslator-AutonomousVerification" `
-        -Action $action4 -Trigger @($trigger4Logon, $trigger4Boot) -Principal $principal4 -Settings $settings4 `
+        -Action $action4 -Trigger $trigger4Logon -Principal $principal4 -Settings $settings4 `
         -Description "Autonomous Verification Worker - scheduled verification and audit pass" | Out-Null
     Write-Host "  [OK] Task created successfully" -ForegroundColor Green
 } catch {
@@ -265,11 +263,10 @@ $action5 = New-ScheduledTaskAction `
     -Argument $orchestratorArgs `
     -WorkingDirectory $ProjectRoot
 
-# Dual trigger: first to start (30s delay) — lightweight, no CUDA
+# Single trigger: AtLogon only (see Task 1 comment — AtStartup removed to prevent duplicates).
+# First to start — lightweight, no CUDA.
 $trigger5Logon = New-ScheduledTaskTrigger -AtLogon -User $currentUser
 $trigger5Logon.Delay = "PT30S"
-$trigger5Boot = New-ScheduledTaskTrigger -AtStartup
-$trigger5Boot.Delay = "PT30S"
 $principal5 = New-ScheduledTaskPrincipal -UserId $currentUser -LogonType Interactive -RunLevel Limited
 $settings5 = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -RestartCount 3 -RestartInterval (New-TimeSpan -Minutes 5)
 
@@ -286,7 +283,7 @@ try {
     }
 
     Register-ScheduledTask -TaskName "HugoTranslator-Orchestrator" `
-        -Action $action5 -Trigger @($trigger5Logon, $trigger5Boot) -Principal $principal5 -Settings $settings5 `
+        -Action $action5 -Trigger $trigger5Logon -Principal $principal5 -Settings $settings5 `
         -Description "Worker Orchestrator - trigger-based launcher for oneshot workers" | Out-Null
     Write-Host "  [OK] Task created successfully" -ForegroundColor Green
 } catch {
@@ -348,13 +345,13 @@ Write-Host "Scheduled Tasks:" -ForegroundColor Yellow
 Write-Host "  1. HugoTranslator-ContentWorker" -ForegroundColor White
 Write-Host "     - Runs: 12 times per day (07:00-23:00 Asia/Karachi)"
 Write-Host "     - Device: CUDA (GPU)"
-Write-Host "     - Trigger: At logon (60s delay) + At startup (30s delay)"
+Write-Host "     - Trigger: At logon (60s delay)"
 Write-Host ""
 Write-Host "  2. HugoTranslator-TMWorker" -ForegroundColor White
 Write-Host "     - Runs: 12 times per day (07:00-23:00 Asia/Karachi)"
 Write-Host "     - Device: CUDA (GPU)"
 Write-Host "     - LLM: professionalize_llm (config/global.yaml)"
-Write-Host "     - Trigger: At logon (90s delay) + At startup (60s delay)"
+Write-Host "     - Trigger: At logon (90s delay)"
 Write-Host ""
 Write-Host "  3. HugoTranslator-Watchdog" -ForegroundColor White
 Write-Host "     - Runs: Every 15 minutes"
@@ -364,16 +361,16 @@ Write-Host ""
 Write-Host "  4. HugoTranslator-AutonomousVerification" -ForegroundColor White
 Write-Host "     - Runs: 4 times per day (08:00-23:00 Asia/Karachi)"
 Write-Host "     - Verifies scheduled worker readiness and emits audit telemetry"
-Write-Host "     - Trigger: At logon (120s delay) + At startup (90s delay)"
+Write-Host "     - Trigger: At logon (120s delay)"
 Write-Host ""
 Write-Host "  5. HugoTranslator-Orchestrator" -ForegroundColor White
 Write-Host "     - Polls every 15 minutes for trigger conditions"
 Write-Host "     - Launches workers as oneshot subprocesses when triggers fire"
 Write-Host "     - Config: config/workers.yaml"
-Write-Host "     - Trigger: At logon (30s delay) + At startup (30s delay)"
+Write-Host "     - Trigger: At logon (30s delay)"
 Write-Host ""
 Write-Host "All tasks will:" -ForegroundColor Yellow
-Write-Host "  - Start automatically at boot AND when user logs on (dual trigger, staggered delays)"
+Write-Host "  - Start automatically when user logs on (AtLogon trigger, staggered delays)"
 Write-Host "  - Run as current user ($currentUser)"
 Write-Host "  - Restart automatically on failure (up to 3 times)"
 Write-Host "  - Self-schedule runs throughout the day"

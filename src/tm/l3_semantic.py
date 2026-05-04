@@ -425,6 +425,29 @@ class L3SemanticTM:
 
         return embedding
 
+    def context_similarity(self, ctx1: str, ctx2: str) -> float:
+        """TC-M3-LITE: Cosine similarity between two context strings using the L3 encoder.
+
+        Used by the context gate in engine.py to filter L3 hits whose context
+        diverges too far from the current translation context.
+
+        Returns value in [0, 1]. Returns 1.0 if either context is empty (graceful fallback).
+        """
+        if not ctx1 or not ctx2:
+            return 1.0  # no context data → accept hit (graceful fallback)
+
+        try:
+            emb1 = self._get_or_encode(ctx1)
+            emb2 = self._get_or_encode(ctx2)
+            # Cosine similarity for L2-normalised vectors = dot product
+            norm1 = float(np.linalg.norm(emb1))
+            norm2 = float(np.linalg.norm(emb2))
+            if norm1 == 0.0 or norm2 == 0.0:
+                return 1.0
+            return float(np.dot(emb1, emb2) / (norm1 * norm2))
+        except Exception:
+            return 1.0  # encoder failure → accept hit (graceful fallback)
+
     def semantic_search(
         self,
         site_id: str,

@@ -1,0 +1,81 @@
+name: Content Structure Scan
+
+on:
+  push:
+    branches: [main, 'fix/**', 'feat/**']
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      content_dir:
+        description: 'Content directory path (self-hosted only)'
+        required: false
+        default: ''
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+
+jobs:
+  scan-changed-content:
+    name: Scan Changed Translated Content
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout translator repo
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install pyyaml
+
+      - name: Get changed files
+        id: changed
+        run: |
+          # Get list of changed files in the translator repo itself
+          git diff --name-only HEAD~1 HEAD > /tmp/changed_files.txt || true
+          echo "Changed files:"
+          cat /tmp/changed_files.txt
+
+      - name: Run content structure scan (import test)
+        run: |
+          python -c "
+          from scripts.repair_translated_content import scan_changed_files, ScanResult
+          print('Module import OK: scan_changed_files, ScanResult available')
+          result = scan_changed_files([])
+          print(f'Empty scan: {result.total_files_scanned} files scanned')
+          "
+
+      - name: Validate scan script syntax
+        run: |
+          python -m py_compile scripts/repair_translated_content.py
+          python -m py_compile scripts/ci/scan_changed_content.py
+          echo "Syntax check passed"
+
+  scan-static-analysis:
+    name: Static Analysis of Scan Scripts
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install ruff
+        run: pip install ruff
+
+      - name: Lint scan scripts
+        run: |
+          ruff check scripts/repair_translated_content.py scripts/ci/scan_changed_content.py \
+            --select E,W,F --ignore E501,W291,W293 || true

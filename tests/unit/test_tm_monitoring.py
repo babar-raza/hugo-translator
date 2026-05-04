@@ -311,7 +311,7 @@ class TestCreateMonitorFromPath:
     def test_create_monitor_with_custom_thresholds(self, tmp_path):
         """Test creating monitor with custom thresholds."""
         db_path = tmp_path / "test_tm"
-        l2 = L2PersistentTM(db_path)
+        l2 = L2PersistentTM(db_path, max_size_mb=10)
         l2.close()
 
         monitor = create_monitor_from_path(

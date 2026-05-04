@@ -309,6 +309,24 @@ class TranslationEngine:
         # T202: Cache refresh control (federated-splashing-panda)
         self.force_retranslate = kwargs.get('force_retranslate', False)
         self.cache_write_mode = kwargs.get('cache_write_mode', 'auto')
+        # Git diff change detection (--changed-since CLI flag)
+        self.changed_since_sha: str | None = kwargs.get('changed_since_sha', None)
+
+        # TC-05: File-level review cache — skips re-validation when
+        # source+translation content are unchanged from a previous run.
+        self._review_cache = None
+        try:
+            _rc_cfg = self.config.get_config().get("review_cache", {}) if hasattr(self.config, 'get_config') else {}
+            if _rc_cfg.get("enabled", False):
+                from .validation.review_cache import ReviewCache
+                self._review_cache = ReviewCache(
+                    cache_path=_rc_cfg.get("cache_path"),
+                    max_entries=_rc_cfg.get("max_entries", 10_000),
+                    max_age_days=_rc_cfg.get("max_age_days", 14),
+                )
+                logger.info("Review cache enabled (%d entries loaded)", self._review_cache.size)
+        except Exception as _rc_err:
+            logger.debug("Review cache init failed (disabled): %s", _rc_err)
 
         # T203: Log cache write mode if non-default (federated-splashing-panda)
         if self.cache_write_mode != "auto":
@@ -1474,6 +1492,9 @@ class TranslationEngine:
                 # Prevents cache poisoning: rejected files no longer pollute the TM.
                 _tm_write_buffer: list = []
 
+                # TC-06: Correction pass guard — only attempt once per file+lang
+                _correction_attempted = False
+
                 while retry_count <= max_retry_attempts:
                     try:
                         # Clear buffer at each attempt start (discard any entries from
@@ -1517,69 +1538,179 @@ class TranslationEngine:
 
                             translated_body = _strip_frontmatter(translated_content)
 
-                            # Run validation suite (use validate_aggregated for single result)
-                            validation_result = self.validation_suite.validate_aggregated(
-                                source_body,
-                                translated_body,
-                                context={
-                                    "source_lang": source_lang,
-                                    "target_lang": target_lang,
-                                    "file_path": str(file_path),
-                                },
-                            )
+                            # TC-05: Review cache — skip full validation if this exact
+                            # source+translation pair was already validated and ACCEPTED.
+                            _rc_hit = False
+                            _rc_key = None
+                            if self._review_cache is not None and retry_count == 0:
+                                from .validation.review_cache import ReviewCache
+                                _rc_key = ReviewCache.make_key(source_body, translated_body, target_lang)
+                                _rc_entry = self._review_cache.get(_rc_key)
+                                if _rc_entry and _rc_entry.get("decision") == "ACCEPT":
+                                    _rc_hit = True
+                                    logger.debug(
+                                        "Review cache HIT for %s -> %s (skipping validation)",
+                                        file_path.name, target_lang,
+                                    )
 
-                            # Check that translatable frontmatter fields (title, description,
-                            # seoTitle, summary) are actually in the target language.
-                            # This catches mixed-language corruption (e.g., Greek/Arabic in ES output).
-                            _fm_issues = self._check_frontmatter_language(
-                                translated_content, target_lang
-                            )
-                            validation_result.issues.extend(_fm_issues)
+                            if not _rc_hit:
+                                # Run validation suite (use validate_aggregated for single result)
+                                validation_result = self.validation_suite.validate_aggregated(
+                                    source_body,
+                                    translated_body,
+                                    context={
+                                        "source_lang": source_lang,
+                                        "target_lang": target_lang,
+                                        "file_path": str(file_path),
+                                    },
+                                )
 
-                            # Make decision
-                            decision_result = self.decision_engine.make_decision(
-                                validation_result=validation_result,
-                                retry_count=retry_count,
-                                source=source_body,
-                            )
+                                # Check that translatable frontmatter fields (title, description,
+                                # seoTitle, summary) are actually in the target language.
+                                # This catches mixed-language corruption (e.g., Greek/Arabic in ES output).
+                                _fm_issues = self._check_frontmatter_language(
+                                    translated_content, target_lang
+                                )
+                                validation_result.issues.extend(_fm_issues)
 
-                            final_decision = decision_result
-                            final_validation_result = validation_result
+                                # Make decision
+                                decision_result = self.decision_engine.make_decision(
+                                    validation_result=validation_result,
+                                    retry_count=retry_count,
+                                    source=source_body,
+                                )
+
+                                final_decision = decision_result
+                                final_validation_result = validation_result
+
+                                # TC-05: Store ACCEPT results in review cache
+                                if (self._review_cache is not None
+                                        and _rc_key
+                                        and decision_result.decision == PostValidationDecision.ACCEPT):
+                                    self._review_cache.put(
+                                        _rc_key,
+                                        decision="ACCEPT",
+                                        error_count=validation_result.error_count,
+                                        warning_count=validation_result.warning_count,
+                                        decision_reason=decision_result.decision_reason or "",
+                                    )
+                            else:
+                                # Cache hit — treat as ACCEPT, skip full validation
+                                final_decision = None
+                                final_validation_result = None
 
                             # T3-D: Append to local validation metrics log (gated by config flag)
-                            try:
-                                from .validation.decision_engine import append_validation_metric
-                                _vr = {
-                                    i.validator: (i.severity.value != "error")
-                                    for i in validation_result.issues
-                                }
-                                append_validation_metric(
-                                    file_path=str(file_path),
-                                    lang=target_lang,
-                                    decision=decision_result.decision.value,
-                                    validator_results=_vr,
-                                    retry_count=retry_count,
-                                    error_count=sum(
-                                        1 for i in validation_result.issues
-                                        if i.severity.value == "error"
-                                    ),
-                                    warning_count=sum(
-                                        1 for i in validation_result.issues
-                                        if i.severity.value == "warning"
-                                    ),
-                                )
-                            except Exception:
-                                pass
+                            if not _rc_hit:
+                                try:
+                                    from .validation.decision_engine import append_validation_metric
+                                    _vr = {
+                                        i.validator: (i.severity.value != "error")
+                                        for i in validation_result.issues
+                                    }
+                                    append_validation_metric(
+                                        file_path=str(file_path),
+                                        lang=target_lang,
+                                        decision=decision_result.decision.value,
+                                        validator_results=_vr,
+                                        retry_count=retry_count,
+                                        error_count=sum(
+                                            1 for i in validation_result.issues
+                                            if i.severity.value == "error"
+                                        ),
+                                        warning_count=sum(
+                                            1 for i in validation_result.issues
+                                            if i.severity.value == "warning"
+                                        ),
+                                    )
+                                except Exception:
+                                    pass
 
-                            # Handle decision
-                            if decision_result.decision == PostValidationDecision.REJECT:
-                                # Don't write file, raise exception
-                                raise TranslationRejectedError(
-                                    message=f"Translation rejected: {decision_result.decision_reason}",
-                                    file_path=str(file_path),
-                                    validation_result=validation_result,
-                                    rejection_reason=decision_result.decision_reason,
-                                )
+                            # Handle decision (skip on review cache hit — already ACCEPTED)
+                            if _rc_hit:
+                                pass  # Fall through to ACCEPT / write phase
+                            elif decision_result.decision == PostValidationDecision.REJECT:
+                                # TC-06: Correction pass — attempt LLM fix before final rejection.
+                                # Only runs once per file+lang (guarded by _correction_attempted).
+                                if not _correction_attempted:
+                                    _correction_attempted = True
+                                    try:
+                                        _corr_cfg = (
+                                            self.config.get_config().get("correction_pass", {})
+                                            if hasattr(self.config, 'get_config') else {}
+                                        )
+                                        if _corr_cfg.get("enabled", False):
+                                            from .correction import attempt_correction
+                                            _corr_model = _corr_cfg.get("model", "professionalize_llm")
+                                            _corrected_body = attempt_correction(
+                                                source_body=source_body,
+                                                translated_body=translated_body,
+                                                src_lang=source_lang,
+                                                tgt_lang=target_lang,
+                                                issues=validation_result.issues,
+                                                model_id=_corr_model,
+                                            )
+                                            if _corrected_body:
+                                                # Re-assemble full content: original frontmatter + corrected body
+                                                if translated_content.startswith("---"):
+                                                    _fm_end = translated_content.find("---", 3)
+                                                    if _fm_end != -1:
+                                                        translated_content = (
+                                                            translated_content[:_fm_end + 3]
+                                                            + "\n" + _corrected_body
+                                                        )
+                                                    else:
+                                                        translated_content = _corrected_body
+                                                else:
+                                                    translated_content = _corrected_body
+
+                                                # Re-validate the corrected content
+                                                translated_body = _corrected_body
+                                                validation_result = self.validation_suite.validate_aggregated(
+                                                    source_body,
+                                                    translated_body,
+                                                    context={
+                                                        "source_lang": source_lang,
+                                                        "target_lang": target_lang,
+                                                        "file_path": str(file_path),
+                                                    },
+                                                )
+                                                _fm_issues = self._check_frontmatter_language(
+                                                    translated_content, target_lang
+                                                )
+                                                validation_result.issues.extend(_fm_issues)
+                                                decision_result = self.decision_engine.make_decision(
+                                                    validation_result=validation_result,
+                                                    retry_count=retry_count,
+                                                    source=source_body,
+                                                )
+                                                final_decision = decision_result
+                                                final_validation_result = validation_result
+
+                                                if decision_result.decision != PostValidationDecision.REJECT:
+                                                    logger.info(
+                                                        "Correction pass SAVED %s -> %s (decision: %s)",
+                                                        file_path.name, target_lang,
+                                                        decision_result.decision.value,
+                                                    )
+                                                    # Fall through to ACCEPT/RETRY handling below
+                                                    # (don't raise TranslationRejectedError)
+                                                else:
+                                                    logger.warning(
+                                                        "Correction pass did NOT fix %s -> %s",
+                                                        file_path.name, target_lang,
+                                                    )
+                                    except Exception as _corr_err:
+                                        logger.debug("Correction pass error: %s", _corr_err)
+
+                                # After correction attempt, re-check decision
+                                if decision_result.decision == PostValidationDecision.REJECT:
+                                    # Don't write file, raise exception
+                                    raise TranslationRejectedError(
+                                        message=f"Translation rejected: {decision_result.decision_reason}",
+                                        file_path=str(file_path),
+                                        validation_result=validation_result,
+                                        rejection_reason=decision_result.decision_reason,
+                                    )
 
                             elif decision_result.decision == PostValidationDecision.RETRY:
                                 # Retry with feedback
@@ -1994,6 +2125,66 @@ class TranslationEngine:
                                     output_path.name, validation_error,
                                 )
 
+                        # RC-5/RC-6: STRUCTURAL GATE — YAML frontmatter parse check.
+                        # If the translated output has invalid YAML frontmatter, block
+                        # the write and quarantine the candidate. This is the final
+                        # fail-closed guard before any target file is overwritten.
+                        if validation_passed:
+                            try:
+                                import yaml as _pre_write_yaml
+                                _fm_parts = translated_content.split("---", 2)
+                                if len(_fm_parts) >= 3:
+                                    _fm_candidate = _fm_parts[1]
+                                    _fm_parsed = _pre_write_yaml.safe_load(_fm_candidate)
+                                    if _fm_parsed is None or not isinstance(_fm_parsed, dict):
+                                        raise ValueError(
+                                            f"Frontmatter parsed as {type(_fm_parsed).__name__}, not dict"
+                                        )
+                                    # Key integrity: translated YAML must not have translated key names
+                                    # (compare against source frontmatter if available)
+                                    if hasattr(doc, "frontmatter") and doc.frontmatter:
+                                        _src_fm_keys = set(doc.frontmatter.keys())
+                                        _out_fm_keys = set(_fm_parsed.keys())
+                                        if _src_fm_keys != _out_fm_keys:
+                                            _diff = _src_fm_keys ^ _out_fm_keys
+                                            raise ValueError(
+                                                f"Frontmatter key integrity violated: "
+                                                f"mismatched keys {_diff}"
+                                            )
+                                else:
+                                    raise ValueError("Translated content missing YAML frontmatter delimiters")
+                            except Exception as _fm_gate_err:
+                                validation_passed = False
+                                validation_error = f"Frontmatter structural gate: {_fm_gate_err}"
+                                logger.error(
+                                    "FRONTMATTER STRUCTURAL GATE FAILED for %s: %s",
+                                    output_path.name, validation_error,
+                                )
+                                # Quarantine: write invalid candidate for diagnosis
+                                try:
+                                    from pathlib import Path as _QPath
+                                    _qdir = _QPath("workspace/quarantine") / (
+                                        output_path.parent.name
+                                    )
+                                    _qdir.mkdir(parents=True, exist_ok=True)
+                                    _qfile = _qdir / (output_path.name + ".quarantine.md")
+                                    _qfile.write_text(translated_content, encoding="utf-8")
+                                    import json as _qjson
+                                    (_qdir / (output_path.name + ".error.json")).write_text(
+                                        _qjson.dumps({
+                                            "file": str(output_path),
+                                            "error": str(validation_error),
+                                            "target_lang": target_lang,
+                                        }, ensure_ascii=False, indent=2),
+                                        encoding="utf-8",
+                                    )
+                                    logger.info(
+                                        "Quarantined invalid candidate to %s", _qfile
+                                    )
+                                except Exception as _qe:
+                                    logger.warning("Quarantine write failed: %s", _qe)
+                                _tm_write_buffer.clear()
+
                         # PHASE 2: WRITE (only if ALL validation passed)
                         if validation_passed:
                             try:
@@ -2086,6 +2277,14 @@ class TranslationEngine:
                                 result.stats.validation_errors = final_validation_result.error_count
                                 result.stats.validation_warnings = final_validation_result.warning_count
                                 result.stats.validation_info = final_validation_result.info_count
+                            # TC-H5: Compute per-file quality signal
+                            _s = result.stats
+                            if _s.validation_errors > 0:
+                                _s.quality_score = "FAIL"
+                            elif _s.ast_missing_nodes > 1 or _s.validation_warnings > 0:
+                                _s.quality_score = "PARTIAL"
+                            else:
+                                _s.quality_score = "PASS"
 
                         # VA-03: Store verification result
                         if final_verification_result:
@@ -2119,6 +2318,7 @@ class TranslationEngine:
                         result.errors.append(f"Translation to {target_lang} rejected after {retry_count} attempts")
                         result.stats.validation_failed = True
                         result.stats.validation_decision = "REJECT"
+                        result.stats.quality_score = "FAIL"  # TC-H5
                         raise
 
                     except TranslationRetryableError as e:
@@ -2856,6 +3056,18 @@ class TranslationEngine:
                 # Count every TM lookup (segments x languages) for accurate hit rate
                 stats.total_lookups += 1
 
+                # RC-4 FIX: Disable L3 semantic search for frontmatter segments.
+                # L3 semantic matching does not discriminate by field_path context,
+                # so it can return cross-file or cross-field translations for
+                # frontmatter values that are textually similar to body content in
+                # other documents. Only L1 (exact cache) and L2 (exact LMDB) are
+                # safe for frontmatter because they require exact text matches.
+                _is_frontmatter_segment = bool(
+                    segment.context
+                    and hasattr(segment.context, "context_type")
+                    and str(segment.context.context_type) == "SegmentContextType.FRONTMATTER"
+                )
+
                 # Try TM lookup
                 tm_result = self.tm.lookup(
                     site_id=site_id,
@@ -2864,6 +3076,7 @@ class TranslationEngine:
                     text=segment.source_text,
                     context=str(segment.context) if segment.context else None,
                     lookup_context=lookup_context,
+                    use_semantic=not _is_frontmatter_segment,
                 )
 
                 if tm_result.hit:
@@ -2880,7 +3093,33 @@ class TranslationEngine:
                     elif tm_result.source == "l2_exact":
                         stats.l2_hits += 1
                     elif tm_result.source == "l3_semantic":
-                        stats.l3_hits += 1
+                        # TC-M3-LITE: Optional context gate for L3 hits (default disabled).
+                        # Rejects hits where stored context differs too much from current context.
+                        _ctx_gate_rejected = False
+                        try:
+                            _tm_cfg = self.config.get_config().get('tm_defaults', {})
+                            if _tm_cfg.get('l3_context_gate_enabled', False):
+                                _ctx_threshold = float(_tm_cfg.get('l3_context_similarity_threshold', 0.50))
+                                _hit_ctx = (
+                                    tm_result.candidates[0].context
+                                    if tm_result.candidates and tm_result.candidates[0].context
+                                    else ""
+                                )
+                                _seg_ctx = str(segment.context) if segment.context else ""
+                                if _hit_ctx and _seg_ctx and self._l3 is not None:
+                                    _ctx_sim = self._l3.context_similarity(_hit_ctx, _seg_ctx)
+                                    if _ctx_sim < _ctx_threshold:
+                                        logger.debug(
+                                            "L3 context_mismatch: sim=%.2f < %.2f, rejecting hit for %s",
+                                            _ctx_sim, _ctx_threshold, segment.id,
+                                        )
+                                        _ctx_gate_rejected = True
+                                        del translations[segment.id]
+                                        stats.tm_hits -= 1
+                        except Exception:
+                            pass  # gate failure → accept hit (graceful fallback)
+                        if not _ctx_gate_rejected:
+                            stats.l3_hits += 1
 
                     # Track cached tokens - use actual count if available for accuracy
                     # TEL-04: Count tokens saved by cache hit
@@ -2958,18 +3197,22 @@ class TranslationEngine:
                 texts = texts_with_feedback
                 logger.debug(f"Applied retry feedback to {len(texts)} segments")
 
-            # INT-02: Calculate temperature variation on retry
-            # Note: Current model backends don't support temperature parameter yet,
-            # but we calculate it here for future use when backends are updated
+            # INT-02: Retry temperature tracking (TC-M2 2026-05-01).
+            # Temperature IS supported by all LLM providers via provider._config.temperature.
+            # However, this calculated value is NOT applied to the backend between retries —
+            # each retry sends the same prompt with the backend's configured temperature.
+            # Diversity on retry comes from LLM server-side sampling (non-deterministic).
+            # To vary temperature per retry, update backend._provider._config.temperature
+            # before the translate call — left as a future improvement to avoid state mutation.
             base_temperature = 0.7  # Default
             if retry_count > 0:
-                temperature_increment = 0.1  # Could be config from site_profile in future
+                temperature_increment = 0.1
                 max_temperature = 1.0
                 temperature = min(
                     base_temperature + (retry_count * temperature_increment),
                     max_temperature
                 )
-                logger.debug(f"Retry {retry_count}: temperature adjusted to {temperature}")
+                logger.debug(f"Retry {retry_count}: temperature would be {temperature} (not yet applied to backend)")
             else:
                 temperature = base_temperature
             try:
@@ -3110,23 +3353,57 @@ class TranslationEngine:
                 from .reconstructor import YAMLFormatter
                 yaml_formatter = YAMLFormatter()
 
-                # Translate frontmatter fields
-                translated_frontmatter = {}
+                # RC-1 FIX: Deep-copy CommentedMap to preserve indentation, comments,
+                # and quote styles. Plain dict loses all ruamel.yaml formatting metadata.
+                import copy as _copy
+                from ruamel.yaml.comments import CommentedMap as _CommentedMap
+                if isinstance(doc.frontmatter, _CommentedMap):
+                    translated_frontmatter = _copy.deepcopy(doc.frontmatter)
+                else:
+                    translated_frontmatter = dict(doc.frontmatter)
+
+                # Build segment lookup: frontmatter_key -> segment_id
+                # RC-4 FIX: Use segment.id as lookup key (not raw value text).
+                # segments is the list of all segments built earlier in this function.
+                _fm_key_to_seg_id = {}
+                for _seg in segments:
+                    if (
+                        _seg.context
+                        and hasattr(_seg.context, "frontmatter_key")
+                        and _seg.context.frontmatter_key
+                        and hasattr(_seg.context, "context_type")
+                        and str(_seg.context.context_type) == "SegmentContextType.FRONTMATTER"
+                    ):
+                        _fm_key_to_seg_id[_seg.context.frontmatter_key] = _seg.id
+
+                # Translate frontmatter fields using segment ID lookup
                 for key, value in doc.frontmatter.items():
-                    # Check if field should be translated
                     field_rule = site_profile.frontmatter.get(key)
                     if field_rule and field_rule.mode == "translate":
-                        # Find translation in segments (only for hashable types like strings)
-                        if isinstance(value, str) and value in translations:
-                            translated_frontmatter[key] = translations[value]
-                        else:
-                            translated_frontmatter[key] = value
-                    else:
-                        # Passthrough or other modes
-                        translated_frontmatter[key] = value
+                        seg_id = _fm_key_to_seg_id.get(key)
+                        if seg_id and seg_id in translations and isinstance(value, str):
+                            translated_frontmatter[key] = translations[seg_id]
+                        # else: keep original value (already in deep copy)
 
                 # Format frontmatter as YAML (includes --- delimiters)
+                # RC-5: _validate_yaml_output() called inside format_frontmatter()
                 frontmatter_yaml = yaml_formatter.format_frontmatter(translated_frontmatter)
+
+                # RC-3 FIX: Verify frontmatter keys were not translated.
+                # After serialization, parsed keys must exactly match source keys.
+                import yaml as _yaml_check
+                _source_keys = set(doc.frontmatter.keys())
+                try:
+                    _out_data = _yaml_check.safe_load(frontmatter_yaml.split("---", 2)[1])
+                    _out_keys = set(_out_data.keys()) if isinstance(_out_data, dict) else set()
+                    if _source_keys != _out_keys:
+                        _diff = _source_keys ^ _out_keys
+                        raise ValueError(
+                            f"Frontmatter key integrity check failed after translation. "
+                            f"Mismatched keys: {_diff}"
+                        )
+                except _yaml_check.YAMLError as _e:
+                    raise ValueError(f"Frontmatter key integrity: YAML parse failed: {_e}") from _e
 
                 # Combine frontmatter + body
                 translated_content = f"{frontmatter_yaml}\n{translated_body}"
@@ -3356,6 +3633,40 @@ class TranslationEngine:
         except Exception:
             return 0.06
 
+    @staticmethod
+    def _should_skip_purity_segment(line: str) -> bool:
+        """Return True if a line should be excluded from FastText language detection.
+
+        TC-C1: Prevents barcode symbology strings and ASCII-heavy technical lines
+        from being misclassified as Spanish/English inside non-Latin target files.
+
+        Rules (any match → skip):
+        1. Barcode/codec spec pattern: "Codabar: 0-9,A-D" / "Code 128: 0-9,A-Z,a-z"
+        2. >60% non-letter visible chars (digits + punctuation dominant line)
+        3. Line contains an Aspose product-name token ("Aspose.BarCode" etc.)
+
+        IMPORTANT: Only affects FastText input filtering — never modifies content.
+        """
+        if not line:
+            return False
+
+        # Pattern 1: barcode/codec spec — "Code 128: 0-9,A-Z,a-z" / "Codabar: 0-9,A-D"
+        if re.match(r'^[A-Z][a-zA-Z0-9 ]+:\s*[0-9A-Za-z+\-,. /]+$', line):
+            return True
+
+        # Pattern 2: >60% non-letter visible characters (digit/punctuation heavy)
+        visible = [c for c in line if not c.isspace()]
+        if visible:
+            non_letter = sum(1 for c in visible if not c.isalpha())
+            if non_letter / len(visible) > 0.60:
+                return True
+
+        # Pattern 3: Aspose product name token present ("Aspose.BarCode", "Aspose.PDF")
+        if re.search(r'Aspose\.[A-Z]', line):
+            return True
+
+        return False
+
     def _verify_final_file_purity(
         self,
         content: str,
@@ -3417,6 +3728,8 @@ class TranslationEngine:
         for para in paragraphs:
             if len(para) < 20:
                 continue  # Too short to validate
+            if self._should_skip_purity_segment(para):
+                continue  # TC-C1: skip barcode/ASCII-heavy/product-name lines
 
             try:
                 detected, conf = detector.detect(para)
@@ -3715,6 +4028,19 @@ class TranslationEngine:
                     f"After filtering: {len(md_files)} source files to translate"
                 )
 
+            # Git diff change detection: intersect with files changed since a given commit SHA.
+            # Falls back gracefully (no filter) if git is unavailable or SHA is invalid.
+            if self.changed_since_sha and md_files:
+                from ..utils.file_filters import git_changed_files
+                _git_changed = git_changed_files(directory, self.changed_since_sha)
+                if _git_changed is not None:
+                    _before = len(md_files)
+                    md_files = [f for f in md_files if f.resolve() in _git_changed]
+                    logger.info(
+                        "Git diff filter (--changed-since %s): %d -> %d files",
+                        self.changed_since_sha[:12], _before, len(md_files),
+                    )
+
             # Completion-aware filtering: skip files where all target language outputs already
             # exist AND are newer than the source (i.e., source has not changed since translation).
             # This breaks the alphabetical ordering trap where files with complete outputs
@@ -3922,6 +4248,13 @@ class TranslationEngine:
                 f"in {result.duration_seconds:.2f}s"
             )
 
+            # TC-05: Persist review cache to disk at end of directory run
+            if self._review_cache is not None:
+                try:
+                    self._review_cache.save()
+                except Exception as _rc_err:
+                    logger.debug("Review cache save failed: %s", _rc_err)
+
             # TEL-04: Track aggregated stats and close telemetry
             if telemetry_run and telemetry_enabled:
                 try:
@@ -4002,6 +4335,41 @@ class TranslationEngine:
             # TC-GIT-01: Store telemetry context for git commit association
             if telemetry_enabled and telemetry_run:
                 result.telemetry_context = telemetry_run
+
+        # Asset sync: copy non-markdown assets for per_language_folders sites
+        try:
+            _asset_cfg = (
+                self.config.get_config().get("asset_sync", {})
+                if hasattr(self.config, "get_config") else {}
+            )
+            if (
+                _asset_cfg.get("enabled", False)
+                and site_profile
+                and getattr(
+                    getattr(site_profile, "output_layout", None),
+                    "per_language_folders",
+                    False,
+                )
+            ):
+                from ..utils.asset_sync import sync_assets
+                _exts = _asset_cfg.get("extensions", None)
+                _skip = _asset_cfg.get("skip_if_exists", True)
+                _src_lang = getattr(site_profile, "default_source_lang", "en")
+                _total_synced = 0
+                for _tgt_lang in target_langs:
+                    _src_dir = directory / _src_lang
+                    _tgt_dir = directory / _tgt_lang
+                    if _src_dir.is_dir():
+                        _total_synced += sync_assets(
+                            _src_dir, _tgt_dir,
+                            extensions=frozenset(_exts) if _exts else None,
+                            skip_if_exists=_skip,
+                        )
+                if _total_synced:
+                    logger.info("Asset sync total: %d files across %d languages",
+                                _total_synced, len(target_langs))
+        except Exception as _asset_err:
+            logger.warning("Asset sync failed (non-fatal): %s", _asset_err)
 
         return result
 

@@ -96,7 +96,7 @@ tm_prefs:
 
     # Initialize TM (in-memory only for tests)
     l1 = L1Cache(max_size=1000)
-    l2 = L2PersistentTM(temp_dir / "tm.lmdb")
+    l2 = L2PersistentTM(temp_dir / "tm.lmdb", max_size_mb=20)
     tm = TranslationMemory(l1, l2)
 
     # Initialize model loader (mock or minimal)

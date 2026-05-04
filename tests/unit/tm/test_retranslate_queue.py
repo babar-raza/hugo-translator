@@ -23,7 +23,9 @@ import src.tm.retranslate_queue as rtq
 def patch_queue_path(tmp_path):
     """Redirect the queue file to a temp directory for every test."""
     queue_file = tmp_path / "retranslate_queue.jsonl"
-    with mock.patch.object(rtq, "_QUEUE_FILE", queue_file):
+    quarantine_file = tmp_path / "quarantine.jsonl"
+    with mock.patch.object(rtq, "_QUEUE_FILE", queue_file), \
+         mock.patch.object(rtq, "_QUARANTINE_FILE", quarantine_file):
         yield queue_file
 
 

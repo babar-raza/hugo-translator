@@ -1,0 +1,439 @@
+[
+  {
+    "project_id": 3,
+    "name": "Landing Page Translator",
+    "path_with_namespace": "chernihiv-groupdocs-com/groupdocs-products/ai-translator-for-products-generator",
+    "web_url": "https://gitlab.recruitize.ai/chernihiv-groupdocs-com/groupdocs-products/ai-translator-for-products-generator",
+    "http_url_to_repo": "https://gitlab.recruitize.ai/chernihiv-groupdocs-com/groupdocs-products/ai-translator-for-products-generator.git",
+    "default_branch": "master",
+    "last_activity_at": "2026-01-21",
+    "description": "",
+    "matched_search_terms": [
+      "translator"
+    ],
+    "classification": "eliminated"
+  },
+  {
+    "project_id": 10,
+    "name": "Blog Post Translator",
+    "path_with_namespace": "sialkot/lahore-aspose/lahore-blogs-team/blog-post-translator",
+    "web_url": "https://gitlab.recruitize.ai/sialkot/lahore-aspose/lahore-blogs-team/blog-post-translator",
+    "http_url_to_repo": "https://gitlab.recruitize.ai/sialkot/lahore-aspose/lahore-blogs-team/blog-post-translator.git",
+    "default_branch": "master",
+    "last_activity_at": "2026-04-01",
+    "description": "",
+    "matched_search_terms": [
+      "translator"
+    ],
+    "classification": "confirmed_md_translator"
+  },
+  {
+    "project_id": 33,
+    "name": "GaI18n",
+    "path_with_namespace": "kraik/spb-email/gai18n",
+    "web_url": "https://gitlab.recruitize.ai/kraik/spb-email/gai18n",
+    "http_url_to_repo": "https://gitlab.recruitize.ai/kraik/spb-email/gai18n.git",
+    "default_branch": "main",
+    "last_activity_at": "2026-03-13",
+    "description": "",
+    "matched_search_terms": [
+      "i18n"
+    ],
+    "classification": "confirmed_md_translator"
+  },
+  {
+    "project_id": 44,
+    "name": "autonomous_topic_translator_flow",
+    "path_with_namespace": "sialkot/lahore-aspose/lahore-kb-team/autonomous_topic_translator_flow",
+    "web_url": "https://gitlab.recruitize.ai/sialkot/lahore-aspose/lahore-kb-team/autonomous_topic_translator_flow",
+    "http_url_to_repo": "https://gitlab.recruitize.ai/sialkot/lahore-aspose/lahore-kb-team/autonomous_topic_translator_flow.git",
+    "default_branch": "master",
+    "last_activity_at": "2025-11-29",
+    "description": "",
+    "matched_search_terms": [
+      "translator"
+    ],
+    "classification": "confirmed_md_translator"
+  },
+  {
+    "project_id": 51,
+    "name": "Blog post generator and translater AI Agent",
+    "path_with_namespace": "almaty/blog-post-generator-and-translater-ai-agent",
+    "web_url": "https://gitlab.recruitize.ai/almaty/blog-post-generator-and-translater-ai-agent",
+    "http_url_to_repo": "https://gitlab.recruitize.ai/almaty/blog-post-generator-and-translater-ai-agent.git",
+    "default_branch": "master",
+    "last_activity_at": "2025-12-06",
+    "description": "",
+    "matched_search_terms": [
+      "translate"
+    ],
+    "classification": "eliminated"
+  },
+  {
+    "project_id": 76,
+    "name": "Blog Post Translator",
+    "path_with_namespace": "chernihiv-groupdocs-com/groupdocs-blog/blog-post-translator",
+    "web_url": "https://gitlab.recruitize.ai/chernihiv-groupdocs-com/groupdocs-blog/blog-post-translator",
+    "http_url_to_repo": "https://gitlab.recruitize.ai/chernihiv-groupdocs-com/groupdocs-blog/blog-post-translator.git",
+    "default_branch": "master",
+    "last_activity_at": "2026-03-16",
+    "description": "",
+    "matched_search_terms": [
+      "translator"
+    ],
+    "classification": "confirmed_md_translator"
+  },
+  {
+    "project_id": 88,
+    "name": "Resource Translator Agent",
+    "path_with_namespace": "bryansk-pdf/web/resource-translator-agent",
+    "web_url": "https://gitlab.recruitize.ai/bryansk-pdf/web/resource-translator-agent",
+    "http_url_to_repo": "https://gitlab.recruitize.ai/bryansk-pdf/web/resource-translator-agent.git",
+    "default_branch": "master",
+    "last_activity_at": "2026-02-13",
+    "description": "",
+    "matched_search_terms": [
+      "translator"
+    ],
+    "classification": "eliminated"
+  },
+  {
+    "project_id": 93,
+    "name": "cells.blog-translate-agent",
+    "path_with_namespace": "gulou-cells/roywang/cells.blog-translate-agent",
+    "web_url": "https://gitlab.recruitize.ai/gulou-cells/roywang/cells.blog-translate-agent",
+    "http_url_to_repo": "https://gitlab.recruitize.ai/gulou-cells/roywang/cells.blog-translate-agent.git",
+    "default_branch": "master",
+    "last_activity_at": "2025-12-11",
+    "description": "",
+    "matched_search_terms": [
+      "translate"
+    ],
+    "classification": "confirmed_md_translator"
+  },
+  {
+    "project_id": 95,
+    "name": "Blog Translation Agent",
+    "path_with_namespace": "gulou-cells/xuejianzhang/blog-translation-agent",
+    "web_url": "https://gitlab.recruitize.ai/gulou-cells/xuejianzhang/blog-translation-agent",
+    "http_url_to_repo": "https://gitlab.recruitize.ai/gulou-cells/xuejianzhang/blog-translation-agent.git",
+    "default_branch": "master",
+    "last_activity_at": "2025-12-23",
+    "description": "",
+    "matched_search_terms": [
+      "translation"
+    ],
+    "classification": "confirmed_md_translator"
+  },
+  {
+    "project_id": 97,
+    "name": "Translation Checker Agent",
+    "path_with_namespace": "rostov/rostov-groupdocs-app/translation-checker-agent",
+    "web_url": "https://gitlab.recruitize.ai/rostov/rostov-groupdocs-app/translation-checker-agent",
+    "http_url_to_repo": "https://gitlab.recruitize.ai/rostov/rostov-groupdocs-app/translation-checker-agent.git",
+    "default_branch": "master",
+    "last_activity_at": "2026-01-14",
+    "description": "",
+    "matched_search_terms": [
+      "translation"
+    ],
+    "classification": "eliminated"
+  },
+  {
+    "project_id": 115,
+    "name": "AI Documentation Translator",
+    "path_with_namespace": "kraik/batumi-slides/maksim-churyumov/documentation-translator",
+    "web_url": "https://gitlab.recruitize.ai/kraik/batumi-slides/maksim-churyumov/documentation-translator",
+    "http_url_to_repo": "https://gitlab.recruitize.ai/kraik/batumi-slides/maksim-churyumov/documentation-translator.git",
+    "default_branch": "master",
+    "last_activity_at": "2026-03-31",
+    "description": "",
+    "matched_search_terms": [
+      "translator"
+    ],
+    "classification": "confirmed_md_translator"
+  },
+  {
+    "project_id": 123,
+    "name": "Hugo blog article generator + translator",
+    "path_with_namespace": "krsk-procurize/hugo-blog-post-generator-translator",
+    "web_url": "https://gitlab.recruitize.ai/krsk-procurize/hugo-blog-post-generator-translator",
+    "http_url_to_repo": "https://gitlab.recruitize.ai/krsk-procurize/hugo-blog-post-generator-translator.git",
+    "default_branch": "master",
+    "last_activity_at": "2025-12-23",
+    "description": "",
+    "matched_search_terms": [
+      "translator"
+    ],
+    "classification": "confirmed_md_translator"
+  },
+  {
+    "project_id": 131,
+    "name": "Blogs.BlogPostTranslator",
+    "path_with_namespace": "moscow-groupdocs-cloud/blogs-blogpost-translator",
+    "web_url": "https://gitlab.recruitize.ai/moscow-groupdocs-cloud/blogs-blogpost-translator",
+    "http_url_to_repo": "https://gitlab.recruitize.ai/moscow-groupdocs-cloud/blogs-blogpost-translator.git",
+    "default_branch": "master",
+    "last_activity_at": "2026-01-10",
+    "description": "",
+    "matched_search_terms": [
+      "translator"
+    ],
+    "classification": "confirmed_md_translator"
+  },
+  {
+    "project_id": 144,
+    "name": "TestcasesTranslationAgent",
+    "path_with_namespace": "gulou-cells/xinyazhu/testcasestranslationagent",
+    "web_url": "https://gitlab.recruitize.ai/gulou-cells/xinyazhu/testcasestranslationagent",
+    "http_url_to_repo": "https://gitlab.recruitize.ai/gulou-cells/xinyazhu/testcasestranslationagent.git",
+    "default_branch": "master",
+    "last_activity_at": "2026-04-17",
+    "description": "",
+    "matched_search_terms": [
+      "translation"
+    ],
+    "classification": "eliminated"
+  },
+  {
+    "project_id": 150,
+    "name": "HugoDoc Translator",
+    "path_with_namespace": "gulou-cells/fengge/hugodoc-translator",
+    "web_url": "https://gitlab.recruitize.ai/gulou-cells/fengge/hugodoc-translator",
+    "http_url_to_repo": "https://gitlab.recruitize.ai/gulou-cells/fengge/hugodoc-translator.git",
+    "default_branch": "master",
+    "last_activity_at": "2025-12-18",
+    "description": "",
+    "matched_search_terms": [
+      "translator"
+    ],
+    "classification": "confirmed_md_translator"
+  },
+  {
+    "project_id": 156,
+    "name": "mdfile-translator-agent",
+    "path_with_namespace": "bryansk-pdf/core/mdfile-translator-agent",
+    "web_url": "https://gitlab.recruitize.ai/bryansk-pdf/core/mdfile-translator-agent",
+    "http_url_to_repo": "https://gitlab.recruitize.ai/bryansk-pdf/core/mdfile-translator-agent.git",
+    "default_branch": "master",
+    "last_activity_at": "2025-12-18",
+    "description": "",
+    "matched_search_terms": [
+      "translator"
+    ],
+    "classification": "confirmed_md_translator"
+  },
+  {
+    "project_id": 166,
+    "name": "GridJsLocaleGenerator",
+    "path_with_namespace": "gulou-cells/peterzhou/gridjslocalegenerator",
+    "web_url": "https://gitlab.recruitize.ai/gulou-cells/peterzhou/gridjslocalegenerator",
+    "http_url_to_repo": "https://gitlab.recruitize.ai/gulou-cells/peterzhou/gridjslocalegenerator.git",
+    "default_branch": "master",
+    "last_activity_at": "2026-01-07",
+    "description": "",
+    "matched_search_terms": [
+      "locale"
+    ],
+    "classification": "eliminated"
+  },
+  {
+    "project_id": 170,
+    "name": "ai-translator-agent",
+    "path_with_namespace": "santiago-doconut/ai-translator-agent",
+    "web_url": "https://gitlab.recruitize.ai/santiago-doconut/ai-translator-agent",
+    "http_url_to_repo": "https://gitlab.recruitize.ai/santiago-doconut/ai-translator-agent.git",
+    "default_branch": "master",
+    "last_activity_at": "2025-12-23",
+    "description": "",
+    "matched_search_terms": [
+      "translator"
+    ],
+    "classification": "confirmed_md_translator"
+  },
+  {
+    "project_id": 182,
+    "name": "Resx-Localiser",
+    "path_with_namespace": "rostov/krakow-groupdocs-ai/resx-localiser",
+    "web_url": "https://gitlab.recruitize.ai/rostov/krakow-groupdocs-ai/resx-localiser",
+    "http_url_to_repo": "https://gitlab.recruitize.ai/rostov/krakow-groupdocs-ai/resx-localiser.git",
+    "default_branch": "master",
+    "last_activity_at": "2026-04-03",
+    "description": "",
+    "matched_search_terms": [
+      "resx"
+    ],
+    "classification": "eliminated"
+  },
+  {
+    "project_id": 200,
+    "name": "autonomous-multilingual-translation-agent",
+    "path_with_namespace": "sialkot/lahore-aspose/lahore-kb-team/autonomous-multilingual-translation-agent",
+    "web_url": "https://gitlab.recruitize.ai/sialkot/lahore-aspose/lahore-kb-team/autonomous-multilingual-translation-agent",
+    "http_url_to_repo": "https://gitlab.recruitize.ai/sialkot/lahore-aspose/lahore-kb-team/autonomous-multilingual-translation-agent.git",
+    "default_branch": "master",
+    "last_activity_at": "2025-12-30",
+    "description": "",
+    "matched_search_terms": [
+      "multilingual",
+      "translation"
+    ],
+    "classification": "confirmed_md_translator"
+  },
+  {
+    "project_id": 209,
+    "name": "CodeTranslator Attributes Generator Agent",
+    "path_with_namespace": "bryansk-pdf/derived/cpp/codetranslator-attributes-generator-agent",
+    "web_url": "https://gitlab.recruitize.ai/bryansk-pdf/derived/cpp/codetranslator-attributes-generator-agent",
+    "http_url_to_repo": "https://gitlab.recruitize.ai/bryansk-pdf/derived/cpp/codetranslator-attributes-generator-agent.git",
+    "default_branch": "master",
+    "last_activity_at": "2026-04-21",
+    "description": "",
+    "matched_search_terms": [
+      "translator"
+    ],
+    "classification": "eliminated"
+  },
+  {
+    "project_id": 313,
+    "name": "Java To Apex Translator Agent",
+    "path_with_namespace": "uly-codeporting/java-to-apex-translator",
+    "web_url": "https://gitlab.recruitize.ai/uly-codeporting/java-to-apex-translator",
+    "http_url_to_repo": "https://gitlab.recruitize.ai/uly-codeporting/java-to-apex-translator.git",
+    "default_branch": "master",
+    "last_activity_at": "2026-02-04",
+    "description": "",
+    "matched_search_terms": [
+      "translator"
+    ],
+    "classification": "eliminated"
+  },
+  {
+    "project_id": 318,
+    "name": "XmlTranslationAgent",
+    "path_with_namespace": "xuanwu-diagram/xml-translation-agent",
+    "web_url": "https://gitlab.recruitize.ai/xuanwu-diagram/xml-translation-agent",
+    "http_url_to_repo": "https://gitlab.recruitize.ai/xuanwu-diagram/xml-translation-agent.git",
+    "default_branch": "master",
+    "last_activity_at": "2026-03-27",
+    "description": "",
+    "matched_search_terms": [
+      "translation"
+    ],
+    "classification": "eliminated"
+  },
+  {
+    "project_id": 321,
+    "name": "Scan Missing and Translate Resx",
+    "path_with_namespace": "sialkot/islamabad-fileformat/scan-missing-and-translate-resx",
+    "web_url": "https://gitlab.recruitize.ai/sialkot/islamabad-fileformat/scan-missing-and-translate-resx",
+    "http_url_to_repo": "https://gitlab.recruitize.ai/sialkot/islamabad-fileformat/scan-missing-and-translate-resx.git",
+    "default_branch": "master",
+    "last_activity_at": "2026-04-24",
+    "description": "",
+    "matched_search_terms": [
+      "resx",
+      "translate"
+    ],
+    "classification": "eliminated"
+  },
+  {
+    "project_id": 368,
+    "name": "AI-Powered Multilingual Translation",
+    "path_with_namespace": "suceava-purchase/agents/ai-multilingual-translation",
+    "web_url": "https://gitlab.recruitize.ai/suceava-purchase/agents/ai-multilingual-translation",
+    "http_url_to_repo": "https://gitlab.recruitize.ai/suceava-purchase/agents/ai-multilingual-translation.git",
+    "default_branch": "master",
+    "last_activity_at": "2026-02-19",
+    "description": "",
+    "matched_search_terms": [
+      "multilingual",
+      "translation"
+    ],
+    "classification": "confirmed_md_translator"
+  },
+  {
+    "project_id": 403,
+    "name": "TranslateAgent",
+    "path_with_namespace": "xuanwu-diagram/translateagent",
+    "web_url": "https://gitlab.recruitize.ai/xuanwu-diagram/translateagent",
+    "http_url_to_repo": "https://gitlab.recruitize.ai/xuanwu-diagram/translateagent.git",
+    "default_branch": "master",
+    "last_activity_at": "2026-03-02",
+    "description": "",
+    "matched_search_terms": [
+      "translate"
+    ],
+    "classification": "eliminated"
+  },
+  {
+    "project_id": 454,
+    "name": "Translation Prompt Optimizer",
+    "path_with_namespace": "chernihiv-groupdocs-com/groupdocs-labs/translation-prompt-optimizer",
+    "web_url": "https://gitlab.recruitize.ai/chernihiv-groupdocs-com/groupdocs-labs/translation-prompt-optimizer",
+    "http_url_to_repo": "https://gitlab.recruitize.ai/chernihiv-groupdocs-com/groupdocs-labs/translation-prompt-optimizer.git",
+    "default_branch": "master",
+    "last_activity_at": "2026-03-16",
+    "description": "Automated prompt optimization for LLM translation",
+    "matched_search_terms": [
+      "translation"
+    ],
+    "classification": "eliminated"
+  },
+  {
+    "project_id": 472,
+    "name": "Autonomous KB Article Generator and Translator",
+    "path_with_namespace": "sialkot/lahore-aspose/lahore-kb-team/autonomous-kb-article-generator-and-translator",
+    "web_url": "https://gitlab.recruitize.ai/sialkot/lahore-aspose/lahore-kb-team/autonomous-kb-article-generator-and-translator",
+    "http_url_to_repo": "https://gitlab.recruitize.ai/sialkot/lahore-aspose/lahore-kb-team/autonomous-kb-article-generator-and-translator.git",
+    "default_branch": "master",
+    "last_activity_at": "2026-04-04",
+    "description": "",
+    "matched_search_terms": [
+      "translator"
+    ],
+    "classification": "confirmed_md_translator"
+  },
+  {
+    "project_id": 579,
+    "name": "Product Pages Translator Agent",
+    "path_with_namespace": "sialkot/islamabad-fileformat/product-pages-translator-agent",
+    "web_url": "https://gitlab.recruitize.ai/sialkot/islamabad-fileformat/product-pages-translator-agent",
+    "http_url_to_repo": "https://gitlab.recruitize.ai/sialkot/islamabad-fileformat/product-pages-translator-agent.git",
+    "default_branch": "master",
+    "last_activity_at": "2026-04-23",
+    "description": "",
+    "matched_search_terms": [
+      "translator"
+    ],
+    "classification": "confirmed_md_translator"
+  },
+  {
+    "project_id": 626,
+    "name": "Dzen Agent Knowledge Hub",
+    "path_with_namespace": "lviv-html/dzen-agent-knowledge-hub",
+    "web_url": "https://gitlab.recruitize.ai/lviv-html/dzen-agent-knowledge-hub",
+    "http_url_to_repo": "https://gitlab.recruitize.ai/lviv-html/dzen-agent-knowledge-hub.git",
+    "default_branch": "master",
+    "last_activity_at": "2026-04-14",
+    "description": "multilingual knowledge base",
+    "matched_search_terms": [
+      "multilingual"
+    ],
+    "classification": "eliminated"
+  },
+  {
+    "project_id": 698,
+    "name": "Localization Sync Agent",
+    "path_with_namespace": "bryansk-pdf/derived/cloud/localization-sync-agent",
+    "web_url": "https://gitlab.recruitize.ai/bryansk-pdf/derived/cloud/localization-sync-agent",
+    "http_url_to_repo": "https://gitlab.recruitize.ai/bryansk-pdf/derived/cloud/localization-sync-agent.git",
+    "default_branch": "main",
+    "last_activity_at": "2026-04-24",
+    "description": "",
+    "matched_search_terms": [
+      "localization"
+    ],
+    "classification": "eliminated"
+  }
+]

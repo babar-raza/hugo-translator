@@ -458,10 +458,15 @@ class TMImprovementWorker:
             return None
 
     def _write_pid_file(self):
-        """Write PID file for watchdog monitoring."""
-        pid_path = Path("data/logs") / f"{self._worker_id}.pid"
-        pid_path.parent.mkdir(parents=True, exist_ok=True)
-        pid_path.write_text(str(os.getpid()))
+        """Write PID file for watchdog monitoring (with single-instance guard)."""
+        from src.workers.worker_state import acquire_pid_file
+
+        if not acquire_pid_file(self._worker_id):
+            logger.critical(
+                "Another instance of %s is already running. Exiting.",
+                self._worker_id,
+            )
+            sys.exit(1)
 
     def _offload_resources(self) -> None:
         """Unload LLM from Ollama VRAM and offload L3 FAISS + encoder before sleeping.
@@ -499,7 +504,7 @@ class TMImprovementWorker:
             if torch.cuda.is_available():
                 torch.cuda.empty_cache()
         except ImportError:
-            pass
+            logger.debug("[VRAM] torch not available — skipping CUDA cache clear")
 
     def _write_heartbeat(self, status="alive"):
         """Write heartbeat file for watchdog monitoring."""

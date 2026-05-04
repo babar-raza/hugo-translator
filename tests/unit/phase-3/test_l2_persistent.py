@@ -112,7 +112,7 @@ class TestL2PersistentTM:
 
     def test_store_and_lookup(self, temp_db: Path) -> None:
         """Test basic store and lookup."""
-        with L2PersistentTM(temp_db) as tm:
+        with L2PersistentTM(temp_db, max_size_mb=20) as tm:
             # Store translation
             key = tm.store("site1", "en", "es", "Hello", "Hola")
             assert key is not None
@@ -125,13 +125,13 @@ class TestL2PersistentTM:
 
     def test_lookup_miss(self, temp_db: Path) -> None:
         """Test lookup of non-existent entry."""
-        with L2PersistentTM(temp_db) as tm:
+        with L2PersistentTM(temp_db, max_size_mb=20) as tm:
             entry = tm.exact_lookup("site1", "en", "es", "NotFound")
             assert entry is None
 
     def test_normalization_matching(self, temp_db: Path) -> None:
         """Test that normalized text matches."""
-        with L2PersistentTM(temp_db) as tm:
+        with L2PersistentTM(temp_db, max_size_mb=20) as tm:
             # Store with extra whitespace
             tm.store("site1", "en", "es", "  Hello   World  ", "Hola Mundo")
 
@@ -142,7 +142,7 @@ class TestL2PersistentTM:
 
     def test_different_languages(self, temp_db: Path) -> None:
         """Test same text in different language pairs."""
-        with L2PersistentTM(temp_db) as tm:
+        with L2PersistentTM(temp_db, max_size_mb=20) as tm:
             tm.store("site1", "en", "es", "Hello", "Hola")
             tm.store("site1", "en", "fr", "Hello", "Bonjour")
 
@@ -155,7 +155,7 @@ class TestL2PersistentTM:
 
     def test_context_filtering(self, temp_db: Path) -> None:
         """Test context-aware lookup."""
-        with L2PersistentTM(temp_db) as tm:
+        with L2PersistentTM(temp_db, max_size_mb=20) as tm:
             # Store with context
             tm.store("site1", "en", "es", "Title", "Título", context="frontmatter.title")
 
@@ -169,7 +169,7 @@ class TestL2PersistentTM:
 
     def test_batch_store(self, temp_db: Path) -> None:
         """Test batch storage."""
-        with L2PersistentTM(temp_db) as tm:
+        with L2PersistentTM(temp_db, max_size_mb=20) as tm:
             entries = [
                 TranslationEntry("One", "Uno", "site1", "en", "es"),
                 TranslationEntry("Two", "Dos", "site1", "en", "es"),
@@ -186,7 +186,7 @@ class TestL2PersistentTM:
 
     def test_delete(self, temp_db: Path) -> None:
         """Test deletion of entries."""
-        with L2PersistentTM(temp_db) as tm:
+        with L2PersistentTM(temp_db, max_size_mb=20) as tm:
             tm.store("site1", "en", "es", "Hello", "Hola")
 
             # Verify exists
@@ -201,7 +201,7 @@ class TestL2PersistentTM:
 
     def test_count(self, temp_db: Path) -> None:
         """Test entry counting."""
-        with L2PersistentTM(temp_db) as tm:
+        with L2PersistentTM(temp_db, max_size_mb=20) as tm:
             assert tm.count() == 0
 
             tm.store("site1", "en", "es", "One", "Uno")
@@ -212,7 +212,7 @@ class TestL2PersistentTM:
 
     def test_clear(self, temp_db: Path) -> None:
         """Test clearing database."""
-        with L2PersistentTM(temp_db) as tm:
+        with L2PersistentTM(temp_db, max_size_mb=20) as tm:
             tm.store("site1", "en", "es", "One", "Uno")
             tm.store("site1", "en", "es", "Two", "Dos")
 
@@ -224,18 +224,18 @@ class TestL2PersistentTM:
     def test_persistence(self, temp_db: Path) -> None:
         """Test data persists across sessions."""
         # First session
-        with L2PersistentTM(temp_db) as tm:
+        with L2PersistentTM(temp_db, max_size_mb=20) as tm:
             tm.store("site1", "en", "es", "Hello", "Hola")
 
         # Second session
-        with L2PersistentTM(temp_db) as tm:
+        with L2PersistentTM(temp_db, max_size_mb=20) as tm:
             entry = tm.exact_lookup("site1", "en", "es", "Hello")
             assert entry is not None
             assert entry.translation == "Hola"
 
     def test_len(self, temp_db: Path) -> None:
         """Test __len__ method."""
-        with L2PersistentTM(temp_db) as tm:
+        with L2PersistentTM(temp_db, max_size_mb=20) as tm:
             assert len(tm) == 0
 
             tm.store("site1", "en", "es", "Hello", "Hola")
@@ -243,7 +243,7 @@ class TestL2PersistentTM:
 
     def test_metadata_storage(self, temp_db: Path) -> None:
         """Test storing and retrieving metadata."""
-        with L2PersistentTM(temp_db) as tm:
+        with L2PersistentTM(temp_db, max_size_mb=20) as tm:
             metadata = {
                 "source_file": "content/post.md",
                 "segment_id": "abc123",
@@ -280,7 +280,7 @@ class TestL2DBNameConstant:
         import lmdb
 
         db_path = tmp_path / L2_DB_NAME
-        with L2PersistentTM(db_path=db_path):
+        with L2PersistentTM(db_path=db_path, max_size_mb=20):
             pass
         env = lmdb.open(str(db_path), readonly=True, lock=False)
         stats = env.stat()

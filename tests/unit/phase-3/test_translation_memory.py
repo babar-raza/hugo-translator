@@ -25,7 +25,7 @@ def temp_tm_dir(tmp_path):
 def tm_components(temp_tm_dir):
     """Create TM components."""
     l1 = L1Cache(max_size=100)
-    l2 = L2PersistentTM(db_path=temp_tm_dir / "l2.lmdb")
+    l2 = L2PersistentTM(db_path=temp_tm_dir / "l2.lmdb", max_size_mb=20)
     l3 = L3SemanticTM(index_path=temp_tm_dir / "l3_index")
     return l1, l2, l3
 
@@ -41,7 +41,7 @@ def tm_with_l3(tm_components):
 def tm_without_l3(temp_tm_dir):
     """Create TM without L3 (semantic disabled)."""
     l1 = L1Cache(max_size=100)
-    l2 = L2PersistentTM(db_path=temp_tm_dir / "l2.lmdb")
+    l2 = L2PersistentTM(db_path=temp_tm_dir / "l2.lmdb", max_size_mb=20)
     return TranslationMemory(l1_cache=l1, l2_persistent=l2, l3_semantic=None)
 
 

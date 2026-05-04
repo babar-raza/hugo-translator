@@ -1,0 +1,6 @@
+agent: claude-opus-4-6-main
+project_id: 368
+intended_output: reviews/gitlab-translators/368-ai-powered-multilingual-translation.md
+start_time: 2026-04-28T09:35:42Z
+source_repo: https://gitlab.recruitize.ai/suceava-purchase/agents/ai-multilingual-translation.git
+status: active

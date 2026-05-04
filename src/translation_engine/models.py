@@ -87,6 +87,12 @@ class TranslationStats:
     ast_individual_fallbacks: int = 0  # Number of fallbacks to individual translation
     ast_missing_nodes: int = 0  # TC-MLD-01: AST nodes with no matching TextUnit (source-text leakage risk)
 
+    # TC-H5: Operator-visible quality signal per translated file.
+    # PASS: purity ok, 0 errors, 0 missing nodes
+    # PARTIAL: purity ok but >0 warnings OR 1 missing node
+    # FAIL: any validation error OR purity failure
+    quality_score: str = ""
+
     # MSP-02: Multiline batching metrics
     multiline_segments: int = 0  # Multiline segments translated
     multiline_lines: int = 0  # Translatable multiline lines

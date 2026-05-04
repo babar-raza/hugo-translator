@@ -295,6 +295,34 @@ class TestDryRunNoPopen:
         assert len(dry_run_events) >= 1
 
 
+class TestStatusCommand:
+    """TC-12: --status subcommand returns structured worker overview."""
+
+    def test_print_status_returns_all_workers(self, tmp_path):
+        from src.workers.worker_orchestrator import print_status
+
+        registry = _base_registry(tmp_path)
+        state = _make_state()
+        with patch("src.workers.worker_orchestrator.print_status.__module__", create=True):
+            pass
+        report = print_status(registry, state, as_json=False)
+        assert "workers" in report
+        assert "content_worker" in report["workers"]
+        assert "queues" in report
+        assert "circuit_breaker" in report
+
+    def test_print_status_json(self, tmp_path, capsys):
+        from src.workers.worker_orchestrator import print_status
+
+        registry = _base_registry(tmp_path)
+        state = _make_state()
+        report = print_status(registry, state, as_json=True)
+        captured = capsys.readouterr()
+        parsed = json.loads(captured.out)
+        assert "workers" in parsed
+        assert "content_worker" in parsed["workers"]
+
+
 class TestWorkerCompletedTrigger:
     """Bonus: worker_completed trigger fires when content_worker completes."""
 

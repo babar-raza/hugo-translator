@@ -7,6 +7,7 @@ Verifies:
 - Processes are launched in parallel (non-blocking Popen, not wait())
 - Exit codes are collected correctly
 - VRAM clamp logic
+- wait_and_cleanup closes file handles and returns exit codes
 """
 
 from __future__ import annotations
@@ -31,6 +32,11 @@ def _load():
         launch_sites,
     )
     return build_site_cli_args, clamp_gpu_memory, launch_sites
+
+
+def _load_cleanup():
+    from src.utils.parallel_sites import wait_and_cleanup
+    return wait_and_cleanup
 
 
 # ---------------------------------------------------------------------------
@@ -217,3 +223,47 @@ class TestClampGpuMemory:
     def test_zero_sites_returns_requested(self):
         _, clamp, _ = _load()
         assert clamp(0, 50) == 50
+
+
+# ---------------------------------------------------------------------------
+# wait_and_cleanup
+# ---------------------------------------------------------------------------
+
+class TestWaitAndCleanup:
+    def test_exit_codes_returned_in_order(self):
+        cleanup = _load_cleanup()
+        exit_sequence = [0, 0, 1, 0]
+        procs = []
+        for code in exit_sequence:
+            m = MagicMock(spec=subprocess.Popen)
+            m.returncode = code
+            procs.append(m)
+        result = cleanup(procs)
+        assert result == exit_sequence
+        for p in procs:
+            p.wait.assert_called_once()
+
+    def test_log_handles_closed_after_wait(self):
+        cleanup = _load_cleanup()
+        mock_fout = MagicMock()
+        mock_ferr = MagicMock()
+        procs = []
+        for _ in range(2):
+            m = MagicMock(spec=subprocess.Popen)
+            m.returncode = 0
+            fout, ferr = MagicMock(), MagicMock()
+            m._log_handles = [fout, ferr]
+            procs.append(m)
+        cleanup(procs)
+        for p in procs:
+            for fh in p._log_handles:
+                fh.close.assert_called_once()
+
+    def test_no_error_when_log_handles_missing(self):
+        cleanup = _load_cleanup()
+        m = MagicMock(spec=subprocess.Popen)
+        m.returncode = 42
+        # spec=subprocess.Popen means _log_handles is not an attribute
+        # wait_and_cleanup uses getattr with default [] — should not raise
+        result = cleanup([m])
+        assert result == [42]

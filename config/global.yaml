@@ -55,6 +55,13 @@ tm_defaults:
   l3_embedding_model: "sentence-transformers/paraphrase-multilingual-mpnet-base-v2"
   l3_index_type: "IVFFlat"  # Flat, IVFFlat, HNSW
 
+  # TC-M3-LITE: L3 context gate (default disabled — enable after testing in staging)
+  # When enabled, L3 hits whose stored context has cosine similarity < threshold with
+  # the current segment context are rejected. Graceful fallback: if either context is
+  # empty, the hit is accepted regardless.
+  l3_context_gate_enabled: false
+  l3_context_similarity_threshold: 0.50
+
 # Default model preferences
 model_defaults:
   fallback_model: "professionalize_llm"
@@ -63,6 +70,29 @@ model_defaults:
   cache_models: true
   max_cached_models: 2
   allow_model_download: false  # Prevent automatic model downloads in production (default: false)
+
+# Asset synchronization for Hugo page bundles (per_language_folders sites only)
+# Copies non-markdown assets (images, PDFs) from source to target language folders.
+asset_sync:
+  enabled: false
+  extensions: [".png", ".jpg", ".jpeg", ".svg", ".gif", ".webp", ".pdf", ".zip"]
+  skip_if_exists: true
+
+# TC-05: File-level review cache — skip re-validation when source+translation
+# content pair was already validated and ACCEPTED in a previous run.
+review_cache:
+  enabled: true    # TC-M1 2026-05-01: enabled — SHA256-keyed validation cache prevents redundant re-validation
+  max_entries: 10000
+  max_age_days: 14
+
+# TC-06: Correction pass — when validation rejects a translation, send the
+# failed output + validation issues to an LLM for targeted fixes before
+# final rejection. Only attempted once per file+lang per run.
+correction_pass:
+  enabled: true    # TC-C5 2026-05-01: enabled — LLM fix attempt before retranslate queue
+  model: professionalize_llm
+  # NOTE: purity failures bypass correction pass by architecture — they occur after the
+  # correction+revalidation cycle completes. Correction only handles validation-suite rejections.
 
 # Translation generation defaults
 translation:
@@ -238,7 +268,7 @@ features:
   # additionally checked via fasttext language sampling to detect wrong-language outputs.
   # Results are cached per-file for quality_aware_filter_ttl_days days to keep overhead low.
   # Default: off. Enable in off-peak windows; monitor with scan_wrong_language_outputs.py.
-  enable_quality_aware_completion_filter: false
+  enable_quality_aware_completion_filter: true   # TC-C2 2026-05-01: enabled — re-checks "done" files for wrong-language content
   quality_aware_filter_ttl_days: 7      # Re-validate each "complete" file every N days
   quality_aware_filter_confidence: 0.80  # fasttext confidence threshold for flagging
   quality_aware_filter_paragraphs: 2     # Max body paragraphs to sample per output file
@@ -600,6 +630,20 @@ translation_engine:
   # Kept skipped: Latin-script and ambiguous-script languages where English product names
   # cause ~27-30% FastText false positives (would trigger exit_code=1 failures).
   # PREREQUISITE: verify no exit_code=1 failures for re-enabled langs in staging first.
+  #
+  # TC-H3 DEFERRAL RECORD (2026-05-01):
+  # Narrowing this skip list (e.g. removing es/it/cs) is DEFERRED until:
+  #   fp_rate_for_lang = (
+  #       segments_flagged_wrong_lang_in_correct_translation
+  #       / total_segments_translated_for_lang
+  #   )
+  # Source: data/logs/validation_metrics.jsonl (requires log enhancement to record per-segment
+  # lang-detection results — this field does NOT currently exist in the log).
+  # Gate: fp_rate(es) < 5% AND fp_rate(it) < 5% AND fp_rate(cs) < 5% over >= 500 segments each.
+  # Script: scripts/measure_batch_purity_fp.py (must be created before this gate can be evaluated).
+  # COMPENSATING CONTROL: validation.yaml per_language_overrides enforce es=98%/it=98%/cs=97%
+  # file-level purity via LanguageConsistencyValidator. Tests: test_batch_purity_skip_compensation.py.
+  # MANDATORY REVIEW: 2026-07-01. If measurement script does not exist by then, deferral expires.
   batch_purity_skip_langs: [ar, ca, cs, de, el, es, fa, fr, ga, he, hu, id, it, ja, ko, lt, ms, nl, pl, pt, ro, ru, sk, tr, uk, zh]
 
   min_file_purity_percentage: 0.95  # Require 95% of segments match target language (5% tolerance for mixed content)
@@ -615,6 +659,7 @@ translation_engine:
   # Only add languages with observed FP rate >= 15% in production logs.
   purity_threshold_overrides:
     lt: 0.15  # Lithuanian: reduced from 0.30 — 30% allowed catastrophic contamination through; 15% still generous for English product name FPs
+    bg: 0.15  # Bulgarian: reduced 0.50→0.15 (TC-C1 2026-05-01) — barcode ASCII strip now excludes "Codabar: 0-9,A-D" from FastText; 0.15 matches lt tolerance for remaining English product names
 
   # WS-COMP-7: Per-language model routing overrides.
   # Routes specific target languages to a different model instead of the global fallback.
@@ -667,6 +712,14 @@ translation_engine:
   # of their input length are truncated. Production observed: 11.4× (Hindi barcode).
   max_llm_output_to_input_ratio: 4.0  # float > 0
 
+  # TC-H2: Per-language LLM output ratio overrides.
+  # Use when a language's natural expansion rate exceeds the global cap.
+  # Evidence required before adding: production logs showing legitimate expansion.
+  llm_output_ratio_overrides:
+    hi: 3.0   # Hindi: natural expansion ~2-2.5×; 11× observed was hallucination
+    pl: 5.0   # Polish: morphological expansion ~1.5-2×; 4× too tight for complex sentences
+    cs: 5.0   # Czech: similar morphological pattern to Polish
+
   # TC-AST-02: Purity backpressure threshold.
   # After this many consecutive language-purity failures for the same language,
   # the adaptive batch tracker reduces current_batch_size by 1 (minimum 1).
@@ -696,3 +749,10 @@ metrics:
 logging:
   max_log_size_mb: 50     # Each log file rotates at this size (MB)
   max_log_backups: 3      # Number of rotated backups kept (.log.1, .log.2, .log.3)
+
+# TC-REEXEC-06: Scheduler safety — campaign mode must not be restored until all
+# scheduler safety gates (TC-SCHED-01..06) pass. Setting campaign_mode_enabled=true
+# without passing those gates will allow daemon mode to run unsafely.
+scheduler:
+  campaign_mode_enabled: false  # Set true ONLY after TC-SCHED-01..06 pass all gates
+  max_queue_files_per_run: 2000 # TC-SCHED-06: cap per-run queue processing

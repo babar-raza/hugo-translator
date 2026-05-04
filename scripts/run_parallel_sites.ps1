@@ -29,6 +29,11 @@
 .PARAMETER ForceNoGpu
     Pass --device cpu to every subprocess; bypasses VRAM checks.
 
+.PARAMETER AllSites
+    Run ALL autonomous-enabled sites from ConfigService, not just the four
+    production .net subdomains. Without this flag, the default scope is:
+    products.aspose.net, docs.aspose.net, kb.aspose.net, blog.aspose.net.
+
 .PARAMETER TimeoutMinutes
     Wall-clock timeout in minutes before stragglers are killed (default 120).
 
@@ -39,6 +44,7 @@
     powershell -ExecutionPolicy Bypass -File scripts\run_parallel_sites.ps1 -DryRun
     powershell -ExecutionPolicy Bypass -File scripts\run_parallel_sites.ps1 -Site blog.aspose.net -ParallelLanguages 2
     powershell -ExecutionPolicy Bypass -File scripts\run_parallel_sites.ps1 -ParallelLanguages 4 -MaxGpuMemoryPercent 20
+    powershell -ExecutionPolicy Bypass -File scripts\run_parallel_sites.ps1 -AllSites -DryRun
 #>
 param(
     [int]   $ParallelLanguages   = 4,
@@ -46,6 +52,7 @@ param(
     [switch]$DryRun,
     [string]$Site                = "",
     [switch]$ForceNoGpu,
+    [switch]$AllSites,
     [int]   $TimeoutMinutes      = 120,
     [string]$LogLevel            = "INFO"
 )
@@ -69,15 +76,27 @@ New-Item -ItemType Directory -Path $LogsDir -Force | Out-Null
 # ---------------------------------------------------------------------------
 # Discover sites via ConfigService.list_sites() (autonomous_only=True)
 # ---------------------------------------------------------------------------
+# Default production scope: the four .net subdomains required by the sprint.
+# Use -AllSites to include every autonomous-enabled profile from ConfigService.
+# Use -Site to target a single site explicitly.
+$DefaultProdSites = @(
+    "products.aspose.net",
+    "docs.aspose.net",
+    "kb.aspose.net",
+    "blog.aspose.net"
+)
+
 if ($Site -ne "") {
     $Sites = @($Site)
-} else {
+} elseif ($AllSites) {
     $SitesJson = & $Python -c "import sys; sys.path.insert(0, r'$ProjectRoot'); from src.utils.config_loader import ConfigService; import json; cs = ConfigService(r'$ProjectRoot/config'); print(json.dumps(cs.list_sites()))"
     if ($LASTEXITCODE -ne 0) {
         Write-Error "[ERROR] Failed to discover sites from ConfigService."
         exit 1
     }
     $Sites = $SitesJson | ConvertFrom-Json
+} else {
+    $Sites = $DefaultProdSites
 }
 
 $NSites = $Sites.Count
@@ -118,9 +137,9 @@ foreach ($SiteId in $Sites) {
 
     if ($ForceNoGpu) {
         $null = $CliArgs.AddRange([string[]]@("--device", "cpu"))
-    } else {
-        $null = $CliArgs.AddRange([string[]]@("--max-gpu-memory-percent", "$EffectiveCap"))
     }
+    # Note: GPU memory percent is controlled via config (global.yaml hardware
+    # section), not a CLI flag. VRAM clamp warnings above are informational.
 
     if ($DryRun) {
         $null = $CliArgs.Add("--dry-run")

@@ -369,7 +369,7 @@ class TestVerifyEntry:
     def checker(self, tmp_path):
         """Create checker with empty database."""
         db_path = tmp_path / "test_tm"
-        l2 = L2PersistentTM(db_path)
+        l2 = L2PersistentTM(db_path, max_size_mb=20)
         return CacheIntegrityChecker(l2)
 
     def test_verify_entry_valid(self, checker):
@@ -403,7 +403,7 @@ class TestCheckCacheIntegrity:
         db_path = tmp_path / "test_tm"
 
         # Create and populate database
-        l2 = L2PersistentTM(db_path)
+        l2 = L2PersistentTM(db_path, max_size_mb=20)
         l2.store(
             site_id="test.site",
             src_lang="en",

@@ -318,6 +318,32 @@ if (-not $LoadHelpersOnly) {
     Write-Host "==> Overall: $overallStatus" -ForegroundColor $statusColor
     Write-Host ""
 
+    # TC-H4: Quarantine check — warn if files permanently dropped in last 7 days
+    Write-Host "--- Permanent Drop Monitor ---" -ForegroundColor Yellow
+    $QuarantineFile = Join-Path $ProjectRoot "data\quarantine.jsonl"
+    if (Test-Path $QuarantineFile) {
+        $cutoff = (Get-Date).AddDays(-7).ToUniversalTime()
+        $recentDrops = 0
+        foreach ($line in (Get-Content $QuarantineFile -ErrorAction SilentlyContinue)) {
+            try {
+                $entry = $line | ConvertFrom-Json -ErrorAction SilentlyContinue
+                if ($entry -and $entry.queued_at) {
+                    $ts = [datetime]::Parse($entry.queued_at, $null, [System.Globalization.DateTimeStyles]::RoundtripKind)
+                    if ($ts -gt $cutoff) { $recentDrops++ }
+                }
+            } catch { }
+        }
+        if ($recentDrops -gt 0) {
+            Write-Host "  [WARN] $recentDrops file(s) permanently dropped in last 7 days — inspect data/quarantine.jsonl" -ForegroundColor Yellow
+            if ($overallStatus -eq "OK") { $overallStatus = "WARN" }
+        } else {
+            Write-Host "  [OK] No permanently dropped files in last 7 days" -ForegroundColor Green
+        }
+    } else {
+        Write-Host "  [OK] data/quarantine.jsonl does not exist (no permanent drops yet)" -ForegroundColor Green
+    }
+    Write-Host ""
+
     Write-Host "--- Worker Provenance ---" -ForegroundColor Yellow
     foreach ($row in $rows) {
         $c = @{ "OK" = "Green"; "WARN" = "Yellow"; "CRIT" = "Red" }[$row.Status]

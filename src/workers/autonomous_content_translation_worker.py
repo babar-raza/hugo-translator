@@ -319,10 +319,15 @@ class AutonomousContentTranslationWorker:
         logger.info("Setup complete")
 
     def _write_pid_file(self):
-        """Write PID file for watchdog monitoring."""
-        pid_path = Path("data/logs") / f"{self._worker_id}.pid"
-        pid_path.parent.mkdir(parents=True, exist_ok=True)
-        pid_path.write_text(str(os.getpid()))
+        """Write PID file for watchdog monitoring (with single-instance guard)."""
+        from src.workers.worker_state import acquire_pid_file
+
+        if not acquire_pid_file(self._worker_id):
+            logger.critical(
+                "Another instance of %s is already running. Exiting.",
+                self._worker_id,
+            )
+            sys.exit(1)
 
     def _write_heartbeat(self, status="alive"):
         """Write heartbeat file for watchdog monitoring."""
@@ -466,6 +471,21 @@ class AutonomousContentTranslationWorker:
         )
         self._daemon_start_time = time.time()
         try:
+            # TC-REEXEC-06: Campaign config gate — daemon mode must not run
+            # unless scheduler.campaign_mode_enabled=true in global.yaml.
+            # This prevents accidental daemon spawning while scheduler safety
+            # gates (TC-SCHED-01..06) are incomplete. Oneshot is not gated.
+            if self.config.mode == "daemon":
+                _raw_cfg = getattr(self.config_service, '_raw_global_config', {})
+                _sched_cfg = _raw_cfg.get('scheduler', {})
+                if not _sched_cfg.get('campaign_mode_enabled', False):
+                    logger.info(
+                        "[SCHED] campaign_mode_enabled=false in config. "
+                        "Daemon exiting safely. Set scheduler.campaign_mode_enabled=true "
+                        "in global.yaml after TC-SCHED-01..06 pass all gates."
+                    )
+                    return
+
             if self.config.mode == "oneshot":
                 self._run_oneshot()
             elif self.config.mode == "daemon":
@@ -961,6 +981,11 @@ class AutonomousContentTranslationWorker:
                 chunk_idx += 1
                 skip_first += result.total_files
 
+                # Zero-progress guard: break if chunk produced nothing useful
+                if result.successful_files == 0 and result.failed_files == 0:
+                    logger.warning("Chunk %d: zero progress (0 successful, 0 failed) — breaking loop", chunk_idx)
+                    break
+
                 # Exit when the slice was smaller than the chunk size (last slice)
                 if result.total_files < files_per_commit:
                     break
@@ -1144,11 +1169,17 @@ class AutonomousContentTranslationWorker:
             output_dir.mkdir(parents=True, exist_ok=True)
             ts = _now.strftime("%Y%m%dT%H%M%SZ")
             run_file = output_dir / f"run_{ts}_{site_id}.json"
-            run_file.write_text(
-                _json.dumps(run_summary, indent=2, ensure_ascii=False),
-                encoding="utf-8",
-            )
-            logger.info("TC-16: Run metrics written to %s", run_file)
+            # Use a thread with timeout to guard against OneDrive-sync file write hangs
+            # (Windows OneDrive can block write_text() indefinitely on synced paths).
+            import concurrent.futures as _cf
+            _content = _json.dumps(run_summary, indent=2, ensure_ascii=False)
+            with _cf.ThreadPoolExecutor(max_workers=1) as _ex:
+                _fut = _ex.submit(run_file.write_text, _content, "utf-8")
+                try:
+                    _fut.result(timeout=10)
+                    logger.info("TC-16: Run metrics written to %s", run_file)
+                except _cf.TimeoutError:
+                    logger.warning("TC-16: Run metrics write timed out (OneDrive sync?) — skipping")
         except Exception as _e:
             logger.warning("TC-16: Failed to write run metrics (non-fatal): %s", _e)
 
@@ -1283,7 +1314,7 @@ class AutonomousContentTranslationWorker:
             if torch.cuda.is_available():
                 torch.cuda.empty_cache()
         except ImportError:
-            pass
+            logger.debug("[VRAM] torch not available — skipping CUDA cache clear")
 
         # TC-L3-007: Offload L3 encoder to CPU (mirrors TM worker pattern)
         try:
@@ -1699,6 +1730,11 @@ Examples:
 
 def main():
     """Main entry point for autonomous worker."""
+    # Enable faulthandler so C-level crashes (segfault in PyTorch/HTTPX) produce
+    # a native stack trace to stderr rather than silently dying.
+    import faulthandler as _fh
+    _fh.enable()
+
     # Parse arguments
     args = parse_args()
 
@@ -1729,6 +1765,30 @@ def main():
     # Ensure logs are flushed on any exit path (normal, exception, signal)
     import atexit
     atexit.register(logging.shutdown)
+
+    # TC-REEXEC-09 / RISK-09: Route structlog through stdlib logging so Windows
+    # pipe errors (OSError [Errno 22]) are swallowed by stdlib Handler.emit()
+    # instead of aborting translation. Without this, structlog's default
+    # PrintLoggerFactory calls print(msg, file=sys.stdout) directly, which
+    # crashes on restricted pipes (Task Scheduler, redirected stdout).
+    import structlog as _structlog
+    _structlog.configure(
+        processors=[
+            _structlog.stdlib.filter_by_level,
+            _structlog.stdlib.add_logger_name,
+            _structlog.stdlib.add_log_level,
+            _structlog.stdlib.PositionalArgumentsFormatter(),
+            _structlog.processors.TimeStamper(fmt="iso"),
+            _structlog.processors.StackInfoRenderer(),
+            _structlog.processors.format_exc_info,
+            _structlog.processors.UnicodeDecoder(),
+            _structlog.dev.ConsoleRenderer(),
+        ],
+        wrapper_class=_structlog.stdlib.BoundLogger,
+        context_class=dict,
+        logger_factory=_structlog.stdlib.LoggerFactory(),
+        cache_logger_on_first_use=True,
+    )
 
     logger.info("=" * 80)
     logger.info("AUTONOMOUS CONTENT TRANSLATION WORKER")

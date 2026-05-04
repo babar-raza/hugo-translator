@@ -1,0 +1,6 @@
+agent: claude-opus-4-6-main
+project_id: 123
+intended_output: reviews/gitlab-translators/123-hugo-blog-generator-translator.md
+start_time: 2026-04-28T09:35:42Z
+source_repo: https://gitlab.recruitize.ai/krsk-procurize/hugo-blog-post-generator-translator.git
+status: active
