@@ -21,6 +21,9 @@ _yaml_dumper.preserve_quotes = True
 _yaml_dumper.width = 4096  # Prevent line wrapping
 _yaml_dumper.default_flow_style = False
 _yaml_dumper.allow_duplicate_keys = True  # Hugo files may have duplicate keys
+# Use documented indent() API (ruamel >= 0.16) to set 4-space indentation.
+# This preserves Hugo convention and prevents block scalar indentation failures.
+_yaml_dumper.indent(mapping=4, sequence=4, offset=2)
 
 
 class YAMLFormatter:
@@ -68,10 +71,30 @@ class YAMLFormatter:
                 allow_unicode=True,
                 sort_keys=False,
                 width=float("inf"),
+                indent=4,
             )
+
+        # RC-5: Post-serialization validation — fail before write if YAML is invalid.
+        YAMLFormatter._validate_yaml_output(yaml_content)
 
         # Wrap in Hugo frontmatter delimiters
         return f"---\n{yaml_content}---\n"
+
+    @staticmethod
+    def _validate_yaml_output(yaml_content: str) -> None:
+        """Raise ValueError if serialized YAML is not parseable by yaml.safe_load.
+
+        Called by format_frontmatter() before returning. Prevents invalid YAML
+        from reaching the file write step (RC-5 fix).
+        """
+        try:
+            result = yaml.safe_load(yaml_content)
+            if result is not None and not isinstance(result, dict):
+                raise ValueError(
+                    f"Serialized frontmatter YAML is not a mapping (got {type(result).__name__})"
+                )
+        except yaml.YAMLError as exc:
+            raise ValueError(f"Serialized frontmatter YAML is invalid: {exc}") from exc
 
     @staticmethod
     def apply_literal_style(value: str) -> LiteralScalarString:

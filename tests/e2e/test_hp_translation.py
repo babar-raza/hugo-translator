@@ -45,7 +45,7 @@ def translation_engine(config_service, config_root):
     l1_cache = L1Cache(max_size=1000)
     l2_path = tm_data_dir / "l2_lmdb"
     l2_path.mkdir(parents=True, exist_ok=True)
-    l2_persistent = L2PersistentTM(str(l2_path))
+    l2_persistent = L2PersistentTM(str(l2_path), max_size_mb=20)
 
     tm = TranslationMemory(
         l1_cache=l1_cache,

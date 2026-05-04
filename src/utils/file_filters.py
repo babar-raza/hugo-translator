@@ -6,6 +6,7 @@ separating source files from already-translated files.
 """
 
 import logging
+import subprocess
 from pathlib import Path
 
 logger = logging.getLogger(__name__)
@@ -139,3 +140,69 @@ def filter_source_files(
             )
 
     return filtered_files
+
+
+def git_changed_files(content_root: Path, since_sha: str) -> set[Path] | None:
+    """Return absolute paths of files changed since a given commit SHA.
+
+    Runs ``git diff --name-only <since_sha> HEAD`` inside *content_root*.
+    Uses ``git rev-parse --show-toplevel`` to find the repo root so that
+    returned paths are correct even when *content_root* is a subdirectory.
+
+    Args:
+        content_root: Directory inside the content git repository.
+        since_sha: Commit SHA to diff against HEAD.
+
+    Returns:
+        Set of absolute, resolved Paths for changed files, or None on any
+        git failure (caller should treat None as "don't filter").
+
+    Source: Pattern from GitLab project 368 (ai-powered-multilingual-translation).
+    """
+    try:
+        # Find git repo root (content_root may be a subdirectory)
+        repo_root_result = subprocess.run(
+            ["git", "-C", str(content_root), "rev-parse", "--show-toplevel"],
+            capture_output=True, text=True, timeout=30,
+        )
+        if repo_root_result.returncode != 0:
+            logger.warning(
+                "git rev-parse failed in %s: %s",
+                content_root, repo_root_result.stderr.strip(),
+            )
+            return None
+        repo_root = Path(repo_root_result.stdout.strip()).resolve()
+
+        # Run git diff from repo root
+        diff_result = subprocess.run(
+            ["git", "-C", str(repo_root), "diff", "--name-only", since_sha, "HEAD"],
+            capture_output=True, text=True, timeout=60,
+        )
+        if diff_result.returncode != 0:
+            logger.warning(
+                "git diff failed (sha=%s): %s",
+                since_sha, diff_result.stderr.strip(),
+            )
+            return None
+
+        changed: set[Path] = set()
+        for line in diff_result.stdout.splitlines():
+            line = line.strip()
+            if line:
+                changed.add((repo_root / line).resolve())
+
+        logger.info(
+            "git diff %s..HEAD: %d changed files in %s",
+            since_sha[:12], len(changed), repo_root,
+        )
+        return changed
+
+    except subprocess.TimeoutExpired:
+        logger.warning("git diff timed out for %s", content_root)
+        return None
+    except FileNotFoundError:
+        logger.warning("git not found on PATH")
+        return None
+    except Exception as exc:
+        logger.warning("git_changed_files error: %s", exc)
+        return None

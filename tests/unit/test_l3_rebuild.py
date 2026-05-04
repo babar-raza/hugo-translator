@@ -79,7 +79,7 @@ class TestL2ExportAll:
     def test_export_all_empty_cache(self, tmp_path):
         """Test exporting from empty cache."""
         db_path = tmp_path / "empty_tm"
-        l2 = L2PersistentTM(db_path)
+        l2 = L2PersistentTM(db_path, max_size_mb=10)
 
         entries = l2.export_all()
         assert entries == []

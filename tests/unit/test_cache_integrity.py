@@ -97,7 +97,7 @@ class TestAtomicWrites:
     def test_atomic_write_succeeds(self):
         """Test that atomic write succeeds with valid entry."""
         with tempfile.TemporaryDirectory() as tmpdir:
-            tm = L2PersistentTM(db_path=tmpdir)
+            tm = L2PersistentTM(db_path=tmpdir, max_size_mb=20)
 
             # Store valid entry
             result = tm.store(
@@ -126,7 +126,7 @@ class TestAtomicWrites:
     def test_invalid_entry_rejected(self):
         """Test that invalid entry is rejected before write."""
         with tempfile.TemporaryDirectory() as tmpdir:
-            tm = L2PersistentTM(db_path=tmpdir)
+            tm = L2PersistentTM(db_path=tmpdir, max_size_mb=20)
 
             # Attempt to store invalid entry (empty translation)
             with pytest.raises(ValueError, match="failed validation"):
@@ -157,7 +157,7 @@ class TestCorruptionDetection:
     def test_corrupted_json_detected_on_read(self):
         """Test that corrupted JSON is detected and skipped on read."""
         with tempfile.TemporaryDirectory() as tmpdir:
-            tm = L2PersistentTM(db_path=tmpdir)
+            tm = L2PersistentTM(db_path=tmpdir, max_size_mb=20)
 
             # Manually insert corrupted data
             from src.tm.normalization import make_tm_key
@@ -184,7 +184,7 @@ class TestCorruptionDetection:
     def test_invalid_entry_detected_on_read(self):
         """Test that invalid entry (failed validation) is detected on read."""
         with tempfile.TemporaryDirectory() as tmpdir:
-            tm = L2PersistentTM(db_path=tmpdir)
+            tm = L2PersistentTM(db_path=tmpdir, max_size_mb=20)
 
             # Manually insert entry with missing required fields
             from src.tm.normalization import make_tm_key
@@ -225,7 +225,7 @@ class TestConcurrentWrites:
     def test_concurrent_writes_safe(self):
         """Test that concurrent writes from multiple threads are safe."""
         with tempfile.TemporaryDirectory() as tmpdir:
-            tm = L2PersistentTM(db_path=tmpdir)
+            tm = L2PersistentTM(db_path=tmpdir, max_size_mb=20)
 
             # Number of concurrent threads
             num_threads = 5
@@ -279,7 +279,7 @@ class TestBatchIntegrity:
     def test_batch_store_validates_all_entries(self):
         """Test that batch_store validates all entries before write."""
         with tempfile.TemporaryDirectory() as tmpdir:
-            tm = L2PersistentTM(db_path=tmpdir)
+            tm = L2PersistentTM(db_path=tmpdir, max_size_mb=20)
 
             # Create batch with one invalid entry
             entries = [
@@ -319,7 +319,7 @@ class TestBatchIntegrity:
     def test_batch_store_succeeds_with_valid_entries(self):
         """Test that batch_store succeeds with all valid entries."""
         with tempfile.TemporaryDirectory() as tmpdir:
-            tm = L2PersistentTM(db_path=tmpdir)
+            tm = L2PersistentTM(db_path=tmpdir, max_size_mb=20)
 
             # Create batch with all valid entries
             entries = [
@@ -361,7 +361,7 @@ class TestErrorHandling:
     def test_serialization_error_raises_runtime_error(self):
         """Test that JSON serialization error raises RuntimeError."""
         with tempfile.TemporaryDirectory() as tmpdir:
-            tm = L2PersistentTM(db_path=tmpdir)
+            tm = L2PersistentTM(db_path=tmpdir, max_size_mb=20)
 
             # Create entry with unserializable metadata
             with pytest.raises(RuntimeError, match="Failed to serialize"):

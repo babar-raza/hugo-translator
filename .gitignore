@@ -196,6 +196,7 @@ tests/logs/
 /agents/
 /waves/
 /failures/
+/workspace/
 
 # Test output artifacts
 m2m100_test_output.txt

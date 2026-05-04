@@ -1,0 +1,6 @@
+agent: claude-opus-4-6-main
+project_id: 076
+intended_output: reviews/gitlab-translators/076-blog-post-translator-groupdocs.md
+start_time: 2026-04-28T09:35:42Z
+source_repo: https://gitlab.recruitize.ai/chernihiv-groupdocs-com/groupdocs-blog/blog-post-translator.git
+status: active

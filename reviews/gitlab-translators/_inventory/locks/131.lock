@@ -1,0 +1,6 @@
+agent: claude-opus-4-6-main
+project_id: 131
+intended_output: reviews/gitlab-translators/131-blogs-blogpost-translator.md
+start_time: 2026-04-28T09:35:42Z
+source_repo: https://gitlab.recruitize.ai/moscow-groupdocs-cloud/blogs-blogpost-translator.git
+status: active

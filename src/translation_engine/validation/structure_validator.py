@@ -54,8 +54,11 @@ class StructureValidator(Validator):
         # Check lists
         self._check_lists(source, translation, result)
 
-        # Check code blocks
+        # Check code blocks (count invariant — TC-H1A)
         self._check_code_blocks(source, translation, result)
+
+        # Check code block contents (content integrity — TC-H1B)
+        self._check_code_block_contents(source, translation, result)
 
         # Check links and images
         self._check_links(source, translation, result)
@@ -213,6 +216,58 @@ class StructureValidator(Validator):
         inline = len(re.findall(r"`[^`]+`", text))
 
         return fenced + inline
+
+    def _check_code_block_contents(
+        self, source: str, translation: str, result: ValidationResult
+    ) -> None:
+        """TC-H1B: Check fenced code block content and language-tag preservation.
+
+        For each fenced block (by position), compares:
+        1. Content character-for-character (warns on corruption)
+        2. Language tag preservation (```python → ```python, not ```)
+
+        Emits WARNING (not ERROR) — promotes to ERROR after production data shows <1% FP.
+        Only fires when block COUNTS match (if counts differ, TC-H1A ERROR already fires).
+        """
+        # Extract fenced block (lang_tag, content) pairs
+        _FENCED_RE = re.compile(r"^```([^\n]*)\n(.*?)^```", re.DOTALL | re.MULTILINE)
+        src_blocks = [(m.group(1).strip(), m.group(2)) for m in _FENCED_RE.finditer(source)]
+        tgt_blocks = [(m.group(1).strip(), m.group(2)) for m in _FENCED_RE.finditer(translation)]
+
+        # Only compare when counts match (count mismatch is handled by _check_code_blocks)
+        if len(src_blocks) != len(tgt_blocks):
+            return
+
+        for i, ((src_tag, src_body), (tgt_tag, tgt_body)) in enumerate(
+            zip(src_blocks, tgt_blocks)
+        ):
+            block_num = i + 1
+
+            # Check language tag preservation
+            if src_tag and tgt_tag != src_tag:
+                result.issues.append(
+                    self.create_issue(
+                        ValidationSeverity.WARNING,
+                        f"Code block {block_num}: language tag changed "
+                        f"(```{src_tag} → ```{tgt_tag})",
+                        location=f"code_block_{block_num}",
+                        details={"src_tag": src_tag, "tgt_tag": tgt_tag},
+                    )
+                )
+
+            # Check content preservation (content must be identical)
+            if src_body != tgt_body:
+                result.issues.append(
+                    self.create_issue(
+                        ValidationSeverity.WARNING,
+                        f"Code block {block_num}: content was modified during translation",
+                        location=f"code_block_{block_num}",
+                        details={
+                            "src_len": len(src_body),
+                            "tgt_len": len(tgt_body),
+                        },
+                    )
+                )
 
     def _check_links(
         self, source: str, translation: str, result: ValidationResult

@@ -88,7 +88,7 @@ class TranslationMemory:
 
         Uses FastTextDetector when available. Rejects hits where the detected
         language differs from tgt_lang and is not in a known similarity group.
-        Fails open (returns True) on any detection error or when detector is unavailable.
+        Fails closed (returns False) on detector exceptions (TC-C3). Returns True when detector is unavailable (no detector loaded).
         """
         if self._language_detector is None:
             return True
@@ -113,8 +113,13 @@ class TranslationMemory:
             )
             self._poisoned_hits_rejected += 1
             return False
-        except Exception:
-            return True  # fail open — never block on detector errors
+        except Exception as exc:
+            logger.warning(
+                "TM language detector raised exception during hit validation "
+                "(tgt_lang=%s) — rejecting hit (fail-closed): %s",
+                tgt_lang, exc,
+            )
+            return False  # fail closed — detector errors reject the hit (TC-C3)
 
     def lookup(
         self,

@@ -132,13 +132,15 @@ class YAMLValidator(Validator):
                 )
             )
 
-        # Extra keys
+        # Extra keys — ERROR: extra keys in translation likely means YAML keys were
+        # translated (RC-3 defect class) or hallucinated by LLM.
         extra_keys = translation_keys - source_keys
         if extra_keys:
             result.issues.append(
                 self.create_issue(
-                    ValidationSeverity.WARNING,
-                    f"Translation has extra keys: {', '.join(sorted(extra_keys))}",
+                    ValidationSeverity.ERROR,
+                    f"Translation has extra/translated keys (possible key translation): "
+                    f"{', '.join(sorted(extra_keys))}",
                     location="frontmatter",
                     details={"extra_keys": list(extra_keys)},
                 )

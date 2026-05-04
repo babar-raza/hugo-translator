@@ -1,7 +1,10 @@
 """
 Pytest configuration and shared fixtures for the translation system tests.
 """
+import os
+import shutil
 import sys
+import time
 from collections.abc import Generator
 from pathlib import Path
 
@@ -152,3 +155,44 @@ def small_test_models(available_models: list[str]) -> list[str]:
         for model_id in available_models
         if any(keyword in model_id.lower() for keyword in small_keywords)
     ]
+
+
+# ---------------------------------------------------------------------------
+# LMDB cleanup helpers (Windows-safe)
+# ---------------------------------------------------------------------------
+
+TEST_L2_MAX_SIZE_MB: int = 20
+
+
+def _force_delete_lmdb_dir(path: Path, retries: int = 5, delay: float = 0.2) -> bool:
+    """Delete an LMDB directory with retry logic for Windows file-lock issues."""
+    for attempt in range(retries):
+        try:
+            shutil.rmtree(path)
+            return True
+        except PermissionError:
+            if attempt < retries - 1:
+                time.sleep(delay)
+    return False
+
+
+def _find_lmdb_dirs_in(root: Path) -> list[Path]:
+    """Find LMDB directories under *root* by presence of data.mdb + lock.mdb."""
+    results = []
+    if not root.exists():
+        return results
+    for data_mdb in root.rglob("data.mdb"):
+        lmdb_dir = data_mdb.parent
+        if (lmdb_dir / "lock.mdb").exists() and not lmdb_dir.is_symlink():
+            results.append(lmdb_dir)
+    return results
+
+
+@pytest.fixture(autouse=True)
+def _cleanup_test_lmdb(tmp_path: Path) -> Generator[None, None, None]:
+    """Per-test autouse fixture: clean up LMDB dirs inside tmp_path on Windows."""
+    yield
+    if os.name != "nt":
+        return
+    for lmdb_dir in _find_lmdb_dirs_in(tmp_path):
+        _force_delete_lmdb_dir(lmdb_dir)

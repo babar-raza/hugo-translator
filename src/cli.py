@@ -204,6 +204,8 @@ class CLIConfigOverrides:
         self.resume: bool = args.resume
         self.force_restart: bool = args.force_restart
         self.progress_dir: str = args.progress_dir
+        # Git diff change detection
+        self.changed_since: str | None = getattr(args, 'changed_since', None)
         # Content hash tracking
         self.disable_content_hash: bool = args.disable_content_hash
         self.rebuild_content_hashes: bool = args.rebuild_content_hashes
@@ -310,6 +312,10 @@ class CLIConfigOverrides:
 
         # Content hash tracking control (CHT-04)
         overrides["enable_content_hash_tracking"] = not self.disable_content_hash
+
+        # Git diff change detection (--changed-since)
+        if self.changed_since:
+            overrides["changed_since_sha"] = self.changed_since
 
         # Note: rebuild_content_hashes is handled in main() before engine creation
         # Note: validate_output_integrity would be passed to engine if implemented
@@ -720,6 +726,18 @@ Examples:
         default=".translation_progress",
         metavar="DIR",
         help="Directory to store progress files (default: .translation_progress)",
+    )
+
+    resume_group.add_argument(
+        "--changed-since",
+        type=str,
+        default=None,
+        metavar="SHA",
+        help=(
+            "Only translate files changed since this Git commit SHA. "
+            "Runs git diff in the content repo; falls back to no filter on failure. "
+            "Useful in CI: --changed-since $GITHUB_EVENT_BEFORE"
+        ),
     )
 
     # Cache behavior control (federated-splashing-panda: Phase 2 redesign)
@@ -1505,6 +1523,10 @@ def translate_site(args: argparse.Namespace) -> int:
     Returns:
         Exit code (0 for success, non-zero for failure)
     """
+    # Start CI heartbeat early — prevents timeout kills on long translations
+    from .utils.ci_heartbeat import start_ci_heartbeat
+    start_ci_heartbeat()
+
     # Import all dependencies needed for translation
     try:
         from .model_runtime import ModelLoader

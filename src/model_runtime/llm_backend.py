@@ -98,13 +98,19 @@ class LLMModelBackend:
         # Read from global config so it survives model reloads without restarts.
         try:
             from src.utils.config_loader import get_global_config
+            _te_cfg = get_global_config().get('translation_engine', {})
             self._max_hallucination_ratio: float = float(
-                get_global_config().get('translation_engine', {}).get(
-                    'max_llm_output_to_input_ratio', 4.0
-                )
+                _te_cfg.get('max_llm_output_to_input_ratio', 4.0)
             )
+            # TC-H2: Per-language overrides (e.g. hi: 3.0, pl: 5.0, cs: 5.0).
+            # Key: ISO 639-1 lang code → float ratio. Falls back to global when absent.
+            self._hallucination_ratio_overrides: dict[str, float] = {
+                str(k): float(v)
+                for k, v in _te_cfg.get('llm_output_ratio_overrides', {}).items()
+            }
         except Exception:
             self._max_hallucination_ratio = 4.0
+            self._hallucination_ratio_overrides = {}
 
     @property
     def _term_manager(self):
@@ -270,10 +276,13 @@ class LLMModelBackend:
                 user_text=input_text,
             )
 
-            # TC-AST-02: Configurable hallucination cap (max_llm_output_to_input_ratio).
+            # TC-AST-02 / TC-H2: Configurable hallucination cap with per-language overrides.
+            # Per-language override takes precedence; falls back to global ratio.
             input_len = len(input_text)
             output_len = len(result)
-            _max_ratio = self._max_hallucination_ratio  # default 4.0
+            _max_ratio = self._hallucination_ratio_overrides.get(
+                tgt_lang, self._max_hallucination_ratio
+            )
             if input_len > 0 and output_len > _max_ratio * input_len:
                 logger.error(
                     "LLM hallucination detected: segment %d/%d output is %.1fx input "

@@ -65,7 +65,7 @@ class TestSiblingDetectionWarning:
         db_path = tmp_path / L2_DB_NAME
         with warnings.catch_warnings(record=True) as caught:
             warnings.simplefilter("always")
-            tm = L2PersistentTM(db_path)
+            tm = L2PersistentTM(db_path, max_size_mb=10)
             tm.env.close()
         sibling_warns = [w for w in caught if issubclass(w.category, UserWarning)
                          and "sibling" in str(w.message).lower()]
@@ -83,7 +83,7 @@ class TestSiblingDetectionWarning:
 
         with warnings.catch_warnings(record=True) as caught:
             warnings.simplefilter("always")
-            tm = L2PersistentTM(db_path)
+            tm = L2PersistentTM(db_path, max_size_mb=10)
             tm.env.close()
 
         sibling_warns = [w for w in caught if issubclass(w.category, UserWarning)
@@ -108,7 +108,7 @@ class TestSiblingDetectionWarning:
 
         with warnings.catch_warnings(record=True) as caught:
             warnings.simplefilter("always")
-            tm = L2PersistentTM(db_path)
+            tm = L2PersistentTM(db_path, max_size_mb=10)
             tm.env.close()
 
         sibling_warns = [w for w in caught if issubclass(w.category, UserWarning)

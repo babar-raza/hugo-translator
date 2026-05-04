@@ -44,7 +44,7 @@ def test_single_translation():
     print("   OK: L1Cache initialized")
 
     lmdb_path = REPO_ROOT / "data" / "tm" / "l2_lmdb"
-    l2_persistent = L2PersistentTM(str(lmdb_path))
+    l2_persistent = L2PersistentTM(str(lmdb_path), max_size_mb=20)
     print("   OK: L2PersistentTM initialized")
 
     # Initialize L3
