@@ -194,7 +194,18 @@ translate-hugo --site mysite --sort-segments-by-length
 
 **Note:** Sorting overhead is typically <1% of total translation time. Output preserves original document structure exactly.
 
-📚 **Full Documentation**: [Segment Sorting Guide](docs/features/segment-sorting.md)
+Full Documentation: [Segment Sorting Guide](docs/features/segment-sorting.md)
+
+### Agent Metrics API (Dry-Run)
+
+Posts per-run translation metrics to a shared Google Sheet for cross-agent visibility. Currently in dry-run mode (payloads logged, not posted to production).
+
+- **Safety**: Append-only sheet, dry_run=true default, enabled=false default, test row cap
+- **17-field payload**: timestamp, agent identity, job type, scope, item counts, LLM token usage
+- **Profile-driven scope**: Derives product, platform, website from site profile configuration
+- **Local evidence**: Sidecar JSON and JSONL ledger for audit
+
+Full Documentation: [Agent Metrics API](docs/observability/agent-metrics-api.md)
 
 ## Quick Start
 

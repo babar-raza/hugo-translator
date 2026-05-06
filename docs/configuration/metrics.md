@@ -376,6 +376,10 @@ metrics:
 5. **Test changes**: Validate configuration changes in staging before production
 6. **Review periodically**: Adjust limits as workload patterns change
 
+## Related
+
+- [Agent Metrics API](../observability/agent-metrics-api.md) - External metrics posting to Google Sheets (separate from Prometheus)
+
 ## Change History
 
 - **2025-12-24**: Initial metrics configuration system (CFG-01)

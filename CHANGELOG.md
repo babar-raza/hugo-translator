@@ -67,6 +67,17 @@ All notable changes to the Hugo Translation System are documented in this file.
   - Standalone helper function `get_metrics_config()` for global access
   - Documentation: [docs/configuration/metrics.md](docs/configuration/metrics.md)
 
+- **Agent Metrics API Integration** (Plan v6): Profile-driven per-run metrics posting to Google Sheet
+  - 17-field Pydantic-validated payload (timestamp, agent identity, scope, item counts, LLM tokens)
+  - ScopeResolver with 4-level priority cascade and configurable mappings
+  - Scope audit hard gate (`python -m src.observability.metrics_scope --audit`)
+  - ContextVar-based LLM accounting (attempted/completed/failed calls, token usage)
+  - Evidence system: sidecar JSON (schema_version=2), JSONL ledger, posted markers
+  - Non-blocking worker hooks in content translation and TM improvement workers
+  - Safety: enabled=false, dry_run=true defaults; test row cap (3/sprint); env-only secrets
+  - 143 new tests (115 unit + 28 integration), all passing
+  - Documentation: [docs/observability/agent-metrics-api.md](docs/observability/agent-metrics-api.md)
+
 - **Comprehensive Negative Test Coverage** (SR-14): 45 test cases covering edge cases, error handling, and concurrency
   - Storage layer negative tests (17 cases): Malformed data, SQL injection prevention, corrupted database recovery
   - Recommender negative tests (18 cases): No historical data, conflicting requirements, NaN/infinity handling

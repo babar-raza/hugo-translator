@@ -47,6 +47,7 @@ Deploy, monitor, and maintain production systems.
 **Reference:**
 - [Deployment Guide](operations/deployment.md) - Production setup
 - [Metrics](operations/metrics.md) - Metrics and alerts
+- [Agent Metrics API](observability/agent-metrics-api.md) - External metrics posting
 
 ### 💻 System Contributor (Engineer)
 Understand, extend, and contribute to the codebase.
@@ -64,6 +65,7 @@ Understand, extend, and contribute to the codebase.
 **Reference:**
 - [Architecture Overview](architecture/) - System design
 - [API Reference](reference/api.md) - Extension points
+- [Agent Metrics API](observability/agent-metrics-api.md) - Payload schema and scope resolution
 
 ## By Scenario
 
@@ -103,7 +105,11 @@ Understand, extend, and contribute to the codebase.
 - **Technical**: [Architecture](architecture/benchmarking-system.md) | [API Reference](api/benchmarking-api.md)
 - **Performance**: [CPU Benchmarks](performance/cpu-benchmarks.md) - Model comparison and guidance
 
-### ⚡ Performance Optimization
+### Agent Metrics API
+- **Canonical Guide**: [Agent Metrics API](observability/agent-metrics-api.md) - Payload schema, safety model, scope resolution, evidence
+- **Configuration**: `config/global.yaml` → `agent_metrics` section
+
+### Performance Optimization
 - **[Performance Tuning Guide](guides/performance-tuning.md)** - Complete performance optimization strategies (batch sizing, GPU config, segment sorting)
 - **Segment Sorting**: [Segment Sorting Guide](features/segment-sorting.md) - Length-based sorting for improved GPU batching (0-20% throughput improvement)
 - **Batch Optimization**: [Batch Optimization Guide](guides/batch-optimization.md) - Dynamic batch sizing and memory management

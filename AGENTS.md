@@ -166,3 +166,20 @@ This ensures VRAM is free during the sleep window for other processes.
 - [Windows-Native Deployment](docs/operations/windows-native-deployment.md) - Production deployment on Windows
 - [ONBOARDING.md](docs/getting-started/ONBOARDING.md) - New contributor onboarding
 - [VRAM Policy Spec](specs/autonomous_workers/VRAM_POLICY.md) - GPU memory management specification
+
+---
+
+## Agent Metrics Reporting
+
+Both the Content Translation Worker and TM Improvement Worker report per-run metrics via the Agent Metrics API integration. This is **disabled by default** (`enabled: false`, `dry_run: true` in `config/global.yaml`).
+
+When enabled, each content_root translation produces a 17-field payload covering item counts, LLM token usage, and scope (product, platform, website). Payloads are posted to a shared Google Sheet. Evidence sidecars are written locally regardless of posting status.
+
+**Worker hooks:**
+- Content worker: `MetricsRunContext.start()` before each content_root, `.finish()` after
+- TM worker: Same pattern, with `job_type="tm_improvement"`
+- Errors are caught and logged — metrics never crash a worker run
+
+**Configuration**: `config/global.yaml` → `agent_metrics` section
+
+**Full reference**: [Agent Metrics API](docs/observability/agent-metrics-api.md)

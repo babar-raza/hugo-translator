@@ -383,6 +383,12 @@ histogram_quantile(0.99, rate(translation_duration_seconds_bucket[5m]))
 
 3. Ensure metrics are properly labeled
 
+## Agent Metrics API
+
+For external per-run metrics posting to Google Sheets (item counts, LLM token usage, scope), see: [Agent Metrics API](../observability/agent-metrics-api.md).
+
+This is separate from Prometheus metrics and is currently in dry-run mode.
+
 ## References
 
 - [Prometheus Documentation](https://prometheus.io/docs/)
