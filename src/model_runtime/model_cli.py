@@ -5,6 +5,11 @@ Provides CLI interface for model acquisition, organization, and verification:
 - models sync-registry: Generate Opus registry and discover cache models
 - models download: Download models with various filters
 - models verify: Validate downloaded models against manifest
+- models discover: Discover local models across drives and folders
+- models discover-report: View discovery run reports
+- models show: Show detailed model info
+- models select: Select best model for a language pair
+- models doctor: Check registry health
 """
 import argparse
 import logging
@@ -241,12 +246,26 @@ def cmd_list(args: argparse.Namespace) -> int:
     """
     logger.info("=== Model List ===")
 
-    # Load registry
+    # Load registry including discovered models
+    registry_paths = args.registry
+    discovered = Path("config/model_registry.discovered.yaml")
+    if discovered.exists():
+        registry_paths = f"{registry_paths},{discovered}"
+
     try:
-        registry = ModelRegistry(args.registry)
+        registry = ModelRegistry(registry_paths)
     except Exception as e:
         logger.error(f"Failed to load registry: {e}")
         return 1
+
+    # Track which model_ids are discovered (start with disc_ prefix)
+    discovered_ids: set[str] = set()
+    if discovered.exists():
+        try:
+            disc_reg = ModelRegistry(str(discovered))
+            discovered_ids = set(disc_reg.models.keys())
+        except Exception:
+            pass
 
     # Create model store
     store = ModelStore(
@@ -259,21 +278,29 @@ def cmd_list(args: argparse.Namespace) -> int:
     plan = store.get_download_plan()
 
     # Display status
-    print(f"\n{'Model ID':<30} {'Status':<15} {'Size (MB)':<12} {'Backend':<12}")
-    print("-" * 75)
+    _safe_print(f"\n{'Model ID':<40} {'Source':<12} {'Status':<15} {'Size (MB)':<10} {'Backend':<12}")
+    print("-" * 95)
 
     for model_info in sorted(registry.models.values(), key=lambda m: m.model_id):
-        status = "✓ Downloaded" if model_info.model_id in plan["already_present"] else "⬇ Need Download"
+        if model_info.model_id in plan["already_present"]:
+            status = "Downloaded"
+        elif model_info.local_path and model_info.local_path.exists():
+            status = "Available"
+        else:
+            status = "Need Download"
+        source = "discovered" if model_info.model_id in discovered_ids else "curated"
         size = model_info.model_size_mb
         backend = model_info.backend
 
-        print(f"{model_info.model_id:<30} {status:<15} {size:<12} {backend:<12}")
+        _safe_print(f"{model_info.model_id:<40} {source:<12} {status:<15} {size:<10} {backend:<12}")
 
     # Summary
-    print("\n" + "=" * 75)
-    print(f"Total Models: {plan['total_models']}")
-    print(f"Downloaded: {plan['already_present_count']}")
-    print(f"Need Download: {plan['needs_download_count']} ({plan['total_size_mb']:.1f} MB)")
+    curated_count = len(registry.models) - len(discovered_ids & set(registry.models.keys()))
+    disc_count = len(discovered_ids & set(registry.models.keys()))
+    print("\n" + "=" * 95)
+    _safe_print(f"Total Models: {len(registry.models)} (curated: {curated_count}, discovered: {disc_count})")
+    _safe_print(f"Downloaded: {plan['already_present_count']}")
+    _safe_print(f"Need Download: {plan['needs_download_count']} ({plan['total_size_mb']:.1f} MB)")
 
     return 0
 
@@ -462,6 +489,357 @@ def cmd_list_ct2(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_discover(args: argparse.Namespace) -> int:
+    """Discover local models across configured roots."""
+    import os as _os
+    from .discovery_report import DiscoveryReportManager
+    from .local_discovery import LocalModelDiscovery, ScanRoot, get_default_scan_roots
+
+    logger.info("=== Local Model Discovery ===")
+
+    # Apply environment variable overrides
+    env_registry = _os.environ.get("HUGO_TRANSLATOR_MODEL_REGISTRY_PATH", "")
+    if env_registry.strip():
+        args.output_registry = env_registry.strip()
+
+    env_report_dir = _os.environ.get("HUGO_TRANSLATOR_MODEL_DISCOVERY_REPORT_DIR", "")
+    if env_report_dir.strip():
+        args.report_dir = env_report_dir.strip()
+
+    env_full_drive = _os.environ.get("HUGO_TRANSLATOR_ENABLE_FULL_DRIVE_SCAN", "")
+    enable_full_drive = env_full_drive.strip().lower() in ("true", "1", "yes")
+
+    # Build scan roots
+    scan_roots = get_default_scan_roots()
+
+    # Add custom dirs from CLI
+    if args.custom_dirs:
+        for i, raw in enumerate(args.custom_dirs.split(";")):
+            raw = raw.strip()
+            if raw:
+                scan_roots.append(ScanRoot(
+                    path=Path(raw), label=f"custom_{i}", max_depth=args.max_depth,
+                ))
+
+    # Add drive scan roots from CLI or env
+    drive_spec = args.include_drives or ""
+    if enable_full_drive and not drive_spec:
+        import string
+        drive_spec = ",".join(
+            f"{d}:" for d in string.ascii_uppercase if Path(f"{d}:/").exists()
+        )
+        logger.info(f"Full drive scan enabled via env: {drive_spec}")
+
+    if drive_spec:
+        for drive_letter in drive_spec.split(","):
+            drive_letter = drive_letter.strip().rstrip(":/\\")
+            if drive_letter:
+                drive_root = Path(f"{drive_letter}:/")
+                if drive_root.exists():
+                    scan_roots.append(ScanRoot(
+                        path=drive_root, label=f"drive_{drive_letter}",
+                        max_depth=args.max_depth, scan_type="directory",
+                    ))
+
+    # Toggle HF cache / Ollama
+    if args.no_hf_cache:
+        scan_roots = [r for r in scan_roots if r.label != "hf_cache"]
+    if args.no_ollama:
+        scan_roots = [r for r in scan_roots if r.label != "ollama"]
+
+    # Run discovery
+    discovery = LocalModelDiscovery(scan_roots=scan_roots)
+    report_mgr = DiscoveryReportManager(reports_dir=Path(args.report_dir))
+    run_id = report_mgr.start_run(scan_roots)
+
+    all_models = discovery.discover_all()
+
+    # Record models
+    for m in all_models:
+        m.discovery_run_id = run_id
+        report_mgr.record_model(run_id, m.to_dict())
+
+    # Load existing registry IDs for new-model detection
+    existing_ids: set[str] = set()
+    try:
+        reg = ModelRegistry(args.registry)
+        existing_ids = set(reg.models.keys())
+    except Exception:
+        pass
+
+    report = report_mgr.finish_run(
+        run_id,
+        skipped_roots=discovery.skipped_roots,
+        errors=discovery.errors,
+        existing_model_ids=existing_ids,
+        total_before_dedup=len(all_models),
+    )
+
+    # Print summary
+    _safe_print(f"\n{'='*60}")
+    _safe_print(f"Discovery Run: {run_id}")
+    _safe_print(f"{'='*60}")
+    _safe_print(f"Models found:     {report.models_found}")
+    _safe_print(f"New models:       {report.models_new}")
+    _safe_print(f"Errors:           {len(report.errors)}")
+    _safe_print(f"Skipped roots:    {len(report.skipped_roots)}")
+    _safe_print(f"Duration:         {report.duration_seconds:.1f}s")
+
+    if report.models_by_format:
+        _safe_print(f"\nBy format:")
+        for fmt, count in sorted(report.models_by_format.items()):
+            _safe_print(f"  {fmt}: {count}")
+
+    if report.models_by_backend:
+        _safe_print(f"\nBy backend:")
+        for bk, count in sorted(report.models_by_backend.items()):
+            _safe_print(f"  {bk}: {count}")
+
+    if report.errors:
+        _safe_print(f"\nErrors:")
+        for err in report.errors[:10]:
+            _safe_print(f"  {err.get('path', '?')}: {err.get('message', err.get('error', '?'))}")
+
+    # Print models table
+    if all_models:
+        _safe_print(f"\n{'Model ID':<40} {'Family':<12} {'Format':<14} {'Size':<10} {'Path'}")
+        _safe_print("-" * 120)
+        for m in sorted(all_models, key=lambda x: x.model_id):
+            size = f"{m.size_bytes / (1024**2):.0f}MB" if m.size_bytes else "?"
+            path_str = str(m.absolute_path)
+            if len(path_str) > 50:
+                path_str = "..." + path_str[-47:]
+            _safe_print(f"  {m.model_id:<38} {m.model_family:<12} {m.model_format:<14} {size:<10} {path_str}")
+
+    if args.dry_run:
+        _safe_print(f"\n[DRY RUN] No report or registry files written.")
+        return 0
+
+    # Save report
+    report_path = report_mgr.save_report(report)
+    _safe_print(f"\nReport saved: {report_path}")
+
+    # Export registry YAML
+    output = Path(args.output_registry)
+    count = report_mgr.export_as_registry_yaml(report, output, exclude_existing=existing_ids)
+    _safe_print(f"Registry exported: {output} ({count} models)")
+
+    return 0
+
+
+def cmd_show(args: argparse.Namespace) -> int:
+    """Show detailed info for a specific model."""
+    # Load registry including discovered
+    registry_paths = args.registry
+    discovered = Path("config/model_registry.discovered.yaml")
+    if discovered.exists():
+        registry_paths = f"{registry_paths},{discovered}"
+
+    try:
+        registry = ModelRegistry(registry_paths)
+    except Exception as e:
+        logger.error(f"Failed to load registry: {e}")
+        return 1
+
+    if args.model_id not in registry:
+        _safe_print(f"Model not found: {args.model_id}")
+        _safe_print(f"\nAvailable models ({len(registry)} total):")
+        for mid in sorted(registry.models.keys()):
+            _safe_print(f"  {mid}")
+        return 1
+
+    model = registry.get_model(args.model_id)
+    _safe_print(f"\n{'='*60}")
+    _safe_print(f"Model: {model.model_id}")
+    _safe_print(f"{'='*60}")
+    for key, value in model.to_dict().items():
+        if value is not None:
+            _safe_print(f"  {key}: {value}")
+
+    return 0
+
+
+def _safe_print(text: str) -> None:
+    """Print text with Unicode chars replaced for Windows console safety."""
+    try:
+        print(text)
+    except UnicodeEncodeError:
+        print(text.encode("ascii", errors="replace").decode("ascii"))
+
+
+def cmd_select(args: argparse.Namespace) -> int:
+    """Select best model for a language pair."""
+    from .hardware import HardwareDetector
+    from .selector import LanguageAwareModelSelector
+
+    # Load registry including discovered
+    registry_paths = args.registry
+    discovered = Path("config/model_registry.discovered.yaml")
+    if discovered.exists():
+        registry_paths = f"{registry_paths},{discovered}"
+
+    try:
+        registry = ModelRegistry(registry_paths)
+    except Exception as e:
+        logger.error(f"Failed to load registry: {e}")
+        return 1
+
+    # Detect hardware
+    try:
+        hardware = HardwareDetector().detect()
+    except Exception:
+        # Minimal fallback hardware info
+        from .hardware import HardwareInfo
+        hardware = HardwareInfo(
+            cpu_count=4, total_ram_gb=16.0, has_cuda=False,
+            recommended_device="cpu", platform="unknown",
+        )
+
+    selector = LanguageAwareModelSelector(
+        registry=registry,
+        hardware_info=hardware,
+        fallback_model=None,
+    )
+
+    try:
+        selection = selector.select_for_language_pair(
+            args.source, args.target,
+            prefer_quality=args.prefer_quality,
+        )
+    except ValueError as e:
+        print(f"\nNo suitable model found for {args.source} -> {args.target}")
+        _safe_print(f"  Reason: {e}")
+        return 1
+
+    _safe_print(f"\nSelected model for {args.source} -> {args.target}:")
+    _safe_print(f"  Model ID:    {selection.model_info.model_id}")
+    _safe_print(f"  Name:        {selection.model_info.name}")
+    _safe_print(f"  Backend:     {selection.model_info.backend}")
+    _safe_print(f"  Strategy:    {selection.selection_strategy}")
+    _safe_print(f"  Rationale:   {selection.rationale}")
+    _safe_print(f"  HW fit:      {selection.hardware_fit}")
+    if selection.model_info.local_path:
+        _safe_print(f"  Local path:  {selection.model_info.local_path}")
+    return 0
+
+
+def cmd_doctor(args: argparse.Namespace) -> int:
+    """Check registry health and report issues."""
+    # Load registry including discovered
+    registry_paths = args.registry
+    discovered = Path("config/model_registry.discovered.yaml")
+    if discovered.exists():
+        registry_paths = f"{registry_paths},{discovered}"
+
+    try:
+        registry = ModelRegistry(registry_paths)
+    except Exception as e:
+        logger.error(f"Failed to load registry: {e}")
+        return 1
+
+    _safe_print(f"\n{'='*60}")
+    _safe_print(f"Model Registry Doctor")
+    _safe_print(f"{'='*60}")
+    _safe_print(f"Total models: {len(registry)}")
+
+    issues = 0
+    warnings = 0
+
+    # Check each model
+    for model in sorted(registry.models.values(), key=lambda m: m.model_id):
+        model_issues: list[str] = []
+
+        # Check local_path exists
+        if model.local_path:
+            if not model.local_path.exists():
+                model_issues.append(f"path missing: {model.local_path}")
+                issues += 1
+
+        # Check backend requirements
+        if model.backend == "ctranslate2":
+            try:
+                import ctranslate2  # noqa: F401
+            except ImportError:
+                model_issues.append("ctranslate2 package not installed")
+                warnings += 1
+
+        if model_issues:
+            _safe_print(f"\n  {model.model_id}:")
+            for issue in model_issues:
+                _safe_print(f"    - {issue}")
+
+    # Summary
+    _safe_print(f"\n{'='*60}")
+    if issues == 0 and warnings == 0:
+        _safe_print("All models OK.")
+    else:
+        _safe_print(f"Issues: {issues}, Warnings: {warnings}")
+
+    return 0 if issues == 0 else 1
+
+
+def cmd_discover_report(args: argparse.Namespace) -> int:
+    """View or export discovery run reports."""
+    from .discovery_report import DiscoveryReportManager
+
+    report_mgr = DiscoveryReportManager(reports_dir=Path(args.report_dir))
+
+    if args.list_reports:
+        reports = report_mgr.list_reports()
+        if not reports:
+            _safe_print("No discovery reports found.")
+            return 0
+        _safe_print(f"\n{'Run ID':<15} {'Timestamp':<28} {'Models':<10} {'Errors':<10}")
+        _safe_print("-" * 70)
+        for r in reports:
+            _safe_print(f"  {r['run_id']:<13} {r['timestamp']:<28} {r['models_found']:<10} {r['errors']:<10}")
+        return 0
+
+    # Load specific or latest report
+    report = None
+    if args.run_id:
+        report = report_mgr.load_report(args.run_id)
+        if not report:
+            _safe_print(f"Report not found: {args.run_id}")
+            return 1
+    elif args.latest:
+        report = report_mgr.get_latest_report()
+        if not report:
+            _safe_print("No discovery reports found.")
+            return 1
+    else:
+        _safe_print("Specify --list, --run-id, or --latest")
+        return 1
+
+    # Display report
+    _safe_print(f"\n{'='*60}")
+    _safe_print(f"Discovery Report: {report.run_id}")
+    _safe_print(f"{'='*60}")
+    _safe_print(f"Timestamp:   {report.timestamp}")
+    _safe_print(f"Duration:    {report.duration_seconds:.1f}s")
+    _safe_print(f"Models:      {report.models_found}")
+    _safe_print(f"New models:  {report.models_new}")
+    _safe_print(f"Errors:      {len(report.errors)}")
+
+    if report.models_by_format:
+        _safe_print(f"\nBy format: {report.models_by_format}")
+    if report.models_by_backend:
+        _safe_print(f"By backend: {report.models_by_backend}")
+
+    if report.selection_recommendations:
+        _safe_print(f"\nRecommendations:")
+        for rec in report.selection_recommendations:
+            _safe_print(f"  - {rec}")
+
+    # Export if requested
+    if args.export_yaml:
+        output = Path(args.export_yaml)
+        count = report_mgr.export_as_registry_yaml(report, output)
+        _safe_print(f"\nExported {count} models to {output}")
+
+    return 0
+
+
 def main() -> int:
     """Main entry point for model CLI."""
     parser = argparse.ArgumentParser(
@@ -646,6 +1024,138 @@ def main() -> int:
         help="Base directory for model storage"
     )
 
+    # discover command
+    discover_parser = subparsers.add_parser(
+        "discover",
+        help="Discover local models across drives and folders"
+    )
+    discover_parser.add_argument(
+        "--custom-dirs",
+        help="Additional directories to scan (semicolon-separated)"
+    )
+    discover_parser.add_argument(
+        "--include-drives",
+        help="Scan model directories on specified drives (e.g., D:,E:)"
+    )
+    discover_parser.add_argument(
+        "--no-hf-cache",
+        action="store_true",
+        help="Exclude HuggingFace cache from scan"
+    )
+    discover_parser.add_argument(
+        "--no-ollama",
+        action="store_true",
+        help="Exclude Ollama models from scan"
+    )
+    discover_parser.add_argument(
+        "--max-depth",
+        type=int,
+        default=4,
+        help="Max directory depth for scanning (default: 4)"
+    )
+    discover_parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Discover but don't write report or registry files"
+    )
+    discover_parser.add_argument(
+        "--output-registry",
+        default="config/model_registry.discovered.yaml",
+        help="Path for discovered models registry YAML"
+    )
+    discover_parser.add_argument(
+        "--report-dir",
+        default="data/discovery",
+        help="Directory for discovery reports"
+    )
+    discover_parser.add_argument(
+        "--registry",
+        default="config/model_registry.yaml",
+        help="Existing registry path (for detecting new models)"
+    )
+
+    # discover-report command
+    dr_parser = subparsers.add_parser(
+        "discover-report",
+        help="View or export discovery run reports"
+    )
+    dr_parser.add_argument(
+        "--list",
+        dest="list_reports",
+        action="store_true",
+        help="List all discovery reports"
+    )
+    dr_parser.add_argument(
+        "--run-id",
+        help="Show specific report by run ID"
+    )
+    dr_parser.add_argument(
+        "--latest",
+        action="store_true",
+        help="Show latest discovery report"
+    )
+    dr_parser.add_argument(
+        "--export-yaml",
+        help="Export report to registry YAML at given path"
+    )
+    dr_parser.add_argument(
+        "--report-dir",
+        default="data/discovery",
+        help="Directory for discovery reports"
+    )
+
+    # show command
+    show_parser = subparsers.add_parser(
+        "show",
+        help="Show detailed info for a specific model"
+    )
+    show_parser.add_argument(
+        "model_id",
+        help="Model ID to show"
+    )
+    show_parser.add_argument(
+        "--registry",
+        default="config/model_registry.yaml",
+        help="Registry path"
+    )
+
+    # select command
+    select_parser = subparsers.add_parser(
+        "select",
+        help="Select best model for a language pair"
+    )
+    select_parser.add_argument(
+        "--source",
+        required=True,
+        help="Source language code (e.g., en)"
+    )
+    select_parser.add_argument(
+        "--target",
+        required=True,
+        help="Target language code (e.g., fr)"
+    )
+    select_parser.add_argument(
+        "--prefer-quality",
+        action="store_true",
+        help="Prefer quality over speed"
+    )
+    select_parser.add_argument(
+        "--registry",
+        default="config/model_registry.yaml",
+        help="Registry path"
+    )
+
+    # doctor command
+    doctor_parser = subparsers.add_parser(
+        "doctor",
+        help="Check registry health and report issues"
+    )
+    doctor_parser.add_argument(
+        "--registry",
+        default="config/model_registry.yaml",
+        help="Registry path"
+    )
+
     # Parse arguments
     args = parser.parse_args()
 
@@ -660,20 +1170,24 @@ def main() -> int:
     )
 
     # Execute command
-    if args.command == "sync-registry":
-        return cmd_sync_registry(args)
-    elif args.command == "download":
-        return cmd_download(args)
-    elif args.command == "verify":
-        return cmd_verify(args)
-    elif args.command == "list":
-        return cmd_list(args)
-    elif args.command == "plan":
-        return cmd_plan(args)
-    elif args.command == "convert-ct2":
-        return cmd_convert_ct2(args)
-    elif args.command == "list-ct2":
-        return cmd_list_ct2(args)
+    commands = {
+        "sync-registry": cmd_sync_registry,
+        "download": cmd_download,
+        "verify": cmd_verify,
+        "list": cmd_list,
+        "plan": cmd_plan,
+        "convert-ct2": cmd_convert_ct2,
+        "list-ct2": cmd_list_ct2,
+        "discover": cmd_discover,
+        "discover-report": cmd_discover_report,
+        "show": cmd_show,
+        "select": cmd_select,
+        "doctor": cmd_doctor,
+    }
+
+    handler = commands.get(args.command)
+    if handler:
+        return handler(args)
     else:
         logger.error(f"Unknown command: {args.command}")
         return 1

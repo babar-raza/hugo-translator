@@ -43,7 +43,7 @@ class TestCorrectionScope:
                 mock_reg.get_model.return_value = MagicMock()
                 MockRegistry.return_value = mock_reg
                 mock_backend_inst = MagicMock()
-                mock_backend_inst._provider.generate.return_value = "Fixed translation text"
+                mock_backend_inst._provider.generate.return_value = ("Fixed translation text", 50, 30)
                 MockBackend.return_value = mock_backend_inst
 
                 result = attempt_correction(

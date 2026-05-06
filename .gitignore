@@ -306,6 +306,7 @@ docs/_audit/
 /config/model_registry.backup.yaml
 /config/model_registry.local.yaml
 /config/model_registry.opus_autogen.yaml
+/config/model_registry.discovered.yaml
 /config/model_registry_*.yaml
 /config/model_registry.yaml.backup
 /config/custom_*.yaml

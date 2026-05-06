@@ -819,28 +819,54 @@ class TMImprovementWorker:
 
     def _execute_improvement_run_with_telemetry(self) -> dict[str, Any]:
         """Execute improvement run wrapped in telemetry tracking."""
-        if not (self.telemetry and self.telemetry.is_available()):
-            return self._execute_improvement_run()
-
-        with self.telemetry.client.track_run(
-            agent_name="tm_improvement_worker",
-            job_type="tm_improvement",
-            trigger_type="scheduled",
-        ) as ctx:
-            result = self._execute_improvement_run()
-            ctx.set_metrics(
-                items_discovered=result.get("candidates_pulled", 0),
-                items_succeeded=result.get("improved_count", 0),
-                items_failed=result.get("failed_count", 0),
-                metrics_json={
-                    "llm_calls": result.get("llm_calls", 0),
-                    "skipped_count": result.get("skipped_count", 0),
-                    "elapsed_seconds": result.get("elapsed_seconds", 0),
-                    "llm_provider": self.config.llm_provider,
-                    "llm_model": self.config.llm_model,
-                },
+        # Agent Metrics: start LLM context tracking
+        _metrics_ctx = None
+        try:
+            from src.observability.agent_metrics_integration import MetricsRunContext
+            _metrics_ctx = MetricsRunContext(
+                site_id="tm_improvement",
+                content_root_raw="tm_improvement",
+                config_service=getattr(self, 'config_service', None),
+                job_type="tm_improvement",
             )
-            return result
+            _metrics_ctx.start()
+        except Exception:
+            pass
+
+        if not (self.telemetry and self.telemetry.is_available()):
+            result = self._execute_improvement_run()
+        else:
+            with self.telemetry.client.track_run(
+                agent_name="tm_improvement_worker",
+                job_type="tm_improvement",
+                trigger_type="scheduled",
+            ) as ctx:
+                result = self._execute_improvement_run()
+                ctx.set_metrics(
+                    items_discovered=result.get("candidates_pulled", 0),
+                    items_succeeded=result.get("improved_count", 0),
+                    items_failed=result.get("failed_count", 0),
+                    metrics_json={
+                        "llm_calls": result.get("llm_calls", 0),
+                        "skipped_count": result.get("skipped_count", 0),
+                        "elapsed_seconds": result.get("elapsed_seconds", 0),
+                        "llm_provider": self.config.llm_provider,
+                        "llm_model": self.config.llm_model,
+                    },
+                )
+
+        # Agent Metrics: finish and post
+        if _metrics_ctx is not None:
+            try:
+                _metrics_ctx.finish(
+                    items_discovered=result.get("candidates_pulled", 0),
+                    items_succeeded=result.get("improved_count", 0),
+                    items_failed=result.get("failed_count", 0),
+                )
+            except Exception as _m_exc:
+                logger.debug("Agent metrics finish skipped: %s", _m_exc)
+
+        return result
 
     def _execute_improvement_run(self) -> dict[str, Any]:
         """

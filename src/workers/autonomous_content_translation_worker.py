@@ -878,6 +878,20 @@ class AutonomousContentTranslationWorker:
         logger.info(f"Translating content_root: {resolved_content_dir}")
         logger.info(f"Target languages: {', '.join(target_langs)}")
 
+        # Agent Metrics: start per-content-root LLM context tracking
+        _metrics_ctx = None
+        try:
+            from src.observability.agent_metrics_integration import MetricsRunContext
+            _metrics_ctx = MetricsRunContext(
+                site_id=site_id,
+                content_root_raw=content_root,
+                config_service=self.config_service,
+                job_type="content_translation",
+            )
+            _metrics_ctx.start()
+        except Exception as _m_exc:
+            logger.debug("Agent metrics context init skipped: %s", _m_exc)
+
         # WS-COMP-8: Accumulators for coverage telemetry emitted at end of this method.
         _cov_total_needing_work = 0
         _cov_successful = 0
@@ -1115,6 +1129,17 @@ class AutonomousContentTranslationWorker:
             )
         except Exception as _ev_exc:
             logger.debug("Coverage event skipped: %s", _ev_exc)
+
+        # Agent Metrics: finish per-content-root metrics and post (dry-run by default)
+        if _metrics_ctx is not None:
+            try:
+                _metrics_ctx.finish(
+                    items_discovered=_cov_total_needing_work,
+                    items_succeeded=_cov_successful,
+                    items_failed=_cov_total_needing_work - _cov_successful,
+                )
+            except Exception as _mp_exc:
+                logger.debug("Agent metrics finish skipped: %s", _mp_exc)
 
     def _write_run_metrics(self, site_id: str, run_id: str) -> None:
         """

@@ -443,3 +443,69 @@ class ModelRegistry:
     def __contains__(self, model_id: str) -> bool:
         """Check if model is registered."""
         return model_id in self.models
+
+    def load_discovered_models(self, discovered_yaml_path: Path) -> int:
+        """
+        Load discovered models from YAML, skipping existing model_ids.
+
+        Curated entries always take priority over discovered entries.
+
+        Args:
+            discovered_yaml_path: Path to discovered registry YAML
+
+        Returns:
+            Number of new models added
+        """
+        if not discovered_yaml_path.exists():
+            logger.debug(f"Discovered registry not found (skipping): {discovered_yaml_path}")
+            return 0
+
+        try:
+            with open(discovered_yaml_path, encoding="utf-8") as f:
+                data = yaml.safe_load(f)
+        except (yaml.YAMLError, OSError) as e:
+            logger.warning(f"Failed to load discovered registry {discovered_yaml_path}: {e}")
+            return 0
+
+        if not data or "models" not in data:
+            return 0
+
+        added = 0
+        for model_data in data["models"]:
+            model_id = model_data.get("model_id")
+            if not model_id:
+                continue
+            if model_id in self.models:
+                logger.debug(f"Skipping discovered {model_id} (curated entry exists)")
+                continue
+            try:
+                model = ModelInfo.from_dict(model_data)
+                self.models[model.model_id] = model
+                added += 1
+            except Exception as e:
+                logger.warning(f"Invalid discovered model entry {model_id}: {e}")
+
+        if added:
+            logger.info(f"Loaded {added} discovered model(s) from {discovered_yaml_path}")
+        return added
+
+    def merge_discovered(
+        self, models: list[ModelInfo], allow_override: bool = False
+    ) -> int:
+        """
+        Merge discovered ModelInfo objects into registry.
+
+        Args:
+            models: List of ModelInfo objects from discovery
+            allow_override: If True, discovered models can override existing entries
+
+        Returns:
+            Number of models added or updated
+        """
+        count = 0
+        for model in models:
+            if model.model_id in self.models and not allow_override:
+                continue
+            self.models[model.model_id] = model
+            count += 1
+        return count
