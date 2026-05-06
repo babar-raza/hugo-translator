@@ -859,3 +859,51 @@ logging:
 scheduler:
   campaign_mode_enabled: false  # Set true ONLY after TC-SCHED-01..06 pass all gates
   max_queue_files_per_run: 2000 # TC-SCHED-06: cap per-run queue processing
+
+# Local model discovery configuration
+# Discovers models from HF cache, Ollama, custom directories, and multiple drives.
+# Read-only scanning -- never copies, moves, or modifies model files.
+local_discovery:
+  enabled: true
+  registry_output: "config/model_registry.discovered.yaml"
+  report_dir: "data/discovery"
+  auto_discover_on_startup: false
+  discovery_cache_ttl_hours: 24
+  follow_symlinks: false
+  enable_full_drive_scan: false
+  max_depth_default: 4
+  enabled_formats:
+    - transformers
+    - ctranslate2
+    - gguf
+    - ollama
+    - sentencepiece
+  scan_roots:
+    - path: "~/.cache/huggingface/hub"
+      label: "hf_cache"
+      enabled: true
+      max_depth: 4
+    - path: "~/.ollama/models"
+      label: "ollama"
+      enabled: true
+      max_depth: 4
+    # Uncomment to add custom model directories:
+    # - path: "D:/models"
+    #   label: "custom_d_drive"
+    #   enabled: true
+    #   max_depth: 4
+  drive_scan:
+    enabled: false
+    drives: []    # e.g., ["D:", "E:"]
+    max_depth: 4
+  skip_patterns:
+    - "$RECYCLE.BIN"
+    - "System Volume Information"
+    - "Windows"
+    - "Program Files"
+    - "Program Files (x86)"
+    - ".git"
+    - "node_modules"
+    - "__pycache__"
+    - ".venv"
+    - "venv"
