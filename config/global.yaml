@@ -744,6 +744,109 @@ metrics:
   write_per_language_summary: true
   format: "json"
 
+# Agent Metrics API — posts per-run metrics to Google Sheets endpoint.
+# Endpoint URL and auth token come from environment variables only (never in config).
+# dry_run=true by default: payloads are logged but NOT posted.
+agent_metrics:
+  enabled: false                    # Master switch; default off
+  dry_run: true                     # Log payload but don't POST; default on
+  endpoint_env: "AGENT_METRICS_ENDPOINT"
+  token_env: "AGENT_METRICS_TOKEN"
+  post_timeout_seconds: 15
+  fire_and_forget: true             # Production: async. Test posts always sync.
+
+  evidence_dir: "data/metrics/agent_evidence"
+  ledger_file: "data/metrics/agent_evidence/metrics_ledger.jsonl"
+
+  test_job_type: "test"
+  max_test_rows_per_sprint: 3
+
+  # Profiles with these prefixes are excluded from metrics posting
+  excluded_site_id_prefixes:
+    - "blog-test"
+    - "products-test"
+    - "golden-test"
+    - "e2e-reference"
+    - "stage-b-canary"
+    - "ws5-test"
+    - "nested-list-test"
+    - "realworld"
+    - "example"
+
+  # Website normalization: source domain -> billing domain
+  metrics_website_mapping:
+    "aspose.net": "aspose.com"
+    "aspose.org": "aspose.com"
+    "groupdocs.net": "groupdocs.com"
+    "groupdocs.org": "groupdocs.com"
+    "conholdate.net": "conholdate.com"
+    "conholdate.org": "conholdate.com"
+
+  # Section normalization: subsystem/display_name -> section label
+  metrics_section_mapping:
+    "docs": "Docs"
+    "kb": "KB"
+    "blog": "Blog"
+    "products": "Product Pages"
+    "reference": "API Reference"
+    "websites": "Product Pages"
+    "www": "Product Pages"
+    "about": "About"
+    "Documentation": "Docs"
+    "Landing Pages": "Product Pages"
+    "blog posts": "Blog"
+    "knowledge base articles": "KB"
+    "API References": "API Reference"
+    "files": "Product Pages"
+
+  # Brand mapping: billing domain -> brand name
+  metrics_brand_mapping:
+    "aspose.com": "Aspose"
+    "groupdocs.com": "GroupDocs"
+    "conholdate.com": "Conholdate"
+
+  # Known product families and platforms (for validation)
+  known_product_families:
+    - words
+    - cells
+    - pdf
+    - slides
+    - email
+    - barcode
+    - diagram
+    - tasks
+    - ocr
+    - note
+    - cad
+    - 3d
+    - html
+    - zip
+    - tex
+    - svg
+    - finance
+    - drawing
+    - font
+    - page
+    - psd
+    - imaging
+    - omr
+    - pub
+    - gis
+    - total
+
+  known_platforms:
+    - net
+    - java
+    - python
+    - cpp
+    - nodejs
+    - php
+    - android
+    - go
+    - jasperreports
+    - reportingservices
+    - sharepoint
+
 # TC-SYS-02: Worker log rotation.
 # Workers use RotatingFileHandler with these limits so log files never grow unbounded.
 logging:

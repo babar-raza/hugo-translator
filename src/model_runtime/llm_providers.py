@@ -27,29 +27,27 @@ class BaseLLMProvider(ABC):
 
     @abstractmethod
     def initialize(self, config: LLMProviderConfig) -> None:
-        """Initialize the provider with configuration.
-
-        Args:
-            config: Validated provider configuration.
-
-        Raises:
-            RuntimeError: If initialization fails (e.g., missing SDK, connection error).
-        """
+        """Initialize the provider with configuration."""
 
     @abstractmethod
+    def _generate_impl(self, system_prompt: str, user_text: str) -> tuple[str, int, int]:
+        """Subclass implementation of generation logic."""
+
     def generate(self, system_prompt: str, user_text: str) -> tuple[str, int, int]:
-        """Generate a completion.
-
-        Args:
-            system_prompt: System instruction.
-            user_text: User message.
-
-        Returns:
-            Tuple of (generated_text, input_tokens, output_tokens).
-
-        Raises:
-            RuntimeError: If the API call fails.
-        """
+        """Instrumented generate — tracks LLM calls via LLMRunContext."""
+        from ..observability.llm_run_context import LLMRunContext
+        ctx = LLMRunContext.get_current()
+        if ctx:
+            ctx.record_attempted()
+        try:
+            result = self._generate_impl(system_prompt, user_text)
+            if ctx:
+                ctx.record_completed(result[1], result[2])
+            return result
+        except Exception:
+            if ctx:
+                ctx.record_failed()
+            raise
 
     def health_check(self) -> bool:
         """Test provider connectivity.
@@ -93,7 +91,7 @@ class OllamaProvider(BaseLLMProvider):
         self._base_url = config.base_url or "http://localhost:11434"
         logger.info("OllamaProvider initialized: %s model=%s", self._base_url, config.model_name)
 
-    def generate(self, system_prompt: str, user_text: str) -> tuple[str, int, int]:
+    def _generate_impl(self, system_prompt: str, user_text: str) -> tuple[str, int, int]:
         import requests
 
         url = f"{self._base_url}/api/chat"
@@ -160,7 +158,7 @@ class OpenAIProvider(BaseLLMProvider):
         self._client = openai.OpenAI(api_key=api_key)
         logger.info("OpenAIProvider initialized: model=%s", config.model_name)
 
-    def generate(self, system_prompt: str, user_text: str) -> tuple[str, int, int]:
+    def _generate_impl(self, system_prompt: str, user_text: str) -> tuple[str, int, int]:
         response = self._client.chat.completions.create(
             model=self._config.model_name,
             messages=[
@@ -212,7 +210,7 @@ class AnthropicProvider(BaseLLMProvider):
         self._client = anthropic.Anthropic(api_key=api_key)
         logger.info("AnthropicProvider initialized: model=%s", config.model_name)
 
-    def generate(self, system_prompt: str, user_text: str) -> tuple[str, int, int]:
+    def _generate_impl(self, system_prompt: str, user_text: str) -> tuple[str, int, int]:
         response = self._client.messages.create(
             model=self._config.model_name,
             system=system_prompt,
@@ -268,7 +266,7 @@ class OpenAICompatibleProvider(BaseLLMProvider):
             config.model_name,
         )
 
-    def generate(self, system_prompt: str, user_text: str) -> tuple[str, int, int]:
+    def _generate_impl(self, system_prompt: str, user_text: str) -> tuple[str, int, int]:
         response = self._client.chat.completions.create(
             model=self._config.model_name,
             messages=[

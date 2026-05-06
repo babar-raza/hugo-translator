@@ -70,7 +70,7 @@ class TestAttemptCorrection:
 
         mock_backend = MagicMock()
         mock_backend._provider = MagicMock()
-        mock_backend._provider.generate.return_value = "Corrected translation"
+        mock_backend._provider.generate.return_value = ("Corrected translation", 50, 30)
         mock_backend_cls.return_value = mock_backend
 
         result = attempt_correction(
@@ -104,7 +104,7 @@ class TestAttemptCorrection:
 
         mock_backend = MagicMock()
         mock_backend._provider = MagicMock()
-        mock_backend._provider.generate.return_value = ""
+        mock_backend._provider.generate.return_value = ("", 10, 5)
         mock_backend_cls.return_value = mock_backend
 
         result = attempt_correction(

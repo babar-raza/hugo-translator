@@ -100,7 +100,13 @@ def attempt_correction(
             logger.warning("Correction pass: provider not initialized")
             return None
 
-        response = backend._provider.generate(prompt)
+        correction_system_prompt = (
+            "You are a translation quality fixer. Fix only the issues listed. "
+            "Output only the corrected translation text, nothing else."
+        )
+        response, _in_tok, _out_tok = backend._provider.generate(
+            correction_system_prompt, prompt
+        )
         if not response or not response.strip():
             logger.warning("Correction pass: empty response from LLM")
             return None
