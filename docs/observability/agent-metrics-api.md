@@ -251,7 +251,12 @@ File: `src/workers/autonomous_content_translation_worker.py`
 
 - `MetricsRunContext.start()` before each content_root translation (~line 884)
 - `MetricsRunContext.finish()` after coverage telemetry (~line 1137)
+- `MetricsRunContext.abort(error_detail)` called on two early-exit paths:
+  - Run deadline exceeded before translation started (~line 923)
+  - `finish()` itself raises an exception (~line 1160)
 - Wrapped in try/except — errors logged at debug level, never crash the worker
+
+**Failure sidecar guarantee:** If the process completes (even partially), `finish()` or `abort()` will always produce a sidecar. If the process is killed externally (SIGKILL), no sidecar is written — this is a documented limitation (see Deferred Work: TC-METRICS-13).
 
 ### TM Improvement Worker
 
@@ -267,6 +272,19 @@ File: `src/workers/tm_improvement_worker.py`
 - Fixture/test profiles (matching `excluded_site_id_prefixes`) are excluded from posting
 - If `enabled: false` or secrets missing, all calls are no-ops
 
+### Repeated Feedback Guard (Translation Engine)
+
+The translation engine (`src/translation_engine/engine.py`) includes a guard against futile LLM correction loops.
+
+If the same error validator fires on **two consecutive retries**, the file is failed immediately without exhausting all `max_retry_attempts`. This addresses cases where the LLM generates incorrect output (e.g., Arabic script when translating to Danish) and cannot self-correct — the guard detects the pattern and cuts the loop early, saving API calls.
+
+The guard tracks `_prev_retry_validators: frozenset | None` across retries per file. It triggers only when:
+- Same set of `(validator_name, "error")` tuples on consecutive retries
+- Current set is non-empty (warnings-only failures are not guarded)
+- Not the first retry (no prior state to compare against)
+
+When triggered, a `TranslationRejectedError` is raised — the file is marked as failed and the worker moves on to the next file. The error is counted in `items_failed` for the metrics sidecar.
+
 ## Testing and Verification
 
 ### Unit Tests
@@ -275,7 +293,7 @@ File: `src/workers/tm_improvement_worker.py`
 pytest tests/unit/observability/ -v
 ```
 
-Covers: llm_run_context (18), metrics_scope (28), agent_metrics_payload (21), metrics_evidence (18), idempotency (9), agent_metrics_poster (14), gitlab_context (5) — **113 tests total**.
+Covers: llm_run_context (18), metrics_scope (28), agent_metrics_payload (21), metrics_evidence (18), idempotency (9), agent_metrics_poster (14), gitlab_context (5), metrics_run_context_abort (7), repeated_feedback_guard (8) — **128 tests total**.
 
 ### Integration Tests
 

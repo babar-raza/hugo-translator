@@ -267,8 +267,19 @@ class AutonomousContentTranslationWorker:
             from src.model_runtime import ModelLoader
             from src.model_runtime.registry import ModelRegistry
 
-            registry_path = os.path.join(self.config.config_root, "model_registry.yaml")
-            model_registry = ModelRegistry(registry_path)
+            # RBTW-003: Load combined registry (curated + custom CT2 + discovered local models)
+            _registry_candidates = [
+                os.path.join(self.config.config_root, "model_registry.yaml"),
+                os.path.join(self.config.config_root, "custom_ct2_registry.yaml"),
+                os.path.join(self.config.config_root, "model_registry.discovered.yaml"),
+            ]
+            _existing_registries = [p for p in _registry_candidates if os.path.exists(p)]
+            if not _existing_registries:
+                _existing_registries = [_registry_candidates[0]]
+            model_registry = ModelRegistry(_existing_registries)
+            logger.info(
+                f"Worker registry: {_existing_registries} — {len(model_registry)} models total"
+            )
             raw_config = self.config_service.get_config()
             model_loader = ModelLoader(
                 registry=model_registry,
@@ -909,6 +920,11 @@ class AutonomousContentTranslationWorker:
             remaining = run_deadline - time.time()
             if remaining <= 0:
                 logger.warning("Run deadline already exceeded before translation, skipping")
+                if _metrics_ctx is not None:
+                    try:
+                        _metrics_ctx.abort("Run deadline exceeded before translation started")
+                    except Exception:
+                        pass
                 return
             logger.info(f"Time budget for this content root: {remaining:.0f}s")
 
@@ -1140,6 +1156,10 @@ class AutonomousContentTranslationWorker:
                 )
             except Exception as _mp_exc:
                 logger.debug("Agent metrics finish skipped: %s", _mp_exc)
+                try:
+                    _metrics_ctx.abort(f"finish() raised: {_mp_exc!s:.200}")
+                except Exception:
+                    pass
 
     def _write_run_metrics(self, site_id: str, run_id: str) -> None:
         """

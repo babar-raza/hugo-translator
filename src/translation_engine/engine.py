@@ -875,11 +875,24 @@ class TranslationEngine:
         if src_lang and tgt_lang and self.model_selector:
             try:
                 selection = self.model_selector.select_for_language_pair(src_lang, tgt_lang)
-                logger.info(
-                    f"CT2-002: Selected {selection.model_info.model_id} for {src_lang}→{tgt_lang} "
-                    f"(strategy={selection.selection_strategy}, backend={selection.model_info.backend})"
+                _model_id = selection.model_info.model_id
+                _origin = "discovered" if _model_id.startswith("disc_") else "curated"
+                _local_path = str(selection.model_info.local_path) if selection.model_info.local_path else None
+                _path_exists = bool(
+                    selection.model_info.local_path
+                    and selection.model_info.local_path.exists()
                 )
-                return selection.model_info.model_id
+                logger.info(
+                    f"CT2-002 model_decision: model_id={_model_id} "
+                    f"backend={selection.model_info.backend} "
+                    f"origin={_origin} "
+                    f"strategy={selection.selection_strategy} "
+                    f"local_path={_local_path} "
+                    f"local_path_exists={_path_exists} "
+                    f"pair={src_lang}->{tgt_lang} "
+                    f"fallback_used=False"
+                )
+                return _model_id
             except ValueError as e:
                 # No suitable model found via selector, fall through to static defaults
                 logger.warning(
@@ -897,12 +910,18 @@ class TranslationEngine:
                 global_fallback = md.fallback_model
         fallback_model = getattr(site_profile, 'default_model', None) or global_fallback
 
-        # Log if using fallback (helps with observability)
+        # Log fallback decision (RBTW-004: structured model decision record)
         if src_lang and tgt_lang:
-            logger.debug(
-                f"Using fallback model {fallback_model} for {src_lang}→{tgt_lang} "
-                f"(no selector or languages not provided)"
+            _fb_origin = "discovered" if fallback_model.startswith("disc_") else "curated"
+            logger.info(
+                f"CT2-002 model_decision: model_id={fallback_model} "
+                f"origin={_fb_origin} "
+                f"pair={src_lang}->{tgt_lang} "
+                f"fallback_used=True "
+                f"fallback_reason=no_selector_or_no_match"
             )
+        elif fallback_model:
+            logger.debug(f"Using fallback model {fallback_model} (no language pair provided)")
 
         return fallback_model
 
@@ -1494,6 +1513,10 @@ class TranslationEngine:
 
                 # TC-06: Correction pass guard — only attempt once per file+lang
                 _correction_attempted = False
+                # Repeated feedback guard: tracks error validator names from previous retry.
+                # If the same validators fire again, the LLM cannot resolve this issue ---
+                # fail early instead of exhausting all max_retry_attempts uselessly.
+                _prev_retry_validators: frozenset | None = None
 
                 while retry_count <= max_retry_attempts:
                     try:
@@ -1713,6 +1736,34 @@ class TranslationEngine:
                                     )
 
                             elif decision_result.decision == PostValidationDecision.RETRY:
+                                # Repeated feedback guard: if the same error validators fire on
+                                # consecutive retries, the LLM cannot fix this — fail early.
+                                try:
+                                    _current_validators = frozenset(
+                                        (getattr(iss, 'validator', ''), getattr(iss, 'severity', ''))
+                                        for iss in (validation_result.issues if validation_result else [])
+                                        if getattr(getattr(iss, 'severity', None), 'value', '') == 'error'
+                                    )
+                                except Exception:
+                                    _current_validators = frozenset()
+                                if (
+                                    _prev_retry_validators is not None
+                                    and _current_validators
+                                    and _current_validators == _prev_retry_validators
+                                ):
+                                    logger.warning(
+                                        f'Repeated feedback for {file_path} to {target_lang}: '
+                                        f'same validators on retry {retry_count}. Failing early. '
+                                        f'Validators: {_current_validators}'
+                                    )
+                                    raise TranslationRejectedError(
+                                        message=f'Repeated identical feedback: {decision_result.decision_reason}',
+                                        file_path=str(file_path),
+                                        validation_result=validation_result,
+                                        rejection_reason='Repeated feedback — LLM cannot resolve this issue',
+                                    )
+                                _prev_retry_validators = _current_validators
+
                                 # Retry with feedback
                                 retry_count += 1
 

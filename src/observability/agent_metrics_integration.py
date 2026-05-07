@@ -68,6 +68,23 @@ class MetricsRunContext:
         except Exception as e:
             logger.debug("LLMRunContext start failed: %s", e)
 
+    def abort(self, error_detail: str = "Worker aborted before content_root completed") -> dict | None:
+        """Call if content_root fails or is killed before finish().
+
+        Writes a failure sidecar (dry_run only — no HTTP POST) with whatever LLM
+        counters have accumulated so far. Item counts are set to 0/unknown at abort time.
+        Safe to call at any point after start(); no-op when not enabled.
+        """
+        if not self.enabled:
+            return None
+        logger.debug("Agent metrics abort: %s", error_detail[:120])
+        return self.finish(
+            items_discovered=0,
+            items_succeeded=0,
+            items_failed=0,
+            error_detail=error_detail,
+        )
+
     def finish(
         self,
         items_discovered: int,
@@ -92,11 +109,11 @@ class MetricsRunContext:
                 token_usage = delta.token_usage
                 api_calls_count = delta.api_calls_count
                 call_accounting = {
-                    "attempted_provider_calls": delta.attempted,
-                    "completed_provider_calls": delta.completed,
-                    "failed_provider_calls": delta.failed,
-                    "total_input_tokens": delta.input_tokens,
-                    "total_output_tokens": delta.output_tokens,
+                    "attempted_provider_calls": delta.attempted_provider_calls,
+                    "completed_provider_calls": delta.completed_provider_calls,
+                    "failed_provider_calls": delta.failed_provider_calls,
+                    "total_input_tokens": delta.total_input_tokens,
+                    "total_output_tokens": delta.total_output_tokens,
                     "token_usage_posted": token_usage,
                     "api_calls_count_posted": api_calls_count,
                 }
@@ -149,13 +166,7 @@ class MetricsRunContext:
 
         # Resolve scope
         content_root_id = derive_content_root_id(self.content_root_raw)
-        resolver = ScopeResolver(
-            website_mapping=self._cfg.get("metrics_website_mapping", {}),
-            section_mapping=self._cfg.get("metrics_section_mapping", {}),
-            brand_mapping=self._cfg.get("metrics_brand_mapping", {}),
-            known_families=self._cfg.get("known_product_families", []),
-            known_platforms=self._cfg.get("known_platforms", []),
-        )
+        resolver = ScopeResolver(config=self._cfg)
         scope_input = ScopeInput(
             site_id=self.site_id,
             content_root_raw=self.content_root_raw,
