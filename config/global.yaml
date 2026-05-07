@@ -753,7 +753,7 @@ agent_metrics:
   endpoint_env: "AGENT_METRICS_ENDPOINT"
   token_env: "AGENT_METRICS_TOKEN"
   post_timeout_seconds: 15
-  fire_and_forget: true             # Production: async. Test posts always sync.
+  fire_and_forget: false            # NOTE: keep false for CLI oneshot runs — daemon threads are killed before POST completes on process exit.
 
   evidence_dir: "data/metrics/agent_evidence"
   ledger_file: "data/metrics/agent_evidence/metrics_ledger.jsonl"
