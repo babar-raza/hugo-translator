@@ -226,7 +226,7 @@ class MetricsRunContext:
             "parent_run_id": self._parent_run_id,
         }
         scope_dict = {
-            "site_id": self.site_id,
+            "site_id": resolved.site_id,  # normalized canonical value (e.g. "docs.aspose.net")
             "source_site_domain": resolved.source_site_domain,
             "content_root_raw": self.content_root_raw,
             "content_root_id": resolved.content_root_id,

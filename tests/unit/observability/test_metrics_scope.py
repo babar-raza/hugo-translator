@@ -290,3 +290,138 @@ class TestIDGeneration:
         seg1 = generate_segment_run_id(slice_id, attempt)
         seg2 = generate_segment_run_id(slice_id, attempt)
         assert seg1 == seg2
+
+
+class TestScopeResolverFamilySuffixBug:
+    """SG-SCOPE-GAP: Regression tests for the family-token suffix bug.
+
+    Previously, site_id="docs.aspose.net.words" (CLI arg style) caused
+    _extract_domain to return "net.words" instead of "aspose.net", which
+    then fell through to website="net.words" instead of "aspose.com".
+    """
+
+    def setup_method(self):
+        self.resolver = ScopeResolver()
+
+    def test_cli_site_id_with_words_suffix_resolves_website_correctly(self):
+        """Core regression: website must be aspose.com, not net.words."""
+        inp = ScopeInput(
+            site_id="docs.aspose.net.words",
+            content_root_raw="${ASPOSE_NET_CONTENT}/docs.aspose.net/words",
+            profile_filename="docs.aspose.net.words.yaml",
+            display_name="Documentation",
+        )
+        scope = self.resolver.resolve(inp)
+        assert scope.website == "aspose.com", (
+            f"website must be aspose.com, got {scope.website!r} — "
+            "family token suffix must not corrupt domain extraction"
+        )
+        assert scope.source_site_domain == "aspose.net"
+        assert scope.product == "Aspose.Words"
+        assert scope.website_section == "Docs"
+        assert scope.site_id == "docs.aspose.net"  # normalized
+        assert scope.content_root_id == "docs.aspose.net/words"
+        assert scope.item_name == "docs.aspose.net/words content_translation"
+
+    def test_cli_site_id_never_produces_net_words(self):
+        """website must never be 'net.words' regardless of site_id input."""
+        inp = ScopeInput(
+            site_id="docs.aspose.net.words",
+            content_root_raw="${X}/docs.aspose.net/words",
+            profile_filename="",
+        )
+        scope = self.resolver.resolve(inp)
+        assert scope.website != "net.words"
+        assert scope.source_site_domain != "net.words"
+
+    def test_cells_suffix_resolves_correctly(self):
+        """docs.aspose.net.cells must produce website=aspose.com, product=Aspose.Cells."""
+        inp = ScopeInput(
+            site_id="docs.aspose.net.cells",
+            content_root_raw="${X}/docs.aspose.net/cells",
+            profile_filename="docs.aspose.net.cells.yaml",
+            display_name="Documentation",
+        )
+        scope = self.resolver.resolve(inp)
+        assert scope.website == "aspose.com"
+        assert scope.product == "Aspose.Cells"
+        assert scope.source_site_domain == "aspose.net"
+        assert scope.site_id == "docs.aspose.net"
+
+    def test_groupdocs_viewer_suffix_resolves_correctly(self):
+        """docs.groupdocs.net.viewer must produce website=groupdocs.com, product=GroupDocs.Viewer."""
+        inp = ScopeInput(
+            site_id="docs.groupdocs.net.viewer",
+            content_root_raw="${X}/docs.groupdocs.net/viewer",
+            profile_filename="docs.groupdocs.net.viewer.yaml",
+            display_name="Documentation",
+        )
+        scope = self.resolver.resolve(inp)
+        assert scope.website == "groupdocs.com"
+        assert scope.product == "GroupDocs.Viewer"
+        assert scope.source_site_domain == "groupdocs.net"
+        assert scope.site_id == "docs.groupdocs.net"
+
+    def test_unknown_suffix_does_not_corrupt_website(self):
+        """An unknown family suffix must not corrupt the website field."""
+        inp = ScopeInput(
+            site_id="docs.aspose.net.unknownfamily",
+            content_root_raw="${X}/docs.aspose.net/unknownfamily",
+            profile_filename="",
+        )
+        scope = self.resolver.resolve(inp)
+        assert scope.website == "aspose.com"
+        assert scope.source_site_domain == "aspose.net"
+        assert scope.site_id == "docs.aspose.net"
+
+    def test_audit_path_site_id_unchanged(self):
+        """Scope audit path (site_id already correct from YAML) must still resolve same way."""
+        inp = ScopeInput(
+            site_id="docs.aspose.net",
+            content_root_raw="${ASPOSE_NET_CONTENT}/docs.aspose.net/words",
+            profile_filename="docs.aspose.net.words.yaml",
+            display_name="Documentation",
+        )
+        scope = self.resolver.resolve(inp)
+        assert scope.website == "aspose.com"
+        assert scope.product == "Aspose.Words"
+        assert scope.site_id == "docs.aspose.net"
+
+    def test_runtime_and_audit_produce_identical_scope(self):
+        """CLI arg style and YAML style site_id must produce identical scope."""
+        resolver = ScopeResolver()
+        content_root = "${ASPOSE_NET_CONTENT}/docs.aspose.net/words"
+
+        runtime_inp = ScopeInput(
+            site_id="docs.aspose.net.words",  # CLI arg style
+            content_root_raw=content_root,
+            profile_filename="docs.aspose.net.words.yaml",
+            display_name="Documentation",
+        )
+        audit_inp = ScopeInput(
+            site_id="docs.aspose.net",  # profile YAML style
+            content_root_raw=content_root,
+            profile_filename="docs.aspose.net.words.yaml",
+            display_name="Documentation",
+        )
+        r1 = resolver.resolve(runtime_inp)
+        r2 = resolver.resolve(audit_inp)
+
+        assert r1.website == r2.website
+        assert r1.website_section == r2.website_section
+        assert r1.product == r2.product
+        assert r1.product_family_token == r2.product_family_token
+        assert r1.source_site_domain == r2.source_site_domain
+        assert r1.site_id == r2.site_id
+        assert r1.content_root_id == r2.content_root_id
+        assert r1.item_name == r2.item_name
+
+    def test_extract_domain_tld_aware(self):
+        """_extract_domain must use TLD-aware parsing, not naive last-2-parts."""
+        assert ScopeResolver._extract_domain("docs.aspose.net.words") == "aspose.net"
+        assert ScopeResolver._extract_domain("docs.aspose.net") == "aspose.net"
+        assert ScopeResolver._extract_domain("blog.aspose.com") == "aspose.com"
+        assert ScopeResolver._extract_domain("docs.groupdocs.net.viewer") == "groupdocs.net"
+        assert ScopeResolver._extract_domain("about.aspose.net") == "aspose.net"
+        # Fallback for no-TLD site_ids
+        assert ScopeResolver._extract_domain("blog-test") == "blog-test"

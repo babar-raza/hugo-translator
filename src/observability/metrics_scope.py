@@ -286,12 +286,26 @@ class ScopeResolver:
         self._warnings = []
         self._detection_method = "profile_field_derivation"
         scope = ResolvedScope()
-        scope.site_id = inp.site_id
         scope.operation_type = inp.operation_type
         scope.content_root_id = derive_content_root_id(inp.content_root_raw)
 
-        domain = self._extract_domain(inp.site_id)
-        subsystem = self._extract_subsystem(inp.site_id)
+        # Derive canonical site_id from the content_root_id's first path segment.
+        # The content_root_id is always derived from the profile's content_roots entry
+        # (never from the CLI --site argument), so its first segment is the true site
+        # domain without any family/platform suffix.
+        # Example: content_root_id="docs.aspose.net/words" → "docs.aspose.net"
+        # This fixes cases where the CLI passes "docs.aspose.net.words" (filename stem)
+        # but the profile's site_id field is "docs.aspose.net".
+        first_segment = scope.content_root_id.split("/")[0]
+        canonical_site_id = (
+            first_segment
+            if "." in first_segment
+            else inp.site_id
+        )
+        scope.site_id = canonical_site_id
+
+        domain = self._extract_domain(canonical_site_id)
+        subsystem = self._extract_subsystem(canonical_site_id)
         scope.source_site_domain = domain
 
         scope.website = self._resolve_website(inp, domain)
@@ -326,10 +340,30 @@ class ScopeResolver:
 
         return scope
 
+    # Known TLDs used to detect the brand.tld boundary in site_id strings.
+    _KNOWN_TLDS: frozenset[str] = frozenset({"com", "net", "org", "io", "co"})
+
     @staticmethod
     def _extract_domain(site_id: str) -> str:
-        """Extract the domain from site_id (e.g., 'docs.aspose.net' -> 'aspose.net')."""
+        """Extract base domain from site_id, ignoring subsystem prefix and family/platform suffixes.
+
+        Scans left-to-right for the first known TLD segment; the part immediately
+        before it is the brand name.  This correctly handles site_ids that carry a
+        family/platform token after the TLD (e.g. 'docs.aspose.net.words' -> 'aspose.net').
+
+        Examples:
+            'docs.aspose.net'            -> 'aspose.net'
+            'docs.aspose.net.words'      -> 'aspose.net'   (was 'net.words' — fixed)
+            'blog.aspose.com'            -> 'aspose.com'
+            'docs.groupdocs.net.viewer'  -> 'groupdocs.net'
+            'blog-test'                  -> 'blog-test'    (no TLD, fallback)
+        """
         parts = site_id.split(".")
+        known_tlds = ScopeResolver._KNOWN_TLDS
+        for i, part in enumerate(parts):
+            if part in known_tlds and i > 0:
+                return f"{parts[i - 1]}.{part}"
+        # Fallback: last two parts (preserves old behaviour for unknown TLDs)
         if len(parts) >= 2:
             return ".".join(parts[-2:])
         return site_id
