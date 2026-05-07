@@ -810,7 +810,7 @@ class MetricsCollector:
                     "l3_hits": int(tm_l3_hits),
                     "misses": int(tm_misses),
                     "total_hits": int(tm_l1_hits + tm_l2_hits + tm_l3_hits),
-                    "hit_rate": self.get_tm_hit_rate(),
+                    "hit_rate": (tm_l1_hits + tm_l2_hits + tm_l3_hits) / tm_lookups if tm_lookups > 0 else 0.0,
                 },
                 "queue": {
                     "depth": int(queue_depth),
