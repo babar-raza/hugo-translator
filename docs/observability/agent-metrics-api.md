@@ -307,13 +307,16 @@ Set `enabled: true`, `dry_run: true` in `global.yaml`, run a worker in oneshot m
 
 ## Deferred Work
 
-| Taskcard | Description | Status |
-|----------|-------------|--------|
-| TC-METRICS-12 | Per-locale token tracking | Deferred |
-| TC-METRICS-13 | Failed post backfill (detect "posting_in_progress" sidecars) | Deferred |
-| TC-METRICS-14 | Persistent CI ledger | Deferred |
-| TC-METRICS-15 | TM queue family metadata | Deferred |
-| Production enablement | `enabled: true`, `dry_run: false` for production workers | Requires separate approval |
+None of the deferred items block content worker production enablement. TC-METRICS-15 blocks TM worker production.
+
+| Taskcard | Description | Status | Blocks Production? |
+|----------|-------------|--------|--------------------|
+| TC-METRICS-12 | Per-locale token tracking | Deferred | No — content_root-level `locale_grain="all"` is correct for v1 |
+| TC-METRICS-13 | Failed post backfill (orphan sidecar scan + retry) | Deferred | No for pilot; recommended before broad rollout |
+| TC-METRICS-14 | Persistent CI ledger | Deferred | No — production runs on local Windows with persistent workspace |
+| TC-METRICS-15 | TM queue family metadata | Deferred | Yes — blocks TM worker production (hardcoded `site_id="tm_improvement"`) |
+| Stage 9 | Content worker production (`enabled: true`, `dry_run: false`) | Requires separate approval | Ready for controlled pilot |
+| Stage 10 | TM worker production | Requires TC-METRICS-15 or explicit "Mixed" acceptance | Blocked by TC-METRICS-15 |
 
 ## Source of Truth
 
