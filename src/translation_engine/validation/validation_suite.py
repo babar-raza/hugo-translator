@@ -19,6 +19,7 @@ from .link_validator import LinkValidator
 from .placeholder_validator import PlaceholderValidator
 from .repetition_detector_validator import RepetitionDetectorValidator
 from .semantic_similarity_validator import SemanticSimilarityValidator
+from .metadata_markdown_contamination_validator import MetadataMarkdownContaminationValidator
 from .shortcode_preservation_validator import ShortcodePreservationValidator
 from .structure_validator import StructureValidator
 from .terminology_preservation_validator import TerminologyPreservationValidator
@@ -110,6 +111,7 @@ class ValidationSuite:
                 per_language_overrides=lc_cfg["per_language_overrides"],
             ),
             ShortcodePreservationValidator(),
+            MetadataMarkdownContaminationValidator(),
             RepetitionDetectorValidator(config={
                 "ngram_threshold": 5,          # Require 5+ occurrences (default 3) — reduces false positives on structured docs
                 "sentence_dup_threshold": 3,   # Require 3 duplicates (default 2) — tolerates paired FAQ/step patterns
@@ -186,6 +188,9 @@ class ValidationSuite:
 
         if validators_config.get('shortcode_preservation', {}).get('enabled', True):
             validators.append(ShortcodePreservationValidator())
+
+        if validators_config.get('metadata_markdown_contamination', {}).get('enabled', True):
+            validators.append(MetadataMarkdownContaminationValidator())
 
         if validators_config.get('frontmatter_protection', {}).get('enabled', True):
             if site_profile:

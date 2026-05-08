@@ -231,6 +231,8 @@ validators:
     enabled: false
   shortcode_preservation:
     enabled: false
+  metadata_markdown_contamination:
+    enabled: false
   frontmatter_protection:
     enabled: false
   terminology_preservation:
