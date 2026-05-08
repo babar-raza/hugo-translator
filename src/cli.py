@@ -2381,10 +2381,11 @@ def translate_site(args: argparse.Namespace) -> int:
         )
 
         logger.info("Initializing Model Loader...")
-        # CT2-002: Support multiple registries (base + custom CT2 registry)
+        # CT2-002: Support multiple registries (base + custom CT2 + discovered local models)
         registry_paths = [
             Path(args.config_root) / "model_registry.yaml",
             Path(args.config_root) / "custom_ct2_registry.yaml",
+            Path(args.config_root) / "model_registry.discovered.yaml",
         ]
         # Filter to only existing registry files
         existing_registries = [p for p in registry_paths if p.exists()]
@@ -2393,6 +2394,7 @@ def translate_site(args: argparse.Namespace) -> int:
 
         logger.info(f"Loading model registries: {[str(p) for p in existing_registries]}")
         model_registry = ModelRegistry(existing_registries)
+        logger.info(f"Combined registry: {len(model_registry)} models total")
 
         # Device selection with CLI override support (T102: federated-splashing-panda)
         try:
