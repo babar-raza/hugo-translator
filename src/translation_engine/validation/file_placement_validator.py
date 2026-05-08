@@ -110,8 +110,10 @@ class FilePlacementValidator(Validator):
 
         # Validate content root alignment if site profile available
         if site_profile:
+            output_override_active = bool(context.get("output_override_active", False))
             self._validate_content_root(
-                source_path, translation_path, site_profile, result
+                source_path, translation_path, site_profile, result,
+                output_override_active=output_override_active,
             )
 
         # Validate subdomain-specific rules if site profile available
@@ -296,24 +298,32 @@ class FilePlacementValidator(Validator):
         """
         translation_name = translation_path.name
 
-        # Check if target language is in the filename
-        # Expected pattern: {name}.{lang}.md
-        pattern = rf'\.{re.escape(target_lang)}\.md$'
-        if not re.search(pattern, translation_name, re.IGNORECASE):
+        # Check if target language is present in the filename (index.fr.md pattern)
+        # OR as a path component (fr/index.md pattern — used when output pattern is /{lang}/{relative_path}).
+        # Both patterns satisfy file-based localization intent.
+        filename_pattern = rf'\.{re.escape(target_lang)}\.md$'
+        lang_in_filename = bool(re.search(filename_pattern, translation_name, re.IGNORECASE))
+        lang_in_path_parts = target_lang in translation_path.parts
+
+        if not lang_in_filename and not lang_in_path_parts:
             result.issues.append(
                 self.create_issue(
                     ValidationSeverity.ERROR,
-                    f"Target language '{target_lang}' not found in translation filename",
+                    f"Target language '{target_lang}' not found in translation filename or path",
                     location="translation_path",
                     details={
                         "translation_path": str(translation_path),
                         "translation_name": translation_name,
                         "target_lang": target_lang,
-                        "expected_pattern": f"*.{target_lang}.md",
+                        "expected_pattern": f"*.{target_lang}.md or {target_lang}/<file>.md",
                     },
                 )
             )
             result.success = False
+            return
+
+        # If lang is in path parts but not filename, skip same-directory check below
+        if lang_in_path_parts and not lang_in_filename:
             return
 
         # Verify source and translation are in same directory (file-based keeps same folder)
@@ -336,6 +346,7 @@ class FilePlacementValidator(Validator):
         translation_path: Path,
         site_profile: SiteProfile,
         result: ValidationResult,
+        output_override_active: bool = False,
     ) -> None:
         """
         Validate that paths align with content roots defined in site profile.
@@ -345,6 +356,8 @@ class FilePlacementValidator(Validator):
             translation_path: Translation file path
             site_profile: Site profile with content root definitions
             result: ValidationResult to add issues to
+            output_override_active: If True, content-root mismatch is downgraded to WARNING
+                (expected when CLI --output redirects to evidence/staging directory)
         """
         if not site_profile.content_roots:
             return
@@ -378,9 +391,12 @@ class FilePlacementValidator(Validator):
             )
 
         if not translation_has_root:
+            # When --output override is active (evidence/staging writes), downgrade to WARNING.
+            # For normal production writes, this is an ERROR (file went to wrong location).
+            severity = ValidationSeverity.WARNING if output_override_active else ValidationSeverity.ERROR
             result.issues.append(
                 self.create_issue(
-                    ValidationSeverity.ERROR,
+                    severity,
                     f"Translation path does not contain any defined content root: {site_profile.content_roots}",
                     location="translation_path",
                     details={
@@ -389,7 +405,8 @@ class FilePlacementValidator(Validator):
                     },
                 )
             )
-            result.success = False
+            if not output_override_active:
+                result.success = False
 
     def _validate_subdomain_rules(
         self,
@@ -558,6 +575,7 @@ class FilePlacementValidator(Validator):
                     "target_lang": target_lang,
                     "site_id": context.get("site_id"),
                     "site_profile": context.get("site_profile"),
+                    "output_override_active": context.get("output_override_active", False),
                 },
             )
             result.merge(placement_result)
