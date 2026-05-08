@@ -243,3 +243,65 @@ class TestRC5YAMLValidation:
             mock_dumper.dump.side_effect = write_bad_yaml_to_stream
             with pytest.raises(ValueError, match="YAML"):
                 YAMLFormatter.format_frontmatter({"title": "anything"})
+
+
+class TestRCDAutoCorrection:
+    """RC-D auto-correction: _strip_rcd_contamination removes orphaned '#' markers.
+
+    Orphaned '#' characters in frontmatter fields are a systematic MT artifact
+    when the English source title ends with 'C#'. The formatter auto-corrects
+    before serialization so MetadataMarkdownContaminationValidator never retries.
+    """
+
+    def test_trailing_hash_stripped_from_title(self):
+        """Trailing '#' not preceded by C/c is stripped from title field."""
+        data = {"title": "Πώς να αφαιρέσετε κενή σελίδα#", "draft": False}
+        YAMLFormatter._strip_rcd_contamination(data)
+        assert data["title"] == "Πώς να αφαιρέσετε κενή σελίδα"
+
+    def test_trailing_hash_dot_stripped(self):
+        """Trailing '#.' pattern is stripped."""
+        data = {"title": "C# का उपयोग करके Word में सफेद पृष्ठ#."}
+        YAMLFormatter._strip_rcd_contamination(data)
+        assert data["title"] == "C# का उपयोग करके Word में सफेद पृष्ठ"
+
+    def test_csharp_preserved_in_middle(self):
+        """'C#' in the middle of a value is NOT stripped."""
+        data = {"title": "Using C# to Convert Word Documents"}
+        YAMLFormatter._strip_rcd_contamination(data)
+        assert data["title"] == "Using C# to Convert Word Documents"
+
+    def test_csharp_at_end_preserved(self):
+        """'C#' at the end of a value is NOT stripped (# is preceded by C)."""
+        data = {"title": "How to Remove Blank Page in Word Using C#"}
+        YAMLFormatter._strip_rcd_contamination(data)
+        assert data["title"] == "How to Remove Blank Page in Word Using C#"
+
+    def test_leading_hash_space_stripped_from_title(self):
+        """Leading '# ' heading marker is stripped from title."""
+        data = {"title": "# C#를 사용하여 Word에서 빈 페이지 제거하는 방법"}
+        YAMLFormatter._strip_rcd_contamination(data)
+        assert data["title"] == "C#를 사용하여 Word에서 빈 페이지 제거하는 방법"
+
+    def test_step_fields_corrected(self):
+        """Trailing '#.' in step2 field is stripped."""
+        data = {"step2": "ロードします#."}
+        YAMLFormatter._strip_rcd_contamination(data)
+        assert data["step2"] == "ロードします"
+
+    def test_unchecked_field_not_touched(self):
+        """Fields not in _RCD_CHECKED_FIELDS are not modified."""
+        data = {"productname": "Aspose#"}  # productname is not in checked fields
+        YAMLFormatter._strip_rcd_contamination(data)
+        assert data["productname"] == "Aspose#"
+
+    def test_format_frontmatter_auto_corrects_rcd(self):
+        """format_frontmatter() applies RC-D correction before serialization."""
+        data = {
+            "title": "Πώς να αφαιρέσετε κενή σελίδα#",
+            "description": "Μάθετε πώς να χρησιμοποιείτε το C#",
+        }
+        result = YAMLFormatter.format_frontmatter(data)
+        assert "Πώς να αφαιρέσετε κενή σελίδα#" not in result
+        assert "Πώς να αφαιρέσετε κενή σελίδα" in result
+        assert "C#" in result  # C# in description preserved

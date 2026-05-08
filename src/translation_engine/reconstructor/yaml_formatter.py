@@ -7,6 +7,18 @@ import re
 from io import StringIO
 from typing import Any
 
+# RC-D auto-correction: same fields as MetadataMarkdownContaminationValidator.
+# Applied before serialization so the validator never needs to retry.
+_RCD_CHECKED_FIELDS: frozenset[str] = frozenset(
+    ["title", "description", "linktitle", "head_title", "head_description",
+     "seoTitle", "summary"]
+    + [f"step{i}" for i in range(1, 11)]
+)
+# Leading heading marker: value starts with one or more '#' followed by space
+_RCD_LEADING_HASH_RE = re.compile(r"^#{1,6}\s+")
+# Trailing orphaned '#' or '#.': NOT preceded by C or c (preserves C#)
+_RCD_TRAILING_HASH_RE = re.compile(r"(?<![Cc])#\.?\s*$")
+
 import structlog
 import yaml
 from ruamel.yaml import YAML
@@ -56,6 +68,11 @@ class YAMLFormatter:
         if not data:
             return ""
 
+        # RC-D: Strip orphaned Markdown heading markers from scalar fields
+        # before serialization so MetadataMarkdownContaminationValidator never
+        # needs to trigger a costly LLM retry for this systematic MT artifact.
+        YAMLFormatter._strip_rcd_contamination(data)
+
         try:
             # Use ruamel.yaml for round-trip formatting
             stream = StringIO()
@@ -95,6 +112,36 @@ class YAMLFormatter:
                 )
         except yaml.YAMLError as exc:
             raise ValueError(f"Serialized frontmatter YAML is invalid: {exc}") from exc
+
+    @staticmethod
+    def _strip_rcd_contamination(data: dict[str, Any] | CommentedMap) -> None:
+        """RC-D auto-correction: strip orphaned Markdown '#' markers in-place.
+
+        MT models systematically produce trailing '#' when the English source
+        title ends with 'C#'. This strips the artefact before serialization so
+        the MetadataMarkdownContaminationValidator never needs to retry.
+
+        Only top-level scalar fields in _RCD_CHECKED_FIELDS are touched.
+        The C# programming language marker is preserved: the regex requires
+        that the '#' is NOT immediately preceded by 'C' or 'c'.
+        """
+        for field in _RCD_CHECKED_FIELDS:
+            value = data.get(field)
+            if not isinstance(value, str) or not value:
+                continue
+            original = value
+            # Strip leading heading marker (e.g. "# Title" → "Title")
+            value = _RCD_LEADING_HASH_RE.sub("", value)
+            # Strip trailing orphaned # or #. (e.g. "...語を削除#" → "...語を削除")
+            value = _RCD_TRAILING_HASH_RE.sub("", value).rstrip()
+            if value != original:
+                data[field] = value
+                logger.info(
+                    "rcd_autocorrect",
+                    field=field,
+                    before=original[:80],
+                    after=value[:80],
+                )
 
     @staticmethod
     def apply_literal_style(value: str) -> LiteralScalarString:
