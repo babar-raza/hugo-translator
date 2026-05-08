@@ -581,6 +581,8 @@ class TestWindowsPaths:
         model_dir = tmp_path / "win_model"
         model_dir.mkdir()
         (model_dir / "config.json").write_text(json.dumps({"model_type": "m2m_100"}))
+        # Weight file required — tokenizer-only dirs are now rejected by the detector
+        (model_dir / "model.safetensors").write_bytes(b"\x00" * 8)
 
         model = detect_transformers_model(model_dir)
         assert model is not None

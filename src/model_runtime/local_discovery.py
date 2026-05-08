@@ -209,9 +209,10 @@ def _parse_hf_id(dir_name: str) -> str | None:
 
 
 def _parse_opus_language_pair(hf_id: str) -> tuple[str, str] | None:
-    """Extract (src, tgt) language pair from Helsinki-NLP/opus-mt-XX-YY model ID."""
-    match = re.match(
-        r"Helsinki-NLP/opus-mt-([a-z]{2,3})-([a-z]{2,3})$", hf_id, re.IGNORECASE
+    """Extract (src, tgt) language pair from Helsinki-NLP/opus-mt-XX-YY model ID or path."""
+    # Use re.search to handle full paths like /tmp/Helsinki-NLP/opus-mt-en-fr
+    match = re.search(
+        r"Helsinki-NLP[/_]opus-mt-([a-z]{2,3})-([a-z]{2,3})$", hf_id, re.IGNORECASE
     )
     if match:
         return (match.group(1).lower(), match.group(2).lower())
@@ -447,6 +448,25 @@ def _detect_from_config_json(
     size_bytes = _compute_dir_size_bytes(model_dir)
     size_mb = size_bytes / (1024 * 1024)
 
+    # Verify model weight files exist — reject tokenizer-only cache entries
+    _WEIGHT_FILES = [
+        "pytorch_model.bin", "model.safetensors", "tf_model.h5",
+        "flax_model.msgpack", "model.ckpt.index",
+    ]
+    has_weights = any((model_dir / w).exists() for w in _WEIGHT_FILES)
+    if not has_weights:
+        # Also check sharded weights
+        has_weights = (
+            any(model_dir.glob("pytorch_model-*.bin"))
+            or any(model_dir.glob("model-*.safetensors"))
+        )
+    if not has_weights:
+        logger.debug(
+            f"Skipping {model_dir}: config.json present but no weight files "
+            f"(tokenizer-only cache). detected_files={detected_files}"
+        )
+        return None
+
     model_id = _generate_model_id(model_dir, "transformers", hf_id)
 
     return DiscoveredLocalModel(
@@ -469,8 +489,8 @@ def _detect_from_config_json(
         device_hint="cuda" if size_mb > 500 else "cpu",
         load_priority=30 if not multilingual else 50,
         health_status="available",
-        validation_status="metadata_valid",
-        confidence=0.9,
+        validation_status="weights_verified",
+        confidence=0.95,
         hf_model_id=hf_id,
     )
 
@@ -605,12 +625,35 @@ def detect_ctranslate2_model(model_dir: Path) -> DiscoveredLocalModel | None:
         detected_files.append("model_spec.json")
 
     size_bytes = _compute_dir_size_bytes(model_dir)
-    model_id = _generate_model_id(model_dir, "ct2")
+    # Include parent dir name to disambiguate (e.g. en-fr/ct2_int8 → en_fr_ct2_int8)
+    parent_name = model_dir.parent.name
+    _ct2_id = f"{parent_name}/{model_dir.name}" if parent_name != "." else model_dir.name
+    model_id = _generate_model_id(model_dir, "ct2", hf_id=_ct2_id)
+
+    # Extract language pair from directory structure (e.g. en-fr/ct2_int8 or standalone en-fr/)
+    src_lang: str | None = None
+    tgt_lang: str | None = None
+    # Match simple XX-YY or XXX-YY language pair patterns directly
+    _LANG_PAIR_RE = re.compile(r"^([a-z]{2,3})-([a-z]{2,3})$")
+    for _candidate in [parent_name, model_dir.name]:
+        _m = _LANG_PAIR_RE.match(_candidate)
+        if _m:
+            src_lang, tgt_lang = _m.group(1), _m.group(2)
+            break
+    # Also try _parse_opus_language_pair for HF-style names
+    if not src_lang:
+        _pair = _parse_opus_language_pair(parent_name) or _parse_opus_language_pair(model_dir.name)
+        if _pair:
+            src_lang, tgt_lang = _pair
+
+    model_family = "opus" if src_lang and tgt_lang else "ctranslate2"
+    supported_pairs = [(src_lang, tgt_lang), (tgt_lang, src_lang)] if src_lang and tgt_lang else "all"
+    multilingual = not (src_lang and tgt_lang)
 
     return DiscoveredLocalModel(
         model_id=model_id,
-        display_name=f"CT2: {model_dir.name}",
-        model_family="ctranslate2",
+        display_name=f"CT2: {parent_name}/{model_dir.name}",
+        model_family=model_family,
         model_type="ctranslate2",
         backend_type="ctranslate2",
         model_format="ctranslate2",
@@ -620,6 +663,10 @@ def detect_ctranslate2_model(model_dir: Path) -> DiscoveredLocalModel | None:
         detected_files=detected_files,
         size_bytes=size_bytes,
         last_modified=_get_last_modified(model_dir),
+        source_language=src_lang,
+        target_language=tgt_lang,
+        supported_language_pairs=supported_pairs,
+        multilingual=multilingual,
         quantization=quantization,
         device_hint="cpu" if quantization == "int8" else "cuda",
         load_priority=20,  # CT2 is fast, prefer it
