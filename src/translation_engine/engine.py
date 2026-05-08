@@ -850,6 +850,16 @@ class TranslationEngine:
         """
         # Priority 1: CLI override (explicit user choice)
         if self.model_id_override:
+            if src_lang and tgt_lang:
+                _p1_origin = "discovered" if self.model_id_override.startswith("disc_") else "curated"
+                logger.info(
+                    f"CT2-002 model_decision: model_id={self.model_id_override} "
+                    f"origin={_p1_origin} "
+                    f"pair={src_lang}->{tgt_lang} "
+                    f"strategy=cli-override "
+                    f"fallback_used=False "
+                    f"selection_reason=cli_model_flag"
+                )
             return self.model_id_override
 
         # Priority 1b: WS-COMP-7 — per-language routing override from config.
@@ -5014,6 +5024,9 @@ class TranslationEngine:
             "target_lang": target_lang,
             "site_id": site_id,
             "site_profile": site_profile,
+            # G-L4-4: When --output override is active, content-root mismatch is expected
+            # (evidence/staging dir writes). Downgrade to warning, not error.
+            "output_override_active": bool(self.output_dir_override),
         }
 
         # Validate written file
