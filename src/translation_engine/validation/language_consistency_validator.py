@@ -389,7 +389,7 @@ class LanguageConsistencyValidator(PostTranslationValidator):
         return sentences
 
     def _clean_text_for_detection(self, text: str) -> str:
-        """Remove code blocks, URLs, and shortcodes from text.
+        """Remove code blocks, frontmatter, URLs, and shortcodes from text.
 
         Args:
             text: Raw translation text
@@ -397,6 +397,11 @@ class LanguageConsistencyValidator(PostTranslationValidator):
         Returns:
             Cleaned text suitable for language detection
         """
+        # Remove YAML frontmatter (--- ... ---) — contains English-only fields
+        # (productname, productkey, keywords, etc.) that skew purity checks.
+        # _check_script_mixing already strips frontmatter; keep consistent.
+        text = re.sub(r'^---.*?^---', '', text, flags=re.DOTALL | re.MULTILINE)
+
         # Remove code blocks (``` ... ```)
         text = re.sub(r"```.*?```", "", text, flags=re.DOTALL)
 
