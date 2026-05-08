@@ -180,9 +180,17 @@ class LanguageAwareModelSelector:
         """
         lang_pair = (src_lang, tgt_lang)
 
-        # Search for Opus models supporting this language pair
+        # Search for Opus models supporting this language pair.
+        # Exclude models with supported_pairs="all" (multilingual models that happen
+        # to have "opus" in their name, e.g. disc_ct2_opus_mt_ct2_en_pt_ct2).
+        # Those belong in the multilingual-fallback tier, not the opus-specific tier.
+        # Also exclude sentence-transformer/embedding models.
         opus_candidates = []
         for model in self.registry.models.values():
+            if model.supported_pairs == "all":
+                continue
+            if "sentence_transform" in model.model_id.lower():
+                continue
             # Check if model supports this language pair
             if self.registry._supports_lang_pair(model, lang_pair):
                 # Prefer Opus models (marked with "opus" in model_id)
@@ -232,11 +240,13 @@ class LanguageAwareModelSelector:
         Returns:
             ModelSelection if multilingual model found and fits hardware, None otherwise
         """
-        # Search for multilingual models (supported_pairs="all")
+        # Search for multilingual models (supported_pairs="all").
+        # Exclude sentence-transformer/embedding models — they are not translation models.
         multilingual_candidates = []
         for model in self.registry.models.values():
             if model.supported_pairs == "all":
-                multilingual_candidates.append(model)
+                if "sentence_transform" not in model.model_id.lower():
+                    multilingual_candidates.append(model)
 
         if not multilingual_candidates:
             logger.debug("No multilingual models found in registry")
