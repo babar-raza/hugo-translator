@@ -54,15 +54,15 @@ class TestScopeResolverLevel3:
             display_name="Documentation",
         )
         scope = self.resolver.resolve(inp)
-        assert scope.website == "aspose.com"
+        assert scope.website == "aspose.net"
         assert scope.website_section == "Docs"
         assert scope.product == "Aspose.Words"
-        assert scope.platform == "All"
+        assert scope.platform == ".NET"
         assert scope.content_root_id == "docs.aspose.net/words"
         assert scope.source_site_domain == "aspose.net"
         assert scope.product_family_token == "words"
         assert scope.reporting_confidence == "high"
-        assert scope.item_name == "docs.aspose.net/words content_translation"
+        assert scope.item_name == ""  # item_name is built in integration layer
 
     def test_products_aspose_net_words(self):
         inp = ScopeInput(
@@ -96,7 +96,7 @@ class TestScopeResolverLevel3:
             display_name="blog posts",
         )
         scope = self.resolver.resolve(inp)
-        assert scope.website == "aspose.com"
+        assert scope.website == "aspose.org"
         assert scope.website_section == "Blog"
 
     def test_source_site_domain_preserved(self):
@@ -107,7 +107,7 @@ class TestScopeResolverLevel3:
         )
         scope = self.resolver.resolve(inp)
         assert scope.source_site_domain == "aspose.net"
-        assert scope.website == "aspose.com"
+        assert scope.website == "aspose.net"
         assert scope.site_id == "docs.aspose.net"
 
 
@@ -170,7 +170,8 @@ class TestScopeResolverFallback:
 
 
 class TestScopeResolverItemName:
-    def test_normal_item_name(self):
+    def test_item_name_empty_from_resolve(self):
+        """item_name is always empty from resolve() — built in integration layer."""
         resolver = ScopeResolver()
         inp = ScopeInput(
             site_id="docs.aspose.net",
@@ -178,9 +179,10 @@ class TestScopeResolverItemName:
             profile_filename="docs.aspose.net.words.yaml",
         )
         scope = resolver.resolve(inp)
-        assert scope.item_name == "docs.aspose.net/words content_translation"
+        assert scope.item_name == ""
 
-    def test_test_item_name_prefix(self):
+    def test_item_name_empty_even_with_is_test(self):
+        """is_test flag does not affect item_name from resolve()."""
         resolver = ScopeResolver()
         inp = ScopeInput(
             site_id="docs.aspose.net",
@@ -189,7 +191,7 @@ class TestScopeResolverItemName:
             is_test=True,
         )
         scope = resolver.resolve(inp)
-        assert scope.item_name.startswith("test ")
+        assert scope.item_name == ""
 
 
 class TestScopeResolverProductDisplay:
@@ -297,14 +299,14 @@ class TestScopeResolverFamilySuffixBug:
 
     Previously, site_id="docs.aspose.net.words" (CLI arg style) caused
     _extract_domain to return "net.words" instead of "aspose.net", which
-    then fell through to website="net.words" instead of "aspose.com".
+    then fell through to website="net.words" instead of "aspose.net".
     """
 
     def setup_method(self):
         self.resolver = ScopeResolver()
 
     def test_cli_site_id_with_words_suffix_resolves_website_correctly(self):
-        """Core regression: website must be aspose.com, not net.words."""
+        """Core regression: website must be aspose.net, not net.words."""
         inp = ScopeInput(
             site_id="docs.aspose.net.words",
             content_root_raw="${ASPOSE_NET_CONTENT}/docs.aspose.net/words",
@@ -312,8 +314,8 @@ class TestScopeResolverFamilySuffixBug:
             display_name="Documentation",
         )
         scope = self.resolver.resolve(inp)
-        assert scope.website == "aspose.com", (
-            f"website must be aspose.com, got {scope.website!r} — "
+        assert scope.website == "aspose.net", (
+            f"website must be aspose.net, got {scope.website!r} — "
             "family token suffix must not corrupt domain extraction"
         )
         assert scope.source_site_domain == "aspose.net"
@@ -321,7 +323,7 @@ class TestScopeResolverFamilySuffixBug:
         assert scope.website_section == "Docs"
         assert scope.site_id == "docs.aspose.net"  # normalized
         assert scope.content_root_id == "docs.aspose.net/words"
-        assert scope.item_name == "docs.aspose.net/words content_translation"
+        assert scope.item_name == ""  # item_name built in integration layer
 
     def test_cli_site_id_never_produces_net_words(self):
         """website must never be 'net.words' regardless of site_id input."""
@@ -335,7 +337,7 @@ class TestScopeResolverFamilySuffixBug:
         assert scope.source_site_domain != "net.words"
 
     def test_cells_suffix_resolves_correctly(self):
-        """docs.aspose.net.cells must produce website=aspose.com, product=Aspose.Cells."""
+        """docs.aspose.net.cells must produce website=aspose.net, product=Aspose.Cells."""
         inp = ScopeInput(
             site_id="docs.aspose.net.cells",
             content_root_raw="${X}/docs.aspose.net/cells",
@@ -343,13 +345,13 @@ class TestScopeResolverFamilySuffixBug:
             display_name="Documentation",
         )
         scope = self.resolver.resolve(inp)
-        assert scope.website == "aspose.com"
+        assert scope.website == "aspose.net"
         assert scope.product == "Aspose.Cells"
         assert scope.source_site_domain == "aspose.net"
         assert scope.site_id == "docs.aspose.net"
 
     def test_groupdocs_viewer_suffix_resolves_correctly(self):
-        """docs.groupdocs.net.viewer must produce website=groupdocs.com, product=GroupDocs.Viewer."""
+        """docs.groupdocs.net.viewer must produce website=groupdocs.net, product=GroupDocs.Viewer."""
         inp = ScopeInput(
             site_id="docs.groupdocs.net.viewer",
             content_root_raw="${X}/docs.groupdocs.net/viewer",
@@ -357,7 +359,7 @@ class TestScopeResolverFamilySuffixBug:
             display_name="Documentation",
         )
         scope = self.resolver.resolve(inp)
-        assert scope.website == "groupdocs.com"
+        assert scope.website == "groupdocs.net"
         assert scope.product == "GroupDocs.Viewer"
         assert scope.source_site_domain == "groupdocs.net"
         assert scope.site_id == "docs.groupdocs.net"
@@ -370,7 +372,7 @@ class TestScopeResolverFamilySuffixBug:
             profile_filename="",
         )
         scope = self.resolver.resolve(inp)
-        assert scope.website == "aspose.com"
+        assert scope.website == "aspose.net"
         assert scope.source_site_domain == "aspose.net"
         assert scope.site_id == "docs.aspose.net"
 
@@ -383,7 +385,7 @@ class TestScopeResolverFamilySuffixBug:
             display_name="Documentation",
         )
         scope = self.resolver.resolve(inp)
-        assert scope.website == "aspose.com"
+        assert scope.website == "aspose.net"
         assert scope.product == "Aspose.Words"
         assert scope.site_id == "docs.aspose.net"
 

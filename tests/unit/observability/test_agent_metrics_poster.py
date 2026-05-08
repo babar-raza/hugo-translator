@@ -99,7 +99,7 @@ class TestSyncPost:
         )
 
         poster = AgentMetricsPoster(dry_run=False, fire_and_forget=False)
-        result = poster.post(SAMPLE_PAYLOAD, job_type="test")
+        result = poster.post(SAMPLE_PAYLOAD, job_type="Test")
         assert result["posted"] is True
         assert result["response_code"] == 302
 
@@ -131,11 +131,11 @@ class TestTestRowLimit:
         poster = AgentMetricsPoster(dry_run=False, fire_and_forget=False)
 
         for i in range(3):
-            result = poster.post(SAMPLE_PAYLOAD, job_type="test")
+            result = poster.post(SAMPLE_PAYLOAD, job_type="Test")
             assert result["posted"] is True, f"Post {i+1} should succeed"
 
         # 4th should be blocked
-        result = poster.post(SAMPLE_PAYLOAD, job_type="test")
+        result = poster.post(SAMPLE_PAYLOAD, job_type="Test")
         assert result["posted"] is False
         assert "limit" in result["error"]
         assert get_test_rows_posted() == 3
@@ -150,7 +150,7 @@ class TestTestRowLimit:
 
         poster = AgentMetricsPoster(dry_run=False, fire_and_forget=False)
         for _ in range(5):
-            result = poster.post(SAMPLE_PAYLOAD, job_type="content_translation")
+            result = poster.post(SAMPLE_PAYLOAD, job_type="Content Translation")
             assert result["posted"] is True
 
     @patch("urllib.request.urlopen")
@@ -163,7 +163,7 @@ class TestTestRowLimit:
         mock_urlopen.return_value = mock_response
 
         poster = AgentMetricsPoster(dry_run=False, fire_and_forget=True)
-        result = poster.post(SAMPLE_PAYLOAD, job_type="test")
+        result = poster.post(SAMPLE_PAYLOAD, job_type="Test")
         # Synchronous means we get a real response_code back
         assert result["response_code"] == 200
         assert result["posted"] is True

@@ -22,9 +22,9 @@ def _make_config_service(enabled: bool = True, dry_run: bool = True) -> MagicMoc
             "enabled": enabled,
             "dry_run": dry_run,
             "evidence_dir": "data/metrics/agent_evidence",
-            "metrics_website_mapping": {"aspose.net": "aspose.com"},
+            "metrics_website_mapping": {},
             "metrics_section_mapping": {"docs": "Docs"},
-            "metrics_brand_mapping": {"aspose.com": "Aspose"},
+            "metrics_brand_mapping": {"aspose.net": "Aspose"},
             "known_product_families": ["words"],
             "known_platforms": [],
         }

@@ -26,7 +26,7 @@ class TestScopeAuditGate:
         )
 
     def test_all_profiles_have_required_fields(self):
-        """Every production profile must have non-empty website, product, item_name."""
+        """Every production profile must have non-empty website, product, website_section, platform."""
         audit_path = Path("data/metrics/scope_audit.json")
         if not audit_path.exists():
             pytest.skip("scope_audit.json not generated yet")
@@ -38,7 +38,9 @@ class TestScopeAuditGate:
             resolved = entry.get("resolved", {})
             assert resolved.get("website"), f"Empty website in {entry['profile']}"
             assert resolved.get("product"), f"Empty product in {entry['profile']}"
-            assert resolved.get("item_name"), f"Empty item_name in {entry['profile']}"
+            assert resolved.get("website_section"), f"Empty website_section in {entry['profile']}"
+            assert resolved.get("platform"), f"Empty platform in {entry['profile']}"
+            # item_name is built at run time in integration layer, not in scope audit
 
     def test_test_profiles_excluded(self):
         """Test/fixture profiles must be marked as excluded."""

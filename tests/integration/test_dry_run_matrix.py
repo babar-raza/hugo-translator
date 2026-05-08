@@ -16,6 +16,7 @@ from src.observability.agent_metrics_payload import (
     AGENT_NAME, AGENT_OWNER, EXPECTED_POST_KEYS,
     AgentMetricsPayload, determine_status, make_timestamp,
 )
+from src.observability.agent_metrics_integration import _build_item_name
 from src.observability.metrics_scope import (
     ScopeResolver, ScopeInput, derive_content_root_id,
     generate_stable_work_slice_id, generate_execution_attempt_id,
@@ -34,14 +35,15 @@ def _build_scenario(
     items_failed: int,
     token_usage: int,
     api_calls_count: int,
-    job_type: str = "content_translation",
+    job_type: str = "Content Translation",
 ) -> dict:
     """Build a full dry-run scenario and return evidence + payload."""
     crid = derive_content_root_id(content_root_raw)
     resolver = ScopeResolver(config={
-        "metrics_website_mapping": {"aspose.net": "aspose.com"},
+        "metrics_website_mapping": {},
         "metrics_section_mapping": {"docs": "Docs", "products": "Product Pages", "blog": "Blog"},
-        "metrics_brand_mapping": {"aspose.com": "Aspose"},
+        "metrics_brand_mapping": {"aspose.net": "Aspose", "aspose.com": "Aspose"},
+        "metrics_domain_platform_mapping": {"aspose.net": "net"},
     })
     scope_input = ScopeInput(
         site_id=site_id,
@@ -49,6 +51,7 @@ def _build_scenario(
         profile_filename=f"{site_id}.yaml",
     )
     resolved = resolver.resolve(scope_input)
+    item_name = _build_item_name(resolved, job_type, items_succeeded)
 
     status = determine_status(items_succeeded, items_failed, items_discovered)
     payload = AgentMetricsPayload(
@@ -60,7 +63,7 @@ def _build_scenario(
         platform=resolved.platform,
         website=resolved.website,
         website_section=resolved.website_section,
-        item_name=resolved.item_name,
+        item_name=item_name,
         items_discovered=items_discovered,
         items_failed=items_failed,
         items_succeeded=items_succeeded,
@@ -85,9 +88,10 @@ class TestM1ContentTranslationDocsWords:
         )
         assert r["resolved"].product == "Aspose.Words"
         assert r["resolved"].website_section == "Docs"
-        assert r["resolved"].website == "aspose.com"
+        assert r["resolved"].website == "aspose.net"
         assert r["post_dict"]["token_usage"] == 1200
-        assert "docs.aspose.net/words content_translation" in r["post_dict"]["item_name"]
+        assert "Words" in r["post_dict"]["item_name"]
+        assert "Docs" in r["post_dict"]["item_name"]
 
 
 class TestM2ProductsPagesWords:

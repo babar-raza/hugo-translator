@@ -30,14 +30,9 @@ _NAMESPACE = uuid.NAMESPACE_URL
 # Default mappings — overridden by global.yaml agent_metrics config
 # ---------------------------------------------------------------------------
 
-DEFAULT_WEBSITE_MAPPING: dict[str, str] = {
-    "aspose.net": "aspose.com",
-    "aspose.org": "aspose.com",
-    "groupdocs.net": "groupdocs.com",
-    "groupdocs.org": "groupdocs.com",
-    "conholdate.net": "conholdate.com",
-    "conholdate.org": "conholdate.com",
-}
+# Website is the source domain the user navigates to — no cross-TLD normalization.
+# Empty by default so domain passes through as-is (aspose.net, aspose.org, etc.).
+DEFAULT_WEBSITE_MAPPING: dict[str, str] = {}
 
 DEFAULT_SECTION_MAPPING: dict[str, str] = {
     # By subsystem prefix
@@ -60,8 +55,20 @@ DEFAULT_SECTION_MAPPING: dict[str, str] = {
 
 DEFAULT_BRAND_MAPPING: dict[str, str] = {
     "aspose.com": "Aspose",
+    "aspose.net": "Aspose",
+    "aspose.org": "Aspose",
     "groupdocs.com": "GroupDocs",
+    "groupdocs.net": "GroupDocs",
+    "groupdocs.org": "GroupDocs",
     "conholdate.com": "Conholdate",
+    "conholdate.net": "Conholdate",
+    "conholdate.org": "Conholdate",
+}
+
+# Domain-based platform fallback: aspose.net always means .NET (no platform segment in paths).
+# For aspose.org, platform is encoded in content path hierarchy — handled by Level 3 path-scan.
+DEFAULT_DOMAIN_PLATFORM_MAPPING: dict[str, str] = {
+    "aspose.net": "net",
 }
 
 DEFAULT_PRODUCT_DISPLAY_MAPPING: dict[str, str] = {
@@ -169,6 +176,7 @@ class ScopeResolver:
         self.brand_mapping = cfg.get("metrics_brand_mapping", DEFAULT_BRAND_MAPPING)
         self.product_display_mapping = cfg.get("product_display_mapping", DEFAULT_PRODUCT_DISPLAY_MAPPING)
         self.platform_display_mapping = cfg.get("platform_display_mapping", DEFAULT_PLATFORM_DISPLAY_MAPPING)
+        self.domain_platform_mapping = cfg.get("metrics_domain_platform_mapping", DEFAULT_DOMAIN_PLATFORM_MAPPING)
         self.known_families = cfg.get("known_product_families", DEFAULT_KNOWN_FAMILIES)
         self.known_platforms = cfg.get("known_platforms", DEFAULT_KNOWN_PLATFORMS)
         self.excluded_prefixes = cfg.get("excluded_site_id_prefixes", DEFAULT_EXCLUDED_PREFIXES)
@@ -234,18 +242,21 @@ class ScopeResolver:
         # Not found — this is mixed content, not a fallback error
         return None
 
-    def _resolve_platform(self, inp: ScopeInput, content_root_id: str) -> str:
+    def _resolve_platform(self, inp: ScopeInput, content_root_id: str, domain: str = "") -> str:
         # Level 1: CLI
         if inp.cli_overrides and inp.cli_overrides.get("platform"):
             return inp.cli_overrides["platform"]
         # Level 2: hints
         if inp.metrics_hints and inp.metrics_hints.get("platform"):
             return inp.metrics_hints["platform"]
-        # Level 3: content_root_id segments
+        # Level 3: content_root_id path segments (covers aspose.org where platform is in path)
         segments = content_root_id.split("/")
         for seg in reversed(segments):
             if seg in self.known_platforms and seg != "all":
                 return seg
+        # Level 3b: domain-based mapping (covers aspose.net where platform is not in path)
+        if domain and domain in self.domain_platform_mapping:
+            return self.domain_platform_mapping[domain]
         return "all"
 
     def _resolve_product_display(self, inp: ScopeInput, website: str, family_token: str | None) -> str:
@@ -315,11 +326,10 @@ class ScopeResolver:
         scope.product_family_token = family_token or "total"
         scope.product = self._resolve_product_display(inp, scope.website, family_token)
 
-        platform_token = self._resolve_platform(inp, scope.content_root_id)
+        platform_token = self._resolve_platform(inp, scope.content_root_id, domain)
         scope.platform = self._resolve_platform_display(platform_token)
 
-        prefix = "test " if inp.is_test else ""
-        scope.item_name = f"{prefix}{scope.content_root_id} {inp.operation_type}"
+        # item_name is built in MetricsRunContext.finish() after file counts are known.
 
         scope.detection_method = self._detection_method
         scope.warnings = list(self._warnings)
@@ -331,8 +341,8 @@ class ScopeResolver:
         else:
             scope.reporting_confidence = "high"
 
-        # Check for blank fields
-        for f in ["website", "website_section", "product", "platform", "item_name"]:
+        # Check for blank fields (item_name is built in integration layer, not here)
+        for f in ["website", "website_section", "product", "platform"]:
             if not getattr(scope, f):
                 scope.warnings.append(f"Blank field: {f}")
                 scope.fallback_used = True
@@ -551,8 +561,7 @@ def run_scope_audit(profiles_dir: str = "config/site_profiles", output_path: str
                     "website_section": scope.website_section,
                     "product": scope.product,
                     "platform": scope.platform,
-                    "item_name": scope.item_name,
-                },
+                        },
                 "classification": classification,
                 "detection_method": scope.detection_method,
                 "fallback_used": scope.fallback_used,
@@ -587,7 +596,7 @@ def check_audit_gate(results: list[dict]) -> tuple[bool, list[str]]:
                 f"— warnings: {row.get('warnings')}"
             )
         resolved = row.get("resolved", {})
-        for field_name in ["website", "website_section", "product", "platform", "item_name"]:
+        for field_name in ["website", "website_section", "product", "platform"]:
             if not resolved.get(field_name):
                 blockers.append(
                     f"BLANK FIELD: {row.get('profile')} / {field_name} is empty"

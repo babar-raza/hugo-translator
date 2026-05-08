@@ -827,7 +827,7 @@ class TMImprovementWorker:
                 site_id="tm_improvement",
                 content_root_raw="tm_improvement",
                 config_service=getattr(self, 'config_service', None),
-                job_type="tm_improvement",
+                job_type="TM Improvement",
             )
             _metrics_ctx.start()
         except Exception:
@@ -838,7 +838,7 @@ class TMImprovementWorker:
         else:
             with self.telemetry.client.track_run(
                 agent_name="tm_improvement_worker",
-                job_type="tm_improvement",
+                job_type="TM Improvement",
                 trigger_type="scheduled",
             ) as ctx:
                 result = self._execute_improvement_run()

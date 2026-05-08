@@ -27,6 +27,21 @@ def _is_excluded(site_id: str, cfg: dict) -> bool:
     return any(site_id.startswith(p) for p in prefixes)
 
 
+def _build_item_name(resolved, job_type: str, items_succeeded: int) -> str:
+    """Build human-readable item_name: verb + family + section + file count."""
+    verb_map = {
+        "Content Translation": "Translated",
+        "TM Improvement": "Improved TM for",
+        "Test": "Tested",
+    }
+    verb = verb_map.get(job_type, job_type)
+    family_token = getattr(resolved, "product_family_token", "total") or "total"
+    family = "All Products" if family_token == "total" else family_token.capitalize()
+    section = getattr(resolved, "website_section", "") or "Content"
+    noun = "file" if items_succeeded == 1 else "files"
+    return f"{verb} {family} {section} — {items_succeeded} {noun}"
+
+
 class MetricsRunContext:
     """Wraps a single content_root translation run for metrics collection."""
 
@@ -201,7 +216,7 @@ class MetricsRunContext:
             platform=resolved.platform,
             website=resolved.website,
             website_section=resolved.website_section,
-            item_name=resolved.item_name,
+            item_name=_build_item_name(resolved, self.job_type, items_succeeded),
             items_discovered=items_discovered,
             items_failed=items_failed,
             items_succeeded=items_succeeded,

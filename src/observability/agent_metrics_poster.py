@@ -79,7 +79,7 @@ class AgentMetricsPoster:
             return result
 
         # Enforce test-row limit
-        if job_type == "test":
+        if job_type == "Test":
             with _test_rows_lock:
                 global _test_rows_posted
                 if _test_rows_posted >= _MAX_TEST_ROWS_PER_SPRINT:
@@ -88,7 +88,7 @@ class AgentMetricsPoster:
                     return result
 
         # Test posts are always synchronous (Amendment #2)
-        is_sync = job_type == "test" or not self.fire_and_forget
+        is_sync = job_type == "Test" or not self.fire_and_forget
 
         if is_sync:
             return self._do_post_sync(payload_dict, job_type)
@@ -125,7 +125,7 @@ class AgentMetricsPoster:
             result["posted"] = True
 
             # Increment test row counter on success
-            if job_type == "test":
+            if job_type == "Test":
                 with _test_rows_lock:
                     global _test_rows_posted
                     _test_rows_posted += 1
@@ -138,7 +138,7 @@ class AgentMetricsPoster:
             if e.code in (301, 302, 303, 307):
                 redirect_url = e.headers.get("Location")
                 result["posted"] = True
-                if job_type == "test":
+                if job_type == "Test":
                     with _test_rows_lock:
                         _test_rows_posted += 1
                 logger.info("POST redirect (%d) — treated as success", e.code)

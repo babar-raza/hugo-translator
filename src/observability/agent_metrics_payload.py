@@ -8,7 +8,7 @@ from datetime import datetime, timezone
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
-AGENT_NAME = "hugo-translator"
+AGENT_NAME = "Hugo Translator"
 AGENT_OWNER = "Babar Raza"
 
 VALID_STATUSES = {"success", "partial_success", "failure"}
@@ -20,14 +20,14 @@ class AgentMetricsPayload(BaseModel):
     timestamp: str = Field(description="ISO 8601 with timezone")
     agent_name: str = Field(default=AGENT_NAME)
     agent_owner: str = Field(default=AGENT_OWNER)
-    job_type: str = Field(description="content_translation | tm_improvement | test")
+    job_type: str = Field(description="Content Translation | TM Improvement | Test")
     run_id: str = Field(description="segment_run_id UUID string")
     status: str = Field(description="success | partial_success | failure")
     product: str = Field(description="Aspose.Words, Aspose.Total, etc.")
     platform: str = Field(description=".NET, Java, All, etc.")
-    website: str = Field(description="Normalized domain (aspose.com)")
+    website: str = Field(description="Source domain (aspose.net, aspose.org, etc.)")
     website_section: str = Field(description="Docs, KB, Blog, etc.")
-    item_name: str = Field(description="content_root_id + operation_type")
+    item_name: str = Field(description="Human-readable: action + family + section + file count")
     items_discovered: int = Field(ge=0)
     items_failed: int = Field(ge=0)
     items_succeeded: int = Field(ge=0)

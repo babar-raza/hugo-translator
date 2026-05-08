@@ -758,7 +758,7 @@ agent_metrics:
   evidence_dir: "data/metrics/agent_evidence"
   ledger_file: "data/metrics/agent_evidence/metrics_ledger.jsonl"
 
-  test_job_type: "test"
+  test_job_type: "Test"
   max_test_rows_per_sprint: 3
 
   # Profiles with these prefixes are excluded from metrics posting
@@ -773,14 +773,14 @@ agent_metrics:
     - "realworld"
     - "example"
 
-  # Website normalization: source domain -> billing domain
-  metrics_website_mapping:
-    "aspose.net": "aspose.com"
-    "aspose.org": "aspose.com"
-    "groupdocs.net": "groupdocs.com"
-    "groupdocs.org": "groupdocs.com"
-    "conholdate.net": "conholdate.com"
-    "conholdate.org": "conholdate.com"
+  # Website: source domain passes through as-is (no cross-TLD normalization)
+  metrics_website_mapping: {}
+
+  # Platform mapping: source domain -> platform (for domains where platform is NOT in path hierarchy)
+  # aspose.org platforms ARE in path hierarchy (e.g. /net/, /python/) — path-scan handles those
+  # aspose.net content is always .NET and has no platform segment in paths
+  metrics_domain_platform_mapping:
+    "aspose.net": "net"
 
   # Section normalization: subsystem/display_name -> section label
   metrics_section_mapping:
@@ -799,11 +799,17 @@ agent_metrics:
     "API References": "API Reference"
     "files": "Product Pages"
 
-  # Brand mapping: billing domain -> brand name
+  # Brand mapping: source domain -> brand name (covers .com, .net, .org variants)
   metrics_brand_mapping:
     "aspose.com": "Aspose"
+    "aspose.net": "Aspose"
+    "aspose.org": "Aspose"
     "groupdocs.com": "GroupDocs"
+    "groupdocs.net": "GroupDocs"
+    "groupdocs.org": "GroupDocs"
     "conholdate.com": "Conholdate"
+    "conholdate.net": "Conholdate"
+    "conholdate.org": "Conholdate"
 
   # Known product families and platforms (for validation)
   known_product_families:

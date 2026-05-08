@@ -897,7 +897,7 @@ class AutonomousContentTranslationWorker:
                 site_id=site_id,
                 content_root_raw=content_root,
                 config_service=self.config_service,
-                job_type="content_translation",
+                job_type="Content Translation",
             )
             _metrics_ctx.start()
         except Exception as _m_exc:
