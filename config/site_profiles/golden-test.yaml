@@ -36,7 +36,7 @@ body:
 
 # Output configuration
 output_layout:
-  per_language_folders: true
+  per_language_folders: false  # CI-1 fix: fixtures are at root, not in en/ subdir
   pattern: "/{lang}/{relative_path}"
   preserve_structure: true
 

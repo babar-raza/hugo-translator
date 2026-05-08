@@ -28,11 +28,11 @@ body:
     - "codespan"
   translate_image_alt: false
   translate_link_titles: false
-  use_ast_body_reconstruction: false
+  use_ast_body_reconstruction: true  # G-L4-2 fix: prevents code fence loss in legacy reconstructor
 
 # Output configuration
 output_layout:
-  per_language_folders: true
+  per_language_folders: false  # CI-2 fix: fixtures are at root, not in en/ subdir
   pattern: "/{lang}/{relative_path}"
   preserve_structure: true
 
