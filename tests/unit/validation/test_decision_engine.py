@@ -517,7 +517,12 @@ class TestValidationDecisionEngine:
         assert "EXACTLY as they appear in source" in feedback
 
     def test_feedback_specific_instructions_shortcode(self):
-        """Test specific instructions for ShortcodePreservationValidator errors."""
+        """ShortcodePreservationValidator is CRITICAL: always REJECTS, no retry feedback.
+
+        ShortcodePreservationValidator was added to CRITICAL_VALIDATORS (Fix 1.1, RC-4).
+        Errors from this validator cause immediate REJECT without retry feedback,
+        even at retry_count=0 and with accept_after_max_retries=True.
+        """
         result = ValidationResult(
             success=False,
             issues=[
@@ -530,10 +535,9 @@ class TestValidationDecisionEngine:
         )
         decision = self.engine.make_decision(result, retry_count=0, source="test")
 
-        feedback = decision.retry_feedback
-        assert "⚠ SHORTCODES:" in feedback
-        assert "Hugo shortcodes" in feedback
-        assert "preserved EXACTLY" in feedback
+        assert decision.decision == ValidationDecision.REJECT
+        assert decision.retry_feedback is None
+        assert "ShortcodePreservationValidator" in decision.decision_reason
 
     def test_feedback_specific_instructions_structure(self):
         """Test specific instructions for StructureValidator errors."""
@@ -1117,12 +1121,13 @@ class TestValidationDecisionEngineTelemetry:
         )
         decision = engine.make_decision(result, retry_count=0, source="test")
 
-        assert decision.decision == ValidationDecision.RETRY
+        # ShortcodePreservationValidator is CRITICAL → REJECT immediately at retry_count=0
+        assert decision.decision == ValidationDecision.REJECT
 
         # Verify telemetry.track_validation_decision was called with correct counts
         self.mock_telemetry.track_validation_decision.assert_called_once_with(
             run_context=self.mock_run_context,
-            decision=ValidationDecision.RETRY.value,
+            decision=ValidationDecision.REJECT.value,
             retry_count=0,
             error_count=2,
             warning_count=1,
@@ -1130,7 +1135,7 @@ class TestValidationDecisionEngineTelemetry:
                 "ShortcodePreservationValidator": False,
                 "CompletenessValidator": False,
             },
-            feedback_provided=True,
+            feedback_provided=False,
         )
 
         # Verify telemetry.track_validation_error was called for each error/warning
@@ -1308,3 +1313,82 @@ class TestValidationDecisionEngineTelemetry:
         decision = engine.make_decision(result, retry_count=2, source="test")
         call_args = self.mock_telemetry.track_validation_decision.call_args
         assert call_args.kwargs["retry_count"] == 2
+
+
+class TestShortcodePreservationValidatorCritical:
+    """RC-4 regression tests: ShortcodePreservationValidator in CRITICAL_VALIDATORS.
+
+    Verifies that a ShortcodePreservationValidator ERROR causes REJECT even when
+    accept_after_max_retries=True and retry_count has reached max_retry_attempts.
+
+    Before Fix 1.1, this validator was absent from CRITICAL_VALIDATORS, so with
+    accept_after_max_retries=True the engine would ACCEPT a translation with broken
+    shortcode balance after exhausting retries. 52 pre-RC-5 files were created this way.
+    """
+
+    def _make_config(self, accept_after_max_retries: bool, max_retries: int = 2) -> dict:
+        return {
+            "decision_rules": {
+                "reject_on_error_count": 99,  # high threshold — must not trigger
+                "reject_on_placeholder_error": False,
+                "reject_on_code_block_error": False,
+                "reject_on_link_error": False,
+                "max_retry_attempts": max_retries,
+                "retry_on_structure_error": True,
+                "retry_on_terminology_warning": False,
+                "accept_warnings": True,
+                "accept_after_max_retries": accept_after_max_retries,
+            }
+        }
+
+    def _make_shortcode_error_result(self) -> "ValidationResult":
+        return ValidationResult(
+            success=False,
+            issues=[
+                ValidationIssue(
+                    severity=ValidationSeverity.ERROR,
+                    validator="ShortcodePreservationValidator",
+                    message="Orphan closing shortcode: {{% /steps %}} has no matching opener",
+                    location="body",
+                )
+            ],
+        )
+
+    def test_shortcode_error_rejects_when_accept_after_max_retries_true_and_retries_exhausted(self):
+        """CRITICAL_VALIDATORS gate fires for ShortcodePreservationValidator even with
+        accept_after_max_retries=True and retry_count at max.
+
+        This is the exact condition under which the 52 shortcode-broken files were
+        written before the RC-4 fix: retries exhausted, accept_after_max_retries=True,
+        ShortcodePreservationValidator not in CRITICAL_VALIDATORS.
+        """
+        config = self._make_config(accept_after_max_retries=True, max_retries=2)
+        engine = ValidationDecisionEngine(config)
+        result = self._make_shortcode_error_result()
+
+        # retry_count == max_retry_attempts (retries exhausted)
+        decision = engine.make_decision(result, retry_count=2, source="test source")
+
+        assert decision.decision == ValidationDecision.REJECT, (
+            f"Expected REJECT via CRITICAL_VALIDATORS gate but got {decision.decision}. "
+            f"Reason: {decision.decision_reason}"
+        )
+        assert "ShortcodePreservationValidator" in decision.decision_reason
+
+    def test_shortcode_error_also_rejects_at_first_attempt(self):
+        """CRITICAL gate fires on the very first attempt (retry_count=0)."""
+        config = self._make_config(accept_after_max_retries=True)
+        engine = ValidationDecisionEngine(config)
+        result = self._make_shortcode_error_result()
+
+        decision = engine.make_decision(result, retry_count=0, source="test source")
+
+        assert decision.decision == ValidationDecision.REJECT
+        assert "ShortcodePreservationValidator" in decision.decision_reason
+
+    def test_shortcode_validator_is_in_critical_validators_set(self):
+        """Validates that ShortcodePreservationValidator is registered in CRITICAL_VALIDATORS."""
+        assert "ShortcodePreservationValidator" in ValidationDecisionEngine.CRITICAL_VALIDATORS, (
+            "ShortcodePreservationValidator must be in CRITICAL_VALIDATORS to prevent "
+            "accept_after_max_retries=True from writing shortcode-broken files."
+        )

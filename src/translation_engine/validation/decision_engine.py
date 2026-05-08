@@ -70,6 +70,7 @@ class ValidationDecisionEngine:
         "CodeBlockValidator",
         "LinkValidator",
         "StructureValidator",
+        "ShortcodePreservationValidator",  # defense-in-depth: class default accept_after_max_retries=True creates gap when instantiated directly
     }
 
     def __init__(self, config: dict[str, Any], telemetry=None, run_context=None) -> None:

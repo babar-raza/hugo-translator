@@ -177,3 +177,69 @@ class TestYAMLFormatterLoggingSafety:
         assert "yaml_ruamel_fallback" in str(call_kwargs)
         assert result.startswith("---\n")
         assert "Safe fallback" in result
+
+
+class TestRC5YAMLValidation:
+    """RC-5 regression tests: _validate_yaml_output raises ValueError for known-bad YAML.
+
+    These tests guard against regressions in the RC-5 pre-write YAML validation
+    (yaml_formatter.py:84-97). Each pattern corresponds to a confirmed failure class
+    found in the 465 YAML-broken translated files created before the RC-5 fix (2026-05-04).
+    """
+
+    def test_unquoted_colon_in_value_raises(self):
+        """Unquoted colon in a YAML value (RC-1 failure pattern) raises ValueError.
+
+        Example: title: Cells: Advanced Spreadsheet Library
+        YAML treats the second ': ' as a nested key, producing a scan error.
+        """
+        bad_yaml = "title: Cells: Advanced Spreadsheet Library\ndescription: test\n"
+        with pytest.raises(ValueError, match="YAML"):
+            YAMLFormatter._validate_yaml_output(bad_yaml)
+
+    def test_bad_block_scalar_indentation_raises(self):
+        """Block scalar content with mixed indentation raises ValueError.
+
+        Example of real failure pattern from pre-RC-5 files:
+            description: |
+              two-space content
+             bad_key: value   ← 1-space: terminates block scalar at wrong indent level
+        The key at 1-space indentation is less than block content (2-space) but
+        more than root mapping (0-space), causing a YAML structural error.
+        """
+        bad_yaml = "description: |\n  content line\n bad_key: value\n"
+        with pytest.raises(ValueError, match="YAML"):
+            YAMLFormatter._validate_yaml_output(bad_yaml)
+
+    def test_collapsed_frontmatter_raises(self):
+        """Collapsed frontmatter (all keys on one line) raises ValueError.
+
+        Occurs when frontmatter serializer collapses multiple key-value pairs onto
+        one line without newlines, making them unparseable as a block mapping.
+        """
+        bad_yaml = "title: Hello description: World date: 2024-01-01\n"
+        with pytest.raises(ValueError, match="YAML"):
+            YAMLFormatter._validate_yaml_output(bad_yaml)
+
+    def test_format_frontmatter_raises_when_serializer_produces_invalid_yaml(self):
+        """format_frontmatter() raises ValueError end-to-end when YAML is invalid.
+
+        Patches the internal serializer to write known-bad YAML to the stream,
+        confirming that _validate_yaml_output is called in the format_frontmatter
+        code path and that the ValueError propagates to the caller.
+
+        Note: _yaml_dumper.dump(data, stream) writes to the stream object; the code
+        reads yaml_content from stream.getvalue(), not from dump's return value.
+        Therefore the mock must use side_effect to write to the stream argument.
+        """
+        bad_yaml = "title: Cells: Advanced Spreadsheet Library\ndescription: test\n"
+
+        def write_bad_yaml_to_stream(data, stream):
+            stream.write(bad_yaml)
+
+        with patch(
+            "src.translation_engine.reconstructor.yaml_formatter._yaml_dumper"
+        ) as mock_dumper:
+            mock_dumper.dump.side_effect = write_bad_yaml_to_stream
+            with pytest.raises(ValueError, match="YAML"):
+                YAMLFormatter.format_frontmatter({"title": "anything"})
