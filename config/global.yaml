@@ -64,7 +64,7 @@ tm_defaults:
 
 # Default model preferences
 model_defaults:
-  fallback_model: "professionalize_llm"
+  fallback_model: "disc_tra_m2m100_418m_hf"
   device: "auto"  # auto, cpu, cuda, mps
   batch_size: 4  # Conservative default to prevent CUDA OOM (GPU optimizer will calculate optimal)
   cache_models: true

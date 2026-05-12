@@ -175,8 +175,13 @@ class HuggingFaceBackend(ModelBackend):
                 )
 
         try:
+            import torch as _torch
             from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
             from transformers.utils import logging as hf_logging
+
+            # Resolve "auto" device to a concrete PyTorch device string
+            if self.device == "auto":
+                self.device = "cuda" if _torch.cuda.is_available() else "cpu"
 
             model_id = self.model_info.hf_model_id or self.model_info.model_id
             if self.model_info.local_path:

@@ -2,6 +2,73 @@
 
 ---
 
+## Workstream: INT-REMED-20260511 - Integration Test Failure Remediation
+**Plan**: `plans/healing/integration-test-failure-remediation-contract.md`
+**Added**: 2026-05-11
+**Status**: IN_PROGRESS
+**Primary rule**: execute only `verified_ready` taskcards; blocked or partial taskcards require additional evidence first.
+
+### ORCH-INT-G0: Gate 0 environment and worktree lock
+**Owner-agent**: Orchestrator / Agent E
+**Status**: PASS
+**Impacted paths**: `reports/PLAN_SOURCES.md`, `reports/PLAN_INDEX.md`, `reports/STATUS.md`, `reports/CHANGELOG.md`
+**Acceptance criteria**: branch, commit, dirty worktree, Python, pytest, and dependency state captured.
+**Evidence**: `reports/STATUS.md`, `reports/CHANGELOG.md`
+
+### TC-B01: Fix invalid SiteProfile fixture ID
+**Owner-agent**: Agent B
+**Status**: PLANNED
+**Scope**: `tests/integration/test_e2e_validation.py`
+**Acceptance criteria**: fixture uses a valid `site_id` matching `^[a-z0-9.-]+$`; assertions are not weakened.
+**Tests**: `python -m pytest tests/integration/test_e2e_validation.py -q --tb=short`
+**Risk**: Low, test fixture only.
+
+### TC-B02: Update RecommendationFeedback fixtures
+**Owner-agent**: Agent B
+**Status**: PLANNED
+**Scope**: `tests/integration/test_benchmarking_e2e.py`
+**Acceptance criteria**: test fixtures match current `RecommendationFeedback` required fields; Windows temp DB handles do not leak.
+**Tests**: `python -m pytest tests/integration/test_benchmarking_e2e.py -q --tb=short`
+**Risk**: Medium, benchmark DB lifecycle can leak handles on Windows.
+
+### TC-B04: Rate volatility transition assertion
+**Owner-agent**: Agent B
+**Status**: PLANNED
+**Scope**: `tests/integration/test_stats_accuracy.py`
+**Acceptance criteria**: test verifies transition volatility, not steady-state uniform samples; no assertion weakening.
+**Tests**: `python -m pytest tests/integration/test_stats_accuracy.py -q --tb=short`
+**Risk**: Low, test timing correction.
+
+### TC-D01: Persist BenchmarkDB extended fields
+**Owner-agent**: Agent B
+**Status**: PLANNED
+**Scope**: `src/benchmarking/storage.py`
+**Acceptance criteria**: extended `SystemInfo` fields round-trip through save/load; schema version remains v10.
+**Tests**: `python -m pytest tests/integration/test_systeminfo_persistence.py -q --tb=short`
+**Regression tests**: `python -m pytest tests/unit/benchmarking/test_migrations.py tests/unit/benchmarking/test_schema_migrations_v8.py -q --tb=short`
+**Risk**: High, benchmark persistence compatibility.
+
+### TC-H02: Windows-safe benchmark CLI output encoding
+**Owner-agent**: Agent B
+**Status**: PLANNED
+**Scope**: `src/benchmarking/cli.py`
+**Acceptance criteria**: CLI does not emit characters that fail under Windows charmap stdout/stderr; help and migrate commands still work.
+**Tests**: targeted benchmark CLI migrate/help tests from `tests/integration/test_benchmarking_cli.py`
+**Risk**: Medium, CLI user-facing output.
+
+### Blocked Items Preserved
+- TC-A01 quality metrics optional dependency contract.
+- TC-D02 legacy migration compatibility.
+- TC-E01 Redis queue test/API contract.
+- TC-F01 real TM integrity verifier.
+- TC-F02 CLI `--source` compatibility.
+- TC-G01 shortcode preservation contract.
+- TC-H01 benchmark CLI schema fixture repair.
+- TC-I01 nested list renderer diagnosis.
+- TC-Z01 remaining failure audit.
+
+---
+
 ## WS-MLD-20260417 — Mixed-Language Defect Detection, Healing & Prevention (harmonic-snacking-kernighan)
 
 **Plan**: `C:\Users\prora\.claude\plans\harmonic-snacking-kernighan.md`

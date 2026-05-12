@@ -1,0 +1,233 @@
+# Reference API documentation for Aspose.Words (aspose.net)
+# Modeled after reference.aspose.org.yaml with Words-specific customizations.
+#
+# IMPORTANT: API reference content has strict translation rules:
+#   - linkTitle and title contain API class/method names → PASSTHROUGH (never translate)
+#   - description and summary contain human-readable prose → TRANSLATE
+#   - categories field contains taxonomy labels (Class, Method, etc.) → PASSTHROUGH
+#   - layout field → PASSTHROUGH
+#   - All PascalCase identifiers, dotted namespaces, interface names → PROTECT
+#   - All code blocks and inline code → PRESERVE
+#
+# Content root: reference.aspose.net/words/
+# Locale convention: per_language_folders (en/file.md → de/file.md, fr/file.md, etc.)
+
+site_id: reference.aspose.net
+display_name: API References
+content_roots:
+- ${ASPOSE_NET_CONTENT}/reference.aspose.net/words
+default_source_lang: en
+target_langs:
+  - ar
+  - bg
+  - ca
+  - cs
+  - da
+  - de
+  - el
+  - es
+  - fa
+  - fi
+  - fr
+  - he
+  - hi
+  - hr
+  - hu
+  - id
+  - it
+  - ja
+  - ko
+  - lt
+  - lv
+  - ms
+  - nl
+  - "no"
+  - pl
+  - pt
+  - ro
+  - ru
+  - sk
+  - sr
+  - sv
+  - th
+  - tr
+  - uk
+  - vi
+  - zh
+
+frontmatter:
+  # API names — never translate (linkTitle is the API class/method name)
+  linkTitle:
+    mode: passthrough
+    strategy: null
+  # title often matches linkTitle for reference pages — passthrough
+  title:
+    mode: passthrough
+    strategy: null
+  # Human-readable description — translate
+  description:
+    mode: translate
+    strategy: null
+  # Human-readable summary — translate
+  summary:
+    mode: translate
+    strategy: null
+  # Taxonomy labels (Class, Method, Property, etc.) — passthrough
+  categories:
+    mode: passthrough
+    strategy: null
+  draft:
+    mode: passthrough
+    strategy: null
+  date:
+    mode: passthrough
+    strategy: null
+  type:
+    mode: passthrough
+    strategy: null
+  layout:
+    mode: passthrough
+    strategy: null
+  url:
+    mode: passthrough
+    strategy: null
+  slug:
+    mode: passthrough
+    strategy: null
+
+body:
+  translate_markdown: true
+  preserve_blocks:
+  - block_code       # C#/Python/Java code examples
+  - codespan         # Inline code (`Document`, `Save()`, etc.)
+  - link             # API cross-reference links
+  preserve_patterns:
+  - ^\{\{<.*>\}\}                          # Hugo shortcodes
+  - ^[A-Z][a-z0-9]+(?:[A-Z][a-z0-9]+)*$   # PascalCase identifiers (standalone)
+  - ^[A-Z]{2,}$                            # ALL_CAPS constants
+  - ^<.*>                                  # HTML/generic type parameters
+  - ^[A-Z][A-Za-z0-9_]*\s*\(.*\)$         # Method signatures
+  placeholder_syntax:
+  - \{\{<.*?>\}\}
+  - \{\{%.*?%\}\}
+  use_ast_body_reconstruction: true
+  ast_segmentation_strategy: adaptive
+  ast_batch_size: 50
+
+output_layout:
+  per_language_folders: true
+  pattern: '{lang}/{path}'
+
+model:
+  default: m2m100_1.2b
+
+tm_prefs:
+  use_semantic_tm: true
+  fallback_exact_only: false
+  min_similarity_score: 0.8
+
+# Strict mode: API reference content must be pixel-perfect
+validation:
+  enabled: true
+  validation_mode: strict
+  validators:
+    completeness:
+      enabled: true
+    language_consistency:
+      enabled: true
+      confidence_threshold: 0.9   # High threshold — API descriptions are prose
+    shortcode_preservation:
+      enabled: true
+    frontmatter_protection:
+      enabled: true
+    terminology_preservation:
+      enabled: true
+      validation_mode: strict
+    file_placement:
+      enabled: true
+  post_write_validation: true
+
+# Parallel files: keep low for API reference (large files with code blocks)
+max_parallel_files: 2
+
+terminology:
+  enabled: true
+  preserve_mode: BOTH
+  inherit_global: true
+  custom_terms:
+  - term: API
+    category: technical_term
+    case_sensitive: true
+    preserve_mode: both
+    severity: error
+  - term: Method
+    category: api_term
+    case_sensitive: false
+    preserve_mode: validate
+    severity: warning
+  - term: Property
+    category: api_term
+    case_sensitive: false
+    preserve_mode: validate
+    severity: warning
+  - term: Namespace
+    category: api_term
+    case_sensitive: false
+    preserve_mode: validate
+    severity: warning
+  - term: Class
+    category: api_term
+    case_sensitive: false
+    preserve_mode: validate
+    severity: warning
+  - term: Exception
+    category: api_term
+    case_sensitive: false
+    preserve_mode: validate
+    severity: warning
+  - term: Interface
+    category: api_term
+    case_sensitive: false
+    preserve_mode: validate
+    severity: warning
+  - term: Enum
+    category: api_term
+    case_sensitive: false
+    preserve_mode: validate
+    severity: warning
+  - term: Struct
+    category: api_term
+    case_sensitive: false
+    preserve_mode: validate
+    severity: warning
+  patterns:
+  # PascalCase API identifiers (class/method names)
+  - pattern: \b[A-Z][a-z]+(?:[A-Z][a-z]+)+\b
+    category: pascal_case_identifier
+    description: PascalCase API identifiers (e.g. Document, LoadOptions, MailMerge)
+    preserve_mode: protect
+    severity: error
+  # UPPER_CASE constants
+  - pattern: \b[A-Z_]{2,}\b
+    category: constant_name
+    description: UPPER_CASE constants (e.g. DEFAULT_FORMAT, MAX_SIZE)
+    preserve_mode: protect
+    severity: warning
+  # Dotted namespace identifiers (Aspose.Words.Loading, System.Exception)
+  - pattern: \b[A-Z][a-zA-Z0-9]*\.[A-Z][a-zA-Z0-9.]*\b
+    category: namespace_identifier
+    description: Dotted namespace identifiers (e.g. Aspose.Words.Document)
+    preserve_mode: protect
+    severity: error
+  # Interface names starting with I
+  - pattern: \bI[A-Z][a-zA-Z0-9]+\b
+    category: interface_name
+    description: Interface names (e.g. IDocumentLoadingCallback, IEnumerable)
+    preserve_mode: protect
+    severity: error
+  # Exception class names
+  - pattern: \b[A-Z][a-z]+Exception\b
+    category: exception_class
+    description: Exception class names (e.g. InvalidOperationException)
+    preserve_mode: protect
+    severity: error
