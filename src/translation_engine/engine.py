@@ -3249,14 +3249,23 @@ class TranslationEngine:
             # INT-02: Prepare translation texts
             texts = [seg.source_text for seg in segments_to_translate]
 
-            # INT-02: If retry_feedback provided, prepend to translation texts
+            # INT-02: If retry_feedback provided, prepend to translation texts.
+            # Only applies to LLM backends — MT models (M2M100, HF, CT2) translate
+            # the feedback string literally instead of following it as an instruction.
             if retry_feedback:
-                texts_with_feedback = [
-                    f"{retry_feedback}\n\nSOURCE TEXT:\n{text}"
-                    for text in texts
-                ]
-                texts = texts_with_feedback
-                logger.debug(f"Applied retry feedback to {len(texts)} segments")
+                from ..model_runtime.llm_backend import LLMModelBackend
+                if isinstance(backend, LLMModelBackend):
+                    texts_with_feedback = [
+                        f"{retry_feedback}\n\nSOURCE TEXT:\n{text}"
+                        for text in texts
+                    ]
+                    texts = texts_with_feedback
+                    logger.debug(f"Applied retry feedback to {len(texts)} segments")
+                else:
+                    logger.debug(
+                        f"Skipping retry feedback injection for non-LLM backend "
+                        f"{type(backend).__name__} — MT models cannot follow instructions"
+                    )
 
             # INT-02: Retry temperature tracking (TC-M2 2026-05-01).
             # Temperature IS supported by all LLM providers via provider._config.temperature.
