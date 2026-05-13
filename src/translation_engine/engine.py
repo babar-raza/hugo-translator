@@ -1287,6 +1287,67 @@ class TranslationEngine:
 
         return total_segments
 
+    def _filter_source_files(
+        self,
+        files: list,
+        site_profile,
+        target_langs: list[str],
+    ) -> list:
+        """Filter a list of files to exclude already-translated files.
+
+        For file-based localization (per_language_folders=False), translated
+        files follow the pattern ``{name}.{lang}.md``. These must be excluded
+        to prevent double-language outputs like ``index.es.da.md``.
+
+        For directory-based localization (per_language_folders=True), all
+        files are returned unchanged because translated files live in separate
+        language subdirectories.
+
+        Args:
+            files: List of Path objects to filter.
+            site_profile: SiteProfile with output_layout configuration.
+            target_langs: Target language codes for this translation run.
+
+        Returns:
+            Filtered list containing only source (non-translated) files.
+        """
+        # Directory layout: translated files are in separate folders, no filtering needed
+        if getattr(getattr(site_profile, 'output_layout', None), 'per_language_folders', True):
+            return list(files)
+
+        source_lang = getattr(site_profile, 'default_source_lang', 'en')
+        source_files = []
+        excluded_count = 0
+
+        for f in files:
+            is_translated, detected_lang = _is_translated_filename(
+                f.name, target_langs, source_lang=source_lang
+            )
+            if is_translated:
+                logger.info(
+                    "Skipping already-translated file: %s (detected lang: %s)",
+                    f.name, detected_lang,
+                )
+                excluded_count += 1
+            else:
+                source_files.append(f)
+
+        total = len(files)
+        if excluded_count > 0 and total > 0:
+            pct = excluded_count / total * 100
+            logger.info(
+                "Filtering: excluded %d/%d files (%.0f%%) as existing translations",
+                excluded_count, total, pct,
+            )
+            if pct > 50:
+                logger.warning(
+                    "High filter rate: %.0f%% of %d files filtered as translations. "
+                    "Verify the source directory is correct.",
+                    pct, total,
+                )
+
+        return source_files
+
     def translate_file(
         self,
         site_id: str,
@@ -1346,6 +1407,22 @@ class TranslationEngine:
                 return result
 
             source_lang = site_profile.default_source_lang
+
+            # Guard: reject translated files in file-based localization layouts
+            output_layout = getattr(site_profile, 'output_layout', None)
+            if output_layout and not getattr(output_layout, 'per_language_folders', True):
+                is_translated, detected_lang = _is_translated_filename(
+                    file_path.name, target_langs, source_lang=source_lang
+                )
+                if is_translated:
+                    msg = (
+                        f"Refusing to translate already-translated file: {file_path.name} "
+                        f"(detected language: {detected_lang}). "
+                        "Pass a source file without a language code in the filename."
+                    )
+                    logger.warning(msg)
+                    result.errors.append(msg)
+                    return result
 
             # Initialize metadata tracker for content hash tracking (if enabled)
             if self.enable_content_hash and not self.metadata_tracker:

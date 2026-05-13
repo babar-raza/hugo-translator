@@ -1549,7 +1549,10 @@ class TextUnitExtractor:
         """Check if node contains inline formatting (strong/em/link/shortcodes/etc.)."""
         formatting_types = {
             NodeType.STRONG, NodeType.EMPHASIS, NodeType.CODE_SPAN,
-            NodeType.LINK, NodeType.IMAGE, NodeType.INLINE_HTML
+            NodeType.LINK, NodeType.IMAGE,
+            # INLINE_HTML intentionally excluded: shortcodes are self-contained leaf nodes
+            # that _collect_text_from_node handles via node.raw. Excluding them allows
+            # full-sentence extraction so placeholder_manager can protect inline shortcodes.
         }
 
         # Check children

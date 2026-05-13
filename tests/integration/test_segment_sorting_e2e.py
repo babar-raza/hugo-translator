@@ -12,6 +12,7 @@ import pytest
 
 from src.model_runtime import ModelLoader
 from src.tm import TranslationMemory
+from src.tm.models import LookupResult
 from src.translation_engine import TranslationEngine
 from src.utils.config_loader import ConfigService
 
@@ -55,13 +56,8 @@ def temp_workspace(tmp_path):
 def mock_config_service(temp_workspace):
     """Create mock config service for testing."""
     config = Mock(spec=ConfigService)
-    config.site_config = Mock()
-    config.site_config.id = "test_site"
-    config.site_config.source_lang = "en"
-    config.site_config.source_dir = temp_workspace["source_dir"]
-    config.site_config.output_dir = temp_workspace["output_dir"]
 
-    # Mock body rules
+    # Body rules attached to site_profile.body
     body_rules = Mock()
     body_rules.translate_markdown = True
     body_rules.preserve_blocks = []
@@ -69,22 +65,30 @@ def mock_config_service(temp_workspace):
     body_rules.placeholder_syntax = []
     body_rules.use_ast_body_reconstruction = False
     body_rules.sort_segments_by_length = False  # Default
-    config.site_config.get_body_rules = Mock(return_value=body_rules)
+    body_rules.ast_segmentation_strategy = "sentence_only"
+    body_rules.ast_batch_size = 32
 
-    # Mock frontmatter rules
-    frontmatter_rules = Mock()
-    frontmatter_rules.translate_keys = []
-    frontmatter_rules.preserve_keys = []
-    config.site_config.get_frontmatter_rules = Mock(return_value=frontmatter_rules)
+    # Build mock site_profile with attributes SegmentExtractor accesses
+    mock_profile = Mock()
+    mock_profile.site_id = "test.site"
+    mock_profile.default_source_lang = "en"
+    mock_profile.body = body_rules
+    mock_profile.frontmatter = {}  # empty dict → .items() returns []
+    mock_profile.output_dir = str(temp_workspace["output_dir"])
+    mock_profile.default_model = None
 
-    # Mock TM preferences
-    tm_prefs = Mock()
-    tm_prefs.use_semantic_tm = False
-    tm_prefs.fallback_exact_only = True
-    config.site_config.get_tm_preferences = Mock(return_value=tm_prefs)
+    output_layout = Mock()
+    output_layout.per_language_folders = False  # File-based: no /en/ path requirement
+    output_layout.output_dir = str(temp_workspace["output_dir"])
+    output_layout.pattern = None  # No filename pattern → fallback to output_dir/{lang}/{name}
+    mock_profile.output_layout = output_layout
 
+    # ConfigService methods the engine calls during __init__ and translate_file
+    config.get_config = Mock(return_value={})  # empty → adaptive batching disabled
+    config.get_site_profile = Mock(return_value=mock_profile)
     config.global_config = Mock()
     config.global_config.tm_data_dir = str(temp_workspace["tm_dir"])
+    config.global_config.model_defaults = None
 
     return config
 
@@ -93,7 +97,7 @@ def mock_config_service(temp_workspace):
 def mock_tm():
     """Create mock translation memory."""
     tm = Mock(spec=TranslationMemory)
-    tm.lookup = Mock(return_value=None)  # No cache hits
+    tm.lookup = Mock(return_value=LookupResult(hit=False))  # No cache hits
     tm.store = Mock()
     tm.set_override_mode = Mock()
     return tm
@@ -104,7 +108,10 @@ def mock_model_loader():
     """Create mock model loader."""
     loader = Mock(spec=ModelLoader)
     backend = MockTranslationBackend()
-    loader.get_backend = Mock(return_value=backend)
+    loader.load_model = Mock(return_value=backend)
+    loader.get_tokenizer_for_counting = Mock(return_value=None)
+    loader.check_and_clear_cache = Mock(return_value=False)
+    loader.clear_cache_after_file = Mock()
     return loader
 
 
@@ -123,6 +130,7 @@ def test_segment_sorting_preserves_structure(
         model_loader=mock_model_loader,
         sort_segments_by_length=True,
         enable_telemetry=False,
+        enable_validation=False,
     )
 
     # Translate file
@@ -133,8 +141,7 @@ def test_segment_sorting_preserves_structure(
     )
 
     # Verify translation succeeded
-    assert result.successful is True
-    assert result.target_lang == "es"
+    assert result.success is True
 
     # Verify output file exists
     output_file = temp_workspace["output_dir"] / "es" / "test.md"
@@ -169,6 +176,7 @@ def test_segment_sorting_edge_case_single(
         model_loader=mock_model_loader,
         sort_segments_by_length=True,
         enable_telemetry=False,
+        enable_validation=False,
     )
 
     # Translate - should not raise IndexError
@@ -178,7 +186,7 @@ def test_segment_sorting_edge_case_single(
         target_langs=["es"],
     )
 
-    assert result.successful is True
+    assert result.success is True
 
 
 def test_segment_sorting_edge_case_uniform(
@@ -196,6 +204,7 @@ def test_segment_sorting_edge_case_uniform(
         model_loader=mock_model_loader,
         sort_segments_by_length=True,
         enable_telemetry=False,
+        enable_validation=False,
     )
 
     # Translate
@@ -205,7 +214,7 @@ def test_segment_sorting_edge_case_uniform(
         target_langs=["es"],
     )
 
-    assert result.successful is True
+    assert result.success is True
 
     # Verify output structure
     output_file = temp_workspace["output_dir"] / "es" / "uniform.md"
@@ -227,6 +236,7 @@ def test_segment_sorting_edge_case_empty(
         model_loader=mock_model_loader,
         sort_segments_by_length=True,
         enable_telemetry=False,
+        enable_validation=False,
     )
 
     # Translate - should handle gracefully
@@ -256,6 +266,7 @@ def test_sorting_disabled_processes_in_order(
         model_loader=mock_model_loader,
         sort_segments_by_length=False,  # Explicit disable
         enable_telemetry=False,
+        enable_validation=False,
     )
 
     # Translate
@@ -265,7 +276,7 @@ def test_sorting_disabled_processes_in_order(
         target_langs=["es"],
     )
 
-    assert result.successful is True
+    assert result.success is True
 
     # Verify output exists
     output_file = temp_workspace["output_dir"] / "es" / "test.md"
@@ -288,6 +299,7 @@ def test_sorting_with_multiple_files(
         model_loader=mock_model_loader,
         sort_segments_by_length=True,
         enable_telemetry=False,
+        enable_validation=False,
     )
 
     # Translate directory

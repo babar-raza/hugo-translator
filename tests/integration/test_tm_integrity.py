@@ -6,6 +6,11 @@ from pathlib import Path
 
 import pytest
 
+# These tests require site profiles that may not be present in all environments
+_PROFILES_DIR = Path(__file__).parent.parent.parent / "config" / "site_profiles"
+_TM_SITE_AVAILABLE = (_PROFILES_DIR / "test.tm.net.yaml").exists()
+_L3_SITE_AVAILABLE = (_PROFILES_DIR / "test.l3.net.yaml").exists()
+
 
 @pytest.fixture
 def tm_snapshot(tmp_path):
@@ -28,6 +33,7 @@ def tm_snapshot(tmp_path):
     return _snapshot
 
 
+@pytest.mark.skipif(not _TM_SITE_AVAILABLE, reason="Site profile test.tm.net.yaml not present")
 def test_tm_integrity_after_concurrent_writes(tmp_path, tm_snapshot):
     """Test TM integrity after multi-language concurrent writes."""
     # Create test corpus
@@ -85,6 +91,7 @@ def test_tm_integrity_after_concurrent_writes(tmp_path, tm_snapshot):
         assert after_l2 >= before_l2, f"L2 entries decreased: {before_l2} → {after_l2}"
 
 
+@pytest.mark.skipif(not _L3_SITE_AVAILABLE, reason="Site profile test.l3.net.yaml not present")
 def test_l3_lock_protection_under_load(tmp_path):
     """Test L3 save_index lock protection under concurrent writes."""
     # This test specifically stresses L3 saves with concurrent processes

@@ -381,7 +381,7 @@ def test_multiple_runs_different_hardware(temp_db):
 def test_schema_version_after_migration(temp_db):
     """Test database schema version is v5 after migration."""
     db = BenchmarkDatabase(temp_db)
-    assert db.get_schema_version() == 5
+    assert db.get_schema_version() == 10
 
 
 def test_backward_compatibility_null_extended_fields(temp_db):

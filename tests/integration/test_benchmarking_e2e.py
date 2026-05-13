@@ -8,6 +8,7 @@ Tests the complete workflow:
 """
 
 import tempfile
+from datetime import datetime
 from pathlib import Path
 
 from src.benchmarking.feedback import RecommendationFeedback
@@ -20,7 +21,7 @@ class TestBenchmarkingEndToEnd:
 
     def test_complete_recommendation_workflow(self):
         """Test complete workflow from benchmark → recommendation → feedback → learning."""
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
             db_path = Path(tmpdir) / "benchmarks.db"
             db = BenchmarkDatabase(db_path)
 
@@ -94,6 +95,7 @@ class TestBenchmarkingEndToEnd:
             assert recommendation.confidence_score > 0
 
             # Step 3: Record feedback for recommendation
+            from datetime import datetime
             feedback = RecommendationFeedback(
                 feedback_id="feedback_001",
                 recommendation_id=recommendation.recommendation_id,
@@ -106,6 +108,9 @@ class TestBenchmarkingEndToEnd:
                 predicted_memory_mb=recommendation.predicted_memory_mb,
                 actual_memory_mb=1800.0,
                 success=True,
+                quality_score=None,
+                failure_reason=None,
+                timestamp_utc=datetime.utcnow().isoformat() + "Z",
                 system_info=similar_system,
             )
 
@@ -131,7 +136,7 @@ class TestBenchmarkingEndToEnd:
 
     def test_schema_migration_with_data_preservation(self):
         """Test that schema migrations preserve existing data."""
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
             db_path = Path(tmpdir) / "benchmarks.db"
 
             # Create v1 database manually
@@ -181,8 +186,8 @@ class TestBenchmarkingEndToEnd:
             # Open with BenchmarkDatabase (triggers migrations)
             db = BenchmarkDatabase(db_path)
 
-            # Verify migration to v4
-            assert db.get_schema_version() == 4
+            # Verify migration to current version (SCHEMA_VERSION = 10)
+            assert db.get_schema_version() == 10
 
             # Verify data preserved
             run = db.get_run("test_run")
@@ -191,7 +196,7 @@ class TestBenchmarkingEndToEnd:
 
     def test_production_metrics_workflow(self):
         """Test production metrics recording integration."""
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
             db_path = Path(tmpdir) / "benchmarks.db"
             db = BenchmarkDatabase(db_path)
 
@@ -225,7 +230,7 @@ class TestBenchmarkingEndToEnd:
 
     def test_timing_instrumentation_integration(self):
         """Test that timing metrics are captured across all components."""
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
             # Test L3 timing metrics
             from src.tm.l3_semantic import L3SemanticTM
 
@@ -276,7 +281,7 @@ class TestBenchmarkingEndToEnd:
 
     def test_foreign_key_cascade_integration(self):
         """Test that foreign key cascades work correctly in practice."""
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
             db_path = Path(tmpdir) / "benchmarks.db"
             db = BenchmarkDatabase(db_path)
 
@@ -360,7 +365,7 @@ class TestBenchmarkingEndToEnd:
 
     def test_adaptive_weight_learning(self):
         """Test that adaptive weight learning improves recommendations over time."""
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
             db_path = Path(tmpdir) / "benchmarks.db"
             db = BenchmarkDatabase(db_path)
 
@@ -428,6 +433,9 @@ class TestBenchmarkingEndToEnd:
                     predicted_memory_mb=recommendation.predicted_memory_mb,
                     actual_memory_mb=recommendation.predicted_memory_mb * 0.9,  # 10% less
                     success=True,
+                    quality_score=None,
+                    failure_reason=None,
+                    timestamp_utc=datetime.utcnow().isoformat() + "Z",
                     system_info=system_info,
                 )
 

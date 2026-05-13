@@ -4,6 +4,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+sacrebleu = pytest.importorskip("sacrebleu", reason="sacrebleu not installed")
 from src.benchmarking.quality_metrics import QualityMetrics, QualityScore
 
 

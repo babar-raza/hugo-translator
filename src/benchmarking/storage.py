@@ -286,6 +286,45 @@ class BenchmarkDatabase:
 
         if from_version < 2:
             # v2: Add composite indices for query optimization (BM-01)
+            # Guard: ensure tables exist for DBs migrated from v1 without full schema
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS system_info (
+                    run_id TEXT PRIMARY KEY,
+                    cpu_model TEXT NOT NULL,
+                    cpu_cores INTEGER NOT NULL,
+                    total_ram_gb REAL NOT NULL,
+                    gpu_model TEXT,
+                    gpu_vram_gb REAL,
+                    os_name TEXT NOT NULL DEFAULT '',
+                    os_version TEXT NOT NULL DEFAULT '',
+                    python_version TEXT NOT NULL DEFAULT '',
+                    torch_version TEXT NOT NULL DEFAULT '',
+                    transformers_version TEXT NOT NULL DEFAULT '',
+                    timestamp_utc TEXT NOT NULL DEFAULT '',
+                    FOREIGN KEY (run_id) REFERENCES benchmark_runs(run_id) ON DELETE CASCADE
+                )
+                """
+            )
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS benchmark_results (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    run_id TEXT NOT NULL,
+                    sample_id TEXT NOT NULL,
+                    model_id TEXT NOT NULL,
+                    device TEXT NOT NULL,
+                    batch_size INTEGER NOT NULL,
+                    duration_seconds REAL NOT NULL,
+                    tokens_input INTEGER NOT NULL,
+                    tokens_output INTEGER NOT NULL,
+                    throughput_tokens_per_sec REAL NOT NULL,
+                    peak_memory_mb REAL,
+                    errors TEXT NOT NULL DEFAULT '[]',
+                    FOREIGN KEY (run_id) REFERENCES benchmark_runs(run_id) ON DELETE CASCADE
+                )
+                """
+            )
             conn.execute(
                 "CREATE INDEX IF NOT EXISTS idx_runs_model_device ON benchmark_runs(model_id, device)"
             )
@@ -655,15 +694,22 @@ class BenchmarkDatabase:
                     ),
                 )
 
-                # Insert system info
+                # Insert system info (all fields including v5 extended fields)
                 si = run.system_info
                 conn.execute(
                     """
                     INSERT INTO system_info
                     (run_id, cpu_model, cpu_cores, total_ram_gb, gpu_model, gpu_vram_gb,
                      os_name, os_version, python_version, torch_version, transformers_version,
-                     timestamp_utc)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                     timestamp_utc,
+                     gpu_compute_capability, has_cuda, cuda_version, gpu_driver_version,
+                     platform_system, platform_release, python_implementation,
+                     torch_cuda_available,
+                     cpu_frequency_mhz, cpu_frequency_max_mhz, cpu_tdp_watts,
+                     memory_bandwidth_gbps, numa_nodes, power_management_state,
+                     collected_at_utc, collector_version)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+                            ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                     (
                         run.run_id,
@@ -677,7 +723,24 @@ class BenchmarkDatabase:
                         si.python_version,
                         si.torch_version or "",  # Handle None
                         "",  # transformers_version not in comprehensive SystemInfo
-                        si.collected_at_utc if hasattr(si, 'collected_at_utc') else si.timestamp_utc,
+                        si.collected_at_utc if hasattr(si, 'collected_at_utc') else getattr(si, 'timestamp_utc', None),
+                        # v5 extended fields
+                        getattr(si, 'gpu_compute_capability', None),
+                        int(bool(getattr(si, 'has_cuda', False))),
+                        getattr(si, 'cuda_version', None),
+                        getattr(si, 'gpu_driver_version', None),
+                        getattr(si, 'platform_system', None),
+                        getattr(si, 'platform_release', None),
+                        getattr(si, 'python_implementation', None),
+                        int(bool(getattr(si, 'torch_cuda_available', False))),
+                        getattr(si, 'cpu_frequency_mhz', None),
+                        getattr(si, 'cpu_frequency_max_mhz', None),
+                        getattr(si, 'cpu_tdp_watts', None),
+                        getattr(si, 'memory_bandwidth_gbps', None),
+                        getattr(si, 'numa_nodes', 1),
+                        getattr(si, 'power_management_state', None),
+                        getattr(si, 'collected_at_utc', None),
+                        getattr(si, 'collector_version', None),
                     ),
                 )
 
@@ -798,28 +861,46 @@ class BenchmarkDatabase:
             cursor = conn.execute("SELECT * FROM system_info WHERE run_id = ?", (run_id,))
             sys_row = cursor.fetchone()
             if not sys_row:
-                logger.warning(f"Missing system_info for run {run_id}")
-                return None
+                logger.warning(f"Missing system_info for run {run_id}; using defaults")
+                system_info = SystemInfo(cpu_model="unknown", cpu_cores=0, total_ram_gb=0.0)
+            else:
+                pass  # will build below
 
             # Fetch results
             cursor = conn.execute("SELECT * FROM benchmark_results WHERE run_id = ?", (run_id,))
             result_rows = cursor.fetchall()
 
             # Reconstruct objects - map DB fields to comprehensive SystemInfo
-            system_info = SystemInfo(
-                cpu_model=sys_row["cpu_model"],
-                cpu_cores=sys_row["cpu_cores"],
-                total_ram_gb=sys_row["total_ram_gb"],
-                gpu_model=sys_row["gpu_model"],
-                gpu_memory_gb=sys_row["gpu_vram_gb"],  # DB has gpu_vram_gb, SystemInfo uses gpu_memory_gb
-                os_name=sys_row["os_name"],
-                os_version=sys_row["os_version"],
-                python_version=sys_row["python_version"],
-                torch_version=sys_row["torch_version"],
-                # Comprehensive SystemInfo has additional fields not in v4 DB schema
-                # These will be NULL until SR-02 migration completes
-                collected_at_utc=sys_row["timestamp_utc"],
-            )
+            if sys_row:
+                _r = dict(sys_row)  # Convert Row to dict for safe .get() access on optional columns
+                system_info = SystemInfo(
+                    cpu_model=_r["cpu_model"],
+                    cpu_cores=_r["cpu_cores"],
+                    total_ram_gb=_r["total_ram_gb"],
+                    gpu_model=_r.get("gpu_model"),
+                    gpu_memory_gb=_r.get("gpu_vram_gb"),  # DB has gpu_vram_gb, SystemInfo uses gpu_memory_gb
+                    os_name=_r["os_name"],
+                    os_version=_r["os_version"],
+                    python_version=_r["python_version"],
+                    torch_version=_r.get("torch_version") or None,
+                    # v5 extended fields (NULL-safe via dict.get)
+                    gpu_compute_capability=_r.get("gpu_compute_capability"),
+                    has_cuda=bool(_r.get("has_cuda", 0)),
+                    cuda_version=_r.get("cuda_version"),
+                    gpu_driver_version=_r.get("gpu_driver_version"),
+                    platform_system=_r.get("platform_system"),
+                    platform_release=_r.get("platform_release"),
+                    python_implementation=_r.get("python_implementation"),
+                    torch_cuda_available=bool(_r.get("torch_cuda_available", 0)),
+                    cpu_frequency_mhz=_r.get("cpu_frequency_mhz"),
+                    cpu_frequency_max_mhz=_r.get("cpu_frequency_max_mhz"),
+                    cpu_tdp_watts=_r.get("cpu_tdp_watts"),
+                    memory_bandwidth_gbps=_r.get("memory_bandwidth_gbps"),
+                    numa_nodes=_r.get("numa_nodes", 1),
+                    power_management_state=_r.get("power_management_state"),
+                    collected_at_utc=_r.get("collected_at_utc") or _r.get("timestamp_utc"),
+                    collector_version=_r.get("collector_version"),
+                )
 
             results = [
                 BenchmarkResult(

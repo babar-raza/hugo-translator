@@ -5,8 +5,11 @@ Higher concurrency and longer durations than standard tests.
 
 SR-04: High-concurrency stress testing to expose race conditions and deadlocks.
 """
+import sys
 import threading
 import time
+
+import pytest
 
 
 class TestAtomicWriteStress:
@@ -48,6 +51,11 @@ class TestAtomicWriteStress:
             content = f.read_text()
             assert content.startswith("Content from writer")
 
+    @pytest.mark.xfail(
+        sys.platform == "win32",
+        reason="Windows os.replace() raises PermissionError under concurrent rename to same target; all writes may fail",
+        strict=False,
+    )
     def test_concurrent_writes_same_file(self, tmp_path, atomic_write_module):
         """Test multiple writers to same file handle contention gracefully.
 

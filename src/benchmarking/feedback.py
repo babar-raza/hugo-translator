@@ -397,17 +397,12 @@ class AdaptiveWeightLearner:
                 adjustment = 1.0
 
             # Update weights with bounds [0.1, 2.0]
+            # Note: do NOT re-normalize to original sum — that would cancel all adjustments.
+            # Weights are bounded, so they won't diverge.
             updated_weights = {}
             for key, value in current_weights.items():
                 new_value = value * adjustment
                 updated_weights[key] = max(0.1, min(2.0, new_value))
-
-            # Normalize weights to sum to original total
-            total = sum(current_weights.values())
-            updated_total = sum(updated_weights.values())
-            if updated_total > 0:
-                normalization = total / updated_total
-                updated_weights = {k: v * normalization for k, v in updated_weights.items()}
 
             # Store updated weights
             self._store_weights(updated_weights)

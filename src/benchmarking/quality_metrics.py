@@ -8,7 +8,12 @@ against reference translations.
 import logging
 from dataclasses import dataclass
 
-import sacrebleu
+try:
+    import sacrebleu
+    _SACREBLEU_AVAILABLE = True
+except ImportError:
+    sacrebleu = None  # type: ignore[assignment]
+    _SACREBLEU_AVAILABLE = False
 
 logger = logging.getLogger(__name__)
 
@@ -79,6 +84,8 @@ class QualityMetrics:
         Returns:
             BLEU score (0-100)
         """
+        if not _SACREBLEU_AVAILABLE:
+            raise ImportError("sacrebleu is required for BLEU scoring. Install with: pip install sacrebleu")
         try:
             # sacrebleu expects lists
             bleu = sacrebleu.sentence_bleu(

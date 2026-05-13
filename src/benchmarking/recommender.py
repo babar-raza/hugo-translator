@@ -3,6 +3,7 @@
 Recommends optimal model configurations based on hardware and requirements.
 """
 
+import json
 import logging
 from dataclasses import dataclass
 
@@ -84,7 +85,7 @@ class ModelRecommender:
 
         # Extract recommendation
         recommendation = ModelRecommendation(
-            recommendation_id=f"rec_{best_run.run_id}",
+            recommendation_id=best_run.run_id,
             model_id=best_run.model_id,
             device=best_run.device,
             batch_size=best_run.batch_sizes[0] if best_run.batch_sizes else 8,
@@ -127,6 +128,45 @@ class ModelRecommender:
             f"(throughput error: {abs(feedback.predicted_throughput - feedback.actual_throughput):.1f}, "
             f"memory error: {abs(feedback.predicted_memory_mb - feedback.actual_memory_mb):.1f})"
         )
+
+        # Persist feedback to database
+        try:
+            from dataclasses import asdict
+            system_info_json = json.dumps(asdict(feedback.system_info))
+            conn = self.db._get_connection()
+            try:
+                conn.execute(
+                    """
+                    INSERT OR IGNORE INTO recommendation_feedback
+                    (feedback_id, recommendation_id, model_id_recommended, model_id_used,
+                     device_recommended, device_used, predicted_throughput, actual_throughput,
+                     predicted_memory_mb, actual_memory_mb, success, quality_score,
+                     failure_reason, timestamp_utc, system_info_json)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        feedback.feedback_id,
+                        feedback.recommendation_id,
+                        feedback.model_id_recommended,
+                        feedback.model_id_used,
+                        feedback.device_recommended,
+                        feedback.device_used,
+                        feedback.predicted_throughput,
+                        feedback.actual_throughput,
+                        feedback.predicted_memory_mb,
+                        feedback.actual_memory_mb,
+                        int(feedback.success),
+                        feedback.quality_score,
+                        feedback.failure_reason,
+                        feedback.timestamp_utc,
+                        system_info_json,
+                    ),
+                )
+                conn.commit()
+            finally:
+                self.db._close_connection(conn)
+        except Exception as exc:
+            logger.warning(f"Failed to persist feedback {feedback.feedback_id}: {exc}")
 
         # Remove from active tracking
         if feedback.recommendation_id in self._active_recommendations:

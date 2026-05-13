@@ -9,6 +9,7 @@ Tests the complete flow:
 """
 
 import os
+import socket
 from collections.abc import Generator
 from pathlib import Path
 
@@ -16,6 +17,25 @@ import pytest
 
 from src.orchestrator.models import JobStatus, JobType, TranslationJob
 from src.orchestrator.redis_backend import RedisJobQueue
+
+
+def _redis_available() -> bool:
+    """Check if Redis is reachable on localhost:6379."""
+    try:
+        s = socket.create_connection(
+            (os.getenv("REDIS_HOST", "localhost"), int(os.getenv("REDIS_PORT", 6379))),
+            timeout=0.5,
+        )
+        s.close()
+        return True
+    except OSError:
+        return False
+
+
+pytestmark = pytest.mark.skipif(
+    not _redis_available(),
+    reason="Redis not running (no connection to localhost:6379)",
+)
 
 
 @pytest.fixture
