@@ -2375,12 +2375,24 @@ class TranslationEngine:
                         break  # Success, exit retry loop
 
                     except TranslationRejectedError:
-                        # Re-raise rejection errors
+                        # Per-locale rejection: record failure, queue for retry, and continue
+                        # to the next locale.  Do NOT re-raise — that would propagate past the
+                        # locale loop, triggering the outer `return result` and silently
+                        # abandoning all remaining locales (hi, lt, lv, ms, no, ...).
                         result.errors.append(f"Translation to {target_lang} rejected after {retry_count} attempts")
                         result.stats.validation_failed = True
                         result.stats.validation_decision = "REJECT"
                         result.stats.quality_score = "FAIL"  # TC-H5
-                        raise
+                        # Queue locale for retry on the next worker run
+                        try:
+                            _rtq_add(output_path, target_lang)
+                            logger.info(
+                                f"Queued rejected translation for retry: {output_path.name} ({target_lang})"
+                            )
+                        except Exception:
+                            pass
+                        # Continue to next locale (break out of the retry while-loop only)
+                        break
 
                     except TranslationRetryableError as e:
                         # Handle retryable errors (from nested logic if needed)
