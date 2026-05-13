@@ -3650,12 +3650,26 @@ class TranslationEngine:
         except ImportError:
             return issues
 
+        # API reference identifier prefixes — title values starting with these are
+        # passthrough (English API class/method names) and must not be language-checked.
+        _API_PREFIXES = (
+            "Class ", "Interface ", "Enum ", "Struct ", "Method ", "Property ",
+            "Namespace ", "Delegate ", "Event ", "Constructor ",
+        )
+
         for field in CHECKED_FIELDS:
             value = fm_data.get(field)
             if not value or not isinstance(value, str) or len(value.strip()) < MIN_CHARS:
                 continue
+            # Skip API reference identifiers in the title field (passthrough content).
+            v_stripped = value.strip()
+            if field == "title" and (
+                any(v_stripped.startswith(p) for p in _API_PREFIXES)
+                or _re.match(r'^[A-Z][A-Za-z0-9.]+$', v_stripped)
+            ):
+                continue
             try:
-                detected_langs = _ld.detect_langs(value.strip())
+                detected_langs = _ld.detect_langs(v_stripped)
                 if detected_langs:
                     top = detected_langs[0]
                     if top.lang != target_lang and top.prob > CONFIDENCE_THRESHOLD:
