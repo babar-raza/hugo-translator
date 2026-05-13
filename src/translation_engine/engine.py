@@ -3682,9 +3682,11 @@ class TranslationEngine:
             value = fm_data.get(field)
             if not value or not isinstance(value, str) or len(value.strip()) < MIN_CHARS:
                 continue
-            # Skip API reference identifiers in the title field (passthrough content).
+            # Skip API reference identifiers in title/description fields (passthrough content).
+            # description values like "Namespace Aspose.Words.Comparing" start with an API
+            # prefix and will always contain English namespace names after translation.
             v_stripped = value.strip()
-            if field == "title" and (
+            if field in ("title", "description") and (
                 any(v_stripped.startswith(p) for p in _API_PREFIXES)
                 or _re.match(r'^[A-Z][A-Za-z0-9.]+$', v_stripped)
             ):
