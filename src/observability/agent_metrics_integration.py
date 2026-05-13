@@ -293,7 +293,7 @@ class MetricsRunContext:
             token_env=self._cfg.get("token_env", "AGENT_METRICS_TOKEN"),
             timeout_seconds=self._cfg.get("post_timeout_seconds", 15),
             dry_run=False,
-            fire_and_forget=self._cfg.get("fire_and_forget", True),
+            fire_and_forget=self._cfg.get("fire_and_forget", False),
         )
         result = poster.post(post_dict, job_type=self.job_type)
 

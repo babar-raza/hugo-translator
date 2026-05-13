@@ -40,7 +40,7 @@ class AgentMetricsPoster:
         token_env: str = "AGENT_METRICS_TOKEN",
         timeout_seconds: int = 15,
         dry_run: bool = True,
-        fire_and_forget: bool = True,
+        fire_and_forget: bool = False,
     ):
         self.endpoint = _get_secret(endpoint_env)
         self.token = _get_secret(token_env)
@@ -161,7 +161,14 @@ class AgentMetricsPoster:
         return result
 
     def _do_post_async(self, payload_dict: dict, job_type: str) -> None:
-        """Fire-and-forget POST in background thread."""
+        """Fire-and-forget POST in background thread.
+
+        WARNING: Failures in async posts are only logged, not recorded in
+        evidence sidecars. Use synchronous posting (fire_and_forget=False)
+        for reliable evidence tracking.
+        """
+        logger.warning("Async fire-and-forget POST — evidence will not be updated on failure")
+
         def _post():
             try:
                 import urllib.request

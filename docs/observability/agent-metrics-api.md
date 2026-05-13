@@ -1,7 +1,7 @@
 # Agent Metrics API Integration
 
-**Last Updated**: 2026-05-06
-**Version**: 1.0
+**Last Updated**: 2026-05-13
+**Version**: 1.1
 **Target Audience**: Engineers, Operators, SREs
 **Status**: Dry-run and controlled-test verified. NOT production-enabled.
 
@@ -58,16 +58,16 @@ The posted JSON contains exactly these 17 keys. No extra keys are sent.
 | # | Field | Type | Source | Notes |
 |---|-------|------|--------|-------|
 | 1 | `timestamp` | string | `make_timestamp()` | ISO 8601 with UTC timezone |
-| 2 | `agent_name` | string | constant | Always `"hugo-translator"` |
+| 2 | `agent_name` | string | constant | Always `"Hugo Translator"` (see Breaking Changes below) |
 | 3 | `agent_owner` | string | constant | Always `"Babar Raza"` |
-| 4 | `job_type` | string | worker context | `content_translation`, `tm_improvement`, `test` |
+| 4 | `job_type` | string | worker context | `Content Translation`, `TM Improvement`, `Test` (Title Case) |
 | 5 | `run_id` | string | `segment_run_id` | UUID5 identifying this specific run |
 | 6 | `status` | string | `determine_status()` | `success`, `partial_success`, `failure` only |
 | 7 | `product` | string | ScopeResolver | e.g., `Aspose.Words`, `Aspose.Total` |
 | 8 | `platform` | string | ScopeResolver | e.g., `.NET`, `Java`, `All` |
-| 9 | `website` | string | ScopeResolver | Normalized domain, e.g., `aspose.com` |
+| 9 | `website` | string | ScopeResolver | Source domain pass-through, e.g., `aspose.net` |
 | 10 | `website_section` | string | ScopeResolver | `Docs`, `KB`, `Blog`, `Product Pages`, etc. |
-| 11 | `item_name` | string | scope + operation | `docs.aspose.net/words content_translation` |
+| 11 | `item_name` | string | `_build_item_name()` | e.g., `Translated Words Docs — 5 files` |
 | 12 | `items_discovered` | int | worker counts | Files selected for processing |
 | 13 | `items_failed` | int | worker counts | Files that failed |
 | 14 | `items_succeeded` | int | worker counts | Files successfully processed |
@@ -129,7 +129,7 @@ All scope dimensions are **derived** from profile configuration. No hardcoded sc
 
 All mappings are in `config/global.yaml` under `agent_metrics`:
 
-- `metrics_website_mapping` — domain normalization (e.g., `aspose.net` → `aspose.com`)
+- `metrics_website_mapping` — domain normalization (empty by default = pass-through)
 - `metrics_section_mapping` — subsystem to section name (e.g., `docs` → `Docs`)
 - `metrics_brand_mapping` — domain to brand (e.g., `aspose.com` → `Aspose`)
 - Product display mapping — family token to display name (e.g., `3d` → `Aspose.3D`)
@@ -336,6 +336,27 @@ None of the deferred items block content worker production enablement. TC-METRIC
 | Stage 9 | Content worker production (`enabled: true`, `dry_run: false`) | Requires separate approval | Ready for controlled pilot |
 | Stage 10 | TM worker production | Requires TC-METRICS-15 or explicit "Mixed" acceptance | Blocked by TC-METRICS-15 |
 
+## Breaking Changes
+
+### v1.1 (2026-05-13): agent_name, job_type, website, item_name
+
+The following field values changed between the initial production pilot (2026-05-07) and v1.1:
+
+| Field | Legacy (3 rows in sheet) | Current (v1.1+) | Reason |
+|-------|-------------------------|------------------|--------|
+| `agent_name` | `"hugo-translator"` | `"Hugo Translator"` | Title Case normalization (commit d8c71b5) |
+| `job_type` | `"content_translation"` | `"Content Translation"` | Title Case normalization |
+| `website` | `"aspose.com"` (cross-mapped) | `"aspose.net"` (pass-through) | Website mapping changed to pass-through |
+| `item_name` | `"docs.aspose.net/words content_translation"` | `"Translated Words Docs — 1 file"` | `_build_item_name()` wired in |
+
+The 3 legacy rows (2 test + 1 production) cannot be corrected (append-only sheet). When filtering, use both old and new values or filter by `run_id` date range.
+
+## Test Row Identification
+
+Test rows are identified by `job_type="Test"`, NOT by the `status` field. The `status` field always reflects the actual outcome of the run (`success`, `partial_success`, or `failure`), even for test runs. This design ensures test rows exercise the same status derivation logic as production rows.
+
+To filter test rows in the sheet: `job_type = "Test"`.
+
 ## Source of Truth
 
 | Component | File |
@@ -352,4 +373,4 @@ None of the deferred items block content worker production enablement. TC-METRIC
 
 ---
 
-**Version**: 1.0 | **Last Updated**: 2026-05-06
+**Version**: 1.1 | **Last Updated**: 2026-05-13

@@ -135,7 +135,7 @@ validation:
       enabled: true
     language_consistency:
       enabled: true
-      confidence_threshold: 0.9   # High threshold — API descriptions are prose
+      confidence_threshold: 0.6   # Relaxed: API body mixes English API names with translated prose
     shortcode_preservation:
       enabled: true
     frontmatter_protection:
