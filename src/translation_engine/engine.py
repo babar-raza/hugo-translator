@@ -2412,12 +2412,26 @@ class TranslationEngine:
                             )
 
                         if retry_count > max_retry_attempts:
-                            raise TranslationRejectedError(
-                                message=f"Failed after {retry_count} retries",
-                                file_path=str(file_path),
-                                validation_result=e.validation_result,
-                                rejection_reason="Max retries exceeded",
+                            # Per-locale rejection: max retries exceeded.  Handle in-place;
+                            # do NOT raise — raising inside except TranslationRetryableError
+                            # propagates past the locale for-loop (not caught by the sibling
+                            # except TranslationRejectedError) and hits the outer handler which
+                            # calls `return result`, silently abandoning ms, nl, no, ...
+                            result.errors.append(
+                                f"Translation to {target_lang} rejected after {retry_count} retries"
                             )
+                            result.stats.validation_failed = True
+                            result.stats.validation_decision = "REJECT"
+                            result.stats.quality_score = "FAIL"
+                            try:
+                                _rtq_add(output_paths_cache.get(target_lang, output_path), target_lang)
+                                logger.info(
+                                    f"Queued rejected translation for retry: "
+                                    f"{output_paths_cache.get(target_lang, output_path).name} ({target_lang})"
+                                )
+                            except Exception:
+                                pass
+                            break  # exit retry loop only; locale for-loop continues
                         continue
 
                     except Exception as e:
