@@ -136,7 +136,7 @@ def test_cpu_benchmark_runner_collect_system_info():
     assert system_info.total_ram_gb > 0
     assert system_info.os_name
     assert system_info.python_version
-    assert system_info.timestamp_utc
+    assert system_info.collected_at_utc
 
 
 @pytest.mark.integration
@@ -194,9 +194,12 @@ def test_cpu_benchmark_full_run_with_mocks(
     """
     mock_model, mock_tokenizer = mock_model_and_tokenizer
 
-    # Mock ModelLoader to return our mock model
+    # Mock ModelLoader to return a backend object with .model and .tokenizer attributes
+    mock_backend = MagicMock()
+    mock_backend.model = mock_model
+    mock_backend.tokenizer = mock_tokenizer
     mock_loader = MagicMock()
-    mock_loader.load_model.return_value = (mock_model, mock_tokenizer)
+    mock_loader.load_model.return_value = mock_backend
     mock_loader_class.return_value = mock_loader
 
     # Create runner

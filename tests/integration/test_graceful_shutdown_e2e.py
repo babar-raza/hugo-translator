@@ -15,6 +15,15 @@ from pathlib import Path
 
 import pytest
 
+# Subprocess-based signal delivery (SIGINT via os.kill) does not reliably work
+# on Windows — child processes don't receive POSIX signals in the same way.
+# Mark all tests that spawn subprocesses and send signals as xfail on Windows.
+_xfail_win32_signals = pytest.mark.xfail(
+    sys.platform == "win32",
+    reason="Subprocess SIGINT delivery unreliable on Windows",
+    strict=False,
+)
+
 
 @pytest.fixture
 def test_script_dir(tmp_path):
@@ -43,6 +52,7 @@ sys.path.insert(0, r"{src_path}")
     return script_path
 
 
+@_xfail_win32_signals
 class TestGracefulShutdownEndToEnd:
     """End-to-end tests for graceful shutdown with actual signal handling."""
 
@@ -556,6 +566,7 @@ time.sleep(30)
             pytest.fail("Process did not exit gracefully")
 
 
+@_xfail_win32_signals
 class TestShutdownIntegrationWithRealTelemetry:
     """Integration tests with real telemetry context objects."""
 

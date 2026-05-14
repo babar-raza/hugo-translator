@@ -1566,10 +1566,12 @@ class TextUnitExtractor:
         return False
 
     def _has_block_content(self, node: ASTNode) -> bool:
-        """Check if node has block-level children (CODE_BLOCK) that cannot be
-        represented as plain text in full-sentence extraction mode."""
+        """Check if node has block-level children that cannot be represented as
+        plain text in full-sentence extraction mode. Nested LISTs are included:
+        a list item containing a sub-list must use leaf extraction so each
+        item's text is extracted separately rather than concatenated."""
         for child in node.children:
-            if child.type == NodeType.CODE_BLOCK:
+            if child.type in (NodeType.CODE_BLOCK, NodeType.LIST):
                 return True
         return False
 

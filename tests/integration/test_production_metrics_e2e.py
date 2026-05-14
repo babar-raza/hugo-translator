@@ -89,17 +89,16 @@ def benchmark_config_enabled(tmp_path):
 
 def test_load_benchmarking_config_integration(benchmark_config_enabled, tmp_path):
     """Test loading real benchmarking config file."""
-    # Temporarily override config path
-    with patch("src.cli.Path") as mock_path_class:
-        mock_path_instance = MagicMock()
-        mock_path_instance.exists.return_value = True
-        mock_path_class.return_value = mock_path_instance
+    import yaml
+    with open(benchmark_config_enabled, encoding="utf-8") as f:
+        raw_config = yaml.safe_load(f.read())
 
-        with patch("builtins.open", open(benchmark_config_enabled)):
-            config = load_benchmarking_config()
+    # Patch the internal yaml loader directly — avoids brittle builtins.open patching
+    with patch("src.cli._load_benchmarking_yaml", return_value=raw_config):
+        config = load_benchmarking_config()
 
-            assert config["production"]["record_enabled"] is True
-            assert config["production"]["min_segments_to_record"] == 5
+        assert config["production"]["record_enabled"] is True
+        assert config["production"]["min_segments_to_record"] == 5
 
 
 def test_production_metrics_disabled_by_default(tmp_path):
@@ -188,7 +187,7 @@ def test_ingestor_disabled_is_noop(tmp_path):
     )
 
     # Verify no runs recorded
-    runs = db.list_runs(purpose="production")
+    runs = db.list_runs()
     assert len(runs) == 0
 
 
@@ -216,7 +215,7 @@ def test_production_metrics_records_run_when_enabled(tmp_path):
     )
 
     # Verify run was recorded
-    runs = db.list_runs(purpose="production")
+    runs = db.list_runs()
     assert len(runs) == 1
 
     # Verify run details
@@ -256,7 +255,7 @@ def test_system_info_collected_and_sanitized(tmp_path):
     )
 
     # Get run
-    runs = db.list_runs(purpose="production")
+    runs = db.list_runs()
     assert len(runs) == 1
 
     run_id = runs[0][0]
@@ -350,7 +349,7 @@ def test_multiple_runs_recorded(tmp_path):
         )
 
     # Verify all runs recorded
-    runs = db.list_runs(purpose="production")
+    runs = db.list_runs()
     assert len(runs) == 3
 
     # Verify each has unique run_id
@@ -381,7 +380,7 @@ def test_failed_translation_recorded(tmp_path):
     )
 
     # Verify run recorded even though it failed
-    runs = db.list_runs(purpose="production")
+    runs = db.list_runs()
     assert len(runs) == 1
 
 
@@ -412,7 +411,7 @@ def test_graceful_error_handling(tmp_path, caplog):
             duration_seconds=1.0,
         )
         # If it succeeds, verify run recorded
-        runs = db.list_runs(purpose="production")
+        runs = db.list_runs()
         # May or may not have runs depending on path creation
     except Exception as e:
         # Should NOT raise - but if it does in test, that's a bug

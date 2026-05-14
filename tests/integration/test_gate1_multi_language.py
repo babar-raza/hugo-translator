@@ -6,7 +6,13 @@ from pathlib import Path
 
 import pytest
 
+_PROFILES_DIR = Path(__file__).parent.parent.parent / "config" / "site_profiles"
+_EXAMPLE_AVAILABLE = (_PROFILES_DIR / "test.example.net.yaml").exists()
+_SCALE_AVAILABLE = (_PROFILES_DIR / "test.scale.net.yaml").exists()
+_INTERRUPT_AVAILABLE = (_PROFILES_DIR / "test.interrupt.net.yaml").exists()
 
+
+@pytest.mark.skipif(not _EXAMPLE_AVAILABLE, reason="Site profile test.example.net.yaml not present")
 def test_multi_language_no_cascading_timeout(tmp_path):
     """Test multi-language translation completes without cascading timeouts."""
     # Minimal test corpus
@@ -22,10 +28,9 @@ def test_multi_language_no_cascading_timeout(tmp_path):
         [
             sys.executable, "-m", "src.cli",
             "--site", "test.example.net",
-            "--source", str(source_dir),
+            "--input", str(source_dir),
             "--output", str(output_dir),
             "--target-langs", "ar,bg,cs",
-            "--skip-tm",  # Faster test
         ],
         capture_output=True,
         text=True,
@@ -60,6 +65,7 @@ def test_multi_language_no_cascading_timeout(tmp_path):
         "Found '300s elapsed' message (5-minute timeout detected)"
 
 
+@pytest.mark.skipif(not _INTERRUPT_AVAILABLE, reason="Site profile test.interrupt.net.yaml not present")
 def test_parent_lock_cleanup_on_interrupt(tmp_path):
     """Test parent lock is cleaned up on Ctrl+C."""
     import signal
@@ -98,6 +104,7 @@ def test_parent_lock_cleanup_on_interrupt(tmp_path):
     assert not lock_file.exists(), "Lock file not cleaned up after SIGINT"
 
 
+@pytest.mark.skipif(not _SCALE_AVAILABLE, reason="Site profile test.scale.net.yaml not present")
 @pytest.mark.parametrize("lang_count", [2, 3, 5])
 def test_multi_language_scales(tmp_path, lang_count):
     """Test multi-language translation scales linearly (not exponentially)."""
@@ -114,10 +121,9 @@ def test_multi_language_scales(tmp_path, lang_count):
         [
             sys.executable, "-m", "src.cli",
             "--site", "test.scale.net",
-            "--source", str(source_dir),
+            "--input", str(source_dir),
             "--output", str(output_dir),
             "--target-langs", ",".join(langs),
-            "--skip-tm",
         ],
         capture_output=True,
         text=True,

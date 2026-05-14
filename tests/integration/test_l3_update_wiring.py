@@ -18,6 +18,7 @@ from unittest import mock
 import pytest
 
 from src.tm.improvement_queue import ImprovementCandidate
+from src.tm.normalization import hash_text
 from src.workers.tm_improvement_worker import TMImprovementWorker, TMImprovementWorkerConfig
 
 # ---------------------------------------------------------------------------
@@ -52,10 +53,10 @@ class StubL3:
 # ---------------------------------------------------------------------------
 
 def _entry_id(candidate: ImprovementCandidate) -> str:
-    """Reproduce the production entry_id formula (translation_memory.py:218)."""
+    """Reproduce the production entry_id formula (tm_improvement_worker.py:1191)."""
     return (
         f"{candidate.site_id}:{candidate.src_lang}:"
-        f"{candidate.tgt_lang}:{hash(candidate.text)}"
+        f"{candidate.tgt_lang}:{hash_text(candidate.text)}"
     )
 
 

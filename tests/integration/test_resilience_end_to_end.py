@@ -319,7 +319,7 @@ class TestModulesExist:
         atomic_path = src_path / "utils" / "atomic_write.py"
         assert atomic_path.exists()
 
-        content = atomic_path.read_text()
+        content = atomic_path.read_text(encoding="utf-8")
         assert "def atomic_write" in content
         assert "class AtomicWriteError" in content
         assert "class DiskFullError" in content
@@ -332,7 +332,7 @@ class TestModulesExist:
         lock_path = src_path / "utils" / "file_lock.py"
         assert lock_path.exists()
 
-        content = lock_path.read_text()
+        content = lock_path.read_text(encoding="utf-8")
         assert "class FileLock" in content
         assert "class LockError" in content
         assert "def acquire" in content
@@ -344,7 +344,7 @@ class TestModulesExist:
         progress_path = src_path / "translation_engine" / "progress.py"
         assert progress_path.exists()
 
-        content = progress_path.read_text()
+        content = progress_path.read_text(encoding="utf-8")
         assert "class ProgressTracker" in content
         assert "def validate_progress_file" in content
         assert "def recover_progress_file" in content
@@ -355,7 +355,7 @@ class TestModulesExist:
         engine_path = src_path / "translation_engine" / "engine.py"
         assert engine_path.exists()
 
-        content = engine_path.read_text()
+        content = engine_path.read_text(encoding="utf-8")
 
         # Check imports
         assert "from ..utils.atomic_write import" in content
@@ -371,7 +371,7 @@ class TestModulesExist:
         cli_path = src_path / "cli.py"
         assert cli_path.exists()
 
-        content = cli_path.read_text()
+        content = cli_path.read_text(encoding="utf-8")
 
         # Check RES feature markers
         assert "RES-06" in content  # Signal handlers
@@ -399,7 +399,7 @@ class TestResilienceSystemComplete:
                 missing.append(f"{file_path} does not exist")
                 continue
 
-            content = file_path.read_text()
+            content = file_path.read_text(encoding="utf-8")
             for marker in markers:
                 if marker not in content:
                     missing.append(f"{marker} not found in {file_path.name}")

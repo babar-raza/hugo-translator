@@ -2,7 +2,9 @@
 import tempfile
 import threading
 import time
+import uuid
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from datetime import datetime, timezone
 from pathlib import Path
 
 from src.benchmarking.feedback import AdaptiveWeightLearner, RecommendationFeedback
@@ -10,6 +12,19 @@ from src.benchmarking.production_ingestor import ProductionMetricsIngestor
 from src.benchmarking.recommender import ModelRecommender
 from src.benchmarking.storage import BenchmarkDatabase, BenchmarkResult, BenchmarkRun
 from src.benchmarking.system_info import SystemInfo, SystemInfoCollector
+
+
+def _now_utc() -> str:
+    return datetime.now(timezone.utc).isoformat()
+
+
+_TEST_SYSTEM_INFO = SystemInfo(
+    cpu_model="test_cpu",
+    cpu_cores=8,
+    total_ram_gb=16.0,
+    os_name="Linux",
+    python_version="3.11",
+)
 
 
 def create_test_run(run_id: str, cpu_cores: int = 8) -> BenchmarkRun:
@@ -43,12 +58,13 @@ def create_test_run(run_id: str, cpu_cores: int = 8) -> BenchmarkRun:
                 peak_memory_mb=1000.0,
             )
         ],
+        total_duration_seconds=10.0,
     )
 
 
 def test_concurrent_database_writes():
     """10 threads writing simultaneously should not corrupt database."""
-    with tempfile.TemporaryDirectory() as tmpdir:
+    with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
         db_path = Path(tmpdir) / "test.db"
         db = BenchmarkDatabase(db_path)
 
@@ -77,7 +93,7 @@ def test_concurrent_database_writes():
 
 def test_concurrent_reads_and_writes():
     """Concurrent reads and writes should not interfere."""
-    with tempfile.TemporaryDirectory() as tmpdir:
+    with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
         db_path = Path(tmpdir) / "test.db"
         db = BenchmarkDatabase(db_path)
 
@@ -140,7 +156,7 @@ def test_concurrent_reads_and_writes():
 
 def test_concurrent_recommender_requests():
     """Multiple threads requesting recommendations simultaneously."""
-    with tempfile.TemporaryDirectory() as tmpdir:
+    with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
         db_path = Path(tmpdir) / "test.db"
         db = BenchmarkDatabase(db_path)
 
@@ -195,7 +211,7 @@ def test_concurrent_recommender_requests():
 
 def test_concurrent_feedback_updates():
     """Multiple threads recording feedback simultaneously."""
-    with tempfile.TemporaryDirectory() as tmpdir:
+    with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
         db_path = Path(tmpdir) / "test.db"
         db = BenchmarkDatabase(db_path)
 
@@ -222,12 +238,21 @@ def test_concurrent_feedback_updates():
 
                 # Record feedback
                 feedback = RecommendationFeedback(
+                    feedback_id=str(uuid.uuid4()),
                     recommendation_id=rec.recommendation_id,
+                    model_id_recommended=rec.model_id,
+                    model_id_used=rec.model_id,
+                    device_recommended=rec.device,
+                    device_used=rec.device,
                     predicted_throughput=rec.predicted_throughput,
                     actual_throughput=rec.predicted_throughput * 0.95,  # 5% error
                     predicted_memory_mb=rec.predicted_memory_mb,
                     actual_memory_mb=rec.predicted_memory_mb * 1.05,  # 5% error
                     success=True,
+                    quality_score=None,
+                    failure_reason=None,
+                    timestamp_utc=_now_utc(),
+                    system_info=_TEST_SYSTEM_INFO,
                 )
 
                 recommender.record_outcome(feedback)
@@ -248,7 +273,7 @@ def test_concurrent_feedback_updates():
 
 def test_concurrent_production_metrics_recording():
     """Multiple threads recording production metrics simultaneously."""
-    with tempfile.TemporaryDirectory() as tmpdir:
+    with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
         db_path = Path(tmpdir) / "test.db"
         db = BenchmarkDatabase(db_path)
 
@@ -289,7 +314,7 @@ def test_concurrent_production_metrics_recording():
 
 def test_concurrent_weight_learner_updates():
     """Multiple threads updating weights simultaneously."""
-    with tempfile.TemporaryDirectory() as tmpdir:
+    with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
         db_path = Path(tmpdir) / "test.db"
         db = BenchmarkDatabase(db_path)
 
@@ -301,12 +326,21 @@ def test_concurrent_weight_learner_updates():
             """Update weights with feedback."""
             try:
                 feedback = RecommendationFeedback(
+                    feedback_id=str(uuid.uuid4()),
                     recommendation_id=f"rec_{worker_id}",
+                    model_id_recommended="test_model",
+                    model_id_used="test_model",
+                    device_recommended="cpu",
+                    device_used="cpu",
                     predicted_throughput=100.0,
                     actual_throughput=95.0 + worker_id,  # Varying performance
                     predicted_memory_mb=1000.0,
                     actual_memory_mb=1100.0 + worker_id * 10,
                     success=True,
+                    quality_score=None,
+                    failure_reason=None,
+                    timestamp_utc=_now_utc(),
+                    system_info=_TEST_SYSTEM_INFO,
                 )
 
                 learner.update_weights(feedback)
@@ -363,7 +397,7 @@ def test_concurrent_system_info_collection():
 
 def test_concurrent_database_deletion():
     """Concurrent deletes should not corrupt database."""
-    with tempfile.TemporaryDirectory() as tmpdir:
+    with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
         db_path = Path(tmpdir) / "test.db"
         db = BenchmarkDatabase(db_path)
 
@@ -401,7 +435,7 @@ def test_concurrent_database_deletion():
 
 def test_stress_concurrent_mixed_operations():
     """Stress test with mixed read/write/update/delete operations."""
-    with tempfile.TemporaryDirectory() as tmpdir:
+    with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
         db_path = Path(tmpdir) / "test.db"
         db = BenchmarkDatabase(db_path)
 

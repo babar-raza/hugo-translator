@@ -3,11 +3,20 @@ End-to-end integration tests for device and load-mode flags (T105: federated-spl
 
 Tests the complete pipeline: CLI flags → device validation → ModelLoader → HuggingFaceBackend
 """
+import os
 import subprocess
+import sys
 import tempfile
 from pathlib import Path
 
 import pytest
+
+# Skip tests that require real LLM models / hardware detection by default.
+# Set SKIP_HEAVY_TESTS=false to enable.
+SKIP_HEAVY_TESTS = os.getenv("SKIP_HEAVY_TESTS", "true").lower() == "true"
+_skip_heavy = pytest.mark.skipif(SKIP_HEAVY_TESTS, reason="Heavy integration test - skipped in CI")
+
+_PROFILES_DIR = Path(__file__).parent.parent.parent / "config" / "site_profiles"
 
 
 @pytest.fixture
@@ -23,6 +32,7 @@ def temp_output_dir():
         yield Path(tmpdir)
 
 
+@_skip_heavy
 class TestDeviceLoadModeE2E:
     """End-to-end tests for device and load-mode integration."""
 
@@ -35,18 +45,18 @@ class TestDeviceLoadModeE2E:
         # Run CLI with CPU and FP32
         result = subprocess.run(
             [
-                "python",
+                sys.executable,
                 "-m",
                 "src.cli",
                 "--site",
-                "example",
+                "kb.aspose.net",
                 "--device",
                 "cpu",
                 "--load-mode",
                 "fp32",
-                "--single-file",
+                "--input",
                 str(test_fixture_path),
-                "--output-dir",
+                "--output",
                 str(temp_output_dir),
             ],
             capture_output=True,
@@ -74,18 +84,18 @@ class TestDeviceLoadModeE2E:
         # Run CLI with CPU and INT8
         result = subprocess.run(
             [
-                "python",
+                sys.executable,
                 "-m",
                 "src.cli",
                 "--site",
-                "example",
+                "kb.aspose.net",
                 "--device",
                 "cpu",
                 "--load-mode",
                 "int8",
-                "--single-file",
+                "--input",
                 str(test_fixture_path),
-                "--output-dir",
+                "--output",
                 str(temp_output_dir),
             ],
             capture_output=True,
@@ -106,7 +116,7 @@ class TestDeviceLoadModeE2E:
 
     @pytest.mark.skipif(
         not __import__("subprocess").run(
-            ["python", "-c", "import torch; print(torch.cuda.is_available())"],
+            [__import__("sys").executable, "-c", "import torch; print(torch.cuda.is_available())"],
             capture_output=True,
             text=True,
         ).stdout.strip() == "True",
@@ -121,18 +131,18 @@ class TestDeviceLoadModeE2E:
         # Run CLI with CUDA and FP16
         result = subprocess.run(
             [
-                "python",
+                sys.executable,
                 "-m",
                 "src.cli",
                 "--site",
-                "example",
+                "kb.aspose.net",
                 "--device",
                 "cuda",
                 "--load-mode",
                 "fp16",
-                "--single-file",
+                "--input",
                 str(test_fixture_path),
-                "--output-dir",
+                "--output",
                 str(temp_output_dir),
             ],
             capture_output=True,
@@ -161,14 +171,14 @@ class TestDeviceLoadModeE2E:
         # Run CLI without device or load-mode flags
         result = subprocess.run(
             [
-                "python",
+                sys.executable,
                 "-m",
                 "src.cli",
                 "--site",
-                "example",
-                "--single-file",
+                "kb.aspose.net",
+                "--input",
                 str(test_fixture_path),
-                "--output-dir",
+                "--output",
                 str(temp_output_dir),
             ],
             capture_output=True,
@@ -191,7 +201,7 @@ class TestDeviceLoadModeE2E:
         """Test that --device cuda fails when CUDA unavailable."""
         # Check if CUDA is available
         cuda_check = subprocess.run(
-            ["python", "-c", "import torch; print(torch.cuda.is_available())"],
+            [sys.executable, "-c", "import torch; print(torch.cuda.is_available())"],
             capture_output=True,
             text=True,
         )
@@ -206,18 +216,22 @@ class TestDeviceLoadModeE2E:
         if cuda_available:
             pytest.skip("CUDA is available, cannot test failure case")
 
+        fixture = Path(__file__).parent.parent / "fixtures" / "device_test" / "sample.md"
+        if not fixture.exists():
+            pytest.skip("Test fixture not found")
+
         # Run CLI with CUDA on non-CUDA system
         result = subprocess.run(
             [
-                "python",
+                sys.executable,
                 "-m",
                 "src.cli",
                 "--site",
-                "example",
+                "kb.aspose.net",
                 "--device",
                 "cuda",
-                "--single-file",
-                "tests/fixtures/device_test/sample.md",
+                "--input",
+                str(fixture),
             ],
             capture_output=True,
             text=True,
@@ -271,7 +285,7 @@ class TestDeviceLoadModeE2E:
         """Test that --load-mode int8 --device cuda logs warning."""
         # Check if CUDA is available
         cuda_check = subprocess.run(
-            ["python", "-c", "import torch; print(torch.cuda.is_available())"],
+            [sys.executable, "-c", "import torch; print(torch.cuda.is_available())"],
             capture_output=True,
             text=True,
         )
@@ -287,18 +301,18 @@ class TestDeviceLoadModeE2E:
         # Run CLI with INT8 on CUDA
         result = subprocess.run(
             [
-                "python",
+                sys.executable,
                 "-m",
                 "src.cli",
                 "--site",
-                "example",
+                "kb.aspose.net",
                 "--device",
                 "cuda",
                 "--load-mode",
                 "int8",
-                "--single-file",
+                "--input",
                 str(test_fixture_path),
-                "--output-dir",
+                "--output",
                 str(temp_output_dir),
             ],
             capture_output=True,

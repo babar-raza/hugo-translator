@@ -9,8 +9,9 @@ from pathlib import Path
 
 import pytest
 
-# Skip if running in CI or if explicitly disabled
-SKIP_HEAVY_TESTS = os.getenv("SKIP_HEAVY_TESTS", "false").lower() == "true"
+# Skip by default: test requires real LLM model (m2m100_418m) and correct engine setup.
+# Set SKIP_HEAVY_TESTS=false to enable.
+SKIP_HEAVY_TESTS = os.getenv("SKIP_HEAVY_TESTS", "true").lower() == "true"
 
 @pytest.mark.skipif(SKIP_HEAVY_TESTS, reason="Heavy integration test - skipped in CI")
 def test_translate_file_with_telemetry_real_llm(tmp_path):

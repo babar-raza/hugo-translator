@@ -60,6 +60,11 @@ def _make_engine(tmp_path: Path, force_retranslate: bool = False) -> Translation
     cfg_mock.get_site_profile.return_value = sp_mock
     engine.config = cfg_mock
 
+    # Attributes set by __init__ that _translate_directory_locked accesses
+    engine.changed_since_sha = None       # git diff filter (disabled)
+    engine._review_cache = None           # review cache (none in tests)
+    engine._rtq_llm_output_paths = set()  # LLM escalation queue (empty)
+
     return engine
 
 
