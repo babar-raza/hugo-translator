@@ -108,10 +108,11 @@ def test_benchmark_db_schema_compatibility():
     # Create in-memory database
     db = BenchmarkDatabase(":memory:")
 
-    # Verify schema has required fields
-    assert hasattr(BenchmarkRun, "model_id"), "BenchmarkRun needs model_id"
-    assert hasattr(BenchmarkRun, "device"), "BenchmarkRun needs device"
-    assert hasattr(BenchmarkResult, "throughput_tokens_per_sec"), "BenchmarkResult needs throughput"
+    # Verify schema has required fields (use __dataclass_fields__ — required fields
+    # without defaults are not class attributes and hasattr() returns False for them)
+    assert "model_id" in BenchmarkRun.__dataclass_fields__, "BenchmarkRun needs model_id"
+    assert "device" in BenchmarkRun.__dataclass_fields__, "BenchmarkRun needs device"
+    assert "throughput_tokens_per_sec" in BenchmarkResult.__dataclass_fields__, "BenchmarkResult needs throughput"
 
 
 if __name__ == "__main__":
