@@ -9,6 +9,23 @@ from unittest.mock import Mock, patch
 
 import pytest
 
+
+@pytest.fixture(autouse=True)
+def _mock_worker_infra():
+    """Prevent real infrastructure from being used during worker tests.
+
+    - L2PersistentTM: opens data/tm/l2.lmdb which stays locked across tests in
+      the same process, causing 'already open' errors on subsequent tests.
+    - acquire_pid_file: PID file from the first test remains held by the live
+      pytest process, causing sys.exit(1) in subsequent tests (single-instance guard).
+    """
+    with patch("src.tm.l2_persistent.L2PersistentTM") as mock_l2, \
+         patch("src.workers.worker_state.acquire_pid_file", return_value=True):
+        mock_l2.return_value.get_stats.return_value = {
+            "used_mb": 0.0, "map_size_mb": 1536.0, "used_pct": 0.0, "entries": 0
+        }
+        yield
+
 from src.translation_engine.models import DirectoryResult
 from src.workers.autonomous_content_translation_worker import (
     AutonomousContentTranslationWorker,
@@ -97,8 +114,9 @@ class TestAutonomousWorkerOneshot:
             # Verify ConfigService loaded
             mock_cs.assert_called_once_with(worker_config.config_root)
 
-            # Verify site profile loaded
-            mock_config_service.get_site_profile.assert_called_once_with("test-site")
+            # Verify site profile loaded (called once in preflight + once for translation = 2)
+            assert mock_config_service.get_site_profile.call_count == 2
+            mock_config_service.get_site_profile.assert_any_call("test-site")
 
             # Verify translation called with trigger_type="scheduled"
             mock_translation_engine.translate_directory.assert_called_once()

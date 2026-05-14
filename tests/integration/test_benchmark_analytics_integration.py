@@ -33,9 +33,9 @@ CURRENT_SCHEMA_VERSION = BenchmarkDatabase.SCHEMA_VERSION
 class TestBenchmarkAnalyticsIntegration:
     """Integration tests for benchmark analytics workflow."""
 
-    def _create_test_runs(self, db: BenchmarkDatabase, num_runs: int = 5):
+    def _create_test_runs(self, db: BenchmarkDatabase, num_runs: int = 5, start_idx: int = 0):
         """Create test benchmark runs with realistic data."""
-        for run_idx in range(num_runs):
+        for run_idx in range(start_idx, start_idx + num_runs):
             timestamp = datetime.now(UTC) - timedelta(hours=run_idx * 2)
 
             results = []
@@ -75,7 +75,7 @@ class TestBenchmarkAnalyticsIntegration:
 
     def test_full_analytics_workflow(self):
         """Test complete analytics workflow from benchmark to queries."""
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
             db_path = Path(tmpdir) / "test.db"
 
             # Step 1: Create database and verify schema
@@ -129,7 +129,7 @@ class TestBenchmarkAnalyticsIntegration:
 
     def test_migration_then_aggregation(self):
         """Test migrating existing v7 database then aggregating."""
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
             db_path = Path(tmpdir) / "test.db"
 
             # Step 1: Create database at current schema version
@@ -162,19 +162,19 @@ class TestBenchmarkAnalyticsIntegration:
 
     def test_incremental_aggregation_workflow(self):
         """Test that aggregation is incremental over time."""
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
             db_path = Path(tmpdir) / "test.db"
             db = BenchmarkDatabase(db_path)
 
             # Create initial runs
-            self._create_test_runs(db, num_runs=3)
+            self._create_test_runs(db, num_runs=3, start_idx=0)
 
             # First aggregation
             aggregator = TimeSeriesAggregator(db_path)
             trends_1 = aggregator.aggregate_model("test_model", "cpu")
 
-            # Create more runs
-            self._create_test_runs(db, num_runs=2)
+            # Create more runs (use start_idx=3 to avoid UNIQUE constraint on run_id)
+            self._create_test_runs(db, num_runs=2, start_idx=3)
 
             # Second aggregation (should be incremental)
             trends_2 = aggregator.aggregate_model("test_model", "cpu")
@@ -186,7 +186,7 @@ class TestBenchmarkAnalyticsIntegration:
     @pytest.mark.skipif(not PANDAS_AVAILABLE, reason="pandas not available")
     def test_analytics_queries_with_real_data(self):
         """Test analytics queries with realistic benchmark data."""
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
             db_path = Path(tmpdir) / "test.db"
             db = BenchmarkDatabase(db_path)
 
@@ -258,7 +258,7 @@ class TestBenchmarkAnalyticsIntegration:
 
     def test_retention_policy_workflow(self):
         """Test that retention policies are created and can be queried."""
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
             db_path = Path(tmpdir) / "test.db"
             db = BenchmarkDatabase(db_path)
 
@@ -285,7 +285,7 @@ class TestBenchmarkAnalyticsIntegration:
 
     def test_baseline_comparison_workflow(self):
         """Test creating baseline and comparing performance."""
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
             db_path = Path(tmpdir) / "test.db"
             db = BenchmarkDatabase(db_path)
 
@@ -373,7 +373,8 @@ class TestBenchmarkAnalyticsIntegration:
             # Compare performance (if pandas available)
             if PANDAS_AVAILABLE:
                 api = AnalyticsQueryAPI(db_path)
-                baseline_date = (datetime.now(UTC) - timedelta(days=30)).date().isoformat()
+                # create_baseline() stores baseline_date = today's date (not the historical data date)
+                baseline_date = datetime.now(UTC).date().isoformat()
                 comparison = api.compare_performance(
                     "test_model",
                     "cpu",

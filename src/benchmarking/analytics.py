@@ -304,8 +304,8 @@ class AnalyticsQueryAPI:
 
             # Convert timestamp columns to datetime
             if not df.empty:
-                df['window_start'] = pd.to_datetime(df['window_start'])
-                df['window_end'] = pd.to_datetime(df['window_end'])
+                df['window_start'] = pd.to_datetime(df['window_start'], format='ISO8601')
+                df['window_end'] = pd.to_datetime(df['window_end'], format='ISO8601')
 
         duration = (datetime.now(UTC) - start_time).total_seconds()
         duration_ms = duration * 1000
@@ -425,8 +425,8 @@ class AnalyticsQueryAPI:
 
             # Convert timestamp columns
             if not df.empty:
-                df['baseline_date'] = pd.to_datetime(df['baseline_date'])
-                df['created_at'] = pd.to_datetime(df['created_at'])
+                df['baseline_date'] = pd.to_datetime(df['baseline_date'], format='ISO8601')
+                df['created_at'] = pd.to_datetime(df['created_at'], format='ISO8601')
 
         duration = (datetime.now(UTC) - start_time).total_seconds()
         duration_ms = duration * 1000
@@ -684,7 +684,7 @@ class AnalyticsQueryAPI:
             )
 
             if not df.empty:
-                df['timestamp_utc'] = pd.to_datetime(df['timestamp_utc'])
+                df['timestamp_utc'] = pd.to_datetime(df['timestamp_utc'], format='ISO8601')
 
         duration = (datetime.now(UTC) - start_time).total_seconds()
         duration_ms = duration * 1000
