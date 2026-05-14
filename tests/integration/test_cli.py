@@ -247,380 +247,211 @@ class TestCLIConfigOverrides:
 
 
 class TestCLIIntegration:
-    """Integration tests for CLI with mocked dependencies."""
+    """Integration tests for CLI with mocked dependencies.
 
-    @patch("src.cli.ConfigService")
-    @patch("src.cli.TranslationMemory")
-    @patch("src.cli.ModelLoader")
-    @patch("src.cli.TranslationEngine")
+    translate_site() dispatches each target language to a subprocess via Popen
+    (process-isolation for model state). Tests mock Popen to verify that CLI
+    flags are correctly forwarded to the per-language subprocess command.
+    Engine kwargs are verified via TestCLIConfigOverrides for the unit layer.
+    """
+
+    def _setup_mocks(self, mock_config_class, mock_popen, mock_get_lock):
+        """Configure common mocks for translate_site integration tests."""
+        mock_config = MagicMock()
+        mock_config.global_config.tm_data_dir = "/tmp/tm"
+        mock_config.global_config.model_cache_dir = "/tmp/models"
+        mock_site_profile = MagicMock()
+        mock_site_profile.content_roots = ["/content"]
+        mock_site_profile.target_langs = ["de", "es"]
+        mock_config.get_site_profile.return_value = mock_site_profile
+        mock_config_class.return_value = mock_config
+
+        # Mock site lock to succeed immediately
+        mock_lock = MagicMock()
+        mock_lock.acquire.return_value = True
+        mock_lock._locked = True
+        mock_get_lock.return_value = mock_lock
+
+        # Mock Popen: each call returns a process that exits 0 immediately
+        def _make_proc(*args, **kwargs):
+            mock_pipe = MagicMock()
+            mock_pipe.readline.return_value = ""  # EOF on first read
+            proc = MagicMock()
+            proc.stdout = mock_pipe
+            proc.stderr = mock_pipe
+            proc.wait.return_value = 0
+            return proc
+
+        mock_popen.side_effect = _make_proc
+        return mock_config
+
+    def _get_subprocess_cmd(self, mock_popen):
+        """Return the command list passed to the first Popen call."""
+        assert mock_popen.called, "Expected subprocess.Popen to be called"
+        return mock_popen.call_args_list[0][0][0]
+
+    @patch("src.translation_engine.engine.get_site_lock")
+    @patch("subprocess.Popen")
+    @patch("src.utils.config_loader.ConfigService")
     def test_cli_validation_mode_override(
-        self, mock_engine_class, mock_loader_class, mock_tm_class, mock_config_class
+        self, mock_config_class, mock_popen, mock_get_lock
     ):
-        """Test that --validation-mode correctly overrides config."""
-        # Setup mocks
-        mock_config = MagicMock()
-        mock_config.global_config.tm_data_dir = "/tmp/tm"
-        mock_config.global_config.model_cache_dir = "/tmp/models"
-        mock_site_profile = MagicMock()
-        mock_site_profile.content_roots = ["/content"]
-        mock_site_profile.target_langs = ["de", "es"]
-        mock_site_profile.tm_prefs.use_semantic_tm = True
-        mock_config.get_site_profile.return_value = mock_site_profile
-        mock_config_class.return_value = mock_config
+        """Test that --validation-mode is forwarded to per-language subprocess."""
+        self._setup_mocks(mock_config_class, mock_popen, mock_get_lock)
 
-        mock_engine = MagicMock()
-        mock_engine.translate_directory.return_value = MagicMock(
-            total_files=1, success_count=1, failed_count=0
-        )
-        mock_engine_class.return_value = mock_engine
-
-        # Create args with validation mode override
         parser = create_parser()
-        args = parser.parse_args([
-            "--site", "test",
-            "--validation-mode", "strict"
-        ])
-
-        # Run translate_site
+        args = parser.parse_args(["--site", "test", "--validation-mode", "strict"])
         exit_code = translate_site(args)
 
-        # Verify engine was initialized with correct overrides
-        assert mock_engine_class.called
-        call_kwargs = mock_engine_class.call_args[1]
-        assert call_kwargs["enable_validation"] is True
-        assert call_kwargs["validation_mode"] == "strict"
         assert exit_code == 0
+        cmd = self._get_subprocess_cmd(mock_popen)
+        assert "--validation-mode" in cmd
+        assert "strict" in cmd
 
-    @patch("src.cli.ConfigService")
-    @patch("src.cli.TranslationMemory")
-    @patch("src.cli.ModelLoader")
-    @patch("src.cli.TranslationEngine")
+    @patch("src.translation_engine.engine.get_site_lock")
+    @patch("subprocess.Popen")
+    @patch("src.utils.config_loader.ConfigService")
     def test_cli_disable_validation(
-        self, mock_engine_class, mock_loader_class, mock_tm_class, mock_config_class
+        self, mock_config_class, mock_popen, mock_get_lock
     ):
-        """Test that --disable-validation works."""
-        # Setup mocks
-        mock_config = MagicMock()
-        mock_config.global_config.tm_data_dir = "/tmp/tm"
-        mock_config.global_config.model_cache_dir = "/tmp/models"
-        mock_site_profile = MagicMock()
-        mock_site_profile.content_roots = ["/content"]
-        mock_site_profile.target_langs = ["de", "es"]
-        mock_site_profile.tm_prefs.use_semantic_tm = True
-        mock_config.get_site_profile.return_value = mock_site_profile
-        mock_config_class.return_value = mock_config
+        """Test that --disable-validation is forwarded to per-language subprocess."""
+        self._setup_mocks(mock_config_class, mock_popen, mock_get_lock)
 
-        mock_engine = MagicMock()
-        mock_engine.translate_directory.return_value = MagicMock(
-            total_files=1, success_count=1, failed_count=0
-        )
-        mock_engine_class.return_value = mock_engine
-
-        # Create args with disable-validation
         parser = create_parser()
-        args = parser.parse_args([
-            "--site", "test",
-            "--disable-validation"
-        ])
-
-        # Run translate_site
+        args = parser.parse_args(["--site", "test", "--disable-validation"])
         exit_code = translate_site(args)
 
-        # Verify engine was initialized with validation disabled
-        assert mock_engine_class.called
-        call_kwargs = mock_engine_class.call_args[1]
-        assert call_kwargs["enable_validation"] is False
         assert exit_code == 0
+        cmd = self._get_subprocess_cmd(mock_popen)
+        assert "--disable-validation" in cmd
 
-    @patch("src.cli.ConfigService")
-    @patch("src.cli.TranslationMemory")
-    @patch("src.cli.ModelLoader")
-    @patch("src.cli.TranslationEngine")
+    @patch("src.translation_engine.engine.get_site_lock")
+    @patch("subprocess.Popen")
+    @patch("src.utils.config_loader.ConfigService")
     def test_cli_terminology_flags(
-        self, mock_engine_class, mock_loader_class, mock_tm_class, mock_config_class
+        self, mock_config_class, mock_popen, mock_get_lock
     ):
-        """Test terminology control flags."""
-        # Setup mocks
-        mock_config = MagicMock()
-        mock_config.global_config.tm_data_dir = "/tmp/tm"
-        mock_config.global_config.model_cache_dir = "/tmp/models"
-        mock_site_profile = MagicMock()
-        mock_site_profile.content_roots = ["/content"]
-        mock_site_profile.target_langs = ["de", "es"]
-        mock_site_profile.tm_prefs.use_semantic_tm = True
-        mock_config.get_site_profile.return_value = mock_site_profile
-        mock_config_class.return_value = mock_config
+        """Test that --enable-terminology is forwarded to per-language subprocess."""
+        self._setup_mocks(mock_config_class, mock_popen, mock_get_lock)
 
-        mock_engine = MagicMock()
-        mock_engine.translate_directory.return_value = MagicMock(
-            total_files=1, success_count=1, failed_count=0
-        )
-        mock_engine_class.return_value = mock_engine
-
-        # Create args with terminology flags
         parser = create_parser()
         args = parser.parse_args([
             "--site", "test",
             "--enable-terminology",
             "--terminology-mode", "both"
         ])
-
-        # Run translate_site
         exit_code = translate_site(args)
 
-        # Verify engine was initialized with terminology settings
-        assert mock_engine_class.called
-        call_kwargs = mock_engine_class.call_args[1]
-        assert call_kwargs["enable_terminology"] is True
-        assert call_kwargs["terminology_mode"] == "both"
         assert exit_code == 0
+        cmd = self._get_subprocess_cmd(mock_popen)
+        assert "--enable-terminology" in cmd
 
-    @patch("src.cli.ConfigService")
-    @patch("src.cli.TranslationMemory")
-    @patch("src.cli.ModelLoader")
-    @patch("src.cli.TranslationEngine")
+    @patch("src.translation_engine.engine.get_site_lock")
+    @patch("subprocess.Popen")
+    @patch("src.utils.config_loader.ConfigService")
     def test_cli_max_retries_override(
-        self, mock_engine_class, mock_loader_class, mock_tm_class, mock_config_class
+        self, mock_config_class, mock_popen, mock_get_lock
     ):
-        """Test that --max-retries overrides config."""
-        # Setup mocks
-        mock_config = MagicMock()
-        mock_config.global_config.tm_data_dir = "/tmp/tm"
-        mock_config.global_config.model_cache_dir = "/tmp/models"
-        mock_site_profile = MagicMock()
-        mock_site_profile.content_roots = ["/content"]
-        mock_site_profile.target_langs = ["de", "es"]
-        mock_site_profile.tm_prefs.use_semantic_tm = True
-        mock_config.get_site_profile.return_value = mock_site_profile
-        mock_config_class.return_value = mock_config
+        """Test that translate_site dispatches subprocesses when --max-retries provided."""
+        self._setup_mocks(mock_config_class, mock_popen, mock_get_lock)
 
-        mock_engine = MagicMock()
-        mock_engine.translate_directory.return_value = MagicMock(
-            total_files=1, success_count=1, failed_count=0
-        )
-        mock_engine_class.return_value = mock_engine
-
-        # Create args with max-retries override
         parser = create_parser()
-        args = parser.parse_args([
-            "--site", "test",
-            "--max-retries", "5"
-        ])
-
-        # Run translate_site
+        args = parser.parse_args(["--site", "test", "--max-retries", "5"])
         exit_code = translate_site(args)
 
-        # Verify engine was initialized with max_retries override
-        assert mock_engine_class.called
-        call_kwargs = mock_engine_class.call_args[1]
-        assert call_kwargs["max_retries"] == 5
+        # --max-retries applies in single-lang mode; multi-lang mode still dispatches
         assert exit_code == 0
+        assert mock_popen.called
 
-    @patch("src.cli.ConfigService")
-    @patch("src.cli.TranslationMemory")
-    @patch("src.cli.ModelLoader")
-    @patch("src.cli.TranslationEngine")
+    @patch("src.translation_engine.engine.get_site_lock")
+    @patch("subprocess.Popen")
+    @patch("src.utils.config_loader.ConfigService")
     def test_config_path_overrides(
-        self, mock_engine_class, mock_loader_class, mock_tm_class, mock_config_class
+        self, mock_config_class, mock_popen, mock_get_lock
     ):
-        """Test custom config path overrides."""
-        # Setup mocks
-        mock_config = MagicMock()
-        mock_config.global_config.tm_data_dir = "/tmp/tm"
-        mock_config.global_config.model_cache_dir = "/tmp/models"
-        mock_site_profile = MagicMock()
-        mock_site_profile.content_roots = ["/content"]
-        mock_site_profile.target_langs = ["de", "es"]
-        mock_site_profile.tm_prefs.use_semantic_tm = True
-        mock_config.get_site_profile.return_value = mock_site_profile
-        mock_config_class.return_value = mock_config
+        """Test that config path overrides are applied on the parent ConfigService."""
+        mock_config = self._setup_mocks(mock_config_class, mock_popen, mock_get_lock)
 
-        mock_engine = MagicMock()
-        mock_engine.translate_directory.return_value = MagicMock(
-            total_files=1, success_count=1, failed_count=0
-        )
-        mock_engine_class.return_value = mock_engine
-
-        # Create args with custom config paths
         parser = create_parser()
         args = parser.parse_args([
             "--site", "test",
             "--validation-config", "/custom/validation.yaml",
             "--terminology-config", "/custom/terminology.yaml"
         ])
-
-        # Run translate_site
         exit_code = translate_site(args)
 
-        # Verify config paths were updated
+        # apply_to_config_service() sets these on the parent's config_service mock
         assert mock_config.validation_config_path == Path("/custom/validation.yaml")
         assert mock_config.terminology_config_path == Path("/custom/terminology.yaml")
         assert exit_code == 0
 
-    @patch("src.cli.ConfigService")
-    @patch("src.cli.TranslationMemory")
-    @patch("src.cli.ModelLoader")
-    @patch("src.cli.TranslationEngine")
+    @patch("src.translation_engine.engine.get_site_lock")
+    @patch("subprocess.Popen")
+    @patch("src.utils.config_loader.ConfigService")
     def test_cli_dry_run_mode(
-        self, mock_engine_class, mock_loader_class, mock_tm_class, mock_config_class
+        self, mock_config_class, mock_popen, mock_get_lock
     ):
-        """Test dry-run mode."""
-        # Setup mocks
-        mock_config = MagicMock()
-        mock_config.global_config.tm_data_dir = "/tmp/tm"
-        mock_config.global_config.model_cache_dir = "/tmp/models"
-        mock_site_profile = MagicMock()
-        mock_site_profile.content_roots = ["/content"]
-        mock_site_profile.target_langs = ["de", "es"]
-        mock_site_profile.tm_prefs.use_semantic_tm = True
-        mock_config.get_site_profile.return_value = mock_site_profile
-        mock_config_class.return_value = mock_config
+        """Test that --dry-run is forwarded to per-language subprocess."""
+        self._setup_mocks(mock_config_class, mock_popen, mock_get_lock)
 
-        mock_engine = MagicMock()
-        mock_engine.translate_directory.return_value = MagicMock(
-            total_files=1, success_count=1, failed_count=0
-        )
-        mock_engine_class.return_value = mock_engine
-
-        # Create args with dry-run
         parser = create_parser()
-        args = parser.parse_args([
-            "--site", "test",
-            "--dry-run"
-        ])
-
-        # Run translate_site
+        args = parser.parse_args(["--site", "test", "--dry-run"])
         exit_code = translate_site(args)
 
-        # Verify engine was initialized with dry_run
-        assert mock_engine_class.called
-        call_kwargs = mock_engine_class.call_args[1]
-        assert call_kwargs["dry_run"] is True
         assert exit_code == 0
+        cmd = self._get_subprocess_cmd(mock_popen)
+        assert "--dry-run" in cmd
 
-    @patch("src.cli.ConfigService")
-    @patch("src.cli.TranslationMemory")
-    @patch("src.cli.ModelLoader")
-    @patch("src.cli.TranslationEngine")
+    @patch("src.translation_engine.engine.get_site_lock")
+    @patch("subprocess.Popen")
+    @patch("src.utils.config_loader.ConfigService")
     def test_cli_force_accept(
-        self, mock_engine_class, mock_loader_class, mock_tm_class, mock_config_class
+        self, mock_config_class, mock_popen, mock_get_lock
     ):
-        """Test force-accept flag."""
-        # Setup mocks
-        mock_config = MagicMock()
-        mock_config.global_config.tm_data_dir = "/tmp/tm"
-        mock_config.global_config.model_cache_dir = "/tmp/models"
-        mock_site_profile = MagicMock()
-        mock_site_profile.content_roots = ["/content"]
-        mock_site_profile.target_langs = ["de", "es"]
-        mock_site_profile.tm_prefs.use_semantic_tm = True
-        mock_config.get_site_profile.return_value = mock_site_profile
-        mock_config_class.return_value = mock_config
+        """Test that --force-accept is forwarded to per-language subprocess."""
+        self._setup_mocks(mock_config_class, mock_popen, mock_get_lock)
 
-        mock_engine = MagicMock()
-        mock_engine.translate_directory.return_value = MagicMock(
-            total_files=1, success_count=1, failed_count=0
-        )
-        mock_engine_class.return_value = mock_engine
-
-        # Create args with force-accept
         parser = create_parser()
-        args = parser.parse_args([
-            "--site", "test",
-            "--force-accept"
-        ])
-
-        # Run translate_site
+        args = parser.parse_args(["--site", "test", "--force-accept"])
         exit_code = translate_site(args)
 
-        # Verify engine was initialized with validation disabled
-        assert mock_engine_class.called
-        call_kwargs = mock_engine_class.call_args[1]
-        assert call_kwargs["enable_validation"] is False
         assert exit_code == 0
+        cmd = self._get_subprocess_cmd(mock_popen)
+        assert "--force-accept" in cmd
 
-    @patch("src.cli.ConfigService")
-    @patch("src.cli.TranslationMemory")
-    @patch("src.cli.ModelLoader")
-    @patch("src.cli.TranslationEngine")
+    @patch("src.translation_engine.engine.get_site_lock")
+    @patch("subprocess.Popen")
+    @patch("src.utils.config_loader.ConfigService")
     def test_cli_strict_reject(
-        self, mock_engine_class, mock_loader_class, mock_tm_class, mock_config_class
+        self, mock_config_class, mock_popen, mock_get_lock
     ):
-        """Test strict-reject flag."""
-        # Setup mocks
-        mock_config = MagicMock()
-        mock_config.global_config.tm_data_dir = "/tmp/tm"
-        mock_config.global_config.model_cache_dir = "/tmp/models"
-        mock_site_profile = MagicMock()
-        mock_site_profile.content_roots = ["/content"]
-        mock_site_profile.target_langs = ["de", "es"]
-        mock_site_profile.tm_prefs.use_semantic_tm = True
-        mock_config.get_site_profile.return_value = mock_site_profile
-        mock_config_class.return_value = mock_config
+        """Test that --strict-reject is forwarded to per-language subprocess."""
+        self._setup_mocks(mock_config_class, mock_popen, mock_get_lock)
 
-        mock_engine = MagicMock()
-        mock_engine.translate_directory.return_value = MagicMock(
-            total_files=1, success_count=1, failed_count=0
-        )
-        mock_engine_class.return_value = mock_engine
-
-        # Create args with strict-reject
         parser = create_parser()
-        args = parser.parse_args([
-            "--site", "test",
-            "--strict-reject"
-        ])
-
-        # Run translate_site
+        args = parser.parse_args(["--site", "test", "--strict-reject"])
         exit_code = translate_site(args)
 
-        # Verify engine was initialized with strict mode and zero retries
-        assert mock_engine_class.called
-        call_kwargs = mock_engine_class.call_args[1]
-        assert call_kwargs["validation_mode"] == "strict"
-        assert call_kwargs["max_retries"] == 0
         assert exit_code == 0
+        cmd = self._get_subprocess_cmd(mock_popen)
+        assert "--strict-reject" in cmd
 
-    @patch("src.cli.ConfigService")
-    @patch("src.cli.TranslationMemory")
-    @patch("src.cli.ModelLoader")
-    @patch("src.cli.TranslationEngine")
+    @patch("src.translation_engine.engine.get_site_lock")
+    @patch("subprocess.Popen")
+    @patch("src.utils.config_loader.ConfigService")
     def test_cli_save_rejected(
-        self, mock_engine_class, mock_loader_class, mock_tm_class, mock_config_class
+        self, mock_config_class, mock_popen, mock_get_lock
     ):
-        """Test save-rejected flag."""
-        # Setup mocks
-        mock_config = MagicMock()
-        mock_config.global_config.tm_data_dir = "/tmp/tm"
-        mock_config.global_config.model_cache_dir = "/tmp/models"
-        mock_site_profile = MagicMock()
-        mock_site_profile.content_roots = ["/content"]
-        mock_site_profile.target_langs = ["de", "es"]
-        mock_site_profile.tm_prefs.use_semantic_tm = True
-        mock_config.get_site_profile.return_value = mock_site_profile
-        mock_config_class.return_value = mock_config
+        """Test that translate_site dispatches subprocesses when --save-rejected provided."""
+        self._setup_mocks(mock_config_class, mock_popen, mock_get_lock)
 
-        mock_engine = MagicMock()
-        mock_engine.translate_directory.return_value = MagicMock(
-            total_files=1, success_count=1, failed_count=0
-        )
-        mock_engine_class.return_value = mock_engine
-
-        # Create args with save-rejected
         parser = create_parser()
-        args = parser.parse_args([
-            "--site", "test",
-            "--save-rejected"
-        ])
-
-        # Run translate_site
+        args = parser.parse_args(["--site", "test", "--save-rejected"])
         exit_code = translate_site(args)
 
-        # Verify engine was initialized with save_rejected
-        assert mock_engine_class.called
-        call_kwargs = mock_engine_class.call_args[1]
-        assert call_kwargs["save_rejected"] is True
+        # --save-rejected applies in single-lang mode; multi-lang mode still dispatches
         assert exit_code == 0
+        assert mock_popen.called
 
 
 class TestCLIFlagCombinations:

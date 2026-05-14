@@ -33,6 +33,7 @@ class TestGetGitRepo:
             capture_output=True,
             text=True,
             timeout=5,
+            cwd=None,
         )
 
     def test_returns_none_when_not_in_repo(self):

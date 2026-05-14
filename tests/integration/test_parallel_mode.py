@@ -3,12 +3,18 @@ Integration tests for parallel language processing mode (T306: federated-splashi
 
 End-to-end tests for --parallel-languages flag.
 """
+import os
 import subprocess
 import sys
 import time
 from pathlib import Path
 
 import pytest
+
+# Heavy tests require real model loading and may take 2-5 minutes per language.
+# Set SKIP_HEAVY_TESTS=0 to enable them.
+_SKIP_HEAVY = os.environ.get("SKIP_HEAVY_TESTS", "1") == "1"
+_skip_heavy = pytest.mark.skipif(_SKIP_HEAVY, reason="SKIP_HEAVY_TESTS=1: requires real models")
 
 
 class TestParallelModeE2E:
@@ -54,6 +60,7 @@ class TestParallelModeE2E:
         assert result.returncode == 0
         assert "--parallel-languages" in result.stdout
 
+    @_skip_heavy
     def test_parallel_processes_languages_concurrently(self, test_content_file, temp_output_dir, temp_tm_dir):
         """Test that parallel mode processes multiple languages successfully."""
         # Run translation with parallel mode (3 languages: de, fr, es)
@@ -93,6 +100,7 @@ class TestParallelModeE2E:
             output_file = base_dir / lang / "presentation-converter" / "how-to-convert-odp-to-powerpoint-pptx-csharp.md"
             assert output_file.exists(), f"Output file not created for language: {lang} at {output_file}"
 
+    @_skip_heavy
     def test_parallel_max_workers_limits_concurrency(self, test_content_file, temp_output_dir, temp_tm_dir):
         """Test that max_workers limits concurrent threads."""
         # Run with parallel-languages=4 (should process 4 languages concurrently)
@@ -168,6 +176,7 @@ class TestParallelModeE2E:
         # Exit code might be 0 (all success) or 1 (partial success)
         assert result.returncode in [0, 1], f"Translation failed unexpectedly: {result.stderr}"
 
+    @_skip_heavy
     def test_parallel_throughput_improvement(self, test_content_file, temp_output_dir, temp_tm_dir):
         """Test that parallel mode is faster than serial mode (optional performance check)."""
         # This test measures whether parallel mode provides throughput improvement
@@ -266,6 +275,7 @@ class TestParallelModeCLIValidation:
         # This test just verifies the flag accepts integers
         assert "--parallel-languages" in str(result.stderr) or result.returncode in [0, 1, 2]
 
+    @_skip_heavy
     def test_parallel_languages_zero_disables_parallel_mode(self, tmpdir):
         """Test that --parallel-languages 0 disables parallel mode (default behavior)."""
         # Create a minimal test file
@@ -320,6 +330,7 @@ class TestParallelModeHelp:
 class TestParallelModeLogging:
     """Test logging for parallel mode operations."""
 
+    @_skip_heavy
     def test_parallel_logs_mode_enabled(self, tmpdir):
         """Test that parallel mode logs when enabled."""
         # Create a minimal test file
@@ -355,6 +366,7 @@ class TestParallelModeLogging:
 class TestParallelModeErrorHandling:
     """Test error handling in parallel mode."""
 
+    @_skip_heavy
     def test_parallel_mode_with_single_language(self, tmpdir):
         """Test parallel mode with single language (should work, no parallelism needed)."""
         # Create a minimal test file
@@ -393,6 +405,7 @@ class TestParallelModeErrorHandling:
 class TestParallelModeBackwardCompatibility:
     """Test backward compatibility when parallel mode is disabled."""
 
+    @_skip_heavy
     def test_default_mode_without_parallel_flag(self, tmpdir):
         """Test that default mode works when --parallel-languages is not specified."""
         # Create a minimal test file
