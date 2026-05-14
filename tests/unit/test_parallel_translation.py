@@ -17,7 +17,7 @@ from src.utils.config_loader import ConfigService
 @pytest.fixture
 def temp_dir():
     """Create temporary directory for tests."""
-    with tempfile.TemporaryDirectory() as tmpdir:
+    with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
         yield Path(tmpdir)
 
 

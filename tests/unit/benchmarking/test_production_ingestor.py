@@ -8,7 +8,7 @@ from src.benchmarking.storage import BenchmarkDatabase
 
 def test_ingestor_disabled_is_noop():
     """When enabled=False, record_translation_run should be no-op."""
-    with tempfile.TemporaryDirectory() as tmpdir:
+    with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
         db_path = Path(tmpdir) / "test.db"
         db = BenchmarkDatabase(db_path)
 
@@ -33,7 +33,7 @@ def test_ingestor_disabled_is_noop():
 
 def test_ingestor_enabled_records_run():
     """When enabled=True, record_translation_run should create benchmark run."""
-    with tempfile.TemporaryDirectory() as tmpdir:
+    with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
         db_path = Path(tmpdir) / "test.db"
         db = BenchmarkDatabase(db_path)
 
@@ -67,7 +67,7 @@ def test_ingestor_thread_safe():
     """ProductionMetricsIngestor should be thread-safe."""
     import threading
 
-    with tempfile.TemporaryDirectory() as tmpdir:
+    with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
         db_path = Path(tmpdir) / "test.db"
         db = BenchmarkDatabase(db_path)
 
@@ -100,7 +100,7 @@ def test_ingestor_thread_safe():
 def test_ingestor_error_doesnt_crash():
     """ProductionMetricsIngestor should not crash on error."""
     # Create ingestor with enabled=True but None collector (will cause error)
-    with tempfile.TemporaryDirectory() as tmpdir:
+    with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
         db_path = Path(tmpdir) / "test.db"
         db = BenchmarkDatabase(db_path)
 

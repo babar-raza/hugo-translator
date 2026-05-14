@@ -84,7 +84,7 @@ class TestMetricsIntegration:
 
     def test_metrics_monotonic_progress(self):
         """Verify segments_done is monotonically increasing."""
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
             metrics_path = Path(tmpdir) / "metrics"
 
             tracker = ProgressTracker(
@@ -124,7 +124,7 @@ class TestMetricsIntegration:
 
     def test_metrics_file_structure(self):
         """Verify metrics file has correct JSON structure."""
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
             metrics_path = Path(tmpdir) / "metrics"
 
             tracker = ProgressTracker(
@@ -372,7 +372,7 @@ class TestGlobalTrackerIntegration:
         # Clean up
         stop_progress_tracker()
 
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
             metrics_path = Path(tmpdir) / "metrics"
 
             # Initialize like CLI would

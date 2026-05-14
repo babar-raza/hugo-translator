@@ -301,7 +301,7 @@ class TestValidateWrittenFile:
 
         # Create the file temporarily for testing
         import tempfile
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
             test_file = Path(tmpdir) / "content" / "blog" / "post" / "index.es.md"
             test_file.parent.mkdir(parents=True, exist_ok=True)
             test_file.write_text("# Test content\nSome translation.")
@@ -331,7 +331,7 @@ class TestValidateWrittenFile:
 
         # Simulate written file without language folder (invalid for folder-based)
         import tempfile
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
             # File WITHOUT /es/ folder (should trigger warning)
             test_file = Path(tmpdir) / "content" / "products" / "cells.md"
             test_file.parent.mkdir(parents=True, exist_ok=True)
@@ -361,7 +361,7 @@ class TestValidateWrittenFile:
         validator = FilePlacementValidator()
 
         import tempfile
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
             # Create source and translation files
             source_file = Path(tmpdir) / "content" / "blog" / "post" / "index.md"
             source_file.parent.mkdir(parents=True, exist_ok=True)

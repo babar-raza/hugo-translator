@@ -17,7 +17,7 @@ from src.utils.models import BodyRules, SiteProfile
 @pytest.fixture
 def temp_content_dir():
     """Create temporary content directory."""
-    with tempfile.TemporaryDirectory() as tmpdir:
+    with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
         content_dir = Path(tmpdir) / "content"
         content_dir.mkdir()
         yield content_dir
@@ -406,7 +406,7 @@ class TestFileWatcher:
 
         try:
             # Create new site profile
-            with tempfile.TemporaryDirectory() as tmpdir:
+            with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
                 new_content_dir = Path(tmpdir) / "content"
                 new_content_dir.mkdir()
 

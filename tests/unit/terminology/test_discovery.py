@@ -247,7 +247,7 @@ class TestTerminologyDiscovery:
         discovered = discovery.discover_terms(corpus)
 
         # Save to temporary file
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
             output_path = os.path.join(tmpdir, "discovered_terms.yaml")
             discovery.save_discovered_terms(discovered, output_path)
 
@@ -420,7 +420,7 @@ class TestTerminologyDiscovery:
         corpus = ["Aspose.Words test", "Aspose.Words again"]
         discovered = discovery.discover_terms(corpus)
 
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
             # Use nested path that doesn't exist
             output_path = os.path.join(tmpdir, "nested", "dir", "discovered.yaml")
             discovery.save_discovered_terms(discovered, output_path)

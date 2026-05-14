@@ -32,7 +32,7 @@ def test_get_output_path_with_base_dir_preserves_structure():
     config_service = ConfigService(config_root)
 
     # Create temporary directory structure
-    with tempfile.TemporaryDirectory() as tmpdir:
+    with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
         base_path = Path(tmpdir)
 
         # Create test file structure
@@ -122,7 +122,7 @@ def test_cli_base_dir_detection_language_folder():
 
     Simulates the base_dir determination logic from cli.py for a file under /en/.
     """
-    with tempfile.TemporaryDirectory() as tmpdir:
+    with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
         base_path = Path(tmpdir)
 
         # Create structure: tmpdir/slides/en/docs/_index.md
@@ -153,7 +153,7 @@ def test_cli_base_dir_detection_no_language_folder():
     """
     Test that CLI falls back to parent directory when no language folder is found.
     """
-    with tempfile.TemporaryDirectory() as tmpdir:
+    with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
         base_path = Path(tmpdir)
 
         # Create structure without language folder: tmpdir/content/_index.md
@@ -196,7 +196,7 @@ def test_output_path_collision_prevention():
     config_root = Path(__file__).parent.parent.parent / "config"
     config_service = ConfigService(config_root)
 
-    with tempfile.TemporaryDirectory() as tmpdir:
+    with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
         base_path = Path(tmpdir)
 
         # Create test structure

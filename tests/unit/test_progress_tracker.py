@@ -312,7 +312,7 @@ class TestProgressTracker:
 
     def test_metrics_file_output(self):
         """Metrics are written to file."""
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
             metrics_path = Path(tmpdir) / "metrics"
 
             tracker = ProgressTracker(

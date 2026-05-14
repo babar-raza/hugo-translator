@@ -158,7 +158,7 @@ class TestRetentionEngine:
 
     def test_list_policies(self):
         """Test listing retention policies."""
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
             db_path = Path(tmpdir) / "test.db"
             db = BenchmarkDatabase(db_path)
 
@@ -175,7 +175,7 @@ class TestRetentionEngine:
 
     def test_list_policies_enabled_only(self):
         """Test listing only enabled policies."""
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
             db_path = Path(tmpdir) / "test.db"
             db = BenchmarkDatabase(db_path)
 
@@ -195,7 +195,7 @@ class TestRetentionEngine:
 
     def test_get_policy(self):
         """Test getting a specific policy."""
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
             db_path = Path(tmpdir) / "test.db"
             BenchmarkDatabase(db_path)
 
@@ -209,7 +209,7 @@ class TestRetentionEngine:
 
     def test_get_policy_not_found(self):
         """Test getting non-existent policy."""
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
             db_path = Path(tmpdir) / "test.db"
             BenchmarkDatabase(db_path)
 
@@ -220,7 +220,7 @@ class TestRetentionEngine:
 
     def test_update_policy(self):
         """Test updating a policy."""
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
             db_path = Path(tmpdir) / "test.db"
             BenchmarkDatabase(db_path)
 
@@ -235,7 +235,7 @@ class TestRetentionEngine:
 
     def test_update_policy_enabled(self):
         """Test enabling/disabling a policy."""
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
             db_path = Path(tmpdir) / "test.db"
             BenchmarkDatabase(db_path)
 
@@ -253,7 +253,7 @@ class TestRetentionEngine:
 
     def test_create_policy(self):
         """Test creating a new policy."""
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
             db_path = Path(tmpdir) / "test.db"
             BenchmarkDatabase(db_path)
 
@@ -275,7 +275,7 @@ class TestRetentionEngine:
 
     def test_create_policy_invalid_table(self):
         """Test creating policy with invalid table."""
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
             db_path = Path(tmpdir) / "test.db"
             BenchmarkDatabase(db_path)
 
@@ -290,7 +290,7 @@ class TestRetentionEngine:
 
     def test_delete_policy(self):
         """Test deleting a policy."""
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
             db_path = Path(tmpdir) / "test.db"
             BenchmarkDatabase(db_path)
 
@@ -311,7 +311,7 @@ class TestRetentionEngine:
 
     def test_get_retention_status(self):
         """Test getting retention status."""
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
             db_path = Path(tmpdir) / "test.db"
             db = BenchmarkDatabase(db_path)
 
@@ -328,7 +328,7 @@ class TestRetentionEngine:
 
     def test_execute_retention_dry_run(self):
         """Test dry run mode doesn't delete data."""
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
             db_path = Path(tmpdir) / "test.db"
             db = BenchmarkDatabase(db_path)
 
@@ -356,7 +356,7 @@ class TestRetentionEngine:
 
     def test_execute_retention_actual(self):
         """Test actual retention execution deletes old data."""
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
             db_path = Path(tmpdir) / "test.db"
             db = BenchmarkDatabase(db_path)
 
@@ -385,7 +385,7 @@ class TestRetentionEngine:
 
     def test_execute_retention_specific_policies(self):
         """Test executing specific policies only."""
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
             db_path = Path(tmpdir) / "test.db"
             db = BenchmarkDatabase(db_path)
 
@@ -407,7 +407,7 @@ class TestRetentionEngine:
 
     def test_execute_retention_no_enabled_policies(self):
         """Test retention with all policies disabled."""
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
             db_path = Path(tmpdir) / "test.db"
             db = BenchmarkDatabase(db_path)
 
@@ -426,7 +426,7 @@ class TestRetentionEngine:
 
     def test_vacuum_database(self):
         """Test database vacuum operation."""
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
             db_path = Path(tmpdir) / "test.db"
             db = BenchmarkDatabase(db_path)
 
@@ -487,7 +487,7 @@ class TestRetentionEngineWithTrends:
 
     def test_retention_on_trends(self):
         """Test retention deletes old trends."""
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
             db_path = Path(tmpdir) / "test.db"
             self._setup_db_with_trends(db_path)
 

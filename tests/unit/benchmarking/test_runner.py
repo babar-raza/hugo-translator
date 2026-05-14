@@ -238,6 +238,21 @@ class TestBenchmarkRunner:
         mock_system_info.python_version = "3.10"
         mock_system_info.torch_version = "2.0"
         mock_system_info.collected_at_utc = "2025-12-19T00:00:00Z"
+        mock_system_info.gpu_compute_capability = None
+        mock_system_info.has_cuda = False
+        mock_system_info.cuda_version = None
+        mock_system_info.gpu_driver_version = None
+        mock_system_info.platform_system = None
+        mock_system_info.platform_release = None
+        mock_system_info.python_implementation = None
+        mock_system_info.torch_cuda_available = False
+        mock_system_info.cpu_frequency_mhz = None
+        mock_system_info.cpu_frequency_max_mhz = None
+        mock_system_info.cpu_tdp_watts = None
+        mock_system_info.memory_bandwidth_gbps = None
+        mock_system_info.numa_nodes = 1
+        mock_system_info.power_management_state = None
+        mock_system_info.collector_version = None
 
         mock_backend = Mock()
         mock_backend.translate_with_token_counts = Mock(
@@ -287,6 +302,21 @@ class TestBenchmarkRunner:
         mock_system_info.python_version = "3.10"
         mock_system_info.torch_version = "2.0"
         mock_system_info.collected_at_utc = "2025-12-19T00:00:00Z"
+        mock_system_info.gpu_compute_capability = None
+        mock_system_info.has_cuda = False
+        mock_system_info.cuda_version = None
+        mock_system_info.gpu_driver_version = None
+        mock_system_info.platform_system = None
+        mock_system_info.platform_release = None
+        mock_system_info.python_implementation = None
+        mock_system_info.torch_cuda_available = False
+        mock_system_info.cpu_frequency_mhz = None
+        mock_system_info.cpu_frequency_max_mhz = None
+        mock_system_info.cpu_tdp_watts = None
+        mock_system_info.memory_bandwidth_gbps = None
+        mock_system_info.numa_nodes = 1
+        mock_system_info.power_management_state = None
+        mock_system_info.collector_version = None
 
         # Mock backend WITHOUT translate_with_token_counts (CT2 backend)
         mock_backend = Mock(spec=['translate', 'load', 'unload', 'is_loaded'])

@@ -108,7 +108,7 @@ class TestSchemaMigrations:
 
     def test_v1_to_v4_full_migration(self):
         """Test migrating from v1 all the way to v4."""
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
             db_path = Path(tmpdir) / "test.db"
 
             # Create v1 database
@@ -179,7 +179,7 @@ class TestSchemaMigrations:
 
     def test_migration_idempotent(self):
         """Test that migrations can run multiple times safely."""
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
             db_path = Path(tmpdir) / "test.db"
 
             # Create database and run migrations
@@ -198,7 +198,7 @@ class TestSchemaMigrations:
 
     def test_v2_to_v4_migration(self):
         """Test migrating from v2 to v4."""
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
             db_path = Path(tmpdir) / "test.db"
 
             # Create v1 then migrate to v2
@@ -324,7 +324,7 @@ class TestSchemaMigrations:
 
     def test_cascading_delete(self):
         """Test that cascading deletes work for foreign keys."""
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
             db_path = Path(tmpdir) / "test.db"
             db = BenchmarkDatabase(db_path)
 
@@ -406,7 +406,7 @@ class TestSchemaMigrations:
 
     def test_new_database_starts_at_v4(self):
         """Test that new databases start directly at schema v4."""
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
             db_path = Path(tmpdir) / "test.db"
             db = BenchmarkDatabase(db_path)
 
@@ -433,7 +433,7 @@ class TestSchemaMigrations:
 
     def test_wal_mode_enabled(self):
         """Test that WAL mode is enabled."""
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
             db_path = Path(tmpdir) / "test.db"
             db = BenchmarkDatabase(db_path)
 

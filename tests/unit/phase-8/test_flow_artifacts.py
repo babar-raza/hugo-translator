@@ -22,7 +22,7 @@ from src.translation_engine.models import TranslationStats
 @pytest.fixture
 def temp_artifacts_dir():
     """Create temporary artifacts directory."""
-    with tempfile.TemporaryDirectory() as tmpdir:
+    with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
         yield Path(tmpdir)
 
 

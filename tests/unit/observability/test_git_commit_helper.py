@@ -343,7 +343,7 @@ class TestCollectModifiedFilesFromGit(unittest.TestCase):
 
         from src.observability.git_commit_helper import collect_modified_files_from_git
 
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
             git_root = Path(tmpdir)
             mock_find_root.return_value = git_root
 
@@ -376,7 +376,7 @@ class TestCollectModifiedFilesFromGit(unittest.TestCase):
 
         from src.observability.git_commit_helper import collect_modified_files_from_git
 
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
             git_root = Path(tmpdir)
             mock_find_root.return_value = git_root
 
@@ -408,7 +408,7 @@ class TestCollectModifiedFilesFromGit(unittest.TestCase):
 
         from src.observability.git_commit_helper import collect_modified_files_from_git
 
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
             git_root = Path(tmpdir)
             mock_find_root.return_value = git_root
 
@@ -442,7 +442,7 @@ class TestCollectModifiedFilesFromGit(unittest.TestCase):
 
         from src.observability.git_commit_helper import collect_modified_files_from_git
 
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
             git_root = Path(tmpdir)
             mock_find_root.return_value = git_root
 
@@ -475,7 +475,7 @@ class TestCollectModifiedFilesFromGit(unittest.TestCase):
 
         from src.observability.git_commit_helper import collect_modified_files_from_git
 
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
             git_root = Path(tmpdir)
             mock_find_root.return_value = git_root
             content_dir = git_root / "content"
@@ -502,7 +502,7 @@ class TestWritePendingCommitFallback(unittest.TestCase):
         """Happy path: writes .pending_commit.json with correct fields."""
         import json
         import tempfile
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
             git_root = Path(tmpdir)
             output_files = [git_root / "content" / "de" / "index.md"]
             (git_root / "content" / "de").mkdir(parents=True)
@@ -531,7 +531,7 @@ class TestWritePendingCommitFallback(unittest.TestCase):
         """File paths in JSON use forward slashes regardless of OS."""
         import json
         import tempfile
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
             git_root = Path(tmpdir)
             sub = git_root / "content" / "blog" / "ar"
             sub.mkdir(parents=True)
@@ -553,7 +553,7 @@ class TestWritePendingCommitFallback(unittest.TestCase):
         """Files not under git_root are silently skipped."""
         import json
         import tempfile
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
             git_root = Path(tmpdir) / "repo"
             git_root.mkdir()
             inside = git_root / "file.md"
@@ -577,7 +577,7 @@ class TestWritePendingCommitFallback(unittest.TestCase):
     def test_returns_false_when_no_files_in_git_root(self):
         """Returns False when all files are outside the git root."""
         import tempfile
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
             git_root = Path(tmpdir) / "repo"
             git_root.mkdir()
             outside = Path(tmpdir) / "outside.md"
@@ -597,7 +597,7 @@ class TestWritePendingCommitFallback(unittest.TestCase):
         """commit_message truncates to 6 langs + '+N more' when many languages."""
         import json
         import tempfile
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
             git_root = Path(tmpdir)
             f = git_root / "file.md"
             f.touch()
@@ -641,7 +641,7 @@ class TestValidateFileIntegrity(unittest.TestCase):
     def test_small_file_rejected(self):
         """File < 100 bytes must be rejected."""
         import tempfile
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
             f = Path(tmpdir) / "tiny.md"
             f.write_text("---\ntitle: x\n---\n", encoding="utf-8")
             self.assertFalse(self._validate(f))
@@ -649,7 +649,7 @@ class TestValidateFileIntegrity(unittest.TestCase):
     def test_valid_md_passes(self):
         """File with front matter + body > 100 bytes must pass."""
         import tempfile
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
             f = Path(tmpdir) / "good.md"
             content = "---\ntitle: Test Article\ndate: 2026-01-01\n---\n" + "A" * 100
             f.write_text(content, encoding="utf-8")
@@ -658,7 +658,7 @@ class TestValidateFileIntegrity(unittest.TestCase):
     def test_no_front_matter_rejected(self):
         """File > 100 bytes but without '---' must be rejected."""
         import tempfile
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
             f = Path(tmpdir) / "nofm.md"
             f.write_text("A" * 200, encoding="utf-8")
             self.assertFalse(self._validate(f))
@@ -666,7 +666,7 @@ class TestValidateFileIntegrity(unittest.TestCase):
     def test_nonexistent_file_rejected(self):
         """Missing file must be rejected."""
         import tempfile
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
             f = Path(tmpdir) / "ghost.md"
             self.assertFalse(self._validate(f))
 

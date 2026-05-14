@@ -15,7 +15,7 @@ from pathlib import Path
 def test_progress_file_cleared_not_appended():
     """Test that progress file is cleared, not appended to."""
     # Simulate the OLD buggy behavior
-    with tempfile.TemporaryDirectory() as tmpdir:
+    with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
         progress_file = Path(tmpdir) / "progress.ndjson"
 
         # First run: write 3 records
@@ -147,7 +147,7 @@ def test_final_validation_detects_duplicates():
 def test_phase6_duplication_scenario():
     """Test the exact Phase 6 scenario: 248 files became 410 records."""
     # Simulate first run (clean)
-    with tempfile.TemporaryDirectory() as tmpdir:
+    with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
         progress_file = Path(tmpdir) / "progress.ndjson"
 
         # First run: 248 unique files

@@ -126,7 +126,7 @@ class TestCorpusBuilding:
         """Test building corpus from fixture directory"""
         fixture_dir = Path(__file__).parent.parent / 'fixtures' / 'corpus_builder'
 
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
             output_dir = Path(tmpdir) / 'test_corpus'
 
             # Build with fixtures (we have 4 files)
@@ -147,7 +147,7 @@ class TestCorpusBuilding:
 
     def test_build_corpus_nonexistent_source(self):
         """Test error handling for nonexistent source"""
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
             output_dir = Path(tmpdir) / 'test_corpus'
             source_dir = Path('/nonexistent/source')
 

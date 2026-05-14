@@ -199,7 +199,7 @@ class TestBenchmarkArchiver:
 
     def test_create_archive(self):
         """Test creating an archive."""
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
             db_path = Path(tmpdir) / "test.db"
             archive_dir = Path(tmpdir) / "archives"
             db = BenchmarkDatabase(db_path)
@@ -229,7 +229,7 @@ class TestBenchmarkArchiver:
 
     def test_create_archive_no_data(self):
         """Test creating archive with no matching data."""
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
             db_path = Path(tmpdir) / "test.db"
             archive_dir = Path(tmpdir) / "archives"
             db = BenchmarkDatabase(db_path)
@@ -249,7 +249,7 @@ class TestBenchmarkArchiver:
 
     def test_create_archive_compressed(self):
         """Test creating compressed archive."""
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
             db_path = Path(tmpdir) / "test.db"
             archive_dir = Path(tmpdir) / "archives"
             db = BenchmarkDatabase(db_path)
@@ -268,7 +268,7 @@ class TestBenchmarkArchiver:
 
     def test_create_archive_delete_after(self):
         """Test archiving with delete after."""
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
             db_path = Path(tmpdir) / "test.db"
             archive_dir = Path(tmpdir) / "archives"
             db = BenchmarkDatabase(db_path)
@@ -299,7 +299,7 @@ class TestBenchmarkArchiver:
 
     def test_list_archives(self):
         """Test listing archives."""
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
             db_path = Path(tmpdir) / "test.db"
             archive_dir = Path(tmpdir) / "archives"
             db = BenchmarkDatabase(db_path)
@@ -325,7 +325,7 @@ class TestBenchmarkArchiver:
 
     def test_get_archive(self):
         """Test getting specific archive metadata."""
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
             db_path = Path(tmpdir) / "test.db"
             archive_dir = Path(tmpdir) / "archives"
             db = BenchmarkDatabase(db_path)
@@ -351,7 +351,7 @@ class TestBenchmarkArchiver:
 
     def test_get_archive_not_found(self):
         """Test getting non-existent archive."""
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
             db_path = Path(tmpdir) / "test.db"
             archive_dir = Path(tmpdir) / "archives"
             BenchmarkDatabase(db_path)
@@ -364,7 +364,7 @@ class TestBenchmarkArchiver:
 
     def test_restore_archive(self):
         """Test restoring from archive."""
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
             db_path = Path(tmpdir) / "test.db"
             archive_dir = Path(tmpdir) / "archives"
             db = BenchmarkDatabase(db_path)
@@ -401,7 +401,7 @@ class TestBenchmarkArchiver:
 
     def test_restore_archive_not_found(self):
         """Test restoring non-existent archive."""
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
             db_path = Path(tmpdir) / "test.db"
             archive_dir = Path(tmpdir) / "archives"
             BenchmarkDatabase(db_path)
@@ -415,7 +415,7 @@ class TestBenchmarkArchiver:
 
     def test_restore_compressed_archive(self):
         """Test restoring from compressed archive."""
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
             db_path = Path(tmpdir) / "test.db"
             archive_dir = Path(tmpdir) / "archives"
             db = BenchmarkDatabase(db_path)
@@ -442,7 +442,7 @@ class TestBenchmarkArchiver:
 
     def test_rotate_archives(self):
         """Test archive rotation."""
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
             db_path = Path(tmpdir) / "test.db"
             archive_dir = Path(tmpdir) / "archives"
             db = BenchmarkDatabase(db_path)
@@ -475,7 +475,7 @@ class TestBenchmarkArchiver:
 
     def test_delete_archive(self):
         """Test deleting a specific archive."""
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
             db_path = Path(tmpdir) / "test.db"
             archive_dir = Path(tmpdir) / "archives"
             db = BenchmarkDatabase(db_path)
@@ -502,7 +502,7 @@ class TestBenchmarkArchiver:
 
     def test_delete_archive_not_found(self):
         """Test deleting non-existent archive."""
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
             db_path = Path(tmpdir) / "test.db"
             archive_dir = Path(tmpdir) / "archives"
             BenchmarkDatabase(db_path)
@@ -515,7 +515,7 @@ class TestBenchmarkArchiver:
 
     def test_get_archive_summary(self):
         """Test getting archive summary."""
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
             db_path = Path(tmpdir) / "test.db"
             archive_dir = Path(tmpdir) / "archives"
             db = BenchmarkDatabase(db_path)
@@ -540,7 +540,7 @@ class TestBenchmarkArchiver:
 
     def test_custom_archive_name(self):
         """Test creating archive with custom name."""
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
             db_path = Path(tmpdir) / "test.db"
             archive_dir = Path(tmpdir) / "archives"
             db = BenchmarkDatabase(db_path)
@@ -565,7 +565,7 @@ class TestArchiverEdgeCases:
 
     def test_archive_with_system_info(self):
         """Test that system_info is properly archived."""
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
             db_path = Path(tmpdir) / "test.db"
             archive_dir = Path(tmpdir) / "archives"
             db = BenchmarkDatabase(db_path)

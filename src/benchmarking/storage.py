@@ -849,97 +849,98 @@ class BenchmarkDatabase:
         Returns:
             BenchmarkRun if found, None otherwise
         """
-        conn = self._get_connection()
-        try:
-            # Fetch run metadata
-            cursor = conn.execute("SELECT * FROM benchmark_runs WHERE run_id = ?", (run_id,))
-            run_row = cursor.fetchone()
-            if not run_row:
-                return None
+        with self._lock:
+            conn = self._get_connection()
+            try:
+                # Fetch run metadata
+                cursor = conn.execute("SELECT * FROM benchmark_runs WHERE run_id = ?", (run_id,))
+                run_row = cursor.fetchone()
+                if not run_row:
+                    return None
 
-            # Fetch system info
-            cursor = conn.execute("SELECT * FROM system_info WHERE run_id = ?", (run_id,))
-            sys_row = cursor.fetchone()
-            if not sys_row:
-                logger.warning(f"Missing system_info for run {run_id}; using defaults")
-                system_info = SystemInfo(cpu_model="unknown", cpu_cores=0, total_ram_gb=0.0)
-            else:
-                pass  # will build below
+                # Fetch system info
+                cursor = conn.execute("SELECT * FROM system_info WHERE run_id = ?", (run_id,))
+                sys_row = cursor.fetchone()
+                if not sys_row:
+                    logger.warning(f"Missing system_info for run {run_id}; using defaults")
+                    system_info = SystemInfo(cpu_model="unknown", cpu_cores=0, total_ram_gb=0.0)
+                else:
+                    pass  # will build below
 
-            # Fetch results
-            cursor = conn.execute("SELECT * FROM benchmark_results WHERE run_id = ?", (run_id,))
-            result_rows = cursor.fetchall()
+                # Fetch results
+                cursor = conn.execute("SELECT * FROM benchmark_results WHERE run_id = ?", (run_id,))
+                result_rows = cursor.fetchall()
 
-            # Reconstruct objects - map DB fields to comprehensive SystemInfo
-            if sys_row:
-                _r = dict(sys_row)  # Convert Row to dict for safe .get() access on optional columns
-                system_info = SystemInfo(
-                    cpu_model=_r["cpu_model"],
-                    cpu_cores=_r["cpu_cores"],
-                    total_ram_gb=_r["total_ram_gb"],
-                    gpu_model=_r.get("gpu_model"),
-                    gpu_memory_gb=_r.get("gpu_vram_gb"),  # DB has gpu_vram_gb, SystemInfo uses gpu_memory_gb
-                    os_name=_r["os_name"],
-                    os_version=_r["os_version"],
-                    python_version=_r["python_version"],
-                    torch_version=_r.get("torch_version") or None,
-                    # v5 extended fields (NULL-safe via dict.get)
-                    gpu_compute_capability=_r.get("gpu_compute_capability"),
-                    has_cuda=bool(_r.get("has_cuda", 0)),
-                    cuda_version=_r.get("cuda_version"),
-                    gpu_driver_version=_r.get("gpu_driver_version"),
-                    platform_system=_r.get("platform_system"),
-                    platform_release=_r.get("platform_release"),
-                    python_implementation=_r.get("python_implementation"),
-                    torch_cuda_available=bool(_r.get("torch_cuda_available", 0)),
-                    cpu_frequency_mhz=_r.get("cpu_frequency_mhz"),
-                    cpu_frequency_max_mhz=_r.get("cpu_frequency_max_mhz"),
-                    cpu_tdp_watts=_r.get("cpu_tdp_watts"),
-                    memory_bandwidth_gbps=_r.get("memory_bandwidth_gbps"),
-                    numa_nodes=_r.get("numa_nodes", 1),
-                    power_management_state=_r.get("power_management_state"),
-                    collected_at_utc=_r.get("collected_at_utc") or _r.get("timestamp_utc"),
-                    collector_version=_r.get("collector_version"),
+                # Reconstruct objects - map DB fields to comprehensive SystemInfo
+                if sys_row:
+                    _r = dict(sys_row)  # Convert Row to dict for safe .get() access on optional columns
+                    system_info = SystemInfo(
+                        cpu_model=_r["cpu_model"],
+                        cpu_cores=_r["cpu_cores"],
+                        total_ram_gb=_r["total_ram_gb"],
+                        gpu_model=_r.get("gpu_model"),
+                        gpu_memory_gb=_r.get("gpu_vram_gb"),  # DB has gpu_vram_gb, SystemInfo uses gpu_memory_gb
+                        os_name=_r["os_name"],
+                        os_version=_r["os_version"],
+                        python_version=_r["python_version"],
+                        torch_version=_r.get("torch_version") or None,
+                        # v5 extended fields (NULL-safe via dict.get)
+                        gpu_compute_capability=_r.get("gpu_compute_capability"),
+                        has_cuda=bool(_r.get("has_cuda", 0)),
+                        cuda_version=_r.get("cuda_version"),
+                        gpu_driver_version=_r.get("gpu_driver_version"),
+                        platform_system=_r.get("platform_system"),
+                        platform_release=_r.get("platform_release"),
+                        python_implementation=_r.get("python_implementation"),
+                        torch_cuda_available=bool(_r.get("torch_cuda_available", 0)),
+                        cpu_frequency_mhz=_r.get("cpu_frequency_mhz"),
+                        cpu_frequency_max_mhz=_r.get("cpu_frequency_max_mhz"),
+                        cpu_tdp_watts=_r.get("cpu_tdp_watts"),
+                        memory_bandwidth_gbps=_r.get("memory_bandwidth_gbps"),
+                        numa_nodes=_r.get("numa_nodes", 1),
+                        power_management_state=_r.get("power_management_state"),
+                        collected_at_utc=_r.get("collected_at_utc") or _r.get("timestamp_utc"),
+                        collector_version=_r.get("collector_version"),
+                    )
+
+                results = [
+                    BenchmarkResult(
+                        sample_id=row["sample_id"],
+                        model_id=row["model_id"],
+                        device=row["device"],
+                        batch_size=row["batch_size"],
+                        duration_seconds=row["duration_seconds"],
+                        tokens_input=row["tokens_input"],
+                        tokens_output=row["tokens_output"],
+                        throughput_tokens_per_sec=row["throughput_tokens_per_sec"],
+                        peak_memory_mb=row["peak_memory_mb"],
+                        bleu_score=dict(row).get("bleu_score"),
+                        comet_score=dict(row).get("comet_score"),
+                        cache_status=dict(row).get("cache_status", "unknown"),
+                        tm_level=dict(row).get("tm_level", "none"),
+                        cache_hit_rate=dict(row).get("cache_hit_rate", 0.0),
+                        errors=json.loads(row["errors"]),
+                    )
+                    for row in result_rows
+                ]
+
+                return BenchmarkRun(
+                    run_id=run_row["run_id"],
+                    model_id=run_row["model_id"],
+                    device=run_row["device"],
+                    batch_sizes=json.loads(run_row["batch_sizes"]),
+                    iterations=run_row["iterations"],
+                    corpus_category=run_row["corpus_category"],
+                    purpose=run_row["purpose"],
+                    tags=json.loads(run_row["tags"]),
+                    system_info=system_info,
+                    results=results,
+                    total_duration_seconds=run_row["total_duration_seconds"],
+                    timestamp_utc=run_row["timestamp_utc"],
+                    metadata=json.loads(run_row["metadata"]),
                 )
-
-            results = [
-                BenchmarkResult(
-                    sample_id=row["sample_id"],
-                    model_id=row["model_id"],
-                    device=row["device"],
-                    batch_size=row["batch_size"],
-                    duration_seconds=row["duration_seconds"],
-                    tokens_input=row["tokens_input"],
-                    tokens_output=row["tokens_output"],
-                    throughput_tokens_per_sec=row["throughput_tokens_per_sec"],
-                    peak_memory_mb=row["peak_memory_mb"],
-                    bleu_score=dict(row).get("bleu_score"),
-                    comet_score=dict(row).get("comet_score"),
-                    cache_status=dict(row).get("cache_status", "unknown"),
-                    tm_level=dict(row).get("tm_level", "none"),
-                    cache_hit_rate=dict(row).get("cache_hit_rate", 0.0),
-                    errors=json.loads(row["errors"]),
-                )
-                for row in result_rows
-            ]
-
-            return BenchmarkRun(
-                run_id=run_row["run_id"],
-                model_id=run_row["model_id"],
-                device=run_row["device"],
-                batch_sizes=json.loads(run_row["batch_sizes"]),
-                iterations=run_row["iterations"],
-                corpus_category=run_row["corpus_category"],
-                purpose=run_row["purpose"],
-                tags=json.loads(run_row["tags"]),
-                system_info=system_info,
-                results=results,
-                total_duration_seconds=run_row["total_duration_seconds"],
-                timestamp_utc=run_row["timestamp_utc"],
-                metadata=json.loads(run_row["metadata"]),
-            )
-        finally:
-            self._close_connection(conn)
+            finally:
+                self._close_connection(conn)
 
     def compare_runs(
         self, run_ids: list[str], metric: str = "throughput_tokens_per_sec"

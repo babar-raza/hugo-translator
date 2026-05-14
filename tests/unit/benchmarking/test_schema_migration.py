@@ -28,7 +28,7 @@ def create_v0_database(db_path: Path) -> sqlite3.Connection:
 
 def test_migration_from_v0_to_v4():
     """Test full migration path from empty database to v4."""
-    with tempfile.TemporaryDirectory() as tmpdir:
+    with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
         db_path = Path(tmpdir) / "test.db"
 
         # Create empty database
@@ -65,7 +65,7 @@ def test_migration_from_v0_to_v4():
 
 def test_migration_idempotent():
     """Test that migrations can run multiple times safely."""
-    with tempfile.TemporaryDirectory() as tmpdir:
+    with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
         db_path = Path(tmpdir) / "test.db"
 
         # Initialize database (runs migrations once)
@@ -91,7 +91,7 @@ def test_migration_idempotent():
 
 def test_schema_version_tracking():
     """Test that schema_version table is correctly maintained."""
-    with tempfile.TemporaryDirectory() as tmpdir:
+    with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
         db_path = Path(tmpdir) / "test.db"
         db = BenchmarkDatabase(db_path)
 
@@ -116,7 +116,7 @@ def test_schema_version_tracking():
 
 def test_foreign_keys_enabled():
     """Test that foreign keys are enabled after migration."""
-    with tempfile.TemporaryDirectory() as tmpdir:
+    with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
         db_path = Path(tmpdir) / "test.db"
         db = BenchmarkDatabase(db_path)
 
@@ -131,7 +131,7 @@ def test_foreign_keys_enabled():
 
 def test_wal_mode_enabled():
     """Test that WAL mode is enabled after migration."""
-    with tempfile.TemporaryDirectory() as tmpdir:
+    with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
         db_path = Path(tmpdir) / "test.db"
         db = BenchmarkDatabase(db_path)
 
@@ -146,7 +146,7 @@ def test_wal_mode_enabled():
 
 def test_indices_created():
     """Test that all expected indices are created."""
-    with tempfile.TemporaryDirectory() as tmpdir:
+    with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
         db_path = Path(tmpdir) / "test.db"
         db = BenchmarkDatabase(db_path)
 
@@ -178,7 +178,7 @@ def test_indices_created():
 
 def test_integrity_check_passes():
     """Test that database integrity check passes after migration."""
-    with tempfile.TemporaryDirectory() as tmpdir:
+    with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
         db_path = Path(tmpdir) / "test.db"
         db = BenchmarkDatabase(db_path)
 

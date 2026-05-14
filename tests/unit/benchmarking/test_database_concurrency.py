@@ -18,7 +18,7 @@ from src.benchmarking.storage import (
 
 def test_wal_mode_enabled():
     """Test that WAL mode is enabled on database creation."""
-    with tempfile.TemporaryDirectory() as tmpdir:
+    with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
         db_path = Path(tmpdir) / "test.db"
         db = BenchmarkDatabase(db_path)
 
@@ -33,7 +33,7 @@ def test_wal_mode_enabled():
 
 def test_busy_timeout_set():
     """Test that busy timeout is configured."""
-    with tempfile.TemporaryDirectory() as tmpdir:
+    with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
         db_path = Path(tmpdir) / "test.db"
         db = BenchmarkDatabase(db_path)
 
@@ -49,7 +49,7 @@ def test_busy_timeout_set():
 
 def test_foreign_keys_enabled():
     """Test that foreign keys are enforced."""
-    with tempfile.TemporaryDirectory() as tmpdir:
+    with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
         db_path = Path(tmpdir) / "test.db"
         db = BenchmarkDatabase(db_path)
 
@@ -169,7 +169,7 @@ def test_concurrent_reads_during_write():
 
 def test_concurrent_writes_with_retries():
     """Test that concurrent writes handle contention gracefully."""
-    with tempfile.TemporaryDirectory() as tmpdir:
+    with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
         db_path = Path(tmpdir) / "test.db"
         db = BenchmarkDatabase(db_path)
 
@@ -227,7 +227,7 @@ def test_concurrent_writes_with_retries():
 
 def test_wal_checkpoint_configured():
     """Test that WAL autocheckpoint is configured."""
-    with tempfile.TemporaryDirectory() as tmpdir:
+    with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
         db_path = Path(tmpdir) / "test.db"
         db = BenchmarkDatabase(db_path)
 
@@ -369,7 +369,7 @@ def test_foreign_key_constraint_enforcement():
 
 def test_cascading_delete():
     """Test that cascading delete works with foreign keys."""
-    with tempfile.TemporaryDirectory() as tmpdir:
+    with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
         db_path = Path(tmpdir) / "test.db"
         db = BenchmarkDatabase(db_path)
 

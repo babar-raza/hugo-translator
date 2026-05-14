@@ -169,7 +169,7 @@ class TestBenchmarkExporter:
 
     def test_export_csv(self):
         """Test CSV export."""
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
             db_path = Path(tmpdir) / "test.db"
             db = BenchmarkDatabase(db_path)
 
@@ -201,7 +201,7 @@ class TestBenchmarkExporter:
 
     def test_export_csv_compressed(self):
         """Test compressed CSV export."""
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
             db_path = Path(tmpdir) / "test.db"
             db = BenchmarkDatabase(db_path)
 
@@ -220,7 +220,7 @@ class TestBenchmarkExporter:
 
     def test_export_csv_with_filter(self):
         """Test CSV export with filters."""
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
             db_path = Path(tmpdir) / "test.db"
             db = BenchmarkDatabase(db_path)
 
@@ -246,7 +246,7 @@ class TestBenchmarkExporter:
 
     def test_export_json(self):
         """Test JSON export."""
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
             db_path = Path(tmpdir) / "test.db"
             db = BenchmarkDatabase(db_path)
 
@@ -273,7 +273,7 @@ class TestBenchmarkExporter:
 
     def test_export_json_compressed(self):
         """Test compressed JSON export."""
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
             db_path = Path(tmpdir) / "test.db"
             db = BenchmarkDatabase(db_path)
 
@@ -295,7 +295,7 @@ class TestBenchmarkExporter:
 
     def test_export_json_pretty(self):
         """Test pretty-printed JSON export."""
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
             db_path = Path(tmpdir) / "test.db"
             db = BenchmarkDatabase(db_path)
 
@@ -315,7 +315,7 @@ class TestBenchmarkExporter:
 
     def test_export_json_with_date_filter(self):
         """Test JSON export with date range filter."""
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
             db_path = Path(tmpdir) / "test.db"
             db = BenchmarkDatabase(db_path)
 
@@ -348,7 +348,7 @@ class TestBenchmarkExporter:
 
     def test_export_sqlite_full_backup(self):
         """Test full SQLite backup."""
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
             db_path = Path(tmpdir) / "test.db"
             db = BenchmarkDatabase(db_path)
 
@@ -402,7 +402,7 @@ class TestBenchmarkExporter:
 
     def test_export_empty_database(self):
         """Test exporting from empty database."""
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
             db_path = Path(tmpdir) / "test.db"
             BenchmarkDatabase(db_path)
 
@@ -420,7 +420,7 @@ class TestBenchmarkExporter:
 
     def test_get_export_estimate(self):
         """Test export size estimation."""
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
             db_path = Path(tmpdir) / "test.db"
             db = BenchmarkDatabase(db_path)
 
@@ -436,7 +436,7 @@ class TestBenchmarkExporter:
 
     def test_get_export_estimate_with_filter(self):
         """Test export estimation with filter."""
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
             db_path = Path(tmpdir) / "test.db"
             db = BenchmarkDatabase(db_path)
 
@@ -456,7 +456,7 @@ class TestBenchmarkExporter:
 
     def test_progress_callback(self):
         """Test progress callback is called."""
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
             db_path = Path(tmpdir) / "test.db"
             db = BenchmarkDatabase(db_path)
 
@@ -487,7 +487,7 @@ class TestExporterEdgeCases:
 
     def test_export_with_device_filter(self):
         """Test export filtered by device."""
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
             db_path = Path(tmpdir) / "test.db"
             db = BenchmarkDatabase(db_path)
 

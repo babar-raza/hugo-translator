@@ -79,7 +79,7 @@ class TestAnalyticsQueryAPI:
 
     def test_get_performance_trends(self):
         """Test querying performance trends."""
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
             db_path = Path(tmpdir) / "test.db"
             db = BenchmarkDatabase(db_path)
 
@@ -112,7 +112,7 @@ class TestAnalyticsQueryAPI:
 
     def test_get_performance_trends_empty(self):
         """Test querying trends for nonexistent model."""
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
             db_path = Path(tmpdir) / "test.db"
             BenchmarkDatabase(db_path)
 
@@ -125,7 +125,7 @@ class TestAnalyticsQueryAPI:
 
     def test_get_performance_trends_invalid_window(self):
         """Test invalid time window raises error."""
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
             db_path = Path(tmpdir) / "test.db"
             BenchmarkDatabase(db_path)
 
@@ -136,7 +136,7 @@ class TestAnalyticsQueryAPI:
 
     def test_get_performance_baselines(self):
         """Test querying performance baselines."""
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
             db_path = Path(tmpdir) / "test.db"
             db = BenchmarkDatabase(db_path)
 
@@ -175,7 +175,7 @@ class TestAnalyticsQueryAPI:
 
     def test_get_performance_baselines_filtered(self):
         """Test querying baselines with type filter."""
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
             db_path = Path(tmpdir) / "test.db"
             db = BenchmarkDatabase(db_path)
 
@@ -197,12 +197,11 @@ class TestAnalyticsQueryAPI:
 
     def test_compare_performance(self):
         """Test comparing performance against baseline."""
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
             db_path = Path(tmpdir) / "test.db"
             db = BenchmarkDatabase(db_path)
 
             # Create baseline runs (30 days ago, lower throughput)
-            baseline_date = (datetime.now(UTC) - timedelta(days=30)).date().isoformat()
             for i in range(15):
                 self._create_test_run(
                     db, "test_model", "cpu",
@@ -220,9 +219,10 @@ class TestAnalyticsQueryAPI:
                     base_throughput=120.0  # Higher current throughput
                 )
 
-            # Create baseline
+            # Create baseline — create_baseline() stores baseline_date=today, not historical date
             aggregator = TimeSeriesAggregator(db_path)
             aggregator.create_baseline("test_model", "cpu", "weekly", days_back=50)
+            baseline_date = datetime.now(UTC).date().isoformat()
 
             # Compare performance
             api = AnalyticsQueryAPI(db_path)
@@ -244,7 +244,7 @@ class TestAnalyticsQueryAPI:
 
     def test_compare_performance_no_baseline(self):
         """Test comparison with nonexistent baseline."""
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
             db_path = Path(tmpdir) / "test.db"
             BenchmarkDatabase(db_path)
 
@@ -262,7 +262,7 @@ class TestAnalyticsQueryAPI:
 
     def test_get_throughput_distribution(self):
         """Test querying throughput distribution."""
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
             db_path = Path(tmpdir) / "test.db"
             db = BenchmarkDatabase(db_path)
 
@@ -290,7 +290,7 @@ class TestAnalyticsQueryAPI:
 
     def test_get_model_comparison(self):
         """Test comparing multiple models."""
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
             db_path = Path(tmpdir) / "test.db"
             db = BenchmarkDatabase(db_path)
 
@@ -324,7 +324,7 @@ class TestAnalyticsQueryAPI:
 
     def test_get_device_comparison(self):
         """Test comparing devices for a model."""
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
             db_path = Path(tmpdir) / "test.db"
             db = BenchmarkDatabase(db_path)
 
@@ -354,7 +354,7 @@ class TestAnalyticsQueryAPI:
 
     def test_query_telemetry_events(self):
         """Test that queries emit telemetry events."""
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
             db_path = Path(tmpdir) / "test.db"
             db = BenchmarkDatabase(db_path)
 
@@ -375,7 +375,7 @@ class TestAnalyticsQueryAPI:
         """Test that API raises error when pandas not available."""
         # This test is symbolic - we can't uninstall pandas during test
         # But the check is in __init__, so if pandas is available, this test passes
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
             db_path = Path(tmpdir) / "test.db"
             BenchmarkDatabase(db_path)
 
@@ -385,7 +385,7 @@ class TestAnalyticsQueryAPI:
 
     def test_empty_database_queries(self):
         """Test queries on empty database return empty results."""
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
             db_path = Path(tmpdir) / "test.db"
             BenchmarkDatabase(db_path)
 
@@ -406,7 +406,7 @@ class TestAnalyticsQueryAPI:
 
     def test_init_all_options_disabled(self):
         """Test initialization with all options disabled."""
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
             db_path = Path(tmpdir) / "test.db"
             BenchmarkDatabase(db_path)
 
@@ -423,7 +423,7 @@ class TestAnalyticsQueryAPI:
 
     def test_init_all_options_enabled(self):
         """Test initialization with all options enabled."""
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
             db_path = Path(tmpdir) / "test.db"
             BenchmarkDatabase(db_path)
 
@@ -441,7 +441,7 @@ class TestAnalyticsQueryAPI:
 
     def test_get_cache_stats(self):
         """Test get_cache_stats method."""
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
             db_path = Path(tmpdir) / "test.db"
             BenchmarkDatabase(db_path)
 
@@ -455,7 +455,7 @@ class TestAnalyticsQueryAPI:
 
     def test_get_cache_stats_disabled(self):
         """Test get_cache_stats returns None when disabled."""
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
             db_path = Path(tmpdir) / "test.db"
             BenchmarkDatabase(db_path)
 
@@ -466,7 +466,7 @@ class TestAnalyticsQueryAPI:
 
     def test_get_monitor_stats(self):
         """Test get_monitor_stats method."""
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
             db_path = Path(tmpdir) / "test.db"
             BenchmarkDatabase(db_path)
 
@@ -477,7 +477,7 @@ class TestAnalyticsQueryAPI:
 
     def test_get_monitor_stats_disabled(self):
         """Test get_monitor_stats returns None when disabled."""
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
             db_path = Path(tmpdir) / "test.db"
             BenchmarkDatabase(db_path)
 
@@ -488,7 +488,7 @@ class TestAnalyticsQueryAPI:
 
     def test_invalidate_cache_all(self):
         """Test full cache invalidation."""
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
             db_path = Path(tmpdir) / "test.db"
             db = BenchmarkDatabase(db_path)
             self._create_test_run(db, "test_model", "cpu")
@@ -505,7 +505,7 @@ class TestAnalyticsQueryAPI:
 
     def test_invalidate_cache_pattern(self):
         """Test pattern-based cache invalidation."""
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
             db_path = Path(tmpdir) / "test.db"
             db = BenchmarkDatabase(db_path)
             self._create_test_run(db, "test_model", "cpu")
@@ -521,7 +521,7 @@ class TestAnalyticsQueryAPI:
 
     def test_invalidate_cache_when_disabled(self):
         """Test invalidate_cache returns 0 when caching disabled."""
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
             db_path = Path(tmpdir) / "test.db"
             BenchmarkDatabase(db_path)
 
@@ -532,7 +532,7 @@ class TestAnalyticsQueryAPI:
 
     def test_close_releases_resources(self):
         """Test close method releases resources."""
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
             db_path = Path(tmpdir) / "test.db"
             BenchmarkDatabase(db_path)
 
@@ -548,7 +548,7 @@ class TestAnalyticsQueryAPI:
 
     def test_percentile_helper(self):
         """Test _percentile helper method."""
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
             db_path = Path(tmpdir) / "test.db"
             BenchmarkDatabase(db_path)
 
@@ -572,7 +572,7 @@ class TestAnalyticsQueryAPI:
 
     def test_caching_hit(self):
         """Test that cache hits work correctly."""
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
             db_path = Path(tmpdir) / "test.db"
             db = BenchmarkDatabase(db_path)
             self._create_test_run(db, "test_model", "cpu")
@@ -596,7 +596,7 @@ class TestAnalyticsQueryAPI:
 
     def test_pooled_connection(self):
         """Test using connection pool."""
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
             db_path = Path(tmpdir) / "test.db"
             db = BenchmarkDatabase(db_path)
             self._create_test_run(db, "test_model", "cpu")
@@ -611,7 +611,7 @@ class TestAnalyticsQueryAPI:
 
     def test_non_pooled_connection(self):
         """Test using non-pooled connection."""
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
             db_path = Path(tmpdir) / "test.db"
             db = BenchmarkDatabase(db_path)
             self._create_test_run(db, "test_model", "cpu")

@@ -17,7 +17,7 @@ from src.utils.models import BodyRules, OutputLayout, SiteProfile
 @pytest.fixture
 def temp_content_dir():
     """Create temporary content directory structure."""
-    with tempfile.TemporaryDirectory() as tmpdir:
+    with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
         content_dir = Path(tmpdir) / "content"
         content_dir.mkdir()
         yield content_dir
@@ -147,7 +147,7 @@ class TestSweepScheduler:
         mock_enqueue_callback.reset_mock()
 
         # Create a fresh temp dir for this test to avoid leftover files
-        with tempfile.TemporaryDirectory() as fresh_tmpdir:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as fresh_tmpdir:
             fresh_content_dir = Path(fresh_tmpdir) / "content"
             fresh_content_dir.mkdir()
 
@@ -322,7 +322,7 @@ class TestSweepScheduler:
         mock_enqueue_callback.reset_mock()
 
         # Use fresh directory
-        with tempfile.TemporaryDirectory() as fresh_tmpdir:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as fresh_tmpdir:
             fresh_content_dir = Path(fresh_tmpdir) / "content"
             fresh_content_dir.mkdir()
 
@@ -419,7 +419,7 @@ class TestSweepScheduler:
     def test_sweep_all_sites(self, mock_enqueue_callback):
         """Test sweeping all configured sites."""
         # Create profiles for multiple sites
-        with tempfile.TemporaryDirectory() as tmpdir1, tempfile.TemporaryDirectory() as tmpdir2:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir1, tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir2:
             content_dir1 = Path(tmpdir1) / "content"
             content_dir1.mkdir()
 

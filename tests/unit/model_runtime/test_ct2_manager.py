@@ -21,7 +21,7 @@ from src.model_runtime.registry import ModelInfo, ModelRegistry
 @pytest.fixture
 def temp_models_dir():
     """Create temporary models directory."""
-    with tempfile.TemporaryDirectory() as tmpdir:
+    with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
         models_dir = Path(tmpdir) / "models"
         models_dir.mkdir(parents=True)
         yield models_dir

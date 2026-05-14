@@ -24,7 +24,7 @@ class TestSchemaMigrationsV8:
 
     def test_migrate_v7_to_v8(self):
         """Test that database has analytics tables (benchmark_trends, etc.)."""
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
             db_path = Path(tmpdir) / "test.db"
 
             # Create database (starts at current version)
@@ -83,7 +83,7 @@ class TestSchemaMigrationsV8:
 
     def test_new_database_starts_at_current_version(self):
         """Test that new databases start at current schema version."""
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
             db_path = Path(tmpdir) / "test.db"
 
             # Create new database
@@ -109,7 +109,7 @@ class TestSchemaMigrationsV8:
 
     def test_rollback_removes_analytics_tables(self):
         """Test rolling back removes analytics tables added in v8."""
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
             db_path = Path(tmpdir) / "test.db"
 
             # Create database at current version
@@ -143,7 +143,7 @@ class TestSchemaMigrationsV8:
 
     def test_migration_dry_run(self):
         """Test dry-run migration validates without executing."""
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
             db_path = Path(tmpdir) / "test.db"
 
             # Create database at current version, then rollback to v7
@@ -175,7 +175,7 @@ class TestSchemaMigrationsV8:
 
     def test_migration_idempotent(self):
         """Test that migrations can run multiple times safely."""
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
             db_path = Path(tmpdir) / "test.db"
 
             # Create database at current version
@@ -191,7 +191,7 @@ class TestSchemaMigrationsV8:
 
     def test_list_migrations(self):
         """Test listing available migrations."""
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
             db_path = Path(tmpdir) / "test.db"
 
             manager = MigrationManager(db_path)
@@ -204,7 +204,7 @@ class TestSchemaMigrationsV8:
 
     def test_benchmark_trends_schema(self):
         """Test benchmark_trends table has correct schema."""
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
             db_path = Path(tmpdir) / "test.db"
 
             db = BenchmarkDatabase(db_path)
@@ -240,7 +240,7 @@ class TestSchemaMigrationsV8:
 
     def test_performance_baselines_schema(self):
         """Test performance_baselines table has correct schema."""
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
             db_path = Path(tmpdir) / "test.db"
 
             db = BenchmarkDatabase(db_path)
@@ -266,7 +266,7 @@ class TestSchemaMigrationsV8:
 
     def test_retention_policies_schema(self):
         """Test retention_policies table has correct schema."""
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
             db_path = Path(tmpdir) / "test.db"
 
             db = BenchmarkDatabase(db_path)
@@ -288,7 +288,7 @@ class TestSchemaMigrationsV8:
 
     def test_v8_indices_created(self):
         """Test that v8 creates required indices."""
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
             db_path = Path(tmpdir) / "test.db"
 
             db = BenchmarkDatabase(db_path)
@@ -311,7 +311,7 @@ class TestSchemaMigrationsV8:
 
     def test_migration_error_handling(self):
         """Test migration error handling."""
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
             db_path = Path(tmpdir) / "test.db"
 
             manager = MigrationManager(db_path)
@@ -347,7 +347,7 @@ class TestMigrationManagerEdgeCases:
 
     def test_rollback_already_at_target_version(self):
         """Rollback should be no-op when already at target version."""
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
             db_path = Path(tmpdir) / "test.db"
 
             # Create database and rollback to v7
@@ -365,7 +365,7 @@ class TestMigrationManagerEdgeCases:
 
     def test_migrate_already_at_target_version(self):
         """Migrate should be no-op when already at target version."""
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
             db_path = Path(tmpdir) / "test.db"
 
             # Create database at current version
@@ -383,7 +383,7 @@ class TestMigrationManagerEdgeCases:
 
     def test_rollback_forward_raises_error(self):
         """Rollback to higher version should raise ValueError."""
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
             db_path = Path(tmpdir) / "test.db"
 
             db = BenchmarkDatabase(db_path)
@@ -398,7 +398,7 @@ class TestMigrationManagerEdgeCases:
 
     def test_migrate_backward_raises_error(self):
         """Migrate to lower version should raise ValueError."""
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
             db_path = Path(tmpdir) / "test.db"
 
             db = BenchmarkDatabase(db_path)
@@ -418,7 +418,7 @@ class TestMigrationWithSharedEngines:
         """Migration should emit telemetry event when starting."""
         from unittest.mock import MagicMock
 
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
             db_path = Path(tmpdir) / "test.db"
 
             # Create database and rollback to v7
@@ -447,7 +447,7 @@ class TestMigrationWithSharedEngines:
         """Migration should emit telemetry event when completed."""
         from unittest.mock import MagicMock
 
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
             db_path = Path(tmpdir) / "test.db"
 
             db = BenchmarkDatabase(db_path)
@@ -468,7 +468,7 @@ class TestMigrationWithSharedEngines:
         """Dry-run migration should emit telemetry with dry_run flag."""
         from unittest.mock import MagicMock
 
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
             db_path = Path(tmpdir) / "test.db"
 
             db = BenchmarkDatabase(db_path)
@@ -490,7 +490,7 @@ class TestMigrationV9:
 
     def test_v9_creates_query_optimization_indices(self):
         """V9 migration via MigrationManager creates query optimization indices."""
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
             db_path = Path(tmpdir) / "test.db"
 
             # Create database at current version, then rollback to v8
@@ -523,7 +523,7 @@ class TestMigrationV9:
 
     def test_v9_rollback_removes_optimization_indices(self):
         """Rolling back v9 removes the optimization indices."""
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
             db_path = Path(tmpdir) / "test.db"
 
             db = BenchmarkDatabase(db_path)
@@ -558,7 +558,7 @@ class TestMigrationValidation:
 
     def test_v8_post_check_validates_schema(self):
         """V8 post-check validates analytics tables and retention policies."""
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
             db_path = Path(tmpdir) / "test.db"
 
             db = BenchmarkDatabase(db_path)
@@ -584,7 +584,7 @@ class TestMigrationValidation:
 
     def test_rollback_dry_run(self):
         """Test dry-run rollback doesn't modify database."""
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
             db_path = Path(tmpdir) / "test.db"
 
             db = BenchmarkDatabase(db_path)
