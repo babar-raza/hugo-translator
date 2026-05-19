@@ -70,6 +70,33 @@ frontmatter:
   products.items.app.description:
     mode: translate
     strategy: null
+  products.items.app.base_description:
+    mode: translate
+    strategy: null
+  products.available_title:
+    mode: translate
+    strategy: null
+  products.available_subtitle:
+    mode: translate
+    strategy: null
+  products.coming_soon_title:
+    mode: translate
+    strategy: null
+  products.coming_soon_subtitle:
+    mode: translate
+    strategy: null
+  products.platform_suffix:
+    mode: translate
+    strategy: null
+  products.platform_conjunction:
+    mode: translate
+    strategy: null
+  products.platform_pair:
+    mode: translate
+    strategy: null
+  popular_features.text:
+    mode: translate
+    strategy: null
   popular_features.heading:
     mode: translate
     strategy: null
@@ -147,4 +174,6 @@ tm_prefs:
   use_semantic_tm: true
   fallback_exact_only: false
   min_similarity_score: 0.8
+model:
+  default: professionalize_llm
 max_parallel_files: 2
