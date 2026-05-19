@@ -239,6 +239,7 @@ class CLIConfigOverrides:
         # force-accept disables validation completely
         if self.force_accept:
             overrides["enable_validation"] = False
+            overrides["force_accept"] = True
         elif self.disable_validation:
             overrides["enable_validation"] = False
         elif self.validation_mode == "off":

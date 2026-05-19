@@ -139,21 +139,20 @@ class MarkdownReconstructor:
                         self.yaml_formatter.set_nested_value(result, key, translation)
 
             elif rule.mode == FrontmatterMode.TRANSLATE_LIST:
-                # Translate list items
-                original_list = self.yaml_formatter.get_nested_value(original, key)
-                if isinstance(original_list, list):
-                    translated_list = []
-                    for idx, item in enumerate(original_list):
-                        list_key = f"{key}[{idx}]"
-                        translation = self._find_frontmatter_translation(
-                            list_key, translations, original
-                        )
-                        if translation:
-                            translated_list.append(translation)
-                        else:
-                            translated_list.append(item)  # Fallback to original
+                # Translate list items — resolve array-indexed paths to list containers
+                list_paths = self._find_list_container_paths(key, original)
 
-                    self.yaml_formatter.set_nested_value(result, key, translated_list)
+                for list_path in list_paths:
+                    original_list = self.yaml_formatter.get_nested_value(original, list_path)
+                    if isinstance(original_list, list):
+                        translated_list = []
+                        for idx, item in enumerate(original_list):
+                            list_key = f"{list_path}[{idx}]"
+                            translation = self._find_frontmatter_translation(
+                                list_key, translations, original
+                            )
+                            translated_list.append(translation if translation else item)
+                        self.yaml_formatter.set_nested_value(result, list_path, translated_list)
 
             elif rule.mode == FrontmatterMode.PASSTHROUGH:
                 # Already in result (copied from original)
@@ -559,6 +558,62 @@ class MarkdownReconstructor:
         result = self._expand_arrays_in_key(parts, original, [])
 
         return result
+
+    def _find_list_container_paths(
+        self, generic_key: str, original: dict[str, Any]
+    ) -> list[str]:
+        """
+        Find all array-indexed paths to list containers for a TRANSLATE_LIST rule.
+
+        For a key like "why_choose.reasons.points" where "reasons" is an array,
+        returns ["why_choose.reasons[0].points", "why_choose.reasons[1].points", ...].
+
+        For a simple key like "why_choose.keywords", returns ["why_choose.keywords"].
+
+        Unlike _find_indexed_keys which expands INTO lists (returning leaf elements),
+        this stops AT the list (returning the container path).
+        """
+        parts = generic_key.split(".")
+        return self._expand_to_list_containers(parts, original, [])
+
+    def _expand_to_list_containers(
+        self, parts: list[str], data: Any, current_path: list[str]
+    ) -> list[str]:
+        """Recursively expand key parts, stopping when we reach the final list value."""
+        if not parts:
+            return [".".join(current_path)] if current_path else []
+
+        if not isinstance(data, dict):
+            return []
+
+        part = parts[0]
+        remaining = parts[1:]
+
+        if part not in data:
+            return []
+
+        field_value = data[part]
+
+        if not remaining:
+            # This is the LAST part — it should be the list itself.
+            # Return the path to it without expanding into the list.
+            return [".".join(current_path + [part])]
+
+        if isinstance(field_value, list):
+            # Intermediate array — expand with indices, continue traversal
+            results = []
+            for idx, item in enumerate(field_value):
+                indexed_part = f"{part}[{idx}]"
+                expanded = self._expand_to_list_containers(
+                    remaining, item, current_path + [indexed_part]
+                )
+                results.extend(expanded)
+            return results
+        else:
+            # Regular dict — continue traversal
+            return self._expand_to_list_containers(
+                remaining, field_value, current_path + [part]
+            )
 
     def _expand_arrays_in_key(
         self, parts: list[str], data: Any, current_path: list[str]

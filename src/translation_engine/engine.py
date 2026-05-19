@@ -306,6 +306,9 @@ class TranslationEngine:
                 f"(device={self.model_selector.hardware_info.recommended_device})"
             )
 
+        # Force-accept: bypass all write guards including B-7.1 language detection
+        self._force_accept = kwargs.get('force_accept', False)
+
         # T202: Cache refresh control (federated-splashing-panda)
         self.force_retranslate = kwargs.get('force_retranslate', False)
         self.cache_write_mode = kwargs.get('cache_write_mode', 'auto')
@@ -2055,7 +2058,9 @@ class TranslationEngine:
                                     # Check for language mismatch (with high confidence)
                                     # Threshold raised to 0.80: technical docs with product names score ~74% English
                                     # even when correctly translated — 0.70 caused too many false write-blocks
-                                    if detected_lang != target_lang and confidence > 0.80:
+                                    # Skip this check entirely when force_accept is enabled
+                                    _force_accept = getattr(self, '_force_accept', False)
+                                    if not _force_accept and detected_lang != target_lang and confidence > 0.80:
                                         # Check if this is a learned similarity pair
                                         is_similar = False
                                         if hasattr(self, 'similarity_tracker') and self.similarity_tracker:
@@ -2077,7 +2082,8 @@ class TranslationEngine:
 
                                     # AGENT B-7.4: Pre-Write Existing File Quality Check
                                     # CRITICAL: If existing file exists, don't overwrite with lower quality
-                                    if validation_passed and output_path.exists():
+                                    # Skip when force_accept is enabled
+                                    if validation_passed and output_path.exists() and not _force_accept:
                                         try:
                                             existing_content = output_path.read_text(encoding='utf-8')
                                             existing_lang, existing_conf = detector.detect(existing_content)
@@ -3522,45 +3528,39 @@ class TranslationEngine:
                     translations=translations
                 )
 
-                # Reconstruct frontmatter (translate frontmatter fields)
+                # Reconstruct frontmatter — delegate to proven legacy reconstructor
+                # which correctly handles dot-notation keys, array indices, and
+                # translate_list rules via _find_indexed_keys + set_nested_value.
+                _fm_reconstructor = MarkdownReconstructor(site_profile)
+                translated_frontmatter = _fm_reconstructor.reconstruct_frontmatter(
+                    doc.frontmatter, translations, target_lang
+                )
+
                 from .reconstructor import YAMLFormatter
                 yaml_formatter = YAMLFormatter()
-
-                # RC-1 FIX: Deep-copy CommentedMap to preserve indentation, comments,
-                # and quote styles. Plain dict loses all ruamel.yaml formatting metadata.
-                import copy as _copy
-                from ruamel.yaml.comments import CommentedMap as _CommentedMap
-                if isinstance(doc.frontmatter, _CommentedMap):
-                    translated_frontmatter = _copy.deepcopy(doc.frontmatter)
-                else:
-                    translated_frontmatter = dict(doc.frontmatter)
-
-                # Build segment lookup: frontmatter_key -> segment_id
-                # RC-4 FIX: Use segment.id as lookup key (not raw value text).
-                # segments is the list of all segments built earlier in this function.
-                _fm_key_to_seg_id = {}
-                for _seg in segments:
-                    if (
-                        _seg.context
-                        and hasattr(_seg.context, "frontmatter_key")
-                        and _seg.context.frontmatter_key
-                        and hasattr(_seg.context, "context_type")
-                        and str(_seg.context.context_type) == "SegmentContextType.FRONTMATTER"
-                    ):
-                        _fm_key_to_seg_id[_seg.context.frontmatter_key] = _seg.id
-
-                # Translate frontmatter fields using segment ID lookup
-                for key, value in doc.frontmatter.items():
-                    field_rule = site_profile.frontmatter.get(key)
-                    if field_rule and field_rule.mode == "translate":
-                        seg_id = _fm_key_to_seg_id.get(key)
-                        if seg_id and seg_id in translations and isinstance(value, str):
-                            translated_frontmatter[key] = translations[seg_id]
-                        # else: keep original value (already in deep copy)
-
                 # Format frontmatter as YAML (includes --- delimiters)
                 # RC-5: _validate_yaml_output() called inside format_frontmatter()
                 frontmatter_yaml = yaml_formatter.format_frontmatter(translated_frontmatter)
+
+                # Structural invariant: verify every frontmatter segment was applied
+                _fm_not_applied = []
+                for _seg in segments:
+                    if (
+                        _seg.context
+                        and hasattr(_seg.context, "context_type")
+                        and str(_seg.context.context_type) == "SegmentContextType.FRONTMATTER"
+                        and _seg.id in translations
+                    ):
+                        _fm_key = _seg.context.frontmatter_key
+                        _expected = translations[_seg.id]
+                        _actual = yaml_formatter.get_nested_value(translated_frontmatter, _fm_key)
+                        if _actual != _expected:
+                            _fm_not_applied.append((_fm_key, _expected[:40], str(_actual)[:40]))
+                if _fm_not_applied:
+                    logger.warning(
+                        "frontmatter_segment_not_applied",
+                        keys=[k for k, _, _ in _fm_not_applied],
+                    )
 
                 # RC-3 FIX: Verify frontmatter keys were not translated.
                 # After serialization, parsed keys must exactly match source keys.
