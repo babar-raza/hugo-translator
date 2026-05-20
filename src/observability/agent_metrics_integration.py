@@ -81,7 +81,7 @@ class MetricsRunContext:
             from src.observability.llm_run_context import LLMRunContext
             self._llm_ctx = LLMRunContext.start_run()
         except Exception as e:
-            logger.debug("LLMRunContext start failed: %s", e)
+            logger.warning("LLMRunContext start failed: %s", e)
 
     def abort(self, error_detail: str = "Worker aborted before content_root completed") -> dict | None:
         """Call if content_root fails or is killed before finish().
@@ -134,7 +134,7 @@ class MetricsRunContext:
                 }
                 LLMRunContext.end_run()
             except Exception as e:
-                logger.debug("LLMRunContext checkpoint failed: %s", e)
+                logger.warning("LLMRunContext checkpoint failed: %s", e)
 
         try:
             return self._build_and_post(

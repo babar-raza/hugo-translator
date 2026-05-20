@@ -830,8 +830,8 @@ class TMImprovementWorker:
                 job_type="TM Improvement",
             )
             _metrics_ctx.start()
-        except Exception:
-            pass
+        except Exception as _m_exc:
+            logger.warning("Agent metrics context init FAILED: %s", _m_exc)
 
         if not (self.telemetry and self.telemetry.is_available()):
             result = self._execute_improvement_run()
@@ -864,7 +864,7 @@ class TMImprovementWorker:
                     items_failed=result.get("failed_count", 0),
                 )
             except Exception as _m_exc:
-                logger.debug("Agent metrics finish skipped: %s", _m_exc)
+                logger.warning("Agent metrics finish FAILED: %s", _m_exc)
 
         return result
 

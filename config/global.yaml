@@ -748,8 +748,8 @@ metrics:
 # Endpoint URL and auth token come from environment variables only (never in config).
 # dry_run=true by default: payloads are logged but NOT posted.
 agent_metrics:
-  enabled: false                    # Master switch; default off
-  dry_run: true                     # Log payload but don't POST; default on
+  enabled: true                     # Master switch
+  dry_run: false                    # Live posting enabled
   endpoint_env: "AGENT_METRICS_ENDPOINT"
   token_env: "AGENT_METRICS_TOKEN"
   post_timeout_seconds: 15

@@ -901,7 +901,7 @@ class AutonomousContentTranslationWorker:
             )
             _metrics_ctx.start()
         except Exception as _m_exc:
-            logger.debug("Agent metrics context init skipped: %s", _m_exc)
+            logger.warning("Agent metrics context init FAILED: %s", _m_exc)
 
         # WS-COMP-8: Accumulators for coverage telemetry emitted at end of this method.
         _cov_total_needing_work = 0
@@ -923,8 +923,8 @@ class AutonomousContentTranslationWorker:
                 if _metrics_ctx is not None:
                     try:
                         _metrics_ctx.abort("Run deadline exceeded before translation started")
-                    except Exception:
-                        pass
+                    except Exception as _ab_exc:
+                        logger.warning("Agent metrics abort FAILED: %s", _ab_exc)
                 return
             logger.info(f"Time budget for this content root: {remaining:.0f}s")
 
@@ -1155,11 +1155,11 @@ class AutonomousContentTranslationWorker:
                     items_failed=_cov_total_needing_work - _cov_successful,
                 )
             except Exception as _mp_exc:
-                logger.debug("Agent metrics finish skipped: %s", _mp_exc)
+                logger.warning("Agent metrics finish FAILED: %s", _mp_exc)
                 try:
                     _metrics_ctx.abort(f"finish() raised: {_mp_exc!s:.200}")
-                except Exception:
-                    pass
+                except Exception as _ab_exc:
+                    logger.warning("Agent metrics abort also FAILED: %s", _ab_exc)
 
     def _write_run_metrics(self, site_id: str, run_id: str) -> None:
         """
