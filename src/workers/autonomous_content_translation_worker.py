@@ -752,6 +752,19 @@ class AutonomousContentTranslationWorker:
                     f"Failed to translate content_root {content_root} for site {site_id}: {e}",
                     exc_info=True,
                 )
+                # Ensure agent metrics fires even on timeout/crash
+                _metrics_ctx = getattr(self, "_last_metrics_ctx", None)
+                if _metrics_ctx is not None:
+                    self._emit_post_run_telemetry(
+                        site_id=site_id,
+                        content_root=content_root,
+                        target_langs=site_profile.target_langs,
+                        metrics_ctx=_metrics_ctx,
+                        cov_total=0,
+                        cov_successful=0,
+                        cov_skipped=0,
+                        error_detail=f"Exception in _translate_content_root: {e!s:.200}",
+                    )
                 # Continue with next content_root
 
     def _get_site_profile(self, site_id: str):
@@ -891,6 +904,7 @@ class AutonomousContentTranslationWorker:
 
         # Agent Metrics: start per-content-root LLM context tracking
         _metrics_ctx = None
+        self._last_metrics_ctx = None  # Expose to _process_site for crash/timeout recovery
         try:
             from src.observability.agent_metrics_integration import MetricsRunContext
             _metrics_ctx = MetricsRunContext(
@@ -900,6 +914,7 @@ class AutonomousContentTranslationWorker:
                 job_type="Content Translation",
             )
             _metrics_ctx.start()
+            self._last_metrics_ctx = _metrics_ctx
         except Exception as _m_exc:
             logger.warning("Agent metrics context init FAILED: %s", _m_exc)
 
@@ -1114,16 +1129,38 @@ class AutonomousContentTranslationWorker:
         # TC-16: Write per-run quality metrics summary to data/metrics/.
         self._write_run_metrics(site_id=site_id, run_id=run_id)
 
+        self._emit_post_run_telemetry(
+            site_id=site_id,
+            content_root=content_root,
+            target_langs=target_langs,
+            metrics_ctx=_metrics_ctx,
+            cov_total=_cov_total_needing_work,
+            cov_successful=_cov_successful,
+            cov_skipped=_cov_skipped,
+        )
+        self._last_metrics_ctx = None  # Prevent double-post from _process_site catch
+
+    def _emit_post_run_telemetry(
+        self,
+        site_id: str,
+        content_root: str,
+        target_langs: list[str],
+        metrics_ctx,
+        cov_total: int,
+        cov_successful: int,
+        cov_skipped: int,
+        error_detail: str | None = None,
+    ) -> None:
+        """Emit coverage telemetry and agent metrics POST. Safe to call on any exit path."""
         # WS-COMP-8: Emit structured coverage telemetry for this content root.
-        # Runs after both chunked and single-pass modes so the snapshot always fires.
         try:
             from src.observability.metrics import record_coverage_snapshot
             record_coverage_snapshot(
                 site_id=site_id,
                 target_langs=target_langs,
-                total_files=_cov_total_needing_work,
-                successful_files=_cov_successful,
-                completion_filter_skipped=_cov_skipped,
+                total_files=cov_total,
+                successful_files=cov_successful,
+                completion_filter_skipped=cov_skipped,
             )
         except Exception as _cov_exc:
             logger.debug("Coverage snapshot skipped: %s", _cov_exc)
@@ -1132,32 +1169,35 @@ class AutonomousContentTranslationWorker:
             emit_worker_event(
                 agent_name="content_worker",
                 job_type="worker_coverage_metrics",
-                items_discovered=_cov_total_needing_work + _cov_skipped,
-                items_succeeded=_cov_successful,
+                items_discovered=cov_total + cov_skipped,
+                items_succeeded=cov_successful,
                 metrics={
                     "site_id": site_id,
                     "content_root": str(content_root),
                     "target_langs": target_langs,
-                    "total_needing_work": _cov_total_needing_work,
-                    "successful": _cov_successful,
-                    "completion_filter_skipped": _cov_skipped,
+                    "total_needing_work": cov_total,
+                    "successful": cov_successful,
+                    "completion_filter_skipped": cov_skipped,
                 },
             )
         except Exception as _ev_exc:
             logger.debug("Coverage event skipped: %s", _ev_exc)
 
-        # Agent Metrics: finish per-content-root metrics and post (dry-run by default)
-        if _metrics_ctx is not None:
+        # Agent Metrics: finish per-content-root metrics and post
+        if metrics_ctx is not None:
             try:
-                _metrics_ctx.finish(
-                    items_discovered=_cov_total_needing_work,
-                    items_succeeded=_cov_successful,
-                    items_failed=_cov_total_needing_work - _cov_successful,
-                )
+                if error_detail:
+                    metrics_ctx.abort(error_detail)
+                else:
+                    metrics_ctx.finish(
+                        items_discovered=cov_total,
+                        items_succeeded=cov_successful,
+                        items_failed=cov_total - cov_successful,
+                    )
             except Exception as _mp_exc:
                 logger.warning("Agent metrics finish FAILED: %s", _mp_exc)
                 try:
-                    _metrics_ctx.abort(f"finish() raised: {_mp_exc!s:.200}")
+                    metrics_ctx.abort(f"finish() raised: {_mp_exc!s:.200}")
                 except Exception as _ab_exc:
                     logger.warning("Agent metrics abort also FAILED: %s", _ab_exc)
 
