@@ -745,7 +745,12 @@ class AutonomousContentTranslationWorker:
             )
             for eff_root in effective_roots:
                 try:
-                    self._translate_content_root(site_id, eff_root, site_profile.target_langs)
+                    self._translate_content_root(
+                        site_id, eff_root, site_profile.target_langs,
+                        profile_filename=f"{site_id}.yaml",
+                        family_scope=site_profile.family_scope,
+                        display_name=site_profile.display_name,
+                    )
                 except (TypeError, AttributeError) as e:
                     logger.critical(
                         "Code error in content_root %s for site %s (will recur on retry): %s",
@@ -918,6 +923,9 @@ class AutonomousContentTranslationWorker:
     def _translate_content_root(
         self, site_id: str, content_root: str, target_langs: list[str],
         batch_idx: int = 1,
+        profile_filename: str = "",
+        family_scope: str | None = None,
+        display_name: str | None = None,
     ) -> None:
         """
         Translate a single content_root directory.
@@ -985,6 +993,9 @@ class AutonomousContentTranslationWorker:
                 content_root_raw=content_root,
                 config_service=self.config_service,
                 job_type="Content Translation",
+                profile_filename=profile_filename,
+                family_scope=family_scope,
+                display_name=display_name,
             )
             _metrics_ctx.start()
             self._last_metrics_ctx = _metrics_ctx

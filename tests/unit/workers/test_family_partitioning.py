@@ -208,6 +208,43 @@ class TestExpandFamilyContentRoots:
             )
 
 
+class TestTranslateContentRootPassthrough:
+    """Verify _translate_content_root accepts and forwards family_scope/profile_filename."""
+
+    def test_translate_content_root_accepts_family_scope_param(self):
+        """_translate_content_root signature must accept family_scope keyword arg."""
+        import inspect
+        from src.workers.autonomous_content_translation_worker import (
+            AutonomousContentTranslationWorker,
+        )
+        sig = inspect.signature(AutonomousContentTranslationWorker._translate_content_root)
+        assert "family_scope" in sig.parameters, (
+            "_translate_content_root must accept family_scope to forward to MetricsRunContext"
+        )
+
+    def test_translate_content_root_accepts_profile_filename_param(self):
+        """_translate_content_root signature must accept profile_filename keyword arg."""
+        import inspect
+        from src.workers.autonomous_content_translation_worker import (
+            AutonomousContentTranslationWorker,
+        )
+        sig = inspect.signature(AutonomousContentTranslationWorker._translate_content_root)
+        assert "profile_filename" in sig.parameters, (
+            "_translate_content_root must accept profile_filename to forward to MetricsRunContext"
+        )
+
+    def test_translate_content_root_accepts_display_name_param(self):
+        """_translate_content_root signature must accept display_name keyword arg."""
+        import inspect
+        from src.workers.autonomous_content_translation_worker import (
+            AutonomousContentTranslationWorker,
+        )
+        sig = inspect.signature(AutonomousContentTranslationWorker._translate_content_root)
+        assert "display_name" in sig.parameters, (
+            "_translate_content_root must accept display_name to forward to MetricsRunContext"
+        )
+
+
 class TestFamilyScopeInSiteProfile:
     """Verify SiteProfile accepts and stores family_scope from YAML."""
 
