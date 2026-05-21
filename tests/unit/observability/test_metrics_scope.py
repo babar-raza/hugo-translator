@@ -76,6 +76,7 @@ class TestScopeResolverLevel3:
         assert scope.product == "Aspose.Words"
 
     def test_kb_aspose_net(self):
+        """Multi-family content root (no family in path) must resolve to 'unknown', not 'total'."""
         inp = ScopeInput(
             site_id="kb.aspose.net",
             content_root_raw="${ASPOSE_NET_CONTENT}/kb.aspose.net",
@@ -84,9 +85,15 @@ class TestScopeResolverLevel3:
         )
         scope = self.resolver.resolve(inp)
         assert scope.website_section == "KB"
-        assert scope.product_family_token == "total"
-        assert scope.product == "Aspose.Total"
-        assert scope.reporting_confidence == "medium"
+        # family must be "unknown" (multi-family root) — never "total"
+        assert scope.product_family_token == "unknown", (
+            "Multi-family content root must not resolve to 'total'. "
+            "Use family-aware partitioning instead."
+        )
+        assert scope.product == "Aspose.Mixed"
+        # low confidence because family could not be resolved
+        assert scope.reporting_confidence == "low"
+        assert scope.fallback_used is True
 
     def test_blog_aspose_org(self):
         inp = ScopeInput(
@@ -427,3 +434,179 @@ class TestScopeResolverFamilySuffixBug:
         assert ScopeResolver._extract_domain("about.aspose.net") == "aspose.net"
         # Fallback for no-TLD site_ids
         assert ScopeResolver._extract_domain("blog-test") == "blog-test"
+
+
+# ---------------------------------------------------------------------------
+# Family-aware scope tests (new in family-aware-scope sprint)
+# ---------------------------------------------------------------------------
+
+class TestFamilyAwareScopeResolution:
+    """Verify family-first scope resolution and fail-closed unknown behaviour."""
+
+    def setup_method(self):
+        self.resolver = ScopeResolver()
+
+    # ── products.aspose.org: multi-family root ──────────────────────────────
+
+    def test_products_aspose_org_multi_family_root_is_unknown(self):
+        """products.aspose.org content_root has no family token → unknown, not total."""
+        inp = ScopeInput(
+            site_id="products.aspose.org",
+            content_root_raw="${ASPOSE_ORG_CONTENT}/products.aspose.org",
+            profile_filename="products.aspose.org.yaml",
+            display_name="Landing Pages",
+        )
+        scope = self.resolver.resolve(inp)
+        assert scope.product_family_token == "unknown", (
+            "products.aspose.org root covers many families — must never say 'total'"
+        )
+        assert scope.product == "Aspose.Mixed"
+        assert scope.fallback_used is True
+        assert scope.reporting_confidence == "low"
+
+    def test_products_aspose_org_family_path_resolves_font(self):
+        """When file_path provides the family, scope resolves correctly."""
+        inp = ScopeInput(
+            site_id="products.aspose.org",
+            content_root_raw="${ASPOSE_ORG_CONTENT}/products.aspose.org",
+            profile_filename="products.aspose.org.yaml",
+            file_path="en/font/python/_index.md",
+        )
+        scope = self.resolver.resolve(inp)
+        assert scope.product_family_token == "font"
+        assert scope.product == "Aspose.Font"
+        assert scope.reporting_confidence == "high"
+        assert scope.fallback_used is False
+
+    def test_products_aspose_org_family_path_resolves_cells(self):
+        inp = ScopeInput(
+            site_id="products.aspose.org",
+            content_root_raw="${ASPOSE_ORG_CONTENT}/products.aspose.org",
+            profile_filename="products.aspose.org.yaml",
+            file_path="en/cells/net/_index.md",
+        )
+        scope = self.resolver.resolve(inp)
+        assert scope.product_family_token == "cells"
+        assert scope.product == "Aspose.Cells"
+
+    # ── aspose.net: {family}/{lang} convention ──────────────────────────────
+
+    def test_kb_aspose_net_per_family_content_root(self):
+        """When content_root already includes family (as from partitioning), scope is correct."""
+        inp = ScopeInput(
+            site_id="kb.aspose.net",
+            content_root_raw="/abs/path/to/kb.aspose.net/words",
+            profile_filename="kb.aspose.net.yaml",
+        )
+        scope = self.resolver.resolve(inp)
+        assert scope.product_family_token == "words"
+        assert scope.product == "Aspose.Words"
+        assert scope.reporting_confidence == "high"
+
+    def test_kb_aspose_net_file_path_barcode(self):
+        """File path in aspose.net {family}/{lang}/... style resolves barcode."""
+        inp = ScopeInput(
+            site_id="kb.aspose.net",
+            content_root_raw="${ASPOSE_NET_CONTENT}/kb.aspose.net",
+            profile_filename="kb.aspose.net.yaml",
+            file_path="barcode/de/1d-reader/_index.md",
+        )
+        scope = self.resolver.resolve(inp)
+        assert scope.product_family_token == "barcode"
+        assert scope.product == "Aspose.BarCode"
+
+    # ── unknown must not become total ──────────────────────────────────────
+
+    def test_unknown_content_root_is_not_total(self):
+        """A completely unknown content root must resolve to 'unknown', not 'total'."""
+        inp = ScopeInput(
+            site_id="docs.aspose.net",
+            content_root_raw="${ASPOSE_NET_CONTENT}/docs.aspose.net",
+            profile_filename="docs.aspose.net.yaml",
+        )
+        scope = self.resolver.resolve(inp)
+        assert scope.product_family_token != "total", (
+            "Unknown content root must never resolve to 'total'"
+        )
+        assert scope.product_family_token == "unknown"
+
+    def test_mixed_run_not_total(self):
+        """A multi-family run root must produce 'unknown' not 'total'."""
+        inp = ScopeInput(
+            site_id="products.aspose.net",
+            content_root_raw="${ASPOSE_NET_CONTENT}/products.aspose.net",
+            profile_filename="products.aspose.net.yaml",
+            display_name="Landing Pages",
+        )
+        scope = self.resolver.resolve(inp)
+        assert scope.product_family_token == "unknown"
+        assert scope.product != "Aspose.Total"
+
+    # ── explicit total — only when family_scope="total" ────────────────────
+
+    def test_explicit_total_via_family_scope(self):
+        """family_scope='total' is the only way to legitimately get Aspose.Total."""
+        inp = ScopeInput(
+            site_id="products.aspose.org",
+            content_root_raw="${ASPOSE_ORG_CONTENT}/products.aspose.org",
+            profile_filename="products.aspose.org.yaml",
+            family_scope="total",
+        )
+        scope = self.resolver.resolve(inp)
+        assert scope.product_family_token == "total"
+        assert scope.product == "Aspose.Total"
+
+    def test_total_from_path_segment(self):
+        """A file under en/total/ still resolves via path-scan before family_scope."""
+        inp = ScopeInput(
+            site_id="products.aspose.org",
+            content_root_raw="${ASPOSE_ORG_CONTENT}/products.aspose.org",
+            profile_filename="products.aspose.org.yaml",
+            file_path="en/total/_index.md",
+        )
+        scope = self.resolver.resolve(inp)
+        assert scope.product_family_token == "total"
+        assert scope.product == "Aspose.Total"
+
+    # ── single-family profiles remain unchanged ────────────────────────────
+
+    def test_docs_aspose_net_words_still_resolves_correctly(self):
+        """Single-family profile (words in content_root) must be unaffected."""
+        inp = ScopeInput(
+            site_id="docs.aspose.net",
+            content_root_raw="${ASPOSE_NET_CONTENT}/docs.aspose.net/words",
+            profile_filename="docs.aspose.net.words.yaml",
+            display_name="Documentation",
+        )
+        scope = self.resolver.resolve(inp)
+        assert scope.product_family_token == "words"
+        assert scope.product == "Aspose.Words"
+        assert scope.reporting_confidence == "high"
+        assert scope.fallback_used is False
+
+    def test_metrics_hints_total_blocked_without_family_scope(self):
+        """metrics_hints.product_family='total' must be blocked without family_scope='total'."""
+        inp = ScopeInput(
+            site_id="products.aspose.org",
+            content_root_raw="${ASPOSE_ORG_CONTENT}/products.aspose.org",
+            profile_filename="products.aspose.org.yaml",
+            metrics_hints={"product_family": "total"},
+        )
+        scope = self.resolver.resolve(inp)
+        # Must NOT be "total" — hints cannot override to total without authority
+        assert scope.product_family_token != "total", (
+            "metrics_hints.product_family='total' must not be accepted without "
+            "family_scope='total' in the profile"
+        )
+
+    def test_metrics_hints_specific_family_accepted(self):
+        """metrics_hints.product_family='words' is still accepted as weak override."""
+        inp = ScopeInput(
+            site_id="products.aspose.org",
+            content_root_raw="${ASPOSE_ORG_CONTENT}/products.aspose.org",
+            profile_filename="products.aspose.org.yaml",
+            metrics_hints={"product_family": "words"},
+        )
+        scope = self.resolver.resolve(inp)
+        assert scope.product_family_token == "words"
+        assert scope.product == "Aspose.Words"

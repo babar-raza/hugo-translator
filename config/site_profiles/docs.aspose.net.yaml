@@ -1,5 +1,7 @@
 site_id: docs.aspose.net
 display_name: Documentation
+# Multi-family: docs organized as {family}/{lang}/ at the content root level
+family_scope: multi
 content_roots:
 - ${ASPOSE_NET_CONTENT}/docs.aspose.net
 default_source_lang: en

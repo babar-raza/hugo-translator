@@ -1,5 +1,7 @@
 site_id: products.aspose.net
 display_name: Landing Pages
+# Multi-family: product pages organized as {family}/{lang}/ (no en/ prefix)
+family_scope: multi
 content_roots:
 - ${ASPOSE_NET_CONTENT}/products.aspose.net
 default_source_lang: en

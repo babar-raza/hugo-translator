@@ -1,5 +1,8 @@
 site_id: products.aspose.org
 display_name: Landing Pages
+# Multi-family: content is partitioned by product family under en/{family}/
+# Translation and metrics are per-family (cells, font, words, pdf, ...).
+family_scope: multi
 content_roots:
 - ${ASPOSE_ORG_CONTENT}/products.aspose.org
 default_source_lang: en

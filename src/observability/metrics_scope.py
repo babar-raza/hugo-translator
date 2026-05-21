@@ -140,6 +140,13 @@ class ScopeInput:
     cli_overrides: dict | None = None
     operation_type: str = "content_translation"
     is_test: bool = False
+    # family_scope declares the scope intent when it cannot be auto-detected from paths.
+    # Values: "single" | "multi" | "total" | None (auto-detect).
+    # "total" is the ONLY way to legitimately resolve to Aspose.Total.
+    family_scope: str | None = None
+    # file_path: path of the source file relative to the content root.
+    # When provided, family is extracted from file path first (strongest path evidence).
+    file_path: str | None = None
 
 
 @dataclass
@@ -155,6 +162,10 @@ class ResolvedScope:
     # Evidence only
     site_id: str = ""
     source_site_domain: str = ""
+    # product_family_token values:
+    #   "words", "cells", ... — a resolved single family
+    #   "total"               — explicitly declared Aspose.Total (family_scope: total)
+    #   "unknown"             — multi-family or unresolved; callers should partition
     product_family_token: str = ""
     operation_type: str = "content_translation"
     locale_grain: str = "all"
@@ -223,23 +234,49 @@ class ScopeResolver:
         return "Unknown"
 
     def _resolve_family(self, inp: ScopeInput, content_root_id: str) -> str | None:
-        # Level 1: CLI
+        # Level 1: CLI override (highest authority)
         if inp.cli_overrides and inp.cli_overrides.get("product_family"):
             return inp.cli_overrides["product_family"]
-        # Level 2: hints
-        if inp.metrics_hints and inp.metrics_hints.get("product_family"):
-            return inp.metrics_hints["product_family"]
-        # Level 3: content_root_id path segments
+
+        # Level 2: per-file path evidence (stronger than content_root — handles mixed roots)
+        if inp.file_path:
+            from .family_extraction import extract_family_from_path
+            fam = extract_family_from_path(inp.file_path, self.known_families)
+            if fam:
+                return fam
+
+        # Level 3: content_root_id path segments (e.g. "kb.aspose.net/words" → "words")
         segments = content_root_id.split("/")
         for seg in reversed(segments):
             if seg in self.known_families:
                 return seg
-        # Level 3b: profile filename
+
+        # Level 3b: profile filename parts (e.g. "docs.aspose.net.words.yaml" → "words")
         parts = inp.profile_filename.replace(".yaml", "").replace(".yml", "").split(".")
         for part in reversed(parts):
             if part in self.known_families:
                 return part
-        # Not found — this is mixed content, not a fallback error
+
+        # Level 4: explicit profile-level family_scope == "total"
+        # This is the ONLY legitimate path to returning "total" when no family token is
+        # present in the path.  All other missing-family cases → None (unknown/multi).
+        if inp.family_scope == "total":
+            return "total"
+
+        # Level 5: metrics_hints (weakest — explicit override only, never auto-fallback)
+        if inp.metrics_hints and inp.metrics_hints.get("product_family"):
+            hint_fam = inp.metrics_hints["product_family"]
+            # Only accept "total" from hints when family_scope == "total" is also set;
+            # otherwise hints can override to a specific family but not to "total".
+            if hint_fam == "total" and inp.family_scope != "total":
+                logger.warning(
+                    "metrics_hints.product_family='total' ignored — "
+                    "set family_scope: total in profile to explicitly declare Total scope."
+                )
+            else:
+                return hint_fam
+
+        # Not found — caller must handle None; must NOT substitute "total"
         return None
 
     def _resolve_platform(self, inp: ScopeInput, content_root_id: str, domain: str = "") -> str:
@@ -266,13 +303,15 @@ class ScopeResolver:
         # Level 2: hints direct product name
         if inp.metrics_hints and inp.metrics_hints.get("product"):
             return inp.metrics_hints["product"]
-        # Look up display mapping
+        # Look up display mapping (covers "total" → "Aspose.Total" when legitimately set)
         if family_token and family_token in self.product_display_mapping:
             return self.product_display_mapping[family_token]
         # Build from brand + family
         brand = self._get_brand(website)
         if not family_token:
-            return f"{brand}.Total"
+            # No family resolved — content root covers multiple families or is unknown.
+            # Use ".Mixed" to signal this accurately; never emit ".Total" here.
+            return f"{brand}.Mixed"
         # Unknown family token — warn but produce a name
         self.warnings_buffer.append(f"Unknown product family token: {family_token}")
         return f"{brand}.{family_token.capitalize()}"
@@ -323,7 +362,12 @@ class ScopeResolver:
         scope.website_section = self._resolve_section(inp, subsystem)
 
         family_token = self._resolve_family(inp, scope.content_root_id)
-        scope.product_family_token = family_token or "total"
+        if family_token:
+            scope.product_family_token = family_token
+        else:
+            # Could not resolve a single family — content root is multi-family or unknown.
+            # Use "unknown" sentinel; callers should partition by family before calling resolve().
+            scope.product_family_token = "unknown"
         scope.product = self._resolve_product_display(inp, scope.website, family_token)
 
         platform_token = self._resolve_platform(inp, scope.content_root_id, domain)
@@ -336,8 +380,14 @@ class ScopeResolver:
 
         # Determine fallback and confidence
         if not family_token:
-            scope.fallback_used = False  # Total for mixed content is correct, not a fallback
-            scope.reporting_confidence = "medium"
+            # Multi-family or unknown content root — mark as low-confidence fallback
+            # so that callers (audit gate, validation) can detect and escalate.
+            scope.fallback_used = True
+            scope.reporting_confidence = "low"
+            scope.warnings.append(
+                "product_family_token could not be resolved — content root may cover "
+                "multiple product families. Partition by family before translation."
+            )
         else:
             scope.reporting_confidence = "high"
 
@@ -537,16 +587,20 @@ def run_scope_audit(profiles_dir: str = "config/site_profiles", output_path: str
                 profile_filename=profile_file.name,
                 display_name=profile.get("display_name"),
                 metrics_hints=profile.get("metrics_hints"),
+                family_scope=profile.get("family_scope"),
             )
             scope = resolver.resolve(inp)
 
             # Classify
             if is_test:
                 classification = "fixture_excluded"
-            elif scope.warnings:
+            elif scope.product_family_token == "unknown":
+                # Multi-family or unresolved — requires family-aware partitioning
+                classification = "multi_family_unresolved"
+            elif scope.warnings and not scope.product_family_token == "total":
                 classification = "ambiguous"
             elif scope.product_family_token == "total":
-                classification = "mixed_accepted"
+                classification = "explicit_total"
             elif scope.fallback_used:
                 classification = "fallback_accepted"
             else:

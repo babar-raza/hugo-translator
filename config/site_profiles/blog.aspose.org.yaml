@@ -6,6 +6,8 @@
 
 site_id: blog.aspose.org
 display_name: blog posts
+# Multi-family: blog posts are organized by product family under en/{family}/
+family_scope: multi
 content_roots:
 - ${ASPOSE_ORG_CONTENT}/blog.aspose.org
 default_source_lang: en

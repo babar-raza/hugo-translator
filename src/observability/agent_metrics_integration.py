@@ -35,8 +35,13 @@ def _build_item_name(resolved, job_type: str, items_succeeded: int) -> str:
         "Test": "Tested",
     }
     verb = verb_map.get(job_type, job_type)
-    family_token = getattr(resolved, "product_family_token", "total") or "total"
-    family = "All Products" if family_token == "total" else family_token.capitalize()
+    family_token = getattr(resolved, "product_family_token", "unknown") or "unknown"
+    if family_token == "total":
+        family = "All Products"
+    elif family_token == "unknown":
+        family = "Mixed"
+    else:
+        family = family_token.capitalize()
     section = getattr(resolved, "website_section", "") or "Content"
     noun = "file" if items_succeeded == 1 else "files"
     return f"{verb} {family} {section} — {items_succeeded} {noun}"
@@ -53,6 +58,7 @@ class MetricsRunContext:
         job_type: str = "content_translation",
         profile_filename: str = "",
         display_name: str | None = None,
+        family_scope: str | None = None,
     ):
         self.site_id = site_id
         self.content_root_raw = content_root_raw
@@ -60,6 +66,9 @@ class MetricsRunContext:
         self.profile_filename = profile_filename
         self.display_name = display_name
         self.config_service = config_service
+        # family_scope: "single" | "multi" | "total" | None
+        # Passed through to ScopeInput so ScopeResolver can correctly classify Total scope.
+        self.family_scope = family_scope
 
         self._cfg = _load_agent_metrics_config(config_service)
         self._enabled = self._cfg.get("enabled", False)
@@ -187,6 +196,7 @@ class MetricsRunContext:
             content_root_raw=self.content_root_raw,
             profile_filename=self.profile_filename,
             display_name=self.display_name,
+            family_scope=self.family_scope,
         )
         resolved = resolver.resolve(scope_input)
 

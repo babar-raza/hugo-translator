@@ -738,34 +738,38 @@ class AutonomousContentTranslationWorker:
             logger.warning(f"Site {site_id} has no target_langs, skipping")
             return
 
-        # Process each content_root
+        # Process each content_root, expanding multi-family roots into per-family batches
         for content_root in site_profile.content_roots:
-            try:
-                self._translate_content_root(site_id, content_root, site_profile.target_langs)
-            except (TypeError, AttributeError) as e:
-                logger.critical(
-                    "Code error in content_root %s for site %s (will recur on retry): %s",
-                    content_root, site_id, e, exc_info=True,
-                )
-            except Exception as e:
-                logger.error(
-                    f"Failed to translate content_root {content_root} for site {site_id}: {e}",
-                    exc_info=True,
-                )
-                # Ensure agent metrics fires even on timeout/crash
-                _metrics_ctx = getattr(self, "_last_metrics_ctx", None)
-                if _metrics_ctx is not None:
-                    self._emit_post_run_telemetry(
-                        site_id=site_id,
-                        content_root=content_root,
-                        target_langs=site_profile.target_langs,
-                        metrics_ctx=_metrics_ctx,
-                        cov_total=0,
-                        cov_successful=0,
-                        cov_skipped=0,
-                        error_detail=f"Exception in _translate_content_root: {e!s:.200}",
+            effective_roots = self._expand_family_content_roots(
+                site_profile, content_root,
+            )
+            for eff_root in effective_roots:
+                try:
+                    self._translate_content_root(site_id, eff_root, site_profile.target_langs)
+                except (TypeError, AttributeError) as e:
+                    logger.critical(
+                        "Code error in content_root %s for site %s (will recur on retry): %s",
+                        eff_root, site_id, e, exc_info=True,
                     )
-                # Continue with next content_root
+                except Exception as e:
+                    logger.error(
+                        f"Failed to translate content_root {eff_root} for site {site_id}: {e}",
+                        exc_info=True,
+                    )
+                    # Ensure agent metrics fires even on timeout/crash
+                    _metrics_ctx = getattr(self, "_last_metrics_ctx", None)
+                    if _metrics_ctx is not None:
+                        self._emit_post_run_telemetry(
+                            site_id=site_id,
+                            content_root=eff_root,
+                            target_langs=site_profile.target_langs,
+                            metrics_ctx=_metrics_ctx,
+                            cov_total=0,
+                            cov_successful=0,
+                            cov_skipped=0,
+                            error_detail=f"Exception in _translate_content_root: {e!s:.200}",
+                        )
+                    # Continue with next content_root
 
     def _get_site_profile(self, site_id: str):
         """Load and cache a site profile for the current worker invocation."""
@@ -782,6 +786,75 @@ class AutonomousContentTranslationWorker:
                 self._site_profile_errors[site_id] = exc
                 raise
         return self._site_profile_cache[site_id]
+
+    def _expand_family_content_roots(
+        self,
+        site_profile,
+        content_root: str,
+    ) -> list[str]:
+        """Expand a multi-family content_root into per-family sub-roots.
+
+        When a profile has ``family_scope: multi`` (or auto-detects multiple known-family
+        subdirectories), the single content_root is split into one entry per family.
+        Each entry is the absolute path of the family subdir so that MetricsRunContext
+        can resolve the family token from the path.
+
+        If the content_root is single-family or cannot be resolved, returns ``[content_root]``
+        unchanged (preserves existing behaviour for single-family profiles).
+
+        Args:
+            site_profile: Loaded SiteProfile for the site.
+            content_root: Raw content root string (may contain env vars, already expanded
+                         by config_loader at profile load time).
+
+        Returns:
+            List of content root strings to process.  Usually ``[content_root]``, but may
+            be multiple strings when multi-family expansion fires.
+        """
+        family_scope = getattr(site_profile, "family_scope", None)
+
+        # Explicit single-family or total — no expansion needed
+        if family_scope in ("single", "total"):
+            return [content_root]
+
+        try:
+            resolved_dir = (
+                self.config_service.resolve_content_root(content_root)
+                if self.config_service is not None
+                else Path(content_root)
+            )
+        except Exception as _re:
+            logger.debug("Cannot resolve content_root for family expansion: %s", _re)
+            return [content_root]
+
+        if not resolved_dir.exists():
+            return [content_root]
+
+        try:
+            from src.observability.family_extraction import discover_family_subdirs
+            from src.observability.metrics_scope import DEFAULT_KNOWN_FAMILIES
+            family_dirs = discover_family_subdirs(resolved_dir, DEFAULT_KNOWN_FAMILIES)
+        except Exception as _fe:
+            logger.debug("Family subdir discovery failed: %s", _fe)
+            return [content_root]
+
+        if len(family_dirs) <= 1:
+            # Single-family or no family dirs: do not expand
+            return [content_root]
+
+        # Multi-family detected
+        if family_scope == "multi":
+            reason = "profile declares family_scope: multi"
+        else:
+            reason = f"auto-detected {len(family_dirs)} family subdirs"
+
+        logger.info(
+            "Family-aware partitioning for %s (%s): %s",
+            content_root,
+            reason,
+            ", ".join(t for t, _ in family_dirs),
+        )
+        return [str(fdir) for _, fdir in family_dirs]
 
     def _iter_recovery_git_roots(self) -> list[Path]:
         """Discover git roots relevant to this worker run without reloading profiles."""

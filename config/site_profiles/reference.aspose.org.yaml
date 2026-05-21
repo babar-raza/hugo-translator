@@ -1,5 +1,7 @@
 site_id: reference.aspose.org
 display_name: API References
+# Multi-family: API reference docs organized by product family under en/{family}/
+family_scope: multi
 content_roots:
 - ${ASPOSE_ORG_CONTENT}/reference.aspose.org
 default_source_lang: en

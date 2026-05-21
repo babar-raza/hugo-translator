@@ -1,5 +1,7 @@
 site_id: docs.aspose.org
 display_name: Documentation
+# Multi-family: content is partitioned by product family under en/{family}/
+family_scope: multi
 content_roots:
 - ${ASPOSE_ORG_CONTENT}/docs.aspose.org
 default_source_lang: en

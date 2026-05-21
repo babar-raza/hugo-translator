@@ -1,5 +1,7 @@
 site_id: kb.aspose.org
 display_name: knowledge base articles
+# Multi-family: content is partitioned by product family under en/{family}/
+family_scope: multi
 content_roots:
 - ${ASPOSE_ORG_CONTENT}/kb.aspose.org
 default_source_lang: en

@@ -218,6 +218,15 @@ class SiteProfile(BaseModel):
         default=True,
         description="Whether the autonomous worker should process this site. Set to false for test/dev profiles.",
     )
+    family_scope: str | None = Field(
+        default=None,
+        description=(
+            "Declares the product-family scope of this profile. "
+            "Values: 'single' (one family), 'multi' (multiple families — triggers per-family "
+            "translation batching), 'total' (explicitly Aspose.Total umbrella), or None (auto-detect). "
+            "Never use 'total' for multi-family subdomains."
+        ),
+    )
 
     @field_validator("target_langs", mode="before")
     @classmethod
