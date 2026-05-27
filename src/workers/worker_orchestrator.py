@@ -35,6 +35,9 @@ from src.workers.queue_probes import (
 
 logger = logging.getLogger(__name__)
 
+# Tracks unresolved env var paths already warned about to avoid log spam.
+_warned_unresolved_paths: set[str] = set()
+
 # ---------------------------------------------------------------------------
 # Constants
 # ---------------------------------------------------------------------------
@@ -95,6 +98,15 @@ def _eval(trigger: dict[str, Any], state: dict[str, Any]) -> bool:
         pattern = trigger.get("pattern", "*")
         for p in paths:
             p = _expand_env(p)
+            if "${" in p:
+                if p not in _warned_unresolved_paths:
+                    _warned_unresolved_paths.add(p)
+                    logger.warning(
+                        "file_change trigger path contains unresolved env var: %r — "
+                        "set the environment variable or remove this path from workers.yaml",
+                        p,
+                    )
+                continue
             if not Path(p).exists():
                 continue
             if pattern == "*.yaml":
@@ -107,7 +119,7 @@ def _eval(trigger: dict[str, Any], state: dict[str, Any]) -> bool:
 
     if ttype == "worker_completed":
         target = trigger.get("worker", "")
-        completed_workers = state.get("recently_completed_workers", [])
+        completed_workers = state.get("recently_launched_workers", [])
         return target in completed_workers
 
     if ttype == "multi":
@@ -147,18 +159,20 @@ def should_launch(
     if sentinel and file_exists(sentinel):
         return False, f"campaign sentinel active: {sentinel}"
 
-    # PID alive check
-    pid_file = Path("data/logs") / f"{name.replace('_worker', '_worker')}.pid"
-    # Try common patterns
-    for candidate in [
-        Path("data/logs") / f"{name}.pid",
-        Path("data/logs") / f"{name.replace('_worker', '')}_worker.pid",
-    ]:
-        if candidate.exists():
-            pid_file = candidate
-            break
-    if worker_pid_alive(pid_file):
-        return False, f"worker already running (PID file: {pid_file})"
+    # PID alive check — auto-clean stale files
+    pid_name = cfg.get("pid_file_name", name)
+    pid_file = Path("data/logs") / f"{pid_name}.pid"
+    if pid_file.exists():
+        if worker_pid_alive(pid_file):
+            return False, f"worker already running (PID file: {pid_file})"
+        else:
+            # Stale PID file — process is dead, clean up so we don't block forever
+            try:
+                stale_pid = pid_file.read_text(encoding="utf-8").strip()
+                pid_file.unlink(missing_ok=True)
+                logger.info("Worker %s: removed stale PID file %s (dead PID %s)", name, pid_file, stale_pid)
+            except OSError as exc:
+                logger.warning("Worker %s: could not remove stale PID file %s: %s", name, pid_file, exc)
 
     # Cooldown
     last_launch = state.get("last_launch", {}).get(name, 0.0)
@@ -272,17 +286,17 @@ def run_check_cycle(
                 launched.append(name)
                 logger.info("Worker %s: launched (%s)", name, reason)
         else:
-            logger.debug("Worker %s: skipped (%s)", name, reason)
+            logger.info("Worker %s: skipped (%s)", name, reason)
 
     if not launched:
-        logger.info("No work available — all triggers inactive")
+        logger.info("No workers launched this cycle")
         _append_event({
             "ts": datetime.now(timezone.utc).isoformat(),
             "event": "no_work_available",
         })
 
     # Mark completed workers for next cycle's worker_completed triggers
-    state["recently_completed_workers"] = launched
+    state["recently_launched_workers"] = launched
     state["last_check_time"] = time.time()
 
     return launched
@@ -425,6 +439,12 @@ def main() -> None:
         level=getattr(logging, args.log_level),
         format="%(asctime)s %(name)s [%(levelname)s] %(message)s",
     )
+
+    # Anchor CWD to project root regardless of how the orchestrator was launched.
+    # All worker file paths (queues, state, PID files) are relative to the project root.
+    _project_root = Path(__file__).resolve().parent.parent.parent
+    os.chdir(_project_root)
+    logger.info("Working directory anchored to: %s", _project_root)
 
     registry = load_worker_registry(args.config)
     state = _load_state()

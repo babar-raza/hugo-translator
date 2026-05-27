@@ -14,7 +14,7 @@ def _make_state(**overrides):
         "last_check_time": time.time() - 600,
         "last_launch": {},
         "launch_history": [],
-        "recently_completed_workers": [],
+        "recently_launched_workers": [],
         "running_count": {},
     }
     state.update(overrides)
@@ -84,14 +84,14 @@ class TestEvaluateTrigger:
         from src.workers.worker_orchestrator import evaluate_trigger
 
         trigger = {"type": "worker_completed", "worker": "content_worker"}
-        state = {"recently_completed_workers": ["content_worker"]}
+        state = {"recently_launched_workers": ["content_worker"]}
         assert evaluate_trigger(trigger, state) is True
 
     def test_worker_not_completed(self):
         from src.workers.worker_orchestrator import evaluate_trigger
 
         trigger = {"type": "worker_completed", "worker": "content_worker"}
-        state = {"recently_completed_workers": []}
+        state = {"recently_launched_workers": []}
         assert evaluate_trigger(trigger, state) is False
 
     def test_multi_any_fires(self, tmp_path):
@@ -106,7 +106,7 @@ class TestEvaluateTrigger:
                 {"type": "worker_completed", "worker": "nope"},
             ],
         }
-        assert evaluate_trigger(trigger, {"recently_completed_workers": []}) is True
+        assert evaluate_trigger(trigger, {"recently_launched_workers": []}) is True
 
     def test_multi_none_fires(self, tmp_path):
         from src.workers.worker_orchestrator import evaluate_trigger
@@ -118,7 +118,7 @@ class TestEvaluateTrigger:
                 {"type": "worker_completed", "worker": "nope"},
             ],
         }
-        assert evaluate_trigger(trigger, {"recently_completed_workers": []}) is False
+        assert evaluate_trigger(trigger, {"recently_launched_workers": []}) is False
 
     def test_unknown_trigger_returns_false(self):
         from src.workers.worker_orchestrator import evaluate_trigger
@@ -199,11 +199,14 @@ class TestShouldLaunch:
         assert ok is True
         assert "trigger fired" in reason
 
-    def test_live_pid_blocks(self, tmp_path):
+    def test_live_pid_blocks(self, tmp_path, monkeypatch):
         from src.workers.worker_orchestrator import should_launch
 
-        pid_file = tmp_path / "w.pid"
-        pid_file.write_text(str(os.getpid()))  # current process is alive
+        # Create PID file at the relative path the orchestrator looks for: data/logs/w.pid
+        pid_dir = tmp_path / "data" / "logs"
+        pid_dir.mkdir(parents=True)
+        (pid_dir / "w.pid").write_text(str(os.getpid()))
+        monkeypatch.chdir(tmp_path)
 
         q = tmp_path / "q.jsonl"
         q.write_text('{"x":1}\n')
@@ -212,7 +215,6 @@ class TestShouldLaunch:
             cooldown_seconds=0,
         )
         state = _make_state()
-        # Patch the PID file lookup to find our tmp file
         with patch("src.workers.worker_orchestrator.worker_pid_alive", return_value=True):
             ok, reason = should_launch("w", cfg, state)
         assert ok is False

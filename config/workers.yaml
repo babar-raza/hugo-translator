@@ -38,6 +38,7 @@ workers:
 
   tm_improvement_worker:
     enabled: true
+    pid_file_name: tm_worker    # worker self-ID per AGENTS.md; tm_improvement_worker.py uses _worker_id = "tm_worker"
     mode: oneshot
     module: src.workers.tm_improvement_worker
     cli_args: ["--mode", "oneshot"]
