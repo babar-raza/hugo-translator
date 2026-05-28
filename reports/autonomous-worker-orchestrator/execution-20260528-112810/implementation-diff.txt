@@ -1,0 +1,231 @@
+commit 7790cae4960fa59231971b0bd82d65b80cbd1128
+Author: Babar Raza <babar.raza@aspose.com>
+Date:   Wed May 27 18:23:49 2026 +0500
+
+    fix(orchestrator): resolve 6 root causes behind silent no-work cycles
+    
+    RC-1: Anchor CWD to project root in main() so all relative file paths
+    (queues, state, PID files) resolve correctly regardless of launch directory.
+    This was the primary cause: all trigger evaluations returned False because
+    Path("data/retranslate_queue.jsonl").exists() resolved against wrong CWD.
+    
+    RC-2: Elevate per-worker skip reasons from logger.debug to logger.info and
+    replace misleading "all triggers inactive" with "No workers launched this
+    cycle" — the previous message was wrong when blocks were PID/cooldown, not
+    trigger evaluation failures.
+    
+    RC-3: Auto-cleanup stale PID files in should_launch(). Previously, a dead
+    worker's PID file blocked re-launch forever. Now: if the PID file exists but
+    the process is dead, delete it and log at INFO before proceeding. Also adds
+    cfg.get("pid_file_name", name) to read the correct PID filename per worker.
+    
+    RC-4: Add pid_file_name: tm_worker to config/workers.yaml for
+    tm_improvement_worker. The worker uses _worker_id = "tm_worker" (canonical
+    per AGENTS.md) so it writes tm_worker.pid; the orchestrator was checking
+    tm_improvement_worker.pid — a file that never existed.
+    
+    RC-5: Warn (once) when a file_change trigger path contains an unresolved
+    ${ENV_VAR} placeholder. Previously silent; now logs WARNING with dedup via
+    module-level _warned_unresolved_paths set.
+    
+    RC-6: Rename state field recently_completed_workers → recently_launched_workers.
+    Workers are launched asynchronously via Popen; the field stores workers just
+    launched this cycle, not workers that have completed. Name now matches reality.
+    
+    Tests: 287 passed, 0 failed. Updated test_orchestrator_triggers.py to match
+    renamed field and to use monkeypatch.chdir for the PID file path test.
+    
+    Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>
+
+diff --git a/config/workers.yaml b/config/workers.yaml
+index 9938415..841bedd 100644
+--- a/config/workers.yaml
++++ b/config/workers.yaml
+@@ -38,6 +38,7 @@ workers:
+ 
+   tm_improvement_worker:
+     enabled: true
++    pid_file_name: tm_worker    # worker self-ID per AGENTS.md; tm_improvement_worker.py uses _worker_id = "tm_worker"
+     mode: oneshot
+     module: src.workers.tm_improvement_worker
+     cli_args: ["--mode", "oneshot"]
+diff --git a/src/workers/worker_orchestrator.py b/src/workers/worker_orchestrator.py
+index dbe3462..3f5d597 100644
+--- a/src/workers/worker_orchestrator.py
++++ b/src/workers/worker_orchestrator.py
+@@ -35,6 +35,9 @@ from src.workers.queue_probes import (
+ 
+ logger = logging.getLogger(__name__)
+ 
++# Tracks unresolved env var paths already warned about to avoid log spam.
++_warned_unresolved_paths: set[str] = set()
++
+ # ---------------------------------------------------------------------------
+ # Constants
+ # ---------------------------------------------------------------------------
+@@ -95,6 +98,15 @@ def _eval(trigger: dict[str, Any], state: dict[str, Any]) -> bool:
+         pattern = trigger.get("pattern", "*")
+         for p in paths:
+             p = _expand_env(p)
++            if "${" in p:
++                if p not in _warned_unresolved_paths:
++                    _warned_unresolved_paths.add(p)
++                    logger.warning(
++                        "file_change trigger path contains unresolved env var: %r — "
++                        "set the environment variable or remove this path from workers.yaml",
++                        p,
++                    )
++                continue
+             if not Path(p).exists():
+                 continue
+             if pattern == "*.yaml":
+@@ -107,7 +119,7 @@ def _eval(trigger: dict[str, Any], state: dict[str, Any]) -> bool:
+ 
+     if ttype == "worker_completed":
+         target = trigger.get("worker", "")
+-        completed_workers = state.get("recently_completed_workers", [])
++        completed_workers = state.get("recently_launched_workers", [])
+         return target in completed_workers
+ 
+     if ttype == "multi":
+@@ -147,18 +159,20 @@ def should_launch(
+     if sentinel and file_exists(sentinel):
+         return False, f"campaign sentinel active: {sentinel}"
+ 
+-    # PID alive check
+-    pid_file = Path("data/logs") / f"{name.replace('_worker', '_worker')}.pid"
+-    # Try common patterns
+-    for candidate in [
+-        Path("data/logs") / f"{name}.pid",
+-        Path("data/logs") / f"{name.replace('_worker', '')}_worker.pid",
+-    ]:
+-        if candidate.exists():
+-            pid_file = candidate
+-            break
+-    if worker_pid_alive(pid_file):
+-        return False, f"worker already running (PID file: {pid_file})"
++    # PID alive check — auto-clean stale files
++    pid_name = cfg.get("pid_file_name", name)
++    pid_file = Path("data/logs") / f"{pid_name}.pid"
++    if pid_file.exists():
++        if worker_pid_alive(pid_file):
++            return False, f"worker already running (PID file: {pid_file})"
++        else:
++            # Stale PID file — process is dead, clean up so we don't block forever
++            try:
++                stale_pid = pid_file.read_text(encoding="utf-8").strip()
++                pid_file.unlink(missing_ok=True)
++                logger.info("Worker %s: removed stale PID file %s (dead PID %s)", name, pid_file, stale_pid)
++            except OSError as exc:
++                logger.warning("Worker %s: could not remove stale PID file %s: %s", name, pid_file, exc)
+ 
+     # Cooldown
+     last_launch = state.get("last_launch", {}).get(name, 0.0)
+@@ -272,17 +286,17 @@ def run_check_cycle(
+                 launched.append(name)
+                 logger.info("Worker %s: launched (%s)", name, reason)
+         else:
+-            logger.debug("Worker %s: skipped (%s)", name, reason)
++            logger.info("Worker %s: skipped (%s)", name, reason)
+ 
+     if not launched:
+-        logger.info("No work available — all triggers inactive")
++        logger.info("No workers launched this cycle")
+         _append_event({
+             "ts": datetime.now(timezone.utc).isoformat(),
+             "event": "no_work_available",
+         })
+ 
+     # Mark completed workers for next cycle's worker_completed triggers
+-    state["recently_completed_workers"] = launched
++    state["recently_launched_workers"] = launched
+     state["last_check_time"] = time.time()
+ 
+     return launched
+@@ -426,6 +440,12 @@ def main() -> None:
+         format="%(asctime)s %(name)s [%(levelname)s] %(message)s",
+     )
+ 
++    # Anchor CWD to project root regardless of how the orchestrator was launched.
++    # All worker file paths (queues, state, PID files) are relative to the project root.
++    _project_root = Path(__file__).resolve().parent.parent.parent
++    os.chdir(_project_root)
++    logger.info("Working directory anchored to: %s", _project_root)
++
+     registry = load_worker_registry(args.config)
+     state = _load_state()
+ 
+diff --git a/tests/unit/workers/test_orchestrator_triggers.py b/tests/unit/workers/test_orchestrator_triggers.py
+index aac391d..77c2c79 100644
+--- a/tests/unit/workers/test_orchestrator_triggers.py
++++ b/tests/unit/workers/test_orchestrator_triggers.py
+@@ -14,7 +14,7 @@ def _make_state(**overrides):
+         "last_check_time": time.time() - 600,
+         "last_launch": {},
+         "launch_history": [],
+-        "recently_completed_workers": [],
++        "recently_launched_workers": [],
+         "running_count": {},
+     }
+     state.update(overrides)
+@@ -84,14 +84,14 @@ class TestEvaluateTrigger:
+         from src.workers.worker_orchestrator import evaluate_trigger
+ 
+         trigger = {"type": "worker_completed", "worker": "content_worker"}
+-        state = {"recently_completed_workers": ["content_worker"]}
++        state = {"recently_launched_workers": ["content_worker"]}
+         assert evaluate_trigger(trigger, state) is True
+ 
+     def test_worker_not_completed(self):
+         from src.workers.worker_orchestrator import evaluate_trigger
+ 
+         trigger = {"type": "worker_completed", "worker": "content_worker"}
+-        state = {"recently_completed_workers": []}
++        state = {"recently_launched_workers": []}
+         assert evaluate_trigger(trigger, state) is False
+ 
+     def test_multi_any_fires(self, tmp_path):
+@@ -106,7 +106,7 @@ class TestEvaluateTrigger:
+                 {"type": "worker_completed", "worker": "nope"},
+             ],
+         }
+-        assert evaluate_trigger(trigger, {"recently_completed_workers": []}) is True
++        assert evaluate_trigger(trigger, {"recently_launched_workers": []}) is True
+ 
+     def test_multi_none_fires(self, tmp_path):
+         from src.workers.worker_orchestrator import evaluate_trigger
+@@ -118,7 +118,7 @@ class TestEvaluateTrigger:
+                 {"type": "worker_completed", "worker": "nope"},
+             ],
+         }
+-        assert evaluate_trigger(trigger, {"recently_completed_workers": []}) is False
++        assert evaluate_trigger(trigger, {"recently_launched_workers": []}) is False
+ 
+     def test_unknown_trigger_returns_false(self):
+         from src.workers.worker_orchestrator import evaluate_trigger
+@@ -199,11 +199,14 @@ class TestShouldLaunch:
+         assert ok is True
+         assert "trigger fired" in reason
+ 
+-    def test_live_pid_blocks(self, tmp_path):
++    def test_live_pid_blocks(self, tmp_path, monkeypatch):
+         from src.workers.worker_orchestrator import should_launch
+ 
+-        pid_file = tmp_path / "w.pid"
+-        pid_file.write_text(str(os.getpid()))  # current process is alive
++        # Create PID file at the relative path the orchestrator looks for: data/logs/w.pid
++        pid_dir = tmp_path / "data" / "logs"
++        pid_dir.mkdir(parents=True)
++        (pid_dir / "w.pid").write_text(str(os.getpid()))
++        monkeypatch.chdir(tmp_path)
+ 
+         q = tmp_path / "q.jsonl"
+         q.write_text('{"x":1}\n')
+@@ -212,7 +215,6 @@ class TestShouldLaunch:
+             cooldown_seconds=0,
+         )
+         state = _make_state()
+-        # Patch the PID file lookup to find our tmp file
+         with patch("src.workers.worker_orchestrator.worker_pid_alive", return_value=True):
+             ok, reason = should_launch("w", cfg, state)
+         assert ok is False

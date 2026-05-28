@@ -1,0 +1,12 @@
+=== worker_events.jsonl tail (last 5 lines) ===
+{"ts": "2026-05-28T06:29:54.091613+00:00", "event": "dry_run_launch", "worker": "content_worker", "command": ".venv/Scripts/python.exe -m src.workers.autonomous_content_translation_worker --mode oneshot"}
+{"ts": "2026-05-28T06:29:54.152861+00:00", "event": "dry_run_launch", "worker": "tm_improvement_worker", "command": ".venv/Scripts/python.exe -m src.workers.tm_improvement_worker --mode oneshot"}
+{"ts": "2026-05-28T06:30:21.145847+00:00", "event": "dry_run_launch", "worker": "content_worker", "command": ".venv/Scripts/python.exe -m src.workers.autonomous_content_translation_worker --mode oneshot"}
+{"ts": "2026-05-28T06:30:21.195205+00:00", "event": "dry_run_launch", "worker": "tm_improvement_worker", "command": ".venv/Scripts/python.exe -m src.workers.tm_improvement_worker --mode oneshot"}
+{"ts": "2026-05-28T06:30:21.212127+00:00", "event": "dry_run_launch", "worker": "verification_worker", "command": ".venv/Scripts/python.exe -m src.workers.autonomous_verification_worker --mode oneshot"}
+
+=== event log file path ===
+/c/Users/prora/OneDrive/Documents/GitHub/hugo-translator-gitlab/data/logs/worker_events.jsonl
+
+=== lines written today (2026-05-28) ===
+8

@@ -1,0 +1,25 @@
+=== PREFLIGHT OUTPUTS ===
+timestamp: 2026-05-28T06:28:28Z
+
+=== pwd ===
+/c/Users/prora/OneDrive/Documents/GitHub/hugo-translator-gitlab
+
+=== git status --short ===
+ M config/site_profiles/docs.aspose.org.yaml
+ M config/site_profiles/reference.aspose.org.yaml
+
+=== git branch ===
+main
+
+=== git log -3 --oneline ===
+7790cae fix(orchestrator): resolve 6 root causes behind silent no-work cycles
+e7de521 test(scope): prove real worker-path chain and strengthen forwarding tests
+f946975 fix(scope): prove and complete family-aware translator metrics pipeline
+
+=== python --version ===
+Python 3.13.2
+
+=== dirty file classification ===
+config/site_profiles/docs.aspose.org.yaml     : PRE-EXISTING, expected, not to be staged
+config/site_profiles/reference.aspose.org.yaml: PRE-EXISTING, expected, not to be staged
+No unexpected dirty files.
