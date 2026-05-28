@@ -17,6 +17,10 @@ cd /d "%~dp0.."
 REM Activate virtual environment
 call .venv\Scripts\activate.bat
 
+REM Set content repository paths (required by content_worker and git_context)
+set ASPOSE_NET_CONTENT=C:\Users\prora\OneDrive\Documents\GitHub\aspose.net\content
+set ASPOSE_ORG_CONTENT=C:\Users\prora\OneDrive\Documents\GitHub\aspose.org\content
+
 REM Start orchestrator in daemon mode (default 15-minute check interval)
 echo Starting orchestrator...
 echo - Check interval: 900 seconds (15 minutes)
