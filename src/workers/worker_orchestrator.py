@@ -214,6 +214,12 @@ def launch_worker(
         return False
 
     parts = cmd.split()
+    # On Windows, Popen with shell=False does not resolve relative executable
+    # paths against CWD.  Resolve to absolute so CreateProcess can find it.
+    if parts:
+        exe = Path(parts[0])
+        if not exe.is_absolute() and exe.exists():
+            parts[0] = str(exe.resolve())
     now = time.time()
 
     if dry_run:
