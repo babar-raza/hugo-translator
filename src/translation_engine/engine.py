@@ -3558,8 +3558,8 @@ class TranslationEngine:
                             _fm_not_applied.append((_fm_key, _expected[:40], str(_actual)[:40]))
                 if _fm_not_applied:
                     logger.warning(
-                        "frontmatter_segment_not_applied",
-                        keys=[k for k, _, _ in _fm_not_applied],
+                        "frontmatter_segment_not_applied: keys=%s",
+                        [k for k, _, _ in _fm_not_applied],
                     )
 
                 # RC-3 FIX: Verify frontmatter keys were not translated.

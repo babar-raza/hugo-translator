@@ -167,25 +167,19 @@ class TestOffloadResourcesCudaFlush(unittest.TestCase):
     def test_calls_empty_cache_when_cuda_available(self):
         """Must call torch.cuda.empty_cache() when CUDA is available."""
         worker = _make_worker()
-        torch_stub = sys.modules["torch"]
-        torch_stub.cuda.is_available.return_value = True
-        torch_stub.cuda.empty_cache.reset_mock()
-
-        with patch("gc.collect"):
+        empty_cache_mock = MagicMock()
+        with patch("gc.collect"), \
+             patch("torch.cuda.is_available", return_value=True), \
+             patch("torch.cuda.empty_cache", empty_cache_mock):
             worker._offload_resources()
-
-        torch_stub.cuda.empty_cache.assert_called_once()
+        empty_cache_mock.assert_called_once()
 
     def test_does_not_crash_when_torch_absent(self):
         """Must silently pass when torch is not installed (ImportError path)."""
         worker = _make_worker()
-        saved = sys.modules.pop("torch", None)
-        try:
-            with patch("gc.collect"):
-                worker._offload_resources()  # should not raise
-        finally:
-            if saved is not None:
-                sys.modules["torch"] = saved
+        with patch("gc.collect"), \
+             patch.dict(sys.modules, {"torch": None}):
+            worker._offload_resources()  # should not raise
 
 
 if __name__ == "__main__":

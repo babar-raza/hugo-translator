@@ -102,39 +102,29 @@ class TestOffloadModelsWithLoadedModels(unittest.TestCase):
     def test_calls_empty_cache_when_cuda_available(self):
         """Must call torch.cuda.empty_cache() when CUDA is available."""
         worker = self._make_worker_with_models()
-        torch_stub = sys.modules["torch"]
-        torch_stub.cuda.is_available.return_value = True
-        torch_stub.cuda.empty_cache.reset_mock()
-        with patch("gc.collect"):
+        empty_cache_mock = MagicMock()
+        with patch("gc.collect"), \
+             patch("torch.cuda.is_available", return_value=True), \
+             patch("torch.cuda.empty_cache", empty_cache_mock):
             worker._offload_models()
-        torch_stub.cuda.empty_cache.assert_called_once()
+        empty_cache_mock.assert_called_once()
 
     def test_does_not_crash_when_torch_import_fails(self):
         """Must not raise even if torch is unavailable (ImportError is silenced)."""
         worker = self._make_worker_with_models()
-        saved = sys.modules.pop("torch", None)
-        try:
-            with patch("gc.collect"):
-                worker._offload_models()  # should not raise
-        finally:
-            if saved is not None:
-                sys.modules["torch"] = saved
+        with patch("gc.collect"), \
+             patch.dict(sys.modules, {"torch": None}):
+            worker._offload_models()  # should not raise
 
     def test_empty_cache_not_called_when_cuda_unavailable(self):
         """Must not call empty_cache() when CUDA is unavailable."""
         worker = self._make_worker_with_models()
-        torch_stub = sys.modules.get("torch")
-        if torch_stub is None:
-            self.skipTest("torch stub not in sys.modules")
-        orig = torch_stub.cuda.is_available
-        torch_stub.cuda.is_available = MagicMock(return_value=False)
-        torch_stub.cuda.empty_cache.reset_mock()
-        try:
-            with patch("gc.collect"):
-                worker._offload_models()
-        finally:
-            torch_stub.cuda.is_available = orig
-        torch_stub.cuda.empty_cache.assert_not_called()
+        empty_cache_mock = MagicMock()
+        with patch("gc.collect"), \
+             patch("torch.cuda.is_available", return_value=False), \
+             patch("torch.cuda.empty_cache", empty_cache_mock):
+            worker._offload_models()
+        empty_cache_mock.assert_not_called()
 
 
 if __name__ == "__main__":

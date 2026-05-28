@@ -394,16 +394,10 @@ def test_execute_improvement_run_preflight_check_aborts_high_usage(
     worker.llm_client = mock_dependencies["llm"]
     worker._llm_unavailable = False
 
-    # Mock high GPU usage
-    mock_gpu_manager = Mock()
-    mock_gpu_info = Mock()
-    mock_gpu_info.total_mb = 8192
-    mock_gpu_info.used_mb = 5120  # 62.5% usage (above 60% threshold)
-    mock_gpu_manager.get_gpu_memory.return_value = mock_gpu_info
-
-    worker.gpu_manager = mock_gpu_manager
-
-    result = worker._execute_improvement_run()
+    # Mock _check_gpu_usage directly — avoids torch.cuda.is_available() dependency
+    # (the real torch reports CUDA unavailable on CPU-only machines, bypassing the check)
+    with patch.object(worker, "_check_gpu_usage", return_value=62.5):
+        result = worker._execute_improvement_run()
 
     assert result["status"] == "aborted"
     assert result["reason"] == "gpu_usage_high"

@@ -46,6 +46,9 @@ def _make_engine(purity_threshold_overrides=None, config_raises=False):
     mock_self._get_purity_threshold = (
         lambda lang: TranslationEngine._get_purity_threshold(mock_self, lang)
     )
+    # Bind the real _should_skip_purity_segment static method — MagicMock would
+    # return a truthy Mock, skipping all paragraphs and causing early "no content" return.
+    mock_self._should_skip_purity_segment = TranslationEngine._should_skip_purity_segment
     return mock_self
 
 
