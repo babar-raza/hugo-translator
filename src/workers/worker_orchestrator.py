@@ -327,15 +327,10 @@ def print_status(
     for name, cfg in workers.items():
         w: dict[str, Any] = {"enabled": cfg.get("enabled", True)}
 
-        # PID alive check
-        pid_file = None
-        for candidate in [
-            Path("data/logs") / f"{name}.pid",
-            Path("data/logs") / f"{name.replace('_worker', '')}_worker.pid",
-        ]:
-            if candidate.exists():
-                pid_file = candidate
-                break
+        # PID alive check — respect pid_file_name override from workers.yaml
+        pid_name = cfg.get("pid_file_name", name)
+        pid_file_candidate = Path("data/logs") / f"{pid_name}.pid"
+        pid_file = pid_file_candidate if pid_file_candidate.exists() else None
         if pid_file and pid_file.exists():
             try:
                 pid = int(pid_file.read_text(encoding="utf-8").strip())
@@ -439,11 +434,18 @@ def main() -> None:
                         help="Evaluate triggers but do not launch workers")
     parser.add_argument("--log-level", default="INFO",
                         choices=["DEBUG", "INFO", "WARNING", "ERROR"])
+    parser.add_argument("--log-file", default=None,
+                        help="Append log output to this file in addition to stderr")
     args = parser.parse_args()
 
+    handlers: list[logging.Handler] = [logging.StreamHandler()]
+    if args.log_file:
+        Path(args.log_file).parent.mkdir(parents=True, exist_ok=True)
+        handlers.append(logging.FileHandler(args.log_file, encoding="utf-8"))
     logging.basicConfig(
         level=getattr(logging, args.log_level),
         format="%(asctime)s %(name)s [%(levelname)s] %(message)s",
+        handlers=handlers,
     )
 
     # Anchor CWD to project root regardless of how the orchestrator was launched.
