@@ -31,7 +31,7 @@ class ModelInfo:
     local_path: Path | None = None
     hf_model_id: str | None = None  # HuggingFace model ID
     description: str | None = None
-    max_new_tokens: int = 256  # TR-01: Reduced from 512 to 256 for memory efficiency
+    max_new_tokens: int = 512  # TR-01 reverted: 256 caused truncation → wrong-language purity failures
 
     # LLM-specific fields (only used when backend="llm" or "local_llm")
     provider: str | None = None          # "ollama" | "openai" | "anthropic" | "openai_compatible"

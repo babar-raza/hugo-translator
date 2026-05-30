@@ -24,6 +24,12 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+try:
+    from dotenv import load_dotenv as _load_dotenv
+    _HAVE_DOTENV = True
+except ImportError:
+    _HAVE_DOTENV = False
+
 from src.utils.config_loader import load_worker_registry
 from src.workers.queue_probes import (
     config_changed_since,
@@ -173,6 +179,16 @@ def should_launch(
                 logger.info("Worker %s: removed stale PID file %s (dead PID %s)", name, pid_file, stale_pid)
             except OSError as exc:
                 logger.warning("Worker %s: could not remove stale PID file %s: %s", name, pid_file, exc)
+            # Update state file so it no longer shows "starting" after a crash
+            try:
+                from src.workers.worker_state import load_worker_state, record_worker_state
+                ws = load_worker_state(name)
+                if ws.get("state") not in ("stopped", ""):
+                    record_worker_state(name, "stopped",
+                                       error="process found dead on orchestrator startup check")
+                    logger.info("Worker %s: state file updated to stopped (dead process cleanup)", name)
+            except Exception as _exc:
+                logger.debug("Worker %s: could not update state file: %s", name, _exc)
 
     # Cooldown
     last_launch = state.get("last_launch", {}).get(name, 0.0)
@@ -448,6 +464,24 @@ def main() -> None:
         handlers=handlers,
     )
 
+    # Load .env so ASPOSE_NET_CONTENT / ASPOSE_ORG_CONTENT enter os.environ
+    # and are inherited by all subprocess workers launched by this orchestrator.
+    if _HAVE_DOTENV:
+        _env_file = Path(__file__).resolve().parent.parent.parent / ".env"
+        if _env_file.exists():
+            _load_dotenv(_env_file, override=False)
+            logger.info("Loaded environment from %s", _env_file)
+    else:
+        logger.warning("python-dotenv not installed — .env file not loaded")
+
+    for _var in ("ASPOSE_NET_CONTENT", "ASPOSE_ORG_CONTENT"):
+        if not os.environ.get(_var):
+            logger.warning(
+                "Required env var %s is not set — content_worker will skip all sites. "
+                "Add it to .env",
+                _var,
+            )
+
     # Anchor CWD to project root regardless of how the orchestrator was launched.
     # All worker file paths (queues, state, PID files) are relative to the project root.
     _project_root = Path(__file__).resolve().parent.parent.parent
@@ -471,16 +505,27 @@ def main() -> None:
     # Daemon loop
     logger.info("Orchestrator starting (check-interval=%ds, dry-run=%s)",
                 args.check_interval, args.dry_run)
-    try:
-        while True:
+    while True:
+        try:
             launched = run_check_cycle(registry, state, dry_run=args.dry_run)
             _save_state(state)
             if launched:
                 logger.info("Launched workers: %s", ", ".join(launched))
-            time.sleep(args.check_interval)
-    except KeyboardInterrupt:
-        logger.info("Orchestrator stopped by user")
-        _save_state(state)
+        except KeyboardInterrupt:
+            logger.info("Orchestrator stopped by user")
+            _save_state(state)
+            sys.exit(0)
+        except Exception as exc:
+            logger.error(
+                "Unhandled error in check cycle — retrying in 60s: %s", exc, exc_info=True
+            )
+            _append_event({
+                "ts": datetime.now(timezone.utc).isoformat(),
+                "event": "cycle_error",
+                "error": str(exc),
+            })
+            time.sleep(60)
+        time.sleep(args.check_interval)
 
 
 if __name__ == "__main__":
