@@ -180,3 +180,49 @@ class TestWALMode:
         conn.close()
         assert mode == "wal"
         tracker.close()
+
+
+class TestRegressionDetectionEndToEnd:
+    """TC-FIX-09: Proves rejection→run_history→regression chain works end-to-end."""
+
+    def test_regression_detection_wired_with_real_data(self) -> None:
+        """Regression alert fires when acceptance drops significantly from stable baseline."""
+        tracker = RunHistoryTracker(":memory:")
+        # Stable baseline: 5 runs at 0.95
+        for _ in range(5):
+            tracker.record_outcome(_make_outcome(acceptance_rate=0.95))
+        # Sharp drop: 1 recent run at 0.60 (delta = 0.35, threshold = 0.15)
+        tracker.record_outcome(_make_outcome(acceptance_rate=0.60))
+
+        alert = tracker.detect_regression("docs.aspose.net", "de", threshold=0.15)
+        assert alert is not None, "Expected regression alert to fire after acceptance drop"
+        assert alert.delta >= 0.15, f"Expected delta >= 0.15, got {alert.delta}"
+        assert alert.current_rate == pytest.approx(0.60, abs=0.05)
+        assert alert.site_id == "docs.aspose.net"
+        assert alert.target_lang == "de"
+
+    def test_acceptance_rate_reflects_failed_files(self) -> None:
+        """acceptance_rate stored correctly when files_rejected > 0 (not always 1.0)."""
+        tracker = RunHistoryTracker(":memory:")
+        outcome = RunOutcome(
+            run_id=str(uuid.uuid4()),
+            site_id="docs.aspose.net",
+            target_lang="de",
+            timestamp=datetime.now(timezone.utc).isoformat(),
+            files_attempted=10,
+            files_accepted=7,
+            files_rejected=3,
+            files_skipped=0,
+            retry_count=0,
+            acceptance_rate=0.7,
+            dominant_failure_type=None,
+            elapsed_seconds=1.0,
+        )
+        tracker.record_outcome(outcome)
+        results = tracker.get_recent_outcomes("docs.aspose.net", "de", limit=5)
+        assert len(results) == 1
+        assert results[0].acceptance_rate == pytest.approx(0.7)
+        assert results[0].files_rejected == 3
+        # Regression should NOT fire on a single run with no baseline
+        alert = tracker.detect_regression("docs.aspose.net", "de", threshold=0.15)
+        assert alert is None, "No regression expected with only 1 run (no baseline)"

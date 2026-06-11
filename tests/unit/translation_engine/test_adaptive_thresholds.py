@@ -1,12 +1,15 @@
-"""Tests for AdaptiveThresholdProvider (TC-AGENT-03 + TC-FIX-01)."""
+"""Tests for AdaptiveThresholdProvider (TC-AGENT-03 + TC-FIX-01 + TC-FIX-08)."""
 
 from __future__ import annotations
 
+import datetime
+import uuid
 from dataclasses import dataclass, field
 from unittest.mock import MagicMock
 
 import pytest
 
+from src.observability.run_history import RunHistoryTracker, RunOutcome
 from src.translation_engine.validation.base import (
     ValidationIssue,
     ValidationResult,
@@ -197,3 +200,75 @@ class TestMakeDecisionUsesAdaptiveThreshold:
         )
         # Provider should NOT have been called (no site_id passed)
         provider._run_history.get_recent_outcomes.assert_not_called()
+
+
+def _make_run_outcome(site_id: str, target_lang: str, acceptance_rate: float) -> RunOutcome:
+    """Helper: create a RunOutcome with the given acceptance_rate."""
+    accepted = int(acceptance_rate * 10)
+    rejected = 10 - accepted
+    return RunOutcome(
+        run_id=str(uuid.uuid4()),
+        site_id=site_id,
+        target_lang=target_lang,
+        timestamp=datetime.datetime.utcnow().isoformat(),
+        files_attempted=10,
+        files_accepted=accepted,
+        files_rejected=rejected,
+        files_skipped=0,
+        retry_count=0,
+        acceptance_rate=acceptance_rate,
+        dominant_failure_type=None,
+        elapsed_seconds=1.0,
+    )
+
+
+class TestAdaptiveThresholdEndToEnd:
+    """TC-FIX-08: Full chain with real :memory: SQLite RunHistoryTracker."""
+
+    def test_end_to_end_with_real_run_history_in_memory(self) -> None:
+        """Low acceptance history loosens threshold; 3 errors NOT rejected when adapted to 4."""
+        tracker = RunHistoryTracker(db_path=":memory:")
+        # Record 10 outcomes with low acceptance (0.60) — should loosen threshold by 1
+        for _ in range(10):
+            tracker.record_outcome(_make_run_outcome("docs.aspose.net", "de", 0.60))
+
+        provider = AdaptiveThresholdProvider(
+            run_history=tracker,
+            config={"enabled": True, "min_history_runs": 5, "max_delta": 1},
+        )
+        # Static = 3; provider should return 4 (low acceptance → loosen by 1)
+        engine = ValidationDecisionEngine(
+            {"decision_rules": {"reject_on_error_count": 3, "max_retry_attempts": 0}},
+            adaptive_provider=provider,
+        )
+        # 3 errors: with static=3 → REJECT; with adapted=4 → RETRY or ACCEPT
+        vr = _make_validation_result(error_count=3)
+        decision = engine.make_decision(
+            vr, retry_count=0, source="src", site_id="docs.aspose.net", target_lang="de"
+        )
+        assert decision.decision != ValidationDecision.REJECT, (
+            f"Expected non-REJECT with adapted threshold=4, got {decision.decision} — "
+            f"end-to-end adaptive chain did not produce the correct outcome"
+        )
+
+    def test_end_to_end_enabled_false_uses_static(self) -> None:
+        """With enabled=False, provider is bypassed; 3 errors with static=3 → REJECT."""
+        tracker = RunHistoryTracker(db_path=":memory:")
+        for _ in range(10):
+            tracker.record_outcome(_make_run_outcome("docs.aspose.net", "de", 0.60))
+
+        provider = AdaptiveThresholdProvider(
+            run_history=tracker,
+            config={"enabled": False, "min_history_runs": 5, "max_delta": 1},
+        )
+        engine = ValidationDecisionEngine(
+            {"decision_rules": {"reject_on_error_count": 3, "max_retry_attempts": 0}},
+            adaptive_provider=provider,
+        )
+        vr = _make_validation_result(error_count=3)
+        decision = engine.make_decision(
+            vr, retry_count=0, source="src", site_id="docs.aspose.net", target_lang="de"
+        )
+        assert decision.decision == ValidationDecision.REJECT, (
+            f"Expected REJECT with enabled=False static threshold=3, got {decision.decision}"
+        )

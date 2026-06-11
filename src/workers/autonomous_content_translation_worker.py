@@ -1183,31 +1183,30 @@ class AutonomousContentTranslationWorker:
                 _cov_skipped += getattr(result, "completion_filter_skipped", 0)
 
                 # Log rejection rate for validation monitoring
-                try:
-                    agg = result.aggregate_stats
-                    rejected = getattr(agg, "rejected_count", 0) or 0
-                    if rejected > 0 and result.total_files > 0:
-                        rej_rate = rejected / result.total_files * 100
-                        logger.info(
-                            "Chunk %d rejection rate: %d/%d (%.1f%%)",
-                            chunk_idx,
-                            rejected,
-                            result.total_files,
-                            rej_rate,
-                        )
-                        if rej_rate > 10:
-                            logger.warning(
-                                "High rejection rate %.1f%% in chunk %d — check validation config",
-                                rej_rate,
-                                chunk_idx,
-                            )
-                    # TC-FIX-03: Accumulate run-level rejection/attempt counters
-                    self._run_rejected_files = getattr(self, "_run_rejected_files", 0) + rejected
-                    self._run_attempted_files = (
-                        getattr(self, "_run_attempted_files", 0) + result.total_files
+                # TC-FIX-06: Use result.failed_files (DirectoryResult field, incremented on
+                # rejection) instead of getattr(agg, "rejected_count", 0) which always returns 0
+                # because TranslationStats has no rejected_count field.
+                rejected = result.failed_files or 0
+                if rejected > 0 and result.total_files > 0:
+                    rej_rate = rejected / result.total_files * 100
+                    logger.info(
+                        "Chunk %d rejection rate: %d/%d (%.1f%%)",
+                        chunk_idx,
+                        rejected,
+                        result.total_files,
+                        rej_rate,
                     )
-                except (AttributeError, TypeError):
-                    pass  # Gracefully handle incomplete result objects
+                    if rej_rate > 10:
+                        logger.warning(
+                            "High rejection rate %.1f%% in chunk %d — check validation config",
+                            rej_rate,
+                            chunk_idx,
+                        )
+                # TC-FIX-06: Accumulate run-level rejection/attempt counters
+                self._run_rejected_files = getattr(self, "_run_rejected_files", 0) + rejected
+                self._run_attempted_files = (
+                    getattr(self, "_run_attempted_files", 0) + result.total_files
+                )
 
                 # BUG-2 FIX: Accumulate successful file count for run-level health tracking
                 _site_files = getattr(self, "_run_new_files", {})
@@ -1285,20 +1284,21 @@ class AutonomousContentTranslationWorker:
             _cov_skipped += getattr(result, "completion_filter_skipped", 0)
 
             # Log rejection rate for validation monitoring
-            try:
-                agg = result.aggregate_stats
-                rejected = getattr(agg, "rejected_count", 0) or 0
-                if rejected > 0 and result.total_files > 0:
-                    rej_rate = rejected / result.total_files * 100
-                    logger.info(
-                        "Rejection rate: %d/%d (%.1f%%)", rejected, result.total_files, rej_rate
-                    )
-                    if rej_rate > 10:
-                        logger.warning(
-                            "High rejection rate %.1f%% — check validation config", rej_rate
-                        )
-            except (AttributeError, TypeError):
-                pass  # Gracefully handle incomplete result objects
+            # TC-FIX-07: Use result.failed_files and accumulate into run-level counters
+            # (single-pass path previously used getattr(agg, "rejected_count", 0) which always
+            # returns 0, and also had no _run_rejected_files accumulation at all)
+            rejected = result.failed_files or 0
+            if rejected > 0 and result.total_files > 0:
+                rej_rate = rejected / result.total_files * 100
+                logger.info(
+                    "Rejection rate: %d/%d (%.1f%%)", rejected, result.total_files, rej_rate
+                )
+                if rej_rate > 10:
+                    logger.warning("High rejection rate %.1f%% — check validation config", rej_rate)
+            self._run_rejected_files = getattr(self, "_run_rejected_files", 0) + rejected
+            self._run_attempted_files = (
+                getattr(self, "_run_attempted_files", 0) + result.total_files
+            )
 
             # BUG-2 FIX: Accumulate successful file count for run-level health tracking
             _site_files = getattr(self, "_run_new_files", {})
