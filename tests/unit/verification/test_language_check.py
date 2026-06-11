@@ -9,6 +9,7 @@ Tests:
 - Short strings skipped
 - Confidence thresholds
 """
+
 from unittest.mock import patch
 
 import pytest

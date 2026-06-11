@@ -154,9 +154,29 @@ def test_bm02_detect_outliers_zscore():
     """Test Z-score outlier detection."""
     # Use many clustered values to minimize masking effect of the outlier
     # With 20 values at ~10 and one extreme, the z-score threshold is met
-    values = [10.0, 10.1, 9.9, 10.0, 10.2, 9.8, 10.0, 10.1, 9.9, 10.0,
-              10.0, 10.1, 9.9, 10.0, 10.2, 9.8, 10.0, 10.1, 9.9, 10.0,
-              100.0]  # Index 20 - extreme outlier
+    values = [
+        10.0,
+        10.1,
+        9.9,
+        10.0,
+        10.2,
+        9.8,
+        10.0,
+        10.1,
+        9.9,
+        10.0,
+        10.0,
+        10.1,
+        9.9,
+        10.0,
+        10.2,
+        9.8,
+        10.0,
+        10.1,
+        9.9,
+        10.0,
+        100.0,
+    ]  # Index 20 - extreme outlier
     #         ^outlier (z > 3 with many clustered values)
 
     outliers = BenchmarkStatistics.detect_outliers(values, method="zscore")

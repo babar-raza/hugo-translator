@@ -8,6 +8,7 @@ Tests cover:
 4. Missing torch module (ImportError handling)
 5. Path sanitization (no username leakage)
 """
+
 import json
 from unittest.mock import Mock, patch
 
@@ -336,7 +337,10 @@ class TestGPUMemoryHelpers:
         mock_torch = Mock()
         mock_torch.cuda.is_available.return_value = True
         mock_torch.cuda.device_count.return_value = 1
-        mock_torch.cuda.mem_get_info.return_value = (4096 * 1024**2, 8192 * 1024**2)  # 4GB free, 8GB total
+        mock_torch.cuda.mem_get_info.return_value = (
+            4096 * 1024**2,
+            8192 * 1024**2,
+        )  # 4GB free, 8GB total
 
         with patch.dict("sys.modules", {"torch": mock_torch}):
             result = SystemInfoCollector.get_available_gpu_memory_mb(device_id=0)
@@ -379,7 +383,10 @@ class TestGPUMemoryHelpers:
         mock_torch = Mock()
         mock_torch.cuda.is_available.return_value = True
         mock_torch.cuda.device_count.return_value = 1
-        mock_torch.cuda.mem_get_info.return_value = (4096 * 1024**2, 8192 * 1024**2)  # 4GB free, 8GB total
+        mock_torch.cuda.mem_get_info.return_value = (
+            4096 * 1024**2,
+            8192 * 1024**2,
+        )  # 4GB free, 8GB total
         mock_torch.cuda.memory_allocated.return_value = 2048 * 1024**2  # 2GB allocated
         mock_torch.cuda.memory_reserved.return_value = 3072 * 1024**2  # 3GB reserved
 
@@ -387,11 +394,11 @@ class TestGPUMemoryHelpers:
             result = SystemInfoCollector.get_gpu_memory_stats(device_id=0)
 
         assert result is not None
-        assert result['total_mb'] == pytest.approx(8192.0, rel=0.01)
-        assert result['free_mb'] == pytest.approx(4096.0, rel=0.01)
-        assert result['used_mb'] == pytest.approx(4096.0, rel=0.01)  # 8192 - 4096
-        assert result['allocated_mb'] == pytest.approx(2048.0, rel=0.01)
-        assert result['reserved_mb'] == pytest.approx(3072.0, rel=0.01)
+        assert result["total_mb"] == pytest.approx(8192.0, rel=0.01)
+        assert result["free_mb"] == pytest.approx(4096.0, rel=0.01)
+        assert result["used_mb"] == pytest.approx(4096.0, rel=0.01)  # 8192 - 4096
+        assert result["allocated_mb"] == pytest.approx(2048.0, rel=0.01)
+        assert result["reserved_mb"] == pytest.approx(3072.0, rel=0.01)
 
         mock_torch.cuda.mem_get_info.assert_called_once_with(0)
         mock_torch.cuda.memory_allocated.assert_called_once_with(0)
@@ -441,7 +448,7 @@ class TestGPUMemoryHelpers:
             result = SystemInfoCollector.get_gpu_memory_stats(device_id=0)
 
         assert result is not None
-        assert result['total_mb'] == pytest.approx(8192.0, rel=0.01)
+        assert result["total_mb"] == pytest.approx(8192.0, rel=0.01)
         mock_torch.cuda.mem_get_info.assert_called_with(0)
 
 

@@ -31,6 +31,7 @@ from src.model_runtime.registry import ModelInfo
 # Fixtures
 # ---------------------------------------------------------------------------
 
+
 @pytest.fixture
 def ollama_model_info():
     """ModelInfo for a local Ollama LLM."""
@@ -132,6 +133,7 @@ def professionalize_model_info():
 # Contract Tests
 # ---------------------------------------------------------------------------
 
+
 class TestContracts:
     """Tests for Pydantic contract models."""
 
@@ -197,6 +199,7 @@ class TestContracts:
 # ---------------------------------------------------------------------------
 # ModelInfo LLM Field Tests
 # ---------------------------------------------------------------------------
+
 
 class TestModelInfoLLMFields:
     """Tests for ModelInfo with LLM-specific fields."""
@@ -274,12 +277,14 @@ class TestModelInfoLLMFields:
 # Provider Factory Tests
 # ---------------------------------------------------------------------------
 
+
 class TestProviderFactory:
     """Tests for create_provider factory."""
 
     def test_create_ollama_provider(self):
         config = LLMProviderConfig(
-            provider="ollama", model_name="qwen3:14b",
+            provider="ollama",
+            model_name="qwen3:14b",
             base_url="http://localhost:11434",
         )
         # OllamaProvider.initialize() stores config — no network call
@@ -308,6 +313,7 @@ class TestProviderFactory:
 # ---------------------------------------------------------------------------
 # LLMModelBackend Tests
 # ---------------------------------------------------------------------------
+
 
 class TestLLMModelBackend:
     """Tests for LLMModelBackend conforming to ModelBackend interface."""
@@ -350,7 +356,9 @@ class TestLLMModelBackend:
         mock_provider = MagicMock()
         # Packed prompt returns [N] numbered output (single call)
         mock_provider.generate.return_value = (
-            "[1] Bonjour\n[2] Au revoir", 10, 7,
+            "[1] Bonjour\n[2] Au revoir",
+            10,
+            7,
         )
         backend._provider = mock_provider
 
@@ -367,7 +375,9 @@ class TestLLMModelBackend:
         mock_provider = MagicMock()
         # Packed prompt returns [N] numbered output (single call)
         mock_provider.generate.return_value = (
-            "[1] Bonjour\n[2] Au revoir", 11, 7,
+            "[1] Bonjour\n[2] Au revoir",
+            11,
+            7,
         )
         backend._provider = mock_provider
 
@@ -425,7 +435,9 @@ class TestLLMModelBackend:
         assert "French" in prompt
 
     def test_system_prompt_custom_template(self, ollama_model_info):
-        ollama_model_info.system_prompt_template = "Translate from {src_lang_name} to {tgt_lang_name}. Only output translation."
+        ollama_model_info.system_prompt_template = (
+            "Translate from {src_lang_name} to {tgt_lang_name}. Only output translation."
+        )
         backend = LLMModelBackend(ollama_model_info, device="api")
         prompt = backend._build_system_prompt("en", "de")
         assert prompt == "Translate from English to German. Only output translation."
@@ -440,6 +452,7 @@ class TestLLMModelBackend:
 # ---------------------------------------------------------------------------
 # ModelLoader Integration Tests
 # ---------------------------------------------------------------------------
+
 
 class TestModelLoaderLLMIntegration:
     """Tests that ModelLoader correctly routes to LLMModelBackend."""
@@ -484,6 +497,7 @@ class TestModelLoaderLLMIntegration:
 # ---------------------------------------------------------------------------
 # Language Names Coverage
 # ---------------------------------------------------------------------------
+
 
 class TestLanguageNames:
     """Test language name mapping coverage."""

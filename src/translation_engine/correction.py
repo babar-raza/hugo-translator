@@ -6,6 +6,7 @@ The corrected text is then re-validated through the normal pipeline.
 
 Config: ``correction_pass.enabled`` in global.yaml (default: false).
 """
+
 from __future__ import annotations
 
 import logging
@@ -52,7 +53,9 @@ def build_correction_prompt(
             sev_str = sev.value if hasattr(sev, "value") else str(sev)
             lines.append(f"{i}. [{sev_str}] {issue.message}")
         elif isinstance(issue, dict):
-            lines.append(f"{i}. [{issue.get('severity', 'error')}] {issue.get('message', str(issue))}")
+            lines.append(
+                f"{i}. [{issue.get('severity', 'error')}] {issue.get('message', str(issue))}"
+            )
         else:
             lines.append(f"{i}. {issue}")
 
@@ -78,8 +81,8 @@ def attempt_correction(
     Returns the corrected body text, or None if correction fails.
     """
     try:
-        from ..model_runtime.registry import ModelRegistry
         from ..model_runtime.llm_backend import LLMModelBackend
+        from ..model_runtime.registry import ModelRegistry
 
         registry = ModelRegistry()
         try:
@@ -91,9 +94,7 @@ def attempt_correction(
         backend = LLMModelBackend(model_info, device="api")
         backend.load()
 
-        prompt = build_correction_prompt(
-            source_body, translated_body, src_lang, tgt_lang, issues
-        )
+        prompt = build_correction_prompt(source_body, translated_body, src_lang, tgt_lang, issues)
 
         # Use the provider directly for a single-shot correction
         if backend._provider is None:
@@ -104,9 +105,7 @@ def attempt_correction(
             "You are a translation quality fixer. Fix only the issues listed. "
             "Output only the corrected translation text, nothing else."
         )
-        response, _in_tok, _out_tok = backend._provider.generate(
-            correction_system_prompt, prompt
-        )
+        response, _in_tok, _out_tok = backend._provider.generate(correction_system_prompt, prompt)
         if not response or not response.strip():
             logger.warning("Correction pass: empty response from LLM")
             return None
@@ -114,7 +113,10 @@ def attempt_correction(
         corrected = response.strip()
         logger.info(
             "Correction pass produced %d chars (was %d) for %s->%s",
-            len(corrected), len(translated_body), src_lang, tgt_lang,
+            len(corrected),
+            len(translated_body),
+            src_lang,
+            tgt_lang,
         )
         return corrected
 

@@ -1,4 +1,5 @@
 """Test single file translation with array reconstruction fix."""
+
 import os
 import sys
 from pathlib import Path
@@ -10,11 +11,9 @@ os.chdir(str(REPO_ROOT))
 
 import logging
 
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(levelname)s - %(message)s'
-)
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
+
 
 def test_single_translation():
     """Test translating the presentation-to-pdf-converter file."""
@@ -53,11 +52,7 @@ def test_single_translation():
     print("   OK: L3SemanticTM initialized")
 
     # Create TM
-    tm = TranslationMemory(
-        l1_cache=l1_cache,
-        l2_persistent=l2_persistent,
-        l3_semantic=l3_semantic
-    )
+    tm = TranslationMemory(l1_cache=l1_cache, l2_persistent=l2_persistent, l3_semantic=l3_semantic)
     print("   OK: TranslationMemory initialized")
 
     # Check GPU
@@ -74,15 +69,13 @@ def test_single_translation():
     print("   OK: ModelLoader initialized")
 
     # Initialize translation engine
-    engine = TranslationEngine(
-        config_service=config_service,
-        tm=tm,
-        model_loader=model_loader
-    )
+    engine = TranslationEngine(config_service=config_service, tm=tm, model_loader=model_loader)
     print("   OK: TranslationEngine initialized")
 
     # Test file
-    test_file = Path(r"D:\onedrive\Documents\GitHub\aspose.net\content\products.aspose.net\slides\en\presentation-to-pdf-converter\_index.md")
+    test_file = Path(
+        r"D:\onedrive\Documents\GitHub\aspose.net\content\products.aspose.net\slides\en\presentation-to-pdf-converter\_index.md"
+    )
 
     print("\n[2/4] Translating test file...")
     print(f"   Source: {test_file}")
@@ -114,6 +107,7 @@ def test_single_translation():
                 if "body:" in content and "block:" in content:
                     # Parse to check array structure
                     import yaml
+
                     try:
                         # Extract frontmatter
                         parts = content.split("---")
@@ -121,7 +115,11 @@ def test_single_translation():
                             fm_text = parts[1]
                             fm = yaml.safe_load(fm_text)
 
-                            if "body" in fm and "block" in fm["body"] and isinstance(fm["body"]["block"], list):
+                            if (
+                                "body" in fm
+                                and "block" in fm["body"]
+                                and isinstance(fm["body"]["block"], list)
+                            ):
                                 print("   [PASS] body.block is an array")
 
                                 # Check if array elements have translations
@@ -139,7 +137,9 @@ def test_single_translation():
                                         if "Add the Aspose" in content_val:
                                             print("   [FAIL] content_left NOT translated")
                                         else:
-                                            print(f"   [PASS] content_left translated: {content_val[:50]}...")
+                                            print(
+                                                f"   [PASS] content_left translated: {content_val[:50]}..."
+                                            )
                             else:
                                 print("   [FAIL] body.block is not an array")
                     except Exception as e:
@@ -158,6 +158,7 @@ def test_single_translation():
     print("\n" + "=" * 80)
     print("TEST COMPLETE")
     print("=" * 80)
+
 
 if __name__ == "__main__":
     test_single_translation()

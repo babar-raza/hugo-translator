@@ -1,4 +1,5 @@
 """Integration test: scope audit gate passes for all production profiles."""
+
 from __future__ import annotations
 
 import json
@@ -16,13 +17,12 @@ class TestScopeAuditGate:
 
         audit = json.loads(audit_path.read_text(encoding="utf-8"))
         ambiguous = [
-            e for e in audit
-            if e.get("classification") == "ambiguous"
-            and not e.get("is_test_profile", False)
+            e
+            for e in audit
+            if e.get("classification") == "ambiguous" and not e.get("is_test_profile", False)
         ]
         assert ambiguous == [], (
-            f"Ambiguous production profiles found: "
-            f"{[e['profile'] for e in ambiguous]}"
+            f"Ambiguous production profiles found: {[e['profile'] for e in ambiguous]}"
         )
 
     def test_all_profiles_have_required_fields(self):

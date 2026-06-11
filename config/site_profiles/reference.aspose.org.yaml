@@ -44,6 +44,12 @@ target_langs:
   - zh
 
 frontmatter:
+  title:
+    mode: translate
+    strategy: null
+  linkTitle:
+    mode: translate
+    strategy: null
   description:
     mode: translate
     strategy: null

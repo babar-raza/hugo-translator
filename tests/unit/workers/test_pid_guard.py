@@ -22,9 +22,7 @@ def test_acquire_pid_file_dead_process(tmp_path):
     pid_file = tmp_path / "test_worker.pid"
     pid_file.write_text("99999999", encoding="utf-8")  # unlikely to be alive
 
-    with mock.patch(
-        "src.workers.worker_state._is_process_alive", return_value=False
-    ):
+    with mock.patch("src.workers.worker_state._is_process_alive", return_value=False):
         result = acquire_pid_file("test_worker", log_dir=tmp_path)
 
     assert result is True
@@ -36,9 +34,7 @@ def test_acquire_pid_file_alive_process(tmp_path):
     pid_file = tmp_path / "test_worker.pid"
     pid_file.write_text("12345", encoding="utf-8")
 
-    with mock.patch(
-        "src.workers.worker_state._is_process_alive", return_value=True
-    ):
+    with mock.patch("src.workers.worker_state._is_process_alive", return_value=True):
         result = acquire_pid_file("test_worker", log_dir=tmp_path)
 
     assert result is False

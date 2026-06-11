@@ -53,7 +53,7 @@ class TestSiteProfileDefaultModel:
         )
 
         # Simulate the resolution logic from engine.py
-        model_id = getattr(profile, 'default_model', None) or "m2m100_418m"
+        model_id = getattr(profile, "default_model", None) or "m2m100_418m"
         assert model_id == "nllb_200_600m"
 
     def test_system_default_when_none_set(self):
@@ -71,7 +71,7 @@ class TestSiteProfileDefaultModel:
 
         # Simulate the resolution logic
         cli_model = None
-        model_id = cli_model or getattr(profile, 'default_model', None) or "m2m100_418m"
+        model_id = cli_model or getattr(profile, "default_model", None) or "m2m100_418m"
         assert model_id == "m2m100_418m"
 
 
@@ -166,7 +166,7 @@ class TestConfigLoaderModelMapping:
 
         assert profile.default_model is None
         # Resolution should fall back to system default
-        model_id = getattr(profile, 'default_model', None) or "m2m100_418m"
+        model_id = getattr(profile, "default_model", None) or "m2m100_418m"
         assert model_id == "m2m100_418m"
 
     def test_direct_overrides_legacy(self, tmp_path):
@@ -248,7 +248,7 @@ class TestCLIModelPriority:
         cli_model = "cli_override_model"
 
         # Simulate the resolution logic from cli.py
-        model_id = cli_model or getattr(profile, 'default_model', None) or "m2m100_418m"
+        model_id = cli_model or getattr(profile, "default_model", None) or "m2m100_418m"
         assert model_id == "cli_override_model"
 
     def test_cli_none_uses_profile(self):
@@ -266,7 +266,7 @@ class TestCLIModelPriority:
 
         cli_model = None
 
-        model_id = cli_model or getattr(profile, 'default_model', None) or "m2m100_418m"
+        model_id = cli_model or getattr(profile, "default_model", None) or "m2m100_418m"
         assert model_id == "profile_model"
 
     def test_full_priority_chain(self):
@@ -291,7 +291,7 @@ class TestCLIModelPriority:
         )
 
         def resolve(cli_model, profile):
-            return cli_model or getattr(profile, 'default_model', None) or "m2m100_418m"
+            return cli_model or getattr(profile, "default_model", None) or "m2m100_418m"
 
         # CLI overrides everything
         assert resolve("cli_model", profile_with_model) == "cli_model"
@@ -321,7 +321,7 @@ class TestEdgeCases:
         )
 
         # Empty string is falsy, should fall through
-        model_id = getattr(profile, 'default_model', None) or "m2m100_418m"
+        model_id = getattr(profile, "default_model", None) or "m2m100_418m"
         assert model_id == "m2m100_418m"
 
     def test_whitespace_only_falls_through_to_default(self):
@@ -340,7 +340,7 @@ class TestEdgeCases:
         # Whitespace-only is normalized to None by field validator
         assert profile.default_model is None
         # Falls through to system default
-        model_id = getattr(profile, 'default_model', None) or "m2m100_418m"
+        model_id = getattr(profile, "default_model", None) or "m2m100_418m"
         assert model_id == "m2m100_418m"
 
     def test_explicit_none_falls_through_to_default(self):
@@ -356,5 +356,5 @@ class TestEdgeCases:
             default_model=None,  # Explicit None
         )
 
-        model_id = getattr(profile, 'default_model', None) or "m2m100_418m"
+        model_id = getattr(profile, "default_model", None) or "m2m100_418m"
         assert model_id == "m2m100_418m"

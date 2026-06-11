@@ -6,6 +6,7 @@ _is_translated_filename. All git subprocess calls are mocked — no real git rep
 
 Run: pytest tests/unit/workers/test_orphan_structural_gate.py -v
 """
+
 import subprocess
 import sys
 import types
@@ -169,8 +170,7 @@ class TestFailSafe:
         """subprocess.TimeoutExpired → fail-safe False."""
         orphan = tmp_path / "index.de.md"
         orphan.write_text(ORPHAN_3CB, encoding="utf-8")
-        with patch("subprocess.run",
-                   side_effect=subprocess.TimeoutExpired("git", 10)):
+        with patch("subprocess.run", side_effect=subprocess.TimeoutExpired("git", 10)):
             result = W._validate_orphan_structural_integrity(
                 orphan, tmp_path, "en", per_language_folders=False
             )
@@ -233,15 +233,11 @@ print("hi")
     def test_gate_reads_from_git_not_disk(self, tmp_path):
         """Gate uses git HEAD content even if source file is corrupted on disk."""
         # Corrupt source file on disk (0 CB)
-        (tmp_path / "index.md").write_text(
-            "---\ntitle: Corrupted\n---\nNo code.", encoding="utf-8"
-        )
+        (tmp_path / "index.md").write_text("---\ntitle: Corrupted\n---\nNo code.", encoding="utf-8")
         # Orphan also has 0 CB — would pass if gate read from disk
         # But git HEAD returns SOURCE_3CB (3 CB) → gate must reject
         result = _run_gate(tmp_path, ORPHAN_0CB, _good_git_result(SOURCE_3CB))
-        assert result is False, (
-            "Gate must read source from git HEAD, not the corrupted disk copy"
-        )
+        assert result is False, "Gate must read source from git HEAD, not the corrupted disk copy"
 
 
 # ===========================================================================
@@ -275,10 +271,42 @@ class TestHallucinationDetection:
 # 4. Language filter (_is_translated_filename)
 # ===========================================================================
 TARGET_LANGS = [
-    "ar", "bg", "ca", "cs", "da", "de", "el", "es", "fa", "fi",
-    "fr", "he", "hi", "hr", "hu", "id", "it", "ja", "ko", "lt",
-    "lv", "ms", "nl", "no", "pl", "pt", "ro", "ru", "sk", "sl",
-    "sv", "th", "tr", "uk", "vi", "zh",
+    "ar",
+    "bg",
+    "ca",
+    "cs",
+    "da",
+    "de",
+    "el",
+    "es",
+    "fa",
+    "fi",
+    "fr",
+    "he",
+    "hi",
+    "hr",
+    "hu",
+    "id",
+    "it",
+    "ja",
+    "ko",
+    "lt",
+    "lv",
+    "ms",
+    "nl",
+    "no",
+    "pl",
+    "pt",
+    "ro",
+    "ru",
+    "sk",
+    "sl",
+    "sv",
+    "th",
+    "tr",
+    "uk",
+    "vi",
+    "zh",
 ]
 
 

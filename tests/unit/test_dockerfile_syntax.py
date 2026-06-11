@@ -1,4 +1,5 @@
 """Test Dockerfile health check syntax."""
+
 import re
 from pathlib import Path
 

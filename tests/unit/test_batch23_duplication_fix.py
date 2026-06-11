@@ -6,6 +6,7 @@ This test validates that the run_batch23.py script properly:
 2. Validates batch creation for duplicates
 3. Validates final results for duplicates
 """
+
 import json
 import tempfile
 from collections import Counter
@@ -19,12 +20,12 @@ def test_progress_file_cleared_not_appended():
         progress_file = Path(tmpdir) / "progress.ndjson"
 
         # First run: write 3 records
-        with open(progress_file, 'w', encoding='utf-8') as f:
+        with open(progress_file, "w", encoding="utf-8") as f:
             for i in range(3):
-                f.write(json.dumps({"id": i, "file": f"file{i}.md"}) + '\n')
+                f.write(json.dumps({"id": i, "file": f"file{i}.md"}) + "\n")
 
         # Verify first run
-        with open(progress_file, encoding='utf-8') as f:
+        with open(progress_file, encoding="utf-8") as f:
             records = [json.loads(line) for line in f]
         assert len(records) == 3
 
@@ -40,12 +41,12 @@ def test_progress_file_cleared_not_appended():
 
         progress_file.touch()
 
-        with open(progress_file, 'w', encoding='utf-8') as f:
+        with open(progress_file, "w", encoding="utf-8") as f:
             for i in range(3):
-                f.write(json.dumps({"id": i, "file": f"file{i}.md"}) + '\n')
+                f.write(json.dumps({"id": i, "file": f"file{i}.md"}) + "\n")
 
         # Verify second run (should have exactly 3, not 6)
-        with open(progress_file, encoding='utf-8') as f:
+        with open(progress_file, encoding="utf-8") as f:
             records = [json.loads(line) for line in f]
 
         assert len(records) == 3, f"Expected 3 records, got {len(records)}"
@@ -153,12 +154,12 @@ def test_phase6_duplication_scenario():
         # First run: 248 unique files
         files_set = {f"file{i}.md" for i in range(248)}
 
-        with open(progress_file, 'w', encoding='utf-8') as f:
+        with open(progress_file, "w", encoding="utf-8") as f:
             for file in files_set:
-                f.write(json.dumps({"source_path": file, "status": "PASS"}) + '\n')
+                f.write(json.dumps({"source_path": file, "status": "PASS"}) + "\n")
 
         # Verify first run
-        with open(progress_file, encoding='utf-8') as f:
+        with open(progress_file, encoding="utf-8") as f:
             records = [json.loads(line) for line in f]
 
         assert len(records) == 248
@@ -169,13 +170,13 @@ def test_phase6_duplication_scenario():
         # But the file would show 410 if we're clever about partial overlap
 
         # For simplicity, simulate appending 162 duplicates
-        with open(progress_file, 'a', encoding='utf-8') as f:
+        with open(progress_file, "a", encoding="utf-8") as f:
             for i in range(162):
                 file = f"file{i}.md"  # These are duplicates
-                f.write(json.dumps({"source_path": file, "status": "FAIL_OTHER"}) + '\n')
+                f.write(json.dumps({"source_path": file, "status": "FAIL_OTHER"}) + "\n")
 
         # Count records
-        with open(progress_file, encoding='utf-8') as f:
+        with open(progress_file, encoding="utf-8") as f:
             records = [json.loads(line) for line in f]
 
         assert len(records) == 410  # 248 + 162 = 410 (Phase 6 bug!)
@@ -192,12 +193,12 @@ def test_phase6_duplication_scenario():
         progress_file.touch()
 
         # Write 248 fresh records
-        with open(progress_file, 'w', encoding='utf-8') as f:
+        with open(progress_file, "w", encoding="utf-8") as f:
             for file in files_set:
-                f.write(json.dumps({"source_path": file, "status": "PASS"}) + '\n')
+                f.write(json.dumps({"source_path": file, "status": "PASS"}) + "\n")
 
         # Verify fixed version
-        with open(progress_file, encoding='utf-8') as f:
+        with open(progress_file, encoding="utf-8") as f:
             records = [json.loads(line) for line in f]
 
         assert len(records) == 248  # Exactly 248, no duplicates!
@@ -211,4 +212,5 @@ def test_phase6_duplication_scenario():
 
 if __name__ == "__main__":
     import pytest
+
     pytest.main([__file__, "-v"])

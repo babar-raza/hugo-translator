@@ -89,8 +89,12 @@ def test_get_output_path_with_base_dir_preserves_structure():
         assert output_a_with_base != output_b_with_base, (
             "Output paths should be distinct when base_dir is provided"
         )
-        assert "a" in str(output_a_with_base), f"Output should preserve 'a' subdirectory: {output_a_with_base}"
-        assert "b" in str(output_b_with_base), f"Output should preserve 'b' subdirectory: {output_b_with_base}"
+        assert "a" in str(output_a_with_base), (
+            f"Output should preserve 'a' subdirectory: {output_a_with_base}"
+        )
+        assert "b" in str(output_b_with_base), (
+            f"Output should preserve 'b' subdirectory: {output_b_with_base}"
+        )
 
         # Test Case 2: WITHOUT base_dir (buggy behavior - should NOT be used by CLI)
         output_a_no_base = engine._get_output_path(
@@ -246,7 +250,9 @@ def test_output_path_collision_prevention():
                     base_dir=en_dir,
                 )
 
-                normalized = str(output_path).lower() if platform.system() == "Windows" else str(output_path)
+                normalized = (
+                    str(output_path).lower() if platform.system() == "Windows" else str(output_path)
+                )
 
                 # Should NOT collide with proper base_dir
                 assert normalized not in output_path_map, (

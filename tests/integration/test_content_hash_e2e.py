@@ -224,6 +224,7 @@ def test_e2e_schema_validation(tmp_path):
 
     # Verify schema version in saved file
     import json
+
     with open(metadata_file) as f:
         data = json.load(f)
 

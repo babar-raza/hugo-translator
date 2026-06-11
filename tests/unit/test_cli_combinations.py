@@ -41,6 +41,7 @@ def parser():
     and avoid import errors at collection time.
     """
     from src.cli import create_parser
+
     return create_parser()
 
 
@@ -51,6 +52,7 @@ def cli_overrides_class():
     Import is done inside fixture to ensure proper test isolation.
     """
     from src.cli import CLIConfigOverrides
+
     return CLIConfigOverrides
 
 
@@ -62,32 +64,32 @@ def cli_overrides_class():
 class TestPriorityCombinationsC01C05:
     """Test priority combinations C01-C05 (compatible combinations)."""
 
-    @pytest.mark.parametrize("test_id,args,checks", [
-        pytest.param(
-            "C01",
-            ["--dry-run", "--no-commit"],
-            [("dry_run", True), ("auto_commit", False)],
-            id="C01-dry-run-no-commit"
-        ),
-        pytest.param(
-            "C02",
-            ["--force-retranslate", "--cache-write-mode", "never"],
-            [("force_retranslate", True), ("cache_write_mode", "never")],
-            id="C02-force-retranslate-cache-never"
-        ),
-        pytest.param(
-            "C08",
-            ["--verify", "--fix"],
-            [("verify", True), ("fix", True)],
-            id="C08-verify-fix"
-        ),
-        pytest.param(
-            "C10",
-            ["--metrics-only", "--no-progress"],
-            [("metrics_only", True), ("no_progress", True)],
-            id="C10-metrics-only-no-progress"
-        ),
-    ])
+    @pytest.mark.parametrize(
+        "test_id,args,checks",
+        [
+            pytest.param(
+                "C01",
+                ["--dry-run", "--no-commit"],
+                [("dry_run", True), ("auto_commit", False)],
+                id="C01-dry-run-no-commit",
+            ),
+            pytest.param(
+                "C02",
+                ["--force-retranslate", "--cache-write-mode", "never"],
+                [("force_retranslate", True), ("cache_write_mode", "never")],
+                id="C02-force-retranslate-cache-never",
+            ),
+            pytest.param(
+                "C08", ["--verify", "--fix"], [("verify", True), ("fix", True)], id="C08-verify-fix"
+            ),
+            pytest.param(
+                "C10",
+                ["--metrics-only", "--no-progress"],
+                [("metrics_only", True), ("no_progress", True)],
+                id="C10-metrics-only-no-progress",
+            ),
+        ],
+    )
     def test_compatible_combinations_parsed(self, parser, test_id, args, checks):
         """Test that compatible option combinations are accepted by parser."""
         full_args = ["--site", "test"] + args
@@ -107,11 +109,7 @@ class TestPriorityCombinationsC01C05:
         Both flags can be parsed, but force_restart should take precedence
         in the implementation logic.
         """
-        args = parser.parse_args([
-            "--site", "test",
-            "--resume",
-            "--force-restart"
-        ])
+        args = parser.parse_args(["--site", "test", "--resume", "--force-restart"])
 
         # Parser accepts both
         assert args.resume is True
@@ -129,11 +127,7 @@ class TestPriorityCombinationsC01C05:
 
         Expected: strict-reject wins and enables strict validation mode.
         """
-        args = parser.parse_args([
-            "--site", "test",
-            "--validation-mode", "off",
-            "--strict-reject"
-        ])
+        args = parser.parse_args(["--site", "test", "--validation-mode", "off", "--strict-reject"])
 
         overrides = cli_overrides_class(args)
         engine_overrides = overrides.get_engine_overrides()
@@ -151,20 +145,16 @@ class TestPriorityCombinationsC01C05:
         (implementation uses: True if enable else (False if disable else None))
         """
         # Test enable then disable -> enable takes precedence
-        args1 = parser.parse_args([
-            "--site", "test",
-            "--enable-terminology",
-            "--disable-terminology"
-        ])
+        args1 = parser.parse_args(
+            ["--site", "test", "--enable-terminology", "--disable-terminology"]
+        )
         overrides1 = cli_overrides_class(args1)
         assert overrides1.enable_terminology is True  # enable takes precedence
 
         # Test disable then enable -> enable takes precedence
-        args2 = parser.parse_args([
-            "--site", "test",
-            "--disable-terminology",
-            "--enable-terminology"
-        ])
+        args2 = parser.parse_args(
+            ["--site", "test", "--disable-terminology", "--enable-terminology"]
+        )
         overrides2 = cli_overrides_class(args2)
         assert overrides2.enable_terminology is True  # enable takes precedence
 
@@ -181,11 +171,9 @@ class TestPriorityCombinationsC06C07:
         """
         # CLI-TC-03: Error should occur at parse time, not runtime
         with pytest.raises(SystemExit) as exc_info:
-            parser.parse_args([
-                "--site", "test",
-                "--parallel-languages", "2",
-                "--global-lang-rounds", "5"
-            ])
+            parser.parse_args(
+                ["--site", "test", "--parallel-languages", "2", "--global-lang-rounds", "5"]
+            )
 
         # SystemExit with code 2 indicates argparse error
         assert exc_info.value.code == 2
@@ -197,11 +185,7 @@ class TestPriorityCombinationsC06C07:
         Current behavior: Both are parsed. This tests the actual behavior.
         Note: These are contradictory semantics (accept all vs. reject on any issue).
         """
-        args = parser.parse_args([
-            "--site", "test",
-            "--force-accept",
-            "--strict-reject"
-        ])
+        args = parser.parse_args(["--site", "test", "--force-accept", "--strict-reject"])
 
         # Parser accepts both flags
         assert args.force_accept is True
@@ -229,12 +213,9 @@ class TestPriorityCombinationC09:
 
         Expected: All accepted - valid GPU configuration.
         """
-        args = parser.parse_args([
-            "--site", "test",
-            "--device", "cuda",
-            "--batch-size", "1",
-            "--load-mode", "int8"
-        ])
+        args = parser.parse_args(
+            ["--site", "test", "--device", "cuda", "--batch-size", "1", "--load-mode", "int8"]
+        )
 
         overrides = cli_overrides_class(args)
 
@@ -254,16 +235,19 @@ class TestPriorityCombinationC09:
 class TestValidationTerminologyCombinations:
     """Test validation mode + terminology mode combinations."""
 
-    @pytest.mark.parametrize("val_mode,term_mode,term_enabled", [
-        ("strict", "protect", True),
-        ("strict", "validate", True),
-        ("strict", "both", True),
-        ("normal", "protect", True),
-        ("normal", "validate", True),
-        ("lenient", "both", True),
-        ("off", "protect", True),  # Terminology can work even with validation off
-        ("off", "none", False),
-    ])
+    @pytest.mark.parametrize(
+        "val_mode,term_mode,term_enabled",
+        [
+            ("strict", "protect", True),
+            ("strict", "validate", True),
+            ("strict", "both", True),
+            ("normal", "protect", True),
+            ("normal", "validate", True),
+            ("lenient", "both", True),
+            ("off", "protect", True),  # Terminology can work even with validation off
+            ("off", "none", False),
+        ],
+    )
     def test_validation_terminology_mode_matrix(
         self, parser, cli_overrides_class, val_mode, term_mode, term_enabled
     ):
@@ -292,11 +276,7 @@ class TestValidationTerminologyCombinations:
 
     def test_disable_validation_with_max_retries(self, parser, cli_overrides_class):
         """Test --disable-validation with --max-retries (C11 extended)."""
-        args = parser.parse_args([
-            "--site", "test",
-            "--disable-validation",
-            "--max-retries", "5"
-        ])
+        args = parser.parse_args(["--site", "test", "--disable-validation", "--max-retries", "5"])
 
         overrides = cli_overrides_class(args)
         engine_overrides = overrides.get_engine_overrides()
@@ -314,24 +294,29 @@ class TestValidationTerminologyCombinations:
 class TestCacheResumeCombinations:
     """Test cache behavior + resume control combinations."""
 
-    @pytest.mark.parametrize("cache_write,force_retranslate,resume,force_restart", [
-        ("auto", False, True, False),
-        ("always", False, True, False),
-        ("never", False, True, False),
-        ("auto", True, True, False),
-        ("always", True, True, False),
-        ("never", True, True, False),  # C02: force-retranslate + never
-        ("auto", True, True, True),
-        ("auto", False, False, False),
-        ("auto", False, False, True),
-    ])
+    @pytest.mark.parametrize(
+        "cache_write,force_retranslate,resume,force_restart",
+        [
+            ("auto", False, True, False),
+            ("always", False, True, False),
+            ("never", False, True, False),
+            ("auto", True, True, False),
+            ("always", True, True, False),
+            ("never", True, True, False),  # C02: force-retranslate + never
+            ("auto", True, True, True),
+            ("auto", False, False, False),
+            ("auto", False, False, True),
+        ],
+    )
     def test_cache_resume_combination_matrix(
         self, parser, cli_overrides_class, cache_write, force_retranslate, resume, force_restart
     ):
         """Test all cache + resume flag combinations."""
         args_list = [
-            "--site", "test",
-            "--cache-write-mode", cache_write,
+            "--site",
+            "test",
+            "--cache-write-mode",
+            cache_write,
         ]
 
         if force_retranslate:
@@ -368,16 +353,24 @@ class TestMultiLanguageCombinations:
 
     def test_parallel_with_all_compatible_options(self, parser, cli_overrides_class):
         """Test --parallel-languages with various compatible options."""
-        args = parser.parse_args([
-            "--site", "test",
-            "--parallel-languages", "4",
-            "--force-retranslate",
-            "--cache-write-mode", "always",
-            "--device", "cuda",
-            "--batch-size", "16",
-            "--validation-mode", "normal",
-            "--enable-terminology"
-        ])
+        args = parser.parse_args(
+            [
+                "--site",
+                "test",
+                "--parallel-languages",
+                "4",
+                "--force-retranslate",
+                "--cache-write-mode",
+                "always",
+                "--device",
+                "cuda",
+                "--batch-size",
+                "16",
+                "--validation-mode",
+                "normal",
+                "--enable-terminology",
+            ]
+        )
 
         overrides = cli_overrides_class(args)
         engine_overrides = overrides.get_engine_overrides()
@@ -392,11 +385,9 @@ class TestMultiLanguageCombinations:
     def test_roundrobin_with_sort_options(self, parser, cli_overrides_class):
         """Test --global-lang-rounds with --global-lang-sort."""
         for sort_order in ["asc", "desc"]:
-            args = parser.parse_args([
-                "--site", "test",
-                "--global-lang-rounds", "100",
-                "--global-lang-sort", sort_order
-            ])
+            args = parser.parse_args(
+                ["--site", "test", "--global-lang-rounds", "100", "--global-lang-sort", sort_order]
+            )
 
             overrides = cli_overrides_class(args)
             engine_overrides = overrides.get_engine_overrides()
@@ -407,18 +398,11 @@ class TestMultiLanguageCombinations:
     def test_fail_fast_combinations(self, parser):
         """Test --fail-fast and --no-fail-fast with multi-language options."""
         # With fail-fast (default)
-        args1 = parser.parse_args([
-            "--site", "test",
-            "--parallel-languages", "2"
-        ])
+        args1 = parser.parse_args(["--site", "test", "--parallel-languages", "2"])
         assert args1.fail_fast is True
 
         # With --no-fail-fast
-        args2 = parser.parse_args([
-            "--site", "test",
-            "--parallel-languages", "2",
-            "--no-fail-fast"
-        ])
+        args2 = parser.parse_args(["--site", "test", "--parallel-languages", "2", "--no-fail-fast"])
         assert args2.fail_fast is False
 
 
@@ -430,14 +414,17 @@ class TestMultiLanguageCombinations:
 class TestOutputControlCombinations:
     """Test output control option combinations."""
 
-    @pytest.mark.parametrize("dry_run,save_rejected,auto_commit", [
-        (True, True, False),   # C01+C13: dry-run + save-rejected + no-commit
-        (True, False, False),
-        (False, True, True),
-        (False, True, False),
-        (False, False, True),
-        (False, False, False),
-    ])
+    @pytest.mark.parametrize(
+        "dry_run,save_rejected,auto_commit",
+        [
+            (True, True, False),  # C01+C13: dry-run + save-rejected + no-commit
+            (True, False, False),
+            (False, True, True),
+            (False, True, False),
+            (False, False, True),
+            (False, False, False),
+        ],
+    )
     def test_output_control_matrix(
         self, parser, cli_overrides_class, dry_run, save_rejected, auto_commit
     ):
@@ -469,23 +456,22 @@ class TestOutputControlCombinations:
 class TestModelControlCombinations:
     """Test model/device control option combinations."""
 
-    @pytest.mark.parametrize("device,load_mode,batch_size,max_tokens", [
-        ("cuda", "fp16", 16, 512),
-        ("cuda", "int8", 32, 1024),
-        ("cuda", "fp32", 8, 256),
-        ("cpu", "fp32", 4, 512),
-        ("cpu", "int8", 8, 768),
-        ("auto", "auto", None, None),
-    ])
+    @pytest.mark.parametrize(
+        "device,load_mode,batch_size,max_tokens",
+        [
+            ("cuda", "fp16", 16, 512),
+            ("cuda", "int8", 32, 1024),
+            ("cuda", "fp32", 8, 256),
+            ("cpu", "fp32", 4, 512),
+            ("cpu", "int8", 8, 768),
+            ("auto", "auto", None, None),
+        ],
+    )
     def test_model_control_matrix(
         self, parser, cli_overrides_class, device, load_mode, batch_size, max_tokens
     ):
         """Test device + load_mode + batch_size + max_tokens combinations."""
-        args_list = [
-            "--site", "test",
-            "--device", device,
-            "--load-mode", load_mode
-        ]
+        args_list = ["--site", "test", "--device", device, "--load-mode", load_mode]
 
         if batch_size is not None:
             args_list.extend(["--batch-size", str(batch_size)])
@@ -506,12 +492,18 @@ class TestModelControlCombinations:
 
     def test_model_override_with_tokens_and_batch(self, parser, cli_overrides_class):
         """Test --model with --max-tokens and --batch-size (C14)."""
-        args = parser.parse_args([
-            "--site", "test",
-            "--model", "nllb_200_600m",
-            "--max-tokens", "1024",
-            "--batch-size", "8"
-        ])
+        args = parser.parse_args(
+            [
+                "--site",
+                "test",
+                "--model",
+                "nllb_200_600m",
+                "--max-tokens",
+                "1024",
+                "--batch-size",
+                "8",
+            ]
+        )
 
         overrides = cli_overrides_class(args)
         engine_overrides = overrides.get_engine_overrides()
@@ -532,11 +524,9 @@ class TestMetricsProgressCombinations:
 
     def test_metrics_file_with_interval(self, parser, cli_overrides_class):
         """Test --metrics-file with --metrics-interval (C15)."""
-        args = parser.parse_args([
-            "--site", "test",
-            "--metrics-file", "./metrics.json",
-            "--metrics-interval", "1.0"
-        ])
+        args = parser.parse_args(
+            ["--site", "test", "--metrics-file", "./metrics.json", "--metrics-interval", "1.0"]
+        )
 
         overrides = cli_overrides_class(args)
 
@@ -545,11 +535,7 @@ class TestMetricsProgressCombinations:
 
     def test_metrics_only_with_log_level(self, parser, cli_overrides_class):
         """Test --metrics-only with --log-level."""
-        args = parser.parse_args([
-            "--site", "test",
-            "--metrics-only",
-            "--log-level", "ERROR"
-        ])
+        args = parser.parse_args(["--site", "test", "--metrics-only", "--log-level", "ERROR"])
 
         overrides = cli_overrides_class(args)
 
@@ -567,12 +553,9 @@ class TestVerificationCombinations:
 
     def test_verify_with_fix_and_report(self, parser, cli_overrides_class):
         """Test --verify with --fix and --verification-report."""
-        args = parser.parse_args([
-            "--site", "test",
-            "--verify",
-            "--fix",
-            "--verification-report", "./report.json"
-        ])
+        args = parser.parse_args(
+            ["--site", "test", "--verify", "--fix", "--verification-report", "./report.json"]
+        )
 
         overrides = cli_overrides_class(args)
         engine_overrides = overrides.get_engine_overrides()
@@ -584,11 +567,7 @@ class TestVerificationCombinations:
     def test_verify_with_validation_modes(self, parser, cli_overrides_class):
         """Test --verify with various validation modes."""
         for val_mode in ["strict", "normal", "lenient"]:
-            args = parser.parse_args([
-                "--site", "test",
-                "--verify",
-                "--validation-mode", val_mode
-            ])
+            args = parser.parse_args(["--site", "test", "--verify", "--validation-mode", val_mode])
 
             overrides = cli_overrides_class(args)
             engine_overrides = overrides.get_engine_overrides()
@@ -605,14 +584,17 @@ class TestVerificationCombinations:
 class TestContentHashCombinations:
     """Test content hash tracking combinations."""
 
-    @pytest.mark.parametrize("disable_hash,rebuild,validate", [
-        (False, False, False),
-        (True, False, False),
-        (False, True, False),
-        (False, False, True),
-        (False, True, True),
-        (True, True, False),  # Unusual but valid: disable + rebuild
-    ])
+    @pytest.mark.parametrize(
+        "disable_hash,rebuild,validate",
+        [
+            (False, False, False),
+            (True, False, False),
+            (False, True, False),
+            (False, False, True),
+            (False, True, True),
+            (True, True, False),  # Unusual but valid: disable + rebuild
+        ],
+    )
     def test_content_hash_flag_matrix(
         self, parser, cli_overrides_class, disable_hash, rebuild, validate
     ):
@@ -648,22 +630,18 @@ class TestGitCommitCombinations:
 
     def test_auto_commit_with_message(self, parser):
         """Test --auto-commit with --commit-message."""
-        args = parser.parse_args([
-            "--site", "test",
-            "--auto-commit",
-            "--commit-message", "Custom commit message"
-        ])
+        args = parser.parse_args(
+            ["--site", "test", "--auto-commit", "--commit-message", "Custom commit message"]
+        )
 
         assert args.auto_commit is True
         assert args.commit_message_override == "Custom commit message"
 
     def test_no_commit_ignores_message(self, parser):
         """Test --no-commit with --commit-message (message ignored)."""
-        args = parser.parse_args([
-            "--site", "test",
-            "--no-commit",
-            "--commit-message", "This will be ignored"
-        ])
+        args = parser.parse_args(
+            ["--site", "test", "--no-commit", "--commit-message", "This will be ignored"]
+        )
 
         assert args.auto_commit is False
         assert args.commit_message_override == "This will be ignored"
@@ -679,22 +657,32 @@ class TestEdgeCases:
 
     def test_all_flags_minimal_conflict(self, parser, cli_overrides_class):
         """Test many flags together with minimal conflicts."""
-        args = parser.parse_args([
-            "--site", "test",
-            "--validation-mode", "normal",
-            "--enable-terminology",
-            "--terminology-mode", "both",
-            "--max-retries", "3",
-            "--dry-run",
-            "--save-rejected",
-            "--verify",
-            "--device", "cpu",
-            "--load-mode", "fp32",
-            "--batch-size", "4",
-            "--no-progress",
-            "--cache-write-mode", "always",
-            "--resume"
-        ])
+        args = parser.parse_args(
+            [
+                "--site",
+                "test",
+                "--validation-mode",
+                "normal",
+                "--enable-terminology",
+                "--terminology-mode",
+                "both",
+                "--max-retries",
+                "3",
+                "--dry-run",
+                "--save-rejected",
+                "--verify",
+                "--device",
+                "cpu",
+                "--load-mode",
+                "fp32",
+                "--batch-size",
+                "4",
+                "--no-progress",
+                "--cache-write-mode",
+                "always",
+                "--resume",
+            ]
+        )
 
         overrides = cli_overrides_class(args)
         engine_overrides = overrides.get_engine_overrides()
@@ -723,11 +711,19 @@ class TestEdgeCases:
 
     def test_target_langs_with_multi_language_options(self, parser, cli_overrides_class):
         """Test --target-langs with multi-language processing options."""
-        args = parser.parse_args([
-            "--site", "test",
-            "--target-langs", "de", "es", "fr", "it",
-            "--parallel-languages", "2"
-        ])
+        args = parser.parse_args(
+            [
+                "--site",
+                "test",
+                "--target-langs",
+                "de",
+                "es",
+                "fr",
+                "it",
+                "--parallel-languages",
+                "2",
+            ]
+        )
 
         overrides = cli_overrides_class(args)
         engine_overrides = overrides.get_engine_overrides()
@@ -748,69 +744,72 @@ class TestCombinationMatrix:
     This serves as documentation and a quick reference for CI.
     """
 
-    @pytest.mark.parametrize("test_case", [
-        {
-            "id": "C01",
-            "desc": "--dry-run --no-commit",
-            "args": ["--dry-run", "--no-commit"],
-            "expect_error": False,
-        },
-        {
-            "id": "C02",
-            "desc": "--force-retranslate --cache-write-mode never",
-            "args": ["--force-retranslate", "--cache-write-mode", "never"],
-            "expect_error": False,
-        },
-        {
-            "id": "C03",
-            "desc": "--resume --force-restart",
-            "args": ["--resume", "--force-restart"],
-            "expect_error": False,  # Both parsed, precedence at runtime
-        },
-        {
-            "id": "C04",
-            "desc": "--validation-mode off --strict-reject",
-            "args": ["--validation-mode", "off", "--strict-reject"],
-            "expect_error": False,  # strict-reject takes precedence
-        },
-        {
-            "id": "C05",
-            "desc": "--enable-terminology --disable-terminology",
-            "args": ["--enable-terminology", "--disable-terminology"],
-            "expect_error": False,  # Last wins
-        },
-        {
-            "id": "C06",
-            "desc": "--parallel-languages 2 --global-lang-rounds 5",
-            "args": ["--parallel-languages", "2", "--global-lang-rounds", "5"],
-            "expect_error": True,  # Mutual exclusion error
-            "parse_time_error": True,  # CLI-TC-03: Error occurs at parse time
-        },
-        {
-            "id": "C07",
-            "desc": "--force-accept --strict-reject",
-            "args": ["--force-accept", "--strict-reject"],
-            "expect_error": False,  # Both parsed (potential design issue)
-        },
-        {
-            "id": "C08",
-            "desc": "--verify --fix",
-            "args": ["--verify", "--fix"],
-            "expect_error": False,
-        },
-        {
-            "id": "C09",
-            "desc": "--device cuda --batch-size 1 --load-mode int8",
-            "args": ["--device", "cuda", "--batch-size", "1", "--load-mode", "int8"],
-            "expect_error": False,
-        },
-        {
-            "id": "C10",
-            "desc": "--metrics-only --no-progress",
-            "args": ["--metrics-only", "--no-progress"],
-            "expect_error": False,
-        },
-    ])
+    @pytest.mark.parametrize(
+        "test_case",
+        [
+            {
+                "id": "C01",
+                "desc": "--dry-run --no-commit",
+                "args": ["--dry-run", "--no-commit"],
+                "expect_error": False,
+            },
+            {
+                "id": "C02",
+                "desc": "--force-retranslate --cache-write-mode never",
+                "args": ["--force-retranslate", "--cache-write-mode", "never"],
+                "expect_error": False,
+            },
+            {
+                "id": "C03",
+                "desc": "--resume --force-restart",
+                "args": ["--resume", "--force-restart"],
+                "expect_error": False,  # Both parsed, precedence at runtime
+            },
+            {
+                "id": "C04",
+                "desc": "--validation-mode off --strict-reject",
+                "args": ["--validation-mode", "off", "--strict-reject"],
+                "expect_error": False,  # strict-reject takes precedence
+            },
+            {
+                "id": "C05",
+                "desc": "--enable-terminology --disable-terminology",
+                "args": ["--enable-terminology", "--disable-terminology"],
+                "expect_error": False,  # Last wins
+            },
+            {
+                "id": "C06",
+                "desc": "--parallel-languages 2 --global-lang-rounds 5",
+                "args": ["--parallel-languages", "2", "--global-lang-rounds", "5"],
+                "expect_error": True,  # Mutual exclusion error
+                "parse_time_error": True,  # CLI-TC-03: Error occurs at parse time
+            },
+            {
+                "id": "C07",
+                "desc": "--force-accept --strict-reject",
+                "args": ["--force-accept", "--strict-reject"],
+                "expect_error": False,  # Both parsed (potential design issue)
+            },
+            {
+                "id": "C08",
+                "desc": "--verify --fix",
+                "args": ["--verify", "--fix"],
+                "expect_error": False,
+            },
+            {
+                "id": "C09",
+                "desc": "--device cuda --batch-size 1 --load-mode int8",
+                "args": ["--device", "cuda", "--batch-size", "1", "--load-mode", "int8"],
+                "expect_error": False,
+            },
+            {
+                "id": "C10",
+                "desc": "--metrics-only --no-progress",
+                "args": ["--metrics-only", "--no-progress"],
+                "expect_error": False,
+            },
+        ],
+    )
     def test_priority_matrix(self, parser, cli_overrides_class, test_case):
         """Validate all priority combinations in the test matrix."""
         full_args = ["--site", "test"] + test_case["args"]

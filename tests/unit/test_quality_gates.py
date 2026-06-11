@@ -3,6 +3,7 @@ Unit tests for quality gates.
 
 Tests each gate individually to ensure correct pass/warn/fail behavior.
 """
+
 import os
 import sys
 from pathlib import Path
@@ -44,7 +45,9 @@ class TestLineCountGate:
         """Test that minor line differences (<20%) pass."""
         gate = LineCountGate(warn_threshold=0.2)
         source = "line1\nline2\nline3\nline4\nline5\nline6\nline7\nline8\nline9\nline10"  # 10 lines
-        target = "line1\nline2\nline3\nline4\nline5\nline6\nline7\nline8\nline9"  # 9 lines (10% loss)
+        target = (
+            "line1\nline2\nline3\nline4\nline5\nline6\nline7\nline8\nline9"  # 9 lines (10% loss)
+        )
 
         result = gate.check(source, target)
 
@@ -362,11 +365,13 @@ class TestGateRunner:
 
     def test_run_all_gates_pass(self):
         """Test runner when all gates pass."""
-        runner = GateRunner([
-            LineCountGate(),
-            ListStructureGate(),
-            MarkdownSyntaxGate(),
-        ])
+        runner = GateRunner(
+            [
+                LineCountGate(),
+                ListStructureGate(),
+                MarkdownSyntaxGate(),
+            ]
+        )
 
         source = """# Heading
 
@@ -391,13 +396,17 @@ class TestGateRunner:
 
     def test_run_all_gates_warn(self):
         """Test runner when some gates warn."""
-        runner = GateRunner([
-            LineCountGate(warn_threshold=0.1),
-            ListStructureGate(),
-        ])
+        runner = GateRunner(
+            [
+                LineCountGate(warn_threshold=0.1),
+                ListStructureGate(),
+            ]
+        )
 
         source = "line1\nline2\nline3\nline4\nline5\nline6\nline7\nline8\nline9\nline10"  # 10 lines
-        target = "line1\nline2\nline3\nline4\nline5\nline6\nline7\nline8\nline9"  # 9 lines (10% loss)
+        target = (
+            "line1\nline2\nline3\nline4\nline5\nline6\nline7\nline8\nline9"  # 9 lines (10% loss)
+        )
 
         report = runner.run_all(source, target)
 
@@ -407,10 +416,12 @@ class TestGateRunner:
 
     def test_run_all_gates_fail(self):
         """Test runner when some gates fail."""
-        runner = GateRunner([
-            LineCountGate(fail_threshold=0.3),
-            ListStructureGate(),
-        ])
+        runner = GateRunner(
+            [
+                LineCountGate(fail_threshold=0.3),
+                ListStructureGate(),
+            ]
+        )
 
         source = "line1\nline2\nline3\nline4\nline5"  # 5 lines
         target = "line1\nline2"  # 2 lines (60% loss)
@@ -422,11 +433,13 @@ class TestGateRunner:
 
     def test_report_summary(self):
         """Test report summary generation."""
-        runner = GateRunner([
-            LineCountGate(warn_threshold=0.1),  # Will warn on 10% change
-            ListStructureGate(),                # Will pass
-            MarkdownSyntaxGate(),               # Will pass
-        ])
+        runner = GateRunner(
+            [
+                LineCountGate(warn_threshold=0.1),  # Will warn on 10% change
+                ListStructureGate(),  # Will pass
+                MarkdownSyntaxGate(),  # Will pass
+            ]
+        )
 
         source = "line1\nline2\nline3\nline4\nline5\nline6\nline7\nline8\nline9\nline10"
         target = "line1\nline2\nline3\nline4\nline5\nline6\nline7\nline8\nline9"

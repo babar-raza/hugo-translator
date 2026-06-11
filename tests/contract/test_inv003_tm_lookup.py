@@ -28,6 +28,7 @@ import pytest
 @dataclass
 class MockSemanticMatch:
     """Mock for L3 semantic search result."""
+
     translation: str
     similarity: float
     metadata: dict[str, Any] | None = None
@@ -49,8 +50,12 @@ def mock_l1_cache():
     l1.get.return_value = None  # Default: miss
     l1.put = Mock()
     l1.stats.return_value = {
-        "hits": 0, "misses": 0, "evictions": 0,
-        "size": 0, "max_size": 10000, "hit_rate": 0.0
+        "hits": 0,
+        "misses": 0,
+        "evictions": 0,
+        "size": 0,
+        "max_size": 10000,
+        "hit_rate": 0.0,
     }
     return l1
 
@@ -94,7 +99,9 @@ def mock_override_controller():
 
 
 @pytest.fixture
-def translation_memory(mock_l1_cache, mock_l2_persistent, mock_l3_semantic, mock_override_controller):
+def translation_memory(
+    mock_l1_cache, mock_l2_persistent, mock_l3_semantic, mock_override_controller
+):
     """
     TranslationMemory instance with all mocked layers.
     """

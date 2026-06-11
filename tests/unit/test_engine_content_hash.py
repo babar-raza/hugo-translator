@@ -17,9 +17,7 @@ def test_should_skip_translation_with_hash_enabled(tmp_path):
     # Mock engine with content hash enabled
     engine = Mock(spec=TranslationEngine)
     engine.enable_content_hash = True
-    engine.metadata_tracker = MetadataTracker(
-        tmp_path / "metadata.json", hash_algorithm="md5"
-    )
+    engine.metadata_tracker = MetadataTracker(tmp_path / "metadata.json", hash_algorithm="md5")
     engine.metadata_tracker.load()
 
     # Record initial hash
@@ -27,6 +25,7 @@ def test_should_skip_translation_with_hash_enabled(tmp_path):
 
     # Create real method
     from src.translation_engine.engine import TranslationEngine as RealEngine
+
     method = RealEngine._should_skip_translation
 
     # Call with content unchanged
@@ -56,6 +55,7 @@ def test_should_skip_translation_with_hash_disabled(tmp_path):
 
     # Create real method
     from src.translation_engine.engine import TranslationEngine as RealEngine
+
     method = RealEngine._should_skip_translation
 
     # Call
@@ -82,9 +82,7 @@ def test_should_skip_translation_content_changed(tmp_path):
     # Mock engine with content hash enabled
     engine = Mock(spec=TranslationEngine)
     engine.enable_content_hash = True
-    engine.metadata_tracker = MetadataTracker(
-        tmp_path / "metadata.json", hash_algorithm="md5"
-    )
+    engine.metadata_tracker = MetadataTracker(tmp_path / "metadata.json", hash_algorithm="md5")
     engine.metadata_tracker.load()
 
     # Record initial hash
@@ -95,6 +93,7 @@ def test_should_skip_translation_content_changed(tmp_path):
 
     # Create real method
     from src.translation_engine.engine import TranslationEngine as RealEngine
+
     method = RealEngine._should_skip_translation
 
     # Call
@@ -124,6 +123,7 @@ def test_should_skip_translation_force_retranslate(tmp_path):
 
     # Create real method
     from src.translation_engine.engine import TranslationEngine as RealEngine
+
     method = RealEngine._should_skip_translation
 
     # Call with force=True
@@ -152,6 +152,7 @@ def test_should_skip_translation_output_missing(tmp_path):
 
     # Create real method
     from src.translation_engine.engine import TranslationEngine as RealEngine
+
     method = RealEngine._should_skip_translation
 
     # Call

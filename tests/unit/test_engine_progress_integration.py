@@ -1,4 +1,5 @@
 """Tests for progress tracker integration in translation engine."""
+
 from pathlib import Path
 from unittest.mock import Mock, patch
 
@@ -22,7 +23,7 @@ def test_engine_marks_completed_on_success():
     )
 
     # Mock successful translation
-    with patch.object(engine, 'translate_file') as mock_translate:
+    with patch.object(engine, "translate_file") as mock_translate:
         mock_translate.return_value = TranslationResult(
             success=True,
             source_file=Path("test.md"),
@@ -65,7 +66,7 @@ def test_engine_marks_failed_on_error():
     )
 
     # Mock failed translation
-    with patch.object(engine, 'translate_file') as mock_translate:
+    with patch.object(engine, "translate_file") as mock_translate:
         mock_translate.return_value = TranslationResult(
             success=False,
             source_file=Path("test.md"),
@@ -109,7 +110,7 @@ def test_engine_marks_failed_on_exception():
     )
 
     # Mock exception during translation
-    with patch.object(engine, 'translate_file') as mock_translate:
+    with patch.object(engine, "translate_file") as mock_translate:
         mock_translate.side_effect = RuntimeError("Unexpected error")
 
         # Create result object
@@ -151,7 +152,7 @@ def test_engine_handles_none_progress_tracker():
     assert engine.progress_tracker is None
 
     # Mock successful translation
-    with patch.object(engine, 'translate_file') as mock_translate:
+    with patch.object(engine, "translate_file") as mock_translate:
         mock_translate.return_value = TranslationResult(
             success=True,
             source_file=Path("test.md"),
@@ -193,7 +194,7 @@ def test_engine_handles_mark_exception():
     )
 
     # Mock successful translation
-    with patch.object(engine, 'translate_file') as mock_translate:
+    with patch.object(engine, "translate_file") as mock_translate:
         mock_translate.return_value = TranslationResult(
             success=True,
             source_file=Path("test.md"),
@@ -234,4 +235,4 @@ def test_engine_backward_compatible_no_param():
 
     # Verify progress_tracker is None
     assert engine.progress_tracker is None
-    assert hasattr(engine, 'progress_tracker')
+    assert hasattr(engine, "progress_tracker")

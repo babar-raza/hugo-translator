@@ -1,11 +1,12 @@
 """Tests for asset synchronization utility (TC-04 / GT-AUDIT-03)."""
+
 from __future__ import annotations
 
 from pathlib import Path
 
 import pytest
 
-from src.utils.asset_sync import sync_assets, DEFAULT_ASSET_EXTENSIONS
+from src.utils.asset_sync import DEFAULT_ASSET_EXTENSIONS, sync_assets
 
 
 class TestSyncAssets:

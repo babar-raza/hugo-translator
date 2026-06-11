@@ -3,28 +3,36 @@
 Each scenario validates that a dry-run metrics payload produces correct
 evidence without actually posting to the Google Sheet.
 """
+
 from __future__ import annotations
 
 import json
 import uuid
 from pathlib import Path
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
 
 import pytest
 
-from src.observability.agent_metrics_payload import (
-    AGENT_NAME, AGENT_OWNER, EXPECTED_POST_KEYS,
-    AgentMetricsPayload, determine_status, make_timestamp,
-)
 from src.observability.agent_metrics_integration import _build_item_name
-from src.observability.metrics_scope import (
-    ScopeResolver, ScopeInput, derive_content_root_id,
-    generate_stable_work_slice_id, generate_execution_attempt_id,
-    generate_segment_run_id,
+from src.observability.agent_metrics_payload import (
+    AGENT_NAME,
+    AGENT_OWNER,
+    EXPECTED_POST_KEYS,
+    AgentMetricsPayload,
+    determine_status,
+    make_timestamp,
 )
 from src.observability.gitlab_context import collect_gitlab_context
-from src.observability.metrics_evidence import EvidenceWriter
 from src.observability.llm_run_context import LLMRunContext
+from src.observability.metrics_evidence import EvidenceWriter
+from src.observability.metrics_scope import (
+    ScopeInput,
+    ScopeResolver,
+    derive_content_root_id,
+    generate_execution_attempt_id,
+    generate_segment_run_id,
+    generate_stable_work_slice_id,
+)
 
 
 def _build_scenario(
@@ -39,12 +47,18 @@ def _build_scenario(
 ) -> dict:
     """Build a full dry-run scenario and return evidence + payload."""
     crid = derive_content_root_id(content_root_raw)
-    resolver = ScopeResolver(config={
-        "metrics_website_mapping": {},
-        "metrics_section_mapping": {"docs": "Docs", "products": "Product Pages", "blog": "Blog"},
-        "metrics_brand_mapping": {"aspose.net": "Aspose", "aspose.com": "Aspose"},
-        "metrics_domain_platform_mapping": {"aspose.net": "net"},
-    })
+    resolver = ScopeResolver(
+        config={
+            "metrics_website_mapping": {},
+            "metrics_section_mapping": {
+                "docs": "Docs",
+                "products": "Product Pages",
+                "blog": "Blog",
+            },
+            "metrics_brand_mapping": {"aspose.net": "Aspose", "aspose.com": "Aspose"},
+            "metrics_domain_platform_mapping": {"aspose.net": "net"},
+        }
+    )
     scope_input = ScopeInput(
         site_id=site_id,
         content_root_raw=content_root_raw,
@@ -83,8 +97,11 @@ class TestM1ContentTranslationDocsWords:
         r = _build_scenario(
             site_id="docs.aspose.net",
             content_root_raw="${ASPOSE_NET_CONTENT}/docs.aspose.net/words",
-            items_discovered=10, items_succeeded=8, items_failed=2,
-            token_usage=1200, api_calls_count=10,
+            items_discovered=10,
+            items_succeeded=8,
+            items_failed=2,
+            token_usage=1200,
+            api_calls_count=10,
         )
         assert r["resolved"].product == "Aspose.Words"
         assert r["resolved"].website_section == "Docs"
@@ -99,8 +116,11 @@ class TestM2ProductsPagesWords:
         r = _build_scenario(
             site_id="products.aspose.net",
             content_root_raw="${ASPOSE_NET_CONTENT}/products.aspose.net/words",
-            items_discovered=5, items_succeeded=5, items_failed=0,
-            token_usage=600, api_calls_count=5,
+            items_discovered=5,
+            items_succeeded=5,
+            items_failed=0,
+            token_usage=600,
+            api_calls_count=5,
         )
         assert r["resolved"].website_section == "Product Pages"
         assert r["resolved"].product == "Aspose.Words"
@@ -112,8 +132,11 @@ class TestM3TwoLocalesSingleRow:
         r = _build_scenario(
             site_id="docs.aspose.net",
             content_root_raw="${ASPOSE_NET_CONTENT}/docs.aspose.net/words",
-            items_discovered=10, items_succeeded=10, items_failed=0,
-            token_usage=2000, api_calls_count=10,
+            items_discovered=10,
+            items_succeeded=10,
+            items_failed=0,
+            token_usage=2000,
+            api_calls_count=10,
         )
         # Single row — locale grain is always "all"
         assert len(r["post_dict"]) == 17
@@ -126,8 +149,11 @@ class TestM4VerificationWorkerNoLLM:
         r = _build_scenario(
             site_id="docs.aspose.net",
             content_root_raw="${ASPOSE_NET_CONTENT}/docs.aspose.net/words",
-            items_discovered=5, items_succeeded=5, items_failed=0,
-            token_usage=0, api_calls_count=0,
+            items_discovered=5,
+            items_succeeded=5,
+            items_failed=0,
+            token_usage=0,
+            api_calls_count=0,
         )
         assert r["post_dict"]["token_usage"] == 0
         assert r["post_dict"]["api_calls_count"] == 0
@@ -162,8 +188,10 @@ class TestM6bNewAttemptSeparateRow:
     @patch("src.observability.metrics_scope._get_source_commit_sha", return_value="sha1")
     def test_m6b(self, _sha, _repo):
         ws = generate_stable_work_slice_id(
-            site_id="docs.aspose.net", content_root_id="docs.aspose.net/words",
-            product_family_token="words", platform="all",
+            site_id="docs.aspose.net",
+            content_root_id="docs.aspose.net/words",
+            product_family_token="words",
+            platform="all",
             operation_type="content_translation",
         )
         ctx = MagicMock()
@@ -200,8 +228,11 @@ class TestM9FallbackProfile:
         r = _build_scenario(
             site_id="blog.aspose.net",
             content_root_raw="${ASPOSE_NET_CONTENT}/blog.aspose.net",
-            items_discovered=3, items_succeeded=3, items_failed=0,
-            token_usage=300, api_calls_count=3,
+            items_discovered=3,
+            items_succeeded=3,
+            items_failed=0,
+            token_usage=300,
+            api_calls_count=3,
         )
         assert "Total" in r["resolved"].product
         assert r["resolved"].reporting_confidence == "medium"
@@ -218,6 +249,7 @@ class TestM11TestProfileExcluded:
     def test_m11(self):
         """Test profile is excluded from posting."""
         from src.observability.agent_metrics_integration import _is_excluded
+
         cfg = {"excluded_site_id_prefixes": ["blog-test", "golden-test", "example"]}
         assert _is_excluded("blog-test-site", cfg) is True
         assert _is_excluded("golden-test-profile", cfg) is True
@@ -227,6 +259,7 @@ class TestM11TestProfileExcluded:
 class TestM12MissingEndpointEnv:
     def test_m12(self, monkeypatch):
         from src.observability.agent_metrics_poster import AgentMetricsPoster
+
         monkeypatch.delenv("AGENT_METRICS_ENDPOINT", raising=False)
         monkeypatch.delenv("AGENT_METRICS_TOKEN", raising=False)
         poster = AgentMetricsPoster(dry_run=False)
@@ -246,8 +279,11 @@ class TestM14PayloadFieldCount:
         r = _build_scenario(
             site_id="docs.aspose.net",
             content_root_raw="${ASPOSE_NET_CONTENT}/docs.aspose.net/words",
-            items_discovered=1, items_succeeded=1, items_failed=0,
-            token_usage=50, api_calls_count=1,
+            items_discovered=1,
+            items_succeeded=1,
+            items_failed=0,
+            token_usage=50,
+            api_calls_count=1,
         )
         d = r["post_dict"]
         serialized = json.loads(json.dumps(d))
@@ -268,8 +304,11 @@ class TestM15ProfessionalizeEvidence:
         r = _build_scenario(
             site_id="docs.aspose.net",
             content_root_raw="${ASPOSE_NET_CONTENT}/docs.aspose.net/words",
-            items_discovered=1, items_succeeded=1, items_failed=0,
-            token_usage=50, api_calls_count=1,
+            items_discovered=1,
+            items_succeeded=1,
+            items_failed=0,
+            token_usage=50,
+            api_calls_count=1,
         )
         path = ew.write_pre_post_sidecar(
             segment_run_id="seg-test",

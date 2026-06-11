@@ -38,6 +38,7 @@ def check_deps():
     try:
         import faiss
         from sentence_transformers import SentenceTransformer
+
         return True
     except ImportError:
         pytest.skip("faiss or sentence-transformers not installed")
@@ -144,10 +145,7 @@ def test_embedding_generated_before_add(l3_tm, check_deps):
 
     # Add entry
     source_text = "Hello world"
-    l3_tm.add_entry(
-        "test_id", "site", "en", "de",
-        source_text, "Hallo Welt"
-    )
+    l3_tm.add_entry("test_id", "site", "en", "de", source_text, "Hallo Welt")
 
     # Verify encoder was called with source_text
     assert len(encode_calls) == 1
@@ -343,7 +341,9 @@ def test_search_filters_by_site_id(l3_tm, sample_entries, check_deps):
 
     # Search for docs.example.com
     results = l3_tm.semantic_search(
-        "docs.example.com", "en", "de",
+        "docs.example.com",
+        "en",
+        "de",
         "Hello world",
         k=10,
         threshold=0.0,  # Accept all similarities
@@ -369,7 +369,9 @@ def test_search_filters_by_src_lang(l3_tm, check_deps):
 
     # Search with en source
     results = l3_tm.semantic_search(
-        "site", "en", "de",
+        "site",
+        "en",
+        "de",
         "Hello",
         k=10,
         threshold=0.0,
@@ -394,7 +396,9 @@ def test_search_filters_by_tgt_lang(l3_tm, sample_entries, check_deps):
 
     # Search for German translations
     results_de = l3_tm.semantic_search(
-        "docs.example.com", "en", "de",
+        "docs.example.com",
+        "en",
+        "de",
         "Hello world",
         k=10,
         threshold=0.0,
@@ -402,7 +406,9 @@ def test_search_filters_by_tgt_lang(l3_tm, sample_entries, check_deps):
 
     # Search for French translations
     results_fr = l3_tm.semantic_search(
-        "docs.example.com", "en", "fr",
+        "docs.example.com",
+        "en",
+        "fr",
         "Hello world",
         k=10,
         threshold=0.0,
@@ -460,11 +466,15 @@ def test_threshold_filters_low_similarity(l3_tm, check_deps):
     # Add entries with varying similarity to query
     l3_tm.add_entry("e1", "site", "en", "de", "Hello world", "Hallo Welt")
     l3_tm.add_entry("e2", "site", "en", "de", "Hello there", "Hallo da")
-    l3_tm.add_entry("e3", "site", "en", "de", "Completely different text about programming", "Ganz anderer Text")
+    l3_tm.add_entry(
+        "e3", "site", "en", "de", "Completely different text about programming", "Ganz anderer Text"
+    )
 
     # High threshold should filter more results
     high_results = l3_tm.semantic_search(
-        "site", "en", "de",
+        "site",
+        "en",
+        "de",
         "Hello world",
         k=10,
         threshold=0.9,
@@ -472,7 +482,9 @@ def test_threshold_filters_low_similarity(l3_tm, check_deps):
 
     # Low threshold should return more
     low_results = l3_tm.semantic_search(
-        "site", "en", "de",
+        "site",
+        "en",
+        "de",
         "Hello world",
         k=10,
         threshold=0.1,
@@ -503,7 +515,9 @@ def test_threshold_zero_returns_all_matches(l3_tm, check_deps):
 
     # threshold=0.0 should return all (up to k)
     results = l3_tm.semantic_search(
-        "site", "en", "de",
+        "site",
+        "en",
+        "de",
         "Any query text",
         k=10,
         threshold=0.0,
@@ -524,7 +538,9 @@ def test_threshold_one_requires_perfect_match(l3_tm, check_deps):
 
     # threshold=1.0 typically returns empty (exact semantic match rare)
     results = l3_tm.semantic_search(
-        "site", "en", "de",
+        "site",
+        "en",
+        "de",
         "Different query text",
         k=10,
         threshold=1.0,
@@ -566,7 +582,8 @@ def test_concurrent_adds_are_thread_safe(tmp_path, check_deps):
                 tm.add_entry(
                     f"t{thread_id}_e{i}",
                     f"site_{thread_id}",
-                    "en", "de",
+                    "en",
+                    "de",
                     f"Text from thread {thread_id} entry {i}",
                     f"Translation {thread_id}_{i}",
                 )
@@ -610,8 +627,12 @@ def test_concurrent_reads_and_writes_are_safe(l3_tm, check_deps):
         try:
             for i in range(20):
                 l3_tm.add_entry(
-                    f"t{thread_id}_e{i}", "site", "en", "de",
-                    f"New text {thread_id}_{i}", f"New trans {thread_id}_{i}",
+                    f"t{thread_id}_e{i}",
+                    "site",
+                    "en",
+                    "de",
+                    f"New text {thread_id}_{i}",
+                    f"New trans {thread_id}_{i}",
                 )
         except Exception as e:
             errors.append(e)
@@ -620,7 +641,9 @@ def test_concurrent_reads_and_writes_are_safe(l3_tm, check_deps):
         try:
             for _ in range(20):
                 l3_tm.semantic_search(
-                    "site", "en", "de",
+                    "site",
+                    "en",
+                    "de",
                     f"Query text {thread_id}",
                     k=5,
                     threshold=0.0,
@@ -657,7 +680,9 @@ def test_empty_index_returns_empty_list(l3_tm, check_deps):
     """
     # Don't add anything
     results = l3_tm.semantic_search(
-        "site", "en", "de",
+        "site",
+        "en",
+        "de",
         "Hello world",
         k=10,
         threshold=0.75,
@@ -681,7 +706,9 @@ def test_k_greater_than_index_size_capped(l3_tm, check_deps):
 
     # Request k=100
     results = l3_tm.semantic_search(
-        "site", "en", "de",
+        "site",
+        "en",
+        "de",
         "Text",
         k=100,
         threshold=0.0,
@@ -714,7 +741,9 @@ def test_oversample_factor_for_filtering(tmp_path, check_deps):
     # Search with k=3 but only 5 entries match site filter
     # Oversample (k*10=30) ensures we search enough to find all 5
     results = tm.semantic_search(
-        "target_site", "en", "de",
+        "target_site",
+        "en",
+        "de",
         "Text content",
         k=3,
         threshold=0.0,
@@ -740,7 +769,9 @@ def test_search_returns_sorted_by_similarity(l3_tm, check_deps):
     l3_tm.add_entry("different", "site", "en", "de", "Programming tutorial", "Programmier Tutorial")
 
     results = l3_tm.semantic_search(
-        "site", "en", "de",
+        "site",
+        "en",
+        "de",
         "Hello world",
         k=10,
         threshold=0.0,
@@ -768,7 +799,8 @@ def test_semantic_match_contains_all_fields(l3_tm, check_deps):
     l3_tm.add_entry(
         "test_entry",
         "test_site",
-        "en", "de",
+        "en",
+        "de",
         "Hello world",
         "Hallo Welt",
         context="test_context",
@@ -776,7 +808,9 @@ def test_semantic_match_contains_all_fields(l3_tm, check_deps):
     )
 
     results = l3_tm.semantic_search(
-        "test_site", "en", "de",
+        "test_site",
+        "en",
+        "de",
         "Hello world",
         k=1,
         threshold=0.0,

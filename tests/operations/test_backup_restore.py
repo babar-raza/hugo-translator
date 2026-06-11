@@ -68,7 +68,7 @@ class TestBackupCreation:
         success, message = backup_tm.create_backup(
             output_path=output_file,
             tm_data_dir=temp_dirs["tm_data"],
-            config_dir=temp_dirs["config"]
+            config_dir=temp_dirs["config"],
         )
 
         assert success is True
@@ -82,11 +82,11 @@ class TestBackupCreation:
         backup_tm.create_backup(
             output_path=output_file,
             tm_data_dir=temp_dirs["tm_data"],
-            config_dir=temp_dirs["config"]
+            config_dir=temp_dirs["config"],
         )
 
         # Check contents
-        with tarfile.open(output_file, 'r:gz') as tar:
+        with tarfile.open(output_file, "r:gz") as tar:
             names = tar.getnames()
 
             assert "metadata.json" in names
@@ -99,9 +99,7 @@ class TestBackupCreation:
     def test_backup_metadata_correct(self, temp_dirs):
         """Test that backup metadata is correct."""
         metadata = backup_tm.create_backup_metadata(
-            tm_data_dir=temp_dirs["tm_data"],
-            config_dir=temp_dirs["config"],
-            version="1.0.0"
+            tm_data_dir=temp_dirs["tm_data"], config_dir=temp_dirs["config"], version="1.0.0"
         )
 
         assert "backup_timestamp" in metadata
@@ -119,7 +117,7 @@ class TestBackupCreation:
         backup_tm.create_backup(
             output_path=output_file,
             tm_data_dir=temp_dirs["tm_data"],
-            config_dir=temp_dirs["config"]
+            config_dir=temp_dirs["config"],
         )
 
         checksum_file = output_file.parent / f"{output_file.name}.sha256"
@@ -133,6 +131,7 @@ class TestBackupCreation:
         """Test backup without config directory."""
         # Remove config
         import shutil
+
         shutil.rmtree(temp_dirs["config"])
 
         output_file = temp_dirs["backups"] / "test_backup.tar.gz"
@@ -140,7 +139,7 @@ class TestBackupCreation:
         success, message = backup_tm.create_backup(
             output_path=output_file,
             tm_data_dir=temp_dirs["tm_data"],
-            config_dir=temp_dirs["config"]
+            config_dir=temp_dirs["config"],
         )
 
         assert success is True
@@ -152,9 +151,7 @@ class TestBackupCreation:
         fake_dir = temp_dirs["root"] / "nonexistent"
 
         success, message = backup_tm.create_backup(
-            output_path=output_file,
-            tm_data_dir=fake_dir,
-            config_dir=temp_dirs["config"]
+            output_path=output_file, tm_data_dir=fake_dir, config_dir=temp_dirs["config"]
         )
 
         assert success is False
@@ -171,7 +168,7 @@ class TestBackupCreation:
                 output_path=output_file,
                 tm_data_dir=temp_dirs["tm_data"],
                 config_dir=temp_dirs["config"],
-                compression=compression
+                compression=compression,
             )
 
             assert success is True
@@ -208,7 +205,7 @@ class TestBackupRotation:
                 output_path=output_file,
                 tm_data_dir=temp_dirs["tm_data"],
                 config_dir=temp_dirs["config"],
-                rotate=3
+                rotate=3,
             )
 
         # Check that only 3 remain
@@ -226,7 +223,7 @@ class TestBackupRestore:
         backup_tm.create_backup(
             output_path=backup_file,
             tm_data_dir=temp_dirs["tm_data"],
-            config_dir=temp_dirs["config"]
+            config_dir=temp_dirs["config"],
         )
 
         # Create restore target
@@ -234,9 +231,7 @@ class TestBackupRestore:
 
         # Restore
         success, message = restore_tm.restore_backup(
-            backup_path=backup_file,
-            target_dir=restore_target,
-            verify=True
+            backup_path=backup_file, target_dir=restore_target, verify=True
         )
 
         assert success is True
@@ -253,7 +248,7 @@ class TestBackupRestore:
         backup_tm.create_backup(
             output_path=backup_file,
             tm_data_dir=temp_dirs["tm_data"],
-            config_dir=temp_dirs["config"]
+            config_dir=temp_dirs["config"],
         )
 
         # Verify integrity
@@ -276,7 +271,7 @@ class TestBackupRestore:
         backup_tm.create_backup(
             output_path=backup_file,
             tm_data_dir=temp_dirs["tm_data"],
-            config_dir=temp_dirs["config"]
+            config_dir=temp_dirs["config"],
         )
 
         # Corrupt checksum file
@@ -295,17 +290,14 @@ class TestBackupRestore:
         backup_tm.create_backup(
             output_path=backup_file,
             tm_data_dir=temp_dirs["tm_data"],
-            config_dir=temp_dirs["config"]
+            config_dir=temp_dirs["config"],
         )
 
         restore_target = temp_dirs["root"] / "restored"
 
         # Dry run
         success, message = restore_tm.restore_backup(
-            backup_path=backup_file,
-            target_dir=restore_target,
-            verify=True,
-            dry_run=True
+            backup_path=backup_file, target_dir=restore_target, verify=True, dry_run=True
         )
 
         assert success is True
@@ -319,8 +311,7 @@ class TestBackupRestore:
         restore_target = temp_dirs["root"] / "restored"
 
         success, message = restore_tm.restore_backup(
-            backup_path=backup_file,
-            target_dir=restore_target
+            backup_path=backup_file, target_dir=restore_target
         )
 
         assert success is False
@@ -332,7 +323,7 @@ class TestBackupRestore:
         backup_tm.create_backup(
             output_path=backup_file,
             tm_data_dir=temp_dirs["tm_data"],
-            config_dir=temp_dirs["config"]
+            config_dir=temp_dirs["config"],
         )
 
         metadata = restore_tm.read_backup_metadata(backup_file)
@@ -353,16 +344,12 @@ class TestBackupRestoreIntegration:
         backup_tm.create_backup(
             output_path=backup_file,
             tm_data_dir=temp_dirs["tm_data"],
-            config_dir=temp_dirs["config"]
+            config_dir=temp_dirs["config"],
         )
 
         # Restore to new location
         restore_target = temp_dirs["root"] / "restored"
-        restore_tm.restore_backup(
-            backup_path=backup_file,
-            target_dir=restore_target,
-            verify=True
-        )
+        restore_tm.restore_backup(backup_path=backup_file, target_dir=restore_target, verify=True)
 
         # Verify content integrity
         original_l2 = temp_dirs["l2_lmdb"] / "data.mdb"
@@ -383,7 +370,7 @@ class TestBackupRestoreIntegration:
             success, message = backup_tm.create_backup(
                 output_path=backup_file,
                 tm_data_dir=temp_dirs["tm_data"],
-                config_dir=temp_dirs["config"]
+                config_dir=temp_dirs["config"],
             )
 
         assert success is True
@@ -399,20 +386,16 @@ class TestBackupRestoreIntegration:
             backup_tm.create_backup(
                 output_path=backup_file,
                 tm_data_dir=temp_dirs["tm_data"],
-                config_dir=temp_dirs["config"]
+                config_dir=temp_dirs["config"],
             )
 
             # Restore and verify
             restore_target = temp_dirs["root"] / f"restored_{i}"
             restore_tm.restore_backup(
-                backup_path=backup_file,
-                target_dir=restore_target,
-                verify=True
+                backup_path=backup_file, target_dir=restore_target, verify=True
             )
 
-            restored_content = (
-                restore_target / "tm_data" / "l2_lmdb" / "data.mdb"
-            ).read_text()
+            restored_content = (restore_target / "tm_data" / "l2_lmdb" / "data.mdb").read_text()
             assert restored_content == f"L2 data {i}"
 
 
@@ -486,7 +469,7 @@ class TestBackupFailureScenarios:
         success, message = backup_tm.create_backup(
             output_path=backup_file,
             tm_data_dir=temp_dirs["tm_data"],
-            config_dir=temp_dirs["config"]
+            config_dir=temp_dirs["config"],
         )
 
         assert success is True
@@ -505,13 +488,13 @@ class TestCrossPlatformCompatibility:
         success, message = backup_tm.create_backup(
             output_path=backup_file,
             tm_data_dir=temp_dirs["tm_data"],
-            config_dir=temp_dirs["config"]
+            config_dir=temp_dirs["config"],
         )
 
         assert success is True
 
         # Verify paths in tarball use forward slashes
-        with tarfile.open(backup_file, 'r:gz') as tar:
+        with tarfile.open(backup_file, "r:gz") as tar:
             names = tar.getnames()
             for name in names:
                 assert "\\" not in name  # No backslashes
@@ -522,15 +505,11 @@ class TestCrossPlatformCompatibility:
         backup_tm.create_backup(
             output_path=backup_file,
             tm_data_dir=temp_dirs["tm_data"],
-            config_dir=temp_dirs["config"]
+            config_dir=temp_dirs["config"],
         )
 
         restore_target = temp_dirs["root"] / "restored"
-        restore_tm.restore_backup(
-            backup_path=backup_file,
-            target_dir=restore_target,
-            verify=True
-        )
+        restore_tm.restore_backup(backup_path=backup_file, target_dir=restore_target, verify=True)
 
         # Check that paths are created correctly
         assert (restore_target / "tm_data" / "l2_lmdb").exists()

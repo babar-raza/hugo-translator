@@ -21,11 +21,8 @@ class TestFeatureFlagToggle:
             content_roots=["content"],
             default_source_lang="en",
             target_langs=["de", "fr"],
-            body=BodyRules(
-                translate_markdown=True,
-                use_ast_body_reconstruction=True
-            ),
-            frontmatter={}
+            body=BodyRules(translate_markdown=True, use_ast_body_reconstruction=True),
+            frontmatter={},
         )
 
     @pytest.fixture
@@ -36,11 +33,8 @@ class TestFeatureFlagToggle:
             content_roots=["content"],
             default_source_lang="en",
             target_langs=["de", "fr"],
-            body=BodyRules(
-                translate_markdown=True,
-                use_ast_body_reconstruction=False
-            ),
-            frontmatter={}
+            body=BodyRules(translate_markdown=True, use_ast_body_reconstruction=False),
+            frontmatter={},
         )
 
     @pytest.fixture
@@ -52,7 +46,7 @@ class TestFeatureFlagToggle:
             default_source_lang="en",
             target_langs=["de", "fr"],
             body=BodyRules(translate_markdown=True),  # use_ast defaults to False
-            frontmatter={}
+            frontmatter={},
         )
 
     def test_flag_true_uses_ast_path(self, site_profile_ast_enabled):
@@ -61,7 +55,7 @@ class TestFeatureFlagToggle:
         assert site_profile_ast_enabled.body.use_ast_body_reconstruction is True
 
         # Verify getattr returns True (matches engine logic at line 856)
-        use_ast = getattr(site_profile_ast_enabled.body, 'use_ast_body_reconstruction', False)
+        use_ast = getattr(site_profile_ast_enabled.body, "use_ast_body_reconstruction", False)
         assert use_ast is True
 
     def test_flag_false_uses_legacy_path(self, site_profile_ast_disabled):
@@ -70,7 +64,7 @@ class TestFeatureFlagToggle:
         assert site_profile_ast_disabled.body.use_ast_body_reconstruction is False
 
         # Verify getattr returns False (matches engine logic)
-        use_ast = getattr(site_profile_ast_disabled.body, 'use_ast_body_reconstruction', False)
+        use_ast = getattr(site_profile_ast_disabled.body, "use_ast_body_reconstruction", False)
         assert use_ast is False
 
     def test_flag_default_is_false(self, site_profile_default):
@@ -79,7 +73,7 @@ class TestFeatureFlagToggle:
         assert site_profile_default.body.use_ast_body_reconstruction is False
 
         # Verify getattr returns False for default
-        use_ast = getattr(site_profile_default.body, 'use_ast_body_reconstruction', False)
+        use_ast = getattr(site_profile_default.body, "use_ast_body_reconstruction", False)
         assert use_ast is False
 
     def test_body_rules_default_value(self):
@@ -104,11 +98,8 @@ class TestFeatureFlagToggle:
             "content_roots": ["content"],
             "default_source_lang": "en",
             "target_langs": ["de"],
-            "body": {
-                "translate_markdown": True,
-                "use_ast_body_reconstruction": True
-            },
-            "frontmatter": {}
+            "body": {"translate_markdown": True, "use_ast_body_reconstruction": True},
+            "frontmatter": {},
         }
         profile = SiteProfile(**config_dict)
         assert profile.body.use_ast_body_reconstruction is True
@@ -121,7 +112,7 @@ class TestFeatureFlagToggle:
             "default_source_lang": "en",
             "target_langs": ["de"],
             "body": {"translate_markdown": True},
-            "frontmatter": {}
+            "frontmatter": {},
         }
         profile = SiteProfile(**config_dict)
         assert profile.body.use_ast_body_reconstruction is False
@@ -135,7 +126,7 @@ class TestASTMethodExists:
         from src.translation_engine.engine import TranslationEngine
 
         # Check method exists on class (not instance, since instantiation requires deps)
-        assert hasattr(TranslationEngine, '_translate_body_ast')
+        assert hasattr(TranslationEngine, "_translate_body_ast")
         assert callable(TranslationEngine._translate_body_ast)
 
 
@@ -157,12 +148,12 @@ class TestFlagInEngineLogic:
 
         # Test with True - should trigger AST path (line 858: if use_ast:)
         profile_ast = MockProfile(use_ast=True)
-        use_ast = getattr(profile_ast.body, 'use_ast_body_reconstruction', False)
+        use_ast = getattr(profile_ast.body, "use_ast_body_reconstruction", False)
         assert use_ast is True, "Flag=True should trigger AST path"
 
         # Test with False - should trigger legacy path (line 899: if not use_ast:)
         profile_legacy = MockProfile(use_ast=False)
-        use_ast = getattr(profile_legacy.body, 'use_ast_body_reconstruction', False)
+        use_ast = getattr(profile_legacy.body, "use_ast_body_reconstruction", False)
         assert use_ast is False, "Flag=False should trigger legacy path"
 
         # Test with missing attribute (fallback to False)
@@ -174,9 +165,9 @@ class TestFlagInEngineLogic:
                 self.body = MockBodyNoAttr()
 
         profile_no_attr = MockProfileNoAttr()
-        use_ast = getattr(profile_no_attr.body, 'use_ast_body_reconstruction', False)
+        use_ast = getattr(profile_no_attr.body, "use_ast_body_reconstruction", False)
         assert use_ast is False, "Missing attribute should default to False"
 
 
-if __name__ == '__main__':
-    pytest.main([__file__, '-v'])
+if __name__ == "__main__":
+    pytest.main([__file__, "-v"])

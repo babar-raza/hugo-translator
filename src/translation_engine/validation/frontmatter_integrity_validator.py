@@ -27,28 +27,53 @@ from typing import Any
 
 import yaml
 
-from .base import ValidationIssue, ValidationResult, ValidationSeverity, Validator
+from .base import ValidationResult, ValidationSeverity, Validator
 
 # Fields that must be passed through unchanged (byte-for-byte equal to source).
 # Extend as additional passthrough fields are discovered in site profiles.
-PASSTHROUGH_FIELDS = frozenset({
-    "date", "lastmod", "draft", "author", "weight", "type", "layout",
-    "cart_id", "plugin_platform", "gisthash", "gistfile",
-    "productname", "productkey", "platformkey", "productplatform",
-    "source_version", "generated_by", "enhanced", "howtoimage",
-    "linktitle",
-    # products.aspose.net structural
-    "enable", "plugin_name",
-})
+PASSTHROUGH_FIELDS = frozenset(
+    {
+        "date",
+        "lastmod",
+        "draft",
+        "author",
+        "weight",
+        "type",
+        "layout",
+        "cart_id",
+        "plugin_platform",
+        "gisthash",
+        "gistfile",
+        "productname",
+        "productkey",
+        "platformkey",
+        "productplatform",
+        "source_version",
+        "generated_by",
+        "enhanced",
+        "howtoimage",
+        "linktitle",
+        # products.aspose.net structural
+        "enable",
+        "plugin_name",
+    }
+)
 
 # Fields where only the URL/path value matters and must not be translated
-URL_LIKE_FIELDS = frozenset({
-    "slug", "url", "canonical", "image", "thumbnail", "howtoimage",
-})
+URL_LIKE_FIELDS = frozenset(
+    {
+        "slug",
+        "url",
+        "canonical",
+        "image",
+        "thumbnail",
+        "howtoimage",
+    }
+)
 
 # Regex: URL starts with http/https/ftp or /
-_URL_RE = re.compile(r'^(https?://|ftp://|/)', re.IGNORECASE)
-_NON_ASCII_RE = re.compile(r'[^\x00-\x7F]')
+_URL_RE = re.compile(r"^(https?://|ftp://|/)", re.IGNORECASE)
+_NON_ASCII_RE = re.compile(r"[^\x00-\x7F]")
 
 
 class FrontmatterIntegrityValidator(Validator):
@@ -105,27 +130,29 @@ class FrontmatterIntegrityValidator(Validator):
     # Internal checks
     # ------------------------------------------------------------------
 
-    def _parse(
-        self, yaml_str: str, label: str, result: ValidationResult
-    ) -> dict[str, Any] | None:
+    def _parse(self, yaml_str: str, label: str, result: ValidationResult) -> dict[str, Any] | None:
         try:
             data = yaml.safe_load(yaml_str)
             if data is None:
                 data = {}
             if not isinstance(data, dict):
-                result.issues.append(self.create_issue(
-                    ValidationSeverity.ERROR,
-                    f"{label} frontmatter is not a YAML mapping (got {type(data).__name__})",
-                    location=label,
-                ))
+                result.issues.append(
+                    self.create_issue(
+                        ValidationSeverity.ERROR,
+                        f"{label} frontmatter is not a YAML mapping (got {type(data).__name__})",
+                        location=label,
+                    )
+                )
                 return None
             return data
         except yaml.YAMLError as exc:
-            result.issues.append(self.create_issue(
-                ValidationSeverity.ERROR,
-                f"{label} frontmatter YAML parse failed: {exc}",
-                location=label,
-            ))
+            result.issues.append(
+                self.create_issue(
+                    ValidationSeverity.ERROR,
+                    f"{label} frontmatter YAML parse failed: {exc}",
+                    location=label,
+                )
+            )
             return None
 
     def _check_key_set(
@@ -139,20 +166,24 @@ class FrontmatterIntegrityValidator(Validator):
         missing = src_keys - tgt_keys
         extra = tgt_keys - src_keys
         if missing:
-            result.issues.append(self.create_issue(
-                ValidationSeverity.ERROR,
-                f"Translation frontmatter missing keys: {sorted(missing)}",
-                location="frontmatter",
-                details={"missing_keys": sorted(missing)},
-            ))
+            result.issues.append(
+                self.create_issue(
+                    ValidationSeverity.ERROR,
+                    f"Translation frontmatter missing keys: {sorted(missing)}",
+                    location="frontmatter",
+                    details={"missing_keys": sorted(missing)},
+                )
+            )
         if extra:
-            result.issues.append(self.create_issue(
-                ValidationSeverity.ERROR,
-                f"Translation frontmatter has extra keys (possible translated key names): "
-                f"{sorted(extra)}",
-                location="frontmatter",
-                details={"extra_keys": sorted(extra)},
-            ))
+            result.issues.append(
+                self.create_issue(
+                    ValidationSeverity.ERROR,
+                    f"Translation frontmatter has extra keys (possible translated key names): "
+                    f"{sorted(extra)}",
+                    location="frontmatter",
+                    details={"extra_keys": sorted(extra)},
+                )
+            )
 
     def _check_key_order(
         self,
@@ -163,12 +194,14 @@ class FrontmatterIntegrityValidator(Validator):
         common = [k for k in source if k in translation]
         tgt_common = [k for k in translation if k in source]
         if common != tgt_common:
-            result.issues.append(self.create_issue(
-                ValidationSeverity.ERROR,
-                f"Frontmatter key order changed. Source order: {common}. "
-                f"Translation order: {tgt_common}",
-                location="frontmatter",
-            ))
+            result.issues.append(
+                self.create_issue(
+                    ValidationSeverity.ERROR,
+                    f"Frontmatter key order changed. Source order: {common}. "
+                    f"Translation order: {tgt_common}",
+                    location="frontmatter",
+                )
+            )
 
     def _check_types(
         self,
@@ -187,32 +220,38 @@ class FrontmatterIntegrityValidator(Validator):
                 # Allow None/None equivalence
                 if sv is None and tv is None:
                     continue
-                result.issues.append(self.create_issue(
-                    ValidationSeverity.ERROR,
-                    f"Type changed for key '{key}': source={s_type}, translation={t_type}",
-                    location=f"frontmatter.{key}",
-                    details={"source_type": s_type, "translation_type": t_type},
-                ))
+                result.issues.append(
+                    self.create_issue(
+                        ValidationSeverity.ERROR,
+                        f"Type changed for key '{key}': source={s_type}, translation={t_type}",
+                        location=f"frontmatter.{key}",
+                        details={"source_type": s_type, "translation_type": t_type},
+                    )
+                )
                 continue
 
             # Bool: must remain bool, not "true"/"false" string
             if isinstance(sv, bool):
                 if not isinstance(tv, bool):
-                    result.issues.append(self.create_issue(
-                        ValidationSeverity.ERROR,
-                        f"Boolean key '{key}' was converted to {t_type} in translation",
-                        location=f"frontmatter.{key}",
-                    ))
+                    result.issues.append(
+                        self.create_issue(
+                            ValidationSeverity.ERROR,
+                            f"Boolean key '{key}' was converted to {t_type} in translation",
+                            location=f"frontmatter.{key}",
+                        )
+                    )
 
             # List: check length and element types
             if isinstance(sv, list) and isinstance(tv, list):
                 if len(sv) != len(tv):
-                    result.issues.append(self.create_issue(
-                        ValidationSeverity.ERROR,
-                        f"List length changed for key '{key}': "
-                        f"source={len(sv)}, translation={len(tv)}",
-                        location=f"frontmatter.{key}",
-                    ))
+                    result.issues.append(
+                        self.create_issue(
+                            ValidationSeverity.ERROR,
+                            f"List length changed for key '{key}': "
+                            f"source={len(sv)}, translation={len(tv)}",
+                            location=f"frontmatter.{key}",
+                        )
+                    )
 
     def _check_passthrough(
         self,
@@ -229,13 +268,15 @@ class FrontmatterIntegrityValidator(Validator):
             sv = source[key]
             tv = translation[key]
             if sv != tv:
-                result.issues.append(self.create_issue(
-                    ValidationSeverity.ERROR,
-                    f"Passthrough field '{key}' was modified: "
-                    f"source={sv!r}, translation={tv!r}",
-                    location=f"frontmatter.{key}",
-                    details={"source_value": str(sv), "translation_value": str(tv)},
-                ))
+                result.issues.append(
+                    self.create_issue(
+                        ValidationSeverity.ERROR,
+                        f"Passthrough field '{key}' was modified: "
+                        f"source={sv!r}, translation={tv!r}",
+                        location=f"frontmatter.{key}",
+                        details={"source_value": str(sv), "translation_value": str(tv)},
+                    )
+                )
 
     def _check_url_fields(
         self,
@@ -252,10 +293,12 @@ class FrontmatterIntegrityValidator(Validator):
                 continue
             # URL changed — check for non-ASCII corruption
             if _NON_ASCII_RE.search(tv) and not _NON_ASCII_RE.search(sv):
-                result.issues.append(self.create_issue(
-                    ValidationSeverity.ERROR,
-                    f"URL field '{key}' contains non-ASCII characters after translation "
-                    f"(possible URL corruption)",
-                    location=f"frontmatter.{key}",
-                    details={"source_value": sv, "translation_value": tv},
-                ))
+                result.issues.append(
+                    self.create_issue(
+                        ValidationSeverity.ERROR,
+                        f"URL field '{key}' contains non-ASCII characters after translation "
+                        f"(possible URL corruption)",
+                        location=f"frontmatter.{key}",
+                        details={"source_value": sv, "translation_value": tv},
+                    )
+                )

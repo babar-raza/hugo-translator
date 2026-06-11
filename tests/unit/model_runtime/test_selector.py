@@ -13,6 +13,7 @@ Tests cover:
 7. Prefer quality flag behavior
 8. No suitable model error handling
 """
+
 from unittest.mock import Mock
 
 import pytest
@@ -27,6 +28,7 @@ from src.model_runtime.selector import (
 
 # === Fixtures ===
 
+
 @pytest.fixture
 def mock_hardware_cpu():
     """Hardware info for CPU system with 8GB RAM."""
@@ -38,7 +40,7 @@ def mock_hardware_cpu():
         has_mps=False,
         recommended_device="cpu",
         platform="Windows",
-        python_version="3.13"
+        python_version="3.13",
     )
 
 
@@ -49,16 +51,18 @@ def mock_hardware_gpu():
         cpu_count=12,
         total_ram_gb=16.0,
         has_cuda=True,
-        cuda_devices=[{
-            "id": 0,
-            "name": "NVIDIA RTX 3080",
-            "total_memory_gb": 8.0,
-            "compute_capability": "8.6"
-        }],
+        cuda_devices=[
+            {
+                "id": 0,
+                "name": "NVIDIA RTX 3080",
+                "total_memory_gb": 8.0,
+                "compute_capability": "8.6",
+            }
+        ],
         has_mps=False,
         recommended_device="cuda",
         platform="Windows",
-        python_version="3.13"
+        python_version="3.13",
     )
 
 
@@ -73,7 +77,7 @@ def mock_hardware_low_ram():
         has_mps=False,
         recommended_device="cpu",
         platform="Windows",
-        python_version="3.13"
+        python_version="3.13",
     )
 
 
@@ -100,7 +104,7 @@ def mock_registry_production():
         parameters=77_000_000,
         license="CC-BY-4.0",
         hf_model_id="Helsinki-NLP/opus-mt-en-fr",
-        description="Specialized English-French model"
+        description="Specialized English-French model",
     )
 
     opus_en_es = ModelInfo(
@@ -114,7 +118,7 @@ def mock_registry_production():
         parameters=77_000_000,
         license="CC-BY-4.0",
         hf_model_id="Helsinki-NLP/opus-mt-en-es",
-        description="Specialized English-Spanish model"
+        description="Specialized English-Spanish model",
     )
 
     opus_en_de = ModelInfo(
@@ -128,7 +132,7 @@ def mock_registry_production():
         parameters=77_000_000,
         license="CC-BY-4.0",
         hf_model_id="Helsinki-NLP/opus-mt-en-de",
-        description="Specialized English-German model"
+        description="Specialized English-German model",
     )
 
     # Define multilingual models
@@ -143,7 +147,7 @@ def mock_registry_production():
         parameters=418_000_000,
         license="MIT",
         hf_model_id="facebook/m2m100_418M",
-        description="Multilingual model supporting 100 languages"
+        description="Multilingual model supporting 100 languages",
     )
 
     m2m100_418m_ct2 = ModelInfo(
@@ -157,7 +161,7 @@ def mock_registry_production():
         parameters=418_000_000,
         license="MIT",
         local_path="./models/ct2/m2m100_418m",
-        description="CTranslate2 optimized M2M100"
+        description="CTranslate2 optimized M2M100",
     )
 
     nllb_200_600m = ModelInfo(
@@ -171,7 +175,7 @@ def mock_registry_production():
         parameters=600_000_000,
         license="CC-BY-NC-4.0",
         hf_model_id="facebook/nllb-200-distilled-600M",
-        description="No Language Left Behind - 200 languages"
+        description="No Language Left Behind - 200 languages",
     )
 
     nllb_200_1_3b = ModelInfo(
@@ -185,7 +189,7 @@ def mock_registry_production():
         parameters=1_300_000_000,
         license="CC-BY-NC-4.0",
         hf_model_id="facebook/nllb-200-1.3B",
-        description="Larger NLLB model with excellent quality"
+        description="Larger NLLB model with excellent quality",
     )
 
     # Registry models dictionary
@@ -224,6 +228,7 @@ def mock_registry_production():
 
 # === Test Cases ===
 
+
 def test_auto_select_opus_when_available(mock_registry_production, mock_hardware_cpu):
     """
     Test 1: Auto-select Opus when available for supported language pair.
@@ -233,9 +238,7 @@ def test_auto_select_opus_when_available(mock_registry_production, mock_hardware
     THEN: Returns opus_en_fr (not multilingual fallback)
     """
     selector = LanguageAwareModelSelector(
-        registry=mock_registry_production,
-        hardware_info=mock_hardware_cpu,
-        fallback_model=None
+        registry=mock_registry_production, hardware_info=mock_hardware_cpu, fallback_model=None
     )
 
     selection = selector.select_for_language_pair("en", "fr")
@@ -256,9 +259,7 @@ def test_auto_select_multilingual_fallback(mock_registry_production, mock_hardwa
     THEN: Returns m2m100_418m_ct2 (multilingual fallback, CTranslate2 preferred for CPU)
     """
     selector = LanguageAwareModelSelector(
-        registry=mock_registry_production,
-        hardware_info=mock_hardware_cpu,
-        fallback_model=None
+        registry=mock_registry_production, hardware_info=mock_hardware_cpu, fallback_model=None
     )
 
     selection = selector.select_for_language_pair("en", "hr")
@@ -282,9 +283,7 @@ def test_hardware_constraints_respected(mock_registry_production, mock_hardware_
           Larger models excluded by RAM constraint
     """
     selector = LanguageAwareModelSelector(
-        registry=mock_registry_production,
-        hardware_info=mock_hardware_low_ram,
-        fallback_model=None
+        registry=mock_registry_production, hardware_info=mock_hardware_low_ram, fallback_model=None
     )
 
     # Test 1: French should select Opus (1GB requirement fits in 2GB)
@@ -322,15 +321,13 @@ def test_no_suitable_model_error(mock_hardware_low_ram):
         parameters=1_300_000_000,
         license="CC-BY-NC-4.0",
         hf_model_id="facebook/nllb-200-1.3B",
-        description="Large model"
+        description="Large model",
     )
     registry.models = {"nllb_200_1.3b": high_ram_model}
     registry._supports_lang_pair.return_value = False  # No Opus models
 
     selector = LanguageAwareModelSelector(
-        registry=registry,
-        hardware_info=mock_hardware_low_ram,
-        fallback_model=None
+        registry=registry, hardware_info=mock_hardware_low_ram, fallback_model=None
     )
 
     with pytest.raises(ValueError) as exc_info:
@@ -354,17 +351,47 @@ def test_selector_integration_with_registry(mock_registry_production, mock_hardw
       - No ValueError raised for any language
     """
     selector = LanguageAwareModelSelector(
-        registry=mock_registry_production,
-        hardware_info=mock_hardware_cpu,
-        fallback_model=None
+        registry=mock_registry_production, hardware_info=mock_hardware_cpu, fallback_model=None
     )
 
     # All 36 target languages from config/target_languages.yaml
     all_languages = [
-        "ar", "bg", "ca", "cs", "da", "de", "el", "es", "fa", "fi",
-        "fr", "he", "hi", "hr", "hu", "id", "it", "ja", "ko", "lt",
-        "lv", "ms", "nl", "no", "pl", "pt", "ro", "ru", "sk", "sr",
-        "sv", "th", "tr", "uk", "vi", "zh"
+        "ar",
+        "bg",
+        "ca",
+        "cs",
+        "da",
+        "de",
+        "el",
+        "es",
+        "fa",
+        "fi",
+        "fr",
+        "he",
+        "hi",
+        "hr",
+        "hu",
+        "id",
+        "it",
+        "ja",
+        "ko",
+        "lt",
+        "lv",
+        "ms",
+        "nl",
+        "no",
+        "pl",
+        "pt",
+        "ro",
+        "ru",
+        "sk",
+        "sr",
+        "sv",
+        "th",
+        "tr",
+        "uk",
+        "vi",
+        "zh",
     ]
 
     opus_languages = ["fr", "es", "de"]
@@ -402,9 +429,7 @@ def test_prefer_quality_flag(mock_registry_production, mock_hardware_gpu):
           NOT smaller model (m2m100_418m, 418M params)
     """
     selector = LanguageAwareModelSelector(
-        registry=mock_registry_production,
-        hardware_info=mock_hardware_gpu,
-        fallback_model=None
+        registry=mock_registry_production, hardware_info=mock_hardware_gpu, fallback_model=None
     )
 
     # Croatian has no Opus, will use multilingual
@@ -438,7 +463,7 @@ def test_global_fallback_model(mock_registry_production, mock_hardware_cpu):
         parameters=77_000_000,
         license="CC-BY-4.0",
         hf_model_id="Helsinki-NLP/opus-mt-en-fr",
-        description="French model"
+        description="French model",
     )
     fallback_model = ModelInfo(
         model_id="m2m100_418m",
@@ -451,10 +476,12 @@ def test_global_fallback_model(mock_registry_production, mock_hardware_cpu):
         parameters=418_000_000,
         license="MIT",
         hf_model_id="facebook/m2m100_418M",
-        description="Fallback model"
+        description="Fallback model",
     )
     registry.models = {"opus_en_fr": opus_fr, "m2m100_418m": fallback_model}
-    registry.get_model.side_effect = lambda mid: registry.models.get(mid, None) or (_ for _ in ()).throw(KeyError(f"Model {mid} not found"))
+    registry.get_model.side_effect = lambda mid: (
+        registry.models.get(mid, None) or (_ for _ in ()).throw(KeyError(f"Model {mid} not found"))
+    )
     registry._supports_lang_pair.side_effect = lambda m, lp: (
         lp == ("en", "fr") if m.model_id == "opus_en_fr" else m.supported_pairs == "all"
     )
@@ -462,7 +489,7 @@ def test_global_fallback_model(mock_registry_production, mock_hardware_cpu):
     selector = LanguageAwareModelSelector(
         registry=registry,
         hardware_info=mock_hardware_cpu,
-        fallback_model="m2m100_418m"  # Specify global fallback
+        fallback_model="m2m100_418m",  # Specify global fallback
     )
 
     # For Croatian (no Opus), should try multilingual then fallback
@@ -484,7 +511,7 @@ def test_get_available_models_for_language_pair(mock_registry_production, mock_h
     selector = LanguageAwareModelSelector(
         registry=mock_registry_production,
         hardware_info=mock_hardware_cpu,
-        fallback_model="m2m100_418m"
+        fallback_model="m2m100_418m",
     )
 
     # French has Opus + multilingual options
@@ -510,9 +537,7 @@ def test_ctranslate2_preference_for_cpu(mock_registry_production, mock_hardware_
     THEN: Prefers m2m100_418m_ct2 (CTranslate2, optimized for CPU)
     """
     selector = LanguageAwareModelSelector(
-        registry=mock_registry_production,
-        hardware_info=mock_hardware_cpu,
-        fallback_model=None
+        registry=mock_registry_production, hardware_info=mock_hardware_cpu, fallback_model=None
     )
 
     # Croatian has no Opus, will select multilingual
@@ -525,6 +550,7 @@ def test_ctranslate2_preference_for_cpu(mock_registry_production, mock_hardware_
 
 # === Integration Test ===
 
+
 def test_end_to_end_selection_workflow(mock_registry_production, mock_hardware_cpu):
     """
     End-to-end test of selector workflow.
@@ -536,9 +562,7 @@ def test_end_to_end_selection_workflow(mock_registry_production, mock_hardware_c
     4. Verify rationales make sense
     """
     selector = LanguageAwareModelSelector(
-        registry=mock_registry_production,
-        hardware_info=mock_hardware_cpu,
-        fallback_model=None
+        registry=mock_registry_production, hardware_info=mock_hardware_cpu, fallback_model=None
     )
 
     # Test cases: (src_lang, tgt_lang, expected_strategy)
@@ -561,12 +585,15 @@ def test_end_to_end_selection_workflow(mock_registry_production, mock_hardware_c
         assert selection.hardware_fit is True
         assert len(selection.rationale) > 0
         # Check that rationale mentions either the language pair OR the strategy
-        assert (f"{src_lang}→{tgt_lang}" in selection.rationale
-                or expected_strategy.replace("-", " ") in selection.rationale.lower()
-                or expected_strategy.split("-")[0] in selection.rationale.lower())
+        assert (
+            f"{src_lang}→{tgt_lang}" in selection.rationale
+            or expected_strategy.replace("-", " ") in selection.rationale.lower()
+            or expected_strategy.split("-")[0] in selection.rationale.lower()
+        )
 
 
 # === Edge Cases ===
+
 
 def test_bidirectional_language_support(mock_registry_production, mock_hardware_cpu):
     """
@@ -577,9 +604,7 @@ def test_bidirectional_language_support(mock_registry_production, mock_hardware_
     THEN: Still selects opus_en_fr (supports both directions)
     """
     selector = LanguageAwareModelSelector(
-        registry=mock_registry_production,
-        hardware_info=mock_hardware_cpu,
-        fallback_model=None
+        registry=mock_registry_production, hardware_info=mock_hardware_cpu, fallback_model=None
     )
 
     # Test both directions

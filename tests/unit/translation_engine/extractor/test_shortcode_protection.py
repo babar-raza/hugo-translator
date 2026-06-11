@@ -5,44 +5,40 @@ from src.translation_engine.extractor.text_unit_extractor import TextUnitExtract
 
 @pytest.fixture
 def extractor():
-    return TextUnitExtractor(
-        segmentation_strategy="sentence_only",
-        terminology_file=None
-    )
+    return TextUnitExtractor(segmentation_strategy="sentence_only", terminology_file=None)
 
 
 class TestShortcodeProtection:
     """Test Hugo shortcode detection in _is_non_translatable()."""
 
-    @pytest.mark.parametrize("shortcode,expected", [
-        # Opening shortcodes with %
-        ("{{% steps %}}", True),
-        ("{{% alert %}}", True),
-        ("{{% note type=\"warning\" %}}", True),
-
-        # Closing shortcodes
-        ("{{% /steps %}}", True),
-        ("{{% /alert %}}", True),
-
-        # Self-closing shortcodes with <
-        ("{{< ref \"path/to/file\" >}}", True),
-        ("{{< figure src=\"image.png\" >}}", True),
-        ("{{< relref \"guide.md\" >}}", True),
-
-        # Non-shortcodes that should NOT match
-        ("regular text", False),
-        ("{{variable}}", False),  # Template variable (one brace pair)
-        ("{{ .Title }}", False),   # Go template
-        ("code {{var}} here", False),
-        ("{{% incomplete", False),  # Malformed
-        ("steps %}}", False),       # Missing opening
-
-        # Edge cases
-        ("", False),  # Empty string
-        ("   ", False),  # Whitespace only
-        ("{{% %}}", True),  # Empty shortcode (valid Hugo syntax)
-        ("{{< >}}", True),  # Empty self-closing
-    ])
+    @pytest.mark.parametrize(
+        "shortcode,expected",
+        [
+            # Opening shortcodes with %
+            ("{{% steps %}}", True),
+            ("{{% alert %}}", True),
+            ('{{% note type="warning" %}}', True),
+            # Closing shortcodes
+            ("{{% /steps %}}", True),
+            ("{{% /alert %}}", True),
+            # Self-closing shortcodes with <
+            ('{{< ref "path/to/file" >}}', True),
+            ('{{< figure src="image.png" >}}', True),
+            ('{{< relref "guide.md" >}}', True),
+            # Non-shortcodes that should NOT match
+            ("regular text", False),
+            ("{{variable}}", False),  # Template variable (one brace pair)
+            ("{{ .Title }}", False),  # Go template
+            ("code {{var}} here", False),
+            ("{{% incomplete", False),  # Malformed
+            ("steps %}}", False),  # Missing opening
+            # Edge cases
+            ("", False),  # Empty string
+            ("   ", False),  # Whitespace only
+            ("{{% %}}", True),  # Empty shortcode (valid Hugo syntax)
+            ("{{< >}}", True),  # Empty self-closing
+        ],
+    )
     def test_hugo_shortcode_detection(self, extractor, shortcode, expected):
         """Verify Hugo shortcodes are correctly identified as non-translatable."""
         result = extractor._is_non_translatable(shortcode)
@@ -51,7 +47,7 @@ class TestShortcodeProtection:
     def test_shortcode_with_unicode(self, extractor):
         """Test shortcodes containing unicode characters."""
         # Hugo shortcodes can have unicode in arguments
-        assert extractor._is_non_translatable("{{% note title=\"测试\" %}}") == True
+        assert extractor._is_non_translatable('{{% note title="测试" %}}') == True
 
     def test_shortcode_case_sensitivity(self, extractor):
         """Verify shortcode detection is case-sensitive for content."""
@@ -99,10 +95,12 @@ Content here.
         # Verify no translatable unit contains raw shortcode syntax.
         for unit in units:
             if not unit.do_not_translate:
-                assert "{{% steps" not in unit.source_text, \
+                assert "{{% steps" not in unit.source_text, (
                     f"Shortcode leaked into translatable unit: {unit.source_text}"
-                assert "{{% /steps" not in unit.source_text, \
+                )
+                assert "{{% /steps" not in unit.source_text, (
                     f"Shortcode leaked into translatable unit: {unit.source_text}"
+                )
 
         # Verify the plain content was extracted
         content_units = [u for u in units if "Content here" in u.source_text]

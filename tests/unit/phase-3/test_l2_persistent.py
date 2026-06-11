@@ -1,6 +1,7 @@
 """
 Unit tests for L2 Persistent Translation Memory.
 """
+
 import sys
 from pathlib import Path
 

@@ -1,6 +1,7 @@
 """
 Unit tests for Model Loader.
 """
+
 from unittest.mock import MagicMock, Mock, patch
 
 import pytest
@@ -88,9 +89,7 @@ class TestHuggingFaceBackend:
 
     @patch("transformers.AutoTokenizer")
     @patch("transformers.AutoModelForSeq2SeqLM")
-    def test_translate(
-        self, mock_model_class, mock_tokenizer_class, sample_model_info
-    ):
+    def test_translate(self, mock_model_class, mock_tokenizer_class, sample_model_info):
         """Test translation with HuggingFace backend."""
         # Setup mocks
         mock_tokenizer = MagicMock()

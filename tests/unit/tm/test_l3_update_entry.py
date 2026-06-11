@@ -116,12 +116,20 @@ class TestUpdateEntry:
         entry_id = "site:en:fr:dup"
         # Add twice (simulating old append-only behaviour)
         l3.add_entry(
-            entry_id=entry_id, site_id="site", src_lang="en", tgt_lang="fr",
-            source_text="Cat", translation="Chat",
+            entry_id=entry_id,
+            site_id="site",
+            src_lang="en",
+            tgt_lang="fr",
+            source_text="Cat",
+            translation="Chat",
         )
         l3.add_entry(
-            entry_id=entry_id, site_id="site", src_lang="en", tgt_lang="fr",
-            source_text="Cat", translation="Minou",
+            entry_id=entry_id,
+            site_id="site",
+            src_lang="en",
+            tgt_lang="fr",
+            source_text="Cat",
+            translation="Minou",
         )
 
         result = l3.update_entry(entry_id, "Félin")
@@ -136,8 +144,12 @@ class TestUpdateEntry:
         """_entry_id_to_positions is populated after add_entry()."""
         entry_id = "site:en:es:55"
         l3.add_entry(
-            entry_id=entry_id, site_id="site", src_lang="en", tgt_lang="es",
-            source_text="Dog", translation="Perro",
+            entry_id=entry_id,
+            site_id="site",
+            src_lang="en",
+            tgt_lang="es",
+            source_text="Dog",
+            translation="Perro",
         )
         assert entry_id in l3._entry_id_to_positions
         assert len(l3._entry_id_to_positions[entry_id]) == 1
@@ -146,8 +158,12 @@ class TestUpdateEntry:
         """update_entry() must NOT grow the FAISS index — vectors stay unchanged."""
         entry_id = "site:en:it:33"
         l3.add_entry(
-            entry_id=entry_id, site_id="site", src_lang="en", tgt_lang="it",
-            source_text="Bird", translation="Uccello",
+            entry_id=entry_id,
+            site_id="site",
+            src_lang="en",
+            tgt_lang="it",
+            source_text="Bird",
+            translation="Uccello",
         )
         ntotal_before = l3.index.ntotal
 

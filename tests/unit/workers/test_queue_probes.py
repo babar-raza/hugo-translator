@@ -126,6 +126,7 @@ class TestStateFileRecent:
         p = tmp_path / "s.json"
         p.write_text("{}")
         import os
+
         os.utime(p, (0, 0))
         assert state_file_recent(p, 60) is False
 
@@ -148,8 +149,9 @@ class TestWorkerPidAlive:
         assert worker_pid_alive(tmp_path / "w.pid") is False
 
     def test_current_process_is_alive(self, tmp_path):
-        from src.workers.queue_probes import worker_pid_alive
         import os
+
+        from src.workers.queue_probes import worker_pid_alive
 
         (tmp_path / "w.pid").write_text(str(os.getpid()))
         assert worker_pid_alive(tmp_path / "w.pid") is True

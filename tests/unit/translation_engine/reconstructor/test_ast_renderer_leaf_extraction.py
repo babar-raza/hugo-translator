@@ -20,7 +20,10 @@ from src.translation_engine.reconstructor.ast_renderer import ASTRenderer
 # Helpers
 # ---------------------------------------------------------------------------
 
-def _node(ntype: NodeType, raw: str | None, addr: str, children: list[ASTNode] | None = None) -> ASTNode:
+
+def _node(
+    ntype: NodeType, raw: str | None, addr: str, children: list[ASTNode] | None = None
+) -> ASTNode:
     n = ASTNode(type=ntype, raw=raw, children=children or [], attrs={})
     n.node_addr = addr
     return n
@@ -50,6 +53,7 @@ def _renderer() -> ASTRenderer:
 #         → leaf-extraction case → counter stays 0, no warning
 # ---------------------------------------------------------------------------
 
+
 def test_paragraph_with_strong_text_in_unit_map_no_fallback(caplog):
     """
     When the STRONG child's TEXT node is in unit_map the container is a
@@ -63,10 +67,18 @@ def test_paragraph_with_strong_text_in_unit_map_no_fallback(caplog):
     para = _node(NodeType.PARAGRAPH, None, "body.paragraph[0]", [strong])
 
     # Only the leaf TEXT is in unit_map (leaf-extraction path)
-    units = [_unit("body.paragraph[0].strong[0].text[0]", "Some bold content here", "Fettgedruckter Inhalt hier")]
+    units = [
+        _unit(
+            "body.paragraph[0].strong[0].text[0]",
+            "Some bold content here",
+            "Fettgedruckter Inhalt hier",
+        )
+    ]
 
     renderer = _renderer()
-    with caplog.at_level(logging.WARNING, logger="src.translation_engine.reconstructor.ast_renderer"):
+    with caplog.at_level(
+        logging.WARNING, logger="src.translation_engine.reconstructor.ast_renderer"
+    ):
         renderer.apply_translations([para], units)
 
     assert renderer._missing_node_count == 0, (
@@ -82,6 +94,7 @@ def test_paragraph_with_strong_text_in_unit_map_no_fallback(caplog):
 #         → true gap → counter = 1, warning fires
 # ---------------------------------------------------------------------------
 
+
 def test_paragraph_with_strong_no_descendant_in_unit_map_fires_fallback(caplog):
     """
     When neither the container nor any descendant is in unit_map it is a
@@ -95,7 +108,9 @@ def test_paragraph_with_strong_no_descendant_in_unit_map_fires_fallback(caplog):
     units = [_unit("body.paragraph[99].text[0]", "Unrelated", "Nicht verwandt")]
 
     renderer = _renderer()
-    with caplog.at_level(logging.WARNING, logger="src.translation_engine.reconstructor.ast_renderer"):
+    with caplog.at_level(
+        logging.WARNING, logger="src.translation_engine.reconstructor.ast_renderer"
+    ):
         renderer.apply_translations([para], units)
 
     assert renderer._missing_node_count == 1, (
@@ -110,6 +125,7 @@ def test_paragraph_with_strong_no_descendant_in_unit_map_fires_fallback(caplog):
 #         → leaf-extraction case → counter stays 0
 # ---------------------------------------------------------------------------
 
+
 def test_list_item_with_link_text_in_unit_map_no_fallback(caplog):
     """
     LIST_ITEM containing a LINK where the LINK's TEXT leaf is in unit_map.
@@ -121,14 +137,18 @@ def test_list_item_with_link_text_in_unit_map_no_fallback(caplog):
     listitem = _node(NodeType.LIST_ITEM, None, "body.list[0].listitem[0]", [link])
     list_node = _node(NodeType.LIST, None, "body.list[0]", [listitem])
 
-    units = [_unit(
-        "body.list[0].listitem[0].link[0].text[0]",
-        "Click here for details",
-        "Hier klicken für Details",
-    )]
+    units = [
+        _unit(
+            "body.list[0].listitem[0].link[0].text[0]",
+            "Click here for details",
+            "Hier klicken für Details",
+        )
+    ]
 
     renderer = _renderer()
-    with caplog.at_level(logging.WARNING, logger="src.translation_engine.reconstructor.ast_renderer"):
+    with caplog.at_level(
+        logging.WARNING, logger="src.translation_engine.reconstructor.ast_renderer"
+    ):
         renderer.apply_translations([list_node], units)
 
     assert renderer._missing_node_count == 0, (
@@ -141,6 +161,7 @@ def test_list_item_with_link_text_in_unit_map_no_fallback(caplog):
 # Test 4: Mixed paragraph — one sibling translated, one not
 #         Only the truly-missing container is counted; the translated sibling is not
 # ---------------------------------------------------------------------------
+
 
 def test_mixed_paragraph_only_truly_missing_counted(caplog):
     """
@@ -161,12 +182,18 @@ def test_mixed_paragraph_only_truly_missing_counted(caplog):
 
     units = [
         # Only para[0]'s leaf is in unit_map
-        _unit("body.paragraph[0].strong[0].text[0]", "Bold text content here", "Fettgedruckter Text hier"),
+        _unit(
+            "body.paragraph[0].strong[0].text[0]",
+            "Bold text content here",
+            "Fettgedruckter Text hier",
+        ),
         # para[1].text[0] is intentionally NOT included → true gap for para[1]
     ]
 
     renderer = _renderer()
-    with caplog.at_level(logging.WARNING, logger="src.translation_engine.reconstructor.ast_renderer"):
+    with caplog.at_level(
+        logging.WARNING, logger="src.translation_engine.reconstructor.ast_renderer"
+    ):
         renderer.apply_translations([para0, para1], units)
 
     assert renderer._missing_node_count == 1, (

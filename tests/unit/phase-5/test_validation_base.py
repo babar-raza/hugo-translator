@@ -2,7 +2,6 @@
 Unit tests for validation base classes.
 """
 
-
 from src.translation_engine.validation.base import (
     ValidationIssue,
     ValidationResult,

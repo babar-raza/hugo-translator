@@ -10,6 +10,7 @@ Tests integration between components without running full end-to-end tests:
 
 All tests are marked with @pytest.mark.smoke and should complete in <30 seconds.
 """
+
 import sys
 import tempfile
 from pathlib import Path
@@ -55,13 +56,13 @@ def test_simple_translation_pipeline():
             tm, l2 = _create_tm(Path(tmpdir))
 
             # Pre-populate TM with test data
-            tm.store('test-site', 'en', 'es', 'Hello', 'Hola')
-            tm.store('test-site', 'en', 'es', 'World', 'Mundo')
+            tm.store("test-site", "en", "es", "Hello", "Hola")
+            tm.store("test-site", "en", "es", "World", "Mundo")
 
             # Lookup should work
-            result = tm.lookup('test-site', 'en', 'es', 'Hello')
+            result = tm.lookup("test-site", "en", "es", "Hello")
             assert result is not None
-            assert result.translation == 'Hola'
+            assert result.translation == "Hola"
 
             l2.close()
 
@@ -138,20 +139,20 @@ def test_tm_lookup_chain():
             tm, l2 = _create_tm(Path(tmpdir))
 
             # Store in TM (goes to L2, cascades to L1)
-            tm.store('test-site', 'en', 'es', 'chain test', 'prueba de cadena')
+            tm.store("test-site", "en", "es", "chain test", "prueba de cadena")
 
             # Lookup should find it
-            result_l1 = tm.lookup('test-site', 'en', 'es', 'chain test')
+            result_l1 = tm.lookup("test-site", "en", "es", "chain test")
             assert result_l1 is not None
-            assert result_l1.translation == 'prueba de cadena'
+            assert result_l1.translation == "prueba de cadena"
 
             # Clear L1 cache
             tm.l1.clear()
 
             # Lookup from L2
-            result_l2 = tm.lookup('test-site', 'en', 'es', 'chain test')
+            result_l2 = tm.lookup("test-site", "en", "es", "chain test")
             assert result_l2 is not None
-            assert result_l2.translation == 'prueba de cadena'
+            assert result_l2.translation == "prueba de cadena"
 
             l2.close()
 
@@ -167,17 +168,17 @@ def test_tm_cache_promotion():
             tm, l2 = _create_tm(Path(tmpdir))
 
             # Store directly in L2
-            tm.l2.store('test-site', 'en', 'es', 'promote', 'promover')
+            tm.l2.store("test-site", "en", "es", "promote", "promover")
 
             # First lookup (L2 hit, should promote to L1)
-            result1 = tm.lookup('test-site', 'en', 'es', 'promote')
+            result1 = tm.lookup("test-site", "en", "es", "promote")
             assert result1 is not None
-            assert result1.translation == 'promover'
+            assert result1.translation == "promover"
 
             # Second lookup should hit L1 cache (returns string)
-            result2 = tm.l1.get('test-site', 'en', 'es', 'promote')
+            result2 = tm.l1.get("test-site", "en", "es", "promote")
             assert result2 is not None
-            assert result2 == 'promover'  # L1Cache returns string directly
+            assert result2 == "promover"  # L1Cache returns string directly
 
             l2.close()
 
@@ -193,15 +194,15 @@ def test_tm_multi_site_isolation():
             tm, l2 = _create_tm(Path(tmpdir))
 
             # Store same text for different sites
-            tm.store('site-a', 'en', 'es', 'test', 'prueba A')
-            tm.store('site-b', 'en', 'es', 'test', 'prueba B')
+            tm.store("site-a", "en", "es", "test", "prueba A")
+            tm.store("site-b", "en", "es", "test", "prueba B")
 
             # Lookups should be site-specific
-            result_a = tm.lookup('site-a', 'en', 'es', 'test')
-            result_b = tm.lookup('site-b', 'en', 'es', 'test')
+            result_a = tm.lookup("site-a", "en", "es", "test")
+            result_b = tm.lookup("site-b", "en", "es", "test")
 
-            assert result_a.translation == 'prueba A'
-            assert result_b.translation == 'prueba B'
+            assert result_a.translation == "prueba A"
+            assert result_b.translation == "prueba B"
 
             l2.close()
 
@@ -341,7 +342,6 @@ def test_config_tm_integration():
     """Smoke test: Config can work with TM setup."""
     with tempfile.TemporaryDirectory() as tmpdir:
         try:
-
             config_root = Path(__file__).parent.parent.parent / "config"
 
             # Create TM with proper initialization
@@ -372,7 +372,7 @@ def test_e2e_component_chain():
             validator = PlaceholderValidator()
 
             # Pre-populate TM
-            tm.store('test-site', 'en', 'es', 'test content', 'contenido de prueba')
+            tm.store("test-site", "en", "es", "test content", "contenido de prueba")
 
             # Parse content
             content = """---
@@ -384,10 +384,10 @@ title: "Test"
             parsed = parser.parse_string(content)
 
             # Lookup from TM
-            result = tm.lookup('test-site', 'en', 'es', 'test content')
+            result = tm.lookup("test-site", "en", "es", "test content")
 
             # Validate (simple check)
-            validation = validator.validate('test', 'prueba', {})
+            validation = validator.validate("test", "prueba", {})
 
             # All components should work
             assert parsed is not None
@@ -436,11 +436,11 @@ def test_graceful_degradation():
             tm, l2 = _create_tm(Path(tmpdir))
 
             # System should work on CPU
-            tm.store('test-site', 'en', 'es', 'cpu test', 'prueba cpu')
-            result = tm.lookup('test-site', 'en', 'es', 'cpu test')
+            tm.store("test-site", "en", "es", "cpu test", "prueba cpu")
+            result = tm.lookup("test-site", "en", "es", "cpu test")
 
             assert result is not None
-            assert result.translation == 'prueba cpu'
+            assert result.translation == "prueba cpu"
 
             l2.close()
 

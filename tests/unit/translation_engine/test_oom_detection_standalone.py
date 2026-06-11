@@ -4,6 +4,7 @@ Standalone test for OOM error detection in TranslationEngine.
 OOM-01: Tests for _is_oom_error() method without requiring pytest.
 Run with: python test_oom_detection_standalone.py
 """
+
 import logging
 import sys
 from pathlib import Path
@@ -17,7 +18,7 @@ from unittest.mock import Mock, patch
 from src.translation_engine import TranslationEngine
 
 # Configure logging to see debug output
-logging.basicConfig(level=logging.DEBUG, format='%(levelname)s: %(message)s')
+logging.basicConfig(level=logging.DEBUG, format="%(levelname)s: %(message)s")
 logger = logging.getLogger(__name__)
 
 
@@ -50,11 +51,12 @@ def create_test_engine():
     mock_tm = Mock()
     mock_loader = Mock()
 
-    with patch('src.translation_engine.engine.HugoParser'), \
-         patch('src.translation_engine.engine.SegmentExtractor'), \
-         patch('src.translation_engine.engine.ValidationSuite'), \
-         patch('src.translation_engine.engine.MarkdownReconstructor'):
-
+    with (
+        patch("src.translation_engine.engine.HugoParser"),
+        patch("src.translation_engine.engine.SegmentExtractor"),
+        patch("src.translation_engine.engine.ValidationSuite"),
+        patch("src.translation_engine.engine.MarkdownReconstructor"),
+    ):
         engine = TranslationEngine(
             config_service=mock_config,
             tm=mock_tm,

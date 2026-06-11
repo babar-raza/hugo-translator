@@ -23,10 +23,9 @@ def _deterministic_encode(text, **kw):
     if isinstance(text, str):
         rng = np.random.default_rng(hash(text) % 2**31)
         return rng.random(_DIM).astype(np.float32)
-    return np.array([
-        np.random.default_rng(hash(t) % 2**31).random(_DIM).astype(np.float32)
-        for t in text
-    ])
+    return np.array(
+        [np.random.default_rng(hash(t) % 2**31).random(_DIM).astype(np.float32) for t in text]
+    )
 
 
 @pytest.fixture
@@ -59,6 +58,7 @@ def _add_entries(l3, n=5):
 
 
 # ========== batch_semantic_search tests ==========
+
 
 class TestBatchSemanticSearchEmpty:
     def test_empty_input(self, l3):
@@ -129,6 +129,7 @@ class TestBatchSemanticSearchFiltering:
 
 # ========== batch_lookup tests ==========
 
+
 class TestBatchLookup:
     @pytest.fixture
     def tm(self, l3):
@@ -148,10 +149,12 @@ class TestBatchLookup:
 
     def test_empty_input(self, tm):
         from src.tm.models import LookupRequest
+
         assert tm.batch_lookup([]) == []
 
     def test_l1_hit_skips_l3(self, tm, l3):
         from src.tm.models import LookupRequest
+
         # Pre-populate L1
         tm.l1.put("site", "en", "fr", "cached_text", "cached_translation")
         l3.encoder.encode.reset_mock()
@@ -180,6 +183,7 @@ class TestBatchLookup:
 
     def test_misses_batch_l3(self, tm, l3):
         from src.tm.models import LookupRequest
+
         _add_entries(l3, 2)
         l3.encoder.encode.reset_mock()
 
@@ -196,6 +200,7 @@ class TestBatchLookup:
 
     def test_mixed_results_preserve_order(self, tm, l3):
         from src.tm.models import LookupRequest
+
         _add_entries(l3, 1)
 
         # Pre-populate L1 for first request

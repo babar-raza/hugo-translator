@@ -1,4 +1,5 @@
 """Test docker-compose.yml syntax."""
+
 from pathlib import Path
 
 import yaml

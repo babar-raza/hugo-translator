@@ -117,6 +117,7 @@ class TestProgressTrackerIntegration:
         """Test progress tracker saves and loads correctly."""
         # Import directly to avoid package issues
         import importlib.util
+
         progress_path = src_path / "translation_engine" / "progress.py"
         spec = importlib.util.spec_from_file_location("progress_module", progress_path)
         progress_module = importlib.util.module_from_spec(spec)
@@ -151,6 +152,7 @@ class TestProgressTrackerIntegration:
     def test_progress_validation_detects_invalid(self, tmp_path):
         """Test validation detects invalid progress files."""
         import importlib.util
+
         progress_path = src_path / "translation_engine" / "progress.py"
         spec = importlib.util.spec_from_file_location("progress_module", progress_path)
         progress_module = importlib.util.module_from_spec(spec)
@@ -169,6 +171,7 @@ class TestProgressTrackerIntegration:
     def test_progress_recovery_works(self, tmp_path):
         """Test progress recovery from partial data."""
         import importlib.util
+
         progress_path = src_path / "translation_engine" / "progress.py"
         spec = importlib.util.spec_from_file_location("progress_module", progress_path)
         progress_module = importlib.util.module_from_spec(spec)
@@ -177,12 +180,16 @@ class TestProgressTrackerIntegration:
 
         # Create recoverable progress file (missing some fields)
         progress_file = tmp_path / "partial_progress.json"
-        progress_file.write_text(json.dumps({
-            "run_id": "test-run",
-            "site_id": "mysite",
-            "completed_files": {"file1.md": ["es"]},
-            "total_files": 2,
-        }))
+        progress_file.write_text(
+            json.dumps(
+                {
+                    "run_id": "test-run",
+                    "site_id": "mysite",
+                    "completed_files": {"file1.md": ["es"]},
+                    "total_files": 2,
+                }
+            )
+        )
 
         tracker = ProgressTracker.recover_progress_file(progress_file)
 
@@ -203,7 +210,7 @@ class TestErrorHandlingIntegration:
         file_path = tmp_path / "test.txt"
 
         # Mock tempfile.mkstemp to simulate disk full
-        with mock.patch('tempfile.mkstemp') as mock_mkstemp:
+        with mock.patch("tempfile.mkstemp") as mock_mkstemp:
             mock_mkstemp.side_effect = OSError(errno.ENOSPC, "No space")
 
             with pytest.raises(DiskFullError):
@@ -217,7 +224,7 @@ class TestErrorHandlingIntegration:
 
         file_path = tmp_path / "test.txt"
 
-        with mock.patch('tempfile.mkstemp') as mock_mkstemp:
+        with mock.patch("tempfile.mkstemp") as mock_mkstemp:
             mock_mkstemp.side_effect = OSError(errno.ENAMETOOLONG, "Name too long")
 
             with pytest.raises(InvalidPathError):
@@ -244,6 +251,7 @@ class TestComponentIntegration:
     def test_progress_with_lock(self, tmp_path):
         """Test progress tracking with file lock."""
         import importlib.util
+
         progress_path = src_path / "translation_engine" / "progress.py"
         spec = importlib.util.spec_from_file_location("progress_module", progress_path)
         progress_module = importlib.util.module_from_spec(spec)
@@ -388,7 +396,10 @@ class TestResilienceSystemComplete:
             (src_path / "utils" / "atomic_write.py", ["RES-03", "RES-09"]),
             (src_path / "utils" / "file_lock.py", ["RES-08"]),
             (src_path / "translation_engine" / "progress.py", ["RES-07"]),
-            (src_path / "translation_engine" / "engine.py", ["RES-05", "RES-06", "RES-08", "RES-09"]),
+            (
+                src_path / "translation_engine" / "engine.py",
+                ["RES-05", "RES-06", "RES-08", "RES-09"],
+            ),
             (src_path / "cli.py", ["RES-02", "RES-06", "RES-07"]),
         ]
 

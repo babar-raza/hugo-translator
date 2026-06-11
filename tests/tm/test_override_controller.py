@@ -1,4 +1,5 @@
 """Tests for OverrideController."""
+
 from src.tm.override_controller import (
     OverrideConfig,
     OverrideController,
@@ -51,14 +52,12 @@ class TestOverrideController:
         controller = OverrideController(config)
 
         # Text with markdown link should match
-        assert controller.should_bypass_lookup(
-            "Get it from [NuGet](https://nuget.org)", "de"
-        ) is True
+        assert (
+            controller.should_bypass_lookup("Get it from [NuGet](https://nuget.org)", "de") is True
+        )
 
         # Text without link should not match
-        assert controller.should_bypass_lookup(
-            "Hello world", "de"
-        ) is False
+        assert controller.should_bypass_lookup("Hello world", "de") is False
 
     def test_target_lang_filter(self):
         """Filter by target language."""
@@ -72,9 +71,7 @@ class TestOverrideController:
 
     def test_frontmatter_key_filter(self):
         """Filter by frontmatter key."""
-        filters = OverrideFilter(
-            frontmatter_keys=["body.block.content_left"]
-        )
+        filters = OverrideFilter(frontmatter_keys=["body.block.content_left"])
         config = OverrideConfig(mode=OverrideMode.REFRESH, filters=filters)
         controller = OverrideController(config)
 
@@ -104,7 +101,7 @@ class TestOverrideController:
             "filters": {
                 "target_langs": ["ru"],
                 "source_patterns": [r"\[.*\]"],
-            }
+            },
         }
 
         controller = OverrideController.from_dict(config_dict)

@@ -31,17 +31,20 @@ def _load():
         clamp_gpu_memory,
         launch_sites,
     )
+
     return build_site_cli_args, clamp_gpu_memory, launch_sites
 
 
 def _load_cleanup():
     from src.utils.parallel_sites import wait_and_cleanup
+
     return wait_and_cleanup
 
 
 # ---------------------------------------------------------------------------
 # build_site_cli_args
 # ---------------------------------------------------------------------------
+
 
 class TestBuildSiteCliArgs:
     def test_site_flag_present(self):
@@ -99,6 +102,7 @@ class TestBuildSiteCliArgs:
 # ---------------------------------------------------------------------------
 # launch_sites — subprocess concurrency
 # ---------------------------------------------------------------------------
+
 
 class TestLaunchSites:
     def test_spawns_correct_number_of_processes(self):
@@ -196,6 +200,7 @@ class TestLaunchSites:
 # clamp_gpu_memory
 # ---------------------------------------------------------------------------
 
+
 class TestClampGpuMemory:
     def test_within_budget_not_clamped(self):
         _, clamp, _ = _load()
@@ -228,6 +233,7 @@ class TestClampGpuMemory:
 # ---------------------------------------------------------------------------
 # wait_and_cleanup
 # ---------------------------------------------------------------------------
+
 
 class TestWaitAndCleanup:
     def test_exit_codes_returned_in_order(self):

@@ -2,6 +2,7 @@
 
 No extra keys may be posted. Evidence-only fields live in metrics_evidence.py.
 """
+
 from __future__ import annotations
 
 from datetime import datetime, timezone
@@ -71,7 +72,7 @@ class AgentMetricsPayload(BaseModel):
         return v
 
     @model_validator(mode="after")
-    def validate_item_counts(self) -> "AgentMetricsPayload":
+    def validate_item_counts(self) -> AgentMetricsPayload:
         if self.items_succeeded + self.items_failed > self.items_discovered:
             raise ValueError(
                 f"items_succeeded ({self.items_succeeded}) + items_failed ({self.items_failed}) "
@@ -80,7 +81,7 @@ class AgentMetricsPayload(BaseModel):
         return self
 
     @model_validator(mode="after")
-    def validate_token_consistency(self) -> "AgentMetricsPayload":
+    def validate_token_consistency(self) -> AgentMetricsPayload:
         if self.api_calls_count == 0 and self.token_usage != 0:
             raise ValueError("token_usage must be 0 when api_calls_count is 0")
         return self
@@ -109,10 +110,23 @@ class AgentMetricsPayload(BaseModel):
 
 
 EXPECTED_POST_KEYS = {
-    "timestamp", "agent_name", "agent_owner", "job_type", "run_id",
-    "status", "product", "platform", "website", "website_section",
-    "item_name", "items_discovered", "items_failed", "items_succeeded",
-    "run_duration_ms", "token_usage", "api_calls_count",
+    "timestamp",
+    "agent_name",
+    "agent_owner",
+    "job_type",
+    "run_id",
+    "status",
+    "product",
+    "platform",
+    "website",
+    "website_section",
+    "item_name",
+    "items_discovered",
+    "items_failed",
+    "items_succeeded",
+    "run_duration_ms",
+    "token_usage",
+    "api_calls_count",
 }
 
 

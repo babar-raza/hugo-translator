@@ -1,8 +1,10 @@
 """Tests for ScopeResolver, content_root_id derivation, and ID generation."""
+
 import uuid
 
 import pytest
 
+from src.observability.gitlab_context import GitLabContext
 from src.observability.metrics_scope import (
     ScopeInput,
     ScopeResolver,
@@ -11,15 +13,20 @@ from src.observability.metrics_scope import (
     generate_segment_run_id,
     generate_stable_work_slice_id,
 )
-from src.observability.gitlab_context import GitLabContext
 
 
 class TestContentRootIdDerivation:
     def test_strips_env_var_prefix(self):
-        assert derive_content_root_id("${ASPOSE_NET_CONTENT}/docs.aspose.net/words") == "docs.aspose.net/words"
+        assert (
+            derive_content_root_id("${ASPOSE_NET_CONTENT}/docs.aspose.net/words")
+            == "docs.aspose.net/words"
+        )
 
     def test_strips_different_env_var(self):
-        assert derive_content_root_id("${ASPOSE_ORG_CONTENT}/products.aspose.org") == "products.aspose.org"
+        assert (
+            derive_content_root_id("${ASPOSE_ORG_CONTENT}/products.aspose.org")
+            == "products.aspose.org"
+        )
 
     def test_normalizes_backslashes(self):
         assert derive_content_root_id("${VAR}\\docs.aspose.net\\words") == "docs.aspose.net/words"
@@ -439,6 +446,7 @@ class TestScopeResolverFamilySuffixBug:
 # ---------------------------------------------------------------------------
 # Family-aware scope tests (new in family-aware-scope sprint)
 # ---------------------------------------------------------------------------
+
 
 class TestFamilyAwareScopeResolution:
     """Verify family-first scope resolution and fail-closed unknown behaviour."""

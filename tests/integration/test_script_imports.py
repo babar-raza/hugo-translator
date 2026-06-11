@@ -20,9 +20,7 @@ class TestScriptImports:
         if not _VALIDATE_AST_SCRIPT.exists():
             pytest.skip(f"Script not found: {_VALIDATE_AST_SCRIPT}")
         result = subprocess.run(
-            [sys.executable, str(_VALIDATE_AST_SCRIPT), "--help"],
-            capture_output=True,
-            text=True
+            [sys.executable, str(_VALIDATE_AST_SCRIPT), "--help"], capture_output=True, text=True
         )
         assert result.returncode == 0, f"Script failed: {result.stderr}"
         assert "usage" in result.stdout.lower()
@@ -32,9 +30,7 @@ class TestScriptImports:
         if not _ANALYZE_CORPUS_SCRIPT.exists():
             pytest.skip(f"Script not found: {_ANALYZE_CORPUS_SCRIPT}")
         result = subprocess.run(
-            [sys.executable, str(_ANALYZE_CORPUS_SCRIPT), "--help"],
-            capture_output=True,
-            text=True
+            [sys.executable, str(_ANALYZE_CORPUS_SCRIPT), "--help"], capture_output=True, text=True
         )
         assert result.returncode == 0, f"Script failed: {result.stderr}"
         assert "usage" in result.stdout.lower()
@@ -46,15 +42,19 @@ class TestScriptImports:
             result = subprocess.run(
                 [sys.executable, str(_VALIDATE_AST_SCRIPT), "--help"],
                 capture_output=True,
-                text=True
+                text=True,
             )
-            assert "ImportError" not in result.stderr, f"Import error in validate_ast_translation.py: {result.stderr}"
+            assert "ImportError" not in result.stderr, (
+                f"Import error in validate_ast_translation.py: {result.stderr}"
+            )
 
         # Test analyze_ast_corpus.py
         if _ANALYZE_CORPUS_SCRIPT.exists():
             result = subprocess.run(
                 [sys.executable, str(_ANALYZE_CORPUS_SCRIPT), "--help"],
                 capture_output=True,
-                text=True
+                text=True,
             )
-            assert "ImportError" not in result.stderr, f"Import error in analyze_ast_corpus.py: {result.stderr}"
+            assert "ImportError" not in result.stderr, (
+                f"Import error in analyze_ast_corpus.py: {result.stderr}"
+            )

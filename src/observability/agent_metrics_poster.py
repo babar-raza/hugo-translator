@@ -1,16 +1,14 @@
 """Agent Metrics API poster — HTTP POST with dry-run, secret handling, 302 support.
 
-Amendment #2: Stage 8 test posting is SYNCHRONOUS to capture response code,
-update evidence/ledger, and allow row verification. Production posting is
-fire-and-forget.
+All posting is synchronous to ensure evidence sidecars are always updated.
 """
+
 from __future__ import annotations
 
 import json
 import logging
 import os
 import threading
-from concurrent.futures import ThreadPoolExecutor, TimeoutError as FutureTimeoutError
 
 logger = logging.getLogger(__name__)
 
@@ -40,20 +38,19 @@ class AgentMetricsPoster:
         token_env: str = "AGENT_METRICS_TOKEN",
         timeout_seconds: int = 15,
         dry_run: bool = True,
-        fire_and_forget: bool = False,
     ):
         self.endpoint = _get_secret(endpoint_env)
         self.token = _get_secret(token_env)
         self.timeout_seconds = timeout_seconds
         self.dry_run = dry_run
-        self.fire_and_forget = fire_and_forget
         self._enabled = True
 
         if not self.endpoint or not self.token:
             if not self.dry_run:
                 logger.warning(
                     "Agent metrics posting disabled: missing %s or %s env var",
-                    endpoint_env, token_env,
+                    endpoint_env,
+                    token_env,
                 )
             self._enabled = False
 
@@ -87,25 +84,18 @@ class AgentMetricsPoster:
                     logger.warning("Test row limit reached, skipping POST")
                     return result
 
-        # Test posts are always synchronous (Amendment #2)
-        is_sync = job_type == "Test" or not self.fire_and_forget
-
-        if is_sync:
-            return self._do_post_sync(payload_dict, job_type)
-        else:
-            self._do_post_async(payload_dict, job_type)
-            result["posted"] = True  # optimistic for fire-and-forget
-            return result
+        return self._do_post_sync(payload_dict, job_type)
 
     def _do_post_sync(self, payload_dict: dict, job_type: str) -> dict:
         """Synchronous POST — returns full result with response_code."""
         result = {"posted": False, "dry_run": False, "response_code": None, "error": None}
         try:
-            import urllib.request
             import urllib.error
+            import urllib.request
 
             # Token passed as query parameter (Google Apps Script convention)
-            from urllib.parse import urlencode, urlparse, urlunparse, parse_qs
+            from urllib.parse import parse_qs, urlencode, urlparse, urlunparse
+
             parsed = urlparse(self.endpoint)
             qs = parse_qs(parsed.query)
             qs["token"] = [self.token]
@@ -159,42 +149,6 @@ class AgentMetricsPoster:
             logger.warning("POST failed: %s", result["error"])
 
         return result
-
-    def _do_post_async(self, payload_dict: dict, job_type: str) -> None:
-        """Fire-and-forget POST in background thread.
-
-        WARNING: Failures in async posts are only logged, not recorded in
-        evidence sidecars. Use synchronous posting (fire_and_forget=False)
-        for reliable evidence tracking.
-        """
-        logger.warning("Async fire-and-forget POST — evidence will not be updated on failure")
-
-        def _post():
-            try:
-                import urllib.request
-                import urllib.error
-                from urllib.parse import urlencode, urlparse, urlunparse, parse_qs
-
-                parsed = urlparse(self.endpoint)
-                qs = parse_qs(parsed.query)
-                qs["token"] = [self.token]
-                new_query = urlencode(qs, doseq=True)
-                url = urlunparse(parsed._replace(query=new_query))
-
-                data = json.dumps(payload_dict).encode("utf-8")
-                req = urllib.request.Request(
-                    url,
-                    data=data,
-                    headers={"Content-Type": "application/json"},
-                    method="POST",
-                )
-                urllib.request.urlopen(req, timeout=self.timeout_seconds)
-                logger.info("Async POST success")
-            except Exception as e:
-                logger.warning("Async POST failed: %s", e)
-
-        thread = threading.Thread(target=_post, daemon=True)
-        thread.start()
 
 
 def reset_test_row_counter() -> None:

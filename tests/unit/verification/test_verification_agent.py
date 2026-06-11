@@ -9,6 +9,7 @@ Tests:
 - Fail-fast mode
 - Error handling for check failures
 """
+
 from typing import Any
 
 import pytest
@@ -484,9 +485,7 @@ class TestVerificationAgent:
         assert "passing_check" in result.check_results
 
         # Check exception is recorded as issue
-        exception_issues = [
-            i for i in result.issues if i.check_name == "exception_check"
-        ]
+        exception_issues = [i for i in result.issues if i.check_name == "exception_check"]
         assert len(exception_issues) == 1
         assert "Simulated check failure" in exception_issues[0].message
 
@@ -534,9 +533,7 @@ class TestVerificationAgent:
         assert result1.error_count == 1
 
         # With skip context - should pass
-        result2 = agent.verify(
-            sample_source, sample_translated, "de", context={"skip": True}
-        )
+        result2 = agent.verify(sample_source, sample_translated, "de", context={"skip": True})
         assert result2.error_count == 0
 
     def test_agent_repr(self):

@@ -6,9 +6,11 @@ Four cases:
   3. test_fail_score_validation_error — any ERROR → FAIL
   4. test_fail_score_missing_nodes — >1 missing node → PARTIAL (boundary)
 """
+
 from __future__ import annotations
 
 import pytest
+
 from src.translation_engine.models import TranslationStats
 
 

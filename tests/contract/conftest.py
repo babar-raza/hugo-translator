@@ -205,7 +205,7 @@ def test_markdown_with_code_blocks(temp_contract_dir) -> Path:
     content_dir.mkdir(parents=True, exist_ok=True)
 
     md_path = content_dir / "test_code_blocks.md"
-    md_content = '''---
+    md_content = """---
 title: Code Block Test
 ---
 
@@ -221,7 +221,7 @@ def hello():
 ```javascript
 console.log("Hello, World!");
 ```
-'''
+"""
     md_path.write_text(md_content, encoding="utf-8")
     return md_path
 

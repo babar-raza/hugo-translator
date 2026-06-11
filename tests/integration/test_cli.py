@@ -4,6 +4,7 @@ Integration tests for CLI flags (CFG-03).
 Tests that CLI flags correctly override configuration settings
 and are passed to the TranslationEngine.
 """
+
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -106,11 +107,16 @@ class TestCLIParser:
         """Test config path overrides."""
         parser = create_parser()
 
-        args = parser.parse_args([
-            "--site", "test",
-            "--validation-config", "/custom/validation.yaml",
-            "--terminology-config", "/custom/terminology.yaml"
-        ])
+        args = parser.parse_args(
+            [
+                "--site",
+                "test",
+                "--validation-config",
+                "/custom/validation.yaml",
+                "--terminology-config",
+                "/custom/terminology.yaml",
+            ]
+        )
         assert args.validation_config == "/custom/validation.yaml"
         assert args.terminology_config == "/custom/terminology.yaml"
 
@@ -121,12 +127,9 @@ class TestCLIConfigOverrides:
     def test_override_initialization(self):
         """Test that overrides are correctly initialized from args."""
         parser = create_parser()
-        args = parser.parse_args([
-            "--site", "test",
-            "--validation-mode", "strict",
-            "--max-retries", "5",
-            "--dry-run"
-        ])
+        args = parser.parse_args(
+            ["--site", "test", "--validation-mode", "strict", "--max-retries", "5", "--dry-run"]
+        )
 
         overrides = CLIConfigOverrides(args)
         assert overrides.validation_mode == "strict"
@@ -191,11 +194,9 @@ class TestCLIConfigOverrides:
         parser = create_parser()
 
         # Test enable terminology
-        args = parser.parse_args([
-            "--site", "test",
-            "--enable-terminology",
-            "--terminology-mode", "both"
-        ])
+        args = parser.parse_args(
+            ["--site", "test", "--enable-terminology", "--terminology-mode", "both"]
+        )
         overrides = CLIConfigOverrides(args)
         engine_overrides = overrides.get_engine_overrides()
         assert engine_overrides["enable_terminology"] is True
@@ -293,9 +294,7 @@ class TestCLIIntegration:
     @patch("src.translation_engine.engine.get_site_lock")
     @patch("subprocess.Popen")
     @patch("src.utils.config_loader.ConfigService")
-    def test_cli_validation_mode_override(
-        self, mock_config_class, mock_popen, mock_get_lock
-    ):
+    def test_cli_validation_mode_override(self, mock_config_class, mock_popen, mock_get_lock):
         """Test that --validation-mode is forwarded to per-language subprocess."""
         self._setup_mocks(mock_config_class, mock_popen, mock_get_lock)
 
@@ -311,9 +310,7 @@ class TestCLIIntegration:
     @patch("src.translation_engine.engine.get_site_lock")
     @patch("subprocess.Popen")
     @patch("src.utils.config_loader.ConfigService")
-    def test_cli_disable_validation(
-        self, mock_config_class, mock_popen, mock_get_lock
-    ):
+    def test_cli_disable_validation(self, mock_config_class, mock_popen, mock_get_lock):
         """Test that --disable-validation is forwarded to per-language subprocess."""
         self._setup_mocks(mock_config_class, mock_popen, mock_get_lock)
 
@@ -328,18 +325,14 @@ class TestCLIIntegration:
     @patch("src.translation_engine.engine.get_site_lock")
     @patch("subprocess.Popen")
     @patch("src.utils.config_loader.ConfigService")
-    def test_cli_terminology_flags(
-        self, mock_config_class, mock_popen, mock_get_lock
-    ):
+    def test_cli_terminology_flags(self, mock_config_class, mock_popen, mock_get_lock):
         """Test that --enable-terminology is forwarded to per-language subprocess."""
         self._setup_mocks(mock_config_class, mock_popen, mock_get_lock)
 
         parser = create_parser()
-        args = parser.parse_args([
-            "--site", "test",
-            "--enable-terminology",
-            "--terminology-mode", "both"
-        ])
+        args = parser.parse_args(
+            ["--site", "test", "--enable-terminology", "--terminology-mode", "both"]
+        )
         exit_code = translate_site(args)
 
         assert exit_code == 0
@@ -349,9 +342,7 @@ class TestCLIIntegration:
     @patch("src.translation_engine.engine.get_site_lock")
     @patch("subprocess.Popen")
     @patch("src.utils.config_loader.ConfigService")
-    def test_cli_max_retries_override(
-        self, mock_config_class, mock_popen, mock_get_lock
-    ):
+    def test_cli_max_retries_override(self, mock_config_class, mock_popen, mock_get_lock):
         """Test that translate_site dispatches subprocesses when --max-retries provided."""
         self._setup_mocks(mock_config_class, mock_popen, mock_get_lock)
 
@@ -366,18 +357,21 @@ class TestCLIIntegration:
     @patch("src.translation_engine.engine.get_site_lock")
     @patch("subprocess.Popen")
     @patch("src.utils.config_loader.ConfigService")
-    def test_config_path_overrides(
-        self, mock_config_class, mock_popen, mock_get_lock
-    ):
+    def test_config_path_overrides(self, mock_config_class, mock_popen, mock_get_lock):
         """Test that config path overrides are applied on the parent ConfigService."""
         mock_config = self._setup_mocks(mock_config_class, mock_popen, mock_get_lock)
 
         parser = create_parser()
-        args = parser.parse_args([
-            "--site", "test",
-            "--validation-config", "/custom/validation.yaml",
-            "--terminology-config", "/custom/terminology.yaml"
-        ])
+        args = parser.parse_args(
+            [
+                "--site",
+                "test",
+                "--validation-config",
+                "/custom/validation.yaml",
+                "--terminology-config",
+                "/custom/terminology.yaml",
+            ]
+        )
         exit_code = translate_site(args)
 
         # apply_to_config_service() sets these on the parent's config_service mock
@@ -388,9 +382,7 @@ class TestCLIIntegration:
     @patch("src.translation_engine.engine.get_site_lock")
     @patch("subprocess.Popen")
     @patch("src.utils.config_loader.ConfigService")
-    def test_cli_dry_run_mode(
-        self, mock_config_class, mock_popen, mock_get_lock
-    ):
+    def test_cli_dry_run_mode(self, mock_config_class, mock_popen, mock_get_lock):
         """Test that --dry-run is forwarded to per-language subprocess."""
         self._setup_mocks(mock_config_class, mock_popen, mock_get_lock)
 
@@ -405,9 +397,7 @@ class TestCLIIntegration:
     @patch("src.translation_engine.engine.get_site_lock")
     @patch("subprocess.Popen")
     @patch("src.utils.config_loader.ConfigService")
-    def test_cli_force_accept(
-        self, mock_config_class, mock_popen, mock_get_lock
-    ):
+    def test_cli_force_accept(self, mock_config_class, mock_popen, mock_get_lock):
         """Test that --force-accept is forwarded to per-language subprocess."""
         self._setup_mocks(mock_config_class, mock_popen, mock_get_lock)
 
@@ -422,9 +412,7 @@ class TestCLIIntegration:
     @patch("src.translation_engine.engine.get_site_lock")
     @patch("subprocess.Popen")
     @patch("src.utils.config_loader.ConfigService")
-    def test_cli_strict_reject(
-        self, mock_config_class, mock_popen, mock_get_lock
-    ):
+    def test_cli_strict_reject(self, mock_config_class, mock_popen, mock_get_lock):
         """Test that --strict-reject is forwarded to per-language subprocess."""
         self._setup_mocks(mock_config_class, mock_popen, mock_get_lock)
 
@@ -439,9 +427,7 @@ class TestCLIIntegration:
     @patch("src.translation_engine.engine.get_site_lock")
     @patch("subprocess.Popen")
     @patch("src.utils.config_loader.ConfigService")
-    def test_cli_save_rejected(
-        self, mock_config_class, mock_popen, mock_get_lock
-    ):
+    def test_cli_save_rejected(self, mock_config_class, mock_popen, mock_get_lock):
         """Test that translate_site dispatches subprocesses when --save-rejected provided."""
         self._setup_mocks(mock_config_class, mock_popen, mock_get_lock)
 
@@ -460,11 +446,9 @@ class TestCLIFlagCombinations:
     def test_validation_mode_with_max_retries(self):
         """Test validation mode with max-retries."""
         parser = create_parser()
-        args = parser.parse_args([
-            "--site", "test",
-            "--validation-mode", "strict",
-            "--max-retries", "3"
-        ])
+        args = parser.parse_args(
+            ["--site", "test", "--validation-mode", "strict", "--max-retries", "3"]
+        )
         overrides = CLIConfigOverrides(args)
         engine_overrides = overrides.get_engine_overrides()
         assert engine_overrides["validation_mode"] == "strict"
@@ -473,11 +457,7 @@ class TestCLIFlagCombinations:
     def test_dry_run_with_save_rejected(self):
         """Test dry-run combined with save-rejected."""
         parser = create_parser()
-        args = parser.parse_args([
-            "--site", "test",
-            "--dry-run",
-            "--save-rejected"
-        ])
+        args = parser.parse_args(["--site", "test", "--dry-run", "--save-rejected"])
         overrides = CLIConfigOverrides(args)
         engine_overrides = overrides.get_engine_overrides()
         assert engine_overrides["dry_run"] is True
@@ -486,11 +466,7 @@ class TestCLIFlagCombinations:
     def test_strict_reject_with_save_rejected(self):
         """Test strict-reject combined with save-rejected for debugging."""
         parser = create_parser()
-        args = parser.parse_args([
-            "--site", "test",
-            "--strict-reject",
-            "--save-rejected"
-        ])
+        args = parser.parse_args(["--site", "test", "--strict-reject", "--save-rejected"])
         overrides = CLIConfigOverrides(args)
         engine_overrides = overrides.get_engine_overrides()
         assert engine_overrides["validation_mode"] == "strict"
@@ -500,12 +476,17 @@ class TestCLIFlagCombinations:
     def test_validation_mode_with_terminology(self):
         """Test validation mode combined with terminology settings."""
         parser = create_parser()
-        args = parser.parse_args([
-            "--site", "test",
-            "--validation-mode", "lenient",
-            "--enable-terminology",
-            "--terminology-mode", "both"
-        ])
+        args = parser.parse_args(
+            [
+                "--site",
+                "test",
+                "--validation-mode",
+                "lenient",
+                "--enable-terminology",
+                "--terminology-mode",
+                "both",
+            ]
+        )
         overrides = CLIConfigOverrides(args)
         engine_overrides = overrides.get_engine_overrides()
         assert engine_overrides["validation_mode"] == "lenient"
@@ -515,11 +496,9 @@ class TestCLIFlagCombinations:
     def test_force_accept_overrides_validation_mode(self):
         """Test that force-accept disables validation even with validation-mode set."""
         parser = create_parser()
-        args = parser.parse_args([
-            "--site", "test",
-            "--force-accept",
-            "--validation-mode", "strict"
-        ])
+        args = parser.parse_args(
+            ["--site", "test", "--force-accept", "--validation-mode", "strict"]
+        )
         overrides = CLIConfigOverrides(args)
         engine_overrides = overrides.get_engine_overrides()
         # force-accept should disable validation regardless
@@ -528,13 +507,18 @@ class TestCLIFlagCombinations:
     def test_dry_run_with_all_validation_flags(self):
         """Test dry-run with comprehensive validation configuration."""
         parser = create_parser()
-        args = parser.parse_args([
-            "--site", "test",
-            "--dry-run",
-            "--validation-mode", "strict",
-            "--max-retries", "2",
-            "--save-rejected"
-        ])
+        args = parser.parse_args(
+            [
+                "--site",
+                "test",
+                "--dry-run",
+                "--validation-mode",
+                "strict",
+                "--max-retries",
+                "2",
+                "--save-rejected",
+            ]
+        )
         overrides = CLIConfigOverrides(args)
         engine_overrides = overrides.get_engine_overrides()
         assert engine_overrides["dry_run"] is True
@@ -545,16 +529,24 @@ class TestCLIFlagCombinations:
     def test_all_flags_together(self):
         """Test a realistic combination of all major flags."""
         parser = create_parser()
-        args = parser.parse_args([
-            "--site", "test",
-            "--validation-mode", "normal",
-            "--enable-terminology",
-            "--terminology-mode", "validate",
-            "--max-retries", "3",
-            "--save-rejected",
-            "--validation-config", "/custom/validation.yaml",
-            "--terminology-config", "/custom/terminology.yaml"
-        ])
+        args = parser.parse_args(
+            [
+                "--site",
+                "test",
+                "--validation-mode",
+                "normal",
+                "--enable-terminology",
+                "--terminology-mode",
+                "validate",
+                "--max-retries",
+                "3",
+                "--save-rejected",
+                "--validation-config",
+                "/custom/validation.yaml",
+                "--terminology-config",
+                "/custom/terminology.yaml",
+            ]
+        )
         overrides = CLIConfigOverrides(args)
         engine_overrides = overrides.get_engine_overrides()
         assert engine_overrides["validation_mode"] == "normal"

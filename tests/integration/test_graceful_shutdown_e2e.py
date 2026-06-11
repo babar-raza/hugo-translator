@@ -122,6 +122,7 @@ time.sleep(30)
             if sys.platform == "win32":
                 # On Windows, use CTRL_BREAK_EVENT
                 import os
+
                 os.kill(process.pid, signal.CTRL_BREAK_EVENT)
             else:
                 process.send_signal(signal.SIGINT)
@@ -255,6 +256,7 @@ time.sleep(30)
             time.sleep(0.2)
             if sys.platform == "win32":
                 import os
+
                 os.kill(process.pid, signal.CTRL_BREAK_EVENT)
                 time.sleep(0.1)
                 try:
@@ -357,6 +359,7 @@ except SystemExit:
             time.sleep(0.5)
             if sys.platform == "win32":
                 import os
+
                 os.kill(process.pid, signal.CTRL_BREAK_EVENT)
             else:
                 process.send_signal(signal.SIGINT)
@@ -420,6 +423,7 @@ time.sleep(30)
             time.sleep(0.2)
             if sys.platform == "win32":
                 import os
+
                 os.kill(process.pid, signal.CTRL_BREAK_EVENT)
             else:
                 process.send_signal(signal.SIGINT)
@@ -495,6 +499,7 @@ time.sleep(30)
             time.sleep(0.2)
             if sys.platform == "win32":
                 import os
+
                 os.kill(process.pid, signal.CTRL_BREAK_EVENT)
             else:
                 process.send_signal(signal.SIGINT)
@@ -548,7 +553,7 @@ time.sleep(30)
 
             # Send SIGBREAK (Windows-specific)
             time.sleep(0.2)
-            if hasattr(signal, 'SIGBREAK'):
+            if hasattr(signal, "SIGBREAK"):
                 process.send_signal(signal.SIGBREAK)
             else:
                 # Fallback to SIGINT if SIGBREAK not available
@@ -650,6 +655,7 @@ time.sleep(30)
             time.sleep(0.2)
             if sys.platform == "win32":
                 import os
+
                 os.kill(process.pid, signal.CTRL_BREAK_EVENT)
             else:
                 process.send_signal(signal.SIGINT)

@@ -25,7 +25,7 @@ class TestTerminologyDetector:
             term="Aspose",
             category="company_name",
             preserve_mode=PreserveMode.BOTH,
-            severity=TermSeverity.ERROR
+            severity=TermSeverity.ERROR,
         )
         detector = TerminologyDetector([rule])
         detected = detector.detect("Aspose is great")
@@ -43,7 +43,7 @@ class TestTerminologyDetector:
             term="Aspose",
             category="company_name",
             preserve_mode=PreserveMode.BOTH,
-            severity=TermSeverity.ERROR
+            severity=TermSeverity.ERROR,
         )
         detector = TerminologyDetector([rule])
         detected = detector.detect("Aspose is great and Aspose rocks")
@@ -60,7 +60,7 @@ class TestTerminologyDetector:
             pattern=r"Aspose\.\w+",
             category="product_family",
             preserve_mode=PreserveMode.PROTECT,
-            severity=TermSeverity.ERROR
+            severity=TermSeverity.ERROR,
         )
         detector = TerminologyDetector([rule])
         detected = detector.detect("Aspose.Words and Aspose.Cells are products")
@@ -78,7 +78,7 @@ class TestTerminologyDetector:
             category="company_name",
             preserve_mode=PreserveMode.BOTH,
             severity=TermSeverity.ERROR,
-            case_sensitive=True
+            case_sensitive=True,
         )
         detector = TerminologyDetector([rule])
         detected = detector.detect("Aspose and aspose and ASPOSE")
@@ -94,7 +94,7 @@ class TestTerminologyDetector:
             category="company_name",
             preserve_mode=PreserveMode.BOTH,
             severity=TermSeverity.ERROR,
-            case_sensitive=False
+            case_sensitive=False,
         )
         detector = TerminologyDetector([rule])
         detected = detector.detect("Aspose and aspose and ASPOSE")
@@ -112,7 +112,7 @@ class TestTerminologyDetector:
             category="product_family",
             preserve_mode=PreserveMode.PROTECT,
             severity=TermSeverity.ERROR,
-            case_sensitive=True
+            case_sensitive=True,
         )
         detector = TerminologyDetector([rule])
         detected = detector.detect("Aspose.Words and aspose.cells")
@@ -128,7 +128,7 @@ class TestTerminologyDetector:
             category="product_family",
             preserve_mode=PreserveMode.PROTECT,
             severity=TermSeverity.ERROR,
-            case_sensitive=False
+            case_sensitive=False,
         )
         detector = TerminologyDetector([rule])
         detected = detector.detect("Aspose.Words and aspose.cells")
@@ -145,7 +145,7 @@ class TestTerminologyDetector:
             category="platform",
             preserve_mode=PreserveMode.BOTH,
             severity=TermSeverity.ERROR,
-            case_sensitive=False
+            case_sensitive=False,
         )
         detector = TerminologyDetector([rule])
         detected = detector.detect("internet and .NET framework")
@@ -161,7 +161,7 @@ class TestTerminologyDetector:
             term="Java",
             category="platform",
             preserve_mode=PreserveMode.BOTH,
-            severity=TermSeverity.ERROR
+            severity=TermSeverity.ERROR,
         )
         detector = TerminologyDetector([rule])
         detected = detector.detect("JavaScript and Java")
@@ -177,13 +177,13 @@ class TestTerminologyDetector:
             term="Aspose",
             category="company_name",
             preserve_mode=PreserveMode.BOTH,
-            severity=TermSeverity.ERROR
+            severity=TermSeverity.ERROR,
         )
         rule2 = TermRule(
             term="Aspose.Words",
             category="product",
             preserve_mode=PreserveMode.BOTH,
-            severity=TermSeverity.ERROR
+            severity=TermSeverity.ERROR,
         )
         detector = TerminologyDetector([rule1, rule2])
         detected = detector.detect("Aspose.Words is great")
@@ -198,13 +198,13 @@ class TestTerminologyDetector:
             pattern=r"Aspose\.\w+",
             category="product_family",
             preserve_mode=PreserveMode.PROTECT,
-            severity=TermSeverity.ERROR
+            severity=TermSeverity.ERROR,
         )
         rule2 = TermRule(
             term="Words",
             category="generic",
             preserve_mode=PreserveMode.BOTH,
-            severity=TermSeverity.WARNING
+            severity=TermSeverity.WARNING,
         )
         detector = TerminologyDetector([rule1, rule2])
         detected = detector.detect("Aspose.Words documentation")
@@ -219,7 +219,7 @@ class TestTerminologyDetector:
             term="Aspose",
             category="company_name",
             preserve_mode=PreserveMode.BOTH,
-            severity=TermSeverity.ERROR
+            severity=TermSeverity.ERROR,
         )
         detector = TerminologyDetector([rule])
         detected = detector.detect("This text has no terminology")
@@ -232,7 +232,7 @@ class TestTerminologyDetector:
             term="Aspose",
             category="company_name",
             preserve_mode=PreserveMode.BOTH,
-            severity=TermSeverity.ERROR
+            severity=TermSeverity.ERROR,
         )
         detector = TerminologyDetector([rule])
         detected = detector.detect("")
@@ -245,7 +245,7 @@ class TestTerminologyDetector:
             pattern=r"[invalid(pattern",  # Invalid regex
             category="test",
             preserve_mode=PreserveMode.PROTECT,
-            severity=TermSeverity.ERROR
+            severity=TermSeverity.ERROR,
         )
         detector = TerminologyDetector([rule])
         detected = detector.detect("some text")
@@ -260,21 +260,21 @@ class TestTerminologyDetector:
                 term="Aspose",
                 category="company_name",
                 preserve_mode=PreserveMode.BOTH,
-                severity=TermSeverity.ERROR
+                severity=TermSeverity.ERROR,
             ),
             TermRule(
                 term=".NET",
                 category="platform",
                 preserve_mode=PreserveMode.BOTH,
                 severity=TermSeverity.ERROR,
-                case_sensitive=False
+                case_sensitive=False,
             ),
             TermRule(
                 pattern=r"\b[A-Z]{2,}\b",  # Acronyms
                 category="acronym",
                 preserve_mode=PreserveMode.PROTECT,
-                severity=TermSeverity.WARNING
-            )
+                severity=TermSeverity.WARNING,
+            ),
         ]
         detector = TerminologyDetector(rules)
         detected = detector.detect("Aspose.Words for .NET API")
@@ -292,14 +292,14 @@ class TestTerminologyDetector:
                 term="Aspose",
                 category="company_name",
                 preserve_mode=PreserveMode.NONE,
-                severity=TermSeverity.ERROR
+                severity=TermSeverity.ERROR,
             ),
             TermRule(
                 term="Words",
                 category="product",
                 preserve_mode=PreserveMode.BOTH,
-                severity=TermSeverity.ERROR
-            )
+                severity=TermSeverity.ERROR,
+            ),
         ]
         detector = TerminologyDetector(rules)
         detected = detector.detect("Aspose.Words")
@@ -315,14 +315,14 @@ class TestTerminologyDetector:
                 term="Words",
                 category="product",
                 preserve_mode=PreserveMode.BOTH,
-                severity=TermSeverity.ERROR
+                severity=TermSeverity.ERROR,
             ),
             TermRule(
                 term="Aspose",
                 category="company",
                 preserve_mode=PreserveMode.BOTH,
-                severity=TermSeverity.ERROR
-            )
+                severity=TermSeverity.ERROR,
+            ),
         ]
         detector = TerminologyDetector(rules)
         detected = detector.detect("Words from Aspose")
@@ -341,14 +341,14 @@ class TestTerminologyDetector:
                 term="Aspose",
                 category="company",
                 preserve_mode=PreserveMode.BOTH,
-                severity=TermSeverity.ERROR
+                severity=TermSeverity.ERROR,
             ),
             TermRule(
                 term="Words",
                 category="product",
                 preserve_mode=PreserveMode.BOTH,
-                severity=TermSeverity.ERROR
-            )
+                severity=TermSeverity.ERROR,
+            ),
         ]
         detector = TerminologyDetector(rules)
         detected = detector.detect("Aspose Words")
@@ -364,7 +364,7 @@ class TestTerminologyDetector:
             pattern=r"(Aspose)\.(Words|Cells)",
             category="product",
             preserve_mode=PreserveMode.PROTECT,
-            severity=TermSeverity.ERROR
+            severity=TermSeverity.ERROR,
         )
         detector = TerminologyDetector([rule])
         detected = detector.detect("Using Aspose.Words and Aspose.Cells")
@@ -379,7 +379,7 @@ class TestTerminologyDetector:
             term=".NET",
             category="platform",
             preserve_mode=PreserveMode.BOTH,
-            severity=TermSeverity.ERROR
+            severity=TermSeverity.ERROR,
         )
         detector = TerminologyDetector([rule])
         detected = detector.detect("Using .NET framework")
@@ -393,7 +393,7 @@ class TestTerminologyDetector:
             term="Aspose",
             category="company",
             preserve_mode=PreserveMode.BOTH,
-            severity=TermSeverity.ERROR
+            severity=TermSeverity.ERROR,
         )
         detector = TerminologyDetector([rule])
         text = """Line 1 with Aspose
@@ -410,7 +410,7 @@ Line 3"""
             term="Aspose",
             category="company",
             preserve_mode=PreserveMode.BOTH,
-            severity=TermSeverity.ERROR
+            severity=TermSeverity.ERROR,
         )
         detector = TerminologyDetector([rule])
         detected = detector.detect("Aspose 是一个公司 Aspose")
@@ -426,14 +426,14 @@ Line 3"""
                 term="Aspose",
                 category="company",
                 preserve_mode=PreserveMode.BOTH,
-                severity=TermSeverity.ERROR
+                severity=TermSeverity.ERROR,
             ),
             TermRule(
                 pattern=r"\w+\.NET",
                 category="platform",
                 preserve_mode=PreserveMode.PROTECT,
-                severity=TermSeverity.ERROR
-            )
+                severity=TermSeverity.ERROR,
+            ),
         ]
         detector = TerminologyDetector(rules)
         detected = detector.detect("Aspose for .NET")
@@ -447,7 +447,7 @@ Line 3"""
             pattern=r"\b",  # Zero-width word boundary
             category="test",
             preserve_mode=PreserveMode.PROTECT,
-            severity=TermSeverity.ERROR
+            severity=TermSeverity.ERROR,
         )
         detector = TerminologyDetector([rule])
         # This should complete without hanging
@@ -461,7 +461,7 @@ Line 3"""
             term="pose",
             category="test",
             preserve_mode=PreserveMode.BOTH,
-            severity=TermSeverity.ERROR
+            severity=TermSeverity.ERROR,
         )
         detector = TerminologyDetector([rule])
         detected = detector.detect("Aspose")  # "pose" is preceded by "As"

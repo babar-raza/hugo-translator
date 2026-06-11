@@ -37,6 +37,7 @@ def temp_db_path(tmp_path):
 def sample_system_info():
     """Create sample SystemInfo for testing."""
     from src.benchmarking.system_info import SystemInfo
+
     return SystemInfo(
         cpu_model="Intel Core i7-9700K",
         cpu_cores=8,
@@ -55,6 +56,7 @@ def sample_system_info():
 def sample_benchmark_result():
     """Create sample BenchmarkResult for testing."""
     from src.benchmarking.storage import BenchmarkResult
+
     return BenchmarkResult(
         sample_id="sample_001",
         model_id="test_model",
@@ -72,6 +74,7 @@ def sample_benchmark_result():
 def sample_benchmark_run(sample_system_info, sample_benchmark_result):
     """Create sample BenchmarkRun for testing."""
     from src.benchmarking.storage import BenchmarkRun
+
     return BenchmarkRun(
         run_id="test_run_001",
         model_id="test_model",
@@ -114,20 +117,20 @@ def test_benchmark_result_has_required_fields():
     )
 
     # Required fields
-    assert hasattr(result, 'sample_id')
-    assert hasattr(result, 'model_id')
-    assert hasattr(result, 'device')
-    assert hasattr(result, 'batch_size')
-    assert hasattr(result, 'duration_seconds')
-    assert hasattr(result, 'tokens_input')
-    assert hasattr(result, 'tokens_output')
-    assert hasattr(result, 'throughput_tokens_per_sec')
+    assert hasattr(result, "sample_id")
+    assert hasattr(result, "model_id")
+    assert hasattr(result, "device")
+    assert hasattr(result, "batch_size")
+    assert hasattr(result, "duration_seconds")
+    assert hasattr(result, "tokens_input")
+    assert hasattr(result, "tokens_output")
+    assert hasattr(result, "throughput_tokens_per_sec")
 
     # Optional fields
-    assert hasattr(result, 'peak_memory_mb')
-    assert hasattr(result, 'bleu_score')
-    assert hasattr(result, 'comet_score')
-    assert hasattr(result, 'errors')
+    assert hasattr(result, "peak_memory_mb")
+    assert hasattr(result, "bleu_score")
+    assert hasattr(result, "comet_score")
+    assert hasattr(result, "errors")
 
 
 @pytest.mark.contract
@@ -199,9 +202,19 @@ def test_benchmark_run_has_required_fields():
     field_names = {f.name for f in fields(BenchmarkRun)}
 
     required_fields = {
-        'run_id', 'model_id', 'device', 'batch_sizes', 'iterations',
-        'corpus_category', 'purpose', 'tags', 'system_info', 'results',
-        'total_duration_seconds', 'timestamp_utc', 'metadata'
+        "run_id",
+        "model_id",
+        "device",
+        "batch_sizes",
+        "iterations",
+        "corpus_category",
+        "purpose",
+        "tags",
+        "system_info",
+        "results",
+        "total_duration_seconds",
+        "timestamp_utc",
+        "metadata",
     }
 
     for field in required_fields:
@@ -291,13 +304,16 @@ def test_database_creates_schema_version_table(temp_db_path):
 
     # Query schema_version table directly
     import sqlite3
+
     conn = sqlite3.connect(str(temp_db_path))
-    cursor = conn.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='schema_version'")
+    cursor = conn.execute(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name='schema_version'"
+    )
     tables = cursor.fetchall()
     conn.close()
 
     assert len(tables) == 1
-    assert tables[0][0] == 'schema_version'
+    assert tables[0][0] == "schema_version"
 
     db.close()
 
@@ -313,7 +329,7 @@ def test_database_schema_version_matches():
     from src.benchmarking.storage import BenchmarkDatabase
 
     # Schema version should be a positive integer
-    assert hasattr(BenchmarkDatabase, 'SCHEMA_VERSION')
+    assert hasattr(BenchmarkDatabase, "SCHEMA_VERSION")
     assert isinstance(BenchmarkDatabase.SCHEMA_VERSION, int)
     assert BenchmarkDatabase.SCHEMA_VERSION > 0
 
@@ -332,13 +348,14 @@ def test_database_creates_required_tables(temp_db_path):
 
     # Query all tables
     import sqlite3
+
     conn = sqlite3.connect(str(temp_db_path))
     cursor = conn.execute("SELECT name FROM sqlite_master WHERE type='table'")
     tables = {row[0] for row in cursor.fetchall()}
     conn.close()
 
     # Required tables
-    required_tables = {'benchmark_runs', 'system_info', 'benchmark_results', 'schema_version'}
+    required_tables = {"benchmark_runs", "system_info", "benchmark_results", "schema_version"}
     for table in required_tables:
         assert table in tables, f"Missing required table: {table}"
 
@@ -364,12 +381,13 @@ def test_database_uses_wal_mode(temp_db_path):
 
     # Check WAL mode
     import sqlite3
+
     conn = sqlite3.connect(str(temp_db_path))
     cursor = conn.execute("PRAGMA journal_mode")
     mode = cursor.fetchone()[0]
     conn.close()
 
-    assert mode.lower() == 'wal'
+    assert mode.lower() == "wal"
 
     db.close()
 
@@ -388,6 +406,7 @@ def test_database_foreign_keys_enabled(temp_db_path):
 
     # Check foreign keys pragma
     import sqlite3
+
     conn = sqlite3.connect(str(temp_db_path))
     conn.execute("PRAGMA foreign_keys = ON")  # Must be set per connection
     cursor = conn.execute("PRAGMA foreign_keys")
@@ -417,7 +436,7 @@ def test_database_has_lock_for_thread_safety(temp_db_path):
     db = BenchmarkDatabase(temp_db_path)
 
     # Database should have a lock attribute
-    assert hasattr(db, '_lock')
+    assert hasattr(db, "_lock")
     assert isinstance(db._lock, type(threading.Lock()))
 
     db.close()
@@ -443,6 +462,7 @@ def test_database_supports_context_manager(temp_db_path):
         assert db is not None
         # Query should work
         import sqlite3
+
         conn = sqlite3.connect(str(temp_db_path))
         cursor = conn.execute("SELECT COUNT(*) FROM benchmark_runs")
         count = cursor.fetchone()[0]
@@ -469,7 +489,7 @@ def test_database_supports_memory_mode():
     db = BenchmarkDatabase(":memory:")
 
     # Tables should exist
-    assert hasattr(db, '_memory_conn')
+    assert hasattr(db, "_memory_conn")
     assert db._memory_conn is not None
 
     db.close()
@@ -502,16 +522,16 @@ def test_system_info_has_required_fields():
     )
 
     # Required fields
-    assert hasattr(sysinfo, 'cpu_model')
-    assert hasattr(sysinfo, 'cpu_cores')
-    assert hasattr(sysinfo, 'total_ram_gb')
-    assert hasattr(sysinfo, 'os_name')
-    assert hasattr(sysinfo, 'python_version')
-    assert hasattr(sysinfo, 'torch_version')
+    assert hasattr(sysinfo, "cpu_model")
+    assert hasattr(sysinfo, "cpu_cores")
+    assert hasattr(sysinfo, "total_ram_gb")
+    assert hasattr(sysinfo, "os_name")
+    assert hasattr(sysinfo, "python_version")
+    assert hasattr(sysinfo, "torch_version")
 
     # Optional fields
-    assert hasattr(sysinfo, 'gpu_model')
-    assert hasattr(sysinfo, 'gpu_memory_gb')
+    assert hasattr(sysinfo, "gpu_model")
+    assert hasattr(sysinfo, "gpu_memory_gb")
 
 
 @pytest.mark.contract
@@ -554,13 +574,14 @@ def test_database_creates_performance_indexes(temp_db_path):
 
     # Query indexes
     import sqlite3
+
     conn = sqlite3.connect(str(temp_db_path))
     cursor = conn.execute("SELECT name FROM sqlite_master WHERE type='index'")
     indexes = {row[0] for row in cursor.fetchall()}
     conn.close()
 
     # Key indexes should exist
-    key_indexes = ['idx_runs_model', 'idx_runs_device', 'idx_runs_timestamp', 'idx_results_run']
+    key_indexes = ["idx_runs_model", "idx_runs_device", "idx_runs_timestamp", "idx_results_run"]
     for idx in key_indexes:
         assert idx in indexes, f"Missing index: {idx}"
 
@@ -594,9 +615,9 @@ def test_benchmark_result_has_cache_tracking_fields():
     )
 
     # Cache tracking fields
-    assert hasattr(result, 'cache_status')
-    assert hasattr(result, 'tm_level')
-    assert hasattr(result, 'cache_hit_rate')
+    assert hasattr(result, "cache_status")
+    assert hasattr(result, "tm_level")
+    assert hasattr(result, "cache_hit_rate")
 
     # Default values
     assert result.cache_status == "unknown"

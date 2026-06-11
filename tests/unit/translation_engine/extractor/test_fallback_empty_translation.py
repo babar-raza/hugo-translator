@@ -20,7 +20,7 @@ from src.translation_engine.extractor.text_unit import TextUnit, TextUnitKind
 
 def _make_unit(source_text: str, node_addr: str = "body.paragraph[0].text[0]") -> TextUnit:
     return TextUnit(
-        unit_id="u_" + node_addr.replace('.', '_').replace('[', '_').replace(']', '_'),
+        unit_id="u_" + node_addr.replace(".", "_").replace("[", "_").replace("]", "_"),
         node_addr=node_addr,
         kind=TextUnitKind.TEXT,
         source_text=source_text,
@@ -33,9 +33,9 @@ def _make_extractor(**kwargs):
 
     mock_config = MagicMock()
     mock_config.get_config.return_value = {
-        'translation_engine': {
-            'batch_purity_skip_langs': [],
-            'language_detection_confidence_threshold': 0.70,
+        "translation_engine": {
+            "batch_purity_skip_langs": [],
+            "language_detection_confidence_threshold": 0.70,
         }
     }
     extractor = TextUnitExtractor.__new__(TextUnitExtractor)
@@ -43,12 +43,12 @@ def _make_extractor(**kwargs):
     extractor.fasttext_detector = None
     extractor.similarity_tracker = None
     extractor.batch_stats = {
-        'total_batches': 0,
-        'successful_batches': 0,
-        'fallback_batches': 0,
-        'mapping_failures': 0,
-        'individual_translations': 0,
-        'individual_translation_errors': 0,
+        "total_batches": 0,
+        "successful_batches": 0,
+        "fallback_batches": 0,
+        "mapping_failures": 0,
+        "individual_translations": 0,
+        "individual_translation_errors": 0,
     }
     extractor.batch_purity_skip_langs = set()
     for k, v in kwargs.items():

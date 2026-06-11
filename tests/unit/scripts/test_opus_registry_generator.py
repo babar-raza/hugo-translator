@@ -6,6 +6,7 @@ Tests:
 - supported_pairs correctness for bilingual models
 - local_path generation according to spec
 """
+
 # Import the generator functions
 import sys
 from pathlib import Path
@@ -26,11 +27,7 @@ class TestOpusRegistryGenerator:
 
     def test_generate_opus_entry_basic(self):
         """Test generating basic Opus model entry."""
-        entry = generate_opus_model_entry(
-            src_lang="en",
-            tgt_lang="fr",
-            check_online=False
-        )
+        entry = generate_opus_model_entry(src_lang="en", tgt_lang="fr", check_online=False)
 
         assert entry is not None
         assert entry["model_id"] == "opus_en_fr"
@@ -160,17 +157,13 @@ class TestDiscoverHfCacheModels:
         opus_path.mkdir(parents=True)
         (opus_path / "config.json").write_text("{}")
 
-        result = _check_model_in_organized_layout(
-            "Helsinki-NLP/opus-mt-en-fr",
-            models_dir=tmp_path
-        )
+        result = _check_model_in_organized_layout("Helsinki-NLP/opus-mt-en-fr", models_dir=tmp_path)
 
         assert result == opus_path
 
         # Non-existent model
         result2 = _check_model_in_organized_layout(
-            "Helsinki-NLP/opus-mt-en-de",
-            models_dir=tmp_path
+            "Helsinki-NLP/opus-mt-en-de", models_dir=tmp_path
         )
 
         assert result2 is None

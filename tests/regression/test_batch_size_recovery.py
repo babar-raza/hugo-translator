@@ -35,30 +35,33 @@ class TestBatchSizeRecoveryFormula:
         new_size = max(current_size + 1, proportional_increase)
 
         # Verify increase happened
-        assert new_size > current_size, \
+        assert new_size > current_size, (
             f"Batch size should increase from {current_size} to at least {current_size + 1}"
-        assert new_size == 5, \
-            f"Expected 5, got {new_size}"
+        )
+        assert new_size == 5, f"Expected 5, got {new_size}"
 
-    @pytest.mark.parametrize("current,expected_min", [
-        (1, 2),   # 1 * 1.10 = 1.1 -> ceil=2, max(2,2)=2
-        (2, 3),   # 2 * 1.10 = 2.2 -> ceil=3, max(3,3)=3
-        (3, 4),   # 3 * 1.10 = 3.3 -> ceil=4, max(4,4)=4
-        (4, 5),   # 4 * 1.10 = 4.4 -> ceil=5, max(5,5)=5
-        (5, 6),   # 5 * 1.10 = 5.5 -> ceil=6, max(6,6)=6
-        (9, 10),  # 9 * 1.10 = 9.9 -> ceil=10, max(10,10)=10
-        (10, 11), # 10 * 1.10 = 11.0 -> ceil=11, max(11,11)=11
-    ])
+    @pytest.mark.parametrize(
+        "current,expected_min",
+        [
+            (1, 2),  # 1 * 1.10 = 1.1 -> ceil=2, max(2,2)=2
+            (2, 3),  # 2 * 1.10 = 2.2 -> ceil=3, max(3,3)=3
+            (3, 4),  # 3 * 1.10 = 3.3 -> ceil=4, max(4,4)=4
+            (4, 5),  # 4 * 1.10 = 4.4 -> ceil=5, max(5,5)=5
+            (5, 6),  # 5 * 1.10 = 5.5 -> ceil=6, max(6,6)=6
+            (9, 10),  # 9 * 1.10 = 9.9 -> ceil=10, max(10,10)=10
+            (10, 11),  # 10 * 1.10 = 11.0 -> ceil=11, max(11,11)=11
+        ],
+    )
     def test_batch_size_increases_for_various_sizes(self, current, expected_min):
         """Verify batch size increases correctly for various starting sizes."""
         increase_factor = 1.10
         proportional_increase = math.ceil(current * increase_factor)
         new_size = max(current + 1, proportional_increase)
 
-        assert new_size >= expected_min, \
+        assert new_size >= expected_min, (
             f"From {current}: expected at least {expected_min}, got {new_size}"
-        assert new_size > current, \
-            f"Batch size must increase from {current}"
+        )
+        assert new_size > current, f"Batch size must increase from {current}"
 
     def test_old_buggy_formula_would_fail(self):
         """
@@ -77,12 +80,10 @@ class TestBatchSizeRecoveryFormula:
         new_new_size = max(current_size + 1, proportional_increase)
 
         # Old formula would NOT increase
-        assert old_new_size == current_size, \
-            "Old formula should have no increase (this is the bug)"
+        assert old_new_size == current_size, "Old formula should have no increase (this is the bug)"
 
         # New formula DOES increase
-        assert new_new_size > current_size, \
-            "New formula should increase"
+        assert new_new_size > current_size, "New formula should increase"
 
     def test_batch_capped_at_baseline(self):
         """Verify batch size doesn't exceed baseline."""
@@ -94,15 +95,17 @@ class TestBatchSizeRecoveryFormula:
         new_size_uncapped = max(current_size + 1, proportional_increase)
         new_size = min(baseline, new_size_uncapped)
 
-        assert new_size <= baseline, \
-            f"Batch size {new_size} should not exceed baseline {baseline}"
+        assert new_size <= baseline, f"Batch size {new_size} should not exceed baseline {baseline}"
 
-    @pytest.mark.parametrize("current,baseline,expected", [
-        (4, 11, 5),    # 4 -> 5, under baseline
-        (10, 11, 11),  # 10 -> 11, at baseline
-        (11, 11, 11),  # 11 -> 11, already at baseline
-        (8, 8, 8),     # 8 -> 8, already at baseline
-    ])
+    @pytest.mark.parametrize(
+        "current,baseline,expected",
+        [
+            (4, 11, 5),  # 4 -> 5, under baseline
+            (10, 11, 11),  # 10 -> 11, at baseline
+            (11, 11, 11),  # 11 -> 11, already at baseline
+            (8, 8, 8),  # 8 -> 8, already at baseline
+        ],
+    )
     def test_baseline_capping_scenarios(self, current, baseline, expected):
         """Test various baseline capping scenarios."""
         increase_factor = 1.10
@@ -112,8 +115,7 @@ class TestBatchSizeRecoveryFormula:
 
         # Only increase if under baseline
         if current < baseline:
-            assert new_size > current or new_size == baseline, \
-                "Should increase or be at baseline"
+            assert new_size > current or new_size == baseline, "Should increase or be at baseline"
         assert new_size <= baseline, "Should not exceed baseline"
 
 

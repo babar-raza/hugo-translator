@@ -6,10 +6,7 @@ from src.translation_engine.extractor.text_unit_extractor import TextUnitExtract
 @pytest.fixture
 def extractor():
     """Create extractor instance for testing."""
-    return TextUnitExtractor(
-        segmentation_strategy="sentence_only",
-        terminology_file=None
-    )
+    return TextUnitExtractor(segmentation_strategy="sentence_only", terminology_file=None)
 
 
 class TestTechnicalTermWhitelist:
@@ -20,28 +17,32 @@ class TestTechnicalTermWhitelist:
         # Should load from YAML if exists, otherwise use defaults
         assert len(extractor.technical_terms) > 0
         # Key terms should be present
-        assert 'Aspose' in extractor.technical_terms
-        assert 'C#' in extractor.technical_terms
+        assert "Aspose" in extractor.technical_terms
+        assert "C#" in extractor.technical_terms
 
-    @pytest.mark.parametrize("text,expected_density", [
-        # 100% technical (3/3 words)
-        ("C# Aspose Excel", 1.0),
-        # 25% technical (1/4 words)
-        ("How to use Excel", 0.25),
-        # 33% technical (2/6 words: "C#" and "Excel")
-        ("How to use C# with Excel", 0.333),
-        # 0% technical
-        ("This is normal text", 0.0),
-        # Empty text
-        ("", 0.0),
-        # Single technical term
-        ("Aspose", 1.0),
-    ])
+    @pytest.mark.parametrize(
+        "text,expected_density",
+        [
+            # 100% technical (3/3 words)
+            ("C# Aspose Excel", 1.0),
+            # 25% technical (1/4 words)
+            ("How to use Excel", 0.25),
+            # 33% technical (2/6 words: "C#" and "Excel")
+            ("How to use C# with Excel", 0.333),
+            # 0% technical
+            ("This is normal text", 0.0),
+            # Empty text
+            ("", 0.0),
+            # Single technical term
+            ("Aspose", 1.0),
+        ],
+    )
     def test_technical_density_calculation(self, extractor, text, expected_density):
         """Verify technical density calculation is accurate."""
         actual_density = extractor._calculate_technical_density(text)
-        assert abs(actual_density - expected_density) < 0.01, \
+        assert abs(actual_density - expected_density) < 0.01, (
             f"Expected density {expected_density}, got {actual_density} for text: {text}"
+        )
 
     def test_technical_density_case_sensitive(self, extractor):
         """Verify technical term matching is case-sensitive."""
@@ -86,7 +87,7 @@ class TestLanguagePurityBypass:
             node_addr="test.1",
             kind=TextUnitKind.TEXT,
             source_text="Use Aspose.Cells for .NET",
-            do_not_translate=False
+            do_not_translate=False,
         )
         unit.translated_text = "Verwenden Sie Aspose.Cells für .NET SDK"
 
@@ -110,7 +111,7 @@ class TestLanguagePurityBypass:
             node_addr="test.2",
             kind=TextUnitKind.TEXT,
             source_text="This is a test",
-            do_not_translate=False
+            do_not_translate=False,
         )
         unit.translated_text = "This is still in English and should fail"
 

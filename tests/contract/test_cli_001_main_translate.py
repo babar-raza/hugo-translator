@@ -310,7 +310,7 @@ class TestAtomicOutputWrites:
         output_file.write_text(original_content, encoding="utf-8")
 
         # Act - Simulate write failure
-        with patch('os.replace') as mock_replace:
+        with patch("os.replace") as mock_replace:
             mock_replace.side_effect = OSError(errno.EIO, "Disk error")
 
             with pytest.raises((AtomicWriteError, OSError)):
@@ -416,7 +416,7 @@ class TestProgressFileIntegrity:
             site_id="test.example.com",
             source_dir=content_dir,
             output_dir=tmp_path / "output",
-            target_langs=["de", "fr"]
+            target_langs=["de", "fr"],
         )
         # Initialize with files to trigger save
         tracker.initialize([test_file])
@@ -441,9 +441,7 @@ class TestProgressFileIntegrity:
         corrupted_file.write_text("{ invalid json content", encoding="utf-8")
 
         # Act
-        is_valid, error_msg, recoverable = ProgressTracker.validate_progress_file(
-            corrupted_file
-        )
+        is_valid, error_msg, recoverable = ProgressTracker.validate_progress_file(corrupted_file)
 
         # Assert
         assert is_valid is False
@@ -633,11 +631,7 @@ class TestCLIArgumentParser:
         parser = create_parser()
 
         # Act - Parse with internal flags
-        args = parser.parse_args([
-            "--site", "test.com",
-            "--_single-lang-mode",
-            "--_skip-site-lock"
-        ])
+        args = parser.parse_args(["--site", "test.com", "--_single-lang-mode", "--_skip-site-lock"])
 
         # Assert - Flags are recognized
         assert args._single_lang_mode is True
@@ -786,10 +780,7 @@ class TestLockIsolation:
         parser = create_parser()
 
         # Act - Parse with skip flag (as child process would receive)
-        args = parser.parse_args([
-            "--site", "test.com",
-            "--_skip-site-lock"
-        ])
+        args = parser.parse_args(["--site", "test.com", "--_skip-site-lock"])
 
         # Assert
         assert args._skip_site_lock is True

@@ -11,6 +11,7 @@ Tests core functionality that must work for the system to be operational:
 
 All tests are marked with @pytest.mark.smoke and should complete in <30 seconds.
 """
+
 import sys
 import tempfile
 from pathlib import Path
@@ -89,10 +90,11 @@ def test_hardware_detector_device_selection():
 
         if hw_info.has_cuda and hw_info.cuda_devices:
             # Check if any GPU has sufficient memory (if available)
-            has_sufficient_gpu = any(
-                d.get("memory_total_gb", 0) >= 2.0
-                for d in hw_info.cuda_devices
-            ) if hw_info.cuda_devices else False
+            has_sufficient_gpu = (
+                any(d.get("memory_total_gb", 0) >= 2.0 for d in hw_info.cuda_devices)
+                if hw_info.cuda_devices
+                else False
+            )
             if has_sufficient_gpu:
                 # May recommend GPU
                 assert device in ["cuda", "mps", "cpu"]
@@ -117,15 +119,15 @@ def test_tm_l1_initialization():
 
         # Verify initialization
         assert cache is not None
-        assert hasattr(cache, 'put')
-        assert hasattr(cache, 'get')
+        assert hasattr(cache, "put")
+        assert hasattr(cache, "get")
 
         # Test basic put/get (L1Cache.get returns Optional[str])
-        cache.put('test-site', 'en', 'es', 'hello', 'hola')
-        result = cache.get('test-site', 'en', 'es', 'hello')
+        cache.put("test-site", "en", "es", "hello", "hola")
+        result = cache.get("test-site", "en", "es", "hello")
 
         assert result is not None
-        assert result == 'hola'  # L1Cache returns the translation string directly
+        assert result == "hola"  # L1Cache returns the translation string directly
 
     except Exception as e:
         pytest.fail(f"L1 cache initialization failed: {e}")
@@ -139,19 +141,19 @@ def test_tm_l1_cache_eviction():
         cache = L1Cache(max_size=3)
 
         # Fill beyond capacity
-        cache.put('test-site', 'en', 'es', 'one', 'uno')
-        cache.put('test-site', 'en', 'es', 'two', 'dos')
-        cache.put('test-site', 'en', 'es', 'three', 'tres')
-        cache.put('test-site', 'en', 'es', 'four', 'cuatro')
+        cache.put("test-site", "en", "es", "one", "uno")
+        cache.put("test-site", "en", "es", "two", "dos")
+        cache.put("test-site", "en", "es", "three", "tres")
+        cache.put("test-site", "en", "es", "four", "cuatro")
 
         # Cache should still work (eviction occurred)
-        result = cache.get('test-site', 'en', 'es', 'four')
+        result = cache.get("test-site", "en", "es", "four")
         assert result is not None
-        assert result == 'cuatro'
+        assert result == "cuatro"
 
         # Verify cache size is maintained (use stats() method)
         stats = cache.stats()
-        assert stats['size'] <= 3
+        assert stats["size"] <= 3
 
     except Exception as e:
         pytest.fail(f"L1 cache eviction failed: {e}")
@@ -164,14 +166,14 @@ def test_tm_l1_multi_language_pairs():
         cache = L1Cache(max_size=100)
 
         # Store translations for different language pairs
-        cache.put('test-site', 'en', 'es', 'hello', 'hola')
-        cache.put('test-site', 'en', 'fr', 'hello', 'bonjour')
-        cache.put('test-site', 'es', 'en', 'hola', 'hello')
+        cache.put("test-site", "en", "es", "hello", "hola")
+        cache.put("test-site", "en", "fr", "hello", "bonjour")
+        cache.put("test-site", "es", "en", "hola", "hello")
 
         # Verify all pairs are accessible (returns string directly)
-        assert cache.get('test-site', 'en', 'es', 'hello') == 'hola'
-        assert cache.get('test-site', 'en', 'fr', 'hello') == 'bonjour'
-        assert cache.get('test-site', 'es', 'en', 'hola') == 'hello'
+        assert cache.get("test-site", "en", "es", "hello") == "hola"
+        assert cache.get("test-site", "en", "fr", "hello") == "bonjour"
+        assert cache.get("test-site", "es", "en", "hola") == "hello"
 
     except Exception as e:
         pytest.fail(f"L1 multi-language support failed: {e}")
@@ -192,15 +194,15 @@ def test_tm_l2_initialization():
 
             # Verify initialization
             assert tm is not None
-            assert hasattr(tm, 'store')
-            assert hasattr(tm, 'exact_lookup')
+            assert hasattr(tm, "store")
+            assert hasattr(tm, "exact_lookup")
 
             # Test basic store/lookup
-            tm.store('test-site', 'en', 'es', 'world', 'mundo')
-            result = tm.exact_lookup('test-site', 'en', 'es', 'world')
+            tm.store("test-site", "en", "es", "world", "mundo")
+            result = tm.exact_lookup("test-site", "en", "es", "world")
 
             assert result is not None
-            assert result.translation == 'mundo'
+            assert result.translation == "mundo"
 
             # Clean up
             tm.close()
@@ -218,15 +220,15 @@ def test_tm_l2_persistence():
 
             # Store data in first instance
             tm1 = L2PersistentTM(db_path=db_path, max_size_mb=10)
-            tm1.store('test-site', 'en', 'es', 'persistence', 'persistencia')
+            tm1.store("test-site", "en", "es", "persistence", "persistencia")
             tm1.close()
 
             # Retrieve data in second instance
             tm2 = L2PersistentTM(db_path=db_path, max_size_mb=10)
-            result = tm2.exact_lookup('test-site', 'en', 'es', 'persistence')
+            result = tm2.exact_lookup("test-site", "en", "es", "persistence")
 
             assert result is not None
-            assert result.translation == 'persistencia'
+            assert result.translation == "persistencia"
 
             tm2.close()
 
@@ -244,19 +246,19 @@ def test_tm_l2_bulk_operations():
 
             # Store multiple entries
             entries = [
-                ('apple', 'manzana'),
-                ('banana', 'plátano'),
-                ('orange', 'naranja'),
-                ('grape', 'uva'),
-                ('pear', 'pera'),
+                ("apple", "manzana"),
+                ("banana", "plátano"),
+                ("orange", "naranja"),
+                ("grape", "uva"),
+                ("pear", "pera"),
             ]
 
             for source, target in entries:
-                tm.store('test-site', 'en', 'es', source, target)
+                tm.store("test-site", "en", "es", source, target)
 
             # Verify all entries
             for source, target in entries:
-                result = tm.exact_lookup('test-site', 'en', 'es', source)
+                result = tm.exact_lookup("test-site", "en", "es", source)
                 assert result is not None
                 assert result.translation == target
 
@@ -287,8 +289,8 @@ def test_tm_l3_initialization():
 
             # Verify initialization
             assert tm is not None
-            assert hasattr(tm, 'add_entry')
-            assert hasattr(tm, 'semantic_search')
+            assert hasattr(tm, "add_entry")
+            assert hasattr(tm, "semantic_search")
 
         except Exception as e:
             pytest.fail(f"L3 semantic TM initialization failed: {e}")
@@ -308,11 +310,11 @@ def test_tm_l3_add_and_search():
             )
 
             # Add some entries (entry_id, site_id, src_lang, tgt_lang, source_text, translation)
-            tm.add_entry('entry1', 'test-site', 'en', 'es', 'Hello world', 'Hola mundo')
-            tm.add_entry('entry2', 'test-site', 'en', 'es', 'Good morning', 'Buenos días')
+            tm.add_entry("entry1", "test-site", "en", "es", "Hello world", "Hola mundo")
+            tm.add_entry("entry2", "test-site", "en", "es", "Good morning", "Buenos días")
 
             # Search (should find exact or similar match)
-            results = tm.semantic_search('test-site', 'en', 'es', 'Hello world')
+            results = tm.semantic_search("test-site", "en", "es", "Hello world")
 
             # Should return results (may be empty list or matches)
             assert isinstance(results, list)
@@ -336,8 +338,8 @@ def test_tm_l3_device_compatibility():
             )
 
             # Should work on any system (entry_id, site_id, src_lang, tgt_lang, source_text, translation)
-            tm.add_entry('entry1', 'test-site', 'en', 'es', 'test', 'prueba')
-            results = tm.semantic_search('test-site', 'en', 'es', 'test')
+            tm.add_entry("entry1", "test-site", "en", "es", "test", "prueba")
+            results = tm.semantic_search("test-site", "en", "es", "test")
 
             assert isinstance(results, list)  # May return 0 or more results
 
@@ -397,13 +399,13 @@ def test_translation_memory_lookup_chain():
             )
 
             # Store in TM (goes to L2)
-            tm.store('test-site', 'en', 'es', 'lookup test', 'prueba de búsqueda')
+            tm.store("test-site", "en", "es", "lookup test", "prueba de búsqueda")
 
             # Lookup should find it
-            result = tm.lookup('test-site', 'en', 'es', 'lookup test')
+            result = tm.lookup("test-site", "en", "es", "lookup test")
 
             assert result is not None
-            assert result.translation == 'prueba de búsqueda'
+            assert result.translation == "prueba de búsqueda"
 
             l2.close()
 
@@ -430,8 +432,8 @@ def test_config_loading_smoke():
             config = ConfigService(config_root)
 
             # Should have basic methods
-            assert hasattr(config, 'get_site_profile')
-            assert hasattr(config, 'global_config')  # Property, not method
+            assert hasattr(config, "get_site_profile")
+            assert hasattr(config, "global_config")  # Property, not method
         else:
             pytest.skip("Config directory not found")
 
@@ -495,7 +497,7 @@ models:
 
             # Should load models
             models = registry.list_models()
-            assert 'test-model' in models or len(models) >= 0
+            assert "test-model" in models or len(models) >= 0
 
         except Exception as e:
             pytest.fail(f"Model registry initialization failed: {e}")

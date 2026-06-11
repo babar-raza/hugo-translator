@@ -8,12 +8,13 @@ Key insight: stdlib's StreamHandler.emit() wraps stream.write() in try/except,
 calling handleError() on failure instead of propagating. We simulate the real
 failure by using a stream whose write() raises OSError, NOT by replacing emit().
 """
+
 from __future__ import annotations
 
 import io
 import logging
 import sys
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
 
 import pytest
 import structlog
@@ -64,9 +65,9 @@ class TestStructlogStdlibRouting:
         """structlog.get_logger() returns a stdlib-backed logger after configure."""
         _configure_structlog_stdlib()
         cfg = structlog.get_config()
-        assert isinstance(
-            cfg["logger_factory"], structlog.stdlib.LoggerFactory
-        ), "logger_factory must be stdlib LoggerFactory"
+        assert isinstance(cfg["logger_factory"], structlog.stdlib.LoggerFactory), (
+            "logger_factory must be stdlib LoggerFactory"
+        )
 
     def test_restricted_stdout_does_not_crash_structlog(self):
         """Writing to a broken stdout does not crash structlog when routed via stdlib.

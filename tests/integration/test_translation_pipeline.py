@@ -39,7 +39,7 @@ title: "Pipeline Test"
 """
 
     config_service = ConfigService(Path(__file__).parent.parent.parent / "config")
-    site_profile = config_service.get_site_profile('kb.aspose.net')
+    site_profile = config_service.get_site_profile("kb.aspose.net")
 
     parser = HugoParser()
     parsed = parser.parse_string(source)
@@ -48,33 +48,27 @@ title: "Pipeline Test"
     plan = extractor.extract_from_ast(parsed.ast, parsed.frontmatter)
 
     # Identity translation: use source text unchanged
-    translations = {
-        u.node_addr: u.source_text
-        for u in plan.units
-        if u.node_addr and u.source_text
-    }
+    translations = {u.node_addr: u.source_text for u in plan.units if u.node_addr and u.source_text}
 
     reconstructor = MarkdownReconstructor(site_profile)
-    output = reconstructor.reconstruct_body(parsed.ast, translations, 'de')
+    output = reconstructor.reconstruct_body(parsed.ast, translations, "de")
 
     # Count structural elements in source body (exclude frontmatter)
-    source_body = source.split('---', 2)[-1]
-    source_ordered = source_body.count('\n1. ') + source_body.count('\n2. ') + source_body.count('\n3. ')
-    source_bullets = source_body.count('\n- ')
-    source_links = source_body.count('](')
-    source_bold = source_body.count('**') // 2
+    source_body = source.split("---", 2)[-1]
+    source_ordered = (
+        source_body.count("\n1. ") + source_body.count("\n2. ") + source_body.count("\n3. ")
+    )
+    source_bullets = source_body.count("\n- ")
+    source_links = source_body.count("](")
+    source_bold = source_body.count("**") // 2
 
     # Count in output
-    out_ordered = output.count('\n1. ') + output.count('\n2. ') + output.count('\n3. ')
-    out_bullets = output.count('\n- ')
-    out_links = output.count('](')
-    out_bold = output.count('**') // 2
+    out_ordered = output.count("\n1. ") + output.count("\n2. ") + output.count("\n3. ")
+    out_bullets = output.count("\n- ")
+    out_links = output.count("](")
+    out_bold = output.count("**") // 2
 
-    assert out_ordered == source_ordered, \
-        f"Ordered lists: {source_ordered} → {out_ordered}"
-    assert out_bullets == source_bullets, \
-        f"Bullet lists: {source_bullets} → {out_bullets}"
-    assert out_links == source_links, \
-        f"Links: {source_links} → {out_links}"
-    assert out_bold == source_bold, \
-        f"Bold: {source_bold} → {out_bold}"
+    assert out_ordered == source_ordered, f"Ordered lists: {source_ordered} → {out_ordered}"
+    assert out_bullets == source_bullets, f"Bullet lists: {source_bullets} → {out_bullets}"
+    assert out_links == source_links, f"Links: {source_links} → {out_links}"
+    assert out_bold == source_bold, f"Bold: {source_bold} → {out_bold}"

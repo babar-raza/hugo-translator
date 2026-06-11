@@ -3,6 +3,7 @@ Integration tests for parallel language processing mode (T306: federated-splashi
 
 End-to-end tests for --parallel-languages flag.
 """
+
 import os
 import subprocess
 import sys
@@ -24,7 +25,9 @@ class TestParallelModeE2E:
     def test_content_file(self):
         """Path to a real test file for translation."""
         # Use actual content from kb.aspose.net
-        content_path = Path("D:/onedrive/Documents/GitHub/aspose.net/content/kb.aspose.net/slides/en/presentation-converter/how-to-convert-odp-to-powerpoint-pptx-csharp.md")
+        content_path = Path(
+            "D:/onedrive/Documents/GitHub/aspose.net/content/kb.aspose.net/slides/en/presentation-converter/how-to-convert-odp-to-powerpoint-pptx-csharp.md"
+        )
         if not content_path.exists():
             pytest.skip(f"Test content file not found: {content_path}")
         return content_path
@@ -61,7 +64,9 @@ class TestParallelModeE2E:
         assert "--parallel-languages" in result.stdout
 
     @_skip_heavy
-    def test_parallel_processes_languages_concurrently(self, test_content_file, temp_output_dir, temp_tm_dir):
+    def test_parallel_processes_languages_concurrently(
+        self, test_content_file, temp_output_dir, temp_tm_dir
+    ):
         """Test that parallel mode processes multiple languages successfully."""
         # Run translation with parallel mode (3 languages: de, fr, es)
         result = subprocess.run(
@@ -74,7 +79,9 @@ class TestParallelModeE2E:
                 "--input",
                 str(test_content_file),
                 "--target-langs",
-                "de", "fr", "es",
+                "de",
+                "fr",
+                "es",
                 "--parallel-languages",
                 "2",  # Process 2 languages in parallel
                 "--output",
@@ -97,11 +104,20 @@ class TestParallelModeE2E:
         expected_langs = ["de", "fr", "es"]
         base_dir = Path("D:/onedrive/Documents/GitHub/aspose.net/content/kb.aspose.net/slides")
         for lang in expected_langs:
-            output_file = base_dir / lang / "presentation-converter" / "how-to-convert-odp-to-powerpoint-pptx-csharp.md"
-            assert output_file.exists(), f"Output file not created for language: {lang} at {output_file}"
+            output_file = (
+                base_dir
+                / lang
+                / "presentation-converter"
+                / "how-to-convert-odp-to-powerpoint-pptx-csharp.md"
+            )
+            assert output_file.exists(), (
+                f"Output file not created for language: {lang} at {output_file}"
+            )
 
     @_skip_heavy
-    def test_parallel_max_workers_limits_concurrency(self, test_content_file, temp_output_dir, temp_tm_dir):
+    def test_parallel_max_workers_limits_concurrency(
+        self, test_content_file, temp_output_dir, temp_tm_dir
+    ):
         """Test that max_workers limits concurrent threads."""
         # Run with parallel-languages=4 (should process 4 languages concurrently)
         result = subprocess.run(
@@ -114,7 +130,10 @@ class TestParallelModeE2E:
                 "--input",
                 str(test_content_file),
                 "--target-langs",
-                "de", "fr", "es", "ru",  # 4 languages
+                "de",
+                "fr",
+                "es",
+                "ru",  # 4 languages
                 "--parallel-languages",
                 "4",  # Process up to 4 languages in parallel
                 "--output",
@@ -133,12 +152,22 @@ class TestParallelModeE2E:
         expected_langs = ["de", "fr", "es", "ru"]
         base_dir = Path("D:/onedrive/Documents/GitHub/aspose.net/content/kb.aspose.net/slides")
         for lang in expected_langs:
-            output_file = base_dir / lang / "presentation-converter" / "how-to-convert-odp-to-powerpoint-pptx-csharp.md"
-            assert output_file.exists(), f"Output file not created for language: {lang} at {output_file}"
+            output_file = (
+                base_dir
+                / lang
+                / "presentation-converter"
+                / "how-to-convert-odp-to-powerpoint-pptx-csharp.md"
+            )
+            assert output_file.exists(), (
+                f"Output file not created for language: {lang} at {output_file}"
+            )
 
         # Verify Parallel mode enabled message in logs
         combined_output = result.stdout + result.stderr
-        assert "Parallel language processing enabled" in combined_output or "parallel" in combined_output.lower()
+        assert (
+            "Parallel language processing enabled" in combined_output
+            or "parallel" in combined_output.lower()
+        )
 
     def test_parallel_failure_in_one_language_continues_others(self, temp_output_dir, temp_tm_dir):
         """Test that failure in one language doesn't block others."""
@@ -161,7 +190,8 @@ class TestParallelModeE2E:
                 "--input",
                 str(test_file),
                 "--target-langs",
-                "de", "fr",  # 2 languages
+                "de",
+                "fr",  # 2 languages
                 "--parallel-languages",
                 "2",
                 "--output",
@@ -197,7 +227,8 @@ class TestParallelModeE2E:
                 "--input",
                 str(test_content_file),
                 "--target-langs",
-                "de", "fr",
+                "de",
+                "fr",
                 "--output",
                 str(serial_output_dir),
             ],
@@ -225,7 +256,8 @@ class TestParallelModeE2E:
                 "--input",
                 str(test_content_file),
                 "--target-langs",
-                "de", "fr",
+                "de",
+                "fr",
                 "--parallel-languages",
                 "2",
                 "--output",
@@ -238,12 +270,14 @@ class TestParallelModeE2E:
         parallel_time = time.time() - parallel_start
 
         # Should complete successfully
-        assert parallel_result.returncode == 0, f"Parallel translation failed: {parallel_result.stderr}"
+        assert parallel_result.returncode == 0, (
+            f"Parallel translation failed: {parallel_result.stderr}"
+        )
 
         # Print timing for analysis
         print(f"\nSerial mode: {serial_time:.2f}s")
         print(f"Parallel mode: {parallel_time:.2f}s")
-        print(f"Speedup: {serial_time/parallel_time:.2f}x")
+        print(f"Speedup: {serial_time / parallel_time:.2f}x")
 
         # Note: We don't assert speedup here because:
         # 1. GIL may limit Python threading benefits
@@ -347,7 +381,8 @@ class TestParallelModeLogging:
                 "--input",
                 str(test_file),
                 "--target-langs",
-                "de", "fr",
+                "de",
+                "fr",
                 "--parallel-languages",
                 "2",
                 "--output",
@@ -360,7 +395,10 @@ class TestParallelModeLogging:
 
         # Check logs for parallel mode message
         combined_output = result.stdout + result.stderr
-        assert "Parallel language processing enabled" in combined_output or "parallel" in combined_output.lower()
+        assert (
+            "Parallel language processing enabled" in combined_output
+            or "parallel" in combined_output.lower()
+        )
 
 
 class TestParallelModeErrorHandling:
@@ -422,7 +460,8 @@ class TestParallelModeBackwardCompatibility:
                 "--input",
                 str(test_file),
                 "--target-langs",
-                "de", "fr",
+                "de",
+                "fr",
                 "--output",
                 str(tmpdir / "output"),
             ],
@@ -466,4 +505,6 @@ class TestParallelModeMutualExclusion:
 
         # Mutual exclusion is enforced at parse time by _MultiLangModeAction (src/cli.py:319)
         assert result.returncode == 2
-        assert "--parallel-languages" in result.stderr or "not allowed with argument" in result.stderr
+        assert (
+            "--parallel-languages" in result.stderr or "not allowed with argument" in result.stderr
+        )

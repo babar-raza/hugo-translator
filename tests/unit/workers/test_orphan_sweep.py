@@ -6,6 +6,7 @@ The orphan sweep runs at the start of each translation run and uses
 `git status --porcelain` to find uncommitted .md files across all configured
 content roots, then commits them per-site.
 """
+
 import subprocess
 import sys
 import types
@@ -57,9 +58,33 @@ def _make_worker(sites_config=None):
             # whether the file's language suffix is in this set.  A bare MagicMock
             # iterates as empty, causing all files to be rejected as "unknown lang".
             profile.target_langs = [
-                "de", "fr", "zh", "ar", "es", "pt", "ru", "ja", "ko",
-                "it", "nl", "pl", "tr", "sv", "da", "fi", "cs", "sk",
-                "hu", "ro", "bg", "hr", "sr", "sl", "uk", "ms", "id",
+                "de",
+                "fr",
+                "zh",
+                "ar",
+                "es",
+                "pt",
+                "ru",
+                "ja",
+                "ko",
+                "it",
+                "nl",
+                "pl",
+                "tr",
+                "sv",
+                "da",
+                "fi",
+                "cs",
+                "sk",
+                "hu",
+                "ro",
+                "bg",
+                "hr",
+                "sr",
+                "sl",
+                "uk",
+                "ms",
+                "id",
             ]
             profiles[site_id] = profile
         config_service.get_site_profile.side_effect = lambda sid: profiles[sid]
@@ -72,7 +97,7 @@ def _make_worker(sites_config=None):
     else:
         config_service.list_sites.return_value = []
 
-    with patch.object(AutonomousContentTranslationWorker, '__init__', lambda self, *a, **kw: None):
+    with patch.object(AutonomousContentTranslationWorker, "__init__", lambda self, *a, **kw: None):
         worker = AutonomousContentTranslationWorker.__new__(AutonomousContentTranslationWorker)
         worker.config = config
         worker.config_service = config_service
@@ -111,15 +136,18 @@ class TestOrphanSweep:
         subprocess.run(["git", "init"], cwd=str(tmp_path), capture_output=True)
         subprocess.run(
             ["git", "config", "user.email", "test@test.com"],
-            cwd=str(tmp_path), capture_output=True,
+            cwd=str(tmp_path),
+            capture_output=True,
         )
         subprocess.run(
             ["git", "config", "user.name", "Test"],
-            cwd=str(tmp_path), capture_output=True,
+            cwd=str(tmp_path),
+            capture_output=True,
         )
         subprocess.run(
             ["git", "commit", "--allow-empty", "-m", "init"],
-            cwd=str(tmp_path), capture_output=True,
+            cwd=str(tmp_path),
+            capture_output=True,
         )
 
         # Create orphaned translation files (untracked)
@@ -138,7 +166,9 @@ class TestOrphanSweep:
         # Verify files are now committed (clean working tree)
         status = subprocess.run(
             ["git", "status", "--porcelain"],
-            cwd=str(tmp_path), capture_output=True, text=True,
+            cwd=str(tmp_path),
+            capture_output=True,
+            text=True,
         )
         assert status.stdout.strip() == ""
 
@@ -156,7 +186,9 @@ class TestOrphanSweep:
         ]
         config = GitCommitConfig()
         msg = AutonomousContentTranslationWorker._build_orphan_commit_message(
-            files, "blog.aspose.net", config,
+            files,
+            "blog.aspose.net",
+            config,
         )
 
         # Subject should use blog scope (not product) for content sites
@@ -189,7 +221,9 @@ class TestOrphanSweep:
         ]
         config = GitCommitConfig()
         msg = AutonomousContentTranslationWorker._build_orphan_commit_message(
-            files, "reference.aspose.net", config,
+            files,
+            "reference.aspose.net",
+            config,
         )
 
         # Multi-product → site-level scope "reference", NOT "barcode"
@@ -209,7 +243,9 @@ class TestOrphanSweep:
         ]
         config = GitCommitConfig()
         msg = AutonomousContentTranslationWorker._build_orphan_commit_message(
-            files, "reference.aspose.net", config,
+            files,
+            "reference.aspose.net",
+            config,
         )
 
         # Single product → product-level scope "slides"
@@ -225,24 +261,29 @@ class TestOrphanSweep:
         subprocess.run(["git", "init"], cwd=str(tmp_path), capture_output=True)
         subprocess.run(
             ["git", "config", "user.email", "test@test.com"],
-            cwd=str(tmp_path), capture_output=True,
+            cwd=str(tmp_path),
+            capture_output=True,
         )
         subprocess.run(
             ["git", "config", "user.name", "Test"],
-            cwd=str(tmp_path), capture_output=True,
+            cwd=str(tmp_path),
+            capture_output=True,
         )
         subprocess.run(
             ["git", "commit", "--allow-empty", "-m", "init"],
-            cwd=str(tmp_path), capture_output=True,
+            cwd=str(tmp_path),
+            capture_output=True,
         )
 
         (blog_root / "post.de.md").write_text("blog de", encoding="utf-8")
         (docs_root / "page.fr.md").write_text("docs fr", encoding="utf-8")
 
-        worker = _make_worker({
-            "blog.aspose.net": [str(blog_root)],
-            "docs.aspose.net": [str(docs_root)],
-        })
+        worker = _make_worker(
+            {
+                "blog.aspose.net": [str(blog_root)],
+                "docs.aspose.net": [str(docs_root)],
+            }
+        )
 
         result = worker._commit_orphaned_translations()
         assert result >= 2
@@ -250,7 +291,9 @@ class TestOrphanSweep:
         # Two commits should exist (init + blog + docs)
         log = subprocess.run(
             ["git", "log", "--oneline"],
-            cwd=str(tmp_path), capture_output=True, text=True,
+            cwd=str(tmp_path),
+            capture_output=True,
+            text=True,
         )
         # At least 3 commits: init + 2 site commits
         assert len(log.stdout.strip().splitlines()) >= 3
@@ -263,15 +306,18 @@ class TestOrphanSweep:
         subprocess.run(["git", "init"], cwd=str(tmp_path), capture_output=True)
         subprocess.run(
             ["git", "config", "user.email", "test@test.com"],
-            cwd=str(tmp_path), capture_output=True,
+            cwd=str(tmp_path),
+            capture_output=True,
         )
         subprocess.run(
             ["git", "config", "user.name", "Test"],
-            cwd=str(tmp_path), capture_output=True,
+            cwd=str(tmp_path),
+            capture_output=True,
         )
         subprocess.run(
             ["git", "commit", "--allow-empty", "-m", "init"],
-            cwd=str(tmp_path), capture_output=True,
+            cwd=str(tmp_path),
+            capture_output=True,
         )
 
         (content_root / "index.de.md").write_text("test", encoding="utf-8")
@@ -286,14 +332,18 @@ class TestOrphanSweep:
         # File should still be untracked (git shows directory for untracked dirs)
         status = subprocess.run(
             ["git", "status", "--porcelain", str(content_root)],
-            cwd=str(tmp_path), capture_output=True, text=True,
+            cwd=str(tmp_path),
+            capture_output=True,
+            text=True,
         )
         assert status.stdout.strip() != ""  # Still has uncommitted content
 
     def test_nonexistent_content_root_skipped(self):
         """Content roots that don't exist are silently skipped."""
-        worker = _make_worker({
-            "missing.site": ["/nonexistent/path/content"],
-        })
+        worker = _make_worker(
+            {
+                "missing.site": ["/nonexistent/path/content"],
+            }
+        )
         result = worker._commit_orphaned_translations()
         assert result == 0

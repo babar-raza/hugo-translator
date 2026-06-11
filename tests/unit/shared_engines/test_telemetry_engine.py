@@ -18,7 +18,7 @@ from src.shared_engines.telemetry_engine import TelemetryEngine
 class TestTelemetryEngine(unittest.TestCase):
     """Test TelemetryEngine wrapper."""
 
-    @patch('src.shared_engines.telemetry_engine.get_telemetry')
+    @patch("src.shared_engines.telemetry_engine.get_telemetry")
     def test_initialization(self, mock_get_telemetry):
         """Test TelemetryEngine initializes correctly."""
         mock_telemetry = Mock()
@@ -30,26 +30,20 @@ class TestTelemetryEngine(unittest.TestCase):
         self.assertTrue(engine.enabled)
         mock_get_telemetry.assert_called_once_with(agent_name="test-agent")
 
-    @patch('src.shared_engines.telemetry_engine.configure_telemetry')
+    @patch("src.shared_engines.telemetry_engine.configure_telemetry")
     def test_initialization_with_config(self, mock_configure):
         """Test TelemetryEngine initializes with custom config."""
         mock_telemetry = Mock()
         mock_configure.return_value = mock_telemetry
         mock_config = Mock()
 
-        engine = TelemetryEngine(
-            agent_name="test-agent",
-            enabled=True,
-            config=mock_config
-        )
+        engine = TelemetryEngine(agent_name="test-agent", enabled=True, config=mock_config)
 
         mock_configure.assert_called_once_with(
-            agent_name="test-agent",
-            enabled=True,
-            config=mock_config
+            agent_name="test-agent", enabled=True, config=mock_config
         )
 
-    @patch('src.shared_engines.telemetry_engine.get_telemetry')
+    @patch("src.shared_engines.telemetry_engine.get_telemetry")
     def test_track_translation_session(self, mock_get_telemetry):
         """Test track_translation_session() delegates to TranslationTelemetry."""
         mock_context = Mock()
@@ -64,7 +58,7 @@ class TestTelemetryEngine(unittest.TestCase):
             job_type="translate_file",
             file_path=Path("example.md"),
             target_langs=["es", "fr"],
-            site_id="products.aspose.com"
+            site_id="products.aspose.com",
         )
 
         self.assertEqual(result, mock_context)
@@ -74,10 +68,10 @@ class TestTelemetryEngine(unittest.TestCase):
             file_path=Path("example.md"),
             target_langs=["es", "fr"],
             errors=None,
-            site_id="products.aspose.com"
+            site_id="products.aspose.com",
         )
 
-    @patch('src.shared_engines.telemetry_engine.get_telemetry')
+    @patch("src.shared_engines.telemetry_engine.get_telemetry")
     def test_track_event_posts_to_api(self, mock_get_telemetry):
         """Test track_event() posts a completed run to the telemetry API."""
         mock_telemetry = Mock()
@@ -90,20 +84,24 @@ class TestTelemetryEngine(unittest.TestCase):
             mock_resp.status_code = 201
             mock_post.return_value = mock_resp
 
-            engine.track_event("translation_session_start",
-                               site_id="products.aspose.com",
-                               target_langs=["es", "fr"])
+            engine.track_event(
+                "translation_session_start",
+                site_id="products.aspose.com",
+                target_langs=["es", "fr"],
+            )
 
             mock_post.assert_called_once()
             call_kwargs = mock_post.call_args
-            posted_json = call_kwargs[1]["json"] if "json" in call_kwargs[1] else call_kwargs.kwargs["json"]
+            posted_json = (
+                call_kwargs[1]["json"] if "json" in call_kwargs[1] else call_kwargs.kwargs["json"]
+            )
             self.assertEqual(posted_json["agent_name"], "test-agent")
             self.assertEqual(posted_json["job_type"], "translation_session_start")
             self.assertEqual(posted_json["status"], "success")
             self.assertEqual(posted_json["metrics_json"]["site_id"], "products.aspose.com")
             self.assertEqual(posted_json["metrics_json"]["target_langs"], ["es", "fr"])
 
-    @patch('src.shared_engines.telemetry_engine.get_telemetry')
+    @patch("src.shared_engines.telemetry_engine.get_telemetry")
     def test_track_event_disabled_noop(self, mock_get_telemetry):
         """Test track_event() does nothing when disabled."""
         mock_telemetry = Mock()
@@ -115,7 +113,7 @@ class TestTelemetryEngine(unittest.TestCase):
             engine.track_event("some_event", data="value")
             mock_post.assert_not_called()
 
-    @patch('src.shared_engines.telemetry_engine.get_telemetry')
+    @patch("src.shared_engines.telemetry_engine.get_telemetry")
     def test_track_event_api_failure_non_fatal(self, mock_get_telemetry):
         """Test track_event() swallows HTTP failures."""
         mock_telemetry = Mock()
@@ -127,7 +125,7 @@ class TestTelemetryEngine(unittest.TestCase):
             # Must not raise
             engine.track_event("some_event", key="value")
 
-    @patch('src.shared_engines.telemetry_engine.get_telemetry')
+    @patch("src.shared_engines.telemetry_engine.get_telemetry")
     def test_track_event_trigger_type_override(self, mock_get_telemetry):
         """Test track_event() supports trigger_type kwarg."""
         mock_telemetry = Mock()
@@ -147,7 +145,7 @@ class TestTelemetryEngine(unittest.TestCase):
             # trigger_type should NOT appear in metrics_json
             self.assertNotIn("trigger_type", posted_json.get("metrics_json", {}))
 
-    @patch('src.shared_engines.telemetry_engine.get_telemetry')
+    @patch("src.shared_engines.telemetry_engine.get_telemetry")
     def test_emit_delegates_to_track_event(self, mock_get_telemetry):
         """Test emit() now delegates to track_event() for API posting."""
         mock_telemetry = Mock()
@@ -167,7 +165,7 @@ class TestTelemetryEngine(unittest.TestCase):
             self.assertEqual(posted_json["job_type"], "model_loaded")
             self.assertEqual(posted_json["metrics_json"]["model_id"], "m2m100_418m")
 
-    @patch('src.shared_engines.telemetry_engine.get_telemetry')
+    @patch("src.shared_engines.telemetry_engine.get_telemetry")
     def test_is_enabled(self, mock_get_telemetry):
         """Test is_enabled() returns correct status."""
         mock_telemetry = Mock()
@@ -181,7 +179,7 @@ class TestTelemetryEngine(unittest.TestCase):
         mock_telemetry.enabled = False
         self.assertFalse(engine.is_enabled())
 
-    @patch('src.shared_engines.telemetry_engine.get_telemetry')
+    @patch("src.shared_engines.telemetry_engine.get_telemetry")
     def test_get_telemetry_client(self, mock_get_telemetry):
         """Test get_telemetry_client() returns underlying client."""
         mock_telemetry = Mock()
@@ -192,7 +190,7 @@ class TestTelemetryEngine(unittest.TestCase):
 
         self.assertEqual(client, mock_telemetry)
 
-    @patch('src.shared_engines.telemetry_engine.get_telemetry')
+    @patch("src.shared_engines.telemetry_engine.get_telemetry")
     def test_shutdown(self, mock_get_telemetry):
         """Test shutdown() cleanup."""
         mock_telemetry = Mock()

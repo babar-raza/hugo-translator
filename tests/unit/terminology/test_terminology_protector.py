@@ -29,16 +29,10 @@ class TestTerminologyProtector:
             term="Aspose",
             category="company_name",
             preserve_mode=PreserveMode.PROTECT,
-            severity=TermSeverity.ERROR
+            severity=TermSeverity.ERROR,
         )
         detected_terms = [
-            DetectedTerm(
-                term_text="Aspose",
-                rule=rule,
-                start_pos=0,
-                end_pos=6,
-                confidence=1.0
-            )
+            DetectedTerm(term_text="Aspose", rule=rule, start_pos=0, end_pos=6, confidence=1.0)
         ]
 
         protected = protector.protect("Aspose is great", detected_terms)
@@ -55,30 +49,18 @@ class TestTerminologyProtector:
             term="Aspose",
             category="company_name",
             preserve_mode=PreserveMode.PROTECT,
-            severity=TermSeverity.ERROR
+            severity=TermSeverity.ERROR,
         )
         rule2 = TermRule(
             term=".NET",
             category="platform",
             preserve_mode=PreserveMode.PROTECT,
-            severity=TermSeverity.ERROR
+            severity=TermSeverity.ERROR,
         )
 
         detected_terms = [
-            DetectedTerm(
-                term_text="Aspose",
-                rule=rule1,
-                start_pos=0,
-                end_pos=6,
-                confidence=1.0
-            ),
-            DetectedTerm(
-                term_text=".NET",
-                rule=rule2,
-                start_pos=11,
-                end_pos=15,
-                confidence=1.0
-            )
+            DetectedTerm(term_text="Aspose", rule=rule1, start_pos=0, end_pos=6, confidence=1.0),
+            DetectedTerm(term_text=".NET", rule=rule2, start_pos=11, end_pos=15, confidence=1.0),
         ]
 
         protected = protector.protect("Aspose for .NET rocks", detected_terms)
@@ -105,30 +87,18 @@ class TestTerminologyProtector:
             term="Aspose",
             category="company_name",
             preserve_mode=PreserveMode.PROTECT,
-            severity=TermSeverity.ERROR
+            severity=TermSeverity.ERROR,
         )
         rule2 = TermRule(
             term="Words",
             category="product",
             preserve_mode=PreserveMode.PROTECT,
-            severity=TermSeverity.ERROR
+            severity=TermSeverity.ERROR,
         )
 
         detected_terms = [
-            DetectedTerm(
-                term_text="Aspose",
-                rule=rule1,
-                start_pos=0,
-                end_pos=6,
-                confidence=1.0
-            ),
-            DetectedTerm(
-                term_text="Words",
-                rule=rule2,
-                start_pos=7,
-                end_pos=12,
-                confidence=1.0
-            )
+            DetectedTerm(term_text="Aspose", rule=rule1, start_pos=0, end_pos=6, confidence=1.0),
+            DetectedTerm(term_text="Words", rule=rule2, start_pos=7, end_pos=12, confidence=1.0),
         ]
 
         protected = protector.protect("Aspose Words", detected_terms)
@@ -148,16 +118,12 @@ class TestTerminologyProtector:
             pattern=r"Aspose\.Words",
             category="product",
             preserve_mode=PreserveMode.PROTECT,
-            severity=TermSeverity.ERROR
+            severity=TermSeverity.ERROR,
         )
 
         detected_terms = [
             DetectedTerm(
-                term_text="Aspose.Words",
-                rule=rule,
-                start_pos=0,
-                end_pos=12,
-                confidence=1.0
+                term_text="Aspose.Words", rule=rule, start_pos=0, end_pos=12, confidence=1.0
             )
         ]
 
@@ -173,16 +139,10 @@ class TestTerminologyProtector:
             term="Aspose",
             category="company_name",
             preserve_mode=PreserveMode.PROTECT,
-            severity=TermSeverity.ERROR
+            severity=TermSeverity.ERROR,
         )
         detected_terms = [
-            DetectedTerm(
-                term_text="Aspose",
-                rule=rule,
-                start_pos=0,
-                end_pos=6,
-                confidence=1.0
-            )
+            DetectedTerm(term_text="Aspose", rule=rule, start_pos=0, end_pos=6, confidence=1.0)
         ]
 
         protected = protector.protect("Aspose is great", detected_terms)
@@ -197,30 +157,18 @@ class TestTerminologyProtector:
             term="Aspose",
             category="company_name",
             preserve_mode=PreserveMode.PROTECT,
-            severity=TermSeverity.ERROR
+            severity=TermSeverity.ERROR,
         )
         rule2 = TermRule(
             term=".NET",
             category="platform",
             preserve_mode=PreserveMode.PROTECT,
-            severity=TermSeverity.ERROR
+            severity=TermSeverity.ERROR,
         )
 
         detected_terms = [
-            DetectedTerm(
-                term_text="Aspose",
-                rule=rule1,
-                start_pos=0,
-                end_pos=6,
-                confidence=1.0
-            ),
-            DetectedTerm(
-                term_text=".NET",
-                rule=rule2,
-                start_pos=11,
-                end_pos=15,
-                confidence=1.0
-            )
+            DetectedTerm(term_text="Aspose", rule=rule1, start_pos=0, end_pos=6, confidence=1.0),
+            DetectedTerm(term_text=".NET", rule=rule2, start_pos=11, end_pos=15, confidence=1.0),
         ]
 
         protected = protector.protect("Aspose for .NET rocks", detected_terms)
@@ -239,30 +187,18 @@ class TestTerminologyProtector:
             term="Aspose",
             category="company_name",
             preserve_mode=PreserveMode.PROTECT,
-            severity=TermSeverity.ERROR
+            severity=TermSeverity.ERROR,
         )
         rule2 = TermRule(
             term=".NET",
             category="platform",
             preserve_mode=PreserveMode.PROTECT,
-            severity=TermSeverity.ERROR
+            severity=TermSeverity.ERROR,
         )
 
         detected_terms = [
-            DetectedTerm(
-                term_text="Aspose",
-                rule=rule1,
-                start_pos=0,
-                end_pos=6,
-                confidence=1.0
-            ),
-            DetectedTerm(
-                term_text=".NET",
-                rule=rule2,
-                start_pos=11,
-                end_pos=15,
-                confidence=1.0
-            )
+            DetectedTerm(term_text="Aspose", rule=rule1, start_pos=0, end_pos=6, confidence=1.0),
+            DetectedTerm(term_text=".NET", rule=rule2, start_pos=11, end_pos=15, confidence=1.0),
         ]
 
         protected = protector.protect("Aspose for .NET rocks", detected_terms)
@@ -271,10 +207,11 @@ class TestTerminologyProtector:
         # Original protected: "{TERM_0} for {TERM_1} rocks"
         # Translated: "{TERM_0} pour {TERM_1} déchire"
         from src.translation_engine.terminology.models import ProtectedSegment
+
         translated = ProtectedSegment(
             original_text=protected.original_text,
             protected_text="{TERM_0} pour {TERM_1} déchire",
-            term_mapping=protected.term_mapping
+            term_mapping=protected.term_mapping,
         )
 
         restored = protector.restore(translated)
@@ -291,40 +228,29 @@ class TestTerminologyProtector:
             term="Aspose",
             category="company_name",
             preserve_mode=PreserveMode.PROTECT,
-            severity=TermSeverity.ERROR
+            severity=TermSeverity.ERROR,
         )
         rule2 = TermRule(
             term=".NET",
             category="platform",
             preserve_mode=PreserveMode.PROTECT,
-            severity=TermSeverity.ERROR
+            severity=TermSeverity.ERROR,
         )
 
         detected_terms = [
-            DetectedTerm(
-                term_text="Aspose",
-                rule=rule1,
-                start_pos=0,
-                end_pos=6,
-                confidence=1.0
-            ),
-            DetectedTerm(
-                term_text=".NET",
-                rule=rule2,
-                start_pos=11,
-                end_pos=15,
-                confidence=1.0
-            )
+            DetectedTerm(term_text="Aspose", rule=rule1, start_pos=0, end_pos=6, confidence=1.0),
+            DetectedTerm(term_text=".NET", rule=rule2, start_pos=11, end_pos=15, confidence=1.0),
         ]
 
         protected = protector.protect("Aspose for .NET rocks", detected_terms)
 
         # Simulate translation that removes {TERM_1}
         from src.translation_engine.terminology.models import ProtectedSegment
+
         translated = ProtectedSegment(
             original_text=protected.original_text,
             protected_text="{TERM_0} pour quelque chose",  # {TERM_1} is missing
-            term_mapping=protected.term_mapping
+            term_mapping=protected.term_mapping,
         )
 
         restored = protector.restore(translated)
@@ -339,24 +265,16 @@ class TestTerminologyProtector:
             pattern=r"Aspose\.\w+",
             category="product",
             preserve_mode=PreserveMode.PROTECT,
-            severity=TermSeverity.ERROR
+            severity=TermSeverity.ERROR,
         )
 
         detected_terms = [
             DetectedTerm(
-                term_text="Aspose.Words",
-                rule=rule,
-                start_pos=0,
-                end_pos=12,
-                confidence=1.0
+                term_text="Aspose.Words", rule=rule, start_pos=0, end_pos=12, confidence=1.0
             ),
             DetectedTerm(
-                term_text="Aspose.Cells",
-                rule=rule,
-                start_pos=17,
-                end_pos=29,
-                confidence=1.0
-            )
+                term_text="Aspose.Cells", rule=rule, start_pos=17, end_pos=29, confidence=1.0
+            ),
         ]
 
         original_text = "Aspose.Words and Aspose.Cells"
@@ -372,34 +290,16 @@ class TestTerminologyProtector:
             term="test",
             category="test_term",
             preserve_mode=PreserveMode.PROTECT,
-            severity=TermSeverity.ERROR
+            severity=TermSeverity.ERROR,
         )
 
         # Terms at beginning, middle, and end
         # "test is in the test and at end test"
         # Position: 0-4 for first "test", 15-19 for second "test", 31-35 for third "test"
         detected_terms = [
-            DetectedTerm(
-                term_text="test",
-                rule=rule,
-                start_pos=0,
-                end_pos=4,
-                confidence=1.0
-            ),
-            DetectedTerm(
-                term_text="test",
-                rule=rule,
-                start_pos=15,
-                end_pos=19,
-                confidence=1.0
-            ),
-            DetectedTerm(
-                term_text="test",
-                rule=rule,
-                start_pos=31,
-                end_pos=35,
-                confidence=1.0
-            )
+            DetectedTerm(term_text="test", rule=rule, start_pos=0, end_pos=4, confidence=1.0),
+            DetectedTerm(term_text="test", rule=rule, start_pos=15, end_pos=19, confidence=1.0),
+            DetectedTerm(term_text="test", rule=rule, start_pos=31, end_pos=35, confidence=1.0),
         ]
 
         protected = protector.protect("test is in the test and at end test", detected_terms)
@@ -421,11 +321,7 @@ class TestTerminologyProtector:
         protector = TerminologyProtector()
         from src.translation_engine.terminology.models import ProtectedSegment
 
-        protected = ProtectedSegment(
-            original_text="",
-            protected_text="",
-            term_mapping={}
-        )
+        protected = ProtectedSegment(original_text="", protected_text="", term_mapping={})
 
         restored = protector.restore(protected)
         assert restored == ""

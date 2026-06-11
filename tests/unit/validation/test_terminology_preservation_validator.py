@@ -70,7 +70,7 @@ global:
       severity: error
 """
         config_path = tmp_path / "terminology.yaml"
-        config_path.write_text(config_content, encoding='utf-8')
+        config_path.write_text(config_content, encoding="utf-8")
         return config_path
 
     @pytest.fixture
@@ -124,7 +124,9 @@ global:
         assert error.details["source_count"] == 1
         assert error.details["translation_count"] == 0
 
-    def test_multiple_exact_matches_missing(self, validator: TerminologyPreservationValidator) -> None:
+    def test_multiple_exact_matches_missing(
+        self, validator: TerminologyPreservationValidator
+    ) -> None:
         """Test detection of multiple missing terms."""
         source = "Aspose provides .NET and Java APIs."
         translation = "We provide Python APIs."  # All terms missing except Python
@@ -146,7 +148,9 @@ global:
         assert result.success
         assert len(result.issues) == 0
 
-    def test_pattern_matching_missing_term(self, validator: TerminologyPreservationValidator) -> None:
+    def test_pattern_matching_missing_term(
+        self, validator: TerminologyPreservationValidator
+    ) -> None:
         """Test detection of missing pattern-matched terms."""
         source = "Use Aspose.Words and Aspose.Cells for processing."
         translation = "Use Aspose.Words for processing."  # Aspose.Cells missing
@@ -209,7 +213,7 @@ global:
       severity: error
 """
         config_path = tmp_path / "terminology.yaml"
-        config_path.write_text(config_content, encoding='utf-8')
+        config_path.write_text(config_content, encoding="utf-8")
 
         validator = TerminologyPreservationValidator(terminology_config_path=config_path)
 
@@ -367,7 +371,7 @@ global:
       severity: warning
 """
         config_path = tmp_path / "terminology.yaml"
-        config_path.write_text(config_content, encoding='utf-8')
+        config_path.write_text(config_content, encoding="utf-8")
 
         validator = TerminologyPreservationValidator(terminology_config_path=config_path)
 
@@ -401,7 +405,7 @@ global:
       severity: info
 """
         config_path = tmp_path / "terminology.yaml"
-        config_path.write_text(config_content, encoding='utf-8')
+        config_path.write_text(config_content, encoding="utf-8")
 
         validator = TerminologyPreservationValidator(terminology_config_path=config_path)
 
@@ -415,7 +419,9 @@ global:
         assert result.warning_count == 1  # Warning
         assert result.info_count == 1  # Info
 
-    def test_empty_source_and_translation(self, validator: TerminologyPreservationValidator) -> None:
+    def test_empty_source_and_translation(
+        self, validator: TerminologyPreservationValidator
+    ) -> None:
         """Test validation with empty strings."""
         result = validator.validate("", "")
 
@@ -432,7 +438,9 @@ global:
         assert result.success
         assert len(result.issues) == 0
 
-    def test_validation_result_success_flag(self, validator: TerminologyPreservationValidator) -> None:
+    def test_validation_result_success_flag(
+        self, validator: TerminologyPreservationValidator
+    ) -> None:
         """Test that success flag is properly set based on errors."""
         # No errors - should be success
         source1 = "Aspose provides APIs."

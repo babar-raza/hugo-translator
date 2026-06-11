@@ -4,6 +4,7 @@ End-to-end smoke test for default_model resolution (SR-H04).
 Verifies that the original AttributeError crash is fixed by loading
 real site profiles and exercising the CLI code path.
 """
+
 import subprocess
 import sys
 from pathlib import Path
@@ -32,7 +33,7 @@ class TestDefaultModelE2E:
         profile = service.get_site_profile("blog.aspose.net")
 
         # Should not raise AttributeError
-        default_model = getattr(profile, 'default_model', None)
+        default_model = getattr(profile, "default_model", None)
 
         # blog.aspose.net has model.default: m2m100_1.2b in YAML
         assert default_model == "m2m100_1.2b"
@@ -45,7 +46,7 @@ class TestDefaultModelE2E:
         profile = service.get_site_profile("products.aspose.net")
 
         # Should not raise AttributeError
-        default_model = getattr(profile, 'default_model', None)
+        default_model = getattr(profile, "default_model", None)
 
         # products.aspose.net has no model field
         assert default_model is None
@@ -59,7 +60,7 @@ class TestDefaultModelE2E:
 
         # Simulate CLI resolution logic
         def resolve_model(cli_override, profile):
-            return cli_override or getattr(profile, 'default_model', None) or "m2m100_418m"
+            return cli_override or getattr(profile, "default_model", None) or "m2m100_418m"
 
         # CLI override takes precedence
         assert resolve_model("nllb_200_600m", profile) == "nllb_200_600m"
@@ -96,7 +97,7 @@ class TestDefaultModelE2E:
             try:
                 profile = service.get_site_profile(site_id)
                 # Access default_model to ensure it doesn't raise
-                _ = getattr(profile, 'default_model', None)
+                _ = getattr(profile, "default_model", None)
             except Exception as e:
                 pytest.fail(f"Failed to load profile {site_id}: {e}")
 
@@ -107,22 +108,23 @@ class TestDefaultModelE2E:
         # Test 1: Verify CLI module can be imported (catches import-time errors)
         # Note: 30s timeout accounts for slow imports (torch, sentence-transformers)
         result = subprocess.run(
-            [sys.executable, "-c",
-             "from src.cli import main; from src.utils.models import SiteProfile; "
-             "from src.utils.config_loader import ConfigService"],
+            [
+                sys.executable,
+                "-c",
+                "from src.cli import main; from src.utils.models import SiteProfile; "
+                "from src.utils.config_loader import ConfigService",
+            ],
             capture_output=True,
             text=True,
             timeout=30,
-            cwd=str(project_root)
+            cwd=str(project_root),
         )
 
         # Should not crash with AttributeError during import
         assert "AttributeError" not in result.stderr, (
             f"CLI import crashed with AttributeError: {result.stderr}"
         )
-        assert result.returncode == 0, (
-            f"CLI import failed: {result.stderr}"
-        )
+        assert result.returncode == 0, f"CLI import failed: {result.stderr}"
 
     def test_cli_help_runs_successfully(self):
         """SR-P02: Verify CLI --help runs without crash."""
@@ -133,13 +135,11 @@ class TestDefaultModelE2E:
             capture_output=True,
             text=True,
             timeout=30,
-            cwd=str(project_root)
+            cwd=str(project_root),
         )
 
         # Help should succeed
-        assert result.returncode == 0, (
-            f"CLI --help failed: {result.stderr}"
-        )
+        assert result.returncode == 0, f"CLI --help failed: {result.stderr}"
         # Should show usage info
         assert "usage" in result.stdout.lower() or "--site" in result.stdout, (
             f"CLI --help output unexpected: {result.stdout}"

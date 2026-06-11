@@ -3,6 +3,7 @@ Unit tests for CTranslate2 model converter.
 
 Tests marked with @pytest.mark.slow require downloading real models.
 """
+
 import sys
 from pathlib import Path
 from unittest.mock import MagicMock, patch
@@ -49,6 +50,7 @@ class TestCT2ConversionPipeline:
             import importlib
 
             import src.model_runtime.ct2_converter
+
             importlib.reload(src.model_runtime.ct2_converter)
 
             with pytest.raises(ImportError, match="ctranslate2 is not installed"):

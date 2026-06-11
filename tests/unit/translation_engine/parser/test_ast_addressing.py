@@ -4,6 +4,7 @@ Unit tests for AST node addressing system (HP-06 TC-02).
 Tests stable node address assignment and retrieval for deterministic
 TextUnit mapping.
 """
+
 from src.translation_engine.parser.ast_nodes import (
     ASTNode,
     NodeType,
@@ -30,10 +31,7 @@ class TestNodeAddressAssignment:
 
     def test_assign_addresses_to_simple_tree(self):
         """Test assigning addresses to a simple tree structure."""
-        para = paragraph_node([
-            text_node("Hello "),
-            text_node("World")
-        ])
+        para = paragraph_node([text_node("Hello "), text_node("World")])
 
         para.assign_addresses("body.para[0]")
 
@@ -45,16 +43,9 @@ class TestNodeAddressAssignment:
         """Test address assignment with inline formatting."""
         from src.translation_engine.parser.ast_nodes import ASTNode
 
-        strong = ASTNode(
-            type=NodeType.STRONG,
-            children=[text_node("bold text")]
-        )
+        strong = ASTNode(type=NodeType.STRONG, children=[text_node("bold text")])
 
-        para = paragraph_node([
-            text_node("Before "),
-            strong,
-            text_node(" after")
-        ])
+        para = paragraph_node([text_node("Before "), strong, text_node(" after")])
 
         para.assign_addresses("body.para[0]")
 
@@ -67,11 +58,7 @@ class TestNodeAddressAssignment:
     def test_assign_addresses_with_links(self):
         """Test address assignment with links."""
         link = link_node("https://example.com", [text_node("click here")])
-        para = paragraph_node([
-            text_node("Visit "),
-            link,
-            text_node(" now")
-        ])
+        para = paragraph_node([text_node("Visit "), link, text_node(" now")])
 
         para.assign_addresses("body.para[0]")
 
@@ -83,17 +70,16 @@ class TestNodeAddressAssignment:
         """Test address assignment with nested formatting (bold link)."""
         link = link_node("https://example.com", [text_node("link text")])
         strong = ASTNode(type=NodeType.STRONG, children=[link])
-        para = paragraph_node([
-            text_node("Visit "),
-            strong,
-            text_node(" now")
-        ])
+        para = paragraph_node([text_node("Visit "), strong, text_node(" now")])
 
         para.assign_addresses("body.para[0]")
 
         assert para.children[1].node_addr == "body.para[0].strong[0]"
         assert para.children[1].children[0].node_addr == "body.para[0].strong[0].link[0]"
-        assert para.children[1].children[0].children[0].node_addr == "body.para[0].strong[0].link[0].text[0]"
+        assert (
+            para.children[1].children[0].children[0].node_addr
+            == "body.para[0].strong[0].link[0].text[0]"
+        )
 
     def test_assign_addresses_to_heading(self):
         """Test address assignment to headings."""
@@ -118,11 +104,7 @@ class TestNodeAddressAssignment:
 
     def test_assign_addresses_type_counters(self):
         """Test that type counters increment correctly."""
-        para = paragraph_node([
-            text_node("First "),
-            text_node("Second "),
-            text_node("Third")
-        ])
+        para = paragraph_node([text_node("First "), text_node("Second "), text_node("Third")])
 
         para.assign_addresses("body.para[0]")
 
@@ -136,13 +118,9 @@ class TestNodeAddressAssignment:
         strong1 = ASTNode(type=NodeType.STRONG, children=[text_node("bold1")])
         strong2 = ASTNode(type=NodeType.STRONG, children=[text_node("bold2")])
 
-        para = paragraph_node([
-            text_node("Text 1 "),
-            strong1,
-            text_node(" Text 2 "),
-            strong2,
-            text_node(" Text 3")
-        ])
+        para = paragraph_node(
+            [text_node("Text 1 "), strong1, text_node(" Text 2 "), strong2, text_node(" Text 3")]
+        )
 
         para.assign_addresses("body.para[0]")
 
@@ -229,11 +207,7 @@ class TestGetNodeByAddress:
 
     def test_get_node_by_addr_multiple_children(self):
         """Test getting specific child when there are multiple."""
-        para = paragraph_node([
-            text_node("First"),
-            text_node("Second"),
-            text_node("Third")
-        ])
+        para = paragraph_node([text_node("First"), text_node("Second"), text_node("Third")])
         para.assign_addresses("body.para[0]")
 
         second = para.get_node_by_addr("body.para[0].text[1]")
@@ -260,14 +234,11 @@ class TestDeterminism:
 
     def test_determinism_complex_structure(self):
         """Test determinism with complex nested structure."""
+
         def build_complex():
             link = link_node("url", [text_node("link")])
             strong = ASTNode(type=NodeType.STRONG, children=[link])
-            return paragraph_node([
-                text_node("Before "),
-                strong,
-                text_node(" after")
-            ])
+            return paragraph_node([text_node("Before "), strong, text_node(" after")])
 
         para1 = build_complex()
         para2 = build_complex()
@@ -479,6 +450,7 @@ class TestAcceptanceCriteria:
     def test_acceptance_address_assignment(self):
         """Test acceptance check: address assignment works."""
         from src.translation_engine.parser import HugoParser
+
         parser = HugoParser()
         doc = parser.parse_string("""---
 title: Test
@@ -505,6 +477,7 @@ Visit **[link](url)** now.
     def test_acceptance_address_stability(self):
         """Test acceptance check: addresses are deterministic."""
         from src.translation_engine.parser import HugoParser
+
         parser = HugoParser()
 
         doc1 = parser.parse_string("**bold**")

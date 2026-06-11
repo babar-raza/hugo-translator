@@ -5,6 +5,7 @@ first load failure, silently disabling TM store validation for the entire proces
 lifetime. The fix adds a 60-second cooldown: after the cooldown expires the
 function re-attempts initialization.
 """
+
 import time
 
 import pytest
@@ -16,12 +17,14 @@ class TestFasttextCooldown:
     def _reset_module_state(self):
         """Reset module-level singletons to clean state for each test."""
         import src.tm.l2_persistent as mod
+
         mod._fasttext_detector_instance = None
         mod._fasttext_detector_failed_at = None
 
     def test_cooldown_constant_is_60_seconds(self):
         """_FASTTEXT_RETRY_COOLDOWN must be 60.0 seconds as specified in SW-3 fix."""
         import src.tm.l2_persistent as mod
+
         assert mod._FASTTEXT_RETRY_COOLDOWN == pytest.approx(60.0, abs=0.1), (
             "SW-6 fix: cooldown must be 60s, not the old permanent-disable behavior"
         )
@@ -29,17 +32,17 @@ class TestFasttextCooldown:
     def test_within_cooldown_returns_none(self):
         """Second call within 60s of failure returns None (caller skips check)."""
         import src.tm.l2_persistent as mod
+
         self._reset_module_state()
         # Simulate a failure recorded 1 second ago
         mod._fasttext_detector_failed_at = time.time() - 1.0
         result = mod._get_fasttext_detector()
-        assert result is None, (
-            "Within cooldown window, _get_fasttext_detector must return None"
-        )
+        assert result is None, "Within cooldown window, _get_fasttext_detector must return None"
 
     def test_after_cooldown_attempts_retry(self, monkeypatch):
         """After cooldown expires, _get_fasttext_detector tries to load again."""
         import src.tm.l2_persistent as mod
+
         self._reset_module_state()
         # Simulate failure recorded 61 seconds ago (past cooldown)
         mod._fasttext_detector_failed_at = time.time() - 61.0
@@ -60,6 +63,7 @@ class TestFasttextCooldown:
 
         # Patch the import path used inside _get_fasttext_detector
         import unittest.mock as mock
+
         fake = FakeDetector()
         with mock.patch(
             "src.translation_engine.language_detection.fasttext_detector.FastTextDetector",
@@ -69,12 +73,15 @@ class TestFasttextCooldown:
             # We verify cooldown check is bypassed (failed_at is old enough)
             # by checking that None is NOT returned before the lock is entered
             # (the cooldown guard only fires if failed_at is within 60s)
-            past_cooldown = (time.time() - mod._fasttext_detector_failed_at) > mod._FASTTEXT_RETRY_COOLDOWN
+            past_cooldown = (
+                time.time() - mod._fasttext_detector_failed_at
+            ) > mod._FASTTEXT_RETRY_COOLDOWN
             assert past_cooldown, "Test precondition: failed_at must be > 60s ago"
 
     def test_successful_load_clears_failed_at(self, monkeypatch):
         """After successful reload, _fasttext_detector_failed_at is reset to None."""
         import src.tm.l2_persistent as mod
+
         self._reset_module_state()
         mod._fasttext_detector_failed_at = time.time() - 61.0  # expired cooldown
 
@@ -83,6 +90,7 @@ class TestFasttextCooldown:
 
         fake = FakeDetector()
         import unittest.mock as mock
+
         with mock.patch.dict("sys.modules", {}):
             # Inject a fake FastTextDetector that succeeds
             with mock.patch(
@@ -100,6 +108,7 @@ class TestFasttextCooldown:
     def test_no_cooldown_on_first_call(self):
         """First ever call (failed_at is None) goes straight to load attempt."""
         import src.tm.l2_persistent as mod
+
         self._reset_module_state()
         assert mod._fasttext_detector_failed_at is None
         # Cooldown check: if failed_at is None, condition is False → no early return

@@ -74,7 +74,7 @@ class TestAtomicWriteSuccess:
 
         atomic_write(path, content)
 
-        assert path.read_text(encoding='utf-8') == content
+        assert path.read_text(encoding="utf-8") == content
 
     def test_atomic_write_large_file(self, tmp_path):
         """Test large file write (1MB)."""
@@ -103,7 +103,7 @@ class TestAtomicWriteCleanup:
         path = tmp_path / "test.txt"
 
         # Mock to raise error during rename
-        with mock.patch('os.replace', side_effect=OSError("Disk full")):
+        with mock.patch("os.replace", side_effect=OSError("Disk full")):
             with pytest.raises(AtomicWriteError):
                 atomic_write(path, "content")
 
@@ -118,7 +118,7 @@ class TestAtomicWriteCleanup:
         path.write_text(original_content)
 
         # Mock to raise error during rename
-        with mock.patch('os.replace', side_effect=OSError("Disk full")):
+        with mock.patch("os.replace", side_effect=OSError("Disk full")):
             with pytest.raises(AtomicWriteError):
                 atomic_write(path, "new content")
 
@@ -135,10 +135,11 @@ class TestAtomicWriteErrorHandling:
 
         # Simulate disk full during write
         original_fdopen = os.fdopen
+
         def mock_fdopen(*args, **kwargs):
             raise OSError(28, "No space left on device")
 
-        with mock.patch('os.fdopen', side_effect=mock_fdopen):
+        with mock.patch("os.fdopen", side_effect=mock_fdopen):
             with pytest.raises(AtomicWriteError, match="No space left on device"):
                 atomic_write(path, "content")
 
@@ -147,11 +148,11 @@ class TestAtomicWriteErrorHandling:
         path = tmp_path / "test.txt"
 
         # Simulate permission denied during temp file creation
-        with mock.patch('tempfile.mkstemp', side_effect=OSError(13, "Permission denied")):
+        with mock.patch("tempfile.mkstemp", side_effect=OSError(13, "Permission denied")):
             with pytest.raises(AtomicWriteError):
                 atomic_write(path, "content")
 
-    @pytest.mark.skipif(sys.platform == 'win32', reason="chmod behaves differently on Windows")
+    @pytest.mark.skipif(sys.platform == "win32", reason="chmod behaves differently on Windows")
     def test_atomic_write_permission_denied_readonly(self, tmp_path):
         """Test permission denied on read-only file."""
         path = tmp_path / "test.txt"
@@ -189,9 +190,9 @@ class TestAtomicWriteOptions:
         path = tmp_path / "test.txt"
         content = "Test content"
 
-        atomic_write(path, content, encoding='latin-1')
+        atomic_write(path, content, encoding="latin-1")
 
-        assert path.read_text(encoding='latin-1') == content
+        assert path.read_text(encoding="latin-1") == content
 
 
 class TestAtomicWriteBinary:
@@ -219,7 +220,7 @@ class TestAtomicWriteBinary:
         """Test binary write cleans up temp on error."""
         path = tmp_path / "test.bin"
 
-        with mock.patch('os.replace', side_effect=OSError("Disk full")):
+        with mock.patch("os.replace", side_effect=OSError("Disk full")):
             with pytest.raises(AtomicWriteError):
                 atomic_write_binary(path, b"content")
 

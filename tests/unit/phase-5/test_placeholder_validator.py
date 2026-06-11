@@ -109,9 +109,7 @@ class TestPlaceholderValidator:
     def test_custom_placeholder_pattern(self):
         """Test with custom placeholder pattern."""
         # Use different pattern: [[TYPE_NUM]]
-        validator = PlaceholderValidator(
-            placeholder_pattern=r"\[\[([A-Z_]+)_(\d+)\]\]"
-        )
+        validator = PlaceholderValidator(placeholder_pattern=r"\[\[([A-Z_]+)_(\d+)\]\]")
 
         source = "Click [[LINK_1]] to read [[CODE_2]]"
         translation = "Cliquez sur [[LINK_1]] pour lire [[CODE_2]]"

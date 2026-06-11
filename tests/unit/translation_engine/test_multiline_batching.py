@@ -1,6 +1,7 @@
 """
 Unit tests for batched multiline translation in TranslationEngine.
 """
+
 from dataclasses import dataclass
 
 from src.translation_engine.engine import TranslationEngine

@@ -46,45 +46,45 @@ class TestNestedListReconstruction:
             raw="",
             children=[ASTNode(type=NodeType.TEXT, raw="Child 1", children=[], attrs={})],
             attrs={},
-            node_addr="body.list[0].listitem[0].list[0].listitem[0]"
+            node_addr="body.list[0].listitem[0].list[0].listitem[0]",
         )
         child_item_2 = ASTNode(
             type=NodeType.LIST_ITEM,
             raw="",
             children=[ASTNode(type=NodeType.TEXT, raw="Child 2", children=[], attrs={})],
             attrs={},
-            node_addr="body.list[0].listitem[0].list[0].listitem[1]"
+            node_addr="body.list[0].listitem[0].list[0].listitem[1]",
         )
         nested_list = ASTNode(
             type=NodeType.LIST,
             raw="",
             children=[child_item_1, child_item_2],
-            attrs={'ordered': False},
-            node_addr="body.list[0].listitem[0].list[0]"
+            attrs={"ordered": False},
+            node_addr="body.list[0].listitem[0].list[0]",
         )
         parent_item_1 = ASTNode(
             type=NodeType.LIST_ITEM,
             raw="",
             children=[
                 ASTNode(type=NodeType.TEXT, raw="Parent item", children=[], attrs={}),
-                nested_list
+                nested_list,
             ],
             attrs={},
-            node_addr="body.list[0].listitem[0]"
+            node_addr="body.list[0].listitem[0]",
         )
         parent_item_2 = ASTNode(
             type=NodeType.LIST_ITEM,
             raw="",
             children=[ASTNode(type=NodeType.TEXT, raw="Another parent", children=[], attrs={})],
             attrs={},
-            node_addr="body.list[0].listitem[1]"
+            node_addr="body.list[0].listitem[1]",
         )
         root_list = ASTNode(
             type=NodeType.LIST,
             raw="",
             children=[parent_item_1, parent_item_2],
-            attrs={'ordered': False},
-            node_addr="body.list[0]"
+            attrs={"ordered": False},
+            node_addr="body.list[0]",
         )
 
         ast = [root_list]
@@ -96,29 +96,29 @@ class TestNestedListReconstruction:
                 node_addr="body.list[0].listitem[0]",
                 kind=TextUnitKind.TEXT,
                 source_text="Parent item",
-                translated_text="Élément parent"
+                translated_text="Élément parent",
             ),
             TextUnit(
                 unit_id="u2",
                 node_addr="body.list[0].listitem[0].list[0].listitem[0]",
                 kind=TextUnitKind.TEXT,
                 source_text="Child 1",
-                translated_text="Enfant 1"
+                translated_text="Enfant 1",
             ),
             TextUnit(
                 unit_id="u3",
                 node_addr="body.list[0].listitem[0].list[0].listitem[1]",
                 kind=TextUnitKind.TEXT,
                 source_text="Child 2",
-                translated_text="Enfant 2"
+                translated_text="Enfant 2",
             ),
             TextUnit(
                 unit_id="u4",
                 node_addr="body.list[0].listitem[1]",
                 kind=TextUnitKind.TEXT,
                 source_text="Another parent",
-                translated_text="Un autre parent"
-            )
+                translated_text="Un autre parent",
+            ),
         ]
 
         # Apply translations
@@ -126,7 +126,9 @@ class TestNestedListReconstruction:
 
         # Verify all units were applied
         assert len(self.renderer.applied_units) == 4, "All 4 TextUnits should be applied"
-        assert len(self.renderer.unit_map) - len(self.renderer.applied_units) == 0, "No orphaned units"
+        assert len(self.renderer.unit_map) - len(self.renderer.applied_units) == 0, (
+            "No orphaned units"
+        )
 
         # Verify AST structure preserved
         parent_item = ast[0].children[0]  # First list item
@@ -168,14 +170,14 @@ class TestNestedListReconstruction:
             raw="",
             children=[ASTNode(type=NodeType.TEXT, raw="Level 3", children=[], attrs={})],
             attrs={},
-            node_addr="body.list[0].listitem[0].list[0].listitem[0].list[0].listitem[0]"
+            node_addr="body.list[0].listitem[0].list[0].listitem[0].list[0].listitem[0]",
         )
         level_3_list = ASTNode(
             type=NodeType.LIST,
             raw="",
             children=[level_3_item],
-            attrs={'ordered': False},
-            node_addr="body.list[0].listitem[0].list[0].listitem[0].list[0]"
+            attrs={"ordered": False},
+            node_addr="body.list[0].listitem[0].list[0].listitem[0].list[0]",
         )
 
         # Level 2 item (contains level 3 list)
@@ -184,17 +186,17 @@ class TestNestedListReconstruction:
             raw="",
             children=[
                 ASTNode(type=NodeType.TEXT, raw="Level 2", children=[], attrs={}),
-                level_3_list
+                level_3_list,
             ],
             attrs={},
-            node_addr="body.list[0].listitem[0].list[0].listitem[0]"
+            node_addr="body.list[0].listitem[0].list[0].listitem[0]",
         )
         level_2_list = ASTNode(
             type=NodeType.LIST,
             raw="",
             children=[level_2_item],
-            attrs={'ordered': False},
-            node_addr="body.list[0].listitem[0].list[0]"
+            attrs={"ordered": False},
+            node_addr="body.list[0].listitem[0].list[0]",
         )
 
         # Level 1 item (contains level 2 list)
@@ -203,17 +205,17 @@ class TestNestedListReconstruction:
             raw="",
             children=[
                 ASTNode(type=NodeType.TEXT, raw="Level 1", children=[], attrs={}),
-                level_2_list
+                level_2_list,
             ],
             attrs={},
-            node_addr="body.list[0].listitem[0]"
+            node_addr="body.list[0].listitem[0]",
         )
         root_list = ASTNode(
             type=NodeType.LIST,
             raw="",
             children=[level_1_item],
-            attrs={'ordered': False},
-            node_addr="body.list[0]"
+            attrs={"ordered": False},
+            node_addr="body.list[0]",
         )
 
         ast = [root_list]
@@ -225,22 +227,22 @@ class TestNestedListReconstruction:
                 node_addr="body.list[0].listitem[0]",
                 kind=TextUnitKind.TEXT,
                 source_text="Level 1",
-                translated_text="Niveau 1"
+                translated_text="Niveau 1",
             ),
             TextUnit(
                 unit_id="u2",
                 node_addr="body.list[0].listitem[0].list[0].listitem[0]",
                 kind=TextUnitKind.TEXT,
                 source_text="Level 2",
-                translated_text="Niveau 2"
+                translated_text="Niveau 2",
             ),
             TextUnit(
                 unit_id="u3",
                 node_addr="body.list[0].listitem[0].list[0].listitem[0].list[0].listitem[0]",
                 kind=TextUnitKind.TEXT,
                 source_text="Level 3",
-                translated_text="Niveau 3"
-            )
+                translated_text="Niveau 3",
+            ),
         ]
 
         # Apply translations
@@ -288,21 +290,21 @@ class TestNestedListReconstruction:
             raw="",
             children=[ASTNode(type=NodeType.TEXT, raw="Nested 1", children=[], attrs={})],
             attrs={},
-            node_addr="body.list[0].listitem[0].list[0].listitem[0]"
+            node_addr="body.list[0].listitem[0].list[0].listitem[0]",
         )
         nested_item_2 = ASTNode(
             type=NodeType.LIST_ITEM,
             raw="",
             children=[ASTNode(type=NodeType.TEXT, raw="Nested 2", children=[], attrs={})],
             attrs={},
-            node_addr="body.list[0].listitem[0].list[0].listitem[1]"
+            node_addr="body.list[0].listitem[0].list[0].listitem[1]",
         )
         nested_list = ASTNode(
             type=NodeType.LIST,
             raw="",
             children=[nested_item_1, nested_item_2],
-            attrs={'ordered': False},
-            node_addr="body.list[0].listitem[0].list[0]"
+            attrs={"ordered": False},
+            node_addr="body.list[0].listitem[0].list[0]",
         )
 
         # Parent item with mixed inline content
@@ -315,26 +317,26 @@ class TestNestedListReconstruction:
                     type=NodeType.STRONG,
                     raw="",
                     children=[ASTNode(type=NodeType.TEXT, raw="bold", children=[], attrs={})],
-                    attrs={}
+                    attrs={},
                 ),
                 ASTNode(type=NodeType.TEXT, raw=" and ", children=[], attrs={}),
                 ASTNode(
                     type=NodeType.EMPHASIS,
                     raw="",
                     children=[ASTNode(type=NodeType.TEXT, raw="italic", children=[], attrs={})],
-                    attrs={}
+                    attrs={},
                 ),
-                nested_list
+                nested_list,
             ],
             attrs={},
-            node_addr="body.list[0].listitem[0]"
+            node_addr="body.list[0].listitem[0]",
         )
         root_list = ASTNode(
             type=NodeType.LIST,
             raw="",
             children=[parent_item],
-            attrs={'ordered': False},
-            node_addr="body.list[0]"
+            attrs={"ordered": False},
+            node_addr="body.list[0]",
         )
 
         ast = [root_list]
@@ -346,22 +348,22 @@ class TestNestedListReconstruction:
                 node_addr="body.list[0].listitem[0]",
                 kind=TextUnitKind.TEXT,
                 source_text="Item with bold and italic",
-                translated_text="Élément avec **gras** et *italique*"
+                translated_text="Élément avec **gras** et *italique*",
             ),
             TextUnit(
                 unit_id="u2",
                 node_addr="body.list[0].listitem[0].list[0].listitem[0]",
                 kind=TextUnitKind.TEXT,
                 source_text="Nested 1",
-                translated_text="Imbriqué 1"
+                translated_text="Imbriqué 1",
             ),
             TextUnit(
                 unit_id="u3",
                 node_addr="body.list[0].listitem[0].list[0].listitem[1]",
                 kind=TextUnitKind.TEXT,
                 source_text="Nested 2",
-                translated_text="Imbriqué 2"
-            )
+                translated_text="Imbriqué 2",
+            ),
         ]
 
         # Apply translations
@@ -406,8 +408,8 @@ class TestNestedListReconstruction:
             type=NodeType.LIST,
             raw="",
             children=[],
-            attrs={'ordered': False},
-            node_addr="body.list[0].listitem[0].list[0]"
+            attrs={"ordered": False},
+            node_addr="body.list[0].listitem[0].list[0]",
         )
 
         # Parent item with empty nested list
@@ -416,17 +418,17 @@ class TestNestedListReconstruction:
             raw="",
             children=[
                 ASTNode(type=NodeType.TEXT, raw="Parent", children=[], attrs={}),
-                empty_nested_list
+                empty_nested_list,
             ],
             attrs={},
-            node_addr="body.list[0].listitem[0]"
+            node_addr="body.list[0].listitem[0]",
         )
         root_list = ASTNode(
             type=NodeType.LIST,
             raw="",
             children=[parent_item],
-            attrs={'ordered': False},
-            node_addr="body.list[0]"
+            attrs={"ordered": False},
+            node_addr="body.list[0]",
         )
 
         ast = [root_list]
@@ -438,7 +440,7 @@ class TestNestedListReconstruction:
                 node_addr="body.list[0].listitem[0]",
                 kind=TextUnitKind.TEXT,
                 source_text="Parent",
-                translated_text="Parent traduit"
+                translated_text="Parent traduit",
             )
         ]
 
@@ -481,14 +483,14 @@ class TestNestedListReconstruction:
             raw="",
             children=[ASTNode(type=NodeType.TEXT, raw="Item A", children=[], attrs={})],
             attrs={},
-            node_addr="body.list[0].listitem[0].list[0].listitem[0]"
+            node_addr="body.list[0].listitem[0].list[0].listitem[0]",
         )
         first_nested_list = ASTNode(
             type=NodeType.LIST,
             raw="",
             children=[first_nested_item],
-            attrs={'ordered': False},
-            node_addr="body.list[0].listitem[0].list[0]"
+            attrs={"ordered": False},
+            node_addr="body.list[0].listitem[0].list[0]",
         )
 
         # Second nested list
@@ -497,14 +499,14 @@ class TestNestedListReconstruction:
             raw="",
             children=[ASTNode(type=NodeType.TEXT, raw="Item B", children=[], attrs={})],
             attrs={},
-            node_addr="body.list[0].listitem[0].list[1].listitem[0]"
+            node_addr="body.list[0].listitem[0].list[1].listitem[0]",
         )
         second_nested_list = ASTNode(
             type=NodeType.LIST,
             raw="",
             children=[second_nested_item],
-            attrs={'ordered': False},
-            node_addr="body.list[0].listitem[0].list[1]"
+            attrs={"ordered": False},
+            node_addr="body.list[0].listitem[0].list[1]",
         )
 
         # Parent item with both nested lists
@@ -514,17 +516,17 @@ class TestNestedListReconstruction:
             children=[
                 ASTNode(type=NodeType.TEXT, raw="Parent", children=[], attrs={}),
                 first_nested_list,
-                second_nested_list
+                second_nested_list,
             ],
             attrs={},
-            node_addr="body.list[0].listitem[0]"
+            node_addr="body.list[0].listitem[0]",
         )
         root_list = ASTNode(
             type=NodeType.LIST,
             raw="",
             children=[parent_item],
-            attrs={'ordered': False},
-            node_addr="body.list[0]"
+            attrs={"ordered": False},
+            node_addr="body.list[0]",
         )
 
         ast = [root_list]
@@ -536,22 +538,22 @@ class TestNestedListReconstruction:
                 node_addr="body.list[0].listitem[0]",
                 kind=TextUnitKind.TEXT,
                 source_text="Parent",
-                translated_text="Parent traduit"
+                translated_text="Parent traduit",
             ),
             TextUnit(
                 unit_id="u2",
                 node_addr="body.list[0].listitem[0].list[0].listitem[0]",
                 kind=TextUnitKind.TEXT,
                 source_text="Item A",
-                translated_text="Élément A"
+                translated_text="Élément A",
             ),
             TextUnit(
                 unit_id="u3",
                 node_addr="body.list[0].listitem[0].list[1].listitem[0]",
                 kind=TextUnitKind.TEXT,
                 source_text="Item B",
-                translated_text="Élément B"
-            )
+                translated_text="Élément B",
+            ),
         ]
 
         # Apply translations
@@ -599,21 +601,21 @@ class TestNestedListReconstruction:
             raw="",
             children=[ASTNode(type=NodeType.TEXT, raw="Nested 1", children=[], attrs={})],
             attrs={},
-            node_addr="body.list[0].listitem[0].list[0].listitem[0]"
+            node_addr="body.list[0].listitem[0].list[0].listitem[0]",
         )
         nested_item_2 = ASTNode(
             type=NodeType.LIST_ITEM,
             raw="",
             children=[ASTNode(type=NodeType.TEXT, raw="Nested 2", children=[], attrs={})],
             attrs={},
-            node_addr="body.list[0].listitem[0].list[0].listitem[1]"
+            node_addr="body.list[0].listitem[0].list[0].listitem[1]",
         )
         nested_list = ASTNode(
             type=NodeType.LIST,
             raw="",
             children=[nested_item_1, nested_item_2],
-            attrs={'ordered': True},  # Ordered nested list
-            node_addr="body.list[0].listitem[0].list[0]"
+            attrs={"ordered": True},  # Ordered nested list
+            node_addr="body.list[0].listitem[0].list[0]",
         )
 
         # Parent ordered items
@@ -622,24 +624,24 @@ class TestNestedListReconstruction:
             raw="",
             children=[
                 ASTNode(type=NodeType.TEXT, raw="First item", children=[], attrs={}),
-                nested_list
+                nested_list,
             ],
             attrs={},
-            node_addr="body.list[0].listitem[0]"
+            node_addr="body.list[0].listitem[0]",
         )
         parent_item_2 = ASTNode(
             type=NodeType.LIST_ITEM,
             raw="",
             children=[ASTNode(type=NodeType.TEXT, raw="Second item", children=[], attrs={})],
             attrs={},
-            node_addr="body.list[0].listitem[1]"
+            node_addr="body.list[0].listitem[1]",
         )
         root_list = ASTNode(
             type=NodeType.LIST,
             raw="",
             children=[parent_item_1, parent_item_2],
-            attrs={'ordered': True},  # Ordered parent list
-            node_addr="body.list[0]"
+            attrs={"ordered": True},  # Ordered parent list
+            node_addr="body.list[0]",
         )
 
         ast = [root_list]
@@ -651,29 +653,29 @@ class TestNestedListReconstruction:
                 node_addr="body.list[0].listitem[0]",
                 kind=TextUnitKind.TEXT,
                 source_text="First item",
-                translated_text="Premier élément"
+                translated_text="Premier élément",
             ),
             TextUnit(
                 unit_id="u2",
                 node_addr="body.list[0].listitem[0].list[0].listitem[0]",
                 kind=TextUnitKind.TEXT,
                 source_text="Nested 1",
-                translated_text="Imbriqué 1"
+                translated_text="Imbriqué 1",
             ),
             TextUnit(
                 unit_id="u3",
                 node_addr="body.list[0].listitem[0].list[0].listitem[1]",
                 kind=TextUnitKind.TEXT,
                 source_text="Nested 2",
-                translated_text="Imbriqué 2"
+                translated_text="Imbriqué 2",
             ),
             TextUnit(
                 unit_id="u4",
                 node_addr="body.list[0].listitem[1]",
                 kind=TextUnitKind.TEXT,
                 source_text="Second item",
-                translated_text="Deuxième élément"
-            )
+                translated_text="Deuxième élément",
+            ),
         ]
 
         # Apply translations
@@ -685,7 +687,7 @@ class TestNestedListReconstruction:
         # Verify structure
         parent = ast[0].children[0]
         assert len(parent.children) == 2, "Parent should have text + nested list"
-        assert parent.children[1].attrs['ordered'] is True, "Nested list is ordered"
+        assert parent.children[1].attrs["ordered"] is True, "Nested list is ordered"
 
         # Verify markdown output has numbering
         markdown = self.renderer.render_to_markdown(ast)

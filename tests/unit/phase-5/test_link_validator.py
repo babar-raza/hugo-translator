@@ -77,10 +77,7 @@ class TestLinkValidator:
 
         # Anchor links with spaces shouldn't trigger "unencoded spaces" warning
         # (but may have URL preservation warnings, which is fine)
-        assert not any(
-            "unencoded spaces" in issue.message.lower()
-            for issue in result.issues
-        )
+        assert not any("unencoded spaces" in issue.message.lower() for issue in result.issues)
 
     def test_malformed_absolute_url(self, validator):
         """Test with malformed absolute URL."""
@@ -136,9 +133,7 @@ class TestLinkValidator:
         result = validator.validate(source, translation)
 
         # Should not check URL changes
-        assert not any(
-            "not found" in issue.message.lower() for issue in result.issues
-        )
+        assert not any("not found" in issue.message.lower() for issue in result.issues)
 
     def test_image_link(self, validator):
         """Test with image link."""

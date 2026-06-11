@@ -23,12 +23,14 @@ def test_cli_flags_parsed():
     assert args.validate_output_integrity is True
 
     # Test all flags together
-    args = parser.parse_args([
-        "example.com",
-        "--disable-content-hash",
-        "--rebuild-content-hashes",
-        "--validate-output-integrity"
-    ])
+    args = parser.parse_args(
+        [
+            "example.com",
+            "--disable-content-hash",
+            "--rebuild-content-hashes",
+            "--validate-output-integrity",
+        ]
+    )
     assert args.disable_content_hash is True
     assert args.rebuild_content_hashes is True
     assert args.validate_output_integrity is True
@@ -207,7 +209,9 @@ def test_rebuild_content_hashes_deletes_metadata(mock_logger, mock_path_class):
 
     # Mock Path to return our mock metadata file
     mock_output_dir = MagicMock()
-    mock_output_dir.__truediv__ = lambda self, x: mock_metadata_file if x == ".translation_metadata.json" else MagicMock()
+    mock_output_dir.__truediv__ = lambda self, x: (
+        mock_metadata_file if x == ".translation_metadata.json" else MagicMock()
+    )
 
     # Verify the logic would delete the file
     if mock_metadata_file.exists():

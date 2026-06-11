@@ -1,4 +1,5 @@
 """Tests for the orphaned LMDB temp cleanup script."""
+
 from __future__ import annotations
 
 import os
@@ -30,7 +31,6 @@ def _make_pytest_structure(root: Path, test_name: str = "test_foo0") -> Path:
 
 
 class TestFindCandidates:
-
     def test_finds_pytest_owned_lmdb(self, tmp_path):
         pytest_dir = _make_pytest_structure(tmp_path)
         _make_lmdb_dir(pytest_dir / "l2.lmdb")
@@ -89,7 +89,6 @@ class TestFindCandidates:
 
 
 class TestCleanup:
-
     def test_dry_run_deletes_nothing(self, tmp_path):
         pytest_dir = _make_pytest_structure(tmp_path)
         lmdb_dir = _make_lmdb_dir(pytest_dir / "l2.lmdb")
@@ -119,7 +118,6 @@ class TestCleanup:
 
 
 class TestMain:
-
     def test_root_outside_temp_rejected(self, tmp_path):
         exit_code = main(["--dry-run", "--root", str(tmp_path)])
         # tmp_path is typically under system temp, so this may pass.

@@ -140,6 +140,7 @@ ignore = [
     "F601",  # multi-value-repeated-key-literal — tracked as tech debt
     "E721",  # type-comparison — tracked as tech debt
     "UP035", # deprecated-import — tracked as tech debt
+    "UP038", # isinstance-with-tuple — deprecated in ruff 0.11; kept for pre-commit v0.11.13 compat
     "UP045", # non-pep604-annotation-optional — can break when type aliases evaluate to None at runtime
 ]
 

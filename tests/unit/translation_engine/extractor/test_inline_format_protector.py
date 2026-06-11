@@ -3,6 +3,7 @@ Unit tests for InlineFormatProtector (HP-05).
 
 Tests inline markdown formatting protection and restoration during translation.
 """
+
 import pytest
 
 from src.translation_engine.extractor.inline_format_protector import (
@@ -81,9 +82,7 @@ class TestInlineFormatProtector:
         protected = protector.protect(original)
 
         # Simulate translation of link text only
-        translated = protected.protected.replace(
-            "See Documentation", "Siehe Dokumentation"
-        )
+        translated = protected.protected.replace("See Documentation", "Siehe Dokumentation")
         restored = protector.restore(protected, translated)
 
         # V2: URL preserved (MT models trained on markdown syntax)
@@ -228,9 +227,9 @@ class TestInlineFormatProtector:
         protected = protector.protect(original)
 
         # Simulate translation
-        translated = protected.protected.replace(
-            "File Size", "Dateigr\u00f6\u00dfe"
-        ).replace("reference", "Referenz")
+        translated = protected.protected.replace("File Size", "Dateigr\u00f6\u00dfe").replace(
+            "reference", "Referenz"
+        )
         restored = protector.restore(protected, translated)
 
         # V2: Both preserved through translation

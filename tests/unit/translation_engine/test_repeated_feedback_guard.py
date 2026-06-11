@@ -10,6 +10,7 @@ observed during P3 pilot (2026-05-07): the LLM generated Arabic characters
 when translating Document AI content to Danish, and repeated correction
 prompts did not resolve the issue.
 """
+
 from __future__ import annotations
 
 import unittest
@@ -20,7 +21,7 @@ class TestRepeatedFeedbackGuard(unittest.TestCase):
 
     def _run_guard(
         self,
-        prev_validators: "frozenset | None",
+        prev_validators: frozenset | None,
         current_issue_validators: list[str],
         current_issue_severities: list[str],
     ) -> tuple[bool, frozenset]:
@@ -62,9 +63,7 @@ class TestRepeatedFeedbackGuard(unittest.TestCase):
 
     def test_different_validators_on_second_retry_does_not_fail_early(self):
         """Different validators on consecutive retries -> keep retrying."""
-        fail_early, prev = self._run_guard(
-            None, ["LanguageConsistencyValidator"], ["error"]
-        )
+        fail_early, prev = self._run_guard(None, ["LanguageConsistencyValidator"], ["error"])
         self.assertFalse(fail_early)
 
         fail_early, _ = self._run_guard(prev, ["CompletenessValidator"], ["error"])
@@ -80,9 +79,7 @@ class TestRepeatedFeedbackGuard(unittest.TestCase):
 
     def test_first_retry_never_fails_early(self):
         """Guard never triggers on the first retry (prev is None)."""
-        fail_early, _ = self._run_guard(
-            None, ["LanguageConsistencyValidator"], ["error"]
-        )
+        fail_early, _ = self._run_guard(None, ["LanguageConsistencyValidator"], ["error"])
         self.assertFalse(fail_early)
 
     def test_multiple_validators_same_set_triggers_guard(self):
@@ -114,18 +111,14 @@ class TestRepeatedFeedbackGuard(unittest.TestCase):
         prev = frozenset({("LanguageConsistencyValidator", "error")})
 
         # Current: same validator but warning severity -> different key
-        fail_early, _ = self._run_guard(
-            prev, ["LanguageConsistencyValidator"], ["warning"]
-        )
+        fail_early, _ = self._run_guard(prev, ["LanguageConsistencyValidator"], ["warning"])
         self.assertFalse(fail_early)
 
     def test_empty_prev_is_treated_as_none(self):
         """Empty frozenset as prev_validators -> guard does not trigger."""
         prev = frozenset()
         # prev is not None but is falsy -> condition requires current and prev both non-empty
-        fail_early, _ = self._run_guard(
-            prev, ["LanguageConsistencyValidator"], ["error"]
-        )
+        fail_early, _ = self._run_guard(prev, ["LanguageConsistencyValidator"], ["error"])
         # prev is not None but empty frozenset != non-empty frozenset -> no fail
         self.assertFalse(fail_early)
 

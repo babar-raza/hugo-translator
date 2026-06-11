@@ -31,6 +31,7 @@ def test_write_dry_run_manifest_records_translate_skip_and_fail(tmp_path, monkey
     future_mtime = current_source.stat().st_mtime + 10
     current_output.touch()
     import os
+
     os.utime(current_output, (future_mtime, future_mtime))
 
     def filter_source_files(files, site_profile, target_langs):
@@ -47,16 +48,18 @@ def test_write_dry_run_manifest_records_translate_skip_and_fail(tmp_path, monkey
     )
 
     import json
+
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
 
     assert manifest["site"] == "fixture.test"
     assert manifest["model"] == "test-model"
-    assert manifest["would_translate"] == [{
-        "source_path": str(new_source),
-        "target_lang": "es",
-        "output_path": str(output_root / "es" / "new.md"),
-    }]
+    assert manifest["would_translate"] == [
+        {
+            "source_path": str(new_source),
+            "target_lang": "es",
+            "output_path": str(output_root / "es" / "new.md"),
+        }
+    ]
     assert any(item["reason"] == "up_to_date" for item in manifest["would_skip"])
     assert any(item["reason"] == "filtered_or_translated" for item in manifest["would_skip"])
     assert manifest["would_fail"] == []
-

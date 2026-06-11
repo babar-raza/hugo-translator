@@ -4,6 +4,7 @@ Unit tests for TI-01: Telemetry Fallback Observability.
 Tests that _safe_duration_ms() emits metrics and structured logs when
 fallback scenarios occur (None stats, None duration_seconds, invalid types).
 """
+
 from unittest.mock import MagicMock, patch
 
 from src.observability.telemetry_integration import _safe_duration_ms
@@ -17,7 +18,7 @@ class TestTelemetryObservability:
         """Verify metrics emitted when stats is None."""
         mock_metrics = MagicMock()
 
-        with patch('src.observability.metrics.get_metrics', return_value=mock_metrics):
+        with patch("src.observability.metrics.get_metrics", return_value=mock_metrics):
             duration_ms, used_fallback = _safe_duration_ms(None, context="test_context")
 
         # Verify return values
@@ -26,8 +27,7 @@ class TestTelemetryObservability:
 
         # Verify metric was emitted
         mock_metrics.increment.assert_called_once_with(
-            'telemetry_duration_fallback',
-            labels={'reason': 'none_stats'}
+            "telemetry_duration_fallback", labels={"reason": "none_stats"}
         )
 
         # Verify structured logging
@@ -42,7 +42,7 @@ class TestTelemetryObservability:
 
         mock_metrics = MagicMock()
 
-        with patch('src.observability.metrics.get_metrics', return_value=mock_metrics):
+        with patch("src.observability.metrics.get_metrics", return_value=mock_metrics):
             duration_ms, used_fallback = _safe_duration_ms(stats, context="test_context")
 
         # Verify return values
@@ -51,8 +51,7 @@ class TestTelemetryObservability:
 
         # Verify metric was emitted
         mock_metrics.increment.assert_called_once_with(
-            'telemetry_duration_fallback',
-            labels={'reason': 'none_duration'}
+            "telemetry_duration_fallback", labels={"reason": "none_duration"}
         )
 
         # Verify structured logging
@@ -65,7 +64,7 @@ class TestTelemetryObservability:
 
         mock_metrics = MagicMock()
 
-        with patch('src.observability.metrics.get_metrics', return_value=mock_metrics):
+        with patch("src.observability.metrics.get_metrics", return_value=mock_metrics):
             duration_ms, used_fallback = _safe_duration_ms(stats, context="test_context")
 
         # Verify return values
@@ -74,8 +73,7 @@ class TestTelemetryObservability:
 
         # Verify metric was emitted
         mock_metrics.increment.assert_called_once_with(
-            'telemetry_duration_fallback',
-            labels={'reason': 'invalid_type'}
+            "telemetry_duration_fallback", labels={"reason": "invalid_type"}
         )
 
         # Verify structured logging
@@ -87,7 +85,7 @@ class TestTelemetryObservability:
 
         mock_metrics = MagicMock()
 
-        with patch('src.observability.metrics.get_metrics', return_value=mock_metrics):
+        with patch("src.observability.metrics.get_metrics", return_value=mock_metrics):
             duration_ms, used_fallback = _safe_duration_ms(stats, context="test_context")
 
         # Verify return values
@@ -103,7 +101,7 @@ class TestTelemetryObservability:
 
         mock_metrics = MagicMock()
 
-        with patch('src.observability.metrics.get_metrics', return_value=mock_metrics):
+        with patch("src.observability.metrics.get_metrics", return_value=mock_metrics):
             duration_ms, used_fallback = _safe_duration_ms(stats, context="test_context")
 
         # Verify return values
@@ -119,7 +117,7 @@ class TestTelemetryObservability:
         stats.duration_seconds = None
 
         # Simulate metrics unavailable (ImportError or Exception)
-        with patch('src.observability.metrics.get_metrics', side_effect=ImportError("No metrics")):
+        with patch("src.observability.metrics.get_metrics", side_effect=ImportError("No metrics")):
             # Should NOT crash
             duration_ms, used_fallback = _safe_duration_ms(stats, context="test_context")
 
@@ -137,7 +135,7 @@ class TestTelemetryObservability:
 
         mock_metrics = MagicMock()
 
-        with patch('src.observability.metrics.get_metrics', return_value=mock_metrics):
+        with patch("src.observability.metrics.get_metrics", return_value=mock_metrics):
             _safe_duration_ms(stats, context="translate_file")
 
         # Verify logging message includes context
@@ -150,7 +148,7 @@ class TestTelemetryObservability:
         contexts = ["translate_file", "translate_directory", "track_translation_stats"]
 
         for context in contexts:
-            with patch('src.observability.metrics.get_metrics'):
+            with patch("src.observability.metrics.get_metrics"):
                 duration_ms, used_fallback = _safe_duration_ms(None, context=context)
                 # If this doesn't crash, context was handled correctly
                 assert duration_ms == 0
@@ -167,7 +165,7 @@ class TestTelemetryObservability:
         ]
 
         for stats_input, expected_output in test_cases:
-            with patch('src.observability.metrics.get_metrics'):
+            with patch("src.observability.metrics.get_metrics"):
                 result = _safe_duration_ms(stats_input, context="test")
                 assert result == expected_output
                 # Verify types

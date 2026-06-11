@@ -8,6 +8,7 @@ Tests cover:
 - Error cases (no models fit, missing benchmarks)
 - Confidence scoring
 """
+
 from unittest.mock import MagicMock
 
 import pytest
@@ -209,7 +210,8 @@ class TestModelRecommenderBenchmarks:
 
         # Memory constraint filters out 600MB model
         recommendation = recommender.recommend(
-            device_preference="cpu", max_memory_gb=0.4  # 400MB
+            device_preference="cpu",
+            max_memory_gb=0.4,  # 400MB
         )
 
         assert recommendation.model_id == "m2m100_418m_ct2_int8"
@@ -226,9 +228,7 @@ class TestModelRecommenderBenchmarks:
         )
 
         # Only INT8 model meets 18 tokens/sec target
-        recommendation = recommender.recommend(
-            device_preference="cpu", target_throughput=18.0
-        )
+        recommendation = recommender.recommend(device_preference="cpu", target_throughput=18.0)
 
         assert recommendation.model_id == "m2m100_418m_ct2_int8"
         assert recommendation.expected_throughput >= 18.0
@@ -244,9 +244,7 @@ class TestModelRecommenderBenchmarks:
         )
 
         # Impossible throughput requirement forces heuristic fallback
-        recommendation = recommender.recommend(
-            device_preference="cpu", target_throughput=1000.0
-        )
+        recommendation = recommender.recommend(device_preference="cpu", target_throughput=1000.0)
 
         # Should use heuristics (confidence = medium)
         assert recommendation.confidence in ["medium", "low"]
@@ -256,9 +254,7 @@ class TestModelRecommenderBenchmarks:
 class TestModelRecommenderHeuristics:
     """Test fallback heuristic recommendations."""
 
-    def test_recommend_heuristic_prefers_ct2_int8_on_cpu(
-        self, mock_registry, mock_hardware
-    ):
+    def test_recommend_heuristic_prefers_ct2_int8_on_cpu(self, mock_registry, mock_hardware):
         """Test that heuristics prefer CT2 INT8 models on CPU."""
         recommender = ModelRecommender(
             registry=mock_registry,
@@ -275,9 +271,7 @@ class TestModelRecommenderHeuristics:
         assert recommendation.confidence == "medium"
         assert "heuristic" in recommendation.rationale.lower()
 
-    def test_recommend_heuristic_respects_memory_constraint(
-        self, mock_registry, mock_hardware
-    ):
+    def test_recommend_heuristic_respects_memory_constraint(self, mock_registry, mock_hardware):
         """Test that heuristics respect memory constraints."""
         recommender = ModelRecommender(
             registry=mock_registry,
@@ -286,16 +280,12 @@ class TestModelRecommenderHeuristics:
         )
 
         # 1GB constraint filters out all but INT8 model
-        recommendation = recommender.recommend(
-            device_preference="cpu", max_memory_gb=1.0
-        )
+        recommendation = recommender.recommend(device_preference="cpu", max_memory_gb=1.0)
 
         assert recommendation.model_id == "m2m100_418m_ct2_int8"
         assert recommendation.expected_memory_mb <= 1024
 
-    def test_recommend_heuristic_no_models_fit_memory(
-        self, mock_registry, mock_hardware
-    ):
+    def test_recommend_heuristic_no_models_fit_memory(self, mock_registry, mock_hardware):
         """Test error handling when no models fit memory constraint."""
         recommender = ModelRecommender(
             registry=mock_registry,
@@ -307,9 +297,7 @@ class TestModelRecommenderHeuristics:
         with pytest.raises(ValueError, match="No models fit memory constraint"):
             recommender.recommend(device_preference="cpu", max_memory_gb=0.1)
 
-    def test_recommend_heuristic_throughput_warning(
-        self, mock_registry, mock_hardware
-    ):
+    def test_recommend_heuristic_throughput_warning(self, mock_registry, mock_hardware):
         """Test that heuristics warn when throughput target may not be met."""
         recommender = ModelRecommender(
             registry=mock_registry,
@@ -318,17 +306,13 @@ class TestModelRecommenderHeuristics:
         )
 
         # High throughput target (heuristic estimates ~20-30 tokens/sec)
-        recommendation = recommender.recommend(
-            device_preference="cpu", target_throughput=100.0
-        )
+        recommendation = recommender.recommend(device_preference="cpu", target_throughput=100.0)
 
         # Should return recommendation with low confidence
         assert recommendation.confidence == "low"
         assert "may not meet target" in recommendation.rationale.lower()
 
-    def test_recommend_heuristic_device_compatibility(
-        self, mock_registry, mock_hardware
-    ):
+    def test_recommend_heuristic_device_compatibility(self, mock_registry, mock_hardware):
         """Test that heuristics consider device compatibility."""
         recommender = ModelRecommender(
             registry=mock_registry,

@@ -20,7 +20,7 @@ def test_yaml_format_fallback_logs_warning(caplog):
     parser = HugoParser()
     content = "---\ntitle: Test Title\ndate: 2024-01-01\n---\n\nBody text."
 
-    with patch.object(parser, '_parse_yaml_with_comments', return_value=None):
+    with patch.object(parser, "_parse_yaml_with_comments", return_value=None):
         with caplog.at_level(logging.WARNING, logger="src.translation_engine.parser.hugo_parser"):
             doc = parser.parse_string(content)
 
@@ -178,7 +178,7 @@ class TestListParsingIntegration:
     def test_cli_validation_case(self):
         """CLI validation from HP-01 acceptance checks."""
         parser = HugoParser()
-        doc = parser.parse_string('''---
+        doc = parser.parse_string("""---
 title: Test
 ---
 
@@ -193,21 +193,21 @@ title: Test
 - Convert presentations
 - Merge decks
 - Extract text
-''')
+""")
 
         # Count list nodes
         list_nodes = [n for n in doc.ast if n.type == NodeType.LIST]
-        assert len(list_nodes) == 2, f'Expected 2 LIST nodes, got {len(list_nodes)}'
+        assert len(list_nodes) == 2, f"Expected 2 LIST nodes, got {len(list_nodes)}"
 
         # Verify ordered vs unordered
-        ordered_list = next((n for n in list_nodes if n.attrs.get('ordered')), None)
-        bullet_list = next((n for n in list_nodes if not n.attrs.get('ordered')), None)
+        ordered_list = next((n for n in list_nodes if n.attrs.get("ordered")), None)
+        bullet_list = next((n for n in list_nodes if not n.attrs.get("ordered")), None)
 
         assert ordered_list is not None, "Should have ordered list"
         assert bullet_list is not None, "Should have bullet list"
 
-        assert len(ordered_list.children) == 3, 'Ordered list should have 3 items'
-        assert len(bullet_list.children) == 3, 'Bullet list should have 3 items'
+        assert len(ordered_list.children) == 3, "Ordered list should have 3 items"
+        assert len(bullet_list.children) == 3, "Bullet list should have 3 items"
 
     def test_mixed_content_with_lists(self):
         """Lists mixed with other content types."""

@@ -58,9 +58,9 @@ class TestASTBatchTranslationE2E:
             results = []
             for text in texts:
                 # Check if this is a batch (contains delimiter)
-                if "\uE000\uE000\uE000" in text:
+                if "\ue000\ue000\ue000" in text:
                     # Extract delimiter pattern
-                    delimiter_pattern = r'(\uE000\uE000\uE000[a-f0-9\-]+\uE001\uE001\uE001)'
+                    delimiter_pattern = r"(\uE000\uE000\uE000[a-f0-9\-]+\uE001\uE001\uE001)"
                     parts = re.split(delimiter_pattern, text)
 
                     # Translate non-delimiter parts to German
@@ -75,7 +75,7 @@ class TestASTBatchTranslationE2E:
                         else:
                             translated_parts.append(part)
 
-                    results.append(''.join(translated_parts))
+                    results.append("".join(translated_parts))
                 else:
                     # Individual translation
                     results.append(f"DE:{text}")
@@ -104,15 +104,17 @@ class TestASTBatchTranslationE2E:
         mock_langdetect.DetectorFactory.seed = 0
 
         # Inject into sys.modules
-        sys.modules['langdetect'] = mock_langdetect
+        sys.modules["langdetect"] = mock_langdetect
 
         yield mock_langdetect
 
         # Cleanup
-        if 'langdetect' in sys.modules:
-            del sys.modules['langdetect']
+        if "langdetect" in sys.modules:
+            del sys.modules["langdetect"]
 
-    def test_ast_batch_translation_full_pipeline(self, test_fixture_path, mock_mt_model, mock_langdetect):
+    def test_ast_batch_translation_full_pipeline(
+        self, test_fixture_path, mock_mt_model, mock_langdetect
+    ):
         """
         Test complete AST batch translation pipeline with real markdown file.
 
@@ -129,7 +131,7 @@ class TestASTBatchTranslationE2E:
         # 1. PARSE: Read and parse the test fixture
         assert test_fixture_path.exists(), f"Test fixture not found: {test_fixture_path}"
 
-        with open(test_fixture_path, encoding='utf-8') as f:
+        with open(test_fixture_path, encoding="utf-8") as f:
             source_content = f.read()
 
         parser = HugoParser()
@@ -153,16 +155,14 @@ class TestASTBatchTranslationE2E:
         assert len(translatable_units) >= 5, "Should have at least 5 translatable units"
 
         # Verify code blocks are marked as non-translatable
-        code_units = [u for u in units if u.do_not_translate and "def hello_world" in (u.source_text or "")]
+        code_units = [
+            u for u in units if u.do_not_translate and "def hello_world" in (u.source_text or "")
+        ]
         assert len(code_units) > 0, "Code blocks should be marked as non-translatable"
 
         # 3. TRANSLATE: Batch translate units
         translated_units = extractor.batch_translate_units(
-            units,
-            mock_mt_model,
-            src_lang="en",
-            tgt_lang="de",
-            batch_size=50
+            units, mock_mt_model, src_lang="en", tgt_lang="de", batch_size=50
         )
 
         # Verify translation occurred
@@ -170,37 +170,41 @@ class TestASTBatchTranslationE2E:
 
         # Verify batch translation was used (not all individual)
         batch_stats = extractor.batch_stats
-        assert batch_stats.get('total_batches', 0) > 0, "Should use batch translation"
+        assert batch_stats.get("total_batches", 0) > 0, "Should use batch translation"
 
         # Check that most translations succeeded via batch (not fallback)
-        successful_batches = batch_stats.get('successful_batches', 0)
-        total_batches = batch_stats.get('total_batches', 0)
+        successful_batches = batch_stats.get("successful_batches", 0)
+        total_batches = batch_stats.get("total_batches", 0)
 
         # Allow some fallback, but most should succeed
         if total_batches > 0:
             success_rate = successful_batches / total_batches
-            assert success_rate >= 0.5, \
+            assert success_rate >= 0.5, (
                 f"Batch success rate should be >= 50%, got {success_rate:.1%}"
+            )
 
         # Verify no delimiter corruption
-        delimiter_corruptions = batch_stats.get('delimiter_corruptions', 0)
+        delimiter_corruptions = batch_stats.get("delimiter_corruptions", 0)
         assert delimiter_corruptions == 0, "Should have no delimiter corruptions"
 
         # Verify translatable units got translated
         for unit in translated_units:
             if not unit.do_not_translate:
-                assert unit.translated_text is not None, \
+                assert unit.translated_text is not None, (
                     f"Translatable unit {unit.unit_id} should have translation"
-                assert unit.translated_text != "", \
+                )
+                assert unit.translated_text != "", (
                     f"Translatable unit {unit.unit_id} translation should not be empty"
+                )
 
         # Verify non-translatable units preserved
         for unit in translated_units:
             if unit.do_not_translate:
                 # Non-translatable units should either have no translation or same as source
                 if unit.translated_text:
-                    assert unit.translated_text == unit.source_text, \
+                    assert unit.translated_text == unit.source_text, (
                         f"Non-translatable unit {unit.unit_id} should preserve source text"
+                    )
 
         # 4. APPLY & RENDER: Apply translations to AST and render to markdown
         renderer = ASTRenderer()
@@ -214,14 +218,17 @@ class TestASTBatchTranslationE2E:
         # Verify structure preserved (body only, no frontmatter)
         assert "```python" in translated_content, "Code blocks should be preserved"
         assert "def hello_world" in translated_content, "Code content should be preserved"
-        assert "[" in translated_content and "]" in translated_content, \
+        assert "[" in translated_content and "]" in translated_content, (
             "Link syntax should be preserved"
+        )
         assert "https://example.com" in translated_content, "URLs should be preserved"
 
         # Verify headings preserved
         assert "#" in translated_content, "Headings should be preserved"
 
-    def test_ast_batch_translation_statistics(self, test_fixture_path, mock_mt_model, mock_langdetect):
+    def test_ast_batch_translation_statistics(
+        self, test_fixture_path, mock_mt_model, mock_langdetect
+    ):
         """
         Test that batch statistics are properly tracked.
 
@@ -231,7 +238,7 @@ class TestASTBatchTranslationE2E:
         - fallback_batches tracked (if any)
         - No double-counting (SR-02 fix)
         """
-        with open(test_fixture_path, encoding='utf-8') as f:
+        with open(test_fixture_path, encoding="utf-8") as f:
             source_content = f.read()
 
         parser = HugoParser()
@@ -243,34 +250,33 @@ class TestASTBatchTranslationE2E:
 
         # Translate
         translated_units = extractor.batch_translate_units(
-            units,
-            mock_mt_model,
-            src_lang="en",
-            tgt_lang="de",
-            batch_size=50
+            units, mock_mt_model, src_lang="en", tgt_lang="de", batch_size=50
         )
 
         # Verify statistics
         stats = extractor.batch_stats
 
         # Basic statistics present
-        assert 'total_batches' in stats
-        assert 'successful_batches' in stats
-        assert 'fallback_batches' in stats
+        assert "total_batches" in stats
+        assert "successful_batches" in stats
+        assert "fallback_batches" in stats
 
         # Statistics make sense
-        total = stats['total_batches']
-        successful = stats['successful_batches']
-        fallback = stats['fallback_batches']
+        total = stats["total_batches"]
+        successful = stats["successful_batches"]
+        fallback = stats["fallback_batches"]
 
         # Total should equal successful + fallback (no double counting)
-        assert total == successful + fallback, \
+        assert total == successful + fallback, (
             f"Statistics inconsistent: {total} total != {successful} successful + {fallback} fallback"
+        )
 
         # All batches should be accounted for
         assert total > 0, "Should have processed at least one batch"
 
-    def test_ast_batch_translation_delimiter_design(self, test_fixture_path, mock_mt_model, mock_langdetect):
+    def test_ast_batch_translation_delimiter_design(
+        self, test_fixture_path, mock_mt_model, mock_langdetect
+    ):
         """
         Test that new delimiter design (AST-FIX-01) is used.
 
@@ -279,7 +285,7 @@ class TestASTBatchTranslationE2E:
         - PUA characters used
         - Triple repetition
         """
-        with open(test_fixture_path, encoding='utf-8') as f:
+        with open(test_fixture_path, encoding="utf-8") as f:
             source_content = f.read()
 
         parser = HugoParser()
@@ -301,37 +307,38 @@ class TestASTBatchTranslationE2E:
 
         # Translate
         translated_units = extractor.batch_translate_units(
-            units,
-            mock_mt_model,
-            src_lang="en",
-            tgt_lang="de",
-            batch_size=50
+            units, mock_mt_model, src_lang="en", tgt_lang="de", batch_size=50
         )
 
         # Check batch texts for delimiter format
-        batch_with_delimiter = [t for t in batch_texts if "\uE000\uE000\uE000" in t]
+        batch_with_delimiter = [t for t in batch_texts if "\ue000\ue000\ue000" in t]
 
         if len(batch_with_delimiter) > 0:
             # Verify no English words in delimiter
             english_words = ["UNTRANSLATABLE", "BOUNDARY", "BATCH", "COUNT", "HEADER"]
             for batch_text in batch_with_delimiter:
                 for word in english_words:
-                    assert word not in batch_text, \
+                    assert word not in batch_text, (
                         f"Batch text should not contain English word '{word}'"
+                    )
 
             # Verify PUA characters present
             for batch_text in batch_with_delimiter:
-                assert "\uE000" in batch_text, "Should contain PUA start token"
-                assert "\uE001" in batch_text, "Should contain PUA end token"
+                assert "\ue000" in batch_text, "Should contain PUA start token"
+                assert "\ue001" in batch_text, "Should contain PUA end token"
 
                 # Verify triple repetition
                 # Count consecutive PUA characters
-                assert "\uE000\uE000\uE000" in batch_text, \
+                assert "\ue000\ue000\ue000" in batch_text, (
                     "Should have triple repetition of start token"
-                assert "\uE001\uE001\uE001" in batch_text, \
+                )
+                assert "\ue001\ue001\ue001" in batch_text, (
                     "Should have triple repetition of end token"
+                )
 
-    def test_ast_batch_translation_dynamic_sizing(self, test_fixture_path, mock_mt_model, mock_langdetect):
+    def test_ast_batch_translation_dynamic_sizing(
+        self, test_fixture_path, mock_mt_model, mock_langdetect
+    ):
         """
         Test that dynamic batch sizing (AST-FIX-03) is working.
 
@@ -339,7 +346,7 @@ class TestASTBatchTranslationE2E:
         - Batch size respects unit limits
         - Batch size respects token limits (estimated)
         """
-        with open(test_fixture_path, encoding='utf-8') as f:
+        with open(test_fixture_path, encoding="utf-8") as f:
             source_content = f.read()
 
         parser = HugoParser()
@@ -355,19 +362,20 @@ class TestASTBatchTranslationE2E:
             mock_mt_model,
             src_lang="en",
             tgt_lang="de",
-            batch_size=3  # Small batch size
+            batch_size=3,  # Small batch size
         )
 
         # With small batch size, should create multiple batches
         stats = extractor.batch_stats
-        total_batches = stats.get('total_batches', 0)
+        total_batches = stats.get("total_batches", 0)
 
         translatable_count = len([u for u in units if not u.do_not_translate])
 
         if translatable_count > 3:
             # Should have created multiple batches
-            assert total_batches > 1, \
+            assert total_batches > 1, (
                 f"With {translatable_count} units and batch_size=3, should have >1 batch"
+            )
 
     def test_ast_batch_translation_empty_document(self, mock_mt_model, mock_langdetect):
         """
@@ -394,11 +402,7 @@ title: "Empty Document"
 
         # Translation should handle empty list gracefully
         translated_units = extractor.batch_translate_units(
-            units,
-            mock_mt_model,
-            src_lang="en",
-            tgt_lang="de",
-            batch_size=50
+            units, mock_mt_model, src_lang="en", tgt_lang="de", batch_size=50
         )
 
         # Should return same units
@@ -406,7 +410,7 @@ title: "Empty Document"
 
         # Should not have called translation (no batches)
         stats = extractor.batch_stats
-        assert stats.get('total_batches', 0) == 0, "Empty document should not create batches"
+        assert stats.get("total_batches", 0) == 0, "Empty document should not create batches"
 
     def test_ast_batch_translation_malformed_delimiter(self, mock_mt_model, mock_langdetect):
         """
@@ -437,9 +441,9 @@ Another paragraph here.
             """Mock translation that partially corrupts delimiter."""
             results = []
             for text in texts:
-                if "\uE000\uE000\uE000" in text:
+                if "\ue000\ue000\ue000" in text:
                     # Corrupt delimiter by removing part of it
-                    corrupted = text.replace("\uE000\uE000\uE000", "\uE000\uE000")
+                    corrupted = text.replace("\ue000\ue000\ue000", "\ue000\ue000")
                     results.append(corrupted)
                 else:
                     results.append(f"DE:{text}")
@@ -449,28 +453,26 @@ Another paragraph here.
 
         # Translate - should detect corruption and fall back
         translated_units = extractor.batch_translate_units(
-            units,
-            mock_mt_model,
-            src_lang="en",
-            tgt_lang="de",
-            batch_size=50
+            units, mock_mt_model, src_lang="en", tgt_lang="de", batch_size=50
         )
 
         # Should have attempted batch translation
         stats = extractor.batch_stats
-        assert stats.get('total_batches', 0) > 0, "Should have attempted batch translation"
+        assert stats.get("total_batches", 0) > 0, "Should have attempted batch translation"
 
         # Should have detected delimiter corruption
-        delimiter_corruptions = stats.get('delimiter_corruptions', 0)
+        delimiter_corruptions = stats.get("delimiter_corruptions", 0)
         if delimiter_corruptions > 0:
             # Fallback should have been triggered
-            fallback_batches = stats.get('fallback_batches', 0)
+            fallback_batches = stats.get("fallback_batches", 0)
             assert fallback_batches > 0, "Delimiter corruption should trigger fallback"
 
         # All units should still have translations (via fallback)
         for unit in translated_units:
             if not unit.do_not_translate:
-                assert unit.translated_text is not None, "All units should be translated via fallback"
+                assert unit.translated_text is not None, (
+                    "All units should be translated via fallback"
+                )
 
     def test_ast_batch_translation_model_error(self, mock_mt_model, mock_langdetect):
         """
@@ -500,11 +502,7 @@ This is a test paragraph.
         # Translation should handle exception gracefully
         try:
             translated_units = extractor.batch_translate_units(
-                units,
-                mock_mt_model,
-                src_lang="en",
-                tgt_lang="de",
-                batch_size=50
+                units, mock_mt_model, src_lang="en", tgt_lang="de", batch_size=50
             )
 
             # If exception is caught internally, check that error is logged
@@ -512,8 +510,9 @@ This is a test paragraph.
             for unit in translated_units:
                 if not unit.do_not_translate:
                     # Translation should be None or empty due to error
-                    assert unit.translated_text is None or unit.translated_text == "", \
+                    assert unit.translated_text is None or unit.translated_text == "", (
                         "Translation should fail gracefully on model error"
+                    )
 
         except RuntimeError as e:
             # If exception propagates, that's also acceptable behavior
@@ -600,21 +599,25 @@ Test paragraph with some content.
         units = plan.units
 
         # Should have frontmatter units (title, description, 3 keywords) + body units
-        frontmatter_units = [u for u in units if u.node_addr and u.node_addr.startswith('frontmatter.')]
-        assert len(frontmatter_units) >= 5, f"Should extract at least 5 frontmatter fields, got {len(frontmatter_units)}"
+        frontmatter_units = [
+            u for u in units if u.node_addr and u.node_addr.startswith("frontmatter.")
+        ]
+        assert len(frontmatter_units) >= 5, (
+            f"Should extract at least 5 frontmatter fields, got {len(frontmatter_units)}"
+        )
 
         # Verify title unit
-        title_units = [u for u in frontmatter_units if u.metadata.get('field_name') == 'title']
+        title_units = [u for u in frontmatter_units if u.metadata.get("field_name") == "title"]
         assert len(title_units) == 1
         assert title_units[0].source_text == "English Title"
 
         # Verify description unit
-        desc_units = [u for u in frontmatter_units if u.metadata.get('field_name') == 'description']
+        desc_units = [u for u in frontmatter_units if u.metadata.get("field_name") == "description"]
         assert len(desc_units) == 1
         assert desc_units[0].source_text == "English description for SEO"
 
         # Verify keywords units
-        kw_units = [u for u in frontmatter_units if u.metadata.get('field_name') == 'keywords']
+        kw_units = [u for u in frontmatter_units if u.metadata.get("field_name") == "keywords"]
         assert len(kw_units) == 3
         assert kw_units[0].source_text == "keyword1"
         assert kw_units[1].source_text == "keyword2"
@@ -622,11 +625,7 @@ Test paragraph with some content.
 
         # Translate (mock adds "DE:" prefix)
         translated_units = extractor.batch_translate_units(
-            units,
-            mock_mt_model,
-            src_lang="en",
-            tgt_lang="de",
-            batch_size=50
+            units, mock_mt_model, src_lang="en", tgt_lang="de", batch_size=50
         )
 
         # Apply translations
@@ -634,12 +633,17 @@ Test paragraph with some content.
         renderer.apply_translations(doc.ast, translated_units, frontmatter=doc.frontmatter)
 
         # Verify frontmatter translated
-        assert doc.frontmatter['title'].startswith('DE:'), f"Title should be translated, got: {doc.frontmatter['title']}"
-        assert doc.frontmatter['description'].startswith('DE:'), f"Description should be translated, got: {doc.frontmatter['description']}"
-        assert all(kw.startswith('DE:') for kw in doc.frontmatter['keywords']), \
+        assert doc.frontmatter["title"].startswith("DE:"), (
+            f"Title should be translated, got: {doc.frontmatter['title']}"
+        )
+        assert doc.frontmatter["description"].startswith("DE:"), (
+            f"Description should be translated, got: {doc.frontmatter['description']}"
+        )
+        assert all(kw.startswith("DE:") for kw in doc.frontmatter["keywords"]), (
             f"All keywords should be translated, got: {doc.frontmatter['keywords']}"
+        )
 
         # Verify protected fields unchanged
-        assert doc.frontmatter['slug'] == "test-slug", "Slug should not be translated"
-        assert doc.frontmatter['date'] == '2025-01-01', "Date should not be translated"
-        assert doc.frontmatter['weight'] == 10, "Weight should not be translated"
+        assert doc.frontmatter["slug"] == "test-slug", "Slug should not be translated"
+        assert doc.frontmatter["date"] == "2025-01-01", "Date should not be translated"
+        assert doc.frontmatter["weight"] == 10, "Weight should not be translated"

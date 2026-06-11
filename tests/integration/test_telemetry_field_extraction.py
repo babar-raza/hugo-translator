@@ -13,6 +13,7 @@ import pytest
 # Set SKIP_HEAVY_TESTS=false to enable.
 SKIP_HEAVY_TESTS = os.getenv("SKIP_HEAVY_TESTS", "true").lower() == "true"
 
+
 @pytest.mark.skipif(SKIP_HEAVY_TESTS, reason="Heavy integration test - skipped in CI")
 def test_translate_file_with_telemetry_real_llm(tmp_path):
     """
@@ -62,14 +63,12 @@ This is a test document for verifying telemetry integration.
             site_id="test.aspose.net",
             enable_telemetry=True,
             enable_validation=True,  # Enable validation to test those metrics
-            output_dir=output_dir
+            output_dir=output_dir,
         )
 
         # Translate to single language
         result = engine.translate_file(
-            file_path=test_file,
-            target_langs=["fr"],
-            site_id="test.aspose.net"
+            file_path=test_file, target_langs=["fr"], site_id="test.aspose.net"
         )
 
         # Verify translation succeeded
@@ -87,7 +86,7 @@ This is a test document for verifying telemetry integration.
         assert output_file.exists()
 
         # Verify output content
-        output_content = output_file.read_text(encoding='utf-8')
+        output_content = output_file.read_text(encoding="utf-8")
         assert len(output_content) > 0
         assert "---" in output_content  # Frontmatter preserved
 
@@ -110,13 +109,13 @@ def test_telemetry_graceful_degradation():
 
     # Should not crash - will return DummyRunContext or real context
     with telemetry.track_translation_session(
-        job_type="translate_file",
-        trigger_type="cli"
+        job_type="translate_file", trigger_type="cli"
     ) as run_context:
         assert run_context is not None
 
     # If we got a real context, complete it
     from src.observability.telemetry_integration import DummyRunContext
+
     if not isinstance(run_context, DummyRunContext):
         # This should also not crash
         pass
@@ -154,12 +153,12 @@ def test_ast_metrics_structure():
     stats = TranslationStats()
 
     # Verify AST fields exist
-    assert hasattr(stats, 'ast_translation_enabled')
-    assert hasattr(stats, 'ast_units_extracted')
-    assert hasattr(stats, 'ast_units_translatable')
-    assert hasattr(stats, 'ast_units_protected')
-    assert hasattr(stats, 'ast_batch_calls')
-    assert hasattr(stats, 'ast_individual_fallbacks')
+    assert hasattr(stats, "ast_translation_enabled")
+    assert hasattr(stats, "ast_units_extracted")
+    assert hasattr(stats, "ast_units_translatable")
+    assert hasattr(stats, "ast_units_protected")
+    assert hasattr(stats, "ast_batch_calls")
+    assert hasattr(stats, "ast_individual_fallbacks")
 
     # Verify defaults
     assert stats.ast_translation_enabled is False

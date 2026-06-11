@@ -18,8 +18,8 @@ from src.shared_engines.logging_engine import LoggingEngine, get_logging_engine
 class TestLoggingEngine(unittest.TestCase):
     """Test LoggingEngine wrapper."""
 
-    @patch('src.shared_engines.logging_engine.setup_structured_logging')
-    @patch('src.shared_engines.logging_engine.StructuredLogger')
+    @patch("src.shared_engines.logging_engine.setup_structured_logging")
+    @patch("src.shared_engines.logging_engine.StructuredLogger")
     def test_initialization_default(self, mock_structured_logger, mock_setup):
         """Test LoggingEngine initializes with defaults."""
         mock_logger_instance = Mock()
@@ -31,14 +31,10 @@ class TestLoggingEngine(unittest.TestCase):
         self.assertEqual(engine.log_level, "INFO")
         self.assertIsNone(engine.log_file)
         self.assertTrue(engine.console_output)
-        mock_setup.assert_called_once_with(
-            log_level="INFO",
-            log_file=None,
-            console_output=True
-        )
+        mock_setup.assert_called_once_with(log_level="INFO", log_file=None, console_output=True)
 
-    @patch('src.shared_engines.logging_engine.setup_structured_logging')
-    @patch('src.shared_engines.logging_engine.StructuredLogger')
+    @patch("src.shared_engines.logging_engine.setup_structured_logging")
+    @patch("src.shared_engines.logging_engine.StructuredLogger")
     def test_initialization_custom(self, mock_structured_logger, mock_setup):
         """Test LoggingEngine initializes with custom settings."""
         mock_logger_instance = Mock()
@@ -46,10 +42,7 @@ class TestLoggingEngine(unittest.TestCase):
 
         log_file = Path("logs/test.ndjson")
         engine = LoggingEngine(
-            name="custom-logger",
-            log_level="DEBUG",
-            log_file=log_file,
-            console_output=False
+            name="custom-logger", log_level="DEBUG", log_file=log_file, console_output=False
         )
 
         self.assertEqual(engine.name, "custom-logger")
@@ -57,13 +50,11 @@ class TestLoggingEngine(unittest.TestCase):
         self.assertEqual(engine.log_file, log_file)
         self.assertFalse(engine.console_output)
         mock_setup.assert_called_once_with(
-            log_level="DEBUG",
-            log_file=log_file,
-            console_output=False
+            log_level="DEBUG", log_file=log_file, console_output=False
         )
 
-    @patch('src.shared_engines.logging_engine.setup_structured_logging')
-    @patch('src.shared_engines.logging_engine.StructuredLogger')
+    @patch("src.shared_engines.logging_engine.setup_structured_logging")
+    @patch("src.shared_engines.logging_engine.StructuredLogger")
     def test_info_logging(self, mock_structured_logger, mock_setup):
         """Test info() logs info message."""
         mock_logger_instance = Mock()
@@ -73,13 +64,11 @@ class TestLoggingEngine(unittest.TestCase):
         engine.info("Test info message", file="example.md", lang="es")
 
         mock_logger_instance.log_info.assert_called_once_with(
-            "Test info message",
-            file="example.md",
-            lang="es"
+            "Test info message", file="example.md", lang="es"
         )
 
-    @patch('src.shared_engines.logging_engine.setup_structured_logging')
-    @patch('src.shared_engines.logging_engine.StructuredLogger')
+    @patch("src.shared_engines.logging_engine.setup_structured_logging")
+    @patch("src.shared_engines.logging_engine.StructuredLogger")
     def test_debug_logging(self, mock_structured_logger, mock_setup):
         """Test debug() logs debug message."""
         mock_logger_instance = Mock()
@@ -89,13 +78,11 @@ class TestLoggingEngine(unittest.TestCase):
         engine.debug("Test debug message", source="hello", hit=True)
 
         mock_logger_instance.log_debug.assert_called_once_with(
-            "Test debug message",
-            source="hello",
-            hit=True
+            "Test debug message", source="hello", hit=True
         )
 
-    @patch('src.shared_engines.logging_engine.setup_structured_logging')
-    @patch('src.shared_engines.logging_engine.StructuredLogger')
+    @patch("src.shared_engines.logging_engine.setup_structured_logging")
+    @patch("src.shared_engines.logging_engine.StructuredLogger")
     def test_warning_logging(self, mock_structured_logger, mock_setup):
         """Test warning() logs warning message."""
         mock_logger_instance = Mock()
@@ -104,13 +91,10 @@ class TestLoggingEngine(unittest.TestCase):
         engine = LoggingEngine()
         engine.warning("Low memory", available_mb=512)
 
-        mock_logger_instance.log_warning.assert_called_once_with(
-            "Low memory",
-            available_mb=512
-        )
+        mock_logger_instance.log_warning.assert_called_once_with("Low memory", available_mb=512)
 
-    @patch('src.shared_engines.logging_engine.setup_structured_logging')
-    @patch('src.shared_engines.logging_engine.StructuredLogger')
+    @patch("src.shared_engines.logging_engine.setup_structured_logging")
+    @patch("src.shared_engines.logging_engine.StructuredLogger")
     def test_error_logging_with_string(self, mock_structured_logger, mock_setup):
         """Test error() logs error message with string."""
         mock_logger_instance = Mock()
@@ -120,14 +104,11 @@ class TestLoggingEngine(unittest.TestCase):
         engine.error("Translation failed", error="Timeout", retry_count=3)
 
         mock_logger_instance._log_both.assert_called_once_with(
-            "error",
-            "Translation failed",
-            error="Timeout",
-            retry_count=3
+            "error", "Translation failed", error="Timeout", retry_count=3
         )
 
-    @patch('src.shared_engines.logging_engine.setup_structured_logging')
-    @patch('src.shared_engines.logging_engine.StructuredLogger')
+    @patch("src.shared_engines.logging_engine.setup_structured_logging")
+    @patch("src.shared_engines.logging_engine.StructuredLogger")
     def test_error_logging_with_exception(self, mock_structured_logger, mock_setup):
         """Test error() logs error message with Exception."""
         mock_logger_instance = Mock()
@@ -147,9 +128,9 @@ class TestLoggingEngine(unittest.TestCase):
         self.assertEqual(context_dict["retry_count"], 3)
         self.assertEqual(exception, test_exception)
 
-    @patch('src.shared_engines.logging_engine.setup_structured_logging')
-    @patch('src.shared_engines.logging_engine.StructuredLogger')
-    @patch('src.shared_engines.logging_engine.LogContext')
+    @patch("src.shared_engines.logging_engine.setup_structured_logging")
+    @patch("src.shared_engines.logging_engine.StructuredLogger")
+    @patch("src.shared_engines.logging_engine.LogContext")
     def test_with_context(self, mock_log_context, mock_structured_logger, mock_setup):
         """Test with_context() returns LogContext."""
         mock_logger_instance = Mock()
@@ -159,20 +140,16 @@ class TestLoggingEngine(unittest.TestCase):
 
         engine = LoggingEngine()
         context = engine.with_context(
-            job_id="job_123",
-            worker_id="worker_1",
-            correlation_id="corr_456"
+            job_id="job_123", worker_id="worker_1", correlation_id="corr_456"
         )
 
         self.assertEqual(context, mock_context_instance)
         mock_log_context.assert_called_once_with(
-            correlation_id="corr_456",
-            job_id="job_123",
-            worker_id="worker_1"
+            correlation_id="corr_456", job_id="job_123", worker_id="worker_1"
         )
 
-    @patch('src.shared_engines.logging_engine.setup_structured_logging')
-    @patch('src.shared_engines.logging_engine.StructuredLogger')
+    @patch("src.shared_engines.logging_engine.setup_structured_logging")
+    @patch("src.shared_engines.logging_engine.StructuredLogger")
     def test_get_logger(self, mock_structured_logger, mock_setup):
         """Test get_logger() returns underlying logger."""
         mock_logger_instance = Mock()
@@ -183,8 +160,8 @@ class TestLoggingEngine(unittest.TestCase):
 
         self.assertEqual(logger, mock_logger_instance)
 
-    @patch('src.shared_engines.logging_engine.setup_structured_logging')
-    @patch('src.shared_engines.logging_engine.StructuredLogger')
+    @patch("src.shared_engines.logging_engine.setup_structured_logging")
+    @patch("src.shared_engines.logging_engine.StructuredLogger")
     def test_set_level(self, mock_structured_logger, mock_setup):
         """Test set_level() changes logging level."""
         mock_logger_instance = Mock()
@@ -196,20 +173,18 @@ class TestLoggingEngine(unittest.TestCase):
         self.assertEqual(engine.log_level, "DEBUG")
         # Verify root logger level was changed
         import logging
+
         root_logger = logging.getLogger()
         self.assertEqual(root_logger.level, logging.DEBUG)
 
-    @patch('src.shared_engines.logging_engine.setup_structured_logging')
-    @patch('src.shared_engines.logging_engine.StructuredLogger')
+    @patch("src.shared_engines.logging_engine.setup_structured_logging")
+    @patch("src.shared_engines.logging_engine.StructuredLogger")
     def test_no_setup_when_no_output(self, mock_structured_logger, mock_setup):
         """Test setup_structured_logging not called when no output."""
         mock_logger_instance = Mock()
         mock_structured_logger.return_value = mock_logger_instance
 
-        engine = LoggingEngine(
-            log_file=None,
-            console_output=False
-        )
+        engine = LoggingEngine(log_file=None, console_output=False)
 
         # setup_structured_logging should not be called
         mock_setup.assert_not_called()
@@ -221,18 +196,17 @@ class TestGetLoggingEngine(unittest.TestCase):
     def setUp(self):
         """Clear global logging engine before each test."""
         import src.shared_engines.logging_engine
+
         src.shared_engines.logging_engine._global_logging_engine = None
 
-    @patch('src.shared_engines.logging_engine.LoggingEngine')
+    @patch("src.shared_engines.logging_engine.LoggingEngine")
     def test_get_logging_engine_creates_instance(self, mock_logging_engine):
         """Test get_logging_engine() creates new instance on first call."""
         mock_engine_instance = Mock()
         mock_logging_engine.return_value = mock_engine_instance
 
         engine = get_logging_engine(
-            name="test-logger",
-            log_level="DEBUG",
-            log_file=Path("logs/test.ndjson")
+            name="test-logger", log_level="DEBUG", log_file=Path("logs/test.ndjson")
         )
 
         self.assertEqual(engine, mock_engine_instance)
@@ -240,10 +214,10 @@ class TestGetLoggingEngine(unittest.TestCase):
             name="test-logger",
             log_level="DEBUG",
             log_file=Path("logs/test.ndjson"),
-            console_output=True
+            console_output=True,
         )
 
-    @patch('src.shared_engines.logging_engine.LoggingEngine')
+    @patch("src.shared_engines.logging_engine.LoggingEngine")
     def test_get_logging_engine_returns_same_instance(self, mock_logging_engine):
         """Test get_logging_engine() returns same instance on subsequent calls."""
         mock_engine_instance = Mock()

@@ -38,10 +38,17 @@ def db_with_runs(temp_db, system_info):
     """
     # All run IDs used in feedback tests
     run_ids = [
-        "rec_001", "rec_002",  # Basic tests
-        "rec_a", "rec_b",      # Model filter tests
-        "rec_0", "rec_1", "rec_2", "rec_3", "rec_4",  # History tests
-        "rec_success", "rec_fail",  # Success/failure tests
+        "rec_001",
+        "rec_002",  # Basic tests
+        "rec_a",
+        "rec_b",  # Model filter tests
+        "rec_0",
+        "rec_1",
+        "rec_2",
+        "rec_3",
+        "rec_4",  # History tests
+        "rec_success",
+        "rec_fail",  # Success/failure tests
     ]
 
     for run_id in run_ids:

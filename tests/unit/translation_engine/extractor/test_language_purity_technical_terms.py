@@ -42,10 +42,7 @@ def test_arabic_with_azure_presentation_technical_density():
         default_source_lang="en",
         target_langs=["ar"],
         body=BodyRules(translate_markdown=True),
-        output_layout=OutputLayout(
-            per_language_folders=True,
-            pattern="{lang}/{path}"
-        )
+        output_layout=OutputLayout(per_language_folders=True, pattern="{lang}/{path}"),
     )
 
     extractor = TextUnitExtractor(site_profile=site_profile)
@@ -70,10 +67,7 @@ def test_arabic_language_purity_with_technical_terms():
         default_source_lang="en",
         target_langs=["ar"],
         body=BodyRules(translate_markdown=True),
-        output_layout=OutputLayout(
-            per_language_folders=True,
-            pattern="{lang}/{path}"
-        )
+        output_layout=OutputLayout(per_language_folders=True, pattern="{lang}/{path}"),
     )
 
     extractor = TextUnitExtractor(site_profile=site_profile)
@@ -114,22 +108,19 @@ def test_script_similar_languages_arabic_romance():
         default_source_lang="en",
         target_langs=["ar"],
         body=BodyRules(translate_markdown=True),
-        output_layout=OutputLayout(
-            per_language_folders=True,
-            pattern="{lang}/{path}"
-        )
+        output_layout=OutputLayout(per_language_folders=True, pattern="{lang}/{path}"),
     )
 
     extractor = TextUnitExtractor(site_profile=site_profile)
 
     # Check that Arabic script-similar languages include Romance languages
-    script_similar = extractor.script_similar_languages.get('ar', set())
+    script_similar = extractor.script_similar_languages.get("ar", set())
 
-    assert 'it' in script_similar, "Italian should be script-similar to Arabic"
-    assert 'es' in script_similar, "Spanish should be script-similar to Arabic"
-    assert 'fr' in script_similar, "French should be script-similar to Arabic"
-    assert 'pt' in script_similar, "Portuguese should be script-similar to Arabic"
-    assert 'fa' in script_similar, "Farsi should be script-similar to Arabic"
+    assert "it" in script_similar, "Italian should be script-similar to Arabic"
+    assert "es" in script_similar, "Spanish should be script-similar to Arabic"
+    assert "fr" in script_similar, "French should be script-similar to Arabic"
+    assert "pt" in script_similar, "Portuguese should be script-similar to Arabic"
+    assert "fa" in script_similar, "Farsi should be script-similar to Arabic"
 
     print(f"✅ Arabic script-similar languages: {script_similar}")
 
@@ -142,10 +133,7 @@ def test_arabic_script_ratio_override(monkeypatch):
         default_source_lang="en",
         target_langs=["ar"],
         body=BodyRules(translate_markdown=True),
-        output_layout=OutputLayout(
-            per_language_folders=True,
-            pattern="{lang}/{path}"
-        )
+        output_layout=OutputLayout(per_language_folders=True, pattern="{lang}/{path}"),
     )
 
     extractor = TextUnitExtractor(site_profile=site_profile)
@@ -164,7 +152,7 @@ def test_arabic_script_ratio_override(monkeypatch):
     mock_langdetect.DetectorFactory.seed = 0
     mock_langdetect.lang_detect_exception = MagicMock()
     mock_langdetect.lang_detect_exception.LangDetectException = Exception
-    monkeypatch.setitem(sys.modules, 'langdetect', mock_langdetect)
+    monkeypatch.setitem(sys.modules, "langdetect", mock_langdetect)
 
     result = extractor._verify_translation_language_purity(units, target_lang="ar")
 
@@ -180,10 +168,7 @@ def test_technical_terms_loaded():
         default_source_lang="en",
         target_langs=["ar"],
         body=BodyRules(translate_markdown=True),
-        output_layout=OutputLayout(
-            per_language_folders=True,
-            pattern="{lang}/{path}"
-        )
+        output_layout=OutputLayout(per_language_folders=True, pattern="{lang}/{path}"),
     )
 
     extractor = TextUnitExtractor(site_profile=site_profile)
@@ -191,10 +176,10 @@ def test_technical_terms_loaded():
     # Check that technical terms are loaded
     terms_lower = {term.lower() for term in extractor.technical_terms}
 
-    assert 'azure' in terms_lower, "Azure should be in technical terms"
-    assert 'presentation' in terms_lower, "Presentation should be in technical terms"
-    assert 'excel' in terms_lower, "Excel should be in technical terms"
-    assert 'pdf' in terms_lower, "PDF should be in technical terms"
+    assert "azure" in terms_lower, "Azure should be in technical terms"
+    assert "presentation" in terms_lower, "Presentation should be in technical terms"
+    assert "excel" in terms_lower, "Excel should be in technical terms"
+    assert "pdf" in terms_lower, "PDF should be in technical terms"
 
     print(f"✅ Technical terms loaded: {len(extractor.technical_terms)} terms")
     print(f"   Azure: {'azure' in terms_lower}")

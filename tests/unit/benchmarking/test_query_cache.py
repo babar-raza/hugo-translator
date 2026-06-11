@@ -341,15 +341,12 @@ class TestQueryCacheIntegration:
             "trends": [
                 {"date": "2024-01-01", "throughput": 85.0},
                 {"date": "2024-01-02", "throughput": 87.0},
-            ]
+            ],
         }
 
         # Generate cache key
         cache_key = make_cache_key(
-            "get_performance_trends",
-            model_id="m2m100_418m",
-            device="cpu",
-            time_window="daily"
+            "get_performance_trends", model_id="m2m100_418m", device="cpu", time_window="daily"
         )
 
         # First access - cache miss
@@ -374,13 +371,11 @@ class TestQueryCacheIntegration:
         comparison_result = {
             "models": models,
             "device": device,
-            "avg_throughput": {"m2m100_418m": 85.0, "nllb_200_distilled_600m": 120.0}
+            "avg_throughput": {"m2m100_418m": 85.0, "nllb_200_distilled_600m": 120.0},
         }
 
         cache_key = make_cache_key(
-            "get_model_comparison",
-            models="|".join(sorted(models)),
-            device=device
+            "get_model_comparison", models="|".join(sorted(models)), device=device
         )
 
         cache.set(cache_key, comparison_result)

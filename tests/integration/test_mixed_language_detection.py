@@ -47,6 +47,7 @@ def _write_tmp_file(tmp_path: Path, content: str, filename: str) -> Path:
 # Tests
 # ---------------------------------------------------------------------------
 
+
 class TestContaminationScannerDetection:
     """LanguageContaminationScanner detects contaminated synthetic files."""
 
@@ -136,9 +137,7 @@ class TestContaminationScannerDetection:
 
         # Should have found at least 2 English blocks
         english_blocks = [b for b in blocks if b["detected_lang"] == "en"]
-        assert len(english_blocks) >= 1, (
-            f"Expected at least 1 English block. Got blocks: {blocks}"
-        )
+        assert len(english_blocks) >= 1, f"Expected at least 1 English block. Got blocks: {blocks}"
 
     def test_fast_mode_detects_script_mixing(self, tmp_path):
         """Fast mode (no langdetect) catches Arabic script in German content."""
@@ -219,8 +218,11 @@ class TestResultToJson:
         file_entry = json_data["files"][0]
 
         required_file_fields = {
-            "file_path", "site_id", "target_lang",
-            "purity_percentage", "threshold",
+            "file_path",
+            "site_id",
+            "target_lang",
+            "purity_percentage",
+            "threshold",
         }
         for field in required_file_fields:
             assert field in file_entry, f"Missing required field: {field}"
@@ -252,10 +254,17 @@ class TestResultToJson:
         )
 
         result = ScanResult(
-            total_files=1, scanned_files=1, contaminated_files=0,
-            script_mixing_files=0, repetition_files=0, clean_files=1,
-            error_files=0, deleted_files=0, analyses=[clean],
-            target_lang="de", scan_timestamp=datetime.now().isoformat(),
+            total_files=1,
+            scanned_files=1,
+            contaminated_files=0,
+            script_mixing_files=0,
+            repetition_files=0,
+            clean_files=1,
+            error_files=0,
+            deleted_files=0,
+            analyses=[clean],
+            target_lang="de",
+            scan_timestamp=datetime.now().isoformat(),
             repo_path="/path/to/content",
         )
 

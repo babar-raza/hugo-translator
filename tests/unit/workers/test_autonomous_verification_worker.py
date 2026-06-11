@@ -18,7 +18,9 @@ def test_oneshot_success_writes_durable_state(tmp_path: Path, monkeypatch: pytes
     """Successful oneshot run should produce state and success provenance."""
     monkeypatch.chdir(tmp_path)
     (tmp_path / "config" / "site_profiles").mkdir(parents=True)
-    (tmp_path / "config" / "site_profiles" / "site-a.yaml").write_text("site: a\n", encoding="utf-8")
+    (tmp_path / "config" / "site_profiles" / "site-a.yaml").write_text(
+        "site: a\n", encoding="utf-8"
+    )
 
     worker = AutonomousVerificationWorker(
         AutonomousVerificationWorkerConfig(
@@ -27,9 +29,11 @@ def test_oneshot_success_writes_durable_state(tmp_path: Path, monkeypatch: pytes
         )
     )
 
-    with patch("src.workers.autonomous_verification_worker.start_worker_run", return_value="evt-1"), patch(
-        "src.workers.autonomous_verification_worker.complete_worker_run", return_value=True
-    ), patch("src.workers.autonomous_verification_worker.emit_worker_event", return_value="evt-2"):
+    with (
+        patch("src.workers.autonomous_verification_worker.start_worker_run", return_value="evt-1"),
+        patch("src.workers.autonomous_verification_worker.complete_worker_run", return_value=True),
+        patch("src.workers.autonomous_verification_worker.emit_worker_event", return_value="evt-2"),
+    ):
         worker.setup()
         worker.run()
 
@@ -42,7 +46,9 @@ def test_oneshot_success_writes_durable_state(tmp_path: Path, monkeypatch: pytes
     assert payload["state"] == "stopped"
 
 
-def test_oneshot_failure_sets_last_error_without_success(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+def test_oneshot_failure_sets_last_error_without_success(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
     """Failed verification pass should set error provenance and no success timestamp."""
     monkeypatch.chdir(tmp_path)
     (tmp_path / "config").mkdir(parents=True)
@@ -54,9 +60,11 @@ def test_oneshot_failure_sets_last_error_without_success(tmp_path: Path, monkeyp
         )
     )
 
-    with patch("src.workers.autonomous_verification_worker.start_worker_run", return_value="evt-1"), patch(
-        "src.workers.autonomous_verification_worker.complete_worker_run", return_value=True
-    ), patch("src.workers.autonomous_verification_worker.emit_worker_event", return_value="evt-2"):
+    with (
+        patch("src.workers.autonomous_verification_worker.start_worker_run", return_value="evt-1"),
+        patch("src.workers.autonomous_verification_worker.complete_worker_run", return_value=True),
+        patch("src.workers.autonomous_verification_worker.emit_worker_event", return_value="evt-2"),
+    ):
         worker.setup()
         with pytest.raises(RuntimeError, match="Verification checks failed"):
             worker.run()

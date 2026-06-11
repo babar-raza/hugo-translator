@@ -90,6 +90,7 @@ def benchmark_config_enabled(tmp_path):
 def test_load_benchmarking_config_integration(benchmark_config_enabled, tmp_path):
     """Test loading real benchmarking config file."""
     import yaml
+
     with open(benchmark_config_enabled, encoding="utf-8") as f:
         raw_config = yaml.safe_load(f.read())
 
@@ -111,9 +112,8 @@ def test_production_metrics_disabled_by_default(tmp_path):
     config = {"production": {"record_enabled": False}}
 
     # Calculate metrics_enabled (same logic as cli.py)
-    metrics_enabled = (
-        args.enable_production_metrics
-        or config.get("production", {}).get("record_enabled", False)
+    metrics_enabled = args.enable_production_metrics or config.get("production", {}).get(
+        "record_enabled", False
     )
 
     # Should be disabled
@@ -134,9 +134,8 @@ def test_production_metrics_enabled_via_cli_flag(tmp_path):
     config = {"production": {"record_enabled": False}}
 
     # CLI flag should override
-    metrics_enabled = (
-        args.enable_production_metrics
-        or config.get("production", {}).get("record_enabled", False)
+    metrics_enabled = args.enable_production_metrics or config.get("production", {}).get(
+        "record_enabled", False
     )
 
     assert metrics_enabled is True

@@ -1,4 +1,5 @@
 """TM integrity tests after concurrent writes."""
+
 import json
 import subprocess
 import sys
@@ -24,7 +25,8 @@ def tm_snapshot(tmp_path):
             [
                 sys.executable,
                 "scripts/verify_tm_integrity.py",
-                "--snapshot", str(snapshot_file),
+                "--snapshot",
+                str(snapshot_file),
             ],
             check=True,
         )
@@ -49,11 +51,17 @@ def test_tm_integrity_after_concurrent_writes(tmp_path, tm_snapshot):
     # Run multi-language translation (5 concurrent subprocesses)
     result = subprocess.run(
         [
-            sys.executable, "-m", "src.cli",
-            "--site", "test.tm.net",
-            "--source", str(source_dir),
-            "--output", str(output_dir),
-            "--target-langs", "ar,bg,cs,da,de",
+            sys.executable,
+            "-m",
+            "src.cli",
+            "--site",
+            "test.tm.net",
+            "--source",
+            str(source_dir),
+            "--output",
+            str(output_dir),
+            "--target-langs",
+            "ar,bg,cs,da,de",
         ],
         capture_output=True,
         text=True,
@@ -70,8 +78,10 @@ def test_tm_integrity_after_concurrent_writes(tmp_path, tm_snapshot):
         [
             sys.executable,
             "scripts/verify_tm_integrity.py",
-            "--snapshot", str(after),
-            "--compare", str(before),
+            "--snapshot",
+            str(after),
+            "--compare",
+            str(before),
         ],
         capture_output=True,
         text=True,
@@ -107,11 +117,17 @@ def test_l3_lock_protection_under_load(tmp_path):
     # Run with save_interval=5 to trigger multiple saves during translation
     result = subprocess.run(
         [
-            sys.executable, "-m", "src.cli",
-            "--site", "test.l3.net",
-            "--source", str(source_dir),
-            "--output", str(output_dir),
-            "--target-langs", "ar,bg,cs,da,de",
+            sys.executable,
+            "-m",
+            "src.cli",
+            "--site",
+            "test.l3.net",
+            "--source",
+            str(source_dir),
+            "--output",
+            str(output_dir),
+            "--target-langs",
+            "ar,bg,cs,da,de",
         ],
         capture_output=True,
         text=True,
@@ -121,10 +137,8 @@ def test_l3_lock_protection_under_load(tmp_path):
     assert result.returncode == 0, f"Translation failed: {result.stderr}"
 
     # Verify no L3 lock timeout errors
-    assert "L3 save_index failed" not in result.stderr, \
-        "L3 save encountered lock timeout"
-    assert "Lock acquisition timeout" not in result.stderr, \
-        "L3 lock timeout detected"
+    assert "L3 save_index failed" not in result.stderr, "L3 save encountered lock timeout"
+    assert "Lock acquisition timeout" not in result.stderr, "L3 lock timeout detected"
 
     # Verify L3 index is loadable
     result = subprocess.run(

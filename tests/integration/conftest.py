@@ -2,6 +2,7 @@
 
 SR-01: Centralized test fixtures to eliminate repetitive imports.
 """
+
 import sys
 from pathlib import Path
 
@@ -20,6 +21,7 @@ def progress_tracker_class():
     Returns the ProgressTracker class for use in tests.
     """
     import importlib.util
+
     progress_path = src_path / "translation_engine" / "progress.py"
     spec = importlib.util.spec_from_file_location("progress_module", progress_path)
     module = importlib.util.module_from_spec(spec)
@@ -37,12 +39,13 @@ def atomic_write_module():
         ReadOnlyFilesystemError,
         atomic_write,
     )
+
     return {
-        'atomic_write': atomic_write,
-        'AtomicWriteError': AtomicWriteError,
-        'DiskFullError': DiskFullError,
-        'InvalidPathError': InvalidPathError,
-        'ReadOnlyFilesystemError': ReadOnlyFilesystemError,
+        "atomic_write": atomic_write,
+        "AtomicWriteError": AtomicWriteError,
+        "DiskFullError": DiskFullError,
+        "InvalidPathError": InvalidPathError,
+        "ReadOnlyFilesystemError": ReadOnlyFilesystemError,
     }
 
 
@@ -50,7 +53,8 @@ def atomic_write_module():
 def file_lock_class():
     """Load FileLock class and LockError."""
     from utils.file_lock import FileLock, LockError
-    return {'FileLock': FileLock, 'LockError': LockError}
+
+    return {"FileLock": FileLock, "LockError": LockError}
 
 
 @pytest.fixture
@@ -61,16 +65,16 @@ def test_environment(tmp_path):
     Returns dict with all required directories pre-created.
     """
     env = {
-        'root': tmp_path,
-        'source_dir': tmp_path / "source",
-        'output_dir': tmp_path / "output",
-        'progress_dir': tmp_path / "progress",
-        'lock_file': tmp_path / "translation.lock",
+        "root": tmp_path,
+        "source_dir": tmp_path / "source",
+        "output_dir": tmp_path / "output",
+        "progress_dir": tmp_path / "progress",
+        "lock_file": tmp_path / "translation.lock",
     }
 
     # Create directories
-    env['source_dir'].mkdir(parents=True, exist_ok=True)
-    env['output_dir'].mkdir(parents=True, exist_ok=True)
-    env['progress_dir'].mkdir(parents=True, exist_ok=True)
+    env["source_dir"].mkdir(parents=True, exist_ok=True)
+    env["output_dir"].mkdir(parents=True, exist_ok=True)
+    env["progress_dir"].mkdir(parents=True, exist_ok=True)
 
     return env

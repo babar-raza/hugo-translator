@@ -1,4 +1,5 @@
 """Unit tests for force_unlock() method."""
+
 import json
 import os
 from pathlib import Path
@@ -18,10 +19,10 @@ def test_force_unlock_dead_process(lock_file):
     """Test force unlock with dead process."""
     # Create lock with dead PID
     metadata = {
-        'pid': 999999,
-        'hostname': 'test-host',
-        'created': '2025-01-01T00:00:00',
-        'format_version': '1.0'
+        "pid": 999999,
+        "hostname": "test-host",
+        "created": "2025-01-01T00:00:00",
+        "format_version": "1.0",
     }
     lock_file.write_text(json.dumps(metadata))
 
@@ -36,10 +37,10 @@ def test_force_unlock_live_process_refuses(lock_file):
     """Test force unlock refuses if process alive."""
     # Create lock with current process (definitely alive)
     metadata = {
-        'pid': os.getpid(),
-        'hostname': 'test-host',
-        'created': '2025-01-01T00:00:00',
-        'format_version': '1.0'
+        "pid": os.getpid(),
+        "hostname": "test-host",
+        "created": "2025-01-01T00:00:00",
+        "format_version": "1.0",
     }
     lock_file.write_text(json.dumps(metadata))
 
@@ -55,10 +56,10 @@ def test_force_unlock_live_process_override(lock_file):
     """Test force unlock with check_pid=False overrides safety."""
     # Create lock with current process
     metadata = {
-        'pid': os.getpid(),
-        'hostname': 'test-host',
-        'created': '2025-01-01T00:00:00',
-        'format_version': '1.0'
+        "pid": os.getpid(),
+        "hostname": "test-host",
+        "created": "2025-01-01T00:00:00",
+        "format_version": "1.0",
     }
     lock_file.write_text(json.dumps(metadata))
 
@@ -92,7 +93,7 @@ def test_force_unlock_permission_error_on_read(lock_file):
     lock = FileLock(lock_file)
 
     # Mock open to raise PermissionError on read
-    with patch('builtins.open', side_effect=PermissionError("Access denied")):
+    with patch("builtins.open", side_effect=PermissionError("Access denied")):
         result = lock.force_unlock(check_pid=True)
 
     # Should proceed with unlock despite PermissionError
@@ -135,6 +136,6 @@ def test_force_unlock_removal_fails(lock_file):
     lock = FileLock(lock_file)
 
     # Mock unlink to fail
-    with patch.object(Path, 'unlink', side_effect=OSError("Permission denied")):
+    with patch.object(Path, "unlink", side_effect=OSError("Permission denied")):
         with pytest.raises(LockError, match="Failed to remove lock file"):
             lock.force_unlock(check_pid=True)

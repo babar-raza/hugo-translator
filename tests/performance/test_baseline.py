@@ -46,16 +46,16 @@ class TestTMPerformance:
 
         # Populate
         for i in range(1000):
-            l1.put('site', 'en', 'es', f'text {i}', f'texto {i}')
+            l1.put("site", "en", "es", f"text {i}", f"texto {i}")
 
         # Benchmark
         start = time.perf_counter()
         for i in range(1000):
-            result = l1.get('site', 'en', 'es', f'text {i}')
+            result = l1.get("site", "en", "es", f"text {i}")
         elapsed = time.perf_counter() - start
 
         # Should do 1000 lookups in under 100ms (>10k lookups/sec)
-        assert elapsed < 0.1, f"L1 cache too slow: {1000/elapsed:.0f} lookups/sec"
+        assert elapsed < 0.1, f"L1 cache too slow: {1000 / elapsed:.0f} lookups/sec"
 
     def test_parser_performance(self, parser):
         """Test parser meets performance targets."""
@@ -68,7 +68,7 @@ class TestTMPerformance:
         elapsed = time.perf_counter() - start
 
         # Should parse 100 docs in under 500ms (5ms per parse)
-        assert elapsed < 0.5, f"Parser too slow: {elapsed*10:.1f}ms per parse"
+        assert elapsed < 0.5, f"Parser too slow: {elapsed * 10:.1f}ms per parse"
 
 
 class TestPipelinePerformance:

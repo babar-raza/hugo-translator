@@ -4,6 +4,7 @@ Unit tests for empty translation fallback mechanism (Iter6 fix).
 Tests the fallback ladder that recovers empty translations by retrying
 with safer generation parameters.
 """
+
 from unittest.mock import MagicMock, Mock, patch
 
 import pytest
@@ -54,11 +55,13 @@ class TestEmptyTranslationFallback:
         }
 
         # Mock model.generate to return outputs
-        mock_backend.model.generate.return_value = torch.tensor([
-            [10, 11, 12],
-            [13, 14, 15],
-            [16, 17, 18],
-        ])
+        mock_backend.model.generate.return_value = torch.tensor(
+            [
+                [10, 11, 12],
+                [13, 14, 15],
+                [16, 17, 18],
+            ]
+        )
 
         # Mock tokenizer.batch_decode to return one empty translation
         mock_backend.tokenizer.batch_decode.return_value = [
@@ -68,9 +71,17 @@ class TestEmptyTranslationFallback:
         ]
 
         # Mock the recovery method to return a recovered translation
-        def mock_recover(texts, empty_indices, current_translations, inputs,
-                        src_lang, tgt_lang, mapped_src_lang, mapped_tgt_lang,
-                        forced_bos_token_id):
+        def mock_recover(
+            texts,
+            empty_indices,
+            current_translations,
+            inputs,
+            src_lang,
+            tgt_lang,
+            mapped_src_lang,
+            mapped_tgt_lang,
+            forced_bos_token_id,
+        ):
             updated = current_translations.copy()
             updated[1] = "Тестовый текст"  # Recovered translation
             return updated, 1  # 1 recovered
@@ -126,6 +137,7 @@ class TestEmptyTranslationFallback:
 
         # Mock tokenizer for recovery
         decode_count = [0]
+
         def mock_decode(outputs, skip_special_tokens=True):
             decode_count[0] += 1
             # First decode returns empty (min_tokens_forced fails)
@@ -208,12 +220,10 @@ class TestEmptyTranslationFallback:
         mock_backend.tokenizer.batch_decode.return_value = [""]  # Empty
 
         # Mock recovery
-        mock_backend._recover_empty_translations = Mock(
-            return_value=(["Recovered"], 1)
-        )
+        mock_backend._recover_empty_translations = Mock(return_value=(["Recovered"], 1))
 
         # Mock metrics
-        with patch('src.model_runtime.loader.get_metrics') as mock_get_metrics:
+        with patch("src.model_runtime.loader.get_metrics") as mock_get_metrics:
             mock_metrics = Mock()
             mock_get_metrics.return_value = mock_metrics
 

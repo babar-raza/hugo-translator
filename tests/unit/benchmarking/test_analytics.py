@@ -16,6 +16,7 @@ import pytest
 # Check if pandas is available
 try:
     import pandas as pd
+
     PANDAS_AVAILABLE = True
 except ImportError:
     PANDAS_AVAILABLE = False
@@ -36,24 +37,26 @@ class TestAnalyticsQueryAPI:
         device: str = "cpu",
         num_results: int = 10,
         timestamp_offset_hours: int = 0,
-        base_throughput: float = 100.0
+        base_throughput: float = 100.0,
     ) -> str:
         """Create a test benchmark run with results."""
         timestamp = datetime.now(UTC) + timedelta(hours=timestamp_offset_hours)
 
         results = []
         for i in range(num_results):
-            results.append(BenchmarkResult(
-                sample_id=f"sample_{i}",
-                model_id=model_id,
-                device=device,
-                batch_size=8,
-                duration_seconds=1.0 + i * 0.1,
-                tokens_input=100,
-                tokens_output=100,
-                throughput_tokens_per_sec=base_throughput + i * 10,
-                peak_memory_mb=500.0 + i * 50
-            ))
+            results.append(
+                BenchmarkResult(
+                    sample_id=f"sample_{i}",
+                    model_id=model_id,
+                    device=device,
+                    batch_size=8,
+                    duration_seconds=1.0 + i * 0.1,
+                    tokens_input=100,
+                    tokens_output=100,
+                    throughput_tokens_per_sec=base_throughput + i * 10,
+                    peak_memory_mb=500.0 + i * 50,
+                )
+            )
 
         run = BenchmarkRun(
             run_id=f"run_{model_id}_{device}_{timestamp_offset_hours}",
@@ -64,14 +67,10 @@ class TestAnalyticsQueryAPI:
             corpus_category="test",
             purpose="testing",
             tags=["test"],
-            system_info=SystemInfo(
-                cpu_model="Test CPU",
-                cpu_cores=4,
-                total_ram_gb=8.0
-            ),
+            system_info=SystemInfo(cpu_model="Test CPU", cpu_cores=4, total_ram_gb=8.0),
             results=results,
             total_duration_seconds=10.0,
-            timestamp_utc=timestamp.isoformat()
+            timestamp_utc=timestamp.isoformat(),
         )
 
         db.save_run(run)
@@ -99,9 +98,15 @@ class TestAnalyticsQueryAPI:
 
             # Should have expected columns
             expected_columns = {
-                "window_start", "window_end", "sample_count",
-                "avg_throughput", "p50_throughput", "p95_throughput", "p99_throughput",
-                "avg_duration", "avg_memory_mb"
+                "window_start",
+                "window_end",
+                "sample_count",
+                "avg_throughput",
+                "p50_throughput",
+                "p95_throughput",
+                "p99_throughput",
+                "avg_duration",
+                "avg_memory_mb",
             }
             assert expected_columns.issubset(set(df.columns))
 
@@ -143,9 +148,7 @@ class TestAnalyticsQueryAPI:
             # Create enough test runs for baseline
             for i in range(15):
                 self._create_test_run(
-                    db, "test_model", "cpu",
-                    num_results=2,
-                    timestamp_offset_hours=-i
+                    db, "test_model", "cpu", num_results=2, timestamp_offset_hours=-i
                 )
 
             # Create baseline
@@ -163,9 +166,14 @@ class TestAnalyticsQueryAPI:
 
             # Should have expected columns
             expected_columns = {
-                "baseline_type", "baseline_date",
-                "avg_throughput", "p50_throughput", "p95_throughput",
-                "sample_count", "metadata", "created_at"
+                "baseline_type",
+                "baseline_date",
+                "avg_throughput",
+                "p50_throughput",
+                "p95_throughput",
+                "sample_count",
+                "metadata",
+                "created_at",
             }
             assert expected_columns.issubset(set(df.columns))
 
@@ -181,7 +189,9 @@ class TestAnalyticsQueryAPI:
 
             # Create test runs
             for i in range(15):
-                self._create_test_run(db, "test_model", "cpu", num_results=2, timestamp_offset_hours=-i)
+                self._create_test_run(
+                    db, "test_model", "cpu", num_results=2, timestamp_offset_hours=-i
+                )
 
             # Create different baseline types
             aggregator = TimeSeriesAggregator(db_path)
@@ -204,19 +214,23 @@ class TestAnalyticsQueryAPI:
             # Create baseline runs (30 days ago, lower throughput)
             for i in range(15):
                 self._create_test_run(
-                    db, "test_model", "cpu",
+                    db,
+                    "test_model",
+                    "cpu",
                     num_results=2,
                     timestamp_offset_hours=-(30 * 24 + i),
-                    base_throughput=80.0  # Lower baseline throughput
+                    base_throughput=80.0,  # Lower baseline throughput
                 )
 
             # Create current runs (recent, higher throughput)
             for i in range(15):
                 self._create_test_run(
-                    db, "test_model", "cpu",
+                    db,
+                    "test_model",
+                    "cpu",
                     num_results=2,
                     timestamp_offset_hours=-i,
-                    base_throughput=120.0  # Higher current throughput
+                    base_throughput=120.0,  # Higher current throughput
                 )
 
             # Create baseline — create_baseline() stores baseline_date=today, not historical date
@@ -227,10 +241,7 @@ class TestAnalyticsQueryAPI:
             # Compare performance
             api = AnalyticsQueryAPI(db_path)
             comparison = api.compare_performance(
-                "test_model",
-                "cpu",
-                baseline_date,
-                datetime.now(UTC).date().isoformat()
+                "test_model", "cpu", baseline_date, datetime.now(UTC).date().isoformat()
             )
 
             # Should have comparison metrics
@@ -249,12 +260,7 @@ class TestAnalyticsQueryAPI:
             BenchmarkDatabase(db_path)
 
             api = AnalyticsQueryAPI(db_path)
-            comparison = api.compare_performance(
-                "test_model",
-                "cpu",
-                "2024-01-01",
-                "2024-02-01"
-            )
+            comparison = api.compare_performance("test_model", "cpu", "2024-01-01", "2024-02-01")
 
             # Should return error in result
             assert "error" in comparison
@@ -279,8 +285,11 @@ class TestAnalyticsQueryAPI:
 
             # Should have expected columns
             expected_columns = {
-                "timestamp_utc", "batch_size", "throughput_tokens_per_sec",
-                "duration_seconds", "peak_memory_mb"
+                "timestamp_utc",
+                "batch_size",
+                "throughput_tokens_per_sec",
+                "duration_seconds",
+                "peak_memory_mb",
             }
             assert expected_columns.issubset(set(df.columns))
 
@@ -309,9 +318,13 @@ class TestAnalyticsQueryAPI:
 
             # Should have expected columns
             expected_columns = {
-                "model_id", "sample_count", "avg_throughput",
-                "avg_duration", "avg_memory_mb",
-                "min_throughput", "max_throughput"
+                "model_id",
+                "sample_count",
+                "avg_throughput",
+                "avg_duration",
+                "avg_memory_mb",
+                "min_throughput",
+                "max_throughput",
             }
             assert expected_columns.issubset(set(df.columns))
 
@@ -342,8 +355,11 @@ class TestAnalyticsQueryAPI:
 
             # Should have expected columns
             expected_columns = {
-                "device", "sample_count", "avg_throughput",
-                "avg_duration", "avg_memory_mb"
+                "device",
+                "sample_count",
+                "avg_throughput",
+                "avg_duration",
+                "avg_memory_mb",
             }
             assert expected_columns.issubset(set(df.columns))
 
@@ -411,10 +427,7 @@ class TestAnalyticsQueryAPI:
             BenchmarkDatabase(db_path)
 
             api = AnalyticsQueryAPI(
-                db_path,
-                enable_caching=False,
-                enable_pooling=False,
-                enable_monitoring=False
+                db_path, enable_caching=False, enable_pooling=False, enable_monitoring=False
             )
 
             assert api._cache is None
@@ -428,10 +441,7 @@ class TestAnalyticsQueryAPI:
             BenchmarkDatabase(db_path)
 
             api = AnalyticsQueryAPI(
-                db_path,
-                enable_caching=True,
-                enable_pooling=True,
-                enable_monitoring=True
+                db_path, enable_caching=True, enable_pooling=True, enable_monitoring=True
             )
 
             assert api._cache is not None
@@ -537,10 +547,7 @@ class TestAnalyticsQueryAPI:
             BenchmarkDatabase(db_path)
 
             api = AnalyticsQueryAPI(
-                db_path,
-                enable_caching=True,
-                enable_pooling=True,
-                enable_monitoring=True
+                db_path, enable_caching=True, enable_pooling=True, enable_monitoring=True
             )
 
             # Should not raise

@@ -6,15 +6,14 @@ per-content-root metrics slicing.
 
 Thread-safe via threading.Lock.
 """
+
 from __future__ import annotations
 
 import threading
 from contextvars import ContextVar
 from dataclasses import dataclass, field
 
-_current_context: ContextVar["LLMRunContext | None"] = ContextVar(
-    "llm_run_context", default=None
-)
+_current_context: ContextVar[LLMRunContext | None] = ContextVar("llm_run_context", default=None)
 
 
 @dataclass
@@ -30,6 +29,7 @@ class _Snapshot:
 @dataclass
 class CheckpointDelta:
     """Delta between two checkpoints."""
+
     attempted_provider_calls: int = 0
     completed_provider_calls: int = 0
     failed_provider_calls: int = 0
@@ -117,7 +117,7 @@ class LLMRunContext:
     # --- ContextVar lifecycle ---
 
     @staticmethod
-    def start_run() -> "LLMRunContext":
+    def start_run() -> LLMRunContext:
         """Create a new context and set it as the current ContextVar value."""
         ctx = LLMRunContext()
         _current_context.set(ctx)
@@ -134,6 +134,6 @@ class LLMRunContext:
         return totals
 
     @staticmethod
-    def get_current() -> "LLMRunContext | None":
+    def get_current() -> LLMRunContext | None:
         """Get the current context, or None if no run is active."""
         return _current_context.get(None)

@@ -11,8 +11,8 @@ def test_scheduler_setup_includes_autonomous_verification_task():
     script = Path("scripts/setup_task_scheduler.ps1").read_text(encoding="utf-8")
 
     assert "[4/4] Creating task: HugoTranslator-AutonomousVerification" in script
-    assert "-TaskName \"HugoTranslator-AutonomousVerification\"" in script
-    assert "\"HugoTranslator-AutonomousVerification\"" in script
+    assert '-TaskName "HugoTranslator-AutonomousVerification"' in script
+    assert '"HugoTranslator-AutonomousVerification"' in script
     assert "$verifiedCount -eq $expectedTasks.Count" in script
 
 

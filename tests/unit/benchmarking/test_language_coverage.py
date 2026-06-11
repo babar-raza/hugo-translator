@@ -1,4 +1,5 @@
 """Tests for language coverage validation."""
+
 import yaml
 
 from src.benchmarking.language_coverage import check_language_coverage
@@ -9,18 +10,18 @@ def test_full_coverage_with_multilingual_model(tmp_path):
     registry = tmp_path / "registry.yaml"
     languages = tmp_path / "languages.yaml"
 
-    registry.write_text(yaml.dump({
-        "models": [
-            {"model_id": "m2m100", "supported_pairs": "all"}
-        ]
-    }))
+    registry.write_text(yaml.dump({"models": [{"model_id": "m2m100", "supported_pairs": "all"}]}))
 
-    languages.write_text(yaml.dump({
-        "languages": [
-            {"iso_code": "fr", "name": "French"},
-            {"iso_code": "de", "name": "German"}
-        ]
-    }))
+    languages.write_text(
+        yaml.dump(
+            {
+                "languages": [
+                    {"iso_code": "fr", "name": "French"},
+                    {"iso_code": "de", "name": "German"},
+                ]
+            }
+        )
+    )
 
     report = check_language_coverage(str(registry), str(languages))
 
@@ -38,21 +39,20 @@ def test_partial_coverage_with_specialized_models(tmp_path):
     registry = tmp_path / "registry.yaml"
     languages = tmp_path / "languages.yaml"
 
-    registry.write_text(yaml.dump({
-        "models": [
-            {
-                "model_id": "opus_en_fr",
-                "supported_pairs": [["en", "fr"]]
-            }
-        ]
-    }))
+    registry.write_text(
+        yaml.dump({"models": [{"model_id": "opus_en_fr", "supported_pairs": [["en", "fr"]]}]})
+    )
 
-    languages.write_text(yaml.dump({
-        "languages": [
-            {"iso_code": "fr", "name": "French"},
-            {"iso_code": "de", "name": "German"}
-        ]
-    }))
+    languages.write_text(
+        yaml.dump(
+            {
+                "languages": [
+                    {"iso_code": "fr", "name": "French"},
+                    {"iso_code": "de", "name": "German"},
+                ]
+            }
+        )
+    )
 
     report = check_language_coverage(str(registry), str(languages))
 
@@ -70,12 +70,16 @@ def test_no_coverage(tmp_path):
 
     registry.write_text(yaml.dump({"models": []}))
 
-    languages.write_text(yaml.dump({
-        "languages": [
-            {"iso_code": "fr", "name": "French"},
-            {"iso_code": "de", "name": "German"}
-        ]
-    }))
+    languages.write_text(
+        yaml.dump(
+            {
+                "languages": [
+                    {"iso_code": "fr", "name": "French"},
+                    {"iso_code": "de", "name": "German"},
+                ]
+            }
+        )
+    )
 
     report = check_language_coverage(str(registry), str(languages))
 
@@ -91,17 +95,9 @@ def test_coverage_report_to_dict(tmp_path):
     registry = tmp_path / "registry.yaml"
     languages = tmp_path / "languages.yaml"
 
-    registry.write_text(yaml.dump({
-        "models": [
-            {"model_id": "m2m100", "supported_pairs": "all"}
-        ]
-    }))
+    registry.write_text(yaml.dump({"models": [{"model_id": "m2m100", "supported_pairs": "all"}]}))
 
-    languages.write_text(yaml.dump({
-        "languages": [
-            {"iso_code": "fr", "name": "French"}
-        ]
-    }))
+    languages.write_text(yaml.dump({"languages": [{"iso_code": "fr", "name": "French"}]}))
 
     report = check_language_coverage(str(registry), str(languages))
     report_dict = report.to_dict()
@@ -118,19 +114,27 @@ def test_mixed_multilingual_and_specialized(tmp_path):
     registry = tmp_path / "registry.yaml"
     languages = tmp_path / "languages.yaml"
 
-    registry.write_text(yaml.dump({
-        "models": [
-            {"model_id": "m2m100", "supported_pairs": "all"},
-            {"model_id": "opus_en_de", "supported_pairs": [["en", "de"]]}
-        ]
-    }))
+    registry.write_text(
+        yaml.dump(
+            {
+                "models": [
+                    {"model_id": "m2m100", "supported_pairs": "all"},
+                    {"model_id": "opus_en_de", "supported_pairs": [["en", "de"]]},
+                ]
+            }
+        )
+    )
 
-    languages.write_text(yaml.dump({
-        "languages": [
-            {"iso_code": "fr", "name": "French"},
-            {"iso_code": "de", "name": "German"}
-        ]
-    }))
+    languages.write_text(
+        yaml.dump(
+            {
+                "languages": [
+                    {"iso_code": "fr", "name": "French"},
+                    {"iso_code": "de", "name": "German"},
+                ]
+            }
+        )
+    )
 
     report = check_language_coverage(str(registry), str(languages))
 

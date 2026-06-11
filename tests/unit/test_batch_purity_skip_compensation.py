@@ -9,11 +9,12 @@ Four cases:
   3. test_cs_97pct_threshold_enforced — Czech at 96% purity → ERROR
   4. test_batch_skip_does_not_disable_file_level_validator — validator always runs
 """
+
 from __future__ import annotations
 
-import pytest
 from unittest.mock import MagicMock, patch
 
+import pytest
 
 ES_OVERRIDES = {
     "es": {"purity_threshold": 98.0, "confidence_threshold": 0.90},
@@ -26,6 +27,7 @@ def _make_validator(overrides=None):
     from src.translation_engine.validation.language_consistency_validator import (
         LanguageConsistencyValidator,
     )
+
     return LanguageConsistencyValidator(
         confidence_threshold=0.85,
         per_language_overrides=overrides or ES_OVERRIDES,
@@ -40,7 +42,9 @@ def _make_detected(lang: str, prob: float = 0.95):
     return [d]
 
 
-def _build_content_with_purity(total: int, correct_lang: str, wrong_lang: str, correct_count: int) -> str:
+def _build_content_with_purity(
+    total: int, correct_lang: str, wrong_lang: str, correct_count: int
+) -> str:
     """Build a text with a controlled ratio of correct vs wrong language sentences."""
     # Use long enough sentences to pass min_sentence_length (8 chars)
     good = f"Esta es una oración de ejemplo en el idioma correcto de {correct_lang}."
@@ -110,9 +114,7 @@ class TestBatchPuritySkipCompensation:
             result = validator.validate("", cs_text, context={"target_lang": "cs"})
 
         errors = [i for i in result.issues if i.severity.value == "error"]
-        assert errors, (
-            "Czech file at 96% purity must be rejected with 97% override; got no errors"
-        )
+        assert errors, "Czech file at 96% purity must be rejected with 97% override; got no errors"
 
     def test_batch_skip_does_not_disable_file_level_validator(self):
         """LanguageConsistencyValidator runs independently of batch_purity_skip_langs.

@@ -7,6 +7,7 @@ Verifies SD-02 acceptance checks:
 - Single-line content stays plain
 - Literal style preserved in round-trip
 """
+
 # Import directly to avoid full package import chain
 import sys
 

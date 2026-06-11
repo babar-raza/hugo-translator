@@ -26,8 +26,8 @@ def _run_frontmatter_gate(source: str, translated: str, validation_passed: bool 
     validation_error = None
 
     # Exact replica of engine.py:1913-1925
-    if validation_passed and source.lstrip('\n').startswith('---'):
-        if not translated.lstrip('\n').startswith('---'):
+    if validation_passed and source.lstrip("\n").startswith("---"):
+        if not translated.lstrip("\n").startswith("---"):
             validation_passed = False
             retryable_gate_failure = False  # structural — not retryable
             validation_error = (

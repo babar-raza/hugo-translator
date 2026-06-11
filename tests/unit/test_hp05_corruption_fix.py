@@ -3,6 +3,7 @@ Test HP-05 robust placeholder protection.
 
 Tests that InlineFormatProtector v2 uses simple tokens that survive MT processing.
 """
+
 import pytest
 
 from src.translation_engine.extractor.inline_format_protector import (

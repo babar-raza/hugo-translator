@@ -1,4 +1,5 @@
 """Tests for AST E2E warning interpretation notes."""
+
 from pathlib import Path
 
 NOTES_PATH = Path("reports/user-guide/ast_e2e_notes.md")

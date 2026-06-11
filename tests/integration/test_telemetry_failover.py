@@ -7,6 +7,7 @@ Verifies that events are buffered locally and synced when API recovers.
 These tests replace the removed direct-DB tests with tests focused on
 the new HTTP API + buffer architecture.
 """
+
 import json
 import tempfile
 from pathlib import Path
@@ -43,7 +44,9 @@ class TestTelemetryClientFailover:
             client = TelemetryClient(config=config)
 
             # Mock HTTP API to raise APIUnavailableError
-            with patch.object(client.http_api, 'post_event', side_effect=APIUnavailableError("API down")):
+            with patch.object(
+                client.http_api, "post_event", side_effect=APIUnavailableError("API down")
+            ):
                 run_id = client.start_run(
                     agent_name="test-agent",
                     job_type="test-job",
@@ -81,7 +84,9 @@ class TestTelemetryClientFailover:
 
             # Mock successful API response
             mock_response = {"status": "created", "event_id": "test-123", "run_id": "test-run"}
-            with patch.object(client.http_api, 'post_event', return_value=mock_response) as mock_post:
+            with patch.object(
+                client.http_api, "post_event", return_value=mock_response
+            ) as mock_post:
                 run_id = client.start_run(
                     agent_name="test-agent",
                     job_type="test-job",
@@ -109,7 +114,9 @@ class TestTelemetryClientFailover:
             client = TelemetryClient(config=config)
 
             # Mock timeout error
-            with patch.object(client.http_api, 'post_event', side_effect=APIUnavailableError("Timeout")):
+            with patch.object(
+                client.http_api, "post_event", side_effect=APIUnavailableError("Timeout")
+            ):
                 run_id = client.start_run(
                     agent_name="test-agent",
                     job_type="test-job",
@@ -140,7 +147,9 @@ class TestTelemetryClientFailover:
             client = TelemetryClient(config=config)
 
             # Mock API unavailable for both start_run and end_run
-            with patch.object(client.http_api, 'post_event', side_effect=APIUnavailableError("API down")):
+            with patch.object(
+                client.http_api, "post_event", side_effect=APIUnavailableError("API down")
+            ):
                 run_id = client.start_run(
                     agent_name="test-agent",
                     job_type="test-job",
@@ -180,7 +189,9 @@ class TestTelemetryClientFailover:
             client = TelemetryClient(config=config)
 
             # Mock API unavailable
-            with patch.object(client.http_api, 'post_event', side_effect=APIUnavailableError("API down")):
+            with patch.object(
+                client.http_api, "post_event", side_effect=APIUnavailableError("API down")
+            ):
                 with client.track_run("test-agent", "test-job") as ctx:
                     ctx.set_metrics(items_discovered=5, items_succeeded=3)
 
@@ -235,7 +246,9 @@ class TestBufferFileFailoverIntegration:
             client = TelemetryClient(config=config)
 
             # Mock API unavailable
-            with patch.object(client.http_api, 'post_event', side_effect=APIUnavailableError("API down")):
+            with patch.object(
+                client.http_api, "post_event", side_effect=APIUnavailableError("API down")
+            ):
                 # Create multiple runs
                 for i in range(3):
                     run_id = client.start_run(
@@ -305,7 +318,9 @@ class TestFailoverRecovery:
             client = TelemetryClient(config=config)
 
             # First run: API unavailable
-            with patch.object(client.http_api, 'post_event', side_effect=APIUnavailableError("API down")):
+            with patch.object(
+                client.http_api, "post_event", side_effect=APIUnavailableError("API down")
+            ):
                 run_id_1 = client.start_run(
                     agent_name="test-agent",
                     job_type="test-job-1",
@@ -313,7 +328,9 @@ class TestFailoverRecovery:
 
             # Second run: API available
             mock_response = {"status": "created", "event_id": "test-456"}
-            with patch.object(client.http_api, 'post_event', return_value=mock_response) as mock_post:
+            with patch.object(
+                client.http_api, "post_event", return_value=mock_response
+            ) as mock_post:
                 run_id_2 = client.start_run(
                     agent_name="test-agent",
                     job_type="test-job-2",
@@ -341,7 +358,9 @@ class TestFailoverRecovery:
             client = TelemetryClient(config=config)
 
             # Simulate extended outage
-            with patch.object(client.http_api, 'post_event', side_effect=APIUnavailableError("API down")):
+            with patch.object(
+                client.http_api, "post_event", side_effect=APIUnavailableError("API down")
+            ):
                 # Create 10 runs
                 run_ids = []
                 for i in range(10):
@@ -387,7 +406,9 @@ class TestFailoverErrorHandling:
             try:
                 client = TelemetryClient(config=config)
                 # Mock API unavailable and buffer write fails
-                with patch.object(client.buffer, 'append', side_effect=OSError("Permission denied")):
+                with patch.object(
+                    client.buffer, "append", side_effect=OSError("Permission denied")
+                ):
                     run_id = client.start_run(
                         agent_name="test-agent",
                         job_type="test-job",
@@ -405,7 +426,7 @@ class TestFailoverErrorHandling:
 
             # Create corrupted buffer file
             corrupted_file = buffer_dir / "telemetry_test.jsonl.active"
-            corrupted_file.write_text('{invalid json\n')
+            corrupted_file.write_text("{invalid json\n")
 
             # Create client (should handle corruption)
             buffer = BufferFile(buffer_dir=str(buffer_dir))
@@ -442,7 +463,7 @@ class TestFailoverErrorHandling:
                 {"status": "created", "event_id": "test-2"},
             ]
 
-            with patch.object(client.http_api, 'post_event', side_effect=responses):
+            with patch.object(client.http_api, "post_event", side_effect=responses):
                 # All runs should succeed without crashing
                 run_id_1 = client.start_run("test-agent", "job-1")  # Fails, buffered
                 run_id_2 = client.start_run("test-agent", "job-2")  # Succeeds
@@ -477,7 +498,7 @@ class TestNDJSONBackup:
 
             # Mock successful API call
             mock_response = {"status": "created", "event_id": "test-123"}
-            with patch.object(client.http_api, 'post_event', return_value=mock_response):
+            with patch.object(client.http_api, "post_event", return_value=mock_response):
                 run_id = client.start_run(
                     agent_name="test-agent",
                     job_type="test-job",
@@ -512,7 +533,9 @@ class TestNDJSONBackup:
             client = TelemetryClient(config=config)
 
             # Mock API failure
-            with patch.object(client.http_api, 'post_event', side_effect=APIUnavailableError("API down")):
+            with patch.object(
+                client.http_api, "post_event", side_effect=APIUnavailableError("API down")
+            ):
                 run_id = client.start_run(
                     agent_name="test-agent",
                     job_type="test-job",

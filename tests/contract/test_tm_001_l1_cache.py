@@ -369,13 +369,7 @@ def test_concurrent_writes_are_thread_safe():
 
     def writer(thread_id: int):
         for i in range(entries_per_thread):
-            cache.put(
-                f"site{thread_id}",
-                "en",
-                "de",
-                f"text{i}",
-                f"translation_{thread_id}_{i}"
-            )
+            cache.put(f"site{thread_id}", "en", "de", f"text{i}", f"translation_{thread_id}_{i}")
 
     # Act - concurrent writes from multiple threads
     threads = []

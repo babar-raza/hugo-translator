@@ -4,6 +4,7 @@ TC-TEST-03: LLM escalation deterministic unit tests.
 Proves that the engine code path fires LLM escalation when retry_count >= 2
 and config enables it, without requiring a live LLM model.
 """
+
 from __future__ import annotations
 
 import json
@@ -23,12 +24,11 @@ class TestLoadQueuedLlmPaths:
             {"output_path": "/out/file_a.md", "tgt_lang": "fr", "retry_count": 2},
             {"output_path": "/out/file_b.md", "tgt_lang": "de", "retry_count": 1},
         ]
-        queue_file.write_text(
-            "\n".join(json.dumps(e) for e in entries), encoding="utf-8"
-        )
+        queue_file.write_text("\n".join(json.dumps(e) for e in entries), encoding="utf-8")
 
         with patch("src.tm.retranslate_queue._queue_path", return_value=queue_file):
             from src.tm.retranslate_queue import load_queued_llm_paths
+
             result = load_queued_llm_paths()
 
         assert "/out/file_a.md" in result
@@ -41,12 +41,11 @@ class TestLoadQueuedLlmPaths:
             {"output_path": "/out/stuck.md", "tgt_lang": "fr", "retry_count": 4},
             {"output_path": "/out/eligible.md", "tgt_lang": "de", "retry_count": 3},
         ]
-        queue_file.write_text(
-            "\n".join(json.dumps(e) for e in entries), encoding="utf-8"
-        )
+        queue_file.write_text("\n".join(json.dumps(e) for e in entries), encoding="utf-8")
 
         with patch("src.tm.retranslate_queue._queue_path", return_value=queue_file):
             from src.tm.retranslate_queue import load_queued_llm_paths
+
             result = load_queued_llm_paths()
 
         assert "/out/stuck.md" not in result
@@ -58,6 +57,7 @@ class TestLoadQueuedLlmPaths:
 
         with patch("src.tm.retranslate_queue._queue_path", return_value=queue_file):
             from src.tm.retranslate_queue import load_queued_llm_paths
+
             result = load_queued_llm_paths()
 
         assert result == set()
@@ -83,12 +83,12 @@ class TestLlmModelOverrideApplied:
 
         # Reproduce the engine code path (engine.py:1455-1469)
         _llm_model_override = None
-        _rtq_llm_paths = getattr(mock_self, '_rtq_llm_output_paths', None)
+        _rtq_llm_paths = getattr(mock_self, "_rtq_llm_output_paths", None)
         if _rtq_llm_paths and str(output_path.resolve()) in _rtq_llm_paths:
             try:
-                _te_cfg = mock_self.config.get_config().get('translation_engine', {})
-                if _te_cfg.get('llm_escalation_enabled', False):
-                    _llm_model_override = _te_cfg.get('llm_escalation_model', 'professionalize_llm')
+                _te_cfg = mock_self.config.get_config().get("translation_engine", {})
+                if _te_cfg.get("llm_escalation_enabled", False):
+                    _llm_model_override = _te_cfg.get("llm_escalation_model", "professionalize_llm")
             except Exception:
                 pass
 
@@ -108,12 +108,12 @@ class TestLlmModelOverrideApplied:
         }
 
         _llm_model_override = None
-        _rtq_llm_paths = getattr(mock_self, '_rtq_llm_output_paths', None)
+        _rtq_llm_paths = getattr(mock_self, "_rtq_llm_output_paths", None)
         if _rtq_llm_paths and str(output_path.resolve()) in _rtq_llm_paths:
             try:
-                _te_cfg = mock_self.config.get_config().get('translation_engine', {})
-                if _te_cfg.get('llm_escalation_enabled', False):
-                    _llm_model_override = _te_cfg.get('llm_escalation_model', 'professionalize_llm')
+                _te_cfg = mock_self.config.get_config().get("translation_engine", {})
+                if _te_cfg.get("llm_escalation_enabled", False):
+                    _llm_model_override = _te_cfg.get("llm_escalation_model", "professionalize_llm")
             except Exception:
                 pass
 
@@ -133,12 +133,12 @@ class TestLlmModelOverrideApplied:
         }
 
         _llm_model_override = None
-        _rtq_llm_paths = getattr(mock_self, '_rtq_llm_output_paths', None)
+        _rtq_llm_paths = getattr(mock_self, "_rtq_llm_output_paths", None)
         if _rtq_llm_paths and str(output_path.resolve()) in _rtq_llm_paths:
             try:
-                _te_cfg = mock_self.config.get_config().get('translation_engine', {})
-                if _te_cfg.get('llm_escalation_enabled', False):
-                    _llm_model_override = _te_cfg.get('llm_escalation_model', 'professionalize_llm')
+                _te_cfg = mock_self.config.get_config().get("translation_engine", {})
+                if _te_cfg.get("llm_escalation_enabled", False):
+                    _llm_model_override = _te_cfg.get("llm_escalation_model", "professionalize_llm")
             except Exception:
                 pass
 
@@ -151,6 +151,7 @@ class TestGlobalYamlEscalationConfig:
     def test_llm_escalation_enabled_in_config(self):
         """global.yaml must have llm_escalation_enabled: true (TC-FIX-03)."""
         import yaml
+
         raw = yaml.safe_load(Path("config/global.yaml").read_text(encoding="utf-8"))
         te_cfg = raw.get("translation_engine", {})
         assert te_cfg.get("llm_escalation_enabled") is True, (
@@ -160,6 +161,7 @@ class TestGlobalYamlEscalationConfig:
     def test_llm_escalation_model_configured(self):
         """global.yaml must have llm_escalation_model set."""
         import yaml
+
         raw = yaml.safe_load(Path("config/global.yaml").read_text(encoding="utf-8"))
         te_cfg = raw.get("translation_engine", {})
         model = te_cfg.get("llm_escalation_model", "professionalize_llm")

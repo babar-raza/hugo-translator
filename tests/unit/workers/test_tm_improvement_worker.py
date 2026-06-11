@@ -483,9 +483,7 @@ def test_config_from_config_service():
         },
     }
 
-    config = TMImprovementWorkerConfig.from_config_service(
-        mock_config_service, mode="daemon"
-    )
+    config = TMImprovementWorkerConfig.from_config_service(mock_config_service, mode="daemon")
 
     assert config.mode == "daemon"
     assert config.runs_per_day == 4

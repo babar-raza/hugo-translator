@@ -133,17 +133,19 @@ class TestBenchmarkExporter:
 
         results = []
         for i in range(num_results):
-            results.append(BenchmarkResult(
-                sample_id=f"{run_id}_sample_{i}",
-                model_id=model_id,
-                device=device,
-                batch_size=8,
-                duration_seconds=1.0 + i * 0.1,
-                tokens_input=100,
-                tokens_output=100,
-                throughput_tokens_per_sec=100.0 + i * 10,
-                peak_memory_mb=500.0,
-            ))
+            results.append(
+                BenchmarkResult(
+                    sample_id=f"{run_id}_sample_{i}",
+                    model_id=model_id,
+                    device=device,
+                    batch_size=8,
+                    duration_seconds=1.0 + i * 0.1,
+                    tokens_input=100,
+                    tokens_output=100,
+                    throughput_tokens_per_sec=100.0 + i * 10,
+                    peak_memory_mb=500.0,
+                )
+            )
 
         run = BenchmarkRun(
             run_id=run_id,
@@ -389,6 +391,7 @@ class TestBenchmarkExporter:
             # Verify backup contains only filtered data using raw SQLite
             # (BenchmarkDatabase would try to re-apply migrations to exported db)
             import sqlite3
+
             backup_conn = sqlite3.connect(backup_path)
             cursor = backup_conn.execute("SELECT run_id, model_id FROM benchmark_runs")
             runs = cursor.fetchall()
@@ -492,16 +495,18 @@ class TestExporterEdgeCases:
             db = BenchmarkDatabase(db_path)
 
             # Create runs on different devices
-            results_cpu = [BenchmarkResult(
-                sample_id="sample_cpu",
-                model_id="test_model",
-                device="cpu",
-                batch_size=8,
-                duration_seconds=1.0,
-                tokens_input=100,
-                tokens_output=100,
-                throughput_tokens_per_sec=100.0,
-            )]
+            results_cpu = [
+                BenchmarkResult(
+                    sample_id="sample_cpu",
+                    model_id="test_model",
+                    device="cpu",
+                    batch_size=8,
+                    duration_seconds=1.0,
+                    tokens_input=100,
+                    tokens_output=100,
+                    throughput_tokens_per_sec=100.0,
+                )
+            ]
             run_cpu = BenchmarkRun(
                 run_id="run_cpu",
                 model_id="test_model",
@@ -517,16 +522,18 @@ class TestExporterEdgeCases:
             )
             db.save_run(run_cpu)
 
-            results_cuda = [BenchmarkResult(
-                sample_id="sample_cuda",
-                model_id="test_model",
-                device="cuda",
-                batch_size=8,
-                duration_seconds=0.5,
-                tokens_input=100,
-                tokens_output=100,
-                throughput_tokens_per_sec=200.0,
-            )]
+            results_cuda = [
+                BenchmarkResult(
+                    sample_id="sample_cuda",
+                    model_id="test_model",
+                    device="cuda",
+                    batch_size=8,
+                    duration_seconds=0.5,
+                    tokens_input=100,
+                    tokens_output=100,
+                    throughput_tokens_per_sec=200.0,
+                )
+            ]
             run_cuda = BenchmarkRun(
                 run_id="run_cuda",
                 model_id="test_model",

@@ -1,4 +1,5 @@
 """Gate 1 integration test - Multi-language translation."""
+
 import subprocess
 import sys
 import time
@@ -26,11 +27,17 @@ def test_multi_language_no_cascading_timeout(tmp_path):
     start = time.time()
     result = subprocess.run(
         [
-            sys.executable, "-m", "src.cli",
-            "--site", "test.example.net",
-            "--input", str(source_dir),
-            "--output", str(output_dir),
-            "--target-langs", "ar,bg,cs",
+            sys.executable,
+            "-m",
+            "src.cli",
+            "--site",
+            "test.example.net",
+            "--input",
+            str(source_dir),
+            "--output",
+            str(output_dir),
+            "--target-langs",
+            "ar,bg,cs",
         ],
         capture_output=True,
         text=True,
@@ -51,21 +58,27 @@ def test_multi_language_no_cascading_timeout(tmp_path):
         assert (lang_dir / "test.md").exists(), f"Translated file for {lang} not found"
 
     # Verify logs contain parent lock pattern
-    assert "Site lock acquired by parent process" in result.stdout or "Site lock acquired by parent process" in result.stderr, \
-        "Parent lock acquisition not logged"
+    assert (
+        "Site lock acquired by parent process" in result.stdout
+        or "Site lock acquired by parent process" in result.stderr
+    ), "Parent lock acquisition not logged"
 
     # Count child skip messages (should be 3 for 3 languages)
     skip_count = (result.stdout + result.stderr).count("Skipping site lock acquisition")
     assert skip_count >= 3, f"Expected 3+ skip messages, got {skip_count}"
 
     # Verify NO cascading timeouts
-    assert "Still waiting for lock" not in result.stdout, \
+    assert "Still waiting for lock" not in result.stdout, (
         "Found 'Still waiting for lock' message (cascading timeout detected)"
-    assert "300s elapsed" not in result.stdout, \
+    )
+    assert "300s elapsed" not in result.stdout, (
         "Found '300s elapsed' message (5-minute timeout detected)"
+    )
 
 
-@pytest.mark.skipif(not _INTERRUPT_AVAILABLE, reason="Site profile test.interrupt.net.yaml not present")
+@pytest.mark.skipif(
+    not _INTERRUPT_AVAILABLE, reason="Site profile test.interrupt.net.yaml not present"
+)
 def test_parent_lock_cleanup_on_interrupt(tmp_path):
     """Test parent lock is cleaned up on Ctrl+C."""
     import signal
@@ -79,11 +92,17 @@ def test_parent_lock_cleanup_on_interrupt(tmp_path):
     # Start translation process
     proc = subprocess.Popen(
         [
-            sys.executable, "-m", "src.cli",
-            "--site", "test.interrupt.net",
-            "--source", str(source_dir),
-            "--output", str(output_dir),
-            "--target-langs", "ar,bg",
+            sys.executable,
+            "-m",
+            "src.cli",
+            "--site",
+            "test.interrupt.net",
+            "--source",
+            str(source_dir),
+            "--output",
+            str(output_dir),
+            "--target-langs",
+            "ar,bg",
         ],
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
@@ -119,11 +138,17 @@ def test_multi_language_scales(tmp_path, lang_count):
     start = time.time()
     result = subprocess.run(
         [
-            sys.executable, "-m", "src.cli",
-            "--site", "test.scale.net",
-            "--input", str(source_dir),
-            "--output", str(output_dir),
-            "--target-langs", ",".join(langs),
+            sys.executable,
+            "-m",
+            "src.cli",
+            "--site",
+            "test.scale.net",
+            "--input",
+            str(source_dir),
+            "--output",
+            str(output_dir),
+            "--target-langs",
+            ",".join(langs),
         ],
         capture_output=True,
         text=True,
@@ -135,5 +160,4 @@ def test_multi_language_scales(tmp_path, lang_count):
 
     # Should scale linearly: ~20s per language (not 300s per language)
     max_expected = lang_count * 30  # 30s per language with overhead
-    assert duration < max_expected, \
-        f"Duration {duration}s exceeds linear scaling ({max_expected}s)"
+    assert duration < max_expected, f"Duration {duration}s exceeds linear scaling ({max_expected}s)"

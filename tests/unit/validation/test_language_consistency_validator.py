@@ -221,7 +221,7 @@ class TestLanguageConsistencyValidator:
         """Test that Hugo shortcodes are removed before language detection."""
         validator = LanguageConsistencyValidator()
         text = (
-            "Dies ist deutscher Text. {{< figure src=\"image.jpg\" >}} "
+            'Dies ist deutscher Text. {{< figure src="image.jpg" >}} '
             "Mehr deutscher Text über Technologie."
         )
 
@@ -325,8 +325,12 @@ class TestLanguageConsistencyValidator:
         # All results should be identical
         assert result1.metadata["purity_percentage"] == result2.metadata["purity_percentage"]
         assert result2.metadata["purity_percentage"] == result3.metadata["purity_percentage"]
-        assert result1.metadata["correct_language_count"] == result2.metadata["correct_language_count"]
-        assert result2.metadata["correct_language_count"] == result3.metadata["correct_language_count"]
+        assert (
+            result1.metadata["correct_language_count"] == result2.metadata["correct_language_count"]
+        )
+        assert (
+            result2.metadata["correct_language_count"] == result3.metadata["correct_language_count"]
+        )
 
     def test_arabic_text_detection(self) -> None:
         """Test that Arabic text is correctly detected."""
@@ -449,7 +453,9 @@ class TestLanguageConsistencyValidator:
         assert result1.issues[0].location == "context"
 
         # Test wrong language (use longer text to avoid "too short" issue)
-        result2 = validator.validate("", "This is English text that is long enough for detection", {"target_lang": "de"})
+        result2 = validator.validate(
+            "", "This is English text that is long enough for detection", {"target_lang": "de"}
+        )
         error = [i for i in result2.issues if i.severity == ValidationSeverity.ERROR][0]
         assert error.location == "translation"
 

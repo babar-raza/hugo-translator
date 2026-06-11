@@ -3,6 +3,7 @@ Integration tests for cache refresh functionality (T205: federated-splashing-pan
 
 End-to-end tests for --force-retranslate and --cache-write-mode flags.
 """
+
 import subprocess
 from pathlib import Path
 
@@ -15,7 +16,9 @@ class TestCacheRefreshE2E:
     @pytest.fixture
     def test_fixture_path(self):
         """Path to test fixture file."""
-        fixture_path = Path(__file__).parent.parent / "fixtures" / "cache_refresh_test" / "sample.md"
+        fixture_path = (
+            Path(__file__).parent.parent / "fixtures" / "cache_refresh_test" / "sample.md"
+        )
         if not fixture_path.exists():
             pytest.skip(f"Test fixture not found: {fixture_path}")
         return fixture_path
@@ -215,9 +218,11 @@ class TestCacheRefreshHelp:
 
         assert result.returncode == 0
         assert "--cache-write-mode" in result.stdout
-        assert ("auto" in result.stdout.lower() or
-                "always" in result.stdout.lower() or
-                "never" in result.stdout.lower())
+        assert (
+            "auto" in result.stdout.lower()
+            or "always" in result.stdout.lower()
+            or "never" in result.stdout.lower()
+        )
 
     def test_help_text_shows_cache_write_mode_choices(self):
         """Test that help text shows cache write mode choices."""

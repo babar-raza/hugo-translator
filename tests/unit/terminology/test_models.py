@@ -64,7 +64,7 @@ class TestTermRule:
             term="Aspose",
             category="company_name",
             preserve_mode=PreserveMode.BOTH,
-            severity=TermSeverity.ERROR
+            severity=TermSeverity.ERROR,
         )
         assert rule.term == "Aspose"
         assert rule.pattern is None
@@ -80,7 +80,7 @@ class TestTermRule:
             pattern=r"Aspose\.\w+",
             category="product_family",
             preserve_mode=PreserveMode.PROTECT,
-            severity=TermSeverity.WARNING
+            severity=TermSeverity.WARNING,
         )
         assert rule.pattern == r"Aspose\.\w+"
         assert rule.term is None
@@ -95,7 +95,7 @@ class TestTermRule:
             category="company_name",
             preserve_mode=PreserveMode.VALIDATE,
             severity=TermSeverity.INFO,
-            case_sensitive=False
+            case_sensitive=False,
         )
         assert rule.case_sensitive is False
 
@@ -106,7 +106,7 @@ class TestTermRule:
             category="company_name",
             preserve_mode=PreserveMode.BOTH,
             severity=TermSeverity.ERROR,
-            description="Company name must be preserved"
+            description="Company name must be preserved",
         )
         assert rule.description == "Company name must be preserved"
 
@@ -114,9 +114,7 @@ class TestTermRule:
         """Test TermRule raises ValueError when neither term nor pattern specified."""
         with pytest.raises(ValueError, match="Either 'term' or 'pattern' must be specified"):
             TermRule(
-                category="test",
-                preserve_mode=PreserveMode.PROTECT,
-                severity=TermSeverity.ERROR
+                category="test", preserve_mode=PreserveMode.PROTECT, severity=TermSeverity.ERROR
             )
 
     def test_term_rule_validation_error_both(self):
@@ -127,17 +125,14 @@ class TestTermRule:
                 pattern=r"Aspose\.\w+",
                 category="test",
                 preserve_mode=PreserveMode.PROTECT,
-                severity=TermSeverity.ERROR
+                severity=TermSeverity.ERROR,
             )
 
     def test_term_rule_all_preserve_modes(self):
         """Test TermRule with all preserve modes."""
         for mode in PreserveMode:
             rule = TermRule(
-                term="Test",
-                category="test",
-                preserve_mode=mode,
-                severity=TermSeverity.INFO
+                term="Test", category="test", preserve_mode=mode, severity=TermSeverity.INFO
             )
             assert rule.preserve_mode == mode
 
@@ -145,10 +140,7 @@ class TestTermRule:
         """Test TermRule with all severity levels."""
         for severity in TermSeverity:
             rule = TermRule(
-                term="Test",
-                category="test",
-                preserve_mode=PreserveMode.PROTECT,
-                severity=severity
+                term="Test", category="test", preserve_mode=PreserveMode.PROTECT, severity=severity
             )
             assert rule.severity == severity
 
@@ -162,14 +154,10 @@ class TestDetectedTerm:
             term="Aspose",
             category="company_name",
             preserve_mode=PreserveMode.BOTH,
-            severity=TermSeverity.ERROR
+            severity=TermSeverity.ERROR,
         )
         detected = DetectedTerm(
-            term_text="Aspose",
-            rule=rule,
-            start_pos=10,
-            end_pos=16,
-            confidence=1.0
+            term_text="Aspose", rule=rule, start_pos=10, end_pos=16, confidence=1.0
         )
         assert detected.term_text == "Aspose"
         assert detected.rule == rule
@@ -183,14 +171,9 @@ class TestDetectedTerm:
             term="Aspose",
             category="company_name",
             preserve_mode=PreserveMode.BOTH,
-            severity=TermSeverity.ERROR
+            severity=TermSeverity.ERROR,
         )
-        detected = DetectedTerm(
-            term_text="Aspose",
-            rule=rule,
-            start_pos=0,
-            end_pos=6
-        )
+        detected = DetectedTerm(term_text="Aspose", rule=rule, start_pos=0, end_pos=6)
         assert detected.confidence == 1.0
 
     def test_detected_term_partial_confidence(self):
@@ -199,14 +182,10 @@ class TestDetectedTerm:
             term="Aspose",
             category="company_name",
             preserve_mode=PreserveMode.BOTH,
-            severity=TermSeverity.ERROR
+            severity=TermSeverity.ERROR,
         )
         detected = DetectedTerm(
-            term_text="aspose",
-            rule=rule,
-            start_pos=0,
-            end_pos=6,
-            confidence=0.8
+            term_text="aspose", rule=rule, start_pos=0, end_pos=6, confidence=0.8
         )
         assert detected.confidence == 0.8
 
@@ -216,14 +195,9 @@ class TestDetectedTerm:
             pattern=r"Aspose\.\w+",
             category="product_family",
             preserve_mode=PreserveMode.PROTECT,
-            severity=TermSeverity.WARNING
+            severity=TermSeverity.WARNING,
         )
-        detected = DetectedTerm(
-            term_text="Aspose.Words",
-            rule=rule,
-            start_pos=5,
-            end_pos=17
-        )
+        detected = DetectedTerm(term_text="Aspose.Words", rule=rule, start_pos=5, end_pos=17)
         assert detected.term_text == "Aspose.Words"
         assert detected.rule.pattern == r"Aspose\.\w+"
 
@@ -233,14 +207,9 @@ class TestDetectedTerm:
             term="Aspose",
             category="company_name",
             preserve_mode=PreserveMode.BOTH,
-            severity=TermSeverity.ERROR
+            severity=TermSeverity.ERROR,
         )
-        detected = DetectedTerm(
-            term_text="Aspose",
-            rule=rule,
-            start_pos=0,
-            end_pos=6
-        )
+        detected = DetectedTerm(term_text="Aspose", rule=rule, start_pos=0, end_pos=6)
         assert detected.start_pos == 0
         assert detected.end_pos == 6
 
@@ -251,8 +220,7 @@ class TestProtectedSegment:
     def test_protected_segment_empty(self):
         """Test ProtectedSegment with no terms."""
         segment = ProtectedSegment(
-            original_text="This is plain text",
-            protected_text="This is plain text"
+            original_text="This is plain text", protected_text="This is plain text"
         )
         assert segment.original_text == "This is plain text"
         assert segment.protected_text == "This is plain text"
@@ -264,18 +232,13 @@ class TestProtectedSegment:
             term="Aspose",
             category="company_name",
             preserve_mode=PreserveMode.PROTECT,
-            severity=TermSeverity.ERROR
+            severity=TermSeverity.ERROR,
         )
-        detected = DetectedTerm(
-            term_text="Aspose",
-            rule=rule,
-            start_pos=0,
-            end_pos=6
-        )
+        detected = DetectedTerm(term_text="Aspose", rule=rule, start_pos=0, end_pos=6)
         segment = ProtectedSegment(
             original_text="Aspose is great",
             protected_text="{{TERM_0}} is great",
-            term_mapping={0: detected}
+            term_mapping={0: detected},
         )
         assert segment.original_text == "Aspose is great"
         assert segment.protected_text == "{{TERM_0}} is great"
@@ -289,30 +252,20 @@ class TestProtectedSegment:
             term="Aspose",
             category="company_name",
             preserve_mode=PreserveMode.PROTECT,
-            severity=TermSeverity.ERROR
+            severity=TermSeverity.ERROR,
         )
         rule2 = TermRule(
             term=".NET",
             category="platform",
             preserve_mode=PreserveMode.PROTECT,
-            severity=TermSeverity.ERROR
+            severity=TermSeverity.ERROR,
         )
-        detected1 = DetectedTerm(
-            term_text="Aspose",
-            rule=rule1,
-            start_pos=0,
-            end_pos=6
-        )
-        detected2 = DetectedTerm(
-            term_text=".NET",
-            rule=rule2,
-            start_pos=11,
-            end_pos=15
-        )
+        detected1 = DetectedTerm(term_text="Aspose", rule=rule1, start_pos=0, end_pos=6)
+        detected2 = DetectedTerm(term_text=".NET", rule=rule2, start_pos=11, end_pos=15)
         segment = ProtectedSegment(
             original_text="Aspose for .NET is great",
             protected_text="{{TERM_0}} for {{TERM_1}} is great",
-            term_mapping={0: detected1, 1: detected2}
+            term_mapping={0: detected1, 1: detected2},
         )
         assert len(segment.term_mapping) == 2
         assert segment.term_mapping[0].term_text == "Aspose"
@@ -320,10 +273,7 @@ class TestProtectedSegment:
 
     def test_protected_segment_default_mapping(self):
         """Test ProtectedSegment with default empty mapping."""
-        segment = ProtectedSegment(
-            original_text="Text",
-            protected_text="Text"
-        )
+        segment = ProtectedSegment(original_text="Text", protected_text="Text")
         assert segment.term_mapping == {}
         assert isinstance(segment.term_mapping, dict)
 
@@ -345,18 +295,15 @@ class TestTerminologyConfig:
             term="Aspose",
             category="company_name",
             preserve_mode=PreserveMode.BOTH,
-            severity=TermSeverity.ERROR
+            severity=TermSeverity.ERROR,
         )
         rule2 = TermRule(
             term=".NET",
             category="platform",
             preserve_mode=PreserveMode.PROTECT,
-            severity=TermSeverity.WARNING
+            severity=TermSeverity.WARNING,
         )
-        config = TerminologyConfig(
-            version="1.0",
-            global_rules=[rule1, rule2]
-        )
+        config = TerminologyConfig(version="1.0", global_rules=[rule1, rule2])
         assert len(config.global_rules) == 2
         assert config.global_rules[0].term == "Aspose"
         assert config.global_rules[1].term == ".NET"
@@ -367,20 +314,16 @@ class TestTerminologyConfig:
             term="Aspose",
             category="company_name",
             preserve_mode=PreserveMode.BOTH,
-            severity=TermSeverity.ERROR
+            severity=TermSeverity.ERROR,
         )
         rule2 = TermRule(
             term="CustomTerm",
             category="custom",
             preserve_mode=PreserveMode.VALIDATE,
-            severity=TermSeverity.INFO
+            severity=TermSeverity.INFO,
         )
         config = TerminologyConfig(
-            version="1.0",
-            site_overrides={
-                "site1": [rule1],
-                "site2": [rule2]
-            }
+            version="1.0", site_overrides={"site1": [rule1], "site2": [rule2]}
         )
         assert len(config.site_overrides) == 2
         assert "site1" in config.site_overrides
@@ -392,11 +335,7 @@ class TestTerminologyConfig:
         """Test TerminologyConfig with auto-discovery settings."""
         config = TerminologyConfig(
             version="1.0",
-            auto_discovery={
-                "enabled": True,
-                "min_frequency": 3,
-                "confidence_threshold": 0.8
-            }
+            auto_discovery={"enabled": True, "min_frequency": 3, "confidence_threshold": 0.8},
         )
         assert config.auto_discovery["enabled"] is True
         assert config.auto_discovery["min_frequency"] == 3
@@ -408,19 +347,19 @@ class TestTerminologyConfig:
             term="Aspose",
             category="company_name",
             preserve_mode=PreserveMode.BOTH,
-            severity=TermSeverity.ERROR
+            severity=TermSeverity.ERROR,
         )
         override_rule = TermRule(
             term="SiteTerm",
             category="custom",
             preserve_mode=PreserveMode.VALIDATE,
-            severity=TermSeverity.WARNING
+            severity=TermSeverity.WARNING,
         )
         config = TerminologyConfig(
             version="2.0",
             global_rules=[rule],
             site_overrides={"site1": [override_rule]},
-            auto_discovery={"enabled": False}
+            auto_discovery={"enabled": False},
         )
         assert config.version == "2.0"
         assert len(config.global_rules) == 1
@@ -437,7 +376,7 @@ class TestTerminologyConfig:
             term="Test",
             category="test",
             preserve_mode=PreserveMode.PROTECT,
-            severity=TermSeverity.INFO
+            severity=TermSeverity.INFO,
         )
         config1.global_rules.append(rule)
 
@@ -446,9 +385,6 @@ class TestTerminologyConfig:
 
     def test_terminology_config_empty_site_override(self):
         """Test TerminologyConfig with empty site override."""
-        config = TerminologyConfig(
-            version="1.0",
-            site_overrides={"site1": []}
-        )
+        config = TerminologyConfig(version="1.0", site_overrides={"site1": []})
         assert "site1" in config.site_overrides
         assert len(config.site_overrides["site1"]) == 0

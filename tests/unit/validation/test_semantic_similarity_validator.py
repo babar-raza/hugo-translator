@@ -11,6 +11,7 @@ Verifies:
 - set_encoder() → _get_encoder() returns injected encoder
 - Embedding exception fails open (success=True)
 """
+
 import math
 from unittest.mock import MagicMock
 
@@ -24,6 +25,7 @@ from src.translation_engine.validation.semantic_similarity_validator import (
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _make_encoder(similarity: float):
     """Return a mock encoder whose embeddings produce a fixed cosine similarity."""
@@ -40,6 +42,7 @@ def _make_encoder(similarity: float):
         call_count[0] += 1
         try:
             import numpy as np
+
             return np.array(v)
         except ImportError:
             return v
@@ -56,6 +59,7 @@ LONG_TEXT = "x" * 300
 # Threshold logic
 # ---------------------------------------------------------------------------
 
+
 def test_above_warn_threshold_returns_ok():
     validator = SemanticSimilarityValidator(
         encoder=_make_encoder(0.80),
@@ -64,8 +68,9 @@ def test_above_warn_threshold_returns_ok():
     )
     result = validator.validate(LONG_TEXT, LONG_TEXT)
     assert result.success
-    assert not any(i.severity in (ValidationSeverity.ERROR, ValidationSeverity.WARNING)
-                   for i in result.issues)
+    assert not any(
+        i.severity in (ValidationSeverity.ERROR, ValidationSeverity.WARNING) for i in result.issues
+    )
 
 
 def test_below_warn_threshold_returns_warning():
@@ -97,6 +102,7 @@ def test_below_error_threshold_returns_error():
 # Short text skip
 # ---------------------------------------------------------------------------
 
+
 def test_short_text_returns_info_skip():
     validator = SemanticSimilarityValidator(
         encoder=_make_encoder(0.90),
@@ -112,6 +118,7 @@ def test_short_text_returns_info_skip():
 # ---------------------------------------------------------------------------
 # No encoder — skip
 # ---------------------------------------------------------------------------
+
 
 def test_no_encoder_returns_info_skip():
     # Reset class-level shared encoder to None for isolation
@@ -129,6 +136,7 @@ def test_no_encoder_returns_info_skip():
 # ---------------------------------------------------------------------------
 # set_encoder() / _get_encoder() injection
 # ---------------------------------------------------------------------------
+
 
 def test_set_encoder_populates_shared_slot():
     original = SemanticSimilarityValidator._shared_encoder
@@ -178,6 +186,7 @@ def test_shared_encoder_used_by_validate(tmp_path):
 # ---------------------------------------------------------------------------
 # Embedding exception fails open
 # ---------------------------------------------------------------------------
+
 
 def test_embedding_exception_fails_open():
     enc = MagicMock()

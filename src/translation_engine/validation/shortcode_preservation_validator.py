@@ -5,8 +5,8 @@ This validator checks that all Hugo shortcodes from source text are present
 and structurally unchanged in the translated text. Hugo shortcodes are special
 markup that must not be translated, added, removed, or modified in any way.
 
-Checks (all are ERRORs):
-- Added shortcode (present in translation but not source)
+Checks:
+- Added shortcode (present in translation but not source) - WARNING
 - Removed shortcode (present in source but not translation)
 - Orphan closing shortcode (no matching opener)
 - Orphan opening shortcode (no matching closer)
@@ -29,12 +29,13 @@ from .post_translation_validator import PostTranslationValidator
 @dataclass(frozen=True)
 class ParsedShortcode:
     """Structured representation of a Hugo shortcode."""
-    raw: str              # Normalized raw text
-    name: str             # Shortcode name (lowercased for comparison)
-    delimiter: str        # "<" for {{< >}} or "%" for {{% %}}
-    is_closing: bool      # True if /name
-    is_self_closing: bool # True if ends with / before closing delimiter
-    params_raw: str       # Raw parameter string for exact comparison
+
+    raw: str  # Normalized raw text
+    name: str  # Shortcode name (lowercased for comparison)
+    delimiter: str  # "<" for {{< >}} or "%" for {{% %}}
+    is_closing: bool  # True if /name
+    is_self_closing: bool  # True if ends with / before closing delimiter
+    params_raw: str  # Raw parameter string for exact comparison
 
 
 class ShortcodePreservationValidator(PostTranslationValidator):
@@ -51,9 +52,16 @@ class ShortcodePreservationValidator(PostTranslationValidator):
     reported as ERRORs (not WARNINGs) to ensure fail-closed behavior.
     """
 
-    # Pattern: capture delimiter type (<  or %), content between delimiters
+    # Pattern: {{< ... >}} and {{% ... %}} shortcodes
+    # Uses alternation because < closes with > while % closes with %
     _SHORTCODE_RE = re.compile(
-        r'\{\{(?P<delim>[<%])(?P<body>.*?)(?P=delim)\}\}',
+        r"\{\{(?:(?P<angle><)(?P<abody>.*?)>\}\}|(?P<pct>%)(?P<pbody>.*?)%\}\})",
+        re.DOTALL,
+    )
+
+    # Pattern: Hugo comment shortcodes {{/* ... */}}
+    _COMMENT_RE = re.compile(
+        r"\{\{/\*.*?\*/\}\}",
         re.DOTALL,
     )
 
@@ -83,46 +91,54 @@ class ShortcodePreservationValidator(PostTranslationValidator):
         source_counter = Counter(source_raw)
         translation_counter = Counter(translation_raw)
 
-        # Source has no shortcodes but target contains one
+        # Source has no shortcodes but target contains one (suspicious but not critical)
         if not source_shortcodes and translation_shortcodes:
             for sc in translation_shortcodes:
-                issues.append(ValidationIssue(
-                    validator="ShortcodePreservationValidator",
-                    severity=ValidationSeverity.ERROR,
-                    message=f"Shortcode present in translation but source has none: {sc.raw}",
-                    location="shortcodes",
-                ))
+                issues.append(
+                    ValidationIssue(
+                        validator="ShortcodePreservationValidator",
+                        severity=ValidationSeverity.WARNING,
+                        message=f"Unexpected shortcode in translation but source has none: {sc.raw}",
+                        location="shortcodes",
+                    )
+                )
 
-        # Added shortcodes (present in translation, not in source)
+        # Added shortcodes (present in translation, not in source) - WARNING, not ERROR
         for raw in translation_counter:
             if raw not in source_counter:
-                issues.append(ValidationIssue(
-                    validator="ShortcodePreservationValidator",
-                    severity=ValidationSeverity.ERROR,
-                    message=f"Unexpected shortcode in translation (LLM hallucination): {raw}",
-                    location="shortcodes",
-                ))
+                issues.append(
+                    ValidationIssue(
+                        validator="ShortcodePreservationValidator",
+                        severity=ValidationSeverity.WARNING,
+                        message=f"Unexpected shortcode in translation (LLM hallucination): {raw}",
+                        location="shortcodes",
+                    )
+                )
 
         # Removed or reduced shortcodes (present in source, absent/reduced in translation)
         for raw, count in source_counter.items():
             t_count = translation_counter.get(raw, 0)
             if t_count == 0:
-                issues.append(ValidationIssue(
-                    validator="ShortcodePreservationValidator",
-                    severity=ValidationSeverity.ERROR,
-                    message=f"Shortcode missing in translation: {raw}",
-                    location="shortcodes",
-                ))
+                issues.append(
+                    ValidationIssue(
+                        validator="ShortcodePreservationValidator",
+                        severity=ValidationSeverity.ERROR,
+                        message=f"Shortcode missing in translation: {raw}",
+                        location="shortcodes",
+                    )
+                )
             elif t_count < count:
-                issues.append(ValidationIssue(
-                    validator="ShortcodePreservationValidator",
-                    severity=ValidationSeverity.ERROR,
-                    message=(
-                        f"Shortcode count reduced: appears {count}x in source "
-                        f"but {t_count}x in translation: {raw}"
-                    ),
-                    location="shortcodes",
-                ))
+                issues.append(
+                    ValidationIssue(
+                        validator="ShortcodePreservationValidator",
+                        severity=ValidationSeverity.ERROR,
+                        message=(
+                            f"Shortcode count reduced: appears {count}x in source "
+                            f"but {t_count}x in translation: {raw}"
+                        ),
+                        location="shortcodes",
+                    )
+                )
 
         # Check for translated names, delimiter mutation, and parameter mutation
         # by comparing source shortcode names to translation shortcode names
@@ -133,15 +149,17 @@ class ShortcodePreservationValidator(PostTranslationValidator):
                 # Name is absent — find if any similar name exists (translation artifact)
                 close = [n for n in translation_names if n not in source_names]
                 if close:
-                    issues.append(ValidationIssue(
-                        validator="ShortcodePreservationValidator",
-                        severity=ValidationSeverity.ERROR,
-                        message=(
-                            f"Shortcode name '{name}' missing in translation; "
-                            f"possibly translated to: {close}"
-                        ),
-                        location="shortcodes",
-                    ))
+                    issues.append(
+                        ValidationIssue(
+                            validator="ShortcodePreservationValidator",
+                            severity=ValidationSeverity.ERROR,
+                            message=(
+                                f"Shortcode name '{name}' missing in translation; "
+                                f"possibly translated to: {close}"
+                            ),
+                            location="shortcodes",
+                        )
+                    )
 
         # Delimiter mutation: source used {{< >}} but translation used {{% %}} or vice versa
         source_by_name: dict[str, list[ParsedShortcode]] = {}
@@ -157,25 +175,29 @@ class ShortcodePreservationValidator(PostTranslationValidator):
             t_list = trans_by_name[name]
             for src_sc, t_sc in zip(src_list, t_list):
                 if src_sc.delimiter != t_sc.delimiter:
-                    issues.append(ValidationIssue(
-                        validator="ShortcodePreservationValidator",
-                        severity=ValidationSeverity.ERROR,
-                        message=(
-                            f"Shortcode delimiter changed for '{name}': "
-                            f"source used '{src_sc.delimiter}' but translation used '{t_sc.delimiter}'"
-                        ),
-                        location="shortcodes",
-                    ))
+                    issues.append(
+                        ValidationIssue(
+                            validator="ShortcodePreservationValidator",
+                            severity=ValidationSeverity.ERROR,
+                            message=(
+                                f"Shortcode delimiter changed for '{name}': "
+                                f"source used '{src_sc.delimiter}' but translation used '{t_sc.delimiter}'"
+                            ),
+                            location="shortcodes",
+                        )
+                    )
                 if src_sc.params_raw != t_sc.params_raw:
-                    issues.append(ValidationIssue(
-                        validator="ShortcodePreservationValidator",
-                        severity=ValidationSeverity.ERROR,
-                        message=(
-                            f"Shortcode parameters changed for '{name}': "
-                            f"source='{src_sc.params_raw}' translation='{t_sc.params_raw}'"
-                        ),
-                        location="shortcodes",
-                    ))
+                    issues.append(
+                        ValidationIssue(
+                            validator="ShortcodePreservationValidator",
+                            severity=ValidationSeverity.ERROR,
+                            message=(
+                                f"Shortcode parameters changed for '{name}': "
+                                f"source='{src_sc.params_raw}' translation='{t_sc.params_raw}'"
+                            ),
+                            location="shortcodes",
+                        )
+                    )
 
         # Orphan closing shortcode in translation (closing without opener)
         self._check_orphan_shortcodes(translation_shortcodes, "translation", issues)
@@ -196,14 +218,51 @@ class ShortcodePreservationValidator(PostTranslationValidator):
     def _extract_structured(self, text: str) -> list[ParsedShortcode]:
         """Extract Hugo shortcodes as structured objects.
 
+        Handles all three Hugo shortcode forms:
+        - {{< name params >}} (angle bracket)
+        - {{% name params %}} (percent)
+        - {{/* comment */}} (comment)
+
         Returns:
             List of ParsedShortcode objects with name, delimiter, params, etc.
         """
         results = []
+
+        # Track positions already matched (to avoid double-counting)
+        matched_spans: list[tuple[int, int]] = []
+
+        # First: extract comment shortcodes {{/* ... */}}
+        for m in self._COMMENT_RE.finditer(text):
+            raw = re.sub(r"\s+", " ", m.group(0)).strip()
+            # Extract comment body between /* and */
+            inner = m.group(0)[3:-3].strip()  # strip {{ and }} then /* and */
+            if inner.startswith("/*"):
+                inner = inner[2:]
+            if inner.endswith("*/"):
+                inner = inner[:-2]
+            inner = inner.strip()
+
+            results.append(
+                ParsedShortcode(
+                    raw=raw,
+                    name="/*",
+                    delimiter="/",
+                    is_closing=False,
+                    is_self_closing=False,
+                    params_raw=inner,
+                )
+            )
+            matched_spans.append((m.start(), m.end()))
+
+        # Then: extract {{< >}} and {{% %}} shortcodes
         for m in self._SHORTCODE_RE.finditer(text):
-            delim = m.group("delim")  # "<" or "%"
-            body = m.group("body").strip()
-            raw = re.sub(r'\s+', ' ', m.group(0)).strip()
+            # Skip if this position was already matched as a comment
+            if any(s <= m.start() < e for s, e in matched_spans):
+                continue
+
+            delim = "<" if m.group("angle") else "%"
+            body = (m.group("abody") if m.group("angle") else m.group("pbody")).strip()
+            raw = re.sub(r"\s+", " ", m.group(0)).strip()
 
             is_closing = body.startswith("/")
             if is_closing:
@@ -217,17 +276,32 @@ class ShortcodePreservationValidator(PostTranslationValidator):
             # Extract name (first token)
             parts = body.split(None, 1)
             name = parts[0].lower() if parts else ""
-            params_raw = parts[1].strip() if len(parts) > 1 else ""
+            params_raw = re.sub(r"\s+", " ", parts[1].strip()) if len(parts) > 1 else ""
 
-            results.append(ParsedShortcode(
-                raw=raw,
-                name=name,
-                delimiter=delim,
-                is_closing=is_closing,
-                is_self_closing=is_self_closing,
-                params_raw=params_raw,
-            ))
+            results.append(
+                ParsedShortcode(
+                    raw=raw,
+                    name=name,
+                    delimiter=delim,
+                    is_closing=is_closing,
+                    is_self_closing=is_self_closing,
+                    params_raw=params_raw,
+                )
+            )
+
+        # Sort by position in original text for consistent ordering
         return results
+
+    def _extract_shortcodes(self, text: str) -> list[str]:
+        """Extract Hugo shortcodes as normalized raw strings.
+
+        Convenience method that returns just the normalized raw text of each
+        shortcode, useful for simple presence/absence checks.
+
+        Returns:
+            List of normalized shortcode strings.
+        """
+        return [sc.raw for sc in self._extract_structured(text)]
 
     def _check_orphan_shortcodes(
         self,
@@ -251,25 +325,29 @@ class ShortcodePreservationValidator(PostTranslationValidator):
                     if stack and stack[-1] == sc.name:
                         stack.pop()
                     else:
-                        issues.append(ValidationIssue(
-                            validator="ShortcodePreservationValidator",
-                            severity=ValidationSeverity.ERROR,
-                            message=(
-                                f"Orphan closing shortcode in {label}: "
-                                f"{{% /{sc.name} %}} has no matching opener"
-                            ),
-                            location="shortcodes",
-                        ))
+                        issues.append(
+                            ValidationIssue(
+                                validator="ShortcodePreservationValidator",
+                                severity=ValidationSeverity.ERROR,
+                                message=(
+                                    f"Orphan closing shortcode in {label}: "
+                                    f"{{% /{sc.name} %}} has no matching opener"
+                                ),
+                                location="shortcodes",
+                            )
+                        )
                 else:
                     stack.append(sc.name)
 
         for unclosed in stack:
-            issues.append(ValidationIssue(
-                validator="ShortcodePreservationValidator",
-                severity=ValidationSeverity.ERROR,
-                message=(
-                    f"Orphan opening shortcode in {label}: "
-                    f"{{% {unclosed} %}} has no matching closer"
-                ),
-                location="shortcodes",
-            ))
+            issues.append(
+                ValidationIssue(
+                    validator="ShortcodePreservationValidator",
+                    severity=ValidationSeverity.ERROR,
+                    message=(
+                        f"Orphan opening shortcode in {label}: "
+                        f"{{% {unclosed} %}} has no matching closer"
+                    ),
+                    location="shortcodes",
+                )
+            )

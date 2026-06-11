@@ -58,7 +58,9 @@ class TestMissingNodeWarning:
         renderer = ASTRenderer()
         para = _para_with_addr("This English text was not translated.", "body.para[0]")
 
-        with caplog.at_level(logging.WARNING, logger="src.translation_engine.reconstructor.ast_renderer"):
+        with caplog.at_level(
+            logging.WARNING, logger="src.translation_engine.reconstructor.ast_renderer"
+        ):
             renderer.apply_translations([para], units=[])
 
         assert "AST_FALLBACK" in caplog.text
@@ -77,8 +79,7 @@ class TestMissingNodeWarning:
         """Multiple missing prose nodes each increment the counter."""
         renderer = ASTRenderer()
         paras = [
-            _para_with_addr("First untranslated paragraph.", f"body.para[{i}]")
-            for i in range(3)
+            _para_with_addr("First untranslated paragraph.", f"body.para[{i}]") for i in range(3)
         ]
 
         renderer.apply_translations(paras, units=[])
@@ -95,14 +96,18 @@ class TestMissingNodeWarning:
 
         # Second call — counter should reset, not accumulate
         renderer.apply_translations([para], units=[])
-        assert renderer._missing_node_count == 1, "Counter should reset, not accumulate across calls"
+        assert renderer._missing_node_count == 1, (
+            "Counter should reset, not accumulate across calls"
+        )
 
     def test_code_block_not_counted(self, caplog):
         """CODE_BLOCK nodes without translation units do NOT count as missing."""
         renderer = ASTRenderer()
         code = _code_node("print('hello world')", "body.code[0]")
 
-        with caplog.at_level(logging.WARNING, logger="src.translation_engine.reconstructor.ast_renderer"):
+        with caplog.at_level(
+            logging.WARNING, logger="src.translation_engine.reconstructor.ast_renderer"
+        ):
             renderer.apply_translations([code], units=[])
 
         assert renderer._missing_node_count == 0
@@ -138,7 +143,9 @@ class TestMissingNodeWarning:
         renderer = ASTRenderer()
         para = _para_with_addr("Some untranslated text here.", "body.para[0]")
 
-        with caplog.at_level(logging.ERROR, logger="src.translation_engine.reconstructor.ast_renderer"):
+        with caplog.at_level(
+            logging.ERROR, logger="src.translation_engine.reconstructor.ast_renderer"
+        ):
             renderer.apply_translations([para], units=[])
 
         assert any(

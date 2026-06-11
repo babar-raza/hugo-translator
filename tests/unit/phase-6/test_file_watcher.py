@@ -82,9 +82,7 @@ class TestContentFileHandler:
         test_file2 = temp_content_dir / "test.markdown"
         assert handler._is_content_file(str(test_file2)) is True
 
-    def test_is_content_file_invalid_extension(
-        self, watch_config, temp_content_dir, mock_callback
-    ):
+    def test_is_content_file_invalid_extension(self, watch_config, temp_content_dir, mock_callback):
         """Test rejection of non-markdown files."""
         handler = ContentFileHandler(
             watch_config=watch_config,

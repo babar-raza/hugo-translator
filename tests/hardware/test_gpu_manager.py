@@ -3,6 +3,7 @@ Tests for GPU Manager.
 
 Tests GPU detection, configuration, memory management, and fallback logic.
 """
+
 import json
 import platform
 from unittest.mock import patch

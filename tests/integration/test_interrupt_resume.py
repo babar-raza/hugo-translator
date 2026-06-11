@@ -6,6 +6,7 @@ Tests verify that:
 2. Partial progress can be recovered
 3. Resume correctly identifies pending work
 """
+
 import json
 
 
@@ -19,10 +20,10 @@ class TestGracefulShutdown:
 
         tracker = ProgressTracker(
             site_id="interrupt-test",
-            source_dir=env['source_dir'],
-            output_dir=env['output_dir'],
+            source_dir=env["source_dir"],
+            output_dir=env["output_dir"],
             target_langs=["es"],
-            progress_dir=env['progress_dir'],
+            progress_dir=env["progress_dir"],
         )
 
         tracker.state.total_files = 3
@@ -35,17 +36,19 @@ class TestGracefulShutdown:
         assert "file1.md" in data["completed_files"]
         assert data["completed_files"]["file1.md"] == ["es"]
 
-    def test_progress_persists_across_multiple_completions(self, test_environment, progress_tracker_class):
+    def test_progress_persists_across_multiple_completions(
+        self, test_environment, progress_tracker_class
+    ):
         """Verify each completion is persisted."""
         ProgressTracker = progress_tracker_class
         env = test_environment
 
         tracker = ProgressTracker(
             site_id="multi-complete-test",
-            source_dir=env['source_dir'],
-            output_dir=env['output_dir'],
+            source_dir=env["source_dir"],
+            output_dir=env["output_dir"],
             target_langs=["es", "fr"],
-            progress_dir=env['progress_dir'],
+            progress_dir=env["progress_dir"],
         )
 
         tracker.state.total_files = 2
@@ -77,10 +80,10 @@ class TestPartialProgressRecovery:
         # Phase 1: Create initial progress (simulating work before crash)
         tracker1 = ProgressTracker(
             site_id="resume-test",
-            source_dir=env['source_dir'],
-            output_dir=env['output_dir'],
+            source_dir=env["source_dir"],
+            output_dir=env["output_dir"],
             target_langs=["es", "fr"],
-            progress_dir=env['progress_dir'],
+            progress_dir=env["progress_dir"],
         )
         tracker1.state.total_files = 5
         tracker1.mark_completed("file1.md", "es")
@@ -105,10 +108,10 @@ class TestPartialProgressRecovery:
         # Create progress
         tracker1 = ProgressTracker(
             site_id="field-preservation-test",
-            source_dir=env['source_dir'],
-            output_dir=env['output_dir'],
+            source_dir=env["source_dir"],
+            output_dir=env["output_dir"],
             target_langs=["es", "fr", "de"],
-            progress_dir=env['progress_dir'],
+            progress_dir=env["progress_dir"],
         )
         tracker1.state.total_files = 10
         tracker1.mark_completed("doc.md", "es")
@@ -133,19 +136,19 @@ class TestResumeCapability:
 
         # Create test files
         files = [
-            env['source_dir'] / "file1.md",
-            env['source_dir'] / "file2.md",
-            env['source_dir'] / "file3.md",
+            env["source_dir"] / "file1.md",
+            env["source_dir"] / "file2.md",
+            env["source_dir"] / "file3.md",
         ]
         for f in files:
             f.write_text("test content")
 
         tracker = ProgressTracker(
             site_id="pending-test",
-            source_dir=env['source_dir'],
-            output_dir=env['output_dir'],
+            source_dir=env["source_dir"],
+            output_dir=env["output_dir"],
             target_langs=["es", "fr"],
-            progress_dir=env['progress_dir'],
+            progress_dir=env["progress_dir"],
         )
         tracker.state.total_files = 3
 
@@ -169,15 +172,15 @@ class TestResumeCapability:
         ProgressTracker = progress_tracker_class
         env = test_environment
 
-        files = [env['source_dir'] / "only_file.md"]
+        files = [env["source_dir"] / "only_file.md"]
         files[0].write_text("content")
 
         tracker = ProgressTracker(
             site_id="complete-test",
-            source_dir=env['source_dir'],
-            output_dir=env['output_dir'],
+            source_dir=env["source_dir"],
+            output_dir=env["output_dir"],
             target_langs=["es"],
-            progress_dir=env['progress_dir'],
+            progress_dir=env["progress_dir"],
         )
         tracker.state.total_files = 1
 
@@ -199,10 +202,10 @@ class TestFailedFilesTracking:
 
         tracker = ProgressTracker(
             site_id="failed-test",
-            source_dir=env['source_dir'],
-            output_dir=env['output_dir'],
+            source_dir=env["source_dir"],
+            output_dir=env["output_dir"],
             target_langs=["es"],
-            progress_dir=env['progress_dir'],
+            progress_dir=env["progress_dir"],
         )
         tracker.state.total_files = 2
 
@@ -214,17 +217,19 @@ class TestFailedFilesTracking:
         assert "error_file.md" in data["failed_files"]
         assert data["failed_files"]["error_file.md"]["es"] == "Translation timeout"
 
-    def test_failed_then_completed_removes_from_failed(self, test_environment, progress_tracker_class):
+    def test_failed_then_completed_removes_from_failed(
+        self, test_environment, progress_tracker_class
+    ):
         """Verify completing a previously failed file removes it from failed list."""
         ProgressTracker = progress_tracker_class
         env = test_environment
 
         tracker = ProgressTracker(
             site_id="retry-test",
-            source_dir=env['source_dir'],
-            output_dir=env['output_dir'],
+            source_dir=env["source_dir"],
+            output_dir=env["output_dir"],
             target_langs=["es"],
-            progress_dir=env['progress_dir'],
+            progress_dir=env["progress_dir"],
         )
         tracker.state.total_files = 1
 

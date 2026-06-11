@@ -6,12 +6,13 @@ Verifies SD-01 acceptance checks:
 - Quote styles preserved in round-trip
 - Fallback works when ruamel.yaml unavailable
 """
+
 from ruamel.yaml.comments import CommentedMap
 
 from src.translation_engine.parser.hugo_parser import HugoParser
 from src.translation_engine.reconstructor.yaml_formatter import YAMLFormatter
 
-SAMPLE_WITH_COMMENTS = '''---
+SAMPLE_WITH_COMMENTS = """---
 # Static
 layout: "family"
 type: "_default"
@@ -26,17 +27,17 @@ description: "Some description"
 ---
 
 Body content here.
-'''
+"""
 
-SAMPLE_WITHOUT_COMMENTS = '''---
+SAMPLE_WITHOUT_COMMENTS = """---
 layout: family
 title: Simple Title
 ---
 
 Body content.
-'''
+"""
 
-SAMPLE_WITH_NESTED = '''---
+SAMPLE_WITH_NESTED = """---
 # Overview
 overview:
   enable: true
@@ -52,7 +53,7 @@ body:
     - title_left: "Second Block"
       content_left: "Second content"
 ---
-'''
+"""
 
 
 class TestYAMLCommentPreservation:
@@ -72,10 +73,10 @@ class TestYAMLCommentPreservation:
         parser = HugoParser()
         doc = parser.parse_string(SAMPLE_WITH_COMMENTS)
 
-        assert doc.frontmatter['layout'] == 'family'
-        assert doc.frontmatter['type'] == '_default'
-        assert doc.frontmatter['head_title'] == 'Test Title'
-        assert doc.frontmatter['title'] == 'Main Title'
+        assert doc.frontmatter["layout"] == "family"
+        assert doc.frontmatter["type"] == "_default"
+        assert doc.frontmatter["head_title"] == "Test Title"
+        assert doc.frontmatter["title"] == "Main Title"
 
     def test_round_trip_preserves_comments(self):
         """Comments should survive parse -> dump cycle."""
@@ -85,9 +86,9 @@ class TestYAMLCommentPreservation:
         output = YAMLFormatter.format_frontmatter(doc.frontmatter)
 
         # Check that comments are preserved
-        assert '# Static' in output, "Static comment should be preserved"
-        assert '# Head' in output, "Head comment should be preserved"
-        assert '# Header' in output, "Header comment should be preserved"
+        assert "# Static" in output, "Static comment should be preserved"
+        assert "# Head" in output, "Head comment should be preserved"
+        assert "# Header" in output, "Header comment should be preserved"
 
     def test_round_trip_preserves_quotes(self):
         """Quote styles should survive parse -> dump cycle."""
@@ -97,7 +98,11 @@ class TestYAMLCommentPreservation:
         output = YAMLFormatter.format_frontmatter(doc.frontmatter)
 
         # Double quotes should be preserved
-        assert 'layout: "family"' in output or "layout: 'family'" in output or 'layout: family' in output
+        assert (
+            'layout: "family"' in output
+            or "layout: 'family'" in output
+            or "layout: family" in output
+        )
         # The key test is that the structure is maintained
 
     def test_parse_without_comments(self):
@@ -105,18 +110,18 @@ class TestYAMLCommentPreservation:
         parser = HugoParser()
         doc = parser.parse_string(SAMPLE_WITHOUT_COMMENTS)
 
-        assert doc.frontmatter['layout'] == 'family'
-        assert doc.frontmatter['title'] == 'Simple Title'
+        assert doc.frontmatter["layout"] == "family"
+        assert doc.frontmatter["title"] == "Simple Title"
 
     def test_parse_nested_structure(self):
         """Parser should handle nested YAML structures."""
         parser = HugoParser()
         doc = parser.parse_string(SAMPLE_WITH_NESTED)
 
-        assert doc.frontmatter['overview']['enable'] is True
-        assert doc.frontmatter['overview']['title'] == 'Overview Title'
-        assert doc.frontmatter['body']['block'][0]['title_left'] == 'First Block'
-        assert len(doc.frontmatter['body']['block']) == 2
+        assert doc.frontmatter["overview"]["enable"] is True
+        assert doc.frontmatter["overview"]["title"] == "Overview Title"
+        assert doc.frontmatter["body"]["block"][0]["title_left"] == "First Block"
+        assert len(doc.frontmatter["body"]["block"]) == 2
 
     def test_nested_round_trip_preserves_comments(self):
         """Nested structure comments should survive round-trip."""
@@ -125,8 +130,8 @@ class TestYAMLCommentPreservation:
 
         output = YAMLFormatter.format_frontmatter(doc.frontmatter)
 
-        assert '# Overview' in output, "Overview comment should be preserved"
-        assert '# Body' in output, "Body comment should be preserved"
+        assert "# Overview" in output, "Overview comment should be preserved"
+        assert "# Body" in output, "Body comment should be preserved"
 
 
 class TestYAMLFormatterFallback:
@@ -144,20 +149,20 @@ class TestYAMLFormatterFallback:
 
     def test_format_plain_dict(self):
         """Plain dict should still work (fallback path)."""
-        data = {'layout': 'family', 'title': 'Test'}
+        data = {"layout": "family", "title": "Test"}
         result = YAMLFormatter.format_frontmatter(data)
 
-        assert '---' in result
-        assert 'layout:' in result
-        assert 'title:' in result
+        assert "---" in result
+        assert "layout:" in result
+        assert "title:" in result
 
     def test_format_with_hugo_delimiters(self):
         """Output should have proper Hugo frontmatter delimiters."""
-        data = {'title': 'Test'}
+        data = {"title": "Test"}
         result = YAMLFormatter.format_frontmatter(data)
 
-        assert result.startswith('---\n')
-        assert result.endswith('---\n')
+        assert result.startswith("---\n")
+        assert result.endswith("---\n")
 
 
 class TestNegativeCases:
@@ -167,11 +172,11 @@ class TestNegativeCases:
         """Parser should handle invalid YAML gracefully."""
         parser = HugoParser()
         # Invalid YAML - unclosed bracket
-        content = '''---
+        content = """---
 layout: [invalid
 ---
 Body
-'''
+"""
         # Should not raise, fallback to empty frontmatter
         doc = parser.parse_string(content)
         # Either parses partially or returns empty
@@ -188,10 +193,10 @@ Body
     def test_parse_empty_frontmatter(self):
         """Parser should handle empty frontmatter."""
         parser = HugoParser()
-        content = '''---
+        content = """---
 ---
 Body content.
-'''
+"""
         doc = parser.parse_string(content)
         # Empty or minimal frontmatter
         assert doc is not None

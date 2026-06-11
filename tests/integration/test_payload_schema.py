@@ -1,4 +1,5 @@
 """Integration test: serialized payload has exactly 17 keys matching Sheet columns."""
+
 from __future__ import annotations
 
 import json
@@ -38,7 +39,9 @@ class TestPayloadSchemaIntegration:
         d = p.to_post_dict()
         # Serialize to JSON and back to simulate actual POST
         serialized = json.loads(json.dumps(d))
-        assert len(serialized) == 17, f"Expected 17 keys, got {len(serialized)}: {sorted(serialized.keys())}"
+        assert len(serialized) == 17, (
+            f"Expected 17 keys, got {len(serialized)}: {sorted(serialized.keys())}"
+        )
         assert set(serialized.keys()) == EXPECTED_POST_KEYS
 
     def test_no_extra_model_fields_leak(self):

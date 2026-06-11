@@ -4,6 +4,7 @@ Integration tests for L3 path consistency across components.
 Verifies that health monitor, L3SemanticTM, and scripts all resolve
 to the same canonical L3 path.
 """
+
 import sys
 from pathlib import Path
 
@@ -71,9 +72,7 @@ def test_config_path_matches_runtime_default():
         l3_dir = config.get("paths", {}).get("l3_index_dir")
 
         # Config should specify l3_faiss
-        assert l3_dir == "l3_faiss", (
-            f"Config l3_index_dir should be 'l3_faiss', got: {l3_dir}"
-        )
+        assert l3_dir == "l3_faiss", f"Config l3_index_dir should be 'l3_faiss', got: {l3_dir}"
 
 
 def test_populate_script_creates_correct_path(tmp_path):
@@ -93,14 +92,17 @@ def test_populate_script_creates_correct_path(tmp_path):
         )
 
 
-@pytest.mark.parametrize("script_name", [
-    "populate_l3_index.py",
-    "test_tm_lookup.py",
-    "build_l3_index.py",
-    "sync_l3_index.py",
-    "inspect_l3_metadata.py",
-    "quick_validate_l3.py",
-])
+@pytest.mark.parametrize(
+    "script_name",
+    [
+        "populate_l3_index.py",
+        "test_tm_lookup.py",
+        "build_l3_index.py",
+        "sync_l3_index.py",
+        "inspect_l3_metadata.py",
+        "quick_validate_l3.py",
+    ],
+)
 def test_all_scripts_use_consistent_path(script_name):
     """Verify all L3 scripts use l3_faiss path."""
     script_path = repo_root / "scripts" / script_name
@@ -109,18 +111,13 @@ def test_all_scripts_use_consistent_path(script_name):
         content = script_path.read_text(encoding="utf-8")
 
         # Should reference l3_faiss
-        assert "l3_faiss" in content, (
-            f"{script_name} should reference l3_faiss"
-        )
+        assert "l3_faiss" in content, f"{script_name} should reference l3_faiss"
 
         # Should NOT have l3.faiss in non-comment lines
         lines = content.splitlines()
-        code_lines = [
-            line for line in lines
-            if not line.strip().startswith('#')
-        ]
+        code_lines = [line for line in lines if not line.strip().startswith("#")]
         code_text = "\n".join(code_lines)
 
-        assert 'l3.faiss' not in code_text, (
+        assert "l3.faiss" not in code_text, (
             f"{script_name} should not contain l3.faiss dot notation in code"
         )

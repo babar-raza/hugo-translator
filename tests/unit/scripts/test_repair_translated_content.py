@@ -11,6 +11,7 @@ TC-RTC-07: Non-ASCII URL in frontmatter → url_corruption detected
 TC-RTC-08: scan_changed_files() filters non-.md and non-translated files
 TC-RTC-09: scan_changed_files() returns ScanResult with correct totals
 """
+
 from __future__ import annotations
 
 import textwrap
@@ -44,6 +45,7 @@ pytestmark = pytest.mark.skipif(not HAS_SCAN, reason="repair_translated_content 
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def make_translated_md(fm: str, body: str = "\nContent here.\n") -> str:
     """Assemble a minimal translated Markdown file from frontmatter and body."""
     return f"---\n{fm}\n---\n{body}"
@@ -52,6 +54,7 @@ def make_translated_md(fm: str, body: str = "\nContent here.\n") -> str:
 # ---------------------------------------------------------------------------
 # TC-RTC-01: Czech-style collapsed YAML blob
 # ---------------------------------------------------------------------------
+
 
 class TestCollapsedFrontmatter:
     """check_collapsed_frontmatter() detects multiple key:value on one line."""
@@ -88,6 +91,7 @@ class TestCollapsedFrontmatter:
 # ---------------------------------------------------------------------------
 # TC-RTC-02: Arabic-style block scalar at same indent
 # ---------------------------------------------------------------------------
+
 
 class TestBlockScalarIndent:
     """check_block_scalar_indent() detects block scalar content at same indent as key."""
@@ -130,6 +134,7 @@ class TestBlockScalarIndent:
 # TC-RTC-03: Clean translated file → zero issues
 # ---------------------------------------------------------------------------
 
+
 class TestCleanFile:
     """scan_file() returns no issues for a well-formed translated file."""
 
@@ -164,6 +169,7 @@ class TestCleanFile:
 # ---------------------------------------------------------------------------
 # TC-RTC-04: Orphaned {{% /steps %}} shortcode
 # ---------------------------------------------------------------------------
+
 
 class TestOrphanClosingShortcode:
     """check_shortcode_balance() detects orphaned closing shortcodes."""
@@ -222,6 +228,7 @@ class TestOrphanClosingShortcode:
 # TC-RTC-05: Multiple key:value pairs on same line
 # ---------------------------------------------------------------------------
 
+
 class TestMultiKVOnOneLine:
     """check_collapsed_frontmatter() detects step-style inline concatenation."""
 
@@ -240,6 +247,7 @@ class TestMultiKVOnOneLine:
 # ---------------------------------------------------------------------------
 # TC-RTC-06: Missing closing delimiter
 # ---------------------------------------------------------------------------
+
 
 class TestMissingClosingDelimiter:
     """extract_frontmatter() detects missing closing --- delimiter."""
@@ -265,6 +273,7 @@ class TestMissingClosingDelimiter:
 # TC-RTC-07: Non-ASCII URL in frontmatter
 # ---------------------------------------------------------------------------
 
+
 class TestUrlCorruption:
     """check_url_corruption() detects non-ASCII characters in URLs."""
 
@@ -284,9 +293,7 @@ class TestUrlCorruption:
         """TC-RTC-07: Non-ASCII URL in frontmatter → url_corruption detected."""
         issues = check_url_corruption(self.FM_WITH_CORRUPT_URL, "test/ar/_index.md")
         kinds = [i.kind for i in issues]
-        assert "url_corruption" in kinds, (
-            f"Expected 'url_corruption', got: {kinds}"
-        )
+        assert "url_corruption" in kinds, f"Expected 'url_corruption', got: {kinds}"
 
     def test_ascii_url_no_issue(self):
         """ASCII-only URL in frontmatter → no url_corruption issue."""
@@ -298,6 +305,7 @@ class TestUrlCorruption:
 # ---------------------------------------------------------------------------
 # TC-RTC-08 / TC-RTC-09: scan_changed_files()
 # ---------------------------------------------------------------------------
+
 
 class TestScanChangedFiles:
     """scan_changed_files() filters correctly and returns ScanResult."""

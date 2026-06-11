@@ -410,10 +410,14 @@ def test_cascading_delete():
         # Verify system_info and results exist
         conn = db._get_connection()
         try:
-            cursor = conn.execute("SELECT COUNT(*) FROM system_info WHERE run_id = ?", ("test_run_cascade",))
+            cursor = conn.execute(
+                "SELECT COUNT(*) FROM system_info WHERE run_id = ?", ("test_run_cascade",)
+            )
             assert cursor.fetchone()[0] == 1, "System info should exist"
 
-            cursor = conn.execute("SELECT COUNT(*) FROM benchmark_results WHERE run_id = ?", ("test_run_cascade",))
+            cursor = conn.execute(
+                "SELECT COUNT(*) FROM benchmark_results WHERE run_id = ?", ("test_run_cascade",)
+            )
             assert cursor.fetchone()[0] == 1, "Results should exist"
         finally:
             db._close_connection(conn)
@@ -424,10 +428,14 @@ def test_cascading_delete():
         # Verify cascading delete removed related records
         conn = db._get_connection()
         try:
-            cursor = conn.execute("SELECT COUNT(*) FROM system_info WHERE run_id = ?", ("test_run_cascade",))
+            cursor = conn.execute(
+                "SELECT COUNT(*) FROM system_info WHERE run_id = ?", ("test_run_cascade",)
+            )
             assert cursor.fetchone()[0] == 0, "System info should be deleted (CASCADE)"
 
-            cursor = conn.execute("SELECT COUNT(*) FROM benchmark_results WHERE run_id = ?", ("test_run_cascade",))
+            cursor = conn.execute(
+                "SELECT COUNT(*) FROM benchmark_results WHERE run_id = ?", ("test_run_cascade",)
+            )
             assert cursor.fetchone()[0] == 0, "Results should be deleted (CASCADE)"
         finally:
             db._close_connection(conn)

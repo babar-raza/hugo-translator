@@ -43,26 +43,26 @@ class TestSpecScanner:
 
         # Create evidence registry
         evidence_data = {
-            'evidence': [
+            "evidence": [
                 {
-                    'evidence_id': 'evidence-001',
-                    'type': 'file',
-                    'pointer': 'src/cli.py:100',
-                    'notes': 'CLI entry point'
+                    "evidence_id": "evidence-001",
+                    "type": "file",
+                    "pointer": "src/cli.py:100",
+                    "notes": "CLI entry point",
                 }
             ]
         }
 
         evidence_file = specs_dir / "_evidence_index.yml"
-        with open(evidence_file, 'w') as f:
+        with open(evidence_file, "w") as f:
             yaml.dump(evidence_data, f)
 
         scanner = SpecScanner(specs_dir, tmp_path / "reports", tmp_path)
         scanner._load_evidence_registry()
 
         assert len(scanner.evidence_registry) == 1
-        assert 'evidence-001' in scanner.evidence_registry
-        assert scanner.evidence_registry['evidence-001']['type'] == 'file'
+        assert "evidence-001" in scanner.evidence_registry
+        assert scanner.evidence_registry["evidence-001"]["type"] == "file"
 
     def test_load_evidence_registry_missing(self, tmp_path):
         """Test handling missing evidence registry."""
@@ -110,14 +110,14 @@ class TestSpecScanner:
     def test_verify_runtime_unit_valid(self, tmp_path):
         """Test verification of valid runtime unit."""
         unit = {
-            'id': 'test-unit',
-            'name': 'Test Unit',
-            'description': 'A test unit',
-            'start_method': 'docker-compose up test',
-            'ports': ['8000'],
-            'deps': [],
-            'config_knobs': [],
-            'evidence_ids': []
+            "id": "test-unit",
+            "name": "Test Unit",
+            "description": "A test unit",
+            "start_method": "docker-compose up test",
+            "ports": ["8000"],
+            "deps": [],
+            "config_knobs": [],
+            "evidence_ids": [],
         }
 
         scanner = SpecScanner(tmp_path / "specs", tmp_path / "reports", tmp_path)
@@ -130,7 +130,7 @@ class TestSpecScanner:
     def test_verify_runtime_unit_missing_fields(self, tmp_path):
         """Test verification of runtime unit with missing fields."""
         unit = {
-            'id': 'test-unit',
+            "id": "test-unit",
             # Missing 'name', 'description', 'start_method'
         }
 
@@ -145,10 +145,10 @@ class TestSpecScanner:
     def test_verify_runtime_unit_invalid_start_method(self, tmp_path):
         """Test verification of runtime unit with invalid start method."""
         unit = {
-            'id': 'test-unit',
-            'name': 'Test Unit',
-            'description': 'A test unit',
-            'start_method': 'python -m 123invalid',  # Invalid module name
+            "id": "test-unit",
+            "name": "Test Unit",
+            "description": "A test unit",
+            "start_method": "python -m 123invalid",  # Invalid module name
         }
 
         scanner = SpecScanner(tmp_path / "specs", tmp_path / "reports", tmp_path)
@@ -160,11 +160,11 @@ class TestSpecScanner:
     def test_verify_runtime_unit_missing_evidence(self, tmp_path):
         """Test verification of runtime unit with missing evidence."""
         unit = {
-            'id': 'test-unit',
-            'name': 'Test Unit',
-            'description': 'A test unit',
-            'start_method': 'docker-compose up test',
-            'evidence_ids': ['evidence-999']  # Non-existent evidence
+            "id": "test-unit",
+            "name": "Test Unit",
+            "description": "A test unit",
+            "start_method": "docker-compose up test",
+            "evidence_ids": ["evidence-999"],  # Non-existent evidence
         }
 
         scanner = SpecScanner(tmp_path / "specs", tmp_path / "reports", tmp_path)
@@ -177,11 +177,11 @@ class TestSpecScanner:
     def test_verify_runtime_unit_invalid_port(self, tmp_path):
         """Test verification of runtime unit with invalid port."""
         unit = {
-            'id': 'test-unit',
-            'name': 'Test Unit',
-            'description': 'A test unit',
-            'start_method': 'docker-compose up test',
-            'ports': ['99999']  # Out of range
+            "id": "test-unit",
+            "name": "Test Unit",
+            "description": "A test unit",
+            "start_method": "docker-compose up test",
+            "ports": ["99999"],  # Out of range
         }
 
         scanner = SpecScanner(tmp_path / "specs", tmp_path / "reports", tmp_path)
@@ -259,14 +259,14 @@ Some content but no status or evidence sections.
         test_file.write_text("# Test file\nprint('hello')\n")
 
         evidence_data = {
-            'evidence_id': 'evidence-001',
-            'type': 'file',
-            'pointer': 'src/cli.py:2',
-            'notes': 'Test evidence'
+            "evidence_id": "evidence-001",
+            "type": "file",
+            "pointer": "src/cli.py:2",
+            "notes": "Test evidence",
         }
 
         scanner = SpecScanner(tmp_path / "specs", tmp_path / "reports", tmp_path)
-        result = scanner._verify_evidence('evidence-001', evidence_data)
+        result = scanner._verify_evidence("evidence-001", evidence_data)
 
         assert result.status == "PASS"
         assert "Pointer file exists" in result.messages
@@ -274,14 +274,14 @@ Some content but no status or evidence sections.
     def test_verify_evidence_missing_file(self, tmp_path):
         """Test verification of evidence with missing file."""
         evidence_data = {
-            'evidence_id': 'evidence-001',
-            'type': 'file',
-            'pointer': 'src/nonexistent.py:100',
-            'notes': 'Test evidence'
+            "evidence_id": "evidence-001",
+            "type": "file",
+            "pointer": "src/nonexistent.py:100",
+            "notes": "Test evidence",
         }
 
         scanner = SpecScanner(tmp_path / "specs", tmp_path / "reports", tmp_path)
-        result = scanner._verify_evidence('evidence-001', evidence_data)
+        result = scanner._verify_evidence("evidence-001", evidence_data)
 
         assert result.status == "FAIL"
         assert any("Pointer file not found" in m for m in result.messages)
@@ -289,14 +289,14 @@ Some content but no status or evidence sections.
     def test_verify_evidence_missing_pointer(self, tmp_path):
         """Test verification of evidence with missing pointer field."""
         evidence_data = {
-            'evidence_id': 'evidence-001',
-            'type': 'file',
+            "evidence_id": "evidence-001",
+            "type": "file",
             # Missing 'pointer'
-            'notes': 'Test evidence'
+            "notes": "Test evidence",
         }
 
         scanner = SpecScanner(tmp_path / "specs", tmp_path / "reports", tmp_path)
-        result = scanner._verify_evidence('evidence-001', evidence_data)
+        result = scanner._verify_evidence("evidence-001", evidence_data)
 
         assert result.status == "FAIL"
         assert any("Missing 'pointer' field" in m for m in result.messages)
@@ -340,9 +340,9 @@ Some content but no status or evidence sections.
         specs_dir.mkdir()
 
         # Create minimal valid evidence registry
-        evidence_data = {'evidence': []}
+        evidence_data = {"evidence": []}
         evidence_file = specs_dir / "_evidence_index.yml"
-        with open(evidence_file, 'w') as f:
+        with open(evidence_file, "w") as f:
             yaml.dump(evidence_data, f)
 
         scanner = SpecScanner(specs_dir, tmp_path / "reports", tmp_path)
@@ -374,7 +374,7 @@ class TestSpecScanResult:
             spec_id="test-unit",
             status="PASS",
             messages=["All good"],
-            location="test.yml:5"
+            location="test.yml:5",
         )
 
         assert result.spec_type == "runtime_unit"
@@ -385,11 +385,7 @@ class TestSpecScanResult:
 
     def test_default_messages(self):
         """Test default empty messages list."""
-        result = SpecScanResult(
-            spec_type="feature",
-            spec_id="test-feature",
-            status="WARNING"
-        )
+        result = SpecScanResult(spec_type="feature", spec_id="test-feature", status="WARNING")
 
         assert result.messages == []
         assert result.location == ""

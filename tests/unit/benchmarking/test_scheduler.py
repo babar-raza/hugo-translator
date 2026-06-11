@@ -421,8 +421,7 @@ class TestSchedulerWithSharedEngines:
 
             # Find deprecation warning
             deprecation_warnings = [
-                warning for warning in w
-                if issubclass(warning.category, DeprecationWarning)
+                warning for warning in w if issubclass(warning.category, DeprecationWarning)
             ]
 
             assert len(deprecation_warnings) >= 1
@@ -517,7 +516,7 @@ class TestSchedulerRunNext:
         high_id = scheduler.schedule({"model_id": "high"}, priority=1)
 
         # Mock wait_for_resources to return True immediately
-        with patch.object(scheduler.monitor, 'wait_for_resources', return_value=True):
+        with patch.object(scheduler.monitor, "wait_for_resources", return_value=True):
             scheduler.run_next()
 
         # Verify high priority job was started
@@ -539,7 +538,7 @@ class TestSchedulerRunNext:
         scheduler.schedule({"model_id": "test"})
 
         # Mock wait_for_resources to return False (timeout)
-        with patch.object(scheduler.monitor, 'wait_for_resources', return_value=False):
+        with patch.object(scheduler.monitor, "wait_for_resources", return_value=False):
             result = scheduler.run_next()
 
         assert result is None
@@ -560,8 +559,8 @@ class TestSchedulerRunNext:
             status_changes.append(status)
             original_update(jid, status, **kwargs)
 
-        with patch.object(scheduler, '_update_job_status', side_effect=track_update):
-            with patch.object(scheduler.monitor, 'wait_for_resources', return_value=True):
+        with patch.object(scheduler, "_update_job_status", side_effect=track_update):
+            with patch.object(scheduler.monitor, "wait_for_resources", return_value=True):
                 scheduler.run_next()
 
         # Should have been updated to "running" then "completed"
@@ -599,7 +598,7 @@ class TestSchedulerRunAll:
                 return MagicMock()  # Return truthy so loop continues
             return None
 
-        with patch.object(scheduler, 'run_next', side_effect=mock_run_next):
+        with patch.object(scheduler, "run_next", side_effect=mock_run_next):
             scheduler.run_all()
 
         # All jobs should be completed
@@ -627,7 +626,7 @@ class TestSchedulerRunAll:
             call_count[0] += 1
             return call_count[0] <= 1  # True for first call only
 
-        with patch.object(scheduler.monitor, 'wait_for_resources', side_effect=mock_wait):
+        with patch.object(scheduler.monitor, "wait_for_resources", side_effect=mock_wait):
             scheduler.run_all()
 
         # Only first job should be completed
@@ -706,7 +705,7 @@ class TestSchedulerCanRunNow:
         job_id = scheduler.schedule({"model_id": "test"})
 
         # Mock is_safe_to_run to return True
-        with patch.object(scheduler.monitor, 'is_safe_to_run', return_value=True) as mock_safe:
+        with patch.object(scheduler.monitor, "is_safe_to_run", return_value=True) as mock_safe:
             result = scheduler.can_run_now(job_id)
 
             assert result is True
@@ -720,7 +719,7 @@ class TestSchedulerCanRunNow:
         job_id = scheduler.schedule({"model_id": "test"})
 
         # Mock is_safe_to_run to return False
-        with patch.object(scheduler.monitor, 'is_safe_to_run', return_value=False):
+        with patch.object(scheduler.monitor, "is_safe_to_run", return_value=False):
             result = scheduler.can_run_now(job_id)
 
             assert result is False

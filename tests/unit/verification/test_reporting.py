@@ -3,6 +3,7 @@ Unit tests for verification reporting module.
 
 Tests JSON and Markdown report generation.
 """
+
 import json
 from pathlib import Path
 from tempfile import TemporaryDirectory

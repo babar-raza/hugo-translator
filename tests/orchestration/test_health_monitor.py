@@ -57,11 +57,7 @@ class TestHealthCheckResult:
 
     def test_create_health_check_result(self):
         """Test creating health check result."""
-        result = HealthCheckResult(
-            component="test",
-            status=HealthStatus.HEALTHY,
-            message="Test OK"
-        )
+        result = HealthCheckResult(component="test", status=HealthStatus.HEALTHY, message="Test OK")
 
         assert result.component == "test"
         assert result.status == HealthStatus.HEALTHY
@@ -72,10 +68,7 @@ class TestHealthCheckResult:
     def test_health_check_result_with_details(self):
         """Test health check result with details."""
         result = HealthCheckResult(
-            component="test",
-            status=HealthStatus.HEALTHY,
-            message="Test OK",
-            details={"metric": 42}
+            component="test", status=HealthStatus.HEALTHY, message="Test OK", details={"metric": 42}
         )
 
         assert result.details["metric"] == 42
@@ -87,10 +80,7 @@ class TestRecoveryAction:
     def test_create_recovery_action(self):
         """Test creating recovery action."""
         action = RecoveryAction(
-            component="test",
-            action="restart",
-            success=True,
-            message="Component restarted"
+            component="test", action="restart", success=True, message="Component restarted"
         )
 
         assert action.component == "test"
@@ -113,11 +103,7 @@ class TestHealthMonitor:
 
     def test_health_monitor_with_options(self, temp_tm_dir):
         """Test creating health monitor with custom options."""
-        monitor = HealthMonitor(
-            tm_data_dir=temp_tm_dir,
-            timeout=10.0,
-            enable_auto_recovery=False
-        )
+        monitor = HealthMonitor(tm_data_dir=temp_tm_dir, timeout=10.0, enable_auto_recovery=False)
 
         assert monitor.timeout == 10.0
         assert monitor.enable_auto_recovery is False
@@ -157,6 +143,7 @@ class TestHealthMonitor:
         """Test L2 database health check when missing."""
         # Remove L2 directory
         import shutil
+
         shutil.rmtree(temp_tm_dir / "l2_lmdb")
 
         monitor = HealthMonitor(tm_data_dir=temp_tm_dir)
@@ -180,6 +167,7 @@ class TestHealthMonitor:
         """Test L3 index health check when missing."""
         # Remove L3 directory
         import shutil
+
         shutil.rmtree(temp_tm_dir / "l3_faiss")
 
         monitor = HealthMonitor(tm_data_dir=temp_tm_dir)
@@ -278,17 +266,12 @@ class TestAutoRecovery:
 
     def test_auto_recovery_disabled(self, temp_tm_dir):
         """Test that recovery doesn't run when disabled."""
-        monitor = HealthMonitor(
-            tm_data_dir=temp_tm_dir,
-            enable_auto_recovery=False
-        )
+        monitor = HealthMonitor(tm_data_dir=temp_tm_dir, enable_auto_recovery=False)
 
         # Force degraded status
-        with mock.patch.object(monitor, 'check_tm_l2') as mock_check:
+        with mock.patch.object(monitor, "check_tm_l2") as mock_check:
             mock_check.return_value = HealthCheckResult(
-                "tm_l2_lmdb",
-                HealthStatus.DEGRADED,
-                "Degraded"
+                "tm_l2_lmdb", HealthStatus.DEGRADED, "Degraded"
             )
 
             monitor.check_health()
@@ -298,17 +281,10 @@ class TestAutoRecovery:
 
     def test_auto_recovery_enabled(self, temp_tm_dir):
         """Test that recovery runs when enabled."""
-        monitor = HealthMonitor(
-            tm_data_dir=temp_tm_dir,
-            enable_auto_recovery=True
-        )
+        monitor = HealthMonitor(tm_data_dir=temp_tm_dir, enable_auto_recovery=True)
 
         # Simulate degraded component
-        result = HealthCheckResult(
-            "tm_l1_cache",
-            HealthStatus.DEGRADED,
-            "Cache issue"
-        )
+        result = HealthCheckResult("tm_l1_cache", HealthStatus.DEGRADED, "Cache issue")
 
         monitor._recover_component(result)
 
@@ -320,11 +296,7 @@ class TestAutoRecovery:
         """Test recovery attempt for L1 cache."""
         monitor = HealthMonitor(tm_data_dir=temp_tm_dir)
 
-        result = HealthCheckResult(
-            "tm_l1_cache",
-            HealthStatus.UNHEALTHY,
-            "Cache error"
-        )
+        result = HealthCheckResult("tm_l1_cache", HealthStatus.UNHEALTHY, "Cache error")
 
         monitor._recover_component(result)
 
@@ -337,11 +309,7 @@ class TestAutoRecovery:
         """Test recovery attempt for disk space."""
         monitor = HealthMonitor(tm_data_dir=temp_tm_dir)
 
-        result = HealthCheckResult(
-            "disk_space",
-            HealthStatus.UNHEALTHY,
-            "Disk full"
-        )
+        result = HealthCheckResult("disk_space", HealthStatus.UNHEALTHY, "Disk full")
 
         monitor._recover_component(result)
 
@@ -356,10 +324,7 @@ class TestHealthExport:
 
     def test_export_health_status(self, temp_tm_dir):
         """Test exporting health status."""
-        monitor = HealthMonitor(
-            tm_data_dir=temp_tm_dir,
-            enable_auto_recovery=False
-        )
+        monitor = HealthMonitor(tm_data_dir=temp_tm_dir, enable_auto_recovery=False)
 
         status = monitor.export_health_status()
 
@@ -371,10 +336,7 @@ class TestHealthExport:
 
     def test_export_includes_check_details(self, temp_tm_dir):
         """Test that export includes check details."""
-        monitor = HealthMonitor(
-            tm_data_dir=temp_tm_dir,
-            enable_auto_recovery=False
-        )
+        monitor = HealthMonitor(tm_data_dir=temp_tm_dir, enable_auto_recovery=False)
 
         status = monitor.export_health_status()
 
@@ -390,11 +352,7 @@ class TestHealthExport:
         monitor = HealthMonitor(tm_data_dir=temp_tm_dir, enable_auto_recovery=True)
 
         # Trigger recovery
-        result = HealthCheckResult(
-            "tm_l1_cache",
-            HealthStatus.DEGRADED,
-            "Issue"
-        )
+        result = HealthCheckResult("tm_l1_cache", HealthStatus.DEGRADED, "Issue")
         monitor._recover_component(result)
 
         status = monitor.export_health_status()
@@ -407,36 +365,27 @@ class TestHealthExport:
 
     def test_get_http_status_code_healthy(self, temp_tm_dir):
         """Test HTTP status code for healthy system."""
-        monitor = HealthMonitor(
-            tm_data_dir=temp_tm_dir,
-            enable_auto_recovery=False
-        )
+        monitor = HealthMonitor(tm_data_dir=temp_tm_dir, enable_auto_recovery=False)
 
-        with mock.patch.object(monitor, 'check_health') as mock_check:
+        with mock.patch.object(monitor, "check_health") as mock_check:
             mock_check.return_value = (HealthStatus.HEALTHY, [])
             code = monitor.get_http_status_code()
             assert code == 200
 
     def test_get_http_status_code_degraded(self, temp_tm_dir):
         """Test HTTP status code for degraded system."""
-        monitor = HealthMonitor(
-            tm_data_dir=temp_tm_dir,
-            enable_auto_recovery=False
-        )
+        monitor = HealthMonitor(tm_data_dir=temp_tm_dir, enable_auto_recovery=False)
 
-        with mock.patch.object(monitor, 'check_health') as mock_check:
+        with mock.patch.object(monitor, "check_health") as mock_check:
             mock_check.return_value = (HealthStatus.DEGRADED, [])
             code = monitor.get_http_status_code()
             assert code == 503
 
     def test_get_http_status_code_unhealthy(self, temp_tm_dir):
         """Test HTTP status code for unhealthy system."""
-        monitor = HealthMonitor(
-            tm_data_dir=temp_tm_dir,
-            enable_auto_recovery=False
-        )
+        monitor = HealthMonitor(tm_data_dir=temp_tm_dir, enable_auto_recovery=False)
 
-        with mock.patch.object(monitor, 'check_health') as mock_check:
+        with mock.patch.object(monitor, "check_health") as mock_check:
             mock_check.return_value = (HealthStatus.UNHEALTHY, [])
             code = monitor.get_http_status_code()
             assert code == 503
@@ -490,6 +439,7 @@ class TestHealthCheckTimeout:
 
         # Health check should complete within timeout
         import time
+
         start = time.time()
         monitor.check_health()
         duration = time.time() - start

@@ -5,6 +5,7 @@ Verifies that autonomous_content_translation_worker._run_daemon() and _run_onesh
 only call _record_state(success=True) when _run_new_files contains at least one
 successful translation.
 """
+
 from __future__ import annotations
 
 import json
@@ -15,6 +16,7 @@ from unittest.mock import MagicMock
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _make_worker(tmp_path: Path, run_new_files: dict) -> Any:
     """

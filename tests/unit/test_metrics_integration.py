@@ -74,7 +74,9 @@ class MockTranslationPipeline:
                 remaining -= batch
 
             if not success:
-                self.progress.record_error("test_error", f"Simulated failure in {file_name}", file_name)
+                self.progress.record_error(
+                    "test_error", f"Simulated failure in {file_name}", file_name
+                )
 
             self.progress.file_completed(success=success)
 
@@ -95,11 +97,13 @@ class TestMetricsIntegration:
             tracker.start(files_total=3)
 
             pipeline = MockTranslationPipeline(tracker)
-            pipeline.translate_files([
-                {"name": "file1.md", "segments": 20, "cache_hit_rate": 0.3},
-                {"name": "file2.md", "segments": 30, "cache_hit_rate": 0.5},
-                {"name": "file3.md", "segments": 10, "cache_hit_rate": 0.0},
-            ])
+            pipeline.translate_files(
+                [
+                    {"name": "file1.md", "segments": 20, "cache_hit_rate": 0.3},
+                    {"name": "file2.md", "segments": 30, "cache_hit_rate": 0.5},
+                    {"name": "file3.md", "segments": 10, "cache_hit_rate": 0.0},
+                ]
+            )
 
             final = tracker.stop()
 
@@ -116,8 +120,9 @@ class TestMetricsIntegration:
 
             # Check monotonically increasing (or equal)
             for i in range(1, len(segments_done_values)):
-                assert segments_done_values[i] >= segments_done_values[i-1], \
-                    f"Segment count decreased at index {i}: {segments_done_values[i-1]} -> {segments_done_values[i]}"
+                assert segments_done_values[i] >= segments_done_values[i - 1], (
+                    f"Segment count decreased at index {i}: {segments_done_values[i - 1]} -> {segments_done_values[i]}"
+                )
 
             # Final should have all segments
             assert final.segments_done == 60

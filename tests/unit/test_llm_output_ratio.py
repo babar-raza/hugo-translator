@@ -6,10 +6,12 @@ Four cases:
   3. test_11x_hindi_fails — 11× expansion fails with hi override (3.0)
   4. test_4x_czech_passes_with_override — 4× passes cs (override=5.0)
 """
+
 from __future__ import annotations
 
-import pytest
 from unittest.mock import MagicMock, patch
+
+import pytest
 
 
 def _make_backend(global_ratio=4.0, overrides=None):
@@ -57,7 +59,9 @@ class TestLLMOutputRatio:
             input_text, 0, 1, "en", "hi", None, translations
         )
 
-        assert backend.last_truncation_detected is True, "11× output should trigger truncation for hi:3.0"
+        assert backend.last_truncation_detected is True, (
+            "11× output should trigger truncation for hi:3.0"
+        )
         assert len(translations[0]) <= len(input_text) * 3.0 * 1.05, (
             f"Truncated output should be ≤3× input; got {len(translations[0])} chars"
         )
@@ -76,5 +80,7 @@ class TestLLMOutputRatio:
             input_text, 0, 1, "en", "cs", None, translations
         )
 
-        assert backend.last_truncation_detected is False, "4× should NOT trigger truncation for cs:5.0"
+        assert backend.last_truncation_detected is False, (
+            "4× should NOT trigger truncation for cs:5.0"
+        )
         assert translations[0] == result_text

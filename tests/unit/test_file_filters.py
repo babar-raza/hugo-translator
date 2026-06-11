@@ -14,11 +14,10 @@ from utils.file_filters import filter_source_files
 
 class MockSiteProfile:
     """Mock site profile for testing."""
-    def __init__(self, per_language_folders=False, source_lang='en'):
+
+    def __init__(self, per_language_folders=False, source_lang="en"):
         self.default_source_lang = source_lang
-        self.output_layout = {
-            'per_language_folders': per_language_folders
-        }
+        self.output_layout = {"per_language_folders": per_language_folders}
 
 
 class TestFileBasedLocalization:
@@ -79,7 +78,7 @@ class TestFolderBasedLocalization:
 
     def test_filters_target_language_folders(self):
         """Should exclude files in target language folders."""
-        site_profile = MockSiteProfile(per_language_folders=True, source_lang='en')
+        site_profile = MockSiteProfile(per_language_folders=True, source_lang="en")
         files = [
             Path("content/en/index.md"),
             Path("content/ro/index.md"),
@@ -95,7 +94,7 @@ class TestFolderBasedLocalization:
 
     def test_includes_source_language_folder(self):
         """Should include files in source language folder."""
-        site_profile = MockSiteProfile(per_language_folders=True, source_lang='en')
+        site_profile = MockSiteProfile(per_language_folders=True, source_lang="en")
         files = [
             Path("content/en/index.md"),
             Path("content/en/posts/post1.md"),
@@ -109,7 +108,7 @@ class TestFolderBasedLocalization:
 
     def test_handles_windows_paths(self):
         """Should handle Windows-style path separators."""
-        site_profile = MockSiteProfile(per_language_folders=True, source_lang='en')
+        site_profile = MockSiteProfile(per_language_folders=True, source_lang="en")
         files = [
             Path("content\\en\\index.md"),
             Path("content\\ro\\index.md"),
@@ -118,9 +117,9 @@ class TestFolderBasedLocalization:
         result = filter_source_files(files, site_profile, ["ro"])
 
         # Should include source language folder
-        assert any('en' in str(f) for f in result)
+        assert any("en" in str(f) for f in result)
         # Should exclude target language folder
-        assert not any('ro' in str(f) and 'en' not in str(f) for f in result)
+        assert not any("ro" in str(f) and "en" not in str(f) for f in result)
 
 
 class TestEdgeCases:
@@ -193,7 +192,7 @@ class TestErrorHandling:
         """Should handle site_profile without output_layout attribute."""
         site_profile = Mock()
         site_profile.output_layout = None
-        site_profile.default_source_lang = 'en'
+        site_profile.default_source_lang = "en"
 
         files = [Path("index.md"), Path("index.ro.md")]
 

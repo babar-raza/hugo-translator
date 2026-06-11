@@ -5,6 +5,7 @@ Higher concurrency and longer durations than standard tests.
 
 SR-04: High-concurrency stress testing to expose race conditions and deadlocks.
 """
+
 import sys
 import threading
 import time
@@ -17,7 +18,7 @@ class TestAtomicWriteStress:
 
     def test_20_concurrent_writers_same_directory(self, tmp_path, atomic_write_module):
         """Test 20 concurrent writers to same directory."""
-        atomic_write = atomic_write_module['atomic_write']
+        atomic_write = atomic_write_module["atomic_write"]
 
         errors = []
         successes = []
@@ -65,7 +66,7 @@ class TestAtomicWriteStress:
         2. The final file has valid content
         3. Failures are handled cleanly (no crashes)
         """
-        atomic_write = atomic_write_module['atomic_write']
+        atomic_write = atomic_write_module["atomic_write"]
 
         target_file = tmp_path / "shared.txt"
         write_count = [0]
@@ -109,7 +110,7 @@ class TestFileLockStress:
 
     def test_lock_contention_20_threads(self, tmp_path, file_lock_class):
         """Test 20 threads competing for same lock."""
-        FileLock = file_lock_class['FileLock']
+        FileLock = file_lock_class["FileLock"]
 
         lock_file = tmp_path / "stress.lock"
         acquire_count = [0]
@@ -164,10 +165,10 @@ class TestProgressTrackerStress:
 
         tracker = ProgressTracker(
             site_id="stress-test",
-            source_dir=env['source_dir'],
-            output_dir=env['output_dir'],
+            source_dir=env["source_dir"],
+            output_dir=env["output_dir"],
             target_langs=["es"],
-            progress_dir=env['progress_dir'],
+            progress_dir=env["progress_dir"],
         )
         tracker.state.total_files = 100
 
@@ -186,6 +187,7 @@ class TestProgressTrackerStress:
         # File persisted correctly
         assert tracker.progress_file.exists()
         import json
+
         data = json.loads(tracker.progress_file.read_text())
         assert len(data["completed_files"]) == 100
 
@@ -208,10 +210,10 @@ class TestProgressTrackerStress:
                 # Create separate tracker per thread to avoid concurrent write conflicts
                 tracker = ProgressTracker(
                     site_id=f"concurrent-stress-{worker_id}",
-                    source_dir=env['source_dir'],
-                    output_dir=env['output_dir'],
+                    source_dir=env["source_dir"],
+                    output_dir=env["output_dir"],
                     target_langs=["es", "fr"],
-                    progress_dir=env['progress_dir'],
+                    progress_dir=env["progress_dir"],
                 )
                 tracker.state.total_files = 5
 
@@ -241,5 +243,5 @@ class TestProgressTrackerStress:
         assert elapsed < 15.0
 
         # All progress files should exist (one per worker)
-        progress_files = list(env['progress_dir'].glob("*.json"))
+        progress_files = list(env["progress_dir"].glob("*.json"))
         assert len(progress_files) == 10

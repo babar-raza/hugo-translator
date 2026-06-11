@@ -377,9 +377,7 @@ class TestSweepScheduler:
             finally:
                 scheduler.stop()
 
-    def test_sweep_statistics(
-        self, mock_config_service, mock_enqueue_callback, temp_content_dir
-    ):
+    def test_sweep_statistics(self, mock_config_service, mock_enqueue_callback, temp_content_dir):
         """Test sweep statistics collection."""
         scheduler = SweepScheduler(
             config_service=mock_config_service,
@@ -419,7 +417,10 @@ class TestSweepScheduler:
     def test_sweep_all_sites(self, mock_enqueue_callback):
         """Test sweeping all configured sites."""
         # Create profiles for multiple sites
-        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir1, tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir2:
+        with (
+            tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir1,
+            tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir2,
+        ):
             content_dir1 = Path(tmpdir1) / "content"
             content_dir1.mkdir()
 
@@ -472,7 +473,9 @@ class TestSweepScheduler:
                 assert mock_enqueue_callback.call_count >= 2
 
                 # Check that both sites were processed
-                sites_processed = {call[0][0].site_id for call in mock_enqueue_callback.call_args_list}
+                sites_processed = {
+                    call[0][0].site_id for call in mock_enqueue_callback.call_args_list
+                }
                 assert "site1.com" in sites_processed
                 assert "site2.com" in sites_processed
 

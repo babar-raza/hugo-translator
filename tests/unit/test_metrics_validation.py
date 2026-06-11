@@ -27,7 +27,8 @@ def test_validation_catches_error_contradiction(caplog):
 
     # Check for validation warning
     validation_warnings = [
-        record for record in caplog.records
+        record
+        for record in caplog.records
         if record.levelno == logging.WARNING
         and "METRICS VALIDATION" in record.message
         and "CONTRADICTION" in record.message
@@ -55,9 +56,9 @@ def test_validation_no_warnings_on_consistent_metrics(caplog):
 
     # Check that no METRICS VALIDATION warnings were logged
     validation_warnings = [
-        record for record in caplog.records
-        if record.levelno == logging.WARNING
-        and "METRICS VALIDATION" in record.message
+        record
+        for record in caplog.records
+        if record.levelno == logging.WARNING and "METRICS VALIDATION" in record.message
     ]
 
     assert len(validation_warnings) == 0, "Expected no validation warnings for consistent metrics"
@@ -85,7 +86,8 @@ def test_validation_allows_failures_with_matching_errors(caplog):
 
     # Should not trigger CONTRADICTION warning (failures match errors)
     contradiction_warnings = [
-        record for record in caplog.records
+        record
+        for record in caplog.records
         if record.levelno == logging.WARNING
         and "METRICS VALIDATION" in record.message
         and "CONTRADICTION" in record.message
@@ -117,7 +119,8 @@ def test_validation_detects_segment_gap(caplog):
 
     # Check for SEGMENT GAP warning
     segment_gap_warnings = [
-        record for record in caplog.records
+        record
+        for record in caplog.records
         if record.levelno == logging.WARNING
         and "METRICS VALIDATION" in record.message
         and "SEGMENT GAP" in record.message
@@ -146,7 +149,8 @@ def test_validation_error_ratio_anomaly(caplog):
 
     # Check for ANOMALY warning
     anomaly_warnings = [
-        record for record in caplog.records
+        record
+        for record in caplog.records
         if record.levelno == logging.WARNING
         and "METRICS VALIDATION" in record.message
         and "ANOMALY" in record.message

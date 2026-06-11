@@ -3,6 +3,7 @@ Test L3 Build Script Argument Conflict Validation
 
 Tests that --force and --resume cannot be used together.
 """
+
 import subprocess
 import sys
 from pathlib import Path

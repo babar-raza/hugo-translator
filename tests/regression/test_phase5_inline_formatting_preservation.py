@@ -55,8 +55,7 @@ Paragraph with *italic* and **bold** formatting.
         if node.type == NodeType.PARAGRAPH:
             # Check if has inline formatting children
             has_formatting = any(
-                child.type in [NodeType.STRONG, NodeType.EMPHASIS]
-                for child in node.children
+                child.type in [NodeType.STRONG, NodeType.EMPHASIS] for child in node.children
             )
             if has_formatting:
                 paragraphs_with_formatting.append(node)
@@ -68,8 +67,7 @@ Paragraph with *italic* and **bold** formatting.
         find_paragraphs(node)
 
     # Should find the paragraphs with formatting
-    assert len(paragraphs_with_formatting) >= 2, \
-        "Should identify paragraphs with inline formatting"
+    assert len(paragraphs_with_formatting) >= 2, "Should identify paragraphs with inline formatting"
 
 
 def test_bold_count_preserved_end_to_end(parser):
@@ -116,12 +114,14 @@ Texte avec **plusieurs** gras **spans**.
 
     def count_bold(ast):
         count = 0
+
         def traverse(node):
             nonlocal count
             if node.type == NodeType.STRONG:
                 count += 1
             for child in node.children:
                 traverse(child)
+
         for node in ast:
             traverse(node)
         return count
@@ -129,8 +129,9 @@ Texte avec **plusieurs** gras **spans**.
     source_bold = count_bold(source_doc.ast)
     target_bold = count_bold(target_doc.ast)
 
-    assert source_bold == target_bold, \
+    assert source_bold == target_bold, (
         f"Bold count must be preserved: source={source_bold}, target={target_bold}"
+    )
     assert source_bold >= 4, "Fixture should have at least 4 bold spans"
 
 
@@ -165,12 +166,14 @@ Texte avec *plusieurs* italique *spans*.
 
     def count_italic(ast):
         count = 0
+
         def traverse(node):
             nonlocal count
             if node.type == NodeType.EMPHASIS:
                 count += 1
             for child in node.children:
                 traverse(child)
+
         for node in ast:
             traverse(node)
         return count
@@ -178,8 +181,9 @@ Texte avec *plusieurs* italique *spans*.
     source_italic = count_italic(source_doc.ast)
     target_italic = count_italic(target_doc.ast)
 
-    assert source_italic == target_italic, \
+    assert source_italic == target_italic, (
         f"Italic count must be preserved: source={source_italic}, target={target_italic}"
+    )
     assert source_italic >= 3, "Fixture should have at least 3 italic spans"
 
 
@@ -211,6 +215,7 @@ Ceci a **gras** et *italique* et **plus gras**.
     def count_formatting(ast):
         bold = 0
         italic = 0
+
         def traverse(node):
             nonlocal bold, italic
             if node.type == NodeType.STRONG:
@@ -219,6 +224,7 @@ Ceci a **gras** et *italique* et **plus gras**.
                 italic += 1
             for child in node.children:
                 traverse(child)
+
         for node in ast:
             traverse(node)
         return bold, italic
@@ -226,10 +232,12 @@ Ceci a **gras** et *italique* et **plus gras**.
     source_bold, source_italic = count_formatting(source_doc.ast)
     target_bold, target_italic = count_formatting(target_doc.ast)
 
-    assert source_bold == target_bold, \
+    assert source_bold == target_bold, (
         f"Bold count mismatch: source={source_bold}, target={target_bold}"
-    assert source_italic == target_italic, \
+    )
+    assert source_italic == target_italic, (
         f"Italic count mismatch: source={source_italic}, target={target_italic}"
+    )
 
 
 def test_regression_frozen_file_formatting(parser):
@@ -282,6 +290,7 @@ Aspose.Slides **Convertisseur de présentation pour .NET**
     def count_formatting(ast):
         bold = 0
         italic = 0
+
         def traverse(node):
             nonlocal bold, italic
             if node.type == NodeType.STRONG:
@@ -290,6 +299,7 @@ Aspose.Slides **Convertisseur de présentation pour .NET**
                 italic += 1
             for child in node.children:
                 traverse(child)
+
         for node in ast:
             traverse(node)
         return bold, italic
@@ -298,10 +308,12 @@ Aspose.Slides **Convertisseur de présentation pour .NET**
     target_bold, target_italic = count_formatting(target_doc.ast)
 
     # Should have same counts
-    assert source_bold == target_bold, \
+    assert source_bold == target_bold, (
         f"Frozen file regression: bold mismatch source={source_bold}, target={target_bold}"
-    assert source_italic == target_italic, \
+    )
+    assert source_italic == target_italic, (
         f"Frozen file regression: italic mismatch source={source_italic}, target={target_italic}"
+    )
 
     # Should match expected counts
     assert source_bold >= 6, f"Should have at least 6 bold spans, got {source_bold}"
@@ -338,12 +350,14 @@ La méthode `Save()` **convertit** le fichier en PDF.
 
     def count_code_spans(ast):
         count = 0
+
         def traverse(node):
             nonlocal count
             if node.type == NodeType.CODE_SPAN:
                 count += 1
             for child in node.children:
                 traverse(child)
+
         for node in ast:
             traverse(node)
         return count
@@ -351,8 +365,9 @@ La méthode `Save()` **convertit** le fichier en PDF.
     source_code = count_code_spans(source_doc.ast)
     target_code = count_code_spans(target_doc.ast)
 
-    assert source_code == target_code, \
+    assert source_code == target_code, (
         f"Code span count must match: source={source_code}, target={target_code}"
+    )
     assert source_code >= 2, "Fixture should have at least 2 code spans"
 
 

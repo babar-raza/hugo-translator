@@ -78,19 +78,13 @@ class TestCalculateBleu:
 
     def test_bleu_partial_match(self, metrics):
         """Test BLEU score for partial matches."""
-        score = metrics.calculate_bleu(
-            "The cat sat on the mat",
-            "The cat is sitting on the mat"
-        )
+        score = metrics.calculate_bleu("The cat sat on the mat", "The cat is sitting on the mat")
         # Should be between 0 and 100
         assert 0 < score < 100
 
     def test_bleu_no_match(self, metrics):
         """Test BLEU score for completely different strings."""
-        score = metrics.calculate_bleu(
-            "Hello world",
-            "Goodbye universe"
-        )
+        score = metrics.calculate_bleu("Hello world", "Goodbye universe")
         # Should be low but not necessarily 0
         assert score < 50
 
@@ -118,8 +112,14 @@ class TestCalculateCorpusBleu:
     def test_corpus_bleu_perfect(self, metrics):
         """Test corpus BLEU with perfect matches."""
         # Use longer sentences - short sentences get 0.0 due to n-gram brevity penalty
-        hypotheses = ["The quick brown fox jumps over the lazy dog", "This is another test sentence for BLEU"]
-        references = ["The quick brown fox jumps over the lazy dog", "This is another test sentence for BLEU"]
+        hypotheses = [
+            "The quick brown fox jumps over the lazy dog",
+            "This is another test sentence for BLEU",
+        ]
+        references = [
+            "The quick brown fox jumps over the lazy dog",
+            "This is another test sentence for BLEU",
+        ]
         score = metrics.calculate_corpus_bleu(hypotheses, references)
         assert score == pytest.approx(100.0, rel=1e-6)
 
@@ -227,10 +227,7 @@ class TestEvaluateTranslation:
 
     def test_evaluate_translation_bleu_only(self, metrics):
         """Test evaluation with BLEU only (no source for COMET)."""
-        result = metrics.evaluate_translation(
-            hypothesis="Hello world",
-            reference="Hello world"
-        )
+        result = metrics.evaluate_translation(hypothesis="Hello world", reference="Hello world")
         assert isinstance(result, QualityScore)
         assert result.bleu_score == pytest.approx(100.0, rel=1e-6)
         assert result.comet_score is None
@@ -240,9 +237,7 @@ class TestEvaluateTranslation:
     def test_evaluate_translation_with_source(self, metrics):
         """Test evaluation with source text (would use COMET if available)."""
         result = metrics.evaluate_translation(
-            hypothesis="Bonjour monde",
-            reference="Bonjour le monde",
-            source="Hello world"
+            hypothesis="Bonjour monde", reference="Bonjour le monde", source="Hello world"
         )
         assert isinstance(result, QualityScore)
         assert 0 < result.bleu_score < 100
@@ -257,9 +252,7 @@ class TestEvaluateTranslation:
         metrics.comet_model.predict.return_value = {"scores": [0.9]}
 
         result = metrics.evaluate_translation(
-            hypothesis="Bonjour",
-            reference="Bonjour",
-            source="Hello"
+            hypothesis="Bonjour", reference="Bonjour", source="Hello"
         )
         assert result.bleu_score == pytest.approx(100.0, rel=1e-6)
         assert result.comet_score == 0.9
@@ -278,7 +271,7 @@ class TestEvaluateCorpus:
         # Use longer sentences - short sentences get 0.0 due to n-gram brevity penalty
         result = metrics.evaluate_corpus(
             hypotheses=["The quick brown fox jumps over the lazy dog", "This is a test sentence"],
-            references=["The quick brown fox jumps over the lazy dog", "This is a test sentence"]
+            references=["The quick brown fox jumps over the lazy dog", "This is a test sentence"],
         )
         assert isinstance(result, QualityScore)
         assert result.bleu_score == pytest.approx(100.0, rel=1e-6)
@@ -293,7 +286,7 @@ class TestEvaluateCorpus:
         result = metrics.evaluate_corpus(
             hypotheses=["Bonjour le monde entier", "Au revoir et bonne journee"],
             references=["Bonjour le monde entier", "Au revoir et bonne journee"],
-            sources=["Hello entire world", "Goodbye and have a nice day"]
+            sources=["Hello entire world", "Goodbye and have a nice day"],
         )
         assert result.bleu_score == pytest.approx(100.0, rel=1e-6)
         # COMET disabled
@@ -310,7 +303,7 @@ class TestEvaluateCorpus:
             hypotheses=["hyp1", "hyp2"],
             references=["ref1", "ref2"],
             sources=["src1", "src2"],
-            batch_size=16
+            batch_size=16,
         )
 
         # Verify batch_size was passed

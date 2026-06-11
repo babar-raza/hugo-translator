@@ -3,6 +3,7 @@ Integration tests for verification report generation.
 
 Tests that reports are generated correctly when verification is enabled.
 """
+
 import json
 import sys
 import tempfile

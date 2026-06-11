@@ -24,14 +24,17 @@ def patch_queue_path(tmp_path):
     """Redirect the queue file to a temp directory for every test."""
     queue_file = tmp_path / "retranslate_queue.jsonl"
     quarantine_file = tmp_path / "quarantine.jsonl"
-    with mock.patch.object(rtq, "_QUEUE_FILE", queue_file), \
-         mock.patch.object(rtq, "_QUARANTINE_FILE", quarantine_file):
+    with (
+        mock.patch.object(rtq, "_QUEUE_FILE", queue_file),
+        mock.patch.object(rtq, "_QUARANTINE_FILE", quarantine_file),
+    ):
         yield queue_file
 
 
 # ---------------------------------------------------------------------------
 # add_to_queue
 # ---------------------------------------------------------------------------
+
 
 class TestAddToQueue:
     def test_creates_queue_file_with_entry(self, tmp_path):
@@ -85,6 +88,7 @@ class TestAddToQueue:
 # load_queued_paths
 # ---------------------------------------------------------------------------
 
+
 class TestLoadQueuedPaths:
     def test_returns_empty_set_when_no_queue_file(self):
         assert rtq.load_queued_paths() == set()
@@ -128,7 +132,7 @@ class TestLoadQueuedPaths:
     def test_skips_malformed_lines(self, tmp_path):
         queue_file = rtq._queue_path()
         queue_file.parent.mkdir(parents=True, exist_ok=True)
-        queue_file.write_text("not-json\n{\"output_path\": \"/valid\", \"retry_count\": 1}\n")
+        queue_file.write_text('not-json\n{"output_path": "/valid", "retry_count": 1}\n')
 
         paths = rtq.load_queued_paths()
         assert "/valid" in paths
@@ -146,6 +150,7 @@ class TestLoadQueuedPaths:
 # ---------------------------------------------------------------------------
 # remove_from_queue
 # ---------------------------------------------------------------------------
+
 
 class TestRemoveFromQueue:
     def test_removes_matching_entry(self, tmp_path):
@@ -186,6 +191,7 @@ class TestRemoveFromQueue:
 # ---------------------------------------------------------------------------
 # increment_retry
 # ---------------------------------------------------------------------------
+
 
 class TestIncrementRetry:
     def test_increments_retry_count(self, tmp_path):
@@ -246,6 +252,7 @@ class TestIncrementRetry:
 # Round-trip integration
 # ---------------------------------------------------------------------------
 
+
 class TestRoundTrip:
     def test_add_load_remove_cycle(self, tmp_path):
         f = tmp_path / "post.ar.md"
@@ -279,6 +286,7 @@ class TestRoundTrip:
 # ---------------------------------------------------------------------------
 # Dedup (TC-02)
 # ---------------------------------------------------------------------------
+
 
 class TestAddToQueueDedup:
     def test_duplicate_add_increments_retry_instead_of_appending(self, tmp_path):

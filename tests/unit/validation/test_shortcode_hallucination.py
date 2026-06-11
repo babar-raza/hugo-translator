@@ -9,6 +9,7 @@ TC-SH-05: Simulates Japanese KB RC-2 defect pattern exactly
 
 RC-2 root cause: unexpected-new-shortcode was WARNING, should be ERROR.
 """
+
 from __future__ import annotations
 
 import pytest
@@ -24,7 +25,7 @@ except ImportError:
 
 # Also test the scan tool's shortcode balance checker
 try:
-    from scripts.repair_translated_content import check_shortcode_balance, Issue
+    from scripts.repair_translated_content import Issue, check_shortcode_balance
 
     HAS_SCAN = True
 except ImportError:
@@ -45,9 +46,8 @@ class TestShortcodePreservationValidator:
 
         assert result is not None
         error_issues = [i for i in result.issues if i.severity.value == "error"]
-        assert len(error_issues) > 0, (
-            "Expected ERROR for shortcode added by LLM, got: "
-            + str([i.message for i in result.issues])
+        assert len(error_issues) > 0, "Expected ERROR for shortcode added by LLM, got: " + str(
+            [i.message for i in result.issues]
         )
 
     def test_tc_sh_02_source_has_pair_translation_keeps_it(self):
@@ -59,9 +59,8 @@ class TestShortcodePreservationValidator:
         result = validator.validate(source, translation)
 
         error_issues = [i for i in result.issues if i.severity.value == "error"]
-        assert len(error_issues) == 0, (
-            "Expected no errors for matched pair, got: "
-            + str([i.message for i in error_issues])
+        assert len(error_issues) == 0, "Expected no errors for matched pair, got: " + str(
+            [i.message for i in error_issues]
         )
 
     def test_tc_sh_04_source_has_shortcode_translation_removes_it(self):
@@ -88,17 +87,9 @@ class TestShortcodePreservationValidator:
     def test_tc_sh_05_japanese_kb_rc2_pattern(self):
         """Simulates the exact RC-2 defect: numbered list + injected {{% /steps %}}."""
         # English source: plain numbered list, NO shortcodes (KB article body excerpt)
-        source = (
-            "7. Save the modified Word document to disk.\n"
-            "\n"
-            "## Where to host the API\n"
-        )
+        source = "7. Save the modified Word document to disk.\n\n## Where to host the API\n"
         # Japanese translation: same but with hallucinated {{% /steps %}} at step 7
-        translation = (
-            "7. {{% /steps %}}.\n"
-            "\n"
-            "## API をホストする場所\n"
-        )
+        translation = "7. {{% /steps %}}.\n\n## API をホストする場所\n"
 
         validator = ShortcodePreservationValidator()
         result = validator.validate(source, translation)

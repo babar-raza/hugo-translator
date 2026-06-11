@@ -14,6 +14,7 @@ Author: Agent C (Tests & Verification Specialist)
 Task: P0-02-GOLDEN-TESTS
 Date: 2026-01-14
 """
+
 import json
 import re
 import subprocess
@@ -32,7 +33,7 @@ class CLIResult:
         stdout: str,
         stderr: str,
         duration: float,
-        files_written: list[str] | None = None
+        files_written: list[str] | None = None,
     ):
         self.exit_code = exit_code
         self.stdout = stdout
@@ -47,7 +48,7 @@ class CLIResult:
             "stdout": self.stdout,
             "stderr": self.stderr,
             "duration": self.duration,
-            "files_written": self.files_written
+            "files_written": self.files_written,
         }
 
     @classmethod
@@ -58,7 +59,7 @@ class CLIResult:
             stdout=data["stdout"],
             stderr=data["stderr"],
             duration=data["duration"],
-            files_written=data.get("files_written", [])
+            files_written=data.get("files_written", []),
         )
 
 
@@ -81,10 +82,7 @@ class GoldenTestBase:
         cls.snapshot_dir.mkdir(parents=True, exist_ok=True)
 
     def run_cli(
-        self,
-        args: list[str],
-        capture_files: bool = False,
-        cwd: Path | None = None
+        self, args: list[str], capture_files: bool = False, cwd: Path | None = None
     ) -> CLIResult:
         """
         Execute CLI via subprocess and capture result.
@@ -110,14 +108,15 @@ class GoldenTestBase:
 
         # Execute CLI
         import time
+
         start_time = time.time()
         result = subprocess.run(
             cmd,
             cwd=cwd,
             capture_output=True,
-            encoding='utf-8',
-            errors='replace',  # Replace invalid UTF-8 chars instead of failing
-            timeout=120  # 2 minute timeout
+            encoding="utf-8",
+            errors="replace",  # Replace invalid UTF-8 chars instead of failing
+            timeout=120,  # 2 minute timeout
         )
         duration = time.time() - start_time
 
@@ -133,7 +132,7 @@ class GoldenTestBase:
             stdout=result.stdout,
             stderr=result.stderr,
             duration=duration,
-            files_written=files_written
+            files_written=files_written,
         )
 
     def _get_output_files(self) -> set:
@@ -182,7 +181,7 @@ class GoldenTestBase:
             stdout=stdout_normalized,
             stderr=stderr_normalized,
             duration=0.0,  # Don't compare duration
-            files_written=files_normalized
+            files_written=files_normalized,
         )
 
     def _normalize_text(self, text: str) -> str:
@@ -206,48 +205,50 @@ class GoldenTestBase:
 
         # Replace ISO8601 timestamps (e.g., 2026-01-14T18:07:19.123456)
         text = re.sub(
-            r'\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})?',
-            '<TIMESTAMP>',
-            text
+            r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})?",
+            "<TIMESTAMP>",
+            text,
         )
 
         # Replace date patterns (YYYY-MM-DD)
-        text = re.sub(r'\d{4}-\d{2}-\d{2}', '<DATE>', text)
+        text = re.sub(r"\d{4}-\d{2}-\d{2}", "<DATE>", text)
 
         # Replace time patterns (HH:MM:SS)
-        text = re.sub(r'\d{2}:\d{2}:\d{2}', '<TIME>', text)
+        text = re.sub(r"\d{2}:\d{2}:\d{2}", "<TIME>", text)
 
         # Replace absolute paths (convert to relative)
-        project_root_str = str(self.project_root).replace('\\', '/')
-        text = text.replace(str(self.project_root), '<PROJECT_ROOT>')
-        text = text.replace(project_root_str, '<PROJECT_ROOT>')
-        text = text.replace(str(self.project_root).replace('\\', '\\\\'), '<PROJECT_ROOT>')
+        project_root_str = str(self.project_root).replace("\\", "/")
+        text = text.replace(str(self.project_root), "<PROJECT_ROOT>")
+        text = text.replace(project_root_str, "<PROJECT_ROOT>")
+        text = text.replace(str(self.project_root).replace("\\", "\\\\"), "<PROJECT_ROOT>")
 
         # Replace Windows-style paths
-        text = re.sub(r'[A-Z]:\\[^\s\"\']+', lambda m: self._normalize_path(m.group(0)), text)
+        text = re.sub(r"[A-Z]:\\[^\s\"\']+", lambda m: self._normalize_path(m.group(0)), text)
 
         # Replace temp directory patterns
-        text = re.sub(r'/tmp/[^\s\"\']+', '<TEMP_DIR>', text)
-        text = re.sub(r'C:\\Users\\[^\\]+\\AppData\\Local\\Temp\\[^\s\"\']+', '<TEMP_DIR>', text)
+        text = re.sub(r"/tmp/[^\s\"\']+", "<TEMP_DIR>", text)
+        text = re.sub(r"C:\\Users\\[^\\]+\\AppData\\Local\\Temp\\[^\s\"\']+", "<TEMP_DIR>", text)
 
         # Replace PIDs
-        text = re.sub(r'PID:\s*\d+', 'PID: <PID>', text)
-        text = re.sub(r'pid=\d+', 'pid=<PID>', text)
+        text = re.sub(r"PID:\s*\d+", "PID: <PID>", text)
+        text = re.sub(r"pid=\d+", "pid=<PID>", text)
 
         # Replace memory addresses
-        text = re.sub(r'0x[0-9a-fA-F]+', '<ADDR>', text)
+        text = re.sub(r"0x[0-9a-fA-F]+", "<ADDR>", text)
 
         # Replace duration patterns (e.g., "1.23s", "45.67 seconds")
-        text = re.sub(r'\d+\.\d+\s*(?:s|sec|seconds?)', '<DURATION>', text)
+        text = re.sub(r"\d+\.\d+\s*(?:s|sec|seconds?)", "<DURATION>", text)
 
         # Replace progress percentages (e.g., "75%", "100.0%")
-        text = re.sub(r'\d+(?:\.\d+)?%', '<PROGRESS>', text)
+        text = re.sub(r"\d+(?:\.\d+)?%", "<PROGRESS>", text)
 
         # Replace "N files processed" patterns
-        text = re.sub(r'\d+\s+files?\s+(?:processed|translated|written)', '<N> files <ACTION>', text)
+        text = re.sub(
+            r"\d+\s+files?\s+(?:processed|translated|written)", "<N> files <ACTION>", text
+        )
 
         # Replace "N/M" progress patterns
-        text = re.sub(r'\d+/\d+', '<N>/<M>', text)
+        text = re.sub(r"\d+/\d+", "<N>/<M>", text)
 
         return text
 
@@ -256,7 +257,9 @@ class GoldenTestBase:
         try:
             path_obj = Path(path)
             if path_obj.is_relative_to(self.project_root):
-                return '<PROJECT_ROOT>/' + str(path_obj.relative_to(self.project_root)).replace('\\', '/')
+                return "<PROJECT_ROOT>/" + str(path_obj.relative_to(self.project_root)).replace(
+                    "\\", "/"
+                )
         except (ValueError, OSError):
             pass
         return path
@@ -270,7 +273,7 @@ class GoldenTestBase:
             result: Normalized CLI result
         """
         snapshot_file = self.snapshot_dir / f"{test_name}.json"
-        with open(snapshot_file, 'w', encoding='utf-8') as f:
+        with open(snapshot_file, "w", encoding="utf-8") as f:
             json.dump(result.to_dict(), f, indent=2, ensure_ascii=False)
 
     def load_snapshot(self, test_name: str) -> CLIResult | None:
@@ -287,15 +290,12 @@ class GoldenTestBase:
         if not snapshot_file.exists():
             return None
 
-        with open(snapshot_file, encoding='utf-8') as f:
+        with open(snapshot_file, encoding="utf-8") as f:
             data = json.load(f)
             return CLIResult.from_dict(data)
 
     def compare_snapshot(
-        self,
-        test_name: str,
-        result: CLIResult,
-        update_snapshot: bool = False
+        self, test_name: str, result: CLIResult, update_snapshot: bool = False
     ) -> None:
         """
         Compare result against baseline snapshot.
@@ -317,27 +317,33 @@ class GoldenTestBase:
             # Create or update baseline
             self.save_snapshot(test_name, result)
             if baseline is None:
-                pytest.skip(f"Baseline snapshot created for {test_name}. Run tests again to validate.")
+                pytest.skip(
+                    f"Baseline snapshot created for {test_name}. Run tests again to validate."
+                )
             return
 
         # Compare exit code
-        assert result.exit_code == baseline.exit_code, \
+        assert result.exit_code == baseline.exit_code, (
             f"Exit code mismatch: expected {baseline.exit_code}, got {result.exit_code}"
+        )
 
         # Compare stdout (allow minor whitespace differences)
         stdout_match = self._compare_text(result.stdout, baseline.stdout)
-        assert stdout_match, \
+        assert stdout_match, (
             f"Stdout mismatch:\n--- Baseline ---\n{baseline.stdout}\n--- Current ---\n{result.stdout}"
+        )
 
         # Compare stderr (allow minor whitespace differences)
         stderr_match = self._compare_text(result.stderr, baseline.stderr)
-        assert stderr_match, \
+        assert stderr_match, (
             f"Stderr mismatch:\n--- Baseline ---\n{baseline.stderr}\n--- Current ---\n{result.stderr}"
+        )
 
         # Compare files written (if applicable)
         if baseline.files_written or result.files_written:
-            assert set(result.files_written) == set(baseline.files_written), \
+            assert set(result.files_written) == set(baseline.files_written), (
                 f"Files written mismatch:\nBaseline: {baseline.files_written}\nCurrent: {result.files_written}"
+            )
 
     def _compare_text(self, text1: str, text2: str) -> bool:
         """
@@ -349,8 +355,8 @@ class GoldenTestBase:
         - Blank lines
         """
         # Normalize whitespace
-        lines1 = [line.strip() for line in text1.split('\n') if line.strip()]
-        lines2 = [line.strip() for line in text2.split('\n') if line.strip()]
+        lines1 = [line.strip() for line in text1.split("\n") if line.strip()]
+        lines2 = [line.strip() for line in text2.split("\n") if line.strip()]
 
         return lines1 == lines2
 
@@ -382,12 +388,9 @@ class TestCLIBackwardCompatibility(GoldenTestBase):
         The baseline captures the current behavior, bugs and all.
         """
         # Run CLI
-        result = self.run_cli([
-            "--site", "golden-test",
-            "--target-langs", "es", "fr",
-            "--strict",
-            "--dry-run"
-        ])
+        result = self.run_cli(
+            ["--site", "golden-test", "--target-langs", "es", "fr", "--strict", "--dry-run"]
+        )
 
         # Normalize output
         normalized = self.normalize_output(result)
@@ -411,12 +414,9 @@ class TestCLIBackwardCompatibility(GoldenTestBase):
         Note: With validation disabled, this test should always succeed.
         """
         # Run CLI
-        result = self.run_cli([
-            "--site", "golden-test",
-            "--target-langs", "de",
-            "--no-validation",
-            "--dry-run"
-        ])
+        result = self.run_cli(
+            ["--site", "golden-test", "--target-langs", "de", "--no-validation", "--dry-run"]
+        )
 
         # Normalize output
         normalized = self.normalize_output(result)
@@ -441,12 +441,9 @@ class TestCLIBackwardCompatibility(GoldenTestBase):
         This test validates the resume flag is accepted and processed.
         """
         # Run CLI
-        result = self.run_cli([
-            "--site", "golden-test",
-            "--target-langs", "pt",
-            "--resume",
-            "--dry-run"
-        ])
+        result = self.run_cli(
+            ["--site", "golden-test", "--target-langs", "pt", "--resume", "--dry-run"]
+        )
 
         # Normalize output
         normalized = self.normalize_output(result)
@@ -470,10 +467,7 @@ class TestCLIBackwardCompatibility(GoldenTestBase):
         Ensures special commands remain backward compatible.
         """
         # Run CLI
-        result = self.run_cli([
-            "diagnose-lock",
-            "--site", "golden-test"
-        ])
+        result = self.run_cli(["diagnose-lock", "--site", "golden-test"])
 
         # Normalize output
         normalized = self.normalize_output(result)

@@ -3,6 +3,7 @@ Unit tests for git_commit_helper._extract_model_id.
 
 Tests all 3 tiers of model_id extraction and edge cases.
 """
+
 import unittest
 from dataclasses import dataclass
 from pathlib import Path
@@ -15,24 +16,28 @@ from src.observability.git_commit_helper import _extract_model_id
 @dataclass
 class MockAggregateStats:
     """Mock AggregateStats for testing."""
+
     model_used: str | None = None
 
 
 @dataclass
 class MockTranslationStats:
     """Mock TranslationStats for testing."""
+
     model_used: str | None = None
 
 
 @dataclass
 class MockFileResult:
     """Mock file result for testing."""
+
     stats: MockTranslationStats | None = None
 
 
 @dataclass
 class MockDirectoryResult:
     """Mock DirectoryResult for testing."""
+
     aggregate_stats: MockAggregateStats | None = None
     file_results: list[MockFileResult] = None
 
@@ -61,9 +66,7 @@ class TestExtractModelId(unittest.TestCase):
     def test_tier1_with_empty_string_falls_through(self):
         """Test that empty string from Tier 1 triggers fallback."""
         # Setup: aggregate_stats.model_used = "" (empty string)
-        dir_result = MockDirectoryResult(
-            aggregate_stats=MockAggregateStats(model_used="")
-        )
+        dir_result = MockDirectoryResult(aggregate_stats=MockAggregateStats(model_used=""))
         config = {"model_defaults": {"fallback_model": "m2m100_418m"}}
 
         # Act
@@ -77,11 +80,7 @@ class TestExtractModelId(unittest.TestCase):
         # Setup: dir_result with no aggregate_stats, but file_results[0].stats.model_used = "m2m100"
         dir_result = MockDirectoryResult(
             aggregate_stats=None,
-            file_results=[
-                MockFileResult(
-                    stats=MockTranslationStats(model_used="m2m100")
-                )
-            ]
+            file_results=[MockFileResult(stats=MockTranslationStats(model_used="m2m100"))],
         )
         config = {"model_defaults": {"fallback_model": "m2m100_418m"}}
 
@@ -96,11 +95,7 @@ class TestExtractModelId(unittest.TestCase):
         # Setup: file_results[0].stats.model_used = ""
         dir_result = MockDirectoryResult(
             aggregate_stats=None,
-            file_results=[
-                MockFileResult(
-                    stats=MockTranslationStats(model_used="")
-                )
-            ]
+            file_results=[MockFileResult(stats=MockTranslationStats(model_used=""))],
         )
         config = {"model_defaults": {"fallback_model": "m2m100_418m"}}
 
@@ -113,10 +108,7 @@ class TestExtractModelId(unittest.TestCase):
     def test_tier3_fallback_with_dict(self):
         """Test Tier 3: Use config fallback when Tier 1 and 2 fail (dict config)."""
         # Setup: dir_result with no model info, config with model_defaults.fallback_model = "m2m100_418m"
-        dir_result = MockDirectoryResult(
-            aggregate_stats=None,
-            file_results=[]
-        )
+        dir_result = MockDirectoryResult(aggregate_stats=None, file_results=[])
         config = {"model_defaults": {"fallback_model": "m2m100_418m"}}
 
         # Act
@@ -128,10 +120,7 @@ class TestExtractModelId(unittest.TestCase):
     def test_tier3_fallback_with_pydantic_model(self):
         """Test Tier 3: Use config fallback when model_defaults is a Pydantic model."""
         # Setup: dir_result with no model info, config with Pydantic model
-        dir_result = MockDirectoryResult(
-            aggregate_stats=None,
-            file_results=[]
-        )
+        dir_result = MockDirectoryResult(aggregate_stats=None, file_results=[])
 
         # Mock a Pydantic model
         mock_model_defaults = Mock()
@@ -148,10 +137,7 @@ class TestExtractModelId(unittest.TestCase):
     def test_tier3_missing_model_defaults_key(self):
         """Test Tier 3: Handle missing model_defaults key gracefully."""
         # Setup: dir_result with no model info, config without model_defaults
-        dir_result = MockDirectoryResult(
-            aggregate_stats=None,
-            file_results=[]
-        )
+        dir_result = MockDirectoryResult(aggregate_stats=None, file_results=[])
         config = {"other_key": "other_value"}
 
         # Act
@@ -163,10 +149,7 @@ class TestExtractModelId(unittest.TestCase):
     def test_no_config_returns_none(self):
         """Test that None is returned when no config provided and no model in results."""
         # Setup: dir_result with no model info, config=None
-        dir_result = MockDirectoryResult(
-            aggregate_stats=None,
-            file_results=[]
-        )
+        dir_result = MockDirectoryResult(aggregate_stats=None, file_results=[])
 
         # Act
         result = _extract_model_id(dir_result, config=None)
@@ -229,9 +212,7 @@ class TestExtractModelId(unittest.TestCase):
     def test_tier1_with_none_falls_through(self):
         """Test that None from Tier 1 triggers fallback."""
         # Setup: aggregate_stats.model_used = None
-        dir_result = MockDirectoryResult(
-            aggregate_stats=MockAggregateStats(model_used=None)
-        )
+        dir_result = MockDirectoryResult(aggregate_stats=MockAggregateStats(model_used=None))
         config = {"model_defaults": {"fallback_model": "m2m100_418m"}}
 
         # Act
@@ -245,11 +226,7 @@ class TestExtractModelId(unittest.TestCase):
         # Setup: file_results[0].stats.model_used = None
         dir_result = MockDirectoryResult(
             aggregate_stats=None,
-            file_results=[
-                MockFileResult(
-                    stats=MockTranslationStats(model_used=None)
-                )
-            ]
+            file_results=[MockFileResult(stats=MockTranslationStats(model_used=None))],
         )
         config = {"model_defaults": {"fallback_model": "m2m100_418m"}}
 
@@ -262,10 +239,7 @@ class TestExtractModelId(unittest.TestCase):
     def test_empty_file_results_falls_through(self):
         """Test that empty file_results list triggers fallback."""
         # Setup: file_results = []
-        dir_result = MockDirectoryResult(
-            aggregate_stats=None,
-            file_results=[]
-        )
+        dir_result = MockDirectoryResult(aggregate_stats=None, file_results=[])
         config = {"model_defaults": {"fallback_model": "m2m100_418m"}}
 
         # Act
@@ -278,8 +252,7 @@ class TestExtractModelId(unittest.TestCase):
         """Test that file_result without stats triggers fallback."""
         # Setup: file_results[0].stats = None
         dir_result = MockDirectoryResult(
-            aggregate_stats=None,
-            file_results=[MockFileResult(stats=None)]
+            aggregate_stats=None, file_results=[MockFileResult(stats=None)]
         )
         config = {"model_defaults": {"fallback_model": "m2m100_418m"}}
 
@@ -292,10 +265,7 @@ class TestExtractModelId(unittest.TestCase):
     def test_custom_fallback_model_respected(self):
         """Test that custom fallback_model in config is respected."""
         # Setup: No model in results, custom fallback in config
-        dir_result = MockDirectoryResult(
-            aggregate_stats=None,
-            file_results=[]
-        )
+        dir_result = MockDirectoryResult(aggregate_stats=None, file_results=[])
         config = {"model_defaults": {"fallback_model": "custom_fallback_model_v2"}}
 
         # Act
@@ -309,11 +279,7 @@ class TestExtractModelId(unittest.TestCase):
         # Setup: Both aggregate_stats and file_results have model_used
         dir_result = MockDirectoryResult(
             aggregate_stats=MockAggregateStats(model_used="tier1_model"),
-            file_results=[
-                MockFileResult(
-                    stats=MockTranslationStats(model_used="tier2_model")
-                )
-            ]
+            file_results=[MockFileResult(stats=MockTranslationStats(model_used="tier2_model"))],
         )
         config = {"model_defaults": {"fallback_model": "m2m100_418m"}}
 
@@ -464,7 +430,9 @@ class TestCollectModifiedFilesFromGit(unittest.TestCase):
         # The path argument should contain "site" (from content_root), not "site/ar" (from output_dir)
         git_cmd = mock_run.call_args[0][0]
         path_arg = git_cmd[3]  # ["git", "status", "--porcelain", <path>]
-        self.assertFalse(path_arg.endswith("ar"), f"Should use content_root, not output_dir: {path_arg}")
+        self.assertFalse(
+            path_arg.endswith("ar"), f"Should use content_root, not output_dir: {path_arg}"
+        )
 
     @unittest.mock.patch("src.observability.git_commit_helper.subprocess.run")
     @unittest.mock.patch("src.observability.git_context.find_git_root")
@@ -496,12 +464,14 @@ class TestWritePendingCommitFallback(unittest.TestCase):
 
     def setUp(self):
         from src.observability.git_commit_helper import _write_pending_commit_fallback
+
         self._fn = _write_pending_commit_fallback
 
     def test_writes_valid_json(self):
         """Happy path: writes .pending_commit.json with correct fields."""
         import json
         import tempfile
+
         with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
             git_root = Path(tmpdir)
             output_files = [git_root / "content" / "de" / "index.md"]
@@ -531,6 +501,7 @@ class TestWritePendingCommitFallback(unittest.TestCase):
         """File paths in JSON use forward slashes regardless of OS."""
         import json
         import tempfile
+
         with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
             git_root = Path(tmpdir)
             sub = git_root / "content" / "blog" / "ar"
@@ -553,6 +524,7 @@ class TestWritePendingCommitFallback(unittest.TestCase):
         """Files not under git_root are silently skipped."""
         import json
         import tempfile
+
         with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
             git_root = Path(tmpdir) / "repo"
             git_root.mkdir()
@@ -577,6 +549,7 @@ class TestWritePendingCommitFallback(unittest.TestCase):
     def test_returns_false_when_no_files_in_git_root(self):
         """Returns False when all files are outside the git root."""
         import tempfile
+
         with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
             git_root = Path(tmpdir) / "repo"
             git_root.mkdir()
@@ -597,6 +570,7 @@ class TestWritePendingCommitFallback(unittest.TestCase):
         """commit_message truncates to 6 langs + '+N more' when many languages."""
         import json
         import tempfile
+
         with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
             git_root = Path(tmpdir)
             f = git_root / "file.md"
@@ -641,6 +615,7 @@ class TestValidateFileIntegrity(unittest.TestCase):
     def test_small_file_rejected(self):
         """File < 100 bytes must be rejected."""
         import tempfile
+
         with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
             f = Path(tmpdir) / "tiny.md"
             f.write_text("---\ntitle: x\n---\n", encoding="utf-8")
@@ -649,6 +624,7 @@ class TestValidateFileIntegrity(unittest.TestCase):
     def test_valid_md_passes(self):
         """File with front matter + body > 100 bytes must pass."""
         import tempfile
+
         with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
             f = Path(tmpdir) / "good.md"
             content = "---\ntitle: Test Article\ndate: 2026-01-01\n---\n" + "A" * 100
@@ -658,6 +634,7 @@ class TestValidateFileIntegrity(unittest.TestCase):
     def test_no_front_matter_rejected(self):
         """File > 100 bytes but without '---' must be rejected."""
         import tempfile
+
         with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
             f = Path(tmpdir) / "nofm.md"
             f.write_text("A" * 200, encoding="utf-8")
@@ -666,6 +643,7 @@ class TestValidateFileIntegrity(unittest.TestCase):
     def test_nonexistent_file_rejected(self):
         """Missing file must be rejected."""
         import tempfile
+
         with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
             f = Path(tmpdir) / "ghost.md"
             self.assertFalse(self._validate(f))

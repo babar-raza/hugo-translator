@@ -37,6 +37,7 @@ class TestChineseLanguagePurity:
     @pytest.fixture
     def sample_units(self):
         """Create sample TextUnits for testing."""
+
         def create_units(texts):
             units = []
             for i, text in enumerate(texts):
@@ -51,6 +52,7 @@ class TestChineseLanguagePurity:
                 )
                 units.append(unit)
             return units
+
         return create_units
 
     def test_chinese_vietnamese_passes_script_validation(self, extractor, sample_units):
@@ -69,9 +71,11 @@ class TestChineseLanguagePurity:
         extractor.fasttext_detector.detect.return_value = ("vi", 0.80)
 
         # Mock script validation to return True (>70% CJK)
-        def mock_verify(text, expected_lang, similarity_tracker=None, script_validation_thresholds=None):
+        def mock_verify(
+            text, expected_lang, similarity_tracker=None, script_validation_thresholds=None
+        ):
             # Calculate CJK ratio
-            cjk_chars = sum(1 for c in text if '\u4E00' <= c <= '\u9FFF')
+            cjk_chars = sum(1 for c in text if "\u4e00" <= c <= "\u9fff")
             total_chars = sum(1 for c in text if c.strip())
             if total_chars > 0:
                 cjk_ratio = cjk_chars / total_chars
@@ -86,7 +90,7 @@ class TestChineseLanguagePurity:
         assert result is True, "Chinese→Vietnamese should pass via script validation (>70% CJK)"
 
         # Verify CJK ratio
-        cjk_chars = sum(1 for c in chinese_text if '\u4E00' <= c <= '\u9FFF')
+        cjk_chars = sum(1 for c in chinese_text if "\u4e00" <= c <= "\u9fff")
         total_chars = sum(1 for c in chinese_text if c.strip())
         cjk_ratio = cjk_chars / total_chars
         assert cjk_ratio >= 0.70, f"CJK ratio should be >=70%, got {cjk_ratio:.2%}"
@@ -155,7 +159,7 @@ class TestChineseLanguagePurity:
         assert result is True, "Pure Chinese text should pass validation"
 
         # Verify 100% CJK script
-        cjk_chars = sum(1 for c in chinese_text if '\u4E00' <= c <= '\u9FFF')
+        cjk_chars = sum(1 for c in chinese_text if "\u4e00" <= c <= "\u9fff")
         total_chars = sum(1 for c in chinese_text if c.strip())
         cjk_ratio = cjk_chars / total_chars
         assert cjk_ratio >= 0.95, f"CJK ratio should be ~100%, got {cjk_ratio:.2%}"
@@ -196,16 +200,18 @@ class TestChineseLanguagePurity:
         units = sample_units([chinese_text])
 
         # Calculate actual CJK ratio
-        cjk_chars = sum(1 for c in chinese_text if '\u4E00' <= c <= '\u9FFF')
+        cjk_chars = sum(1 for c in chinese_text if "\u4e00" <= c <= "\u9fff")
         total_chars = sum(1 for c in chinese_text if c.strip())
         cjk_ratio = cjk_chars / total_chars
 
         # Mock detection as wrong language
         extractor.fasttext_detector.detect.return_value = ("ja", 0.85)
 
-        def mock_verify(text, expected_lang, similarity_tracker=None, script_validation_thresholds=None):
+        def mock_verify(
+            text, expected_lang, similarity_tracker=None, script_validation_thresholds=None
+        ):
             # Simulate script validation with 70% threshold
-            cjk_chars = sum(1 for c in text if '\u4E00' <= c <= '\u9FFF')
+            cjk_chars = sum(1 for c in text if "\u4e00" <= c <= "\u9fff")
             total_chars = sum(1 for c in text if c.strip())
             if total_chars > 0 and (cjk_chars / total_chars) >= 0.70:
                 return True
@@ -215,7 +221,9 @@ class TestChineseLanguagePurity:
 
         if cjk_ratio >= 0.70:
             result = extractor._verify_translation_language_purity(units, "zh")
-            assert result is True, f"Chinese with >=70% CJK script should pass (got {cjk_ratio:.2%})"
+            assert result is True, (
+                f"Chinese with >=70% CJK script should pass (got {cjk_ratio:.2%})"
+            )
 
     def test_chinese_simplified_traditional_baseline_acceptance(self, extractor, sample_units):
         """
@@ -229,7 +237,9 @@ class TestChineseLanguagePurity:
         # Mock detection as Traditional Chinese
         extractor.fasttext_detector.detect.return_value = ("zh-TW", 0.88)
 
-        def mock_verify(text, expected_lang, similarity_tracker=None, script_validation_thresholds=None):
+        def mock_verify(
+            text, expected_lang, similarity_tracker=None, script_validation_thresholds=None
+        ):
             # Simulate baseline group acceptance
             if similarity_tracker and similarity_tracker.are_similar("zh", "zh-TW"):
                 return True
@@ -239,7 +249,9 @@ class TestChineseLanguagePurity:
 
         result = extractor._verify_translation_language_purity(units, "zh")
 
-        assert result is True, "Chinese Simplified→Traditional should be accepted via Chinese baseline group"
+        assert result is True, (
+            "Chinese Simplified→Traditional should be accepted via Chinese baseline group"
+        )
 
         # Verify baseline group contains Chinese variants
         if extractor.similarity_tracker:
@@ -247,7 +259,9 @@ class TestChineseLanguagePurity:
             chinese_group = baseline_groups.get("chinese", [])
             expected_variants = ["zh", "zh-CN", "zh-TW"]
             for variant in expected_variants:
-                assert variant in chinese_group, f"Chinese variant '{variant}' should be in Chinese group (LP-002)"
+                assert variant in chinese_group, (
+                    f"Chinese variant '{variant}' should be in Chinese group (LP-002)"
+                )
 
     def test_chinese_with_machine_learning_terms(self, extractor, sample_units):
         """
@@ -282,7 +296,7 @@ class TestChineseLanguagePurity:
         assert density >= 0.20, f"Should recognize Aspose products (density={density:.2%})"
 
         # Verify mixed script handling (CJK + Latin)
-        cjk_chars = sum(1 for c in chinese_text if '\u4E00' <= c <= '\u9FFF')
+        cjk_chars = sum(1 for c in chinese_text if "\u4e00" <= c <= "\u9fff")
         latin_chars = sum(1 for c in chinese_text if c.isalpha() and ord(c) < 0x0250)
         assert cjk_chars > 0 and latin_chars > 0, "Should contain both CJK and Latin characters"
 
@@ -307,7 +321,9 @@ class TestChineseLanguagePurity:
         if extractor.script_validation_thresholds:
             thresholds = extractor.script_validation_thresholds
             assert "cjk" in thresholds, "CJK script threshold should exist (LP-003)"
-            assert thresholds["cjk"] == 0.70, f"CJK threshold should be 0.70 (LP-003), got {thresholds['cjk']}"
+            assert thresholds["cjk"] == 0.70, (
+                f"CJK threshold should be 0.70 (LP-003), got {thresholds['cjk']}"
+            )
 
         # Verify technical terms loaded
         assert extractor.technical_terms is not None, "Technical terms should be loaded"
@@ -316,7 +332,9 @@ class TestChineseLanguagePurity:
         # Verify LP-001 terms are present
         expected_terms = ["Azure", "API", "SDK", "Cloud", "Docker", "Machine Learning", "DataFrame"]
         for term in expected_terms:
-            assert term in extractor.technical_terms, f"Term '{term}' should be in technical_terms (LP-001)"
+            assert term in extractor.technical_terms, (
+                f"Term '{term}' should be in technical_terms (LP-001)"
+            )
 
         # Verify similarity tracker has Chinese baseline group
         if extractor.similarity_tracker:
@@ -326,4 +344,6 @@ class TestChineseLanguagePurity:
             chinese_group = baseline_groups["chinese"]
             expected_variants = ["zh", "zh-CN", "zh-TW", "zh-HK"]
             for variant in expected_variants:
-                assert variant in chinese_group, f"Chinese variant '{variant}' should be in Chinese group (LP-002)"
+                assert variant in chinese_group, (
+                    f"Chinese variant '{variant}' should be in Chinese group (LP-002)"
+                )

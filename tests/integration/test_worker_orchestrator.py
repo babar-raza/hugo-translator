@@ -11,6 +11,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+
 # All integration tests mock out PID liveness to avoid interference from
 # real worker PID files on the developer's machine.
 @pytest.fixture(autouse=True)
@@ -65,7 +66,11 @@ def _base_registry(tmp_path, **worker_overrides):
             "mode": "oneshot",
             "module": "src.workers.autonomous_verification_worker",
             "cli_args": ["--mode", "oneshot"],
-            "trigger": {"type": "file_change", "paths": [str(tmp_path / "config")], "pattern": "*.yaml"},
+            "trigger": {
+                "type": "file_change",
+                "paths": [str(tmp_path / "config")],
+                "pattern": "*.yaml",
+            },
             "cooldown_seconds": 0,
             "max_concurrent": 1,
             "safe_command": ".venv/Scripts/python.exe -m src.workers.test --mode oneshot",
@@ -269,7 +274,7 @@ class TestDryRunNoPopen:
         assert "tm_improvement_worker" in launched
 
     def test_dry_run_writes_event_log(self, tmp_path):
-        from src.workers.worker_orchestrator import run_check_cycle, _EVENT_LOG
+        from src.workers.worker_orchestrator import _EVENT_LOG, run_check_cycle
 
         q = tmp_path / "q.jsonl"
         q.write_text('{"x": 1}\n', encoding="utf-8")

@@ -4,6 +4,7 @@ Asserts that _ALL_LANGUAGE_CODES in file_filters.py covers every language
 declared in site profiles. If a new language is added to a site profile but
 not to the filter set, it would be silently excluded — this test prevents that.
 """
+
 from __future__ import annotations
 
 import glob

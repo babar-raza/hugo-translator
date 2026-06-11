@@ -8,6 +8,7 @@ Tests verify:
 - CLIConfigOverrides stores flag value correctly
 - Flags work as expected in argparse
 """
+
 import argparse
 import sys
 from pathlib import Path
@@ -21,32 +22,32 @@ from src.cli import CLIConfigOverrides
 def create_mock_args(**overrides):
     """Create mock argparse.Namespace with default values for all CLI args."""
     defaults = {
-        'validation_mode': None,
-        'disable_validation': False,
-        'force_accept': False,
-        'strict_reject': False,
-        'enable_terminology': False,
-        'disable_terminology': False,
-        'terminology_mode': None,
-        'max_retries': None,
-        'validation_config': None,
-        'terminology_config': None,
-        'dry_run': False,
-        'save_rejected': False,
-        'verify': False,
-        'fix': False,
-        'verification_report': None,
-        'max_tokens': None,
-        'model': None,
-        'batch_size': None,
-        'sort_segments_by_length': None,  # Default
-        'device': 'auto',
-        'load_mode': 'auto',
-        'force_retranslate': False,
-        'cache_write_mode': 'normal',
-        'parallel_languages': 1,
-        'global_lang_rounds': 1,
-        'global_lang_sort': 'none',
+        "validation_mode": None,
+        "disable_validation": False,
+        "force_accept": False,
+        "strict_reject": False,
+        "enable_terminology": False,
+        "disable_terminology": False,
+        "terminology_mode": None,
+        "max_retries": None,
+        "validation_config": None,
+        "terminology_config": None,
+        "dry_run": False,
+        "save_rejected": False,
+        "verify": False,
+        "fix": False,
+        "verification_report": None,
+        "max_tokens": None,
+        "model": None,
+        "batch_size": None,
+        "sort_segments_by_length": None,  # Default
+        "device": "auto",
+        "load_mode": "auto",
+        "force_retranslate": False,
+        "cache_write_mode": "normal",
+        "parallel_languages": 1,
+        "global_lang_rounds": 1,
+        "global_lang_sort": "none",
     }
     defaults.update(overrides)
     return argparse.Namespace(**defaults)
@@ -81,7 +82,7 @@ def test_cli_overrides_stores_sort_value():
     # Test True
     args_true = create_mock_args(sort_segments_by_length=True)
     overrides_true = CLIConfigOverrides(args_true)
-    assert hasattr(overrides_true, 'sort_segments_by_length')
+    assert hasattr(overrides_true, "sort_segments_by_length")
     assert overrides_true.sort_segments_by_length is True
 
     # Test False

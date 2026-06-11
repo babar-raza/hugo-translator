@@ -8,6 +8,7 @@ MetricsRunContext.abort() must write a dry-run failure sidecar with:
 - error_detail containing the abort reason
 - token_usage and api_calls_count accumulated so far
 """
+
 from __future__ import annotations
 
 import unittest
@@ -62,12 +63,14 @@ class TestMetricsRunContextAbort(unittest.TestCase):
         finish_calls = []
 
         def mock_finish(items_discovered, items_succeeded, items_failed, error_detail=None):
-            finish_calls.append({
-                "items_discovered": items_discovered,
-                "items_succeeded": items_succeeded,
-                "items_failed": items_failed,
-                "error_detail": error_detail,
-            })
+            finish_calls.append(
+                {
+                    "items_discovered": items_discovered,
+                    "items_succeeded": items_succeeded,
+                    "items_failed": items_failed,
+                    "error_detail": error_detail,
+                }
+            )
             return {"action": "dry_run"}
 
         ctx.finish = mock_finish
@@ -120,7 +123,9 @@ class TestMetricsRunContextAbort(unittest.TestCase):
         )
         ctx._start_time = 1000.0  # simulate start() was called
 
-        with patch("src.observability.agent_metrics_integration.MetricsRunContext._build_and_post") as mock_build:
+        with patch(
+            "src.observability.agent_metrics_integration.MetricsRunContext._build_and_post"
+        ) as mock_build:
             mock_build.return_value = {"action": "dry_run"}
             result = ctx.abort("Test abort — dry_run must not post")
 
@@ -142,7 +147,9 @@ class TestMetricsRunContextAbort(unittest.TestCase):
             config_service=cs,
         )
 
-        with patch("src.observability.agent_metrics_integration.MetricsRunContext._build_and_post") as mock_build:
+        with patch(
+            "src.observability.agent_metrics_integration.MetricsRunContext._build_and_post"
+        ) as mock_build:
             mock_build.return_value = {"action": "dry_run"}
             # start() never called — _start_time is None, _llm_ctx is None
             try:
@@ -161,9 +168,7 @@ class TestRepeatedFeedbackGuardIntegration(unittest.TestCase):
 
         for retry_num in range(3):  # simulate retry_count 0, 1, 2
             current = frozenset({("LanguageConsistencyValidator", "error")})
-            should_fail = (
-                prev is not None and bool(current) and current == prev
-            )
+            should_fail = prev is not None and bool(current) and current == prev
             results.append((retry_num, should_fail))
             prev = current
 
@@ -181,10 +186,8 @@ class TestRepeatedFeedbackGuardIntegration(unittest.TestCase):
         ]
 
         for i, current in enumerate(validators_sequence):
-            should_fail = (
-                prev is not None and bool(current) and current == prev
-            )
-            self.assertFalse(should_fail, f"Guard should not trigger on retry {i+1}")
+            should_fail = prev is not None and bool(current) and current == prev
+            self.assertFalse(should_fail, f"Guard should not trigger on retry {i + 1}")
             prev = current
 
 

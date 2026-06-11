@@ -116,6 +116,7 @@ class TestMetadataTrackerConcurrency:
 
         def mock_lock_context(key, **kwargs):
             """Mock Redis lock that actually uses threading.Lock."""
+
             class MockLock:
                 def __enter__(self):
                     file_lock.acquire()

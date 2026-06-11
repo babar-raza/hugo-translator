@@ -52,7 +52,7 @@ This has **bold emphasis** in paragraph.
             for node in ast_list:
                 if node.type == NodeType.LIST:
                     count += 1
-                if hasattr(node, 'children') and node.children:
+                if hasattr(node, "children") and node.children:
                     count += count_lists(node.children)
             return count
 
@@ -70,7 +70,7 @@ This has **bold emphasis** in paragraph.
             for node in ast_list:
                 if node.type == NodeType.LINK:
                     count += 1
-                if hasattr(node, 'children') and node.children:
+                if hasattr(node, "children") and node.children:
                     count += count_links(node.children)
             return count
 
@@ -88,7 +88,7 @@ This has **bold emphasis** in paragraph.
             for node in ast_list:
                 if node.type == NodeType.STRONG:
                     count += 1
-                if hasattr(node, 'children') and node.children:
+                if hasattr(node, "children") and node.children:
                     count += count_strong(node.children)
             return count
 
@@ -98,7 +98,7 @@ This has **bold emphasis** in paragraph.
     def _reconstruct(self, test_content):
         """Parse → extract → identity-translate → reconstruct. Returns output markdown."""
         config_service = ConfigService(Path(__file__).parent.parent.parent / "config")
-        site_profile = config_service.get_site_profile('kb.aspose.net')
+        site_profile = config_service.get_site_profile("kb.aspose.net")
         parser = HugoParser()
         parsed = parser.parse_string(test_content)
 
@@ -107,38 +107,33 @@ This has **bold emphasis** in paragraph.
 
         # Identity translation: pass source text through unchanged
         translations = {
-            u.node_addr: u.source_text
-            for u in plan.units
-            if u.node_addr and u.source_text
+            u.node_addr: u.source_text for u in plan.units if u.node_addr and u.source_text
         }
 
         reconstructor = MarkdownReconstructor(site_profile)
-        return reconstructor.reconstruct_body(parsed.ast, translations, 'de')
+        return reconstructor.reconstruct_body(parsed.ast, translations, "de")
 
     def test_hp03_lists_reconstructed(self, test_content):
         """HP-03: Verify lists are reconstructed in output."""
         output = self._reconstruct(test_content)
 
-        assert '\n1. ' in output or '1. ' in output, \
-            "Ordered list markers not reconstructed"
-        assert '\n- ' in output or '- ' in output, \
-            "Bullet list markers not reconstructed"
+        assert "\n1. " in output or "1. " in output, "Ordered list markers not reconstructed"
+        assert "\n- " in output or "- " in output, "Bullet list markers not reconstructed"
 
     def test_hp03_links_reconstructed(self, test_content):
         """HP-03: Verify links are reconstructed with URLs."""
         output = self._reconstruct(test_content)
 
-        assert '](' in output, "Link syntax not reconstructed"
-        assert 'https://docs.example.com' in output, "URL not preserved"
-        assert 'https://api.example.com' in output, "URL not preserved"
+        assert "](" in output, "Link syntax not reconstructed"
+        assert "https://docs.example.com" in output, "URL not preserved"
+        assert "https://api.example.com" in output, "URL not preserved"
 
     def test_hp03_bold_reconstructed(self, test_content):
         """HP-03: Verify bold markers are reconstructed."""
         output = self._reconstruct(test_content)
 
-        bold_count = output.count('**') // 2
-        assert bold_count >= 3, \
-            f"Expected ≥3 bold markers in output, got {bold_count}"
+        bold_count = output.count("**") // 2
+        assert bold_count >= 3, f"Expected ≥3 bold markers in output, got {bold_count}"
 
     def test_hp05_inline_protection_active(self, test_content):
         """HP-05: Verify InlineFormatProtector tokenizes inline code content."""

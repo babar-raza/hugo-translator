@@ -1,6 +1,7 @@
 """
 Unit tests for L3 Semantic Translation Memory.
 """
+
 from pathlib import Path
 
 import pytest

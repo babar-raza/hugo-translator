@@ -1,16 +1,17 @@
 """Tests for agent_metrics_poster — dry-run, secrets, 302, test-row limits."""
+
 from __future__ import annotations
 
-from unittest.mock import patch, MagicMock
 import urllib.error
+from unittest.mock import MagicMock, patch
 
 import pytest
 
 from src.observability.agent_metrics_poster import (
     AgentMetricsPoster,
     _get_secret,
-    reset_test_row_counter,
     get_test_rows_posted,
+    reset_test_row_counter,
 )
 
 
@@ -84,7 +85,7 @@ class TestSyncPost:
         mock_response.getcode.return_value = 200
         mock_urlopen.return_value = mock_response
 
-        poster = AgentMetricsPoster(dry_run=False, fire_and_forget=False)
+        poster = AgentMetricsPoster(dry_run=False)
         result = poster.post(SAMPLE_PAYLOAD)
         assert result["posted"] is True
         assert result["response_code"] == 200
@@ -94,11 +95,14 @@ class TestSyncPost:
         monkeypatch.setenv("AGENT_METRICS_ENDPOINT", "https://api.test.com")
         monkeypatch.setenv("AGENT_METRICS_TOKEN", "real-token-123")
         mock_urlopen.side_effect = urllib.error.HTTPError(
-            url="https://api.test.com", code=302, msg="Found",
-            hdrs=MagicMock(), fp=MagicMock(),
+            url="https://api.test.com",
+            code=302,
+            msg="Found",
+            hdrs=MagicMock(),
+            fp=MagicMock(),
         )
 
-        poster = AgentMetricsPoster(dry_run=False, fire_and_forget=False)
+        poster = AgentMetricsPoster(dry_run=False)
         result = poster.post(SAMPLE_PAYLOAD, job_type="Test")
         assert result["posted"] is True
         assert result["response_code"] == 302
@@ -108,11 +112,14 @@ class TestSyncPost:
         monkeypatch.setenv("AGENT_METRICS_ENDPOINT", "https://api.test.com")
         monkeypatch.setenv("AGENT_METRICS_TOKEN", "real-token-123")
         mock_urlopen.side_effect = urllib.error.HTTPError(
-            url="https://api.test.com", code=500, msg="Internal Server Error",
-            hdrs=MagicMock(), fp=MagicMock(),
+            url="https://api.test.com",
+            code=500,
+            msg="Internal Server Error",
+            hdrs=MagicMock(),
+            fp=MagicMock(),
         )
 
-        poster = AgentMetricsPoster(dry_run=False, fire_and_forget=False)
+        poster = AgentMetricsPoster(dry_run=False)
         result = poster.post(SAMPLE_PAYLOAD)
         assert result["posted"] is False
         assert result["response_code"] == 500
@@ -128,11 +135,11 @@ class TestTestRowLimit:
         mock_response.getcode.return_value = 200
         mock_urlopen.return_value = mock_response
 
-        poster = AgentMetricsPoster(dry_run=False, fire_and_forget=False)
+        poster = AgentMetricsPoster(dry_run=False)
 
         for i in range(3):
             result = poster.post(SAMPLE_PAYLOAD, job_type="Test")
-            assert result["posted"] is True, f"Post {i+1} should succeed"
+            assert result["posted"] is True, f"Post {i + 1} should succeed"
 
         # 4th should be blocked
         result = poster.post(SAMPLE_PAYLOAD, job_type="Test")
@@ -148,22 +155,21 @@ class TestTestRowLimit:
         mock_response.getcode.return_value = 200
         mock_urlopen.return_value = mock_response
 
-        poster = AgentMetricsPoster(dry_run=False, fire_and_forget=False)
+        poster = AgentMetricsPoster(dry_run=False)
         for _ in range(5):
             result = poster.post(SAMPLE_PAYLOAD, job_type="Content Translation")
             assert result["posted"] is True
 
     @patch("urllib.request.urlopen")
-    def test_test_post_always_sync(self, mock_urlopen, monkeypatch):
-        """Test posts are synchronous even when fire_and_forget=True (Amendment #2)."""
+    def test_test_post_is_sync(self, mock_urlopen, monkeypatch):
+        """Test posts are synchronous — return real response_code."""
         monkeypatch.setenv("AGENT_METRICS_ENDPOINT", "https://api.test.com")
         monkeypatch.setenv("AGENT_METRICS_TOKEN", "real-token-123")
         mock_response = MagicMock()
         mock_response.getcode.return_value = 200
         mock_urlopen.return_value = mock_response
 
-        poster = AgentMetricsPoster(dry_run=False, fire_and_forget=True)
+        poster = AgentMetricsPoster(dry_run=False)
         result = poster.post(SAMPLE_PAYLOAD, job_type="Test")
-        # Synchronous means we get a real response_code back
         assert result["response_code"] == 200
         assert result["posted"] is True

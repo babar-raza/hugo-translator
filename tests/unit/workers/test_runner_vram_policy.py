@@ -50,7 +50,10 @@ def mock_vram_enforcer():
         MockVRAMEnforcer.return_value = mock_enforcer
 
         # Default return values
-        mock_enforcer.enforce_from_config.return_value = (4915, MagicMock(percent=60.0, source="percent"))
+        mock_enforcer.enforce_from_config.return_value = (
+            4915,
+            MagicMock(percent=60.0, source="percent"),
+        )
 
         yield mock_enforcer
 
@@ -91,7 +94,7 @@ class TestWorkerRunnerVRAMPolicy:
         # Check the call arguments (device is passed as keyword arg)
         call_args = mock_vram_enforcer.enforce_from_config.call_args
         hardware_config = call_args[0][0]  # First positional arg
-        device = call_args[1]["device"]     # Keyword arg
+        device = call_args[1]["device"]  # Keyword arg
 
         assert hardware_config["enable_gpu"] is True
         assert hardware_config["max_gpu_memory_percent"] == 60

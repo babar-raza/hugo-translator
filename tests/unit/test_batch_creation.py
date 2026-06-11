@@ -4,6 +4,7 @@ Unit tests for batch creation logic.
 Tests the batch boundary calculation and deduplication guards
 to prevent the bug found in Phase 6 where 248 files became 410 records.
 """
+
 from collections import Counter
 
 import pytest
@@ -33,7 +34,7 @@ def create_batches(inventory: list, batch_size: int) -> list:
     for site_id, rows in sites.items():
         # Split into batches of batch_size
         for i in range(0, len(rows), batch_size):
-            batch = rows[i:i+batch_size]
+            batch = rows[i : i + batch_size]
             all_batches.append(batch)
 
     return all_batches
@@ -48,8 +49,9 @@ def validate_batches(batches: list, expected_total: int):
     """
     # Count total items
     total_items = sum(len(batch) for batch in batches)
-    assert total_items == expected_total, \
+    assert total_items == expected_total, (
         f"Total items in batches ({total_items}) != expected ({expected_total})"
+    )
 
     # Check for duplicates by collecting all items
     all_items = []
@@ -57,7 +59,7 @@ def validate_batches(batches: list, expected_total: int):
         all_items.extend(batch)
 
     # Use a unique identifier (assume 'source_path' exists)
-    identifiers = [item.get('source_path', id(item)) for item in all_items]
+    identifiers = [item.get("source_path", id(item)) for item in all_items]
     duplicate_count = len(identifiers) - len(set(identifiers))
 
     if duplicate_count > 0:
@@ -76,8 +78,7 @@ class TestBatchCreation:
     def test_single_site_exact_batch_size(self):
         """Test single site with exact batch size."""
         inventory = [
-            {"subdomain": "docs.example.com", "source_path": f"file{i}.md"}
-            for i in range(23)
+            {"subdomain": "docs.example.com", "source_path": f"file{i}.md"} for i in range(23)
         ]
         batches = create_batches(inventory, batch_size=23)
 
@@ -88,8 +89,7 @@ class TestBatchCreation:
     def test_single_site_multiple_batches(self):
         """Test single site requiring multiple batches."""
         inventory = [
-            {"subdomain": "docs.example.com", "source_path": f"file{i}.md"}
-            for i in range(50)
+            {"subdomain": "docs.example.com", "source_path": f"file{i}.md"} for i in range(50)
         ]
         batches = create_batches(inventory, batch_size=23)
 
@@ -137,10 +137,7 @@ class TestBatchCreation:
 
         for site, count in site_files.items():
             for i in range(count):
-                inventory.append({
-                    "subdomain": site,
-                    "source_path": f"{site}/file{i}.md"
-                })
+                inventory.append({"subdomain": site, "source_path": f"{site}/file{i}.md"})
 
         batches = create_batches(inventory, batch_size=23)
 
@@ -179,8 +176,7 @@ class TestBatchCreation:
     def test_batch_size_one(self):
         """Test batch size of 1."""
         inventory = [
-            {"subdomain": "docs.example.com", "source_path": f"file{i}.md"}
-            for i in range(5)
+            {"subdomain": "docs.example.com", "source_path": f"file{i}.md"} for i in range(5)
         ]
         batches = create_batches(inventory, batch_size=1)
 

@@ -31,32 +31,32 @@ class TestLegacyCacheMigration:
 
         # Create sample legacy cache files
         legacy_caches = {
-            'de': {
-                'Hello': 'Hallo',
-                'World': 'Welt',
-                'Good morning': 'Guten Morgen',
-                'Thank you': 'Danke',
-                'Goodbye': 'Auf Wiedersehen'
+            "de": {
+                "Hello": "Hallo",
+                "World": "Welt",
+                "Good morning": "Guten Morgen",
+                "Thank you": "Danke",
+                "Goodbye": "Auf Wiedersehen",
             },
-            'es': {
-                'Hello': 'Hola',
-                'World': 'Mundo',
-                'Good morning': 'Buenos días',
-                'Thank you': 'Gracias',
-                'Goodbye': 'Adiós'
+            "es": {
+                "Hello": "Hola",
+                "World": "Mundo",
+                "Good morning": "Buenos días",
+                "Thank you": "Gracias",
+                "Goodbye": "Adiós",
             },
-            'fr': {
-                'Hello': 'Bonjour',
-                'World': 'Monde',
-                'Good morning': 'Bonjour',
-                'Thank you': 'Merci',
-                'Goodbye': 'Au revoir'
-            }
+            "fr": {
+                "Hello": "Bonjour",
+                "World": "Monde",
+                "Good morning": "Bonjour",
+                "Thank you": "Merci",
+                "Goodbye": "Au revoir",
+            },
         }
 
         for lang_code, cache_data in legacy_caches.items():
             cache_file = cache_dir / f"cache_{lang_code}.json"
-            with open(cache_file, 'w', encoding='utf-8') as f:
+            with open(cache_file, "w", encoding="utf-8") as f:
                 json.dump(cache_data, f, ensure_ascii=False, indent=2)
 
         return cache_dir
@@ -72,24 +72,24 @@ class TestLegacyCacheMigration:
         assert len(cache_files) == 3, "Should find 3 legacy cache files"
 
         lang_codes = [f.stem.replace("cache_", "") for f in cache_files]
-        assert set(lang_codes) == {'de', 'es', 'fr'}
+        assert set(lang_codes) == {"de", "es", "fr"}
 
     def test_legacy_cache_loading(self, legacy_cache_dir):
         """Test loading legacy cache JSON files"""
         cache_file = legacy_cache_dir / "cache_de.json"
-        with open(cache_file, encoding='utf-8') as f:
+        with open(cache_file, encoding="utf-8") as f:
             cache_data = json.load(f)
 
         assert isinstance(cache_data, dict)
-        assert 'Hello' in cache_data
-        assert cache_data['Hello'] == 'Hallo'
+        assert "Hello" in cache_data
+        assert cache_data["Hello"] == "Hallo"
         assert len(cache_data) == 5
 
     def test_migration_to_tm(self, legacy_cache_dir, tm_dir):
         """Test migrating legacy cache to new TM"""
         # Load legacy cache
         cache_file = legacy_cache_dir / "cache_de.json"
-        with open(cache_file, encoding='utf-8') as f:
+        with open(cache_file, encoding="utf-8") as f:
             legacy_data = json.load(f)
 
         # Initialize new TM using the actual dependency-injection API
@@ -123,7 +123,7 @@ class TestLegacyCacheMigration:
         # Load all legacy caches
         total_entries = 0
         for cache_file in legacy_cache_dir.glob("cache_*.json"):
-            with open(cache_file, encoding='utf-8') as f:
+            with open(cache_file, encoding="utf-8") as f:
                 cache_data = json.load(f)
                 total_entries += len(cache_data)
 
@@ -137,7 +137,7 @@ class TestLegacyCacheMigration:
         for cache_file in legacy_cache_dir.glob("cache_*.json"):
             lang_code = cache_file.stem.replace("cache_", "")
 
-            with open(cache_file, encoding='utf-8') as f:
+            with open(cache_file, encoding="utf-8") as f:
                 cache_data = json.load(f)
 
             for source_text, translation in cache_data.items():
@@ -159,7 +159,7 @@ class TestLegacyCacheMigration:
 
         # Create empty cache file
         cache_file = empty_cache_dir / "cache_de.json"
-        with open(cache_file, 'w', encoding='utf-8') as f:
+        with open(cache_file, "w", encoding="utf-8") as f:
             json.dump({}, f)
 
         # Initialize TM using the actual dependency-injection API
@@ -168,7 +168,7 @@ class TestLegacyCacheMigration:
         _tm = TranslationMemory(l1_cache=l1, l2_persistent=l2)
 
         # Should not crash on empty cache
-        with open(cache_file, encoding='utf-8') as f:
+        with open(cache_file, encoding="utf-8") as f:
             cache_data = json.load(f)
 
         assert len(cache_data) == 0
@@ -180,15 +180,15 @@ class TestLegacyCacheMigration:
 
         # Create cache with invalid entries
         invalid_cache = {
-            'Valid': 'Gültig',
-            '': 'Empty source',  # Invalid: empty source
-            'Empty target': '',  # Invalid: empty target
-            123: 'Number key',   # Invalid: non-string key
-            'Valid2': 'Gültig2'
+            "Valid": "Gültig",
+            "": "Empty source",  # Invalid: empty source
+            "Empty target": "",  # Invalid: empty target
+            123: "Number key",  # Invalid: non-string key
+            "Valid2": "Gültig2",
         }
 
         cache_file = cache_dir / "cache_de.json"
-        with open(cache_file, 'w', encoding='utf-8') as f:
+        with open(cache_file, "w", encoding="utf-8") as f:
             json.dump(invalid_cache, f)
 
         # Initialize TM using the actual dependency-injection API
@@ -197,7 +197,7 @@ class TestLegacyCacheMigration:
         tm = TranslationMemory(l1_cache=l1, l2_persistent=l2)
 
         # Migrate, skipping invalid entries
-        with open(cache_file, encoding='utf-8') as f:
+        with open(cache_file, encoding="utf-8") as f:
             cache_data = json.load(f)
 
         valid_count = 0
@@ -244,7 +244,7 @@ class TestSystemCompatibility:
         """Test that translations match between legacy and new system"""
         # Load legacy cache
         cache_file = legacy_cache_dir / "cache_de.json"
-        with open(cache_file, encoding='utf-8') as f:
+        with open(cache_file, encoding="utf-8") as f:
             legacy_cache = json.load(f)
 
         # Initialize new TM using the actual dependency-injection API
@@ -280,15 +280,15 @@ class TestSystemCompatibility:
         cache_dir.mkdir()
 
         legacy_cache = {
-            'Hello': 'Hallo',
-            'World': 'Welt',
-            'Good morning': 'Guten Morgen',
-            'Thank you': 'Danke',
-            'Goodbye': 'Auf Wiedersehen'
+            "Hello": "Hallo",
+            "World": "Welt",
+            "Good morning": "Guten Morgen",
+            "Thank you": "Danke",
+            "Goodbye": "Auf Wiedersehen",
         }
 
         cache_file = cache_dir / "cache_de.json"
-        with open(cache_file, 'w', encoding='utf-8') as f:
+        with open(cache_file, "w", encoding="utf-8") as f:
             json.dump(legacy_cache, f, ensure_ascii=False)
 
         return cache_dir
@@ -304,7 +304,13 @@ class TestMigrationScriptIntegration:
 
     def test_migration_script_exists(self):
         """Test that migration script exists"""
-        script_path = Path(__file__).parent.parent.parent / "scripts" / "archived" / "migrations" / "migrate_legacy_cache.py"
+        script_path = (
+            Path(__file__).parent.parent.parent
+            / "scripts"
+            / "archived"
+            / "migrations"
+            / "migrate_legacy_cache.py"
+        )
         assert script_path.exists(), "Migration script should exist at archived path"
 
     def test_comparison_script_exists(self):

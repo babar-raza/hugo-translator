@@ -9,6 +9,7 @@ Tests cover:
 - Site override merging
 - Default values
 """
+
 from pathlib import Path
 
 import pytest
@@ -169,18 +170,14 @@ class TestTerminologyConfigLoading:
         assert len(patterns) >= 2  # At least Aspose.* and LINQ Engine
 
         # Find and verify Aspose product pattern
-        aspose_pattern = next(
-            (p for p in patterns if "Aspose" in p.pattern), None
-        )
+        aspose_pattern = next((p for p in patterns if "Aspose" in p.pattern), None)
         assert aspose_pattern is not None
         assert aspose_pattern.category == "product_family"
         assert aspose_pattern.preserve_mode == "protect"
         assert aspose_pattern.severity == "error"
 
         # Find and verify LINQ Engine pattern
-        linq_pattern = next(
-            (p for p in patterns if "LINQ Engine" in p.pattern), None
-        )
+        linq_pattern = next((p for p in patterns if "LINQ Engine" in p.pattern), None)
         assert linq_pattern is not None
         assert linq_pattern.category == "plugin_name"
         assert linq_pattern.severity == "error"
@@ -198,8 +195,7 @@ class TestTerminologyConfigLoading:
 
         # Verify PascalCase pattern
         pascal_pattern = next(
-            (p for p in ref_override.patterns if p.category == "pascal_case_identifier"),
-            None
+            (p for p in ref_override.patterns if p.category == "pascal_case_identifier"), None
         )
         assert pascal_pattern is not None
         assert pascal_pattern.preserve_mode == "protect"
@@ -568,8 +564,10 @@ class TestConfigLoaderMerging:
         # Verify inheritance behavior
         if profile.terminology and profile.terminology.inherit_global:
             # Should have global terms
-            assert len(merged["global_terms"]["exact_matches"]) > 0 or \
-                   len(merged["global_terms"]["patterns"]) > 0
+            assert (
+                len(merged["global_terms"]["exact_matches"]) > 0
+                or len(merged["global_terms"]["patterns"]) > 0
+            )
 
     def test_profile_overrides_global_validation_mode(self, config_service):
         """Test that profile validation mode overrides global mode."""

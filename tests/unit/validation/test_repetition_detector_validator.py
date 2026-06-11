@@ -10,7 +10,6 @@ Tests cover:
 - Configuration overrides
 """
 
-
 from src.translation_engine.validation.base import ValidationSeverity
 from src.translation_engine.validation.repetition_detector_validator import (
     RepetitionDetectorValidator,
@@ -36,7 +35,7 @@ class TestRepetitionDetectorValidator:
         result = validator.validate(
             source="Original text",
             translation=buggy_translation,
-            context={"translation_map": {0: buggy_translation}}
+            context={"translation_map": {0: buggy_translation}},
         )
 
         # Should detect the repetition as ERROR
@@ -45,8 +44,7 @@ class TestRepetitionDetectorValidator:
 
         # Check that we detected the n-gram issue
         error_messages = [
-            issue.message for issue in result.issues
-            if issue.severity == ValidationSeverity.ERROR
+            issue.message for issue in result.issues if issue.severity == ValidationSeverity.ERROR
         ]
         assert any("miteinander" in msg.lower() for msg in error_messages)
 
@@ -62,7 +60,7 @@ class TestRepetitionDetectorValidator:
         result = validator.validate(
             source="Original",
             translation=excessive_text,
-            context={"translation_map": {0: excessive_text}}
+            context={"translation_map": {0: excessive_text}},
         )
 
         # Should detect word frequency error
@@ -71,8 +69,7 @@ class TestRepetitionDetectorValidator:
 
         # Check error message mentions the excessive word
         error_messages = [
-            issue.message for issue in result.issues
-            if issue.severity == ValidationSeverity.ERROR
+            issue.message for issue in result.issues if issue.severity == ValidationSeverity.ERROR
         ]
         assert any("important" in msg.lower() for msg in error_messages)
 
@@ -91,7 +88,7 @@ class TestRepetitionDetectorValidator:
         result = validator.validate(
             source="Original",
             translation=duplicated_text,
-            context={"translation_map": {0: duplicated_text}}
+            context={"translation_map": {0: duplicated_text}},
         )
 
         # Should detect sentence duplication
@@ -100,8 +97,7 @@ class TestRepetitionDetectorValidator:
 
         # Check error message mentions repetition
         error_messages = [
-            issue.message for issue in result.issues
-            if issue.severity == ValidationSeverity.ERROR
+            issue.message for issue in result.issues if issue.severity == ValidationSeverity.ERROR
         ]
         assert any("repeated" in msg.lower() for msg in error_messages)
 
@@ -119,7 +115,7 @@ class TestRepetitionDetectorValidator:
         result = validator.validate(
             source="Original",
             translation=technical_text,
-            context={"translation_map": {0: technical_text}}
+            context={"translation_map": {0: technical_text}},
         )
 
         # Should not have errors (technical terms are whitelisted)
@@ -142,7 +138,7 @@ class TestRepetitionDetectorValidator:
         result = validator.validate(
             source="Original",
             translation=normal_text,
-            context={"translation_map": {0: normal_text}}
+            context={"translation_map": {0: normal_text}},
         )
 
         # Should pass with no errors
@@ -163,7 +159,7 @@ class TestRepetitionDetectorValidator:
         result = validator.validate(
             source="Original",
             translation=warning_text,
-            context={"translation_map": {0: warning_text}}
+            context={"translation_map": {0: warning_text}},
         )
 
         # Should succeed (warnings don't fail validation)
@@ -177,9 +173,7 @@ class TestRepetitionDetectorValidator:
         validator = RepetitionDetectorValidator()
 
         result = validator.validate(
-            source="Original",
-            translation="",
-            context={"translation_map": {0: ""}}
+            source="Original", translation="", context={"translation_map": {0: ""}}
         )
 
         # Should pass (empty text is skipped)
@@ -193,7 +187,7 @@ class TestRepetitionDetectorValidator:
         result = validator.validate(
             source="Original",
             translation="Short text",
-            context={"translation_map": {0: "Short text"}}
+            context={"translation_map": {0: "Short text"}},
         )
 
         # Should pass (short text is skipped)
@@ -215,9 +209,7 @@ class TestRepetitionDetectorValidator:
         text = "test test test test other words here to dilute"
 
         result = validator.validate(
-            source="Original",
-            translation=text,
-            context={"translation_map": {0: text}}
+            source="Original", translation=text, context={"translation_map": {0: text}}
         )
 
         # Should pass with custom lenient config
@@ -241,7 +233,7 @@ class TestRepetitionDetectorValidator:
         result = validator.validate(
             source="Original",
             translation=problematic_text,
-            context={"translation_map": {0: problematic_text}}
+            context={"translation_map": {0: problematic_text}},
         )
 
         # Should detect multiple issues
@@ -261,9 +253,7 @@ class TestRepetitionDetectorValidator:
         }
 
         result = validator.validate(
-            source="Original",
-            translation="Combined",
-            context={"translation_map": segments}
+            source="Original", translation="Combined", context={"translation_map": segments}
         )
 
         # Should detect issues in segments 1 and 3
@@ -272,8 +262,7 @@ class TestRepetitionDetectorValidator:
 
         # Check that segment IDs are in error locations
         error_locations = [
-            issue.location for issue in result.issues
-            if issue.severity == ValidationSeverity.ERROR
+            issue.location for issue in result.issues if issue.severity == ValidationSeverity.ERROR
         ]
         assert any("segment_1" in loc for loc in error_locations)
         assert any("segment_3" in loc for loc in error_locations)
@@ -291,9 +280,7 @@ class TestRepetitionDetectorValidator:
         )
 
         result = validator.validate(
-            source="Original",
-            translation=text,
-            context={"translation_map": {0: text}}
+            source="Original", translation=text, context={"translation_map": {0: text}}
         )
 
         # Should pass (stop words like "the" are excluded)
@@ -305,15 +292,10 @@ class TestRepetitionDetectorValidator:
         validator = RepetitionDetectorValidator()
 
         # Same n-gram with different capitalization
-        text = (
-            "Quick brown fox Quick Brown Fox QUICK BROWN FOX "
-            "quick brown fox more text here."
-        )
+        text = "Quick brown fox Quick Brown Fox QUICK BROWN FOX quick brown fox more text here."
 
         result = validator.validate(
-            source="Original",
-            translation=text,
-            context={"translation_map": {0: text}}
+            source="Original", translation=text, context={"translation_map": {0: text}}
         )
 
         # Should detect repetition regardless of case
@@ -330,9 +312,7 @@ class TestRepetitionDetectorValidator:
         }
 
         result = validator.validate(
-            source="Original",
-            translation="Combined",
-            context={"translation_map": segments}
+            source="Original", translation="Combined", context={"translation_map": segments}
         )
 
         # Check metadata
@@ -351,7 +331,7 @@ class TestRepetitionDetectorValidator:
         result = validator.validate(
             source="Original",
             translation=buggy_text,
-            context={}  # No translation_map
+            context={},  # No translation_map
         )
 
         # Should still detect the issue using full text as segment 0
@@ -361,21 +341,18 @@ class TestRepetitionDetectorValidator:
     def test_whitelist_loading_failure_graceful(self):
         """Test that validator handles whitelist loading failure gracefully."""
         # Create validator with non-existent terminology file
-        config = {
-            "terminology_file": "/nonexistent/path/to/file.yaml"
-        }
+        config = {"terminology_file": "/nonexistent/path/to/file.yaml"}
         validator = RepetitionDetectorValidator(config=config)
 
         # Validator should still work with empty whitelist
         normal_text = (
-            "This is a normal translation without issues. "
-            "It contains various words and phrases."
+            "This is a normal translation without issues. It contains various words and phrases."
         )
 
         result = validator.validate(
             source="Original",
             translation=normal_text,
-            context={"translation_map": {0: normal_text}}
+            context={"translation_map": {0: normal_text}},
         )
 
         # Should pass
@@ -389,9 +366,7 @@ class TestRepetitionDetectorValidator:
         text = "alpha beta gamma alpha beta gamma alpha beta gamma more text here"
 
         result = validator.validate(
-            source="Original",
-            translation=text,
-            context={"translation_map": {0: text}}
+            source="Original", translation=text, context={"translation_map": {0: text}}
         )
 
         # Should trigger error at threshold (>=3)
@@ -408,9 +383,7 @@ class TestRepetitionDetectorValidator:
         text = " ".join(words)
 
         result = validator.validate(
-            source="Original",
-            translation=text,
-            context={"translation_map": {0: text}}
+            source="Original", translation=text, context={"translation_map": {0: text}}
         )
 
         # At 30%, should be on the edge - >30% triggers error
@@ -423,16 +396,10 @@ class TestRepetitionDetectorValidator:
         validator = RepetitionDetectorValidator()
 
         # Same sentence with different whitespace/case
-        text = (
-            "This is a sentence. "
-            "THIS IS A SENTENCE. "
-            "This   is   a   sentence."
-        )
+        text = "This is a sentence. THIS IS A SENTENCE. This   is   a   sentence."
 
         result = validator.validate(
-            source="Original",
-            translation=text,
-            context={"translation_map": {0: text}}
+            source="Original", translation=text, context={"translation_map": {0: text}}
         )
 
         # Should detect all as same sentence (normalized)
@@ -448,9 +415,7 @@ class TestRepetitionDetectorValidator:
         text = f"{long_sentence}. {long_sentence}. Another short sentence."
 
         result = validator.validate(
-            source="Original",
-            translation=text,
-            context={"translation_map": {0: text}}
+            source="Original", translation=text, context={"translation_map": {0: text}}
         )
 
         # Should detect duplication
@@ -458,8 +423,7 @@ class TestRepetitionDetectorValidator:
 
         # Check that error message truncates long sentence (contains "...")
         error_messages = [
-            issue.message for issue in result.issues
-            if issue.severity == ValidationSeverity.ERROR
+            issue.message for issue in result.issues if issue.severity == ValidationSeverity.ERROR
         ]
         # At least one error should mention the long sentence with truncation
         has_truncation = any("..." in msg for msg in error_messages)
@@ -480,9 +444,7 @@ class TestRepetitionDetectorValidator:
         )
 
         result = validator.validate(
-            source="Original",
-            translation=text,
-            context={"translation_map": {0: text}}
+            source="Original", translation=text, context={"translation_map": {0: text}}
         )
 
         # Should handle punctuation gracefully and pass (no repetition)
@@ -520,7 +482,9 @@ class TestSourceRelativeBaseline:
         )
 
         # Source ceiling of 10 scales threshold to 16 — 12 repetitions should NOT ERROR
-        error_messages = [i.message for i in result.issues if i.severity == ValidationSeverity.ERROR]
+        error_messages = [
+            i.message for i in result.issues if i.severity == ValidationSeverity.ERROR
+        ]
         assert not error_messages, (
             f"False positive: source ceiling of 10 should allow 12 repetitions. "
             f"Errors: {error_messages}"
@@ -571,10 +535,27 @@ class TestSourceRelativeBaseline:
         # Source has "academic" at ~40% frequency (after stop-word filter)
         # → source_word_freq_ceiling ≈ 0.40
         # → effective_error_threshold = max(0.35, 0.40 × 1.1) = 0.44
-        other_words = ["document", "generator", "create", "build",
-                       "using", "aspose", "words", "net", "code",
-                       "example", "step", "guide", "tutorial", "learn",
-                       "implement", "system", "method", "approach", "technique"]
+        other_words = [
+            "document",
+            "generator",
+            "create",
+            "build",
+            "using",
+            "aspose",
+            "words",
+            "net",
+            "code",
+            "example",
+            "step",
+            "guide",
+            "tutorial",
+            "learn",
+            "implement",
+            "system",
+            "method",
+            "approach",
+            "technique",
+        ]
         source_words = ["academic"] * 40 + other_words * 3  # ~40% "academic"
         source = " ".join(source_words)
 

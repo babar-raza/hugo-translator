@@ -4,6 +4,7 @@ ScopeResolver derives website, section, product, platform, and item_name
 from profile data at runtime using a 4-level priority cascade.
 No static inventory assumptions — works with any profile configuration.
 """
+
 from __future__ import annotations
 
 import json
@@ -124,9 +125,16 @@ DEFAULT_KNOWN_FAMILIES: list[str] = list(DEFAULT_PRODUCT_DISPLAY_MAPPING.keys())
 DEFAULT_KNOWN_PLATFORMS: list[str] = list(DEFAULT_PLATFORM_DISPLAY_MAPPING.keys())
 
 DEFAULT_EXCLUDED_PREFIXES: list[str] = [
-    "blog-test", "products-test", "golden-test", "e2e-reference",
-    "stage-b-canary", "ws5-test", "nested-list-test", "realworld",
-    "example", "default",
+    "blog-test",
+    "products-test",
+    "golden-test",
+    "e2e-reference",
+    "stage-b-canary",
+    "ws5-test",
+    "nested-list-test",
+    "realworld",
+    "example",
+    "default",
 ]
 
 
@@ -185,9 +193,15 @@ class ScopeResolver:
         self.website_mapping = cfg.get("metrics_website_mapping", DEFAULT_WEBSITE_MAPPING)
         self.section_mapping = cfg.get("metrics_section_mapping", DEFAULT_SECTION_MAPPING)
         self.brand_mapping = cfg.get("metrics_brand_mapping", DEFAULT_BRAND_MAPPING)
-        self.product_display_mapping = cfg.get("product_display_mapping", DEFAULT_PRODUCT_DISPLAY_MAPPING)
-        self.platform_display_mapping = cfg.get("platform_display_mapping", DEFAULT_PLATFORM_DISPLAY_MAPPING)
-        self.domain_platform_mapping = cfg.get("metrics_domain_platform_mapping", DEFAULT_DOMAIN_PLATFORM_MAPPING)
+        self.product_display_mapping = cfg.get(
+            "product_display_mapping", DEFAULT_PRODUCT_DISPLAY_MAPPING
+        )
+        self.platform_display_mapping = cfg.get(
+            "platform_display_mapping", DEFAULT_PLATFORM_DISPLAY_MAPPING
+        )
+        self.domain_platform_mapping = cfg.get(
+            "metrics_domain_platform_mapping", DEFAULT_DOMAIN_PLATFORM_MAPPING
+        )
         self.known_families = cfg.get("known_product_families", DEFAULT_KNOWN_FAMILIES)
         self.known_platforms = cfg.get("known_platforms", DEFAULT_KNOWN_PLATFORMS)
         self.excluded_prefixes = cfg.get("excluded_site_id_prefixes", DEFAULT_EXCLUDED_PREFIXES)
@@ -241,6 +255,7 @@ class ScopeResolver:
         # Level 2: per-file path evidence (stronger than content_root — handles mixed roots)
         if inp.file_path:
             from .family_extraction import extract_family_from_path
+
             fam = extract_family_from_path(inp.file_path, self.known_families)
             if fam:
                 return fam
@@ -296,7 +311,9 @@ class ScopeResolver:
             return self.domain_platform_mapping[domain]
         return "all"
 
-    def _resolve_product_display(self, inp: ScopeInput, website: str, family_token: str | None) -> str:
+    def _resolve_product_display(
+        self, inp: ScopeInput, website: str, family_token: str | None
+    ) -> str:
         # Level 1: CLI direct product name
         if inp.cli_overrides and inp.cli_overrides.get("product"):
             return inp.cli_overrides["product"]
@@ -347,11 +364,7 @@ class ScopeResolver:
         # This fixes cases where the CLI passes "docs.aspose.net.words" (filename stem)
         # but the profile's site_id field is "docs.aspose.net".
         first_segment = scope.content_root_id.split("/")[0]
-        canonical_site_id = (
-            first_segment
-            if "." in first_segment
-            else inp.site_id
-        )
+        canonical_site_id = first_segment if "." in first_segment else inp.site_id
         scope.site_id = canonical_site_id
 
         domain = self._extract_domain(canonical_site_id)
@@ -441,30 +454,32 @@ class ScopeResolver:
 # content_root_id derivation
 # ---------------------------------------------------------------------------
 
+
 def derive_content_root_id(content_root_raw: str) -> str:
     """Strip env-var prefix, normalize to forward-slash repo-relative path."""
     # Normalize backslashes first so regex can match either separator
-    stripped = content_root_raw.replace('\\', '/')
-    stripped = re.sub(r'^\$\{[^}]+\}/', '', stripped)
-    stripped = stripped.rstrip('/')
+    stripped = content_root_raw.replace("\\", "/")
+    stripped = re.sub(r"^\$\{[^}]+\}/", "", stripped)
+    stripped = stripped.rstrip("/")
     # Reject absolute paths
-    if stripped.startswith('/') or (len(stripped) >= 2 and stripped[1] == ':'):
+    if stripped.startswith("/") or (len(stripped) >= 2 and stripped[1] == ":"):
         logger.warning("Absolute path in content_root_id: %s — extracting suffix", stripped)
         # Try to find a known domain pattern
-        for pattern in [r'([\w-]+\.[\w-]+\.[\w]+(?:/\w+)*)', r'([\w-]+\.[\w-]+\.[\w]+)']:
+        for pattern in [r"([\w-]+\.[\w-]+\.[\w]+(?:/\w+)*)", r"([\w-]+\.[\w-]+\.[\w]+)"]:
             match = re.search(pattern, stripped)
             if match:
                 stripped = match.group(1)
                 break
         else:
-            parts = stripped.replace('\\', '/').split('/')
-            stripped = '/'.join(parts[-2:]) if len(parts) >= 2 else parts[-1]
+            parts = stripped.replace("\\", "/").split("/")
+            stripped = "/".join(parts[-2:]) if len(parts) >= 2 else parts[-1]
     return stripped
 
 
 # ---------------------------------------------------------------------------
 # ID generation
 # ---------------------------------------------------------------------------
+
 
 def _get_repo_identifier() -> str:
     """Get repo identifier from git remote or env var."""
@@ -474,7 +489,9 @@ def _get_repo_identifier() -> str:
     try:
         result = subprocess.run(
             ["git", "remote", "get-url", "origin"],
-            capture_output=True, text=True, timeout=5,
+            capture_output=True,
+            text=True,
+            timeout=5,
         )
         if result.returncode == 0:
             url = result.stdout.strip()
@@ -496,7 +513,9 @@ def _get_source_commit_sha() -> str:
     try:
         result = subprocess.run(
             ["git", "rev-parse", "HEAD"],
-            capture_output=True, text=True, timeout=5,
+            capture_output=True,
+            text=True,
+            timeout=5,
         )
         if result.returncode == 0:
             return result.stdout.strip()
@@ -515,17 +534,19 @@ def generate_stable_work_slice_id(
 ) -> uuid.UUID:
     repo_id = _get_repo_identifier()
     commit_sha = _get_source_commit_sha()
-    dimensions = "|".join([
-        repo_id,
-        commit_sha,
-        site_id,
-        content_root_id,
-        product_family_token,
-        platform,
-        "all",  # locale grain
-        operation_type,
-        retry_group,
-    ])
+    dimensions = "|".join(
+        [
+            repo_id,
+            commit_sha,
+            site_id,
+            content_root_id,
+            product_family_token,
+            platform,
+            "all",  # locale grain
+            operation_type,
+            retry_group,
+        ]
+    )
     return uuid.uuid5(_NAMESPACE, dimensions)
 
 
@@ -535,12 +556,14 @@ def generate_execution_attempt_id(
 ) -> uuid.UUID:
     if gitlab_ctx is None:
         gitlab_ctx = collect_gitlab_context()
-    dimensions = "|".join([
-        parent_run_id,
-        gitlab_ctx.ci_pipeline_id or "local",
-        gitlab_ctx.ci_job_id or "none",
-        gitlab_ctx.hostname,
-    ])
+    dimensions = "|".join(
+        [
+            parent_run_id,
+            gitlab_ctx.ci_pipeline_id or "local",
+            gitlab_ctx.ci_job_id or "none",
+            gitlab_ctx.hostname,
+        ]
+    )
     return uuid.uuid5(_NAMESPACE, dimensions)
 
 
@@ -555,7 +578,10 @@ def generate_segment_run_id(
 # Scope audit CLI
 # ---------------------------------------------------------------------------
 
-def run_scope_audit(profiles_dir: str = "config/site_profiles", output_path: str | None = None) -> list[dict]:
+
+def run_scope_audit(
+    profiles_dir: str = "config/site_profiles", output_path: str | None = None
+) -> list[dict]:
     """Run scope audit over all profiles, classify each."""
     resolver = ScopeResolver()
     results = []
@@ -563,14 +589,16 @@ def run_scope_audit(profiles_dir: str = "config/site_profiles", output_path: str
 
     for profile_file in sorted(profiles_path.glob("*.yaml")):
         try:
-            with open(profile_file, "r", encoding="utf-8") as f:
+            with open(profile_file, encoding="utf-8") as f:
                 profile = yaml.safe_load(f) or {}
         except Exception as e:
-            results.append({
-                "profile": profile_file.name,
-                "error": str(e),
-                "classification": "ambiguous",
-            })
+            results.append(
+                {
+                    "profile": profile_file.name,
+                    "error": str(e),
+                    "classification": "ambiguous",
+                }
+            )
             continue
 
         site_id = profile.get("site_id", "")
@@ -606,23 +634,25 @@ def run_scope_audit(profiles_dir: str = "config/site_profiles", output_path: str
             else:
                 classification = "exact"
 
-            results.append({
-                "profile": profile_file.name,
-                "site_id": site_id,
-                "content_root_id": scope.content_root_id,
-                "resolved": {
-                    "website": scope.website,
-                    "website_section": scope.website_section,
-                    "product": scope.product,
-                    "platform": scope.platform,
-                        },
-                "classification": classification,
-                "detection_method": scope.detection_method,
-                "fallback_used": scope.fallback_used,
-                "reporting_confidence": scope.reporting_confidence,
-                "warnings": scope.warnings,
-                "is_test_profile": is_test,
-            })
+            results.append(
+                {
+                    "profile": profile_file.name,
+                    "site_id": site_id,
+                    "content_root_id": scope.content_root_id,
+                    "resolved": {
+                        "website": scope.website,
+                        "website_section": scope.website_section,
+                        "product": scope.product,
+                        "platform": scope.platform,
+                    },
+                    "classification": classification,
+                    "detection_method": scope.detection_method,
+                    "fallback_used": scope.fallback_used,
+                    "reporting_confidence": scope.reporting_confidence,
+                    "warnings": scope.warnings,
+                    "is_test_profile": is_test,
+                }
+            )
 
     if output_path:
         out = Path(output_path)
@@ -652,9 +682,7 @@ def check_audit_gate(results: list[dict]) -> tuple[bool, list[str]]:
         resolved = row.get("resolved", {})
         for field_name in ["website", "website_section", "product", "platform"]:
             if not resolved.get(field_name):
-                blockers.append(
-                    f"BLANK FIELD: {row.get('profile')} / {field_name} is empty"
-                )
+                blockers.append(f"BLANK FIELD: {row.get('profile')} / {field_name} is empty")
     return (len(blockers) == 0, blockers)
 
 
@@ -669,7 +697,9 @@ if __name__ == "__main__":
         print(f"\nScope Audit: {len(results)} entries")
         for r in results:
             status = r.get("classification", "?")
-            print(f"  [{status:>18}] {r.get('profile', '?'):40} -> {r.get('resolved', {}).get('product', '?')}")
+            print(
+                f"  [{status:>18}] {r.get('profile', '?'):40} -> {r.get('resolved', {}).get('product', '?')}"
+            )
 
         if blockers:
             print(f"\nGATE BLOCKED — {len(blockers)} issue(s):")

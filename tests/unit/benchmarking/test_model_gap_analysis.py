@@ -1,6 +1,5 @@
 """Tests for model_gap_analysis.py - Model recommendation for coverage gaps."""
 
-
 from src.benchmarking.model_gap_analysis import ModelRecommendation, analyze_gaps
 
 
@@ -17,7 +16,7 @@ class TestModelRecommendation:
             license="MIT",
             priority=1,
             backend="huggingface",
-            optimal_device="cuda"
+            optimal_device="cuda",
         )
         assert rec.model_id == "test_model"
         assert rec.hf_model_id == "test/model"
@@ -67,9 +66,18 @@ class TestAnalyzeGapsManyMissing:
         """Test >10 missing languages recommends NLLB-200."""
         # 12 missing languages
         current_coverage = {
-            "ar": [], "zh": [], "nl": [], "fr": [], "de": [],
-            "hi": [], "id": [], "it": [], "ja": [], "ko": [],
-            "pl": [], "pt": []
+            "ar": [],
+            "zh": [],
+            "nl": [],
+            "fr": [],
+            "de": [],
+            "hi": [],
+            "id": [],
+            "it": [],
+            "ja": [],
+            "ko": [],
+            "pl": [],
+            "pt": [],
         }
         target_languages = set(current_coverage.keys())
 
@@ -103,10 +111,7 @@ class TestAnalyzeGapsFewMissing:
     def test_few_missing_recommends_m2m100(self):
         """Test 5-10 missing languages recommends M2M100."""
         # 7 missing languages that M2M100 supports
-        current_coverage = {
-            "ar": [], "fr": [], "de": [], "es": [],
-            "it": [], "ja": [], "ko": []
-        }
+        current_coverage = {"ar": [], "fr": [], "de": [], "es": [], "it": [], "ja": [], "ko": []}
         target_languages = set(current_coverage.keys())
 
         result = analyze_gaps(current_coverage, target_languages)
@@ -128,7 +133,7 @@ class TestAnalyzeGapsFewMissing:
             "xyz_unsupported": [],  # Not in M2M100
             "abc_unsupported": [],  # Not in M2M100
             "en": [],  # M2M100 supports
-            "es": []   # M2M100 supports
+            "es": [],  # M2M100 supports
         }
         target_languages = set(current_coverage.keys())
 
@@ -147,9 +152,7 @@ class TestAnalyzeGapsSingleMissing:
 
     def test_single_missing_recommends_opus(self):
         """Test single missing language recommends Helsinki-NLP opus-mt."""
-        current_coverage = {
-            "fr": []
-        }
+        current_coverage = {"fr": []}
         target_languages = {"fr"}
 
         result = analyze_gaps(current_coverage, target_languages)
@@ -165,11 +168,7 @@ class TestAnalyzeGapsSingleMissing:
 
     def test_few_missing_uses_opus_for_each(self):
         """Test 1-4 missing languages creates opus model for each."""
-        current_coverage = {
-            "fr": [],
-            "de": [],
-            "es": []
-        }
+        current_coverage = {"fr": [], "de": [], "es": []}
         target_languages = {"fr", "de", "es"}
 
         result = analyze_gaps(current_coverage, target_languages)
@@ -191,10 +190,7 @@ class TestAnalyzeGapsInt8Versions:
         # Note: When >10 missing, only NLLB is returned (returns early)
         # INT8 is NOT added in that case (line 54 returns early)
         # This tests the M2M100 path which does add INT8
-        current_coverage = {
-            "ar": [], "fr": [], "de": [], "es": [],
-            "it": [], "ja": [], "ko": []
-        }
+        current_coverage = {"ar": [], "fr": [], "de": [], "es": [], "it": [], "ja": [], "ko": []}
         target_languages = set(current_coverage.keys())
 
         result = analyze_gaps(current_coverage, target_languages)
@@ -210,10 +206,7 @@ class TestAnalyzeGapsInt8Versions:
 
     def test_int8_has_lower_priority(self):
         """Test INT8 versions have lower priority (download later)."""
-        current_coverage = {
-            "ar": [], "fr": [], "de": [], "es": [],
-            "it": [], "ja": []
-        }
+        current_coverage = {"ar": [], "fr": [], "de": [], "es": [], "it": [], "ja": []}
         target_languages = set(current_coverage.keys())
 
         result = analyze_gaps(current_coverage, target_languages)
@@ -228,11 +221,7 @@ class TestAnalyzeGapsSorting:
 
     def test_results_sorted_by_priority(self):
         """Test recommendations are sorted by priority."""
-        current_coverage = {
-            "fr": [],
-            "de": [],
-            "es": []
-        }
+        current_coverage = {"fr": [], "de": [], "es": []}
         target_languages = {"fr", "de", "es"}
 
         result = analyze_gaps(current_coverage, target_languages)
@@ -259,9 +248,9 @@ class TestAnalyzeGapsEdgeCases:
         """Test with some covered and some not covered."""
         current_coverage = {
             "en": ["model_a"],  # Covered
-            "fr": [],           # Not covered
+            "fr": [],  # Not covered
             "de": ["model_b"],  # Covered
-            "es": [],           # Not covered
+            "es": [],  # Not covered
         }
         target_languages = {"en", "fr", "de", "es"}
 
@@ -281,9 +270,7 @@ class TestAnalyzeGapsEdgeCases:
         """Test boundary case: exactly 5 missing (triggers M2M100 path)."""
         # 5 missing, which triggers elif len(missing) > 5 is False
         # So it goes to Strategy 3 (opus-mt)
-        current_coverage = {
-            "fr": [], "de": [], "es": [], "it": [], "ja": []
-        }
+        current_coverage = {"fr": [], "de": [], "es": [], "it": [], "ja": []}
         target_languages = set(current_coverage.keys())
 
         result = analyze_gaps(current_coverage, target_languages)
@@ -294,9 +281,7 @@ class TestAnalyzeGapsEdgeCases:
 
     def test_exactly_six_missing(self):
         """Test boundary case: exactly 6 missing (triggers M2M100 path)."""
-        current_coverage = {
-            "fr": [], "de": [], "es": [], "it": [], "ja": [], "ko": []
-        }
+        current_coverage = {"fr": [], "de": [], "es": [], "it": [], "ja": [], "ko": []}
         target_languages = set(current_coverage.keys())
 
         result = analyze_gaps(current_coverage, target_languages)

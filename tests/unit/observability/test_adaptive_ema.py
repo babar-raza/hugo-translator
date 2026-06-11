@@ -1,4 +1,5 @@
 """Unit tests for AdaptiveEMACalculator."""
+
 from src.observability.progress import AdaptiveEMACalculator
 
 
@@ -18,10 +19,7 @@ class TestAdaptiveEMACalculator:
     def test_initialization_with_custom_parameters(self):
         """Test AdaptiveEMACalculator with custom parameters."""
         ema = AdaptiveEMACalculator(
-            baseline_alpha=0.2,
-            adaptive_alpha=0.8,
-            window_size=20,
-            volatility_threshold=0.25
+            baseline_alpha=0.2, adaptive_alpha=0.8, window_size=20, volatility_threshold=0.25
         )
 
         assert ema.baseline_alpha == 0.2

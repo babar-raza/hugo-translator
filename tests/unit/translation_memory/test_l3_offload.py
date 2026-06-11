@@ -44,19 +44,19 @@ for _name, _mod in [
 
 def _make_l3(*, use_faiss_gpu=True, device="cuda"):
     from src.tm.l3_semantic import L3SemanticTM
+
     obj = L3SemanticTM.__new__(L3SemanticTM)
     obj.use_faiss_gpu = use_faiss_gpu
     obj.device = device
     obj.index = MagicMock(name="faiss_index")
     obj.encoder = MagicMock(name="encoder")
     obj._index_on_gpu = use_faiss_gpu
-    obj._encoder_on_gpu = (device == "cuda")
+    obj._encoder_on_gpu = device == "cuda"
     obj._lock = threading.Lock()
     return obj
 
 
 class TestOffloadToCpu(unittest.TestCase):
-
     def _run_offload(self, obj):
         with patch("src.tm.l3_semantic.faiss", _faiss_stub):
             with patch.dict(sys.modules, {"torch": _torch_stub, "torch.cuda": _cuda_stub}):
@@ -101,7 +101,6 @@ class TestOffloadToCpu(unittest.TestCase):
 
 
 class TestReloadToGpu(unittest.TestCase):
-
     def _run_reload(self, obj):
         with patch("src.tm.l3_semantic.faiss", _faiss_stub):
             with patch.dict(sys.modules, {"torch": _torch_stub, "torch.cuda": _cuda_stub}):

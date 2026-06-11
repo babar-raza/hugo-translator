@@ -235,7 +235,7 @@ class TestFileLockModuleExists:
     def test_file_lock_has_required_classes(self):
         """Verify that file_lock module has required classes."""
         file_lock_path = Path(__file__).parent.parent.parent / "src" / "utils" / "file_lock.py"
-        content = file_lock_path.read_text(encoding='utf-8')
+        content = file_lock_path.read_text(encoding="utf-8")
 
         assert "class FileLock" in content
         assert "class LockError" in content
@@ -244,7 +244,7 @@ class TestFileLockModuleExists:
     def test_file_lock_has_required_methods(self):
         """Verify that FileLock has required methods."""
         file_lock_path = Path(__file__).parent.parent.parent / "src" / "utils" / "file_lock.py"
-        content = file_lock_path.read_text(encoding='utf-8')
+        content = file_lock_path.read_text(encoding="utf-8")
 
         assert "def acquire(" in content
         assert "def release(" in content
@@ -258,8 +258,10 @@ class TestEngineLockingIntegration:
 
     def test_engine_imports_file_lock(self):
         """Verify that engine.py imports FileLock."""
-        engine_path = Path(__file__).parent.parent.parent / "src" / "translation_engine" / "engine.py"
-        content = engine_path.read_text(encoding='utf-8')
+        engine_path = (
+            Path(__file__).parent.parent.parent / "src" / "translation_engine" / "engine.py"
+        )
+        content = engine_path.read_text(encoding="utf-8")
 
         assert "from ..utils.file_lock import" in content
         assert "FileLock" in content
@@ -267,8 +269,10 @@ class TestEngineLockingIntegration:
 
     def test_engine_uses_locking_in_translate_directory(self):
         """Verify that translate_directory uses locking."""
-        engine_path = Path(__file__).parent.parent.parent / "src" / "translation_engine" / "engine.py"
-        content = engine_path.read_text(encoding='utf-8')
+        engine_path = (
+            Path(__file__).parent.parent.parent / "src" / "translation_engine" / "engine.py"
+        )
+        content = engine_path.read_text(encoding="utf-8")
 
         # Check that translate_directory creates and uses lock
         assert "lock = FileLock(" in content

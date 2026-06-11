@@ -3,6 +3,7 @@ Unit tests for CommitMessageGenerator.
 
 Tests path analysis, product/section detection, and message generation.
 """
+
 import unittest
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -14,6 +15,7 @@ from src.observability.commit_message_generator import CommitMessageGenerator
 @dataclass
 class MockTranslationStats:
     """Mock TranslationStats for testing."""
+
     model_used: str = ""
     total_segments: int = 0
     l1_hits: int = 0
@@ -25,6 +27,7 @@ class MockTranslationStats:
 @dataclass
 class MockTranslationResult:
     """Mock TranslationResult for testing."""
+
     input_path: Path
     output_path: Path
     stats: MockTranslationStats
@@ -34,6 +37,7 @@ class MockTranslationResult:
 @dataclass
 class MockDirectoryResult:
     """Mock DirectoryResult for testing."""
+
     file_results: list[MockTranslationResult] = field(default_factory=list)
     success: bool = True
     directory: Path = Path(".")
@@ -88,8 +92,12 @@ class TestCommitMessageGenerator(unittest.TestCase):
         generator = CommitMessageGenerator()
 
         output_files = [
-            Path("D:/aspose.net/content/products.aspose.net/slides/cs/presentation-converter/_index.md"),
-            Path("D:/aspose.net/content/products.aspose.net/slides/cs/presentation-converter/ppt-to-pdf/_index.md"),
+            Path(
+                "D:/aspose.net/content/products.aspose.net/slides/cs/presentation-converter/_index.md"
+            ),
+            Path(
+                "D:/aspose.net/content/products.aspose.net/slides/cs/presentation-converter/ppt-to-pdf/_index.md"
+            ),
         ]
 
         subject, body = generator.generate(
@@ -108,14 +116,18 @@ class TestCommitMessageGenerator(unittest.TestCase):
         # Verify body components
         self.assertIn("Aspose.Slides", body)
         # Body displays with spaces, not hyphens
-        self.assertTrue("presentation converter" in body.lower() or "presentation-converter" in body.lower())
+        self.assertTrue(
+            "presentation converter" in body.lower() or "presentation-converter" in body.lower()
+        )
 
     def test_aspose_cells_detection(self):
         """Test detection of Aspose.Cells product."""
         generator = CommitMessageGenerator()
 
         output_files = [
-            Path("D:/aspose.net/content/products.aspose.net/cells/fr/features/chart-to-pdf/_index.md")
+            Path(
+                "D:/aspose.net/content/products.aspose.net/cells/fr/features/chart-to-pdf/_index.md"
+            )
         ]
 
         subject, body = generator.generate(
@@ -146,7 +158,9 @@ class TestCommitMessageGenerator(unittest.TestCase):
 
         mock_results = [
             MockTranslationResult(
-                input_path=Path("D:/aspose.net/content/products.aspose.net/pdf/en/features/create-pdf/_index.md"),
+                input_path=Path(
+                    "D:/aspose.net/content/products.aspose.net/pdf/en/features/create-pdf/_index.md"
+                ),
                 output_path=output_files[0],
                 stats=mock_stats,
             )
@@ -168,7 +182,9 @@ class TestCommitMessageGenerator(unittest.TestCase):
         has_model_info = "Model:" in body or "m2m100" in body.lower() or "facebook" in body.lower()
         has_validation_info = "Validation:" in body or "passed" in body.lower()
 
-        self.assertTrue(has_model_info or has_validation_info, "Should include translation metadata")
+        self.assertTrue(
+            has_model_info or has_validation_info, "Should include translation metadata"
+        )
 
     def test_fallback_no_metadata(self):
         """Test fallback message generation without metadata."""
@@ -198,7 +214,9 @@ class TestCommitMessageGenerator(unittest.TestCase):
         generator = CommitMessageGenerator()
 
         output_files = [
-            Path("D:/aspose.net/content/products.aspose.net/diagram/pt/features/visio-to-pdf/_index.md")
+            Path(
+                "D:/aspose.net/content/products.aspose.net/diagram/pt/features/visio-to-pdf/_index.md"
+            )
         ]
 
         subject, body = generator.generate(
@@ -218,7 +236,9 @@ class TestCommitMessageGenerator(unittest.TestCase):
 
         # Create a path with a very long section name
         output_files = [
-            Path("D:/aspose.net/content/products.aspose.net/slides/cs/very-long-section-name-that-exceeds-normal-limits/_index.md")
+            Path(
+                "D:/aspose.net/content/products.aspose.net/slides/cs/very-long-section-name-that-exceeds-normal-limits/_index.md"
+            )
         ]
 
         subject, body = generator.generate(
@@ -299,7 +319,9 @@ class TestCommitMessageGenerator(unittest.TestCase):
 
         # Setup: 9 _index.md files in different directories
         output_files = [
-            Path("D:/aspose.net/content/products.aspose.net/slides/cs/presentation-converter/_index.md"),
+            Path(
+                "D:/aspose.net/content/products.aspose.net/slides/cs/presentation-converter/_index.md"
+            ),
             Path("D:/aspose.net/content/products.aspose.net/slides/cs/ppt-to-pdf/_index.md"),
             Path("D:/aspose.net/content/products.aspose.net/slides/cs/pptx-to-pdf/_index.md"),
             Path("D:/aspose.net/content/products.aspose.net/slides/cs/ppt-to-pptx/_index.md"),
@@ -321,10 +343,17 @@ class TestCommitMessageGenerator(unittest.TestCase):
         self.assertIn("9 section index files", body)
         # Should show directory names (first 3 + count of remaining since we have >5)
         # At least one of the directories should be shown
-        has_directory = any(dir_name in body for dir_name in [
-            "presentation-converter", "ppt-to-pdf", "pptx-to-pdf",
-            "ppt-to-pptx", "merge-ppt", "split-ppt"
-        ])
+        has_directory = any(
+            dir_name in body
+            for dir_name in [
+                "presentation-converter",
+                "ppt-to-pdf",
+                "pptx-to-pdf",
+                "ppt-to-pptx",
+                "merge-ppt",
+                "split-ppt",
+            ]
+        )
         self.assertTrue(has_directory, "Should show at least some directory names")
         # Should show "+X more" since we have more than 5 directories
         self.assertIn("more", body)
@@ -336,7 +365,9 @@ class TestCommitMessageGenerator(unittest.TestCase):
         generator = CommitMessageGenerator()
 
         output_files = [
-            Path("D:/aspose.net/content/products.aspose.net/slides/cs/presentation-converter/_index.md"),
+            Path(
+                "D:/aspose.net/content/products.aspose.net/slides/cs/presentation-converter/_index.md"
+            ),
         ]
 
         subject, body = generator.generate(
@@ -382,7 +413,9 @@ class TestCommitMessageGenerator(unittest.TestCase):
 
         # Setup: 5 _index.md + 5 other files
         output_files = [
-            Path("D:/aspose.net/content/products.aspose.net/slides/cs/presentation-converter/_index.md"),
+            Path(
+                "D:/aspose.net/content/products.aspose.net/slides/cs/presentation-converter/_index.md"
+            ),
             Path("D:/aspose.net/content/products.aspose.net/slides/cs/ppt-to-pdf/_index.md"),
             Path("D:/aspose.net/content/products.aspose.net/slides/cs/pptx-to-pdf/_index.md"),
             Path("D:/aspose.net/content/products.aspose.net/slides/cs/ppt-to-pptx/_index.md"),
@@ -406,7 +439,9 @@ class TestCommitMessageGenerator(unittest.TestCase):
         # Should show directory format with file counts
         self.assertIn("files)", body)
         # Should show some directory paths
-        self.assertTrue(any(dir_name in body for dir_name in ["features", "api", "presentation-converter"]))
+        self.assertTrue(
+            any(dir_name in body for dir_name in ["features", "api", "presentation-converter"])
+        )
 
     def test_non_index_files_use_existing_format(self):
         """Test that non-index files use existing path grouping format."""
@@ -475,7 +510,7 @@ class TestCommitMessageGenerator(unittest.TestCase):
                 input_path=Path(f"D:/repo/en/file{i}.md"),
                 output_path=de_file,
                 stats=MockTranslationStats(),
-                success=True
+                success=True,
             )
             # Add outputs dict to match real TranslationResult structure
             result.outputs = {"de": de_file}
@@ -487,16 +522,14 @@ class TestCommitMessageGenerator(unittest.TestCase):
                 input_path=Path(f"D:/repo/en/file{i}.md"),
                 output_path=fr_file,
                 stats=MockTranslationStats(),
-                success=True
+                success=True,
             )
             result.outputs = {"fr": fr_file}
             file_results.append(result)
 
         # Create DirectoryResult with all 10 file_results
         dir_result = MockDirectoryResult(
-            file_results=file_results,
-            success=True,
-            directory=Path("D:/repo")
+            file_results=file_results, success=True, directory=Path("D:/repo")
         )
 
         # Generate commit message for DE files only (5 files)
@@ -505,7 +538,7 @@ class TestCommitMessageGenerator(unittest.TestCase):
             target_langs=["de"],
             site_id="test",
             run_id="test-validation-001",
-            translation_result=dir_result
+            translation_result=dir_result,
         )
 
         # Assert: Validation should show 5/5, not 10/5
@@ -526,15 +559,13 @@ class TestCommitMessageGenerator(unittest.TestCase):
                 input_path=Path(f"D:/repo/en/file{i}.md"),
                 output_path=output_file,
                 stats=MockTranslationStats(),
-                success=(i < 3)  # First 3 pass, last 2 fail
+                success=(i < 3),  # First 3 pass, last 2 fail
             )
             result.outputs = {"de": output_file}
             file_results.append(result)
 
         dir_result = MockDirectoryResult(
-            file_results=file_results,
-            success=True,
-            directory=Path("D:/repo")
+            file_results=file_results, success=True, directory=Path("D:/repo")
         )
 
         subject, body = generator.generate(
@@ -542,7 +573,7 @@ class TestCommitMessageGenerator(unittest.TestCase):
             target_langs=["de"],
             site_id="test",
             run_id="test-validation-002",
-            translation_result=dir_result
+            translation_result=dir_result,
         )
 
         # Assert: Should show 3/5 files passed
@@ -564,7 +595,7 @@ class TestCommitMessageGenerator(unittest.TestCase):
             input_path=Path("D:/repo/en/file1.md"),
             output_path=output_files[0],
             stats=MockTranslationStats(),
-            success=True
+            success=True,
         )
         result1.outputs = {"de": output_files[0]}
         file_results.append(result1)
@@ -574,15 +605,13 @@ class TestCommitMessageGenerator(unittest.TestCase):
             input_path=Path("D:/repo/en/file2.md"),
             output_path=Path("D:/repo/de/file2.md"),
             stats=MockTranslationStats(),
-            success=True
+            success=True,
         )
         # Don't set outputs attribute
         file_results.append(result2)
 
         dir_result = MockDirectoryResult(
-            file_results=file_results,
-            success=True,
-            directory=Path("D:/repo")
+            file_results=file_results, success=True, directory=Path("D:/repo")
         )
 
         # Should not crash
@@ -591,7 +620,7 @@ class TestCommitMessageGenerator(unittest.TestCase):
             target_langs=["de"],
             site_id="test",
             run_id="test-validation-003",
-            translation_result=dir_result
+            translation_result=dir_result,
         )
 
         # Should only count the result with outputs
@@ -606,15 +635,13 @@ class TestCommitMessageGenerator(unittest.TestCase):
                 input_path=Path("D:/repo/en/file1.md"),
                 output_path=Path("D:/repo/de/file1.md"),
                 stats=MockTranslationStats(),
-                success=True
+                success=True,
             )
         ]
         file_results[0].outputs = {"de": Path("D:/repo/de/file1.md")}
 
         dir_result = MockDirectoryResult(
-            file_results=file_results,
-            success=True,
-            directory=Path("D:/repo")
+            file_results=file_results, success=True, directory=Path("D:/repo")
         )
 
         # Empty output_files
@@ -623,7 +650,7 @@ class TestCommitMessageGenerator(unittest.TestCase):
             target_langs=["de"],
             site_id="test",
             run_id="test-validation-004",
-            translation_result=dir_result
+            translation_result=dir_result,
         )
 
         # Should not crash and not show validation (no relevant results)
@@ -644,15 +671,13 @@ class TestCommitMessageGenerator(unittest.TestCase):
                 input_path=Path(f"D:/repo/en/file{i}.md"),
                 output_path=output_file,
                 stats=MockTranslationStats(),
-                success=False  # All fail
+                success=False,  # All fail
             )
             result.outputs = {"de": output_file}
             file_results.append(result)
 
         dir_result = MockDirectoryResult(
-            file_results=file_results,
-            success=False,
-            directory=Path("D:/repo")
+            file_results=file_results, success=False, directory=Path("D:/repo")
         )
 
         subject, body = generator.generate(
@@ -660,7 +685,7 @@ class TestCommitMessageGenerator(unittest.TestCase):
             target_langs=["de"],
             site_id="test",
             run_id="test-validation-005",
-            translation_result=dir_result
+            translation_result=dir_result,
         )
 
         # Should show 0/3 files passed (not omit the validation line)
@@ -682,8 +707,14 @@ class TestCommitMessageGenerator(unittest.TestCase):
         generator = CommitMessageGenerator()
 
         # Setup: 5 files translated to both DE and FR
-        de_files = [Path(f"D:/aspose.net/content/products.aspose.net/slides/de/file{i}.md") for i in range(5)]
-        fr_files = [Path(f"D:/aspose.net/content/products.aspose.net/slides/fr/file{i}.md") for i in range(5)]
+        de_files = [
+            Path(f"D:/aspose.net/content/products.aspose.net/slides/de/file{i}.md")
+            for i in range(5)
+        ]
+        fr_files = [
+            Path(f"D:/aspose.net/content/products.aspose.net/slides/fr/file{i}.md")
+            for i in range(5)
+        ]
 
         file_results = []
 
@@ -694,7 +725,7 @@ class TestCommitMessageGenerator(unittest.TestCase):
                 input_path=Path(f"D:/aspose.net/content/products.aspose.net/slides/en/file{i}.md"),
                 output_path=de_files[i],
                 stats=MockTranslationStats(),
-                success=True
+                success=True,
             )
             de_result.outputs = {"de": de_files[i]}
             file_results.append(de_result)
@@ -704,7 +735,7 @@ class TestCommitMessageGenerator(unittest.TestCase):
                 input_path=Path(f"D:/aspose.net/content/products.aspose.net/slides/en/file{i}.md"),
                 output_path=fr_files[i],
                 stats=MockTranslationStats(),
-                success=True
+                success=True,
             )
             fr_result.outputs = {"fr": fr_files[i]}
             file_results.append(fr_result)
@@ -712,7 +743,7 @@ class TestCommitMessageGenerator(unittest.TestCase):
         dir_result = MockDirectoryResult(
             file_results=file_results,  # 10 total results
             success=True,
-            directory=Path("D:/aspose.net/content/products.aspose.net/slides")
+            directory=Path("D:/aspose.net/content/products.aspose.net/slides"),
         )
 
         # Test DE commit
@@ -721,7 +752,7 @@ class TestCommitMessageGenerator(unittest.TestCase):
             target_langs=["de"],
             site_id="aspose.net",
             run_id="test-validation-006-de",
-            translation_result=dir_result
+            translation_result=dir_result,
         )
 
         self.assertIn("5/5 files passed", body_de, "DE commit should show 5/5")
@@ -733,12 +764,11 @@ class TestCommitMessageGenerator(unittest.TestCase):
             target_langs=["fr"],
             site_id="aspose.net",
             run_id="test-validation-006-fr",
-            translation_result=dir_result
+            translation_result=dir_result,
         )
 
         self.assertIn("5/5 files passed", body_fr, "FR commit should show 5/5")
         self.assertNotIn("10/5", body_fr, "FR commit should NOT show 10/5")
-
 
     def test_new_commit_subject_format_with_display_name(self):
         """Test new commit subject format with site display_name."""
@@ -748,22 +778,22 @@ class TestCommitMessageGenerator(unittest.TestCase):
 
         # Setup: Aspose.Slides files with docs.aspose.net site profile
         output_files = [
-            Path("D:/aspose.net/content/docs.aspose.net/slides/de/developer-guide/presentation-converter/_index.md"),
+            Path(
+                "D:/aspose.net/content/docs.aspose.net/slides/de/developer-guide/presentation-converter/_index.md"
+            ),
         ]
 
         # Simulate site profile with display_name
-        site_profile = {
-            "display_name": "Documentation"
-        }
+        site_profile = {"display_name": "Documentation"}
 
         # Mock _detect_sites_from_paths to return single site (bypass config loading in tests)
-        with patch.object(generator, '_detect_sites_from_paths', return_value=["docs.aspose.net"]):
+        with patch.object(generator, "_detect_sites_from_paths", return_value=["docs.aspose.net"]):
             subject, body = generator.generate(
                 output_files=output_files,
                 target_langs=["de"],
                 site_id="docs.aspose.net",
                 run_id="test-new-format-001",
-                site_profile=site_profile
+                site_profile=site_profile,
             )
 
         # Assert: New format "Translates Aspose.Slides 1 Documentation to German"
@@ -790,17 +820,15 @@ class TestCommitMessageGenerator(unittest.TestCase):
             Path("D:/aspose.net/content/kb.aspose.net/words/cs/article3.md"),
         ]
 
-        site_profile = {
-            "display_name": "knowledge base articles"
-        }
+        site_profile = {"display_name": "knowledge base articles"}
 
-        with patch.object(generator, '_detect_sites_from_paths', return_value=["kb.aspose.net"]):
+        with patch.object(generator, "_detect_sites_from_paths", return_value=["kb.aspose.net"]):
             subject, body = generator.generate(
                 output_files=output_files,
                 target_langs=["cs"],
                 site_id="kb.aspose.net",
                 run_id="test-new-format-002",
-                site_profile=site_profile
+                site_profile=site_profile,
             )
 
         # Assert: "Translates Aspose.Words 3 knowledge base articles to Czech"
@@ -823,17 +851,15 @@ class TestCommitMessageGenerator(unittest.TestCase):
             Path("D:/aspose.net/content/about.aspose.net/fr/page2.md"),
         ]
 
-        site_profile = {
-            "display_name": "files"
-        }
+        site_profile = {"display_name": "files"}
 
-        with patch.object(generator, '_detect_sites_from_paths', return_value=["about.aspose.net"]):
+        with patch.object(generator, "_detect_sites_from_paths", return_value=["about.aspose.net"]):
             subject, body = generator.generate(
                 output_files=output_files,
                 target_langs=["fr"],
                 site_id="about.aspose.net",
                 run_id="test-new-format-003",
-                site_profile=site_profile
+                site_profile=site_profile,
             )
 
         # Assert: "Translates about.aspose.net 2 files to French"
@@ -858,17 +884,15 @@ class TestCommitMessageGenerator(unittest.TestCase):
             Path("D:/aspose.net/content/docs.aspose.net/home/de/features.md"),
         ]
 
-        site_profile = {
-            "display_name": "Documentation"
-        }
+        site_profile = {"display_name": "Documentation"}
 
-        with patch.object(generator, '_detect_sites_from_paths', return_value=["docs.aspose.net"]):
+        with patch.object(generator, "_detect_sites_from_paths", return_value=["docs.aspose.net"]):
             subject, body = generator.generate(
                 output_files=output_files,
                 target_langs=["de"],
                 site_id="docs.aspose.net",
                 run_id="test-new-format-004",
-                site_profile=site_profile
+                site_profile=site_profile,
             )
 
         # Assert: "Translates Home 2 Documentation to German"
@@ -891,14 +915,14 @@ class TestCommitMessageGenerator(unittest.TestCase):
         ]
 
         # Mock _detect_sites_from_paths to return single site (bypass config loading in tests)
-        with patch.object(generator, '_detect_sites_from_paths', return_value=["docs.aspose.net"]):
+        with patch.object(generator, "_detect_sites_from_paths", return_value=["docs.aspose.net"]):
             # No site_profile or empty site_profile
             subject, body = generator.generate(
                 output_files=output_files,
                 target_langs=["de"],
                 site_id="docs.aspose.net",
                 run_id="test-new-format-005",
-                site_profile=None
+                site_profile=None,
             )
 
             # Assert: Should still generate valid subject with "pages" fallback
@@ -908,7 +932,9 @@ class TestCommitMessageGenerator(unittest.TestCase):
             self.assertIn("pages", subject, "Should fallback to 'pages' when no display_name")
             self.assertIn("German", subject)
             # Should NOT include site_id in parentheses
-            self.assertNotIn("(docs.aspose.net)", subject, "Should not include site_id in parentheses")
+            self.assertNotIn(
+                "(docs.aspose.net)", subject, "Should not include site_id in parentheses"
+            )
 
 
 if __name__ == "__main__":

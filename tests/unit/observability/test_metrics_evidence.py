@@ -1,11 +1,12 @@
 """Tests for metrics evidence sidecar, markers, and ledger."""
+
 from __future__ import annotations
 
 import json
 
 import pytest
 
-from src.observability.metrics_evidence import EvidenceWriter, compute_payload_hash, SCHEMA_VERSION
+from src.observability.metrics_evidence import SCHEMA_VERSION, EvidenceWriter, compute_payload_hash
 
 
 @pytest.fixture
@@ -44,8 +45,16 @@ def _sidecar_kwargs(payload: dict | None = None) -> dict:
         "segment_run_id": "seg-001",
         "ids": {"segment_run_id": "seg-001", "stable_work_slice_id": "ws-001"},
         "execution_context": {"is_ci": False, "hostname": "test-host"},
-        "scope": {"site_id": "docs.aspose.net", "source_site_domain": "aspose.net", "website": "aspose.net"},
-        "llm_provider": {"provider_name": "openai_compatible", "endpoint_host": "llm.professionalize.com", "is_professionalize": True},
+        "scope": {
+            "site_id": "docs.aspose.net",
+            "source_site_domain": "aspose.net",
+            "website": "aspose.net",
+        },
+        "llm_provider": {
+            "provider_name": "openai_compatible",
+            "endpoint_host": "llm.professionalize.com",
+            "is_professionalize": True,
+        },
         "posted_payload": payload,
         "call_accounting": {"attempted_provider_calls": 2, "completed_provider_calls": 2},
         "items_detail": {"total_files_selected": 2},

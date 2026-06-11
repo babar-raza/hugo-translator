@@ -1,4 +1,5 @@
 """Quick test to verify array-aware YAML formatter."""
+
 from src.translation_engine.reconstructor.yaml_formatter import YAMLFormatter
 
 # Test 1: Simple nested key
@@ -29,7 +30,7 @@ expected3 = {
     "body": {
         "block": [
             {"title_left": "First Left", "title_right": "First Right"},
-            {"title_left": "Second Left"}
+            {"title_left": "Second Left"},
         ]
     }
 }
@@ -54,7 +55,7 @@ expected5 = {
     "faq": {
         "list": [
             {"question": "What is this?", "answer": "This is an answer"},
-            {"question": "Second question?"}
+            {"question": "Second question?"},
         ]
     }
 }

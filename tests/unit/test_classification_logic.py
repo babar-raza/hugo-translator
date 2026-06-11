@@ -4,6 +4,7 @@ Unit tests for enhanced failure classification logic.
 Tests the multi-failure detection capability that addresses the Phase 6 issue
 where 70% of failures were classified as FAIL_OTHER due to incomplete classification.
 """
+
 import pytest
 
 from src.translation_engine.quality.failure_classifier import (

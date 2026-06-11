@@ -8,7 +8,6 @@ Author: SHORTCODE-007-P3
 Date: 2026-01-20
 """
 
-
 from src.translation_engine.extractor.inline_format_protector import InlineFormatProtector
 from src.translation_engine.extractor.text_unit_extractor import TextUnitExtractor
 from src.translation_engine.parser.hugo_parser import HugoParser
@@ -59,7 +58,7 @@ The **Aspose.Slides** plugins provide features for {{< callout >}}presentations{
         # This simulates the new configuration where preserve_patterns: []
         extractor = TextUnitExtractor(
             segmentation_strategy="sentence_only",
-            preserve_patterns=[]  # CRITICAL: Empty array (no PlaceholderManager protection)
+            preserve_patterns=[],  # CRITICAL: Empty array (no PlaceholderManager protection)
         )
 
         translation_plan = extractor.extract_from_ast(doc.ast, doc.frontmatter)
@@ -81,10 +80,10 @@ The **Aspose.Slides** plugins provide features for {{< callout >}}presentations{
         # they do NOT appear in the extracted text units. Only inline/paragraph content
         # appears in units.
         # Verify that the paragraph content IS present:
-        assert "The **Aspose.Slides** plugins provide features" in all_text or \
-               "Aspose.Slides" in all_text, (
-            "Paragraph content should appear in extracted units"
-        )
+        assert (
+            "The **Aspose.Slides** plugins provide features" in all_text
+            or "Aspose.Slides" in all_text
+        ), "Paragraph content should appear in extracted units"
         assert "Step one" in all_text, (
             "Content inside shortcode blocks should appear in extracted units"
         )
@@ -171,7 +170,7 @@ Important note.
         # Extract with NO preserve_patterns
         extractor = TextUnitExtractor(
             segmentation_strategy="sentence_only",
-            preserve_patterns=[]  # Empty: PlaceholderManager disabled
+            preserve_patterns=[],  # Empty: PlaceholderManager disabled
         )
 
         translation_plan = extractor.extract_from_ast(doc.ast, doc.frontmatter)
@@ -181,9 +180,7 @@ Important note.
         all_text = "\n".join(u.source_text for u in units)
 
         # Verify NO PlaceholderManager tokens
-        assert "{PLACEHOLDER_" not in all_text, (
-            "No PlaceholderManager tokens should be created"
-        )
+        assert "{PLACEHOLDER_" not in all_text, "No PlaceholderManager tokens should be created"
 
         # Block-level shortcodes ({{< sections >}}, {{% steps %}}, {{% /steps %}},
         # {{< callout >}}, {{< ref >}} on their own lines) are excluded from

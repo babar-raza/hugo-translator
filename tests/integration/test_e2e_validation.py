@@ -129,7 +129,9 @@ class TestE2EParseExtract:
         assert len(segments) > 0
 
         # Check that we have frontmatter segments
-        frontmatter_segments = [s for s in segments if s.context.context_type.value == "frontmatter"]
+        frontmatter_segments = [
+            s for s in segments if s.context.context_type.value == "frontmatter"
+        ]
         assert len(frontmatter_segments) >= 2  # title and description
 
         # Check that we have body segments
@@ -185,7 +187,9 @@ class TestE2ETranslateReconstruct:
         assert "title:" in translated_doc  # Frontmatter preserved
         assert "#" in translated_doc  # Markdown structure preserved
 
-    def test_reconstruct_preserves_frontmatter_structure(self, parser, site_profile, sample_markdown):
+    def test_reconstruct_preserves_frontmatter_structure(
+        self, parser, site_profile, sample_markdown
+    ):
         """Test that frontmatter structure is preserved."""
         doc = parser.parse_string(sample_markdown)
         extractor = SegmentExtractor(site_profile)
@@ -254,7 +258,10 @@ class TestE2EValidation:
         # Should succeed (placeholders preserved, structure maintained)
         all_issues = [i for r in results for i in r.issues]
         overall_success = all(r.success for r in results)
-        assert overall_success or len([i for i in all_issues if i.severity == ValidationSeverity.ERROR]) == 0
+        assert (
+            overall_success
+            or len([i for i in all_issues if i.severity == ValidationSeverity.ERROR]) == 0
+        )
 
     def test_validate_detects_broken_links(self, validator):
         """Test validation detects broken link structure."""
@@ -281,8 +288,8 @@ class TestE2EValidation:
         assert len(results) > 0, "Must have at least one validation result"
         # All results have the expected shape
         for r in results:
-            assert hasattr(r, 'success'), "Each result must have 'success'"
-            assert hasattr(r, 'issues'), "Each result must have 'issues'"
+            assert hasattr(r, "success"), "Each result must have 'success'"
+            assert hasattr(r, "issues"), "Each result must have 'issues'"
 
     def test_validate_detects_broken_code_blocks(self, validator):
         """Test validation detects broken code blocks."""
@@ -296,8 +303,7 @@ class TestE2EValidation:
         any_failure = any(not r.success for r in results)
         all_issues = [i for r in results for i in r.issues]
         structure_issues = [
-            i for i in all_issues
-            if "code" in i.message.lower() or "block" in i.message.lower()
+            i for i in all_issues if "code" in i.message.lower() or "block" in i.message.lower()
         ]
         assert any_failure, f"Should detect code block mismatch. Results: {results}"
         assert len(structure_issues) > 0, f"Should have code/block issue. Issues: {all_issues}"
@@ -319,7 +325,7 @@ class TestE2EFullPipeline:
         sample_file = sample_files[0]
 
         # Read file
-        with open(sample_file, encoding='utf-8') as f:
+        with open(sample_file, encoding="utf-8") as f:
             content = f.read()
 
         # Parse
@@ -354,7 +360,9 @@ class TestE2EFullPipeline:
 
         for target_lang in ["es", "fa", "ja", "zh"]:
             # Mock translations with language tag
-            translations = {segment.id: f"[{target_lang.upper()}] {segment.source_text}" for segment in segments}
+            translations = {
+                segment.id: f"[{target_lang.upper()}] {segment.source_text}" for segment in segments
+            }
 
             # Reconstruct
             reconstructor = MarkdownReconstructor(site_profile)

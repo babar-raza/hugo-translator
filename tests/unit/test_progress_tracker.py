@@ -358,7 +358,7 @@ class TestProgressTracker:
 
         # Verify monotonically increasing
         for i in range(1, len(counts)):
-            assert counts[i] >= counts[i-1]
+            assert counts[i] >= counts[i - 1]
 
         assert counts[-1] == 50
 

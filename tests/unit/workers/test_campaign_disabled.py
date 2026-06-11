@@ -8,6 +8,7 @@ Verifies:
 
 These are static/logic tests; no network calls, no real process spawning.
 """
+
 from __future__ import annotations
 
 import json
@@ -18,6 +19,7 @@ import pytest
 # ---------------------------------------------------------------------------
 # Sentinel file logic tests
 # ---------------------------------------------------------------------------
+
 
 def test_watchdog_skips_when_sentinel_exists(tmp_path):
     """
@@ -67,12 +69,14 @@ def test_sentinel_removal_re_arms_watchdog(tmp_path):
 # Dead PID logic tests
 # ---------------------------------------------------------------------------
 
+
 def test_dead_pid_treated_as_not_alive():
     """
     A PID that is not in the OS process table must be treated as dead
     regardless of what state.json says.
     """
     import os
+
     # Use a PID that almost certainly does not exist
     dead_pid = 999_999
 
@@ -80,6 +84,7 @@ def test_dead_pid_treated_as_not_alive():
     # Check if process is alive via psutil (Python equivalent of Get-Process)
     try:
         import psutil
+
         is_alive = psutil.pid_exists(dead_pid)
     except ImportError:
         # psutil not available — simulate the dead-PID case
@@ -99,12 +104,16 @@ def test_state_starting_with_dead_pid_is_treated_as_dead(tmp_path):
     """
     # Write a fake state.json showing 'starting'
     state_file = tmp_path / "content_worker.state.json"
-    state_file.write_text(json.dumps({
-        "state": "starting",
-        "last_success_ts": None,
-        "last_error_ts": None,
-        "updated_at": "2026-04-17T08:35:50",
-    }))
+    state_file.write_text(
+        json.dumps(
+            {
+                "state": "starting",
+                "last_success_ts": None,
+                "last_error_ts": None,
+                "updated_at": "2026-04-17T08:35:50",
+            }
+        )
+    )
 
     state = json.loads(state_file.read_text())
     assert state["state"] == "starting"
@@ -113,6 +122,7 @@ def test_state_starting_with_dead_pid_is_treated_as_dead(tmp_path):
     dead_pid = 999_999
     try:
         import psutil
+
         pid_alive = psutil.pid_exists(dead_pid)
     except ImportError:
         pid_alive = False
@@ -128,6 +138,7 @@ def test_state_starting_with_dead_pid_is_treated_as_dead(tmp_path):
 # ---------------------------------------------------------------------------
 # Sentinel path convention test
 # ---------------------------------------------------------------------------
+
 
 def test_sentinel_path_follows_convention():
     """

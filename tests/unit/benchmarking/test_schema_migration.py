@@ -44,9 +44,7 @@ def test_migration_from_v0_to_v4():
         # Verify all tables exist
         conn = db._get_connection()
         try:
-            cursor = conn.execute(
-                "SELECT name FROM sqlite_master WHERE type='table' ORDER BY name"
-            )
+            cursor = conn.execute("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name")
             tables = {row[0] for row in cursor.fetchall()}
 
             expected_tables = {
@@ -79,12 +77,16 @@ def test_migration_idempotent():
         # Verify only one entry per version in schema_version table
         conn = db2._get_connection()
         try:
-            cursor = conn.execute("SELECT version, COUNT(*) as count FROM schema_version GROUP BY version")
+            cursor = conn.execute(
+                "SELECT version, COUNT(*) as count FROM schema_version GROUP BY version"
+            )
             version_counts = {row[0]: row[1] for row in cursor.fetchall()}
 
             # Each version should appear exactly once
             for version in [1, 2, 3, 4]:
-                assert version_counts.get(version, 0) == 1, f"Version {version} appears {version_counts.get(version, 0)} times"
+                assert version_counts.get(version, 0) == 1, (
+                    f"Version {version} appears {version_counts.get(version, 0)} times"
+                )
         finally:
             db2._close_connection(conn)
 

@@ -1,6 +1,5 @@
 """Unit tests for adaptive corpus management (BM-05)."""
 
-
 from src.benchmarking.adaptive_corpus import (
     AdaptiveCorpusManager,
     CorpusSample,

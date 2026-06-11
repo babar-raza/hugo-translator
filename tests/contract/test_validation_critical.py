@@ -48,10 +48,12 @@ def test_placeholder_validator_error_always_rejects_strict(
     reason = result_obj.decision_reason
 
     # Assert
-    assert decision == ValidationDecision.REJECT, \
+    assert decision == ValidationDecision.REJECT, (
         f"Expected REJECT for PlaceholderValidator ERROR, got {decision.name}: {reason}"
-    assert "Critical" in reason or "PlaceholderValidator" in reason, \
+    )
+    assert "Critical" in reason or "PlaceholderValidator" in reason, (
         f"Expected reason to mention critical validator, got: {reason}"
+    )
 
 
 @pytest.mark.contract
@@ -77,8 +79,9 @@ def test_placeholder_validator_error_always_rejects_normal(
     reason = result_obj.decision_reason
 
     # Assert
-    assert decision == ValidationDecision.REJECT, \
+    assert decision == ValidationDecision.REJECT, (
         f"Expected REJECT for PlaceholderValidator ERROR in normal mode, got {decision.name}: {reason}"
+    )
 
 
 @pytest.mark.contract
@@ -104,8 +107,9 @@ def test_placeholder_validator_error_always_rejects_lenient(
     reason = result_obj.decision_reason
 
     # Assert
-    assert decision == ValidationDecision.REJECT, \
+    assert decision == ValidationDecision.REJECT, (
         f"Expected REJECT even in lenient mode, got {decision.name}: {reason}"
+    )
 
 
 # ==============================================================================
@@ -136,10 +140,12 @@ def test_code_block_validator_error_always_rejects(
     reason = result_obj.decision_reason
 
     # Assert
-    assert decision == ValidationDecision.REJECT, \
+    assert decision == ValidationDecision.REJECT, (
         f"Expected REJECT for CodeBlockValidator ERROR, got {decision.name}: {reason}"
-    assert "Critical" in reason or "CodeBlockValidator" in reason, \
+    )
+    assert "Critical" in reason or "CodeBlockValidator" in reason, (
         f"Expected reason to mention critical validator, got: {reason}"
+    )
 
 
 # ==============================================================================
@@ -170,10 +176,12 @@ def test_link_validator_error_always_rejects(
     reason = result_obj.decision_reason
 
     # Assert
-    assert decision == ValidationDecision.REJECT, \
+    assert decision == ValidationDecision.REJECT, (
         f"Expected REJECT for LinkValidator ERROR, got {decision.name}: {reason}"
-    assert "Critical" in reason or "LinkValidator" in reason, \
+    )
+    assert "Critical" in reason or "LinkValidator" in reason, (
         f"Expected reason to mention critical validator, got: {reason}"
+    )
 
 
 # ==============================================================================
@@ -207,8 +215,9 @@ def test_non_critical_validator_follows_threshold(
 
     # Assert
     # Warnings should be accepted in lenient mode (not critical validator)
-    assert decision == ValidationDecision.ACCEPT, \
+    assert decision == ValidationDecision.ACCEPT, (
         f"Expected ACCEPT for non-critical warnings in lenient mode, got {decision.name}: {reason}"
+    )
 
 
 @pytest.mark.contract
@@ -234,12 +243,12 @@ def test_critical_validator_bypasses_retry_logic(
     reason = result_obj.decision_reason
 
     # Assert
-    assert decision == ValidationDecision.REJECT, \
-        f"Expected immediate REJECT, got {decision.name}"
+    assert decision == ValidationDecision.REJECT, f"Expected immediate REJECT, got {decision.name}"
 
     # Verify decision is REJECT, not RETRY
-    assert decision != ValidationDecision.RETRY, \
+    assert decision != ValidationDecision.RETRY, (
         "Critical validator errors should REJECT, not RETRY"
+    )
 
 
 @pytest.mark.contract
@@ -266,8 +275,9 @@ def test_critical_validator_bypasses_accept_after_max_retries(
     reason = result_obj.decision_reason
 
     # Assert
-    assert decision == ValidationDecision.REJECT, \
+    assert decision == ValidationDecision.REJECT, (
         f"Expected REJECT even at max retries, got {decision.name}: {reason}"
+    )
 
 
 # ==============================================================================
@@ -300,10 +310,12 @@ def test_critical_validator_fails_with_other_errors(
     reason = result_obj.decision_reason
 
     # Assert
-    assert decision == ValidationDecision.REJECT, \
+    assert decision == ValidationDecision.REJECT, (
         f"Expected REJECT for critical + non-critical mix, got {decision.name}: {reason}"
-    assert "Critical" in reason or "PlaceholderValidator" in reason, \
+    )
+    assert "Critical" in reason or "PlaceholderValidator" in reason, (
         "Reason should mention critical validator failure"
+    )
 
 
 @pytest.mark.contract
@@ -333,16 +345,18 @@ def test_multiple_critical_validators_fail(
     reason = result_obj.decision_reason
 
     # Assert
-    assert decision == ValidationDecision.REJECT, \
+    assert decision == ValidationDecision.REJECT, (
         f"Expected REJECT for multiple critical failures, got {decision.name}: {reason}"
+    )
 
     # Verify reason mentions at least one critical validator
     critical_mentioned = any(
         validator in reason
         for validator in ["PlaceholderValidator", "CodeBlockValidator", "LinkValidator", "Critical"]
     )
-    assert critical_mentioned, \
+    assert critical_mentioned, (
         f"Reason should mention at least one critical validator, got: {reason}"
+    )
 
 
 # ==============================================================================
@@ -385,5 +399,6 @@ def test_critical_validator_warning_does_not_reject():
     reason = result_obj.decision_reason
 
     # Assert
-    assert decision == ValidationDecision.ACCEPT, \
+    assert decision == ValidationDecision.ACCEPT, (
         f"Expected ACCEPT for WARNING from critical validator, got {decision.name}: {reason}"
+    )

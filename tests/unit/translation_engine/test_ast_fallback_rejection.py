@@ -4,6 +4,7 @@ TC-AST-01: AST fallback node tolerance gate.
 Verifies that TranslationIncomplete is raised when the fraction of AST nodes
 without a matching translation unit exceeds ast_fallback_node_tolerance.
 """
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -18,6 +19,7 @@ from src.translation_engine.reconstructor.ast_renderer import ASTRenderer
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _make_text_unit(node_addr: str, translated: str = "traducido") -> TextUnit:
     unit = MagicMock(spec=TextUnit)
@@ -34,6 +36,7 @@ def _make_text_unit(node_addr: str, translated: str = "traducido") -> TextUnit:
 # ---------------------------------------------------------------------------
 # TranslationIncomplete exception shape
 # ---------------------------------------------------------------------------
+
 
 def test_translation_incomplete_attributes():
     exc = TranslationIncomplete(
@@ -54,19 +57,21 @@ def test_translation_incomplete_attributes():
 # Tolerance gate in engine.py
 # ---------------------------------------------------------------------------
 
+
 def test_config_key_present():
     """ast_fallback_node_tolerance must exist in global.yaml translation_engine section."""
     import yaml
+
     cfg_path = Path("config/global.yaml")
     if not cfg_path.exists():
         pytest.skip("config/global.yaml not present in working directory")
     with open(cfg_path) as f:
         cfg = yaml.safe_load(f)
-    te = cfg.get('translation_engine', {})
-    assert 'ast_fallback_node_tolerance' in te, (
+    te = cfg.get("translation_engine", {})
+    assert "ast_fallback_node_tolerance" in te, (
         "ast_fallback_node_tolerance missing from translation_engine config"
     )
-    tol = float(te['ast_fallback_node_tolerance'])
+    tol = float(te["ast_fallback_node_tolerance"])
     assert 0.0 <= tol <= 1.0, f"ast_fallback_node_tolerance={tol} is not in [0.0, 1.0]"
 
 
@@ -81,11 +86,11 @@ def test_engine_raises_translation_incomplete_on_fallback(tmp_path):
 
     # Verify the guard is present in source (static regression check)
     src = inspect.getsource(TranslationEngine._translate_body_ast)
-    assert 'TranslationIncomplete' in src, (
+    assert "TranslationIncomplete" in src, (
         "TC-AST-01: _translate_body_ast must raise TranslationIncomplete "
         "when fallback ratio exceeds tolerance."
     )
-    assert 'ast_fallback_node_tolerance' in src, (
+    assert "ast_fallback_node_tolerance" in src, (
         "TC-AST-01: _translate_body_ast must read ast_fallback_node_tolerance from config."
     )
 
@@ -96,10 +101,10 @@ def test_ast_renderer_missing_node_count_exposed():
     Engine reads this attribute to compute the fallback ratio.
     """
     renderer = ASTRenderer()
-    assert hasattr(renderer, '_missing_node_count'), (
+    assert hasattr(renderer, "_missing_node_count"), (
         "ASTRenderer must expose _missing_node_count for TC-AST-01 tolerance check"
     )
-    assert hasattr(renderer, 'applied_units'), (
+    assert hasattr(renderer, "applied_units"), (
         "ASTRenderer must expose applied_units set for TC-AST-01 total node count"
     )
 
@@ -107,6 +112,7 @@ def test_ast_renderer_missing_node_count_exposed():
 def test_translation_incomplete_is_translation_error():
     """TranslationIncomplete must inherit from TranslationError for consistent catching."""
     from src.translation_engine.exceptions import TranslationError
+
     assert issubclass(TranslationIncomplete, TranslationError)
 
 
@@ -143,7 +149,9 @@ def test_tolerance_nonzero_below_threshold_passes():
     tolerance = 0.15
 
     should_reject = fallback_ratio > tolerance
-    assert should_reject is False, f"ratio={fallback_ratio:.1%} < tolerance={tolerance:.1%} should pass"
+    assert should_reject is False, (
+        f"ratio={fallback_ratio:.1%} < tolerance={tolerance:.1%} should pass"
+    )
 
 
 def test_tolerance_nonzero_above_threshold_rejects():
@@ -157,4 +165,6 @@ def test_tolerance_nonzero_above_threshold_rejects():
     tolerance = 0.10
 
     should_reject = fallback_ratio > tolerance
-    assert should_reject is True, f"ratio={fallback_ratio:.1%} > tolerance={tolerance:.1%} should reject"
+    assert should_reject is True, (
+        f"ratio={fallback_ratio:.1%} > tolerance={tolerance:.1%} should reject"
+    )

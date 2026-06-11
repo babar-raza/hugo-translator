@@ -141,9 +141,7 @@ def test_cpu_benchmark_runner_collect_system_info():
 
 @pytest.mark.integration
 @pytest.mark.slow
-def test_cpu_benchmark_sample_with_mock(
-    mock_corpus_file, mock_model_and_tokenizer
-):
+def test_cpu_benchmark_sample_with_mock(mock_corpus_file, mock_model_and_tokenizer):
     """Test benchmarking a single sample with mocked model."""
     mock_model, mock_tokenizer = mock_model_and_tokenizer
 

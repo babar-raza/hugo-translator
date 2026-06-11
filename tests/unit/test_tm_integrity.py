@@ -32,10 +32,7 @@ class TestIntegrityReport:
     def test_report_health_percentage_full(self):
         """Test 100% health when all entries valid."""
         report = IntegrityReport(
-            total_scanned=100,
-            valid_count=100,
-            corrupt_count=0,
-            repaired_count=0
+            total_scanned=100, valid_count=100, corrupt_count=0, repaired_count=0
         )
         assert report.health_percentage == 100.0
         assert report.is_healthy is True
@@ -43,32 +40,21 @@ class TestIntegrityReport:
     def test_report_health_percentage_partial(self):
         """Test partial health calculation."""
         report = IntegrityReport(
-            total_scanned=100,
-            valid_count=90,
-            corrupt_count=10,
-            repaired_count=0
+            total_scanned=100, valid_count=90, corrupt_count=10, repaired_count=0
         )
         assert report.health_percentage == 90.0
         assert report.is_healthy is False
 
     def test_report_health_percentage_empty(self):
         """Test 100% health for empty cache."""
-        report = IntegrityReport(
-            total_scanned=0,
-            valid_count=0,
-            corrupt_count=0,
-            repaired_count=0
-        )
+        report = IntegrityReport(total_scanned=0, valid_count=0, corrupt_count=0, repaired_count=0)
         assert report.health_percentage == 100.0
         assert report.is_healthy is True
 
     def test_report_string_format(self):
         """Test string representation has expected format."""
         report = IntegrityReport(
-            total_scanned=1000,
-            valid_count=998,
-            corrupt_count=2,
-            repaired_count=0
+            total_scanned=1000, valid_count=998, corrupt_count=2, repaired_count=0
         )
         report_str = str(report)
         assert "scanned=1000" in report_str
@@ -83,7 +69,7 @@ class TestIntegrityReport:
             valid_count=95,
             corrupt_count=5,
             repaired_count=3,
-            errors=[(b"key1", "error1"), (b"key2", "error2")]
+            errors=[(b"key1", "error1"), (b"key2", "error2")],
         )
         d = report.to_dict()
         assert d["total_scanned"] == 100
@@ -107,7 +93,7 @@ class TestCacheIntegrityChecker:
     def _insert_raw_entry(self, l2, key: str, value: bytes):
         """Insert raw bytes directly into LMDB (for testing corruption)."""
         with l2.env.begin(write=True) as txn:
-            txn.put(key.encode('utf-8'), value)
+            txn.put(key.encode("utf-8"), value)
 
     def _insert_valid_entry(self, l2, i: int = 0):
         """Insert a valid translation entry."""
@@ -116,7 +102,7 @@ class TestCacheIntegrityChecker:
             src_lang="en",
             tgt_lang="es",
             text=f"Test source text {i}",
-            translation=f"Test translation {i}"
+            translation=f"Test translation {i}",
         )
 
     def test_integrity_detects_corrupted_json(self, l2_db):
@@ -139,9 +125,9 @@ class TestCacheIntegrityChecker:
             # "translation" missing
             "site_id": "test.site",
             "src_lang": "en",
-            "tgt_lang": "es"
+            "tgt_lang": "es",
         }
-        self._insert_raw_entry(l2_db, "missing_field_key", json.dumps(entry).encode('utf-8'))
+        self._insert_raw_entry(l2_db, "missing_field_key", json.dumps(entry).encode("utf-8"))
 
         checker = CacheIntegrityChecker(l2_db)
         report = checker.verify_all(log_progress=False)
@@ -157,9 +143,9 @@ class TestCacheIntegrityChecker:
             "translation": "",  # Empty
             "site_id": "test.site",
             "src_lang": "en",
-            "tgt_lang": "es"
+            "tgt_lang": "es",
         }
-        self._insert_raw_entry(l2_db, "empty_field_key", json.dumps(entry).encode('utf-8'))
+        self._insert_raw_entry(l2_db, "empty_field_key", json.dumps(entry).encode("utf-8"))
 
         checker = CacheIntegrityChecker(l2_db)
         report = checker.verify_all(log_progress=False)
@@ -174,9 +160,9 @@ class TestCacheIntegrityChecker:
             "translation": None,  # Null
             "site_id": "test.site",
             "src_lang": "en",
-            "tgt_lang": "es"
+            "tgt_lang": "es",
         }
-        self._insert_raw_entry(l2_db, "null_field_key", json.dumps(entry).encode('utf-8'))
+        self._insert_raw_entry(l2_db, "null_field_key", json.dumps(entry).encode("utf-8"))
 
         checker = CacheIntegrityChecker(l2_db)
         report = checker.verify_all(log_progress=False)
@@ -192,9 +178,9 @@ class TestCacheIntegrityChecker:
             "translation": "Hola",
             "site_id": "test.site",
             "src_lang": "english",  # Invalid - should be 2-letter code
-            "tgt_lang": "es"
+            "tgt_lang": "es",
         }
-        self._insert_raw_entry(l2_db, "invalid_lang_key", json.dumps(entry).encode('utf-8'))
+        self._insert_raw_entry(l2_db, "invalid_lang_key", json.dumps(entry).encode("utf-8"))
 
         checker = CacheIntegrityChecker(l2_db)
         report = checker.verify_all(log_progress=False)
@@ -209,9 +195,9 @@ class TestCacheIntegrityChecker:
             "translation": "Hola",
             "site_id": "test.site",
             "src_lang": "xx",  # Unknown code
-            "tgt_lang": "es"
+            "tgt_lang": "es",
         }
-        self._insert_raw_entry(l2_db, "unknown_lang_key", json.dumps(entry).encode('utf-8'))
+        self._insert_raw_entry(l2_db, "unknown_lang_key", json.dumps(entry).encode("utf-8"))
 
         checker = CacheIntegrityChecker(l2_db)
         report = checker.verify_all(log_progress=False)
@@ -319,7 +305,7 @@ class TestCacheIntegrityChecker:
     def test_integrity_detects_invalid_utf8(self, l2_db):
         """Invalid UTF-8 encoding is detected."""
         # Insert invalid UTF-8 bytes
-        self._insert_raw_entry(l2_db, "invalid_utf8", b'\xff\xfe invalid')
+        self._insert_raw_entry(l2_db, "invalid_utf8", b"\xff\xfe invalid")
 
         checker = CacheIntegrityChecker(l2_db)
         report = checker.verify_all(log_progress=False)
@@ -344,7 +330,7 @@ class TestCacheIntegrityPerformance:
                 src_lang="en",
                 tgt_lang="es",
                 text=f"Test source text number {i} with some content",
-                translation=f"Texto de prueba numero {i} con algo de contenido"
+                translation=f"Texto de prueba numero {i} con algo de contenido",
             )
 
         return l2
@@ -379,12 +365,9 @@ class TestVerifyEntry:
             "translation": "Hola",
             "site_id": "test.site",
             "src_lang": "en",
-            "tgt_lang": "es"
+            "tgt_lang": "es",
         }
-        is_valid, error = checker.verify_entry(
-            b"test_key",
-            json.dumps(entry).encode('utf-8')
-        )
+        is_valid, error = checker.verify_entry(b"test_key", json.dumps(entry).encode("utf-8"))
         assert is_valid is True
         assert error is None
 
@@ -405,11 +388,7 @@ class TestCheckCacheIntegrity:
         # Create and populate database
         l2 = L2PersistentTM(db_path, max_size_mb=20)
         l2.store(
-            site_id="test.site",
-            src_lang="en",
-            tgt_lang="es",
-            text="Hello",
-            translation="Hola"
+            site_id="test.site", src_lang="en", tgt_lang="es", text="Hello", translation="Hola"
         )
         l2.close()
 

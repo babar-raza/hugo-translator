@@ -9,10 +9,12 @@ Four cases:
 Note: tests 3 and 4 test the attempt_correction function directly (correction.py),
 not the engine integration, to avoid standing up the full engine.
 """
+
 from __future__ import annotations
 
-import pytest
 from unittest.mock import MagicMock, patch
+
+import pytest
 
 
 class TestCorrectionScope:
@@ -25,7 +27,9 @@ class TestCorrectionScope:
 
         # We verify via code inspection that the guard is structural, not explicit.
         import inspect
+
         import src.translation_engine.engine as engine_mod
+
         src = inspect.getsource(engine_mod.TranslationEngine._verify_final_file_purity)
         # _verify_final_file_purity must NOT call attempt_correction
         assert "attempt_correction" not in src, (
@@ -43,7 +47,11 @@ class TestCorrectionScope:
                 mock_reg.get_model.return_value = MagicMock()
                 MockRegistry.return_value = mock_reg
                 mock_backend_inst = MagicMock()
-                mock_backend_inst._provider.generate.return_value = ("Fixed translation text", 50, 30)
+                mock_backend_inst._provider.generate.return_value = (
+                    "Fixed translation text",
+                    50,
+                    30,
+                )
                 MockBackend.return_value = mock_backend_inst
 
                 result = attempt_correction(

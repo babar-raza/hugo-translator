@@ -10,7 +10,6 @@ Tests cover:
 - Negative cases (structure drift detection)
 """
 
-
 from src.translation_engine.handlers.multiline_handler import (
     MultilineHandler,
     normalize_newlines,
@@ -311,6 +310,7 @@ class TestTranslateMultilineFunction:
 
     def test_basic_usage(self):
         """Basic usage of translate_multiline function."""
+
         def mock_translate(text):
             return text.upper()
 
@@ -320,6 +320,7 @@ class TestTranslateMultilineFunction:
 
     def test_with_escapes(self):
         """Escaped newlines normalized before translation."""
+
         def mock_translate(text):
             return text.upper()
 
@@ -329,6 +330,7 @@ class TestTranslateMultilineFunction:
 
     def test_without_escape_normalization(self):
         """Can disable escape normalization."""
+
         def mock_translate(text):
             return text.upper()
 
@@ -364,7 +366,7 @@ class TestRealWorldCases:
         assert result.structure_preserved is True
 
         # Verify indentation preserved
-        lines = result.translated_text.split('\n')
+        lines = result.translated_text.split("\n")
         assert lines[0].startswith("-   ")  # Top-level bullet
         assert lines[2].startswith("    -   ")  # Nested bullet
         assert lines[3].startswith("    -   ")  # Nested bullet
@@ -382,8 +384,8 @@ class TestRealWorldCases:
 
         result = handler.translate(source, mock_translate)
 
-        source_newlines = source.count('\n')
-        result_newlines = result.translated_text.count('\n')
+        source_newlines = source.count("\n")
+        result_newlines = result.translated_text.count("\n")
 
         assert source_newlines == 5
         assert result_newlines == 5

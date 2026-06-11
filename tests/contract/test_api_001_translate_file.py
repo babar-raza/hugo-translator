@@ -36,6 +36,7 @@ import pytest
 @dataclass
 class MockDocument:
     """Mock Hugo markdown document."""
+
     frontmatter: dict[str, Any]
     body: str
     source_path: Path | None = None
@@ -44,6 +45,7 @@ class MockDocument:
 @dataclass
 class MockSegment:
     """Mock segment for translation."""
+
     text: str
     segment_type: str = "paragraph"
     location: str = "body"
@@ -52,6 +54,7 @@ class MockSegment:
 @dataclass
 class MockLookupResult:
     """Mock TM lookup result."""
+
     hit: bool
     translation: str | None
     source: str
@@ -357,7 +360,7 @@ def test_atomic_write_preserves_original_on_failure(tmp_path):
     output_path.write_text(original_content, encoding="utf-8")
 
     # Act - Simulate write failure during rename
-    with patch('os.replace') as mock_replace:
+    with patch("os.replace") as mock_replace:
         mock_replace.side_effect = OSError(errno.EIO, "Simulated I/O error")
 
         try:

@@ -9,7 +9,7 @@ import sys
 from pathlib import Path
 
 # Add scripts to path to import check_invariants
-sys.path.insert(0, str(Path(__file__).parent.parent.parent / 'scripts'))
+sys.path.insert(0, str(Path(__file__).parent.parent.parent / "scripts"))
 
 from check_invariants import (
     BasicTerminologyChecker,
@@ -29,8 +29,8 @@ class TestPlaceholderInvariants:
         translated = "Ceci est ⟦P0_AST⟧ et ⟦P1_TERM⟧"
         result = checker.check_exact_count(source, translated)
         assert result.passed
-        assert result.details['expected_count'] == 2
-        assert result.details['actual_count'] == 2
+        assert result.details["expected_count"] == 2
+        assert result.details["actual_count"] == 2
 
     def test_exact_count_fail_missing(self):
         checker = PlaceholderInvariantChecker()
@@ -38,7 +38,7 @@ class TestPlaceholderInvariants:
         translated = "Ceci est ⟦P0_AST⟧"  # Missing P1_TERM
         result = checker.check_exact_count(source, translated)
         assert not result.passed
-        assert 'P1_TERM' in result.details['missing']
+        assert "P1_TERM" in result.details["missing"]
 
     def test_exact_count_fail_extra(self):
         checker = PlaceholderInvariantChecker()
@@ -46,7 +46,7 @@ class TestPlaceholderInvariants:
         translated = "Ceci est ⟦P0_AST⟧ et ⟦P1_EXTRA⟧"  # Extra placeholder
         result = checker.check_exact_count(source, translated)
         assert not result.passed
-        assert 'P1_EXTRA' in result.details['extra']
+        assert "P1_EXTRA" in result.details["extra"]
 
     def test_set_equality_pass(self):
         checker = PlaceholderInvariantChecker()
@@ -61,8 +61,8 @@ class TestPlaceholderInvariants:
         translated = "Essai ⟦ABC⟧ et ⟦WRONG⟧"  # Different placeholder
         result = checker.check_set_equality(source, translated)
         assert not result.passed
-        assert 'XYZ' in result.details['missing']
-        assert 'WRONG' in result.details['extra']
+        assert "XYZ" in result.details["missing"]
+        assert "WRONG" in result.details["extra"]
 
     def test_checksum_pass(self):
         checker = PlaceholderInvariantChecker()
@@ -89,8 +89,8 @@ class TestPlaceholderInvariants:
         text = "Test ⟦P0_AST⟧ and ⟦P0_AST⟧ again"  # Duplicate
         result = checker.check_no_duplicates(text, "test")
         assert not result.passed
-        assert 'P0_AST' in result.details['duplicates']
-        assert result.details['duplicates']['P0_AST'] == 2
+        assert "P0_AST" in result.details["duplicates"]
+        assert result.details["duplicates"]["P0_AST"] == 2
 
     def test_no_placeholders(self):
         """Edge case: Document with no placeholders"""
@@ -99,8 +99,8 @@ class TestPlaceholderInvariants:
         translated = "Texte simple sans placeholders"
         result = checker.check_exact_count(source, translated)
         assert result.passed
-        assert result.details['expected_count'] == 0
-        assert result.details['actual_count'] == 0
+        assert result.details["expected_count"] == 0
+        assert result.details["actual_count"] == 0
 
 
 class TestBoundaryInvariants:
@@ -123,7 +123,7 @@ class TestBoundaryInvariants:
         text = "test⟦P0_AST⟧ code"  # 't' before placeholder (invalid)
         result = checker.check_left_boundary(text)
         assert not result.passed
-        assert len(result.details['violations']) > 0
+        assert len(result.details["violations"]) > 0
 
     def test_right_boundary_pass_space(self):
         checker = BoundaryInvariantChecker()
@@ -136,7 +136,7 @@ class TestBoundaryInvariants:
         text = "t⟦P0_AST⟧test"  # 't' after placeholder (invalid)
         result = checker.check_right_boundary(text)
         assert not result.passed
-        assert len(result.details['violations']) > 0
+        assert len(result.details["violations"]) > 0
 
     def test_unicode_boundary_greek_letter(self):
         """Unicode test: Greek letters should be treated as word chars"""
@@ -151,7 +151,7 @@ class TestBoundaryInvariants:
         text = "test⟦P0⟧word and bad⟦P1⟧end"
         result = checker.check_left_boundary(text)
         assert not result.passed
-        assert len(result.details['violations']) == 2
+        assert len(result.details["violations"]) == 2
 
 
 class TestCodeBlockPolicy:
@@ -170,7 +170,7 @@ class TestCodeBlockPolicy:
         translated_wrong = "```python\ndef bar():\n    pass\n```"  # Modified!
         result = checker.check_full_bypass_unchanged(source, translated_wrong)
         assert not result.passed
-        assert len(result.details['violations']) > 0
+        assert len(result.details["violations"]) > 0
 
     def test_java_unchanged(self):
         checker = CodeBlockPolicyChecker()
@@ -310,8 +310,8 @@ class TestBasicTerminology:
         result = checker.check_common_terms(source, translated)
         assert not result.passed
         # Check that violations exist (could be API, endpoint, or both)
-        violations_str = str(result.details['violations'])
-        assert 'API' in violations_str or 'endpoint' in violations_str
+        violations_str = str(result.details["violations"])
+        assert "API" in violations_str or "endpoint" in violations_str
 
     def test_dataframe_preserved(self):
         checker = BasicTerminologyChecker()
@@ -327,9 +327,9 @@ class TestBasicTerminology:
         result = checker.check_common_terms(source, translated)
         assert not result.passed
         # Both DataFrame and async should be violations
-        violations_str = str(result.details['violations'])
-        assert 'DataFrame' in violations_str
-        assert 'async' in violations_str
+        violations_str = str(result.details["violations"])
+        assert "DataFrame" in violations_str
+        assert "async" in violations_str
 
     def test_multiple_terms_preserved(self):
         checker = BasicTerminologyChecker()

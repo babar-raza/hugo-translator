@@ -3,6 +3,7 @@ End-to-End GPU Pipeline Integration Tests.
 
 Tests complete translation pipeline with GPU acceleration.
 """
+
 import tempfile
 
 import pytest
@@ -175,14 +176,16 @@ class TestGPUPipelineIntegration:
 
             entries = []
             for i in range(50):
-                entries.append({
-                    "entry_id": f"tm{i}",
-                    "site_id": "test_site",
-                    "src_lang": "en",
-                    "tgt_lang": "es",
-                    "source_text": f"Test sentence {i}",
-                    "translation": f"Sentencia {i}",
-                })
+                entries.append(
+                    {
+                        "entry_id": f"tm{i}",
+                        "site_id": "test_site",
+                        "src_lang": "en",
+                        "tgt_lang": "es",
+                        "source_text": f"Test sentence {i}",
+                        "translation": f"Sentencia {i}",
+                    }
+                )
 
             count = tm.batch_add(entries)
             assert count == 50

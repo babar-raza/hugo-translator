@@ -1,9 +1,10 @@
 """Tests for git_changed_files() utility (TC-03 / GT-AUDIT-02)."""
+
 from __future__ import annotations
 
 import subprocess
 from pathlib import Path
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
 
 import pytest
 

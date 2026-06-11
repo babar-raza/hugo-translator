@@ -250,7 +250,7 @@ def test_lock_file_contains_metadata(lock_dir):
 
     lock_file = lock_dir / "metadata.lock"
 
-    if sys.platform != 'win32':
+    if sys.platform != "win32":
         # On Unix, we can read the file with a separate handle
         file_lock = FileLock(lock_file, timeout=0)
         file_lock.acquire()
@@ -273,11 +273,12 @@ def test_lock_file_contains_metadata(lock_dir):
         written_data = []
 
         original_write = os.write
+
         def capture_write(fd, data):
             written_data.append(data)
             return original_write(fd, data)
 
-        with patch('os.write', side_effect=capture_write):
+        with patch("os.write", side_effect=capture_write):
             file_lock = FileLock(lock_file, timeout=0)
             file_lock.acquire()
             file_lock.release()
@@ -338,11 +339,9 @@ def test_stale_lock_detection_dead_process(lock_dir):
 
     # Create a fake stale lock (PID that doesn't exist)
     fake_pid = 99999999  # Very unlikely to be a real PID
-    stale_content = json.dumps({
-        "pid": fake_pid,
-        "hostname": "test-host",
-        "created": "2020-01-01T00:00:00"
-    })
+    stale_content = json.dumps(
+        {"pid": fake_pid, "hostname": "test-host", "created": "2020-01-01T00:00:00"}
+    )
     lock_file.write_text(stale_content)
 
     # Lock should be detected as stale

@@ -50,16 +50,16 @@ class TestTranslationRejectedError:
                 ValidationIssue(
                     severity="error",
                     rule="front_matter_structure",
-                    message="Invalid front matter format"
+                    message="Invalid front matter format",
                 )
-            ]
+            ],
         )
 
         error = TranslationRejectedError(
             message="Translation rejected",
             file_path="/content/post.md",
             validation_result=validation_result,
-            rejection_reason="Critical validation errors"
+            rejection_reason="Critical validation errors",
         )
 
         assert str(error) == "Translation rejected"
@@ -75,7 +75,7 @@ class TestTranslationRejectedError:
             message="Test message",
             file_path="/test/file.md",
             validation_result=validation_result,
-            rejection_reason="Test reason"
+            rejection_reason="Test reason",
         )
 
         # All attributes should be accessible
@@ -93,7 +93,7 @@ class TestTranslationRejectedError:
             message="Test",
             file_path="/test.md",
             validation_result=validation_result,
-            rejection_reason="Test"
+            rejection_reason="Test",
         )
 
         assert isinstance(error, TranslationError)
@@ -108,7 +108,7 @@ class TestTranslationRejectedError:
                 message="Rejection test",
                 file_path="/test.md",
                 validation_result=validation_result,
-                rejection_reason="Test rejection"
+                rejection_reason="Test rejection",
             )
 
         assert str(exc_info.value) == "Rejection test"
@@ -124,7 +124,7 @@ class TestTranslationRejectedError:
                 message="Test",
                 file_path="/test.md",
                 validation_result=validation_result,
-                rejection_reason="Test"
+                rejection_reason="Test",
             )
 
         assert isinstance(exc_info.value, TranslationRejectedError)
@@ -138,27 +138,25 @@ class TestTranslationRejectedError:
                     severity="error",
                     rule="front_matter",
                     message="Missing required field",
-                    location="line 1"
+                    location="line 1",
                 ),
                 ValidationIssue(
                     severity="error",
                     rule="content_structure",
                     message="Invalid markdown structure",
-                    location="line 15"
+                    location="line 15",
                 ),
                 ValidationIssue(
-                    severity="warning",
-                    rule="style",
-                    message="Inconsistent heading levels"
-                )
-            ]
+                    severity="warning", rule="style", message="Inconsistent heading levels"
+                ),
+            ],
         )
 
         error = TranslationRejectedError(
             message="Multiple critical errors",
             file_path="/content/complex.md",
             validation_result=validation_result,
-            rejection_reason="Front matter and structure errors"
+            rejection_reason="Front matter and structure errors",
         )
 
         assert len(error.validation_result.issues) == 3
@@ -173,7 +171,7 @@ class TestTranslationRejectedError:
             message="Test",
             file_path="",
             validation_result=validation_result,
-            rejection_reason="Test"
+            rejection_reason="Test",
         )
 
         assert error.file_path == ""
@@ -183,10 +181,7 @@ class TestTranslationRejectedError:
         # This tests that the exception can be created with None,
         # though in production this should be avoided
         error = TranslationRejectedError(
-            message="Test",
-            file_path="/test.md",
-            validation_result=None,
-            rejection_reason="Test"
+            message="Test", file_path="/test.md", validation_result=None, rejection_reason="Test"
         )
 
         assert error.validation_result is None
@@ -198,9 +193,7 @@ class TestTranslationRejectedError:
         with pytest.raises(TypeError):
             # Missing rejection_reason parameter
             TranslationRejectedError(
-                message="Test",
-                file_path="/test.md",
-                validation_result=validation_result
+                message="Test", file_path="/test.md", validation_result=validation_result
             )
 
 
@@ -215,9 +208,9 @@ class TestTranslationRetryableError:
                 ValidationIssue(
                     severity="error",
                     rule="code_block_format",
-                    message="Code block formatting inconsistent"
+                    message="Code block formatting inconsistent",
                 )
-            ]
+            ],
         )
 
         error = TranslationRetryableError(
@@ -225,7 +218,7 @@ class TestTranslationRetryableError:
             file_path="/content/post.md",
             validation_result=validation_result,
             retry_feedback="Preserve code block formatting",
-            retry_count=1
+            retry_count=1,
         )
 
         assert str(error) == "Translation validation failed, retry possible"
@@ -242,7 +235,7 @@ class TestTranslationRetryableError:
             message="Test",
             file_path="/test.md",
             validation_result=validation_result,
-            retry_feedback="Test feedback"
+            retry_feedback="Test feedback",
         )
 
         assert error.retry_count == 0
@@ -256,7 +249,7 @@ class TestTranslationRetryableError:
             file_path="/test/file.md",
             validation_result=validation_result,
             retry_feedback="Fix formatting",
-            retry_count=2
+            retry_count=2,
         )
 
         # All attributes should be accessible
@@ -276,7 +269,7 @@ class TestTranslationRetryableError:
             message="Test",
             file_path="/test.md",
             validation_result=validation_result,
-            retry_feedback="Test"
+            retry_feedback="Test",
         )
 
         assert isinstance(error, TranslationError)
@@ -292,7 +285,7 @@ class TestTranslationRetryableError:
                 file_path="/test.md",
                 validation_result=validation_result,
                 retry_feedback="Test feedback",
-                retry_count=1
+                retry_count=1,
             )
 
         assert str(exc_info.value) == "Retry test"
@@ -309,7 +302,7 @@ class TestTranslationRetryableError:
                 message="Test",
                 file_path="/test.md",
                 validation_result=validation_result,
-                retry_feedback="Test"
+                retry_feedback="Test",
             )
 
         assert isinstance(exc_info.value, TranslationRetryableError)
@@ -324,7 +317,7 @@ class TestTranslationRetryableError:
             file_path="/test.md",
             validation_result=validation_result,
             retry_feedback="Initial feedback",
-            retry_count=0
+            retry_count=0,
         )
         assert error1.retry_count == 0
 
@@ -334,7 +327,7 @@ class TestTranslationRetryableError:
             file_path="/test.md",
             validation_result=validation_result,
             retry_feedback="Updated feedback",
-            retry_count=1
+            retry_count=1,
         )
         assert error2.retry_count == 1
 
@@ -344,7 +337,7 @@ class TestTranslationRetryableError:
             file_path="/test.md",
             validation_result=validation_result,
             retry_feedback="Final feedback",
-            retry_count=2
+            retry_count=2,
         )
         assert error3.retry_count == 2
 
@@ -357,14 +350,12 @@ class TestTranslationRetryableError:
                     severity="error",
                     rule="formatting",
                     message="Inconsistent formatting",
-                    location="segment 5"
+                    location="segment 5",
                 ),
                 ValidationIssue(
-                    severity="warning",
-                    rule="terminology",
-                    message="Inconsistent term usage"
-                )
-            ]
+                    severity="warning", rule="terminology", message="Inconsistent term usage"
+                ),
+            ],
         )
 
         error = TranslationRetryableError(
@@ -372,7 +363,7 @@ class TestTranslationRetryableError:
             file_path="/content/doc.md",
             validation_result=validation_result,
             retry_feedback="Maintain consistent formatting and terminology",
-            retry_count=1
+            retry_count=1,
         )
 
         assert len(error.validation_result.issues) == 2
@@ -387,7 +378,7 @@ class TestTranslationRetryableError:
             message="Test",
             file_path="/test.md",
             validation_result=validation_result,
-            retry_feedback=""
+            retry_feedback="",
         )
 
         assert error.retry_feedback == ""
@@ -397,10 +388,7 @@ class TestTranslationRetryableError:
         # This tests that the exception can be created with None,
         # though in production this should be avoided
         error = TranslationRetryableError(
-            message="Test",
-            file_path="/test.md",
-            validation_result=None,
-            retry_feedback="Test"
+            message="Test", file_path="/test.md", validation_result=None, retry_feedback="Test"
         )
 
         assert error.validation_result is None
@@ -412,9 +400,7 @@ class TestTranslationRetryableError:
         with pytest.raises(TypeError):
             # Missing retry_feedback parameter
             TranslationRetryableError(
-                message="Test",
-                file_path="/test.md",
-                validation_result=validation_result
+                message="Test", file_path="/test.md", validation_result=validation_result
             )
 
 
@@ -428,7 +414,7 @@ class TestExceptionInheritance:
             message="Test",
             file_path="/test.md",
             validation_result=validation_result,
-            rejection_reason="Test"
+            rejection_reason="Test",
         )
 
         assert isinstance(error, TranslationError)
@@ -440,7 +426,7 @@ class TestExceptionInheritance:
             message="Test",
             file_path="/test.md",
             validation_result=validation_result,
-            retry_feedback="Test"
+            retry_feedback="Test",
         )
 
         assert isinstance(error, TranslationError)
@@ -453,14 +439,14 @@ class TestExceptionInheritance:
             message="Test",
             file_path="/test.md",
             validation_result=validation_result,
-            rejection_reason="Test"
+            rejection_reason="Test",
         )
 
         retryable = TranslationRetryableError(
             message="Test",
             file_path="/test.md",
             validation_result=validation_result,
-            retry_feedback="Test"
+            retry_feedback="Test",
         )
 
         assert isinstance(rejected, Exception)
@@ -476,7 +462,7 @@ class TestExceptionInheritance:
                 message="Test",
                 file_path="/test.md",
                 validation_result=validation_result,
-                rejection_reason="Test"
+                rejection_reason="Test",
             )
         except TranslationError as e:
             assert isinstance(e, TranslationRejectedError)
@@ -487,7 +473,7 @@ class TestExceptionInheritance:
                 message="Test",
                 file_path="/test.md",
                 validation_result=validation_result,
-                retry_feedback="Test"
+                retry_feedback="Test",
             )
         except TranslationError as e:
             assert isinstance(e, TranslationRetryableError)
@@ -500,14 +486,14 @@ class TestExceptionInheritance:
             message="Test",
             file_path="/test.md",
             validation_result=validation_result,
-            rejection_reason="Test"
+            rejection_reason="Test",
         )
 
         retryable = TranslationRetryableError(
             message="Test",
             file_path="/test.md",
             validation_result=validation_result,
-            retry_feedback="Test"
+            retry_feedback="Test",
         )
 
         assert type(rejected) != type(retryable)
@@ -527,7 +513,7 @@ class TestExceptionEdgeCases:
             message=long_message,
             file_path="/test.md",
             validation_result=validation_result,
-            rejection_reason="Test"
+            rejection_reason="Test",
         )
 
         assert len(str(error)) == len(long_message)
@@ -541,7 +527,7 @@ class TestExceptionEdgeCases:
             file_path="/test.md",
             validation_result=validation_result,
             retry_feedback="Test",
-            retry_count=999
+            retry_count=999,
         )
 
         assert error.retry_count == 999
@@ -554,14 +540,14 @@ class TestExceptionEdgeCases:
             message="Test",
             file_path="/content/文档.md",
             validation_result=validation_result,
-            rejection_reason="Test"
+            rejection_reason="Test",
         )
 
         retryable = TranslationRetryableError(
             message="Test",
             file_path="/content/документ.md",
             validation_result=validation_result,
-            retry_feedback="Test"
+            retry_feedback="Test",
         )
 
         assert rejected.file_path == "/content/文档.md"
@@ -575,7 +561,7 @@ class TestExceptionEdgeCases:
             message="翻訳が拒否されました",
             file_path="/test.md",
             validation_result=validation_result,
-            rejection_reason="Перевод отклонен"
+            rejection_reason="Перевод отклонен",
         )
 
         assert str(error) == "翻訳が拒否されました"
@@ -589,7 +575,7 @@ class TestExceptionEdgeCases:
             message="Test",
             file_path="/content/file with spaces & special-chars_123.md",
             validation_result=validation_result,
-            retry_feedback="Test"
+            retry_feedback="Test",
         )
 
         assert error.file_path == "/content/file with spaces & special-chars_123.md"

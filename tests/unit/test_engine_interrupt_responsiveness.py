@@ -65,6 +65,7 @@ def test_shutdown_exception_propagates_through_translate_file():
 
     # Verify it's a TranslationError subclass (for proper exception hierarchy)
     from src.translation_engine.exceptions import TranslationError
+
     assert isinstance(exc, TranslationError)
 
 
@@ -84,12 +85,14 @@ def test_directory_sequential_handles_shutdown():
     engine._perform_shutdown = Mock()
 
     # Mock translate_file to raise ShutdownRequested on second file
-    call_count = {'count': 0}
+    call_count = {"count": 0}
 
     def mock_translate_file(*args, **kwargs):
-        call_count['count'] += 1
-        if call_count['count'] == 2:
-            raise ShutdownRequested(file_path=str(kwargs.get('file_path', 'unknown')), segments_completed=10)
+        call_count["count"] += 1
+        if call_count["count"] == 2:
+            raise ShutdownRequested(
+                file_path=str(kwargs.get("file_path", "unknown")), segments_completed=10
+            )
         # Return success for first file
         file_result = Mock()
         file_result.success = True
@@ -121,7 +124,7 @@ def test_directory_sequential_handles_shutdown():
     # Verify shutdown was called
     assert engine._perform_shutdown.called
     # Verify only 2 files were processed (first succeeded, second raised shutdown)
-    assert call_count['count'] == 2
+    assert call_count["count"] == 2
     assert result.successful_files == 1
 
 

@@ -72,33 +72,32 @@ def test_backend_output_language_detection():
     def detect_language_simple(text: str) -> str:
         text_lower = text.lower()
         # Common French words
-        fr_words = ['le', 'la', 'les', 'est', 'sont', 'de', 'des', 'et', 'pour']
+        fr_words = ["le", "la", "les", "est", "sont", "de", "des", "et", "pour"]
         # Common English words
-        en_words = ['the', 'is', 'are', 'and', 'for', 'with']
+        en_words = ["the", "is", "are", "and", "for", "with"]
 
-        fr_count = sum(1 for word in fr_words if f' {word} ' in f' {text_lower} ')
-        en_count = sum(1 for word in en_words if f' {word} ' in f' {text_lower} ')
+        fr_count = sum(1 for word in fr_words if f" {word} " in f" {text_lower} ")
+        en_count = sum(1 for word in en_words if f" {word} " in f" {text_lower} ")
 
         if en_count > fr_count:
-            return 'en'
+            return "en"
         elif fr_count > 0:
-            return 'fr'
-        return 'unknown'
+            return "fr"
+        return "unknown"
 
     # Test cases
     english_output = "Hello world, this is a test"
     french_output = "Bonjour le monde, c'est un test"
 
-    assert detect_language_simple(english_output) == 'en', \
-        "Should detect English output"
-    assert detect_language_simple(french_output) == 'fr', \
-        "Should detect French output"
+    assert detect_language_simple(english_output) == "en", "Should detect English output"
+    assert detect_language_simple(french_output) == "fr", "Should detect French output"
 
     # If target is French but output is English, reject
-    target_lang = 'fr'
+    target_lang = "fr"
     detected = detect_language_simple(english_output)
-    assert detected != target_lang, \
+    assert detected != target_lang, (
         f"Backend output language ({detected}) does not match target ({target_lang}), should reject"
+    )
 
 
 def test_generation_params_applied():
@@ -123,10 +122,12 @@ def test_generation_params_applied():
     sig = inspect.signature(NLLBBackend.translate)
     params = list(sig.parameters.keys())
 
-    assert 'generation_params' in params, \
+    assert "generation_params" in params, (
         "NLLBBackend.translate() must accept generation_params parameter"
-    assert 'max_new_tokens' in params, \
+    )
+    assert "max_new_tokens" in params, (
         "NLLBBackend.translate() must accept max_new_tokens parameter"
+    )
 
 
 if __name__ == "__main__":

@@ -76,7 +76,9 @@ def mock_engine(temp_lock_dir):
         return TranslationResult(
             success=True,
             file_path=file_path,
-            outputs={lang: file_path.parent / f"{file_path.stem}.{lang}.md" for lang in target_langs},
+            outputs={
+                lang: file_path.parent / f"{file_path.stem}.{lang}.md" for lang in target_langs
+            },
         )
 
     engine.translate_file = Mock(side_effect=mock_translate_file)
@@ -97,19 +99,16 @@ def test_directory_result_has_required_fields():
     CONTRACT: API-002 - DirectoryResult output structure
     Evidence: src/translation_engine/models.py lines 152-161
     """
-    result = DirectoryResult(
-        success=True,
-        directory=Path("/test")
-    )
+    result = DirectoryResult(success=True, directory=Path("/test"))
 
     # Required fields
-    assert hasattr(result, 'success')
-    assert hasattr(result, 'directory')
-    assert hasattr(result, 'file_results')
-    assert hasattr(result, 'total_files')
-    assert hasattr(result, 'successful_files')
-    assert hasattr(result, 'failed_files')
-    assert hasattr(result, 'duration_seconds')
+    assert hasattr(result, "success")
+    assert hasattr(result, "directory")
+    assert hasattr(result, "file_results")
+    assert hasattr(result, "total_files")
+    assert hasattr(result, "successful_files")
+    assert hasattr(result, "failed_files")
+    assert hasattr(result, "duration_seconds")
 
 
 @pytest.mark.contract
@@ -120,10 +119,7 @@ def test_directory_result_default_values():
     CONTRACT: API-002 - DirectoryResult defaults
     Evidence: src/translation_engine/models.py lines 157-161
     """
-    result = DirectoryResult(
-        success=False,
-        directory=Path("/test")
-    )
+    result = DirectoryResult(success=False, directory=Path("/test"))
 
     assert result.file_results == []
     assert result.total_files == 0
@@ -140,13 +136,10 @@ def test_directory_result_aggregate_stats():
     CONTRACT: API-002 - Aggregated statistics
     Evidence: src/translation_engine/models.py lines 163-167
     """
-    result = DirectoryResult(
-        success=True,
-        directory=Path("/test")
-    )
+    result = DirectoryResult(success=True, directory=Path("/test"))
 
     # Should have aggregate_stats property
-    assert hasattr(result, 'aggregate_stats')
+    assert hasattr(result, "aggregate_stats")
 
 
 # ==============================================================================
@@ -305,10 +298,11 @@ def test_skip_site_lock_parameter_exists():
     import inspect
 
     from src.translation_engine.engine import TranslationEngine
+
     sig = inspect.signature(TranslationEngine.translate_directory)
     params = list(sig.parameters.keys())
 
-    assert 'skip_site_lock' in params
+    assert "skip_site_lock" in params
 
 
 # ==============================================================================
@@ -332,7 +326,7 @@ def test_recursive_true_uses_double_star_pattern(temp_content_dir):
     filenames = [f.name for f in files]
     assert "index.md" in filenames
     assert "guide.md" in filenames  # From docs subdirectory
-    assert "api.md" in filenames    # From docs subdirectory
+    assert "api.md" in filenames  # From docs subdirectory
 
 
 @pytest.mark.contract
@@ -351,7 +345,7 @@ def test_recursive_false_uses_single_star_pattern(temp_content_dir):
     filenames = [f.name for f in files]
     assert "index.md" in filenames
     assert "guide.md" not in filenames  # Not included
-    assert "api.md" not in filenames    # Not included
+    assert "api.md" not in filenames  # Not included
 
 
 # ==============================================================================
@@ -383,8 +377,7 @@ def test_already_translated_files_excluded(tmp_path):
     # Filter out translated files (simulating what filter_source_files does)
     target_langs = ["fr", "de"]
     source_files = [
-        f for f in all_files
-        if not any(f.name.endswith(f".{lang}.md") for lang in target_langs)
+        f for f in all_files if not any(f.name.endswith(f".{lang}.md") for lang in target_langs)
     ]
 
     # Only index.md should remain
@@ -473,7 +466,7 @@ def test_empty_directory_returns_success(tmp_path):
     result = DirectoryResult(
         success=True,  # Empty is still success
         directory=empty_dir,
-        total_files=0
+        total_files=0,
     )
     assert result.success is True
     assert result.total_files == 0
@@ -498,18 +491,13 @@ def test_all_files_filtered_returns_success(tmp_path):
     target_langs = ["fr", "de"]
     all_files = list(content_dir.glob("*.md"))
     source_files = [
-        f for f in all_files
-        if not any(f.name.endswith(f".{lang}.md") for lang in target_langs)
+        f for f in all_files if not any(f.name.endswith(f".{lang}.md") for lang in target_langs)
     ]
 
     assert len(source_files) == 0
 
     # Same as empty directory - success with 0 files
-    result = DirectoryResult(
-        success=True,
-        directory=content_dir,
-        total_files=0
-    )
+    result = DirectoryResult(success=True, directory=content_dir, total_files=0)
     assert result.success is True
 
 
@@ -530,11 +518,9 @@ def test_stale_lock_older_than_24h_removed(temp_lock_dir):
 
     # Create a stale lock file
     stale_lock = temp_lock_dir / "stale-site.lock"
-    stale_lock.write_text(json.dumps({
-        "pid": 99999,
-        "hostname": "old-host",
-        "created": "2020-01-01T00:00:00"
-    }))
+    stale_lock.write_text(
+        json.dumps({"pid": 99999, "hostname": "old-host", "created": "2020-01-01T00:00:00"})
+    )
 
     # Modify the file time to be >24h old
     old_time = time.time() - (86400 + 3600)  # 25 hours ago
@@ -596,11 +582,7 @@ def test_success_count_aggregated_correctly():
     Evidence: src/translation_engine/engine.py line 2445
     """
     result = DirectoryResult(
-        success=True,
-        directory=Path("/test"),
-        total_files=5,
-        successful_files=4,
-        failed_files=1
+        success=True, directory=Path("/test"), total_files=5, successful_files=4, failed_files=1
     )
 
     # Success is True if any files succeeded
@@ -622,11 +604,7 @@ def test_duration_tracked_correctly():
     time.sleep(0.1)  # Simulate work
     duration = time.time() - start_time
 
-    result = DirectoryResult(
-        success=True,
-        directory=Path("/test"),
-        duration_seconds=duration
-    )
+    result = DirectoryResult(success=True, directory=Path("/test"), duration_seconds=duration)
 
     assert result.duration_seconds >= 0.1
 
@@ -677,14 +655,10 @@ def test_file_results_list_populated():
     Evidence: src/translation_engine/models.py line 157
     """
     result1 = TranslationResult(
-        success=True,
-        file_path=Path("/test/file1.md"),
-        outputs={"fr": Path("/test/file1.fr.md")}
+        success=True, file_path=Path("/test/file1.md"), outputs={"fr": Path("/test/file1.fr.md")}
     )
     result2 = TranslationResult(
-        success=True,
-        file_path=Path("/test/file2.md"),
-        outputs={"fr": Path("/test/file2.fr.md")}
+        success=True, file_path=Path("/test/file2.md"), outputs={"fr": Path("/test/file2.fr.md")}
     )
 
     dir_result = DirectoryResult(
@@ -692,7 +666,7 @@ def test_file_results_list_populated():
         directory=Path("/test"),
         file_results=[result1, result2],
         total_files=2,
-        successful_files=2
+        successful_files=2,
     )
 
     assert len(dir_result.file_results) == 2

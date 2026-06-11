@@ -26,17 +26,15 @@ import importlib.util
 
 # First load atomic_write module
 spec_atomic = importlib.util.spec_from_file_location(
-    "utils.atomic_write",
-    src_path / "utils" / "atomic_write.py"
+    "utils.atomic_write", src_path / "utils" / "atomic_write.py"
 )
 atomic_write_module = importlib.util.module_from_spec(spec_atomic)
-sys.modules['utils.atomic_write'] = atomic_write_module
+sys.modules["utils.atomic_write"] = atomic_write_module
 spec_atomic.loader.exec_module(atomic_write_module)
 
 # Now load progress module (it will use fallback import for atomic_write)
 spec = importlib.util.spec_from_file_location(
-    "progress",
-    src_path / "translation_engine" / "progress.py"
+    "progress", src_path / "translation_engine" / "progress.py"
 )
 progress_module = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(progress_module)
@@ -58,7 +56,7 @@ class TestProgressState:
             output_dir="/output",
             target_langs=["es", "fr"],
             total_files=10,
-            translations_completed=5
+            translations_completed=5,
         )
 
         d = state.to_dict()
@@ -85,7 +83,7 @@ class TestProgressState:
             "translations_completed": 0,
             "translations_failed": 0,
             "started_at": "2025-01-01T00:00:00",
-            "last_updated": "2025-01-01T00:00:00"
+            "last_updated": "2025-01-01T00:00:00",
         }
 
         state = ProgressState.from_dict(data)
@@ -96,10 +94,7 @@ class TestProgressState:
 
     def test_state_unsupported_version(self):
         """Test rejection of unsupported schema version."""
-        data = {
-            "run_id": "test",
-            "schema_version": "99.0"
-        }
+        data = {"run_id": "test", "schema_version": "99.0"}
 
         with pytest.raises(ValueError, match="Unsupported schema version"):
             ProgressState.from_dict(data)
@@ -115,19 +110,14 @@ class TestProgressTrackerInitialization:
         assert not progress_dir.exists()
 
         tracker = ProgressTracker(
-            progress_dir=progress_dir,
-            site_id="test.site",
-            target_langs=["es"]
+            progress_dir=progress_dir, site_id="test.site", target_langs=["es"]
         )
 
         assert progress_dir.exists()
 
     def test_initialization_generates_run_id(self, tmp_path):
         """Test run_id is generated if not provided."""
-        tracker = ProgressTracker(
-            progress_dir=tmp_path / "progress",
-            site_id="test.site"
-        )
+        tracker = ProgressTracker(progress_dir=tmp_path / "progress", site_id="test.site")
 
         assert tracker.run_id is not None
         assert len(tracker.run_id) == 36  # UUID format
@@ -135,9 +125,7 @@ class TestProgressTrackerInitialization:
     def test_initialization_uses_provided_run_id(self, tmp_path):
         """Test provided run_id is used."""
         tracker = ProgressTracker(
-            progress_dir=tmp_path / "progress",
-            run_id="my-custom-id",
-            site_id="test.site"
+            progress_dir=tmp_path / "progress", run_id="my-custom-id", site_id="test.site"
         )
 
         assert tracker.run_id == "my-custom-id"
@@ -149,7 +137,7 @@ class TestProgressTrackerInitialization:
             site_id="my.site",
             source_dir=Path("/source"),
             output_dir=Path("/output"),
-            target_langs=["es", "fr", "de"]
+            target_langs=["es", "fr", "de"],
         )
 
         assert tracker.state.site_id == "my.site"
@@ -172,16 +160,13 @@ class TestProgressTrackerSaveLoad:
             progress_dir=progress_dir,
             run_id="roundtrip-test",
             site_id="test.site",
-            target_langs=["es", "fr"]
+            target_langs=["es", "fr"],
         )
         tracker1.initialize([Path("file1.md"), Path("file2.md")])
         tracker1.mark_completed(Path("file1.md"), "es")
 
         # Load in new tracker
-        tracker2 = ProgressTracker(
-            progress_dir=progress_dir,
-            run_id="roundtrip-test"
-        )
+        tracker2 = ProgressTracker(progress_dir=progress_dir, run_id="roundtrip-test")
 
         assert tracker2.state.site_id == "test.site"
         assert tracker2.state.total_files == 2
@@ -193,9 +178,7 @@ class TestProgressTrackerSaveLoad:
         progress_dir = tmp_path / "progress"
 
         tracker = ProgressTracker(
-            progress_dir=progress_dir,
-            run_id="location-test",
-            site_id="test.site"
+            progress_dir=progress_dir, run_id="location-test", site_id="test.site"
         )
         tracker.initialize([Path("file.md")])
 
@@ -209,9 +192,7 @@ class TestProgressTrackerCompletion:
     def test_mark_completed_single(self, tmp_path):
         """Test marking a single translation as completed."""
         tracker = ProgressTracker(
-            progress_dir=tmp_path / "progress",
-            site_id="test.site",
-            target_langs=["es"]
+            progress_dir=tmp_path / "progress", site_id="test.site", target_langs=["es"]
         )
         tracker.initialize([Path("file.md")])
 
@@ -223,9 +204,7 @@ class TestProgressTrackerCompletion:
     def test_mark_completed_multiple_langs(self, tmp_path):
         """Test completing all languages for a file."""
         tracker = ProgressTracker(
-            progress_dir=tmp_path / "progress",
-            site_id="test.site",
-            target_langs=["es", "fr"]
+            progress_dir=tmp_path / "progress", site_id="test.site", target_langs=["es", "fr"]
         )
         tracker.initialize([Path("file.md")])
 
@@ -238,9 +217,7 @@ class TestProgressTrackerCompletion:
     def test_mark_completed_idempotent(self, tmp_path):
         """Test marking same completion twice is idempotent."""
         tracker = ProgressTracker(
-            progress_dir=tmp_path / "progress",
-            site_id="test.site",
-            target_langs=["es"]
+            progress_dir=tmp_path / "progress", site_id="test.site", target_langs=["es"]
         )
         tracker.initialize([Path("file.md")])
 
@@ -252,9 +229,7 @@ class TestProgressTrackerCompletion:
     def test_mark_completed_removes_from_failed(self, tmp_path):
         """Test completion removes entry from failed list."""
         tracker = ProgressTracker(
-            progress_dir=tmp_path / "progress",
-            site_id="test.site",
-            target_langs=["es"]
+            progress_dir=tmp_path / "progress", site_id="test.site", target_langs=["es"]
         )
         tracker.initialize([Path("file.md")])
 
@@ -272,9 +247,7 @@ class TestProgressTrackerFailure:
     def test_mark_failed(self, tmp_path):
         """Test marking a translation as failed."""
         tracker = ProgressTracker(
-            progress_dir=tmp_path / "progress",
-            site_id="test.site",
-            target_langs=["es"]
+            progress_dir=tmp_path / "progress", site_id="test.site", target_langs=["es"]
         )
         tracker.initialize([Path("file.md")])
 
@@ -286,9 +259,7 @@ class TestProgressTrackerFailure:
     def test_mark_failed_multiple_langs(self, tmp_path):
         """Test multiple failures for same file."""
         tracker = ProgressTracker(
-            progress_dir=tmp_path / "progress",
-            site_id="test.site",
-            target_langs=["es", "fr"]
+            progress_dir=tmp_path / "progress", site_id="test.site", target_langs=["es", "fr"]
         )
         tracker.initialize([Path("file.md")])
 
@@ -306,9 +277,7 @@ class TestProgressTrackerPending:
     def test_get_pending_all(self, tmp_path):
         """Test all work is pending initially."""
         tracker = ProgressTracker(
-            progress_dir=tmp_path / "progress",
-            site_id="test.site",
-            target_langs=["es", "fr"]
+            progress_dir=tmp_path / "progress", site_id="test.site", target_langs=["es", "fr"]
         )
 
         files = [Path("file1.md"), Path("file2.md")]
@@ -322,9 +291,7 @@ class TestProgressTrackerPending:
     def test_get_pending_partial(self, tmp_path):
         """Test pending excludes completed work."""
         tracker = ProgressTracker(
-            progress_dir=tmp_path / "progress",
-            site_id="test.site",
-            target_langs=["es", "fr"]
+            progress_dir=tmp_path / "progress", site_id="test.site", target_langs=["es", "fr"]
         )
 
         files = [Path("file1.md"), Path("file2.md")]
@@ -342,9 +309,7 @@ class TestProgressTrackerPending:
     def test_get_pending_none(self, tmp_path):
         """Test no pending when all complete."""
         tracker = ProgressTracker(
-            progress_dir=tmp_path / "progress",
-            site_id="test.site",
-            target_langs=["es"]
+            progress_dir=tmp_path / "progress", site_id="test.site", target_langs=["es"]
         )
 
         files = [Path("file.md")]
@@ -365,7 +330,7 @@ class TestProgressTrackerStatistics:
             progress_dir=tmp_path / "progress",
             run_id="stats-test",
             site_id="test.site",
-            target_langs=["es", "fr"]
+            target_langs=["es", "fr"],
         )
 
         files = [Path("file1.md"), Path("file2.md")]
@@ -386,9 +351,7 @@ class TestProgressTrackerStatistics:
     def test_is_complete_true(self, tmp_path):
         """Test is_complete when all done."""
         tracker = ProgressTracker(
-            progress_dir=tmp_path / "progress",
-            site_id="test.site",
-            target_langs=["es"]
+            progress_dir=tmp_path / "progress", site_id="test.site", target_langs=["es"]
         )
         tracker.initialize([Path("file.md")])
         tracker.mark_completed(Path("file.md"), "es")
@@ -398,9 +361,7 @@ class TestProgressTrackerStatistics:
     def test_is_complete_false(self, tmp_path):
         """Test is_complete when work remains."""
         tracker = ProgressTracker(
-            progress_dir=tmp_path / "progress",
-            site_id="test.site",
-            target_langs=["es", "fr"]
+            progress_dir=tmp_path / "progress", site_id="test.site", target_langs=["es", "fr"]
         )
         tracker.initialize([Path("file.md")])
         tracker.mark_completed(Path("file.md"), "es")
@@ -416,9 +377,7 @@ class TestProgressTrackerClear:
         progress_dir = tmp_path / "progress"
 
         tracker = ProgressTracker(
-            progress_dir=progress_dir,
-            run_id="clear-test",
-            site_id="test.site"
+            progress_dir=progress_dir, run_id="clear-test", site_id="test.site"
         )
         tracker.initialize([Path("file.md")])
 
@@ -431,10 +390,7 @@ class TestProgressTrackerClear:
 
     def test_clear_nonexistent_ok(self, tmp_path):
         """Test clear on non-existent file doesn't error."""
-        tracker = ProgressTracker(
-            progress_dir=tmp_path / "progress",
-            site_id="test.site"
-        )
+        tracker = ProgressTracker(progress_dir=tmp_path / "progress", site_id="test.site")
         # Don't initialize (no file created)
 
         tracker.clear()  # Should not raise
@@ -453,10 +409,7 @@ class TestProgressTrackerCorruption:
         progress_file.write_text("not valid json {{{")
 
         with pytest.raises(ProgressCorruptionError, match="invalid JSON"):
-            ProgressTracker(
-                progress_dir=progress_dir,
-                run_id="corrupt-test"
-            )
+            ProgressTracker(progress_dir=progress_dir, run_id="corrupt-test")
 
     def test_detect_missing_fields(self, tmp_path):
         """Test detection of missing required fields."""
@@ -468,10 +421,7 @@ class TestProgressTrackerCorruption:
         progress_file.write_text('{"some_field": "value"}')
 
         with pytest.raises(ProgressCorruptionError):
-            ProgressTracker(
-                progress_dir=progress_dir,
-                run_id="missing-test"
-            )
+            ProgressTracker(progress_dir=progress_dir, run_id="missing-test")
 
 
 class TestProgressTrackerFindLatest:
@@ -483,10 +433,7 @@ class TestProgressTrackerFindLatest:
 
         # Create older progress
         tracker1 = ProgressTracker(
-            progress_dir=progress_dir,
-            run_id="older",
-            site_id="test.site",
-            target_langs=["es"]
+            progress_dir=progress_dir, run_id="older", site_id="test.site", target_langs=["es"]
         )
         tracker1.initialize([Path("file.md")])
 
@@ -495,10 +442,7 @@ class TestProgressTrackerFindLatest:
 
         # Create newer progress
         tracker2 = ProgressTracker(
-            progress_dir=progress_dir,
-            run_id="newer",
-            site_id="test.site",
-            target_langs=["es"]
+            progress_dir=progress_dir, run_id="newer", site_id="test.site", target_langs=["es"]
         )
         tracker2.initialize([Path("file.md")])
         tracker2.mark_completed(Path("file.md"), "es")
@@ -516,18 +460,12 @@ class TestProgressTrackerFindLatest:
 
         # Create progress for different sites
         tracker1 = ProgressTracker(
-            progress_dir=progress_dir,
-            run_id="site-a",
-            site_id="site.a",
-            target_langs=["es"]
+            progress_dir=progress_dir, run_id="site-a", site_id="site.a", target_langs=["es"]
         )
         tracker1.initialize([Path("file.md")])
 
         tracker2 = ProgressTracker(
-            progress_dir=progress_dir,
-            run_id="site-b",
-            site_id="site.b",
-            target_langs=["es"]
+            progress_dir=progress_dir, run_id="site-b", site_id="site.b", target_langs=["es"]
         )
         tracker2.initialize([Path("file.md")])
 
@@ -542,9 +480,7 @@ class TestProgressTrackerFindLatest:
         progress_dir = tmp_path / "progress"
 
         tracker = ProgressTracker(
-            progress_dir=progress_dir,
-            site_id="other.site",
-            target_langs=["es"]
+            progress_dir=progress_dir, site_id="other.site", target_langs=["es"]
         )
         tracker.initialize([Path("file.md")])
 
@@ -579,18 +515,12 @@ class TestProgressTrackerConcurrency:
 
         # Create two concurrent trackers
         tracker1 = ProgressTracker(
-            progress_dir=progress_dir,
-            run_id="run-1",
-            site_id="test.site",
-            target_langs=["es"]
+            progress_dir=progress_dir, run_id="run-1", site_id="test.site", target_langs=["es"]
         )
         tracker1.initialize([Path("file1.md")])
 
         tracker2 = ProgressTracker(
-            progress_dir=progress_dir,
-            run_id="run-2",
-            site_id="test.site",
-            target_langs=["es"]
+            progress_dir=progress_dir, run_id="run-2", site_id="test.site", target_langs=["es"]
         )
         tracker2.initialize([Path("file2.md")])
 
@@ -622,7 +552,7 @@ class TestProgressTrackerListAll:
                 progress_dir=progress_dir,
                 run_id=f"run-{i}",
                 site_id=f"site-{i}",
-                target_langs=["es"]
+                target_langs=["es"],
             )
             tracker.initialize([Path("file.md")])
             time.sleep(0.05)  # Ensure different timestamps

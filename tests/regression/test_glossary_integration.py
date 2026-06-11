@@ -5,6 +5,7 @@ Tests that glossary corrections are applied during document reconstruction.
 
 MISSION: Verify glossary corrections work end-to-end in the translation pipeline
 """
+
 import os
 import sys
 from pathlib import Path
@@ -96,7 +97,7 @@ Use security scanning to detect issues.
         default_source_lang="en",
         target_langs=["fr"],
         body=BodyRules(translate_markdown=True),
-        frontmatter={}
+        frontmatter={},
     )
 
     # Extract segments (production path: SegmentExtractor, not TextUnitExtractor)
@@ -147,8 +148,7 @@ Use security scanning to detect issues.
         f"Output: {reconstructed_body}"
     )
     assert "fusion" in reconstructed_body.lower(), (
-        f"Did not find 'fusion' in output - correction failed!\n"
-        f"Output: {reconstructed_body}"
+        f"Did not find 'fusion' in output - correction failed!\nOutput: {reconstructed_body}"
     )
     print("[PASS] 'métrage' correctly replaced with 'fusion'")
 
@@ -158,8 +158,7 @@ Use security scanning to detect issues.
         f"Output: {reconstructed_body}"
     )
     assert "textuel" in reconstructed_body.lower(), (
-        f"Did not find 'textuel' in output - correction failed!\n"
-        f"Output: {reconstructed_body}"
+        f"Did not find 'textuel' in output - correction failed!\nOutput: {reconstructed_body}"
     )
     print("[PASS] 'textile' correctly replaced with 'textuel'")
 
@@ -169,15 +168,12 @@ Use security scanning to detect issues.
         f"Output: {reconstructed_body}"
     )
     assert "analyser" in reconstructed_body.lower(), (
-        f"Did not find 'analyser' in output - correction failed!\n"
-        f"Output: {reconstructed_body}"
+        f"Did not find 'analyser' in output - correction failed!\nOutput: {reconstructed_body}"
     )
     print("[PASS] 'escanner' correctly replaced with 'analyser'")
 
     # Verify TR() wrapper is still present (confirms we're using fake translations)
-    assert "TR(" in reconstructed_body, (
-        "TR() wrapper missing - test setup may be broken"
-    )
+    assert "TR(" in reconstructed_body, "TR() wrapper missing - test setup may be broken"
     print("[PASS] Fake translation wrapper detected (test setup valid)")
 
     print("\n" + "=" * 80)
@@ -199,6 +195,7 @@ if __name__ == "__main__":
     except (AssertionError, Exception) as e:
         print(f"\n[FAIL] Integration test FAILED: {e}\n")
         import traceback
+
         traceback.print_exc()
         raise
 

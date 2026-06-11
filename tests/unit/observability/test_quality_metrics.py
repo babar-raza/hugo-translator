@@ -5,7 +5,6 @@ Tests the QualityMetricsAggregator and StructuredLogger.log_quality_metrics()
 to ensure quality metrics are properly captured and formatted for telemetry.
 """
 
-
 import pytest
 
 from src.observability.logger import StructuredLogger

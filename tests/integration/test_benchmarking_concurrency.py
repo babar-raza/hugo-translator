@@ -1,4 +1,5 @@
 """Concurrency and thread safety tests for benchmarking system."""
+
 import tempfile
 import threading
 import time
@@ -199,8 +200,9 @@ def test_concurrent_recommender_requests():
         assert len(errors) == 0, f"Errors during concurrent recommendations: {errors}"
 
         # Verify all recommendations generated
-        assert len(recommendations) == 20, \
+        assert len(recommendations) == 20, (
             f"Expected 20 recommendations, got {len(recommendations)}"
+        )
 
         # Verify all recommendations are valid
         for rec in recommendations:
@@ -416,10 +418,7 @@ def test_concurrent_database_deletion():
 
         # Execute 50 concurrent deletes
         with ThreadPoolExecutor(max_workers=10) as executor:
-            futures = [
-                executor.submit(delete_run, f"delete_run_{i}")
-                for i in range(50)
-            ]
+            futures = [executor.submit(delete_run, f"delete_run_{i}") for i in range(50)]
 
             for f in as_completed(futures):
                 f.result()
@@ -429,8 +428,7 @@ def test_concurrent_database_deletion():
 
         # Verify 50 runs remain
         remaining_runs = db.list_runs(limit=200)
-        assert len(remaining_runs) == 50, \
-            f"Expected 50 runs remaining, got {len(remaining_runs)}"
+        assert len(remaining_runs) == 50, f"Expected 50 runs remaining, got {len(remaining_runs)}"
 
 
 def test_stress_concurrent_mixed_operations():

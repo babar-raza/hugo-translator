@@ -20,13 +20,13 @@ class TestRealtimeRepetitionDetection:
         """Create TextUnitExtractor instance for testing."""
         extractor = TextUnitExtractor()
         extractor.batch_stats = {
-            'total_batches': 0,
-            'successful_batches': 0,
-            'fallback_batches': 0,
-            'mapping_failures': 0,
-            'language_purity_failures': 0,
-            'translation_errors': 0,
-            'individual_translations': 0,
+            "total_batches": 0,
+            "successful_batches": 0,
+            "fallback_batches": 0,
+            "mapping_failures": 0,
+            "language_purity_failures": 0,
+            "translation_errors": 0,
+            "individual_translations": 0,
         }
         extractor.fasttext_detector = None
         extractor.batch_stats_tracker = None
@@ -50,7 +50,7 @@ class TestRealtimeRepetitionDetection:
                 source_text=f"This is test sentence {i}.",
                 kind="paragraph",
                 node_addr=f"0.{i}",
-                do_not_translate=False
+                do_not_translate=False,
             )
             units.append(unit)
         return units
@@ -58,7 +58,9 @@ class TestRealtimeRepetitionDetection:
     def test_detect_batch_repetition_detects_ngram_repetition(self, extractor, sample_units):
         """Test that _detect_batch_repetition correctly identifies n-gram repetition."""
         # Setup: Create unit with repetitive translation
-        sample_units[0].translated_text = "hello world foo hello world foo hello world foo hello world foo"
+        sample_units[
+            0
+        ].translated_text = "hello world foo hello world foo hello world foo hello world foo"
         sample_units[1].translated_text = "normal translation without repetition"
         sample_units[2].translated_text = "another normal translation"
 
@@ -104,19 +106,18 @@ class TestRealtimeRepetitionDetection:
         repetitive_translation = [
             "miteinander miteinander miteinander miteinander miteinander zusammen arbeiten",
             "eins zwei drei vier fünf",
-            "sechs sieben acht neun zehn"
+            "sechs sieben acht neun zehn",
         ]
         clean_translation = [
             "zusammen arbeiten mit verschiedenen Werkzeugen und Methoden",
             "eins zwei drei vier fünf",
-            "sechs sieben acht neun zehn"
+            "sechs sieben acht neun zehn",
         ]
 
         # Mock needs to handle multiple calls including potential fallback
-        mock_model.translate.side_effect = [
-            repetitive_translation,
-            clean_translation
-        ] + [[f"Einzelübersetzung {i}" for i in range(3)]] * 10
+        mock_model.translate.side_effect = [repetitive_translation, clean_translation] + [
+            [f"Einzelübersetzung {i}" for i in range(3)]
+        ] * 10
 
         # Bypass language purity check for this test
         extractor._verify_translation_language_purity = Mock(return_value=True)
@@ -132,27 +133,27 @@ class TestRealtimeRepetitionDetection:
 
         # First call: normal parameters
         first_call = mock_model.translate.call_args_list[0]
-        assert first_call[1].get('generation_params') is None
+        assert first_call[1].get("generation_params") is None
 
         # Second call: adaptive parameters
         second_call = mock_model.translate.call_args_list[1]
-        adaptive_params = second_call[1].get('generation_params')
+        adaptive_params = second_call[1].get("generation_params")
         assert adaptive_params is not None
-        assert adaptive_params['no_repeat_ngram_size'] == 4
-        assert adaptive_params['repetition_penalty'] == 1.5
-        assert adaptive_params['num_beams'] == 2
+        assert adaptive_params["no_repeat_ngram_size"] == 4
+        assert adaptive_params["repetition_penalty"] == 1.5
+        assert adaptive_params["num_beams"] == 2
 
         # Check stats
-        assert extractor.batch_stats['repetition_detected_count'] == 1
-        assert extractor.batch_stats['repetition_retry_count'] == 1
-        assert extractor.batch_stats['repetition_retry_success'] == 1
+        assert extractor.batch_stats["repetition_detected_count"] == 1
+        assert extractor.batch_stats["repetition_retry_count"] == 1
+        assert extractor.batch_stats["repetition_retry_success"] == 1
 
     def test_adaptive_parameters_applied(self, extractor, mock_model, sample_units):
         """Test that adaptive parameters are correctly passed to model."""
         # Setup: Return repetitive translation first
         mock_model.translate.side_effect = [
             ["miteinander " * 10, "test", "test"],  # Repetitive
-            ["gut übersetzt", "test", "test"]  # Clean after retry
+            ["gut übersetzt", "test", "test"],  # Clean after retry
         ]
 
         # Execute
@@ -163,11 +164,11 @@ class TestRealtimeRepetitionDetection:
         # Assert: Second call should have adaptive params
         assert mock_model.translate.call_count == 2
         second_call = mock_model.translate.call_args_list[1]
-        params = second_call[1]['generation_params']
+        params = second_call[1]["generation_params"]
 
-        assert params['no_repeat_ngram_size'] == 4
-        assert params['repetition_penalty'] == 1.5
-        assert params['num_beams'] == 2
+        assert params["no_repeat_ngram_size"] == 4
+        assert params["repetition_penalty"] == 1.5
+        assert params["num_beams"] == 2
 
     def test_batch_splitting_works(self, extractor, mock_model):
         """Test that persistent repetition triggers batch splitting."""
@@ -179,7 +180,7 @@ class TestRealtimeRepetitionDetection:
                 source_text=f"Test {i}",
                 kind="paragraph",
                 node_addr=f"0.{i}",
-                do_not_translate=False
+                do_not_translate=False,
             )
             units.append(unit)
 
@@ -197,7 +198,7 @@ class TestRealtimeRepetitionDetection:
         # Assert: Should have tried splitting
         # Initial call + retry + 2 splits (each with retry) = multiple calls
         assert mock_model.translate.call_count >= 4
-        assert extractor.batch_stats.get('repetition_split_count', 0) >= 1
+        assert extractor.batch_stats.get("repetition_split_count", 0) >= 1
 
         # Should eventually fall back
         assert success is False
@@ -210,7 +211,7 @@ class TestRealtimeRepetitionDetection:
             source_text="Test",
             kind="paragraph",
             node_addr="0.0",
-            do_not_translate=False
+            do_not_translate=False,
         )
 
         # Mock: Always return repetitive translation
@@ -234,7 +235,7 @@ class TestRealtimeRepetitionDetection:
         mock_model.translate.return_value = [
             "Dies ist ein Testsatz.",
             "Das ist ein weiterer Satz.",
-            "Noch ein dritter Satz."
+            "Noch ein dritter Satz.",
         ]
 
         # Execute
@@ -245,15 +246,15 @@ class TestRealtimeRepetitionDetection:
         # Assert
         assert success is True
         assert mock_model.translate.call_count == 1  # No retry
-        assert extractor.batch_stats.get('repetition_detected_count', 0) == 0
-        assert extractor.batch_stats.get('repetition_retry_count', 0) == 0
+        assert extractor.batch_stats.get("repetition_detected_count", 0) == 0
+        assert extractor.batch_stats.get("repetition_retry_count", 0) == 0
 
     def test_tokenize_for_repetition_check(self, extractor):
         """Test tokenization for repetition checking."""
         text = "Hello, world! This is a test."
         words = extractor._tokenize_for_repetition_check(text)
 
-        assert words == ['hello', 'world', 'this', 'is', 'a', 'test']
+        assert words == ["hello", "world", "this", "is", "a", "test"]
 
     def test_fallback_after_failed_retry(self, extractor, mock_model, sample_units):
         """Test that failed retry triggers individual fallback."""
@@ -284,9 +285,9 @@ class TestRealtimeRepetitionDetection:
         # Assert
         assert success is False
         # Should have tried: normal + retry, then fallback (no splitting for size 1)
-        assert extractor.batch_stats.get('repetition_detected_count', 0) > 0
-        assert extractor.batch_stats.get('repetition_retry_count', 0) > 0
-        assert extractor.batch_stats.get('repetition_fallback_count', 0) > 0
+        assert extractor.batch_stats.get("repetition_detected_count", 0) > 0
+        assert extractor.batch_stats.get("repetition_retry_count", 0) > 0
+        assert extractor.batch_stats.get("repetition_fallback_count", 0) > 0
         extractor._fallback_to_individual.assert_called_once()
 
     def test_integration_with_batch_translate_units(self, extractor, mock_model):
@@ -299,7 +300,7 @@ class TestRealtimeRepetitionDetection:
                 source_text=f"Test sentence {i}.",
                 kind="paragraph",
                 node_addr=f"0.{i}",
-                do_not_translate=False
+                do_not_translate=False,
             )
             units.append(unit)
 
@@ -309,7 +310,7 @@ class TestRealtimeRepetitionDetection:
             "Testsatz zwei.",
             "Testsatz drei.",
             "Testsatz vier.",
-            "Testsatz fünf."
+            "Testsatz fünf.",
         ]
 
         # Mock _yield_safe_batches to return single batch (list of units, not list of list)
@@ -317,12 +318,10 @@ class TestRealtimeRepetitionDetection:
         extractor._estimate_token_count = Mock(return_value=10)
 
         # Execute
-        result = extractor.batch_translate_units(
-            units, mock_model, "en", "de", batch_size=5
-        )
+        result = extractor.batch_translate_units(units, mock_model, "en", "de", batch_size=5)
 
         # Assert
         assert len(result) == 5
         assert all(u.translated_text is not None for u in result)
-        assert extractor.batch_stats['total_batches'] == 1
-        assert extractor.batch_stats['successful_batches'] == 1
+        assert extractor.batch_stats["total_batches"] == 1
+        assert extractor.batch_stats["successful_batches"] == 1

@@ -3,6 +3,7 @@ End-to-end integration tests for device and load-mode flags (T105: federated-spl
 
 Tests the complete pipeline: CLI flags → device validation → ModelLoader → HuggingFaceBackend
 """
+
 import os
 import subprocess
 import sys
@@ -73,7 +74,10 @@ class TestDeviceLoadModeE2E:
         assert result.returncode == 0 or "CUDA device requested" not in result.stderr
 
         # Verify logs show correct device and precision
-        assert "Device: cpu (CLI override)" in result.stdout or "Auto-detected device: cpu" in result.stdout
+        assert (
+            "Device: cpu (CLI override)" in result.stdout
+            or "Auto-detected device: cpu" in result.stdout
+        )
 
     def test_device_cpu_load_mode_int8_e2e(self, test_fixture_path, temp_output_dir):
         """Test --device cpu --load-mode int8 completes successfully."""
@@ -112,14 +116,20 @@ class TestDeviceLoadModeE2E:
         assert result.returncode == 0 or "CUDA device requested" not in result.stderr
 
         # Verify logs show correct device and precision
-        assert "Device: cpu (CLI override)" in result.stdout or "Auto-detected device: cpu" in result.stdout
+        assert (
+            "Device: cpu (CLI override)" in result.stdout
+            or "Auto-detected device: cpu" in result.stdout
+        )
 
     @pytest.mark.skipif(
-        not __import__("subprocess").run(
+        not __import__("subprocess")
+        .run(
             [__import__("sys").executable, "-c", "import torch; print(torch.cuda.is_available())"],
             capture_output=True,
             text=True,
-        ).stdout.strip() == "True",
+        )
+        .stdout.strip()
+        == "True",
         reason="CUDA not available",
     )
     def test_device_cuda_load_mode_fp16_e2e(self, test_fixture_path, temp_output_dir):
@@ -241,7 +251,10 @@ class TestDeviceLoadModeE2E:
         assert result.returncode == 1
 
         # Verify error message
-        assert "CUDA device requested but not available" in result.stderr or "CUDA device requested but not available" in result.stdout
+        assert (
+            "CUDA device requested but not available" in result.stderr
+            or "CUDA device requested but not available" in result.stdout
+        )
 
     def test_load_mode_fp16_on_cpu_warns(self, test_fixture_path, temp_output_dir):
         """Test that --load-mode fp16 --device cpu logs warning."""

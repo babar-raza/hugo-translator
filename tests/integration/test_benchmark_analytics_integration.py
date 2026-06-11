@@ -17,6 +17,7 @@ import pytest
 # Check if pandas is available
 try:
     import pandas as pd
+
     PANDAS_AVAILABLE = True
 except ImportError:
     PANDAS_AVAILABLE = False
@@ -40,17 +41,19 @@ class TestBenchmarkAnalyticsIntegration:
 
             results = []
             for i in range(10):
-                results.append(BenchmarkResult(
-                    sample_id=f"sample_{i}",
-                    model_id="test_model",
-                    device="cpu",
-                    batch_size=8,
-                    duration_seconds=1.0 + i * 0.1,
-                    tokens_input=100,
-                    tokens_output=100,
-                    throughput_tokens_per_sec=100.0 + i * 10 + run_idx * 5,
-                    peak_memory_mb=500.0
-                ))
+                results.append(
+                    BenchmarkResult(
+                        sample_id=f"sample_{i}",
+                        model_id="test_model",
+                        device="cpu",
+                        batch_size=8,
+                        duration_seconds=1.0 + i * 0.1,
+                        tokens_input=100,
+                        tokens_output=100,
+                        throughput_tokens_per_sec=100.0 + i * 10 + run_idx * 5,
+                        peak_memory_mb=500.0,
+                    )
+                )
 
             run = BenchmarkRun(
                 run_id=f"run_{run_idx}",
@@ -61,14 +64,10 @@ class TestBenchmarkAnalyticsIntegration:
                 corpus_category="test",
                 purpose="testing",
                 tags=["test"],
-                system_info=SystemInfo(
-                    cpu_model="Test CPU",
-                    cpu_cores=4,
-                    total_ram_gb=8.0
-                ),
+                system_info=SystemInfo(cpu_model="Test CPU", cpu_cores=4, total_ram_gb=8.0),
                 results=results,
                 total_duration_seconds=10.0,
-                timestamp_utc=timestamp.isoformat()
+                timestamp_utc=timestamp.isoformat(),
             )
 
             db.save_run(run)
@@ -116,7 +115,9 @@ class TestBenchmarkAnalyticsIntegration:
                 api = AnalyticsQueryAPI(db_path)
 
                 # Query trends
-                df_trends = api.get_performance_trends("test_model", "cpu", "hourly", lookback_days=1)
+                df_trends = api.get_performance_trends(
+                    "test_model", "cpu", "hourly", lookback_days=1
+                )
                 assert isinstance(df_trends, pd.DataFrame)
 
                 # Query baselines
@@ -203,17 +204,19 @@ class TestBenchmarkAnalyticsIntegration:
 
                         results = []
                         for i in range(10):
-                            results.append(BenchmarkResult(
-                                sample_id=f"sample_{i}",
-                                model_id=model,
-                                device=device,
-                                batch_size=8,
-                                duration_seconds=1.0,
-                                tokens_input=100,
-                                tokens_output=100,
-                                throughput_tokens_per_sec=base_throughput + i * 10,
-                                peak_memory_mb=500.0
-                            ))
+                            results.append(
+                                BenchmarkResult(
+                                    sample_id=f"sample_{i}",
+                                    model_id=model,
+                                    device=device,
+                                    batch_size=8,
+                                    duration_seconds=1.0,
+                                    tokens_input=100,
+                                    tokens_output=100,
+                                    throughput_tokens_per_sec=base_throughput + i * 10,
+                                    peak_memory_mb=500.0,
+                                )
+                            )
 
                         run = BenchmarkRun(
                             run_id=f"{model}_{device}_{run_idx}",
@@ -225,13 +228,11 @@ class TestBenchmarkAnalyticsIntegration:
                             purpose="testing",
                             tags=["test"],
                             system_info=SystemInfo(
-                                cpu_model="Test CPU",
-                                cpu_cores=4,
-                                total_ram_gb=8.0
+                                cpu_model="Test CPU", cpu_cores=4, total_ram_gb=8.0
                             ),
                             results=results,
                             total_duration_seconds=10.0,
-                            timestamp_utc=timestamp.isoformat()
+                            timestamp_utc=timestamp.isoformat(),
                         )
                         db.save_run(run)
 
@@ -295,17 +296,19 @@ class TestBenchmarkAnalyticsIntegration:
 
                 results = []
                 for i in range(5):
-                    results.append(BenchmarkResult(
-                        sample_id=f"sample_{i}",
-                        model_id="test_model",
-                        device="cpu",
-                        batch_size=8,
-                        duration_seconds=1.0,
-                        tokens_input=100,
-                        tokens_output=100,
-                        throughput_tokens_per_sec=90.0 + i * 5,  # Lower baseline
-                        peak_memory_mb=500.0
-                    ))
+                    results.append(
+                        BenchmarkResult(
+                            sample_id=f"sample_{i}",
+                            model_id="test_model",
+                            device="cpu",
+                            batch_size=8,
+                            duration_seconds=1.0,
+                            tokens_input=100,
+                            tokens_output=100,
+                            throughput_tokens_per_sec=90.0 + i * 5,  # Lower baseline
+                            peak_memory_mb=500.0,
+                        )
+                    )
 
                 run = BenchmarkRun(
                     run_id=f"baseline_run_{run_idx}",
@@ -316,14 +319,10 @@ class TestBenchmarkAnalyticsIntegration:
                     corpus_category="test",
                     purpose="baseline",
                     tags=["baseline"],
-                    system_info=SystemInfo(
-                        cpu_model="Test CPU",
-                        cpu_cores=4,
-                        total_ram_gb=8.0
-                    ),
+                    system_info=SystemInfo(cpu_model="Test CPU", cpu_cores=4, total_ram_gb=8.0),
                     results=results,
                     total_duration_seconds=5.0,
-                    timestamp_utc=timestamp.isoformat()
+                    timestamp_utc=timestamp.isoformat(),
                 )
                 db.save_run(run)
 
@@ -333,17 +332,19 @@ class TestBenchmarkAnalyticsIntegration:
 
                 results = []
                 for i in range(5):
-                    results.append(BenchmarkResult(
-                        sample_id=f"sample_{i}",
-                        model_id="test_model",
-                        device="cpu",
-                        batch_size=8,
-                        duration_seconds=1.0,
-                        tokens_input=100,
-                        tokens_output=100,
-                        throughput_tokens_per_sec=110.0 + i * 5,  # Higher current
-                        peak_memory_mb=500.0
-                    ))
+                    results.append(
+                        BenchmarkResult(
+                            sample_id=f"sample_{i}",
+                            model_id="test_model",
+                            device="cpu",
+                            batch_size=8,
+                            duration_seconds=1.0,
+                            tokens_input=100,
+                            tokens_output=100,
+                            throughput_tokens_per_sec=110.0 + i * 5,  # Higher current
+                            peak_memory_mb=500.0,
+                        )
+                    )
 
                 run = BenchmarkRun(
                     run_id=f"current_run_{run_idx}",
@@ -354,14 +355,10 @@ class TestBenchmarkAnalyticsIntegration:
                     corpus_category="test",
                     purpose="current",
                     tags=["current"],
-                    system_info=SystemInfo(
-                        cpu_model="Test CPU",
-                        cpu_cores=4,
-                        total_ram_gb=8.0
-                    ),
+                    system_info=SystemInfo(cpu_model="Test CPU", cpu_cores=4, total_ram_gb=8.0),
                     results=results,
                     total_duration_seconds=5.0,
-                    timestamp_utc=timestamp.isoformat()
+                    timestamp_utc=timestamp.isoformat(),
                 )
                 db.save_run(run)
 
@@ -376,10 +373,7 @@ class TestBenchmarkAnalyticsIntegration:
                 # create_baseline() stores baseline_date = today's date (not the historical data date)
                 baseline_date = datetime.now(UTC).date().isoformat()
                 comparison = api.compare_performance(
-                    "test_model",
-                    "cpu",
-                    baseline_date,
-                    datetime.now(UTC).date().isoformat()
+                    "test_model", "cpu", baseline_date, datetime.now(UTC).date().isoformat()
                 )
 
                 # Current should be better than baseline

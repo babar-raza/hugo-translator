@@ -163,17 +163,19 @@ class TestBenchmarkArchiver:
 
         results = []
         for i in range(num_results):
-            results.append(BenchmarkResult(
-                sample_id=f"{run_id}_sample_{i}",
-                model_id=model_id,
-                device=device,
-                batch_size=8,
-                duration_seconds=1.0 + i * 0.1,
-                tokens_input=100,
-                tokens_output=100,
-                throughput_tokens_per_sec=100.0 + i * 10,
-                peak_memory_mb=500.0,
-            ))
+            results.append(
+                BenchmarkResult(
+                    sample_id=f"{run_id}_sample_{i}",
+                    model_id=model_id,
+                    device=device,
+                    batch_size=8,
+                    duration_seconds=1.0 + i * 0.1,
+                    tokens_input=100,
+                    tokens_output=100,
+                    throughput_tokens_per_sec=100.0 + i * 10,
+                    peak_memory_mb=500.0,
+                )
+            )
 
         run = BenchmarkRun(
             run_id=run_id,
@@ -573,16 +575,18 @@ class TestArchiverEdgeCases:
             # Create run with detailed system info
             old_timestamp = datetime.now(UTC) - timedelta(days=60)
 
-            results = [BenchmarkResult(
-                sample_id="sample",
-                model_id="test_model",
-                device="cpu",
-                batch_size=8,
-                duration_seconds=1.0,
-                tokens_input=100,
-                tokens_output=100,
-                throughput_tokens_per_sec=100.0,
-            )]
+            results = [
+                BenchmarkResult(
+                    sample_id="sample",
+                    model_id="test_model",
+                    device="cpu",
+                    batch_size=8,
+                    duration_seconds=1.0,
+                    tokens_input=100,
+                    tokens_output=100,
+                    throughput_tokens_per_sec=100.0,
+                )
+            ]
 
             run = BenchmarkRun(
                 run_id="detailed_run",

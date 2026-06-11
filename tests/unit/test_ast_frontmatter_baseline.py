@@ -7,6 +7,7 @@ They prove:
   2. Legacy path correctly applies nested frontmatter translations
   3. Missing profile rules for 10 fields (RC-3)
 """
+
 import hashlib
 from dataclasses import dataclass, field
 from typing import Any
@@ -26,10 +27,10 @@ from src.translation_engine.reconstructor.markdown_reconstructor import (
 from src.translation_engine.reconstructor.yaml_formatter import YAMLFormatter
 from src.utils.models import FrontmatterMode, FrontmatterRule, SiteProfile
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _make_segment(key: str, source_text: str, site_id: str = "www.aspose.org") -> Segment:
     """Create a frontmatter segment with the correct context and ID."""
@@ -148,6 +149,7 @@ def _build_translations(fm: CommentedMap, profile: SiteProfile) -> dict[str, str
 # Test 1: Prove AST path drops nested frontmatter translations (RC-1)
 # ---------------------------------------------------------------------------
 
+
 class TestASTPathDropsNestedKeys:
     """
     Reproduce the exact AST frontmatter reconstruction code from engine.py:3544-3565.
@@ -198,6 +200,7 @@ class TestASTPathDropsNestedKeys:
 
         # Deep-copy frontmatter (as engine does)
         import copy
+
         translated_frontmatter = copy.deepcopy(fm)
 
         # === EXACT ENGINE CODE from engine.py:3558-3565 ===
@@ -210,27 +213,35 @@ class TestASTPathDropsNestedKeys:
 
         # === ASSERTIONS ===
         # Top-level keys SHOULD be translated (they match)
-        assert translated_frontmatter["title"] == "Aspose — Dateiformate-APIs", \
+        assert translated_frontmatter["title"] == "Aspose — Dateiformate-APIs", (
             "Top-level 'title' should be translated by AST path"
+        )
 
         # Nested keys should be translated but ARE NOT (this is the bug).
         # We assert the BUG EXISTS: nested keys still have English values.
-        assert translated_frontmatter["header"]["title"] == "Build Reliable Document Solutions", \
+        assert translated_frontmatter["header"]["title"] == "Build Reliable Document Solutions", (
             "BUG CONFIRMED: AST path did NOT translate header.title (nested key ignored)"
+        )
 
-        assert translated_frontmatter["header"]["subtitle"] == "Cross-platform APIs for document automation", \
-            "BUG CONFIRMED: AST path did NOT translate header.subtitle (nested key ignored)"
+        assert (
+            translated_frontmatter["header"]["subtitle"]
+            == "Cross-platform APIs for document automation"
+        ), "BUG CONFIRMED: AST path did NOT translate header.subtitle (nested key ignored)"
 
-        assert translated_frontmatter["products"]["items"][0]["app"]["subtitle"] == "Process Words documents", \
-            "BUG CONFIRMED: AST path did NOT translate products.items[0].app.subtitle"
+        assert (
+            translated_frontmatter["products"]["items"][0]["app"]["subtitle"]
+            == "Process Words documents"
+        ), "BUG CONFIRMED: AST path did NOT translate products.items[0].app.subtitle"
 
-        assert translated_frontmatter["popular_features"]["heading"] == "Popular Features", \
+        assert translated_frontmatter["popular_features"]["heading"] == "Popular Features", (
             "BUG CONFIRMED: AST path did NOT translate popular_features.heading"
+        )
 
 
 # ---------------------------------------------------------------------------
 # Test 2: Prove legacy path correctly applies nested keys
 # ---------------------------------------------------------------------------
+
 
 class TestLegacyPathAppliesNestedKeys:
     """
@@ -254,14 +265,22 @@ class TestLegacyPathAppliesNestedKeys:
 
         # Nested keys translated
         assert result["header"]["title"] == "Erstellen Sie zuverlässige Dokumentenlösungen"
-        assert result["header"]["subtitle"] == "Plattformübergreifende APIs für Dokumentenautomation"
+        assert (
+            result["header"]["subtitle"] == "Plattformübergreifende APIs für Dokumentenautomation"
+        )
         assert result["header"]["image"]["alt_text"] == "Aspose-Logo"
 
         # Array-indexed keys translated
         assert result["products"]["items"][0]["app"]["subtitle"] == "Words-Dokumente verarbeiten"
-        assert result["products"]["items"][0]["app"]["description"] == "Vollständiges Words-Verarbeitungstoolkit"
+        assert (
+            result["products"]["items"][0]["app"]["description"]
+            == "Vollständiges Words-Verarbeitungstoolkit"
+        )
         assert result["products"]["items"][1]["app"]["subtitle"] == "Cells-Dokumente verarbeiten"
-        assert result["products"]["items"][1]["app"]["description"] == "Vollständiges Cells-Verarbeitungstoolkit"
+        assert (
+            result["products"]["items"][1]["app"]["description"]
+            == "Vollständiges Cells-Verarbeitungstoolkit"
+        )
 
         # Non-indexed nested keys translated
         assert result["popular_features"]["heading"] == "Beliebte Funktionen"
@@ -287,6 +306,7 @@ class TestLegacyPathAppliesNestedKeys:
 # Test 3: Prove missing profile fields (RC-3)
 # ---------------------------------------------------------------------------
 
+
 class TestMissingProfileRules:
     """
     The www.aspose.org.yaml profile is missing rules for 10 translatable fields.
@@ -308,8 +328,9 @@ class TestMissingProfileRules:
     def test_popular_features_text_missing_from_profile(self):
         """popular_features.text has no rule in the current profile."""
         profile = _build_test_profile(include_missing_rules=False)
-        assert "popular_features.text" not in profile.frontmatter, \
+        assert "popular_features.text" not in profile.frontmatter, (
             "popular_features.text should NOT be in current profile (RC-3 proves this)"
+        )
 
     def test_popular_features_text_not_translated_without_rule(self):
         """Without a profile rule, popular_features.text stays in English."""
@@ -321,8 +342,9 @@ class TestMissingProfileRules:
         result = reconstructor.reconstruct_frontmatter(fm, translations, "de")
 
         # popular_features.text should still be English because no rule exists
-        assert result["popular_features"]["text"] == "Trusted by thousands of companies worldwide", \
-            "Without profile rule, popular_features.text stays untranslated"
+        assert (
+            result["popular_features"]["text"] == "Trusted by thousands of companies worldwide"
+        ), "Without profile rule, popular_features.text stays untranslated"
 
     def test_popular_features_text_translated_with_rule(self):
         """With a profile rule added, popular_features.text gets translated."""
@@ -333,13 +355,15 @@ class TestMissingProfileRules:
         reconstructor = MarkdownReconstructor(profile)
         result = reconstructor.reconstruct_frontmatter(fm, translations, "de")
 
-        assert result["popular_features"]["text"] == "Von Tausenden von Unternehmen weltweit vertraut", \
-            "With profile rule, popular_features.text should be translated"
+        assert (
+            result["popular_features"]["text"] == "Von Tausenden von Unternehmen weltweit vertraut"
+        ), "With profile rule, popular_features.text should be translated"
 
 
 # ---------------------------------------------------------------------------
 # Test 4: AST vs Legacy output equivalence (for top-level keys)
 # ---------------------------------------------------------------------------
+
 
 class TestASTLegacyTopLevelEquivalence:
     """
@@ -360,6 +384,7 @@ class TestASTLegacyTopLevelEquivalence:
         _fm_key_to_seg_id = {s.context.frontmatter_key: s.id for s in segments}
 
         import copy
+
         ast_result = copy.deepcopy(fm)
         for key, value in fm.items():
             field_rule = profile.frontmatter.get(key)
@@ -377,5 +402,6 @@ class TestASTLegacyTopLevelEquivalence:
         assert ast_result["description"] == legacy_result["description"]
 
         # Nested keys diverge — AST has English, legacy has German
-        assert ast_result["header"]["title"] != legacy_result["header"]["title"], \
+        assert ast_result["header"]["title"] != legacy_result["header"]["title"], (
             "AST should still have English header.title while legacy has German"
+        )

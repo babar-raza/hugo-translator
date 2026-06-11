@@ -3,6 +3,7 @@ Unit tests for cache_write_mode in TM layers (T203: federated-splashing-panda).
 
 Tests that --cache-write-mode flag controls cache write behavior.
 """
+
 from pathlib import Path
 from unittest.mock import Mock, patch
 
@@ -14,8 +15,8 @@ class TestCacheWriteMode:
 
     def test_cache_write_mode_parameter_stored(self):
         """Test cache_write_mode parameter is stored in engine instance."""
-        with patch('src.translation_engine.engine.ModelLoader'):
-            with patch('src.translation_engine.engine.TranslationMemory'):
+        with patch("src.translation_engine.engine.ModelLoader"):
+            with patch("src.translation_engine.engine.TranslationMemory"):
                 engine = TranslationEngine(
                     config_dir=Path("config"),
                     cache_write_mode="always",
@@ -25,8 +26,8 @@ class TestCacheWriteMode:
 
     def test_cache_write_mode_default_auto(self):
         """Test cache_write_mode defaults to 'auto'."""
-        with patch('src.translation_engine.engine.ModelLoader'):
-            with patch('src.translation_engine.engine.TranslationMemory'):
+        with patch("src.translation_engine.engine.ModelLoader"):
+            with patch("src.translation_engine.engine.TranslationMemory"):
                 engine = TranslationEngine(
                     config_dir=Path("config"),
                 )
@@ -40,11 +41,15 @@ class TestCacheWriteMode:
         test_file.write_text("---\ntitle: Test\n---\n\nHello world")
 
         # Mock dependencies
-        with patch('src.translation_engine.engine.ModelLoader') as mock_loader_cls:
-            with patch('src.translation_engine.engine.TranslationMemory') as mock_tm_cls:
-                with patch('src.translation_engine.engine.HugoParser') as mock_parser_cls:
-                    with patch('src.translation_engine.engine.SegmentExtractor') as mock_extractor_cls:
-                        with patch('src.translation_engine.engine.MarkdownReconstructor') as mock_reconstructor_cls:
+        with patch("src.translation_engine.engine.ModelLoader") as mock_loader_cls:
+            with patch("src.translation_engine.engine.TranslationMemory") as mock_tm_cls:
+                with patch("src.translation_engine.engine.HugoParser") as mock_parser_cls:
+                    with patch(
+                        "src.translation_engine.engine.SegmentExtractor"
+                    ) as mock_extractor_cls:
+                        with patch(
+                            "src.translation_engine.engine.MarkdownReconstructor"
+                        ) as mock_reconstructor_cls:
                             # Setup mocks
                             mock_tm = Mock()
                             mock_tm_cls.return_value = mock_tm
@@ -80,8 +85,8 @@ class TestCacheWriteMode:
                             )
 
                             # Translate
-                            with patch.object(engine, '_get_site_profile'):
-                                with patch.object(engine, '_write_output'):
+                            with patch.object(engine, "_get_site_profile"):
+                                with patch.object(engine, "_write_output"):
                                     result = engine.translate_file(
                                         site_id="test",
                                         file_path=test_file,
@@ -93,8 +98,8 @@ class TestCacheWriteMode:
                             assert mock_tm.store.called
                             store_calls = mock_tm.store.call_args_list
                             for call_args in store_calls:
-                                if 'force_update' in call_args.kwargs:
-                                    assert call_args.kwargs['force_update'] is False
+                                if "force_update" in call_args.kwargs:
+                                    assert call_args.kwargs["force_update"] is False
 
     def test_cache_write_mode_always_overwrites_existing(self, tmp_path):
         """Test cache_write_mode='always' overwrites existing cache entries."""
@@ -103,11 +108,15 @@ class TestCacheWriteMode:
         test_file.write_text("---\ntitle: Test\n---\n\nHello world")
 
         # Mock dependencies
-        with patch('src.translation_engine.engine.ModelLoader') as mock_loader_cls:
-            with patch('src.translation_engine.engine.TranslationMemory') as mock_tm_cls:
-                with patch('src.translation_engine.engine.HugoParser') as mock_parser_cls:
-                    with patch('src.translation_engine.engine.SegmentExtractor') as mock_extractor_cls:
-                        with patch('src.translation_engine.engine.MarkdownReconstructor') as mock_reconstructor_cls:
+        with patch("src.translation_engine.engine.ModelLoader") as mock_loader_cls:
+            with patch("src.translation_engine.engine.TranslationMemory") as mock_tm_cls:
+                with patch("src.translation_engine.engine.HugoParser") as mock_parser_cls:
+                    with patch(
+                        "src.translation_engine.engine.SegmentExtractor"
+                    ) as mock_extractor_cls:
+                        with patch(
+                            "src.translation_engine.engine.MarkdownReconstructor"
+                        ) as mock_reconstructor_cls:
                             # Setup mocks
                             mock_tm = Mock()
                             mock_tm_cls.return_value = mock_tm
@@ -143,8 +152,8 @@ class TestCacheWriteMode:
                             )
 
                             # Translate
-                            with patch.object(engine, '_get_site_profile'):
-                                with patch.object(engine, '_write_output'):
+                            with patch.object(engine, "_get_site_profile"):
+                                with patch.object(engine, "_write_output"):
                                     result = engine.translate_file(
                                         site_id="test",
                                         file_path=test_file,
@@ -156,8 +165,8 @@ class TestCacheWriteMode:
                             assert mock_tm.store.called
                             store_calls = mock_tm.store.call_args_list
                             for call_args in store_calls:
-                                if 'force_update' in call_args.kwargs:
-                                    assert call_args.kwargs['force_update'] is True
+                                if "force_update" in call_args.kwargs:
+                                    assert call_args.kwargs["force_update"] is True
 
     def test_cache_write_mode_never_skips_writes(self, tmp_path):
         """Test cache_write_mode='never' skips all cache writes."""
@@ -166,11 +175,15 @@ class TestCacheWriteMode:
         test_file.write_text("---\ntitle: Test\n---\n\nHello world")
 
         # Mock dependencies
-        with patch('src.translation_engine.engine.ModelLoader') as mock_loader_cls:
-            with patch('src.translation_engine.engine.TranslationMemory') as mock_tm_cls:
-                with patch('src.translation_engine.engine.HugoParser') as mock_parser_cls:
-                    with patch('src.translation_engine.engine.SegmentExtractor') as mock_extractor_cls:
-                        with patch('src.translation_engine.engine.MarkdownReconstructor') as mock_reconstructor_cls:
+        with patch("src.translation_engine.engine.ModelLoader") as mock_loader_cls:
+            with patch("src.translation_engine.engine.TranslationMemory") as mock_tm_cls:
+                with patch("src.translation_engine.engine.HugoParser") as mock_parser_cls:
+                    with patch(
+                        "src.translation_engine.engine.SegmentExtractor"
+                    ) as mock_extractor_cls:
+                        with patch(
+                            "src.translation_engine.engine.MarkdownReconstructor"
+                        ) as mock_reconstructor_cls:
                             # Setup mocks
                             mock_tm = Mock()
                             mock_tm_cls.return_value = mock_tm
@@ -206,8 +219,8 @@ class TestCacheWriteMode:
                             )
 
                             # Translate
-                            with patch.object(engine, '_get_site_profile'):
-                                with patch.object(engine, '_write_output'):
+                            with patch.object(engine, "_get_site_profile"):
+                                with patch.object(engine, "_write_output"):
                                     result = engine.translate_file(
                                         site_id="test",
                                         file_path=test_file,
@@ -221,10 +234,11 @@ class TestCacheWriteMode:
     def test_cache_write_mode_logs_correctly(self, tmp_path, caplog):
         """Test that cache_write_mode logs configuration message."""
         import logging
+
         caplog.set_level(logging.INFO)
 
-        with patch('src.translation_engine.engine.ModelLoader'):
-            with patch('src.translation_engine.engine.TranslationMemory'):
+        with patch("src.translation_engine.engine.ModelLoader"):
+            with patch("src.translation_engine.engine.TranslationMemory"):
                 # Create engine with cache_write_mode='always'
                 engine = TranslationEngine(
                     config_dir=Path("config"),
@@ -242,11 +256,15 @@ class TestCacheWriteMode:
         test_file.write_text("---\ntitle: Test\n---\n\nHello world")
 
         # Mock dependencies
-        with patch('src.translation_engine.engine.ModelLoader') as mock_loader_cls:
-            with patch('src.translation_engine.engine.TranslationMemory') as mock_tm_cls:
-                with patch('src.translation_engine.engine.HugoParser') as mock_parser_cls:
-                    with patch('src.translation_engine.engine.SegmentExtractor') as mock_extractor_cls:
-                        with patch('src.translation_engine.engine.MarkdownReconstructor') as mock_reconstructor_cls:
+        with patch("src.translation_engine.engine.ModelLoader") as mock_loader_cls:
+            with patch("src.translation_engine.engine.TranslationMemory") as mock_tm_cls:
+                with patch("src.translation_engine.engine.HugoParser") as mock_parser_cls:
+                    with patch(
+                        "src.translation_engine.engine.SegmentExtractor"
+                    ) as mock_extractor_cls:
+                        with patch(
+                            "src.translation_engine.engine.MarkdownReconstructor"
+                        ) as mock_reconstructor_cls:
                             # Setup mocks
                             mock_tm = Mock()
                             mock_tm_cls.return_value = mock_tm
@@ -283,8 +301,8 @@ class TestCacheWriteMode:
                             )
 
                             # Translate
-                            with patch.object(engine, '_get_site_profile'):
-                                with patch.object(engine, '_write_output'):
+                            with patch.object(engine, "_get_site_profile"):
+                                with patch.object(engine, "_write_output"):
                                     result = engine.translate_file(
                                         site_id="test",
                                         file_path=test_file,
@@ -299,8 +317,8 @@ class TestCacheWriteMode:
                             assert mock_tm.store.called
                             store_calls = mock_tm.store.call_args_list
                             for call_args in store_calls:
-                                if 'force_update' in call_args.kwargs:
-                                    assert call_args.kwargs['force_update'] is True
+                                if "force_update" in call_args.kwargs:
+                                    assert call_args.kwargs["force_update"] is True
 
     def test_force_retranslate_with_cache_write_mode_never(self, tmp_path):
         """Test combining force_retranslate with cache_write_mode='never' (unusual but valid)."""
@@ -309,11 +327,15 @@ class TestCacheWriteMode:
         test_file.write_text("---\ntitle: Test\n---\n\nHello world")
 
         # Mock dependencies
-        with patch('src.translation_engine.engine.ModelLoader') as mock_loader_cls:
-            with patch('src.translation_engine.engine.TranslationMemory') as mock_tm_cls:
-                with patch('src.translation_engine.engine.HugoParser') as mock_parser_cls:
-                    with patch('src.translation_engine.engine.SegmentExtractor') as mock_extractor_cls:
-                        with patch('src.translation_engine.engine.MarkdownReconstructor') as mock_reconstructor_cls:
+        with patch("src.translation_engine.engine.ModelLoader") as mock_loader_cls:
+            with patch("src.translation_engine.engine.TranslationMemory") as mock_tm_cls:
+                with patch("src.translation_engine.engine.HugoParser") as mock_parser_cls:
+                    with patch(
+                        "src.translation_engine.engine.SegmentExtractor"
+                    ) as mock_extractor_cls:
+                        with patch(
+                            "src.translation_engine.engine.MarkdownReconstructor"
+                        ) as mock_reconstructor_cls:
                             # Setup mocks
                             mock_tm = Mock()
                             mock_tm_cls.return_value = mock_tm
@@ -350,8 +372,8 @@ class TestCacheWriteMode:
                             )
 
                             # Translate
-                            with patch.object(engine, '_get_site_profile'):
-                                with patch.object(engine, '_write_output'):
+                            with patch.object(engine, "_get_site_profile"):
+                                with patch.object(engine, "_write_output"):
                                     result = engine.translate_file(
                                         site_id="test",
                                         file_path=test_file,

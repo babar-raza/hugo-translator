@@ -173,7 +173,7 @@ def test_no_temp_files_remain_after_failed_write(atomic_write_test_dir):
     file_path = atomic_write_test_dir / "fail_write.md"
 
     # Act - Patch os.replace to simulate failure after temp file created
-    with patch('os.replace') as mock_replace:
+    with patch("os.replace") as mock_replace:
         mock_replace.side_effect = OSError(errno.EIO, "Simulated I/O error")
 
         try:
@@ -211,7 +211,7 @@ def test_original_file_preserved_on_write_error(existing_file, atomic_write_test
     new_content = "This content should NOT appear in file"
 
     # Act - Patch os.replace to fail (simulates crash during rename)
-    with patch('os.replace') as mock_replace:
+    with patch("os.replace") as mock_replace:
         mock_replace.side_effect = OSError(errno.EIO, "Disk error during rename")
 
         try:
@@ -413,7 +413,7 @@ def test_atomic_write_fsyncs_by_default(atomic_write_test_dir):
     content = "Content requiring fsync"
 
     # Act - Use patch to verify fsync is called
-    with patch('os.fsync') as mock_fsync:
+    with patch("os.fsync") as mock_fsync:
         # Note: fsync is called inside fdopen context, hard to mock directly
         # Instead, verify the file is written correctly (functional test)
         atomic_write(file_path, content, fsync=True)

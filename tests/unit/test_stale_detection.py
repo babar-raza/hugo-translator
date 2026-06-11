@@ -1,4 +1,5 @@
 """Unit tests for stale lock detection."""
+
 import json
 import os
 import sys
@@ -21,10 +22,10 @@ def test_stale_detection_dead_pid_json(lock_file):
     """Test stale detection with dead PID (JSON format)."""
     # Create lock with dead PID
     metadata = {
-        'pid': 999999,
-        'hostname': 'test-host',
-        'created': '2025-01-01T00:00:00',
-        'format_version': '1.0'
+        "pid": 999999,
+        "hostname": "test-host",
+        "created": "2025-01-01T00:00:00",
+        "format_version": "1.0",
     }
     lock_file.write_text(json.dumps(metadata, indent=2))
 
@@ -49,10 +50,10 @@ def test_stale_detection_live_pid_json(lock_file):
     """Test stale detection with live PID (JSON format)."""
     # Use current process (definitely alive)
     metadata = {
-        'pid': os.getpid(),
-        'hostname': 'test-host',
-        'created': '2025-01-01T00:00:00',
-        'format_version': '1.0'
+        "pid": os.getpid(),
+        "hostname": "test-host",
+        "created": "2025-01-01T00:00:00",
+        "format_version": "1.0",
     }
     lock_file.write_text(json.dumps(metadata, indent=2))
 
@@ -85,7 +86,7 @@ def test_stale_detection_permission_error_old_file(lock_file):
     # Mock open to raise PermissionError
     lock = FileLock(lock_file, timeout=300.0)
 
-    with patch('builtins.open', side_effect=PermissionError("Access denied")):
+    with patch("builtins.open", side_effect=PermissionError("Access denied")):
         is_stale = lock._is_stale_lock()
 
     # Age-based heuristic should treat as stale
@@ -104,7 +105,7 @@ def test_stale_detection_permission_error_recent_file(lock_file):
     # Mock open to raise PermissionError
     lock = FileLock(lock_file, timeout=300.0)
 
-    with patch('builtins.open', side_effect=PermissionError("Access denied")):
+    with patch("builtins.open", side_effect=PermissionError("Access denied")):
         is_stale = lock._is_stale_lock()
 
     # Age-based heuristic should keep as valid
@@ -143,7 +144,7 @@ def test_is_process_alive_nonexistent_pid():
     assert lock._is_process_alive(999999) is False
 
 
-@pytest.mark.skipif(sys.platform != 'win32', reason="Windows-specific")
+@pytest.mark.skipif(sys.platform != "win32", reason="Windows-specific")
 def test_is_process_alive_windows(lock_file):
     """Test Windows process detection via tasklist."""
     from src.utils.file_lock import FileLock
@@ -151,16 +152,15 @@ def test_is_process_alive_windows(lock_file):
     lock = FileLock(lock_file)
 
     # Mock tasklist output for alive process
-    with patch('subprocess.run') as mock_run:
+    with patch("subprocess.run") as mock_run:
         mock_run.return_value = MagicMock(
-            stdout=f"python.exe  {os.getpid()}  Console  1  12345 K",
-            returncode=0
+            stdout=f"python.exe  {os.getpid()}  Console  1  12345 K", returncode=0
         )
 
         assert lock._is_process_alive(os.getpid()) is True
 
 
-@pytest.mark.skipif(sys.platform == 'win32', reason="Unix-specific")
+@pytest.mark.skipif(sys.platform == "win32", reason="Unix-specific")
 def test_is_process_alive_unix(lock_file):
     """Test Unix process detection via kill signal 0."""
     from src.utils.file_lock import FileLock
@@ -171,7 +171,7 @@ def test_is_process_alive_unix(lock_file):
     assert lock._is_process_alive(os.getpid()) is True
 
     # Mock os.kill to simulate dead process
-    with patch('os.kill', side_effect=OSError("No such process")):
+    with patch("os.kill", side_effect=OSError("No such process")):
         assert lock._is_process_alive(99999) is False
 
 

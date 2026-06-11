@@ -43,13 +43,7 @@ class TestL2ExportAll:
         ]
 
         for source, trans, site, src, tgt in entries:
-            l2.store(
-                site_id=site,
-                src_lang=src,
-                tgt_lang=tgt,
-                text=source,
-                translation=trans
-            )
+            l2.store(site_id=site, src_lang=src, tgt_lang=tgt, text=source, translation=trans)
 
         return l2
 
@@ -107,29 +101,17 @@ class TestRebuildResult:
 
     def test_rebuild_result_success_true(self):
         """Test success is True when all entries indexed."""
-        result = RebuildResult(
-            entries_exported=100,
-            entries_indexed=100,
-            duration_seconds=5.5
-        )
+        result = RebuildResult(entries_exported=100, entries_indexed=100, duration_seconds=5.5)
         assert result.success is True
 
     def test_rebuild_result_success_false(self):
         """Test success is False when some entries failed."""
-        result = RebuildResult(
-            entries_exported=100,
-            entries_indexed=95,
-            duration_seconds=5.5
-        )
+        result = RebuildResult(entries_exported=100, entries_indexed=95, duration_seconds=5.5)
         assert result.success is False
 
     def test_rebuild_result_str(self):
         """Test string representation."""
-        result = RebuildResult(
-            entries_exported=100,
-            entries_indexed=100,
-            duration_seconds=5.5
-        )
+        result = RebuildResult(entries_exported=100, entries_indexed=100, duration_seconds=5.5)
         s = str(result)
         assert "exported=100" in s
         assert "indexed=100" in s
@@ -141,7 +123,7 @@ class TestRebuildResult:
             entries_exported=100,
             entries_indexed=100,
             duration_seconds=5.5,
-            backup_path=Path("/backup")
+            backup_path=Path("/backup"),
         )
         d = result.to_dict()
         assert d["entries_exported"] == 100
@@ -163,7 +145,7 @@ class TestL3IndexRebuilder:
                 translation=f"Trans {i}",
                 site_id="test.site",
                 src_lang="en",
-                tgt_lang="es"
+                tgt_lang="es",
             )
             for i in range(10)
         ]
@@ -198,10 +180,7 @@ class TestL3IndexRebuilder:
         rebuilder = L3IndexRebuilder(mock_l2, mock_l3)
         rebuilder.rebuild(site_id="mysite", tgt_lang="fr", backup_existing=False)
 
-        mock_l2.export_all.assert_called_once_with(
-            site_id="mysite",
-            tgt_lang="fr"
-        )
+        mock_l2.export_all.assert_called_once_with(site_id="mysite", tgt_lang="fr")
 
     def test_rebuild_empty_l2(self, mock_l2, mock_l3):
         """Test rebuild with empty L2."""
@@ -245,7 +224,7 @@ class TestL3IndexRebuilderIntegration:
                 src_lang="en",
                 tgt_lang="es",
                 text=f"Test source {i}",
-                translation=f"Traduccion {i}"
+                translation=f"Traduccion {i}",
             )
 
         return l2

@@ -1,4 +1,5 @@
 """Unit tests for ProductionMetricsIngestor."""
+
 import tempfile
 from pathlib import Path
 

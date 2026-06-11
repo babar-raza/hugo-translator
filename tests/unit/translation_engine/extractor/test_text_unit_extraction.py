@@ -50,11 +50,7 @@ class TestBasicExtraction:
         extractor = TextUnitExtractor(segmentation_strategy="leaf_only")
 
         # Create paragraph with multiple text nodes
-        para = paragraph_node([
-            text_node("First "),
-            text_node("second "),
-            text_node("third")
-        ])
+        para = paragraph_node([text_node("First "), text_node("second "), text_node("third")])
         para.assign_addresses("body.paragraph[0]")
 
         plan = extractor.extract_from_ast([para])
@@ -132,7 +128,7 @@ class TestNodeTypes:
         link = ASTNode(
             type=NodeType.LINK,
             attrs={"url": "https://example.com"},
-            children=[text_node("Click here")]
+            children=[text_node("Click here")],
         )
         para = paragraph_node([link])
         para.assign_addresses("body.paragraph[0]")
@@ -154,8 +150,7 @@ class TestNodeTypes:
 
         # Create image node
         image = ASTNode(
-            type=NodeType.IMAGE,
-            attrs={"src": "/images/photo.jpg", "alt": "Beautiful photo"}
+            type=NodeType.IMAGE, attrs={"src": "/images/photo.jpg", "alt": "Beautiful photo"}
         )
         para = paragraph_node([image])
         para.assign_addresses("body.paragraph[0]")
@@ -177,11 +172,7 @@ class TestNodeTypes:
 
         # Create paragraph with code span
         code = ASTNode(type=NodeType.CODE_SPAN, raw="myFunction()")
-        para = paragraph_node([
-            text_node("Call "),
-            code,
-            text_node(" here")
-        ])
+        para = paragraph_node([text_node("Call "), code, text_node(" here")])
         para.assign_addresses("body.paragraph[0]")
 
         plan = extractor.extract_from_ast([para])
@@ -203,7 +194,7 @@ class TestNodeTypes:
         code_block = ASTNode(
             type=NodeType.CODE_BLOCK,
             raw="def hello():\n    print('world')",
-            attrs={"lang": "python"}
+            attrs={"lang": "python"},
         )
         code_block.assign_addresses("body.codeblock[0]")
 
@@ -223,11 +214,7 @@ class TestNestedFormatting:
 
         # Create paragraph with bold
         strong = ASTNode(type=NodeType.STRONG, children=[text_node("bold")])
-        para = paragraph_node([
-            text_node("This is "),
-            strong,
-            text_node(" text")
-        ])
+        para = paragraph_node([text_node("This is "), strong, text_node(" text")])
         para.assign_addresses("body.paragraph[0]")
 
         plan = extractor.extract_from_ast([para])
@@ -242,9 +229,7 @@ class TestNestedFormatting:
 
         # Create: **[link](url)**
         link = ASTNode(
-            type=NodeType.LINK,
-            attrs={"url": "https://example.com"},
-            children=[text_node("link")]
+            type=NodeType.LINK, attrs={"url": "https://example.com"}, children=[text_node("link")]
         )
         strong = ASTNode(type=NodeType.STRONG, children=[link])
         para = paragraph_node([strong])
@@ -263,11 +248,7 @@ class TestNestedFormatting:
 
         # Create: [**bold**](url)
         strong = ASTNode(type=NodeType.STRONG, children=[text_node("bold")])
-        link = ASTNode(
-            type=NodeType.LINK,
-            attrs={"url": "https://example.com"},
-            children=[strong]
-        )
+        link = ASTNode(type=NodeType.LINK, attrs={"url": "https://example.com"}, children=[strong])
         para = paragraph_node([link])
         para.assign_addresses("body.paragraph[0]")
 
@@ -286,14 +267,10 @@ class TestNestedFormatting:
         link = ASTNode(
             type=NodeType.LINK,
             attrs={"url": "https://example.com"},
-            children=[text_node("click "), em]
+            children=[text_node("click "), em],
         )
         strong = ASTNode(type=NodeType.STRONG, children=[link])
-        para = paragraph_node([
-            text_node("Visit "),
-            strong,
-            text_node(" now")
-        ])
+        para = paragraph_node([text_node("Visit "), strong, text_node(" now")])
         para.assign_addresses("body.paragraph[0]")
 
         plan = extractor.extract_from_ast([para])
@@ -312,11 +289,7 @@ class TestSmartSegmentation:
 
         # Create paragraph with mixed content
         strong = ASTNode(type=NodeType.STRONG, children=[text_node("bold")])
-        para = paragraph_node([
-            text_node("Plain "),
-            strong,
-            text_node(" text")
-        ])
+        para = paragraph_node([text_node("Plain "), strong, text_node(" text")])
         para.assign_addresses("body.paragraph[0]")
 
         plan = extractor.extract_from_ast([para])
@@ -359,10 +332,7 @@ class TestSmartSegmentation:
 
         # Create paragraph with formatting
         strong = ASTNode(type=NodeType.STRONG, children=[text_node("bold")])
-        para = paragraph_node([
-            text_node("Text with "),
-            strong
-        ])
+        para = paragraph_node([text_node("Text with "), strong])
         para.assign_addresses("body.paragraph[0]")
 
         plan = extractor.extract_from_ast([para])
@@ -377,11 +347,7 @@ class TestSmartSegmentation:
 
         # Create paragraph with code
         code = ASTNode(type=NodeType.CODE_SPAN, raw="code()")
-        para = paragraph_node([
-            text_node("Call "),
-            code,
-            text_node(" here")
-        ])
+        para = paragraph_node([text_node("Call "), code, text_node(" here")])
         para.assign_addresses("body.paragraph[0]")
 
         plan = extractor.extract_from_ast([para])
@@ -497,22 +463,26 @@ class TestBatchTranslation:
                 node_addr="p1.t1",
                 kind=TextUnitKind.TEXT,
                 source_text="Hello",
-                do_not_translate=False
+                do_not_translate=False,
             ),
             TextUnit(
                 unit_id="u2",
                 node_addr="p1.t2",
                 kind=TextUnitKind.TEXT,
                 source_text="World",
-                do_not_translate=False
+                do_not_translate=False,
             ),
         ]
 
         # Mock MT model with tokenizer
         mt_model = Mock()
         mt_model.tokenizer = Mock()
-        mt_model.tokenizer.encode = Mock(side_effect=lambda text, **kwargs: list(text.encode('utf-8')))
-        mt_model.tokenizer.decode = Mock(side_effect=lambda tokens, **kwargs: bytes(tokens).decode('utf-8'))
+        mt_model.tokenizer.encode = Mock(
+            side_effect=lambda text, **kwargs: list(text.encode("utf-8"))
+        )
+        mt_model.tokenizer.decode = Mock(
+            side_effect=lambda tokens, **kwargs: bytes(tokens).decode("utf-8")
+        )
 
         # Native batching: model receives a list of texts, returns a list of translations
         def mock_translate(texts, source_lang, target_lang, **kwargs):
@@ -523,11 +493,7 @@ class TestBatchTranslation:
 
         # Batch translate
         result = extractor.batch_translate_units(
-            units,
-            mt_model,
-            src_lang="en",
-            tgt_lang="es",
-            batch_size=50
+            units, mt_model, src_lang="en", tgt_lang="es", batch_size=50
         )
 
         # Verify translations
@@ -535,8 +501,8 @@ class TestBatchTranslation:
         assert result[1].translated_text == "Mundo"
 
         # Verify stats
-        assert extractor.batch_stats['successful_batches'] == 1
-        assert extractor.batch_stats['fallback_batches'] == 0
+        assert extractor.batch_stats["successful_batches"] == 1
+        assert extractor.batch_stats["fallback_batches"] == 0
 
     def test_batch_translate_delimiter_corruption_fallback(self):
         """Test automatic fallback when delimiter is corrupted (AST-FIX-04)."""
@@ -548,22 +514,26 @@ class TestBatchTranslation:
                 node_addr="p1.t1",
                 kind=TextUnitKind.TEXT,
                 source_text="Hello",
-                do_not_translate=False
+                do_not_translate=False,
             ),
             TextUnit(
                 unit_id="u2",
                 node_addr="p1.t2",
                 kind=TextUnitKind.TEXT,
                 source_text="World",
-                do_not_translate=False
+                do_not_translate=False,
             ),
         ]
 
         # Mock MT model with tokenizer that corrupts delimiter
         mt_model = Mock()
         mt_model.tokenizer = Mock()
-        mt_model.tokenizer.encode = Mock(side_effect=lambda text, **kwargs: list(text.encode('utf-8')))
-        mt_model.tokenizer.decode = Mock(side_effect=lambda tokens, **kwargs: bytes(tokens).decode('utf-8'))
+        mt_model.tokenizer.encode = Mock(
+            side_effect=lambda text, **kwargs: list(text.encode("utf-8"))
+        )
+        mt_model.tokenizer.decode = Mock(
+            side_effect=lambda tokens, **kwargs: bytes(tokens).decode("utf-8")
+        )
 
         call_count = [0]
 
@@ -581,11 +551,7 @@ class TestBatchTranslation:
 
         # Batch translate
         result = extractor.batch_translate_units(
-            units,
-            mt_model,
-            src_lang="en",
-            tgt_lang="es",
-            batch_size=50
+            units, mt_model, src_lang="en", tgt_lang="es", batch_size=50
         )
 
         # Verify fallback occurred and translations are correct
@@ -593,8 +559,8 @@ class TestBatchTranslation:
         assert result[1].translated_text == "Mundo"
 
         # Verify stats - should have fallback due to mapping validation failure
-        assert extractor.batch_stats['fallback_batches'] >= 1
-        assert extractor.batch_stats.get('mapping_failures', 0) >= 1
+        assert extractor.batch_stats["fallback_batches"] >= 1
+        assert extractor.batch_stats.get("mapping_failures", 0) >= 1
 
     def test_batch_translate_skips_non_translatable(self):
         """Test non-translatable units are not sent to MT."""
@@ -606,29 +572,33 @@ class TestBatchTranslation:
                 node_addr="p1.t1",
                 kind=TextUnitKind.TEXT,
                 source_text="Hello",
-                do_not_translate=False
+                do_not_translate=False,
             ),
             TextUnit(
                 unit_id="u2",
                 node_addr="p1.c1",
                 kind=TextUnitKind.CODE_SPAN,
                 source_text="myCode()",
-                do_not_translate=True
+                do_not_translate=True,
             ),
             TextUnit(
                 unit_id="u3",
                 node_addr="p1.t2",
                 kind=TextUnitKind.TEXT,
                 source_text="World",
-                do_not_translate=False
+                do_not_translate=False,
             ),
         ]
 
         # Mock MT model with tokenizer
         mt_model = Mock()
         mt_model.tokenizer = Mock()
-        mt_model.tokenizer.encode = Mock(side_effect=lambda text, **kwargs: list(text.encode('utf-8')))
-        mt_model.tokenizer.decode = Mock(side_effect=lambda tokens, **kwargs: bytes(tokens).decode('utf-8'))
+        mt_model.tokenizer.encode = Mock(
+            side_effect=lambda text, **kwargs: list(text.encode("utf-8"))
+        )
+        mt_model.tokenizer.decode = Mock(
+            side_effect=lambda tokens, **kwargs: bytes(tokens).decode("utf-8")
+        )
 
         def mock_translate(texts, source_lang, target_lang, **kwargs):
             text = texts[0] if isinstance(texts, list) else texts
@@ -636,9 +606,10 @@ class TestBatchTranslation:
             assert "myCode()" not in text
 
             # Extract NEW delimiter if present
-            if "\uE000" in text:
+            if "\ue000" in text:
                 import re
-                match = re.search(r'\uE000\uE000\uE000[a-f0-9]+\uE001\uE001\uE001', text)
+
+                match = re.search(r"\uE000\uE000\uE000[a-f0-9]+\uE001\uE001\uE001", text)
                 if match:
                     delimiter = match.group(0)
                     return [f"Hola{delimiter}Mundo"]
@@ -648,11 +619,7 @@ class TestBatchTranslation:
 
         # Batch translate
         result = extractor.batch_translate_units(
-            units,
-            mt_model,
-            src_lang="en",
-            tgt_lang="es",
-            batch_size=50
+            units, mt_model, src_lang="en", tgt_lang="es", batch_size=50
         )
 
         # Verify non-translatable unit copied source to translated
@@ -673,14 +640,14 @@ class TestBatchTranslation:
                 node_addr="p1.t1",
                 kind=TextUnitKind.TEXT,
                 source_text="This is a long enough English text for language detection",
-                do_not_translate=False
+                do_not_translate=False,
             ),
             TextUnit(
                 unit_id="u2",
                 node_addr="p1.t2",
                 kind=TextUnitKind.TEXT,
                 source_text="Another long English sentence to test the system",
-                do_not_translate=False
+                do_not_translate=False,
             ),
         ]
 
@@ -737,32 +704,31 @@ class TestBatchTranslation:
         mock_langdetect.DetectorFactory.seed = 0
 
         # Use monkeypatch to inject mock (automatic cleanup by pytest)
-        monkeypatch.setitem(__import__('sys').modules, 'langdetect', mock_langdetect)
+        monkeypatch.setitem(__import__("sys").modules, "langdetect", mock_langdetect)
 
         # Batch translate
         result = extractor.batch_translate_units(
-            units,
-            mt_model,
-            src_lang="en",
-            tgt_lang="de",
-            batch_size=50
+            units, mt_model, src_lang="en", tgt_lang="de", batch_size=50
         )
 
         # Verify language purity failure was detected
-        assert extractor.batch_stats.get('language_purity_failures', 0) >= 1, \
+        assert extractor.batch_stats.get("language_purity_failures", 0) >= 1, (
             "Language purity failure should be detected"
+        )
 
         # Verify fallback to individual translation occurred
-        assert extractor.batch_stats.get('fallback_batches', 0) >= 1, \
+        assert extractor.batch_stats.get("fallback_batches", 0) >= 1, (
             "Fallback should occur when language purity fails"
+        )
 
         # Verify units still got translated (via fallback)
         assert result[0].translated_text != ""
         assert result[1].translated_text != ""
 
         # Verify individual translations were used (pure German)
-        assert "deutscher" in result[0].translated_text or result[0].translated_text != "", \
+        assert "deutscher" in result[0].translated_text or result[0].translated_text != "", (
             "Fallback should translate units individually"
+        )
 
 
 class TestComplexDocuments:
@@ -862,11 +828,7 @@ class TestEdgeCases:
         text = text_node("Deep")
         em = ASTNode(type=NodeType.EMPHASIS, children=[text])
         strong = ASTNode(type=NodeType.STRONG, children=[em])
-        link = ASTNode(
-            type=NodeType.LINK,
-            attrs={"url": "url"},
-            children=[strong]
-        )
+        link = ASTNode(type=NodeType.LINK, attrs={"url": "url"}, children=[strong])
         para = paragraph_node([link])
         para.assign_addresses("body.paragraph[0]")
 
@@ -906,6 +868,7 @@ class TestEdgeCases:
     def test_logs_when_node_skipped(self, caplog):
         """Test that skipped nodes are logged at DEBUG level (SR-04)."""
         import logging
+
         extractor = TextUnitExtractor(segmentation_strategy="leaf_only")
 
         # Create paragraph with text node but don't assign addresses
@@ -913,12 +876,15 @@ class TestEdgeCases:
         # Explicitly don't assign addresses
 
         # Enable DEBUG logging for the extractor module
-        with caplog.at_level(logging.DEBUG, logger="src.translation_engine.extractor.text_unit_extractor"):
+        with caplog.at_level(
+            logging.DEBUG, logger="src.translation_engine.extractor.text_unit_extractor"
+        ):
             plan = extractor.extract_from_ast([para])
 
         # Verify log message was emitted
-        assert any("Skipping" in record.message for record in caplog.records), \
+        assert any("Skipping" in record.message for record in caplog.records), (
             "Expected 'Skipping' log message when node has no address"
+        )
 
         # Verify no units were extracted (since no addresses)
         assert len(plan.units) == 0
@@ -969,23 +935,20 @@ class TestHelperMethods:
 
         # Create a simple batch
         from src.translation_engine.extractor.text_unit import TextUnit, TextUnitKind
+
         units = [
             TextUnit(
                 unit_id="u1",
                 node_addr="test.1",
                 kind=TextUnitKind.TEXT,
                 source_text="Hello",
-                do_not_translate=False
+                do_not_translate=False,
             )
         ]
 
         # Call batch_translate_units - should skip pre-validation but still translate
         result = extractor.batch_translate_units(
-            units,
-            mock_model,
-            src_lang="en",
-            tgt_lang="de",
-            batch_size=10
+            units, mock_model, src_lang="en", tgt_lang="de", batch_size=10
         )
 
         # Should complete successfully (skipping pre-validation)
@@ -1012,21 +975,25 @@ class TestConstantValidation:
         source = inspect.getsource(module)
 
         # Confirm the validation block uses raise ValueError, not assert
-        assert "raise ValueError" in source, \
+        assert "raise ValueError" in source, (
             "Module should use raise ValueError for constant validation (not assert)"
-        assert "LANGUAGE_PURITY_MIN_LENGTH" in source, \
+        )
+        assert "LANGUAGE_PURITY_MIN_LENGTH" in source, (
             "Module should validate LANGUAGE_PURITY_MIN_LENGTH"
+        )
 
         # Confirm no bare assert is used for constant validation
         # (assert would be silently disabled with -O flag)
         # Look for the pattern: assert <constant> — should not exist for these
         import re
+
         bad_pattern = re.compile(
-            r'^\s*assert\s+(5\s*<=\s*LANGUAGE_PURITY_MIN_LENGTH|LANGUAGE_PURITY_MIN_LENGTH)',
-            re.MULTILINE
+            r"^\s*assert\s+(5\s*<=\s*LANGUAGE_PURITY_MIN_LENGTH|LANGUAGE_PURITY_MIN_LENGTH)",
+            re.MULTILINE,
         )
-        assert not bad_pattern.search(source), \
+        assert not bad_pattern.search(source), (
             "Constant validation must not use bare assert (fails with -O flag)"
+        )
 
     def test_valid_constants_import_successfully(self):
         """Test that module imports successfully with valid constants."""
@@ -1052,8 +1019,8 @@ class TestFrontmatterTranslation:
 
         # Create frontmatter dictionary
         frontmatter = {
-            'title': 'Test Document',
-            'slug': 'test-doc'  # Protected field
+            "title": "Test Document",
+            "slug": "test-doc",  # Protected field
         }
 
         # Extract from frontmatter only
@@ -1061,112 +1028,107 @@ class TestFrontmatterTranslation:
 
         # Should extract title but not slug
         assert len(plan.units) == 1
-        assert plan.units[0].source_text == 'Test Document'
-        assert plan.units[0].metadata['field_name'] == 'title'
-        assert plan.units[0].metadata['field_type'] == 'string'
-        assert plan.units[0].node_addr == 'frontmatter.title'
+        assert plan.units[0].source_text == "Test Document"
+        assert plan.units[0].metadata["field_name"] == "title"
+        assert plan.units[0].metadata["field_type"] == "string"
+        assert plan.units[0].node_addr == "frontmatter.title"
 
     def test_extract_frontmatter_array_field(self):
         """Test extraction of array frontmatter field (e.g., keywords)."""
         extractor = TextUnitExtractor(segmentation_strategy="leaf_only")
 
-        frontmatter = {
-            'keywords': ['keyword1', 'keyword2', 'keyword3']
-        }
+        frontmatter = {"keywords": ["keyword1", "keyword2", "keyword3"]}
 
         plan = extractor.extract_from_ast([], frontmatter=frontmatter)
 
         # Should extract 3 array items
         assert len(plan.units) == 3
-        assert plan.units[0].source_text == 'keyword1'
-        assert plan.units[0].metadata['field_name'] == 'keywords'
-        assert plan.units[0].metadata['field_type'] == 'array'
-        assert plan.units[0].metadata['index'] == 0
-        assert plan.units[0].node_addr == 'frontmatter.keywords[0]'
+        assert plan.units[0].source_text == "keyword1"
+        assert plan.units[0].metadata["field_name"] == "keywords"
+        assert plan.units[0].metadata["field_type"] == "array"
+        assert plan.units[0].metadata["index"] == 0
+        assert plan.units[0].node_addr == "frontmatter.keywords[0]"
 
-        assert plan.units[2].source_text == 'keyword3'
-        assert plan.units[2].metadata['index'] == 2
-        assert plan.units[2].node_addr == 'frontmatter.keywords[2]'
+        assert plan.units[2].source_text == "keyword3"
+        assert plan.units[2].metadata["index"] == 2
+        assert plan.units[2].node_addr == "frontmatter.keywords[2]"
 
     def test_skip_protected_frontmatter_fields(self):
         """Test that protected fields are not extracted."""
         extractor = TextUnitExtractor(segmentation_strategy="leaf_only")
 
         frontmatter = {
-            'title': 'Test',  # Translatable
-            'slug': 'test',   # Protected
-            'date': '2025-01-01',  # Protected
-            'weight': 10  # Protected (also not string)
+            "title": "Test",  # Translatable
+            "slug": "test",  # Protected
+            "date": "2025-01-01",  # Protected
+            "weight": 10,  # Protected (also not string)
         }
 
         plan = extractor.extract_from_ast([], frontmatter=frontmatter)
 
         # Should only extract title
         assert len(plan.units) == 1
-        assert plan.units[0].source_text == 'Test'
-        assert plan.units[0].metadata['field_name'] == 'title'
+        assert plan.units[0].source_text == "Test"
+        assert plan.units[0].metadata["field_name"] == "title"
 
     def test_apply_frontmatter_string_translation(self):
         """Test applying translation to string frontmatter field."""
         from src.translation_engine.reconstructor.ast_renderer import ASTRenderer
 
-        frontmatter = {'title': 'English Title'}
+        frontmatter = {"title": "English Title"}
 
         unit = TextUnit(
-            unit_id='fm_title',
-            node_addr='frontmatter.title',
+            unit_id="fm_title",
+            node_addr="frontmatter.title",
             kind=TextUnitKind.TEXT,
-            source_text='English Title',
-            translated_text='Deutscher Titel',
-            metadata={'field_name': 'title', 'field_type': 'string'}
+            source_text="English Title",
+            translated_text="Deutscher Titel",
+            metadata={"field_name": "title", "field_type": "string"},
         )
 
         renderer = ASTRenderer()
         renderer.apply_translations([], [unit], frontmatter=frontmatter)
 
         # Title should be updated
-        assert frontmatter['title'] == 'Deutscher Titel'
+        assert frontmatter["title"] == "Deutscher Titel"
 
     def test_apply_frontmatter_array_translation(self):
         """Test applying translation to array frontmatter field."""
         from src.translation_engine.reconstructor.ast_renderer import ASTRenderer
 
-        frontmatter = {'keywords': ['English', 'Keywords']}
+        frontmatter = {"keywords": ["English", "Keywords"]}
 
         units = [
             TextUnit(
-                unit_id='fm_kw0',
-                node_addr='frontmatter.keywords[0]',
+                unit_id="fm_kw0",
+                node_addr="frontmatter.keywords[0]",
                 kind=TextUnitKind.TEXT,
-                source_text='English',
-                translated_text='Englisch',
-                metadata={'field_name': 'keywords', 'field_type': 'array', 'index': 0}
+                source_text="English",
+                translated_text="Englisch",
+                metadata={"field_name": "keywords", "field_type": "array", "index": 0},
             ),
             TextUnit(
-                unit_id='fm_kw1',
-                node_addr='frontmatter.keywords[1]',
+                unit_id="fm_kw1",
+                node_addr="frontmatter.keywords[1]",
                 kind=TextUnitKind.TEXT,
-                source_text='Keywords',
-                translated_text='Schlüsselwörter',
-                metadata={'field_name': 'keywords', 'field_type': 'array', 'index': 1}
-            )
+                source_text="Keywords",
+                translated_text="Schlüsselwörter",
+                metadata={"field_name": "keywords", "field_type": "array", "index": 1},
+            ),
         ]
 
         renderer = ASTRenderer()
         renderer.apply_translations([], units, frontmatter=frontmatter)
 
         # Array should be updated
-        assert frontmatter['keywords'] == ['Englisch', 'Schlüsselwörter']
+        assert frontmatter["keywords"] == ["Englisch", "Schlüsselwörter"]
 
     def test_frontmatter_with_body_extraction(self):
         """Test extracting both frontmatter and body together."""
         extractor = TextUnitExtractor(segmentation_strategy="leaf_only")
 
         # Frontmatter
-        frontmatter = {
-            'title': 'My Title',
-            'description': 'My description'
-        }
+        frontmatter = {"title": "My Title", "description": "My description"}
 
         # Body AST
         para = paragraph_node([text_node("Body text")])
@@ -1178,11 +1140,13 @@ class TestFrontmatterTranslation:
         assert len(plan.units) == 3
 
         # Check frontmatter units
-        fm_units = [u for u in plan.units if u.node_addr and u.node_addr.startswith('frontmatter.')]
+        fm_units = [u for u in plan.units if u.node_addr and u.node_addr.startswith("frontmatter.")]
         assert len(fm_units) == 2
 
         # Check body units
-        body_units = [u for u in plan.units if not (u.node_addr and u.node_addr.startswith('frontmatter.'))]
+        body_units = [
+            u for u in plan.units if not (u.node_addr and u.node_addr.startswith("frontmatter."))
+        ]
         assert len(body_units) == 1
         assert body_units[0].source_text == "Body text"
 
@@ -1203,9 +1167,9 @@ class TestFrontmatterTranslation:
         extractor = TextUnitExtractor(segmentation_strategy="leaf_only")
 
         frontmatter = {
-            'title': '',  # Empty string
-            'description': '   ',  # Whitespace only
-            'keywords': ['good', '', 'another']  # Array with empty item
+            "title": "",  # Empty string
+            "description": "   ",  # Whitespace only
+            "keywords": ["good", "", "another"],  # Array with empty item
         }
 
         plan = extractor.extract_from_ast([], frontmatter=frontmatter)
@@ -1213,9 +1177,9 @@ class TestFrontmatterTranslation:
         # Should only extract 'good' and 'another' from keywords array
         # Empty strings should be skipped
         assert len(plan.units) == 2
-        assert plan.units[0].source_text == 'good'
-        assert plan.units[1].source_text == 'another'
+        assert plan.units[0].source_text == "good"
+        assert plan.units[1].source_text == "another"
 
 
-if __name__ == '__main__':
-    pytest.main([__file__, '-v'])
+if __name__ == "__main__":
+    pytest.main([__file__, "-v"])

@@ -122,7 +122,9 @@ class TestTMLayerIntegration:
         l1.clear()
 
         # Lookup similar text (should hit L3)
-        result = tm.lookup("site1", "en", "de", "Hello world!", use_semantic=True, semantic_threshold=0.75)
+        result = tm.lookup(
+            "site1", "en", "de", "Hello world!", use_semantic=True, semantic_threshold=0.75
+        )
 
         assert result.hit is True
         assert result.source == "l3_semantic"
@@ -192,7 +194,7 @@ class TestTMLayerIntegration:
                 translation=f"Test DE {i}",
                 site_id="site1",
                 src_lang="en",
-                tgt_lang="de"
+                tgt_lang="de",
             )
             for i in range(10)
         ]
@@ -232,7 +234,7 @@ class TestTMLayerIntegration:
 
         assert stats.total_lookups == 6
         assert stats.total_hits == 5
-        assert stats.overall_hit_rate == pytest.approx(5/6, abs=0.01)
+        assert stats.overall_hit_rate == pytest.approx(5 / 6, abs=0.01)
         assert stats.l1_hits > 0
         assert stats.l2_size >= 5
         assert stats.l3_size >= 5
@@ -416,8 +418,8 @@ class TestEdgeCases:
         tm = TranslationMemory(l1_cache=l1, l2_persistent=l2)
 
         # Store with special characters
-        text = "Hello 世界 🌍 <tag> & \"quotes\""
-        translation = "Hallo 世界 🌍 <tag> & \"Anführungszeichen\""
+        text = 'Hello 世界 🌍 <tag> & "quotes"'
+        translation = 'Hallo 世界 🌍 <tag> & "Anführungszeichen"'
 
         tm.store("site1", "en", "de", text, translation)
         result = tm.lookup("site1", "en", "de", text)

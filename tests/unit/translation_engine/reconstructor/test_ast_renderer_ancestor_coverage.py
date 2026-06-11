@@ -17,6 +17,7 @@ Root cause: barcode/add-barcode-in-asp-dotnet-mvc showed 112 false-positive
 STRONG nodes (39.3% of total) because _has_descendant_in_unit_map is
 descendant-oriented only; Path A ancestor coverage was not checked.
 """
+
 from __future__ import annotations
 
 import pytest
@@ -29,8 +30,10 @@ from src.translation_engine.reconstructor.ast_renderer import ASTRenderer
 # Helpers
 # ---------------------------------------------------------------------------
 
-def _node(ntype: NodeType, raw: str | None, addr: str,
-          children: list[ASTNode] | None = None) -> ASTNode:
+
+def _node(
+    ntype: NodeType, raw: str | None, addr: str, children: list[ASTNode] | None = None
+) -> ASTNode:
     n = ASTNode(type=ntype, raw=raw, children=children or [], attrs={})
     n.node_addr = addr
     return n
@@ -65,6 +68,7 @@ def _apply(units: list[TextUnit], ast: list[ASTNode]) -> ASTRenderer:
 # Test 1 -- STRONG inside Path A PARAGRAPH not counted as gap
 # ---------------------------------------------------------------------------
 
+
 def test_strong_inside_path_a_paragraph_not_counted_as_gap():
     """
     Path A: PARAGRAPH has a TextUnit (full-sentence extraction).
@@ -72,10 +76,13 @@ def test_strong_inside_path_a_paragraph_not_counted_as_gap():
     Expected: _missing_node_count == 0.
     """
     strong_text = _text("some bold text")
-    strong = _node(NodeType.STRONG, None, "body.paragraph[0].strong[0]",
-                   children=[strong_text])
-    para = _node(NodeType.PARAGRAPH, "some bold text paragraph sentence",
-                 "body.paragraph[0]", children=[strong])
+    strong = _node(NodeType.STRONG, None, "body.paragraph[0].strong[0]", children=[strong_text])
+    para = _node(
+        NodeType.PARAGRAPH,
+        "some bold text paragraph sentence",
+        "body.paragraph[0]",
+        children=[strong],
+    )
 
     units = [_unit("body.paragraph[0]", "some bold text paragraph sentence")]
     r = _apply(units, [para])
@@ -90,6 +97,7 @@ def test_strong_inside_path_a_paragraph_not_counted_as_gap():
 # Test 2 -- STRONG with NO ancestor coverage IS counted
 # ---------------------------------------------------------------------------
 
+
 def test_strong_without_ancestor_coverage_counted_as_gap():
     """
     STRONG has no TextUnit AND its parent PARAGRAPH also has no address.
@@ -97,8 +105,7 @@ def test_strong_without_ancestor_coverage_counted_as_gap():
     Expected: _missing_node_count == 1.
     """
     strong_text = _text("some bold text")
-    strong = _node(NodeType.STRONG, None, "body.paragraph[1].strong[0]",
-                   children=[strong_text])
+    strong = _node(NodeType.STRONG, None, "body.paragraph[1].strong[0]", children=[strong_text])
     # PARAGRAPH with no address -- will not be in unit_map
     para = ASTNode(type=NodeType.PARAGRAPH, raw=None, children=[strong], attrs={})
     para.node_addr = ""
@@ -108,8 +115,7 @@ def test_strong_without_ancestor_coverage_counted_as_gap():
     r = _apply(units, [para])
 
     assert r._missing_node_count == 1, (
-        f"Expected 1 missing node (STRONG has no ancestor in unit_map), "
-        f"got {r._missing_node_count}"
+        f"Expected 1 missing node (STRONG has no ancestor in unit_map), got {r._missing_node_count}"
     )
 
 
@@ -117,15 +123,16 @@ def test_strong_without_ancestor_coverage_counted_as_gap():
 # Test 3 -- EMPHASIS inside Path A PARAGRAPH not counted
 # ---------------------------------------------------------------------------
 
+
 def test_emphasis_inside_path_a_paragraph_not_counted():
     """
     Same as test 1 but with EMPHASIS (italic) instead of STRONG.
     """
     em_text = _text("italic text here")
-    em = _node(NodeType.EMPHASIS, None, "body.paragraph[2].emphasis[0]",
-               children=[em_text])
-    para = _node(NodeType.PARAGRAPH, "italic text here in a sentence",
-                 "body.paragraph[2]", children=[em])
+    em = _node(NodeType.EMPHASIS, None, "body.paragraph[2].emphasis[0]", children=[em_text])
+    para = _node(
+        NodeType.PARAGRAPH, "italic text here in a sentence", "body.paragraph[2]", children=[em]
+    )
 
     units = [_unit("body.paragraph[2]", "italic text here in a sentence")]
     r = _apply(units, [para])
@@ -140,6 +147,7 @@ def test_emphasis_inside_path_a_paragraph_not_counted():
 # Test 4 -- Nested PARAGRAPH -> STRONG -> EMPHASIS all suppressed
 # ---------------------------------------------------------------------------
 
+
 def test_nested_formatting_inside_covered_paragraph():
     """
     PARAGRAPH (in unit_map) -> STRONG (not in unit_map) -> EMPHASIS (not in unit_map).
@@ -147,12 +155,16 @@ def test_nested_formatting_inside_covered_paragraph():
     Expected: _missing_node_count == 0 for both STRONG and EMPHASIS.
     """
     em_text = _text("nested italic")
-    em = _node(NodeType.EMPHASIS, None, "body.paragraph[3].strong[0].emphasis[0]",
-               children=[em_text])
-    strong = _node(NodeType.STRONG, None, "body.paragraph[3].strong[0]",
-                   children=[em])
-    para = _node(NodeType.PARAGRAPH, "nested bold italic sentence here",
-                 "body.paragraph[3]", children=[strong])
+    em = _node(
+        NodeType.EMPHASIS, None, "body.paragraph[3].strong[0].emphasis[0]", children=[em_text]
+    )
+    strong = _node(NodeType.STRONG, None, "body.paragraph[3].strong[0]", children=[em])
+    para = _node(
+        NodeType.PARAGRAPH,
+        "nested bold italic sentence here",
+        "body.paragraph[3]",
+        children=[strong],
+    )
 
     units = [_unit("body.paragraph[3]", "nested bold italic sentence here")]
     r = _apply(units, [para])
@@ -167,6 +179,7 @@ def test_nested_formatting_inside_covered_paragraph():
 # Test 5 -- Path B leaf-extraction still suppressed by descendant check (TC-MLD-06)
 # ---------------------------------------------------------------------------
 
+
 def test_path_b_leaf_extraction_still_suppressed():
     """
     TC-MLD-06 regression: PATH B container (not in unit_map, TEXT children ARE in
@@ -179,10 +192,8 @@ def test_path_b_leaf_extraction_still_suppressed():
     """
     text_leaf = _text("leaf text long enough here")
     text_leaf.node_addr = "body.paragraph[4].strong[0].text[0]"
-    strong = _node(NodeType.STRONG, None, "body.paragraph[4].strong[0]",
-                   children=[text_leaf])
-    para = _node(NodeType.PARAGRAPH, None, "body.paragraph[4]",
-                 children=[strong])
+    strong = _node(NodeType.STRONG, None, "body.paragraph[4].strong[0]", children=[text_leaf])
+    para = _node(NodeType.PARAGRAPH, None, "body.paragraph[4]", children=[strong])
 
     # Only the TEXT leaf is in unit_map, not STRONG or PARAGRAPH
     units = [_unit("body.paragraph[4].strong[0].text[0]", "leaf text long enough here")]
@@ -198,6 +209,7 @@ def test_path_b_leaf_extraction_still_suppressed():
 # Test 6 -- Mixed: one covered PARAGRAPH, one uncovered PARAGRAPH in same AST
 # ---------------------------------------------------------------------------
 
+
 def test_mixed_covered_and_uncovered_paragraphs():
     """
     Two PARAGRAPHs in the same AST:
@@ -210,18 +222,26 @@ def test_mixed_covered_and_uncovered_paragraphs():
     the count, while real gaps are still detected.
     """
     # Covered paragraph (Path A)
-    strong_covered = _node(NodeType.STRONG, None,
-                           "body.paragraph[5].strong[0]",
-                           children=[_text("covered bold text")])
-    para_covered = _node(NodeType.PARAGRAPH, "covered bold text sentence",
-                         "body.paragraph[5]", children=[strong_covered])
+    strong_covered = _node(
+        NodeType.STRONG, None, "body.paragraph[5].strong[0]", children=[_text("covered bold text")]
+    )
+    para_covered = _node(
+        NodeType.PARAGRAPH,
+        "covered bold text sentence",
+        "body.paragraph[5]",
+        children=[strong_covered],
+    )
 
     # Uncovered paragraph — no unit, STRONG child is a true gap
-    strong_uncovered = _node(NodeType.STRONG, None,
-                             "body.paragraph[6].strong[0]",
-                             children=[_text("uncovered bold text")])
-    para_uncovered = ASTNode(type=NodeType.PARAGRAPH, raw=None,
-                             children=[strong_uncovered], attrs={})
+    strong_uncovered = _node(
+        NodeType.STRONG,
+        None,
+        "body.paragraph[6].strong[0]",
+        children=[_text("uncovered bold text")],
+    )
+    para_uncovered = ASTNode(
+        type=NodeType.PARAGRAPH, raw=None, children=[strong_uncovered], attrs={}
+    )
     para_uncovered.node_addr = ""  # not addressable → not in unit_map
 
     units = [_unit("body.paragraph[5]", "covered bold text sentence")]

@@ -7,6 +7,7 @@ during the translation pipeline.
 MISSION: Reproduce and fix the nested list corruption bug identified in
 PHASE10_PROD_FORCE_TRANSLATE.md
 """
+
 import os
 import sys
 from pathlib import Path
@@ -76,7 +77,7 @@ def test_nested_list_structure_preserved():
     # Count list structures in source (need to traverse the whole AST)
     source_list_items = sum(count_list_items(node) for node in source_doc.ast)
     source_list_containers = sum(count_list_containers(node) for node in source_doc.ast)
-    source_lines = len(source_content.strip().split('\n'))
+    source_lines = len(source_content.strip().split("\n"))
 
     print("      Source metrics:")
     print(f"      - List items: {source_list_items}")
@@ -90,7 +91,7 @@ def test_nested_list_structure_preserved():
         default_source_lang="en",
         target_langs=["fr"],
         body=BodyRules(translate_markdown=True),
-        frontmatter={}
+        frontmatter={},
     )
 
     # Extract text units from body AST
@@ -122,6 +123,7 @@ def test_nested_list_structure_preserved():
     # Combine into full document
     if frontmatter_copy:
         import yaml
+
         fm_yaml = yaml.dump(frontmatter_copy, allow_unicode=True, default_flow_style=False)
         output_content = f"---\n{fm_yaml}---\n\n{reconstructed_body}"
     else:
@@ -133,7 +135,7 @@ def test_nested_list_structure_preserved():
     output_doc = parser.parse_string(output_content)
     output_list_items = sum(count_list_items(node) for node in output_doc.ast)
     output_list_containers = sum(count_list_containers(node) for node in output_doc.ast)
-    output_lines = len(output_content.strip().split('\n'))
+    output_lines = len(output_content.strip().split("\n"))
 
     print("\n      Output metrics:")
     print(f"      - List items: {output_list_items}")
@@ -175,7 +177,9 @@ def test_nested_list_structure_preserved():
         f"Loss of {container_loss} exceeds tolerance {container_tolerance}. "
         f"This indicates list structure is being flattened."
     )
-    print(f"[PASS] List container count acceptable: {output_list_containers} (expected {source_list_containers}, tolerance -{container_tolerance})")
+    print(
+        f"[PASS] List container count acceptable: {output_list_containers} (expected {source_list_containers}, tolerance -{container_tolerance})"
+    )
 
     # Assert line count is not drastically reduced (allow 20% variance for translation).
     # Multi-line list items (* **Header**\n  description:) are collapsed to a single line
@@ -191,9 +195,9 @@ def test_nested_list_structure_preserved():
     # Assert nested indentation is present in output
     # Check for indentation patterns (at least 2 or 4 spaces at line start for nested items)
     nested_pattern_found = any(
-        line.startswith('  ') or line.startswith('    ')
-        for line in output_content.split('\n')
-        if line.strip().startswith('-') or line.strip().startswith('*')
+        line.startswith("  ") or line.startswith("    ")
+        for line in output_content.split("\n")
+        if line.strip().startswith("-") or line.strip().startswith("*")
     )
     assert nested_pattern_found, (
         "No nested indentation found in output. Lists may have been flattened."
@@ -233,7 +237,7 @@ title: Test
     parser = HugoParser()
     source_doc = parser.parse_string(checklist_md)
     source_list_items = sum(count_list_items(node) for node in source_doc.ast)
-    source_lines = len(checklist_md.strip().split('\n'))
+    source_lines = len(checklist_md.strip().split("\n"))
 
     print(f"[2/4] Source has {source_list_items} list items, {source_lines} lines")
 
@@ -244,7 +248,7 @@ title: Test
         default_source_lang="en",
         target_langs=["fr"],
         body=BodyRules(translate_markdown=True),
-        frontmatter={}
+        frontmatter={},
     )
 
     # Extract and translate
@@ -268,8 +272,8 @@ title: Test
     reconstructed_body = renderer2.render_to_markdown(source_doc.ast)
 
     # Check output
-    output_lines = reconstructed_body.strip().split('\n')
-    checklist_lines = [line for line in output_lines if '✔' in line]
+    output_lines = reconstructed_body.strip().split("\n")
+    checklist_lines = [line for line in output_lines if "✔" in line]
 
     print(f"[4/4] Output has {len(checklist_lines)} lines with checkmark")
 
@@ -279,17 +283,15 @@ title: Test
     print("=" * 80)
 
     assert len(checklist_lines) == 5, (
-        f"Expected 5 checklist lines, got {len(checklist_lines)}. "
-        f"Items may have been concatenated."
+        f"Expected 5 checklist lines, got {len(checklist_lines)}. Items may have been concatenated."
     )
     print("[PASS] All 5 checklist items on separate lines")
 
     # Each checklist line should have exactly one ✔
     for i, line in enumerate(checklist_lines, 1):
-        check_count = line.count('✔')
+        check_count = line.count("✔")
         assert check_count == 1, (
-            f"Checklist line {i} has {check_count} checkmarks (expected 1). "
-            f"Line: {line[:50]}..."
+            f"Checklist line {i} has {check_count} checkmarks (expected 1). Line: {line[:50]}..."
         )
     print("[PASS] Each checklist line has exactly one checkmark")
 

@@ -4,6 +4,7 @@ Unit tests for FilePlacementValidator.
 Tests the fix for file-based vs folder-based localization detection.
 Ensures blog.aspose.net (file-based) doesn't warn about missing /en/ folder.
 """
+
 from pathlib import Path
 
 import pytest
@@ -30,10 +31,7 @@ def file_based_site_profile():
             preserve_patterns=[],
             placeholder_syntax=[],
         ),
-        output_layout=OutputLayout(
-            per_language_folders=False,
-            pattern="{filename}.{lang}{ext}"
-        ),
+        output_layout=OutputLayout(per_language_folders=False, pattern="{filename}.{lang}{ext}"),
     )
 
 
@@ -54,10 +52,7 @@ def folder_based_site_profile():
             preserve_patterns=[],
             placeholder_syntax=[],
         ),
-        output_layout=OutputLayout(
-            per_language_folders=True,
-            pattern="{lang}/{path}"
-        ),
+        output_layout=OutputLayout(per_language_folders=True, pattern="{lang}/{path}"),
     )
 
 
@@ -81,7 +76,7 @@ class TestFilePlacementValidator:
                 "source_lang": "en",
                 "target_lang": "es",
                 "site_profile": file_based_site_profile,
-            }
+            },
         )
 
         # Should succeed
@@ -89,11 +84,13 @@ class TestFilePlacementValidator:
 
         # Should NOT warn about missing /en/ in path
         for issue in result.issues:
-            assert "not found in source path" not in issue.message.lower(), \
+            assert "not found in source path" not in issue.message.lower(), (
                 f"Unexpected warning about source language in path: {issue.message}"
-            assert issue.severity != ValidationSeverity.WARNING or \
-                "source language" not in issue.message.lower(), \
-                f"Unexpected source language warning: {issue.message}"
+            )
+            assert (
+                issue.severity != ValidationSeverity.WARNING
+                or "source language" not in issue.message.lower()
+            ), f"Unexpected source language warning: {issue.message}"
 
     def test_folder_based_validates_source_lang_in_path(self, folder_based_site_profile):
         """
@@ -111,7 +108,7 @@ class TestFilePlacementValidator:
                 "source_lang": "en",
                 "target_lang": "es",
                 "site_profile": folder_based_site_profile,
-            }
+            },
         )
 
         # Should succeed with proper /en/ → /es/ substitution
@@ -131,13 +128,16 @@ class TestFilePlacementValidator:
                 "source_lang": "en",
                 "target_lang": "es",
                 "site_profile": folder_based_site_profile,
-            }
+            },
         )
 
         # Should have warning about missing source language
-        warnings = [issue for issue in result.issues if issue.severity == ValidationSeverity.WARNING]
-        assert any("not found in source path" in w.message for w in warnings), \
+        warnings = [
+            issue for issue in result.issues if issue.severity == ValidationSeverity.WARNING
+        ]
+        assert any("not found in source path" in w.message for w in warnings), (
             "Expected warning about missing source language in path"
+        )
 
     def test_file_based_validates_filename_pattern(self, file_based_site_profile):
         """
@@ -153,14 +153,15 @@ class TestFilePlacementValidator:
                 "source_lang": "en",
                 "target_lang": "es",
                 "site_profile": file_based_site_profile,
-            }
+            },
         )
 
         # Should fail - missing language in filename
         assert not result.success, "Should fail when language code missing from filename"
         errors = [issue for issue in result.issues if issue.severity == ValidationSeverity.ERROR]
-        assert any("not found in translation filename" in e.message for e in errors), \
+        assert any("not found in translation filename" in e.message for e in errors), (
             "Expected error about missing language in filename"
+        )
 
     def test_none_output_layout_uses_default_folder_based(self):
         """
@@ -192,13 +193,16 @@ class TestFilePlacementValidator:
                 "source_lang": "en",
                 "target_lang": "es",
                 "site_profile": site_profile,
-            }
+            },
         )
 
         # Should warn about missing /en/ (folder-based behavior)
-        warnings = [issue for issue in result.issues if issue.severity == ValidationSeverity.WARNING]
-        assert any("not found in source path" in w.message for w in warnings), \
+        warnings = [
+            issue for issue in result.issues if issue.severity == ValidationSeverity.WARNING
+        ]
+        assert any("not found in source path" in w.message for w in warnings), (
             "Should use folder-based validation when output_layout is None"
+        )
 
     def test_none_site_profile_uses_default_folder_based(self):
         """
@@ -214,13 +218,16 @@ class TestFilePlacementValidator:
                 "source_lang": "en",
                 "target_lang": "es",
                 # No site_profile
-            }
+            },
         )
 
         # Should warn about missing /en/ (folder-based behavior)
-        warnings = [issue for issue in result.issues if issue.severity == ValidationSeverity.WARNING]
-        assert any("not found in source path" in w.message for w in warnings), \
+        warnings = [
+            issue for issue in result.issues if issue.severity == ValidationSeverity.WARNING
+        ]
+        assert any("not found in source path" in w.message for w in warnings), (
             "Should use folder-based validation when site_profile is None"
+        )
 
     def test_file_based_different_languages(self, file_based_site_profile):
         """
@@ -236,7 +243,7 @@ class TestFilePlacementValidator:
                 "source_lang": "en",
                 "target_lang": "de",
                 "site_profile": file_based_site_profile,
-            }
+            },
         )
         assert result_de.success
 
@@ -248,7 +255,7 @@ class TestFilePlacementValidator:
                 "source_lang": "en",
                 "target_lang": "fr",
                 "site_profile": file_based_site_profile,
-            }
+            },
         )
         assert result_fr.success
 
@@ -266,7 +273,7 @@ class TestFilePlacementValidator:
                 "source_lang": "en",
                 "target_lang": "de",
                 "site_profile": folder_based_site_profile,
-            }
+            },
         )
         assert result_de.success
 
@@ -278,7 +285,7 @@ class TestFilePlacementValidator:
                 "source_lang": "en",
                 "target_lang": "fr",
                 "site_profile": folder_based_site_profile,
-            }
+            },
         )
         assert result_fr.success
 
@@ -301,6 +308,7 @@ class TestValidateWrittenFile:
 
         # Create the file temporarily for testing
         import tempfile
+
         with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
             test_file = Path(tmpdir) / "content" / "blog" / "post" / "index.es.md"
             test_file.parent.mkdir(parents=True, exist_ok=True)
@@ -311,17 +319,19 @@ class TestValidateWrittenFile:
                 context={
                     "target_lang": "es",
                     "site_profile": file_based_site_profile,
-                }
+                },
             )
 
             # Should succeed without warning about missing /es/ folder
-            assert result.success or result.warning_count == 0, \
+            assert result.success or result.warning_count == 0, (
                 f"Should not fail or warn for file-based site: {[issue.message for issue in result.issues]}"
+            )
 
             # Specifically check no warning about language not found in path
             for issue in result.issues:
-                assert "not found in file path" not in issue.message.lower(), \
+                assert "not found in file path" not in issue.message.lower(), (
                     f"Unexpected warning about language not in path: {issue.message}"
+                )
 
     def test_folder_based_written_file_warns_missing_folder(self, folder_based_site_profile):
         """
@@ -331,6 +341,7 @@ class TestValidateWrittenFile:
 
         # Simulate written file without language folder (invalid for folder-based)
         import tempfile
+
         with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
             # File WITHOUT /es/ folder (should trigger warning)
             test_file = Path(tmpdir) / "content" / "products" / "cells.md"
@@ -342,14 +353,16 @@ class TestValidateWrittenFile:
                 context={
                     "target_lang": "es",
                     "site_profile": folder_based_site_profile,
-                }
+                },
             )
 
             # Should have warning about missing language folder
-            warnings = [issue for issue in result.issues
-                       if issue.severity == ValidationSeverity.WARNING]
-            assert any("not found in file path" in w.message for w in warnings), \
+            warnings = [
+                issue for issue in result.issues if issue.severity == ValidationSeverity.WARNING
+            ]
+            assert any("not found in file path" in w.message for w in warnings), (
                 "Should warn about missing language folder for folder-based site"
+            )
 
     def test_file_based_written_file_validates_filename(self, file_based_site_profile):
         """
@@ -361,6 +374,7 @@ class TestValidateWrittenFile:
         validator = FilePlacementValidator()
 
         import tempfile
+
         with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
             # Create source and translation files
             source_file = Path(tmpdir) / "content" / "blog" / "post" / "index.md"
@@ -377,12 +391,13 @@ class TestValidateWrittenFile:
                     "source_lang": "en",
                     "target_lang": "es",
                     "site_profile": file_based_site_profile,
-                }
+                },
             )
 
             # Should succeed - proper filename pattern
-            assert result.success, \
+            assert result.success, (
                 f"Should succeed with proper filename: {[issue.message for issue in result.issues]}"
+            )
 
 
 class TestObservabilityLogging:
@@ -391,6 +406,7 @@ class TestObservabilityLogging:
     def test_file_based_routing_logged(self, file_based_site_profile, caplog):
         """Verify file-based validation routing is logged."""
         import logging
+
         caplog.set_level(logging.DEBUG)
 
         validator = FilePlacementValidator()
@@ -402,17 +418,19 @@ class TestObservabilityLogging:
                 "source_lang": "en",
                 "target_lang": "es",
                 "site_profile": file_based_site_profile,
-            }
+            },
         )
 
         # Check that routing decision was logged
         log_messages = [record.message for record in caplog.records]
-        assert any("file_placement_validation_routing" in str(msg) for msg in log_messages), \
+        assert any("file_placement_validation_routing" in str(msg) for msg in log_messages), (
             f"Expected routing log message. Got: {log_messages}"
+        )
 
     def test_folder_based_routing_logged(self, folder_based_site_profile, caplog):
         """Verify folder-based validation routing is logged."""
         import logging
+
         caplog.set_level(logging.DEBUG)
 
         validator = FilePlacementValidator()
@@ -424,13 +442,14 @@ class TestObservabilityLogging:
                 "source_lang": "en",
                 "target_lang": "es",
                 "site_profile": folder_based_site_profile,
-            }
+            },
         )
 
         # Check that routing decision was logged
         log_messages = [record.message for record in caplog.records]
-        assert any("file_placement_validation_routing" in str(msg) for msg in log_messages), \
+        assert any("file_placement_validation_routing" in str(msg) for msg in log_messages), (
             f"Expected routing log message. Got: {log_messages}"
+        )
 
 
 class TestBackwardsCompatibility:
@@ -448,26 +467,31 @@ class TestBackwardsCompatibility:
         See: docs/compatibility-check.md for codebase search results
         """
         # Verify output_layout is a Pydantic OutputLayout model
-        assert hasattr(file_based_site_profile, 'output_layout'), \
+        assert hasattr(file_based_site_profile, "output_layout"), (
             "SiteProfile should have output_layout attribute"
+        )
 
         output_layout = file_based_site_profile.output_layout
         assert output_layout is not None, "output_layout should not be None for test profile"
 
         # Should be OutputLayout instance, not dict
-        assert not isinstance(output_layout, dict), \
+        assert not isinstance(output_layout, dict), (
             "output_layout should be Pydantic OutputLayout model, not dict"
+        )
 
         # Should have Pydantic model methods
-        assert hasattr(output_layout, 'model_dump'), \
+        assert hasattr(output_layout, "model_dump"), (
             "output_layout should be Pydantic model with model_dump method"
+        )
 
         # Should have per_language_folders as bool attribute, not dict key
-        assert hasattr(output_layout, 'per_language_folders'), \
+        assert hasattr(output_layout, "per_language_folders"), (
             "OutputLayout should have per_language_folders attribute"
+        )
 
-        assert isinstance(output_layout.per_language_folders, bool), \
+        assert isinstance(output_layout.per_language_folders, bool), (
             "per_language_folders should be bool, not None or other type"
+        )
 
     def test_loaded_config_has_pydantic_output_layout(self):
         """
@@ -487,20 +511,25 @@ class TestBackwardsCompatibility:
             blog_profile = config_service.get_site_profile("blog.aspose.net")
 
             # Verify it has Pydantic OutputLayout
-            assert blog_profile.output_layout is not None, \
+            assert blog_profile.output_layout is not None, (
                 "blog.aspose.net should have output_layout"
+            )
 
-            assert isinstance(blog_profile.output_layout, OutputLayout), \
+            assert isinstance(blog_profile.output_layout, OutputLayout), (
                 f"output_layout should be OutputLayout instance, got {type(blog_profile.output_layout)}"
+            )
 
-            assert not isinstance(blog_profile.output_layout, dict), \
+            assert not isinstance(blog_profile.output_layout, dict), (
                 "output_layout should not be dict"
+            )
 
             # Verify attribute access works (not dict access)
-            assert isinstance(blog_profile.output_layout.per_language_folders, bool), \
+            assert isinstance(blog_profile.output_layout.per_language_folders, bool), (
                 "per_language_folders should be accessible as attribute"
+            )
 
         except Exception as e:
             # If config loading fails, skip test (may not be in dev environment)
             import pytest
+
             pytest.skip(f"Config loading failed (may not be in dev env): {e}")

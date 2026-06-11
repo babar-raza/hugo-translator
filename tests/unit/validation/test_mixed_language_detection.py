@@ -48,7 +48,7 @@ class TestMixedLanguageDetectionFixes:
         )
 
         # Mock the detect method to return 'unknown'
-        with patch.object(detector, 'detect', return_value=("unknown", 0.0)):
+        with patch.object(detector, "detect", return_value=("unknown", 0.0)):
             result = detector.verify_language(
                 text="This is some text",
                 expected_lang="da",
@@ -68,8 +68,10 @@ class TestMixedLanguageDetectionFixes:
             fallback_to_langdetect=False,
         )
 
-        with patch.object(detector, 'detect', return_value=("unknown", 0.0)):
-            with patch('src.translation_engine.language_detection.fasttext_detector.logger') as mock_logger:
+        with patch.object(detector, "detect", return_value=("unknown", 0.0)):
+            with patch(
+                "src.translation_engine.language_detection.fasttext_detector.logger"
+            ) as mock_logger:
                 detector.verify_language(
                     text="This is some text",
                     expected_lang="da",
@@ -96,7 +98,9 @@ class TestMixedLanguageDetectionFixes:
         long_text = "This is a longer text that will definitely trigger an exception during language detection processing"
 
         # Mock langdetect.detect_langs to raise exception on first call
-        with patch('src.translation_engine.validation.language_consistency_validator.langdetect.detect_langs') as mock_detect:
+        with patch(
+            "src.translation_engine.validation.language_consistency_validator.langdetect.detect_langs"
+        ) as mock_detect:
             mock_detect.side_effect = LangDetectException("No features in text", "")
 
             result = validator.validate(
@@ -116,8 +120,9 @@ class TestMixedLanguageDetectionFixes:
             # This triggers "Mixed language detected: only 0.0% of sentences are da"
             # which is the expected behavior - exception causes validation failure
             error_msg = error_issues[0].message
-            assert "Mixed language detected" in error_msg or "Language detection failed" in error_msg, \
-                f"Expected error about detection failure, got: {error_msg}"
+            assert (
+                "Mixed language detected" in error_msg or "Language detection failed" in error_msg
+            ), f"Expected error about detection failure, got: {error_msg}"
 
     def test_exception_blocks_validation(self) -> None:
         """
@@ -128,7 +133,9 @@ class TestMixedLanguageDetectionFixes:
         """
         validator = LanguageConsistencyValidator()
 
-        with patch('src.translation_engine.validation.language_consistency_validator.langdetect.detect_langs') as mock_detect:
+        with patch(
+            "src.translation_engine.validation.language_consistency_validator.langdetect.detect_langs"
+        ) as mock_detect:
             mock_detect.side_effect = LangDetectException("Detection failed", "")
 
             result = validator.validate(
@@ -174,7 +181,10 @@ class TestMixedLanguageDetectionFixes:
         german_sentences = ["Dies ist ein deutscher Satz über Technologie. "] * 100
         text = " ".join(german_sentences)
 
-        with patch('src.translation_engine.validation.language_consistency_validator.langdetect.detect_langs', side_effect=mock_detect_langs):
+        with patch(
+            "src.translation_engine.validation.language_consistency_validator.langdetect.detect_langs",
+            side_effect=mock_detect_langs,
+        ):
             result = validator.validate(
                 source="",
                 translation=text,
@@ -215,7 +225,10 @@ class TestMixedLanguageDetectionFixes:
         german_sentences = ["Dies ist ein deutscher Satz über Technologie. "] * 100
         text = " ".join(german_sentences)
 
-        with patch('src.translation_engine.validation.language_consistency_validator.langdetect.detect_langs', side_effect=mock_detect_langs):
+        with patch(
+            "src.translation_engine.validation.language_consistency_validator.langdetect.detect_langs",
+            side_effect=mock_detect_langs,
+        ):
             result = validator.validate(
                 source="",
                 translation=text,
@@ -257,7 +270,10 @@ class TestMixedLanguageDetectionFixes:
         sentences = ["Dette er en dansk sætning om teknologi. "] * 100
         text = " ".join(sentences)
 
-        with patch('src.translation_engine.validation.language_consistency_validator.langdetect.detect_langs', side_effect=mock_detect_langs):
+        with patch(
+            "src.translation_engine.validation.language_consistency_validator.langdetect.detect_langs",
+            side_effect=mock_detect_langs,
+        ):
             result = validator.validate(
                 source="",
                 translation=text,
@@ -303,7 +319,10 @@ class TestMixedLanguageDetectionFixes:
         sentences = ["Dette er en dansk sætning om softwareudvikling. "] * 100
         text = " ".join(sentences)
 
-        with patch('src.translation_engine.validation.language_consistency_validator.langdetect.detect_langs', side_effect=mock_detect_langs):
+        with patch(
+            "src.translation_engine.validation.language_consistency_validator.langdetect.detect_langs",
+            side_effect=mock_detect_langs,
+        ):
             result = validator.validate(
                 source="",
                 translation=text,
@@ -333,13 +352,15 @@ class TestMixedLanguageDetectionFixes:
         The setting is intentionally toggled based on operational mode.
         """
         import yaml
+
         config_path = Path(__file__).parents[3] / "config" / "validation.yaml"
 
         with open(config_path) as f:
             config = yaml.safe_load(f)
 
-        assert "accept_after_max_retries" in config["decision_rules"], \
+        assert "accept_after_max_retries" in config["decision_rules"], (
             "accept_after_max_retries must be present in validation config"
+        )
 
     # =========================================================================
     # Test Suite 6: Real Contamination Scenarios
@@ -369,16 +390,16 @@ class TestMixedLanguageDetectionFixes:
         )
 
         # Should fail due to mixed languages
-        assert result.success is False, \
-            "Contaminated Danish+Arabic should be rejected"
+        assert result.success is False, "Contaminated Danish+Arabic should be rejected"
         assert result.error_count >= 1
 
         # Check purity is low (contamination detected)
         # Note: langdetect may detect Arabic as 'ar' or other related languages
         # The key is that purity should be significantly below 99%
         if "purity_percentage" in result.metadata:
-            assert result.metadata["purity_percentage"] < 99.0, \
+            assert result.metadata["purity_percentage"] < 99.0, (
                 "Contaminated text should have low purity"
+            )
 
     def test_actual_contaminated_danish_czech(self) -> None:
         """
@@ -403,8 +424,7 @@ class TestMixedLanguageDetectionFixes:
         )
 
         # Should fail due to mixed languages
-        assert result.success is False, \
-            "Contaminated Danish+Czech should be rejected"
+        assert result.success is False, "Contaminated Danish+Czech should be rejected"
         assert result.error_count >= 1
 
     def test_multi_language_contamination(self) -> None:
@@ -432,14 +452,14 @@ class TestMixedLanguageDetectionFixes:
         )
 
         # Should fail with low purity
-        assert result.success is False, \
-            "Multi-language contamination should be rejected"
+        assert result.success is False, "Multi-language contamination should be rejected"
         assert result.error_count >= 1
 
         # Purity should be significantly below 99%
         if "purity_percentage" in result.metadata:
-            assert result.metadata["purity_percentage"] < 80.0, \
+            assert result.metadata["purity_percentage"] < 80.0, (
                 "Multi-language contamination should have low purity"
+            )
 
     def test_pure_danish_passes(self) -> None:
         """
@@ -474,8 +494,9 @@ class TestMixedLanguageDetectionFixes:
             print(f"Samples: {result.metadata.get('wrong_language_samples', [])}")
 
         # With longer, more complex sentences, should achieve >= 99% purity
-        assert result.metadata.get("purity_percentage", 0) >= 80.0, \
+        assert result.metadata.get("purity_percentage", 0) >= 80.0, (
             "Pure Danish text should have high purity (>= 80%, ideally >= 99%)"
+        )
 
     def test_short_contamination_snippet(self) -> None:
         """
@@ -561,6 +582,5 @@ class TestMixedLanguageDetectionFixes:
                 context={"target_lang": lang},
             )
 
-            assert result.success is True, \
-                f"Pure {lang} text should pass validation"
+            assert result.success is True, f"Pure {lang} text should pass validation"
             assert result.error_count == 0

@@ -126,12 +126,11 @@ class TestFilePlacementValidator:
         # Should have error about language substitution failure
         # Either "Target language not found" or "Source language found in translation path"
         error_messages = [
-            issue.message for issue in result.issues
-            if issue.severity == ValidationSeverity.ERROR
+            issue.message for issue in result.issues if issue.severity == ValidationSeverity.ERROR
         ]
         assert any(
-            ("Target language" in msg and "not found in translation path" in msg) or
-            ("Source language" in msg and "found in translation path" in msg)
+            ("Target language" in msg and "not found in translation path" in msg)
+            or ("Source language" in msg and "found in translation path" in msg)
             for msg in error_messages
         )
 
@@ -208,16 +207,11 @@ class TestFilePlacementValidator:
         assert result.error_count >= 1
         # Should have error about content root
         error_messages = [
-            issue.message for issue in result.issues
-            if issue.severity == ValidationSeverity.ERROR
+            issue.message for issue in result.issues if issue.severity == ValidationSeverity.ERROR
         ]
-        assert any(
-            "content root" in msg.lower() for msg in error_messages
-        )
+        assert any("content root" in msg.lower() for msg in error_messages)
 
-    def test_missing_target_language_context(
-        self, validator: FilePlacementValidator
-    ) -> None:
+    def test_missing_target_language_context(self, validator: FilePlacementValidator) -> None:
         """Test that missing target language in context fails validation."""
         source = "/content/products/en/words/index.md"
         translation = "/content/products/de/words/index.md"
@@ -231,16 +225,11 @@ class TestFilePlacementValidator:
         assert result.success is False
         assert result.error_count >= 1
         error_messages = [
-            issue.message for issue in result.issues
-            if issue.severity == ValidationSeverity.ERROR
+            issue.message for issue in result.issues if issue.severity == ValidationSeverity.ERROR
         ]
-        assert any(
-            "No target language specified" in msg for msg in error_messages
-        )
+        assert any("No target language specified" in msg for msg in error_messages)
 
-    def test_multiple_language_folders(
-        self, validator: FilePlacementValidator
-    ) -> None:
+    def test_multiple_language_folders(self, validator: FilePlacementValidator) -> None:
         """Test paths with multiple language folder occurrences."""
         source = "/content/docs/en/products/en/guide.md"
         translation = "/content/docs/de/products/de/guide.md"
@@ -254,9 +243,7 @@ class TestFilePlacementValidator:
         # Should pass - both language folders substituted
         assert result.success is True
 
-    def test_missing_language_folder_in_source(
-        self, validator: FilePlacementValidator
-    ) -> None:
+    def test_missing_language_folder_in_source(self, validator: FilePlacementValidator) -> None:
         """Test source path without language folder."""
         source = "/content/products/words/index.md"  # No /en/
         translation = "/content/products/de/words/index.md"
@@ -270,8 +257,7 @@ class TestFilePlacementValidator:
         # Should have warning about source language not found
         assert result.warning_count >= 1
         warning_messages = [
-            issue.message for issue in result.issues
-            if issue.severity == ValidationSeverity.WARNING
+            issue.message for issue in result.issues if issue.severity == ValidationSeverity.WARNING
         ]
         assert any(
             "Source language" in msg and "not found in source path" in msg
@@ -295,8 +281,7 @@ class TestFilePlacementValidator:
         assert result.success is False
         assert result.error_count >= 1
         error_messages = [
-            issue.message for issue in result.issues
-            if issue.severity == ValidationSeverity.ERROR
+            issue.message for issue in result.issues if issue.severity == ValidationSeverity.ERROR
         ]
         assert any(
             "Target language" in msg and "not found in translation path" in msg
@@ -339,12 +324,9 @@ class TestFilePlacementValidator:
         assert result.success is False
         # Should have error about wrong content root
         error_messages = [
-            issue.message for issue in result.issues
-            if issue.severity == ValidationSeverity.ERROR
+            issue.message for issue in result.issues if issue.severity == ValidationSeverity.ERROR
         ]
-        assert any(
-            "content root" in msg.lower() for msg in error_messages
-        )
+        assert any("content root" in msg.lower() for msg in error_messages)
 
     def test_subdomain_rules_validation(
         self, validator: FilePlacementValidator, products_profile: SiteProfile
@@ -381,11 +363,12 @@ class TestFilePlacementValidator:
 
         # Should still validate language substitution, but may warn about invalid language
         # The validator checks if target language is present, not if it's valid
-        assert any(issue.severity == ValidationSeverity.ERROR for issue in result.issues) or result.error_count == 0
+        assert (
+            any(issue.severity == ValidationSeverity.ERROR for issue in result.issues)
+            or result.error_count == 0
+        )
 
-    def test_path_with_different_case(
-        self, validator: FilePlacementValidator
-    ) -> None:
+    def test_path_with_different_case(self, validator: FilePlacementValidator) -> None:
         """Test paths with different casing."""
         source = "/Content/Products/EN/words/index.md"
         translation = "/Content/Products/DE/words/index.md"
@@ -474,12 +457,9 @@ class TestFilePlacementValidator:
         # Should have warning about failed profile load
         assert result.warning_count >= 1
         warning_messages = [
-            issue.message for issue in result.issues
-            if issue.severity == ValidationSeverity.WARNING
+            issue.message for issue in result.issues if issue.severity == ValidationSeverity.WARNING
         ]
-        assert any(
-            "Could not load site profile" in msg for msg in warning_messages
-        )
+        assert any("Could not load site profile" in msg for msg in warning_messages)
 
     def test_empty_context(self, validator: FilePlacementValidator) -> None:
         """Test validation with empty context."""
@@ -512,9 +492,7 @@ class TestFilePlacementValidator:
         custom_validator = FilePlacementValidator(name="CustomFilePlacement")
         assert custom_validator.name == "CustomFilePlacement"
 
-    def test_path_structure_mismatch(
-        self, validator: FilePlacementValidator
-    ) -> None:
+    def test_path_structure_mismatch(self, validator: FilePlacementValidator) -> None:
         """Test detection of path structure mismatch."""
         source = "/content/products/en/words/guide/index.md"
         translation = "/content/products/de/different/path.md"
@@ -529,9 +507,7 @@ class TestFilePlacementValidator:
         # The validator primarily checks language substitution
         assert result.error_count == 0 or result.success is True
 
-    def test_complex_path_with_dots(
-        self, validator: FilePlacementValidator
-    ) -> None:
+    def test_complex_path_with_dots(self, validator: FilePlacementValidator) -> None:
         """Test paths with dots in directory names."""
         source = "/content/products/en/aspose.words/index.md"
         translation = "/content/products/de/aspose.words/index.md"
@@ -545,9 +521,7 @@ class TestFilePlacementValidator:
         assert result.success is True
         assert result.error_count == 0
 
-    def test_path_with_special_characters(
-        self, validator: FilePlacementValidator
-    ) -> None:
+    def test_path_with_special_characters(self, validator: FilePlacementValidator) -> None:
         """Test paths with special characters."""
         source = "/content/products/en/test-feature/index.md"
         translation = "/content/products/de/test-feature/index.md"

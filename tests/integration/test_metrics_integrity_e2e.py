@@ -8,7 +8,7 @@ Simulates production issue: 63 files, all succeed, but reported 63 errors.
 import logging
 import sys
 
-sys.path.insert(0, '.')
+sys.path.insert(0, ".")
 
 from src.observability.progress import ProgressTracker
 
@@ -125,7 +125,9 @@ def test_accounting_with_batch_failures():
     assert snapshot.files_failed == 2, f"Expected 2 failed files, got {snapshot.files_failed}"
 
     print(f"  Cache: {snapshot.cache_hits} hits + {snapshot.cache_misses} misses = {cache_total}")
-    print(f"  Segments: {snapshot.segments_done} done + {snapshot.segments_failed} failed = {segments_total}")
+    print(
+        f"  Segments: {snapshot.segments_done} done + {snapshot.segments_failed} failed = {segments_total}"
+    )
     print(f"  Errors: {snapshot.error_count} (matches {snapshot.files_failed} failures)")
     print("  [PASS] Accounting with failures test")
 
@@ -155,7 +157,7 @@ def test_validation_catches_contradictions():
                 self.warnings.append(record.getMessage())
 
     handler = WarningCapture()
-    logging.getLogger('src.observability.progress').addHandler(handler)
+    logging.getLogger("src.observability.progress").addHandler(handler)
 
     # Test 1: Inject contradiction (0 failures but errors counted)
     tracker = ProgressTracker()
@@ -184,7 +186,7 @@ def test_validation_catches_contradictions():
     print("  [PASS] Validation detects contradictions")
 
     # Cleanup
-    logging.getLogger('src.observability.progress').removeHandler(handler)
+    logging.getLogger("src.observability.progress").removeHandler(handler)
 
 
 def test_production_regression_7045_segments():
@@ -240,8 +242,12 @@ def test_production_regression_7045_segments():
         f"Cache: {cache_total}, Segments: {segments_total}"
     )
 
-    print(f"  Cache ops: {cache_total} (hits: {snapshot.cache_hits}, misses: {snapshot.cache_misses})")
-    print(f"  Segments: {segments_total} (done: {snapshot.segments_done}, failed: {snapshot.segments_failed})")
+    print(
+        f"  Cache ops: {cache_total} (hits: {snapshot.cache_hits}, misses: {snapshot.cache_misses})"
+    )
+    print(
+        f"  Segments: {segments_total} (done: {snapshot.segments_done}, failed: {snapshot.segments_failed})"
+    )
     print(f"  Gap: {gap} (original bug: 7,045)")
     print("  [PASS] Production regression test")
 
@@ -270,10 +276,12 @@ if __name__ == "__main__":
     except AssertionError as e:
         print(f"\n[FAIL] Integration test failed: {e}")
         import traceback
+
         traceback.print_exc()
         sys.exit(1)
     except Exception as e:
         print(f"\n[ERROR] Unexpected error: {e}")
         import traceback
+
         traceback.print_exc()
         sys.exit(1)

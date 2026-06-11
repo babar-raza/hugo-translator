@@ -4,6 +4,7 @@ Python's hash() is randomized per-process via PYTHONHASHSEED since Python 3.3.
 Using hash() caused duplicate FAISS vectors to accumulate across daemon restarts.
 hash_text() uses MD5 which is stable regardless of PYTHONHASHSEED.
 """
+
 import hashlib
 
 
@@ -13,6 +14,7 @@ class TestHashTextDeterminism:
     def test_hash_text_returns_md5_hex(self):
         """hash_text output matches raw MD5 of the same input."""
         from src.tm.normalization import hash_text
+
         text = "Aspose.Words for .NET developer guide"
         expected = hashlib.md5(text.encode("utf-8")).hexdigest()
         assert hash_text(text) == expected
@@ -20,6 +22,7 @@ class TestHashTextDeterminism:
     def test_hash_text_same_input_same_output(self):
         """Same string always produces same hash (no process-level randomness)."""
         from src.tm.normalization import hash_text
+
         text = "Translation memory entry"
         results = {hash_text(text) for _ in range(10)}
         assert len(results) == 1, "hash_text must be deterministic"
@@ -27,6 +30,7 @@ class TestHashTextDeterminism:
     def test_hash_text_different_inputs_differ(self):
         """Different strings (after normalization) produce different hashes."""
         from src.tm.normalization import hash_text
+
         # Both inputs are meaningfully different after normalization
         assert hash_text("foo") != hash_text("bar")
         assert hash_text("hello world") != hash_text("goodbye world")
@@ -35,6 +39,7 @@ class TestHashTextDeterminism:
     def test_hash_text_returns_string_not_int(self):
         """hash_text must return str (hexdigest), not int like Python's hash()."""
         from src.tm.normalization import hash_text
+
         result = hash_text("test")
         assert isinstance(result, str)
         assert len(result) == 32  # MD5 hex = 32 chars
@@ -42,6 +47,7 @@ class TestHashTextDeterminism:
     def test_entry_id_format_uses_hash_text(self):
         """TranslationMemory builds L3 entry_id with hash_text, not hash()."""
         from src.tm.normalization import hash_text
+
         # Simulate the entry_id construction from translation_memory.py:222
         site_id = "blog.aspose.net"
         src_lang = "en"
@@ -58,6 +64,7 @@ class TestHashTextDeterminism:
     def test_hash_text_normalizes_before_hashing(self):
         """hash_text normalizes whitespace before hashing — matches L2 key behavior."""
         from src.tm.normalization import hash_text
+
         # Trailing space normalizes away → same hash
         assert hash_text("foo") == hash_text("foo ")
         # Multiple internal spaces collapse → same hash
@@ -70,6 +77,7 @@ class TestHashTextDeterminism:
         This guards against accidentally reverting to hash().
         """
         from src.tm.normalization import hash_text
+
         text = "test entry"
         ht_result = hash_text(text)
         py_hash = hash(text)

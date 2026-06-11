@@ -1,4 +1,5 @@
 """Negative test cases for BenchmarkDatabase storage layer."""
+
 import sqlite3
 import tempfile
 from pathlib import Path

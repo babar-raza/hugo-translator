@@ -3,6 +3,7 @@ Unit tests for multi-language CLI flags (T301: federated-splashing-panda).
 
 Tests --parallel-languages, --global-lang-rounds, and --global-lang-sort flags.
 """
+
 import pytest
 
 from src.cli import CLIConfigOverrides, create_parser
@@ -22,10 +23,7 @@ class TestMultiLanguageFlags:
     def test_parallel_languages_flag_parsing(self):
         """Test --parallel-languages flag parsing."""
         parser = create_parser()
-        args = parser.parse_args([
-            "--site", "test",
-            "--parallel-languages", "4"
-        ])
+        args = parser.parse_args(["--site", "test", "--parallel-languages", "4"])
         overrides = CLIConfigOverrides(args)
 
         assert overrides.parallel_languages == 4
@@ -41,10 +39,7 @@ class TestMultiLanguageFlags:
     def test_global_lang_rounds_flag_parsing(self):
         """Test --global-lang-rounds flag parsing."""
         parser = create_parser()
-        args = parser.parse_args([
-            "--site", "test",
-            "--global-lang-rounds", "100"
-        ])
+        args = parser.parse_args(["--site", "test", "--global-lang-rounds", "100"])
         overrides = CLIConfigOverrides(args)
 
         assert overrides.global_lang_rounds == 100
@@ -60,10 +55,7 @@ class TestMultiLanguageFlags:
     def test_global_lang_sort_flag_parsing_asc(self):
         """Test --global-lang-sort flag parsing with 'asc'."""
         parser = create_parser()
-        args = parser.parse_args([
-            "--site", "test",
-            "--global-lang-sort", "asc"
-        ])
+        args = parser.parse_args(["--site", "test", "--global-lang-sort", "asc"])
         overrides = CLIConfigOverrides(args)
 
         assert overrides.global_lang_sort == "asc"
@@ -71,10 +63,7 @@ class TestMultiLanguageFlags:
     def test_global_lang_sort_flag_parsing_desc(self):
         """Test --global-lang-sort flag parsing with 'desc'."""
         parser = create_parser()
-        args = parser.parse_args([
-            "--site", "test",
-            "--global-lang-sort", "desc"
-        ])
+        args = parser.parse_args(["--site", "test", "--global-lang-sort", "desc"])
         overrides = CLIConfigOverrides(args)
 
         assert overrides.global_lang_sort == "desc"
@@ -84,18 +73,12 @@ class TestMultiLanguageFlags:
         parser = create_parser()
 
         with pytest.raises(SystemExit):
-            parser.parse_args([
-                "--site", "test",
-                "--global-lang-sort", "invalid"
-            ])
+            parser.parse_args(["--site", "test", "--global-lang-sort", "invalid"])
 
     def test_parallel_languages_in_engine_overrides(self):
         """Test parallel_languages added to engine overrides when > 0."""
         parser = create_parser()
-        args = parser.parse_args([
-            "--site", "test",
-            "--parallel-languages", "2"
-        ])
+        args = parser.parse_args(["--site", "test", "--parallel-languages", "2"])
         overrides = CLIConfigOverrides(args)
 
         engine_overrides = overrides.get_engine_overrides()
@@ -114,10 +97,7 @@ class TestMultiLanguageFlags:
     def test_global_lang_rounds_in_engine_overrides(self):
         """Test global_lang_rounds added to engine overrides when > 0."""
         parser = create_parser()
-        args = parser.parse_args([
-            "--site", "test",
-            "--global-lang-rounds", "50"
-        ])
+        args = parser.parse_args(["--site", "test", "--global-lang-rounds", "50"])
         overrides = CLIConfigOverrides(args)
 
         engine_overrides = overrides.get_engine_overrides()
@@ -139,11 +119,9 @@ class TestMultiLanguageFlags:
     def test_global_lang_sort_in_engine_overrides_with_rounds(self):
         """Test global_lang_sort added to engine overrides along with rounds."""
         parser = create_parser()
-        args = parser.parse_args([
-            "--site", "test",
-            "--global-lang-rounds", "100",
-            "--global-lang-sort", "asc"
-        ])
+        args = parser.parse_args(
+            ["--site", "test", "--global-lang-rounds", "100", "--global-lang-sort", "asc"]
+        )
         overrides = CLIConfigOverrides(args)
 
         engine_overrides = overrides.get_engine_overrides()
@@ -166,11 +144,9 @@ class TestMutualExclusion:
 
         # CLI-TC-03: Error should occur at parse time, not runtime
         with pytest.raises(SystemExit) as exc_info:
-            parser.parse_args([
-                "--site", "test",
-                "--parallel-languages", "2",
-                "--global-lang-rounds", "50"
-            ])
+            parser.parse_args(
+                ["--site", "test", "--parallel-languages", "2", "--global-lang-rounds", "50"]
+            )
 
         # SystemExit with code 2 indicates argparse error
         assert exc_info.value.code == 2
@@ -178,10 +154,7 @@ class TestMutualExclusion:
     def test_parallel_only_succeeds(self):
         """Test that using only --parallel-languages succeeds."""
         parser = create_parser()
-        args = parser.parse_args([
-            "--site", "test",
-            "--parallel-languages", "3"
-        ])
+        args = parser.parse_args(["--site", "test", "--parallel-languages", "3"])
         overrides = CLIConfigOverrides(args)
 
         # Should not raise
@@ -192,10 +165,7 @@ class TestMutualExclusion:
     def test_roundrobin_only_succeeds(self):
         """Test that using only --global-lang-rounds succeeds."""
         parser = create_parser()
-        args = parser.parse_args([
-            "--site", "test",
-            "--global-lang-rounds", "100"
-        ])
+        args = parser.parse_args(["--site", "test", "--global-lang-rounds", "100"])
         overrides = CLIConfigOverrides(args)
 
         # Should not raise
@@ -221,11 +191,9 @@ class TestFlagCombinations:
     def test_parallel_with_force_retranslate(self):
         """Test --parallel-languages with --force-retranslate."""
         parser = create_parser()
-        args = parser.parse_args([
-            "--site", "test",
-            "--parallel-languages", "2",
-            "--force-retranslate"
-        ])
+        args = parser.parse_args(
+            ["--site", "test", "--parallel-languages", "2", "--force-retranslate"]
+        )
         overrides = CLIConfigOverrides(args)
 
         engine_overrides = overrides.get_engine_overrides()
@@ -235,11 +203,9 @@ class TestFlagCombinations:
     def test_roundrobin_with_cache_write_mode(self):
         """Test --global-lang-rounds with --cache-write-mode."""
         parser = create_parser()
-        args = parser.parse_args([
-            "--site", "test",
-            "--global-lang-rounds", "50",
-            "--cache-write-mode", "always"
-        ])
+        args = parser.parse_args(
+            ["--site", "test", "--global-lang-rounds", "50", "--cache-write-mode", "always"]
+        )
         overrides = CLIConfigOverrides(args)
 
         engine_overrides = overrides.get_engine_overrides()
@@ -249,12 +215,18 @@ class TestFlagCombinations:
     def test_parallel_with_device_and_load_mode(self):
         """Test --parallel-languages with --device and --load-mode."""
         parser = create_parser()
-        args = parser.parse_args([
-            "--site", "test",
-            "--parallel-languages", "3",
-            "--device", "cpu",
-            "--load-mode", "int8"
-        ])
+        args = parser.parse_args(
+            [
+                "--site",
+                "test",
+                "--parallel-languages",
+                "3",
+                "--device",
+                "cpu",
+                "--load-mode",
+                "int8",
+            ]
+        )
         overrides = CLIConfigOverrides(args)
 
         engine_overrides = overrides.get_engine_overrides()

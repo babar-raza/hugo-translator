@@ -25,6 +25,7 @@ from src.workers.tm_improvement_worker import TMImprovementWorker, TMImprovement
 # Stub L3 — tracks update_entry / add_entry calls via an in-memory dict
 # ---------------------------------------------------------------------------
 
+
 class StubL3:
     """
     Minimal L3 stand-in that does not load FAISS or sentence-transformers.
@@ -38,9 +39,7 @@ class StubL3:
 
     def update_entry(self, entry_id: str, new_translation: str, new_metadata: dict) -> bool:
         """Return True iff entry_id was pre-populated (simulates found-in-index)."""
-        self.update_calls.append(
-            {"entry_id": entry_id, "new_translation": new_translation}
-        )
+        self.update_calls.append({"entry_id": entry_id, "new_translation": new_translation})
         return entry_id in self._known_ids
 
     def add_entry(self, entry_id: str, text: str, translation: str, metadata: dict = None):
@@ -52,11 +51,11 @@ class StubL3:
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def _entry_id(candidate: ImprovementCandidate) -> str:
     """Reproduce the production entry_id formula (tm_improvement_worker.py:1191)."""
     return (
-        f"{candidate.site_id}:{candidate.src_lang}:"
-        f"{candidate.tgt_lang}:{hash_text(candidate.text)}"
+        f"{candidate.site_id}:{candidate.src_lang}:{candidate.tgt_lang}:{hash_text(candidate.text)}"
     )
 
 
@@ -100,6 +99,7 @@ def _make_candidate() -> ImprovementCandidate:
 # ---------------------------------------------------------------------------
 # Case A — entry exists in L3 → update_entry returns True → skip_l3=True
 # ---------------------------------------------------------------------------
+
 
 class TestCaseAL3EntryExists:
     def test_update_entry_called_with_correct_entry_id(self, tmp_path):
@@ -147,6 +147,7 @@ class TestCaseAL3EntryExists:
 # Case B — entry absent from L3 → update_entry returns False → skip_l3=False
 # ---------------------------------------------------------------------------
 
+
 class TestCaseBL3EntryAbsent:
     def test_tm_store_called_with_skip_l3_false_when_not_in_l3(self, tmp_path):
         """
@@ -162,8 +163,7 @@ class TestCaseBL3EntryAbsent:
         assert result == "improved"
         _, kwargs = worker.tm.store.call_args
         assert kwargs.get("skip_l3") is False, (
-            f"tm.store() must use skip_l3=False when L3 entry is absent; "
-            f"actual kwargs: {kwargs}"
+            f"tm.store() must use skip_l3=False when L3 entry is absent; actual kwargs: {kwargs}"
         )
 
     def test_update_entry_still_called_even_when_absent(self, tmp_path):
@@ -182,6 +182,7 @@ class TestCaseBL3EntryAbsent:
 # ---------------------------------------------------------------------------
 # Case C — L3 is None → no crash; skip_l3=False
 # ---------------------------------------------------------------------------
+
 
 class TestCaseCL3IsNone:
     def test_no_crash_when_l3_is_none(self, tmp_path):

@@ -5,6 +5,7 @@ from pathlib import Path
 
 class MockOutputLayout:
     """Mock OutputLayout for testing."""
+
     def __init__(self, per_language_folders, pattern):
         self.per_language_folders = per_language_folders
         self.pattern = pattern
@@ -12,7 +13,8 @@ class MockOutputLayout:
 
 class MockSiteProfile:
     """Mock SiteProfile for testing."""
-    def __init__(self, output_layout, default_source_lang='en', output_dir=None):
+
+    def __init__(self, output_layout, default_source_lang="en", output_dir=None):
         self.output_layout = output_layout
         self.default_source_lang = default_source_lang
         self.output_dir = output_dir
@@ -23,10 +25,7 @@ def test_file_based_localization_pattern():
     # Setup
     source_path = Path("/content/blog/index.md")
     target_lang = "es"
-    output_layout = MockOutputLayout(
-        per_language_folders=False,
-        pattern="{filename}.{lang}{ext}"
-    )
+    output_layout = MockOutputLayout(per_language_folders=False, pattern="{filename}.{lang}{ext}")
     site_profile = MockSiteProfile(output_layout)
 
     # Apply pattern manually (same logic as in engine.py)
@@ -35,10 +34,7 @@ def test_file_based_localization_pattern():
     filename_ext = source_path.suffix  # ".md"
 
     output_filename = pattern.format(
-        filename=filename_stem,
-        lang=target_lang,
-        ext=filename_ext,
-        path=str(source_path.name)
+        filename=filename_stem, lang=target_lang, ext=filename_ext, path=str(source_path.name)
     )
 
     # Verify
@@ -50,10 +46,7 @@ def test_folder_based_localization_pattern():
     # Setup
     source_path = Path("/content/blog/index.md")
     target_lang = "de"
-    output_layout = MockOutputLayout(
-        per_language_folders=True,
-        pattern="{lang}/{path}"
-    )
+    output_layout = MockOutputLayout(per_language_folders=True, pattern="{lang}/{path}")
     site_profile = MockSiteProfile(output_layout)
 
     # For folder-based, pattern is used differently (not tested here)
@@ -78,10 +71,7 @@ def test_pattern_substitution_with_different_extensions():
         filename_ext = source_path.suffix
 
         output_filename = pattern.format(
-            filename=filename_stem,
-            lang=lang,
-            ext=filename_ext,
-            path=str(source_path.name)
+            filename=filename_stem, lang=lang, ext=filename_ext, path=str(source_path.name)
         )
 
         assert output_filename == expected, f"Expected {expected}, got {output_filename}"
@@ -97,7 +87,7 @@ def test_pattern_with_path_variable():
         lang=target_lang,
         path=str(source_path.name),
         filename=source_path.stem,
-        ext=source_path.suffix
+        ext=source_path.suffix,
     )
 
     assert output_path == "es/article.md"

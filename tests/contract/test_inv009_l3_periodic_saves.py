@@ -40,6 +40,7 @@ def check_deps():
     try:
         import faiss
         from sentence_transformers import SentenceTransformer
+
         return True
     except ImportError:
         pytest.skip("faiss or sentence-transformers not installed")
@@ -155,10 +156,7 @@ def test_save_counter_resets_after_save(l3_tm_low_interval):
 
     # Add 5 entries to trigger save
     for i in range(5):
-        tm.add_entry(
-            f"entry{i}", "test-site", "en", "es",
-            f"Source text {i}", f"Translation {i}"
-        )
+        tm.add_entry(f"entry{i}", "test-site", "en", "es", f"Source text {i}", f"Translation {i}")
 
     # Counter should be reset after save
     assert tm._additions_since_save == 0
@@ -186,10 +184,7 @@ def test_no_save_when_interval_disabled(l3_tm_disabled_save):
 
     # Add many entries
     for i in range(20):
-        tm.add_entry(
-            f"entry{i}", "test-site", "en", "es",
-            f"Source {i}", f"Translation {i}"
-        )
+        tm.add_entry(f"entry{i}", "test-site", "en", "es", f"Source {i}", f"Translation {i}")
 
     # Save should never have been triggered
     assert len(save_triggered) == 0
@@ -214,10 +209,7 @@ def test_get_save_stats_returns_correct_data(l3_tm_low_interval):
 
     # Add some entries (not enough to trigger save)
     for i in range(3):
-        tm.add_entry(
-            f"entry{i}", "test-site", "en", "es",
-            f"Source {i}", f"Translation {i}"
-        )
+        tm.add_entry(f"entry{i}", "test-site", "en", "es", f"Source {i}", f"Translation {i}")
 
     stats = tm.get_save_stats()
 
@@ -249,10 +241,7 @@ def test_total_additions_persists_across_saves(l3_tm_low_interval):
 
     # Add 7 entries (triggers save at 5)
     for i in range(7):
-        tm.add_entry(
-            f"entry{i}", "test-site", "en", "es",
-            f"Source {i}", f"Translation {i}"
-        )
+        tm.add_entry(f"entry{i}", "test-site", "en", "es", f"Source {i}", f"Translation {i}")
 
     stats = tm.get_save_stats()
 

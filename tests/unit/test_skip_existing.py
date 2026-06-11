@@ -68,7 +68,7 @@ def _is_valid_output(output_path: Path) -> bool:
             return False
 
         # Check readability
-        with open(output_path, encoding='utf-8') as f:
+        with open(output_path, encoding="utf-8") as f:
             content = f.read(1024)
 
         # Basic validation: has some content
@@ -93,9 +93,7 @@ class TestShouldSkipTranslation:
         time.sleep(0.1)
         output.write_text("Translated content longer than minimum")
 
-        should_skip, reason = _should_skip_translation(
-            source, output, force_retranslate=True
-        )
+        should_skip, reason = _should_skip_translation(source, output, force_retranslate=True)
 
         assert should_skip is False
         assert "force_retranslate enabled" in reason
@@ -107,9 +105,7 @@ class TestShouldSkipTranslation:
 
         source.write_text("Source content")
 
-        should_skip, reason = _should_skip_translation(
-            source, output, force_retranslate=False
-        )
+        should_skip, reason = _should_skip_translation(source, output, force_retranslate=False)
 
         assert should_skip is False
         assert "does not exist" in reason
@@ -125,9 +121,7 @@ class TestShouldSkipTranslation:
         # Create output after (newer)
         output.write_text("Translated content that is longer than minimum")
 
-        should_skip, reason = _should_skip_translation(
-            source, output, force_retranslate=False
-        )
+        should_skip, reason = _should_skip_translation(source, output, force_retranslate=False)
 
         assert should_skip is True
         assert "newer than source" in reason
@@ -143,9 +137,7 @@ class TestShouldSkipTranslation:
         # Modify source after (newer)
         source.write_text("Updated source content")
 
-        should_skip, reason = _should_skip_translation(
-            source, output, force_retranslate=False
-        )
+        should_skip, reason = _should_skip_translation(source, output, force_retranslate=False)
 
         assert should_skip is False
         assert "modified" in reason
@@ -160,9 +152,7 @@ class TestShouldSkipTranslation:
         # Create empty output
         output.write_text("")
 
-        should_skip, reason = _should_skip_translation(
-            source, output, force_retranslate=False
-        )
+        should_skip, reason = _should_skip_translation(source, output, force_retranslate=False)
 
         assert should_skip is False
         assert "invalid" in reason
@@ -229,8 +219,10 @@ class TestTranslationResultSkipTracking:
     def test_skipped_langs_field_exists(self):
         """Test that TranslationResult has skipped_langs field."""
         # Read model file directly to avoid import chain issues
-        models_path = Path(__file__).parent.parent.parent / "src" / "translation_engine" / "models.py"
-        models_content = models_path.read_text(encoding='utf-8')
+        models_path = (
+            Path(__file__).parent.parent.parent / "src" / "translation_engine" / "models.py"
+        )
+        models_content = models_path.read_text(encoding="utf-8")
 
         # Verify the field is defined in TranslationResult
         assert "skipped_langs: List[str]" in models_content
@@ -238,8 +230,10 @@ class TestTranslationResultSkipTracking:
 
     def test_skip_reasons_field_exists(self):
         """Test that TranslationResult has skip_reasons field."""
-        models_path = Path(__file__).parent.parent.parent / "src" / "translation_engine" / "models.py"
-        models_content = models_path.read_text(encoding='utf-8')
+        models_path = (
+            Path(__file__).parent.parent.parent / "src" / "translation_engine" / "models.py"
+        )
+        models_content = models_path.read_text(encoding="utf-8")
 
         # Verify the field is defined in TranslationResult
         assert "skip_reasons: Dict[str, str]" in models_content
@@ -247,18 +241,20 @@ class TestTranslationResultSkipTracking:
 
     def test_skip_tracking_fields_have_defaults(self):
         """Test that skip tracking fields have default factories."""
-        models_path = Path(__file__).parent.parent.parent / "src" / "translation_engine" / "models.py"
-        models_content = models_path.read_text(encoding='utf-8')
+        models_path = (
+            Path(__file__).parent.parent.parent / "src" / "translation_engine" / "models.py"
+        )
+        models_content = models_path.read_text(encoding="utf-8")
 
         # Both should use default_factory for mutable defaults
-        lines = models_content.split('\n')
+        lines = models_content.split("\n")
         found_skipped_langs = False
         found_skip_reasons = False
 
         for line in lines:
-            if 'skipped_langs' in line and 'default_factory=list' in line:
+            if "skipped_langs" in line and "default_factory=list" in line:
                 found_skipped_langs = True
-            if 'skip_reasons' in line and 'default_factory=dict' in line:
+            if "skip_reasons" in line and "default_factory=dict" in line:
                 found_skip_reasons = True
 
         assert found_skipped_langs, "skipped_langs should use default_factory=list"
@@ -279,13 +275,12 @@ class TestSkipLogicEdgeCases:
 
         # Set same mtime for both
         import os
+
         current_time = time.time()
         os.utime(source, (current_time, current_time))
         os.utime(output, (current_time, current_time))
 
-        should_skip, reason = _should_skip_translation(
-            source, output, force_retranslate=False
-        )
+        should_skip, reason = _should_skip_translation(source, output, force_retranslate=False)
 
         # Same mtime means output >= source, so should skip
         assert should_skip is True
@@ -293,7 +288,7 @@ class TestSkipLogicEdgeCases:
     def test_unicode_content_valid(self, tmp_path):
         """Test that Unicode content is handled correctly."""
         output = tmp_path / "output.md"
-        output.write_text("日本語のテスト内容です。これは十分な長さです。", encoding='utf-8')
+        output.write_text("日本語のテスト内容です。これは十分な長さです。", encoding="utf-8")
 
         assert _is_valid_output(output) is True
 
@@ -317,8 +312,10 @@ class TestEngineMethodsExist:
         """Verify that engine.py contains the skip methods."""
         from pathlib import Path
 
-        engine_path = Path(__file__).parent.parent.parent / "src" / "translation_engine" / "engine.py"
-        engine_content = engine_path.read_text(encoding='utf-8')
+        engine_path = (
+            Path(__file__).parent.parent.parent / "src" / "translation_engine" / "engine.py"
+        )
+        engine_content = engine_path.read_text(encoding="utf-8")
 
         # Check method signatures exist
         assert "def _should_skip_translation(" in engine_content
@@ -329,8 +326,10 @@ class TestEngineMethodsExist:
         """Verify that models.py has skip tracking fields."""
         from pathlib import Path
 
-        models_path = Path(__file__).parent.parent.parent / "src" / "translation_engine" / "models.py"
-        models_content = models_path.read_text(encoding='utf-8')
+        models_path = (
+            Path(__file__).parent.parent.parent / "src" / "translation_engine" / "models.py"
+        )
+        models_content = models_path.read_text(encoding="utf-8")
 
         # Check fields exist
         assert "skipped_langs" in models_content
@@ -357,10 +356,7 @@ class TestSkipTelemetry:
         from src.translation_engine.models import TranslationStats
 
         stats = TranslationStats(
-            total_segments=100,
-            tm_hits=50,
-            translated_segments=50,
-            duration_seconds=5.0
+            total_segments=100, tm_hits=50, translated_segments=50, duration_seconds=5.0
         )
 
         # Simulate skip scenario: 2 languages translated, 3 skipped
@@ -370,8 +366,8 @@ class TestSkipTelemetry:
         # Verify fields are accessible
         assert stats.langs_translated == 2
         assert stats.langs_skipped == 3
-        assert hasattr(stats, 'langs_translated')
-        assert hasattr(stats, 'langs_skipped')
+        assert hasattr(stats, "langs_translated")
+        assert hasattr(stats, "langs_skipped")
 
     def test_output_summary_differentiates_skipped_vs_translated(self):
         """
@@ -388,7 +384,7 @@ class TestSkipTelemetry:
             outputs={"es": "out.es.md", "fr": "out.fr.md"},
             errors=[],
             skipped_langs=None,
-            skip_reasons=None
+            skip_reasons=None,
         )
         assert summary_no_skip == "2 translations, 0 errors"
         assert "skipped" not in summary_no_skip
@@ -399,7 +395,7 @@ class TestSkipTelemetry:
             outputs={"es": "out.es.md", "fr": "out.fr.md"},
             errors=[],
             skipped_langs=["de", "it"],
-            skip_reasons={"de": "output exists", "it": "output exists"}
+            skip_reasons={"de": "output exists", "it": "output exists"},
         )
         assert "2 translations" in summary_with_skip
         assert "2 skipped (existing outputs)" in summary_with_skip
@@ -423,18 +419,14 @@ class TestSkipTelemetry:
 
         # Simulate all-skipped scenario
         stats = TranslationStats(
-            total_segments=100,
-            tm_hits=0,
-            translated_segments=0,
-            duration_seconds=0.5
+            total_segments=100, tm_hits=0, translated_segments=0, duration_seconds=0.5
         )
         stats.langs_translated = 0
         stats.langs_skipped = 3  # All 3 languages skipped
 
         # Verify the conditions for "all skipped"
         total_langs = 3
-        all_skipped = (stats.langs_skipped == total_langs and
-                      total_langs > 0)
+        all_skipped = stats.langs_skipped == total_langs and total_langs > 0
 
         assert all_skipped is True
         assert stats.langs_translated == 0
@@ -456,18 +448,14 @@ class TestSkipTelemetry:
 
         # Simulate mixed scenario: some translated, some skipped
         stats = TranslationStats(
-            total_segments=100,
-            tm_hits=30,
-            translated_segments=70,
-            duration_seconds=10.0
+            total_segments=100, tm_hits=30, translated_segments=70, duration_seconds=10.0
         )
         stats.langs_translated = 2
         stats.langs_skipped = 1  # Mixed: 2 translated, 1 skipped
 
         # Verify NOT all-skipped
         total_langs = 3
-        all_skipped = (stats.langs_skipped == total_langs and
-                      total_langs > 0)
+        all_skipped = stats.langs_skipped == total_langs and total_langs > 0
 
         assert all_skipped is False
         assert stats.langs_translated > 0
@@ -489,14 +477,14 @@ class TestSkipTelemetry:
             tm_hits=40,
             translated_segments=50,
             skipped_segments=10,
-            duration_seconds=5.0
+            duration_seconds=5.0,
         )
 
         # Calculate metrics with skip count
         metrics = calculate_items_metrics(
             job_type="translate_file",
             stats=stats,
-            skip_count=2  # 2 languages skipped (existing outputs)
+            skip_count=2,  # 2 languages skipped (existing outputs)
         )
 
         # Verify items_succeeded = translated_segments + tm_hits
@@ -523,7 +511,7 @@ class TestSkipTelemetry:
         summary = build_output_summary(
             job_type="translate_file",
             outputs={"es": "out.es.md"},
-            errors=[]
+            errors=[],
             # skipped_langs and skip_reasons omitted (None)
         )
         assert "1 translations, 0 errors" in summary
@@ -531,15 +519,12 @@ class TestSkipTelemetry:
 
         # Scenario 2: calculate_items_metrics with default skip_count=0
         stats = TranslationStats(
-            total_segments=50,
-            tm_hits=20,
-            translated_segments=30,
-            duration_seconds=3.0
+            total_segments=50, tm_hits=20, translated_segments=30, duration_seconds=3.0
         )
 
         metrics = calculate_items_metrics(
             job_type="translate_file",
-            stats=stats
+            stats=stats,
             # skip_count defaults to 0
         )
 
@@ -558,8 +543,8 @@ class TestSkipTelemetry:
         stats = TranslationStats()
 
         # Verify fields exist with correct defaults
-        assert hasattr(stats, 'langs_skipped')
-        assert hasattr(stats, 'langs_translated')
+        assert hasattr(stats, "langs_skipped")
+        assert hasattr(stats, "langs_translated")
         assert stats.langs_skipped == 0
         assert stats.langs_translated == 0
 
@@ -576,7 +561,7 @@ class TestSkipTelemetry:
             outputs={"es": "a.md", "fr": "b.md", "de": "c.md"},
             errors=["Error 1", "Error 2"],
             skipped_langs=["it", "pt"],
-            skip_reasons={"it": "exists", "pt": "exists"}
+            skip_reasons={"it": "exists", "pt": "exists"},
         )
 
         # Verify format exactly matches spec
@@ -610,7 +595,7 @@ class TestSkipTelemetry:
             file_path=Path("test.md"),
             outputs={"es": Path("test.es.md"), "fr": Path("test.fr.md")},
             skipped_langs=["de"],
-            skip_reasons={"de": "output already exists"}
+            skip_reasons={"de": "output already exists"},
         )
 
         # Simulate engine calculation (lines 1242-1243)

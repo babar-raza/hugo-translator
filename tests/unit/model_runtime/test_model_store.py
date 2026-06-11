@@ -7,6 +7,7 @@ Tests:
 - Manifest CRUD operations
 - Download plan generation
 """
+
 from pathlib import Path
 from unittest.mock import Mock, patch
 
@@ -45,7 +46,7 @@ def mock_registry():
         min_ram_gb=4.0,
         optimal_device="cuda",
         hf_model_id="facebook/m2m100_418M",
-        local_path=Path("m2m100_418M")
+        local_path=Path("m2m100_418M"),
     )
 
     # Opus bilingual model
@@ -58,7 +59,7 @@ def mock_registry():
         min_ram_gb=1.0,
         optimal_device="cpu",
         hf_model_id="Helsinki-NLP/opus-mt-en-fr",
-        local_path=Path("opus/opus-mt-en-fr")
+        local_path=Path("opus/opus-mt-en-fr"),
     )
 
     # CT2 model
@@ -70,7 +71,7 @@ def mock_registry():
         model_size_mb=250,
         min_ram_gb=1.5,
         optimal_device="cpu",
-        local_path=Path("ct2/m2m100_418m_int8")
+        local_path=Path("ct2/m2m100_418m_int8"),
     )
 
     registry.models = {
@@ -109,7 +110,7 @@ class TestModelManifest:
             download_source="huggingface:test/model",
             backend="huggingface",
             size_mb=100.5,
-            files=[{"name": "config.json", "size_bytes": 1024, "sha256": "abc123"}]
+            files=[{"name": "config.json", "size_bytes": 1024, "sha256": "abc123"}],
         )
 
         # Save
@@ -136,7 +137,7 @@ class TestModelManifest:
             download_source="huggingface:org/model1",
             backend="huggingface",
             size_mb=200.0,
-            files=[]
+            files=[],
         )
 
         assert len(manifest._data["models"]) == 1
@@ -148,7 +149,7 @@ class TestModelManifest:
             download_source="huggingface:org/model1",
             backend="huggingface",
             size_mb=250.0,
-            files=[]
+            files=[],
         )
 
         # Should replace, not duplicate
@@ -269,9 +270,7 @@ class TestModelStore:
         assert "downloads are disabled" in str(exc_info.value).lower()
 
     @patch("huggingface_hub.snapshot_download")
-    def test_download_model_success(
-        self, mock_snapshot_download, mock_registry, temp_models_dir
-    ):
+    def test_download_model_success(self, mock_snapshot_download, mock_registry, temp_models_dir):
         """Test successful model download."""
         store = ModelStore(mock_registry, temp_models_dir, allow_downloads=True)
 

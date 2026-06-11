@@ -1,4 +1,5 @@
 """Tests for CI stdout heartbeat (TC-04)."""
+
 from __future__ import annotations
 
 import threading
@@ -13,6 +14,7 @@ from src.utils.ci_heartbeat import start_ci_heartbeat
 def _reset_heartbeat():
     """Reset the module-level singleton guard between tests."""
     import src.utils.ci_heartbeat as mod
+
     with mod._heartbeat_lock:
         mod._heartbeat_started = False
     yield

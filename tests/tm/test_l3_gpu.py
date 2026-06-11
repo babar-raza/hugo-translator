@@ -3,6 +3,7 @@ Tests for L3 Semantic TM with GPU acceleration.
 
 Tests GPU-accelerated embeddings and FAISS GPU index.
 """
+
 import tempfile
 
 import pytest
@@ -82,14 +83,16 @@ class TestL3SemanticGPU:
             # Batch add entries
             entries = []
             for i in range(50):
-                entries.append({
-                    "entry_id": f"test{i}",
-                    "site_id": "test_site",
-                    "src_lang": "en",
-                    "tgt_lang": "es",
-                    "source_text": f"Test sentence {i}",
-                    "translation": f"Sentencia de prueba {i}",
-                })
+                entries.append(
+                    {
+                        "entry_id": f"test{i}",
+                        "site_id": "test_site",
+                        "src_lang": "en",
+                        "tgt_lang": "es",
+                        "source_text": f"Test sentence {i}",
+                        "translation": f"Sentencia de prueba {i}",
+                    }
+                )
 
             count = tm.batch_add(entries)
             assert count == 50
@@ -331,14 +334,16 @@ class TestL3Performance:
             # Add large batch
             entries = []
             for i in range(500):
-                entries.append({
-                    "entry_id": f"test{i}",
-                    "site_id": "test_site",
-                    "src_lang": "en",
-                    "tgt_lang": "es",
-                    "source_text": f"Test sentence number {i} for benchmarking",
-                    "translation": f"Sentencia de prueba número {i}",
-                })
+                entries.append(
+                    {
+                        "entry_id": f"test{i}",
+                        "site_id": "test_site",
+                        "src_lang": "en",
+                        "tgt_lang": "es",
+                        "source_text": f"Test sentence number {i} for benchmarking",
+                        "translation": f"Sentencia de prueba número {i}",
+                    }
+                )
 
             count = tm.batch_add(entries)
             assert count == 500
@@ -357,14 +362,16 @@ class TestL3Performance:
             # Add large batch
             entries = []
             for i in range(200):
-                entries.append({
-                    "entry_id": f"test{i}",
-                    "site_id": "test_site",
-                    "src_lang": "en",
-                    "tgt_lang": "es",
-                    "source_text": f"Test sentence {i}",
-                    "translation": f"Sentencia {i}",
-                })
+                entries.append(
+                    {
+                        "entry_id": f"test{i}",
+                        "site_id": "test_site",
+                        "src_lang": "en",
+                        "tgt_lang": "es",
+                        "source_text": f"Test sentence {i}",
+                        "translation": f"Sentencia {i}",
+                    }
+                )
 
             count = tm.batch_add(entries)
             assert count == 200

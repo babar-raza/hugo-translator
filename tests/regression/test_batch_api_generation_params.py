@@ -6,6 +6,7 @@ without throwing "unexpected keyword argument" error.
 
 MISSION: Fix batch translation API mismatch identified in PHASE10_PROD_FORCE_TRANSLATE.md
 """
+
 import os
 import sys
 from pathlib import Path
@@ -43,7 +44,7 @@ def test_translate_accepts_generation_params():
         model_size_mb=1000,
         min_ram_gb=2.0,
         optimal_device="cpu",
-        hf_model_id="facebook/m2m100_418M"
+        hf_model_id="facebook/m2m100_418M",
     )
 
     # Create backend instance (don't actually load the model)
@@ -57,8 +58,10 @@ def test_translate_accepts_generation_params():
 
     # Configure mock tokenizer
     backend.tokenizer.return_value = {
-        "input_ids": MagicMock(numel=MagicMock(return_value=10), to=MagicMock(return_value=MagicMock())),
-        "attention_mask": MagicMock(to=MagicMock(return_value=MagicMock()))
+        "input_ids": MagicMock(
+            numel=MagicMock(return_value=10), to=MagicMock(return_value=MagicMock())
+        ),
+        "attention_mask": MagicMock(to=MagicMock(return_value=MagicMock())),
     }
     backend.tokenizer.get_lang_id = MagicMock(return_value=123)
 
@@ -80,11 +83,7 @@ def test_translate_accepts_generation_params():
     tgt_lang = "fr"
 
     # Custom generation parameters
-    generation_params = {
-        "num_beams": 4,
-        "temperature": 0.7,
-        "top_p": 0.9
-    }
+    generation_params = {"num_beams": 4, "temperature": 0.7, "top_p": 0.9}
 
     print(f"[2/3] Calling translate() with generation_params: {generation_params}")
 
@@ -97,15 +96,12 @@ def test_translate_accepts_generation_params():
             src_lang=src_lang,
             tgt_lang=tgt_lang,
             max_new_tokens=256,
-            generation_params=generation_params
+            generation_params=generation_params,
         )
         print("[3/3] translate() call succeeded (no exception)")
     except TypeError as e:
         if "generation_params" in str(e):
-            pytest.fail(
-                f"translate() does not accept generation_params parameter. "
-                f"Error: {e}"
-            )
+            pytest.fail(f"translate() does not accept generation_params parameter. Error: {e}")
         else:
             raise
 
@@ -132,7 +128,9 @@ def test_translate_accepts_generation_params():
     print(f"[PASS] Custom num_beams parameter applied: {call_kwargs['num_beams']}")
 
     assert "temperature" in call_kwargs, "temperature not passed to model.generate()"
-    assert call_kwargs["temperature"] == 0.7, f"Expected temperature=0.7, got {call_kwargs['temperature']}"
+    assert call_kwargs["temperature"] == 0.7, (
+        f"Expected temperature=0.7, got {call_kwargs['temperature']}"
+    )
     print(f"[PASS] Custom temperature parameter applied: {call_kwargs['temperature']}")
 
     assert "top_p" in call_kwargs, "top_p not passed to model.generate()"
@@ -167,7 +165,7 @@ def test_translate_with_token_counts_accepts_generation_params():
         model_size_mb=1000,
         min_ram_gb=2.0,
         optimal_device="cpu",
-        hf_model_id="facebook/m2m100_418M"
+        hf_model_id="facebook/m2m100_418M",
     )
 
     # Create backend instance
@@ -181,8 +179,10 @@ def test_translate_with_token_counts_accepts_generation_params():
 
     # Configure mocks
     backend.tokenizer.return_value = {
-        "input_ids": MagicMock(numel=MagicMock(return_value=10), to=MagicMock(return_value=MagicMock())),
-        "attention_mask": MagicMock(to=MagicMock(return_value=MagicMock()))
+        "input_ids": MagicMock(
+            numel=MagicMock(return_value=10), to=MagicMock(return_value=MagicMock())
+        ),
+        "attention_mask": MagicMock(to=MagicMock(return_value=MagicMock())),
     }
     backend.tokenizer.get_lang_id = MagicMock(return_value=123)
 
@@ -204,14 +204,13 @@ def test_translate_with_token_counts_accepts_generation_params():
             src_lang="en",
             tgt_lang="fr",
             max_new_tokens=256,
-            generation_params=generation_params
+            generation_params=generation_params,
         )
         print("[2/2] translate_with_token_counts() call succeeded")
     except TypeError as e:
         if "generation_params" in str(e):
             pytest.fail(
-                f"translate_with_token_counts() does not accept generation_params. "
-                f"Error: {e}"
+                f"translate_with_token_counts() does not accept generation_params. Error: {e}"
             )
         else:
             raise

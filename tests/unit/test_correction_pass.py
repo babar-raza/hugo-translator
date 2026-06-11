@@ -1,4 +1,5 @@
 """Tests for TC-06: Two-stage translate + correct for failed validations."""
+
 from __future__ import annotations
 
 from unittest.mock import MagicMock, patch
@@ -34,16 +35,20 @@ class TestBuildCorrectionPrompt:
         issue.severity.value = "warning"
 
         prompt = build_correction_prompt(
-            source_body="src", translated_body="tgt",
-            src_lang="en", tgt_lang="fr",
+            source_body="src",
+            translated_body="tgt",
+            src_lang="en",
+            tgt_lang="fr",
             issues=[issue],
         )
         assert "[warning] Link broken" in prompt
 
     def test_empty_issues(self):
         prompt = build_correction_prompt(
-            source_body="src", translated_body="tgt",
-            src_lang="en", tgt_lang="de",
+            source_body="src",
+            translated_body="tgt",
+            src_lang="en",
+            tgt_lang="de",
             issues=[],
         )
         assert "(no details)" in prompt
@@ -51,8 +56,10 @@ class TestBuildCorrectionPrompt:
     def test_truncates_long_content(self):
         long_text = "x" * 20_000
         prompt = build_correction_prompt(
-            source_body=long_text, translated_body=long_text,
-            src_lang="en", tgt_lang="ja",
+            source_body=long_text,
+            translated_body=long_text,
+            src_lang="en",
+            tgt_lang="ja",
             issues=[],
         )
         # Should not contain the full 20K text (capped at 8000)
@@ -91,8 +98,11 @@ class TestAttemptCorrection:
         mock_registry_cls.return_value = mock_registry
 
         result = attempt_correction(
-            source_body="src", translated_body="tgt",
-            src_lang="en", tgt_lang="es", issues=[],
+            source_body="src",
+            translated_body="tgt",
+            src_lang="en",
+            tgt_lang="es",
+            issues=[],
         )
         assert result is None
 
@@ -108,8 +118,11 @@ class TestAttemptCorrection:
         mock_backend_cls.return_value = mock_backend
 
         result = attempt_correction(
-            source_body="src", translated_body="tgt",
-            src_lang="en", tgt_lang="fr", issues=[],
+            source_body="src",
+            translated_body="tgt",
+            src_lang="en",
+            tgt_lang="fr",
+            issues=[],
         )
         assert result is None
 
@@ -117,8 +130,11 @@ class TestAttemptCorrection:
         """When model_runtime is unavailable, returns None gracefully."""
         with patch.dict("sys.modules", {"src.model_runtime.registry": None}):
             result = attempt_correction(
-                source_body="src", translated_body="tgt",
-                src_lang="en", tgt_lang="de", issues=[],
+                source_body="src",
+                translated_body="tgt",
+                src_lang="en",
+                tgt_lang="de",
+                issues=[],
             )
             assert result is None
 
@@ -133,8 +149,11 @@ class TestAttemptCorrection:
         mock_backend_cls.return_value = mock_backend
 
         result = attempt_correction(
-            source_body="src", translated_body="tgt",
-            src_lang="en", tgt_lang="it", issues=[],
+            source_body="src",
+            translated_body="tgt",
+            src_lang="en",
+            tgt_lang="it",
+            issues=[],
         )
         assert result is None
 

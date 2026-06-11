@@ -166,12 +166,13 @@ def test_only_specific_files_staged_not_git_add_all(
         assert str(rel_path).replace("\\", "/") in result.stdout
 
     # Unrelated file should NOT be staged (should show ?? for untracked)
-    lines = result.stdout.strip().split('\n')
+    lines = result.stdout.strip().split("\n")
     unrelated_status = [l for l in lines if "unrelated.txt" in l]
     if unrelated_status:
         # Should be untracked (??) not staged (A)
-        assert unrelated_status[0].startswith("??"), \
+        assert unrelated_status[0].startswith("??"), (
             f"Unrelated file was staged: {unrelated_status[0]}"
+        )
 
 
 @pytest.mark.contract
@@ -197,7 +198,7 @@ def test_staging_uses_git_add_with_specific_path(
         return original_run(*args, **kwargs)
 
     # Act
-    with patch('subprocess.run', side_effect=capture_run):
+    with patch("subprocess.run", side_effect=capture_run):
         git_committer._stage_files(translation_output_files, temp_git_repo)
 
     # Assert - Commands use "git add --" pattern (not "git add -A" or "git add .")
@@ -279,7 +280,7 @@ def test_push_failure_does_not_fail_commit_result(
     Evidence: src/observability/git_commit.py lines 202-208 (push handling)
     """
     # Arrange - Mock push to fail
-    with patch.object(git_committer, '_push', return_value=False):
+    with patch.object(git_committer, "_push", return_value=False):
         # Stage files first
         git_committer._stage_files(translation_output_files, temp_git_repo)
 
@@ -345,8 +346,9 @@ def test_commit_success_independent_of_push(
         )
 
         # Assert - success reflects commit status, not push
-        assert result.success == scenario["expected_success"], \
+        assert result.success == scenario["expected_success"], (
             f"Scenario {scenario}: success should be {scenario['expected_success']}"
+        )
 
 
 # ==============================================================================
@@ -488,7 +490,10 @@ def test_collect_output_files_excludes_skipped_languages():
     # File 1: Both languages translated
     file1 = Mock()
     file1.success = True
-    file1.outputs = {"de": Mock(exists=Mock(return_value=True)), "fr": Mock(exists=Mock(return_value=True))}
+    file1.outputs = {
+        "de": Mock(exists=Mock(return_value=True)),
+        "fr": Mock(exists=Mock(return_value=True)),
+    }
     file1.skipped_langs = set()
     file1.errors = {}
     file1.validation_decision = None
@@ -496,7 +501,10 @@ def test_collect_output_files_excludes_skipped_languages():
     # File 2: One language skipped
     file2 = Mock()
     file2.success = True
-    file2.outputs = {"de": Mock(exists=Mock(return_value=True)), "fr": Mock(exists=Mock(return_value=True))}
+    file2.outputs = {
+        "de": Mock(exists=Mock(return_value=True)),
+        "fr": Mock(exists=Mock(return_value=True)),
+    }
     file2.skipped_langs = {"fr"}  # French was skipped
     file2.errors = {}
     file2.validation_decision = None

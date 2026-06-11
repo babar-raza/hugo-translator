@@ -7,6 +7,7 @@ Tests focus on:
 - Default values and field initialization
 - Serialization and data integrity
 """
+
 from pathlib import Path
 
 from src.translation_engine.models import (

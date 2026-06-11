@@ -341,8 +341,7 @@ class TestConnectionPoolIntegration:
         def read_worker(thread_id, start_id, end_id):
             with pool.get_connection() as conn:
                 cursor = conn.execute(
-                    "SELECT COUNT(*) FROM test_data WHERE id >= ? AND id < ?",
-                    (start_id, end_id)
+                    "SELECT COUNT(*) FROM test_data WHERE id >= ? AND id < ?", (start_id, end_id)
                 )
                 count = cursor.fetchone()[0]
                 results[thread_id] = count

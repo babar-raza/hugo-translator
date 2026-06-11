@@ -35,7 +35,9 @@ class MockValidator(Validator):
         self.has_errors_flag = has_errors
         self.validate_called = False
 
-    def validate(self, source: str, translation: str, context: dict[str, Any] = None) -> ValidationResult:
+    def validate(
+        self, source: str, translation: str, context: dict[str, Any] = None
+    ) -> ValidationResult:
         self.validate_called = True
         result = ValidationResult(success=self.return_success)
         if self.has_errors_flag:
@@ -436,6 +438,7 @@ validators:
 
     def test_validate_with_context(self):
         """Test that context is passed to validators."""
+
         class ContextCheckValidator(Validator):
             def __init__(self):
                 super().__init__("ContextCheck")
@@ -471,6 +474,7 @@ validators:
 
     def test_short_circuit_does_not_trigger_on_warnings(self):
         """Test that short-circuit only triggers on errors, not warnings."""
+
         class WarningValidator(Validator):
             def __init__(self, name):
                 super().__init__(name)
@@ -514,6 +518,7 @@ validators:
 
     def test_multiple_errors_aggregation(self):
         """Test aggregation of multiple errors from different validators."""
+
         class MultiErrorValidator(Validator):
             def __init__(self, name, error_count):
                 super().__init__(name)
@@ -526,7 +531,7 @@ validators:
                         ValidationIssue(
                             severity=ValidationSeverity.ERROR,
                             validator=self.name,
-                            message=f"Error {i+1}",
+                            message=f"Error {i + 1}",
                         )
                     )
                 return result

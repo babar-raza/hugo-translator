@@ -8,6 +8,7 @@ Tests cover:
 - Validation config merging
 - Validator-specific settings
 """
+
 from pathlib import Path
 from unittest.mock import Mock
 
@@ -37,9 +38,9 @@ class TestSiteProfileValidationSchema:
         profile = config_service.get_site_profile("products.aspose.net")
 
         assert profile.validation is not None
-        assert hasattr(profile.validation, 'enabled')
-        assert hasattr(profile.validation, 'validation_mode')
-        assert hasattr(profile.validation, 'validators')
+        assert hasattr(profile.validation, "enabled")
+        assert hasattr(profile.validation, "validation_mode")
+        assert hasattr(profile.validation, "validators")
 
     def test_products_validation_mode(self, config_service):
         """Test that products.aspose.net has normal validation mode."""
@@ -124,10 +125,9 @@ class TestCLIValidationFlags:
     def test_validation_config_flag(self):
         """Test that --validation-config flag is parsed correctly."""
         parser = create_parser()
-        args = parser.parse_args([
-            "--site", "test.site",
-            "--validation-config", "/path/to/custom-validation.yaml"
-        ])
+        args = parser.parse_args(
+            ["--site", "test.site", "--validation-config", "/path/to/custom-validation.yaml"]
+        )
 
         assert args.validation_config == "/path/to/custom-validation.yaml"
 
@@ -182,10 +182,9 @@ class TestCLIValidationFlags:
     def test_cli_overrides_validation_config_path(self):
         """Test that CLIConfigOverrides handles --validation-config."""
         parser = create_parser()
-        args = parser.parse_args([
-            "--site", "test.site",
-            "--validation-config", "/custom/validation.yaml"
-        ])
+        args = parser.parse_args(
+            ["--site", "test.site", "--validation-config", "/custom/validation.yaml"]
+        )
 
         overrides = CLIConfigOverrides(args)
 
@@ -224,10 +223,7 @@ class TestValidationConfigPrecedence:
         parser = create_parser()
 
         # Profile has "normal", CLI specifies "strict"
-        args = parser.parse_args([
-            "--site", "products.aspose.net",
-            "--validation-mode", "strict"
-        ])
+        args = parser.parse_args(["--site", "products.aspose.net", "--validation-mode", "strict"])
 
         overrides = CLIConfigOverrides(args)
         engine_overrides = overrides.get_engine_overrides()
@@ -240,10 +236,7 @@ class TestValidationConfigPrecedence:
         parser = create_parser()
 
         # Profile has validation enabled, CLI disables it
-        args = parser.parse_args([
-            "--site", "products.aspose.net",
-            "--disable-validation"
-        ])
+        args = parser.parse_args(["--site", "products.aspose.net", "--disable-validation"])
 
         overrides = CLIConfigOverrides(args)
         engine_overrides = overrides.get_engine_overrides()
@@ -263,10 +256,7 @@ class TestValidationConfigPrecedence:
         """Test that CLI --max-retries overrides config setting."""
         parser = create_parser()
 
-        args = parser.parse_args([
-            "--site", "products.aspose.net",
-            "--max-retries", "5"
-        ])
+        args = parser.parse_args(["--site", "products.aspose.net", "--max-retries", "5"])
 
         overrides = CLIConfigOverrides(args)
         engine_overrides = overrides.get_engine_overrides()
@@ -382,11 +372,9 @@ class TestConfigLoadingEndToEnd:
     def test_merge_cli_and_profile_settings(self, config_service):
         """Test that CLI overrides are merged with profile settings."""
         parser = create_parser()
-        args = parser.parse_args([
-            "--site", "products.aspose.net",
-            "--validation-mode", "strict",
-            "--max-retries", "1"
-        ])
+        args = parser.parse_args(
+            ["--site", "products.aspose.net", "--validation-mode", "strict", "--max-retries", "1"]
+        )
 
         overrides = CLIConfigOverrides(args)
         engine_overrides = overrides.get_engine_overrides()
@@ -411,10 +399,9 @@ class TestConfigLoadingEndToEnd:
     def test_validation_config_path_override(self, config_service):
         """Test that custom validation config path can be specified."""
         parser = create_parser()
-        args = parser.parse_args([
-            "--site", "products.aspose.net",
-            "--validation-config", "./custom-validation.yaml"
-        ])
+        args = parser.parse_args(
+            ["--site", "products.aspose.net", "--validation-config", "./custom-validation.yaml"]
+        )
 
         overrides = CLIConfigOverrides(args)
 

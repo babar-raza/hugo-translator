@@ -3,12 +3,12 @@
 Keeps worker code changes minimal — one call before content_root,
 one call after.
 """
+
 from __future__ import annotations
 
 import logging
 import time
 import uuid
-from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
@@ -88,11 +88,14 @@ class MetricsRunContext:
         self._start_time = time.time()
         try:
             from src.observability.llm_run_context import LLMRunContext
+
             self._llm_ctx = LLMRunContext.start_run()
         except Exception as e:
             logger.warning("LLMRunContext start failed: %s", e)
 
-    def abort(self, error_detail: str = "Worker aborted before content_root completed") -> dict | None:
+    def abort(
+        self, error_detail: str = "Worker aborted before content_root completed"
+    ) -> dict | None:
         """Call if content_root fails or is killed before finish().
 
         Writes a failure sidecar (dry_run only — no HTTP POST) with whatever LLM
@@ -129,6 +132,7 @@ class MetricsRunContext:
         if self._llm_ctx:
             try:
                 from src.observability.llm_run_context import LLMRunContext
+
                 delta = self._llm_ctx.checkpoint()
                 token_usage = delta.token_usage
                 api_calls_count = delta.api_calls_count
@@ -171,22 +175,22 @@ class MetricsRunContext:
         call_accounting: dict,
         error_detail: str | None,
     ) -> dict:
-        from src.observability.metrics_scope import (
-            ScopeResolver,
-            ScopeInput,
-            derive_content_root_id,
-            generate_stable_work_slice_id,
-            generate_execution_attempt_id,
-            generate_segment_run_id,
-        )
         from src.observability.agent_metrics_payload import (
             AgentMetricsPayload,
             determine_status,
             make_timestamp,
         )
+        from src.observability.agent_metrics_poster import AgentMetricsPoster
         from src.observability.gitlab_context import collect_gitlab_context
         from src.observability.metrics_evidence import EvidenceWriter
-        from src.observability.agent_metrics_poster import AgentMetricsPoster
+        from src.observability.metrics_scope import (
+            ScopeInput,
+            ScopeResolver,
+            derive_content_root_id,
+            generate_execution_attempt_id,
+            generate_segment_run_id,
+            generate_stable_work_slice_id,
+        )
 
         # Resolve scope
         content_root_id = derive_content_root_id(self.content_root_raw)
@@ -294,7 +298,9 @@ class MetricsRunContext:
             return lifecycle
 
         if lifecycle["action"] == "dry_run":
-            logger.info("Metrics DRY RUN: payload logged for %s (%s)", self.site_id, content_root_id)
+            logger.info(
+                "Metrics DRY RUN: payload logged for %s (%s)", self.site_id, content_root_id
+            )
             return lifecycle
 
         # Actually post
@@ -303,7 +309,6 @@ class MetricsRunContext:
             token_env=self._cfg.get("token_env", "AGENT_METRICS_TOKEN"),
             timeout_seconds=self._cfg.get("post_timeout_seconds", 15),
             dry_run=False,
-            fire_and_forget=self._cfg.get("fire_and_forget", False),
         )
         result = poster.post(post_dict, job_type=self.job_type)
 
@@ -321,6 +326,7 @@ class MetricsRunContext:
             model_id = raw.get("llm_escalation_model", "professionalize_llm")
             # Try to read model registry
             from src.model_runtime.registry import ModelRegistry
+
             reg = ModelRegistry()
             info = reg.get_model(model_id)
             provider_name = getattr(info, "provider", "unknown")
@@ -329,6 +335,7 @@ class MetricsRunContext:
             endpoint_host = ""
             if endpoint:
                 from urllib.parse import urlparse
+
                 endpoint_host = urlparse(endpoint).hostname or ""
             is_prof = "professionalize.com" in endpoint_host
             return {

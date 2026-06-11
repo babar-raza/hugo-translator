@@ -8,6 +8,7 @@ Verifies SD-03 acceptance checks:
 - Blank lines preserved
 - Indentation preserved
 """
+
 # Import directly to avoid full package import chain
 import sys
 from dataclasses import dataclass, field
@@ -19,6 +20,7 @@ sys.path.insert(0, ".")
 
 class SegmentContextType(str, Enum):
     """Type of segment context."""
+
     FRONTMATTER = "frontmatter"
     BODY_TEXT = "body_text"
 
@@ -26,6 +28,7 @@ class SegmentContextType(str, Enum):
 @dataclass
 class SegmentContext:
     """Context information for a translatable segment."""
+
     context_type: SegmentContextType
     frontmatter_key: str | None = None
     metadata: dict[str, Any] = field(default_factory=dict)
@@ -34,6 +37,7 @@ class SegmentContext:
 @dataclass
 class Segment:
     """A translatable unit with context."""
+
     id: str
     source_text: str
     context: SegmentContext
@@ -181,9 +185,7 @@ Body content.
         translations = {"seg1": "Translated Title"}
         segment_map = {"seg1": segment}
 
-        result = reconstructor.reconstruct_from_template(
-            source, translations, segment_map
-        )
+        result = reconstructor.reconstruct_from_template(source, translations, segment_map)
 
         assert "Translated Title" in result
         assert "English Title" not in result
@@ -215,9 +217,7 @@ overview:
         translations = {"seg1": "Translated Overview"}
         segment_map = {"seg1": segment}
 
-        result = reconstructor.reconstruct_from_template(
-            source, translations, segment_map
-        )
+        result = reconstructor.reconstruct_from_template(source, translations, segment_map)
 
         assert "Translated Overview" in result
 
@@ -250,9 +250,7 @@ content: |
         translations = {"seg1": "Translated 1\nTranslated 2\n- Point 1\n- Point 2"}
         segment_map = {"seg1": segment}
 
-        result = reconstructor.reconstruct_from_template(
-            source, translations, segment_map
-        )
+        result = reconstructor.reconstruct_from_template(source, translations, segment_map)
 
         # Should preserve literal style
         assert "content: |" in result or "content:\n" in result
@@ -290,9 +288,7 @@ More body text here.
         translations = {"body1": "Dies ist übersetzter Inhalt."}
         segment_map = {"body1": segment}
 
-        result = reconstructor.reconstruct_from_template(
-            source, translations, segment_map
-        )
+        result = reconstructor.reconstruct_from_template(source, translations, segment_map)
 
         assert "Dies ist übersetzter Inhalt." in result
         assert "This is body content to translate." not in result

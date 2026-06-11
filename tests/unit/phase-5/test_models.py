@@ -1,6 +1,7 @@
 """
 Unit tests for translation engine result models.
 """
+
 from pathlib import Path
 
 from src.translation_engine.models import (

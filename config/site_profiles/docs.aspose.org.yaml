@@ -50,6 +50,9 @@ frontmatter:
   description:
     mode: translate
     strategy: null
+  subtitle:
+    mode: translate
+    strategy: null
   draft:
     mode: passthrough
     strategy: null

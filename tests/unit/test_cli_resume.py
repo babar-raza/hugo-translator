@@ -26,38 +26,38 @@ def load_cli_module():
 
     # Create mock modules for dependencies
     mock_modules = [
-        'translation_engine',
-        'translation_engine.TranslationEngine',
-        'translation_engine.models',
-        'translation_engine.models.TranslationResult',
-        'translation_engine.models.DirectoryResult',
-        'translation_engine.progress',
-        'translation_engine.progress.ProgressTracker',
-        'tm',
-        'tm.TranslationMemory',
-        'tm.l1_cache',
-        'tm.l1_cache.L1Cache',
-        'tm.l2_persistent',
-        'tm.l2_persistent.L2PersistentTM',
-        'tm.l3_semantic',
-        'tm.l3_semantic.L3SemanticTM',
-        'model_runtime',
-        'model_runtime.ModelLoader',
-        'model_runtime.registry',
-        'model_runtime.registry.ModelRegistry',
-        'model_runtime.cpu_optimizer',
-        'model_runtime.cpu_optimizer.CPUOptimizer',
-        'utils',
-        'utils.config_loader',
-        'utils.config_loader.ConfigService',
-        'utils.models',
-        'utils.models.ValidationSettings',
-        'utils.models.TerminologySettings',
-        'verification',
-        'verification.report',
-        'verification.report.write_report',
-        'observability',
-        'observability.progress',
+        "translation_engine",
+        "translation_engine.TranslationEngine",
+        "translation_engine.models",
+        "translation_engine.models.TranslationResult",
+        "translation_engine.models.DirectoryResult",
+        "translation_engine.progress",
+        "translation_engine.progress.ProgressTracker",
+        "tm",
+        "tm.TranslationMemory",
+        "tm.l1_cache",
+        "tm.l1_cache.L1Cache",
+        "tm.l2_persistent",
+        "tm.l2_persistent.L2PersistentTM",
+        "tm.l3_semantic",
+        "tm.l3_semantic.L3SemanticTM",
+        "model_runtime",
+        "model_runtime.ModelLoader",
+        "model_runtime.registry",
+        "model_runtime.registry.ModelRegistry",
+        "model_runtime.cpu_optimizer",
+        "model_runtime.cpu_optimizer.CPUOptimizer",
+        "utils",
+        "utils.config_loader",
+        "utils.config_loader.ConfigService",
+        "utils.models",
+        "utils.models.ValidationSettings",
+        "utils.models.TerminologySettings",
+        "verification",
+        "verification.report",
+        "verification.report.write_report",
+        "observability",
+        "observability.progress",
     ]
 
     for mod_name in mock_modules:
@@ -67,7 +67,7 @@ def load_cli_module():
     # Now load cli module
     spec = importlib.util.spec_from_file_location("cli", src_path / "cli.py")
     cli_module = importlib.util.module_from_spec(spec)
-    sys.modules['cli'] = cli_module
+    sys.modules["cli"] = cli_module
     spec.loader.exec_module(cli_module)
 
     return cli_module
@@ -90,55 +90,37 @@ class TestCLIResumeFlags:
 
     def test_resume_flag_default_enabled(self, parser):
         """Test --resume is enabled by default."""
-        args = parser.parse_args([
-            "--site", "test.site"
-        ])
+        args = parser.parse_args(["--site", "test.site"])
         assert args.resume is True
 
     def test_resume_flag_explicit(self, parser):
         """Test --resume can be explicitly set."""
-        args = parser.parse_args([
-            "--site", "test.site",
-            "--resume"
-        ])
+        args = parser.parse_args(["--site", "test.site", "--resume"])
         assert args.resume is True
 
     def test_no_resume_flag(self, parser):
         """Test --no-resume disables resume."""
-        args = parser.parse_args([
-            "--site", "test.site",
-            "--no-resume"
-        ])
+        args = parser.parse_args(["--site", "test.site", "--no-resume"])
         assert args.resume is False
 
     def test_force_restart_flag_default(self, parser):
         """Test --force-restart is disabled by default."""
-        args = parser.parse_args([
-            "--site", "test.site"
-        ])
+        args = parser.parse_args(["--site", "test.site"])
         assert args.force_restart is False
 
     def test_force_restart_flag_enabled(self, parser):
         """Test --force-restart can be enabled."""
-        args = parser.parse_args([
-            "--site", "test.site",
-            "--force-restart"
-        ])
+        args = parser.parse_args(["--site", "test.site", "--force-restart"])
         assert args.force_restart is True
 
     def test_progress_dir_default(self, parser):
         """Test --progress-dir has correct default."""
-        args = parser.parse_args([
-            "--site", "test.site"
-        ])
+        args = parser.parse_args(["--site", "test.site"])
         assert args.progress_dir == ".translation_progress"
 
     def test_progress_dir_custom(self, parser):
         """Test --progress-dir accepts custom path."""
-        args = parser.parse_args([
-            "--site", "test.site",
-            "--progress-dir", "/tmp/my_progress"
-        ])
+        args = parser.parse_args(["--site", "test.site", "--progress-dir", "/tmp/my_progress"])
         assert args.progress_dir == "/tmp/my_progress"
 
     def test_help_includes_resume_flags(self, parser, capsys):
@@ -246,17 +228,11 @@ class TestCleanupProgress:
         """Test cleanup removes progress files for matching site."""
         # Create progress file for test.site
         pf1 = progress_dir / "progress_abc123.json"
-        pf1.write_text(json.dumps({
-            "site_id": "test.site",
-            "run_id": "abc123"
-        }))
+        pf1.write_text(json.dumps({"site_id": "test.site", "run_id": "abc123"}))
 
         # Create progress file for other.site
         pf2 = progress_dir / "progress_def456.json"
-        pf2.write_text(json.dumps({
-            "site_id": "other.site",
-            "run_id": "def456"
-        }))
+        pf2.write_text(json.dumps({"site_id": "other.site", "run_id": "def456"}))
 
         # Clean up test.site
         result = _cleanup_progress(progress_dir, "test.site")
@@ -269,10 +245,7 @@ class TestCleanupProgress:
         """Test cleanup handles corrupted JSON files."""
         # Create valid file
         pf1 = progress_dir / "progress_valid.json"
-        pf1.write_text(json.dumps({
-            "site_id": "test.site",
-            "run_id": "valid"
-        }))
+        pf1.write_text(json.dumps({"site_id": "test.site", "run_id": "valid"}))
 
         # Create invalid JSON file
         pf2 = progress_dir / "progress_invalid.json"
@@ -290,10 +263,7 @@ class TestCleanupProgress:
         # Create 3 progress files for same site
         for i in range(3):
             pf = progress_dir / f"progress_run{i}.json"
-            pf.write_text(json.dumps({
-                "site_id": "test.site",
-                "run_id": f"run{i}"
-            }))
+            pf.write_text(json.dumps({"site_id": "test.site", "run_id": f"run{i}"}))
 
         result = _cleanup_progress(progress_dir, "test.site")
 
@@ -311,21 +281,13 @@ class TestFlagConflictHandling:
 
     def test_force_restart_with_resume(self, parser):
         """Test --force-restart and --resume can coexist (force-restart wins)."""
-        args = parser.parse_args([
-            "--site", "test.site",
-            "--resume",
-            "--force-restart"
-        ])
+        args = parser.parse_args(["--site", "test.site", "--resume", "--force-restart"])
         # Both can be parsed, but force_restart should win in implementation
         assert args.resume is True
         assert args.force_restart is True
 
     def test_force_restart_with_no_resume(self, parser):
         """Test --force-restart with --no-resume."""
-        args = parser.parse_args([
-            "--site", "test.site",
-            "--no-resume",
-            "--force-restart"
-        ])
+        args = parser.parse_args(["--site", "test.site", "--no-resume", "--force-restart"])
         assert args.resume is False
         assert args.force_restart is True

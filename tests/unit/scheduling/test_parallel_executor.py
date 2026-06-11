@@ -3,6 +3,7 @@ Unit tests for parallel language executor (T303: federated-splashing-panda).
 
 Tests ParallelLanguageExecutor and LanguageExecutionResult.
 """
+
 from pathlib import Path
 from unittest.mock import MagicMock, Mock, patch
 
@@ -411,7 +412,10 @@ class TestParallelLanguageExecutorConcurrency:
         mock_pool.submit = Mock(return_value=mock_future)
 
         # Mock as_completed to return futures
-        with patch("src.translation_engine.scheduling.parallel_executor.as_completed", return_value=[mock_future]):
+        with patch(
+            "src.translation_engine.scheduling.parallel_executor.as_completed",
+            return_value=[mock_future],
+        ):
             mock_engine = Mock()
             executor = ParallelLanguageExecutor(max_workers=3, engine=mock_engine)
 
@@ -478,8 +482,10 @@ class TestParallelLanguageExecutorConcurrency:
             for j in range(i + 1, len(langs)):
                 lang1, lang2 = langs[i], langs[j]
                 # Check if execution windows overlap
-                if (execution_times[lang1]["start"] < execution_times[lang2]["end"] and
-                    execution_times[lang2]["start"] < execution_times[lang1]["end"]):
+                if (
+                    execution_times[lang1]["start"] < execution_times[lang2]["end"]
+                    and execution_times[lang2]["start"] < execution_times[lang1]["end"]
+                ):
                     overlaps += 1
 
         # With 3 languages running concurrently, we should see overlaps

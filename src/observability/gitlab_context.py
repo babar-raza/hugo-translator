@@ -1,10 +1,10 @@
 """GitLab CI context collector with local-run fallback."""
+
 from __future__ import annotations
 
 import os
 import socket
 from dataclasses import dataclass, field
-
 
 _CI_VARS = [
     "CI_PROJECT_PATH",

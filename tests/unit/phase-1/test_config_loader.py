@@ -1,6 +1,7 @@
 """
 Unit tests for ConfigService - Configuration loading and validation.
 """
+
 import sys
 from pathlib import Path
 

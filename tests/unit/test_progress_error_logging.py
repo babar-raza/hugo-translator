@@ -94,7 +94,8 @@ def test_final_error_count_matches_log_count(caplog):
 
     # Count ERROR logs from record_error (exclude other ERROR logs)
     error_logs = [
-        record for record in caplog.records
+        record
+        for record in caplog.records
         if record.levelno == logging.ERROR and "Error #" in record.message
     ]
 

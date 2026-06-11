@@ -8,6 +8,7 @@ Scenarios:
   D) config values load from global.yaml
   E) per-site limit overrides global --max-seconds-per-run
 """
+
 import sys
 import time
 import types
@@ -50,6 +51,7 @@ def _make_worker(files_per_commit, max_seconds_per_run=None):
         AutonomousContentTranslationWorker,
         AutonomousWorkerConfig,
     )
+
     cfg = AutonomousWorkerConfig(max_seconds_per_run=max_seconds_per_run)
     worker = AutonomousContentTranslationWorker.__new__(AutonomousContentTranslationWorker)
     worker.config = cfg
@@ -101,8 +103,10 @@ def test_chunked_45_files_produces_3_commits():
         _make_dir_result(5),
     ]
 
-    with patch("src.workers.autonomous_content_translation_worker.auto_commit_translations",
-               return_value=True) as mock_commit:
+    with patch(
+        "src.workers.autonomous_content_translation_worker.auto_commit_translations",
+        return_value=True,
+    ) as mock_commit:
         _run(worker, batch_idx=1)
 
     assert worker.translation_engine.translate_directory.call_count == 3
@@ -127,8 +131,10 @@ def test_legacy_single_pass_unchanged():
     worker_b = _make_worker(files_per_commit=0)
     worker_b.translation_engine.translate_directory.return_value = _make_dir_result(100)
 
-    with patch("src.workers.autonomous_content_translation_worker.auto_commit_translations",
-               return_value=True) as mock_commit_b:
+    with patch(
+        "src.workers.autonomous_content_translation_worker.auto_commit_translations",
+        return_value=True,
+    ) as mock_commit_b:
         _run(worker_b, batch_idx=2)
 
     assert worker_b.translation_engine.translate_directory.call_count == 1
@@ -156,6 +162,7 @@ def test_deadline_stops_loop_between_chunks():
     worker_c._run_start = T  # deadline = T + 700
 
     n = [0]
+
     def _fake_time():
         n[0] += 1
         return T + 600 if n[0] < 3 else T + 800  # calls 1-2 before deadline, call 3+ after
@@ -166,9 +173,13 @@ def test_deadline_stops_loop_between_chunks():
         RuntimeError("translate_directory called 2nd time — deadline check did not fire"),
     ]
 
-    with patch.object(wmod.time, "time", side_effect=_fake_time), \
-         patch("src.workers.autonomous_content_translation_worker.auto_commit_translations",
-               return_value=True) as mock_commit_c:
+    with (
+        patch.object(wmod.time, "time", side_effect=_fake_time),
+        patch(
+            "src.workers.autonomous_content_translation_worker.auto_commit_translations",
+            return_value=True,
+        ) as mock_commit_c,
+    ):
         _run(worker_c, batch_idx=3)
 
     assert worker_c.translation_engine.translate_directory.call_count == 1
@@ -179,6 +190,7 @@ def test_deadline_stops_loop_between_chunks():
 def test_production_config_values():
     """global.yaml has the expected files_per_commit."""
     from src.utils.config_loader import ConfigService
+
     cs = ConfigService("config/")
     raw = cs.get_config()
 
@@ -201,6 +213,7 @@ def test_per_site_limit_overrides_global():
         AutonomousContentTranslationWorker,
         AutonomousWorkerConfig,
     )
+
     cfg = AutonomousWorkerConfig(max_seconds_per_run=3600)  # global = 1h
     worker = AutonomousContentTranslationWorker.__new__(AutonomousContentTranslationWorker)
     worker.config = cfg
@@ -234,8 +247,10 @@ def test_per_site_limit_overrides_global():
 
     worker.translation_engine.translate_directory.side_effect = capture_translate
 
-    with patch("src.workers.autonomous_content_translation_worker.auto_commit_translations",
-               return_value=True):
+    with patch(
+        "src.workers.autonomous_content_translation_worker.auto_commit_translations",
+        return_value=True,
+    ):
         # Use "reference.aspose.net" to match the per_site_limits key
         worker._run_new_files = {}
         worker._run_skipped = {}
@@ -269,11 +284,13 @@ def test_all_skipped_chunk_advances_offset_and_terminates():
     worker = _make_worker(files_per_commit=20)
     worker.translation_engine.translate_directory.side_effect = [
         _make_dir_result(20, translated_segments=0),  # chunk 0: all done, advance offset
-        _make_dir_result(0),                          # chunk 1: no files at offset 20 → break
+        _make_dir_result(0),  # chunk 1: no files at offset 20 → break
     ]
 
-    with patch("src.workers.autonomous_content_translation_worker.auto_commit_translations",
-               return_value=True) as mock_commit:
+    with patch(
+        "src.workers.autonomous_content_translation_worker.auto_commit_translations",
+        return_value=True,
+    ) as mock_commit:
         _run(worker, batch_idx=1)
 
     # Two translate calls: chunk 0 (advance) and chunk 1 (empty → break)
@@ -294,11 +311,13 @@ def test_offset_advances_across_chunks():
     worker.translation_engine.translate_directory.side_effect = [
         _make_dir_result(20, translated_segments=5),  # chunk 0: 5 new translations
         _make_dir_result(20, translated_segments=3),  # chunk 1: 3 new translations
-        _make_dir_result(7,  translated_segments=0),  # chunk 2: final partial → break
+        _make_dir_result(7, translated_segments=0),  # chunk 2: final partial → break
     ]
 
-    with patch("src.workers.autonomous_content_translation_worker.auto_commit_translations",
-               return_value=True):
+    with patch(
+        "src.workers.autonomous_content_translation_worker.auto_commit_translations",
+        return_value=True,
+    ):
         _run(worker, batch_idx=1)
 
     calls = worker.translation_engine.translate_directory.call_args_list
@@ -319,11 +338,13 @@ def test_run_new_files_populated_after_chunked_translation():
     worker = _make_worker(files_per_commit=20)
     worker.translation_engine.translate_directory.side_effect = [
         _make_dir_result(total_files=20, successful_files=18),  # chunk 0: 18 ok, 2 failed
-        _make_dir_result(total_files=5,  successful_files=5),   # chunk 1: final, all ok
+        _make_dir_result(total_files=5, successful_files=5),  # chunk 1: final, all ok
     ]
 
-    with patch("src.workers.autonomous_content_translation_worker.auto_commit_translations",
-               return_value=True):
+    with patch(
+        "src.workers.autonomous_content_translation_worker.auto_commit_translations",
+        return_value=True,
+    ):
         _run(worker, batch_idx=1)
 
     # BUG-2 FIX: site key must exist and hold the correct total
@@ -342,8 +363,10 @@ def test_run_new_files_populated_after_legacy_translation():
         total_files=50, successful_files=47
     )
 
-    with patch("src.workers.autonomous_content_translation_worker.auto_commit_translations",
-               return_value=True):
+    with patch(
+        "src.workers.autonomous_content_translation_worker.auto_commit_translations",
+        return_value=True,
+    ):
         _run(worker, batch_idx=1)
 
     assert "test.site" in worker._run_new_files
@@ -355,6 +378,7 @@ def test_translate_directory_accepts_skip_first():
     import inspect
 
     from src.translation_engine.engine import TranslationEngine
+
     sig = inspect.signature(TranslationEngine.translate_directory)
     assert "skip_first" in sig.parameters, (
         "translate_directory must accept skip_first for chunked commit mode"
@@ -369,6 +393,7 @@ def test_execute_translation_run_initializes_run_start_and_run_new_files():
         AutonomousContentTranslationWorker,
         AutonomousWorkerConfig,
     )
+
     cfg = AutonomousWorkerConfig()
     worker = AutonomousContentTranslationWorker.__new__(AutonomousContentTranslationWorker)
     worker.config = cfg

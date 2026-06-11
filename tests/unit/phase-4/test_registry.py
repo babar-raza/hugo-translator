@@ -1,6 +1,7 @@
 """
 Unit tests for Model Registry.
 """
+
 import tempfile
 from pathlib import Path
 
@@ -56,9 +57,7 @@ models:
 @pytest.fixture
 def temp_registry_file(sample_registry_yaml):
     """Create temporary registry file."""
-    with tempfile.NamedTemporaryFile(
-        mode="w", suffix=".yaml", delete=False, encoding="utf-8"
-    ) as f:
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False, encoding="utf-8") as f:
         f.write(sample_registry_yaml)
         temp_path = Path(f.name)
 
@@ -302,9 +301,7 @@ class TestRegistryPersistence:
 
     def test_save_registry(self, registry):
         """Test saving registry to file."""
-        with tempfile.NamedTemporaryFile(
-            mode="w", suffix=".yaml", delete=False
-        ) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
             temp_path = Path(f.name)
 
         try:
@@ -324,9 +321,7 @@ class TestRegistryPersistence:
 
     def test_save_and_reload(self, registry):
         """Test save and reload cycle."""
-        with tempfile.NamedTemporaryFile(
-            mode="w", suffix=".yaml", delete=False
-        ) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
             temp_path = Path(f.name)
 
         try:

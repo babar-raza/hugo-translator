@@ -6,6 +6,7 @@ Covers:
 - is_multi_family
 - fail-closed: unknown paths must NOT return "total"
 """
+
 from __future__ import annotations
 
 import os
@@ -21,9 +22,28 @@ from src.observability.family_extraction import (
 )
 
 KNOWN_FAMILIES = [
-    "words", "cells", "pdf", "slides", "email", "imaging", "3d",
-    "barcode", "cad", "diagram", "html", "ocr", "psd", "zip",
-    "tasks", "note", "font", "tex", "page", "svg", "gis", "total",
+    "words",
+    "cells",
+    "pdf",
+    "slides",
+    "email",
+    "imaging",
+    "3d",
+    "barcode",
+    "cad",
+    "diagram",
+    "html",
+    "ocr",
+    "psd",
+    "zip",
+    "tasks",
+    "note",
+    "font",
+    "tex",
+    "page",
+    "svg",
+    "gis",
+    "total",
 ]
 
 
@@ -39,7 +59,9 @@ class TestExtractFamilyFromPath:
         assert extract_family_from_path("en/cells/net/_index.md", KNOWN_FAMILIES) == "cells"
 
     def test_org_products_words(self):
-        assert extract_family_from_path("en/words/getting-started/intro.md", KNOWN_FAMILIES) == "words"
+        assert (
+            extract_family_from_path("en/words/getting-started/intro.md", KNOWN_FAMILIES) == "words"
+        )
 
     def test_org_docs_pdf(self):
         assert extract_family_from_path("en/pdf/api-reference.md", KNOWN_FAMILIES) == "pdf"
@@ -53,7 +75,9 @@ class TestExtractFamilyFromPath:
         assert extract_family_from_path("words/en/_index.md", KNOWN_FAMILIES) == "words"
 
     def test_net_kb_barcode_de(self):
-        assert extract_family_from_path("barcode/de/1d-reader/_index.md", KNOWN_FAMILIES) == "barcode"
+        assert (
+            extract_family_from_path("barcode/de/1d-reader/_index.md", KNOWN_FAMILIES) == "barcode"
+        )
 
     def test_net_reference_cells_fr(self):
         assert extract_family_from_path("cells/fr/namespace/_index.md", KNOWN_FAMILIES) == "cells"

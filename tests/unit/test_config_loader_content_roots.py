@@ -2,7 +2,6 @@
 Unit tests for content-root path resolution in ConfigService.
 """
 
-
 from src.utils.config_loader import ConfigService
 
 

@@ -1,4 +1,5 @@
 """Integration test: stable_work_slice_id is identical across path styles."""
+
 from __future__ import annotations
 
 from unittest.mock import patch
@@ -22,14 +23,18 @@ class TestIdStability:
     def test_work_slice_id_stable_across_path_formats(self, _sha, _repo):
         cid = derive_content_root_id("${VAR}/docs.aspose.net/words")
         id1 = generate_stable_work_slice_id(
-            site_id="docs.aspose.net", content_root_id=cid,
-            product_family_token="words", platform="all",
+            site_id="docs.aspose.net",
+            content_root_id=cid,
+            product_family_token="words",
+            platform="all",
             operation_type="content_translation",
         )
         cid2 = derive_content_root_id("${VAR}\\docs.aspose.net\\words")
         id2 = generate_stable_work_slice_id(
-            site_id="docs.aspose.net", content_root_id=cid2,
-            product_family_token="words", platform="all",
+            site_id="docs.aspose.net",
+            content_root_id=cid2,
+            product_family_token="words",
+            platform="all",
             operation_type="content_translation",
         )
         assert id1 == id2

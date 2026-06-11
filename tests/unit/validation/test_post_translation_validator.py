@@ -435,7 +435,9 @@ class TestValidationDecisionEngine:
         assert decision.decision_reason is not None
         assert len(decision.decision_reason) > 0
 
-    def test_make_decision_no_retry_feedback(self, mock_validation_result: ValidationResult) -> None:
+    def test_make_decision_no_retry_feedback(
+        self, mock_validation_result: ValidationResult
+    ) -> None:
         """Test that stub implementation returns no retry feedback."""
         engine = ValidationDecisionEngine(config={})
         decision = engine.make_decision(

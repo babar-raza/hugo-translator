@@ -45,6 +45,7 @@ def _make_worker():
     from src.workers.autonomous_content_translation_worker import (
         AutonomousContentTranslationWorker,
     )
+
     worker = AutonomousContentTranslationWorker.__new__(AutonomousContentTranslationWorker)
     worker.translation_engine = None
     worker._worker_id = "content_worker"
@@ -52,7 +53,6 @@ def _make_worker():
 
 
 class TestOffloadModelsNoEngine(unittest.TestCase):
-
     def test_noop_when_translation_engine_is_none(self):
         """Must return early without error when translation_engine is None."""
         worker = _make_worker()
@@ -77,7 +77,6 @@ class TestOffloadModelsNoEngine(unittest.TestCase):
 
 
 class TestOffloadModelsWithLoadedModels(unittest.TestCase):
-
     def _make_worker_with_models(self, model_keys=("m2m100",)):
         worker = _make_worker()
         engine = MagicMock()
@@ -103,26 +102,29 @@ class TestOffloadModelsWithLoadedModels(unittest.TestCase):
         """Must call torch.cuda.empty_cache() when CUDA is available."""
         worker = self._make_worker_with_models()
         empty_cache_mock = MagicMock()
-        with patch("gc.collect"), \
-             patch("torch.cuda.is_available", return_value=True), \
-             patch("torch.cuda.empty_cache", empty_cache_mock):
+        with (
+            patch("gc.collect"),
+            patch("torch.cuda.is_available", return_value=True),
+            patch("torch.cuda.empty_cache", empty_cache_mock),
+        ):
             worker._offload_models()
         empty_cache_mock.assert_called_once()
 
     def test_does_not_crash_when_torch_import_fails(self):
         """Must not raise even if torch is unavailable (ImportError is silenced)."""
         worker = self._make_worker_with_models()
-        with patch("gc.collect"), \
-             patch.dict(sys.modules, {"torch": None}):
+        with patch("gc.collect"), patch.dict(sys.modules, {"torch": None}):
             worker._offload_models()  # should not raise
 
     def test_empty_cache_not_called_when_cuda_unavailable(self):
         """Must not call empty_cache() when CUDA is unavailable."""
         worker = self._make_worker_with_models()
         empty_cache_mock = MagicMock()
-        with patch("gc.collect"), \
-             patch("torch.cuda.is_available", return_value=False), \
-             patch("torch.cuda.empty_cache", empty_cache_mock):
+        with (
+            patch("gc.collect"),
+            patch("torch.cuda.is_available", return_value=False),
+            patch("torch.cuda.empty_cache", empty_cache_mock),
+        ):
             worker._offload_models()
         empty_cache_mock.assert_not_called()
 

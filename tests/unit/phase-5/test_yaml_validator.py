@@ -85,9 +85,7 @@ description: "Un test"
         result = validator.validate(source, translation)
 
         assert result.error_count > 0
-        assert any(
-            "missing keys" in issue.message.lower() for issue in result.issues
-        )
+        assert any("missing keys" in issue.message.lower() for issue in result.issues)
         assert any("tags" in str(issue.details) for issue in result.issues if issue.details)
 
     def test_extra_keys(self, validator):
@@ -104,9 +102,7 @@ extra_key: "Should not be here"
         result = validator.validate(source, translation)
 
         assert result.warning_count > 0
-        assert any(
-            "extra keys" in issue.message.lower() for issue in result.issues
-        )
+        assert any("extra keys" in issue.message.lower() for issue in result.issues)
 
     def test_type_mismatch(self, validator):
         """Test with type mismatches."""
@@ -123,9 +119,7 @@ tags: "un, deux"
         result = validator.validate(source, translation)
 
         assert result.error_count >= 2  # count and tags type mismatches
-        type_issues = [
-            issue for issue in result.issues if "type mismatch" in issue.message.lower()
-        ]
+        type_issues = [issue for issue in result.issues if "type mismatch" in issue.message.lower()]
         assert len(type_issues) == 2
 
     def test_list_length_mismatch(self, validator):
@@ -139,9 +133,7 @@ tags: ["un", "deux"]
         result = validator.validate(source, translation)
 
         assert result.warning_count > 0
-        assert any(
-            "list length mismatch" in issue.message.lower() for issue in result.issues
-        )
+        assert any("list length mismatch" in issue.message.lower() for issue in result.issues)
 
     def test_unquoted_colon_warning(self, validator):
         """Test warning for unquoted colons in values."""

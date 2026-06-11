@@ -54,7 +54,7 @@ class TestCLIOutputValidation:
 
         assert exc_info.value.code == 1
 
-    @patch('os.access')
+    @patch("os.access")
     def test_validate_output_path_fails_if_not_writable(self, mock_access, tmp_path):
         """Output path without write permissions fails with clear error."""
         readonly_dir = tmp_path / "readonly"
@@ -91,7 +91,7 @@ class TestCLIOutputValidation:
         captured = capsys.readouterr()
         assert "ERROR: Output path parent does not exist" in captured.err
 
-    @patch('os.access')
+    @patch("os.access")
     def test_validate_output_path_error_message_for_no_write_permission(
         self, mock_access, tmp_path, capsys
     ):

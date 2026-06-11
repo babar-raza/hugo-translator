@@ -1,4 +1,5 @@
 """Integration tests for translation statistics accuracy."""
+
 from src.observability.progress import AdaptiveEMACalculator, ProgressTracker
 
 
@@ -223,9 +224,9 @@ class TestProgressSnapshotFields:
         snapshot = tracker.get_snapshot()
 
         # Check new fields exist
-        assert hasattr(snapshot, 'token_count_method')
-        assert hasattr(snapshot, 'eta_confidence')
-        assert hasattr(snapshot, 'rate_volatility')
+        assert hasattr(snapshot, "token_count_method")
+        assert hasattr(snapshot, "eta_confidence")
+        assert hasattr(snapshot, "rate_volatility")
 
         # Check values are set
         assert snapshot.token_count_method == "actual"

@@ -8,6 +8,7 @@ Validates that when translation is interrupted with SIGINT/SIGTERM:
 - items_* reflect partial progress (GS-04)
 - metrics_json contains partial token/TM stats (GS-05)
 """
+
 import json
 import signal
 import sqlite3
@@ -52,16 +53,18 @@ def cleanup_test_runs(telemetry_db_path):
 
 
 @pytest.mark.integration
-@pytest.mark.skipif(not Path("/data/telemetry.sqlite").exists(),
-                   reason="Requires telemetry database (Docker environment)")
+@pytest.mark.skipif(
+    not Path("/data/telemetry.sqlite").exists(),
+    reason="Requires telemetry database (Docker environment)",
+)
 def test_directory_translation_interrupted_captures_telemetry(telemetry_db_path, cleanup_test_runs):
     """Test that interrupting directory translation captures complete telemetry."""
     # Start translation in subprocess
-    proc = subprocess.Popen([
-        "python", "-m", "src.cli",
-        "--site", "blog.aspose.net",
-        "--input", "content/blog/"
-    ], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    proc = subprocess.Popen(
+        ["python", "-m", "src.cli", "--site", "blog.aspose.net", "--input", "content/blog/"],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+    )
 
     # Let it run for 3 seconds
     time.sleep(3)
@@ -88,21 +91,32 @@ def test_directory_translation_interrupted_captures_telemetry(telemetry_db_path,
     row = cursor.fetchone()
     assert row is not None, "No telemetry record found"
 
-    status, duration_ms, end_time_str, items_disc, items_succ, items_fail, metrics_json_str, error = row
+    (
+        status,
+        duration_ms,
+        end_time_str,
+        items_disc,
+        items_succ,
+        items_fail,
+        metrics_json_str,
+        error,
+    ) = row
 
     # GS-01: Verify status is 'cancelled'
-    assert status == 'cancelled', f"Expected status='cancelled', got '{status}'"
+    assert status == "cancelled", f"Expected status='cancelled', got '{status}'"
 
     # GS-02: Verify duration_ms is captured
     assert duration_ms is not None, "duration_ms should not be None"
     assert duration_ms > 0, f"Expected duration_ms > 0, got {duration_ms}"
-    assert duration_ms < elapsed_ms + 2000, f"Duration {duration_ms}ms too large (expected ~{elapsed_ms}ms)"
+    assert duration_ms < elapsed_ms + 2000, (
+        f"Duration {duration_ms}ms too large (expected ~{elapsed_ms}ms)"
+    )
 
     # GS-03: Verify end_time is populated
     assert end_time_str is not None, "end_time should be populated"
 
     # Verify error_summary mentions SIGINT
-    assert 'SIGINT' in error or 'interrupted' in error.lower(), f"error_summary: {error}"
+    assert "SIGINT" in error or "interrupted" in error.lower(), f"error_summary: {error}"
 
     # GS-04: Verify items_* metrics (may be 0 if interrupted very early)
     assert items_disc is not None and items_disc >= 0
@@ -118,8 +132,10 @@ def test_directory_translation_interrupted_captures_telemetry(telemetry_db_path,
 
 
 @pytest.mark.integration
-@pytest.mark.skipif(not Path("/data/telemetry.sqlite").exists(),
-                   reason="Requires telemetry database (Docker environment)")
+@pytest.mark.skipif(
+    not Path("/data/telemetry.sqlite").exists(),
+    reason="Requires telemetry database (Docker environment)",
+)
 def test_file_translation_interrupted_captures_telemetry(telemetry_db_path, cleanup_test_runs):
     """Test that interrupting file translation captures complete telemetry."""
     # Create a test markdown file
@@ -129,12 +145,21 @@ def test_file_translation_interrupted_captures_telemetry(telemetry_db_path, clea
 
     try:
         # Start translation in subprocess
-        proc = subprocess.Popen([
-            "python", "-m", "src.cli",
-            "--site", "blog.aspose.net",
-            "--input", str(test_file),
-            "--target-langs", "es,fr,de"
-        ], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        proc = subprocess.Popen(
+            [
+                "python",
+                "-m",
+                "src.cli",
+                "--site",
+                "blog.aspose.net",
+                "--input",
+                str(test_file),
+                "--target-langs",
+                "es,fr,de",
+            ],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
 
         # Let it run for 2 seconds
         time.sleep(2)
@@ -158,7 +183,7 @@ def test_file_translation_interrupted_captures_telemetry(telemetry_db_path, clea
             status, duration_ms, end_time_str, error = row
 
             # GS-01: Verify status
-            assert status == 'cancelled', f"Expected status='cancelled', got '{status}'"
+            assert status == "cancelled", f"Expected status='cancelled', got '{status}'"
 
             # GS-02: Verify duration
             assert duration_ms is not None and duration_ms >= 0
@@ -195,17 +220,19 @@ def test_graceful_shutdown_telemetry_fields_integration():
     mock_ctx._start_time = time.time() - 2.5
     mock_ctx.set_metrics = Mock()
     mock_ctx.__exit__ = Mock()
-    mock_ctx.get_partial_metrics = Mock(return_value={
-        'items_discovered': 15,
-        'items_succeeded': 8,
-        'items_failed': 0,
-        'metrics_json': {
-            'tokens_input': 2500,
-            'tokens_output': 3200,
-            'tm_hits': 12,
-            'translated_segments': 45
+    mock_ctx.get_partial_metrics = Mock(
+        return_value={
+            "items_discovered": 15,
+            "items_succeeded": 8,
+            "items_failed": 0,
+            "metrics_json": {
+                "tokens_input": 2500,
+                "tokens_output": 3200,
+                "tm_hits": 12,
+                "translated_segments": 45,
+            },
         }
-    })
+    )
 
     # Register context
     _active_contexts.append(mock_ctx)
@@ -221,27 +248,27 @@ def test_graceful_shutdown_telemetry_fields_integration():
     call_kwargs = mock_ctx.set_metrics.call_args[1]
 
     # GS-01: run_status
-    assert call_kwargs['run_status'] == 'cancelled'
+    assert call_kwargs["run_status"] == "cancelled"
 
     # GS-02: duration_ms
-    assert 'duration_ms' in call_kwargs
-    assert 2000 < call_kwargs['duration_ms'] < 3500
+    assert "duration_ms" in call_kwargs
+    assert 2000 < call_kwargs["duration_ms"] < 3500
 
     # GS-03: end_time
-    assert 'end_time' in call_kwargs
-    assert isinstance(call_kwargs['end_time'], str)
+    assert "end_time" in call_kwargs
+    assert isinstance(call_kwargs["end_time"], str)
 
     # GS-04: items_*
-    assert call_kwargs.get('items_discovered') == 15
-    assert call_kwargs.get('items_succeeded') == 8
-    assert call_kwargs.get('items_failed') == 0
+    assert call_kwargs.get("items_discovered") == 15
+    assert call_kwargs.get("items_succeeded") == 8
+    assert call_kwargs.get("items_failed") == 0
 
     # GS-05: metrics_json
-    assert 'metrics_json' in call_kwargs
-    assert call_kwargs['metrics_json']['tokens_input'] == 2500
-    assert call_kwargs['metrics_json']['tm_hits'] == 12
+    assert "metrics_json" in call_kwargs
+    assert call_kwargs["metrics_json"]["tokens_input"] == 2500
+    assert call_kwargs["metrics_json"]["tm_hits"] == 12
 
     # Other fields
-    assert 'output_summary' in call_kwargs
-    assert 'error_summary' in call_kwargs
-    assert 'SIGINT' in call_kwargs['error_summary']
+    assert "output_summary" in call_kwargs
+    assert "error_summary" in call_kwargs
+    assert "SIGINT" in call_kwargs["error_summary"]

@@ -290,6 +290,7 @@ class TestCorruptionDetection:
         Evidence: src/tm/l2_persistent.py lines 150-154
         """
         import logging
+
         caplog.set_level(logging.WARNING)
 
         # Arrange - corrupt an entry
@@ -412,6 +413,7 @@ class TestValidationBeforeWrite:
         Evidence: src/tm/l2_persistent.py lines 216-219
         """
         import logging
+
         caplog.set_level(logging.ERROR)
 
         # Act - attempt to store invalid entry
@@ -654,9 +656,7 @@ class TestContextFiltering:
         )
 
         # Act - lookup with matching context
-        result = l2_tm.exact_lookup(
-            "site.com", "en", "de", "Hello", context="frontmatter.title"
-        )
+        result = l2_tm.exact_lookup("site.com", "en", "de", "Hello", context="frontmatter.title")
 
         # Assert - entry found
         assert result is not None
@@ -1022,12 +1022,15 @@ class TestDatabaseOperations:
         # Assert
         assert result is True
         assert l2_tm.count() == 0
-        assert l2_tm.exact_lookup(
-            sample_entry_params["site_id"],
-            sample_entry_params["src_lang"],
-            sample_entry_params["tgt_lang"],
-            sample_entry_params["text"],
-        ) is None
+        assert (
+            l2_tm.exact_lookup(
+                sample_entry_params["site_id"],
+                sample_entry_params["src_lang"],
+                sample_entry_params["tgt_lang"],
+                sample_entry_params["text"],
+            )
+            is None
+        )
 
     def test_delete_nonexistent_returns_false(self, l2_tm):
         """

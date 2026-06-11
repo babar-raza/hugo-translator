@@ -32,11 +32,10 @@ def l3(tmp_path):
     mock_encoder = mock.MagicMock()
     mock_encoder.encode.side_effect = lambda text, **kw: (
         np.random.default_rng(hash(text) % 2**31).random(_DIM).astype(np.float32)
-        if isinstance(text, str) else
-        np.array([
-            np.random.default_rng(hash(t) % 2**31).random(_DIM).astype(np.float32)
-            for t in text
-        ])
+        if isinstance(text, str)
+        else np.array(
+            [np.random.default_rng(hash(t) % 2**31).random(_DIM).astype(np.float32) for t in text]
+        )
     )
     mock_encoder.get_sentence_embedding_dimension.return_value = _DIM
     instance.encoder = mock_encoder

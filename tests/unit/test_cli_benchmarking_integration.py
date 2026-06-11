@@ -77,9 +77,8 @@ def test_production_metrics_disabled_by_default():
     config = {"production": {"record_enabled": False}}
 
     # Calculate metrics_enabled
-    metrics_enabled = (
-        args.enable_production_metrics
-        or config.get("production", {}).get("record_enabled", False)
+    metrics_enabled = args.enable_production_metrics or config.get("production", {}).get(
+        "record_enabled", False
     )
 
     assert metrics_enabled is False
@@ -94,9 +93,8 @@ def test_production_metrics_enabled_via_cli_flag():
     config = {"production": {"record_enabled": False}}
 
     # CLI flag should override
-    metrics_enabled = (
-        args.enable_production_metrics
-        or config.get("production", {}).get("record_enabled", False)
+    metrics_enabled = args.enable_production_metrics or config.get("production", {}).get(
+        "record_enabled", False
     )
 
     assert metrics_enabled is True
@@ -110,9 +108,8 @@ def test_production_metrics_enabled_via_config():
     # Config enabled
     config = {"production": {"record_enabled": True}}
 
-    metrics_enabled = (
-        args.enable_production_metrics
-        or config.get("production", {}).get("record_enabled", False)
+    metrics_enabled = args.enable_production_metrics or config.get("production", {}).get(
+        "record_enabled", False
     )
 
     assert metrics_enabled is True
@@ -125,9 +122,8 @@ def test_production_metrics_cli_flag_overrides_disabled_config():
 
     config = {"production": {"record_enabled": False}}
 
-    metrics_enabled = (
-        args.enable_production_metrics
-        or config.get("production", {}).get("record_enabled", False)
+    metrics_enabled = args.enable_production_metrics or config.get("production", {}).get(
+        "record_enabled", False
     )
 
     # CLI flag wins
@@ -146,9 +142,7 @@ def test_ingestor_initialization_when_enabled():
 
                     # Simulate the initialization logic
                     config = mock_load()
-                    metrics_enabled = config.get("production", {}).get(
-                        "record_enabled", False
-                    )
+                    metrics_enabled = config.get("production", {}).get("record_enabled", False)
 
                     if metrics_enabled:
                         db_path = mock_path(purpose="production")
@@ -169,9 +163,7 @@ def test_ingestor_not_created_when_disabled():
             with patch("src.cli.ProductionMetricsIngestor") as mock_ingestor:
                 # Simulate the initialization logic
                 config = mock_load()
-                metrics_enabled = config.get("production", {}).get(
-                    "record_enabled", False
-                )
+                metrics_enabled = config.get("production", {}).get("record_enabled", False)
 
                 ingestor = None
                 if metrics_enabled:

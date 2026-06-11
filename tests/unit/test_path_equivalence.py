@@ -93,8 +93,11 @@ class TestFolderLayoutPathEquivalence:
         mod = _load_verify_module()
         self.output_path_folder = mod._output_path_folder
 
-    @pytest.mark.parametrize("content_root,source,lang,expected", FOLDER_CASES,
-                             ids=["simple", "nested", "en_in_subfolder"])
+    @pytest.mark.parametrize(
+        "content_root,source,lang,expected",
+        FOLDER_CASES,
+        ids=["simple", "nested", "en_in_subfolder"],
+    )
     def test_folder_path_matches_contract(self, content_root, source, lang, expected):
         # The verify script uses pathlib Path (not PurePosixPath), so convert
         result = self.output_path_folder(Path(source), lang, Path(content_root))
@@ -107,8 +110,9 @@ class TestBlogLayoutPathEquivalence:
         mod = _load_verify_module()
         self.output_path_blog = mod._output_path_blog
 
-    @pytest.mark.parametrize("source,lang,expected", BLOG_CASES,
-                             ids=["index", "tutorial", "underscore_index"])
+    @pytest.mark.parametrize(
+        "source,lang,expected", BLOG_CASES, ids=["index", "tutorial", "underscore_index"]
+    )
     def test_blog_path_matches_contract(self, source, lang, expected):
         result = self.output_path_blog(Path(source), lang)
         assert PurePosixPath(result) == expected

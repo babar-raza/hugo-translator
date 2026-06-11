@@ -19,12 +19,18 @@ def _mock_worker_infra():
     - acquire_pid_file: PID file from the first test remains held by the live
       pytest process, causing sys.exit(1) in subsequent tests (single-instance guard).
     """
-    with patch("src.tm.l2_persistent.L2PersistentTM") as mock_l2, \
-         patch("src.workers.worker_state.acquire_pid_file", return_value=True):
+    with (
+        patch("src.tm.l2_persistent.L2PersistentTM") as mock_l2,
+        patch("src.workers.worker_state.acquire_pid_file", return_value=True),
+    ):
         mock_l2.return_value.get_stats.return_value = {
-            "used_mb": 0.0, "map_size_mb": 1536.0, "used_pct": 0.0, "entries": 0
+            "used_mb": 0.0,
+            "map_size_mb": 1536.0,
+            "used_pct": 0.0,
+            "entries": 0,
         }
         yield
+
 
 from src.translation_engine.models import DirectoryResult
 from src.workers.autonomous_content_translation_worker import (
@@ -98,11 +104,16 @@ class TestAutonomousWorkerOneshot:
         worker = AutonomousContentTranslationWorker(worker_config)
 
         # Patch dependencies
-        with patch("src.workers.autonomous_content_translation_worker.ConfigService") as mock_cs, \
-             patch("src.workers.autonomous_content_translation_worker.TranslationEngine") as mock_te, \
-             patch("src.workers.autonomous_content_translation_worker.auto_commit_translations") as mock_commit, \
-             patch("src.workers.autonomous_content_translation_worker.Path.exists", return_value=True):
-
+        with (
+            patch("src.workers.autonomous_content_translation_worker.ConfigService") as mock_cs,
+            patch("src.workers.autonomous_content_translation_worker.TranslationEngine") as mock_te,
+            patch(
+                "src.workers.autonomous_content_translation_worker.auto_commit_translations"
+            ) as mock_commit,
+            patch(
+                "src.workers.autonomous_content_translation_worker.Path.exists", return_value=True
+            ),
+        ):
             mock_cs.return_value = mock_config_service
             mock_te.return_value = mock_translation_engine
             mock_commit.return_value = True
@@ -150,11 +161,16 @@ class TestAutonomousWorkerOneshot:
 
         worker = AutonomousContentTranslationWorker(config)
 
-        with patch("src.workers.autonomous_content_translation_worker.ConfigService") as mock_cs, \
-             patch("src.workers.autonomous_content_translation_worker.TranslationEngine") as mock_te, \
-             patch("src.workers.autonomous_content_translation_worker.auto_commit_translations") as mock_commit, \
-             patch("src.workers.autonomous_content_translation_worker.Path.exists", return_value=True):
-
+        with (
+            patch("src.workers.autonomous_content_translation_worker.ConfigService") as mock_cs,
+            patch("src.workers.autonomous_content_translation_worker.TranslationEngine") as mock_te,
+            patch(
+                "src.workers.autonomous_content_translation_worker.auto_commit_translations"
+            ) as mock_commit,
+            patch(
+                "src.workers.autonomous_content_translation_worker.Path.exists", return_value=True
+            ),
+        ):
             mock_cs.return_value = mock_config_service
             mock_te.return_value = mock_translation_engine
             mock_commit.return_value = True
@@ -183,11 +199,16 @@ class TestAutonomousWorkerOneshot:
 
         worker = AutonomousContentTranslationWorker(config)
 
-        with patch("src.workers.autonomous_content_translation_worker.ConfigService") as mock_cs, \
-             patch("src.workers.autonomous_content_translation_worker.TranslationEngine") as mock_te, \
-             patch("src.workers.autonomous_content_translation_worker.auto_commit_translations") as mock_commit, \
-             patch("src.workers.autonomous_content_translation_worker.Path.exists", return_value=True):
-
+        with (
+            patch("src.workers.autonomous_content_translation_worker.ConfigService") as mock_cs,
+            patch("src.workers.autonomous_content_translation_worker.TranslationEngine") as mock_te,
+            patch(
+                "src.workers.autonomous_content_translation_worker.auto_commit_translations"
+            ) as mock_commit,
+            patch(
+                "src.workers.autonomous_content_translation_worker.Path.exists", return_value=True
+            ),
+        ):
             mock_cs.return_value = mock_config_service
             mock_te.return_value = mock_translation_engine
             mock_commit.return_value = True
@@ -198,7 +219,9 @@ class TestAutonomousWorkerOneshot:
             # Verify only 2 sites processed (due to limit)
             assert mock_config_service.get_site_profile.call_count == 2
 
-    def test_oneshot_no_successful_files_skips_commit(self, worker_config, mock_config_service, mock_translation_engine):
+    def test_oneshot_no_successful_files_skips_commit(
+        self, worker_config, mock_config_service, mock_translation_engine
+    ):
         """Test that no commit is made when no files are successfully translated."""
         # Mock result with no successful files
         mock_result = DirectoryResult(
@@ -212,11 +235,16 @@ class TestAutonomousWorkerOneshot:
 
         worker = AutonomousContentTranslationWorker(worker_config)
 
-        with patch("src.workers.autonomous_content_translation_worker.ConfigService") as mock_cs, \
-             patch("src.workers.autonomous_content_translation_worker.TranslationEngine") as mock_te, \
-             patch("src.workers.autonomous_content_translation_worker.auto_commit_translations") as mock_commit, \
-             patch("src.workers.autonomous_content_translation_worker.Path.exists", return_value=True):
-
+        with (
+            patch("src.workers.autonomous_content_translation_worker.ConfigService") as mock_cs,
+            patch("src.workers.autonomous_content_translation_worker.TranslationEngine") as mock_te,
+            patch(
+                "src.workers.autonomous_content_translation_worker.auto_commit_translations"
+            ) as mock_commit,
+            patch(
+                "src.workers.autonomous_content_translation_worker.Path.exists", return_value=True
+            ),
+        ):
             mock_cs.return_value = mock_config_service
             mock_te.return_value = mock_translation_engine
 
@@ -247,11 +275,16 @@ class TestAutonomousWorkerOneshot:
 
         worker = AutonomousContentTranslationWorker(config)
 
-        with patch("src.workers.autonomous_content_translation_worker.ConfigService") as mock_cs, \
-             patch("src.workers.autonomous_content_translation_worker.TranslationEngine") as mock_te, \
-             patch("src.workers.autonomous_content_translation_worker.auto_commit_translations") as mock_commit, \
-             patch("src.workers.autonomous_content_translation_worker.Path.exists", return_value=True):
-
+        with (
+            patch("src.workers.autonomous_content_translation_worker.ConfigService") as mock_cs,
+            patch("src.workers.autonomous_content_translation_worker.TranslationEngine") as mock_te,
+            patch(
+                "src.workers.autonomous_content_translation_worker.auto_commit_translations"
+            ) as mock_commit,
+            patch(
+                "src.workers.autonomous_content_translation_worker.Path.exists", return_value=True
+            ),
+        ):
             mock_cs.return_value = mock_config_service
             mock_te.return_value = mock_translation_engine
             mock_commit.return_value = True
@@ -265,7 +298,9 @@ class TestAutonomousWorkerOneshot:
             # Verify site1 and site3 were translated (site2 failed)
             assert mock_translation_engine.translate_directory.call_count == 2
 
-    def test_oneshot_content_root_does_not_exist(self, worker_config, mock_config_service, mock_translation_engine):
+    def test_oneshot_content_root_does_not_exist(
+        self, worker_config, mock_config_service, mock_translation_engine
+    ):
         """Test that nonexistent content_root is skipped."""
         worker = AutonomousContentTranslationWorker(worker_config)
         mock_config_service.get_site_profile.return_value = Mock(
@@ -274,10 +309,13 @@ class TestAutonomousWorkerOneshot:
             default_source_lang="en",
         )
 
-        with patch("src.workers.autonomous_content_translation_worker.ConfigService") as mock_cs, \
-             patch("src.workers.autonomous_content_translation_worker.TranslationEngine") as mock_te, \
-             patch("src.workers.autonomous_content_translation_worker.auto_commit_translations") as mock_commit:
-
+        with (
+            patch("src.workers.autonomous_content_translation_worker.ConfigService") as mock_cs,
+            patch("src.workers.autonomous_content_translation_worker.TranslationEngine") as mock_te,
+            patch(
+                "src.workers.autonomous_content_translation_worker.auto_commit_translations"
+            ) as mock_commit,
+        ):
             mock_cs.return_value = mock_config_service
             mock_te.return_value = mock_translation_engine
 
@@ -304,11 +342,16 @@ class TestAutonomousWorkerVRAM:
 
         worker = AutonomousContentTranslationWorker(config)
 
-        with patch("src.workers.autonomous_content_translation_worker.ConfigService") as mock_cs, \
-             patch("src.workers.autonomous_content_translation_worker.TranslationEngine") as mock_te, \
-             patch("src.workers.autonomous_content_translation_worker.VRAMEnforcer") as mock_enforcer, \
-             patch("src.workers.autonomous_content_translation_worker.Path.exists", return_value=True):
-
+        with (
+            patch("src.workers.autonomous_content_translation_worker.ConfigService") as mock_cs,
+            patch("src.workers.autonomous_content_translation_worker.TranslationEngine") as mock_te,
+            patch(
+                "src.workers.autonomous_content_translation_worker.VRAMEnforcer"
+            ) as mock_enforcer,
+            patch(
+                "src.workers.autonomous_content_translation_worker.Path.exists", return_value=True
+            ),
+        ):
             mock_cs.return_value = mock_config_service
             mock_te.return_value = mock_translation_engine
 
@@ -340,11 +383,16 @@ class TestAutonomousWorkerVRAM:
 
         worker = AutonomousContentTranslationWorker(config)
 
-        with patch("src.workers.autonomous_content_translation_worker.ConfigService") as mock_cs, \
-             patch("src.workers.autonomous_content_translation_worker.TranslationEngine") as mock_te, \
-             patch("src.workers.autonomous_content_translation_worker.VRAMEnforcer") as mock_enforcer, \
-             patch("src.workers.autonomous_content_translation_worker.Path.exists", return_value=True):
-
+        with (
+            patch("src.workers.autonomous_content_translation_worker.ConfigService") as mock_cs,
+            patch("src.workers.autonomous_content_translation_worker.TranslationEngine") as mock_te,
+            patch(
+                "src.workers.autonomous_content_translation_worker.VRAMEnforcer"
+            ) as mock_enforcer,
+            patch(
+                "src.workers.autonomous_content_translation_worker.Path.exists", return_value=True
+            ),
+        ):
             mock_cs.return_value = mock_config_service
             mock_te.return_value = mock_translation_engine
 
@@ -357,15 +405,22 @@ class TestAutonomousWorkerVRAM:
 class TestAutonomousWorkerRunID:
     """Tests for run ID generation and tracking."""
 
-    def test_run_id_includes_invocation_id(self, worker_config, mock_config_service, mock_translation_engine):
+    def test_run_id_includes_invocation_id(
+        self, worker_config, mock_config_service, mock_translation_engine
+    ):
         """Test that run_id includes invocation_id for traceability."""
         worker = AutonomousContentTranslationWorker(worker_config)
 
-        with patch("src.workers.autonomous_content_translation_worker.ConfigService") as mock_cs, \
-             patch("src.workers.autonomous_content_translation_worker.TranslationEngine") as mock_te, \
-             patch("src.workers.autonomous_content_translation_worker.auto_commit_translations") as mock_commit, \
-             patch("src.workers.autonomous_content_translation_worker.Path.exists", return_value=True):
-
+        with (
+            patch("src.workers.autonomous_content_translation_worker.ConfigService") as mock_cs,
+            patch("src.workers.autonomous_content_translation_worker.TranslationEngine") as mock_te,
+            patch(
+                "src.workers.autonomous_content_translation_worker.auto_commit_translations"
+            ) as mock_commit,
+            patch(
+                "src.workers.autonomous_content_translation_worker.Path.exists", return_value=True
+            ),
+        ):
             mock_cs.return_value = mock_config_service
             mock_te.return_value = mock_translation_engine
             mock_commit.return_value = True
@@ -402,12 +457,19 @@ class TestAutonomousWorkerDaemonMode:
 
         worker = AutonomousContentTranslationWorker(config)
 
-        with patch("src.workers.autonomous_content_translation_worker.ConfigService") as mock_cs, \
-             patch("src.workers.autonomous_content_translation_worker.TranslationEngine") as mock_te, \
-             patch("src.workers.autonomous_content_translation_worker.WindowScheduler") as mock_scheduler, \
-             patch("src.workers.autonomous_content_translation_worker.auto_commit_translations") as mock_commit, \
-             patch("src.workers.autonomous_content_translation_worker.Path.exists", return_value=True):
-
+        with (
+            patch("src.workers.autonomous_content_translation_worker.ConfigService") as mock_cs,
+            patch("src.workers.autonomous_content_translation_worker.TranslationEngine") as mock_te,
+            patch(
+                "src.workers.autonomous_content_translation_worker.WindowScheduler"
+            ) as mock_scheduler,
+            patch(
+                "src.workers.autonomous_content_translation_worker.auto_commit_translations"
+            ) as mock_commit,
+            patch(
+                "src.workers.autonomous_content_translation_worker.Path.exists", return_value=True
+            ),
+        ):
             mock_cs.return_value = mock_config_service
             mock_te.return_value = mock_translation_engine
             mock_commit.return_value = True

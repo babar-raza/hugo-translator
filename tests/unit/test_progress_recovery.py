@@ -29,7 +29,7 @@ ProgressTracker = _progress_module.ProgressTracker
 def _validate_progress_file(progress_file: Path) -> tuple[bool, str, bool]:
     """Copy of validation logic for testing purposes."""
     try:
-        with open(progress_file, encoding='utf-8') as f:
+        with open(progress_file, encoding="utf-8") as f:
             data = json.load(f)
     except json.JSONDecodeError as e:
         return (False, f"Invalid JSON: {e}", False)
@@ -40,8 +40,12 @@ def _validate_progress_file(progress_file: Path) -> tuple[bool, str, bool]:
 
     # Check required fields
     required_fields = [
-        'run_id', 'schema_version', 'site_id',
-        'total_files', 'completed_files', 'started_at'
+        "run_id",
+        "schema_version",
+        "site_id",
+        "total_files",
+        "completed_files",
+        "started_at",
     ]
 
     missing = [f for f in required_fields if f not in data]
@@ -49,17 +53,17 @@ def _validate_progress_file(progress_file: Path) -> tuple[bool, str, bool]:
         return (False, f"Missing fields: {missing}", True)
 
     # Check schema version
-    version = data.get('schema_version')
-    if version != '1.0':
+    version = data.get("schema_version")
+    if version != "1.0":
         return (False, f"Unsupported schema version: {version}", False)
 
     # Check data types
     try:
-        total_files = int(data['total_files'])
+        total_files = int(data["total_files"])
         if total_files < 0:
             return (False, "total_files cannot be negative", True)
 
-        completed = data['completed_files']
+        completed = data["completed_files"]
         if not isinstance(completed, dict):
             return (False, "completed_files must be a dict", True)
 
@@ -67,8 +71,9 @@ def _validate_progress_file(progress_file: Path) -> tuple[bool, str, bool]:
         return (False, f"Invalid data type: {e}", True)
 
     # Check logical consistency
-    num_completed = sum(len(langs) if isinstance(langs, list) else 0
-                       for langs in data['completed_files'].values())
+    num_completed = sum(
+        len(langs) if isinstance(langs, list) else 0 for langs in data["completed_files"].values()
+    )
     if num_completed > total_files * 10:  # Sanity check
         return (False, "Suspiciously high completion count", True)
 
@@ -81,14 +86,18 @@ class TestValidateProgressFile:
     def test_validate_valid_progress(self, tmp_path):
         """Test validation passes for valid progress file."""
         progress_file = tmp_path / "progress_test.json"
-        progress_file.write_text(json.dumps({
-            'run_id': 'test-123',
-            'schema_version': '1.0',
-            'site_id': 'mysite',
-            'total_files': 10,
-            'completed_files': {'file1.md': ['es', 'fr']},
-            'started_at': '2024-01-01T00:00:00Z'
-        }))
+        progress_file.write_text(
+            json.dumps(
+                {
+                    "run_id": "test-123",
+                    "schema_version": "1.0",
+                    "site_id": "mysite",
+                    "total_files": 10,
+                    "completed_files": {"file1.md": ["es", "fr"]},
+                    "started_at": "2024-01-01T00:00:00Z",
+                }
+            )
+        )
 
         is_valid, msg, recoverable = _validate_progress_file(progress_file)
 
@@ -110,10 +119,14 @@ class TestValidateProgressFile:
     def test_validate_missing_fields(self, tmp_path):
         """Test validation detects missing required fields."""
         progress_file = tmp_path / "progress_test.json"
-        progress_file.write_text(json.dumps({
-            'run_id': 'test',
-            # Missing other required fields
-        }))
+        progress_file.write_text(
+            json.dumps(
+                {
+                    "run_id": "test",
+                    # Missing other required fields
+                }
+            )
+        )
 
         is_valid, msg, recoverable = _validate_progress_file(progress_file)
 
@@ -124,14 +137,18 @@ class TestValidateProgressFile:
     def test_validate_unsupported_schema(self, tmp_path):
         """Test validation detects unsupported schema version."""
         progress_file = tmp_path / "progress_test.json"
-        progress_file.write_text(json.dumps({
-            'run_id': 'test-123',
-            'schema_version': '2.0',
-            'site_id': 'mysite',
-            'total_files': 10,
-            'completed_files': {},
-            'started_at': '2024-01-01T00:00:00Z'
-        }))
+        progress_file.write_text(
+            json.dumps(
+                {
+                    "run_id": "test-123",
+                    "schema_version": "2.0",
+                    "site_id": "mysite",
+                    "total_files": 10,
+                    "completed_files": {},
+                    "started_at": "2024-01-01T00:00:00Z",
+                }
+            )
+        )
 
         is_valid, msg, recoverable = _validate_progress_file(progress_file)
 
@@ -142,14 +159,18 @@ class TestValidateProgressFile:
     def test_validate_negative_total_files(self, tmp_path):
         """Test validation detects negative total_files."""
         progress_file = tmp_path / "progress_test.json"
-        progress_file.write_text(json.dumps({
-            'run_id': 'test-123',
-            'schema_version': '1.0',
-            'site_id': 'mysite',
-            'total_files': -5,
-            'completed_files': {},
-            'started_at': '2024-01-01T00:00:00Z'
-        }))
+        progress_file.write_text(
+            json.dumps(
+                {
+                    "run_id": "test-123",
+                    "schema_version": "1.0",
+                    "site_id": "mysite",
+                    "total_files": -5,
+                    "completed_files": {},
+                    "started_at": "2024-01-01T00:00:00Z",
+                }
+            )
+        )
 
         is_valid, msg, recoverable = _validate_progress_file(progress_file)
 
@@ -160,14 +181,18 @@ class TestValidateProgressFile:
     def test_validate_invalid_completed_files_type(self, tmp_path):
         """Test validation detects wrong type for completed_files."""
         progress_file = tmp_path / "progress_test.json"
-        progress_file.write_text(json.dumps({
-            'run_id': 'test-123',
-            'schema_version': '1.0',
-            'site_id': 'mysite',
-            'total_files': 10,
-            'completed_files': "not a dict",  # Should be dict
-            'started_at': '2024-01-01T00:00:00Z'
-        }))
+        progress_file.write_text(
+            json.dumps(
+                {
+                    "run_id": "test-123",
+                    "schema_version": "1.0",
+                    "site_id": "mysite",
+                    "total_files": 10,
+                    "completed_files": "not a dict",  # Should be dict
+                    "started_at": "2024-01-01T00:00:00Z",
+                }
+            )
+        )
 
         is_valid, msg, recoverable = _validate_progress_file(progress_file)
 
@@ -189,18 +214,22 @@ class TestValidateProgressFile:
         """Test validation detects suspiciously high completion count."""
         progress_file = tmp_path / "progress_test.json"
         # total_files is 2, but completed count is way higher
-        progress_file.write_text(json.dumps({
-            'run_id': 'test-123',
-            'schema_version': '1.0',
-            'site_id': 'mysite',
-            'total_files': 2,
-            'completed_files': {
-                'f1': ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k'],
-                'f2': ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k'],
-                'f3': ['a', 'b', 'c'],  # This pushes us over 2 * 10 = 20
-            },
-            'started_at': '2024-01-01T00:00:00Z'
-        }))
+        progress_file.write_text(
+            json.dumps(
+                {
+                    "run_id": "test-123",
+                    "schema_version": "1.0",
+                    "site_id": "mysite",
+                    "total_files": 2,
+                    "completed_files": {
+                        "f1": ["a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k"],
+                        "f2": ["a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k"],
+                        "f3": ["a", "b", "c"],  # This pushes us over 2 * 10 = 20
+                    },
+                    "started_at": "2024-01-01T00:00:00Z",
+                }
+            )
+        )
 
         is_valid, msg, recoverable = _validate_progress_file(progress_file)
 
@@ -215,24 +244,28 @@ class TestRecoverProgressFile:
     def test_recover_partial_data(self, tmp_path):
         """Test recovery of partially corrupted/incomplete data."""
         progress_file = tmp_path / "progress_test.json"
-        progress_file.write_text(json.dumps({
-            'run_id': 'test123',
-            'site_id': 'mysite',
-            'source_dir': '/src',
-            'output_dir': '/out',
-            'target_langs': ['es', 'fr'],
-            'completed_files': {'file1.md': ['es']},
-            'total_files': 10,
-            # Missing some fields
-        }))
+        progress_file.write_text(
+            json.dumps(
+                {
+                    "run_id": "test123",
+                    "site_id": "mysite",
+                    "source_dir": "/src",
+                    "output_dir": "/out",
+                    "target_langs": ["es", "fr"],
+                    "completed_files": {"file1.md": ["es"]},
+                    "total_files": 10,
+                    # Missing some fields
+                }
+            )
+        )
 
         # Use module-level ProgressTracker
         tracker = ProgressTracker.recover_progress_file(progress_file)
 
         assert tracker is not None
-        assert tracker.state.run_id == 'test123'
-        assert tracker.state.site_id == 'mysite'
-        assert 'file1.md' in tracker.state.completed_files
+        assert tracker.state.run_id == "test123"
+        assert tracker.state.site_id == "mysite"
+        assert "file1.md" in tracker.state.completed_files
 
     def test_recovery_failure_on_invalid_json(self, tmp_path):
         """Test recovery returns None for files with invalid JSON."""
@@ -247,10 +280,14 @@ class TestRecoverProgressFile:
     def test_recovery_handles_missing_fields(self, tmp_path):
         """Test recovery handles completely missing optional fields."""
         progress_file = tmp_path / "progress_test.json"
-        progress_file.write_text(json.dumps({
-            'completed_files': {'file1.md': ['es']},
-            # Many fields missing
-        }))
+        progress_file.write_text(
+            json.dumps(
+                {
+                    "completed_files": {"file1.md": ["es"]},
+                    # Many fields missing
+                }
+            )
+        )
 
         # Use module-level ProgressTracker
 
@@ -258,23 +295,27 @@ class TestRecoverProgressFile:
 
         # Should recover with defaults
         assert tracker is not None
-        assert 'file1.md' in tracker.state.completed_files
-        assert tracker.state.site_id == 'unknown'
+        assert "file1.md" in tracker.state.completed_files
+        assert tracker.state.site_id == "unknown"
 
     def test_recovery_cleans_invalid_completed_files(self, tmp_path):
         """Test recovery cleans up invalid completed_files entries."""
         progress_file = tmp_path / "progress_test.json"
-        progress_file.write_text(json.dumps({
-            'run_id': 'test',
-            'site_id': 'mysite',
-            'target_langs': ['es', 'fr'],
-            'completed_files': {
-                'file1.md': ['es', 'fr'],  # Valid
-                'file2.md': 'not_a_list',  # Invalid - string instead of list
-                'file3.md': [123, 'es'],  # Partially invalid - number in list
-            },
-            'total_files': 3,
-        }))
+        progress_file.write_text(
+            json.dumps(
+                {
+                    "run_id": "test",
+                    "site_id": "mysite",
+                    "target_langs": ["es", "fr"],
+                    "completed_files": {
+                        "file1.md": ["es", "fr"],  # Valid
+                        "file2.md": "not_a_list",  # Invalid - string instead of list
+                        "file3.md": [123, "es"],  # Partially invalid - number in list
+                    },
+                    "total_files": 3,
+                }
+            )
+        )
 
         # Use module-level ProgressTracker
 
@@ -282,11 +323,11 @@ class TestRecoverProgressFile:
 
         assert tracker is not None
         # file1.md should be preserved as-is
-        assert tracker.state.completed_files.get('file1.md') == ['es', 'fr']
+        assert tracker.state.completed_files.get("file1.md") == ["es", "fr"]
         # file2.md should be converted to list
-        assert tracker.state.completed_files.get('file2.md') == ['not_a_list']
+        assert tracker.state.completed_files.get("file2.md") == ["not_a_list"]
         # file3.md should have only the string entry
-        assert tracker.state.completed_files.get('file3.md') == ['es']
+        assert tracker.state.completed_files.get("file3.md") == ["es"]
 
 
 class TestProgressModuleValidation:
@@ -294,24 +335,30 @@ class TestProgressModuleValidation:
 
     def test_progress_has_validation_method(self):
         """Verify that progress.py contains validate_progress_file method."""
-        progress_path = Path(__file__).parent.parent.parent / "src" / "translation_engine" / "progress.py"
-        progress_content = progress_path.read_text(encoding='utf-8')
+        progress_path = (
+            Path(__file__).parent.parent.parent / "src" / "translation_engine" / "progress.py"
+        )
+        progress_content = progress_path.read_text(encoding="utf-8")
 
         assert "def validate_progress_file(" in progress_content
         assert "RES-07" in progress_content
 
     def test_progress_has_recovery_method(self):
         """Verify that progress.py contains recover_progress_file method."""
-        progress_path = Path(__file__).parent.parent.parent / "src" / "translation_engine" / "progress.py"
-        progress_content = progress_path.read_text(encoding='utf-8')
+        progress_path = (
+            Path(__file__).parent.parent.parent / "src" / "translation_engine" / "progress.py"
+        )
+        progress_content = progress_path.read_text(encoding="utf-8")
 
         assert "def recover_progress_file(" in progress_content
         assert "@classmethod" in progress_content
 
     def test_progress_has_validation_error_class(self):
         """Verify that progress.py contains ProgressValidationError class."""
-        progress_path = Path(__file__).parent.parent.parent / "src" / "translation_engine" / "progress.py"
-        progress_content = progress_path.read_text(encoding='utf-8')
+        progress_path = (
+            Path(__file__).parent.parent.parent / "src" / "translation_engine" / "progress.py"
+        )
+        progress_content = progress_path.read_text(encoding="utf-8")
 
         assert "class ProgressValidationError" in progress_content
         assert "recoverable" in progress_content
@@ -323,7 +370,7 @@ class TestCLIValidationIntegration:
     def test_cli_has_validation_integration(self):
         """Verify that cli.py integrates with progress validation."""
         cli_path = Path(__file__).parent.parent.parent / "src" / "cli.py"
-        cli_content = cli_path.read_text(encoding='utf-8')
+        cli_content = cli_path.read_text(encoding="utf-8")
 
         assert "validate_progress_file" in cli_content
         assert "recover_progress_file" in cli_content
@@ -332,7 +379,7 @@ class TestCLIValidationIntegration:
     def test_cli_has_backup_logic(self):
         """Verify that cli.py backs up corrupted files."""
         cli_path = Path(__file__).parent.parent.parent / "src" / "cli.py"
-        cli_content = cli_path.read_text(encoding='utf-8')
+        cli_content = cli_path.read_text(encoding="utf-8")
 
         assert ".json.corrupt" in cli_content
         assert "shutil" in cli_content
@@ -344,14 +391,18 @@ class TestEdgeCases:
     def test_validate_empty_completed_files(self, tmp_path):
         """Test validation accepts empty completed_files dict."""
         progress_file = tmp_path / "progress_test.json"
-        progress_file.write_text(json.dumps({
-            'run_id': 'test-123',
-            'schema_version': '1.0',
-            'site_id': 'mysite',
-            'total_files': 0,
-            'completed_files': {},
-            'started_at': '2024-01-01T00:00:00Z'
-        }))
+        progress_file.write_text(
+            json.dumps(
+                {
+                    "run_id": "test-123",
+                    "schema_version": "1.0",
+                    "site_id": "mysite",
+                    "total_files": 0,
+                    "completed_files": {},
+                    "started_at": "2024-01-01T00:00:00Z",
+                }
+            )
+        )
 
         is_valid, msg, recoverable = _validate_progress_file(progress_file)
 
@@ -361,14 +412,18 @@ class TestEdgeCases:
     def test_validate_zero_total_files(self, tmp_path):
         """Test validation accepts zero total_files."""
         progress_file = tmp_path / "progress_test.json"
-        progress_file.write_text(json.dumps({
-            'run_id': 'test-123',
-            'schema_version': '1.0',
-            'site_id': 'mysite',
-            'total_files': 0,
-            'completed_files': {},
-            'started_at': '2024-01-01T00:00:00Z'
-        }))
+        progress_file.write_text(
+            json.dumps(
+                {
+                    "run_id": "test-123",
+                    "schema_version": "1.0",
+                    "site_id": "mysite",
+                    "total_files": 0,
+                    "completed_files": {},
+                    "started_at": "2024-01-01T00:00:00Z",
+                }
+            )
+        )
 
         is_valid, msg, recoverable = _validate_progress_file(progress_file)
 
@@ -377,14 +432,18 @@ class TestEdgeCases:
     def test_validate_total_files_as_float(self, tmp_path):
         """Test validation handles total_files as float."""
         progress_file = tmp_path / "progress_test.json"
-        progress_file.write_text(json.dumps({
-            'run_id': 'test-123',
-            'schema_version': '1.0',
-            'site_id': 'mysite',
-            'total_files': 10.0,  # Float instead of int
-            'completed_files': {},
-            'started_at': '2024-01-01T00:00:00Z'
-        }))
+        progress_file.write_text(
+            json.dumps(
+                {
+                    "run_id": "test-123",
+                    "schema_version": "1.0",
+                    "site_id": "mysite",
+                    "total_files": 10.0,  # Float instead of int
+                    "completed_files": {},
+                    "started_at": "2024-01-01T00:00:00Z",
+                }
+            )
+        )
 
         is_valid, msg, recoverable = _validate_progress_file(progress_file)
 
@@ -394,21 +453,23 @@ class TestEdgeCases:
     def test_recovery_preserves_failed_files(self, tmp_path):
         """Test recovery preserves failed_files data."""
         progress_file = tmp_path / "progress_test.json"
-        progress_file.write_text(json.dumps({
-            'run_id': 'test',
-            'site_id': 'mysite',
-            'target_langs': ['es'],
-            'completed_files': {},
-            'failed_files': {
-                'error_file.md': {'es': 'Translation failed: timeout'}
-            },
-            'total_files': 1,
-        }))
+        progress_file.write_text(
+            json.dumps(
+                {
+                    "run_id": "test",
+                    "site_id": "mysite",
+                    "target_langs": ["es"],
+                    "completed_files": {},
+                    "failed_files": {"error_file.md": {"es": "Translation failed: timeout"}},
+                    "total_files": 1,
+                }
+            )
+        )
 
         # Use module-level ProgressTracker
 
         tracker = ProgressTracker.recover_progress_file(progress_file)
 
         assert tracker is not None
-        assert 'error_file.md' in tracker.state.failed_files
-        assert tracker.state.failed_files['error_file.md']['es'] == 'Translation failed: timeout'
+        assert "error_file.md" in tracker.state.failed_files
+        assert tracker.state.failed_files["error_file.md"]["es"] == "Translation failed: timeout"

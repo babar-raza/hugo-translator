@@ -60,16 +60,20 @@ def worker_process(
 
             from src.utils.metadata_tracker import SourceFileMetadata
 
-            tracker._data[str(source_path)] = type('FileMetadata', (), {
-                'source': SourceFileMetadata(
-                    path=str(source_path),
-                    hash=f"hash_{worker_id}_{i}",
-                    last_modified=datetime.now(timezone.utc).isoformat(),
-                    size_bytes=1024,
-                    hash_computed_at=datetime.now(timezone.utc).isoformat(),
-                ),
-                'outputs': {}
-            })()
+            tracker._data[str(source_path)] = type(
+                "FileMetadata",
+                (),
+                {
+                    "source": SourceFileMetadata(
+                        path=str(source_path),
+                        hash=f"hash_{worker_id}_{i}",
+                        last_modified=datetime.now(timezone.utc).isoformat(),
+                        size_bytes=1024,
+                        hash_computed_at=datetime.now(timezone.utc).isoformat(),
+                    ),
+                    "outputs": {},
+                },
+            )()
 
             # Save after each update (stress test locking)
             tracker.save()
@@ -103,9 +107,7 @@ def redis_connection():
 class TestMultiWorkerMetadata:
     """Integration tests for multi-worker metadata coordination."""
 
-    def test_two_workers_concurrent_updates__no_data_loss(
-        self, tmp_path, redis_connection
-    ):
+    def test_two_workers_concurrent_updates__no_data_loss(self, tmp_path, redis_connection):
         """Two workers updating metadata concurrently should not lose data."""
         metadata_file = tmp_path / ".translation_metadata.json"
 
@@ -157,9 +159,7 @@ class TestMultiWorkerMetadata:
                 assert file_key in data["files"]
                 assert data["files"][file_key]["source"]["hash"] == f"hash_{worker_id}_{file_id}"
 
-    def test_five_workers_high_contention__metadata_consistent(
-        self, tmp_path, redis_connection
-    ):
+    def test_five_workers_high_contention__metadata_consistent(self, tmp_path, redis_connection):
         """Five workers with high contention should maintain consistency."""
         metadata_file = tmp_path / ".translation_metadata.json"
 
@@ -201,9 +201,7 @@ class TestMultiWorkerMetadata:
         data = json.loads(metadata_file.read_text())
         assert len(data["files"]) == 100  # 5 workers * 20 files
 
-    def test_worker_crash_during_lock__other_workers_continue(
-        self, tmp_path, redis_connection
-    ):
+    def test_worker_crash_during_lock__other_workers_continue(self, tmp_path, redis_connection):
         """If one worker crashes while holding lock, others should recover."""
 
         def crashing_worker(metadata_file, redis_host, redis_port, results_queue):
@@ -241,9 +239,7 @@ class TestMultiWorkerMetadata:
         # Skipping for now, but documented as expected behavior
         pytest.skip("Worker crash recovery requires complex Redis lock timeout handling")
 
-    def test_sequential_workers__metadata_accumulates(
-        self, tmp_path, redis_connection
-    ):
+    def test_sequential_workers__metadata_accumulates(self, tmp_path, redis_connection):
         """Workers running sequentially should accumulate metadata correctly."""
         metadata_file = tmp_path / ".translation_metadata.json"
 

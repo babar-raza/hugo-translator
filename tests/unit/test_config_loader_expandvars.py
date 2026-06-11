@@ -1,4 +1,5 @@
 """Test env-var expansion in ConfigService.resolve_content_root."""
+
 import os
 from unittest.mock import patch
 

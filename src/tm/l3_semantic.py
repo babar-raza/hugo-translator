@@ -9,6 +9,7 @@ Enhanced with:
 - Save timeout protection
 - Error handling and logging
 """
+
 import json
 import logging
 import pickle
@@ -98,6 +99,7 @@ class L3SemanticTM:
 
         # BM-08: Timing instrumentation (TM-07: bounded to prevent memory leak, CFG-01: configurable)
         from src.utils.config_loader import get_metrics_config
+
         metrics_config = get_metrics_config()
         timing_maxlen = metrics_config["metrics"]["storage"]["l3_semantic"]["timing_metrics_maxlen"]
         self._search_warning_ms = metrics_config["metrics"]["thresholds"].get(
@@ -120,6 +122,7 @@ class L3SemanticTM:
         # Determine device for embeddings
         if use_gpu:
             import torch
+
             device = "cuda" if torch.cuda.is_available() else "cpu"
             if device == "cpu":
                 logger.warning("GPU requested but not available, falling back to CPU")
@@ -129,7 +132,7 @@ class L3SemanticTM:
         # Load embedding model
         self.device = device
         self.encoder = SentenceTransformer(embedding_model, device=device)
-        self.embedding_dim = self.encoder.get_sentence_embedding_dimension()
+        self.embedding_dim = self.encoder.get_embedding_dimension()
 
         # FAISS GPU flag
         self.use_faiss_gpu = use_faiss_gpu and device == "cuda"
@@ -175,14 +178,17 @@ class L3SemanticTM:
         if self.use_faiss_gpu:
             try:
                 import torch
+
                 if torch.cuda.is_available():
                     res = faiss.StandardGpuResources()
                     self.index = faiss.index_cpu_to_gpu(res, 0, self.index)
                     import logging
+
                     logger = logging.getLogger(__name__)
                     logger.info("FAISS index moved to GPU")
             except Exception as e:
                 import logging
+
                 logger = logging.getLogger(__name__)
                 logger.warning(f"Failed to move FAISS index to GPU: {e}. Using CPU.")
 
@@ -216,9 +222,7 @@ class L3SemanticTM:
         start_time = time.perf_counter()
 
         # Generate embedding
-        embedding = self.encoder.encode(
-            source_text, convert_to_numpy=True, show_progress_bar=False
-        )
+        embedding = self.encoder.encode(source_text, convert_to_numpy=True, show_progress_bar=False)
 
         # Add to index
         with self._lock:
@@ -389,7 +393,8 @@ class L3SemanticTM:
                 "cache_hits": self._metrics["cache_hits"],
                 "cache_misses": self._metrics["cache_misses"],
                 "cache_hit_rate": (
-                    self._metrics["cache_hits"] / (self._metrics["cache_hits"] + self._metrics["cache_misses"])
+                    self._metrics["cache_hits"]
+                    / (self._metrics["cache_hits"] + self._metrics["cache_misses"])
                     if (self._metrics["cache_hits"] + self._metrics["cache_misses"]) > 0
                     else 0.0
                 ),
@@ -409,9 +414,7 @@ class L3SemanticTM:
                 return cached.copy()
 
         # Encode outside the lock (this is the expensive part)
-        embedding = self.encoder.encode(
-            query_text, convert_to_numpy=True, show_progress_bar=False
-        )
+        embedding = self.encoder.encode(query_text, convert_to_numpy=True, show_progress_bar=False)
         # Store immutable copy in cache
         embedding_copy = embedding.copy()
 
@@ -650,17 +653,19 @@ class L3SemanticTM:
                         and meta["tgt_lang"] == tgt_lang
                         and similarity >= threshold
                     ):
-                        matches.append(SemanticMatch(
-                            entry_id=meta["entry_id"],
-                            similarity=float(similarity),
-                            source_text=meta["source_text"],
-                            translation=meta["translation"],
-                            site_id=meta["site_id"],
-                            src_lang=meta["src_lang"],
-                            tgt_lang=meta["tgt_lang"],
-                            context=meta["context"],
-                            metadata=meta["metadata"],
-                        ))
+                        matches.append(
+                            SemanticMatch(
+                                entry_id=meta["entry_id"],
+                                similarity=float(similarity),
+                                source_text=meta["source_text"],
+                                translation=meta["translation"],
+                                site_id=meta["site_id"],
+                                src_lang=meta["src_lang"],
+                                tgt_lang=meta["tgt_lang"],
+                                context=meta["context"],
+                                metadata=meta["metadata"],
+                            )
+                        )
                         if len(matches) >= k:
                             break
 
@@ -766,6 +771,7 @@ class L3SemanticTM:
                     self.encoder.to("cpu")
                     self._encoder_on_gpu = False
                     import torch
+
                     torch.cuda.empty_cache()
                     logger.debug("L3 embedding encoder moved to CPU")
                 except Exception as e:
@@ -778,7 +784,11 @@ class L3SemanticTM:
         """
         with self._lock:
             # Move FAISS CPU index back to GPU
-            if self.use_faiss_gpu and self.index is not None and not getattr(self, '_index_on_gpu', self.use_faiss_gpu):
+            if (
+                self.use_faiss_gpu
+                and self.index is not None
+                and not getattr(self, "_index_on_gpu", self.use_faiss_gpu)
+            ):
                 try:
                     res = faiss.StandardGpuResources()
                     self.index = faiss.index_cpu_to_gpu(res, 0, self.index)
@@ -788,7 +798,11 @@ class L3SemanticTM:
                     logger.warning("L3 FAISS GPU reload failed: %s", e)
 
             # Move SentenceTransformer encoder back to GPU
-            if self.device == "cuda" and self.encoder is not None and not getattr(self, '_encoder_on_gpu', self.device == "cuda"):
+            if (
+                self.device == "cuda"
+                and self.encoder is not None
+                and not getattr(self, "_encoder_on_gpu", self.device == "cuda")
+            ):
                 try:
                     self.encoder.to("cuda")
                     self._encoder_on_gpu = True
@@ -822,20 +836,20 @@ class L3SemanticTM:
                             pass
 
                     # Atomic write pattern: write to temp file, then rename
-                    temp_index_file = index_file.with_suffix('.faiss.tmp')
+                    temp_index_file = index_file.with_suffix(".faiss.tmp")
                     faiss.write_index(index_to_save, str(temp_index_file))
                     temp_index_file.replace(index_file)  # Atomic on POSIX and Windows
 
                     # Save metadata (atomic write)
                     metadata_file = self.index_path / "metadata.pkl"
-                    temp_metadata_file = metadata_file.with_suffix('.pkl.tmp')
+                    temp_metadata_file = metadata_file.with_suffix(".pkl.tmp")
                     with open(temp_metadata_file, "wb") as f:
                         pickle.dump(self.metadata, f)
                     temp_metadata_file.replace(metadata_file)
 
                     # Save config (atomic write)
                     config_file = self.index_path / "config.json"
-                    temp_config_file = config_file.with_suffix('.json.tmp')
+                    temp_config_file = config_file.with_suffix(".json.tmp")
                     config = {
                         "embedding_dim": self.embedding_dim,
                         "num_entries": self.index.ntotal,
@@ -861,14 +875,17 @@ class L3SemanticTM:
                 if self.use_faiss_gpu:
                     try:
                         import torch
+
                         if torch.cuda.is_available():
                             res = faiss.StandardGpuResources()
                             self.index = faiss.index_cpu_to_gpu(res, 0, self.index)
                             import logging
+
                             logger = logging.getLogger(__name__)
                             logger.info("Loaded FAISS index moved to GPU")
                     except Exception as e:
                         import logging
+
                         logger = logging.getLogger(__name__)
                         logger.warning(f"Failed to move loaded index to GPU: {e}")
             else:

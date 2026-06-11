@@ -20,7 +20,8 @@ def create_minimal_hugo_site(site_path: Path):
 
     # Create a simple markdown file
     test_file = content_dir / "test.md"
-    test_file.write_text("""---
+    test_file.write_text(
+        """---
 title: Test Post
 date: 2024-01-01
 ---
@@ -32,7 +33,9 @@ This is another test paragraph.
 More content here to ensure we have enough segments.
 Additional content for testing purposes.
 Final paragraph to meet segment threshold.
-""", encoding="utf-8")
+""",
+        encoding="utf-8",
+    )
 
     return test_file
 
@@ -53,6 +56,7 @@ def create_benchmarking_config(config_path: Path, enabled: bool = True, min_segm
     }
 
     import yaml
+
     with open(config_path, "w", encoding="utf-8") as f:
         yaml.dump(config_content, f)
 
@@ -85,7 +89,9 @@ def test_cli_translate_help_works():
     assert "usage:" in result.stdout.lower() or "Usage:" in result.stdout
 
 
-@pytest.mark.skip(reason="Requires full translation engine integration - depends on working translate command with production metrics")
+@pytest.mark.skip(
+    reason="Requires full translation engine integration - depends on working translate command with production metrics"
+)
 def test_cli_production_metrics_enabled_via_flag(tmp_path):
     """Test that --enable-production-metrics flag records metrics.
 
@@ -114,8 +120,10 @@ def test_cli_production_metrics_enabled_via_flag(tmp_path):
             "-m",
             "src.cli",
             "translate",
-            "--source", str(site_dir),
-            "--target-lang", "es",
+            "--source",
+            str(site_dir),
+            "--target-lang",
+            "es",
             "--enable-production-metrics",
         ],
         capture_output=True,
@@ -127,9 +135,7 @@ def test_cli_production_metrics_enabled_via_flag(tmp_path):
 
     # Should succeed
     assert result.returncode == 0, (
-        f"CLI translation failed:\\n"
-        f"STDOUT:\\n{result.stdout}\\n"
-        f"STDERR:\\n{result.stderr}"
+        f"CLI translation failed:\\nSTDOUT:\\n{result.stdout}\\nSTDERR:\\n{result.stderr}"
     )
 
     # Verify production.db was created
@@ -138,6 +144,7 @@ def test_cli_production_metrics_enabled_via_flag(tmp_path):
 
     # Verify metrics were recorded
     from src.benchmarking.storage import BenchmarkDatabase
+
     db = BenchmarkDatabase(prod_db)
     runs = db.list_runs()
 
@@ -170,8 +177,10 @@ def test_cli_production_metrics_disabled_by_default(tmp_path):
             "-m",
             "src.cli",
             "translate",
-            "--source", str(site_dir),
-            "--target-lang", "es",
+            "--source",
+            str(site_dir),
+            "--target-lang",
+            "es",
             # NOTE: No --enable-production-metrics flag!
         ],
         capture_output=True,
@@ -219,8 +228,10 @@ def test_cli_production_metrics_via_config(tmp_path):
             "-m",
             "src.cli",
             "translate",
-            "--source", str(site_dir),
-            "--target-lang", "es",
+            "--source",
+            str(site_dir),
+            "--target-lang",
+            "es",
             "--enable-production-metrics",  # Explicit opt-in via flag
         ],
         capture_output=True,
@@ -264,8 +275,10 @@ def test_cli_handles_ingestor_errors_gracefully(tmp_path):
             "-m",
             "src.cli",
             "translate",
-            "--source", str(site_dir),
-            "--target-lang", "es",
+            "--source",
+            str(site_dir),
+            "--target-lang",
+            "es",
             "--enable-production-metrics",
         ],
         capture_output=True,
@@ -314,7 +327,11 @@ def test_cli_invocation_modes_subprocess():
 def test_subprocess_captures_output():
     """Test that subprocess tests can capture stdout/stderr for debugging."""
     result = subprocess.run(
-        [sys.executable, "-c", "print('stdout test'); import sys; sys.stderr.write('stderr test\\n')"],
+        [
+            sys.executable,
+            "-c",
+            "print('stdout test'); import sys; sys.stderr.write('stderr test\\n')",
+        ],
         capture_output=True,
         text=True,
         timeout=5,

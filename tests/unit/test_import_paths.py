@@ -59,7 +59,7 @@ class TestImportPaths(unittest.TestCase):
         from src.translation_engine import engine
 
         # The engine module should have successfully imported
-        assert hasattr(engine, 'TranslationEngine')
+        assert hasattr(engine, "TranslationEngine")
 
     def test_all_public_api_functions_available(self):
         """Test that all public API functions are accessible."""
@@ -67,12 +67,12 @@ class TestImportPaths(unittest.TestCase):
 
         # Public API functions
         public_functions = [
-            'setup_graceful_shutdown',
-            'register_active_context',
-            'unregister_active_context',
-            'register_shutdown_handler',
-            'get_active_context_count',
-            'reset_for_testing',
+            "setup_graceful_shutdown",
+            "register_active_context",
+            "unregister_active_context",
+            "register_shutdown_handler",
+            "get_active_context_count",
+            "reset_for_testing",
         ]
 
         for func_name in public_functions:
@@ -88,13 +88,13 @@ class TestImportPaths(unittest.TestCase):
         module_attrs = dir(gs_module)
 
         # Public API should be present
-        assert 'setup_graceful_shutdown' in module_attrs
-        assert 'register_active_context' in module_attrs
+        assert "setup_graceful_shutdown" in module_attrs
+        assert "register_active_context" in module_attrs
 
         # Internal implementation details should exist but are private
-        assert '_active_contexts' in module_attrs
-        assert '_contexts_lock' in module_attrs
-        assert '_perform_graceful_shutdown' in module_attrs
+        assert "_active_contexts" in module_attrs
+        assert "_contexts_lock" in module_attrs
+        assert "_perform_graceful_shutdown" in module_attrs
 
     def test_no_import_side_effects(self):
         """Test that importing modules doesn't have side effects."""
@@ -116,6 +116,7 @@ class TestImportPaths(unittest.TestCase):
         """Test that the same module is imported across different import paths."""
         from src.observability import graceful_shutdown
         from src.observability.graceful_shutdown import setup_graceful_shutdown as setup1
+
         setup2 = graceful_shutdown.setup_graceful_shutdown
 
         # Both should point to the same function
@@ -124,6 +125,7 @@ class TestImportPaths(unittest.TestCase):
     def test_import_works_from_different_working_directories(self):
         """Test imports work regardless of current working directory."""
         import os
+
         original_cwd = os.getcwd()
 
         try:
@@ -132,6 +134,7 @@ class TestImportPaths(unittest.TestCase):
             os.chdir(project_root)
 
             from src.observability.graceful_shutdown import setup_graceful_shutdown
+
             assert callable(setup_graceful_shutdown)
 
             # Test from src directory
@@ -140,6 +143,7 @@ class TestImportPaths(unittest.TestCase):
             import importlib
 
             import src.observability.graceful_shutdown
+
             importlib.reload(src.observability.graceful_shutdown)
             assert callable(src.observability.graceful_shutdown.setup_graceful_shutdown)
 
@@ -159,7 +163,7 @@ class TestImportPaths(unittest.TestCase):
             import observability.graceful_shutdown as graceful_shutdown_module
 
         assert graceful_shutdown_module is not None
-        assert hasattr(graceful_shutdown_module, 'setup_graceful_shutdown')
+        assert hasattr(graceful_shutdown_module, "setup_graceful_shutdown")
 
     def test_engine_relative_import_pattern(self):
         """Test the relative import pattern used in engine.py."""
@@ -181,6 +185,7 @@ class TestImportErrorHandling(unittest.TestCase):
 
         try:
             from src.observability.graceful_shutdown import register_active_context
+
             # If we get here, import succeeded (which it should)
             context_registered = True
         except ImportError:
@@ -192,11 +197,13 @@ class TestImportErrorHandling(unittest.TestCase):
 
     def test_missing_module_fallback(self):
         """Test that code handles missing modules gracefully."""
+
         # Simulate the pattern used in engine.py
         def safe_register_context(context):
             """Safely register context with fallback."""
             try:
                 from src.observability.graceful_shutdown import register_active_context
+
                 register_active_context(context)
                 return True
             except ImportError:
@@ -205,10 +212,11 @@ class TestImportErrorHandling(unittest.TestCase):
 
         # With the module available, should succeed
         from unittest.mock import Mock
+
         mock_context = Mock()
         result = safe_register_context(mock_context)
         assert result is True
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()

@@ -239,9 +239,7 @@ class TestJobStatus:
         queue.enqueue(sample_job)
 
         result = {"files_translated": 1, "duration": 5.2}
-        success = queue.update_job_status(
-            "test_job_1", JobStatus.COMPLETED, result_summary=result
-        )
+        success = queue.update_job_status("test_job_1", JobStatus.COMPLETED, result_summary=result)
 
         assert success is True
         job = queue.get_job("test_job_1")

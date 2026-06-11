@@ -193,8 +193,7 @@ presentation.Save("output.pdf", SaveFormat.Pdf);
 
 
 def test_technical_terms_not_counted_as_untranslated(
-    source_with_technical_terms,
-    correct_french_translation
+    source_with_technical_terms, correct_french_translation
 ):
     """
     Test that properly translated content PASSES even with technical terms.
@@ -207,24 +206,19 @@ def test_technical_terms_not_counted_as_untranslated(
     2. Total identity match ratio stays under 35% threshold
     """
     has_issue, ratio = check_excessive_untranslated(
-        source_with_technical_terms,
-        correct_french_translation,
-        'fr'
+        source_with_technical_terms, correct_french_translation, "fr"
     )
 
     # Should PASS - properly translated content with technical terms is acceptable
-    assert not has_issue, \
+    assert not has_issue, (
         f"Translation with correct technical terms should PASS. Ratio: {ratio:.1%}"
+    )
 
     # Ratio might be non-zero (technical terms), but should be under threshold
-    assert ratio < 0.35, \
-        f"Ratio should be under 35% threshold: {ratio:.1%}"
+    assert ratio < 0.35, f"Ratio should be under 35% threshold: {ratio:.1%}"
 
 
-def test_actual_untranslated_prose_is_detected(
-    source_with_technical_terms,
-    untranslated_prose
-):
+def test_actual_untranslated_prose_is_detected(source_with_technical_terms, untranslated_prose):
     """
     Test that actual untranslated prose IS still detected.
 
@@ -232,18 +226,14 @@ def test_actual_untranslated_prose_is_detected(
     real translation failures where prose remains in English.
     """
     has_issue, ratio = check_excessive_untranslated(
-        source_with_technical_terms,
-        untranslated_prose,
-        'fr'
+        source_with_technical_terms, untranslated_prose, "fr"
     )
 
     # The ratio should be HIGH (> 35%) because most content is untranslated
-    assert ratio > 0.35, \
-        f"Untranslated prose should be detected. Ratio: {ratio:.1%}"
+    assert ratio > 0.35, f"Untranslated prose should be detected. Ratio: {ratio:.1%}"
 
     # Should FAIL (have an issue)
-    assert has_issue, \
-        f"Translation with untranslated prose should FAIL. Ratio: {ratio:.1%}"
+    assert has_issue, f"Translation with untranslated prose should FAIL. Ratio: {ratio:.1%}"
 
 
 def test_breakdown_categorizes_technical_terms():
@@ -271,15 +261,15 @@ title: Test
 Formats pris en charge: PPTX, PPT, ODP
 """
 
-    breakdown = generate_untranslated_breakdown(source, target, 'fr', output_path=None)
+    breakdown = generate_untranslated_breakdown(source, target, "fr", output_path=None)
 
-    assert breakdown.get('available'), "Breakdown should be available"
-    assert 'total_source_chars' in breakdown, "Should have char counts"
-    assert 'untranslated_ratio' in breakdown, "Should have ratio"
-    assert 'contributors' in breakdown, "Should have contributors list"
+    assert breakdown.get("available"), "Breakdown should be available"
+    assert "total_source_chars" in breakdown, "Should have char counts"
+    assert "untranslated_ratio" in breakdown, "Should have ratio"
+    assert "contributors" in breakdown, "Should have contributors list"
 
     # Should have some identity matches (technical terms)
-    assert len(breakdown['contributors']) > 0, "Should identify some identity matches"
+    assert len(breakdown["contributors"]) > 0, "Should identify some identity matches"
 
 
 def test_code_blocks_excluded_from_ratio():
@@ -318,14 +308,12 @@ Console.WriteLine("Hello World");
 Ceci est un texte traduit.
 """
 
-    has_issue, ratio = check_excessive_untranslated(source, target, 'fr')
+    has_issue, ratio = check_excessive_untranslated(source, target, "fr")
 
     # Code staying identical should NOT cause high untranslated ratio
-    assert ratio < 0.20, \
-        f"Code blocks staying identical should not inflate ratio: {ratio:.1%}"
+    assert ratio < 0.20, f"Code blocks staying identical should not inflate ratio: {ratio:.1%}"
 
-    assert not has_issue, \
-        f"Translation with preserved code blocks should PASS. Ratio: {ratio:.1%}"
+    assert not has_issue, f"Translation with preserved code blocks should PASS. Ratio: {ratio:.1%}"
 
 
 def test_word_based_vs_ast_based_comparison():
@@ -360,11 +348,10 @@ Formats pris en charge: {source}
 Le convertisseur gère tous les formats efficacement.
 """
 
-    has_issue, ratio = check_excessive_untranslated(source_full, target_full, 'fr')
+    has_issue, ratio = check_excessive_untranslated(source_full, target_full, "fr")
 
     # With AST-based check and context, should have LOW ratio
-    assert ratio < 0.25, \
-        f"Technical terms in context should have low ratio: {ratio:.1%}"
+    assert ratio < 0.25, f"Technical terms in context should have low ratio: {ratio:.1%}"
 
 
 def test_regression_frozen_file_case():
@@ -463,11 +450,10 @@ Pour commencer à utiliser le convertisseur, installez le package et initialisez
 R: Le convertisseur prend en charge tous les principaux formats de présentation, y compris PowerPoint et les normes OpenDocument.
 """
 
-    has_issue, ratio = check_excessive_untranslated(source, target, 'fr')
+    has_issue, ratio = check_excessive_untranslated(source, target, "fr")
 
     # Should PASS - more prose content dilutes the technical terms
-    assert not has_issue, \
-        f"Frozen file pattern with adequate prose should PASS. Ratio: {ratio:.1%}"
+    assert not has_issue, f"Frozen file pattern with adequate prose should PASS. Ratio: {ratio:.1%}"
 
 
 if __name__ == "__main__":

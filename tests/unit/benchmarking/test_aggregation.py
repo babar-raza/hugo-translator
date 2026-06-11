@@ -25,7 +25,7 @@ class TestTimeSeriesAggregator:
         model_id: str = "test_model",
         device: str = "cpu",
         num_results: int = 10,
-        timestamp_offset_hours: int = 0
+        timestamp_offset_hours: int = 0,
     ) -> str:
         """Create a test benchmark run with results.
 
@@ -43,17 +43,19 @@ class TestTimeSeriesAggregator:
 
         results = []
         for i in range(num_results):
-            results.append(BenchmarkResult(
-                sample_id=f"sample_{i}",
-                model_id=model_id,
-                device=device,
-                batch_size=8,
-                duration_seconds=1.0 + i * 0.1,
-                tokens_input=100,
-                tokens_output=100,
-                throughput_tokens_per_sec=100.0 + i * 10,
-                peak_memory_mb=500.0 + i * 50
-            ))
+            results.append(
+                BenchmarkResult(
+                    sample_id=f"sample_{i}",
+                    model_id=model_id,
+                    device=device,
+                    batch_size=8,
+                    duration_seconds=1.0 + i * 0.1,
+                    tokens_input=100,
+                    tokens_output=100,
+                    throughput_tokens_per_sec=100.0 + i * 10,
+                    peak_memory_mb=500.0 + i * 50,
+                )
+            )
 
         run = BenchmarkRun(
             run_id=f"run_{model_id}_{device}_{timestamp_offset_hours}",
@@ -64,14 +66,10 @@ class TestTimeSeriesAggregator:
             corpus_category="test",
             purpose="testing",
             tags=["test"],
-            system_info=SystemInfo(
-                cpu_model="Test CPU",
-                cpu_cores=4,
-                total_ram_gb=8.0
-            ),
+            system_info=SystemInfo(cpu_model="Test CPU", cpu_cores=4, total_ram_gb=8.0),
             results=results,
             total_duration_seconds=10.0,
-            timestamp_utc=timestamp.isoformat()
+            timestamp_utc=timestamp.isoformat(),
         )
 
         db.save_run(run)
@@ -96,10 +94,13 @@ class TestTimeSeriesAggregator:
             # Verify trends exist in database
             conn = db._get_connection()
             try:
-                cursor = conn.execute("""
+                cursor = conn.execute(
+                    """
                     SELECT COUNT(*) FROM benchmark_trends
                     WHERE model_id = ? AND device = ?
-                """, ("test_model", "cpu"))
+                """,
+                    ("test_model", "cpu"),
+                )
                 count = cursor.fetchone()[0]
                 assert count > 0
 
@@ -169,7 +170,9 @@ class TestTimeSeriesAggregator:
             db = BenchmarkDatabase(db_path)
 
             # Create initial run
-            self._create_test_run(db, "test_model", "cpu", num_results=10, timestamp_offset_hours=-2)
+            self._create_test_run(
+                db, "test_model", "cpu", num_results=10, timestamp_offset_hours=-2
+            )
 
             # First aggregation
             aggregator = TimeSeriesAggregator(db_path)
@@ -195,32 +198,26 @@ class TestTimeSeriesAggregator:
             # Create test runs with enough data
             for i in range(15):
                 self._create_test_run(
-                    db,
-                    "test_model",
-                    "cpu",
-                    num_results=2,
-                    timestamp_offset_hours=-i
+                    db, "test_model", "cpu", num_results=2, timestamp_offset_hours=-i
                 )
 
             # Create baseline
             aggregator = TimeSeriesAggregator(db_path)
-            baseline_id = aggregator.create_baseline(
-                "test_model",
-                "cpu",
-                "weekly",
-                days_back=30
-            )
+            baseline_id = aggregator.create_baseline("test_model", "cpu", "weekly", days_back=30)
 
             assert baseline_id is not None
 
             # Verify baseline exists
             conn = db._get_connection()
             try:
-                cursor = conn.execute("""
+                cursor = conn.execute(
+                    """
                     SELECT avg_throughput, p50_throughput, p95_throughput, sample_count
                     FROM performance_baselines
                     WHERE id = ?
-                """, (baseline_id,))
+                """,
+                    (baseline_id,),
+                )
                 row = cursor.fetchone()
 
                 assert row is not None
@@ -243,11 +240,7 @@ class TestTimeSeriesAggregator:
             self._create_test_run(db, "test_model", "cpu", num_results=5)
 
             aggregator = TimeSeriesAggregator(db_path)
-            baseline_id = aggregator.create_baseline(
-                "test_model",
-                "cpu",
-                "weekly"
-            )
+            baseline_id = aggregator.create_baseline("test_model", "cpu", "weekly")
 
             # Should return None (insufficient data)
             assert baseline_id is None
@@ -262,16 +255,18 @@ class TestTimeSeriesAggregator:
 
             # Create old run (400 days ago)
             old_timestamp = datetime.now(UTC) - timedelta(days=400)
-            results = [BenchmarkResult(
-                sample_id="sample_1",
-                model_id="test_model",
-                device="cpu",
-                batch_size=8,
-                duration_seconds=1.0,
-                tokens_input=100,
-                tokens_output=100,
-                throughput_tokens_per_sec=100.0
-            )]
+            results = [
+                BenchmarkResult(
+                    sample_id="sample_1",
+                    model_id="test_model",
+                    device="cpu",
+                    batch_size=8,
+                    duration_seconds=1.0,
+                    tokens_input=100,
+                    tokens_output=100,
+                    throughput_tokens_per_sec=100.0,
+                )
+            ]
 
             old_run = BenchmarkRun(
                 run_id="old_run",
@@ -282,14 +277,10 @@ class TestTimeSeriesAggregator:
                 corpus_category="test",
                 purpose="testing",
                 tags=["test"],
-                system_info=SystemInfo(
-                    cpu_model="Test CPU",
-                    cpu_cores=4,
-                    total_ram_gb=8.0
-                ),
+                system_info=SystemInfo(cpu_model="Test CPU", cpu_cores=4, total_ram_gb=8.0),
                 results=results,
                 total_duration_seconds=1.0,
-                timestamp_utc=old_timestamp.isoformat()
+                timestamp_utc=old_timestamp.isoformat(),
             )
             db.save_run(old_run)
 
@@ -301,15 +292,30 @@ class TestTimeSeriesAggregator:
             conn = db._get_connection()
             try:
                 old_created = (datetime.now(UTC) - timedelta(days=400)).isoformat()
-                conn.execute("""
+                conn.execute(
+                    """
                     INSERT INTO benchmark_trends
                     (model_id, device, time_window, window_start, window_end,
                      sample_count, avg_throughput, p50_throughput, p95_throughput, p99_throughput,
                      avg_duration, avg_memory_mb, created_at)
                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                """, ("test_model", "cpu", "daily", old_timestamp.isoformat(),
-                      old_timestamp.isoformat(), 1, 100.0, 100.0, 100.0, 100.0,
-                      1.0, None, old_created))
+                """,
+                    (
+                        "test_model",
+                        "cpu",
+                        "daily",
+                        old_timestamp.isoformat(),
+                        old_timestamp.isoformat(),
+                        1,
+                        100.0,
+                        100.0,
+                        100.0,
+                        100.0,
+                        1.0,
+                        None,
+                        old_created,
+                    ),
+                )
                 conn.commit()
 
             finally:
@@ -343,17 +349,19 @@ class TestTimeSeriesAggregator:
             results = []
             throughputs = [100.0, 110.0, 120.0, 130.0, 140.0, 150.0, 160.0, 170.0, 180.0, 190.0]
             for i, throughput in enumerate(throughputs):
-                results.append(BenchmarkResult(
-                    sample_id=f"sample_{i}",
-                    model_id="test_model",
-                    device="cpu",
-                    batch_size=8,
-                    duration_seconds=1.0,
-                    tokens_input=100,
-                    tokens_output=100,
-                    throughput_tokens_per_sec=throughput,
-                    peak_memory_mb=500.0
-                ))
+                results.append(
+                    BenchmarkResult(
+                        sample_id=f"sample_{i}",
+                        model_id="test_model",
+                        device="cpu",
+                        batch_size=8,
+                        duration_seconds=1.0,
+                        tokens_input=100,
+                        tokens_output=100,
+                        throughput_tokens_per_sec=throughput,
+                        peak_memory_mb=500.0,
+                    )
+                )
 
             run = BenchmarkRun(
                 run_id="test_run",
@@ -364,13 +372,9 @@ class TestTimeSeriesAggregator:
                 corpus_category="test",
                 purpose="testing",
                 tags=["test"],
-                system_info=SystemInfo(
-                    cpu_model="Test CPU",
-                    cpu_cores=4,
-                    total_ram_gb=8.0
-                ),
+                system_info=SystemInfo(cpu_model="Test CPU", cpu_cores=4, total_ram_gb=8.0),
                 results=results,
-                total_duration_seconds=10.0
+                total_duration_seconds=10.0,
             )
             db.save_run(run)
 
@@ -381,11 +385,14 @@ class TestTimeSeriesAggregator:
             # Check statistics
             conn = db._get_connection()
             try:
-                cursor = conn.execute("""
+                cursor = conn.execute(
+                    """
                     SELECT avg_throughput, p50_throughput, sample_count
                     FROM benchmark_trends
                     WHERE model_id = ? AND device = ? AND time_window = 'hourly'
-                """, ("test_model", "cpu"))
+                """,
+                    ("test_model", "cpu"),
+                )
                 row = cursor.fetchone()
 
                 assert row is not None

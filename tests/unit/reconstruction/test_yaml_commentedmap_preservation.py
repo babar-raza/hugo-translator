@@ -7,6 +7,7 @@ TC-REC-03: block scalar content_left with list items is more-indented than key
 TC-REC-04: Output YAML parses successfully via yaml.safe_load
 TC-REC-05: PyYAML fallback path produces 4-space indented output
 """
+
 from __future__ import annotations
 
 import pytest
@@ -38,6 +39,7 @@ class TestYAMLFormatterCommentedMap:
         ryaml = YAML()
         ryaml.best_indent = indent
         import io
+
         buf = io.StringIO()
         ryaml.dump(data, buf)
         buf.seek(0)
@@ -57,12 +59,14 @@ class TestYAMLFormatterCommentedMap:
 
     def test_tc_rec_04_output_parses_with_safe_load(self):
         """Output YAML must parse successfully via yaml.safe_load."""
-        cm = self._make_commented_map({
-            "title": "A title with: colon",
-            "draft": False,
-            "date": "2024-01-01",
-            "tags": ["tag1", "tag2"],
-        })
+        cm = self._make_commented_map(
+            {
+                "title": "A title with: colon",
+                "draft": False,
+                "date": "2024-01-01",
+                "tags": ["tag1", "tag2"],
+            }
+        )
         result = YAMLFormatter.format_frontmatter(cm)
         # Extract FM between --- markers
         parts = result.split("---")

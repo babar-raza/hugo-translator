@@ -5,11 +5,12 @@ Proves that YAMLFormatter.format_frontmatter() is safe regardless of
 logging transport failures. structlog calls in yaml_formatter.py must
 never abort YAML formatting or alter output content.
 """
+
 from __future__ import annotations
 
 import io
 import logging
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
 
 import pytest
 import structlog
@@ -25,6 +26,7 @@ class _BrokenStream:
 
     def flush(self):
         raise OSError(22, "Invalid argument")
+
 
 # Try to import CommentedMap; skip if ruamel unavailable
 try:
@@ -53,9 +55,7 @@ class TestYAMLFormatterLoggingSafety:
         """format_frontmatter returns correct YAML even when logger.debug raises."""
         data = {"title": "Caf\u00e9 r\u00e9sum\u00e9", "draft": False}
 
-        with patch(
-            "src.translation_engine.reconstructor.yaml_formatter.logger"
-        ) as mock_logger:
+        with patch("src.translation_engine.reconstructor.yaml_formatter.logger") as mock_logger:
             mock_logger.debug.side_effect = OSError(22, "Invalid argument")
             result = YAMLFormatter.format_frontmatter(data)
 
@@ -67,9 +67,7 @@ class TestYAMLFormatterLoggingSafety:
         """The exact RISK-09 failure shape (OSError errno 22) does not escape."""
         data = {"title": "Test", "date": "2026-04-23"}
 
-        with patch(
-            "src.translation_engine.reconstructor.yaml_formatter.logger"
-        ) as mock_logger:
+        with patch("src.translation_engine.reconstructor.yaml_formatter.logger") as mock_logger:
             mock_logger.debug.side_effect = OSError(22, "Invalid argument")
             # Must not raise
             result = YAMLFormatter.format_frontmatter(data)
@@ -162,11 +160,12 @@ class TestYAMLFormatterLoggingSafety:
         """When ruamel fails, logger.warning is called and PyYAML fallback works."""
         data = {"title": "Safe fallback"}
 
-        with patch(
-            "src.translation_engine.reconstructor.yaml_formatter._yaml_dumper"
-        ) as mock_dumper, patch(
-            "src.translation_engine.reconstructor.yaml_formatter.logger"
-        ) as mock_logger:
+        with (
+            patch(
+                "src.translation_engine.reconstructor.yaml_formatter._yaml_dumper"
+            ) as mock_dumper,
+            patch("src.translation_engine.reconstructor.yaml_formatter.logger") as mock_logger,
+        ):
             mock_dumper.dump.side_effect = RuntimeError("ruamel error")
             mock_logger.warning = MagicMock()
 

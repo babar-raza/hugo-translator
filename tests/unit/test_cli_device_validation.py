@@ -3,6 +3,7 @@ Unit tests for CLI device validation logic (T102: federated-splashing-panda).
 
 Tests device override and CUDA availability validation in translate_site().
 """
+
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -11,21 +12,24 @@ import pytest
 @pytest.fixture
 def mock_all_dependencies():
     """Mock all dependencies for CLI testing."""
-    with patch.dict('sys.modules', {
-        'src.translation_engine': MagicMock(),
-        'src.translation_engine.models': MagicMock(),
-        'src.tm': MagicMock(),
-        'src.tm.translation_memory': MagicMock(),
-        'src.tm.l1_cache': MagicMock(),
-        'src.tm.l2_persistent': MagicMock(),
-        'src.tm.l3_semantic': MagicMock(),
-        'src.model_runtime': MagicMock(),
-        'src.model_runtime.loader': MagicMock(),
-        'src.model_runtime.registry': MagicMock(),
-        'src.utils.config_loader': MagicMock(),
-        'src.utils.models': MagicMock(),
-        'torch': MagicMock(),
-    }):
+    with patch.dict(
+        "sys.modules",
+        {
+            "src.translation_engine": MagicMock(),
+            "src.translation_engine.models": MagicMock(),
+            "src.tm": MagicMock(),
+            "src.tm.translation_memory": MagicMock(),
+            "src.tm.l1_cache": MagicMock(),
+            "src.tm.l2_persistent": MagicMock(),
+            "src.tm.l3_semantic": MagicMock(),
+            "src.model_runtime": MagicMock(),
+            "src.model_runtime.loader": MagicMock(),
+            "src.model_runtime.registry": MagicMock(),
+            "src.utils.config_loader": MagicMock(),
+            "src.utils.models": MagicMock(),
+            "torch": MagicMock(),
+        },
+    ):
         yield
 
 
@@ -38,12 +42,13 @@ def test_device_auto_detects_cuda(mock_all_dependencies):
     overrides = CLIConfigOverrides(args)
 
     # Mock torch.cuda.is_available() to return True
-    with patch('torch.cuda.is_available', return_value=True):
+    with patch("torch.cuda.is_available", return_value=True):
         # Verify logic would use cuda
         if overrides.device:
             device = overrides.device
         else:
             import torch
+
             device = "cuda" if torch.cuda.is_available() else "cpu"
 
         assert device == "cuda"
@@ -58,12 +63,13 @@ def test_device_auto_falls_back_to_cpu(mock_all_dependencies):
     overrides = CLIConfigOverrides(args)
 
     # Mock torch.cuda.is_available() to return False
-    with patch('torch.cuda.is_available', return_value=False):
+    with patch("torch.cuda.is_available", return_value=False):
         # Verify logic would use cpu
         if overrides.device:
             device = overrides.device
         else:
             import torch
+
             device = "cuda" if torch.cuda.is_available() else "cpu"
 
         assert device == "cpu"
@@ -81,7 +87,7 @@ def test_device_override_cpu_succeeds(mock_all_dependencies):
     assert overrides.device == "cpu"
 
     # CPU always succeeds regardless of CUDA availability
-    with patch('torch.cuda.is_available', return_value=True):
+    with patch("torch.cuda.is_available", return_value=True):
         device = overrides.device if overrides.device else "auto"
         assert device == "cpu"
 
@@ -97,8 +103,9 @@ def test_device_override_cuda_when_unavailable_should_fail(mock_all_dependencies
     assert overrides.device == "cuda"
 
     # Simulate validation logic
-    with patch('torch.cuda.is_available', return_value=False):
+    with patch("torch.cuda.is_available", return_value=False):
         import torch
+
         if overrides.device == "cuda" and not torch.cuda.is_available():
             # Should fail - return code 1
             result = 1
@@ -119,8 +126,9 @@ def test_device_override_cuda_when_available_succeeds(mock_all_dependencies):
     assert overrides.device == "cuda"
 
     # Simulate validation logic
-    with patch('torch.cuda.is_available', return_value=True):
+    with patch("torch.cuda.is_available", return_value=True):
         import torch
+
         if overrides.device == "cuda" and not torch.cuda.is_available():
             result = 1
         else:
@@ -204,6 +212,7 @@ def test_pytorch_import_error_with_cuda_request(mock_all_dependencies):
     # Should fail with exit code 1
     try:
         import torch
+
         mock_import_error()
     except ImportError:
         if overrides.device == "cuda":

@@ -23,6 +23,7 @@ import pytest
 # Helpers — pure logic extracted from engine.py completion filter
 # ---------------------------------------------------------------------------
 
+
 def _completion_filter(
     md_files: list,
     target_langs: list,
@@ -79,6 +80,7 @@ def _completion_filter(
 # Fixtures
 # ---------------------------------------------------------------------------
 
+
 @pytest.fixture
 def source_dir(tmp_path):
     """Create a source directory with numbered .md files."""
@@ -114,10 +116,12 @@ def make_output(output_dir, lang: str, name: str, mtime_offset: float = 1.0) -> 
 # Tests
 # ---------------------------------------------------------------------------
 
+
 class TestCompletionFilter:
     def _get_output_path(self, output_dir, langs_root="output"):
         def _inner(source_file: Path, lang: str) -> Path:
             return output_dir / lang / source_file.name
+
         return _inner
 
     def test_skips_file_when_all_outputs_newer_than_source(self, tmp_path):
@@ -133,6 +137,7 @@ class TestCompletionFilter:
         # Bump output mtime to be definitely after source
         future = src_mtime + 10
         import os
+
         os.utime(out_fr, (future, future))
 
         def get_output(f, lang):
@@ -165,6 +170,7 @@ class TestCompletionFilter:
 
         # Make output older than source
         import os
+
         old_mtime = src.stat().st_mtime - 100
         os.utime(out, (old_mtime, old_mtime))
 
@@ -178,6 +184,7 @@ class TestCompletionFilter:
     def test_skips_only_fully_complete_files(self, tmp_path):
         """Only skip if ALL target lang outputs are newer. Include if any is missing."""
         import os
+
         src = tmp_path / "en" / "d.md"
         src.parent.mkdir(parents=True)
         src.write_text("source")
@@ -200,6 +207,7 @@ class TestCompletionFilter:
 
     def test_force_retranslate_bypasses_filter(self, tmp_path):
         import os
+
         src = tmp_path / "en" / "e.md"
         src.parent.mkdir(parents=True)
         src.write_text("source")
@@ -213,15 +221,14 @@ class TestCompletionFilter:
         def get_output(f, lang):
             return tmp_path / lang / f.name
 
-        result, skipped, _ = _completion_filter(
-            [src], ["fr"], get_output, force_retranslate=True
-        )
+        result, skipped, _ = _completion_filter([src], ["fr"], get_output, force_retranslate=True)
         assert src in result
         assert skipped == 0
 
     def test_queued_file_force_included_despite_current_outputs(self, tmp_path):
         """Files in retranslate queue are included even when outputs appear up-to-date."""
         import os
+
         src = tmp_path / "en" / "f.md"
         src.parent.mkdir(parents=True)
         src.write_text("source")
@@ -256,6 +263,7 @@ class TestCompletionFilter:
     def test_partial_queue_match_includes_only_matched(self, tmp_path):
         """Only the source file whose output is queued is force-included."""
         import os
+
         src_a = tmp_path / "en" / "ga.md"
         src_b = tmp_path / "en" / "gb.md"
         src_a.parent.mkdir(parents=True, exist_ok=True)
@@ -280,8 +288,8 @@ class TestCompletionFilter:
         result, skipped, force_included = _completion_filter(
             [src_a, src_b], ["ar"], get_output, queued_output_paths=queued
         )
-        assert src_a in result       # queued → force-included
-        assert src_b not in result   # up-to-date → skipped
+        assert src_a in result  # queued → force-included
+        assert src_b not in result  # up-to-date → skipped
         assert skipped == 1
         assert force_included == 1
 

@@ -26,16 +26,12 @@ def _get_heartbeat_wait_timeout():
             return True
 
     with patch("threading.Event", SpyEvent):
-        with patch(
-            "src.workers.autonomous_content_translation_worker.logger"
-        ):
+        with patch("src.workers.autonomous_content_translation_worker.logger"):
             from src.workers.autonomous_content_translation_worker import (
                 AutonomousContentTranslationWorker,
             )
 
-            worker = AutonomousContentTranslationWorker.__new__(
-                AutonomousContentTranslationWorker
-            )
+            worker = AutonomousContentTranslationWorker.__new__(AutonomousContentTranslationWorker)
             worker._worker_id = "test"
             worker._write_heartbeat = MagicMock()
 

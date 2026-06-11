@@ -33,17 +33,11 @@ def blog_site_profile():
         content_roots=["content"],
         default_source_lang="en",
         target_langs=["da", "fr"],
-        output_layout=OutputLayout(
-            per_language_folders=False,
-            pattern="{filename}.{lang}{ext}"
-        ),
+        output_layout=OutputLayout(per_language_folders=False, pattern="{filename}.{lang}{ext}"),
         frontmatter={},
         body=BodyRules(
-            translate_markdown=True,
-            preserve_blocks=[],
-            preserve_patterns=[],
-            placeholder_syntax=[]
-        )
+            translate_markdown=True, preserve_blocks=[], preserve_patterns=[], placeholder_syntax=[]
+        ),
     )
 
 
@@ -64,11 +58,7 @@ def mock_translation_engine(blog_site_profile):
     config_service.get_site_profile.return_value = blog_site_profile
 
     # Create engine with mocked components
-    engine = TranslationEngine(
-        config_service=config_service,
-        tm=None,
-        model_loader=None
-    )
+    engine = TranslationEngine(config_service=config_service, tm=None, model_loader=None)
 
     # Mock the actual translation method to return simple fake translations
     original_translate_file = engine.translate_file
@@ -77,7 +67,7 @@ def mock_translation_engine(blog_site_profile):
         """Mock translation that just adds language suffix to content."""
 
         # Call original to get filtering logic, but mock the actual translation
-        with patch.object(engine, '_translate_content') as mock_content:
+        with patch.object(engine, "_translate_content") as mock_content:
             mock_content.return_value = f"[TRANSLATED TO {target_lang.upper()}]"
             return original_translate_file(file_path, target_lang, **kwargs)
 
@@ -90,10 +80,7 @@ class TestSourceFileFilteringE2E:
     """Integration tests for source file filtering end-to-end workflow."""
 
     def test_filter_source_files_excludes_translated(
-        self,
-        tmp_path,
-        test_fixtures_dir,
-        blog_site_profile
+        self, tmp_path, test_fixtures_dir, blog_site_profile
     ):
         """
         Test that _filter_source_files correctly excludes already-translated files.
@@ -117,17 +104,11 @@ class TestSourceFileFilteringE2E:
 
         # Create minimal engine to test filtering
         config_service = MagicMock()
-        engine = TranslationEngine(
-            config_service=config_service,
-            tm=None,
-            model_loader=None
-        )
+        engine = TranslationEngine(config_service=config_service, tm=None, model_loader=None)
 
         # Filter files using the method under test
         filtered_files = engine._filter_source_files(
-            files=all_files,
-            site_profile=blog_site_profile,
-            target_langs=["da", "fr"]
+            files=all_files, site_profile=blog_site_profile, target_langs=["da", "fr"]
         )
 
         # Extract just filenames for easier assertion
@@ -141,20 +122,18 @@ class TestSourceFileFilteringE2E:
 
         # Assert: Translated file excluded
         if "index.es.md" in all_names:
-            assert "index.es.md" not in filtered_names, \
+            assert "index.es.md" not in filtered_names, (
                 "Translated file index.es.md should be excluded"
+            )
 
         # Assert: Expected count (3 source files if fixture has README)
         expected_sources = {"index.md", "tutorial.md", "_index.md"}
-        assert filtered_names >= expected_sources, \
+        assert filtered_names >= expected_sources, (
             f"Expected at least {expected_sources}, got {filtered_names}"
-
+        )
 
     def test_directory_translation_skips_existing_translations(
-        self,
-        tmp_path,
-        test_fixtures_dir,
-        blog_site_profile
+        self, tmp_path, test_fixtures_dir, blog_site_profile
     ):
         """
         Test that directory translation skips already-translated files.
@@ -183,18 +162,12 @@ class TestSourceFileFilteringE2E:
         # We need to mock the actual translation to avoid loading models
         # But we want to test the filtering logic, so we'll check what files
         # would be processed
-        engine = TranslationEngine(
-            config_service=config_service,
-            tm=None,
-            model_loader=None
-        )
+        engine = TranslationEngine(config_service=config_service, tm=None, model_loader=None)
 
         # Get files that would be translated
         markdown_files = list(test_input.glob("*.md"))
         files_to_translate = engine._filter_source_files(
-            files=markdown_files,
-            site_profile=blog_site_profile,
-            target_langs=["da", "fr"]
+            files=markdown_files, site_profile=blog_site_profile, target_langs=["da", "fr"]
         )
 
         file_names = {f.name for f in files_to_translate}
@@ -205,8 +178,9 @@ class TestSourceFileFilteringE2E:
         assert "_index.md" in file_names
 
         # Assert: Translated file excluded (key assertion)
-        assert "index.es.md" not in file_names, \
+        assert "index.es.md" not in file_names, (
             "index.es.md should be skipped to prevent index.es.da.md creation"
+        )
 
         # Additional assertion: Verify no README.md included (if it exists)
         # README files are typically documentation, not content
@@ -215,12 +189,8 @@ class TestSourceFileFilteringE2E:
             # This is acceptable as long as translated files are excluded
             pass
 
-
     def test_single_file_translation_rejects_translated_file(
-        self,
-        tmp_path,
-        test_fixtures_dir,
-        blog_site_profile
+        self, tmp_path, test_fixtures_dir, blog_site_profile
     ):
         """
         Test that attempting to translate an already-translated file is rejected.
@@ -238,19 +208,12 @@ class TestSourceFileFilteringE2E:
         config_service = MagicMock()
         config_service.get_site_profile.return_value = blog_site_profile
 
-        engine = TranslationEngine(
-            config_service=config_service,
-            tm=None,
-            model_loader=None
-        )
+        engine = TranslationEngine(config_service=config_service, tm=None, model_loader=None)
 
         # Attempt to translate the file
         # The safety check should reject it early, before any actual translation
         result = engine.translate_file(
-            site_id="test-blog.test",
-            file_path=test_file,
-            target_langs=["da", "fr"],
-            force=False
+            site_id="test-blog.test", file_path=test_file, target_langs=["da", "fr"], force=False
         )
 
         # Assert: Translation rejected
@@ -259,18 +222,14 @@ class TestSourceFileFilteringE2E:
 
         # Assert: Error message is clear and actionable
         error_text = " ".join(result.errors).lower()
-        assert "already-translated" in error_text or "refusing to translate" in error_text, \
+        assert "already-translated" in error_text or "refusing to translate" in error_text, (
             f"Error should mention already-translated file: {result.errors}"
-        assert "index.es.md" in error_text, \
+        )
+        assert "index.es.md" in error_text, (
             f"Error should mention the problematic filename: {result.errors}"
+        )
 
-
-    def test_no_double_language_files_created(
-        self,
-        tmp_path,
-        test_fixtures_dir,
-        blog_site_profile
-    ):
+    def test_no_double_language_files_created(self, tmp_path, test_fixtures_dir, blog_site_profile):
         """
         Test the core bug fix: verify no double-language files are created.
 
@@ -288,11 +247,7 @@ class TestSourceFileFilteringE2E:
 
         # Create engine
         config_service = MagicMock()
-        engine = TranslationEngine(
-            config_service=config_service,
-            tm=None,
-            model_loader=None
-        )
+        engine = TranslationEngine(config_service=config_service, tm=None, model_loader=None)
 
         # Get all files including translated ones
         all_files = sorted(test_input.glob("*.md"))
@@ -300,9 +255,7 @@ class TestSourceFileFilteringE2E:
 
         # Filter to get files that would be translated
         filtered_files = engine._filter_source_files(
-            files=all_files,
-            site_profile=blog_site_profile,
-            target_langs=["da", "fr"]
+            files=all_files, site_profile=blog_site_profile, target_langs=["da", "fr"]
         )
 
         filtered_names = [f.name for f in filtered_files]
@@ -310,8 +263,9 @@ class TestSourceFileFilteringE2E:
         # Assert: No translated files in the list
         for filename in all_names:
             if ".es." in filename or ".da." in filename or ".fr." in filename:
-                assert filename not in filtered_names, \
+                assert filename not in filtered_names, (
                     f"Translated file {filename} should be filtered out"
+                )
 
         # Assert: Only source files (no language code before extension)
         for filename in filtered_names:
@@ -319,15 +273,11 @@ class TestSourceFileFilteringE2E:
             stem = Path(filename).stem
             # If stem ends with a language code, it's a translated file
             for lang in ["es", "da", "fr", "de", "pt", "zh", "ar"]:
-                assert not stem.endswith(f".{lang}"), \
+                assert not stem.endswith(f".{lang}"), (
                     f"File {filename} appears to be translated (ends with .{lang})"
+                )
 
-
-    def test_filtering_with_case_insensitive_extensions(
-        self,
-        tmp_path,
-        blog_site_profile
-    ):
+    def test_filtering_with_case_insensitive_extensions(self, tmp_path, blog_site_profile):
         """
         Test that filtering works with case-insensitive file extensions.
 
@@ -340,17 +290,11 @@ class TestSourceFileFilteringE2E:
         (tmp_path / "guide.Es.Md").write_text("Spanish")
 
         config_service = MagicMock()
-        engine = TranslationEngine(
-            config_service=config_service,
-            tm=None,
-            model_loader=None
-        )
+        engine = TranslationEngine(config_service=config_service, tm=None, model_loader=None)
 
         all_files = list(tmp_path.glob("*.[Mm][Dd]"))
         filtered = engine._filter_source_files(
-            files=all_files,
-            site_profile=blog_site_profile,
-            target_langs=["es", "da"]
+            files=all_files, site_profile=blog_site_profile, target_langs=["es", "da"]
         )
 
         filtered_names = {f.name for f in filtered}
@@ -361,12 +305,7 @@ class TestSourceFileFilteringE2E:
         assert "tutorial.es.MD" not in filtered_names
         assert "guide.Es.Md" not in filtered_names
 
-
-    def test_filtering_respects_target_languages(
-        self,
-        tmp_path,
-        blog_site_profile
-    ):
+    def test_filtering_respects_target_languages(self, tmp_path, blog_site_profile):
         """
         Test that filtering uses both default language codes and target_langs.
 
@@ -379,19 +318,13 @@ class TestSourceFileFilteringE2E:
         (tmp_path / "tutorial.md").write_text("Source")
 
         config_service = MagicMock()
-        engine = TranslationEngine(
-            config_service=config_service,
-            tm=None,
-            model_loader=None
-        )
+        engine = TranslationEngine(config_service=config_service, tm=None, model_loader=None)
 
         all_files = list(tmp_path.glob("*.md"))
 
         # Filter with custom target language
         filtered = engine._filter_source_files(
-            files=all_files,
-            site_profile=blog_site_profile,
-            target_langs=["customlang", "da"]
+            files=all_files, site_profile=blog_site_profile, target_langs=["customlang", "da"]
         )
 
         filtered_names = {f.name for f in filtered}
@@ -399,20 +332,15 @@ class TestSourceFileFilteringE2E:
         # index.customlang.md should be filtered because customlang is in target_langs
         assert "index.md" in filtered_names
         assert "tutorial.md" in filtered_names
-        assert "index.customlang.md" not in filtered_names, \
+        assert "index.customlang.md" not in filtered_names, (
             "File with custom target language should be filtered"
+        )
 
 
 class TestFilteringObservabilityE2E:
     """Test observability features like logging in integration scenarios."""
 
-    def test_filtering_logs_summary(
-        self,
-        tmp_path,
-        test_fixtures_dir,
-        blog_site_profile,
-        caplog
-    ):
+    def test_filtering_logs_summary(self, tmp_path, test_fixtures_dir, blog_site_profile, caplog):
         """
         Test that filtering operations log a summary.
 
@@ -425,20 +353,14 @@ class TestFilteringObservabilityE2E:
         shutil.copytree(test_fixtures_dir, test_input)
 
         config_service = MagicMock()
-        engine = TranslationEngine(
-            config_service=config_service,
-            tm=None,
-            model_loader=None
-        )
+        engine = TranslationEngine(config_service=config_service, tm=None, model_loader=None)
 
         all_files = list(test_input.glob("*.md"))
 
         # Filter with logging enabled
         with caplog.at_level(logging.INFO):
             filtered = engine._filter_source_files(
-                files=all_files,
-                site_profile=blog_site_profile,
-                target_langs=["da", "fr"]
+                files=all_files, site_profile=blog_site_profile, target_langs=["da", "fr"]
             )
 
         # Assert: Summary log present
@@ -447,16 +369,11 @@ class TestFilteringObservabilityE2E:
         # Should log something about filtering
         if len(all_files) != len(filtered):
             # Only logs if files were actually filtered
-            assert "filtering" in log_text or "skipped" in log_text, \
+            assert "filtering" in log_text or "skipped" in log_text, (
                 f"Expected filtering summary in logs: {caplog.text}"
+            )
 
-
-    def test_high_filter_rate_warning(
-        self,
-        tmp_path,
-        blog_site_profile,
-        caplog
-    ):
+    def test_high_filter_rate_warning(self, tmp_path, blog_site_profile, caplog):
         """
         Test that unusually high filter rates trigger a warning.
 
@@ -472,29 +389,23 @@ class TestFilteringObservabilityE2E:
         (tmp_path / "tutorial.md").write_text("Source")
 
         config_service = MagicMock()
-        engine = TranslationEngine(
-            config_service=config_service,
-            tm=None,
-            model_loader=None
-        )
+        engine = TranslationEngine(config_service=config_service, tm=None, model_loader=None)
 
         all_files = list(tmp_path.glob("*.md"))
 
         # Filter with logging
         with caplog.at_level(logging.WARNING):
             filtered = engine._filter_source_files(
-                files=all_files,
-                site_profile=blog_site_profile,
-                target_langs=["es", "da"]
+                files=all_files, site_profile=blog_site_profile, target_langs=["es", "da"]
             )
 
         # Assert: Warning logged
         log_text = caplog.text.lower()
 
         # Should warn about high filter rate
-        assert "warning" in log_text or "filtered" in log_text, \
+        assert "warning" in log_text or "filtered" in log_text, (
             f"Expected warning for high filter rate: {caplog.text}"
+        )
 
         # Should mention the percentage
-        assert "%" in caplog.text, \
-            "Warning should include percentage of filtered files"
+        assert "%" in caplog.text, "Warning should include percentage of filtered files"

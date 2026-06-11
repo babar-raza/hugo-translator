@@ -9,6 +9,7 @@ Verifies:
 
 Gap: G-TM-02 — two live L2 LMDB directories (data/tm/l2.lmdb + data/tm/l2_lmdb).
 """
+
 from __future__ import annotations
 
 import json
@@ -20,6 +21,7 @@ import pytest
 
 try:
     import lmdb
+
     LMDB_AVAILABLE = True
 except ImportError:
     LMDB_AVAILABLE = False
@@ -30,6 +32,7 @@ pytestmark = pytest.mark.skipif(not LMDB_AVAILABLE, reason="lmdb not installed")
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _make_lmdb(path: Path, entries: dict[bytes, bytes]) -> None:
     """Create a minimal LMDB database at *path* with the given entries."""
@@ -57,18 +60,22 @@ def _read_lmdb(path: Path) -> dict[bytes, bytes]:
 # L2PersistentTM startup warning tests
 # ---------------------------------------------------------------------------
 
-class TestSiblingDetectionWarning:
 
+class TestSiblingDetectionWarning:
     def test_no_warning_when_only_canonical_present(self, tmp_path: Path):
         """No warning when only the canonical l2.lmdb directory exists."""
         from src.tm.l2_persistent import L2_DB_NAME, L2PersistentTM
+
         db_path = tmp_path / L2_DB_NAME
         with warnings.catch_warnings(record=True) as caught:
             warnings.simplefilter("always")
             tm = L2PersistentTM(db_path, max_size_mb=10)
             tm.env.close()
-        sibling_warns = [w for w in caught if issubclass(w.category, UserWarning)
-                         and "sibling" in str(w.message).lower()]
+        sibling_warns = [
+            w
+            for w in caught
+            if issubclass(w.category, UserWarning) and "sibling" in str(w.message).lower()
+        ]
         assert len(sibling_warns) == 0, (
             f"Unexpected sibling warning with only canonical present: {sibling_warns}"
         )
@@ -76,6 +83,7 @@ class TestSiblingDetectionWarning:
     def test_warning_when_sibling_exists(self, tmp_path: Path):
         """UserWarning is emitted when a sibling l2*.lmdb directory exists."""
         from src.tm.l2_persistent import L2_DB_NAME, L2PersistentTM
+
         db_path = tmp_path / L2_DB_NAME
         # Create a sibling directory BEFORE opening canonical
         sibling = tmp_path / "l2_lmdb"
@@ -86,8 +94,11 @@ class TestSiblingDetectionWarning:
             tm = L2PersistentTM(db_path, max_size_mb=10)
             tm.env.close()
 
-        sibling_warns = [w for w in caught if issubclass(w.category, UserWarning)
-                         and "sibling" in str(w.message).lower()]
+        sibling_warns = [
+            w
+            for w in caught
+            if issubclass(w.category, UserWarning) and "sibling" in str(w.message).lower()
+        ]
         assert len(sibling_warns) == 1, (
             f"Expected exactly 1 sibling UserWarning, got {len(sibling_warns)}: "
             f"{[str(w.message) for w in caught]}"
@@ -102,6 +113,7 @@ class TestSiblingDetectionWarning:
     def test_warning_names_all_siblings(self, tmp_path: Path):
         """Warning message includes all sibling directory names."""
         from src.tm.l2_persistent import L2_DB_NAME, L2PersistentTM
+
         db_path = tmp_path / L2_DB_NAME
         _make_lmdb(tmp_path / "l2_lmdb", {b"a": b"1"})
         _make_lmdb(tmp_path / "l2_lmdb_old", {b"b": b"2"})
@@ -111,8 +123,11 @@ class TestSiblingDetectionWarning:
             tm = L2PersistentTM(db_path, max_size_mb=10)
             tm.env.close()
 
-        sibling_warns = [w for w in caught if issubclass(w.category, UserWarning)
-                         and "sibling" in str(w.message).lower()]
+        sibling_warns = [
+            w
+            for w in caught
+            if issubclass(w.category, UserWarning) and "sibling" in str(w.message).lower()
+        ]
         assert len(sibling_warns) == 1
         msg = str(sibling_warns[0].message)
         assert "l2_lmdb" in msg
@@ -123,12 +138,13 @@ class TestSiblingDetectionWarning:
 # Migration script tests
 # ---------------------------------------------------------------------------
 
-class TestMigrationScript:
 
+class TestMigrationScript:
     def _run_migrate(self, *args: str) -> int:
         """Call migrate_l2_lmdb.main() with the given CLI args. Returns exit code."""
         # Import fresh each call so sys.argv doesn't leak
         from scripts import migrate_l2_lmdb
+
         try:
             migrate_l2_lmdb.main(list(args))
             return 0
@@ -143,6 +159,7 @@ class TestMigrationScript:
         _make_lmdb(dst, {})
 
         from scripts.migrate_l2_lmdb import migrate
+
         migrate(src, dst, dry_run=True)
 
         dst_entries = _read_lmdb(dst)
@@ -159,6 +176,7 @@ class TestMigrationScript:
         _make_lmdb(dst, {b"k1": b"already_there"})  # k1 already present
 
         from scripts.migrate_l2_lmdb import migrate
+
         migrate(src, dst, dry_run=False)
 
         dst_entries = _read_lmdb(dst)
@@ -173,6 +191,7 @@ class TestMigrationScript:
         _make_lmdb(dst, {})
 
         from scripts.migrate_l2_lmdb import migrate
+
         migrate(src, dst, dry_run=False)
         after_first = _read_lmdb(dst)
 
@@ -188,6 +207,7 @@ class TestMigrationScript:
         _make_lmdb(dst, {b"k": b"v"})
 
         from scripts.migrate_l2_lmdb import migrate
+
         # Should not raise — just report nothing to migrate
         migrate(src, dst, dry_run=False)
         assert _read_lmdb(dst) == {b"k": b"v"}, "Destination must be unchanged"
@@ -196,6 +216,7 @@ class TestMigrationScript:
         """Running without --dry-run or --apply must exit with an error."""
         monkeypatch.chdir(tmp_path)
         from scripts.migrate_l2_lmdb import main
+
         with pytest.raises(SystemExit) as exc_info:
             main([])
         assert exc_info.value.code != 0

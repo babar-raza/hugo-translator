@@ -1,4 +1,5 @@
 """Lock logging verification tests."""
+
 import subprocess
 import sys
 from pathlib import Path
@@ -13,7 +14,9 @@ def _cli_has_subcommand(subcommand: str) -> bool:
     """Return True if the CLI accepts the given subcommand."""
     result = subprocess.run(
         [sys.executable, "-m", "src.cli", subcommand, "--help"],
-        capture_output=True, text=True, timeout=5,
+        capture_output=True,
+        text=True,
+        timeout=5,
     )
     # returncode 0 = subcommand accepted; 2 = unknown command
     return result.returncode != 2
@@ -28,11 +31,17 @@ def test_parent_lock_logging(tmp_path):
 
     result = subprocess.run(
         [
-            sys.executable, "-m", "src.cli",
-            "--site", "test.log.net",
-            "--input", str(source_dir),
-            "--output", str(tmp_path / "output"),
-            "--target-langs", "ar,bg",
+            sys.executable,
+            "-m",
+            "src.cli",
+            "--site",
+            "test.log.net",
+            "--input",
+            str(source_dir),
+            "--output",
+            str(tmp_path / "output"),
+            "--target-langs",
+            "ar,bg",
         ],
         capture_output=True,
         text=True,
@@ -57,9 +66,12 @@ def test_diagnostic_command_logging(tmp_path):
     try:
         result = subprocess.run(
             [
-                sys.executable, "-m", "src.cli",
+                sys.executable,
+                "-m",
+                "src.cli",
                 "diagnose-lock",
-                "--site", "test.diag.net",
+                "--site",
+                "test.diag.net",
             ],
             capture_output=True,
             text=True,
@@ -84,14 +96,19 @@ def test_unlock_command_logging(tmp_path):
     lock_dir = Path(".translation_progress/locks")
     lock_dir.mkdir(parents=True, exist_ok=True)
     lock_file = lock_dir / "test.unlock.net.lock"
-    lock_file.write_text('{"pid": 999999, "hostname": "test-host"}')  # Dead PID in expected JSON format
+    lock_file.write_text(
+        '{"pid": 999999, "hostname": "test-host"}'
+    )  # Dead PID in expected JSON format
 
     try:
         result = subprocess.run(
             [
-                sys.executable, "-m", "src.cli",
+                sys.executable,
+                "-m",
+                "src.cli",
                 "unlock",
-                "--site", "test.unlock.net",
+                "--site",
+                "test.unlock.net",
                 "--yes",
             ],
             capture_output=True,

@@ -7,6 +7,7 @@ setup completes.
 
 Gap: G-TM-01 — state.json stuck at "starting" post-watchdog-restart.
 """
+
 from datetime import datetime, timezone
 from pathlib import Path
 from unittest.mock import MagicMock, call, patch
@@ -19,11 +20,13 @@ from src.workers.worker_state import load_worker_state, record_worker_state
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def _make_state_calls(log_dir: Path, states: list[str]) -> None:
     """Simulate the sequence of record_worker_state calls a worker makes."""
     now_base = datetime(2026, 4, 18, 10, 0, 0, tzinfo=timezone.utc)
     for i, state in enumerate(states):
         from datetime import timedelta
+
         record_worker_state(
             "tm_worker",
             state,
@@ -36,6 +39,7 @@ def _make_state_calls(log_dir: Path, states: list[str]) -> None:
 # ---------------------------------------------------------------------------
 # Tests
 # ---------------------------------------------------------------------------
+
 
 def test_sleeping_state_written_before_first_scheduler_sleep(tmp_path: Path):
     """
@@ -84,7 +88,9 @@ def test_empty_queue_run_does_not_advance_last_success_ts(tmp_path: Path):
     record_worker_state("tm_worker", "sleeping", log_dir=tmp_path, now=t_prior)
     # Queue-empty run: result["improved_count"] == 0
     # Worker calls _record_state("run_completed", success=False) — no useful work done
-    record_worker_state("tm_worker", "run_completed", success=False, log_dir=tmp_path, now=t_empty_run)
+    record_worker_state(
+        "tm_worker", "run_completed", success=False, log_dir=tmp_path, now=t_empty_run
+    )
 
     state = load_worker_state("tm_worker", log_dir=tmp_path)
     assert state["last_success_ts"] == t_prior.isoformat(), (
@@ -119,7 +125,9 @@ def test_error_state_does_not_advance_last_success_ts(tmp_path: Path):
     t_fail = datetime(2026, 4, 18, 10, 0, 0, tzinfo=timezone.utc)
 
     record_worker_state("tm_worker", "run_completed", success=True, log_dir=tmp_path, now=t_success)
-    record_worker_state("tm_worker", "run_failed", error="LLM timeout", log_dir=tmp_path, now=t_fail)
+    record_worker_state(
+        "tm_worker", "run_failed", error="LLM timeout", log_dir=tmp_path, now=t_fail
+    )
 
     state = load_worker_state("tm_worker", log_dir=tmp_path)
     assert state["state"] == "run_failed"

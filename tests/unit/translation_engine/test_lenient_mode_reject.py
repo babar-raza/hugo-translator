@@ -7,6 +7,7 @@ lenient mode, causing blog.aspose.net to write wrong-language files to disk afte
 validation retries were exhausted. This test locks in the fix so the regression cannot
 be reintroduced silently.
 """
+
 from unittest.mock import Mock
 
 from src.translation_engine.engine import TranslationEngine

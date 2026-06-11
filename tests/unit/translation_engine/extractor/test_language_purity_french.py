@@ -37,6 +37,7 @@ class TestFrenchLanguagePurity:
     @pytest.fixture
     def sample_units(self):
         """Create sample TextUnits for testing."""
+
         def create_units(texts):
             units = []
             for i, text in enumerate(texts):
@@ -51,6 +52,7 @@ class TestFrenchLanguagePurity:
                 )
                 units.append(unit)
             return units
+
         return create_units
 
     def test_french_italian_accepted_via_romance_baseline_group(self, extractor, sample_units):
@@ -67,7 +69,9 @@ class TestFrenchLanguagePurity:
         extractor.fasttext_detector.detect.return_value = ("it", 0.85)
 
         # Mock verify_language to use similarity tracker
-        def mock_verify(text, expected_lang, similarity_tracker=None, script_validation_thresholds=None):
+        def mock_verify(
+            text, expected_lang, similarity_tracker=None, script_validation_thresholds=None
+        ):
             # Simulate baseline group acceptance
             if similarity_tracker and similarity_tracker.are_similar("fr", "it"):
                 return True
@@ -87,7 +91,9 @@ class TestFrenchLanguagePurity:
             assert "fr" in romance_group, "French should be in Romance group"
             assert "it" in romance_group, "Italian should be in Romance group"
 
-    def test_french_with_high_technical_density_bypasses_purity_check(self, extractor, sample_units):
+    def test_french_with_high_technical_density_bypasses_purity_check(
+        self, extractor, sample_units
+    ):
         """
         Test French with >25% technical terms bypasses purity check.
 
@@ -167,7 +173,9 @@ class TestFrenchLanguagePurity:
         # Verify all terms are recognized
         density = extractor._calculate_technical_density(french_text)
         # Docker, Kubernetes, Azure, Cloud = 4 terms / 10 words = 40%
-        assert density >= 0.30, f"Should recognize Docker, Kubernetes, Azure, Cloud (density={density:.2%})"
+        assert density >= 0.30, (
+            f"Should recognize Docker, Kubernetes, Azure, Cloud (density={density:.2%})"
+        )
 
     def test_french_edge_case_exactly_25_percent_technical_density(self, extractor, sample_units):
         """
@@ -264,7 +272,9 @@ class TestFrenchLanguagePurity:
         # Verify some LP-001 terms are present
         expected_terms = ["Azure", "Docker", "Kubernetes", "DataFrame", "Cloud"]
         for term in expected_terms:
-            assert term in extractor.technical_terms, f"Term '{term}' should be in technical_terms (LP-001)"
+            assert term in extractor.technical_terms, (
+                f"Term '{term}' should be in technical_terms (LP-001)"
+            )
 
         # Verify similarity tracker has baseline groups
         if extractor.similarity_tracker:
@@ -274,4 +284,6 @@ class TestFrenchLanguagePurity:
             romance_group = baseline_groups["romance"]
             expected_langs = ["fr", "it", "es", "pt"]
             for lang in expected_langs:
-                assert lang in romance_group, f"Language '{lang}' should be in Romance group (LP-002)"
+                assert lang in romance_group, (
+                    f"Language '{lang}' should be in Romance group (LP-002)"
+                )

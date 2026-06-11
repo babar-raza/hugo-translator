@@ -29,7 +29,7 @@ def load_corpus(corpus_path: Path) -> list[dict[str, Any]]:
     if not corpus_path.exists():
         pytest.skip(f"Corpus file not found: {corpus_path}")
 
-    with open(corpus_path, encoding='utf-8') as f:
+    with open(corpus_path, encoding="utf-8") as f:
         return json.load(f)
 
 
@@ -108,7 +108,9 @@ class TestCorpusSize:
     def test_medium_corpus_has_200_segments(self):
         """Verify medium corpus has 200-210 segments."""
         corpus = load_corpus(MEDIUM_CORPUS)
-        assert 200 <= len(corpus) <= 210, f"Medium corpus must have 200-210 segments, got {len(corpus)}"
+        assert 200 <= len(corpus) <= 210, (
+            f"Medium corpus must have 200-210 segments, got {len(corpus)}"
+        )
 
 
 @pytest.mark.benchmarking
@@ -127,14 +129,18 @@ class TestCorpusTokenCounts:
         corpus = load_corpus(SMALL_CORPUS)
 
         total_tokens = sum(estimate_token_count(entry["text_en"]) for entry in corpus)
-        assert 500 <= total_tokens <= 1000, f"Small corpus must have 500-1000 tokens, got {total_tokens}"
+        assert 500 <= total_tokens <= 1000, (
+            f"Small corpus must have 500-1000 tokens, got {total_tokens}"
+        )
 
     def test_medium_corpus_token_count(self):
         """Verify medium corpus has 2000-5000 tokens total."""
         corpus = load_corpus(MEDIUM_CORPUS)
 
         total_tokens = sum(estimate_token_count(entry["text_en"]) for entry in corpus)
-        assert 2000 <= total_tokens <= 5000, f"Medium corpus must have 2000-5000 tokens, got {total_tokens}"
+        assert 2000 <= total_tokens <= 5000, (
+            f"Medium corpus must have 2000-5000 tokens, got {total_tokens}"
+        )
 
 
 @pytest.mark.benchmarking
@@ -143,9 +149,9 @@ class TestCorpusSanitization:
 
     # Patterns to detect real URLs (not sanitized example.com)
     REAL_URL_PATTERNS = [
-        r'https?://(?!example\.com|example\.net|docs\.example|api\.example|support\.example|download\.example|reference\.example|releases\.example|forum\.example)',
-        r'aspose\.com',
-        r'aspose\.net',
+        r"https?://(?!example\.com|example\.net|docs\.example|api\.example|support\.example|download\.example|reference\.example|releases\.example|forum\.example)",
+        r"aspose\.com",
+        r"aspose\.net",
     ]
 
     @pytest.mark.parametrize("corpus_file", [TINY_CORPUS, SMALL_CORPUS, MEDIUM_CORPUS])
@@ -213,7 +219,7 @@ class TestCorpusFeatureCoverage:
         text_all = " ".join(entry["text_en"] for entry in corpus)
 
         # Check for markdown links
-        assert re.search(r'\[.+?\]\(.+?\)', text_all), "Small corpus must include markdown links"
+        assert re.search(r"\[.+?\]\(.+?\)", text_all), "Small corpus must include markdown links"
 
     def test_medium_has_mixed_formatting(self):
         """Verify medium corpus includes complex nested formatting."""
@@ -222,8 +228,12 @@ class TestCorpusFeatureCoverage:
         text_all = " ".join(entry["text_en"] for entry in corpus)
 
         # Check for nested formatting patterns
-        assert "**`" in text_all or "`**" in text_all, "Medium corpus must include bold+code combinations"
-        assert "**[" in text_all or "[**" in text_all, "Medium corpus must include bold+link combinations"
+        assert "**`" in text_all or "`**" in text_all, (
+            "Medium corpus must include bold+code combinations"
+        )
+        assert "**[" in text_all or "[**" in text_all, (
+            "Medium corpus must include bold+link combinations"
+        )
 
     @pytest.mark.parametrize("corpus_file", [TINY_CORPUS, SMALL_CORPUS, MEDIUM_CORPUS])
     def test_corpus_has_multiple_domains(self, corpus_file):
@@ -233,7 +243,9 @@ class TestCorpusFeatureCoverage:
         domains = {entry["domain"] for entry in corpus}
 
         # At minimum should have technical and general
-        assert len(domains) >= 2, f"Corpus should have at least 2 domains, got {len(domains)}: {domains}"
+        assert len(domains) >= 2, (
+            f"Corpus should have at least 2 domains, got {len(domains)}: {domains}"
+        )
 
 
 @pytest.mark.benchmarking
@@ -248,32 +260,44 @@ class TestCorpusConsistency:
 
         # Tiny IDs should start with "tiny_"
         for entry in tiny:
-            assert entry["id"].startswith("tiny_"), f"Tiny corpus ID must start with 'tiny_': {entry['id']}"
+            assert entry["id"].startswith("tiny_"), (
+                f"Tiny corpus ID must start with 'tiny_': {entry['id']}"
+            )
 
         # Small IDs should start with "small_"
         for entry in small:
-            assert entry["id"].startswith("small_"), f"Small corpus ID must start with 'small_': {entry['id']}"
+            assert entry["id"].startswith("small_"), (
+                f"Small corpus ID must start with 'small_': {entry['id']}"
+            )
 
         # Medium IDs should start with "medium_"
         for entry in medium:
-            assert entry["id"].startswith("medium_"), f"Medium corpus ID must start with 'medium_': {entry['id']}"
+            assert entry["id"].startswith("medium_"), (
+                f"Medium corpus ID must start with 'medium_': {entry['id']}"
+            )
 
     def test_domain_values_are_valid(self):
         """Verify domain values are from expected set."""
         all_corpus = (
-            load_corpus(TINY_CORPUS) +
-            load_corpus(SMALL_CORPUS) +
-            load_corpus(MEDIUM_CORPUS)
+            load_corpus(TINY_CORPUS) + load_corpus(SMALL_CORPUS) + load_corpus(MEDIUM_CORPUS)
         )
 
         valid_domains = {
-            "general", "technical", "documentation", "marketing",
-            "support", "blog", "api", "tutorial"
+            "general",
+            "technical",
+            "documentation",
+            "marketing",
+            "support",
+            "blog",
+            "api",
+            "tutorial",
         }
 
         for entry in all_corpus:
             domain = entry["domain"]
-            assert domain in valid_domains, f"Unknown domain '{domain}' in entry {entry['id']}. Valid: {valid_domains}"
+            assert domain in valid_domains, (
+                f"Unknown domain '{domain}' in entry {entry['id']}. Valid: {valid_domains}"
+            )
 
 
 @pytest.mark.benchmarking
@@ -342,13 +366,19 @@ class TestMarkdownCorpusCollection:
         blog_dir = content_dir / "blog.aspose.net" / "2024"
         blog_dir.mkdir(parents=True)
 
-        (blog_dir / "post1.md").write_text("This is a test post with some content.", encoding='utf-8')
-        (blog_dir / "post2.md").write_text("Another test post with different content here.", encoding='utf-8')
+        (blog_dir / "post1.md").write_text(
+            "This is a test post with some content.", encoding="utf-8"
+        )
+        (blog_dir / "post2.md").write_text(
+            "Another test post with different content here.", encoding="utf-8"
+        )
 
         products_dir = content_dir / "products.aspose.net"
         products_dir.mkdir(parents=True)
 
-        (products_dir / "index.md").write_text("Product documentation page with more text.", encoding='utf-8')
+        (products_dir / "index.md").write_text(
+            "Product documentation page with more text.", encoding="utf-8"
+        )
 
         # Collect corpus
         manager = CorpusManager()
@@ -390,11 +420,11 @@ class TestMarkdownCorpusCollection:
 
         blog_dir = content_dir / "blog.aspose.net"
         blog_dir.mkdir(parents=True)
-        (blog_dir / "post.md").write_text("Blog post content.", encoding='utf-8')
+        (blog_dir / "post.md").write_text("Blog post content.", encoding="utf-8")
 
         products_dir = content_dir / "products.aspose.net"
         products_dir.mkdir(parents=True)
-        (products_dir / "index.md").write_text("Product content.", encoding='utf-8')
+        (products_dir / "index.md").write_text("Product content.", encoding="utf-8")
 
         # Collect only blog category
         manager = CorpusManager()
@@ -418,9 +448,9 @@ class TestMarkdownCorpusCollection:
         content_dir = tmp_path / "content"
         content_dir.mkdir()
 
-        (content_dir / "short.md").write_text("Short.", encoding='utf-8')  # ~1 token
-        (content_dir / "medium.md").write_text("A" * 100, encoding='utf-8')  # ~25 tokens
-        (content_dir / "long.md").write_text("A" * 400, encoding='utf-8')  # ~100 tokens
+        (content_dir / "short.md").write_text("Short.", encoding="utf-8")  # ~1 token
+        (content_dir / "medium.md").write_text("A" * 100, encoding="utf-8")  # ~25 tokens
+        (content_dir / "long.md").write_text("A" * 400, encoding="utf-8")  # ~100 tokens
 
         # Collect only medium-sized files (20-50 tokens)
         manager = CorpusManager()
@@ -445,7 +475,7 @@ class TestMarkdownCorpusCollection:
         content_dir.mkdir()
 
         for i in range(20):
-            (content_dir / f"file{i}.md").write_text(f"Content for file {i}.", encoding='utf-8')
+            (content_dir / f"file{i}.md").write_text(f"Content for file {i}.", encoding="utf-8")
 
         # Collect only 5 samples
         manager = CorpusManager()
@@ -477,8 +507,8 @@ class TestMarkdownCorpusLoading:
 
         blog_dir = content_dir / "blog.aspose.net"
         blog_dir.mkdir(parents=True)
-        (blog_dir / "post1.md").write_text("This is blog post 1.", encoding='utf-8')
-        (blog_dir / "post2.md").write_text("This is blog post 2.", encoding='utf-8')
+        (blog_dir / "post1.md").write_text("This is blog post 1.", encoding="utf-8")
+        (blog_dir / "post2.md").write_text("This is blog post 2.", encoding="utf-8")
 
         # Create metadata.yaml
         metadata = {
@@ -505,7 +535,7 @@ class TestMarkdownCorpusLoading:
         }
 
         metadata_path = tmp_path / "metadata.yaml"
-        with open(metadata_path, 'w', encoding='utf-8') as f:
+        with open(metadata_path, "w", encoding="utf-8") as f:
             yaml.dump(metadata, f)
 
         # Load samples
@@ -530,8 +560,8 @@ class TestMarkdownCorpusLoading:
         content_dir = tmp_path / "content"
         content_dir.mkdir()
 
-        (content_dir / "blog.md").write_text("Blog content.", encoding='utf-8')
-        (content_dir / "product.md").write_text("Product content.", encoding='utf-8')
+        (content_dir / "blog.md").write_text("Blog content.", encoding="utf-8")
+        (content_dir / "product.md").write_text("Product content.", encoding="utf-8")
 
         # Create metadata.yaml with mixed categories
         metadata = {
@@ -540,13 +570,25 @@ class TestMarkdownCorpusLoading:
             "collected": "2025-12-20T10:00:00Z",
             "total_files": 2,
             "samples": [
-                {"id": "blog_001", "path": "blog.md", "category": "blog", "tokens": 10, "lang": "en"},
-                {"id": "products_001", "path": "product.md", "category": "products", "tokens": 10, "lang": "en"},
+                {
+                    "id": "blog_001",
+                    "path": "blog.md",
+                    "category": "blog",
+                    "tokens": 10,
+                    "lang": "en",
+                },
+                {
+                    "id": "products_001",
+                    "path": "product.md",
+                    "category": "products",
+                    "tokens": 10,
+                    "lang": "en",
+                },
             ],
         }
 
         metadata_path = tmp_path / "metadata.yaml"
-        with open(metadata_path, 'w', encoding='utf-8') as f:
+        with open(metadata_path, "w", encoding="utf-8") as f:
             yaml.dump(metadata, f)
 
         # Load only blog samples
@@ -565,8 +607,8 @@ class TestMarkdownCorpusLoading:
         content_dir = tmp_path / "content"
         content_dir.mkdir()
 
-        (content_dir / "short.md").write_text("Short.", encoding='utf-8')
-        (content_dir / "long.md").write_text("A" * 400, encoding='utf-8')
+        (content_dir / "short.md").write_text("Short.", encoding="utf-8")
+        (content_dir / "long.md").write_text("A" * 400, encoding="utf-8")
 
         # Create metadata.yaml with different token counts
         metadata = {
@@ -575,13 +617,25 @@ class TestMarkdownCorpusLoading:
             "collected": "2025-12-20T10:00:00Z",
             "total_files": 2,
             "samples": [
-                {"id": "short_001", "path": "short.md", "category": "general", "tokens": 5, "lang": "en"},
-                {"id": "long_001", "path": "long.md", "category": "general", "tokens": 100, "lang": "en"},
+                {
+                    "id": "short_001",
+                    "path": "short.md",
+                    "category": "general",
+                    "tokens": 5,
+                    "lang": "en",
+                },
+                {
+                    "id": "long_001",
+                    "path": "long.md",
+                    "category": "general",
+                    "tokens": 100,
+                    "lang": "en",
+                },
             ],
         }
 
         metadata_path = tmp_path / "metadata.yaml"
-        with open(metadata_path, 'w', encoding='utf-8') as f:
+        with open(metadata_path, "w", encoding="utf-8") as f:
             yaml.dump(metadata, f)
 
         # Load only medium-sized samples (50-150 tokens)
@@ -601,7 +655,7 @@ class TestMarkdownCorpusLoading:
         content_dir.mkdir()
 
         for i in range(10):
-            (content_dir / f"file{i}.md").write_text(f"Content {i}.", encoding='utf-8')
+            (content_dir / f"file{i}.md").write_text(f"Content {i}.", encoding="utf-8")
 
         # Create metadata.yaml with many samples
         metadata = {
@@ -610,13 +664,19 @@ class TestMarkdownCorpusLoading:
             "collected": "2025-12-20T10:00:00Z",
             "total_files": 10,
             "samples": [
-                {"id": f"test_{i:03d}", "path": f"file{i}.md", "category": "general", "tokens": 10, "lang": "en"}
+                {
+                    "id": f"test_{i:03d}",
+                    "path": f"file{i}.md",
+                    "category": "general",
+                    "tokens": 10,
+                    "lang": "en",
+                }
                 for i in range(10)
             ],
         }
 
         metadata_path = tmp_path / "metadata.yaml"
-        with open(metadata_path, 'w', encoding='utf-8') as f:
+        with open(metadata_path, "w", encoding="utf-8") as f:
             yaml.dump(metadata, f)
 
         # Load only 3 samples
@@ -640,12 +700,18 @@ class TestMarkdownCorpusLoading:
             "collected": "2025-12-20T10:00:00Z",
             "total_files": 1,
             "samples": [
-                {"id": "test_001", "path": "test.md", "category": "general", "tokens": 10, "lang": "en"},
+                {
+                    "id": "test_001",
+                    "path": "test.md",
+                    "category": "general",
+                    "tokens": 10,
+                    "lang": "en",
+                },
             ],
         }
 
         metadata_path = tmp_path / "metadata.yaml"
-        with open(metadata_path, 'w', encoding='utf-8') as f:
+        with open(metadata_path, "w", encoding="utf-8") as f:
             yaml.dump(metadata, f)
 
         # Validate

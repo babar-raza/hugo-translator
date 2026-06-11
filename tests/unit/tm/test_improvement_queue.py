@@ -8,7 +8,6 @@ Tests:
 - clear()
 """
 
-
 import pytest
 
 from src.tm.improvement_queue import ImprovementCandidate, ImprovementQueue

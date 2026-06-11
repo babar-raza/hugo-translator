@@ -27,6 +27,7 @@ def test_markdown_links():
     assert "]" not in text
     print("  PASSED\n")
 
+
 # Test 2: Issue locations
 def test_issue_locations():
     """Test that the test uses long enough text for language detection."""
@@ -38,6 +39,7 @@ def test_issue_locations():
 
     assert len(text) >= 20
     print("  PASSED (text is long enough for detection)\n")
+
 
 # Test 3: Decision reason
 def test_decision_reason():
@@ -52,6 +54,7 @@ def test_decision_reason():
     assert decision_reason is not None
     assert len(decision_reason) > 0
     print("  PASSED\n")
+
 
 # Test 4: Protect terms at different positions
 def test_protect_terms():
@@ -79,6 +82,7 @@ def test_protect_terms():
     assert positions[1] == (15, 19)
     assert positions[2] == (31, 35)
     print("  PASSED\n")
+
 
 if __name__ == "__main__":
     try:

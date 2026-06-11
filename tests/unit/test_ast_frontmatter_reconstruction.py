@@ -10,6 +10,7 @@ MarkdownReconstructor.reconstruct_frontmatter(). These tests verify:
   5. Structural invariant fires when segments are not applied
   6. Every extracted frontmatter segment is applied
 """
+
 from unittest.mock import MagicMock
 
 import pytest
@@ -26,10 +27,10 @@ from src.translation_engine.reconstructor.markdown_reconstructor import (
 from src.translation_engine.reconstructor.yaml_formatter import YAMLFormatter
 from src.utils.models import FrontmatterMode, FrontmatterRule, SiteProfile
 
-
 # ---------------------------------------------------------------------------
 # Helpers (shared with baseline tests)
 # ---------------------------------------------------------------------------
+
 
 def _make_segment(key: str, source_text: str, site_id: str = "www.aspose.org") -> Segment:
     context = SegmentContext(
@@ -74,10 +75,12 @@ def _build_frontmatter_with_arrays() -> CommentedMap:
     why["heading"] = "Why Choose Aspose"
     why["keywords"] = ["reliability", "performance", "scalability"]
     reasons = []
-    for i, (title, points) in enumerate([
-        ("Stability", ["99.9% uptime", "Enterprise support"]),
-        ("Performance", ["Sub-second latency", "Parallel processing"]),
-    ]):
+    for i, (title, points) in enumerate(
+        [
+            ("Stability", ["99.9% uptime", "Enterprise support"]),
+            ("Performance", ["Sub-second latency", "Parallel processing"]),
+        ]
+    ):
         reason = CommentedMap()
         reason["title"] = title
         reason["points"] = list(points)
@@ -126,8 +129,14 @@ def _build_translations_for(fm: CommentedMap) -> dict[str, str]:
     families = ["words", "cells", "pdf"]
     for i, family in enumerate(families):
         for field in ["subtitle", "description"]:
-            src = f"Process {family.title()}" if field == "subtitle" else f"{family.title()} toolkit"
-            tgt = f"{family.title()} verarbeiten" if field == "subtitle" else f"{family.title()}-Werkzeugkasten"
+            src = (
+                f"Process {family.title()}" if field == "subtitle" else f"{family.title()} toolkit"
+            )
+            tgt = (
+                f"{family.title()} verarbeiten"
+                if field == "subtitle"
+                else f"{family.title()}-Werkzeugkasten"
+            )
             key = f"products.items[{i}].app.{field}"
             seg = _make_segment(key, src)
             translations[seg.id] = tgt
@@ -137,7 +146,9 @@ def _build_translations_for(fm: CommentedMap) -> dict[str, str]:
     translations[seg.id] = "Warum Aspose wählen"
 
     # Reason titles
-    for i, (title, de_title) in enumerate([("Stability", "Stabilität"), ("Performance", "Leistung")]):
+    for i, (title, de_title) in enumerate(
+        [("Stability", "Stabilität"), ("Performance", "Leistung")]
+    ):
         key = f"why_choose.reasons[{i}].title"
         seg = _make_segment(key, title)
         translations[seg.id] = de_title
@@ -170,6 +181,7 @@ def _build_translations_for(fm: CommentedMap) -> dict[str, str]:
 # Test 1: Nested keys work through delegation
 # ---------------------------------------------------------------------------
 
+
 class TestDelegationNestedKeys:
     def test_nested_keys_translated(self):
         fm = _build_frontmatter_with_arrays()
@@ -187,6 +199,7 @@ class TestDelegationNestedKeys:
 # ---------------------------------------------------------------------------
 # Test 2: Array-indexed rules
 # ---------------------------------------------------------------------------
+
 
 class TestArrayIndexedRules:
     def test_product_subtitles_translated(self):
@@ -218,6 +231,7 @@ class TestArrayIndexedRules:
 # Test 3: translate_list rules
 # ---------------------------------------------------------------------------
 
+
 class TestTranslateListRules:
     def test_why_choose_points_translated_through_array(self):
         """translate_list through array: why_choose.reasons.points where reasons is an array."""
@@ -229,10 +243,12 @@ class TestTranslateListRules:
         result = reconstructor.reconstruct_frontmatter(fm, translations, "de")
 
         assert result["why_choose"]["reasons"][0]["points"] == [
-            "99,9% Betriebszeit", "Unternehmensunterstützung"
+            "99,9% Betriebszeit",
+            "Unternehmensunterstützung",
         ]
         assert result["why_choose"]["reasons"][1]["points"] == [
-            "Latenz unter einer Sekunde", "Parallelverarbeitung"
+            "Latenz unter einer Sekunde",
+            "Parallelverarbeitung",
         ]
 
     def test_why_choose_keywords_translated(self):
@@ -244,7 +260,9 @@ class TestTranslateListRules:
         result = reconstructor.reconstruct_frontmatter(fm, translations, "de")
 
         assert result["why_choose"]["keywords"] == [
-            "Zuverlässigkeit", "Leistung_kw", "Skalierbarkeit"
+            "Zuverlässigkeit",
+            "Leistung_kw",
+            "Skalierbarkeit",
         ]
 
     def test_why_choose_titles_translated(self):
@@ -262,6 +280,7 @@ class TestTranslateListRules:
 # ---------------------------------------------------------------------------
 # Test 4: Product count invariant — no added or removed items
 # ---------------------------------------------------------------------------
+
 
 class TestProductCountInvariant:
     def test_product_count_preserved(self):
@@ -310,6 +329,7 @@ class TestProductCountInvariant:
 # Test 5: Structural invariant — detect unapplied segments
 # ---------------------------------------------------------------------------
 
+
 class TestStructuralInvariant:
     """
     Simulate the invariant check from the engine fix.
@@ -341,8 +361,13 @@ class TestStructuralInvariant:
 
         # Build segments for all translated fields
         segments = []
-        for key in ["title", "description", "header.title", "header.subtitle",
-                     "why_choose.heading"]:
+        for key in [
+            "title",
+            "description",
+            "header.title",
+            "header.subtitle",
+            "why_choose.heading",
+        ]:
             src = YAMLFormatter.get_nested_value(fm, key)
             segments.append(_make_segment(key, src))
         for i in range(3):
@@ -375,9 +400,11 @@ class TestStructuralInvariant:
 # Test 6: YAML output roundtrips correctly
 # ---------------------------------------------------------------------------
 
+
 class TestYAMLOutput:
     def test_format_frontmatter_produces_valid_yaml(self):
         import yaml
+
         fm = _build_frontmatter_with_arrays()
         profile = _build_full_profile()
         translations = _build_translations_for(fm)

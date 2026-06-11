@@ -7,6 +7,7 @@ Verifies:
 3. _run_daemon() calls _record_state("sleeping") before every scheduler sleep.
 4. Watchdog idle WARN threshold: Invoke-VerificationIdleCheck present in watchdog.
 """
+
 from __future__ import annotations
 
 from datetime import datetime, timezone
@@ -20,11 +21,13 @@ from src.workers.worker_state import load_worker_state, record_worker_state
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def _make_state_calls(log_dir: Path, transitions: list[tuple]) -> None:
     """
     transitions: list of (state_name, kwargs) where kwargs include success/error.
     """
     from datetime import timedelta
+
     base = datetime(2026, 4, 18, 10, 0, 0, tzinfo=timezone.utc)
     for i, (state, kwargs) in enumerate(transitions):
         record_worker_state(
@@ -40,15 +43,19 @@ def _make_state_calls(log_dir: Path, transitions: list[tuple]) -> None:
 # State transition tests
 # ---------------------------------------------------------------------------
 
+
 def test_state_sleeping_written_before_scheduler_sleep(tmp_path):
     """
     State must transition from 'starting' → 'sleeping' before the first
     scheduler sleep (identical requirement as TC-TM-01 but for verification_worker).
     """
-    _make_state_calls(tmp_path, [
-        ("starting", {}),
-        ("sleeping", {}),
-    ])
+    _make_state_calls(
+        tmp_path,
+        [
+            ("starting", {}),
+            ("sleeping", {}),
+        ],
+    )
     state = load_worker_state("verification_worker", log_dir=tmp_path)
     assert state["state"] == "sleeping", (
         f"Expected 'sleeping' after setup, got '{state['state']}'. "
@@ -62,6 +69,7 @@ def test_full_daemon_cycle(tmp_path):
     last_success_ts must advance on run_completed.
     """
     from datetime import timedelta
+
     t0 = datetime(2026, 4, 18, 10, 0, 0, tzinfo=timezone.utc)
     t1 = t0 + timedelta(minutes=1)
     t2 = t0 + timedelta(minutes=2)
@@ -70,7 +78,9 @@ def test_full_daemon_cycle(tmp_path):
     record_worker_state("verification_worker", "starting", log_dir=tmp_path, now=t0)
     record_worker_state("verification_worker", "sleeping", log_dir=tmp_path, now=t1)
     record_worker_state("verification_worker", "running", log_dir=tmp_path, now=t2)
-    record_worker_state("verification_worker", "run_completed", success=True, log_dir=tmp_path, now=t3)
+    record_worker_state(
+        "verification_worker", "run_completed", success=True, log_dir=tmp_path, now=t3
+    )
 
     state = load_worker_state("verification_worker", log_dir=tmp_path)
     assert state["state"] == "run_completed"
@@ -85,10 +95,14 @@ def test_zero_file_pass_advances_last_success_ts(tmp_path):
     t_prior = datetime(2026, 4, 17, 10, 0, 0, tzinfo=timezone.utc)
     t_now = datetime(2026, 4, 18, 10, 0, 0, tzinfo=timezone.utc)
 
-    record_worker_state("verification_worker", "run_completed", success=True, log_dir=tmp_path, now=t_prior)
+    record_worker_state(
+        "verification_worker", "run_completed", success=True, log_dir=tmp_path, now=t_prior
+    )
     record_worker_state("verification_worker", "sleeping", log_dir=tmp_path, now=t_prior)
     # Zero-file pass: still success=True
-    record_worker_state("verification_worker", "run_completed", success=True, log_dir=tmp_path, now=t_now)
+    record_worker_state(
+        "verification_worker", "run_completed", success=True, log_dir=tmp_path, now=t_now
+    )
 
     state = load_worker_state("verification_worker", log_dir=tmp_path)
     assert state["last_success_ts"] == t_now.isoformat(), (
@@ -103,8 +117,12 @@ def test_run_failed_does_not_advance_last_success_ts(tmp_path):
     t_success = datetime(2026, 4, 17, 10, 0, 0, tzinfo=timezone.utc)
     t_fail = datetime(2026, 4, 18, 10, 0, 0, tzinfo=timezone.utc)
 
-    record_worker_state("verification_worker", "run_completed", success=True, log_dir=tmp_path, now=t_success)
-    record_worker_state("verification_worker", "run_failed", error="config missing", log_dir=tmp_path, now=t_fail)
+    record_worker_state(
+        "verification_worker", "run_completed", success=True, log_dir=tmp_path, now=t_success
+    )
+    record_worker_state(
+        "verification_worker", "run_failed", error="config missing", log_dir=tmp_path, now=t_fail
+    )
 
     state = load_worker_state("verification_worker", log_dir=tmp_path)
     assert state["state"] == "run_failed"
@@ -115,6 +133,7 @@ def test_run_failed_does_not_advance_last_success_ts(tmp_path):
 # ---------------------------------------------------------------------------
 # Static source inspection
 # ---------------------------------------------------------------------------
+
 
 def test_verification_daemon_calls_record_state_sleeping():
     """
@@ -141,6 +160,7 @@ def test_verification_daemon_calls_record_state_sleeping():
 # ---------------------------------------------------------------------------
 # Watchdog idle check presence
 # ---------------------------------------------------------------------------
+
 
 def test_watchdog_has_verification_idle_check():
     """

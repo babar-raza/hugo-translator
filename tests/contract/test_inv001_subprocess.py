@@ -73,12 +73,12 @@ def mock_subprocess_popen():
     """
     Mock subprocess.Popen for command capture.
     """
-    with patch('subprocess.Popen') as mock_popen:
+    with patch("subprocess.Popen") as mock_popen:
         mock_process = Mock()
         mock_process.stdout = Mock()
         mock_process.stderr = Mock()
-        mock_process.stdout.readline.side_effect = ['', StopIteration]
-        mock_process.stderr.readline.side_effect = ['', StopIteration]
+        mock_process.stdout.readline.side_effect = ["", StopIteration]
+        mock_process.stderr.readline.side_effect = ["", StopIteration]
         mock_process.wait.return_value = 0
         mock_process.returncode = 0
         mock_popen.return_value = mock_process

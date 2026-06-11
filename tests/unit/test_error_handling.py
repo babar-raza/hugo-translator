@@ -83,10 +83,7 @@ class TestHandleOSError:
         with pytest.raises(PermissionError, match="Permission denied"):
             _handle_os_error(path, err)
 
-    @pytest.mark.skipif(
-        not hasattr(errno, 'EROFS'),
-        reason="EROFS not available on this platform"
-    )
+    @pytest.mark.skipif(not hasattr(errno, "EROFS"), reason="EROFS not available on this platform")
     def test_readonly_filesystem(self, tmp_path):
         """Test EROFS raises ReadOnlyFilesystemError."""
         path = tmp_path / "test.txt"
@@ -146,7 +143,7 @@ class TestAtomicWriteErrorHandling:
         path = tmp_path / "test.txt"
 
         # Mock tempfile.mkstemp to raise disk full
-        with mock.patch('tempfile.mkstemp') as mock_mkstemp:
+        with mock.patch("tempfile.mkstemp") as mock_mkstemp:
             mock_mkstemp.side_effect = OSError(errno.ENOSPC, "No space")
 
             with pytest.raises(DiskFullError, match="No space left"):
@@ -156,7 +153,7 @@ class TestAtomicWriteErrorHandling:
         """Test permission denied error detection via mock."""
         path = tmp_path / "test.txt"
 
-        with mock.patch('tempfile.mkstemp') as mock_mkstemp:
+        with mock.patch("tempfile.mkstemp") as mock_mkstemp:
             mock_mkstemp.side_effect = OSError(errno.EACCES, "Permission denied")
 
             with pytest.raises(PermissionError, match="Permission denied"):
@@ -168,19 +165,19 @@ class TestAtomicWriteModuleContents:
 
     def test_module_has_custom_exceptions(self):
         """Verify module exports custom exceptions."""
-        assert hasattr(_atomic_write_module, 'DiskFullError')
-        assert hasattr(_atomic_write_module, 'InvalidPathError')
-        assert hasattr(_atomic_write_module, 'ReadOnlyFilesystemError')
-        assert hasattr(_atomic_write_module, 'AtomicWriteError')
+        assert hasattr(_atomic_write_module, "DiskFullError")
+        assert hasattr(_atomic_write_module, "InvalidPathError")
+        assert hasattr(_atomic_write_module, "ReadOnlyFilesystemError")
+        assert hasattr(_atomic_write_module, "AtomicWriteError")
 
     def test_module_has_error_handler(self):
         """Verify module has _handle_os_error function."""
-        assert hasattr(_atomic_write_module, '_handle_os_error')
+        assert hasattr(_atomic_write_module, "_handle_os_error")
         assert callable(_atomic_write_module._handle_os_error)
 
     def test_res09_marker_in_module(self):
         """Verify RES-09 marker is in the module."""
-        content = _atomic_write_path.read_text(encoding='utf-8')
+        content = _atomic_write_path.read_text(encoding="utf-8")
         assert "RES-09" in content
 
 
@@ -190,7 +187,7 @@ class TestEngineErrorHandling:
     def test_engine_imports_error_classes(self):
         """Verify engine.py imports new exception classes."""
         engine_path = src_path / "translation_engine" / "engine.py"
-        content = engine_path.read_text(encoding='utf-8')
+        content = engine_path.read_text(encoding="utf-8")
 
         assert "DiskFullError" in content
         assert "InvalidPathError" in content
@@ -199,7 +196,7 @@ class TestEngineErrorHandling:
     def test_engine_has_get_free_space(self):
         """Verify engine.py has _get_free_space method."""
         engine_path = src_path / "translation_engine" / "engine.py"
-        content = engine_path.read_text(encoding='utf-8')
+        content = engine_path.read_text(encoding="utf-8")
 
         assert "def _get_free_space(" in content
         assert "RES-09" in content
@@ -207,7 +204,7 @@ class TestEngineErrorHandling:
     def test_engine_write_output_handles_errors(self):
         """Verify _write_output handles specific error types."""
         engine_path = src_path / "translation_engine" / "engine.py"
-        content = engine_path.read_text(encoding='utf-8')
+        content = engine_path.read_text(encoding="utf-8")
 
         # Check for enhanced error handling in _write_output
         assert "except DiskFullError" in content
@@ -237,7 +234,7 @@ class TestDiskSpaceCheck:
         total, used, free = shutil.disk_usage(tmp_path)
 
         # We should have space for a small file
-        assert free > len(content.encode('utf-8')) * 10
+        assert free > len(content.encode("utf-8")) * 10
 
 
 class TestErrorMessages:

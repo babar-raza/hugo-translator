@@ -39,7 +39,7 @@ class TestBackupInfo:
             path=Path("/test/backup"),
             timestamp=datetime.now(),
             size_bytes=512 * 1024 * 1024,
-            entry_count=1000
+            entry_count=1000,
         )
         assert info.size_mb == 512.0
 
@@ -49,7 +49,7 @@ class TestBackupInfo:
             path=Path("/test/backup"),
             timestamp=datetime.now(),
             size_bytes=1024 * 1024 * 1024,
-            entry_count=1000
+            entry_count=1000,
         )
         assert info.size_gb == 1.0
 
@@ -60,7 +60,7 @@ class TestBackupInfo:
             path=Path("/test/tm_backup_20251223_143000"),
             timestamp=timestamp,
             size_bytes=100 * 1024 * 1024,
-            entry_count=5000
+            entry_count=5000,
         )
         s = str(info)
         assert "tm_backup_20251223_143000" in s
@@ -75,7 +75,7 @@ class TestBackupInfo:
             path=Path("/test/backup"),
             timestamp=timestamp,
             size_bytes=100 * 1024 * 1024,
-            entry_count=5000
+            entry_count=5000,
         )
         d = info.to_dict()
         assert d["size_bytes"] == 100 * 1024 * 1024
@@ -95,10 +95,7 @@ class TestCacheBackupManagerInit:
         # Create TM path
         tm_path.mkdir()
 
-        manager = CacheBackupManager(
-            tm_path=tm_path,
-            backup_dir=backup_dir
-        )
+        manager = CacheBackupManager(tm_path=tm_path, backup_dir=backup_dir)
 
         assert backup_dir.exists()
         assert manager.max_backups == 5  # Default
@@ -106,19 +103,13 @@ class TestCacheBackupManagerInit:
     def test_init_validates_max_backups(self, tmp_path):
         """Test max_backups validation."""
         with pytest.raises(ValueError, match="max_backups"):
-            CacheBackupManager(
-                tm_path=tmp_path,
-                backup_dir=tmp_path / "backups",
-                max_backups=0
-            )
+            CacheBackupManager(tm_path=tmp_path, backup_dir=tmp_path / "backups", max_backups=0)
 
     def test_init_validates_min_free_space(self, tmp_path):
         """Test min_free_space_gb validation."""
         with pytest.raises(ValueError, match="min_free_space"):
             CacheBackupManager(
-                tm_path=tmp_path,
-                backup_dir=tmp_path / "backups",
-                min_free_space_gb=-1
+                tm_path=tmp_path, backup_dir=tmp_path / "backups", min_free_space_gb=-1
             )
 
 
@@ -138,7 +129,7 @@ class TestCacheBackupManagerBackup:
                 src_lang="en",
                 tgt_lang="es",
                 text=f"Test source text {i}",
-                translation=f"Test translation {i}"
+                translation=f"Test translation {i}",
             )
 
         l2.close()
@@ -149,9 +140,7 @@ class TestCacheBackupManagerBackup:
         backup_dir = tmp_path / "backups"
 
         manager = CacheBackupManager(
-            tm_path=populated_tm,
-            backup_dir=backup_dir,
-            min_free_space_gb=0
+            tm_path=populated_tm, backup_dir=backup_dir, min_free_space_gb=0
         )
 
         backup_info = manager.create_backup(verify_integrity=False)
@@ -164,9 +153,7 @@ class TestCacheBackupManagerBackup:
     def test_create_backup_naming(self, populated_tm, tmp_path):
         """Test backup naming convention."""
         manager = CacheBackupManager(
-            tm_path=populated_tm,
-            backup_dir=tmp_path / "backups",
-            min_free_space_gb=0
+            tm_path=populated_tm, backup_dir=tmp_path / "backups", min_free_space_gb=0
         )
 
         before = datetime.now().replace(microsecond=0)
@@ -185,9 +172,7 @@ class TestCacheBackupManagerBackup:
     def test_create_backup_with_integrity_check(self, populated_tm, tmp_path):
         """Test backup with integrity check."""
         manager = CacheBackupManager(
-            tm_path=populated_tm,
-            backup_dir=tmp_path / "backups",
-            min_free_space_gb=0
+            tm_path=populated_tm, backup_dir=tmp_path / "backups", min_free_space_gb=0
         )
 
         # Should pass integrity check
@@ -197,9 +182,7 @@ class TestCacheBackupManagerBackup:
     def test_create_backup_fails_without_tm_path(self, tmp_path):
         """Test backup fails when TM path doesn't exist."""
         manager = CacheBackupManager(
-            tm_path=tmp_path / "nonexistent",
-            backup_dir=tmp_path / "backups",
-            min_free_space_gb=0
+            tm_path=tmp_path / "nonexistent", backup_dir=tmp_path / "backups", min_free_space_gb=0
         )
 
         with pytest.raises(BackupError, match="does not exist"):
@@ -218,19 +201,12 @@ class TestCacheBackupManagerList:
         # Create minimal LMDB
         l2 = L2PersistentTM(db_path, max_size_mb=10)
         l2.store(
-            site_id="test.site",
-            src_lang="en",
-            tgt_lang="es",
-            text="Hello",
-            translation="Hola"
+            site_id="test.site", src_lang="en", tgt_lang="es", text="Hello", translation="Hola"
         )
         l2.close()
 
         manager = CacheBackupManager(
-            tm_path=db_path,
-            backup_dir=backup_dir,
-            max_backups=10,
-            min_free_space_gb=0
+            tm_path=db_path, backup_dir=backup_dir, max_backups=10, min_free_space_gb=0
         )
 
         # Create 3 backups with delay
@@ -262,10 +238,7 @@ class TestCacheBackupManagerList:
         db_path = tmp_path / "tm_cache"
         db_path.mkdir()
 
-        manager = CacheBackupManager(
-            tm_path=db_path,
-            backup_dir=tmp_path / "backups"
-        )
+        manager = CacheBackupManager(tm_path=db_path, backup_dir=tmp_path / "backups")
 
         backups = manager.list_backups()
         assert backups == []
@@ -284,10 +257,7 @@ class TestCacheBackupManagerList:
         db_path = tmp_path / "tm_cache"
         db_path.mkdir()
 
-        manager = CacheBackupManager(
-            tm_path=db_path,
-            backup_dir=tmp_path / "backups"
-        )
+        manager = CacheBackupManager(tm_path=db_path, backup_dir=tmp_path / "backups")
 
         assert manager.get_latest_backup() is None
 
@@ -308,15 +278,11 @@ class TestCacheBackupManagerRestore:
             src_lang="en",
             tgt_lang="es",
             text="Original",
-            translation="Original translation"
+            translation="Original translation",
         )
         l2.close()
 
-        manager = CacheBackupManager(
-            tm_path=db_path,
-            backup_dir=backup_dir,
-            min_free_space_gb=0
-        )
+        manager = CacheBackupManager(tm_path=db_path, backup_dir=backup_dir, min_free_space_gb=0)
 
         # Create backup
         backup_info = manager.create_backup(verify_integrity=False)
@@ -328,7 +294,7 @@ class TestCacheBackupManagerRestore:
             src_lang="en",
             tgt_lang="fr",
             text="New entry",
-            translation="Nouvelle entree"
+            translation="Nouvelle entree",
         )
         l2.close()
 
@@ -371,11 +337,7 @@ class TestCacheBackupManagerRestore:
         """Test restore without safety backup."""
         manager, backup_info, _ = setup_for_restore
 
-        result = manager.restore_backup(
-            backup_info.path,
-            force=True,
-            create_safety_backup=False
-        )
+        result = manager.restore_backup(backup_info.path, force=True, create_safety_backup=False)
 
         assert result is None
 
@@ -391,19 +353,12 @@ class TestCacheBackupManagerPruning:
         # Create minimal LMDB
         l2 = L2PersistentTM(db_path, max_size_mb=10)
         l2.store(
-            site_id="test.site",
-            src_lang="en",
-            tgt_lang="es",
-            text="Test",
-            translation="Prueba"
+            site_id="test.site", src_lang="en", tgt_lang="es", text="Test", translation="Prueba"
         )
         l2.close()
 
         manager = CacheBackupManager(
-            tm_path=db_path,
-            backup_dir=backup_dir,
-            max_backups=2,
-            min_free_space_gb=0
+            tm_path=db_path, backup_dir=backup_dir, max_backups=2, min_free_space_gb=0
         )
 
         # Create 5 backups
@@ -422,19 +377,12 @@ class TestCacheBackupManagerPruning:
 
         l2 = L2PersistentTM(db_path, max_size_mb=10)
         l2.store(
-            site_id="test.site",
-            src_lang="en",
-            tgt_lang="es",
-            text="Test",
-            translation="Prueba"
+            site_id="test.site", src_lang="en", tgt_lang="es", text="Test", translation="Prueba"
         )
         l2.close()
 
         manager = CacheBackupManager(
-            tm_path=db_path,
-            backup_dir=backup_dir,
-            max_backups=2,
-            min_free_space_gb=0
+            tm_path=db_path, backup_dir=backup_dir, max_backups=2, min_free_space_gb=0
         )
 
         # Create 3 backups, tracking paths
@@ -463,19 +411,11 @@ class TestCacheBackupManagerDelete:
 
         l2 = L2PersistentTM(db_path, max_size_mb=10)
         l2.store(
-            site_id="test.site",
-            src_lang="en",
-            tgt_lang="es",
-            text="Test",
-            translation="Prueba"
+            site_id="test.site", src_lang="en", tgt_lang="es", text="Test", translation="Prueba"
         )
         l2.close()
 
-        manager = CacheBackupManager(
-            tm_path=db_path,
-            backup_dir=backup_dir,
-            min_free_space_gb=0
-        )
+        manager = CacheBackupManager(tm_path=db_path, backup_dir=backup_dir, min_free_space_gb=0)
 
         backup_info = manager.create_backup(verify_integrity=False)
         assert backup_info.path.exists()
@@ -485,10 +425,7 @@ class TestCacheBackupManagerDelete:
 
     def test_delete_nonexistent_backup(self, tmp_path):
         """Test deleting nonexistent backup fails."""
-        manager = CacheBackupManager(
-            tm_path=tmp_path,
-            backup_dir=tmp_path / "backups"
-        )
+        manager = CacheBackupManager(tm_path=tmp_path, backup_dir=tmp_path / "backups")
 
         with pytest.raises(ValueError, match="not found"):
             manager.delete_backup(Path("/nonexistent"))
@@ -506,7 +443,7 @@ class TestCacheBackupManagerDiskSpace:
         manager = CacheBackupManager(
             tm_path=db_path,
             backup_dir=tmp_path / "backups",
-            min_free_space_gb=1000000  # 1 million GB
+            min_free_space_gb=1000000,  # 1 million GB
         )
 
         with pytest.raises(InsufficientSpaceError, match="Insufficient disk space"):
@@ -534,11 +471,7 @@ class TestCreateBackupManager:
         backup_dir = tmp_path / "custom_backups"
         db_path.mkdir()
 
-        manager = create_backup_manager(
-            tm_path=db_path,
-            backup_dir=backup_dir,
-            max_backups=10
-        )
+        manager = create_backup_manager(tm_path=db_path, backup_dir=backup_dir, max_backups=10)
 
         assert manager.backup_dir == backup_dir
         assert manager.max_backups == 10

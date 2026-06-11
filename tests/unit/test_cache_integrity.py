@@ -3,6 +3,7 @@ Unit tests for cache integrity safeguards (T204: federated-splashing-panda).
 
 Tests validation, error handling, and corruption detection in L2PersistentTM.
 """
+
 import json
 import tempfile
 import threading
@@ -161,6 +162,7 @@ class TestCorruptionDetection:
 
             # Manually insert corrupted data
             from src.tm.normalization import make_tm_key
+
             key = make_tm_key("test", "en", "de", "Hello")
             key_bytes = key.encode("utf-8")
 
@@ -188,6 +190,7 @@ class TestCorruptionDetection:
 
             # Manually insert entry with missing required fields
             from src.tm.normalization import make_tm_key
+
             key = make_tm_key("test", "en", "de", "Hello")
             key_bytes = key.encode("utf-8")
 
@@ -366,7 +369,9 @@ class TestErrorHandling:
             # Create entry with unserializable metadata
             with pytest.raises(RuntimeError, match="Failed to serialize"):
                 # Patch json.dumps to raise TypeError
-                with patch('src.tm.l2_persistent.json.dumps', side_effect=TypeError("Cannot serialize")):
+                with patch(
+                    "src.tm.l2_persistent.json.dumps", side_effect=TypeError("Cannot serialize")
+                ):
                     tm.store(
                         site_id="test",
                         src_lang="en",

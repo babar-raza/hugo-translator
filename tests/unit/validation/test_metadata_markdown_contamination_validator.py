@@ -136,6 +136,7 @@ class TestEdgeCases:
 
     def test_all_error_severity(self, validator):
         from src.translation_engine.validation.base import ValidationSeverity
+
         doc = _doc('title: "Bad#"')
         result = validator.validate("", doc)
         assert all(i.severity == ValidationSeverity.ERROR for i in result.issues)

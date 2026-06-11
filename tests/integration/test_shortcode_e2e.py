@@ -74,12 +74,11 @@ This paragraph has {{< ref "inline.md" >}} shortcode inline with regular text th
         # 3. Extract TextUnits using TextUnitExtractor
         # Use Hugo shortcode regex pattern to protect shortcodes via PlaceholderManager
         hugo_shortcode_patterns = [
-            r'\{\{[%<].*?[%>]\}\}',  # Hugo shortcodes: {{< >}} or {{% %}}
+            r"\{\{[%<].*?[%>]\}\}",  # Hugo shortcodes: {{< >}} or {{% %}}
         ]
 
         extractor = TextUnitExtractor(
-            segmentation_strategy="sentence_only",
-            preserve_patterns=hugo_shortcode_patterns
+            segmentation_strategy="sentence_only", preserve_patterns=hugo_shortcode_patterns
         )
 
         translation_plan = extractor.extract_from_ast(doc.ast, doc.frontmatter)
@@ -91,8 +90,7 @@ This paragraph has {{< ref "inline.md" >}} shortcode inline with regular text th
         # With preserve_patterns, shortcodes are replaced with {PLACEHOLDER_N}
         # and stored in unit.metadata['placeholder_map']
         units_with_placeholders = [
-            u for u in units
-            if u.metadata and u.metadata.get('placeholder_map')
+            u for u in units if u.metadata and u.metadata.get("placeholder_map")
         ]
 
         # Log units with protected content
@@ -104,14 +102,15 @@ This paragraph has {{< ref "inline.md" >}} shortcode inline with regular text th
         # Verify that Hugo shortcodes were protected
         total_shortcodes_protected = 0
         for unit in units_with_placeholders:
-            placeholder_map = unit.metadata.get('placeholder_map', {})
+            placeholder_map = unit.metadata.get("placeholder_map", {})
             for placeholder, original in placeholder_map.items():
-                if '{{<' in original or '{{%' in original:
+                if "{{<" in original or "{{%" in original:
                     total_shortcodes_protected += 1
                     print(f"  - Protected shortcode: {original}")
 
-        assert total_shortcodes_protected > 0, \
+        assert total_shortcodes_protected > 0, (
             "Should have protected at least some Hugo shortcodes via placeholders"
+        )
 
         print(f"\n[DEBUG] Total shortcodes protected: {total_shortcodes_protected}")
 
@@ -133,27 +132,29 @@ This paragraph has {{< ref "inline.md" >}} shortcode inline with regular text th
         placeholder_manager = PlaceholderManager()
 
         for unit in units:
-            if unit.metadata and unit.metadata.get('placeholder_map'):
-                placeholder_map = unit.metadata['placeholder_map']
+            if unit.metadata and unit.metadata.get("placeholder_map"):
+                placeholder_map = unit.metadata["placeholder_map"]
                 # Restore shortcodes from placeholders in translated text
                 unit.translated_text = placeholder_manager.restore(
-                    unit.translated_text,
-                    placeholder_map
+                    unit.translated_text, placeholder_map
                 )
 
         # 7. Verify shortcodes were restored in translated units
         units_with_restored_shortcodes = []
         for unit in units:
-            if unit.translated_text and ('{{<' in unit.translated_text or '{{%' in unit.translated_text):
+            if unit.translated_text and (
+                "{{<" in unit.translated_text or "{{%" in unit.translated_text
+            ):
                 units_with_restored_shortcodes.append(unit)
                 print(f"  - Restored: {unit.translated_text[:80]}")
 
-        assert len(units_with_restored_shortcodes) > 0, \
+        assert len(units_with_restored_shortcodes) > 0, (
             "Should have restored shortcodes in at least some units"
+        )
 
         # 8. Reconstruct markdown from translated units
         config_service = ConfigService(Path(__file__).parent.parent.parent / "config")
-        site_profile = config_service.get_site_profile('kb.aspose.net')
+        site_profile = config_service.get_site_profile("kb.aspose.net")
 
         reconstructor = MarkdownReconstructor(site_profile)
 
@@ -164,50 +165,53 @@ This paragraph has {{< ref "inline.md" >}} shortcode inline with regular text th
                 translations[unit.node_addr] = unit.translated_text
 
         # Reconstruct body only (frontmatter translation tested separately)
-        output_markdown = reconstructor.reconstruct_body(doc.ast, translations, 'pt')
+        output_markdown = reconstructor.reconstruct_body(doc.ast, translations, "pt")
 
         print(f"\n[DEBUG] Reconstructed markdown length: {len(output_markdown)}")
         print(f"[DEBUG] Output preview:\n{output_markdown[:500]}")
 
         # 9. Verify all shortcode variants preserved in output
-        assert "{{< sections >}}" in output_markdown, \
-            "Self-closing shortcode should be preserved"
-        assert "{{< callout >}}" in output_markdown, \
-            "Opening paired shortcode should be preserved"
-        assert "{{< /callout >}}" in output_markdown, \
-            "Closing paired shortcode should be preserved"
-        assert "{{% steps %}}" in output_markdown, \
+        assert "{{< sections >}}" in output_markdown, "Self-closing shortcode should be preserved"
+        assert "{{< callout >}}" in output_markdown, "Opening paired shortcode should be preserved"
+        assert "{{< /callout >}}" in output_markdown, "Closing paired shortcode should be preserved"
+        assert "{{% steps %}}" in output_markdown, (
             "Opening percent-style shortcode should be preserved"
-        assert "{{% /steps %}}" in output_markdown, \
+        )
+        assert "{{% /steps %}}" in output_markdown, (
             "Closing percent-style shortcode should be preserved"
-        assert '{{< ref "path/to/file.md" >}}' in output_markdown or \
-               '{{< ref "inline.md" >}}' in output_markdown, \
-            "Shortcode with parameters should be preserved"
+        )
+        assert (
+            '{{< ref "path/to/file.md" >}}' in output_markdown
+            or '{{< ref "inline.md" >}}' in output_markdown
+        ), "Shortcode with parameters should be preserved"
 
         # 10. Verify shortcodes are NOT translated (negative tests)
-        assert "[Página de trabalho]" not in output_markdown, \
+        assert "[Página de trabalho]" not in output_markdown, (
             "Shortcode should not be translated to Portuguese placeholder text"
+        )
 
         # Check that shortcode keywords were not translated
         # Note: We allow these words in regular content, but shortcode syntax must be preserved
-        shortcode_lines = [line for line in output_markdown.split('\n') if '{{' in line]
+        shortcode_lines = [line for line in output_markdown.split("\n") if "{{" in line]
         for line in shortcode_lines:
             # Within shortcode lines, the shortcode syntax must be preserved
-            assert not re.search(r'\{\{.*?seções.*?\}\}', line, re.IGNORECASE), \
+            assert not re.search(r"\{\{.*?seções.*?\}\}", line, re.IGNORECASE), (
                 f"Shortcode 'sections' should not be translated to 'seções': {line}"
-            assert not re.search(r'\{\{.*?passos.*?\}\}', line, re.IGNORECASE), \
+            )
+            assert not re.search(r"\{\{.*?passos.*?\}\}", line, re.IGNORECASE), (
                 f"Shortcode 'steps' should not be translated to 'passos': {line}"
+            )
 
         # 11. Verify surrounding content WAS translated (positive test)
         # Check that regular text was translated (at least some Portuguese words)
         portuguese_indicators = [
             "ferramentas",  # tools
-            "poderoso",     # powerful
-            "importante",   # important
-            "configurar",   # configure
-            "aplicação",    # application
+            "poderoso",  # powerful
+            "importante",  # important
+            "configurar",  # configure
+            "aplicação",  # application
             "informações",  # information
-            "completo",     # complete
+            "completo",  # complete
         ]
 
         # At least one Portuguese word should appear (content was translated)
@@ -282,10 +286,9 @@ This paragraph has {{< ref "inline.md" >}} shortcode inline with regular text th
         # Apply translations while preserving markdown
         for eng, por in translations.items():
             # Use word boundary matching to avoid partial replacements
-            result = re.sub(rf'\b{re.escape(eng)}\b', por, result)
+            result = re.sub(rf"\b{re.escape(eng)}\b", por, result)
 
         return result
-
 
     def test_shortcode_variants_all_protected(self):
         """Test that all shortcode variants are properly protected.
@@ -328,55 +331,53 @@ Nested in text: This is a {{< ref "inline.md" >}} reference.
         doc = parser.parse_string(markdown)
 
         hugo_shortcode_patterns = [
-            r'\{\{[%<].*?[%>]\}\}',  # Hugo shortcodes: {{< >}} or {{% %}}
+            r"\{\{[%<].*?[%>]\}\}",  # Hugo shortcodes: {{< >}} or {{% %}}
         ]
 
         extractor = TextUnitExtractor(
-            segmentation_strategy="sentence_only",
-            preserve_patterns=hugo_shortcode_patterns
+            segmentation_strategy="sentence_only", preserve_patterns=hugo_shortcode_patterns
         )
         translation_plan = extractor.extract_from_ast(doc.ast, doc.frontmatter)
 
         # Find all units with protected shortcodes
         units_with_placeholders = [
-            u for u in translation_plan.units
-            if u.metadata and u.metadata.get('placeholder_map')
+            u for u in translation_plan.units if u.metadata and u.metadata.get("placeholder_map")
         ]
 
         # Count protected shortcodes
         total_shortcodes_protected = 0
         shortcode_types_found = {
-            'self_closing': False,
-            'opening_paired': False,
-            'closing_paired': False,
-            'opening_percent': False,
-            'closing_percent': False,
-            'with_params': False,
-            'multi_params': False,
+            "self_closing": False,
+            "opening_paired": False,
+            "closing_paired": False,
+            "opening_percent": False,
+            "closing_percent": False,
+            "with_params": False,
+            "multi_params": False,
         }
 
         for unit in units_with_placeholders:
-            placeholder_map = unit.metadata.get('placeholder_map', {})
+            placeholder_map = unit.metadata.get("placeholder_map", {})
             for placeholder, original in placeholder_map.items():
-                if '{{<' in original or '{{%' in original:
+                if "{{<" in original or "{{%" in original:
                     total_shortcodes_protected += 1
                     print(f"  - Protected: {original}")
 
                     # Track specific patterns
-                    if '{{< sections >}}' in original:
-                        shortcode_types_found['self_closing'] = True
-                    if '{{< callout >}}' in original:
-                        shortcode_types_found['opening_paired'] = True
-                    if '{{< /callout >}}' in original:
-                        shortcode_types_found['closing_paired'] = True
-                    if '{{% steps %}}' in original:
-                        shortcode_types_found['opening_percent'] = True
-                    if '{{% /steps %}}' in original:
-                        shortcode_types_found['closing_percent'] = True
-                    if '{{< ref' in original:
-                        shortcode_types_found['with_params'] = True
-                    if 'param1=' in original and 'param2=' in original:
-                        shortcode_types_found['multi_params'] = True
+                    if "{{< sections >}}" in original:
+                        shortcode_types_found["self_closing"] = True
+                    if "{{< callout >}}" in original:
+                        shortcode_types_found["opening_paired"] = True
+                    if "{{< /callout >}}" in original:
+                        shortcode_types_found["closing_paired"] = True
+                    if "{{% steps %}}" in original:
+                        shortcode_types_found["opening_percent"] = True
+                    if "{{% /steps %}}" in original:
+                        shortcode_types_found["closing_percent"] = True
+                    if "{{< ref" in original:
+                        shortcode_types_found["with_params"] = True
+                    if "param1=" in original and "param2=" in original:
+                        shortcode_types_found["multi_params"] = True
 
         # Block-level shortcodes ({{< sections >}}, {{% steps %}}, {{< callout >}} on own lines)
         # are handled as do_not_translate AST nodes and do NOT appear in placeholder_map.
@@ -386,8 +387,9 @@ Nested in text: This is a {{< ref "inline.md" >}} reference.
         assert total_shortcodes_protected > 0, "Should have protected some shortcodes"
 
         # Only assert inline shortcode types (ref and multi-param variants in paragraph text)
-        inline_types = {k: v for k, v in shortcode_types_found.items()
-                        if k in ('with_params', 'multi_params')}
+        inline_types = {
+            k: v for k, v in shortcode_types_found.items() if k in ("with_params", "multi_params")
+        }
         for shortcode_type, found in inline_types.items():
             assert found, f"Inline shortcode type '{shortcode_type}' not found in protected content"
 

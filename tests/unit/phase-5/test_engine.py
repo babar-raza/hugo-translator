@@ -3,6 +3,7 @@ Unit tests for TranslationEngine.
 
 INT-01: Added comprehensive tests for retry loop with validation and decision engine.
 """
+
 from pathlib import Path
 from unittest.mock import Mock, patch
 
@@ -83,7 +84,7 @@ def mock_model_loader():
     backend.translate_with_token_counts.return_value = (
         ["Bonjour le monde"],
         100,  # input_tokens
-        50    # output_tokens
+        50,  # output_tokens
     )
 
     loader.load_model.return_value = backend
@@ -107,8 +108,10 @@ def _isolate_retranslate_queue(tmp_path):
     Without this, engine tests that trigger REJECT decisions write to the live
     production data/retranslate_queue.jsonl, contaminating it with pytest temp paths.
     """
-    with patch.object(_rtq, "_QUEUE_FILE", tmp_path / "retranslate_queue.jsonl"), \
-         patch.object(_rtq, "_QUARANTINE_FILE", tmp_path / "quarantine.jsonl"):
+    with (
+        patch.object(_rtq, "_QUEUE_FILE", tmp_path / "retranslate_queue.jsonl"),
+        patch.object(_rtq, "_QUARANTINE_FILE", tmp_path / "quarantine.jsonl"),
+    ):
         yield
 
 
@@ -132,9 +135,7 @@ This is a test paragraph.
 class TestTranslationEngineInit:
     """Test TranslationEngine initialization."""
 
-    def test_engine_initialization(
-        self, mock_config_service, mock_tm, mock_model_loader
-    ):
+    def test_engine_initialization(self, mock_config_service, mock_tm, mock_model_loader):
         """Test creating TranslationEngine."""
         engine = TranslationEngine(
             config_service=mock_config_service,
@@ -151,9 +152,7 @@ class TestTranslationEngineInit:
 class TestExtractSegments:
     """Test segment extraction."""
 
-    def test_extract_segments_basic(
-        self, translation_engine, sample_markdown_file
-    ):
+    def test_extract_segments_basic(self, translation_engine, sample_markdown_file):
         """Test extracting segments from file."""
         segments = translation_engine.extract_segments(
             site_id="test_site",
@@ -204,12 +203,14 @@ class TestTranslateFile:
         mock_backend.translate_with_token_counts.return_value = (
             ["Translated content"],
             100,  # input_tokens
-            50    # output_tokens
+            50,  # output_tokens
         )
 
         # Mock reconstructor
         mock_reconstructor = mock_reconstructor_class.return_value
-        mock_reconstructor.reconstruct_document.return_value = Mock(__str__=lambda x: "# Translated Content\n\nTranslated body")
+        mock_reconstructor.reconstruct_document.return_value = Mock(
+            __str__=lambda x: "# Translated Content\n\nTranslated body"
+        )
 
         # Mock output path in site profile
         translation_engine.config.get_site_profile.return_value.output_dir = str(
@@ -229,9 +230,7 @@ class TestTranslateFile:
         assert "fr" in result.outputs
         assert result.stats.total_segments == 1
 
-    def test_translate_file_no_site_profile(
-        self, translation_engine, sample_markdown_file
-    ):
+    def test_translate_file_no_site_profile(self, translation_engine, sample_markdown_file):
         """Test error when site profile not found."""
         translation_engine.config.get_site_profile.return_value = None
 
@@ -316,12 +315,14 @@ class TestTranslateWithTM:
         mock_backend.translate_with_token_counts.return_value = (
             ["Bonjour le monde"],
             100,  # input_tokens
-            50    # output_tokens
+            50,  # output_tokens
         )
 
         # Mock reconstructor
         mock_reconstructor = mock_reconstructor_class.return_value
-        mock_reconstructor.reconstruct_document.return_value = Mock(__str__=lambda x: "# Translated Content\n\nTranslated body")
+        mock_reconstructor.reconstruct_document.return_value = Mock(
+            __str__=lambda x: "# Translated Content\n\nTranslated body"
+        )
 
         # Mock output path
         translation_engine.config.get_site_profile.return_value.output_dir = str(
@@ -385,11 +386,13 @@ class TestTranslateWithTM:
         mock_backend.translate_with_token_counts.return_value = (
             ["Bonjour le monde"],
             100,  # input_tokens
-            50    # output_tokens
+            50,  # output_tokens
         )
 
         mock_reconstructor = mock_reconstructor_class.return_value
-        mock_reconstructor.reconstruct_document.return_value = Mock(__str__=lambda x: "# Translated Content\n\nTranslated body")
+        mock_reconstructor.reconstruct_document.return_value = Mock(
+            __str__=lambda x: "# Translated Content\n\nTranslated body"
+        )
 
         translation_engine.config.get_site_profile.return_value.output_dir = str(
             tmp_path / "output"
@@ -412,9 +415,7 @@ class TestTranslateWithTM:
 class TestTranslateDirectory:
     """Test directory translation."""
 
-    def test_translate_directory(
-        self, translation_engine, tmp_path
-    ):
+    def test_translate_directory(self, translation_engine, tmp_path):
         """Test translating directory of files."""
         # Create test files
         (tmp_path / "file1.md").write_text("# Test 1", encoding="utf-8")
@@ -422,16 +423,18 @@ class TestTranslateDirectory:
 
         # Mock translate_file to return success
         original_translate = translation_engine.translate_file
-        translation_engine.translate_file = Mock(side_effect=lambda **kwargs: Mock(
-            success=True,
-            file_path=kwargs["file_path"],
-            outputs={"fr": Path("output/fr/test.md")},
-            stats=Mock(
-                total_segments=1,
-                tm_hits=0,
-                translated_segments=1,
-            ),
-        ))
+        translation_engine.translate_file = Mock(
+            side_effect=lambda **kwargs: Mock(
+                success=True,
+                file_path=kwargs["file_path"],
+                outputs={"fr": Path("output/fr/test.md")},
+                stats=Mock(
+                    total_segments=1,
+                    tm_hits=0,
+                    translated_segments=1,
+                ),
+            )
+        )
 
         # Translate directory
         result = translation_engine.translate_directory(
@@ -469,9 +472,7 @@ class TestTMOperations:
             tgt_lang="fr",
         )
 
-        translation_engine.tm.clear.assert_called_once_with(
-            "test_site", "en", "fr"
-        )
+        translation_engine.tm.clear.assert_called_once_with("test_site", "en", "fr")
 
 
 class TestWriteOutput:
@@ -549,7 +550,7 @@ class TestWriteOutput:
         # Verify stats for new file
         assert stats.md_files_added == 1
         assert stats.md_files_updated == 0
-        assert stats.bytes_written_md == len(content.encode('utf-8'))
+        assert stats.bytes_written_md == len(content.encode("utf-8"))
 
     def test_write_output_updates_stats_existing_file(self, translation_engine, tmp_path):
         """Test that _write_output updates stats for existing file."""
@@ -569,7 +570,7 @@ class TestWriteOutput:
         # Verify stats for updated file
         assert stats.md_files_added == 0
         assert stats.md_files_updated == 1
-        assert stats.bytes_written_md == len(content.encode('utf-8'))
+        assert stats.bytes_written_md == len(content.encode("utf-8"))
 
     def test_write_output_handles_unicode(self, translation_engine, tmp_path):
         """Test that _write_output handles unicode content correctly."""
@@ -640,7 +641,12 @@ class TestRetryLoop:
 
     @pytest.fixture
     def engine_with_validation(
-        self, mock_config_service, mock_tm, mock_model_loader, mock_validation_suite, mock_decision_engine
+        self,
+        mock_config_service,
+        mock_tm,
+        mock_model_loader,
+        mock_validation_suite,
+        mock_decision_engine,
     ):
         """Create TranslationEngine with validation enabled."""
         return TranslationEngine(
@@ -689,15 +695,19 @@ class TestRetryLoop:
         mock_backend.translate_with_token_counts.return_value = (
             ["Translated content"],
             100,  # input_tokens
-            50    # output_tokens
+            50,  # output_tokens
         )
 
         # Mock reconstructor
         mock_reconstructor = mock_reconstructor_class.return_value
-        mock_reconstructor.reconstruct_document.return_value = Mock(__str__=lambda x: "# Translated Content\n\nTranslated body")
+        mock_reconstructor.reconstruct_document.return_value = Mock(
+            __str__=lambda x: "# Translated Content\n\nTranslated body"
+        )
 
         # Set output directory
-        engine_with_validation.config.get_site_profile.return_value.output_dir = str(tmp_path / "output")
+        engine_with_validation.config.get_site_profile.return_value.output_dir = str(
+            tmp_path / "output"
+        )
 
         # Translate
         result = engine_with_validation.translate_file(
@@ -752,14 +762,18 @@ class TestRetryLoop:
         mock_backend.translate_with_token_counts.return_value = (
             ["Translated content"],
             100,  # input_tokens
-            50    # output_tokens
+            50,  # output_tokens
         )
 
         # Mock reconstructor
         mock_reconstructor = mock_reconstructor_class.return_value
-        mock_reconstructor.reconstruct_document.return_value = Mock(__str__=lambda x: "# Translated Content\n\nTranslated body")
+        mock_reconstructor.reconstruct_document.return_value = Mock(
+            __str__=lambda x: "# Translated Content\n\nTranslated body"
+        )
 
-        engine_with_validation.config.get_site_profile.return_value.output_dir = str(tmp_path / "output")
+        engine_with_validation.config.get_site_profile.return_value.output_dir = str(
+            tmp_path / "output"
+        )
 
         # First attempt: RETRY decision
         retry_decision = DecisionResult(
@@ -846,13 +860,17 @@ class TestRetryLoop:
         mock_backend.translate_with_token_counts.return_value = (
             ["Translated content"],
             100,  # input_tokens
-            50    # output_tokens
+            50,  # output_tokens
         )
 
         mock_reconstructor = mock_reconstructor_class.return_value
-        mock_reconstructor.reconstruct_document.return_value = Mock(__str__=lambda x: "# Translated Content\n\nTranslated body")
+        mock_reconstructor.reconstruct_document.return_value = Mock(
+            __str__=lambda x: "# Translated Content\n\nTranslated body"
+        )
 
-        engine_with_validation.config.get_site_profile.return_value.output_dir = str(tmp_path / "output")
+        engine_with_validation.config.get_site_profile.return_value.output_dir = str(
+            tmp_path / "output"
+        )
 
         # All attempts: REJECT decision
         reject_decision = DecisionResult(
@@ -926,13 +944,17 @@ class TestRetryLoop:
         mock_backend.translate_with_token_counts.return_value = (
             ["Translated content"],
             100,  # input_tokens
-            50    # output_tokens
+            50,  # output_tokens
         )
 
         mock_reconstructor = mock_reconstructor_class.return_value
-        mock_reconstructor.reconstruct_document.return_value = Mock(__str__=lambda x: "# Translated Content\n\nTranslated body")
+        mock_reconstructor.reconstruct_document.return_value = Mock(
+            __str__=lambda x: "# Translated Content\n\nTranslated body"
+        )
 
-        engine_with_validation.config.get_site_profile.return_value.output_dir = str(tmp_path / "output")
+        engine_with_validation.config.get_site_profile.return_value.output_dir = str(
+            tmp_path / "output"
+        )
 
         # First attempt: RETRY with feedback
         retry_decision = DecisionResult(
@@ -966,7 +988,10 @@ class TestRetryLoop:
 
         # Verify _translate_to_language was called with retry_feedback
         # (this would require inspecting the actual call, but we can verify the result)
-        assert result.retry_history[0]["feedback"] == "Ensure all headings are preserved with same level"
+        assert (
+            result.retry_history[0]["feedback"]
+            == "Ensure all headings are preserved with same level"
+        )
 
     def test_validation_disabled_no_retry(
         self,
@@ -976,10 +1001,13 @@ class TestRetryLoop:
     ):
         """Test that retry loop is bypassed when validation is disabled."""
         # Mock parser and extractor
-        with patch("src.translation_engine.engine.HugoParser") as mock_parser_class, \
-             patch("src.translation_engine.engine.SegmentExtractor") as mock_extractor_class, \
-             patch("src.translation_engine.engine.MarkdownReconstructor") as mock_reconstructor_class:
-
+        with (
+            patch("src.translation_engine.engine.HugoParser") as mock_parser_class,
+            patch("src.translation_engine.engine.SegmentExtractor") as mock_extractor_class,
+            patch(
+                "src.translation_engine.engine.MarkdownReconstructor"
+            ) as mock_reconstructor_class,
+        ):
             mock_parser = mock_parser_class.return_value
             mock_doc = Mock(spec=HugoDocument)
             mock_doc.file_path = sample_markdown_file
@@ -1000,13 +1028,17 @@ class TestRetryLoop:
             mock_backend.translate_with_token_counts.return_value = (
                 ["Translated"],
                 100,  # input_tokens
-                50    # output_tokens
+                50,  # output_tokens
             )
 
             mock_reconstructor = mock_reconstructor_class.return_value
-            mock_reconstructor.reconstruct_document.return_value = Mock(__str__=lambda x: "Translated")
+            mock_reconstructor.reconstruct_document.return_value = Mock(
+                __str__=lambda x: "Translated"
+            )
 
-            translation_engine.config.get_site_profile.return_value.output_dir = str(tmp_path / "output")
+            translation_engine.config.get_site_profile.return_value.output_dir = str(
+                tmp_path / "output"
+            )
 
             # Translate with validation disabled
             result = translation_engine.translate_file(
@@ -1071,10 +1103,13 @@ class TestINT02RetryFeedback:
         mock_reconstructor = mock_reconstructor_class.return_value
         mock_reconstructor.reconstruct_document.return_value = Mock(__str__=lambda x: "Translated")
 
-        translation_engine.config.get_site_profile.return_value.output_dir = str(tmp_path / "output")
+        translation_engine.config.get_site_profile.return_value.output_dir = str(
+            tmp_path / "output"
+        )
 
         # Call _translate_to_language with retry_feedback
         from src.translation_engine.models import TranslationStats
+
         stats = TranslationStats()
 
         translated_content = translation_engine._translate_to_language(
@@ -1144,10 +1179,13 @@ class TestINT02RetryFeedback:
         mock_reconstructor = mock_reconstructor_class.return_value
         mock_reconstructor.reconstruct_document.return_value = Mock(__str__=lambda x: "Translated")
 
-        translation_engine.config.get_site_profile.return_value.output_dir = str(tmp_path / "output")
+        translation_engine.config.get_site_profile.return_value.output_dir = str(
+            tmp_path / "output"
+        )
 
         # Call _translate_to_language WITHOUT retry_feedback (first attempt)
         from src.translation_engine.models import TranslationStats
+
         stats = TranslationStats()
 
         translated_content = translation_engine._translate_to_language(
@@ -1204,17 +1242,20 @@ class TestINT02RetryFeedback:
         mock_backend.translate_with_token_counts.return_value = (
             ["Translated"],
             100,  # input_tokens
-            50    # output_tokens
+            50,  # output_tokens
         )
         translation_engine.model_loader.load_model.return_value = mock_backend
 
         mock_reconstructor = mock_reconstructor_class.return_value
         mock_reconstructor.reconstruct_document.return_value = Mock(__str__=lambda x: "Translated")
 
-        translation_engine.config.get_site_profile.return_value.output_dir = str(tmp_path / "output")
+        translation_engine.config.get_site_profile.return_value.output_dir = str(
+            tmp_path / "output"
+        )
 
         # Call _translate_to_language with retry_count=1
         from src.translation_engine.models import TranslationStats
+
         stats = TranslationStats()
 
         translation_engine._translate_to_language(
@@ -1277,17 +1318,20 @@ class TestINT02RetryFeedback:
         mock_backend.translate_with_token_counts.return_value = (
             ["Translated"],
             100,  # input_tokens
-            50    # output_tokens
+            50,  # output_tokens
         )
         translation_engine.model_loader.load_model.return_value = mock_backend
 
         mock_reconstructor = mock_reconstructor_class.return_value
         mock_reconstructor.reconstruct_document.return_value = Mock(__str__=lambda x: "Translated")
 
-        translation_engine.config.get_site_profile.return_value.output_dir = str(tmp_path / "output")
+        translation_engine.config.get_site_profile.return_value.output_dir = str(
+            tmp_path / "output"
+        )
 
         # Call with very high retry_count (should cap at 1.0)
         from src.translation_engine.models import TranslationStats
+
         stats = TranslationStats()
 
         translation_engine._translate_to_language(

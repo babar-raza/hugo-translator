@@ -4,6 +4,7 @@ Regression tests for markdown formatting preservation.
 These tests ensure that bold, italic, links, headings, and lists are preserved
 during AST-based translation, addressing Phase 6 markdown fidelity failures.
 """
+
 import pytest
 
 from src.translation_engine.extractor.text_unit_extractor import TextUnitExtractor

@@ -7,6 +7,7 @@ Verifies the .active → .ready → .synced state machine works correctly.
 These tests replace the removed direct-DB tests (test_telemetry_pragma_settings.py,
 test_telemetry_concurrent_access.py) with tests focused on the new HTTP API + buffer architecture.
 """
+
 import json
 import tempfile
 import time
@@ -302,7 +303,7 @@ class TestBufferFileFailureModes:
             buffer = BufferFile(tmpdir)
 
             # Write corrupted JSON manually
-            with open(buffer.current_file, 'a') as f:
+            with open(buffer.current_file, "a") as f:
                 f.write('{"invalid json\n')
 
             # Subsequent appends should still work
@@ -326,10 +327,7 @@ class TestBufferFileFormat:
         with tempfile.TemporaryDirectory() as tmpdir:
             buffer = BufferFile(tmpdir)
 
-            events = [
-                {"event_id": f"test-{i}", "value": i}
-                for i in range(10)
-            ]
+            events = [{"event_id": f"test-{i}", "value": i} for i in range(10)]
 
             for event in events:
                 buffer.append(event)
@@ -349,13 +347,8 @@ class TestBufferFileFormat:
             # Complex nested event
             event = {
                 "event_id": "test-123",
-                "metadata": {
-                    "nested": {
-                        "value": [1, 2, 3],
-                        "flag": True
-                    }
-                },
-                "text": "Line with\nnewlines and \"quotes\""
+                "metadata": {"nested": {"value": [1, 2, 3], "flag": True}},
+                "text": 'Line with\nnewlines and "quotes"',
             }
 
             buffer.append(event)
@@ -364,7 +357,7 @@ class TestBufferFileFormat:
                 line = f.readline()
 
             # Line should not contain literal newlines (JSON-escaped)
-            assert "\n" not in line.rstrip('\n')
+            assert "\n" not in line.rstrip("\n")
 
             # Should parse correctly
             parsed = json.loads(line)
@@ -383,7 +376,7 @@ class TestBufferFileFormat:
                 content = f.read()
 
             # Should not have trailing comma
-            assert not content.rstrip().endswith(',')
+            assert not content.rstrip().endswith(",")
 
             # Each line should be parseable independently
             for line in content.splitlines():

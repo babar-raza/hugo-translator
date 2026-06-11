@@ -73,7 +73,6 @@ class MockTranslator:
             "Option to preserve text order": "Option de conservation de l'ordre du texte",
             "Another top-level item": "Un autre élément de niveau supérieur",
             "Test Document": "Document de test",
-
             # Multiple nesting levels
             "Multiple Levels": "Niveaux multiples",
             "Level 1": "Niveau 1",
@@ -82,7 +81,6 @@ class MockTranslator:
             "Level 4": "Niveau 4",
             "Back to Level 1": "Retour au niveau 1",
             "Level 2 again": "Niveau 2 encore",
-
             # Mixed content
             "Mixed Content": "Contenu mixte",
             "Item with **bold** text and [link](https://example.com):": "Élément avec texte **gras** et [lien](https://example.com):",
@@ -90,7 +88,6 @@ class MockTranslator:
             "Nested item 2 with *emphasis*": "Élément imbriqué 2 avec *emphase*",
             "Regular item with code: `inline_code()`": "Élément régulier avec code: `inline_code()`",
             "Another nested item": "Un autre élément imbriqué",
-
             # Ordered lists
             "Ordered Lists": "Listes ordonnées",
             "First ordered item": "Premier élément ordonné",
@@ -138,7 +135,9 @@ def translate_markdown(markdown_content: str) -> tuple[str, list, int, int]:
     # Check for unapplied units
     unapplied_units = set(renderer.unit_map.keys()) - renderer.applied_units
     # Filter out frontmatter units
-    unapplied_non_frontmatter = [addr for addr in unapplied_units if not addr.startswith('frontmatter.')]
+    unapplied_non_frontmatter = [
+        addr for addr in unapplied_units if not addr.startswith("frontmatter.")
+    ]
 
     applied_count = len(renderer.applied_units)
 
@@ -169,8 +168,8 @@ def test_simple_nested_list():
 
     # Verify indentation exists (nested items should have leading spaces)
     # ASTRenderer uses 2-space indent per nesting level
-    lines = output.split('\n')
-    nested_lines = [line for line in lines if line.startswith('  -')]
+    lines = output.split("\n")
+    nested_lines = [line for line in lines if line.startswith("  -")]
     assert len(nested_lines) >= 5, f"Expected at least 5 nested items, found {len(nested_lines)}"
 
     print("\nPASS: Simple nested list test passed")
@@ -198,10 +197,12 @@ def test_multiple_nesting_levels():
 
     # Verify different indentation levels exist
     # ASTRenderer uses 2-space indent per nesting level
-    lines = output.split('\n')
-    level2_lines = [line for line in lines if line.startswith('  -') or line.startswith('  *')]
-    level3_lines = [line for line in lines if line.startswith('    -') or line.startswith('    *')]
-    level4_lines = [line for line in lines if line.startswith('      -') or line.startswith('      *')]
+    lines = output.split("\n")
+    level2_lines = [line for line in lines if line.startswith("  -") or line.startswith("  *")]
+    level3_lines = [line for line in lines if line.startswith("    -") or line.startswith("    *")]
+    level4_lines = [
+        line for line in lines if line.startswith("      -") or line.startswith("      *")
+    ]
 
     assert len(level2_lines) >= 2, f"Expected at least 2 level-2 items, found {len(level2_lines)}"
     assert len(level3_lines) >= 1, f"Expected at least 1 level-3 item, found {len(level3_lines)}"
@@ -230,8 +231,8 @@ def test_mixed_content_nested_list():
     assert "*emphase*" in output or "*emphasis*" in output  # Emphasis preserved
 
     # Verify nested structure (2-space indent per level)
-    lines = output.split('\n')
-    nested_lines = [line for line in lines if line.startswith('  -')]
+    lines = output.split("\n")
+    nested_lines = [line for line in lines if line.startswith("  -")]
     assert len(nested_lines) >= 3, f"Expected at least 3 nested items, found {len(nested_lines)}"
 
     print("\nPASS: Mixed content nested list test passed")
@@ -254,12 +255,16 @@ def test_ordered_nested_list():
     assert "Deuxième élément ordonné" in output
 
     # Verify ordered list structure (should have numbered items)
-    lines = output.split('\n')
-    ordered_top_level = [line for line in lines if line.strip().startswith('1.') or line.strip().startswith('2.')]
-    assert len(ordered_top_level) >= 2, f"Expected at least 2 top-level ordered items, found {len(ordered_top_level)}"
+    lines = output.split("\n")
+    ordered_top_level = [
+        line for line in lines if line.strip().startswith("1.") or line.strip().startswith("2.")
+    ]
+    assert len(ordered_top_level) >= 2, (
+        f"Expected at least 2 top-level ordered items, found {len(ordered_top_level)}"
+    )
 
     # Verify nested structure (2-space indent per level)
-    nested_lines = [line for line in lines if line.startswith('  ')]
+    nested_lines = [line for line in lines if line.startswith("  ")]
     assert len(nested_lines) >= 2, f"Expected at least 2 nested items, found {len(nested_lines)}"
 
     print("\nPASS: Ordered nested list test passed")
@@ -286,14 +291,16 @@ def test_no_regression_simple_list():
     assert applied == extracted, f"Only {applied}/{extracted} units applied"
 
     # Verify structure (should NOT have indented items)
-    lines = output.split('\n')
-    nested_lines = [line for line in lines if line.startswith('  -')]
-    assert len(nested_lines) == 0, f"Simple list should not have nested items, found {len(nested_lines)}"
+    lines = output.split("\n")
+    nested_lines = [line for line in lines if line.startswith("  -")]
+    assert len(nested_lines) == 0, (
+        f"Simple list should not have nested items, found {len(nested_lines)}"
+    )
 
     print("\nPASS: Simple list (no regression) test passed")
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     """Run all tests with detailed output."""
     print("=" * 70)
     print("INTEGRATION TEST: Nested List Reconstruction (Issue #5)")

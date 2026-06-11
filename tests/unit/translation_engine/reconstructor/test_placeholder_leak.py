@@ -36,7 +36,7 @@ def _make_unit_with_placeholder(
         source_text=source,
         translated_text=translated,
     )
-    unit.metadata['placeholder_map'] = placeholder_map
+    unit.metadata["placeholder_map"] = placeholder_map
     return unit
 
 
@@ -65,9 +65,11 @@ class TestPlaceholderLeakDetection:
         )
 
         # Monkeypatch _restore_placeholders to simulate failure (returns input unchanged)
-        with patch.object(renderer, '_restore_placeholders', return_value=unit.translated_text):
+        with patch.object(renderer, "_restore_placeholders", return_value=unit.translated_text):
             ast = _make_ast_for_unit(unit)
-            with caplog.at_level(logging.ERROR, logger="src.translation_engine.reconstructor.ast_renderer"):
+            with caplog.at_level(
+                logging.ERROR, logger="src.translation_engine.reconstructor.ast_renderer"
+            ):
                 renderer.apply_translations(ast, [unit])
 
         assert "PLACEHOLDER_LEAK" in caplog.text
@@ -104,7 +106,7 @@ class TestPlaceholderLeakDetection:
         )
 
         # Simulate failed restoration (returns text with placeholder still present)
-        with patch.object(renderer, '_restore_placeholders', return_value=pre_restore_text):
+        with patch.object(renderer, "_restore_placeholders", return_value=pre_restore_text):
             ast = _make_ast_for_unit(unit)
             renderer.apply_translations(ast, [unit])
 
@@ -126,9 +128,11 @@ class TestPlaceholderLeakDetection:
 
         # Real restoration: {PLACEHOLDER_0} → {{< link >}}
         expected_restored = "Besuchen Sie {{< link >}} für Details"
-        with patch.object(renderer, '_restore_placeholders', return_value=expected_restored):
+        with patch.object(renderer, "_restore_placeholders", return_value=expected_restored):
             ast = _make_ast_for_unit(unit)
-            with caplog.at_level(logging.WARNING, logger="src.translation_engine.reconstructor.ast_renderer"):
+            with caplog.at_level(
+                logging.WARNING, logger="src.translation_engine.reconstructor.ast_renderer"
+            ):
                 renderer.apply_translations(ast, [unit])
 
         assert "PLACEHOLDER_LEAK" not in caplog.text
@@ -147,7 +151,9 @@ class TestPlaceholderLeakDetection:
         # No placeholder_map in metadata
 
         ast = _make_ast_for_unit(unit)
-        with caplog.at_level(logging.WARNING, logger="src.translation_engine.reconstructor.ast_renderer"):
+        with caplog.at_level(
+            logging.WARNING, logger="src.translation_engine.reconstructor.ast_renderer"
+        ):
             renderer.apply_translations(ast, [unit])
 
         assert "PLACEHOLDER_LEAK" not in caplog.text

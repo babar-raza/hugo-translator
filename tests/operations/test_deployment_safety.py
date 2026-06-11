@@ -4,6 +4,7 @@ Tests for Deployment Safety Checker
 
 Tests the deployment safety automation and checklist validation.
 """
+
 import json
 import sys
 import tempfile
@@ -30,37 +31,32 @@ from scripts.check_deployment_safety import (
 
 def test_check_item_creation():
     """Test CheckItem can be created."""
-    item = CheckItem(
-        category='Test',
-        name='Test Check',
-        automated=True,
-        required=True
-    )
+    item = CheckItem(category="Test", name="Test Check", automated=True, required=True)
 
-    assert item.category == 'Test'
-    assert item.name == 'Test Check'
+    assert item.category == "Test"
+    assert item.name == "Test Check"
     assert item.automated is True
     assert item.required is True
-    assert item.status == 'pending'
+    assert item.status == "pending"
 
 
 def test_check_item_to_dict():
     """Test CheckItem serialization."""
     item = CheckItem(
-        category='Test',
-        name='Test Check',
+        category="Test",
+        name="Test Check",
         automated=True,
         required=True,
-        status='passed',
-        evidence='Test passed'
+        status="passed",
+        evidence="Test passed",
     )
 
     item_dict = item.to_dict()
 
-    assert item_dict['category'] == 'Test'
-    assert item_dict['name'] == 'Test Check'
-    assert item_dict['status'] == 'passed'
-    assert item_dict['evidence'] == 'Test passed'
+    assert item_dict["category"] == "Test"
+    assert item_dict["name"] == "Test Check"
+    assert item_dict["status"] == "passed"
+    assert item_dict["evidence"] == "Test passed"
 
 
 # ============================================================================
@@ -73,7 +69,7 @@ def test_checklist_loader_initialization():
     loader = ChecklistLoader()
 
     assert loader is not None
-    assert hasattr(loader, 'checklist_items')
+    assert hasattr(loader, "checklist_items")
 
 
 def test_checklist_loader_defines_items():
@@ -92,7 +88,7 @@ def test_checklist_includes_categories():
 
     categories = set(item.category for item in items)
 
-    expected_categories = {'Code Quality', 'Security', 'Performance', 'Infrastructure', 'Rollback'}
+    expected_categories = {"Code Quality", "Security", "Performance", "Infrastructure", "Rollback"}
 
     for expected in expected_categories:
         assert expected in categories, f"Missing category: {expected}"
@@ -124,7 +120,7 @@ def test_automated_checker_initialization():
     assert checker.project_root == project_root
 
 
-@patch('subprocess.run')
+@patch("subprocess.run")
 def test_automated_checker_tests_pass(mock_run):
     """Test checking if all tests pass."""
     # Mock successful test run
@@ -143,7 +139,7 @@ def test_automated_checker_tests_pass(mock_run):
     assert "passed" in evidence.lower()
 
 
-@patch('subprocess.run')
+@patch("subprocess.run")
 def test_automated_checker_tests_fail(mock_run):
     """Test checking when tests fail."""
     # Mock failed test run
@@ -162,7 +158,7 @@ def test_automated_checker_tests_fail(mock_run):
     assert "failed" in evidence.lower()
 
 
-@patch('subprocess.run')
+@patch("subprocess.run")
 def test_automated_checker_smoke_tests(mock_run):
     """Test smoke test check."""
     # Mock successful smoke tests
@@ -174,9 +170,9 @@ def test_automated_checker_smoke_tests(mock_run):
 
     with tempfile.TemporaryDirectory() as tmpdir:
         project_root = Path(tmpdir)
-        scripts_dir = project_root / 'scripts'
+        scripts_dir = project_root / "scripts"
         scripts_dir.mkdir()
-        (scripts_dir / 'run_smoke_tests.py').write_text('print("test")')
+        (scripts_dir / "run_smoke_tests.py").write_text('print("test")')
 
         checker = AutomatedChecker(project_root)
 
@@ -218,7 +214,7 @@ def test_automated_checker_resources():
     assert passed is True or "skip" in evidence.lower()
 
 
-@patch('subprocess.run')
+@patch("subprocess.run")
 def test_automated_checker_production_readiness(mock_run):
     """Test production readiness check."""
     # Mock successful readiness check
@@ -230,9 +226,9 @@ def test_automated_checker_production_readiness(mock_run):
 
     with tempfile.TemporaryDirectory() as tmpdir:
         project_root = Path(tmpdir)
-        scripts_dir = project_root / 'scripts'
+        scripts_dir = project_root / "scripts"
         scripts_dir.mkdir()
-        (scripts_dir / 'production_readiness_check.py').write_text('print("test")')
+        (scripts_dir / "production_readiness_check.py").write_text('print("test")')
 
         checker = AutomatedChecker(project_root)
 
@@ -241,7 +237,7 @@ def test_automated_checker_production_readiness(mock_run):
         assert passed is True
 
 
-@patch('subprocess.run')
+@patch("subprocess.run")
 def test_automated_checker_rollback_dry_run(mock_run):
     """Test rollback dry-run check."""
     # Mock successful dry-run
@@ -253,9 +249,9 @@ def test_automated_checker_rollback_dry_run(mock_run):
 
     with tempfile.TemporaryDirectory() as tmpdir:
         project_root = Path(tmpdir)
-        scripts_dir = project_root / 'scripts'
+        scripts_dir = project_root / "scripts"
         scripts_dir.mkdir()
-        (scripts_dir / 'rollback.py').write_text('print("test")')
+        (scripts_dir / "rollback.py").write_text('print("test")')
 
         checker = AutomatedChecker(project_root)
 
@@ -271,19 +267,19 @@ def test_automated_checker_run_all_checks():
         checker = AutomatedChecker(project_root)
 
         items = [
-            CheckItem('Test', 'Static analysis clean', automated=True, required=True),
-            CheckItem('Test', 'Manual review', automated=False, required=True),
+            CheckItem("Test", "Static analysis clean", automated=True, required=True),
+            CheckItem("Test", "Manual review", automated=False, required=True),
         ]
 
         updated_items = checker.run_all_checks(items)
 
         # Static analysis should have been run
-        static_item = [i for i in updated_items if i.name == 'Static analysis clean'][0]
-        assert static_item.status in ['passed', 'failed', 'skipped']
+        static_item = [i for i in updated_items if i.name == "Static analysis clean"][0]
+        assert static_item.status in ["passed", "failed", "skipped"]
 
         # Manual item should remain manual
-        manual_item = [i for i in updated_items if i.name == 'Manual review'][0]
-        assert manual_item.status == 'manual'
+        manual_item = [i for i in updated_items if i.name == "Manual review"][0]
+        assert manual_item.status == "manual"
 
 
 # ============================================================================
@@ -303,8 +299,8 @@ def test_checklist_validator_all_passed():
     validator = ChecklistValidator()
 
     items = [
-        CheckItem('Test', 'Check 1', automated=True, required=True, status='passed'),
-        CheckItem('Test', 'Check 2', automated=True, required=True, status='passed'),
+        CheckItem("Test", "Check 1", automated=True, required=True, status="passed"),
+        CheckItem("Test", "Check 2", automated=True, required=True, status="passed"),
     ]
 
     ready, warnings = validator.validate(items, strict=False)
@@ -318,15 +314,15 @@ def test_checklist_validator_with_failures():
     validator = ChecklistValidator()
 
     items = [
-        CheckItem('Test', 'Check 1', automated=True, required=True, status='passed'),
-        CheckItem('Test', 'Check 2', automated=True, required=True, status='failed'),
+        CheckItem("Test", "Check 1", automated=True, required=True, status="passed"),
+        CheckItem("Test", "Check 2", automated=True, required=True, status="failed"),
     ]
 
     ready, warnings = validator.validate(items, strict=False)
 
     assert ready is False
     assert len(warnings) > 0
-    assert any('failed' in w.lower() for w in warnings)
+    assert any("failed" in w.lower() for w in warnings)
 
 
 def test_checklist_validator_with_manual():
@@ -334,8 +330,8 @@ def test_checklist_validator_with_manual():
     validator = ChecklistValidator()
 
     items = [
-        CheckItem('Test', 'Check 1', automated=True, required=True, status='passed'),
-        CheckItem('Test', 'Check 2', automated=False, required=True, status='manual'),
+        CheckItem("Test", "Check 1", automated=True, required=True, status="passed"),
+        CheckItem("Test", "Check 2", automated=False, required=True, status="manual"),
     ]
 
     # Non-strict should allow manual
@@ -345,7 +341,7 @@ def test_checklist_validator_with_manual():
     # Strict should require manual completion
     ready, warnings = validator.validate(items, strict=True)
     assert ready is False
-    assert any('manual' in w.lower() for w in warnings)
+    assert any("manual" in w.lower() for w in warnings)
 
 
 def test_checklist_validator_pending_automated():
@@ -353,14 +349,14 @@ def test_checklist_validator_pending_automated():
     validator = ChecklistValidator()
 
     items = [
-        CheckItem('Test', 'Check 1', automated=True, required=True, status='pending'),
-        CheckItem('Test', 'Check 2', automated=True, required=True, status='passed'),
+        CheckItem("Test", "Check 1", automated=True, required=True, status="pending"),
+        CheckItem("Test", "Check 2", automated=True, required=True, status="passed"),
     ]
 
     ready, warnings = validator.validate(items, strict=False)
 
     assert ready is False
-    assert any('pending' in w.lower() or 'not run' in w.lower() for w in warnings)
+    assert any("pending" in w.lower() or "not run" in w.lower() for w in warnings)
 
 
 # ============================================================================
@@ -380,11 +376,11 @@ def test_approval_reporter_generate_json():
     reporter = ApprovalReporter()
 
     items = [
-        CheckItem('Test', 'Check 1', automated=True, required=True, status='passed'),
+        CheckItem("Test", "Check 1", automated=True, required=True, status="passed"),
     ]
 
     report = ChecklistReport(
-        timestamp='2024-01-01T12:00:00',
+        timestamp="2024-01-01T12:00:00",
         total_items=1,
         automated_items=1,
         manual_items=0,
@@ -393,15 +389,15 @@ def test_approval_reporter_generate_json():
         pending=0,
         manual_review=0,
         ready_for_deployment=True,
-        items=items
+        items=items,
     )
 
     report_json = reporter.generate_report(report)
 
     # Should be valid JSON
     report_data = json.loads(report_json)
-    assert report_data['ready_for_deployment'] is True
-    assert report_data['total_items'] == 1
+    assert report_data["ready_for_deployment"] is True
+    assert report_data["total_items"] == 1
 
 
 def test_approval_reporter_save_to_file():
@@ -409,11 +405,11 @@ def test_approval_reporter_save_to_file():
     reporter = ApprovalReporter()
 
     items = [
-        CheckItem('Test', 'Check 1', automated=True, required=True, status='passed'),
+        CheckItem("Test", "Check 1", automated=True, required=True, status="passed"),
     ]
 
     report = ChecklistReport(
-        timestamp='2024-01-01T12:00:00',
+        timestamp="2024-01-01T12:00:00",
         total_items=1,
         automated_items=1,
         manual_items=0,
@@ -422,18 +418,18 @@ def test_approval_reporter_save_to_file():
         pending=0,
         manual_review=0,
         ready_for_deployment=True,
-        items=items
+        items=items,
     )
 
     with tempfile.TemporaryDirectory() as tmpdir:
-        report_path = Path(tmpdir) / 'report.json'
+        report_path = Path(tmpdir) / "report.json"
         reporter.generate_report(report, report_path)
 
         assert report_path.exists()
 
         # Verify content
         report_data = json.loads(report_path.read_text())
-        assert report_data['ready_for_deployment'] is True
+        assert report_data["ready_for_deployment"] is True
 
 
 def test_approval_reporter_markdown():
@@ -441,12 +437,27 @@ def test_approval_reporter_markdown():
     reporter = ApprovalReporter()
 
     items = [
-        CheckItem('Code Quality', 'Check 1', automated=True, required=True, status='passed', evidence='Test passed'),
-        CheckItem('Security', 'Check 2', automated=True, required=True, status='failed', evidence='Test failed', error='Error details'),
+        CheckItem(
+            "Code Quality",
+            "Check 1",
+            automated=True,
+            required=True,
+            status="passed",
+            evidence="Test passed",
+        ),
+        CheckItem(
+            "Security",
+            "Check 2",
+            automated=True,
+            required=True,
+            status="failed",
+            evidence="Test failed",
+            error="Error details",
+        ),
     ]
 
     report = ChecklistReport(
-        timestamp='2024-01-01T12:00:00',
+        timestamp="2024-01-01T12:00:00",
         total_items=2,
         automated_items=2,
         manual_items=0,
@@ -456,28 +467,28 @@ def test_approval_reporter_markdown():
         manual_review=0,
         ready_for_deployment=False,
         items=items,
-        warnings=['1 check failed']
+        warnings=["1 check failed"],
     )
 
     md_report = reporter.generate_markdown_report(report)
 
     # Should contain expected sections
-    assert '# Deployment Safety Approval Report' in md_report
-    assert 'Code Quality' in md_report
-    assert 'Security' in md_report
-    assert 'Check 1' in md_report
-    assert 'Check 2' in md_report
-    assert 'Warnings' in md_report
+    assert "# Deployment Safety Approval Report" in md_report
+    assert "Code Quality" in md_report
+    assert "Security" in md_report
+    assert "Check 1" in md_report
+    assert "Check 2" in md_report
+    assert "Warnings" in md_report
 
 
 def test_checklist_report_to_dict():
     """Test ChecklistReport serialization."""
     items = [
-        CheckItem('Test', 'Check 1', automated=True, required=True, status='passed'),
+        CheckItem("Test", "Check 1", automated=True, required=True, status="passed"),
     ]
 
     report = ChecklistReport(
-        timestamp='2024-01-01T12:00:00',
+        timestamp="2024-01-01T12:00:00",
         total_items=1,
         automated_items=1,
         manual_items=0,
@@ -486,11 +497,11 @@ def test_checklist_report_to_dict():
         pending=0,
         manual_review=0,
         ready_for_deployment=True,
-        items=items
+        items=items,
     )
 
     report_dict = report.to_dict()
 
-    assert report_dict['timestamp'] == '2024-01-01T12:00:00'
-    assert report_dict['ready_for_deployment'] is True
-    assert len(report_dict['items']) == 1
+    assert report_dict["timestamp"] == "2024-01-01T12:00:00"
+    assert report_dict["ready_for_deployment"] is True
+    assert len(report_dict["items"]) == 1

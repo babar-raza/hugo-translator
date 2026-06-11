@@ -96,6 +96,7 @@ class TestBenchmarkingEndToEnd:
 
             # Step 3: Record feedback for recommendation
             from datetime import datetime
+
             feedback = RecommendationFeedback(
                 feedback_id="feedback_001",
                 recommendation_id=recommendation.recommendation_id,
@@ -141,6 +142,7 @@ class TestBenchmarkingEndToEnd:
 
             # Create v1 database manually
             import sqlite3
+
             conn = sqlite3.connect(str(db_path))
             try:
                 # Create minimal v1 schema

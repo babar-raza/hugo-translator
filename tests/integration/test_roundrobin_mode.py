@@ -3,6 +3,7 @@ Integration tests for round-robin language processing mode (T305: federated-spla
 
 End-to-end tests for --global-lang-rounds and --global-lang-sort flags.
 """
+
 import os
 import subprocess
 import sys
@@ -24,7 +25,9 @@ class TestRoundRobinModeE2E:
     def test_content_file(self):
         """Path to a real test file for translation."""
         # Use actual content from kb.aspose.net
-        content_path = Path("D:/onedrive/Documents/GitHub/aspose.net/content/kb.aspose.net/slides/en/presentation-converter/how-to-convert-odp-to-powerpoint-pptx-csharp.md")
+        content_path = Path(
+            "D:/onedrive/Documents/GitHub/aspose.net/content/kb.aspose.net/slides/en/presentation-converter/how-to-convert-odp-to-powerpoint-pptx-csharp.md"
+        )
         if not content_path.exists():
             pytest.skip(f"Test content file not found: {content_path}")
         return content_path
@@ -81,7 +84,9 @@ class TestRoundRobinModeE2E:
         assert result.returncode == 0
         assert "--global-lang-sort" in result.stdout
 
-    def test_roundrobin_processes_file_successfully(self, test_content_file, temp_output_dir, temp_tm_dir):
+    def test_roundrobin_processes_file_successfully(
+        self, test_content_file, temp_output_dir, temp_tm_dir
+    ):
         """Test that round-robin mode processes a file successfully."""
         # Run translation with round-robin mode (3 languages: de, fr, es)
         # Use small batch size (5 texts per round) to trigger multiple rounds
@@ -95,7 +100,9 @@ class TestRoundRobinModeE2E:
                 "--input",
                 str(test_content_file),
                 "--target-langs",
-                "de", "fr", "es",
+                "de",
+                "fr",
+                "es",
                 "--global-lang-rounds",
                 "5",  # 5 texts per language per round
                 "--output",
@@ -118,8 +125,15 @@ class TestRoundRobinModeE2E:
         expected_langs = ["de", "fr", "es"]
         base_dir = Path("D:/onedrive/Documents/GitHub/aspose.net/content/kb.aspose.net/slides")
         for lang in expected_langs:
-            output_file = base_dir / lang / "presentation-converter" / "how-to-convert-odp-to-powerpoint-pptx-csharp.md"
-            assert output_file.exists(), f"Output file not created for language: {lang} at {output_file}"
+            output_file = (
+                base_dir
+                / lang
+                / "presentation-converter"
+                / "how-to-convert-odp-to-powerpoint-pptx-csharp.md"
+            )
+            assert output_file.exists(), (
+                f"Output file not created for language: {lang} at {output_file}"
+            )
 
     def test_roundrobin_sorting_desc(self, test_content_file, temp_output_dir, temp_tm_dir):
         """Test round-robin with descending sort (most missing translations first)."""
@@ -134,7 +148,8 @@ class TestRoundRobinModeE2E:
                 "--input",
                 str(test_content_file),
                 "--target-langs",
-                "de", "fr",
+                "de",
+                "fr",
                 "--global-lang-rounds",
                 "10",
                 "--global-lang-sort",
@@ -151,7 +166,10 @@ class TestRoundRobinModeE2E:
         assert result.returncode == 0, f"Translation failed: {result.stderr}"
 
         # Verify Round-robin mode enabled message in logs
-        assert "Round-robin language processing enabled" in result.stderr or "Round-robin" in result.stdout
+        assert (
+            "Round-robin language processing enabled" in result.stderr
+            or "Round-robin" in result.stdout
+        )
 
     def test_roundrobin_sorting_asc(self, test_content_file, temp_output_dir, temp_tm_dir):
         """Test round-robin with ascending sort (least missing translations first)."""
@@ -166,7 +184,8 @@ class TestRoundRobinModeE2E:
                 "--input",
                 str(test_content_file),
                 "--target-langs",
-                "de", "fr",
+                "de",
+                "fr",
                 "--global-lang-rounds",
                 "10",
                 "--global-lang-sort",
@@ -184,9 +203,15 @@ class TestRoundRobinModeE2E:
 
         # Verify sort order in logs (check stdout where logs are written)
         combined_output = result.stdout + result.stderr
-        assert "asc" in combined_output.lower() or "Round-robin" in combined_output or "sort=asc" in combined_output
+        assert (
+            "asc" in combined_output.lower()
+            or "Round-robin" in combined_output
+            or "sort=asc" in combined_output
+        )
 
-    def test_roundrobin_with_small_batch_triggers_multiple_rounds(self, test_content_file, temp_output_dir, temp_tm_dir):
+    def test_roundrobin_with_small_batch_triggers_multiple_rounds(
+        self, test_content_file, temp_output_dir, temp_tm_dir
+    ):
         """Test that small batch size triggers multiple rounds."""
         # Use very small batch size (2 texts) to force multiple rounds
         result = subprocess.run(
@@ -199,7 +224,8 @@ class TestRoundRobinModeE2E:
                 "--input",
                 str(test_content_file),
                 "--target-langs",
-                "de", "fr",
+                "de",
+                "fr",
                 "--global-lang-rounds",
                 "2",  # Very small batch
                 "--output",
@@ -216,8 +242,18 @@ class TestRoundRobinModeE2E:
         # Verify multiple languages were processed
         # Output is written to the content tree (not temp_output_dir)
         base_dir = Path("D:/onedrive/Documents/GitHub/aspose.net/content/kb.aspose.net/slides")
-        de_file = base_dir / "de" / "presentation-converter" / "how-to-convert-odp-to-powerpoint-pptx-csharp.md"
-        fr_file = base_dir / "fr" / "presentation-converter" / "how-to-convert-odp-to-powerpoint-pptx-csharp.md"
+        de_file = (
+            base_dir
+            / "de"
+            / "presentation-converter"
+            / "how-to-convert-odp-to-powerpoint-pptx-csharp.md"
+        )
+        fr_file = (
+            base_dir
+            / "fr"
+            / "presentation-converter"
+            / "how-to-convert-odp-to-powerpoint-pptx-csharp.md"
+        )
 
         assert de_file.exists(), f"German translation not created at {de_file}"
         assert fr_file.exists(), f"French translation not created at {fr_file}"
@@ -244,7 +280,9 @@ class TestRoundRobinModeCLIValidation:
                 timeout=30,
             )
         except subprocess.TimeoutExpired:
-            pytest.skip("CLI timed out — no content root configured for kb.aspose.net in this environment")
+            pytest.skip(
+                "CLI timed out — no content root configured for kb.aspose.net in this environment"
+            )
 
         # Should accept (argparse doesn't validate positive, but engine might)
         # This test just verifies the flag accepts integers
@@ -268,7 +306,9 @@ class TestRoundRobinModeCLIValidation:
                 timeout=30,
             )
         except subprocess.TimeoutExpired:
-            pytest.skip("CLI timed out — no content root configured for kb.aspose.net in this environment")
+            pytest.skip(
+                "CLI timed out — no content root configured for kb.aspose.net in this environment"
+            )
 
         # Should fail with exit code 2 (argparse error)
         assert result.returncode == 2
@@ -295,11 +335,15 @@ class TestRoundRobinModeCLIValidation:
                 timeout=30,
             )
         except subprocess.TimeoutExpired:
-            pytest.skip("CLI timed out — no content root configured for kb.aspose.net in this environment")
+            pytest.skip(
+                "CLI timed out — no content root configured for kb.aspose.net in this environment"
+            )
 
         # Mutual exclusion is enforced at parse time by _MultiLangModeAction (src/cli.py:319)
         assert result.returncode == 2
-        assert "--parallel-languages" in result.stderr or "not allowed with argument" in result.stderr
+        assert (
+            "--parallel-languages" in result.stderr or "not allowed with argument" in result.stderr
+        )
 
 
 class TestRoundRobinModeHelp:
@@ -315,7 +359,9 @@ class TestRoundRobinModeHelp:
 
         assert result.returncode == 0
         assert "--global-lang-rounds" in result.stdout
-        assert "round-robin" in result.stdout.lower() or "texts per language" in result.stdout.lower()
+        assert (
+            "round-robin" in result.stdout.lower() or "texts per language" in result.stdout.lower()
+        )
 
     def test_help_text_includes_global_lang_sort(self):
         """Test that help text includes --global-lang-sort description."""
@@ -374,7 +420,9 @@ class TestRoundRobinModeMemoryManagement:
         """Test that cache is cleared between language switches (verify via logs)."""
         # Create a minimal test file
         test_file = Path(tmpdir) / "test.md"
-        test_file.write_text("---\ntitle: Test\n---\n\nTest content for cache clearing verification.")
+        test_file.write_text(
+            "---\ntitle: Test\n---\n\nTest content for cache clearing verification."
+        )
 
         result = subprocess.run(
             [
@@ -386,7 +434,8 @@ class TestRoundRobinModeMemoryManagement:
                 "--input",
                 str(test_file),
                 "--target-langs",
-                "de", "fr",  # 2 languages to trigger language switch
+                "de",
+                "fr",  # 2 languages to trigger language switch
                 "--global-lang-rounds",
                 "5",
                 "--output",

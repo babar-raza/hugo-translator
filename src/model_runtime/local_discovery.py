@@ -12,6 +12,7 @@ Supported model formats:
 - Ollama manifests
 - SentencePiece tokenizer models
 """
+
 from __future__ import annotations
 
 import json
@@ -19,7 +20,6 @@ import logging
 import os
 import platform
 import re
-import struct
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
@@ -196,6 +196,7 @@ class DiscoveredLocalModel:
 # Utility functions
 # ---------------------------------------------------------------------------
 
+
 def _parse_hf_id(dir_name: str) -> str | None:
     """Parse HuggingFace model ID from cache directory name."""
     if not dir_name.startswith("models--"):
@@ -211,9 +212,7 @@ def _parse_hf_id(dir_name: str) -> str | None:
 def _parse_opus_language_pair(hf_id: str) -> tuple[str, str] | None:
     """Extract (src, tgt) language pair from Helsinki-NLP/opus-mt-XX-YY model ID or path."""
     # Use re.search to handle full paths like /tmp/Helsinki-NLP/opus-mt-en-fr
-    match = re.search(
-        r"Helsinki-NLP[/_]opus-mt-([a-z]{2,3})-([a-z]{2,3})$", hf_id, re.IGNORECASE
-    )
+    match = re.search(r"Helsinki-NLP[/_]opus-mt-([a-z]{2,3})-([a-z]{2,3})$", hf_id, re.IGNORECASE)
     if match:
         return (match.group(1).lower(), match.group(2).lower())
     return None
@@ -278,12 +277,14 @@ def get_default_scan_roots() -> list[ScanRoot]:
 
     # HuggingFace cache
     hf_cache = Path.home() / ".cache" / "huggingface" / "hub"
-    roots.append(ScanRoot(
-        path=hf_cache,
-        label="hf_cache",
-        max_depth=3,
-        scan_type="hf_cache",
-    ))
+    roots.append(
+        ScanRoot(
+            path=hf_cache,
+            label="hf_cache",
+            max_depth=3,
+            scan_type="hf_cache",
+        )
+    )
 
     # Ollama models
     if platform.system() == "Windows":
@@ -295,12 +296,14 @@ def get_default_scan_roots() -> list[ScanRoot]:
     else:
         ollama_dir = Path.home() / ".ollama" / "models"
 
-    roots.append(ScanRoot(
-        path=ollama_dir,
-        label="ollama",
-        max_depth=3,
-        scan_type="ollama",
-    ))
+    roots.append(
+        ScanRoot(
+            path=ollama_dir,
+            label="ollama",
+            max_depth=3,
+            scan_type="ollama",
+        )
+    )
 
     return roots
 
@@ -316,18 +319,21 @@ def get_env_scan_roots() -> list[ScanRoot]:
         raw_path = raw_path.strip()
         if not raw_path:
             continue
-        roots.append(ScanRoot(
-            path=Path(raw_path),
-            label=f"env_root_{i}",
-            max_depth=4,
-            scan_type="auto",
-        ))
+        roots.append(
+            ScanRoot(
+                path=Path(raw_path),
+                label=f"env_root_{i}",
+                max_depth=4,
+                scan_type="auto",
+            )
+        )
     return roots
 
 
 # ---------------------------------------------------------------------------
 # Detectors
 # ---------------------------------------------------------------------------
+
 
 def detect_hf_cache_models(cache_dir: Path) -> list[DiscoveredLocalModel]:
     """Detect models in a HuggingFace cache directory."""
@@ -428,10 +434,19 @@ def _detect_from_config_json(
     # Detect files present
     detected_files = []
     for fname in [
-        "config.json", "tokenizer.json", "tokenizer_config.json",
-        "pytorch_model.bin", "model.safetensors", "sentencepiece.bpe.model",
-        "spm.model", "source.spm", "target.spm", "vocab.json", "merges.txt",
-        "generation_config.json", "tokenizer.model",
+        "config.json",
+        "tokenizer.json",
+        "tokenizer_config.json",
+        "pytorch_model.bin",
+        "model.safetensors",
+        "sentencepiece.bpe.model",
+        "spm.model",
+        "source.spm",
+        "target.spm",
+        "vocab.json",
+        "merges.txt",
+        "generation_config.json",
+        "tokenizer.model",
     ]:
         if (model_dir / fname).exists():
             detected_files.append(fname)
@@ -450,15 +465,17 @@ def _detect_from_config_json(
 
     # Verify model weight files exist — reject tokenizer-only cache entries
     _WEIGHT_FILES = [
-        "pytorch_model.bin", "model.safetensors", "tf_model.h5",
-        "flax_model.msgpack", "model.ckpt.index",
+        "pytorch_model.bin",
+        "model.safetensors",
+        "tf_model.h5",
+        "flax_model.msgpack",
+        "model.ckpt.index",
     ]
     has_weights = any((model_dir / w).exists() for w in _WEIGHT_FILES)
     if not has_weights:
         # Also check sharded weights
-        has_weights = (
-            any(model_dir.glob("pytorch_model-*.bin"))
-            or any(model_dir.glob("model-*.safetensors"))
+        has_weights = any(model_dir.glob("pytorch_model-*.bin")) or any(
+            model_dir.glob("model-*.safetensors")
         )
     if not has_weights:
         logger.debug(
@@ -526,14 +543,19 @@ def detect_ollama_models(ollama_dir: Path) -> list[DiscoveredLocalModel]:
                         for sub_tag in tag_file.iterdir():
                             if sub_tag.is_file():
                                 _parse_ollama_manifest(
-                                    sub_tag, model_name_dir.name,
+                                    sub_tag,
+                                    model_name_dir.name,
                                     f"{tag_file.name}/{sub_tag.name}",
-                                    blobs_dir, results,
+                                    blobs_dir,
+                                    results,
                                 )
                     elif tag_file.is_file():
                         _parse_ollama_manifest(
-                            tag_file, model_name_dir.name, tag_file.name,
-                            blobs_dir, results,
+                            tag_file,
+                            model_name_dir.name,
+                            tag_file.name,
+                            blobs_dir,
+                            results,
                         )
                 except (PermissionError, OSError) as e:
                     logger.debug(f"Skipping Ollama manifest {tag_file}: {e}")
@@ -569,28 +591,30 @@ def _parse_ollama_manifest(
     display_name = f"{model_name}:{tag}"
     model_id = _generate_model_id(manifest_path, "ollama", display_name)
 
-    results.append(DiscoveredLocalModel(
-        model_id=model_id,
-        display_name=display_name,
-        model_family="ollama",
-        model_type="ollama",
-        backend_type="local_llm",
-        model_format="ollama",
-        absolute_path=manifest_path.parent.parent.parent,  # ollama models dir
-        path_exists=True,
-        detected_from="detect_ollama_models",
-        detected_files=[manifest_path.name],
-        size_bytes=total_size,
-        last_modified=_get_last_modified(manifest_path),
-        supported_language_pairs="all",
-        multilingual=True,
-        device_hint="cuda" if total_size > 4 * 1024**3 else "cpu",
-        load_priority=60,
-        health_status="available",
-        validation_status="metadata_valid",
-        confidence=0.85,
-        notes=f"{layer_count} layers, Ollama manifest",
-    ))
+    results.append(
+        DiscoveredLocalModel(
+            model_id=model_id,
+            display_name=display_name,
+            model_family="ollama",
+            model_type="ollama",
+            backend_type="local_llm",
+            model_format="ollama",
+            absolute_path=manifest_path.parent.parent.parent,  # ollama models dir
+            path_exists=True,
+            detected_from="detect_ollama_models",
+            detected_files=[manifest_path.name],
+            size_bytes=total_size,
+            last_modified=_get_last_modified(manifest_path),
+            supported_language_pairs="all",
+            multilingual=True,
+            device_hint="cuda" if total_size > 4 * 1024**3 else "cpu",
+            load_priority=60,
+            health_status="available",
+            validation_status="metadata_valid",
+            confidence=0.85,
+            notes=f"{layer_count} layers, Ollama manifest",
+        )
+    )
 
 
 def detect_ctranslate2_model(model_dir: Path) -> DiscoveredLocalModel | None:
@@ -647,7 +671,9 @@ def detect_ctranslate2_model(model_dir: Path) -> DiscoveredLocalModel | None:
             src_lang, tgt_lang = _pair
 
     model_family = "opus" if src_lang and tgt_lang else "ctranslate2"
-    supported_pairs = [(src_lang, tgt_lang), (tgt_lang, src_lang)] if src_lang and tgt_lang else "all"
+    supported_pairs = (
+        [(src_lang, tgt_lang), (tgt_lang, src_lang)] if src_lang and tgt_lang else "all"
+    )
     multilingual = not (src_lang and tgt_lang)
 
     return DiscoveredLocalModel(
@@ -771,6 +797,7 @@ def detect_sentencepiece_model(file_path: Path) -> DiscoveredLocalModel | None:
 # Main discovery class
 # ---------------------------------------------------------------------------
 
+
 class LocalModelDiscovery:
     """
     Discover local models across configured scan roots.
@@ -788,7 +815,11 @@ class LocalModelDiscovery:
         self.scan_roots = scan_roots or get_default_scan_roots()
         self.skip_patterns = skip_patterns or list(DEFAULT_SKIP_PATTERNS)
         self.enabled_formats = enabled_formats or [
-            "transformers", "ctranslate2", "gguf", "ollama", "sentencepiece",
+            "transformers",
+            "ctranslate2",
+            "gguf",
+            "ollama",
+            "sentencepiece",
         ]
         self.follow_symlinks = follow_symlinks
 
@@ -825,7 +856,9 @@ class LocalModelDiscovery:
             if scan_type == "auto":
                 scan_type = self._auto_detect_scan_type(root.path)
 
-            logger.info(f"Scanning [{root.label}] {root.path} (type={scan_type}, depth={root.max_depth})")
+            logger.info(
+                f"Scanning [{root.label}] {root.path} (type={scan_type}, depth={root.max_depth})"
+            )
 
             try:
                 if scan_type == "hf_cache":
@@ -841,11 +874,13 @@ class LocalModelDiscovery:
                 logger.info(f"  Found {len(models)} model(s) in [{root.label}]")
 
             except (PermissionError, OSError) as e:
-                self.errors.append({
-                    "path": str(root.path),
-                    "error_type": type(e).__name__,
-                    "message": str(e),
-                })
+                self.errors.append(
+                    {
+                        "path": str(root.path),
+                        "error_type": type(e).__name__,
+                        "message": str(e),
+                    }
+                )
                 logger.warning(f"Error scanning [{root.label}] {root.path}: {e}")
 
         # Deduplicate by normalized absolute path
@@ -909,17 +944,17 @@ class LocalModelDiscovery:
                             continue
 
             except (PermissionError, OSError) as e:
-                self.errors.append({
-                    "path": str(entry),
-                    "error_type": type(e).__name__,
-                    "message": str(e),
-                })
+                self.errors.append(
+                    {
+                        "path": str(entry),
+                        "error_type": type(e).__name__,
+                        "message": str(e),
+                    }
+                )
 
         return results
 
-    def _walk_directory(
-        self, directory: Path, root_depth: int, max_depth: int
-    ) -> list[Path]:
+    def _walk_directory(self, directory: Path, root_depth: int, max_depth: int) -> list[Path]:
         """Bounded recursive directory walk with skip pattern enforcement."""
         entries: list[Path] = []
 
@@ -945,22 +980,20 @@ class LocalModelDiscovery:
                         continue
                     if (child / "model.bin").exists():
                         continue
-                    entries.extend(
-                        self._walk_directory(child, root_depth, max_depth)
-                    )
+                    entries.extend(self._walk_directory(child, root_depth, max_depth))
 
         except (PermissionError, OSError) as e:
-            self.errors.append({
-                "path": str(directory),
-                "error_type": type(e).__name__,
-                "message": str(e),
-            })
+            self.errors.append(
+                {
+                    "path": str(directory),
+                    "error_type": type(e).__name__,
+                    "message": str(e),
+                }
+            )
 
         return entries
 
-    def _deduplicate(
-        self, models: list[DiscoveredLocalModel]
-    ) -> list[DiscoveredLocalModel]:
+    def _deduplicate(self, models: list[DiscoveredLocalModel]) -> list[DiscoveredLocalModel]:
         """Deduplicate models by normalized absolute path."""
         seen: dict[str, DiscoveredLocalModel] = {}
         for model in models:

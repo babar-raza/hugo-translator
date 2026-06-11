@@ -1,6 +1,7 @@
 """
 Unit tests for ModelRegistry multi-registry merge behavior.
 """
+
 from pathlib import Path
 
 import yaml

@@ -6,10 +6,12 @@ Four cases:
   3. test_gate_enabled_accepts_high_context_similarity — gate on → high sim → hit accepted
   4. test_gate_enabled_empty_context_accepts_hit — gate on, empty context → hit accepted
 """
+
 from __future__ import annotations
 
-import pytest
 from unittest.mock import MagicMock, patch
+
+import pytest
 
 
 class TestL3ContextGate:
@@ -25,9 +27,11 @@ class TestL3ContextGate:
 
     def test_context_similarity_uses_encoder(self):
         """context_similarity encodes both contexts and returns cosine similarity."""
-        import numpy as np
-        from collections import OrderedDict
         import threading
+        from collections import OrderedDict
+
+        import numpy as np
+
         from src.tm.l3_semantic import L3SemanticTM
 
         l3 = L3SemanticTM.__new__(L3SemanticTM)
@@ -61,9 +65,10 @@ class TestL3ContextGate:
         # Gate disabled in config → context similarity is never checked
         # This is the existing (default) behavior — the gate adds no overhead
         from src.utils.config_loader import get_global_config
+
         cfg = get_global_config()
-        tm_defaults = cfg.get('tm_defaults', {})
-        gate_enabled = tm_defaults.get('l3_context_gate_enabled', False)
+        tm_defaults = cfg.get("tm_defaults", {})
+        gate_enabled = tm_defaults.get("l3_context_gate_enabled", False)
         assert gate_enabled is False, (
             "l3_context_gate_enabled must default to False to preserve existing TM hit rate"
         )

@@ -1,6 +1,7 @@
 """
 Unit tests for Unified Translation Memory Interface.
 """
+
 from pathlib import Path
 
 import pytest
@@ -107,9 +108,7 @@ class TestLayeredLookup:
         )
 
         # Lookup similar text
-        result = tm_with_l3.lookup(
-            "site1", "en", "fr", "Hello world", semantic_threshold=0.75
-        )
+        result = tm_with_l3.lookup("site1", "en", "fr", "Hello world", semantic_threshold=0.75)
 
         assert result.hit is True
         assert result.translation == "Bonjour le monde"

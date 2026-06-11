@@ -31,7 +31,7 @@ class TestCacheSizeReport:
             max_bytes=1024 * 1024 * 1024,  # 1GB
             usage_percent=48.83,
             entry_count=10000,
-            warning=False
+            warning=False,
         )
 
         report_str = str(report)
@@ -47,7 +47,7 @@ class TestCacheSizeReport:
             max_bytes=1024 * 1024 * 1024,
             usage_percent=50.0,
             entry_count=1000,
-            warning=False
+            warning=False,
         )
 
         assert report.current_mb == 512.0
@@ -59,7 +59,7 @@ class TestCacheSizeReport:
             max_bytes=2 * 1024 * 1024 * 1024,
             usage_percent=50.0,
             entry_count=1000,
-            warning=False
+            warning=False,
         )
 
         assert report.current_gb == 1.0
@@ -72,7 +72,7 @@ class TestCacheSizeReport:
             usage_percent=50.0,
             entry_count=1000,
             warning=True,
-            recommendation="Test recommendation"
+            recommendation="Test recommendation",
         )
 
         d = report.to_dict()
@@ -95,12 +95,12 @@ class TestCacheMonitor:
 
         # Default stats: 50% usage
         mock_env.stat.return_value = {
-            'psize': 4096,  # page size
-            'entries': 5000
+            "psize": 4096,  # page size
+            "entries": 5000,
         }
         mock_env.info.return_value = {
-            'last_pgno': 12800,  # ~50MB used
-            'map_size': 100 * 1024 * 1024  # 100MB max
+            "last_pgno": 12800,  # ~50MB used
+            "map_size": 100 * 1024 * 1024,  # 100MB max
         }
 
         mock_l2 = mock.MagicMock(spec=L2PersistentTM)
@@ -139,8 +139,8 @@ class TestCacheMonitor:
         """Test warning at warn threshold."""
         # Set usage to 85%
         mock_l2.env.info.return_value = {
-            'last_pgno': 21760,  # ~85% of 100MB
-            'map_size': 100 * 1024 * 1024
+            "last_pgno": 21760,  # ~85% of 100MB
+            "map_size": 100 * 1024 * 1024,
         }
 
         monitor = CacheMonitor(mock_l2, warn_threshold_percent=80)
@@ -153,8 +153,8 @@ class TestCacheMonitor:
         """Test critical alert at critical threshold."""
         # Set usage to 96%
         mock_l2.env.info.return_value = {
-            'last_pgno': 24576,  # ~96% of 100MB
-            'map_size': 100 * 1024 * 1024
+            "last_pgno": 24576,  # ~96% of 100MB
+            "map_size": 100 * 1024 * 1024,
         }
 
         monitor = CacheMonitor(mock_l2, critical_threshold_percent=95)
@@ -166,10 +166,7 @@ class TestCacheMonitor:
     def test_monitor_provides_recommendations(self, mock_l2):
         """Test actionable recommendations are provided."""
         # Set usage to 96%
-        mock_l2.env.info.return_value = {
-            'last_pgno': 24576,
-            'map_size': 100 * 1024 * 1024
-        }
+        mock_l2.env.info.return_value = {"last_pgno": 24576, "map_size": 100 * 1024 * 1024}
 
         monitor = CacheMonitor(mock_l2, critical_threshold_percent=95)
         report = monitor.check_size()
@@ -185,10 +182,7 @@ class TestCacheMonitor:
         assert monitor.is_healthy() is True
 
         # Set usage to 85%
-        mock_l2.env.info.return_value = {
-            'last_pgno': 21760,
-            'map_size': 100 * 1024 * 1024
-        }
+        mock_l2.env.info.return_value = {"last_pgno": 21760, "map_size": 100 * 1024 * 1024}
         assert monitor.is_healthy() is False
 
     def test_monitor_get_usage_percent(self, mock_l2):
@@ -208,8 +202,8 @@ class TestCacheMonitorValidation:
     def mock_l2(self):
         """Create a mock L2PersistentTM."""
         mock_env = mock.MagicMock()
-        mock_env.stat.return_value = {'psize': 4096, 'entries': 1000}
-        mock_env.info.return_value = {'last_pgno': 1000, 'map_size': 100 * 1024 * 1024}
+        mock_env.stat.return_value = {"psize": 4096, "entries": 1000}
+        mock_env.info.return_value = {"last_pgno": 1000, "map_size": 100 * 1024 * 1024}
 
         mock_l2 = mock.MagicMock(spec=L2PersistentTM)
         mock_l2.env = mock_env
@@ -257,7 +251,7 @@ class TestCacheMonitorIntegration:
                 src_lang="en",
                 tgt_lang="es",
                 text=f"Test source text {i}",
-                translation=f"Test translation {i}"
+                translation=f"Test translation {i}",
             )
 
         return l2
@@ -315,9 +309,7 @@ class TestCreateMonitorFromPath:
         l2.close()
 
         monitor = create_monitor_from_path(
-            db_path,
-            warn_threshold_percent=70,
-            critical_threshold_percent=90
+            db_path, warn_threshold_percent=70, critical_threshold_percent=90
         )
 
         assert monitor.warn_threshold == 70

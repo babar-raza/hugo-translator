@@ -42,7 +42,7 @@ def mock_llm_client():
 
 def test_l4_initialization_when_enabled(l4_config):
     """Test L4 layer initialization when enabled."""
-    with patch('src.tm.l4_llm.LLMClient') as mock_llm:
+    with patch("src.tm.l4_llm.LLMClient") as mock_llm:
         mock_instance = Mock()
         mock_instance.is_available.return_value = True
         mock_llm.return_value = mock_instance
@@ -66,7 +66,7 @@ def test_l4_initialization_when_disabled():
 
 def test_l4_graceful_degradation_when_llm_unavailable(l4_config):
     """Test L4 gracefully handles unavailable LLM."""
-    with patch('src.tm.l4_llm.LLMClient') as mock_llm:
+    with patch("src.tm.l4_llm.LLMClient") as mock_llm:
         mock_instance = Mock()
         mock_instance.is_available.return_value = False
         mock_llm.return_value = mock_instance
@@ -95,7 +95,7 @@ def test_l4_graceful_degradation_when_llm_unavailable(l4_config):
 
 def test_l4_skips_non_hits():
     """Test L4 skips TM misses."""
-    with patch('src.tm.l4_llm.LLMClient') as mock_llm:
+    with patch("src.tm.l4_llm.LLMClient") as mock_llm:
         mock_instance = Mock()
         mock_instance.is_available.return_value = True
         mock_llm.return_value = mock_instance
@@ -119,7 +119,7 @@ def test_l4_skips_non_hits():
 
 def test_l4_skips_low_similarity_matches():
     """Test L4 skips matches below similarity threshold."""
-    with patch('src.tm.l4_llm.LLMClient') as mock_llm:
+    with patch("src.tm.l4_llm.LLMClient") as mock_llm:
         mock_instance = Mock()
         mock_instance.is_available.return_value = True
         mock_llm.return_value = mock_instance
@@ -148,7 +148,7 @@ def test_l4_skips_low_similarity_matches():
 
 def test_l4_skips_high_similarity_matches():
     """Test L4 skips matches above similarity threshold (already good)."""
-    with patch('src.tm.l4_llm.LLMClient') as mock_llm:
+    with patch("src.tm.l4_llm.LLMClient") as mock_llm:
         mock_instance = Mock()
         mock_instance.is_available.return_value = True
         mock_llm.return_value = mock_instance
@@ -177,7 +177,7 @@ def test_l4_skips_high_similarity_matches():
 
 def test_l4_adapts_sweet_spot_matches():
     """Test L4 adapts matches in the sweet spot (0.75-0.95)."""
-    with patch('src.tm.l4_llm.LLMClient') as mock_llm:
+    with patch("src.tm.l4_llm.LLMClient") as mock_llm:
         mock_instance = Mock()
         mock_instance.is_available.return_value = True
         mock_instance.adapt_translation.return_value = "Adapted translation"
@@ -218,7 +218,7 @@ def test_l4_adapts_sweet_spot_matches():
 
 def test_l4_includes_metadata():
     """Test L4 includes metadata in adapted result."""
-    with patch('src.tm.l4_llm.LLMClient') as mock_llm:
+    with patch("src.tm.l4_llm.LLMClient") as mock_llm:
         mock_instance = Mock()
         mock_instance.is_available.return_value = True
         mock_instance.adapt_translation.return_value = "Adapted translation"
@@ -253,13 +253,14 @@ def test_l4_includes_metadata():
 
 def test_l4_rejects_slow_adaptations():
     """Test L4 rejects adaptations that exceed latency limit."""
-    with patch('src.tm.l4_llm.LLMClient') as mock_llm:
+    with patch("src.tm.l4_llm.LLMClient") as mock_llm:
         mock_instance = Mock()
         mock_instance.is_available.return_value = True
 
         # Simulate slow adaptation
         def slow_adapt(*args, **kwargs):
             import time
+
             time.sleep(0.6)  # 600ms
             return "Adapted translation"
 
@@ -289,7 +290,7 @@ def test_l4_rejects_slow_adaptations():
 
 def test_l4_handles_llm_errors():
     """Test L4 handles LLM errors gracefully."""
-    with patch('src.tm.l4_llm.LLMClient') as mock_llm:
+    with patch("src.tm.l4_llm.LLMClient") as mock_llm:
         mock_instance = Mock()
         mock_instance.is_available.return_value = True
         mock_instance.adapt_translation.side_effect = Exception("LLM error")
@@ -319,7 +320,7 @@ def test_l4_handles_llm_errors():
 
 def test_l4_handles_empty_llm_response():
     """Test L4 handles empty LLM responses."""
-    with patch('src.tm.l4_llm.LLMClient') as mock_llm:
+    with patch("src.tm.l4_llm.LLMClient") as mock_llm:
         mock_instance = Mock()
         mock_instance.is_available.return_value = True
         mock_instance.adapt_translation.return_value = ""  # Empty response
@@ -348,7 +349,7 @@ def test_l4_handles_empty_llm_response():
 
 def test_l4_factory_function():
     """Test create_l4_layer factory function."""
-    with patch('src.tm.l4_llm.LLMClient'):
+    with patch("src.tm.l4_llm.LLMClient"):
         l4 = create_l4_layer(
             enabled=True,
             provider="ollama",
@@ -365,7 +366,7 @@ def test_l4_factory_function():
 
 def test_l4_test_connection():
     """Test L4 test_connection method."""
-    with patch('src.tm.l4_llm.LLMClient') as mock_llm:
+    with patch("src.tm.l4_llm.LLMClient") as mock_llm:
         mock_instance = Mock()
         mock_instance.is_available.return_value = True
         mock_instance.test_connection.return_value = {
@@ -385,7 +386,7 @@ def test_l4_test_connection():
 
 def test_l4_passes_context_to_llm():
     """Test L4 passes context to LLM for adaptation."""
-    with patch('src.tm.l4_llm.LLMClient') as mock_llm:
+    with patch("src.tm.l4_llm.LLMClient") as mock_llm:
         mock_instance = Mock()
         mock_instance.is_available.return_value = True
         mock_instance.adapt_translation.return_value = "Adapted"
@@ -417,7 +418,7 @@ def test_l4_passes_context_to_llm():
 @pytest.mark.integration
 @pytest.mark.skipif(
     True,  # Skip by default - requires actual LLM
-    reason="Integration test requires running Ollama/LLM"
+    reason="Integration test requires running Ollama/LLM",
 )
 def test_l4_with_real_llm():
     """Integration test with real LLM (requires Ollama running)."""

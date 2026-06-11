@@ -1,6 +1,7 @@
 """
 Tests for parallel directory translation.
 """
+
 import tempfile
 import time
 from pathlib import Path
@@ -253,6 +254,7 @@ Content.
 
         # Verify locks are Lock objects
         from threading import Lock
+
         assert isinstance(translation_engine._tm_lock, Lock)
         assert isinstance(translation_engine._model_lock, Lock)
         assert isinstance(translation_engine._file_write_lock, Lock)

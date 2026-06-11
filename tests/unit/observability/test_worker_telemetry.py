@@ -23,8 +23,16 @@ class TestBuildBaseRun(unittest.TestCase):
 
     def test_base_run_has_required_fields(self):
         run = _build_base_run("test-agent", "test-job")
-        required = {"event_id", "run_id", "agent_name", "job_type",
-                     "trigger_type", "start_time", "host", "environment"}
+        required = {
+            "event_id",
+            "run_id",
+            "agent_name",
+            "job_type",
+            "trigger_type",
+            "start_time",
+            "host",
+            "environment",
+        }
         self.assertTrue(required.issubset(set(run.keys())))
 
     def test_base_run_agent_name(self):
@@ -46,6 +54,7 @@ class TestBuildBaseRun(unittest.TestCase):
 
     def test_base_run_event_id_is_uuid(self):
         import uuid
+
         run = _build_base_run("a", "b")
         uuid.UUID(run["event_id"])  # Raises if invalid
 
@@ -84,6 +93,7 @@ class TestPostRun(unittest.TestCase):
     @patch("src.observability.worker_telemetry._get_api_url", return_value="http://test:8765")
     def test_post_timeout_returns_none(self, _mock_url):
         import requests
+
         with patch("requests.post", side_effect=requests.exceptions.Timeout("timeout")):
             eid = _post_run({"event_id": "abc", "job_type": "test"})
             self.assertIsNone(eid)
@@ -194,7 +204,8 @@ class TestStartAndCompleteWorkerRun(unittest.TestCase):
         mock_post.return_value = "run-002"
 
         start_worker_run(
-            "content_worker", "worker_lifecycle",
+            "content_worker",
+            "worker_lifecycle",
             context={"mode": "daemon", "runs_per_day": 4},
         )
         call_data = mock_post.call_args[0][0]
@@ -242,8 +253,7 @@ class TestStartCompleteIntegration(unittest.TestCase):
     @patch("src.observability.worker_telemetry._patch_run", return_value=True)
     @patch("src.observability.worker_telemetry._post_run", return_value="run-integration")
     def test_full_lifecycle(self, mock_post, mock_patch):
-        eid = start_worker_run("content_worker", "worker_lifecycle",
-                               context={"mode": "daemon"})
+        eid = start_worker_run("content_worker", "worker_lifecycle", context={"mode": "daemon"})
         self.assertIsNotNone(eid)
 
         ok = complete_worker_run(

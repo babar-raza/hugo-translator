@@ -1,6 +1,7 @@
 """
 Unit tests for Site Profile Schema and Pydantic models.
 """
+
 import sys
 from pathlib import Path
 

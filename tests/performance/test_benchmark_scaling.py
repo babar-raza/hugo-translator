@@ -140,36 +140,68 @@ def create_large_test_database(db_path: str, num_runs: int = 10000) -> None:
         run_id = f"scale_test_run_{i:06d}"
         timestamp = (base_time + timedelta(hours=i * 0.5)).isoformat()
 
-        run_batch.append((
-            run_id, model_id, device, json.dumps([8]), 10, "general",
-            "scalability_test", json.dumps(["test"]), 15.0, timestamp, json.dumps({})
-        ))
+        run_batch.append(
+            (
+                run_id,
+                model_id,
+                device,
+                json.dumps([8]),
+                10,
+                "general",
+                "scalability_test",
+                json.dumps(["test"]),
+                15.0,
+                timestamp,
+                json.dumps({}),
+            )
+        )
 
         # 10 results per run
         for j in range(10):
-            result_batch.append((
-                run_id, f"{run_id}_sample_{j}", model_id, device, 8, 1.5 + (j * 0.1),
-                512, 128, 85.0 + (j * 5), 2048.0 if device == "cpu" else 4096.0,
-                0.65 + (j * 0.01), 0.75 + (j * 0.01), "miss", "none", 0.0, json.dumps([])
-            ))
+            result_batch.append(
+                (
+                    run_id,
+                    f"{run_id}_sample_{j}",
+                    model_id,
+                    device,
+                    8,
+                    1.5 + (j * 0.1),
+                    512,
+                    128,
+                    85.0 + (j * 5),
+                    2048.0 if device == "cpu" else 4096.0,
+                    0.65 + (j * 0.01),
+                    0.75 + (j * 0.01),
+                    "miss",
+                    "none",
+                    0.0,
+                    json.dumps([]),
+                )
+            )
 
         # Commit in batches of 100
         if (i + 1) % 100 == 0:
-            conn.executemany("""
+            conn.executemany(
+                """
                 INSERT INTO benchmark_runs
                 (run_id, model_id, device, batch_sizes, iterations, corpus_category,
                  purpose, tags, total_duration_seconds, timestamp_utc, metadata)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """, run_batch)
+            """,
+                run_batch,
+            )
 
-            conn.executemany("""
+            conn.executemany(
+                """
                 INSERT INTO benchmark_results
                 (run_id, sample_id, model_id, device, batch_size, duration_seconds,
                  tokens_input, tokens_output, throughput_tokens_per_sec,
                  peak_memory_mb, bleu_score, comet_score, cache_status, tm_level,
                  cache_hit_rate, errors)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """, result_batch)
+            """,
+                result_batch,
+            )
 
             conn.commit()
             run_batch = []
@@ -181,50 +213,81 @@ def create_large_test_database(db_path: str, num_runs: int = 10000) -> None:
 
     # Insert remaining batches
     if run_batch:
-        conn.executemany("""
+        conn.executemany(
+            """
             INSERT INTO benchmark_runs
             (run_id, model_id, device, batch_sizes, iterations, corpus_category,
              purpose, tags, total_duration_seconds, timestamp_utc, metadata)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """, run_batch)
+        """,
+            run_batch,
+        )
 
-        conn.executemany("""
+        conn.executemany(
+            """
             INSERT INTO benchmark_results
             (run_id, sample_id, model_id, device, batch_size, duration_seconds,
              tokens_input, tokens_output, throughput_tokens_per_sec,
              peak_memory_mb, bleu_score, comet_score, cache_status, tm_level,
              cache_hit_rate, errors)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """, result_batch)
+        """,
+            result_batch,
+        )
 
     # Create trend and baseline data
     for model in models:
         for device in devices:
             for day in range(90):
                 window_start = (base_time + timedelta(days=day)).isoformat()
-                window_end = (base_time + timedelta(days=day+1)).isoformat()
-                conn.execute("""
+                window_end = (base_time + timedelta(days=day + 1)).isoformat()
+                conn.execute(
+                    """
                     INSERT INTO benchmark_trends
                     (model_id, device, time_window, window_start, window_end,
                      sample_count, avg_throughput, p50_throughput, p95_throughput, p99_throughput,
                      avg_duration, avg_memory_mb, created_at)
                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                """, (
-                    model, device, "daily", window_start, window_end,
-                    100, 90.0, 88.0, 95.0, 98.0, 1.5, 3000.0, datetime.now(UTC).isoformat()
-                ))
+                """,
+                    (
+                        model,
+                        device,
+                        "daily",
+                        window_start,
+                        window_end,
+                        100,
+                        90.0,
+                        88.0,
+                        95.0,
+                        98.0,
+                        1.5,
+                        3000.0,
+                        datetime.now(UTC).isoformat(),
+                    ),
+                )
 
             # Baseline
-            conn.execute("""
+            conn.execute(
+                """
                 INSERT INTO performance_baselines
                 (model_id, device, baseline_type, baseline_date,
                  avg_throughput, p50_throughput, p95_throughput,
                  sample_count, metadata, created_at)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """, (
-                model, device, "monthly", "2024-01-01",
-                85.0, 83.0, 92.0, 1000, json.dumps({}), datetime.now(UTC).isoformat()
-            ))
+            """,
+                (
+                    model,
+                    device,
+                    "monthly",
+                    "2024-01-01",
+                    85.0,
+                    83.0,
+                    92.0,
+                    1000,
+                    json.dumps({}),
+                    datetime.now(UTC).isoformat(),
+                ),
+            )
 
     conn.commit()
     conn.close()
@@ -339,7 +402,9 @@ class TestQueryPerformanceAtScale:
         """
 
         start_time = time.perf_counter()
-        cursor = conn.execute(query, ("m2m100_418m", "nllb_200_distilled_600m", "opus_mt_en_fr", "cpu", "-30 days"))
+        cursor = conn.execute(
+            query, ("m2m100_418m", "nllb_200_distilled_600m", "opus_mt_en_fr", "cpu", "-30 days")
+        )
         results = cursor.fetchall()
         duration_ms = (time.perf_counter() - start_time) * 1000
 
@@ -370,16 +435,21 @@ class TestQueryCacheEffectiveness:
         # Execute queries multiple times
         for _ in range(10):
             for model_id, device, time_window in queries:
-                cache_key = make_cache_key("trends", model_id=model_id, device=device, window=time_window)
+                cache_key = make_cache_key(
+                    "trends", model_id=model_id, device=device, window=time_window
+                )
 
                 # Check cache
                 result = cache.get(cache_key)
                 if result is None:
                     # Cache miss - execute query
-                    cursor = conn.execute("""
+                    cursor = conn.execute(
+                        """
                         SELECT * FROM benchmark_trends
                         WHERE model_id = ? AND device = ? AND time_window = ?
-                    """, (model_id, device, time_window))
+                    """,
+                        (model_id, device, time_window),
+                    )
                     result = cursor.fetchall()
                     cache.set(cache_key, result)
 
@@ -407,10 +477,13 @@ class TestQueryCacheEffectiveness:
 
         # First query (cache miss)
         start_time = time.perf_counter()
-        cursor = conn.execute("""
+        cursor = conn.execute(
+            """
             SELECT * FROM benchmark_trends
             WHERE model_id = ? AND device = ? AND time_window = ?
-        """, (model_id, device, time_window))
+        """,
+            (model_id, device, time_window),
+        )
         result = cursor.fetchall()
         cache.set(cache_key, result)
         uncached_duration_ms = (time.perf_counter() - start_time) * 1000

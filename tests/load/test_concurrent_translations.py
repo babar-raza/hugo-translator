@@ -17,8 +17,7 @@ import pytest
 
 # Setup logging for load tests
 logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 )
 logger = logging.getLogger(__name__)
 
@@ -66,45 +65,43 @@ class LoadTestMetrics:
             "failed_requests": self.failed_requests,
             "success_rate": (
                 self.successful_requests / self.total_requests * 100
-                if self.total_requests > 0 else 0
+                if self.total_requests > 0
+                else 0
             ),
-
             # Throughput
             "duration_seconds": duration,
-            "throughput_rps": (
-                self.total_requests / duration
-                if duration > 0 else 0
-            ),
-
+            "throughput_rps": (self.total_requests / duration if duration > 0 else 0),
             # Latency stats
             "latency_p50": statistics.median(self.latencies) if self.latencies else 0,
             "latency_p95": (
                 statistics.quantiles(self.latencies, n=20)[18]
-                if len(self.latencies) >= 20 else
-                max(self.latencies) if self.latencies else 0
+                if len(self.latencies) >= 20
+                else max(self.latencies)
+                if self.latencies
+                else 0
             ),
             "latency_p99": (
                 statistics.quantiles(self.latencies, n=100)[98]
-                if len(self.latencies) >= 100 else
-                max(self.latencies) if self.latencies else 0
+                if len(self.latencies) >= 100
+                else max(self.latencies)
+                if self.latencies
+                else 0
             ),
             "latency_mean": statistics.mean(self.latencies) if self.latencies else 0,
             "latency_min": min(self.latencies) if self.latencies else 0,
             "latency_max": max(self.latencies) if self.latencies else 0,
-
             # TM stats
             "tm_hit_rate": (
                 self.tm_hits / (self.tm_hits + self.tm_misses) * 100
-                if (self.tm_hits + self.tm_misses) > 0 else 0
+                if (self.tm_hits + self.tm_misses) > 0
+                else 0
             ),
             "l1_hits": self.l1_hits,
             "l2_hits": self.l2_hits,
             "l3_hits": self.l3_hits,
-
             # Resource usage
             "peak_memory_mb": self.peak_memory_mb,
             "avg_cpu_percent": self.avg_cpu_percent,
-
             # Errors
             "error_count": len(self.errors),
             "unique_errors": len(set(self.errors)),
@@ -152,17 +149,16 @@ class LoadTestRunner:
         Returns:
             LoadTestMetrics with results
         """
-        logger.info(f"Starting load test with {self.config.num_workers} workers "
-                   f"for {self.config.duration_seconds}s")
+        logger.info(
+            f"Starting load test with {self.config.num_workers} workers "
+            f"for {self.config.duration_seconds}s"
+        )
 
         self.metrics.start_time = time.time()
 
         try:
             # Start resource monitoring in background
-            monitor_thread = threading.Thread(
-                target=self._monitor_resources,
-                daemon=True
-            )
+            monitor_thread = threading.Thread(target=self._monitor_resources, daemon=True)
             monitor_thread.start()
 
             # Run concurrent workers
@@ -176,14 +172,11 @@ class LoadTestRunner:
                     # Stagger start times for ramp-up
                     delay = (
                         worker_id * self.config.ramp_up_seconds / self.config.num_workers
-                        if self.config.ramp_up_seconds > 0 else 0
+                        if self.config.ramp_up_seconds > 0
+                        else 0
                     )
 
-                    future = executor.submit(
-                        self._worker_loop,
-                        worker_id,
-                        delay
-                    )
+                    future = executor.submit(self._worker_loop, worker_id, delay)
                     futures.append(future)
 
                 # Wait for test duration
@@ -229,6 +222,7 @@ class LoadTestRunner:
                 break
 
             import random
+
             test_file = random.choice(self.config.test_files)
 
             # Execute translation request
@@ -319,6 +313,7 @@ class LoadTestRunner:
         """Monitor system resource usage during test."""
         try:
             import psutil
+
             process = psutil.Process()
 
             samples = []
@@ -329,10 +324,7 @@ class LoadTestRunner:
                 cpu_percent = process.cpu_percent(interval=1.0)
 
                 with self._lock:
-                    self.metrics.peak_memory_mb = max(
-                        self.metrics.peak_memory_mb,
-                        mem_mb
-                    )
+                    self.metrics.peak_memory_mb = max(self.metrics.peak_memory_mb, mem_mb)
 
                 samples.append(cpu_percent)
 
@@ -361,17 +353,21 @@ def test_files(tmp_path):
 
     # Small file
     small = tmp_path / "small.md"
-    small.write_text("""---
+    small.write_text(
+        """---
 title: "Small Test"
 ---
 
 This is a small test file with minimal content.
-""", encoding="utf-8")
+""",
+        encoding="utf-8",
+    )
     files.append(small)
 
     # Medium file
     medium = tmp_path / "medium.md"
-    medium.write_text("""---
+    medium.write_text(
+        """---
 title: "Medium Test"
 description: "A medium-sized test file"
 ---
@@ -394,7 +390,9 @@ ut aliquip ex ea commodo consequat.
 
 Duis aute irure dolor in reprehenderit in voluptate velit esse cillum
 dolore eu fugiat nulla pariatur.
-""", encoding="utf-8")
+""",
+        encoding="utf-8",
+    )
     files.append(medium)
 
     # Large file
@@ -413,7 +411,7 @@ This is a large test file with extensive content for load testing.
     # Add multiple sections
     for i in range(10):
         content += f"""
-## Section {i+1}
+## Section {i + 1}
 
 Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod
 tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam,
@@ -422,12 +420,12 @@ quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequa
 Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore
 eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident.
 
-### Subsection {i+1}.1
+### Subsection {i + 1}.1
 
 More content here with additional paragraphs to make the file larger.
 This helps simulate realistic translation workloads.
 
-### Subsection {i+1}.2
+### Subsection {i + 1}.2
 
 Even more content with varied structure and formatting.
 
@@ -503,7 +501,7 @@ def test_concurrent_translation_medium_load(test_files):
 @pytest.mark.slow
 @pytest.mark.skipif(
     os.getenv("SKIP_HEAVY_LOAD_TESTS") == "1",
-    reason="Heavy load test disabled via environment variable"
+    reason="Heavy load test disabled via environment variable",
 )
 def test_concurrent_translation_high_load(test_files):
     """
@@ -532,9 +530,9 @@ def test_concurrent_translation_high_load(test_files):
     assert summary["latency_p99"] < 60, "p99 latency should be < 60s"
 
     # Check for deadlocks (all requests should complete)
-    assert metrics.total_requests == (
-        metrics.successful_requests + metrics.failed_requests
-    ), "All requests should be accounted for (no deadlocks)"
+    assert metrics.total_requests == (metrics.successful_requests + metrics.failed_requests), (
+        "All requests should be accounted for (no deadlocks)"
+    )
 
     logger.info(f"High load test summary: {summary}")
     logger.info(f"TM hit rate: {summary['tm_hit_rate']:.1f}%")
@@ -580,12 +578,14 @@ def test_tm_performance_under_load(test_files):
     logger.info(f"Warm cache TM hit rate: {summary_warm['tm_hit_rate']:.1f}%")
 
     # Warm cache should have MUCH higher hit rate
-    assert summary_warm["tm_hit_rate"] > summary_cold["tm_hit_rate"], \
+    assert summary_warm["tm_hit_rate"] > summary_cold["tm_hit_rate"], (
         "Warm cache should have higher TM hit rate"
+    )
 
     # Warm cache should be faster
-    assert summary_warm["latency_mean"] < summary_cold["latency_mean"], \
+    assert summary_warm["latency_mean"] < summary_cold["latency_mean"], (
         "Warm cache should have lower latency"
+    )
 
 
 def test_no_deadlocks_with_shared_resources(test_files):
@@ -611,14 +611,14 @@ def test_no_deadlocks_with_shared_resources(test_files):
         raise TimeoutError("Load test timed out - possible deadlock")
 
     # Set timeout (only on Unix-like systems)
-    if hasattr(signal, 'SIGALRM'):
+    if hasattr(signal, "SIGALRM"):
         signal.signal(signal.SIGALRM, timeout_handler)
         signal.alarm(30)  # 30s timeout
 
     try:
         metrics = runner.run()
 
-        if hasattr(signal, 'SIGALRM'):
+        if hasattr(signal, "SIGALRM"):
             signal.alarm(0)  # Cancel timeout
 
         # All requests should complete (no hanging threads)
@@ -667,13 +667,11 @@ def test_resource_usage_stays_bounded(test_files):
     logger.info(f"Avg CPU: {summary['avg_cpu_percent']:.1f}%")
 
     # Memory growth should be reasonable (< 500MB for this test)
-    assert memory_growth_mb < 500, \
-        f"Excessive memory growth: {memory_growth_mb:.1f} MB"
+    assert memory_growth_mb < 500, f"Excessive memory growth: {memory_growth_mb:.1f} MB"
 
     # Average CPU should be reasonable (allow high CPU during test)
     # Just check it's not stuck at 100%
-    assert summary["avg_cpu_percent"] < 100, \
-        "CPU usage should not be constantly maxed out"
+    assert summary["avg_cpu_percent"] < 100, "CPU usage should not be constantly maxed out"
 
 
 if __name__ == "__main__":

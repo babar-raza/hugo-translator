@@ -7,6 +7,7 @@ Tests CT2 conversion workflow including:
 - Model validation
 - Conversion planning
 """
+
 import tempfile
 from pathlib import Path
 from unittest.mock import Mock, patch
@@ -156,9 +157,7 @@ class TestCT2ConversionManager:
         (source_path / "pytorch_model.bin").touch()
 
         # Mock manifest to return source path
-        ct2_manager.manifest.get_model_entry = Mock(
-            return_value={"local_path": str(source_path)}
-        )
+        ct2_manager.manifest.get_model_entry = Mock(return_value={"local_path": str(source_path)})
 
         # Mock pipeline
         mock_pipeline = Mock()
@@ -176,15 +175,15 @@ class TestCT2ConversionManager:
         ct2_manager.manifest.add_or_update_model.assert_called_once()
         ct2_manager.registry.register_model.assert_called_once()
 
-    def test_get_source_model_path_from_manifest(self, ct2_manager, sample_model_info, temp_models_dir):
+    def test_get_source_model_path_from_manifest(
+        self, ct2_manager, sample_model_info, temp_models_dir
+    ):
         """Test getting source model path from manifest."""
         # Setup
         source_path = temp_models_dir / "test_model"
         source_path.mkdir(parents=True)
 
-        ct2_manager.manifest.get_model_entry = Mock(
-            return_value={"local_path": str(source_path)}
-        )
+        ct2_manager.manifest.get_model_entry = Mock(return_value={"local_path": str(source_path)})
 
         # Execute
         result = ct2_manager._get_source_model_path(sample_model_info)
@@ -192,7 +191,9 @@ class TestCT2ConversionManager:
         # Verify
         assert result == source_path
 
-    def test_get_source_model_path_from_local_path(self, ct2_manager, sample_model_info, temp_models_dir):
+    def test_get_source_model_path_from_local_path(
+        self, ct2_manager, sample_model_info, temp_models_dir
+    ):
         """Test getting source model path from registry local_path."""
         # Setup
         source_path = temp_models_dir / "test_model"
@@ -211,7 +212,9 @@ class TestCT2ConversionManager:
 class TestCT2RegistryUpdates:
     """Test registry update functionality."""
 
-    def test_update_registry_creates_ct2_entry(self, ct2_manager, sample_model_info, temp_models_dir):
+    def test_update_registry_creates_ct2_entry(
+        self, ct2_manager, sample_model_info, temp_models_dir
+    ):
         """Test that registry is updated with CT2 model entry."""
         # Setup
         ct2_path = temp_models_dir / "ct2" / "test__int8"
@@ -266,7 +269,9 @@ class TestCT2RegistryUpdates:
         call_args = ct2_manager.registry.register_model.call_args[0][0]
         assert call_args.supported_pairs == [("en", "fr"), ("fr", "en")]
 
-    def test_update_registry_reduces_ram_requirement(self, ct2_manager, sample_model_info, temp_models_dir):
+    def test_update_registry_reduces_ram_requirement(
+        self, ct2_manager, sample_model_info, temp_models_dir
+    ):
         """Test that CT2 model has reduced RAM requirement (60% of original)."""
         # Setup
         ct2_path = temp_models_dir / "ct2" / "test__int8"
@@ -342,9 +347,7 @@ class TestCT2ListingAndPlanning:
         # Setup source model
         source_path = temp_models_dir / "m2m100_418M"
         source_path.mkdir(parents=True)
-        ct2_manager.manifest.get_model_entry = Mock(
-            return_value={"local_path": str(source_path)}
-        )
+        ct2_manager.manifest.get_model_entry = Mock(return_value={"local_path": str(source_path)})
 
         # Execute
         plans = ct2_manager.plan_conversion(["m2m100_418m"], quantization="int8")

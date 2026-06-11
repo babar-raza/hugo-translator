@@ -6,9 +6,11 @@ Four cases:
   3. test_code_lang_tag_stripped — ```python → ``` → WARNING
   4. test_code_count_mismatch_keeps_tc_h1a_error — different count → ERROR (existing behavior)
 """
+
 from __future__ import annotations
 
 import pytest
+
 from src.translation_engine.validation.structure_validator import StructureValidator
 
 

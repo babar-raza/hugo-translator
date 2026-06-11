@@ -4,6 +4,7 @@ TC-REEXEC-06: Campaign config gate tests.
 Proves that the scheduler.campaign_mode_enabled config key in global.yaml
 controls daemon-mode startup. Oneshot mode is never gated.
 """
+
 from __future__ import annotations
 
 import logging
@@ -64,7 +65,14 @@ class TestCampaignConfigGate:
     @patch.object(AutonomousContentTranslationWorker, "_run_daemon")
     @patch("src.workers.autonomous_content_translation_worker.emit_worker_event")
     def test_daemon_proceeds_when_campaign_enabled(
-        self, mock_emit, mock_daemon, mock_pid, mock_hb_start, mock_record, mock_hb_write, mock_hb_stop
+        self,
+        mock_emit,
+        mock_daemon,
+        mock_pid,
+        mock_hb_start,
+        mock_record,
+        mock_hb_write,
+        mock_hb_stop,
     ):
         """Daemon mode must proceed to _run_daemon when campaign_mode_enabled=true."""
         worker = _make_worker(mode="daemon", campaign_enabled=True)
@@ -81,7 +89,14 @@ class TestCampaignConfigGate:
     @patch.object(AutonomousContentTranslationWorker, "_run_oneshot")
     @patch("src.workers.autonomous_content_translation_worker.emit_worker_event")
     def test_oneshot_ignores_campaign_gate(
-        self, mock_emit, mock_oneshot, mock_pid, mock_hb_start, mock_record, mock_hb_write, mock_hb_stop
+        self,
+        mock_emit,
+        mock_oneshot,
+        mock_pid,
+        mock_hb_start,
+        mock_record,
+        mock_hb_write,
+        mock_hb_stop,
     ):
         """Oneshot mode must run regardless of campaign_mode_enabled value."""
         worker = _make_worker(mode="oneshot", campaign_enabled=False)

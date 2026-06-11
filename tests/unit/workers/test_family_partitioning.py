@@ -7,6 +7,7 @@ Tests _expand_family_content_roots() and verify:
 - family_scope=single/total bypasses expansion
 - No regression for existing single-family profiles
 """
+
 from __future__ import annotations
 
 import os
@@ -83,8 +84,8 @@ class TestExpandFamilyContentRoots:
         """Net-style multi-family root ({family}/) is expanded per family."""
         (tmp_path / "words").mkdir()
         (tmp_path / "barcode").mkdir()
-        (tmp_path / "home").mkdir()   # non-family dir — must be ignored
-        (tmp_path / "ar").mkdir()     # lang dir — must be ignored
+        (tmp_path / "home").mkdir()  # non-family dir — must be ignored
+        (tmp_path / "ar").mkdir()  # lang dir — must be ignored
 
         worker = _make_worker()
         worker.config_service.resolve_content_root.return_value = tmp_path
@@ -202,6 +203,7 @@ class TestExpandFamilyContentRoots:
         for r in result:
             p = Path(r)
             from src.observability.metrics_scope import DEFAULT_KNOWN_FAMILIES
+
             assert p.name in DEFAULT_KNOWN_FAMILIES, (
                 f"Expanded path {r!r} must end with a known family token "
                 "so MetricsRunContext can resolve scope."
@@ -238,9 +240,7 @@ class TestTranslateContentRootPassthrough:
             file_timeout_seconds=60,
             max_seconds_per_run=None,
         )
-        worker = AutonomousContentTranslationWorker.__new__(
-            AutonomousContentTranslationWorker
-        )
+        worker = AutonomousContentTranslationWorker.__new__(AutonomousContentTranslationWorker)
         worker.config = config
         worker.invocation_id = "test-spy-001"
         worker._run_start = time.time()
@@ -352,17 +352,20 @@ class TestFamilyScopeInSiteProfile:
 
     def test_family_scope_field_exists(self):
         from src.utils.models import SiteProfile
+
         assert hasattr(SiteProfile, "model_fields")
         assert "family_scope" in SiteProfile.model_fields
 
     def test_family_scope_defaults_to_none(self):
         from src.utils.models import SiteProfile
+
         field = SiteProfile.model_fields["family_scope"]
         assert field.default is None
 
     def test_family_scope_multi_accepted(self):
         """SiteProfile can hold family_scope='multi'."""
-        from src.utils.models import SiteProfile, BodyRules
+        from src.utils.models import BodyRules, SiteProfile
+
         profile = SiteProfile(
             site_id="products.aspose.org",
             content_roots=["/content/products.aspose.org"],

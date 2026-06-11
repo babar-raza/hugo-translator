@@ -4,6 +4,7 @@ Test that verify_batch() runtime deduplication guard catches duplicates.
 
 This test validates TASK-5.3: Runtime deduplication guard in verify_batch().
 """
+
 import sys
 from pathlib import Path
 
@@ -16,13 +17,15 @@ sys.path.insert(0, str(REPO_ROOT))
 
 def test_verify_batch_dedup_guard_in_code():
     """Test that the deduplication guard exists in run_batch23.py."""
-    script_path = REPO_ROOT / "reports" / "phase6_cli_forced_translate" / "20260128-2139" / "run_batch23.py"
+    script_path = (
+        REPO_ROOT / "reports" / "phase6_cli_forced_translate" / "20260128-2139" / "run_batch23.py"
+    )
 
     if not script_path.exists():
         pytest.skip(f"Script not found: {script_path}")
 
     # Read the script and verify the guard is present
-    with open(script_path, encoding='utf-8') as f:
+    with open(script_path, encoding="utf-8") as f:
         content = f.read()
 
     # Check for the deduplication guard
@@ -35,7 +38,8 @@ def test_verify_batch_dedup_guard_in_code():
     # Verify it's in the verify_batch function
     # Extract the verify_batch function
     import re
-    pattern = r'def verify_batch\(.*?\):(.*?)(?=\ndef |\Z)'
+
+    pattern = r"def verify_batch\(.*?\):(.*?)(?=\ndef |\Z)"
     match = re.search(pattern, content, re.DOTALL)
 
     assert match, "verify_batch function not found"
@@ -49,6 +53,7 @@ def test_verify_batch_dedup_guard_in_code():
 
 def test_dedup_guard_logic_unit():
     """Unit test for the deduplication guard logic in isolation."""
+
     # Simulate the guard logic
     def check_for_duplicates(batch_rows, batch_num):
         seen_paths = set()

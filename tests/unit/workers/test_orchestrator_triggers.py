@@ -41,6 +41,7 @@ def _make_cfg(**overrides):
 # evaluate_trigger
 # ---------------------------------------------------------------------------
 
+
 class TestEvaluateTrigger:
     def test_queue_non_empty_true(self, tmp_path):
         from src.workers.worker_orchestrator import evaluate_trigger
@@ -136,6 +137,7 @@ class TestEvaluateTrigger:
 # should_launch
 # ---------------------------------------------------------------------------
 
+
 class TestShouldLaunch:
     def test_disabled_worker(self):
         from src.workers.worker_orchestrator import should_launch
@@ -224,6 +226,7 @@ class TestShouldLaunch:
 # ---------------------------------------------------------------------------
 # run_check_cycle
 # ---------------------------------------------------------------------------
+
 
 class TestRunCheckCycle:
     def test_no_triggers_no_launch(self, tmp_path):

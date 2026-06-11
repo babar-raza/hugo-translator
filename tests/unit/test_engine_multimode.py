@@ -3,6 +3,7 @@ Unit tests for engine multi-mode support (T304: federated-splashing-panda).
 
 Tests TranslationEngine with serial, parallel, and round-robin modes.
 """
+
 from pathlib import Path
 from unittest.mock import Mock, patch
 
@@ -35,7 +36,7 @@ class TestTranslationEngineMultiModeInitialization:
 
         assert engine.parallel_languages == 0
         assert engine.global_lang_rounds == 0
-        assert engine.global_lang_sort == 'desc'
+        assert engine.global_lang_sort == "desc"
 
     def test_engine_parallel_mode(self):
         """Test engine initialization in parallel mode."""
@@ -64,12 +65,12 @@ class TestTranslationEngineMultiModeInitialization:
             tm=mock_tm,
             model_loader=mock_loader,
             global_lang_rounds=50,
-            global_lang_sort='asc',
+            global_lang_sort="asc",
         )
 
         assert engine.parallel_languages == 0
         assert engine.global_lang_rounds == 50
-        assert engine.global_lang_sort == 'asc'
+        assert engine.global_lang_sort == "asc"
 
     def test_mutual_exclusion_raises_error(self):
         """Test that using both parallel and round-robin raises ValueError."""
@@ -97,13 +98,13 @@ class TestTranslationEngineMultiModeInitialization:
             tm=mock_tm,
             model_loader=mock_loader,
             **{
-                'parallel_languages': 3,
-                'global_lang_sort': 'desc',
-            }
+                "parallel_languages": 3,
+                "global_lang_sort": "desc",
+            },
         )
 
         assert engine.parallel_languages == 3
-        assert engine.global_lang_sort == 'desc'
+        assert engine.global_lang_sort == "desc"
 
 
 class TestTranslationEngineClearCache:
@@ -117,7 +118,7 @@ class TestTranslationEngineClearCache:
 
         # Mock L1 cache with clear method
         mock_l1 = Mock()
-        mock_l1.cache = {'key1': 'value1', 'key2': 'value2'}
+        mock_l1.cache = {"key1": "value1", "key2": "value2"}
         mock_tm.l1 = mock_l1
 
         engine = TranslationEngine(
@@ -174,7 +175,7 @@ class TestTranslationEngineClearCache:
 class TestTranslationEngineSingleLanguage:
     """Test TranslationEngine._translate_single_language()."""
 
-    @patch.object(TranslationEngine, 'translate_file')
+    @patch.object(TranslationEngine, "translate_file")
     def test_translate_single_language_calls_translate_file(self, mock_translate_file):
         """Test _translate_single_language calls translate_file with single language."""
         mock_config = Mock()
@@ -209,7 +210,7 @@ class TestTranslationEngineSingleLanguage:
 
         assert result is mock_result
 
-    @patch.object(TranslationEngine, 'translate_file')
+    @patch.object(TranslationEngine, "translate_file")
     def test_translate_single_language_with_force(self, mock_translate_file):
         """Test _translate_single_language passes force parameter."""
         mock_config = Mock()
@@ -322,8 +323,8 @@ class TestMultiLanguageProgressModel:
         progress = MultiLanguageProgress()
         progress.languages = {
             "de": LanguageProgress("de", 100, 100),  # Complete
-            "fr": LanguageProgress("fr", 100, 75),   # Incomplete
-            "es": LanguageProgress("es", 50, 50),    # Complete
+            "fr": LanguageProgress("fr", 100, 75),  # Incomplete
+            "es": LanguageProgress("es", 50, 50),  # Complete
         }
 
         assert progress.completed_languages == 2
@@ -332,7 +333,7 @@ class TestMultiLanguageProgressModel:
         """Test overall_progress_percentage property."""
         progress = MultiLanguageProgress()
         progress.languages = {
-            "de": LanguageProgress("de", 100, 50),   # 50%
+            "de": LanguageProgress("de", 100, 50),  # 50%
             "fr": LanguageProgress("fr", 100, 100),  # 100%
         }
 

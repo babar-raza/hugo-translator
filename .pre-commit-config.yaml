@@ -27,4 +27,12 @@ repos:
         entry: 'D:\\onedrive|D:/onedrive|C:\\Users\\prora|C:/Users/prora'
         language: pygrep
         types_or: [yaml, python, shell, batch]
-        exclude: '(\.env|\.pre-commit-config\.yaml)'
+        exclude: |
+          (?x)^(
+            \.env|
+            \.pre-commit-config\.yaml|
+            tests/integration/test_parallel_mode\.py|
+            tests/integration/test_roundrobin_mode\.py|
+            tests/regression/test_single_file_translation\.py|
+            tests/unit/test_telemetry_path_config\.py
+          )$

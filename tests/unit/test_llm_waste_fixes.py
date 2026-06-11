@@ -6,6 +6,7 @@ Fix 2a: Cap recursive purity split depth to MAX_PURITY_SPLIT_DEPTH.
 Fix 2b: batch_purity_skip_langs skips batch-level purity for configured langs.
 Fix 3: Multi-segment LLM prompt packing in LLMModelBackend.
 """
+
 import re
 import sys
 import types
@@ -18,8 +19,12 @@ from unittest.mock import MagicMock, patch
 # ---------------------------------------------------------------------------
 def _ensure_stubs():
     for mod in (
-        "ctranslate2", "transformers", "sentence_transformers",
-        "faiss", "lmdb", "pytz",
+        "ctranslate2",
+        "transformers",
+        "sentence_transformers",
+        "faiss",
+        "lmdb",
+        "pytz",
     ):
         sys.modules.setdefault(mod, types.ModuleType(mod))
     if "torch" not in sys.modules:
@@ -127,16 +132,17 @@ class TestFix2aSplitDepthCap:
 
     def _make_extractor(self):
         from src.translation_engine.extractor.text_unit_extractor import TextUnitExtractor
+
         ext = TextUnitExtractor.__new__(TextUnitExtractor)
         ext.batch_stats = {
-            'total_batches': 0,
-            'successful_batches': 0,
-            'fallback_batches': 0,
-            'mapping_failures': 0,
-            'translation_errors': 0,
-            'individual_translations': 0,
-            'individual_translation_errors': 0,
-            'empty_translations': 0,
+            "total_batches": 0,
+            "successful_batches": 0,
+            "fallback_batches": 0,
+            "mapping_failures": 0,
+            "translation_errors": 0,
+            "individual_translations": 0,
+            "individual_translation_errors": 0,
+            "empty_translations": 0,
         }
         ext.batch_stats_tracker = MagicMock()
         ext.batch_stats_tracker.react_to_failure.return_value = 4
@@ -168,16 +174,19 @@ class TestFix2aSplitDepthCap:
         mt_model.translate.return_value = ["Translated"] * 4
 
         # Patch _verify_translation_language_purity to always fail
-        with patch.object(ext, '_verify_translation_language_purity', return_value=False):
+        with patch.object(ext, "_verify_translation_language_purity", return_value=False):
             # Call at max depth — should NOT recurse, should accept
             result = ext._translate_single_batch(
-                units, mt_model, "en", "cs",
+                units,
+                mt_model,
+                "en",
+                "cs",
                 _split_depth=ext.MAX_PURITY_SPLIT_DEPTH,
             )
 
         # Should accept (True) and increment successful_batches
         assert result is True
-        assert ext.batch_stats['successful_batches'] == 1
+        assert ext.batch_stats["successful_batches"] == 1
 
     def test_max_depth_cross_script_falls_back(self):
         """Non-Latin targets fall back when max-depth output resolves to the wrong script."""
@@ -197,16 +206,19 @@ class TestFix2aSplitDepthCap:
         mt_model = MagicMock()
         mt_model.translate.return_value = ["Arabic output"] * 2
 
-        with patch.object(ext, '_verify_translation_language_purity', return_value=False):
-            with patch.object(ext, '_fallback_to_individual') as mock_fallback:
+        with patch.object(ext, "_verify_translation_language_purity", return_value=False):
+            with patch.object(ext, "_fallback_to_individual") as mock_fallback:
                 result = ext._translate_single_batch(
-                    units, mt_model, "en", "ru",
+                    units,
+                    mt_model,
+                    "en",
+                    "ru",
                     _split_depth=ext.MAX_PURITY_SPLIT_DEPTH,
                 )
 
         assert result is False
         mock_fallback.assert_called_once_with(units, mt_model, "en", "ru")
-        assert ext.batch_stats['successful_batches'] == 0
+        assert ext.batch_stats["successful_batches"] == 0
 
     def test_max_depth_latin_accepts(self):
         """Latin-script targets keep the original max-depth accept behavior."""
@@ -226,14 +238,17 @@ class TestFix2aSplitDepthCap:
         mt_model = MagicMock()
         mt_model.translate.return_value = ["Traduit"] * 2
 
-        with patch.object(ext, '_verify_translation_language_purity', return_value=False):
+        with patch.object(ext, "_verify_translation_language_purity", return_value=False):
             result = ext._translate_single_batch(
-                units, mt_model, "en", "fr",
+                units,
+                mt_model,
+                "en",
+                "fr",
                 _split_depth=ext.MAX_PURITY_SPLIT_DEPTH,
             )
 
         assert result is True
-        assert ext.batch_stats['successful_batches'] == 1
+        assert ext.batch_stats["successful_batches"] == 1
 
     def test_max_depth_no_detector_accepts(self):
         """Missing detector preserves existing fail-open behavior."""
@@ -250,14 +265,17 @@ class TestFix2aSplitDepthCap:
         mt_model = MagicMock()
         mt_model.translate.return_value = ["Translated"] * 2
 
-        with patch.object(ext, '_verify_translation_language_purity', return_value=False):
+        with patch.object(ext, "_verify_translation_language_purity", return_value=False):
             result = ext._translate_single_batch(
-                units, mt_model, "en", "ru",
+                units,
+                mt_model,
+                "en",
+                "ru",
                 _split_depth=ext.MAX_PURITY_SPLIT_DEPTH,
             )
 
         assert result is True
-        assert ext.batch_stats['successful_batches'] == 1
+        assert ext.batch_stats["successful_batches"] == 1
 
     def test_depth_0_allows_splitting(self):
         """At depth 0, splitting is allowed (up to MAX_PURITY_SPLIT_DEPTH)."""
@@ -297,9 +315,13 @@ class TestFix2aSplitDepthCap:
             fail_count[0] += 1
             return fail_count[0] > 1  # First check fails, rest pass
 
-        with patch.object(ext, '_verify_translation_language_purity', side_effect=purity_check):
+        with patch.object(ext, "_verify_translation_language_purity", side_effect=purity_check):
             result = ext._translate_single_batch(
-                units, mt_model, "en", "cs", _split_depth=0,
+                units,
+                mt_model,
+                "en",
+                "cs",
+                _split_depth=0,
             )
 
         # Depth 0 should have triggered a split (depth 1 calls)
@@ -314,16 +336,17 @@ class TestFix2bBatchPuritySkipLangs:
 
     def _make_extractor(self, skip_langs=None):
         from src.translation_engine.extractor.text_unit_extractor import TextUnitExtractor
+
         ext = TextUnitExtractor.__new__(TextUnitExtractor)
         ext.batch_stats = {
-            'total_batches': 0,
-            'successful_batches': 0,
-            'fallback_batches': 0,
-            'mapping_failures': 0,
-            'translation_errors': 0,
-            'individual_translations': 0,
-            'individual_translation_errors': 0,
-            'empty_translations': 0,
+            "total_batches": 0,
+            "successful_batches": 0,
+            "fallback_batches": 0,
+            "mapping_failures": 0,
+            "translation_errors": 0,
+            "individual_translations": 0,
+            "individual_translation_errors": 0,
+            "empty_translations": 0,
         }
         ext.batch_stats_tracker = MagicMock()
         ext.fasttext_detector = None
@@ -352,13 +375,13 @@ class TestFix2bBatchPuritySkipLangs:
         mt_model = MagicMock()
         mt_model.translate.return_value = ["Přeloženo"] * 4
 
-        with patch.object(ext, '_verify_translation_language_purity') as mock_purity:
+        with patch.object(ext, "_verify_translation_language_purity") as mock_purity:
             result = ext._translate_single_batch(units, mt_model, "en", "cs")
 
         assert result is True
         # LWF-07: skip-langs path must increment purity_skipped_batches, NOT successful_batches
-        assert ext.batch_stats['purity_skipped_batches'] == 1
-        assert ext.batch_stats['successful_batches'] == 0  # not inflated
+        assert ext.batch_stats["purity_skipped_batches"] == 1
+        assert ext.batch_stats["successful_batches"] == 0  # not inflated
         # Purity check should NOT have been called
         mock_purity.assert_not_called()
 
@@ -377,7 +400,9 @@ class TestFix2bBatchPuritySkipLangs:
         mt_model = MagicMock()
         mt_model.translate.return_value = ["Übersetzt"] * 2
 
-        with patch.object(ext, '_verify_translation_language_purity', return_value=True) as mock_purity:
+        with patch.object(
+            ext, "_verify_translation_language_purity", return_value=True
+        ) as mock_purity:
             result = ext._translate_single_batch(units, mt_model, "en", "de")
 
         assert result is True
@@ -391,7 +416,9 @@ class TestFix2bBatchPuritySkipLangs:
         mt_model = MagicMock()
         mt_model.translate.return_value = ["Bonjour"]
 
-        with patch.object(ext, '_verify_translation_language_purity', return_value=True) as mock_purity:
+        with patch.object(
+            ext, "_verify_translation_language_purity", return_value=True
+        ) as mock_purity:
             ext._translate_single_batch(units, mt_model, "en", "fr")
 
         mock_purity.assert_called_once()
@@ -399,12 +426,14 @@ class TestFix2bBatchPuritySkipLangs:
     def test_constructor_accepts_skip_langs(self):
         """Constructor wires batch_purity_skip_langs correctly."""
         from src.translation_engine.extractor.text_unit_extractor import TextUnitExtractor
+
         ext = TextUnitExtractor(batch_purity_skip_langs=["cs", "hr", "el"])
         assert ext._batch_purity_skip_langs == frozenset(["cs", "hr", "el"])
 
     def test_constructor_default_empty(self):
         """Default is empty frozenset."""
         from src.translation_engine.extractor.text_unit_extractor import TextUnitExtractor
+
         ext = TextUnitExtractor()
         assert ext._batch_purity_skip_langs == frozenset()
 
@@ -427,18 +456,18 @@ class TestFix2bBatchPuritySkipLangs:
         mt_model = MagicMock()
         mt_model.translate.return_value = ["Věta 0", "Věta 1", "Věta 2"]
 
-        baseline_success = ext.batch_stats['successful_batches']
+        baseline_success = ext.batch_stats["successful_batches"]
 
-        with patch.object(ext, '_verify_translation_language_purity') as mock_purity:
+        with patch.object(ext, "_verify_translation_language_purity") as mock_purity:
             result = ext._translate_single_batch(units, mt_model, "en", "cs")
 
         assert result is True
         # successful_batches must NOT be incremented for a skipped-purity batch
-        assert ext.batch_stats['successful_batches'] == baseline_success, (
+        assert ext.batch_stats["successful_batches"] == baseline_success, (
             "successful_batches was inflated by purity-skip path (LWF-07 regression)"
         )
         # purity_skipped_batches must be incremented
-        assert ext.batch_stats['purity_skipped_batches'] == 1
+        assert ext.batch_stats["purity_skipped_batches"] == 1
         # purity verification must not be called
         mock_purity.assert_not_called()
 
@@ -451,6 +480,7 @@ class TestFix3PromptPacking:
 
     def _make_backend(self):
         from src.model_runtime.llm_backend import LLMModelBackend
+
         model_info = MagicMock()
         model_info.system_prompt_template = None
         model_info.llm_provider = "openai_compatible"
@@ -469,6 +499,7 @@ class TestFix3PromptPacking:
     def test_parse_packed_output_success(self):
         """Parse correctly formatted <<<SEG_N>>> output."""
         from src.model_runtime.llm_backend import LLMModelBackend
+
         raw = "<<<SEG_1>>> Bonjour le monde\n<<<SEG_2>>> Bonne journée\n<<<SEG_3>>> Au revoir"
         result = LLMModelBackend._parse_packed_output(raw, 3)
         assert result == ["Bonjour le monde", "Bonne journée", "Au revoir"]
@@ -476,6 +507,7 @@ class TestFix3PromptPacking:
     def test_parse_packed_output_wrong_count(self):
         """Wrong number of segments returns None."""
         from src.model_runtime.llm_backend import LLMModelBackend
+
         raw = "<<<SEG_1>>> Bonjour\n<<<SEG_2>>> Monde"
         result = LLMModelBackend._parse_packed_output(raw, 3)
         assert result is None
@@ -483,6 +515,7 @@ class TestFix3PromptPacking:
     def test_parse_packed_output_missing_number(self):
         """Missing segment number (gap) returns None."""
         from src.model_runtime.llm_backend import LLMModelBackend
+
         raw = "<<<SEG_1>>> Bonjour\n<<<SEG_3>>> Monde"  # missing SEG_2
         result = LLMModelBackend._parse_packed_output(raw, 2)
         assert result is None
@@ -490,6 +523,7 @@ class TestFix3PromptPacking:
     def test_parse_packed_output_out_of_range(self):
         """Segment number out of range returns None."""
         from src.model_runtime.llm_backend import LLMModelBackend
+
         raw = "<<<SEG_1>>> Bonjour\n<<<SEG_5>>> Monde"
         result = LLMModelBackend._parse_packed_output(raw, 2)
         assert result is None
@@ -497,6 +531,7 @@ class TestFix3PromptPacking:
     def test_parse_packed_output_with_leading_whitespace(self):
         """Handles leading whitespace before <<<SEG_N>>>."""
         from src.model_runtime.llm_backend import LLMModelBackend
+
         raw = "  <<<SEG_1>>> Bonjour\n  <<<SEG_2>>> Monde"
         result = LLMModelBackend._parse_packed_output(raw, 2)
         assert result == ["Bonjour", "Monde"]
@@ -508,6 +543,7 @@ class TestFix3PromptPacking:
         returning the wrong result.  <<<SEG_N>>> is immune to this.
         """
         from src.model_runtime.llm_backend import LLMModelBackend
+
         raw = "<<<SEG_1>>> See step [2] above\n<<<SEG_2>>> Done"
         result = LLMModelBackend._parse_packed_output(raw, 2)
         assert result == ["See step [2] above", "Done"]
@@ -534,7 +570,8 @@ class TestFix3PromptPacking:
         # Mock: packed call returns <<<SEG_N>>> numbered output
         provider.generate.return_value = (
             "<<<SEG_1>>> Bonjour\n<<<SEG_2>>> Monde\n<<<SEG_3>>> Au revoir",
-            30, 20,
+            30,
+            20,
         )
         backend._provider = provider
 
@@ -553,6 +590,7 @@ class TestFix3PromptPacking:
         provider = MagicMock()
 
         call_count = [0]
+
         def mock_generate(system_prompt, user_text):
             call_count[0] += 1
             if call_count[0] == 1:
@@ -609,7 +647,7 @@ class TestFix3PromptPacking:
         def mock_generate(system_prompt, user_text):
             call_count[0] += 1
             # Count <<<SEG_N>>> tags to determine segment count (LWF-01 delimiter)
-            tags = re.findall(r'<<<SEG_(\d+)>>>', user_text)
+            tags = re.findall(r"<<<SEG_(\d+)>>>", user_text)
             n = len(tags)
             if n > 1:
                 lines = [f"<<<SEG_{i}>>> Translated-{i}" for i in range(1, n + 1)]

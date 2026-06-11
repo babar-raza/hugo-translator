@@ -2,7 +2,6 @@
 Tests for metrics collection system.
 """
 
-
 from src.observability.metrics import (
     Counter,
     Gauge,

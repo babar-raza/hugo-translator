@@ -4,6 +4,7 @@ Tests for Benchmark CLI module.
 Validates argument parsing, command execution, storage interactions,
 and error handling for all CLI commands.
 """
+
 import argparse
 import json
 from contextlib import contextmanager
@@ -104,11 +105,20 @@ def sample_run():
 
 
 _ALL_HEAVY_DEPS = [
-    'BenchmarkRecommender', 'BenchmarkReporter', 'BenchmarkRunner',
-    'load_corpus', 'BenchmarkDatabase', 'MigrationManager',
-    'TimeSeriesAggregator', 'AnalyticsQueryAPI', 'RetentionEngine',
-    'BenchmarkExporter', 'ExportFilter', 'BenchmarkArchiver',
-    'ModelRecommender', 'ModelRegistry',
+    "BenchmarkRecommender",
+    "BenchmarkReporter",
+    "BenchmarkRunner",
+    "load_corpus",
+    "BenchmarkDatabase",
+    "MigrationManager",
+    "TimeSeriesAggregator",
+    "AnalyticsQueryAPI",
+    "RetentionEngine",
+    "BenchmarkExporter",
+    "ExportFilter",
+    "BenchmarkArchiver",
+    "ModelRecommender",
+    "ModelRegistry",
 ]
 
 
@@ -132,7 +142,7 @@ def patch_deps(**instance_mocks):
         else:
             deps[key] = MagicMock()
 
-    with patch('src.benchmarking.cli._import_heavy_deps', return_value=deps):
+    with patch("src.benchmarking.cli._import_heavy_deps", return_value=deps):
         yield deps
 
 
@@ -460,7 +470,9 @@ class TestCmdCompare:
             result = cmd_compare(args)
 
             assert result == 0
-            mock_db.compare_runs.assert_called_once_with(["run1", "run2"], metric="throughput_tokens_per_sec")
+            mock_db.compare_runs.assert_called_once_with(
+                ["run1", "run2"], metric="throughput_tokens_per_sec"
+            )
 
     def test_compare_insufficient_runs(self):
         """Test compare with less than 2 runs."""
@@ -657,16 +669,25 @@ class TestMainCLI:
             total_duration_seconds=10.0,
         )
 
-        with patch("sys.argv", [
-            "cli.py",
-            "run",
-            "--model", "opus_en_fr",
-            "--device", "cpu",
-            "--batch-sizes", "8",
-            "--corpus", "tiny",
-            "--registry", "config/model_registry.yaml",
-            "--target-lang", "fr",
-        ]):
+        with patch(
+            "sys.argv",
+            [
+                "cli.py",
+                "run",
+                "--model",
+                "opus_en_fr",
+                "--device",
+                "cpu",
+                "--batch-sizes",
+                "8",
+                "--corpus",
+                "tiny",
+                "--registry",
+                "config/model_registry.yaml",
+                "--target-lang",
+                "fr",
+            ],
+        ):
             with patch_deps(ModelRegistry=mock_registry) as deps:
                 MockRunner = deps["BenchmarkRunner"]
                 mock_runner = MockRunner.return_value
@@ -682,19 +703,19 @@ class TestArgumentParsing:
     def test_parse_multiple_batch_sizes(self):
         """Test parsing comma-separated batch sizes."""
         batch_sizes_str = "8,16,32"
-        batch_sizes = [int(bs.strip()) for bs in batch_sizes_str.split(',')]
+        batch_sizes = [int(bs.strip()) for bs in batch_sizes_str.split(",")]
         assert batch_sizes == [8, 16, 32]
 
     def test_parse_tags(self):
         """Test parsing comma-separated tags."""
         tags_str = "baseline, gpu, smoke"
-        tags = [tag.strip() for tag in tags_str.split(',')]
+        tags = [tag.strip() for tag in tags_str.split(",")]
         assert tags == ["baseline", "gpu", "smoke"]
 
     def test_parse_run_ids(self):
         """Test parsing comma-separated run IDs."""
         run_ids_str = "run1, run2, run3"
-        run_ids = [rid.strip() for rid in run_ids_str.split(',')]
+        run_ids = [rid.strip() for rid in run_ids_str.split(",")]
         assert run_ids == ["run1", "run2", "run3"]
 
 
@@ -759,8 +780,8 @@ class TestCLIIntegrationReadiness:
         mock_db.get_run.return_value = sample_run
 
         with patch_deps(BenchmarkDatabase=mock_db) as deps:
-            deps["BenchmarkReporter"].return_value.format_json.return_value = (
-                json.dumps({"run_id": "test123", "model_id": "opus_en_fr"})
+            deps["BenchmarkReporter"].return_value.format_json.return_value = json.dumps(
+                {"run_id": "test123", "model_id": "opus_en_fr"}
             )
             with patch("builtins.print") as mock_print:
                 result = cmd_report(args)
@@ -1023,9 +1044,7 @@ class TestCmdAggregate:
 
             assert result == 0
             mock_aggregator.aggregate_model.assert_called_once_with(
-                model_id="m2m100_418m",
-                device="cpu",
-                lookback_days=30
+                model_id="m2m100_418m", device="cpu", lookback_days=30
             )
 
     def test_aggregate_creates_baseline(self, tmp_path):
@@ -1052,10 +1071,7 @@ class TestCmdAggregate:
 
             assert result == 0
             mock_aggregator.create_baseline.assert_called_once_with(
-                model_id="m2m100_418m",
-                device="cpu",
-                baseline_type="weekly",
-                days_back=90
+                model_id="m2m100_418m", device="cpu", baseline_type="weekly", days_back=90
             )
 
     def test_aggregate_baseline_requires_model_device(self, tmp_path):
@@ -1162,7 +1178,7 @@ class TestCmdRetention:
                     "rows_to_delete": 100,
                     "last_cleanup": "2025-12-01T10:00:00",
                 }
-            ]
+            ],
         }
 
         with patch_deps(RetentionEngine=mock_engine):
@@ -1230,8 +1246,7 @@ class TestCmdRetention:
 
             assert result == 0
             mock_engine.execute_retention.assert_called_once_with(
-                policy_names=["benchmark_results_90d"],
-                dry_run=False
+                policy_names=["benchmark_results_90d"], dry_run=False
             )
 
     def test_retention_with_vacuum(self, tmp_path):

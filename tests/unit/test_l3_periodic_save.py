@@ -16,24 +16,24 @@ from unittest import mock
 import pytest
 
 # Mock heavy dependencies before importing the module
-sys.modules['faiss'] = mock.MagicMock()
-sys.modules['numpy'] = mock.MagicMock()
-sys.modules['sentence_transformers'] = mock.MagicMock()
+sys.modules["faiss"] = mock.MagicMock()
+sys.modules["numpy"] = mock.MagicMock()
+sys.modules["sentence_transformers"] = mock.MagicMock()
 
 # Create proper mock for numpy array operations
-np_mock = sys.modules['numpy']
+np_mock = sys.modules["numpy"]
 np_mock.array = mock.MagicMock(return_value=mock.MagicMock())
-np_mock.float32 = 'float32'
+np_mock.float32 = "float32"
 
 # Create mock for SentenceTransformer
-st_mock = sys.modules['sentence_transformers']
+st_mock = sys.modules["sentence_transformers"]
 mock_encoder = mock.MagicMock()
 mock_encoder.encode.return_value = mock.MagicMock()
 mock_encoder.get_sentence_embedding_dimension.return_value = 384
 st_mock.SentenceTransformer.return_value = mock_encoder
 
 # Create mock for faiss
-faiss_mock = sys.modules['faiss']
+faiss_mock = sys.modules["faiss"]
 mock_index = mock.MagicMock()
 mock_index.ntotal = 0
 mock_index.add = mock.MagicMock()
@@ -115,7 +115,7 @@ class TestAdditionCounters:
             src_lang="en",
             tgt_lang="ja",
             source_text="Hello",
-            translation="こんにちは"
+            translation="こんにちは",
         )
         assert tm._additions_since_save == 1
         assert tm._total_additions == 1
@@ -129,7 +129,7 @@ class TestAdditionCounters:
                 src_lang="en",
                 tgt_lang="ja",
                 source_text=f"Text {i}",
-                translation=f"Translation {i}"
+                translation=f"Translation {i}",
             )
         assert tm._additions_since_save == 3
         assert tm._total_additions == 3
@@ -145,7 +145,7 @@ class TestPeriodicSaveTrigger:
 
     def test_save_triggered_at_interval(self, tm):
         """Test save is triggered when reaching save_interval."""
-        with mock.patch.object(tm, '_trigger_save') as mock_trigger:
+        with mock.patch.object(tm, "_trigger_save") as mock_trigger:
             # Add entries up to interval
             for i in range(3):
                 tm.add_entry(
@@ -154,14 +154,14 @@ class TestPeriodicSaveTrigger:
                     src_lang="en",
                     tgt_lang="ja",
                     source_text=f"Text {i}",
-                    translation=f"Translation {i}"
+                    translation=f"Translation {i}",
                 )
             # Should have triggered save
             mock_trigger.assert_called_once()
 
     def test_save_not_triggered_before_interval(self, tm):
         """Test save is not triggered before reaching interval."""
-        with mock.patch.object(tm, '_trigger_save') as mock_trigger:
+        with mock.patch.object(tm, "_trigger_save") as mock_trigger:
             # Add fewer than interval
             for i in range(2):
                 tm.add_entry(
@@ -170,14 +170,14 @@ class TestPeriodicSaveTrigger:
                     src_lang="en",
                     tgt_lang="ja",
                     source_text=f"Text {i}",
-                    translation=f"Translation {i}"
+                    translation=f"Translation {i}",
                 )
             mock_trigger.assert_not_called()
 
     def test_save_disabled_with_zero_interval(self, tmp_path):
         """Test periodic save disabled when interval is 0."""
         tm = L3SemanticTM(tmp_path / "l3_index", save_interval=0)
-        with mock.patch.object(tm, '_trigger_save') as mock_trigger:
+        with mock.patch.object(tm, "_trigger_save") as mock_trigger:
             for i in range(10):
                 tm.add_entry(
                     entry_id=f"e{i}",
@@ -185,7 +185,7 @@ class TestPeriodicSaveTrigger:
                     src_lang="en",
                     tgt_lang="ja",
                     source_text=f"Text {i}",
-                    translation=f"Translation {i}"
+                    translation=f"Translation {i}",
                 )
             mock_trigger.assert_not_called()
 
@@ -207,7 +207,7 @@ class TestBatchAddPeriodicSave:
                 "src_lang": "en",
                 "tgt_lang": "ja",
                 "source_text": f"Text {i}",
-                "translation": f"Translation {i}"
+                "translation": f"Translation {i}",
             }
             for i in range(3)
         ]
@@ -217,7 +217,7 @@ class TestBatchAddPeriodicSave:
 
     def test_batch_add_triggers_save(self, tm):
         """Test batch_add triggers save when exceeding interval."""
-        with mock.patch.object(tm, '_trigger_save') as mock_trigger:
+        with mock.patch.object(tm, "_trigger_save") as mock_trigger:
             entries = [
                 {
                     "entry_id": f"e{i}",
@@ -225,7 +225,7 @@ class TestBatchAddPeriodicSave:
                     "src_lang": "en",
                     "tgt_lang": "ja",
                     "source_text": f"Text {i}",
-                    "translation": f"Translation {i}"
+                    "translation": f"Translation {i}",
                 }
                 for i in range(6)  # Exceeds interval of 5
             ]
@@ -239,11 +239,7 @@ class TestSaveStats:
     @pytest.fixture
     def tm(self, tmp_path):
         """Create TM instance."""
-        return L3SemanticTM(
-            tmp_path / "l3_index",
-            save_interval=10,
-            async_save=False
-        )
+        return L3SemanticTM(tmp_path / "l3_index", save_interval=10, async_save=False)
 
     def test_initial_stats(self, tm):
         """Test initial save statistics."""
@@ -264,7 +260,7 @@ class TestSaveStats:
                 src_lang="en",
                 tgt_lang="ja",
                 source_text=f"Text {i}",
-                translation=f"Translation {i}"
+                translation=f"Translation {i}",
             )
         stats = tm.get_save_stats()
         assert stats["total_additions"] == 5
@@ -284,7 +280,7 @@ class TestDoSave:
         tm._additions_since_save = 10
         tm._total_additions = 10
 
-        with mock.patch.object(tm, 'save_index'):
+        with mock.patch.object(tm, "save_index"):
             result = tm._do_save()
 
         assert result is True
@@ -295,7 +291,7 @@ class TestDoSave:
         """Test _do_save updates last_save_time."""
         assert tm._last_save_time is None
 
-        with mock.patch.object(tm, 'save_index'):
+        with mock.patch.object(tm, "save_index"):
             tm._do_save()
 
         assert tm._last_save_time is not None
@@ -305,7 +301,7 @@ class TestDoSave:
         """Test _do_save handles save errors."""
         tm._additions_since_save = 10
 
-        with mock.patch.object(tm, 'save_index', side_effect=Exception("Save failed")):
+        with mock.patch.object(tm, "save_index", side_effect=Exception("Save failed")):
             result = tm._do_save()
 
         assert result is False
@@ -323,7 +319,7 @@ class TestTriggerSave:
 
     def test_trigger_save_sync(self, tm):
         """Test synchronous save trigger."""
-        with mock.patch.object(tm, '_do_save', return_value=True) as mock_do:
+        with mock.patch.object(tm, "_do_save", return_value=True) as mock_do:
             result = tm._trigger_save()
             mock_do.assert_called_once()
             assert result is True
@@ -345,7 +341,7 @@ class TestContextManager:
     def test_exit_saves_index(self, tmp_path):
         """Test __exit__ saves index."""
         tm = L3SemanticTM(tmp_path / "l3_index")
-        with mock.patch.object(tm, 'save_index') as mock_save:
+        with mock.patch.object(tm, "save_index") as mock_save:
             tm.__exit__(None, None, None)
             mock_save.assert_called_once()
 
@@ -355,14 +351,14 @@ class TestContextManager:
         executor = tm._executor
         assert executor is not None
 
-        with mock.patch.object(tm, 'save_index'):
+        with mock.patch.object(tm, "save_index"):
             tm.__exit__(None, None, None)
 
         assert tm._executor is None
 
     def test_context_manager_usage(self, tmp_path):
         """Test using TM as context manager."""
-        with mock.patch.object(L3SemanticTM, 'save_index'):
+        with mock.patch.object(L3SemanticTM, "save_index"):
             with L3SemanticTM(tmp_path / "l3_index") as tm:
                 tm.add_entry(
                     entry_id="e1",
@@ -370,7 +366,7 @@ class TestContextManager:
                     src_lang="en",
                     tgt_lang="ja",
                     source_text="Hello",
-                    translation="こんにちは"
+                    translation="こんにちは",
                 )
             # save_index should be called on exit
 
@@ -387,7 +383,7 @@ class TestSemanticMatchDataclass:
             translation="こんにちは",
             site_id="site1",
             src_lang="en",
-            tgt_lang="ja"
+            tgt_lang="ja",
         )
         result = match.to_dict()
         assert result["entry_id"] == "e1"
@@ -406,7 +402,7 @@ class TestSemanticMatchDataclass:
             src_lang="en",
             tgt_lang="ja",
             context="Greeting",
-            metadata={"source": "manual"}
+            metadata={"source": "manual"},
         )
         result = match.to_dict()
         assert result["context"] == "Greeting"

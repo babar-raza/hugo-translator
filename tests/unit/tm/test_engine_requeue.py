@@ -48,8 +48,10 @@ class TestEngineRequeueWiring:
 
         queue_file = tmp_path / "retranslate_queue.jsonl"
         quarantine_file = tmp_path / "quarantine.jsonl"
-        with patch.object(rtq, "_QUEUE_FILE", queue_file), \
-             patch.object(rtq, "_QUARANTINE_FILE", quarantine_file):
+        with (
+            patch.object(rtq, "_QUEUE_FILE", queue_file),
+            patch.object(rtq, "_QUARANTINE_FILE", quarantine_file),
+        ):
             f = tmp_path / "stuck.ar.md"
             f.touch()
 

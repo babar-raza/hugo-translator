@@ -8,6 +8,7 @@ Tests subprocess stats module in real-world scenarios:
 - Real error scenarios
 - Telemetry integration
 """
+
 import subprocess
 
 import pytest

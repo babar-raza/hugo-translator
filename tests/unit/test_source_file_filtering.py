@@ -13,58 +13,61 @@ from src.translation_engine.engine import _is_translated_filename
 class TestIsTranslatedFilename:
     """Test helper function for detecting translated filenames."""
 
-    @pytest.mark.parametrize("filename,target_langs,source_lang,expected_translated,expected_lang", [
-        # Source files (should NOT be filtered - no language code)
-        ("index.md", ["es", "fr"], "en", False, None),
-        ("_index.md", ["es", "fr"], "en", False, None),
-        ("tutorial.md", ["es", "fr", "da"], "en", False, None),
-        ("README.md", ["es"], "en", False, None),
-        ("post.md", ["es", "fr"], "en", False, None),
-
-        # Translated files (should be filtered - language code present)
-        ("index.es.md", ["es", "fr"], "en", True, "es"),
-        ("index.fr.md", ["es", "fr"], "en", True, "fr"),
-        ("tutorial.da.md", ["da"], "en", True, "da"),
-        ("post.de.md", ["de", "fr"], "en", True, "de"),
-
-        # Case insensitive matching
-        ("index.ES.MD", ["es", "fr"], "en", True, "es"),
-        ("tutorial.FR.MD", ["es", "fr"], "en", True, "fr"),
-        ("INDEX.De.Md", ["de"], "en", True, "de"),
-
-        # .markdown extension support
-        ("tutorial.fr.markdown", ["es", "fr"], "en", True, "fr"),
-        ("index.es.markdown", ["es"], "en", True, "es"),
-        ("post.DE.MARKDOWN", ["de"], "en", True, "de"),
-
-        # Double-language files (matches last language code found)
-        ("index.es.da.md", ["es", "da", "fr"], "en", True, "da"),
-        ("post.de.fr.md", ["de", "fr"], "en", True, "fr"),
-        ("tutorial.fr.es.md", ["es", "fr"], "en", True, "es"),
-
-        # Source language files (should NOT be filtered when source_lang matches)
-        ("index.en.md", ["es", "fr"], "en", False, None),  # en is source lang, excluded
-
-        # Edge cases: files without .md extension (should NOT match)
-        ("index.es.txt", ["es"], "en", False, None),
-        ("tutorial.fr.html", ["fr"], "en", False, None),
-
-        # Files with language-like patterns but not matching (depends on _ALL_LANGUAGE_CODES)
-        # Note: "business.es.md" WILL match because "es" is a valid language code
-        # This is expected behavior - the pattern is .{lang}.(md|markdown)
-        ("business.es.md", ["es", "fr"], "en", True, "es"),  # "es" matches
-        ("design.id.md", ["id"], "en", True, "id"),  # "id" (Indonesian) matches
-
-        # Files not in target_langs but in _ALL_LANGUAGE_CODES (should still match)
-        ("index.ja.md", ["es", "fr"], "en", True, "ja"),  # ja in _ALL_LANGUAGE_CODES
-        ("post.zh.md", ["es"], "en", True, "zh"),  # zh in _ALL_LANGUAGE_CODES
-        ("tutorial.ar.md", ["de"], "en", True, "ar"),  # ar in _ALL_LANGUAGE_CODES
-    ])
-    def test_detection(self, filename, target_langs, source_lang, expected_translated, expected_lang):
+    @pytest.mark.parametrize(
+        "filename,target_langs,source_lang,expected_translated,expected_lang",
+        [
+            # Source files (should NOT be filtered - no language code)
+            ("index.md", ["es", "fr"], "en", False, None),
+            ("_index.md", ["es", "fr"], "en", False, None),
+            ("tutorial.md", ["es", "fr", "da"], "en", False, None),
+            ("README.md", ["es"], "en", False, None),
+            ("post.md", ["es", "fr"], "en", False, None),
+            # Translated files (should be filtered - language code present)
+            ("index.es.md", ["es", "fr"], "en", True, "es"),
+            ("index.fr.md", ["es", "fr"], "en", True, "fr"),
+            ("tutorial.da.md", ["da"], "en", True, "da"),
+            ("post.de.md", ["de", "fr"], "en", True, "de"),
+            # Case insensitive matching
+            ("index.ES.MD", ["es", "fr"], "en", True, "es"),
+            ("tutorial.FR.MD", ["es", "fr"], "en", True, "fr"),
+            ("INDEX.De.Md", ["de"], "en", True, "de"),
+            # .markdown extension support
+            ("tutorial.fr.markdown", ["es", "fr"], "en", True, "fr"),
+            ("index.es.markdown", ["es"], "en", True, "es"),
+            ("post.DE.MARKDOWN", ["de"], "en", True, "de"),
+            # Double-language files (matches last language code found)
+            ("index.es.da.md", ["es", "da", "fr"], "en", True, "da"),
+            ("post.de.fr.md", ["de", "fr"], "en", True, "fr"),
+            ("tutorial.fr.es.md", ["es", "fr"], "en", True, "es"),
+            # Source language files (should NOT be filtered when source_lang matches)
+            ("index.en.md", ["es", "fr"], "en", False, None),  # en is source lang, excluded
+            # Edge cases: files without .md extension (should NOT match)
+            ("index.es.txt", ["es"], "en", False, None),
+            ("tutorial.fr.html", ["fr"], "en", False, None),
+            # Files with language-like patterns but not matching (depends on _ALL_LANGUAGE_CODES)
+            # Note: "business.es.md" WILL match because "es" is a valid language code
+            # This is expected behavior - the pattern is .{lang}.(md|markdown)
+            ("business.es.md", ["es", "fr"], "en", True, "es"),  # "es" matches
+            ("design.id.md", ["id"], "en", True, "id"),  # "id" (Indonesian) matches
+            # Files not in target_langs but in _ALL_LANGUAGE_CODES (should still match)
+            ("index.ja.md", ["es", "fr"], "en", True, "ja"),  # ja in _ALL_LANGUAGE_CODES
+            ("post.zh.md", ["es"], "en", True, "zh"),  # zh in _ALL_LANGUAGE_CODES
+            ("tutorial.ar.md", ["de"], "en", True, "ar"),  # ar in _ALL_LANGUAGE_CODES
+        ],
+    )
+    def test_detection(
+        self, filename, target_langs, source_lang, expected_translated, expected_lang
+    ):
         """Test detection of translated vs source filenames."""
-        is_trans, detected = _is_translated_filename(filename, target_langs, source_lang=source_lang)
-        assert is_trans == expected_translated, f"Failed for {filename}: expected {expected_translated}, got {is_trans}"
-        assert detected == expected_lang, f"Failed for {filename}: expected lang {expected_lang}, got {detected}"
+        is_trans, detected = _is_translated_filename(
+            filename, target_langs, source_lang=source_lang
+        )
+        assert is_trans == expected_translated, (
+            f"Failed for {filename}: expected {expected_translated}, got {is_trans}"
+        )
+        assert detected == expected_lang, (
+            f"Failed for {filename}: expected lang {expected_lang}, got {detected}"
+        )
 
     def test_empty_target_langs(self):
         """Test with empty target_langs list (should still check _ALL_LANGUAGE_CODES)."""
@@ -138,7 +141,7 @@ class TestFilterSourceFilesIntegration:
         # Mock site profile for file-based localization
         site_profile = MagicMock()
         site_profile.output_layout.per_language_folders = False
-        site_profile.default_source_lang = 'en'
+        site_profile.default_source_lang = "en"
 
         # Create engine (minimal config needed)
         config = MagicMock(spec=ConfigService)
@@ -146,13 +149,13 @@ class TestFilterSourceFilesIntegration:
 
         # Filter files
         filtered = engine._filter_source_files(
-            all_files,
-            site_profile,
-            target_langs=['es', 'da', 'fr', 'de']
+            all_files, site_profile, target_langs=["es", "da", "fr", "de"]
         )
 
         # Verify: only source files included
-        assert len(filtered) == len(source_files), f"Expected {len(source_files)} files, got {len(filtered)}"
+        assert len(filtered) == len(source_files), (
+            f"Expected {len(source_files)} files, got {len(filtered)}"
+        )
         filtered_names = {f.name for f in filtered}
         assert filtered_names == set(source_files)
 
@@ -198,16 +201,14 @@ class TestFilterSourceFilesIntegration:
         # Mock site profile for folder-based localization
         site_profile = MagicMock()
         site_profile.output_layout.per_language_folders = True
-        site_profile.default_source_lang = 'en'
+        site_profile.default_source_lang = "en"
 
         config = MagicMock()
         engine = TranslationEngine(config_service=config, tm=None, model_loader=None)
 
         # Filter files
         filtered = engine._filter_source_files(
-            all_files,
-            site_profile,
-            target_langs=['es', 'de', 'fr']
+            all_files, site_profile, target_langs=["es", "de", "fr"]
         )
 
         # Verify: only source files from /en/ included
@@ -223,12 +224,12 @@ class TestFilterSourceFilesIntegration:
 
         site_profile = MagicMock()
         site_profile.output_layout.per_language_folders = False
-        site_profile.default_source_lang = 'en'
+        site_profile.default_source_lang = "en"
 
         config = MagicMock()
         engine = TranslationEngine(config_service=config, tm=None, model_loader=None)
 
-        filtered = engine._filter_source_files([], site_profile, target_langs=['es'])
+        filtered = engine._filter_source_files([], site_profile, target_langs=["es"])
         assert filtered == []
 
     def test_all_source_files_no_filtering_needed(self, tmp_path):
@@ -244,12 +245,14 @@ class TestFilterSourceFilesIntegration:
 
         site_profile = MagicMock()
         site_profile.output_layout.per_language_folders = False
-        site_profile.default_source_lang = 'en'
+        site_profile.default_source_lang = "en"
 
         config = MagicMock()
         engine = TranslationEngine(config_service=config, tm=None, model_loader=None)
 
-        filtered = engine._filter_source_files(source_files, site_profile, target_langs=['es', 'fr'])
+        filtered = engine._filter_source_files(
+            source_files, site_profile, target_langs=["es", "fr"]
+        )
 
         assert len(filtered) == len(source_files)
         assert set(filtered) == set(source_files)
@@ -272,7 +275,7 @@ class TestEdgeCases:
         ]
 
         for filename in non_md:
-            is_trans, lang = _is_translated_filename(filename, ['es', 'fr', 'de', 'da', 'pt'], 'en')
+            is_trans, lang = _is_translated_filename(filename, ["es", "fr", "de", "da", "pt"], "en")
             assert is_trans == False, f"{filename} should not be detected as translated"
             assert lang == None
 
@@ -289,7 +292,7 @@ class TestEdgeCases:
         ]
 
         for filename, expected_trans, expected_lang in edge_files:
-            is_trans, lang = _is_translated_filename(filename, ['es', 'fr'], 'en')
+            is_trans, lang = _is_translated_filename(filename, ["es", "fr"], "en")
             assert is_trans == expected_trans, f"Failed for {filename}"
             assert lang == expected_lang
 
@@ -298,8 +301,8 @@ class TestEdgeCases:
         from src.translation_engine.engine import _is_translated_filename
 
         # These should NOT match because they don't end with .md or .markdown
-        assert _is_translated_filename("index.es.md.old", ['es'], 'en') == (False, None)
-        assert _is_translated_filename("tutorial.fr.markdown.bak", ['fr'], 'en') == (False, None)
+        assert _is_translated_filename("index.es.md.old", ["es"], "en") == (False, None)
+        assert _is_translated_filename("tutorial.fr.markdown.bak", ["fr"], "en") == (False, None)
 
     def test_unusual_capitalization(self):
         """Test various capitalization patterns."""
@@ -316,7 +319,7 @@ class TestEdgeCases:
         ]
 
         for filename, expected_trans, expected_lang in caps_variants:
-            is_trans, lang = _is_translated_filename(filename, ['es', 'fr'], 'en')
+            is_trans, lang = _is_translated_filename(filename, ["es", "fr"], "en")
             assert is_trans == expected_trans, f"Failed for {filename}"
             assert lang == expected_lang
 
@@ -329,25 +332,25 @@ class TestEdgeCases:
         # Our pattern is specifically \.{lang}\.(md|markdown)$
 
         # This WILL match - "business.es.md" has .es.md pattern
-        assert _is_translated_filename("business.es.md", ['es'], 'en') == (True, 'es')
+        assert _is_translated_filename("business.es.md", ["es"], "en") == (True, "es")
 
         # This will NOT match - "es" is the whole filename (no stem before .es)
-        assert _is_translated_filename("es.md", ['es'], 'en') == (False, None)
+        assert _is_translated_filename("es.md", ["es"], "en") == (False, None)
 
         # This will NOT match - no dot before es
-        assert _is_translated_filename("espanol.md", ['es'], 'en') == (False, None)
+        assert _is_translated_filename("espanol.md", ["es"], "en") == (False, None)
 
     def test_very_long_filenames(self):
         """Test filtering works with very long filenames."""
         from src.translation_engine.engine import _is_translated_filename
 
         long_name = "a" * 200 + ".es.md"
-        is_trans, lang = _is_translated_filename(long_name, ['es'], 'en')
+        is_trans, lang = _is_translated_filename(long_name, ["es"], "en")
         assert is_trans == True
-        assert lang == 'es'
+        assert lang == "es"
 
         long_name_source = "a" * 200 + ".md"
-        is_trans, lang = _is_translated_filename(long_name_source, ['es'], 'en')
+        is_trans, lang = _is_translated_filename(long_name_source, ["es"], "en")
         assert is_trans == False
         assert lang == None
 
@@ -364,7 +367,7 @@ class TestEdgeCases:
         ]
 
         for filename, expected_trans, expected_lang in special_files:
-            is_trans, lang = _is_translated_filename(filename, ['es', 'fr', 'pt'], 'en')
+            is_trans, lang = _is_translated_filename(filename, ["es", "fr", "pt"], "en")
             assert is_trans == expected_trans, f"Failed for {filename}"
             assert lang == expected_lang
 
@@ -373,9 +376,12 @@ class TestEdgeCases:
         from src.translation_engine.engine import _is_translated_filename
 
         # Pattern should only match the LAST .{lang}.(md|markdown)
-        assert _is_translated_filename("v2.0.index.es.md", ['es'], 'en') == (True, 'es')
-        assert _is_translated_filename("file.v1.0.md", ['v1'], 'en') == (False, None)  # v1 not a lang
-        assert _is_translated_filename("my.file.name.fr.markdown", ['fr'], 'en') == (True, 'fr')
+        assert _is_translated_filename("v2.0.index.es.md", ["es"], "en") == (True, "es")
+        assert _is_translated_filename("file.v1.0.md", ["v1"], "en") == (
+            False,
+            None,
+        )  # v1 not a lang
+        assert _is_translated_filename("my.file.name.fr.markdown", ["fr"], "en") == (True, "fr")
 
 
 # Observability tests (TF-06)
@@ -397,7 +403,7 @@ class TestFilteringObservability:
 
         site_profile = MagicMock()
         site_profile.output_layout.per_language_folders = False
-        site_profile.default_source_lang = 'en'
+        site_profile.default_source_lang = "en"
 
         config = MagicMock()
         engine = TranslationEngine(config_service=config, tm=None, model_loader=None)
@@ -405,9 +411,7 @@ class TestFilteringObservability:
         # Capture logs
         with caplog.at_level(logging.INFO):
             filtered = engine._filter_source_files(
-                source_files + translated_files,
-                site_profile,
-                target_langs=['es', 'fr', 'de']
+                source_files + translated_files, site_profile, target_langs=["es", "fr", "de"]
             )
 
         # Verify summary log present
@@ -433,16 +437,14 @@ class TestFilteringObservability:
 
         site_profile = MagicMock()
         site_profile.output_layout.per_language_folders = False
-        site_profile.default_source_lang = 'en'
+        site_profile.default_source_lang = "en"
 
         config = MagicMock()
         engine = TranslationEngine(config_service=config, tm=None, model_loader=None)
 
         with caplog.at_level(logging.INFO):
             filtered = engine._filter_source_files(
-                source_files,
-                site_profile,
-                target_langs=['es', 'fr']
+                source_files, site_profile, target_langs=["es", "fr"]
             )
 
         # Should not log filtering summary when nothing filtered
@@ -463,16 +465,14 @@ class TestFilteringObservability:
 
         site_profile = MagicMock()
         site_profile.output_layout.per_language_folders = False
-        site_profile.default_source_lang = 'en'
+        site_profile.default_source_lang = "en"
 
         config = MagicMock()
         engine = TranslationEngine(config_service=config, tm=None, model_loader=None)
 
         with caplog.at_level(logging.WARNING):
             filtered = engine._filter_source_files(
-                source_files + translated_files,
-                site_profile,
-                target_langs=['es']
+                source_files + translated_files, site_profile, target_langs=["es"]
             )
 
         # Verify warning present
@@ -496,16 +496,14 @@ class TestFilteringObservability:
 
         site_profile = MagicMock()
         site_profile.output_layout.per_language_folders = False
-        site_profile.default_source_lang = 'en'
+        site_profile.default_source_lang = "en"
 
         config = MagicMock()
         engine = TranslationEngine(config_service=config, tm=None, model_loader=None)
 
         with caplog.at_level(logging.WARNING):
             filtered = engine._filter_source_files(
-                source_files + translated_files,
-                site_profile,
-                target_langs=['es']
+                source_files + translated_files, site_profile, target_langs=["es"]
             )
 
         # Should not warn for normal filter rate
@@ -531,4 +529,6 @@ class TestFilteringPerformance:
 
         # Should complete in well under 1 second for 1000 files
         assert duration < 1.0, f"Filtering 1000 filenames took {duration:.3f}s, expected <1s"
-        print(f"Performance: {len(filenames)} filenames checked in {duration:.3f}s ({len(filenames)/duration:.0f} files/sec)")
+        print(
+            f"Performance: {len(filenames)} filenames checked in {duration:.3f}s ({len(filenames) / duration:.0f} files/sec)"
+        )

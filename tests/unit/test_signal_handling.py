@@ -30,7 +30,7 @@ def test_unified_handler_registration_count():
         signal_calls.append((sig, handler))
         return original_signal(sig, handler)
 
-    with patch('signal.signal', side_effect=track_signal_call):
+    with patch("signal.signal", side_effect=track_signal_call):
         setup_unified_signal_handler(mock_engine)
 
     # Should register SIGINT and SIGTERM (always)
@@ -56,14 +56,14 @@ def test_unified_handler_windows_platform():
         # Don't actually register to avoid side effects
         return lambda *args: None
 
-    with patch('signal.signal', side_effect=track_signal_call):
-        with patch('platform.system', return_value='Windows'):
+    with patch("signal.signal", side_effect=track_signal_call):
+        with patch("platform.system", return_value="Windows"):
             setup_unified_signal_handler(mock_engine)
 
     # On Windows, should register SIGINT, SIGTERM, and SIGBREAK
     assert signal.SIGINT in signal_calls
     assert signal.SIGTERM in signal_calls
-    if hasattr(signal, 'SIGBREAK'):
+    if hasattr(signal, "SIGBREAK"):
         assert signal.SIGBREAK in signal_calls
 
 
@@ -78,14 +78,14 @@ def test_unified_handler_unix_platform():
         signal_calls.append(sig)
         return lambda *args: None
 
-    with patch('signal.signal', side_effect=track_signal_call):
-        with patch('platform.system', return_value='Linux'):
+    with patch("signal.signal", side_effect=track_signal_call):
+        with patch("platform.system", return_value="Linux"):
             setup_unified_signal_handler(mock_engine)
 
     # On Linux, should register SIGINT and SIGTERM only
     assert signal.SIGINT in signal_calls
     assert signal.SIGTERM in signal_calls
-    if hasattr(signal, 'SIGBREAK'):
+    if hasattr(signal, "SIGBREAK"):
         assert signal.SIGBREAK not in signal_calls
 
 
@@ -99,10 +99,10 @@ def test_cleanup_sequence_order():
     call_order = []
 
     def mock_cleanup(*args, **kwargs):
-        call_order.append('cleanup')
+        call_order.append("cleanup")
 
     def mock_request_shutdown():
-        call_order.append('engine_shutdown')
+        call_order.append("engine_shutdown")
 
     mock_engine.request_shutdown = mock_request_shutdown
 
@@ -115,8 +115,11 @@ def test_cleanup_sequence_order():
             captured_handler = handler
         return lambda *args: None
 
-    with patch('signal.signal', side_effect=capture_handler):
-        with patch('src.observability.graceful_shutdown.cleanup_telemetry_contexts', side_effect=mock_cleanup):
+    with patch("signal.signal", side_effect=capture_handler):
+        with patch(
+            "src.observability.graceful_shutdown.cleanup_telemetry_contexts",
+            side_effect=mock_cleanup,
+        ):
             setup_unified_signal_handler(mock_engine)
 
     # Simulate SIGINT
@@ -124,8 +127,9 @@ def test_cleanup_sequence_order():
         captured_handler(signal.SIGINT, None)
 
     # Verify order: cleanup → engine shutdown
-    assert call_order == ['cleanup', 'engine_shutdown'], \
+    assert call_order == ["cleanup", "engine_shutdown"], (
         f"Expected ['cleanup', 'engine_shutdown'], got {call_order}"
+    )
 
 
 def test_force_exit_on_second_signal():
@@ -144,8 +148,8 @@ def test_force_exit_on_second_signal():
             captured_handler = handler
         return lambda *args: None
 
-    with patch('signal.signal', side_effect=capture_handler):
-        with patch('src.observability.graceful_shutdown.cleanup_telemetry_contexts'):
+    with patch("signal.signal", side_effect=capture_handler):
+        with patch("src.observability.graceful_shutdown.cleanup_telemetry_contexts"):
             setup_unified_signal_handler(mock_engine)
 
     # First signal: should call cleanup and engine shutdown
@@ -157,8 +161,7 @@ def test_force_exit_on_second_signal():
     with pytest.raises(SystemExit) as exc_info:
         captured_handler(signal.SIGINT, None)
 
-    assert exc_info.value.code == 130, \
-        f"Expected exit code 130, got {exc_info.value.code}"
+    assert exc_info.value.code == 130, f"Expected exit code 130, got {exc_info.value.code}"
 
 
 def test_cleanup_error_handling():
@@ -180,8 +183,11 @@ def test_cleanup_error_handling():
             captured_handler = handler
         return lambda *args: None
 
-    with patch('signal.signal', side_effect=capture_handler):
-        with patch('src.observability.graceful_shutdown.cleanup_telemetry_contexts', side_effect=mock_cleanup_error):
+    with patch("signal.signal", side_effect=capture_handler):
+        with patch(
+            "src.observability.graceful_shutdown.cleanup_telemetry_contexts",
+            side_effect=mock_cleanup_error,
+        ):
             setup_unified_signal_handler(mock_engine)
 
     # Signal should still trigger engine shutdown even if cleanup fails
@@ -189,8 +195,9 @@ def test_cleanup_error_handling():
         captured_handler(signal.SIGINT, None)
 
     # Engine shutdown should still be called
-    assert mock_engine.request_shutdown.called, \
+    assert mock_engine.request_shutdown.called, (
         "Engine shutdown should be called even if telemetry cleanup fails"
+    )
 
 
 def test_graceful_shutdown_cleanup_function():
@@ -224,8 +231,8 @@ def test_graceful_shutdown_cleanup_function():
     # Verify metrics set with correct status
     call_args = mock_context.set_metrics.call_args
     assert call_args is not None
-    assert call_args[1]['run_status'] == 'cancelled'
-    assert 'SIGINT' in call_args[1]['error_summary']
+    assert call_args[1]["run_status"] == "cancelled"
+    assert "SIGINT" in call_args[1]["error_summary"]
 
 
 def test_legacy_setup_signal_handlers_delegates():
@@ -234,7 +241,7 @@ def test_legacy_setup_signal_handlers_delegates():
 
     mock_engine = Mock()
 
-    with patch('src.cli.setup_unified_signal_handler') as mock_unified:
+    with patch("src.cli.setup_unified_signal_handler") as mock_unified:
         setup_signal_handlers(mock_engine)
 
     # Verify delegation
@@ -245,11 +252,12 @@ def test_legacy_setup_graceful_shutdown_warns():
     """Test that legacy setup_graceful_shutdown logs deprecation warning."""
     from src.observability.graceful_shutdown import setup_graceful_shutdown
 
-    with patch('signal.signal'):  # Prevent actual registration
-        with patch('src.observability.graceful_shutdown.logger') as mock_logger:
+    with patch("signal.signal"):  # Prevent actual registration
+        with patch("src.observability.graceful_shutdown.logger") as mock_logger:
             setup_graceful_shutdown()
 
     # Verify deprecation warning logged
-    warning_calls = [call for call in mock_logger.warning.call_args_list
-                     if 'deprecated' in str(call).lower()]
+    warning_calls = [
+        call for call in mock_logger.warning.call_args_list if "deprecated" in str(call).lower()
+    ]
     assert len(warning_calls) > 0, "Deprecation warning should be logged"

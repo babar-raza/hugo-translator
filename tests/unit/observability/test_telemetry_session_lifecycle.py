@@ -24,8 +24,7 @@ def test_start_and_complete_session_lifecycle():
 
     # Start session
     run_context, context_manager = telemetry.start_translation_session(
-        job_type="translate_file",
-        trigger_type="cli"
+        job_type="translate_file", trigger_type="cli"
     )
 
     # Verify context returned
@@ -34,7 +33,7 @@ def test_start_and_complete_session_lifecycle():
 
     # If telemetry is enabled, verify session tracked
     if not isinstance(run_context, DummyRunContext):
-        assert hasattr(telemetry, '_active_sessions')
+        assert hasattr(telemetry, "_active_sessions")
         # Session should be in active sessions
         session_id = id(run_context)
         assert session_id in telemetry._active_sessions
@@ -52,8 +51,7 @@ def test_context_manager_backward_compatibility():
 
     # Use context manager
     with telemetry.track_translation_session(
-        job_type="translate_file",
-        trigger_type="cli"
+        job_type="translate_file", trigger_type="cli"
     ) as run_context:
         # Context should be returned
         assert run_context is not None
@@ -64,8 +62,7 @@ def test_disabled_telemetry_returns_dummy():
     telemetry = TranslationTelemetry(enabled=False)
 
     run_context, context_manager = telemetry.start_translation_session(
-        job_type="translate_file",
-        trigger_type="cli"
+        job_type="translate_file", trigger_type="cli"
     )
 
     # Should get dummy context
@@ -78,7 +75,7 @@ def test_complete_session_handles_missing_context():
     telemetry = TranslationTelemetry(enabled=True)
 
     # Create a fake context not from start_translation_session
-    fake_context = type('FakeContext', (), {'event_id': 'fake-123'})()
+    fake_context = type("FakeContext", (), {"event_id": "fake-123"})()
 
     # Should not crash
     telemetry.complete_translation_session(fake_context)
@@ -86,7 +83,7 @@ def test_complete_session_handles_missing_context():
 
 def test_session_with_file_path():
     """Test session creation with real file path."""
-    with tempfile.NamedTemporaryFile(mode='w', suffix='.md', delete=False) as f:
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".md", delete=False) as f:
         f.write("# Test Content")
         test_file = Path(f.name)
 
@@ -94,10 +91,7 @@ def test_session_with_file_path():
         telemetry = TranslationTelemetry(enabled=True)
 
         run_context, cm = telemetry.start_translation_session(
-            job_type="translate_file",
-            trigger_type="cli",
-            file_path=test_file,
-            target_langs=["fr"]
+            job_type="translate_file", trigger_type="cli", file_path=test_file, target_langs=["fr"]
         )
 
         assert run_context is not None
@@ -128,11 +122,12 @@ def test_concurrent_session_management():
             run_context, cm = telemetry.start_translation_session(
                 job_type="translate_file",
                 trigger_type="cli",
-                file_path=Path(f"/test/file_{thread_id}.md")
+                file_path=Path(f"/test/file_{thread_id}.md"),
             )
 
             # Simulate some work
             import time
+
             time.sleep(0.01)
 
             # Complete session
@@ -158,9 +153,10 @@ def test_concurrent_session_management():
     assert len(errors) == 0, f"Thread errors: {errors}"
 
     # Verify all sessions cleaned up (only if telemetry enabled)
-    if telemetry.enabled and hasattr(telemetry, '_active_sessions'):
-        assert len(telemetry._active_sessions) == 0, \
+    if telemetry.enabled and hasattr(telemetry, "_active_sessions"):
+        assert len(telemetry._active_sessions) == 0, (
             f"Expected 0 active sessions, found {len(telemetry._active_sessions)}"
+        )
 
 
 def test_session_auto_cleanup_on_gc():
@@ -177,8 +173,7 @@ def test_session_auto_cleanup_on_gc():
 
     # Start a session
     run_context, cm = telemetry.start_translation_session(
-        job_type="translate_file",
-        trigger_type="cli"
+        job_type="translate_file", trigger_type="cli"
     )
 
     # Skip test if telemetry is disabled (returns DummyRunContext)
@@ -187,8 +182,9 @@ def test_session_auto_cleanup_on_gc():
 
     # Verify session is tracked
     session_id = id(run_context)
-    assert session_id in telemetry._active_sessions, \
+    assert session_id in telemetry._active_sessions, (
         "Session should be in _active_sessions after start"
+    )
 
     # Delete the run_context reference (simulates exception/leak scenario)
     del run_context
@@ -198,5 +194,6 @@ def test_session_auto_cleanup_on_gc():
     gc.collect()
 
     # Verify session was auto-cleaned
-    assert session_id not in telemetry._active_sessions, \
+    assert session_id not in telemetry._active_sessions, (
         "Session should be auto-cleaned from _active_sessions after gc"
+    )

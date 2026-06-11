@@ -3,6 +3,7 @@ Unit tests for GPU optimizer.
 
 Tests batch size calculation based on VRAM, model size, and precision.
 """
+
 from unittest.mock import Mock, patch
 
 import pytest
@@ -201,7 +202,7 @@ class TestGPUOptimizer:
         # Higher utilization should allow larger batch
         assert batch_90 > batch_70
 
-    @patch('src.model_runtime.gpu_optimizer.torch')
+    @patch("src.model_runtime.gpu_optimizer.torch")
     def test_optimize_success(self, mock_torch):
         """Test successful optimization flow."""
         # Mock CUDA availability
@@ -230,7 +231,7 @@ class TestGPUOptimizer:
         assert 0 < config.estimated_vram_mb <= config.total_vram_mb
         assert config.target_utilization == 0.85
 
-    @patch('src.model_runtime.gpu_optimizer.torch')
+    @patch("src.model_runtime.gpu_optimizer.torch")
     def test_optimize_cuda_not_available(self, mock_torch):
         """Test optimization fails gracefully when CUDA unavailable."""
         mock_torch.cuda.is_available.return_value = False
@@ -240,7 +241,7 @@ class TestGPUOptimizer:
         with pytest.raises(RuntimeError, match="CUDA not available"):
             optimizer.optimize()
 
-    @patch('src.model_runtime.gpu_optimizer.torch')
+    @patch("src.model_runtime.gpu_optimizer.torch")
     def test_optimize_invalid_device_id(self, mock_torch):
         """Test optimization fails with invalid device ID."""
         mock_torch.cuda.is_available.return_value = True
@@ -251,7 +252,7 @@ class TestGPUOptimizer:
         with pytest.raises(RuntimeError, match="Invalid device ID"):
             optimizer.optimize()
 
-    @patch('src.model_runtime.gpu_optimizer.torch')
+    @patch("src.model_runtime.gpu_optimizer.torch")
     def test_optimize_with_batch_size_override(self, mock_torch):
         """Test that batch size override is respected."""
         # Mock CUDA
@@ -274,7 +275,7 @@ class TestGPUOptimizer:
         # Should use override
         assert config.batch_size == 8
 
-    @patch('src.model_runtime.gpu_optimizer.torch')
+    @patch("src.model_runtime.gpu_optimizer.torch")
     def test_optimize_multi_gpu(self, mock_torch):
         """Test optimization with multi-GPU setup."""
         mock_torch.cuda.is_available.return_value = True

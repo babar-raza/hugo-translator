@@ -19,13 +19,10 @@ class TestBackendSelection:
 
     def test_default_backend_redis(self):
         """Test default backend is Redis."""
-        config = {
-            "redis": {"host": "localhost", "port": 6379},
-            "memory": {"max_queue_size": 1000}
-        }
+        config = {"redis": {"host": "localhost", "port": 6379}, "memory": {"max_queue_size": 1000}}
 
         # Mock Redis to avoid actual connection
-        with patch('src.queues.redis_queue.RedisQueueBackend._get_redis'):
+        with patch("src.queues.redis_queue.RedisQueueBackend._get_redis"):
             engine = JobEngineV2(config=config)
 
             assert engine.primary_backend_type == "redis"
@@ -37,7 +34,7 @@ class TestBackendSelection:
         config = {
             "backend": "memory",
             "fallback_backend": "redis",
-            "memory": {"max_queue_size": 100}
+            "memory": {"max_queue_size": 100},
         }
 
         engine = JobEngineV2(config=config)
@@ -53,7 +50,7 @@ class TestBackendSelection:
 
         config = {
             "backend": "redis",  # This should be overridden by env var
-            "memory": {"max_queue_size": 500}
+            "memory": {"max_queue_size": 500},
         }
 
         engine = JobEngineV2(config=config)
@@ -62,13 +59,10 @@ class TestBackendSelection:
 
     def test_execution_mode_backend_selection(self):
         """Test execution mode backend defaults."""
-        config = {
-            "primary_backend_from_mode": "redis",
-            "redis": {"host": "localhost"}
-        }
+        config = {"primary_backend_from_mode": "redis", "redis": {"host": "localhost"}}
 
         # Mock Redis to avoid actual connection
-        with patch('src.queues.redis_queue.RedisQueueBackend._get_redis'):
+        with patch("src.queues.redis_queue.RedisQueueBackend._get_redis"):
             engine = JobEngineV2(config=config)
 
             assert engine.primary_backend_type == "redis"
@@ -120,6 +114,7 @@ class TestMemoryBackend:
 
         # Push 3rd item (should raise QueueFullError)
         from src.queues.base import QueueFullError
+
         with pytest.raises(QueueFullError):
             backend.push("test_queue", {"job_id": "job_3", "priority": 3})
 
@@ -197,7 +192,7 @@ class TestRedisBackend:
 
     def test_redis_backend_health_check_success(self, mock_redis):
         """Test Redis health check success."""
-        with patch('src.queues.redis_queue.redis.Redis', return_value=mock_redis):
+        with patch("src.queues.redis_queue.redis.Redis", return_value=mock_redis):
             backend = RedisQueueBackend(host="localhost", port=6379)
 
             assert backend.health_check() is True
@@ -207,7 +202,7 @@ class TestRedisBackend:
         """Test Redis health check failure."""
         mock_redis.ping.side_effect = Exception("Connection refused")
 
-        with patch('src.queues.redis_queue.redis.Redis', return_value=mock_redis):
+        with patch("src.queues.redis_queue.redis.Redis", return_value=mock_redis):
             backend = RedisQueueBackend(host="localhost", port=6379)
 
             # Force connection
@@ -221,15 +216,11 @@ class TestRedisBackend:
         mock_redis.ping.side_effect = [
             Exception("Retry 1"),
             Exception("Retry 2"),
-            True  # Success on 3rd attempt
+            True,  # Success on 3rd attempt
         ]
 
-        with patch('src.queues.redis_queue.redis.Redis', return_value=mock_redis):
-            backend = RedisQueueBackend(
-                host="localhost",
-                max_retries=3,
-                retry_delay=0.1
-            )
+        with patch("src.queues.redis_queue.redis.Redis", return_value=mock_redis):
+            backend = RedisQueueBackend(host="localhost", max_retries=3, retry_delay=0.1)
 
             # This should succeed on 3rd retry
             client = backend._get_redis()
@@ -245,11 +236,11 @@ class TestBackendFailover:
             "backend": "redis",
             "fallback_backend": "memory",
             "redis": {"host": "localhost", "port": 6379},
-            "memory": {"max_queue_size": 1000}
+            "memory": {"max_queue_size": 1000},
         }
 
         # Mock Redis to fail health check
-        with patch('src.queues.redis_queue.RedisQueueBackend._get_redis') as mock_redis:
+        with patch("src.queues.redis_queue.RedisQueueBackend._get_redis") as mock_redis:
             mock_redis.side_effect = ConnectionError("Redis unavailable")
 
             engine = JobEngineV2(config=config)
@@ -264,11 +255,11 @@ class TestBackendFailover:
             "backend": "redis",
             "fallback_backend": "memory",
             "redis": {"host": "localhost", "port": 6379, "health_check_interval": 0},
-            "memory": {"max_queue_size": 1000}
+            "memory": {"max_queue_size": 1000},
         }
 
         # Start with failed Redis
-        with patch('src.queues.redis_queue.RedisQueueBackend._get_redis') as mock_redis:
+        with patch("src.queues.redis_queue.RedisQueueBackend._get_redis") as mock_redis:
             mock_redis.side_effect = ConnectionError("Redis unavailable")
 
             engine = JobEngineV2(config=config)
@@ -301,11 +292,11 @@ class TestBackendFailover:
             "fallback_backend": "memory",
             "redis": {"host": "localhost"},
             "memory": {"max_queue_size": 1000},
-            "telemetry": mock_telemetry
+            "telemetry": mock_telemetry,
         }
 
         # Mock Redis to fail
-        with patch('src.queues.redis_queue.RedisQueueBackend._get_redis') as mock_redis:
+        with patch("src.queues.redis_queue.RedisQueueBackend._get_redis") as mock_redis:
             mock_redis.side_effect = ConnectionError("Redis unavailable")
 
             engine = JobEngineV2(config=config)
@@ -333,7 +324,7 @@ class TestJobEngineIntegration:
         config = {
             "backend": "memory",
             "fallback_backend": "memory",
-            "memory": {"max_queue_size": 500}
+            "memory": {"max_queue_size": 500},
         }
 
         engine = JobEngine(config=config)
@@ -367,7 +358,7 @@ class TestEndToEndScenarios:
         config = {
             "backend": "memory",  # Use memory to avoid Redis dependency
             "fallback_backend": "memory",
-            "memory": {"max_queue_size": 100}
+            "memory": {"max_queue_size": 100},
         }
 
         engine = JobEngine(config=config)
@@ -379,7 +370,7 @@ class TestEndToEndScenarios:
             site_id="test.com",
             target_langs=["es", "fr"],
             input_paths=[Path("test.md")],
-            priority=1
+            priority=1,
         )
 
         # Enqueue job
@@ -408,7 +399,7 @@ class TestEndToEndScenarios:
         config = {
             "backend": "memory",
             "redis": {"health_check_interval": 0},  # Check every operation
-            "memory": {"max_queue_size": 100}
+            "memory": {"max_queue_size": 100},
         }
 
         engine = JobEngine(config=config)

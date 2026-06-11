@@ -10,7 +10,6 @@ Tests cover:
 - Edge cases (empty source, very short segments)
 """
 
-
 from src.translation_engine.validation.base import ValidationSeverity
 from src.translation_engine.validation.length_anomaly_validator import LengthAnomalyValidator
 
@@ -64,8 +63,7 @@ class TestLengthAnomalyValidator:
         assert not result.success
         assert result.has_errors()
         assert any(
-            issue.severity == ValidationSeverity.ERROR
-            and "word ratio" in issue.message.lower()
+            issue.severity == ValidationSeverity.ERROR and "word ratio" in issue.message.lower()
             for issue in result.issues
         )
 
@@ -83,8 +81,7 @@ class TestLengthAnomalyValidator:
         assert not result.has_errors()
         assert result.has_warnings()
         assert any(
-            issue.severity == ValidationSeverity.WARNING
-            and "word ratio" in issue.message.lower()
+            issue.severity == ValidationSeverity.WARNING and "word ratio" in issue.message.lower()
             for issue in result.issues
         )
 

@@ -1,6 +1,5 @@
 """Unit tests for extended metrics (BM-08)."""
 
-
 from src.observability.metrics import MetricsCollector
 
 
@@ -44,9 +43,7 @@ def test_bm08_batch_preparation_duration_metric_exists():
     """Test that batch_preparation_duration_seconds metric is registered."""
     collector = MetricsCollector(worker_id="test")
 
-    assert "batch_preparation_duration_seconds" in [
-        h.name for h in collector._histograms.values()
-    ]
+    assert "batch_preparation_duration_seconds" in [h.name for h in collector._histograms.values()]
 
 
 def test_bm08_retry_count_metric_exists():

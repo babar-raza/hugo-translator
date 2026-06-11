@@ -148,12 +148,12 @@ class TestSchemaMigrations:
             assert db.get_schema_version() == CURRENT_SCHEMA_VERSION
 
             # Verify data preserved
-            run = db.get_run('run1')
+            run = db.get_run("run1")
             assert run is not None
-            assert run.model_id == 'model1'
-            assert run.device == 'cpu'
+            assert run.model_id == "model1"
+            assert run.device == "cpu"
             assert len(run.results) == 1
-            assert run.results[0].sample_id == 'sample1'
+            assert run.results[0].sample_id == "sample1"
 
             # Verify new tables exist
             conn = db._get_connection()

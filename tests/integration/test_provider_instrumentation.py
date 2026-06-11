@@ -1,7 +1,8 @@
 """Integration tests: ContextVar accumulates across provider calls."""
+
 from __future__ import annotations
 
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -89,7 +90,9 @@ class TestCorrectionTwoArgFix:
     def test_correction_uses_two_arg_generate(self):
         """correction.py calls generate(system_prompt, user_text), not generate(prompt)."""
         import inspect
+
         from src.translation_engine import correction
+
         src = inspect.getsource(correction.attempt_correction)
         # Must have 2-arg call pattern (system_prompt, prompt)
         assert "correction_system_prompt" in src

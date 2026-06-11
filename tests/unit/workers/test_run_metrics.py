@@ -9,6 +9,7 @@ Verifies:
 - Does not raise on failure (non-fatal)
 - Respects metrics.enabled=false gate
 """
+
 import json
 import warnings
 from datetime import timezone
@@ -20,6 +21,7 @@ def _make_worker():
     from src.workers.autonomous_content_translation_worker import (
         AutonomousContentTranslationWorker,
     )
+
     w = AutonomousContentTranslationWorker.__new__(AutonomousContentTranslationWorker)
     w._run_new_files = {"blog.aspose.net": 5}
     return w
@@ -37,7 +39,14 @@ def _make_config_service(enabled=True, output_dir=None):
 def _fake_stats_summary():
     return {
         "translations": {"total": 10, "success": 8, "failed": 2},
-        "tm": {"lookups": 20, "l1_hits": 5, "l2_hits": 3, "l3_hits": 2, "misses": 10, "hit_rate": 0.5},
+        "tm": {
+            "lookups": 20,
+            "l1_hits": 5,
+            "l2_hits": 3,
+            "l3_hits": 2,
+            "misses": 10,
+            "hit_rate": 0.5,
+        },
         "performance": {},
     }
 
@@ -45,6 +54,7 @@ def _fake_stats_summary():
 # ---------------------------------------------------------------------------
 # Happy path
 # ---------------------------------------------------------------------------
+
 
 def test_write_run_metrics_creates_json(tmp_path):
     """File is written and contains all required keys."""
@@ -54,8 +64,10 @@ def test_write_run_metrics_creates_json(tmp_path):
     mock_mc = MagicMock()
     mock_mc.get_stats_summary.return_value = _fake_stats_summary()
 
-    with patch("src.observability.metrics.get_metrics", return_value=mock_mc), \
-         patch("src.tm.retranslate_queue.load_queued_paths", return_value={"a", "b"}):
+    with (
+        patch("src.observability.metrics.get_metrics", return_value=mock_mc),
+        patch("src.tm.retranslate_queue.load_queued_paths", return_value={"a", "b"}),
+    ):
         worker._write_run_metrics(site_id="blog.aspose.net", run_id="run-123")
 
     files = list(tmp_path.glob("run_*.json"))
@@ -79,13 +91,17 @@ def test_write_run_metrics_no_deprecated_datetime_warning(tmp_path):
     mock_mc = MagicMock()
     mock_mc.get_stats_summary.return_value = _fake_stats_summary()
 
-    with warnings.catch_warnings(record=True) as caught, \
-         patch("src.observability.metrics.get_metrics", return_value=mock_mc), \
-         patch("src.tm.retranslate_queue.load_queued_paths", return_value=set()):
+    with (
+        warnings.catch_warnings(record=True) as caught,
+        patch("src.observability.metrics.get_metrics", return_value=mock_mc),
+        patch("src.tm.retranslate_queue.load_queued_paths", return_value=set()),
+    ):
         warnings.simplefilter("always")
         worker._write_run_metrics(site_id="blog.aspose.net", run_id="run-456")
 
-    deprecation_msgs = [str(w.message) for w in caught if issubclass(w.category, DeprecationWarning)]
+    deprecation_msgs = [
+        str(w.message) for w in caught if issubclass(w.category, DeprecationWarning)
+    ]
     utcnow_warnings = [m for m in deprecation_msgs if "utcnow" in m.lower()]
     assert not utcnow_warnings, f"datetime.utcnow() DeprecationWarning found: {utcnow_warnings}"
 
@@ -93,14 +109,17 @@ def test_write_run_metrics_no_deprecated_datetime_warning(tmp_path):
 def test_write_run_metrics_timestamp_is_utc_aware(tmp_path):
     """Timestamp string should be parseable as UTC ISO 8601."""
     from datetime import datetime
+
     worker = _make_worker()
     worker.config_service = _make_config_service(output_dir=str(tmp_path))
 
     mock_mc = MagicMock()
     mock_mc.get_stats_summary.return_value = _fake_stats_summary()
 
-    with patch("src.observability.metrics.get_metrics", return_value=mock_mc), \
-         patch("src.tm.retranslate_queue.load_queued_paths", return_value=set()):
+    with (
+        patch("src.observability.metrics.get_metrics", return_value=mock_mc),
+        patch("src.tm.retranslate_queue.load_queued_paths", return_value=set()),
+    ):
         worker._write_run_metrics(site_id="blog.aspose.net", run_id="run-789")
 
     files = list(tmp_path.glob("run_*.json"))
@@ -114,6 +133,7 @@ def test_write_run_metrics_timestamp_is_utc_aware(tmp_path):
 # ---------------------------------------------------------------------------
 # Gate: disabled
 # ---------------------------------------------------------------------------
+
 
 def test_write_run_metrics_disabled_by_config(tmp_path):
     worker = _make_worker()
@@ -129,6 +149,7 @@ def test_write_run_metrics_disabled_by_config(tmp_path):
 # ---------------------------------------------------------------------------
 # Failure modes — must never raise
 # ---------------------------------------------------------------------------
+
 
 def test_write_run_metrics_exception_does_not_propagate(tmp_path):
     """Exception in MetricsCollector must not crash the worker."""
@@ -148,8 +169,10 @@ def test_write_run_metrics_queue_error_still_writes(tmp_path):
     mock_mc = MagicMock()
     mock_mc.get_stats_summary.return_value = _fake_stats_summary()
 
-    with patch("src.observability.metrics.get_metrics", return_value=mock_mc), \
-         patch("src.tm.retranslate_queue.load_queued_paths", side_effect=OSError("disk error")):
+    with (
+        patch("src.observability.metrics.get_metrics", return_value=mock_mc),
+        patch("src.tm.retranslate_queue.load_queued_paths", side_effect=OSError("disk error")),
+    ):
         worker._write_run_metrics(site_id="blog.aspose.net", run_id="run-qerr")
 
     files = list(tmp_path.glob("run_*.json"))

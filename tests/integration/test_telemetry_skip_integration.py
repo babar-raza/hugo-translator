@@ -64,8 +64,8 @@ class TestTelemetrySkipIntegration:
             skip_reasons={
                 "es": "output already exists",
                 "fr": "output already exists",
-                "de": "output already exists"
-            }
+                "de": "output already exists",
+            },
         )
 
         # Set stats to reflect skip scenario
@@ -79,9 +79,9 @@ class TestTelemetrySkipIntegration:
 
         # Verify all-skipped condition
         total_langs = len(result.skipped_langs)
-        all_skipped = (result.stats.langs_skipped == total_langs and
-                      total_langs > 0 and
-                      result.success)
+        all_skipped = (
+            result.stats.langs_skipped == total_langs and total_langs > 0 and result.success
+        )
 
         assert all_skipped is True
         assert result.stats.langs_translated == 0
@@ -89,12 +89,13 @@ class TestTelemetrySkipIntegration:
 
         # Build output summary (for logging, not telemetry)
         from src.observability.telemetry_integration import build_output_summary
+
         output_summary = build_output_summary(
             job_type="translate_file",
             outputs=result.outputs,
             errors=result.errors,
             skipped_langs=result.skipped_langs,
-            skip_reasons=result.skip_reasons
+            skip_reasons=result.skip_reasons,
         )
 
         # Verify output summary format (even though no telemetry event is created)
@@ -135,13 +136,9 @@ class TestTelemetrySkipIntegration:
         result = TranslationResult(
             success=True,
             file_path=Path("test.md"),
-            outputs={
-                "es": Path("test.es.md"),
-                "fr": Path("test.fr.md"),
-                "de": Path("test.de.md")
-            },
+            outputs={"es": Path("test.es.md"), "fr": Path("test.fr.md"), "de": Path("test.de.md")},
             skipped_langs=[],  # No skips
-            skip_reasons={}
+            skip_reasons={},
         )
 
         # Set stats to reflect translation work
@@ -155,20 +152,19 @@ class TestTelemetrySkipIntegration:
 
         # Track telemetry
         with telemetry.track_translation_session(
-            job_type="translate_file",
-            file_path=Path("test.md"),
-            target_langs=["es", "fr", "de"]
+            job_type="translate_file", file_path=Path("test.md"), target_langs=["es", "fr", "de"]
         ) as ctx:
             telemetry.track_translation_stats(ctx, result.stats)
 
             # Build output summary
             from src.observability.telemetry_integration import build_output_summary
+
             output_summary = build_output_summary(
                 job_type="translate_file",
                 outputs=result.outputs,
                 errors=result.errors,
                 skipped_langs=result.skipped_langs,
-                skip_reasons=result.skip_reasons
+                skip_reasons=result.skip_reasons,
             )
 
             # Verify output summary format (no skips mentioned)
@@ -177,9 +173,9 @@ class TestTelemetrySkipIntegration:
 
             # Verify NOT all-skipped
             total_langs = len(result.outputs)
-            all_skipped = (result.stats.langs_skipped == total_langs and
-                          total_langs > 0 and
-                          result.success)
+            all_skipped = (
+                result.stats.langs_skipped == total_langs and total_langs > 0 and result.success
+            )
 
             assert all_skipped is False
             assert result.stats.langs_translated == 3
@@ -208,12 +204,9 @@ class TestTelemetrySkipIntegration:
         result = TranslationResult(
             success=True,
             file_path=Path("test.md"),
-            outputs={
-                "es": Path("test.es.md"),
-                "fr": Path("test.fr.md")
-            },
+            outputs={"es": Path("test.es.md"), "fr": Path("test.fr.md")},
             skipped_langs=["de"],  # 1 skipped
-            skip_reasons={"de": "output already exists"}
+            skip_reasons={"de": "output already exists"},
         )
 
         # Set stats to reflect mixed work
@@ -227,20 +220,19 @@ class TestTelemetrySkipIntegration:
 
         # Track telemetry
         with telemetry.track_translation_session(
-            job_type="translate_file",
-            file_path=Path("test.md"),
-            target_langs=["es", "fr", "de"]
+            job_type="translate_file", file_path=Path("test.md"), target_langs=["es", "fr", "de"]
         ) as ctx:
             telemetry.track_translation_stats(ctx, result.stats)
 
             # Build output summary
             from src.observability.telemetry_integration import build_output_summary
+
             output_summary = build_output_summary(
                 job_type="translate_file",
                 outputs=result.outputs,
                 errors=result.errors,
                 skipped_langs=result.skipped_langs,
-                skip_reasons=result.skip_reasons
+                skip_reasons=result.skip_reasons,
             )
 
             # Verify output summary includes both
@@ -249,9 +241,9 @@ class TestTelemetrySkipIntegration:
 
             # Verify NOT all-skipped (work was done)
             total_langs = 3
-            all_skipped = (result.stats.langs_skipped == total_langs and
-                          total_langs > 0 and
-                          result.success)
+            all_skipped = (
+                result.stats.langs_skipped == total_langs and total_langs > 0 and result.success
+            )
 
             assert all_skipped is False
             assert result.stats.langs_translated == 2
@@ -281,22 +273,20 @@ class TestTelemetrySkipIntegration:
             file_path=Path("test.md"),
             outputs={},
             skipped_langs=["es", "fr"],
-            skip_reasons={"es": "exists", "fr": "exists"}
+            skip_reasons={"es": "exists", "fr": "exists"},
         )
 
         result.stats.langs_skipped = 2
         result.stats.langs_translated = 0
 
         with telemetry.track_translation_session(
-            job_type="translate_file",
-            file_path=Path("test.md"),
-            target_langs=["es", "fr"]
+            job_type="translate_file", file_path=Path("test.md"), target_langs=["es", "fr"]
         ) as ctx:
             # Simulate event logging
             total_langs = 2
-            all_skipped = (result.stats.langs_skipped == total_langs and
-                          total_langs > 0 and
-                          result.success)
+            all_skipped = (
+                result.stats.langs_skipped == total_langs and total_langs > 0 and result.success
+            )
 
             if all_skipped:
                 expected_payload = {
@@ -307,7 +297,10 @@ class TestTelemetrySkipIntegration:
                 }
 
                 # Verify payload structure
-                assert expected_payload["reason"] == "All target languages skipped (outputs already exist)"
+                assert (
+                    expected_payload["reason"]
+                    == "All target languages skipped (outputs already exist)"
+                )
                 assert expected_payload["langs_skipped"] == 2
                 assert expected_payload["total_langs"] == 2
                 assert expected_payload["skipped_langs"] == ["es", "fr"]
@@ -330,15 +323,13 @@ class TestTelemetrySkipIntegration:
             tm_hits=60,
             translated_segments=80,
             skipped_segments=10,
-            duration_seconds=12.0
+            duration_seconds=12.0,
         )
         stats.langs_skipped = 2
         stats.langs_translated = 1
 
         metrics = calculate_items_metrics(
-            job_type="translate_file",
-            stats=stats,
-            skip_count=stats.langs_skipped
+            job_type="translate_file", stats=stats, skip_count=stats.langs_skipped
         )
 
         # Verify metrics calculation
@@ -361,17 +352,14 @@ class TestTelemetrySkipIntegration:
 
         # Old-style result (no skip data)
         stats = TranslationStats(
-            total_segments=100,
-            tm_hits=40,
-            translated_segments=60,
-            duration_seconds=5.0
+            total_segments=100, tm_hits=40, translated_segments=60, duration_seconds=5.0
         )
 
         # build_output_summary without skip params
         summary = build_output_summary(
             job_type="translate_file",
             outputs={"es": "out.es.md"},
-            errors=[]
+            errors=[],
             # skipped_langs and skip_reasons omitted
         )
 
@@ -381,7 +369,7 @@ class TestTelemetrySkipIntegration:
         # calculate_items_metrics without skip_count
         metrics = calculate_items_metrics(
             job_type="translate_file",
-            stats=stats
+            stats=stats,
             # skip_count defaults to 0
         )
 
@@ -405,7 +393,7 @@ class TestTelemetrySkipIntegration:
             file_path=Path("test.md"),
             outputs={"es": Path("test.es.md")},
             skipped_langs=["fr"],
-            skip_reasons={"fr": "output exists"}
+            skip_reasons={"fr": "output exists"},
         )
 
         result.stats.langs_skipped = 1
@@ -413,9 +401,7 @@ class TestTelemetrySkipIntegration:
 
         # Should not raise exception
         with telemetry.track_translation_session(
-            job_type="translate_file",
-            file_path=Path("test.md"),
-            target_langs=["es", "fr"]
+            job_type="translate_file", file_path=Path("test.md"), target_langs=["es", "fr"]
         ) as ctx:
             telemetry.track_translation_stats(ctx, result.stats)
 
@@ -436,8 +422,7 @@ class TestTelemetrySkipIntegration:
         stats_all_skipped.langs_translated = 0
 
         total_langs_1 = 3
-        all_skipped_1 = (stats_all_skipped.langs_skipped == total_langs_1 and
-                        total_langs_1 > 0)
+        all_skipped_1 = stats_all_skipped.langs_skipped == total_langs_1 and total_langs_1 > 0
 
         assert all_skipped_1 is True  # Should log "completed_no_changes"
 
@@ -447,8 +432,7 @@ class TestTelemetrySkipIntegration:
         stats_mixed.langs_translated = 2
 
         total_langs_2 = 3
-        all_skipped_2 = (stats_mixed.langs_skipped == total_langs_2 and
-                        total_langs_2 > 0)
+        all_skipped_2 = stats_mixed.langs_skipped == total_langs_2 and total_langs_2 > 0
 
         assert all_skipped_2 is False  # Should log "completed"
 
@@ -458,8 +442,7 @@ class TestTelemetrySkipIntegration:
         stats_none_skipped.langs_translated = 3
 
         total_langs_3 = 3
-        all_skipped_3 = (stats_none_skipped.langs_skipped == total_langs_3 and
-                        total_langs_3 > 0)
+        all_skipped_3 = stats_none_skipped.langs_skipped == total_langs_3 and total_langs_3 > 0
 
         assert all_skipped_3 is False  # Should log "completed"
 
@@ -479,15 +462,13 @@ class TestTelemetrySkipIntegration:
             tm_hits=80,
             translated_segments=100,
             skipped_segments=20,
-            duration_seconds=15.0
+            duration_seconds=15.0,
         )
         stats.langs_skipped = 1
         stats.langs_translated = 2
 
         metrics = calculate_items_metrics(
-            job_type="translate_file",
-            stats=stats,
-            skip_count=stats.langs_skipped
+            job_type="translate_file", stats=stats, skip_count=stats.langs_skipped
         )
 
         # Verify accuracy

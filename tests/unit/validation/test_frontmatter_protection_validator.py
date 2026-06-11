@@ -10,7 +10,6 @@ Tests cover:
 - 100% code coverage
 """
 
-
 import pytest
 
 from src.translation_engine.validation.base import ValidationSeverity
@@ -636,9 +635,7 @@ Inhalt"""
     def test_computed_permalink_valid(self, basic_site_profile: SiteProfile) -> None:
         """Test that valid COMPUTED permalink field passes validation."""
         # Add permalink to frontmatter rules
-        basic_site_profile.frontmatter["permalink"] = FrontmatterRule(
-            mode=FrontmatterMode.COMPUTED
-        )
+        basic_site_profile.frontmatter["permalink"] = FrontmatterRule(mode=FrontmatterMode.COMPUTED)
         validator = FrontmatterProtectionValidator(basic_site_profile)
 
         source = """---
@@ -662,9 +659,7 @@ Inhalt"""
 
     def test_computed_permalink_invalid_format(self, basic_site_profile: SiteProfile) -> None:
         """Test that invalid COMPUTED permalink format produces WARNING."""
-        basic_site_profile.frontmatter["permalink"] = FrontmatterRule(
-            mode=FrontmatterMode.COMPUTED
-        )
+        basic_site_profile.frontmatter["permalink"] = FrontmatterRule(mode=FrontmatterMode.COMPUTED)
         validator = FrontmatterProtectionValidator(basic_site_profile)
 
         source = """---
@@ -692,9 +687,7 @@ Inhalt"""
 
     def test_computed_permalink_invalid_type(self, basic_site_profile: SiteProfile) -> None:
         """Test that invalid COMPUTED permalink type produces ERROR."""
-        basic_site_profile.frontmatter["permalink"] = FrontmatterRule(
-            mode=FrontmatterMode.COMPUTED
-        )
+        basic_site_profile.frontmatter["permalink"] = FrontmatterRule(mode=FrontmatterMode.COMPUTED)
         validator = FrontmatterProtectionValidator(basic_site_profile)
 
         source = """---

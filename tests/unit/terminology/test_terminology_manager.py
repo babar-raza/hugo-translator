@@ -72,7 +72,9 @@ auto_discovery:
   confidence_threshold: 0.8
 """
         # Create temporary file
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.yaml', delete=False, encoding='utf-8') as f:
+        with tempfile.NamedTemporaryFile(
+            mode="w", suffix=".yaml", delete=False, encoding="utf-8"
+        ) as f:
             f.write(config_content)
             temp_path = f.name
 
@@ -96,7 +98,7 @@ auto_discovery:
         assert "docs.aspose.com" in manager.site_overrides
 
         # Check auto_discovery settings
-        assert manager.auto_discovery.get('enabled') == False
+        assert manager.auto_discovery.get("enabled") == False
 
     def test_config_file_not_found(self):
         """Test error handling when config file doesn't exist."""
@@ -315,7 +317,9 @@ auto_discovery:
     def test_real_world_config_loading(self):
         """Test loading the actual production config file."""
         # Path to real config
-        config_path = r"c:\Users\prora\OneDrive\Documents\GitHub\hugo-translator\config\terminology.yaml"
+        config_path = (
+            r"c:\Users\prora\OneDrive\Documents\GitHub\hugo-translator\config\terminology.yaml"
+        )
 
         if not Path(config_path).exists():
             pytest.skip("Production config not found")

@@ -10,7 +10,6 @@ Tests cover:
 - Markdown validity (roundtrip)
 """
 
-
 import pytest
 
 from src.translation_engine.extractor.text_unit import TextUnit, TextUnitKind
@@ -41,7 +40,7 @@ class TestApplyTranslations:
             node_addr="body.paragraph[0].text[0]",
             kind=TextUnitKind.TEXT,
             source_text="Hello",
-            translated_text="Hola"
+            translated_text="Hola",
         )
 
         # Apply translation
@@ -65,7 +64,7 @@ class TestApplyTranslations:
             source_text="Hello",
             prefix_ws="  ",
             suffix_ws="  ",
-            translated_text="Hola"
+            translated_text="Hola",
         )
 
         renderer.apply_translations([para], [unit])
@@ -88,7 +87,7 @@ class TestApplyTranslations:
             node_addr="body.paragraph[0].strong[0].text[0]",
             kind=TextUnitKind.TEXT,
             source_text="bold",
-            translated_text="audaz"
+            translated_text="audaz",
         )
 
         renderer.apply_translations([para], [unit])
@@ -101,10 +100,7 @@ class TestApplyTranslations:
         renderer = ASTRenderer()
 
         # Create paragraph with multiple text nodes
-        para = paragraph_node([
-            text_node("First "),
-            text_node("second")
-        ])
+        para = paragraph_node([text_node("First "), text_node("second")])
         para.assign_addresses("body.paragraph[0]")
 
         units = [
@@ -114,14 +110,14 @@ class TestApplyTranslations:
                 kind=TextUnitKind.TEXT,
                 source_text="First",
                 translated_text="Primero",
-                suffix_ws=" "
+                suffix_ws=" ",
             ),
             TextUnit(
                 unit_id="u2",
                 node_addr="body.paragraph[0].text[1]",
                 kind=TextUnitKind.TEXT,
                 source_text="second",
-                translated_text="segundo"
+                translated_text="segundo",
             ),
         ]
 
@@ -207,7 +203,7 @@ class TestRenderBasicNodes:
         code_block = ASTNode(
             type=NodeType.CODE_BLOCK,
             raw="def hello():\n    print('world')",
-            attrs={"lang": "python"}
+            attrs={"lang": "python"},
         )
         code_block.assign_addresses("body.codeblock[0]")
 
@@ -228,7 +224,7 @@ class TestRenderLinks:
         link = ASTNode(
             type=NodeType.LINK,
             attrs={"url": "https://example.com"},
-            children=[text_node("Click here")]
+            children=[text_node("Click here")],
         )
         para = paragraph_node([link])
 
@@ -243,7 +239,7 @@ class TestRenderLinks:
         link = ASTNode(
             type=NodeType.LINK,
             attrs={"url": "https://example.com/path?query=1"},
-            children=[text_node("link")]
+            children=[text_node("link")],
         )
         link.assign_addresses("body.link[0]")
         link.children[0].assign_addresses("body.link[0].text[0]")
@@ -254,7 +250,7 @@ class TestRenderLinks:
             node_addr="body.link[0].text[0]",
             kind=TextUnitKind.LINK_TEXT,
             source_text="link",
-            translated_text="enlace"
+            translated_text="enlace",
         )
 
         renderer.apply_translations([link], [unit])
@@ -270,8 +266,7 @@ class TestRenderLinks:
         renderer = ASTRenderer()
 
         image = ASTNode(
-            type=NodeType.IMAGE,
-            attrs={"src": "/images/photo.jpg", "alt": "Beautiful photo"}
+            type=NodeType.IMAGE, attrs={"src": "/images/photo.jpg", "alt": "Beautiful photo"}
         )
 
         markdown = renderer.render_to_markdown([image])
@@ -282,10 +277,7 @@ class TestRenderLinks:
         """Test image src is preserved."""
         renderer = ASTRenderer()
 
-        image = ASTNode(
-            type=NodeType.IMAGE,
-            attrs={"src": "/images/photo.jpg", "alt": "Photo"}
-        )
+        image = ASTNode(type=NodeType.IMAGE, attrs={"src": "/images/photo.jpg", "alt": "Photo"})
         image.assign_addresses("body.image[0]")
 
         # Translate alt text
@@ -294,7 +286,7 @@ class TestRenderLinks:
             node_addr="body.image[0]",
             kind=TextUnitKind.IMAGE_ALT,
             source_text="Photo",
-            translated_text="Foto"
+            translated_text="Foto",
         )
 
         renderer.apply_translations([image], [unit])
@@ -315,11 +307,7 @@ class TestRenderLists:
 
         item1 = ASTNode(type=NodeType.LIST_ITEM, children=[text_node("First")])
         item2 = ASTNode(type=NodeType.LIST_ITEM, children=[text_node("Second")])
-        list_node = ASTNode(
-            type=NodeType.LIST,
-            attrs={"ordered": False},
-            children=[item1, item2]
-        )
+        list_node = ASTNode(type=NodeType.LIST, attrs={"ordered": False}, children=[item1, item2])
 
         markdown = renderer.render_to_markdown([list_node])
 
@@ -332,11 +320,7 @@ class TestRenderLists:
 
         item1 = ASTNode(type=NodeType.LIST_ITEM, children=[text_node("First")])
         item2 = ASTNode(type=NodeType.LIST_ITEM, children=[text_node("Second")])
-        list_node = ASTNode(
-            type=NodeType.LIST,
-            attrs={"ordered": True},
-            children=[item1, item2]
-        )
+        list_node = ASTNode(type=NodeType.LIST, attrs={"ordered": True}, children=[item1, item2])
 
         markdown = renderer.render_to_markdown([list_node])
 
@@ -357,23 +341,18 @@ class TestRenderTables:
         header_row = ASTNode(
             type=NodeType.TABLE_ROW,
             attrs={"is_header": True},
-            children=[header_cell1, header_cell2]
+            children=[header_cell1, header_cell2],
         )
 
         # Create body row
         body_cell1 = ASTNode(type=NodeType.TABLE_CELL, children=[text_node("Data 1")])
         body_cell2 = ASTNode(type=NodeType.TABLE_CELL, children=[text_node("Data 2")])
         body_row = ASTNode(
-            type=NodeType.TABLE_ROW,
-            attrs={"is_header": False},
-            children=[body_cell1, body_cell2]
+            type=NodeType.TABLE_ROW, attrs={"is_header": False}, children=[body_cell1, body_cell2]
         )
 
         # Create table
-        table = ASTNode(
-            type=NodeType.TABLE,
-            children=[header_row, body_row]
-        )
+        table = ASTNode(type=NodeType.TABLE, children=[header_row, body_row])
 
         markdown = renderer.render_to_markdown([table])
 
@@ -391,34 +370,25 @@ class TestRenderTables:
 
         # Create header with alignment info
         header_cell1 = ASTNode(
-            type=NodeType.TABLE_CELL,
-            attrs={"align": "left"},
-            children=[text_node("Left")]
+            type=NodeType.TABLE_CELL, attrs={"align": "left"}, children=[text_node("Left")]
         )
         header_cell2 = ASTNode(
-            type=NodeType.TABLE_CELL,
-            attrs={"align": "center"},
-            children=[text_node("Center")]
+            type=NodeType.TABLE_CELL, attrs={"align": "center"}, children=[text_node("Center")]
         )
         header_cell3 = ASTNode(
-            type=NodeType.TABLE_CELL,
-            attrs={"align": "right"},
-            children=[text_node("Right")]
+            type=NodeType.TABLE_CELL, attrs={"align": "right"}, children=[text_node("Right")]
         )
         header_row = ASTNode(
             type=NodeType.TABLE_ROW,
             attrs={"is_header": True},
-            children=[header_cell1, header_cell2, header_cell3]
+            children=[header_cell1, header_cell2, header_cell3],
         )
 
-        table = ASTNode(
-            type=NodeType.TABLE,
-            children=[header_row]
-        )
+        table = ASTNode(type=NodeType.TABLE, children=[header_row])
 
         markdown = renderer.render_to_markdown([table])
 
-        lines = markdown.strip().split('\n')
+        lines = markdown.strip().split("\n")
         separator_line = lines[1]  # Second line is separator
 
         # Check alignment markers
@@ -435,10 +405,7 @@ class TestRenderBlockquote:
         """Test rendering blockquote."""
         renderer = ASTRenderer()
 
-        blockquote = ASTNode(
-            type=NodeType.BLOCKQUOTE,
-            children=[text_node("This is a quote")]
-        )
+        blockquote = ASTNode(type=NodeType.BLOCKQUOTE, children=[text_node("This is a quote")])
 
         markdown = renderer.render_to_markdown([blockquote])
 
@@ -454,11 +421,7 @@ class TestComplexNesting:
 
         # [**bold**](url)
         strong = ASTNode(type=NodeType.STRONG, children=[text_node("bold")])
-        link = ASTNode(
-            type=NodeType.LINK,
-            attrs={"url": "https://example.com"},
-            children=[strong]
-        )
+        link = ASTNode(type=NodeType.LINK, attrs={"url": "https://example.com"}, children=[strong])
         para = paragraph_node([link])
 
         markdown = renderer.render_to_markdown([para])
@@ -471,9 +434,7 @@ class TestComplexNesting:
 
         # **[link](url)**
         link = ASTNode(
-            type=NodeType.LINK,
-            attrs={"url": "https://example.com"},
-            children=[text_node("link")]
+            type=NodeType.LINK, attrs={"url": "https://example.com"}, children=[text_node("link")]
         )
         strong = ASTNode(type=NodeType.STRONG, children=[link])
         para = paragraph_node([strong])
@@ -567,7 +528,7 @@ class TestEdgeCases:
             node_addr="body.paragraph[99].text[0]",  # Invalid address
             kind=TextUnitKind.TEXT,
             source_text="Hello",
-            translated_text="Hola"
+            translated_text="Hola",
         )
 
         # Should not crash, just warn
@@ -596,7 +557,7 @@ class TestPreservation:
             kind=TextUnitKind.CODE_SPAN,
             source_text="myFunction()",
             do_not_translate=True,
-            translated_text="myFunction()"  # Same as source
+            translated_text="myFunction()",  # Same as source
         )
 
         renderer.apply_translations([para], [unit])
@@ -610,9 +571,7 @@ class TestPreservation:
         renderer = ASTRenderer()
 
         link = ASTNode(
-            type=NodeType.LINK,
-            attrs={"url": "https://example.com"},
-            children=[text_node("link")]
+            type=NodeType.LINK, attrs={"url": "https://example.com"}, children=[text_node("link")]
         )
         link.assign_addresses("body.link[0]")
         link.children[0].assign_addresses("body.link[0].text[0]")
@@ -623,7 +582,7 @@ class TestPreservation:
             node_addr="body.link[0].text[0]",
             kind=TextUnitKind.LINK_TEXT,
             source_text="link",
-            translated_text="enlace"
+            translated_text="enlace",
         )
 
         renderer.apply_translations([link], [unit])
@@ -751,5 +710,5 @@ class TestOutputSanitization:
         assert "marker" in result
 
 
-if __name__ == '__main__':
-    pytest.main([__file__, '-v'])
+if __name__ == "__main__":
+    pytest.main([__file__, "-v"])

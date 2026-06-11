@@ -2,6 +2,7 @@
 
 Tests that benchmark scripts properly persist results to the BenchmarkDatabase.
 """
+
 import subprocess
 import tempfile
 from pathlib import Path
@@ -90,7 +91,11 @@ def test_benchmark_db_flag_is_optional():
     # Verify it's optional (not in required arguments section)
     # Optional args typically appear in "optional arguments:" section
     help_text = result.stdout.lower()
-    assert "optional" in help_text or "save-to-db" in help_text.split("positional arguments")[0] if "positional arguments" in help_text else True
+    assert (
+        "optional" in help_text or "save-to-db" in help_text.split("positional arguments")[0]
+        if "positional arguments" in help_text
+        else True
+    )
 
 
 def test_benchmark_db_schema_compatibility():
@@ -112,7 +117,9 @@ def test_benchmark_db_schema_compatibility():
     # without defaults are not class attributes and hasattr() returns False for them)
     assert "model_id" in BenchmarkRun.__dataclass_fields__, "BenchmarkRun needs model_id"
     assert "device" in BenchmarkRun.__dataclass_fields__, "BenchmarkRun needs device"
-    assert "throughput_tokens_per_sec" in BenchmarkResult.__dataclass_fields__, "BenchmarkResult needs throughput"
+    assert "throughput_tokens_per_sec" in BenchmarkResult.__dataclass_fields__, (
+        "BenchmarkResult needs throughput"
+    )
 
 
 if __name__ == "__main__":

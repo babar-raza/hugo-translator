@@ -27,9 +27,10 @@ def reset_state():
 def mock_cuda():
     """Mock torch.cuda to simulate GPU presence."""
     # Need to patch both modules since they import torch independently
-    with patch("src.hardware.vram_enforcer.torch") as mock_torch_enforcer, \
-         patch("src.hardware.vram_budget.torch") as mock_torch_budget:
-
+    with (
+        patch("src.hardware.vram_enforcer.torch") as mock_torch_enforcer,
+        patch("src.hardware.vram_budget.torch") as mock_torch_budget,
+    ):
         # Mock get_device_properties to return 8192 MB (8 GB) GPU
         mock_props = MagicMock()
         mock_props.total_memory = 8192 * 1024 * 1024  # 8 GB in bytes
@@ -46,9 +47,10 @@ def mock_cuda():
 @pytest.fixture
 def mock_cuda_unavailable():
     """Mock torch.cuda to simulate no GPU."""
-    with patch("src.hardware.vram_enforcer.torch") as mock_torch_enforcer, \
-         patch("src.hardware.vram_budget.torch") as mock_torch_budget:
-
+    with (
+        patch("src.hardware.vram_enforcer.torch") as mock_torch_enforcer,
+        patch("src.hardware.vram_budget.torch") as mock_torch_budget,
+    ):
         for mock_torch in [mock_torch_enforcer, mock_torch_budget]:
             mock_torch.cuda.is_available.return_value = False
 

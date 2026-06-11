@@ -1,4 +1,5 @@
 """Shared pytest fixtures for benchmarking tests."""
+
 import gc
 import tempfile
 from datetime import datetime, timezone
@@ -56,6 +57,7 @@ def make_system_info():
             info = make_system_info()  # All defaults
             info = make_system_info(cpu_cores=16)  # Override specific fields
     """
+
     def _factory(**kwargs):
         defaults = dict(
             cpu_model="Test CPU",
@@ -71,6 +73,7 @@ def make_system_info():
         )
         defaults.update(kwargs)
         return SystemInfo(**defaults)
+
     return _factory
 
 
@@ -83,6 +86,7 @@ def make_benchmark_result():
             result = make_benchmark_result()  # All defaults
             result = make_benchmark_result(batch_size=16)  # Override specific fields
     """
+
     def _factory(sample_id="sample_001", **kwargs):
         defaults = dict(
             model_id="test_model",
@@ -96,6 +100,7 @@ def make_benchmark_result():
         )
         defaults.update(kwargs)
         return BenchmarkResult(sample_id=sample_id, **defaults)
+
     return _factory
 
 
@@ -108,6 +113,7 @@ def make_benchmark_run(make_system_info, make_benchmark_result):
             run = make_benchmark_run()  # All defaults
             run = make_benchmark_run(model_id="custom_model")  # Override specific fields
     """
+
     def _factory(run_id="test_run", with_results=False, **kwargs):
         defaults = dict(
             model_id="test_model",
@@ -123,6 +129,7 @@ def make_benchmark_run(make_system_info, make_benchmark_result):
         )
         defaults.update(kwargs)
         return BenchmarkRun(run_id=run_id, **defaults)
+
     return _factory
 
 

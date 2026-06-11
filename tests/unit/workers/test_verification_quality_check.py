@@ -78,6 +78,7 @@ class TestRunQualitySpotCheck:
         from src.workers.autonomous_verification_worker import (
             AutonomousVerificationWorkerConfig,
         )
+
         config = AutonomousVerificationWorkerConfig(config_root="config/")
         return AutonomousVerificationWorker(config)
 

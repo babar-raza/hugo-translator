@@ -5,7 +5,7 @@ Runs basic smoke tests to verify core functionality.
 
 import sys
 
-sys.path.insert(0, '.')
+sys.path.insert(0, ".")
 
 from src.observability.progress import ProgressSnapshot, ProgressTracker
 
@@ -60,7 +60,9 @@ def test_cache_operations_match_segment_total():
     assert snapshot.cache_misses == 70, f"Expected 70 misses, got {snapshot.cache_misses}"
     assert snapshot.segments_done == 150, f"Expected 150 done, got {snapshot.segments_done}"
     assert snapshot.segments_failed == 20, f"Expected 20 failed, got {snapshot.segments_failed}"
-    assert cache_total == segments_total, f"Cache ops ({cache_total}) != segments ({segments_total})"
+    assert cache_total == segments_total, (
+        f"Cache ops ({cache_total}) != segments ({segments_total})"
+    )
     print("[PASS] test_cache_operations_match_segment_total")
 
 
@@ -68,7 +70,7 @@ def test_segments_failed_infrastructure():
     """SR-05: Verify segments_failed field exists and works."""
     # Test ProgressSnapshot dataclass
     snapshot = ProgressSnapshot(timestamp=0, start_time=0, elapsed_s=0)
-    assert hasattr(snapshot, 'segments_failed'), "segments_failed field missing"
+    assert hasattr(snapshot, "segments_failed"), "segments_failed field missing"
     assert snapshot.segments_failed == 0, f"Expected 0, got {snapshot.segments_failed}"
 
     # Test ProgressTracker
@@ -100,5 +102,6 @@ if __name__ == "__main__":
     except Exception as e:
         print(f"\n[ERROR] {e}")
         import traceback
+
         traceback.print_exc()
         sys.exit(1)

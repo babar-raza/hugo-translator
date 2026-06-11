@@ -16,6 +16,7 @@ TC-CFC-05: Body segment ID includes context_type=body_text discriminator
 TC-CFC-06: Same text, same frontmatter key → same ID (TM hit works correctly)
 TC-CFC-07: SegmentContext.context_type distinguishes FRONTMATTER from BODY_TEXT
 """
+
 from __future__ import annotations
 
 import pytest
@@ -41,6 +42,7 @@ SOURCE_TEXT = "DocumentBuilder allows you to insert content"
 # ---------------------------------------------------------------------------
 # TC-CFC-01: Frontmatter title vs identical body paragraph
 # ---------------------------------------------------------------------------
+
 
 class TestFrontmatterVsBodyIsolation:
     """Same source text in frontmatter title and body paragraph → different IDs."""
@@ -86,6 +88,7 @@ class TestFrontmatterVsBodyIsolation:
 # ---------------------------------------------------------------------------
 # TC-CFC-02: Two different frontmatter keys with same text
 # ---------------------------------------------------------------------------
+
 
 class TestDifferentFrontmatterKeysIsolation:
     """Same source text in two different frontmatter keys → different IDs."""
@@ -135,6 +138,7 @@ class TestDifferentFrontmatterKeysIsolation:
 # TC-CFC-04: Frontmatter segment ID includes frontmatter_key discriminator
 # ---------------------------------------------------------------------------
 
+
 class TestFrontmatterKeyDiscriminator:
     """Verify frontmatter_key is incorporated into segment ID."""
 
@@ -181,6 +185,7 @@ class TestFrontmatterKeyDiscriminator:
 # TC-CFC-03: Body segment cannot retrieve a frontmatter TM entry
 # ---------------------------------------------------------------------------
 
+
 class TestTMCannotCrossContaminate:
     """
     Verify that a body segment's ID cannot accidentally match a frontmatter
@@ -220,6 +225,7 @@ class TestTMCannotCrossContaminate:
 # ---------------------------------------------------------------------------
 # TC-CFC-07: SegmentContextType enum values
 # ---------------------------------------------------------------------------
+
 
 class TestSegmentContextTypeEnum:
     """SegmentContextType distinguishes all expected context types."""

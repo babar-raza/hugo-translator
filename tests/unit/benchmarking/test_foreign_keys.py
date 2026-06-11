@@ -186,7 +186,9 @@ def test_cascading_delete_system_info():
         # Verify system_info exists
         conn = db._get_connection()
         try:
-            cursor = conn.execute("SELECT COUNT(*) FROM system_info WHERE run_id = ?", ("test_cascade_1",))
+            cursor = conn.execute(
+                "SELECT COUNT(*) FROM system_info WHERE run_id = ?", ("test_cascade_1",)
+            )
             count_before = cursor.fetchone()[0]
             assert count_before == 1, "System info should exist before delete"
         finally:
@@ -198,7 +200,9 @@ def test_cascading_delete_system_info():
         # Verify system_info was cascaded (deleted)
         conn = db._get_connection()
         try:
-            cursor = conn.execute("SELECT COUNT(*) FROM system_info WHERE run_id = ?", ("test_cascade_1",))
+            cursor = conn.execute(
+                "SELECT COUNT(*) FROM system_info WHERE run_id = ?", ("test_cascade_1",)
+            )
             count_after = cursor.fetchone()[0]
             assert count_after == 0, "System info should be deleted via CASCADE"
         finally:
@@ -258,7 +262,9 @@ def test_cascading_delete_benchmark_results():
         # Verify results exist
         conn = db._get_connection()
         try:
-            cursor = conn.execute("SELECT COUNT(*) FROM benchmark_results WHERE run_id = ?", ("test_cascade_2",))
+            cursor = conn.execute(
+                "SELECT COUNT(*) FROM benchmark_results WHERE run_id = ?", ("test_cascade_2",)
+            )
             count_before = cursor.fetchone()[0]
             assert count_before == 2, "Results should exist before delete"
         finally:
@@ -270,7 +276,9 @@ def test_cascading_delete_benchmark_results():
         # Verify results were cascaded (deleted)
         conn = db._get_connection()
         try:
-            cursor = conn.execute("SELECT COUNT(*) FROM benchmark_results WHERE run_id = ?", ("test_cascade_2",))
+            cursor = conn.execute(
+                "SELECT COUNT(*) FROM benchmark_results WHERE run_id = ?", ("test_cascade_2",)
+            )
             count_after = cursor.fetchone()[0]
             assert count_after == 0, "Results should be deleted via CASCADE"
         finally:
@@ -337,7 +345,8 @@ def test_cascading_delete_recommendation_feedback():
 
             # Verify feedback exists
             cursor = conn.execute(
-                "SELECT COUNT(*) FROM recommendation_feedback WHERE recommendation_id = ?", ("test_cascade_3",)
+                "SELECT COUNT(*) FROM recommendation_feedback WHERE recommendation_id = ?",
+                ("test_cascade_3",),
             )
             count_before = cursor.fetchone()[0]
             assert count_before == 1, "Feedback should exist before delete"
@@ -351,7 +360,8 @@ def test_cascading_delete_recommendation_feedback():
         conn = db._get_connection()
         try:
             cursor = conn.execute(
-                "SELECT COUNT(*) FROM recommendation_feedback WHERE recommendation_id = ?", ("test_cascade_3",)
+                "SELECT COUNT(*) FROM recommendation_feedback WHERE recommendation_id = ?",
+                ("test_cascade_3",),
             )
             count_after = cursor.fetchone()[0]
             assert count_after == 0, "Feedback should be deleted via CASCADE"
@@ -375,7 +385,18 @@ def test_fk_violation_prevents_orphaned_records():
                        (run_id, cpu_model, cpu_cores, total_ram_gb, os_name, os_version,
                         python_version, torch_version, transformers_version, timestamp_utc)
                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-                    ("orphan_1", "CPU", 4, 16.0, "Linux", "5.15", "3.11", "2.0", "4.0", "2025-12-24T00:00:00Z"),
+                    (
+                        "orphan_1",
+                        "CPU",
+                        4,
+                        16.0,
+                        "Linux",
+                        "5.15",
+                        "3.11",
+                        "2.0",
+                        "4.0",
+                        "2025-12-24T00:00:00Z",
+                    ),
                 ),
                 (
                     "benchmark_results",
@@ -415,9 +436,9 @@ def test_fk_violation_prevents_orphaned_records():
                     conn.execute(insert_sql, params)
                     conn.commit()
 
-                assert "FOREIGN KEY constraint failed" in str(
-                    exc_info.value
-                ), f"{table_name} should enforce FK constraint"
+                assert "FOREIGN KEY constraint failed" in str(exc_info.value), (
+                    f"{table_name} should enforce FK constraint"
+                )
                 conn.rollback()
         finally:
             db._close_connection(conn)

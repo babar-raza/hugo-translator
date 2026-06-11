@@ -1,6 +1,7 @@
 """
 Pytest configuration and shared fixtures for the translation system tests.
 """
+
 import os
 import shutil
 import sys

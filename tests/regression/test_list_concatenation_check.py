@@ -44,8 +44,9 @@ def test_bold_markers_not_flagged_as_concatenation():
 
     issues = check_list_item_concatenation(content)
 
-    assert len(issues) == 0, \
+    assert len(issues) == 0, (
         f"Bold markers should NOT trigger concatenation warning. Issues: {issues}"
+    )
 
 
 def test_italic_markers_not_flagged_as_concatenation():
@@ -65,8 +66,9 @@ def test_italic_markers_not_flagged_as_concatenation():
 
     issues = check_list_item_concatenation(content_double_underscore)
 
-    assert len(issues) == 0, \
+    assert len(issues) == 0, (
         f"Double underscore should NOT trigger concatenation warning. Issues: {issues}"
+    )
 
 
 def test_actual_concatenation_is_detected():
@@ -100,8 +102,7 @@ def test_normal_list_items_not_flagged():
 
     issues = check_list_item_concatenation(content)
 
-    assert len(issues) == 0, \
-        f"Normal list items should NOT trigger warning. Issues: {issues}"
+    assert len(issues) == 0, f"Normal list items should NOT trigger warning. Issues: {issues}"
 
 
 def test_ordered_list_concatenation():
@@ -115,8 +116,7 @@ def test_ordered_list_concatenation():
 
     issues = check_list_item_concatenation(content)
 
-    assert len(issues) == 0, \
-        f"Normal ordered list should NOT trigger warning. Issues: {issues}"
+    assert len(issues) == 0, f"Normal ordered list should NOT trigger warning. Issues: {issues}"
 
 
 def test_mixed_bold_and_list_markers():
@@ -135,8 +135,9 @@ def test_mixed_bold_and_list_markers():
 
     issues = check_list_item_concatenation(content)
 
-    assert len(issues) == 0, \
+    assert len(issues) == 0, (
         f"Mixed formatting should NOT trigger false positives. Issues: {issues}"
+    )
 
 
 def test_regression_frozen_file_case():
@@ -161,8 +162,9 @@ def test_regression_frozen_file_case():
 
     issues = check_list_item_concatenation(content)
 
-    assert len(issues) == 0, \
+    assert len(issues) == 0, (
         f"Frozen file case should NOT produce concatenation warnings. Issues: {issues}"
+    )
 
 
 def test_check_mark_concatenation():
@@ -177,8 +179,7 @@ def test_check_mark_concatenation():
     issues = check_list_item_concatenation(content)
 
     # These should not be flagged as concatenation (separate lines)
-    assert len(issues) == 0, \
-        f"Check mark list items should not trigger warning. Issues: {issues}"
+    assert len(issues) == 0, f"Check mark list items should not trigger warning. Issues: {issues}"
 
 
 if __name__ == "__main__":

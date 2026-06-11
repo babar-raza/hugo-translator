@@ -25,6 +25,7 @@ class TestITranslationBackend(unittest.TestCase):
 
     def test_interface_requires_translate_implementation(self):
         """Test that subclasses must implement translate()."""
+
         class IncompleteBackend(ITranslationBackend):
             def get_model_info(self):
                 return {}
@@ -34,6 +35,7 @@ class TestITranslationBackend(unittest.TestCase):
 
     def test_interface_default_translate_batch(self):
         """Test that default translate_batch() calls translate() sequentially."""
+
         class MinimalBackend(ITranslationBackend):
             def translate(self, text, src_lang, tgt_lang, **kwargs):
                 return f"{text}_translated"
@@ -47,6 +49,7 @@ class TestITranslationBackend(unittest.TestCase):
 
     def test_interface_default_supports_language_pair(self):
         """Test that default supports_language_pair() returns True."""
+
         class MinimalBackend(ITranslationBackend):
             def translate(self, text, src_lang, tgt_lang, **kwargs):
                 return text
@@ -60,6 +63,7 @@ class TestITranslationBackend(unittest.TestCase):
 
     def test_interface_default_warmup_shutdown(self):
         """Test that default warmup() and shutdown() are no-ops."""
+
         class MinimalBackend(ITranslationBackend):
             def translate(self, text, src_lang, tgt_lang, **kwargs):
                 return text
@@ -76,15 +80,12 @@ class TestITranslationBackend(unittest.TestCase):
 class TestMTBackend(unittest.TestCase):
     """Test MT backend (wraps ModelLoader)."""
 
-    @patch('src.translation_engine.backends.mt_backend.ModelLoader')
-    @patch('src.translation_engine.backends.mt_backend.ModelRegistry')
+    @patch("src.translation_engine.backends.mt_backend.ModelLoader")
+    @patch("src.translation_engine.backends.mt_backend.ModelRegistry")
     def test_mt_backend_initialization(self, mock_registry, mock_loader):
         """Test MTBackend initializes with correct parameters."""
         backend = MTBackend(
-            model_id="m2m100_418m",
-            device="cuda",
-            max_memory_mb=4096,
-            load_mode="fp16"
+            model_id="m2m100_418m", device="cuda", max_memory_mb=4096, load_mode="fp16"
         )
 
         self.assertEqual(backend.model_id, "m2m100_418m")
@@ -93,8 +94,8 @@ class TestMTBackend(unittest.TestCase):
         self.assertEqual(backend.load_mode, "fp16")
         self.assertFalse(backend._loaded)
 
-    @patch('src.translation_engine.backends.mt_backend.ModelLoader')
-    @patch('src.translation_engine.backends.mt_backend.ModelRegistry')
+    @patch("src.translation_engine.backends.mt_backend.ModelLoader")
+    @patch("src.translation_engine.backends.mt_backend.ModelRegistry")
     def test_mt_backend_lazy_loading(self, mock_registry, mock_loader):
         """Test that model is loaded on first translate() call."""
         mock_model = Mock()
@@ -115,21 +116,17 @@ class TestMTBackend(unittest.TestCase):
         self.assertTrue(backend._loaded)
         self.assertIsNotNone(backend.backend)
         mock_loader_instance.load_model.assert_called_once_with(
-            model_id="m2m100_418m",
-            device="cuda"
+            model_id="m2m100_418m", device="cuda"
         )
 
         # Verify translation
         self.assertEqual(result, "hola")
         mock_model.translate.assert_called_once_with(
-            texts=["hello"],
-            src_lang="en",
-            tgt_lang="es",
-            max_new_tokens=None
+            texts=["hello"], src_lang="en", tgt_lang="es", max_new_tokens=None
         )
 
-    @patch('src.translation_engine.backends.mt_backend.ModelLoader')
-    @patch('src.translation_engine.backends.mt_backend.ModelRegistry')
+    @patch("src.translation_engine.backends.mt_backend.ModelLoader")
+    @patch("src.translation_engine.backends.mt_backend.ModelRegistry")
     def test_mt_backend_translate_batch(self, mock_registry, mock_loader):
         """Test batch translation."""
         mock_model = Mock()
@@ -142,21 +139,15 @@ class TestMTBackend(unittest.TestCase):
 
         self.assertEqual(results, ["hola", "mundo"])
         mock_model.translate.assert_called_once_with(
-            texts=["hello", "world"],
-            src_lang="en",
-            tgt_lang="es",
-            max_new_tokens=None
+            texts=["hello", "world"], src_lang="en", tgt_lang="es", max_new_tokens=None
         )
 
-    @patch('src.translation_engine.backends.mt_backend.ModelLoader')
-    @patch('src.translation_engine.backends.mt_backend.ModelRegistry')
+    @patch("src.translation_engine.backends.mt_backend.ModelLoader")
+    @patch("src.translation_engine.backends.mt_backend.ModelRegistry")
     def test_mt_backend_get_model_info(self, mock_registry, mock_loader):
         """Test get_model_info() returns correct metadata."""
         backend = MTBackend(
-            model_id="m2m100_418m",
-            device="cuda",
-            max_memory_mb=4096,
-            load_mode="fp16"
+            model_id="m2m100_418m", device="cuda", max_memory_mb=4096, load_mode="fp16"
         )
 
         info = backend.get_model_info()
@@ -168,8 +159,8 @@ class TestMTBackend(unittest.TestCase):
         self.assertEqual(info["max_memory_mb"], 4096)
         self.assertFalse(info["loaded"])
 
-    @patch('src.translation_engine.backends.mt_backend.ModelLoader')
-    @patch('src.translation_engine.backends.mt_backend.ModelRegistry')
+    @patch("src.translation_engine.backends.mt_backend.ModelLoader")
+    @patch("src.translation_engine.backends.mt_backend.ModelRegistry")
     def test_mt_backend_warmup(self, mock_registry, mock_loader):
         """Test warmup() pre-loads model."""
         mock_model = Mock()
@@ -185,8 +176,8 @@ class TestMTBackend(unittest.TestCase):
         self.assertTrue(backend._loaded)
         mock_loader_instance.load_model.assert_called_once()
 
-    @patch('src.translation_engine.backends.mt_backend.ModelLoader')
-    @patch('src.translation_engine.backends.mt_backend.ModelRegistry')
+    @patch("src.translation_engine.backends.mt_backend.ModelLoader")
+    @patch("src.translation_engine.backends.mt_backend.ModelRegistry")
     def test_mt_backend_shutdown(self, mock_registry, mock_loader):
         """Test shutdown() unloads model."""
         mock_model = Mock()
@@ -207,7 +198,7 @@ class TestMTBackend(unittest.TestCase):
 class TestLLMBackend(unittest.TestCase):
     """Test LLM backend (unified provider layer via LLMModelBackend)."""
 
-    @patch('src.model_runtime.llm_backend.create_provider')
+    @patch("src.model_runtime.llm_backend.create_provider")
     def test_llm_backend_initialization(self, mock_create):
         """Test LLMBackend initializes with provider and model_id."""
         mock_provider = Mock()
@@ -224,7 +215,7 @@ class TestLLMBackend(unittest.TestCase):
         self.assertEqual(backend.model_id, "qwen3:14b")
         mock_create.assert_called_once()
 
-    @patch('src.model_runtime.llm_backend.create_provider')
+    @patch("src.model_runtime.llm_backend.create_provider")
     def test_llm_backend_api_key_from_env(self, mock_create):
         """Test LLMBackend uses api_key_env for key resolution."""
         mock_provider = Mock()
@@ -238,7 +229,7 @@ class TestLLMBackend(unittest.TestCase):
 
         self.assertEqual(backend.model_id, "gpt-4o")
 
-    @patch('src.model_runtime.llm_backend.create_provider')
+    @patch("src.model_runtime.llm_backend.create_provider")
     def test_llm_backend_translate(self, mock_create):
         """Test translate() calls unified provider correctly."""
         mock_provider = Mock()
@@ -255,7 +246,7 @@ class TestLLMBackend(unittest.TestCase):
         self.assertEqual(result, "hola")
         mock_provider.generate.assert_called_once()
 
-    @patch('src.model_runtime.llm_backend.create_provider')
+    @patch("src.model_runtime.llm_backend.create_provider")
     def test_llm_backend_translate_batch(self, mock_create):
         """Test translate_batch() passes all texts through provider."""
         mock_provider = Mock()
@@ -275,7 +266,7 @@ class TestLLMBackend(unittest.TestCase):
         self.assertEqual(results, ["hola", "mundo"])
         self.assertEqual(mock_provider.generate.call_count, 1)  # One packed batch call
 
-    @patch('src.model_runtime.llm_backend.create_provider')
+    @patch("src.model_runtime.llm_backend.create_provider")
     def test_llm_backend_get_model_info(self, mock_create):
         """Test get_model_info() returns correct metadata."""
         mock_create.return_value = Mock()
@@ -292,7 +283,7 @@ class TestLLMBackend(unittest.TestCase):
         self.assertEqual(info["device"], "api")
         self.assertEqual(info["provider"], "anthropic")
 
-    @patch('src.model_runtime.llm_backend.create_provider')
+    @patch("src.model_runtime.llm_backend.create_provider")
     def test_llm_backend_supports_all_languages(self, mock_create):
         """Test supports_language_pair() returns True for all pairs."""
         mock_create.return_value = Mock()
@@ -307,7 +298,7 @@ class TestLLMBackend(unittest.TestCase):
         self.assertTrue(backend.supports_language_pair("zh", "ar"))
         self.assertTrue(backend.supports_language_pair("unknown", "code"))
 
-    @patch('src.model_runtime.llm_backend.create_provider')
+    @patch("src.model_runtime.llm_backend.create_provider")
     def test_llm_backend_requires_anthropic_sdk(self, mock_create):
         """Test LLMBackend shutdown delegates to provider."""
         mock_provider = Mock()

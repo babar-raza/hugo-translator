@@ -106,9 +106,7 @@ footer: true"""  # Comments stripped
 
         result = validator.validate(source, target)
 
-        missing_comment_issues = [
-            i for i in result.issues if i.issue_type == "missing_comment"
-        ]
+        missing_comment_issues = [i for i in result.issues if i.issue_type == "missing_comment"]
         assert len(missing_comment_issues) >= 2  # At least # Static and # Head
 
     def test_detects_literal_block_loss(self):
@@ -125,21 +123,15 @@ description: 'Description text'"""
 
         result = validator.validate(source, target)
 
-        literal_issues = [
-            i for i in result.issues if i.issue_type == "literal_block_loss"
-        ]
+        literal_issues = [i for i in result.issues if i.issue_type == "literal_block_loss"]
         assert len(literal_issues) == 1
 
     def test_configurable_thresholds(self):
         """Custom thresholds should work correctly."""
         # Very strict validator
-        strict_validator = YAMLStructureValidator(
-            warn_threshold=5.0, error_threshold=10.0
-        )
+        strict_validator = YAMLStructureValidator(warn_threshold=5.0, error_threshold=10.0)
         # Very lenient validator
-        lenient_validator = YAMLStructureValidator(
-            warn_threshold=30.0, error_threshold=50.0
-        )
+        lenient_validator = YAMLStructureValidator(warn_threshold=30.0, error_threshold=50.0)
 
         source = "line1\nline2\nline3\nline4\nline5"
         target = "line1\nline2\nline3\nline4"  # 20% drift

@@ -1,4 +1,5 @@
 """Unit tests for tokenizer access methods in model backends."""
+
 from unittest.mock import Mock
 
 from src.model_runtime.loader import CTranslate2Backend, HuggingFaceBackend, ModelLoader
@@ -83,9 +84,7 @@ class TestHuggingFaceBackendTokenizer:
         # Mock tokenizer
         backend.tokenizer = Mock()
         backend.loaded = True
-        backend.tokenizer.return_value = {
-            "input_ids": [[1, 2, 3], [4, 5]]
-        }
+        backend.tokenizer.return_value = {"input_ids": [[1, 2, 3], [4, 5]]}
 
         texts = ["text one", "text two"]
         counts = backend.get_batch_token_counts(texts)

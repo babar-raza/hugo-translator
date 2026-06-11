@@ -1,16 +1,17 @@
 """Tests for segment_run_id idempotency and duplicate suppression."""
+
 from __future__ import annotations
 
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
 
 import pytest
 
+from src.observability.metrics_evidence import EvidenceWriter
 from src.observability.metrics_scope import (
-    generate_stable_work_slice_id,
     generate_execution_attempt_id,
     generate_segment_run_id,
+    generate_stable_work_slice_id,
 )
-from src.observability.metrics_evidence import EvidenceWriter
 
 
 def _mock_gitlab_ctx(**overrides):
@@ -63,6 +64,7 @@ class TestIdGeneration:
 
     def test_same_slice_and_attempt_same_segment_id(self):
         import uuid
+
         ws = uuid.uuid4()
         ea = uuid.uuid4()
         sid1 = generate_segment_run_id(ws, ea)
@@ -71,6 +73,7 @@ class TestIdGeneration:
 
     def test_different_attempt_different_segment_id(self):
         import uuid
+
         ws = uuid.uuid4()
         ea1 = uuid.uuid4()
         ea2 = uuid.uuid4()

@@ -3,6 +3,7 @@ Tests for local model discovery engine.
 
 Uses temporary mock model folders -- no real large models required.
 """
+
 from __future__ import annotations
 
 import json
@@ -13,6 +14,7 @@ from unittest.mock import patch
 import pytest
 import yaml
 
+from src.model_runtime.discovery_report import DiscoveryReportManager
 from src.model_runtime.local_discovery import (
     DEFAULT_SKIP_PATTERNS,
     DiscoveredLocalModel,
@@ -28,9 +30,7 @@ from src.model_runtime.local_discovery import (
     detect_sentencepiece_model,
     detect_transformers_model,
 )
-from src.model_runtime.discovery_report import DiscoveryReportManager
 from src.model_runtime.registry import ModelInfo, ModelRegistry
-
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -46,11 +46,15 @@ def mock_hf_cache(tmp_path: Path) -> Path:
     # M2M100 model
     m2m_dir = cache_dir / "models--facebook--m2m100_418M" / "snapshots" / "abc123"
     m2m_dir.mkdir(parents=True)
-    (m2m_dir / "config.json").write_text(json.dumps({
-        "model_type": "m2m_100",
-        "_name_or_path": "facebook/m2m100_418M",
-        "vocab_size": 128112,
-    }))
+    (m2m_dir / "config.json").write_text(
+        json.dumps(
+            {
+                "model_type": "m2m_100",
+                "_name_or_path": "facebook/m2m100_418M",
+                "vocab_size": 128112,
+            }
+        )
+    )
     (m2m_dir / "pytorch_model.bin").write_bytes(b"\x00" * 1024)
     (m2m_dir / "sentencepiece.bpe.model").write_bytes(b"\x00" * 100)
     (m2m_dir / "tokenizer_config.json").write_text("{}")
@@ -58,10 +62,14 @@ def mock_hf_cache(tmp_path: Path) -> Path:
     # Opus EN-FR model
     opus_dir = cache_dir / "models--Helsinki-NLP--opus-mt-en-fr" / "snapshots" / "def456"
     opus_dir.mkdir(parents=True)
-    (opus_dir / "config.json").write_text(json.dumps({
-        "model_type": "marian",
-        "_name_or_path": "Helsinki-NLP/opus-mt-en-fr",
-    }))
+    (opus_dir / "config.json").write_text(
+        json.dumps(
+            {
+                "model_type": "marian",
+                "_name_or_path": "Helsinki-NLP/opus-mt-en-fr",
+            }
+        )
+    )
     (opus_dir / "pytorch_model.bin").write_bytes(b"\x00" * 512)
 
     return cache_dir
@@ -73,10 +81,14 @@ def mock_nllb_cache(tmp_path: Path) -> Path:
     cache_dir = tmp_path / "nllb_cache" / "hub"
     nllb_dir = cache_dir / "models--facebook--nllb-200-distilled-600M" / "snapshots" / "snap1"
     nllb_dir.mkdir(parents=True)
-    (nllb_dir / "config.json").write_text(json.dumps({
-        "model_type": "m2m_100",  # NLLB uses m2m_100 architecture
-        "_name_or_path": "facebook/nllb-200-distilled-600M",
-    }))
+    (nllb_dir / "config.json").write_text(
+        json.dumps(
+            {
+                "model_type": "m2m_100",  # NLLB uses m2m_100 architecture
+                "_name_or_path": "facebook/nllb-200-distilled-600M",
+            }
+        )
+    )
     (nllb_dir / "model.safetensors").write_bytes(b"\x00" * 2048)
     return cache_dir
 
@@ -87,10 +99,14 @@ def mock_marian_cache(tmp_path: Path) -> Path:
     cache_dir = tmp_path / "marian_cache" / "hub"
     marian_dir = cache_dir / "models--Helsinki-NLP--opus-mt-de-en" / "snapshots" / "snap1"
     marian_dir.mkdir(parents=True)
-    (marian_dir / "config.json").write_text(json.dumps({
-        "model_type": "marian",
-        "_name_or_path": "Helsinki-NLP/opus-mt-de-en",
-    }))
+    (marian_dir / "config.json").write_text(
+        json.dumps(
+            {
+                "model_type": "marian",
+                "_name_or_path": "Helsinki-NLP/opus-mt-de-en",
+            }
+        )
+    )
     (marian_dir / "pytorch_model.bin").write_bytes(b"\x00" * 512)
     return cache_dir
 
@@ -104,14 +120,18 @@ def mock_ollama_dir(tmp_path: Path) -> Path:
     manifest_file = manifests / "latest"
 
     # Simplified Ollama manifest
-    manifest_file.write_text(json.dumps({
-        "schemaVersion": 2,
-        "mediaType": "application/vnd.docker.distribution.manifest.v2+json",
-        "layers": [
-            {"mediaType": "application/vnd.ollama.image.model", "size": 8_000_000_000},
-            {"mediaType": "application/vnd.ollama.image.template", "size": 1024},
-        ],
-    }))
+    manifest_file.write_text(
+        json.dumps(
+            {
+                "schemaVersion": 2,
+                "mediaType": "application/vnd.docker.distribution.manifest.v2+json",
+                "layers": [
+                    {"mediaType": "application/vnd.ollama.image.model", "size": 8_000_000_000},
+                    {"mediaType": "application/vnd.ollama.image.template", "size": 1024},
+                ],
+            }
+        )
+    )
 
     blobs = ollama / "blobs"
     blobs.mkdir(parents=True)
@@ -124,10 +144,14 @@ def mock_ct2_dir(tmp_path: Path) -> Path:
     ct2 = tmp_path / "ct2_model"
     ct2.mkdir()
     (ct2 / "model.bin").write_bytes(b"\x00" * 4096)
-    (ct2 / "model_spec.json").write_text(json.dumps({
-        "quantization": "int8",
-        "with_source_bpe": True,
-    }))
+    (ct2 / "model_spec.json").write_text(
+        json.dumps(
+            {
+                "quantization": "int8",
+                "with_source_bpe": True,
+            }
+        )
+    )
     (ct2 / "shared_vocabulary.json").write_text("{}")
     return ct2
 
@@ -340,7 +364,7 @@ class TestPermissionErrorHandling:
 
     def test_permission_error_during_scan(self, tmp_path: Path):
         """Scanner should handle PermissionError raised by iterdir()."""
-        from unittest.mock import patch, PropertyMock
+        from unittest.mock import PropertyMock, patch
 
         # Create a valid model in a good directory
         good_dir = tmp_path / "accessible"
@@ -490,26 +514,36 @@ class TestRegistryMerge:
         """Curated entries should not be overridden by discovered models."""
         # Create a curated registry
         curated_path = tmp_path / "curated.yaml"
-        curated_path.write_text(yaml.dump({"models": [{
-            "model_id": "test_model",
-            "name": "Curated Test Model",
-            "backend": "huggingface",
-            "supported_pairs": "all",
-            "model_size_mb": 100,
-            "min_ram_gb": 2,
-            "optimal_device": "cpu",
-        }]}))
+        curated_path.write_text(
+            yaml.dump(
+                {
+                    "models": [
+                        {
+                            "model_id": "test_model",
+                            "name": "Curated Test Model",
+                            "backend": "huggingface",
+                            "supported_pairs": "all",
+                            "model_size_mb": 100,
+                            "min_ram_gb": 2,
+                            "optimal_device": "cpu",
+                        }
+                    ]
+                }
+            )
+        )
 
         registry = ModelRegistry(curated_path)
         assert registry.get_model("test_model").name == "Curated Test Model"
 
         # Create a discovered model with same ID
-        discovered = ModelInfo.from_dict({
-            "model_id": "test_model",
-            "name": "Discovered Override Attempt",
-            "backend": "huggingface",
-            "supported_pairs": "all",
-        })
+        discovered = ModelInfo.from_dict(
+            {
+                "model_id": "test_model",
+                "name": "Discovered Override Attempt",
+                "backend": "huggingface",
+                "supported_pairs": "all",
+            }
+        )
 
         count = registry.merge_discovered([discovered], allow_override=False)
         assert count == 0

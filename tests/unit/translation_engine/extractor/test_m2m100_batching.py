@@ -18,6 +18,7 @@ import pytest
 @dataclass
 class TextUnit:
     """Skeleton TextUnit for testing."""
+
     unit_id: str
     source_text: str
     translated_text: str | None = None
@@ -27,6 +28,7 @@ class TextUnit:
 @dataclass
 class BatchStats:
     """Statistics for batched translation."""
+
     total_units: int = 0
     batches_created: int = 0
     delimiter_corruptions: int = 0
@@ -45,11 +47,7 @@ class SkeletonBatcher:
         self.delimiter = delimiter
         self.stats = BatchStats()
 
-    def batch_translate_units(
-        self,
-        units: list[TextUnit],
-        batch_size: int = 50
-    ) -> list[TextUnit]:
+    def batch_translate_units(self, units: list[TextUnit], batch_size: int = 50) -> list[TextUnit]:
         """
         Batch translate units with delimiter protection.
 
@@ -73,6 +71,7 @@ class SkeletonBatcher:
 
 # Test Cases
 
+
 class TestDelimiterSurvival:
     """Test delimiter survival with adversarial inputs."""
 
@@ -84,14 +83,8 @@ class TestDelimiterSurvival:
         **Expected**: Delimiter survives, content newlines preserved.
         """
         adversarial_units = [
-            TextUnit(
-                unit_id="u1",
-                source_text="This text has\nnewlines\neverywhere"
-            ),
-            TextUnit(
-                unit_id="u2",
-                source_text="Another\ntext\nwith\nmultiple\nlines"
-            ),
+            TextUnit(unit_id="u1", source_text="This text has\nnewlines\neverywhere"),
+            TextUnit(unit_id="u2", source_text="Another\ntext\nwith\nmultiple\nlines"),
         ]
 
         batcher = SkeletonBatcher()
@@ -99,7 +92,9 @@ class TestDelimiterSurvival:
 
         assert len(result) == len(adversarial_units), "All units should be returned"
         assert batcher.stats.delimiter_corruptions == 0, "No delimiter corruption expected"
-        assert batcher.stats.survival_rate >= 95.0, f"Survival rate {batcher.stats.survival_rate}% < 95%"
+        assert batcher.stats.survival_rate >= 95.0, (
+            f"Survival rate {batcher.stats.survival_rate}% < 95%"
+        )
 
     def test_delimiter_like_content(self):
         """
@@ -109,18 +104,9 @@ class TestDelimiterSurvival:
         **Expected**: Delimiter survives, similar content preserved.
         """
         adversarial_units = [
-            TextUnit(
-                unit_id="u1",
-                source_text="This text contains UNTRANSLATABLE_BOUNDARY inside"
-            ),
-            TextUnit(
-                unit_id="u2",
-                source_text="The BOUNDARY between sections is clear"
-            ),
-            TextUnit(
-                unit_id="u3",
-                source_text="Some words are UNTRANSLATABLE in context"
-            ),
+            TextUnit(unit_id="u1", source_text="This text contains UNTRANSLATABLE_BOUNDARY inside"),
+            TextUnit(unit_id="u2", source_text="The BOUNDARY between sections is clear"),
+            TextUnit(unit_id="u3", source_text="Some words are UNTRANSLATABLE in context"),
         ]
 
         batcher = SkeletonBatcher()
@@ -138,14 +124,8 @@ class TestDelimiterSurvival:
         **Expected**: Delimiter survives, PUA content preserved.
         """
         adversarial_units = [
-            TextUnit(
-                unit_id="u1",
-                source_text="Unicode PUA: \uE000 \uE001 \uE002"
-            ),
-            TextUnit(
-                unit_id="u2",
-                source_text="More PUA chars: \uF000 \uF8FF"
-            ),
+            TextUnit(unit_id="u1", source_text="Unicode PUA: \ue000 \ue001 \ue002"),
+            TextUnit(unit_id="u2", source_text="More PUA chars: \uf000 \uf8ff"),
         ]
 
         batcher = SkeletonBatcher()
@@ -185,18 +165,9 @@ class TestDelimiterSurvival:
         **Expected**: Delimiter survives, special characters preserved.
         """
         adversarial_units = [
-            TextUnit(
-                unit_id="u1",
-                source_text="Emojis: 😀 🎉 🚀 💻 🔥"
-            ),
-            TextUnit(
-                unit_id="u2",
-                source_text="RTL: العربية עברית مرحبا"
-            ),
-            TextUnit(
-                unit_id="u3",
-                source_text="Combining: e\u0301 a\u0300 n\u0303"
-            ),
+            TextUnit(unit_id="u1", source_text="Emojis: 😀 🎉 🚀 💻 🔥"),
+            TextUnit(unit_id="u2", source_text="RTL: العربية עברית مرحبا"),
+            TextUnit(unit_id="u3", source_text="Combining: e\u0301 a\u0300 n\u0303"),
         ]
 
         batcher = SkeletonBatcher()
@@ -214,14 +185,8 @@ class TestDelimiterSurvival:
         **Expected**: Delimiter survives, all scripts preserved.
         """
         adversarial_units = [
-            TextUnit(
-                unit_id="u1",
-                source_text="Mixed: English 中文 Русский עברית العربية"
-            ),
-            TextUnit(
-                unit_id="u2",
-                source_text="More mixing: 日本語 한국어 Ελληνικά ไทย"
-            ),
+            TextUnit(unit_id="u1", source_text="Mixed: English 中文 Русский עברית العربية"),
+            TextUnit(unit_id="u2", source_text="More mixing: 日本語 한국어 Ελληνικά ไทย"),
         ]
 
         batcher = SkeletonBatcher()
@@ -239,14 +204,8 @@ class TestDelimiterSurvival:
         **Expected**: Delimiter survives, entities preserved or consistently transformed.
         """
         adversarial_units = [
-            TextUnit(
-                unit_id="u1",
-                source_text="HTML: &lt;div&gt; &amp; &quot;test&quot;"
-            ),
-            TextUnit(
-                unit_id="u2",
-                source_text="Numeric: &#169; &#8364; &#128512;"
-            ),
+            TextUnit(unit_id="u1", source_text="HTML: &lt;div&gt; &amp; &quot;test&quot;"),
+            TextUnit(unit_id="u2", source_text="Numeric: &#169; &#8364; &#128512;"),
         ]
 
         batcher = SkeletonBatcher()
@@ -304,6 +263,7 @@ class TestPerformanceMetrics:
 
 # Placeholder fixtures (will be expanded in TC-03)
 
+
 @pytest.fixture
 def mt_model():
     """Placeholder for actual MT model."""
@@ -313,10 +273,7 @@ def mt_model():
 @pytest.fixture
 def sample_text_units():
     """Fixture providing sample TextUnits for testing."""
-    return [
-        TextUnit(unit_id=f"u{i}", source_text=f"Sample text {i}")
-        for i in range(10)
-    ]
+    return [TextUnit(unit_id=f"u{i}", source_text=f"Sample text {i}") for i in range(10)]
 
 
 # Test execution notes

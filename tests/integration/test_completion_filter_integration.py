@@ -26,6 +26,7 @@ from src.translation_engine.models import DirectoryResult
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def _make_engine(tmp_path: Path, force_retranslate: bool = False) -> TranslationEngine:
     """
     Construct a minimal TranslationEngine via __new__ with only the attributes
@@ -61,8 +62,8 @@ def _make_engine(tmp_path: Path, force_retranslate: bool = False) -> Translation
     engine.config = cfg_mock
 
     # Attributes set by __init__ that _translate_directory_locked accesses
-    engine.changed_since_sha = None       # git diff filter (disabled)
-    engine._review_cache = None           # review cache (none in tests)
+    engine.changed_since_sha = None  # git diff filter (disabled)
+    engine._review_cache = None  # review cache (none in tests)
     engine._rtq_llm_output_paths = set()  # LLM escalation queue (empty)
 
     return engine
@@ -77,14 +78,17 @@ def _set_mtime(path: Path, delta_seconds: float) -> None:
 @pytest.fixture(autouse=True)
 def _redirect_queue(tmp_path):
     """Redirect queue file to tmp_path for every test."""
-    with mock.patch.object(rtq, "_QUEUE_FILE", tmp_path / "queue.jsonl"), \
-         mock.patch.object(rtq, "_QUARANTINE_FILE", tmp_path / "quarantine.jsonl"):
+    with (
+        mock.patch.object(rtq, "_QUEUE_FILE", tmp_path / "queue.jsonl"),
+        mock.patch.object(rtq, "_QUARANTINE_FILE", tmp_path / "quarantine.jsonl"),
+    ):
         yield
 
 
 # ---------------------------------------------------------------------------
 # Case A — all outputs current → file skipped
 # ---------------------------------------------------------------------------
+
 
 class TestCaseASkipComplete:
     def test_complete_file_is_skipped(self, tmp_path):
@@ -96,14 +100,14 @@ class TestCaseASkipComplete:
         src_dir.mkdir()
         source = src_dir / "post.md"
         source.write_text("# Hello")
-        _set_mtime(source, -100)          # source is 100s in the past
+        _set_mtime(source, -100)  # source is 100s in the past
 
         out_dir = tmp_path / "out"
         for lang in ["de", "fr"]:
             out = out_dir / lang / "post.md"
             out.parent.mkdir(parents=True, exist_ok=True)
             out.write_text(f"# Hallo ({lang})")
-            _set_mtime(out, +10)           # outputs are 10s newer than now > source
+            _set_mtime(out, +10)  # outputs are 10s newer than now > source
 
         engine = _make_engine(tmp_path)
 
@@ -156,6 +160,7 @@ class TestCaseASkipComplete:
 # Case B — stale output → file included
 # ---------------------------------------------------------------------------
 
+
 class TestCaseBIncludeStale:
     def test_stale_output_file_is_included(self, tmp_path):
         """
@@ -165,13 +170,13 @@ class TestCaseBIncludeStale:
         src_dir.mkdir()
         source = src_dir / "post.md"
         source.write_text("# Hello")
-        _set_mtime(source, +10)           # source is newer
+        _set_mtime(source, +10)  # source is newer
 
         out_dir = tmp_path / "out"
         out = out_dir / "de" / "post.md"
         out.parent.mkdir(parents=True, exist_ok=True)
         out.write_text("# Hallo")
-        _set_mtime(out, -100)             # output is older than source
+        _set_mtime(out, -100)  # output is older than source
 
         engine = _make_engine(tmp_path)
         captured = {}
@@ -204,6 +209,7 @@ def result_skipped(engine):
 # Case C — queued file force-included despite current outputs
 # ---------------------------------------------------------------------------
 
+
 class TestCaseCQueuedForceIncluded:
     def test_queued_output_forces_source_into_batch(self, tmp_path):
         """
@@ -215,13 +221,13 @@ class TestCaseCQueuedForceIncluded:
         src_dir.mkdir()
         source = src_dir / "stuck.md"
         source.write_text("# Stuck")
-        _set_mtime(source, -200)          # source is old
+        _set_mtime(source, -200)  # source is old
 
         out_dir = tmp_path / "out"
         out = out_dir / "ar" / "stuck.md"
         out.parent.mkdir(parents=True, exist_ok=True)
         out.write_text("# WRONG LANGUAGE CONTENT")
-        _set_mtime(out, +200)             # output is NEWER than source (looks complete)
+        _set_mtime(out, +200)  # output is NEWER than source (looks complete)
 
         # Enqueue the output path — simulates CASE 4 having fired
         rtq.add_to_queue(out, "ar")
@@ -254,6 +260,7 @@ class TestCaseCQueuedForceIncluded:
 # Case D — force_retranslate=True bypasses filter entirely
 # ---------------------------------------------------------------------------
 
+
 class TestCaseDForceRetranslate:
     def test_force_retranslate_bypasses_filter(self, tmp_path):
         """
@@ -264,13 +271,13 @@ class TestCaseDForceRetranslate:
         src_dir.mkdir()
         source = src_dir / "old.md"
         source.write_text("# Old content")
-        _set_mtime(source, -300)          # source is old
+        _set_mtime(source, -300)  # source is old
 
         out_dir = tmp_path / "out"
         out = out_dir / "de" / "old.md"
         out.parent.mkdir(parents=True, exist_ok=True)
         out.write_text("# Alt Inhalt")
-        _set_mtime(out, +300)             # output is very current
+        _set_mtime(out, +300)  # output is very current
 
         engine = _make_engine(tmp_path, force_retranslate=True)
         captured = {}

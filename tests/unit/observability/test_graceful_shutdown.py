@@ -170,71 +170,69 @@ class TestSignalHandlers:
 
     def test_setup_registers_signal_handlers_on_unix(self):
         """Test that setup_graceful_shutdown registers SIGINT and SIGTERM on Unix."""
-        with patch('src.observability.graceful_shutdown.platform.system', return_value='Linux'):
-            with patch('signal.signal') as mock_signal:
+        with patch("src.observability.graceful_shutdown.platform.system", return_value="Linux"):
+            with patch("signal.signal") as mock_signal:
                 setup_graceful_shutdown()
 
                 # Verify SIGINT handler registered
                 calls = mock_signal.call_args_list
-                assert any(
-                    call[0][0] == signal.SIGINT
-                    for call in calls
-                ), "SIGINT handler should be registered on Linux"
+                assert any(call[0][0] == signal.SIGINT for call in calls), (
+                    "SIGINT handler should be registered on Linux"
+                )
 
                 # Verify SIGTERM handler registered
-                assert any(
-                    call[0][0] == signal.SIGTERM
-                    for call in calls
-                ), "SIGTERM handler should be registered on Linux"
+                assert any(call[0][0] == signal.SIGTERM for call in calls), (
+                    "SIGTERM handler should be registered on Linux"
+                )
 
     def test_setup_registers_signal_handlers_on_windows(self):
         """Test that setup_graceful_shutdown registers SIGINT and SIGBREAK on Windows."""
-        with patch('src.observability.graceful_shutdown.platform.system', return_value='Windows'):
-            with patch('signal.signal') as mock_signal:
+        with patch("src.observability.graceful_shutdown.platform.system", return_value="Windows"):
+            with patch("signal.signal") as mock_signal:
                 # Mock SIGBREAK availability
-                with patch('src.observability.graceful_shutdown.signal.SIGBREAK', signal.SIGINT, create=True):
+                with patch(
+                    "src.observability.graceful_shutdown.signal.SIGBREAK",
+                    signal.SIGINT,
+                    create=True,
+                ):
                     setup_graceful_shutdown()
 
                     # Verify SIGINT handler registered
                     calls = mock_signal.call_args_list
-                    assert any(
-                        call[0][0] == signal.SIGINT
-                        for call in calls
-                    ), "SIGINT handler should be registered on Windows"
+                    assert any(call[0][0] == signal.SIGINT for call in calls), (
+                        "SIGINT handler should be registered on Windows"
+                    )
 
     def test_setup_registers_signal_handlers_on_macos(self):
         """Test that setup_graceful_shutdown registers SIGINT and SIGTERM on macOS."""
-        with patch('src.observability.graceful_shutdown.platform.system', return_value='Darwin'):
-            with patch('signal.signal') as mock_signal:
+        with patch("src.observability.graceful_shutdown.platform.system", return_value="Darwin"):
+            with patch("signal.signal") as mock_signal:
                 setup_graceful_shutdown()
 
                 # Verify SIGINT handler registered
                 calls = mock_signal.call_args_list
-                assert any(
-                    call[0][0] == signal.SIGINT
-                    for call in calls
-                ), "SIGINT handler should be registered on macOS"
+                assert any(call[0][0] == signal.SIGINT for call in calls), (
+                    "SIGINT handler should be registered on macOS"
+                )
 
                 # Verify SIGTERM handler registered
-                assert any(
-                    call[0][0] == signal.SIGTERM
-                    for call in calls
-                ), "SIGTERM handler should be registered on macOS"
+                assert any(call[0][0] == signal.SIGTERM for call in calls), (
+                    "SIGTERM handler should be registered on macOS"
+                )
 
     def test_setup_handles_missing_sigbreak_on_windows(self):
         """Test graceful handling when SIGBREAK is not available on Windows."""
-        with patch('src.observability.graceful_shutdown.platform.system', return_value='Windows'):
-            with patch('signal.signal') as mock_signal:
+        with patch("src.observability.graceful_shutdown.platform.system", return_value="Windows"):
+            with patch("signal.signal") as mock_signal:
                 # Simulate SIGBREAK not being available
-                with patch('src.observability.graceful_shutdown.hasattr', return_value=False):
+                with patch("src.observability.graceful_shutdown.hasattr", return_value=False):
                     setup_graceful_shutdown()
 
                     # Should still register SIGINT
                     calls = mock_signal.call_args_list
-                    assert any(
-                        call[0][0] == signal.SIGINT
-                        for call in calls
-                    ), "SIGINT handler should still be registered even without SIGBREAK"
+                    assert any(call[0][0] == signal.SIGINT for call in calls), (
+                        "SIGINT handler should still be registered even without SIGBREAK"
+                    )
 
 
 class TestGracefulShutdown:
@@ -247,12 +245,12 @@ class TestGracefulShutdown:
     def test_shutdown_closes_all_contexts(self):
         """Test that shutdown closes all active contexts."""
         # Create mock contexts with proper spec
-        ctx1 = Mock(spec=['set_metrics', '__exit__', '_start_time'])
+        ctx1 = Mock(spec=["set_metrics", "__exit__", "_start_time"])
         ctx1.set_metrics = Mock()
         ctx1.__exit__ = Mock()
         ctx1._start_time = time.time()
 
-        ctx2 = Mock(spec=['set_metrics', '__exit__', '_start_time'])
+        ctx2 = Mock(spec=["set_metrics", "__exit__", "_start_time"])
         ctx2.set_metrics = Mock()
         ctx2.__exit__ = Mock()
         ctx2._start_time = time.time()
@@ -261,7 +259,7 @@ class TestGracefulShutdown:
         register_active_context(ctx2)
 
         # Perform shutdown (mock sys.exit to prevent actual exit)
-        with patch('sys.exit'):
+        with patch("sys.exit"):
             _perform_graceful_shutdown(signal.SIGINT, None)
 
         # Verify both contexts were closed
@@ -272,67 +270,69 @@ class TestGracefulShutdown:
 
     def test_shutdown_sets_correct_metrics(self):
         """Test that shutdown sets correct cancellation metrics."""
-        mock_context = Mock(spec=['set_metrics', '__exit__', '_start_time'])
+        mock_context = Mock(spec=["set_metrics", "__exit__", "_start_time"])
         mock_context.set_metrics = Mock()
         mock_context.__exit__ = Mock()
         mock_context._start_time = time.time() - 5  # 5 seconds ago
 
         register_active_context(mock_context)
 
-        with patch('sys.exit'):
+        with patch("sys.exit"):
             _perform_graceful_shutdown(signal.SIGINT, None)
 
         # Verify set_metrics called with correct arguments
         call_kwargs = mock_context.set_metrics.call_args[1]
-        assert call_kwargs['run_status'] == 'cancelled'
-        assert call_kwargs['duration_ms'] >= 4900  # ~5000ms
-        assert call_kwargs['duration_ms'] <= 5200
-        assert 'end_time' in call_kwargs
-        assert 'error_summary' in call_kwargs
-        assert 'SIGINT' in call_kwargs['error_summary']
+        assert call_kwargs["run_status"] == "cancelled"
+        assert call_kwargs["duration_ms"] >= 4900  # ~5000ms
+        assert call_kwargs["duration_ms"] <= 5200
+        assert "end_time" in call_kwargs
+        assert "error_summary" in call_kwargs
+        assert "SIGINT" in call_kwargs["error_summary"]
 
     def test_shutdown_handles_context_without_start_time(self):
         """Test shutdown handles contexts without _start_time gracefully."""
-        mock_context = Mock(spec=['set_metrics', '__exit__'])
+        mock_context = Mock(spec=["set_metrics", "__exit__"])
         mock_context.set_metrics = Mock()
         mock_context.__exit__ = Mock()
         # No _start_time attribute - should be handled by hasattr check
 
         register_active_context(mock_context)
 
-        with patch('sys.exit'):
+        with patch("sys.exit"):
             _perform_graceful_shutdown(signal.SIGINT, None)
 
         # Verify set_metrics called with duration_ms=0
         call_kwargs = mock_context.set_metrics.call_args[1]
-        assert call_kwargs['duration_ms'] == 0
+        assert call_kwargs["duration_ms"] == 0
 
     def test_shutdown_extracts_partial_metrics(self):
         """Test shutdown extracts partial metrics if available."""
-        mock_context = Mock(spec=['set_metrics', '__exit__', '_start_time', 'get_partial_metrics'])
+        mock_context = Mock(spec=["set_metrics", "__exit__", "_start_time", "get_partial_metrics"])
         mock_context.set_metrics = Mock()
         mock_context.__exit__ = Mock()
         mock_context._start_time = time.time()
-        mock_context.get_partial_metrics = Mock(return_value={
-            'items_discovered': 100,
-            'items_succeeded': 75,
-            'items_failed': 5,
-        })
+        mock_context.get_partial_metrics = Mock(
+            return_value={
+                "items_discovered": 100,
+                "items_succeeded": 75,
+                "items_failed": 5,
+            }
+        )
 
         register_active_context(mock_context)
 
-        with patch('sys.exit'):
+        with patch("sys.exit"):
             _perform_graceful_shutdown(signal.SIGINT, None)
 
         # Verify partial metrics included
         call_kwargs = mock_context.set_metrics.call_args[1]
-        assert call_kwargs['items_discovered'] == 100
-        assert call_kwargs['items_succeeded'] == 75
-        assert call_kwargs['items_failed'] == 5
+        assert call_kwargs["items_discovered"] == 100
+        assert call_kwargs["items_succeeded"] == 75
+        assert call_kwargs["items_failed"] == 5
 
     def test_shutdown_handles_get_partial_metrics_exception(self):
         """Test shutdown handles exception from get_partial_metrics."""
-        mock_context = Mock(spec=['set_metrics', '__exit__', '_start_time', 'get_partial_metrics'])
+        mock_context = Mock(spec=["set_metrics", "__exit__", "_start_time", "get_partial_metrics"])
         mock_context.set_metrics = Mock()
         mock_context.__exit__ = Mock()
         mock_context._start_time = time.time()
@@ -341,7 +341,7 @@ class TestGracefulShutdown:
         register_active_context(mock_context)
 
         # Should not raise exception
-        with patch('sys.exit'):
+        with patch("sys.exit"):
             _perform_graceful_shutdown(signal.SIGINT, None)
 
         # Verify context still closed
@@ -350,13 +350,13 @@ class TestGracefulShutdown:
     def test_shutdown_handles_context_without_set_metrics(self):
         """Test shutdown handles contexts without set_metrics method."""
         # Use MagicMock which allows arbitrary attribute assignment
-        mock_context = MagicMock(spec=['__exit__'])
+        mock_context = MagicMock(spec=["__exit__"])
         mock_context.__exit__ = Mock()
 
         register_active_context(mock_context)
 
         # Should not raise exception
-        with patch('sys.exit'):
+        with patch("sys.exit"):
             _perform_graceful_shutdown(signal.SIGINT, None)
 
         # Verify __exit__ still called
@@ -364,14 +364,14 @@ class TestGracefulShutdown:
 
     def test_shutdown_handles_context_without_exit(self):
         """Test shutdown handles contexts without __exit__ method."""
-        mock_context = Mock(spec=['set_metrics', '_start_time'])
+        mock_context = Mock(spec=["set_metrics", "_start_time"])
         mock_context.set_metrics = Mock()
         mock_context._start_time = time.time()
 
         register_active_context(mock_context)
 
         # Should not raise exception
-        with patch('sys.exit'):
+        with patch("sys.exit"):
             _perform_graceful_shutdown(signal.SIGINT, None)
 
         # Verify set_metrics still called
@@ -379,7 +379,7 @@ class TestGracefulShutdown:
 
     def test_shutdown_handles_exit_exception(self):
         """Test shutdown handles exception from context.__exit__."""
-        mock_context = Mock(spec=['set_metrics', '__exit__', '_start_time'])
+        mock_context = Mock(spec=["set_metrics", "__exit__", "_start_time"])
         mock_context.set_metrics = Mock()
         mock_context.__exit__ = Mock(side_effect=Exception("Exit error"))
         mock_context._start_time = time.time()
@@ -387,7 +387,7 @@ class TestGracefulShutdown:
         register_active_context(mock_context)
 
         # Should not raise exception
-        with patch('sys.exit'):
+        with patch("sys.exit"):
             _perform_graceful_shutdown(signal.SIGINT, None)
 
         # Verify attempt was made
@@ -395,7 +395,7 @@ class TestGracefulShutdown:
 
     def test_shutdown_clears_context_registry(self):
         """Test that shutdown clears the context registry."""
-        ctx1 = Mock(spec=['set_metrics', '__exit__', '_start_time'])
+        ctx1 = Mock(spec=["set_metrics", "__exit__", "_start_time"])
         ctx1.set_metrics = Mock()
         ctx1.__exit__ = Mock()
         ctx1._start_time = time.time()
@@ -403,7 +403,7 @@ class TestGracefulShutdown:
         register_active_context(ctx1)
         assert get_active_context_count() == 1
 
-        with patch('sys.exit'):
+        with patch("sys.exit"):
             _perform_graceful_shutdown(signal.SIGINT, None)
 
         assert get_active_context_count() == 0
@@ -411,7 +411,7 @@ class TestGracefulShutdown:
     def test_shutdown_with_no_contexts(self):
         """Test shutdown with no active contexts."""
         # Should not raise exception
-        with patch('sys.exit'):
+        with patch("sys.exit"):
             _perform_graceful_shutdown(signal.SIGINT, None)
 
     def test_reentrant_shutdown_exits_immediately(self):
@@ -419,7 +419,7 @@ class TestGracefulShutdown:
         # Test needs fresh state but will trigger shutdown twice in same test
         # Don't register any context - we're just testing the shutdown flag behavior
 
-        with patch('sys.exit', side_effect=SystemExit) as mock_exit:
+        with patch("sys.exit", side_effect=SystemExit) as mock_exit:
             # First shutdown sets the flag
             try:
                 _perform_graceful_shutdown(signal.SIGINT, None)
@@ -431,7 +431,7 @@ class TestGracefulShutdown:
             assert mock_exit.call_args[0][0] == 0
 
         # Second shutdown attempt - flag is still set from first shutdown
-        with patch('sys.exit', side_effect=SystemExit) as mock_exit:
+        with patch("sys.exit", side_effect=SystemExit) as mock_exit:
             try:
                 _perform_graceful_shutdown(signal.SIGINT, None)
             except SystemExit:
@@ -442,19 +442,19 @@ class TestGracefulShutdown:
 
     def test_shutdown_signal_name_for_sigterm(self):
         """Test shutdown uses correct signal name for SIGTERM."""
-        mock_context = Mock(spec=['set_metrics', '__exit__', '_start_time'])
+        mock_context = Mock(spec=["set_metrics", "__exit__", "_start_time"])
         mock_context.set_metrics = Mock()
         mock_context.__exit__ = Mock()
         mock_context._start_time = time.time()
 
         register_active_context(mock_context)
 
-        with patch('sys.exit'):
+        with patch("sys.exit"):
             _perform_graceful_shutdown(signal.SIGTERM, None)
 
         # Verify error summary mentions SIGTERM
         call_kwargs = mock_context.set_metrics.call_args[1]
-        assert 'SIGTERM' in call_kwargs['error_summary']
+        assert "SIGTERM" in call_kwargs["error_summary"]
 
 
 class TestShutdownHandlers:
@@ -473,7 +473,7 @@ class TestShutdownHandlers:
 
         register_shutdown_handler(custom_handler)
 
-        with patch('sys.exit'):
+        with patch("sys.exit"):
             _perform_graceful_shutdown(signal.SIGINT, None)
 
         assert len(handler_called) == 1
@@ -495,7 +495,7 @@ class TestShutdownHandlers:
         register_shutdown_handler(handler2)
         register_shutdown_handler(handler3)
 
-        with patch('sys.exit'):
+        with patch("sys.exit"):
             _perform_graceful_shutdown(signal.SIGINT, None)
 
         assert calls == [1, 2, 3]
@@ -514,7 +514,7 @@ class TestShutdownHandlers:
         register_shutdown_handler(success_handler)
 
         # Should not raise exception
-        with patch('sys.exit'):
+        with patch("sys.exit"):
             _perform_graceful_shutdown(signal.SIGINT, None)
 
         # Success handler should still be called
@@ -531,7 +531,7 @@ class TestShutdownHandlers:
         register_shutdown_handler(handler)  # Duplicate
         register_shutdown_handler(handler)  # Another duplicate
 
-        with patch('sys.exit'):
+        with patch("sys.exit"):
             _perform_graceful_shutdown(signal.SIGINT, None)
 
         # Should only be called once
@@ -564,7 +564,7 @@ class TestResetForTesting:
         register_shutdown_handler(handler)
         reset_for_testing()
 
-        with patch('sys.exit'):
+        with patch("sys.exit"):
             _perform_graceful_shutdown(signal.SIGINT, None)
 
         # Handler should not be called
@@ -573,14 +573,14 @@ class TestResetForTesting:
     def test_reset_clears_shutdown_flag(self):
         """Test that reset clears shutdown in progress flag."""
         # Trigger shutdown to set flag
-        with patch('sys.exit'):
+        with patch("sys.exit"):
             _perform_graceful_shutdown(signal.SIGINT, None)
 
         # Reset
         reset_for_testing()
 
         # Should be able to shutdown again without forced exit
-        with patch('sys.exit') as mock_exit:
+        with patch("sys.exit") as mock_exit:
             _perform_graceful_shutdown(signal.SIGINT, None)
             # Should exit with 0 (normal), not 1 (forced)
             mock_exit.assert_called_with(0)

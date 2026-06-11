@@ -4,6 +4,7 @@ Regression tests for CLI import chain without torch (TEST-006, TEST-011, TEST-01
 Ensures that --help and --dry-run work in minimal environments without torch installed.
 This prevents regression of the import chain failures fixed in Phase 1.
 """
+
 import subprocess
 import sys
 from pathlib import Path
@@ -53,15 +54,11 @@ except SystemExit as e:
 
     # Should succeed (exit code 0)
     assert result.returncode == 0, (
-        f"--help failed with torch blocked:\\n"
-        f"STDOUT:\\n{result.stdout}\\n"
-        f"STDERR:\\n{result.stderr}"
+        f"--help failed with torch blocked:\\nSTDOUT:\\n{result.stdout}\\nSTDERR:\\n{result.stderr}"
     )
 
     # Should display usage
-    assert "usage:" in result.stdout.lower() or "Usage:" in result.stdout, (
-        "Help text not displayed"
-    )
+    assert "usage:" in result.stdout.lower() or "Usage:" in result.stdout, "Help text not displayed"
 
 
 def test_version_works_without_torch():
@@ -158,9 +155,7 @@ except SystemExit as e:
     )
 
     # Should show invalid choice error
-    assert "invalid choice" in result.stderr.lower(), (
-        "Expected 'invalid choice' error in stderr"
-    )
+    assert "invalid choice" in result.stderr.lower(), "Expected 'invalid choice' error in stderr"
 
 
 @pytest.mark.slow
@@ -216,10 +211,10 @@ except SystemExit as e:
     ]
 
     import re
+
     for pattern in forbidden_patterns:
         assert not re.search(pattern, stderr_lower, re.IGNORECASE), (
-            f"Found torch import error in stderr (pattern: {pattern}):\\n"
-            f"STDERR:\\n{result.stderr}"
+            f"Found torch import error in stderr (pattern: {pattern}):\\nSTDERR:\\n{result.stderr}"
         )
 
     # The command may fail for other reasons (missing site config, missing other deps)

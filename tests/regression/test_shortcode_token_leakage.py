@@ -31,9 +31,9 @@ class FakeMTModel:
     """
 
     BLOCKED_TOKENS = [
-        "xifp",           # Internal marker (case-insensitive)
-        "⟦",              # Left bracket placeholder
-        "⟧",              # Right bracket placeholder
+        "xifp",  # Internal marker (case-insensitive)
+        "⟦",  # Left bracket placeholder
+        "⟧",  # Right bracket placeholder
         "{PLACEHOLDER_",  # Template token prefix
     ]
 
@@ -71,7 +71,7 @@ def simulate_translation_pipeline(markdown: str, model: FakeMTModel) -> str:
     4. Reassemble markdown with translations and preserved shortcodes
     """
     # Pattern to match Hugo shortcodes
-    shortcode_pattern = r'\{\{<\s*\w+\s*>\}\}'
+    shortcode_pattern = r"\{\{<\s*\w+\s*>\}\}"
 
     # Extract shortcodes and their positions
     shortcodes = []
@@ -155,7 +155,7 @@ def test_shortcode_preservation_with_translation():
     print("=" * 80)
 
     # Check 1: Shortcode preserved byte-for-byte
-    shortcode_pattern = r'\{\{<\s*sections\s*>\}\}'
+    shortcode_pattern = r"\{\{<\s*sections\s*>\}\}"
     shortcode_match = re.search(shortcode_pattern, output_markdown)
 
     print("\n[Check 1] Shortcode preservation:")

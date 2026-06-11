@@ -9,6 +9,7 @@ REPO_ROOT = Path(__file__).parent.parent.parent
 SRC_ROOT = REPO_ROOT / "src"
 sys.path.insert(0, str(REPO_ROOT))
 
+
 # Load modules directly to avoid package __init__.py issues
 def load_module_from_path(module_name: str, file_path: Path):
     """Load a Python module from file path and register in sys.modules."""
@@ -18,28 +19,25 @@ def load_module_from_path(module_name: str, file_path: Path):
     spec.loader.exec_module(module)
     return module
 
+
 # Load base module first and register as the relative import target
 base_module = load_module_from_path(
     "src.translation_engine.validation.base",
-    SRC_ROOT / "translation_engine" / "validation" / "base.py"
+    SRC_ROOT / "translation_engine" / "validation" / "base.py",
 )
 
 # Load models module
-models_module = load_module_from_path(
-    "src.utils.models",
-    SRC_ROOT / "utils" / "models.py"
-)
+models_module = load_module_from_path("src.utils.models", SRC_ROOT / "utils" / "models.py")
 
 # Load config_loader (needed by file_placement_validator)
 config_loader_module = load_module_from_path(
-    "src.utils.config_loader",
-    SRC_ROOT / "utils" / "config_loader.py"
+    "src.utils.config_loader", SRC_ROOT / "utils" / "config_loader.py"
 )
 
 # Now load the validator (it will find dependencies in sys.modules)
 validator_module = load_module_from_path(
     "src.translation_engine.validation.file_placement_validator",
-    SRC_ROOT / "translation_engine" / "validation" / "file_placement_validator.py"
+    SRC_ROOT / "translation_engine" / "validation" / "file_placement_validator.py",
 )
 
 # Extract the classes we need
@@ -47,6 +45,7 @@ FilePlacementValidator = validator_module.FilePlacementValidator
 SiteProfile = models_module.SiteProfile
 OutputLayout = models_module.OutputLayout
 BodyRules = models_module.BodyRules
+
 
 def test_basic():
     """Test basic functionality."""
@@ -103,13 +102,8 @@ def test_basic():
         content_roots=["/content/products"],
         default_source_lang="en",
         target_langs=["de", "es", "fr"],
-        body=BodyRules(
-            translate_markdown=True
-        ),
-        output_layout=OutputLayout(
-            per_language_folders=True,
-            pattern="{lang}/{path}"
-        )
+        body=BodyRules(translate_markdown=True),
+        output_layout=OutputLayout(per_language_folders=True, pattern="{lang}/{path}"),
     )
 
     source = "/content/products/en/words/index.md"
@@ -118,7 +112,7 @@ def test_basic():
         "source_lang": "en",
         "target_lang": "de",
         "site_id": "products.aspose.net",
-        "site_profile": profile
+        "site_profile": profile,
     }
 
     result = validator.validate(source, translation, context)
@@ -137,7 +131,7 @@ def test_basic():
         "source_lang": "en",
         "target_lang": "de",
         "site_id": "products.aspose.net",
-        "site_profile": profile
+        "site_profile": profile,
     }
 
     result = validator.validate(source, translation, context)
@@ -150,9 +144,10 @@ def test_basic():
     assert result.success is False, "Test 5 should fail"
     print("  ✓ PASSED")
 
-    print("\n" + "="*60)
+    print("\n" + "=" * 60)
     print("All basic tests PASSED!")
-    print("="*60)
+    print("=" * 60)
+
 
 if __name__ == "__main__":
     try:
@@ -162,5 +157,6 @@ if __name__ == "__main__":
     except Exception as e:
         print(f"\n✗ Test failed: {e}")
         import traceback
+
         traceback.print_exc()
         sys.exit(1)

@@ -1,4 +1,5 @@
 """Unit tests for FileLock class core functionality."""
+
 import os
 import sys
 import time
@@ -97,12 +98,12 @@ def test_json_metadata_written(lock_file):
     data = json.loads(content)
 
     # Verify metadata fields
-    assert 'pid' in data
-    assert 'hostname' in data
-    assert 'created' in data
-    assert 'format_version' in data
+    assert "pid" in data
+    assert "hostname" in data
+    assert "created" in data
+    assert "format_version" in data
 
-    assert data['pid'] == os.getpid()
+    assert data["pid"] == os.getpid()
 
     lock.release()
 
@@ -167,10 +168,10 @@ def test_multiple_lock_instances_same_file(lock_file):
     lock2.release()
 
 
-@pytest.mark.skipif(sys.platform != 'win32', reason="Windows-specific test")
+@pytest.mark.skipif(sys.platform != "win32", reason="Windows-specific test")
 def test_windows_msvcrt_locking(lock_file):
     """Test Windows msvcrt.locking is called."""
-    with patch('msvcrt.locking') as mock_locking:
+    with patch("msvcrt.locking") as mock_locking:
         lock = FileLock(lock_file, timeout=5.0)
 
         lock.acquire(blocking=True)
@@ -181,10 +182,10 @@ def test_windows_msvcrt_locking(lock_file):
         lock.release()
 
 
-@pytest.mark.skipif(sys.platform == 'win32', reason="Unix-specific test")
+@pytest.mark.skipif(sys.platform == "win32", reason="Unix-specific test")
 def test_unix_fcntl_flock(lock_file):
     """Test Unix fcntl.flock is called."""
-    with patch('fcntl.flock') as mock_flock:
+    with patch("fcntl.flock") as mock_flock:
         lock = FileLock(lock_file, timeout=5.0)
 
         lock.acquire(blocking=True)

@@ -85,7 +85,7 @@ class TestWorkerConfig:
             "TM_DATA_PATH": "/data/tm",
             "DEVICE": "cpu",
             "USE_SHARED_ENGINES": "true",
-            "LOG_LEVEL": "DEBUG"
+            "LOG_LEVEL": "DEBUG",
         }
 
         with patch.dict(os.environ, env_vars, clear=True):
@@ -110,7 +110,7 @@ class TestWorkerConfig:
             "device": "cpu",
             "max_retries": 5,
             "poll_interval": 3.0,
-            "worker_id": "docker-cpu-worker"
+            "worker_id": "docker-cpu-worker",
         }
 
         with patch.dict(os.environ, {}, clear=True):
@@ -146,9 +146,7 @@ class TestWorkerConfig:
     def test_worker_config_to_dict(self):
         """Test WorkerConfig.to_dict() serialization."""
         config = WorkerConfig(
-            execution_mode=ExecutionMode.DOCKER_CPU,
-            worker_id="test-worker",
-            device="cpu"
+            execution_mode=ExecutionMode.DOCKER_CPU, worker_id="test-worker", device="cpu"
         )
         config_dict = config.to_dict()
         assert config_dict["execution_mode"] == "docker_cpu"
@@ -244,10 +242,7 @@ class TestWorkerRunner:
             def shutdown(self):
                 self.shutdown_called = True
 
-        config = WorkerConfig(
-            execution_mode=ExecutionMode.DOCKER_CPU,
-            worker_id="test-worker"
-        )
+        config = WorkerConfig(execution_mode=ExecutionMode.DOCKER_CPU, worker_id="test-worker")
 
         worker = ConcreteWorker(config)
         assert worker.config.execution_mode == ExecutionMode.DOCKER_CPU
@@ -279,17 +274,14 @@ class TestWorkerRunner:
         # Docker CPU mode - should force CPU
         config_cpu = WorkerConfig(
             execution_mode=ExecutionMode.DOCKER_CPU,
-            device="cuda"  # Request GPU
+            device="cuda",  # Request GPU
         )
         worker_cpu = ConcreteWorker(config_cpu)
         assert worker_cpu.config.device == "cpu"  # Overridden to CPU
         assert worker_cpu.get_effective_device() == "cpu"
 
         # Docker GPU mode - should allow GPU
-        config_gpu = WorkerConfig(
-            execution_mode=ExecutionMode.DOCKER_GPU,
-            device="cuda"
-        )
+        config_gpu = WorkerConfig(execution_mode=ExecutionMode.DOCKER_GPU, device="cuda")
         worker_gpu = ConcreteWorker(config_gpu)
         assert worker_gpu.config.device == "cuda"  # Not overridden
         assert worker_gpu.get_effective_device() == "cuda"
@@ -307,10 +299,7 @@ class TestWorkerRunner:
             def shutdown(self):
                 pass
 
-        config = WorkerConfig(
-            execution_mode=ExecutionMode.DOCKER_CPU,
-            worker_id="test-worker"
-        )
+        config = WorkerConfig(execution_mode=ExecutionMode.DOCKER_CPU, worker_id="test-worker")
         worker = ConcreteWorker(config)
 
         # Should not raise error
@@ -372,7 +361,7 @@ class TestIntegration:
         env_vars = {
             "EXECUTION_MODE": "docker_cpu",
             "WORKER_ID": "cpu-worker-1",
-            "DEVICE": "cuda"  # Request GPU (will be overridden)
+            "DEVICE": "cuda",  # Request GPU (will be overridden)
         }
 
         with patch.dict(os.environ, env_vars, clear=True):
@@ -411,11 +400,7 @@ class TestIntegration:
                 pass
 
         # Simulate windows_cuda environment
-        env_vars = {
-            "EXECUTION_MODE": "windows_cuda",
-            "WORKER_ID": "gpu-worker-1",
-            "DEVICE": "cuda"
-        }
+        env_vars = {"EXECUTION_MODE": "windows_cuda", "WORKER_ID": "gpu-worker-1", "DEVICE": "cuda"}
 
         with patch.dict(os.environ, env_vars, clear=True):
             config = WorkerConfig.from_env()
@@ -439,15 +424,11 @@ class TestIntegration:
             def shutdown(self):
                 pass
 
-        mode_defaults = {
-            "device": "cpu",
-            "max_retries": 5,
-            "poll_interval": 3.0
-        }
+        mode_defaults = {"device": "cpu", "max_retries": 5, "poll_interval": 3.0}
 
         env_vars = {
             "EXECUTION_MODE": "docker_cpu",
-            "MAX_RETRIES": "7"  # Override mode default
+            "MAX_RETRIES": "7",  # Override mode default
         }
 
         with patch.dict(os.environ, env_vars, clear=True):

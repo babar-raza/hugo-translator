@@ -164,8 +164,8 @@ class TestPlaceholderValidation:
         """Test that Hugo shortcodes are validated."""
         validator = QualityValidator()
 
-        source = "Content {{< ref \"page\" >}} more."
-        translation = "Contenido {{< ref \"page\" >}} más."
+        source = 'Content {{< ref "page" >}} more.'
+        translation = 'Contenido {{< ref "page" >}} más.'
 
         result = validator.validate_content(source, translation)
         assert result.success or result.error_count == 0
@@ -174,7 +174,7 @@ class TestPlaceholderValidation:
         """Test detection of missing shortcodes."""
         validator = QualityValidator()
 
-        source = "Content {{< ref \"page\" >}} more."
+        source = 'Content {{< ref "page" >}} more.'
         translation = "Contenido más."  # Missing shortcode
 
         result = validator.validate_content(source, translation)
@@ -228,8 +228,10 @@ code
 
         result = validator.validate_content(source, translation)
         assert result.error_count > 0
-        assert any("unbalanced" in issue.message.lower() or "code" in issue.message.lower()
-                   for issue in result.issues)
+        assert any(
+            "unbalanced" in issue.message.lower() or "code" in issue.message.lower()
+            for issue in result.issues
+        )
 
     def test_different_code_block_count(self):
         """Test warning for different code block counts."""
@@ -408,8 +410,11 @@ class TestLinkValidation:
 
             result = validator.validate_content(source, translation)
             # Should not warn about existing file
-            link_warnings = [i for i in result.issues
-                           if "link" in i.message.lower() and i.severity == ValidationSeverity.WARNING]
+            link_warnings = [
+                i
+                for i in result.issues
+                if "link" in i.message.lower() and i.severity == ValidationSeverity.WARNING
+            ]
             assert len([w for w in link_warnings if "existing.md" in w.message]) == 0
 
     def test_missing_relative_link(self):

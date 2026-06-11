@@ -58,14 +58,14 @@ def test_load_valid_metadata(tmp_path):
                         "size_bytes": 120,
                         "status": "success",
                     }
-                }
+                },
             }
         },
         "statistics": {
             "total_files_tracked": 1,
             "total_translations": 1,
             "last_updated": "2025-01-01T00:01:00+00:00",
-        }
+        },
     }
 
     metadata_file.write_text(json.dumps(data))

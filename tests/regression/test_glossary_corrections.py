@@ -6,6 +6,7 @@ Tests that known mistranslations are corrected using glossary post-processing.
 MISSION: Implement translation quality mitigation for vocabulary errors
 identified in PHASE10_PROD_FORCE_TRANSLATE.md
 """
+
 import os
 import sys
 from pathlib import Path
@@ -52,14 +53,10 @@ def test_metrage_correction():
     print("ASSERTIONS:")
     print("=" * 80)
 
-    assert corrected == expected_text, (
-        f"Expected '{expected_text}', got '{corrected}'"
-    )
+    assert corrected == expected_text, f"Expected '{expected_text}', got '{corrected}'"
     print("[PASS] 'Métrage' correctly replaced with 'Fusion'")
 
-    assert "métrage -> fusion" in changes, (
-        f"Correction not recorded in changes: {changes}"
-    )
+    assert "métrage -> fusion" in changes, f"Correction not recorded in changes: {changes}"
     print(f"[PASS] Correction logged: {changes}")
 
     print("\n" + "=" * 80)
@@ -93,9 +90,7 @@ def test_textile_correction():
     print("ASSERTIONS:")
     print("=" * 80)
 
-    assert corrected == expected_text, (
-        f"Expected '{expected_text}', got '{corrected}'"
-    )
+    assert corrected == expected_text, f"Expected '{expected_text}', got '{corrected}'"
     print("[PASS] 'textile' correctly replaced with 'textuel'")
 
     assert "textile -> textuel" in changes
@@ -132,9 +127,7 @@ def test_escanner_correction():
     print("ASSERTIONS:")
     print("=" * 80)
 
-    assert corrected == expected_text, (
-        f"Expected '{expected_text}', got '{corrected}'"
-    )
+    assert corrected == expected_text, f"Expected '{expected_text}', got '{corrected}'"
     print("[PASS] 'escanner' correctly replaced with 'analyser'")
 
     print("\n" + "=" * 80)
@@ -158,7 +151,9 @@ def test_word_boundary_matching():
     print("[1/2] Loaded glossary")
 
     # Text that contains substrings but shouldn't be replaced
-    text_no_match = "estimation textile de la capacité"  # "textile" is whole word, should be replaced
+    text_no_match = (
+        "estimation textile de la capacité"  # "textile" is whole word, should be replaced
+    )
     # But let's test a case where métrage is NOT a complete word
     text_with_partial = "pourcentage métrique"  # "métrage" not present
 
@@ -180,9 +175,7 @@ def test_word_boundary_matching():
     print("[PASS] Whole word 'textile' replaced")
 
     # Test 2: "pourcentage métrique" should NOT be changed (no matching words)
-    assert corrected_2 == text_with_partial, (
-        f"Expected no change, but got '{corrected_2}'"
-    )
+    assert corrected_2 == text_with_partial, f"Expected no change, but got '{corrected_2}'"
     assert len(changes_2) == 0, f"Expected no corrections, got {changes_2}"
     print("[PASS] No partial word replacements")
 
@@ -217,9 +210,7 @@ def test_case_preservation():
     print("ASSERTIONS:")
     print("=" * 80)
 
-    assert corrected_caps == expected_caps, (
-        f"Expected '{expected_caps}', got '{corrected_caps}'"
-    )
+    assert corrected_caps == expected_caps, f"Expected '{expected_caps}', got '{corrected_caps}'"
     print("[PASS] Capitalization preserved: Métrage -> Fusion")
 
     print("\n" + "=" * 80)
@@ -279,6 +270,7 @@ def test_get_glossary_corrector_cache():
 
     # Clear cache first (if needed)
     from src.translation_engine.quality.glossary_corrector import _glossary_cache
+
     _glossary_cache.clear()
 
     print("[1/3] Cleared cache")

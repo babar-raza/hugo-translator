@@ -34,11 +34,7 @@ def test_ct2_empty_translation_fallback(ct2_model_path):
     backend = CTranslate2Backend()
 
     # Load model
-    backend.load(
-        model_path=ct2_model_path,
-        device="cpu",
-        compute_type="int8"
-    )
+    backend.load(model_path=ct2_model_path, device="cpu", compute_type="int8")
 
     try:
         # Test case 1: Placeholder-only content (likely to produce empty translation)
@@ -49,19 +45,16 @@ def test_ct2_empty_translation_fallback(ct2_model_path):
 
         # Translate both
         texts = [placeholder_text, normal_text]
-        translations = backend.translate(
-            texts=texts,
-            src_lang="en",
-            tgt_lang="fr"
-        )
+        translations = backend.translate(texts=texts, src_lang="en", tgt_lang="fr")
 
         # Verify results
         assert len(translations) == 2, "Should return 2 translations"
 
         # For placeholder-only, expect fallback to source text
         # (CT2 likely returns empty string, triggering fallback)
-        assert translations[0] == placeholder_text, \
+        assert translations[0] == placeholder_text, (
             f"Expected fallback to source text for placeholder, got: {translations[0]}"
+        )
 
         # For normal text, expect actual translation (not source)
         # Note: If model also fails on normal text, it will fallback too
@@ -85,38 +78,29 @@ def test_ct2_mixed_empty_and_valid(ct2_model_path):
     not to all translations in the batch.
     """
     backend = CTranslate2Backend()
-    backend.load(
-        model_path=ct2_model_path,
-        device="cpu",
-        compute_type="int8"
-    )
+    backend.load(model_path=ct2_model_path, device="cpu", compute_type="int8")
 
     try:
         # Mix of potentially empty and normal content
         texts = [
-            "{PLACEHOLDER_0}",           # Likely empty
-            "The quick brown fox",        # Should translate
-            "{PLACEHOLDER_1}",           # Likely empty
-            "jumps over the lazy dog",   # Should translate
+            "{PLACEHOLDER_0}",  # Likely empty
+            "The quick brown fox",  # Should translate
+            "{PLACEHOLDER_1}",  # Likely empty
+            "jumps over the lazy dog",  # Should translate
         ]
 
-        translations = backend.translate(
-            texts=texts,
-            src_lang="en",
-            tgt_lang="fr"
-        )
+        translations = backend.translate(texts=texts, src_lang="en", tgt_lang="fr")
 
         # Verify all texts got some translation (either real or fallback)
         assert len(translations) == 4, "Should return 4 translations"
         for i, translation in enumerate(translations):
-            assert translation.strip(), \
+            assert translation.strip(), (
                 f"Translation {i} should not be empty (either real translation or fallback)"
+            )
 
         # Placeholders should fall back to source text
-        assert translations[0] == "{PLACEHOLDER_0}", \
-            "Placeholder 0 should fall back to source"
-        assert translations[2] == "{PLACEHOLDER_1}", \
-            "Placeholder 1 should fall back to source"
+        assert translations[0] == "{PLACEHOLDER_0}", "Placeholder 0 should fall back to source"
+        assert translations[2] == "{PLACEHOLDER_1}", "Placeholder 1 should fall back to source"
 
         # Normal text should be translated (not source text)
         # Note: If model fails, fallback is acceptable - we're testing fallback works
@@ -139,25 +123,13 @@ def test_ct2_all_normal_text(ct2_model_path):
     interfere with normal translation operation.
     """
     backend = CTranslate2Backend()
-    backend.load(
-        model_path=ct2_model_path,
-        device="cpu",
-        compute_type="int8"
-    )
+    backend.load(model_path=ct2_model_path, device="cpu", compute_type="int8")
 
     try:
         # All normal text, no placeholders
-        texts = [
-            "Hello",
-            "Goodbye",
-            "Thank you"
-        ]
+        texts = ["Hello", "Goodbye", "Thank you"]
 
-        translations = backend.translate(
-            texts=texts,
-            src_lang="en",
-            tgt_lang="fr"
-        )
+        translations = backend.translate(texts=texts, src_lang="en", tgt_lang="fr")
 
         # Verify translations exist and are different from source
         # (at least some should be translated, not all should be identical to source)

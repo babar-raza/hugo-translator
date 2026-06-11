@@ -2,7 +2,6 @@
 Unit tests for validation suite.
 """
 
-
 from src.translation_engine.validation import (
     LinkValidator,
     PlaceholderValidator,
@@ -193,6 +192,7 @@ title: "Tester"
 
     def test_context_passing(self):
         """Test that context is passed to validators."""
+
         # Create custom validator that checks context
         class ContextCheckingValidator(Validator):
             def validate(self, source, translation, context=None):

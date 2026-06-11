@@ -31,21 +31,24 @@ class TestRetentionPolicy:
 
     def test_from_row(self):
         """Test creating RetentionPolicy from database row."""
+
         # Mock a sqlite3.Row-like dict
         class MockRow(dict):
             def __getitem__(self, key):
                 return dict.__getitem__(self, key)
 
-        row = MockRow({
-            "id": 1,
-            "policy_name": "test_policy",
-            "target_table": "benchmark_results",
-            "retention_days": 90,
-            "enabled": 1,
-            "last_cleanup": "2024-01-15T12:00:00",
-            "created_at": "2024-01-01T00:00:00",
-            "updated_at": "2024-01-15T12:00:00",
-        })
+        row = MockRow(
+            {
+                "id": 1,
+                "policy_name": "test_policy",
+                "target_table": "benchmark_results",
+                "retention_days": 90,
+                "enabled": 1,
+                "last_cleanup": "2024-01-15T12:00:00",
+                "created_at": "2024-01-01T00:00:00",
+                "updated_at": "2024-01-15T12:00:00",
+            }
+        )
 
         policy = RetentionPolicy.from_row(row)
 
@@ -122,17 +125,19 @@ class TestRetentionEngine:
 
         results = []
         for i in range(num_results):
-            results.append(BenchmarkResult(
-                sample_id=f"sample_{i}",
-                model_id=model_id,
-                device=device,
-                batch_size=8,
-                duration_seconds=1.0 + i * 0.1,
-                tokens_input=100,
-                tokens_output=100,
-                throughput_tokens_per_sec=100.0 + i * 10,
-                peak_memory_mb=500.0,
-            ))
+            results.append(
+                BenchmarkResult(
+                    sample_id=f"sample_{i}",
+                    model_id=model_id,
+                    device=device,
+                    batch_size=8,
+                    duration_seconds=1.0 + i * 0.1,
+                    tokens_input=100,
+                    tokens_output=100,
+                    throughput_tokens_per_sec=100.0 + i * 10,
+                    peak_memory_mb=500.0,
+                )
+            )
 
         run = BenchmarkRun(
             run_id=run_id,
@@ -459,25 +464,57 @@ class TestRetentionEngineWithTrends:
         try:
             # Insert old trend data
             old_timestamp = (datetime.now(UTC) - timedelta(days=400)).isoformat()
-            conn.execute("""
+            conn.execute(
+                """
                 INSERT INTO benchmark_trends
                 (model_id, device, time_window, window_start, window_end,
                  sample_count, avg_throughput, p50_throughput, p95_throughput, p99_throughput,
                  avg_duration, avg_memory_mb, created_at)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """, ("test_model", "cpu", "daily", old_timestamp, old_timestamp,
-                  10, 100.0, 100.0, 100.0, 100.0, 1.0, 500.0, old_timestamp))
+            """,
+                (
+                    "test_model",
+                    "cpu",
+                    "daily",
+                    old_timestamp,
+                    old_timestamp,
+                    10,
+                    100.0,
+                    100.0,
+                    100.0,
+                    100.0,
+                    1.0,
+                    500.0,
+                    old_timestamp,
+                ),
+            )
 
             # Insert recent trend data
             recent_timestamp = datetime.now(UTC).isoformat()
-            conn.execute("""
+            conn.execute(
+                """
                 INSERT INTO benchmark_trends
                 (model_id, device, time_window, window_start, window_end,
                  sample_count, avg_throughput, p50_throughput, p95_throughput, p99_throughput,
                  avg_duration, avg_memory_mb, created_at)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """, ("test_model", "cpu", "daily", recent_timestamp, recent_timestamp,
-                  10, 100.0, 100.0, 100.0, 100.0, 1.0, 500.0, recent_timestamp))
+            """,
+                (
+                    "test_model",
+                    "cpu",
+                    "daily",
+                    recent_timestamp,
+                    recent_timestamp,
+                    10,
+                    100.0,
+                    100.0,
+                    100.0,
+                    100.0,
+                    1.0,
+                    500.0,
+                    recent_timestamp,
+                ),
+            )
 
             conn.commit()
         finally:

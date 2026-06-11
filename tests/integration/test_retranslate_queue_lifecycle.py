@@ -27,14 +27,17 @@ def _redirect_queue(tmp_path):
     """Point the queue file at a temp location for every test."""
     queue_file = tmp_path / "retranslate_queue.jsonl"
     quarantine_file = tmp_path / "quarantine.jsonl"
-    with mock.patch.object(rtq, "_QUEUE_FILE", queue_file), \
-         mock.patch.object(rtq, "_QUARANTINE_FILE", quarantine_file):
+    with (
+        mock.patch.object(rtq, "_QUEUE_FILE", queue_file),
+        mock.patch.object(rtq, "_QUARANTINE_FILE", quarantine_file),
+    ):
         yield queue_file
 
 
 # ---------------------------------------------------------------------------
 # Step 1 — CASE 4 fires: add_to_queue writes entry to disk
 # ---------------------------------------------------------------------------
+
 
 class TestStep1Enqueue:
     def test_add_to_queue_writes_jsonl_entry(self, tmp_path):
@@ -77,6 +80,7 @@ class TestStep1Enqueue:
 # ---------------------------------------------------------------------------
 # Step 2 — Completion filter: queued path force-included despite current outputs
 # ---------------------------------------------------------------------------
+
 
 class TestStep2CompletionFilterReadsQueue:
     def test_queued_path_returned_by_load_queued_paths(self, tmp_path):
@@ -125,6 +129,7 @@ class TestStep2CompletionFilterReadsQueue:
 # ---------------------------------------------------------------------------
 # Step 3 — Successful write dequeues the entry
 # ---------------------------------------------------------------------------
+
 
 class TestStep3Dequeue:
     def test_remove_from_queue_purges_entry(self, tmp_path):
@@ -175,6 +180,7 @@ class TestStep3Dequeue:
 # ---------------------------------------------------------------------------
 # Step 4 — Retry cap: MAX_RETRIES increments → silent drop
 # ---------------------------------------------------------------------------
+
 
 class TestStep4RetryCapDrop:
     def test_entry_dropped_after_max_retries(self, tmp_path):

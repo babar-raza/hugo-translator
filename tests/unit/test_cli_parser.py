@@ -3,6 +3,7 @@ Unit tests for CLI parser without full dependency chain (CFG-03).
 
 Tests the argument parser in isolation.
 """
+
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -12,26 +13,31 @@ import pytest
 @pytest.fixture
 def mock_dependencies():
     """Mock all CLI dependencies for isolated parser testing."""
-    with patch.dict('sys.modules', {
-        'src.translation_engine': MagicMock(),
-        'src.translation_engine.models': MagicMock(),
-        'src.tm': MagicMock(),
-        'src.model_runtime': MagicMock(),
-        'src.utils.config_loader': MagicMock(),
-        'src.utils.models': MagicMock(),
-    }):
+    with patch.dict(
+        "sys.modules",
+        {
+            "src.translation_engine": MagicMock(),
+            "src.translation_engine.models": MagicMock(),
+            "src.tm": MagicMock(),
+            "src.model_runtime": MagicMock(),
+            "src.utils.config_loader": MagicMock(),
+            "src.utils.models": MagicMock(),
+        },
+    ):
         yield
 
 
 def test_parser_imports(mock_dependencies):
     """Test that CLI module can be imported with mocked dependencies."""
     from src.cli import create_parser
+
     assert create_parser is not None
 
 
 def test_parser_creation(mock_dependencies):
     """Test that parser is created with correct program name."""
     from src.cli import create_parser
+
     parser = create_parser()
     assert parser is not None
     assert parser.prog == "translate-hugo"
@@ -40,6 +46,7 @@ def test_parser_creation(mock_dependencies):
 def test_parser_required_site_arg(mock_dependencies):
     """Test that --site argument is required."""
     from src.cli import create_parser
+
     parser = create_parser()
 
     # Missing --site should fail
@@ -50,6 +57,7 @@ def test_parser_required_site_arg(mock_dependencies):
 def test_parser_validation_mode_choices(mock_dependencies):
     """Test validation-mode accepts valid choices."""
     from src.cli import create_parser
+
     parser = create_parser()
 
     # Valid choices
@@ -65,6 +73,7 @@ def test_parser_validation_mode_choices(mock_dependencies):
 def test_parser_terminology_mode_choices(mock_dependencies):
     """Test terminology-mode accepts valid choices."""
     from src.cli import create_parser
+
     parser = create_parser()
 
     # Valid choices
@@ -80,6 +89,7 @@ def test_parser_terminology_mode_choices(mock_dependencies):
 def test_parser_max_retries_type(mock_dependencies):
     """Test max-retries accepts integer values."""
     from src.cli import create_parser
+
     parser = create_parser()
 
     args = parser.parse_args(["--site", "test", "--max-retries", "5"])
@@ -94,6 +104,7 @@ def test_parser_max_retries_type(mock_dependencies):
 def test_parser_boolean_flags(mock_dependencies):
     """Test boolean flags are properly parsed."""
     from src.cli import create_parser
+
     parser = create_parser()
 
     # Test disable-validation
@@ -124,13 +135,19 @@ def test_parser_boolean_flags(mock_dependencies):
 def test_parser_config_path_arguments(mock_dependencies):
     """Test custom config path arguments."""
     from src.cli import create_parser
+
     parser = create_parser()
 
-    args = parser.parse_args([
-        "--site", "test",
-        "--validation-config", "/custom/validation.yaml",
-        "--terminology-config", "/custom/terminology.yaml"
-    ])
+    args = parser.parse_args(
+        [
+            "--site",
+            "test",
+            "--validation-config",
+            "/custom/validation.yaml",
+            "--terminology-config",
+            "/custom/terminology.yaml",
+        ]
+    )
     assert args.validation_config == "/custom/validation.yaml"
     assert args.terminology_config == "/custom/terminology.yaml"
 
@@ -138,18 +155,17 @@ def test_parser_config_path_arguments(mock_dependencies):
 def test_parser_target_langs_list(mock_dependencies):
     """Test that target-langs accepts multiple values."""
     from src.cli import create_parser
+
     parser = create_parser()
 
-    args = parser.parse_args([
-        "--site", "test",
-        "--target-langs", "de", "es", "fr"
-    ])
+    args = parser.parse_args(["--site", "test", "--target-langs", "de", "es", "fr"])
     assert args.target_langs == ["de", "es", "fr"]
 
 
 def test_parser_log_level_choices(mock_dependencies):
     """Test log-level accepts valid choices."""
     from src.cli import create_parser
+
     parser = create_parser()
 
     # Valid choices
@@ -165,17 +181,25 @@ def test_parser_log_level_choices(mock_dependencies):
 def test_parser_combined_flags(mock_dependencies):
     """Test multiple flags can be used together."""
     from src.cli import create_parser
+
     parser = create_parser()
 
-    args = parser.parse_args([
-        "--site", "test",
-        "--validation-mode", "strict",
-        "--enable-terminology",
-        "--terminology-mode", "both",
-        "--max-retries", "5",
-        "--dry-run",
-        "--log-level", "DEBUG"
-    ])
+    args = parser.parse_args(
+        [
+            "--site",
+            "test",
+            "--validation-mode",
+            "strict",
+            "--enable-terminology",
+            "--terminology-mode",
+            "both",
+            "--max-retries",
+            "5",
+            "--dry-run",
+            "--log-level",
+            "DEBUG",
+        ]
+    )
 
     assert args.site == "test"
     assert args.validation_mode == "strict"
@@ -189,6 +213,7 @@ def test_parser_combined_flags(mock_dependencies):
 def test_parser_help_text(mock_dependencies):
     """Test that help text is properly formatted."""
     from src.cli import create_parser
+
     parser = create_parser()
 
     help_text = parser.format_help()
@@ -213,11 +238,9 @@ def test_cli_config_overrides_initialization(mock_dependencies):
     from src.cli import CLIConfigOverrides, create_parser
 
     parser = create_parser()
-    args = parser.parse_args([
-        "--site", "test",
-        "--validation-mode", "strict",
-        "--max-retries", "5"
-    ])
+    args = parser.parse_args(
+        ["--site", "test", "--validation-mode", "strict", "--max-retries", "5"]
+    )
 
     overrides = CLIConfigOverrides(args)
     assert overrides.validation_mode == "strict"
@@ -289,11 +312,9 @@ def test_cli_config_overrides_terminology_mode(mock_dependencies):
     from src.cli import CLIConfigOverrides, create_parser
 
     parser = create_parser()
-    args = parser.parse_args([
-        "--site", "test",
-        "--enable-terminology",
-        "--terminology-mode", "both"
-    ])
+    args = parser.parse_args(
+        ["--site", "test", "--enable-terminology", "--terminology-mode", "both"]
+    )
     overrides = CLIConfigOverrides(args)
     engine_overrides = overrides.get_engine_overrides()
     assert engine_overrides["enable_terminology"] is True
@@ -315,6 +336,7 @@ def test_cli_config_overrides_dry_run(mock_dependencies):
 def test_parser_max_tokens_type(mock_dependencies):
     """Test max-tokens accepts integer values (TR-01)."""
     from src.cli import create_parser
+
     parser = create_parser()
 
     args = parser.parse_args(["--site", "test", "--max-tokens", "1024"])
@@ -329,6 +351,7 @@ def test_parser_max_tokens_type(mock_dependencies):
 def test_parser_max_tokens_default_none(mock_dependencies):
     """Test that max-tokens defaults to None when not specified."""
     from src.cli import create_parser
+
     parser = create_parser()
 
     args = parser.parse_args(["--site", "test"])

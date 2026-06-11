@@ -3,6 +3,7 @@ Tests for telemetry_integration module (TEL-05-A, TEL-05-C).
 
 Tests business context extraction and telemetry wiring.
 """
+
 from pathlib import Path
 from unittest.mock import MagicMock
 
@@ -33,59 +34,43 @@ class TestExtractBusinessContext:
 
     def test_extracts_product_family_slides(self):
         """TFR-02: product_family now uses capitalized Aspose product name."""
-        result = extract_business_context(
-            file_path=Path("/content/slides/net/getting-started.md")
-        )
+        result = extract_business_context(file_path=Path("/content/slides/net/getting-started.md"))
         assert result["product_family"] == "Aspose.Slides"
         assert result["product"] == "slides"  # product remains lowercase
 
     def test_extracts_product_family_words(self):
         """TFR-02: product_family now uses capitalized Aspose product name."""
-        result = extract_business_context(
-            file_path=Path("C:/repos/docs/words/java/overview.md")
-        )
+        result = extract_business_context(file_path=Path("C:/repos/docs/words/java/overview.md"))
         assert result["product_family"] == "Aspose.Words"
 
     def test_extracts_product_family_cells(self):
         """TFR-02: product_family now uses capitalized Aspose product name."""
-        result = extract_business_context(
-            file_path=Path("/products/cells/python/api-reference.md")
-        )
+        result = extract_business_context(file_path=Path("/products/cells/python/api-reference.md"))
         assert result["product_family"] == "Aspose.Cells"
 
     def test_extracts_platform_dotnet(self):
         """Extracts .NET platform from path."""
-        result = extract_business_context(
-            file_path=Path("/slides/net/installation.md")
-        )
+        result = extract_business_context(file_path=Path("/slides/net/installation.md"))
         assert result["platform"] == ".NET"
 
     def test_extracts_platform_java(self):
         """Extracts Java platform from path."""
-        result = extract_business_context(
-            file_path=Path("/words/java/quickstart.md")
-        )
+        result = extract_business_context(file_path=Path("/words/java/quickstart.md"))
         assert result["platform"] == "Java"
 
     def test_extracts_platform_python(self):
         """Extracts Python platform from path."""
-        result = extract_business_context(
-            file_path=Path("/cells/python/tutorials.md")
-        )
+        result = extract_business_context(file_path=Path("/cells/python/tutorials.md"))
         assert result["platform"] == "Python"
 
     def test_extracts_platform_cpp(self):
         """Extracts C++ platform from path."""
-        result = extract_business_context(
-            file_path=Path("/pdf/cpp/reference.md")
-        )
+        result = extract_business_context(file_path=Path("/pdf/cpp/reference.md"))
         assert result["platform"] == "C++"
 
     def test_extracts_platform_nodejs(self):
         """Extracts Node.js platform from path."""
-        result = extract_business_context(
-            file_path=Path("/barcode/nodejs/examples.md")
-        )
+        result = extract_business_context(file_path=Path("/barcode/nodejs/examples.md"))
         assert result["platform"] == "Node.js"
 
     def test_extracts_all_fields_combined(self):
@@ -103,17 +88,13 @@ class TestExtractBusinessContext:
 
     def test_returns_none_for_unknown_product(self):
         """Returns None for product_family when path has no known product."""
-        result = extract_business_context(
-            file_path=Path("/content/unknown/docs/guide.md")
-        )
+        result = extract_business_context(file_path=Path("/content/unknown/docs/guide.md"))
         assert result["product_family"] is None
         assert result["product"] is None
 
     def test_returns_default_for_unknown_platform(self):
         """Returns default platform when path has no known platform."""
-        result = extract_business_context(
-            file_path=Path("/slides/unknown/guide.md")
-        )
+        result = extract_business_context(file_path=Path("/slides/unknown/guide.md"))
         # Default platform from env var or ".NET"
         assert result["platform"] == ".NET" or result["platform"] is not None
 
@@ -128,17 +109,13 @@ class TestExtractBusinessContext:
 
     def test_handles_windows_paths(self):
         """Handles Windows-style backslash paths."""
-        result = extract_business_context(
-            file_path=Path("C:\\repos\\docs\\slides\\net\\guide.md")
-        )
+        result = extract_business_context(file_path=Path("C:\\repos\\docs\\slides\\net\\guide.md"))
         assert result["product_family"] == "Aspose.Slides"  # TFR-02: capitalized
         assert result["platform"] == ".NET"
 
     def test_case_insensitive_matching(self):
         """Matches product families and platforms case-insensitively."""
-        result = extract_business_context(
-            file_path=Path("/Content/SLIDES/NET/Guide.md")
-        )
+        result = extract_business_context(file_path=Path("/Content/SLIDES/NET/Guide.md"))
         assert result["product_family"] == "Aspose.Slides"  # TFR-02: capitalized
         assert result["platform"] == ".NET"
 
@@ -358,7 +335,9 @@ class TestRunRecordFields:
         successful_files = 8
         total_files = 10
         files_generated = 16
-        output_summary = f"{successful_files}/{total_files} files translated, {files_generated} outputs"
+        output_summary = (
+            f"{successful_files}/{total_files} files translated, {files_generated} outputs"
+        )
         assert output_summary == "8/10 files translated, 16 outputs"
 
 
@@ -602,12 +581,14 @@ class TestTSC04EnvironmentField:
         """Default environment is dev when env var not set."""
         monkeypatch.delenv("HUGO_TRANSLATOR_ENV", raising=False)
         import os
+
         assert os.getenv("HUGO_TRANSLATOR_ENV", "dev") == "dev"
 
     def test_environment_from_env_var(self, monkeypatch):
         """Environment reads from HUGO_TRANSLATOR_ENV."""
         monkeypatch.setenv("HUGO_TRANSLATOR_ENV", "prod")
         import os
+
         assert os.getenv("HUGO_TRANSLATOR_ENV", "dev") == "prod"
 
 
@@ -619,9 +600,7 @@ class TestSR03HelperFunctions:
         from src.observability.telemetry_integration import build_output_summary
 
         summary = build_output_summary(
-            job_type="translate_file",
-            outputs={"es": "a.md", "fr": "b.md"},
-            errors=[]
+            job_type="translate_file", outputs={"es": "a.md", "fr": "b.md"}, errors=[]
         )
         assert summary == "2 translations, 0 errors"
 
@@ -630,9 +609,7 @@ class TestSR03HelperFunctions:
         from src.observability.telemetry_integration import build_output_summary
 
         summary = build_output_summary(
-            job_type="translate_file",
-            outputs={"es": "a.md"},
-            errors=["Error 1", "Error 2"]
+            job_type="translate_file", outputs={"es": "a.md"}, errors=["Error 1", "Error 2"]
         )
         assert summary == "1 translations, 2 errors"
 
@@ -645,7 +622,7 @@ class TestSR03HelperFunctions:
             successful_files=8,
             total_files=10,
             files_generated=16,
-            errors=[]
+            errors=[],
         )
         assert summary == "8/10 files translated, 16 outputs"
 
@@ -677,10 +654,7 @@ class TestSR03HelperFunctions:
         mock_stats.tm_hits = 2
         mock_stats.skipped_segments = 1
 
-        metrics = calculate_items_metrics(
-            job_type="translate_file",
-            stats=mock_stats
-        )
+        metrics = calculate_items_metrics(job_type="translate_file", stats=mock_stats)
 
         assert metrics["items_discovered"] == 10
         assert metrics["items_succeeded"] == 9  # 7 + 2
@@ -691,10 +665,7 @@ class TestSR03HelperFunctions:
         from src.observability.telemetry_integration import calculate_items_metrics
 
         metrics = calculate_items_metrics(
-            job_type="translate_directory",
-            total_files=10,
-            successful_files=8,
-            failed_files=2
+            job_type="translate_directory", total_files=10, successful_files=8, failed_files=2
         )
 
         assert metrics["items_discovered"] == 10
@@ -705,10 +676,7 @@ class TestSR03HelperFunctions:
         """SR-03: calculate_items_metrics handles None stats gracefully."""
         from src.observability.telemetry_integration import calculate_items_metrics
 
-        metrics = calculate_items_metrics(
-            job_type="translate_file",
-            stats=None
-        )
+        metrics = calculate_items_metrics(job_type="translate_file", stats=None)
 
         assert metrics["items_discovered"] == 0
         assert metrics["items_succeeded"] == 0
@@ -722,7 +690,7 @@ class TestSR03HelperFunctions:
             job_type="translate_directory",
             total_files=None,
             successful_files=None,
-            failed_files=None
+            failed_files=None,
         )
 
         assert metrics["items_discovered"] == 0

@@ -159,6 +159,4 @@ class TestDetectorNoneSkipsPurityCheck:
         if validation_passed and detector is not None:
             purity_ran = True
 
-        assert purity_ran is False, (
-            "Purity check must not run when detector is None"
-        )
+        assert purity_ran is False, "Purity check must not run when detector is None"

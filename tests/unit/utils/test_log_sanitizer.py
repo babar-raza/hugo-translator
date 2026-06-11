@@ -114,7 +114,7 @@ class TestLanguageScripts:
         text = "日本語"
         result = sanitize_for_log(text)
         # Kanji detected as ZH or JA (both acceptable)
-        assert ("[ZH:" in result or "[JA:" in result)
+        assert "[ZH:" in result or "[JA:" in result
         assert result.isascii()
 
     def test_korean_hangul(self):
@@ -437,7 +437,7 @@ class TestEdgeCases:
         result = sanitize_for_log(text)
         assert "Translation complete " in result
         # Emoji should be sanitized (unknown script)
-        assert ("[UNI:" in result or result == "Translation complete ")
+        assert "[UNI:" in result or result == "Translation complete "
         assert result.isascii()
 
     def test_emoji_heart(self):
@@ -504,29 +504,29 @@ class TestInternalFunctions:
 
     def test_detect_script_ascii(self):
         """Test _detect_script with ASCII character."""
-        result = _detect_script('A')
+        result = _detect_script("A")
         assert result is None  # ASCII returns None
 
     def test_detect_script_chinese(self):
         """Test _detect_script with Chinese character."""
-        result = _detect_script('中')
-        assert result == 'ZH'
+        result = _detect_script("中")
+        assert result == "ZH"
 
     def test_detect_script_japanese_hiragana(self):
         """Test _detect_script with Japanese Hiragana."""
-        result = _detect_script('あ')
-        assert result == 'JA'
+        result = _detect_script("あ")
+        assert result == "JA"
 
     def test_detect_script_korean(self):
         """Test _detect_script with Korean Hangul."""
-        result = _detect_script('한')
-        assert result == 'KO'
+        result = _detect_script("한")
+        assert result == "KO"
 
     def test_detect_script_unknown(self):
         """Test _detect_script with unknown Unicode character."""
-        result = _detect_script('🔥')
+        result = _detect_script("🔥")
         # Unknown scripts return 'UNI' or None
-        assert result in ['UNI', None] or result is not None
+        assert result in ["UNI", None] or result is not None
 
     def test_format_placeholder_chinese(self):
         """Test _format_placeholder with Chinese text."""
@@ -546,83 +546,70 @@ class TestASCIIVerification:
     produce ASCII-only outputs.
     """
 
-    @pytest.mark.parametrize("text,description", [
-        # ASCII inputs
-        ("Hello World", "Simple ASCII"),
-        ("Translation: 123.45 seconds", "ASCII with numbers"),
-        ("File: /path/to/file.md", "ASCII with path"),
-        ("", "Empty string"),
-        ("   ", "Whitespace only"),
-
-        # Chinese
-        ("智能翻译", "Chinese simple"),
-        ("中文测试内容", "Chinese longer"),
-        ("Hello 世界", "Mixed ASCII + Chinese"),
-
-        # Japanese
-        ("こんにちは", "Japanese Hiragana"),
-        ("カタカナ", "Japanese Katakana"),
-        ("日本語", "Japanese with Kanji"),
-
-        # Korean
-        ("안녕하세요", "Korean Hangul"),
-        ("한국어", "Korean simple"),
-
-        # Arabic
-        ("مرحبا بك", "Arabic greeting"),
-        ("العربية", "Arabic simple"),
-
-        # Persian
-        ("سلام دنیا", "Persian/Farsi"),
-
-        # Hebrew
-        ("שלום עולם", "Hebrew greeting"),
-
-        # Russian
-        ("Привет мир", "Russian greeting"),
-        ("Русский язык", "Russian simple"),
-
-        # Greek
-        ("Γειά σου", "Greek greeting"),
-        ("Ελληνικά", "Greek simple"),
-
-        # Hindi
-        ("नमस्ते", "Hindi greeting"),
-
-        # Thai
-        ("สวัสดี", "Thai greeting"),
-
-        # Vietnamese
-        ("Tiếng Việt", "Vietnamese"),
-
-        # European languages with diacritics
-        ("Guten Tag mit ü ö ä", "German with umlauts"),
-        ("Bonjour avec é è ê", "French with accents"),
-        ("Hola con ñ", "Spanish with tilde"),
-        ("Ciao con à è ì", "Italian with accents"),
-        ("Olá com ã õ ç", "Portuguese with accents"),
-        ("Witaj z ą ę ł", "Polish"),
-        ("Ahoj s ř ž č", "Czech"),
-
-        # Mixed content
-        ("Using Azure для работы", "Mixed ASCII + Russian"),
-        ("Welcome مرحبا to Azure", "Mixed ASCII + Arabic"),
-        ("API 文档", "Mixed ASCII + Chinese"),
-
-        # Edge cases
-        ("Translation 🔥", "Emoji"),
-        ("Copyright © 2024", "Special char"),
-        ("Azure™ API", "Trademark symbol"),
-        ("Line1\nLine2\tTab", "Whitespace"),
-
-        # Long strings
-        ("A" * 300, "Long ASCII"),
-        ("中" * 150, "Long Chinese"),
-
-        # Multiple scripts
-        ("Hello 世界 مرحبا Привет", "Multi-script"),
-        ("智能 API 翻译", "ASCII surrounded by Unicode"),
-    ])
+    @pytest.mark.parametrize(
+        "text,description",
+        [
+            # ASCII inputs
+            ("Hello World", "Simple ASCII"),
+            ("Translation: 123.45 seconds", "ASCII with numbers"),
+            ("File: /path/to/file.md", "ASCII with path"),
+            ("", "Empty string"),
+            ("   ", "Whitespace only"),
+            # Chinese
+            ("智能翻译", "Chinese simple"),
+            ("中文测试内容", "Chinese longer"),
+            ("Hello 世界", "Mixed ASCII + Chinese"),
+            # Japanese
+            ("こんにちは", "Japanese Hiragana"),
+            ("カタカナ", "Japanese Katakana"),
+            ("日本語", "Japanese with Kanji"),
+            # Korean
+            ("안녕하세요", "Korean Hangul"),
+            ("한국어", "Korean simple"),
+            # Arabic
+            ("مرحبا بك", "Arabic greeting"),
+            ("العربية", "Arabic simple"),
+            # Persian
+            ("سلام دنیا", "Persian/Farsi"),
+            # Hebrew
+            ("שלום עולם", "Hebrew greeting"),
+            # Russian
+            ("Привет мир", "Russian greeting"),
+            ("Русский язык", "Russian simple"),
+            # Greek
+            ("Γειά σου", "Greek greeting"),
+            ("Ελληνικά", "Greek simple"),
+            # Hindi
+            ("नमस्ते", "Hindi greeting"),
+            # Thai
+            ("สวัสดี", "Thai greeting"),
+            # Vietnamese
+            ("Tiếng Việt", "Vietnamese"),
+            # European languages with diacritics
+            ("Guten Tag mit ü ö ä", "German with umlauts"),
+            ("Bonjour avec é è ê", "French with accents"),
+            ("Hola con ñ", "Spanish with tilde"),
+            ("Ciao con à è ì", "Italian with accents"),
+            ("Olá com ã õ ç", "Portuguese with accents"),
+            ("Witaj z ą ę ł", "Polish"),
+            ("Ahoj s ř ž č", "Czech"),
+            # Mixed content
+            ("Using Azure для работы", "Mixed ASCII + Russian"),
+            ("Welcome مرحبا to Azure", "Mixed ASCII + Arabic"),
+            ("API 文档", "Mixed ASCII + Chinese"),
+            # Edge cases
+            ("Translation 🔥", "Emoji"),
+            ("Copyright © 2024", "Special char"),
+            ("Azure™ API", "Trademark symbol"),
+            ("Line1\nLine2\tTab", "Whitespace"),
+            # Long strings
+            ("A" * 300, "Long ASCII"),
+            ("中" * 150, "Long Chinese"),
+            # Multiple scripts
+            ("Hello 世界 مرحبا Привет", "Multi-script"),
+            ("智能 API 翻译", "ASCII surrounded by Unicode"),
+        ],
+    )
     def test_output_is_ascii(self, text, description):
         """Verify all outputs are ASCII-only (parameterized test)."""
         result = sanitize_for_log(text)

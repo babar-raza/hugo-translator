@@ -149,7 +149,9 @@ class TestFlowArtifactWriter:
 
     def test_record_segment_sampled_level(self, temp_artifacts_dir, sample_job, sample_segment):
         """Test SAMPLED level respects sample size."""
-        writer = FlowArtifactWriter(temp_artifacts_dir, detail_level=DetailLevel.SAMPLED, sample_size=3)
+        writer = FlowArtifactWriter(
+            temp_artifacts_dir, detail_level=DetailLevel.SAMPLED, sample_size=3
+        )
         writer.start_job(sample_job)
 
         tm_result = LookupResult(

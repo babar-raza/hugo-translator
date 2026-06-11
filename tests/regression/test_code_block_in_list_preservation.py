@@ -30,6 +30,7 @@ from src.translation_engine.reconstructor.ast_renderer import ASTRenderer
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def find_nodes(nodes, target_type):
     """Recursively find all nodes of a given type."""
     result = []
@@ -52,8 +53,8 @@ def make_extractor(strategy="adaptive"):
 # Bug 1: Parser preserves code blocks inside list items
 # ---------------------------------------------------------------------------
 
-class TestParserCodeBlockInListItem:
 
+class TestParserCodeBlockInListItem:
     def test_fenced_code_block_inside_list_item_is_parsed(self):
         """Bug 1: fence token inside list item must produce a CODE_BLOCK AST node."""
         md = """\
@@ -106,9 +107,7 @@ class TestParserCodeBlockInListItem:
         parser = make_parser()
         doc = parser.parse_string(md)
         code_blocks = find_nodes(doc.ast, NodeType.CODE_BLOCK)
-        assert len(code_blocks) == 2, (
-            f"Expected 2 CODE_BLOCK nodes, got {len(code_blocks)}"
-        )
+        assert len(code_blocks) == 2, f"Expected 2 CODE_BLOCK nodes, got {len(code_blocks)}"
 
     def test_code_block_and_text_both_preserved_in_list_item(self):
         """Bug 1: a list item with text AND a code block must have both as children."""
@@ -148,8 +147,8 @@ class TestParserCodeBlockInListItem:
 # Bug 2 & 3: Extractor preserves code blocks in sentence_only mode
 # ---------------------------------------------------------------------------
 
-class TestExtractorCodeBlockPreservation:
 
+class TestExtractorCodeBlockPreservation:
     def test_has_inline_formatting_does_not_detect_code_block(self):
         """TC-02: _has_inline_formatting() must return False for a CODE_BLOCK child.
         CODE_BLOCK is block-level content, not inline formatting.
@@ -277,17 +276,15 @@ class TestExtractorCodeBlockPreservation:
 
         # The code block content must appear in at least one unit's source_text
         all_source = " ".join(u.source_text or "" for u in plan.units)
-        assert "doc.Save" in all_source, (
-            "Code block content lost during sentence_only extraction"
-        )
+        assert "doc.Save" in all_source, "Code block content lost during sentence_only extraction"
 
 
 # ---------------------------------------------------------------------------
 # Bug 4: Reconstruction preserves CODE_BLOCK children
 # ---------------------------------------------------------------------------
 
-class TestReconstructorCodeBlockPreservation:
 
+class TestReconstructorCodeBlockPreservation:
     def setup_method(self):
         self.renderer = ASTRenderer()
 
@@ -385,9 +382,7 @@ class TestReconstructorCodeBlockPreservation:
         self.renderer.apply_translations([paragraph], [para_unit, cb_unit])
 
         code_blocks_after = find_nodes([paragraph], NodeType.CODE_BLOCK)
-        assert len(code_blocks_after) == 1, (
-            "CODE_BLOCK child was destroyed by PARAGRAPH flattening"
-        )
+        assert len(code_blocks_after) == 1, "CODE_BLOCK child was destroyed by PARAGRAPH flattening"
         assert "42" in code_blocks_after[0].raw
 
 
@@ -395,8 +390,8 @@ class TestReconstructorCodeBlockPreservation:
 # End-to-end: parse → extract → render (no translation)
 # ---------------------------------------------------------------------------
 
-class TestEndToEndCodeBlockInList:
 
+class TestEndToEndCodeBlockInList:
     def test_round_trip_code_block_in_list_item(self):
         """End-to-end: code block inside list item survives parse → render unchanged."""
         md = """\
@@ -446,8 +441,8 @@ class TestEndToEndCodeBlockInList:
 # TC-05: Bug 2 test isolation — _collect_text_from_node() tested independently
 # ---------------------------------------------------------------------------
 
-class TestBug2Isolation:
 
+class TestBug2Isolation:
     def test_collect_text_code_block_direct_not_empty(self):
         """TC-05/Bug 2: _collect_text_from_node(CODE_BLOCK) must not return empty string.
         This test directly exercises the Bug 2 fix path (independent of Bug 3 guard).
@@ -504,8 +499,8 @@ class TestBug2Isolation:
 # TC-07: Trailing-newline format consistency
 # ---------------------------------------------------------------------------
 
-class TestTrailingNewline:
 
+class TestTrailingNewline:
     def test_collect_text_code_block_has_trailing_newlines(self):
         """TC-07: _collect_text_from_node(CODE_BLOCK) must end with \\n\\n to match renderer."""
         extractor = make_extractor()
@@ -517,6 +512,4 @@ class TestTrailingNewline:
             node_id="cb1",
         )
         result = extractor._collect_text_from_node(node)
-        assert result.endswith("\n\n"), (
-            f"TC-07: Expected trailing \\n\\n, got: {result!r}"
-        )
+        assert result.endswith("\n\n"), f"TC-07: Expected trailing \\n\\n, got: {result!r}"

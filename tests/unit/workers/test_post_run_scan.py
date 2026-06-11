@@ -8,6 +8,7 @@ Verifies:
 - Returns silently on subprocess failure (never blocks worker)
 - Returns early if content_root doesn't exist
 """
+
 import json
 import sys
 from pathlib import Path
@@ -19,6 +20,7 @@ def _make_worker():
     from src.workers.autonomous_content_translation_worker import (
         AutonomousContentTranslationWorker,
     )
+
     return AutonomousContentTranslationWorker.__new__(AutonomousContentTranslationWorker)
 
 
@@ -31,6 +33,7 @@ def _make_config_service(enabled=True):
 # ---------------------------------------------------------------------------
 # Happy path — contaminated files are queued
 # ---------------------------------------------------------------------------
+
 
 def test_scan_uses_repo_not_profiles_dir(tmp_path):
     """--repo <content_root> must be in the subprocess command."""
@@ -54,8 +57,10 @@ def test_scan_uses_repo_not_profiles_dir(tmp_path):
         r.stderr = ""
         return r
 
-    with patch("subprocess.run", side_effect=fake_run), \
-         patch("src.tm.retranslate_queue.add_to_queue") as _mock_q:
+    with (
+        patch("subprocess.run", side_effect=fake_run),
+        patch("src.tm.retranslate_queue.add_to_queue") as _mock_q,
+    ):
         worker._run_post_contamination_scan(site_id="blog.aspose.net", content_root=tmp_path)
 
     assert "--repo" in captured_cmd, "Must pass --repo to scan script"
@@ -83,8 +88,10 @@ def test_scan_queues_contaminated_files(tmp_path):
         r.stderr = ""
         return r
 
-    with patch("subprocess.run", side_effect=fake_run), \
-         patch("src.tm.retranslate_queue.add_to_queue") as mock_add:
+    with (
+        patch("subprocess.run", side_effect=fake_run),
+        patch("src.tm.retranslate_queue.add_to_queue") as mock_add,
+    ):
         worker._run_post_contamination_scan(site_id="docs", content_root=tmp_path)
 
     assert mock_add.call_count == 2
@@ -96,6 +103,7 @@ def test_scan_queues_contaminated_files(tmp_path):
 # ---------------------------------------------------------------------------
 # Guard paths — method must never block the worker
 # ---------------------------------------------------------------------------
+
 
 def test_scan_disabled_by_config(tmp_path):
     worker = _make_worker()
@@ -132,6 +140,7 @@ def test_scan_subprocess_exception_does_not_propagate(tmp_path):
 def test_scan_timeout_does_not_propagate(tmp_path):
     """Subprocess timeout must not propagate."""
     import subprocess
+
     worker = _make_worker()
     worker.config_service = _make_config_service()
 

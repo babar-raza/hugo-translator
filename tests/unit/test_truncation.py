@@ -7,6 +7,7 @@ Tests focus on:
 - No false positives for short content
 - Metrics surfaced via stats object
 """
+
 import logging
 from unittest.mock import MagicMock
 
@@ -98,9 +99,7 @@ class TestTruncationDetection:
                 break
         assert warning_found, "Truncation warning not found in logs"
 
-    def test_truncation_detected_near_limit(
-        self, model_info, mock_model_and_tokenizer, caplog
-    ):
+    def test_truncation_detected_near_limit(self, model_info, mock_model_and_tokenizer, caplog):
         """Test truncation is detected when output is within tolerance of limit."""
         mock_model, mock_tokenizer = mock_model_and_tokenizer
 
@@ -120,9 +119,7 @@ class TestTruncationDetection:
         mock_outputs = torch.tensor([[100] * 509])
         mock_model.generate.return_value = mock_outputs
 
-        mock_tokenizer.batch_decode.return_value = [
-            "Translation that is almost at the limit"
-        ]
+        mock_tokenizer.batch_decode.return_value = ["Translation that is almost at the limit"]
 
         with caplog.at_level(logging.WARNING):
             texts = ["Source text"]
@@ -132,9 +129,7 @@ class TestTruncationDetection:
         assert backend.last_truncation_detected is True
         assert backend.truncation_count == 1
 
-    def test_no_truncation_for_short_content(
-        self, model_info, mock_model_and_tokenizer, caplog
-    ):
+    def test_no_truncation_for_short_content(self, model_info, mock_model_and_tokenizer, caplog):
         """Test no false positive for short content well below limit."""
         mock_model, mock_tokenizer = mock_model_and_tokenizer
 
@@ -153,9 +148,7 @@ class TestTruncationDetection:
         mock_outputs = torch.tensor([[100] * 50])
         mock_model.generate.return_value = mock_outputs
 
-        mock_tokenizer.batch_decode.return_value = [
-            "Short translation"
-        ]
+        mock_tokenizer.batch_decode.return_value = ["Short translation"]
 
         with caplog.at_level(logging.WARNING):
             texts = ["Short source text"]
@@ -169,9 +162,7 @@ class TestTruncationDetection:
         for record in caplog.records:
             assert "Possible truncation detected" not in record.message
 
-    def test_truncation_count_increments(
-        self, model_info, mock_model_and_tokenizer, caplog
-    ):
+    def test_truncation_count_increments(self, model_info, mock_model_and_tokenizer, caplog):
         """Test truncation count increments across multiple calls."""
         mock_model, mock_tokenizer = mock_model_and_tokenizer
 
@@ -255,9 +246,7 @@ class TestTruncationDetection:
         assert "AAA" in warning_record.message
         assert "..." in warning_record.message
 
-    def test_batch_truncation_logs_all_items(
-        self, model_info, mock_model_and_tokenizer, caplog
-    ):
+    def test_batch_truncation_logs_all_items(self, model_info, mock_model_and_tokenizer, caplog):
         """Test truncation warning logs all items in batch."""
         mock_model, mock_tokenizer = mock_model_and_tokenizer
 
@@ -300,9 +289,7 @@ class TestTruncationDetection:
         assert any("Source[1]:" in w and "Text two" in w for w in warnings)
         assert any("Source[2]:" in w and "Text three" in w for w in warnings)
 
-    def test_truncation_flag_reset_each_call(
-        self, model_info, mock_model_and_tokenizer
-    ):
+    def test_truncation_flag_reset_each_call(self, model_info, mock_model_and_tokenizer):
         """Test truncation flag is reset for each translate call."""
         mock_model, mock_tokenizer = mock_model_and_tokenizer
 
@@ -343,9 +330,7 @@ class TestTruncationDetection:
         assert backend.last_truncation_detected is False
         assert backend.truncation_count == 0
 
-    def test_long_text_preview_truncation(
-        self, model_info, mock_model_and_tokenizer, caplog
-    ):
+    def test_long_text_preview_truncation(self, model_info, mock_model_and_tokenizer, caplog):
         """Test long source text is truncated in warning message."""
         mock_model, mock_tokenizer = mock_model_and_tokenizer
 

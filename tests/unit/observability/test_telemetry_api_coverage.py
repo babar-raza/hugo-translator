@@ -21,6 +21,7 @@ from src.observability.telemetry_integration import TranslationTelemetry
 @dataclass
 class TranslationStatsFixture:
     """Test data matching real TranslationStats structure."""
+
     # Core metrics
     total_segments: int = 0
     translated_segments: int = 0
@@ -147,7 +148,7 @@ def test_target_ref_json_serialization():
     output_paths = {
         "fr": Path("/output/fr/test.md"),
         "es": Path("/output/es/test.md"),
-        "de": Path("/output/de/test.md")
+        "de": Path("/output/de/test.md"),
     }
 
     # Convert to JSON (same logic as telemetry_integration.py)
@@ -225,11 +226,7 @@ def test_associate_commit_with_disabled_telemetry():
     telemetry = TranslationTelemetry(enabled=False)
 
     # This should return False without errors
-    result = telemetry.associate_commit(
-        run_context=None,
-        commit_hash="abc123",
-        commit_source="llm"
-    )
+    result = telemetry.associate_commit(run_context=None, commit_hash="abc123", commit_source="llm")
 
     assert result is False
 
@@ -247,7 +244,7 @@ def test_git_commit_result_dataclass():
         files_committed=5,
         push_success=True,
         commit_author="Test User <test@example.com>",
-        commit_timestamp="2024-01-01T00:00:00Z"
+        commit_timestamp="2024-01-01T00:00:00Z",
     )
 
     # Verify all fields exist and have correct values
@@ -264,7 +261,7 @@ def test_git_commit_result_dataclass():
 
 def test_telemetry_context_with_file_path():
     """Test real telemetry context creation with file path."""
-    with tempfile.NamedTemporaryFile(mode='w', suffix='.md', delete=False) as f:
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".md", delete=False) as f:
         f.write("# Test")
         test_file = Path(f.name)
 
@@ -277,7 +274,7 @@ def test_telemetry_context_with_file_path():
             job_type="translate_file",
             trigger_type="cli",
             file_path=test_file,
-            target_langs=["fr", "es"]
+            target_langs=["fr", "es"],
         ) as run_context:
             # Context should not be None
             assert run_context is not None
@@ -291,11 +288,11 @@ def test_telemetry_disabled_gracefully():
     telemetry = TranslationTelemetry(enabled=False)
 
     with telemetry.track_translation_session(
-        job_type="translate_file",
-        trigger_type="cli"
+        job_type="translate_file", trigger_type="cli"
     ) as run_context:
         # Should get DummyRunContext
         from src.observability.telemetry_integration import DummyRunContext
+
         assert isinstance(run_context, DummyRunContext)
 
 
@@ -315,6 +312,7 @@ def test_associate_commit_retries_on_connection_error():
     - Logs WARNING on each retry
     - Returns False after all retries exhausted
     """
+
     # Create a mock client that raises ConnectionError
     class MockClientWithConnectionError:
         def __init__(self):
@@ -345,11 +343,10 @@ def test_associate_commit_retries_on_connection_error():
     try:
         # Call associate_commit - should retry 3 times
         import time
+
         start_time = time.time()
         result = telemetry.associate_commit(
-            run_context=run_context,
-            commit_hash="abc123def456",
-            commit_source="llm"
+            run_context=run_context, commit_hash="abc123def456", commit_source="llm"
         )
         elapsed = time.time() - start_time
 
@@ -379,6 +376,7 @@ def test_associate_commit_no_retry_on_client_error():
     - Logs WARNING about non-retryable error
     - Only calls API once (no retries)
     """
+
     # Create a mock client that raises a non-transient error
     class MockClientWithClientError:
         def __init__(self):
@@ -404,11 +402,10 @@ def test_associate_commit_no_retry_on_client_error():
 
     # Call associate_commit - should NOT retry
     import time
+
     start_time = time.time()
     result = telemetry.associate_commit(
-        run_context=run_context,
-        commit_hash="xyz789",
-        commit_source="llm"
+        run_context=run_context, commit_hash="xyz789", commit_source="llm"
     )
     elapsed = time.time() - start_time
 
@@ -432,6 +429,7 @@ def test_associate_commit_retry_succeeds_on_second_attempt():
     - Returns True on success
     - Only retries as many times as needed
     """
+
     # Create a mock client that fails once, then succeeds
     class MockClientWithRecovery:
         def __init__(self):
@@ -466,9 +464,7 @@ def test_associate_commit_retry_succeeds_on_second_attempt():
     try:
         # Call associate_commit - should succeed on second attempt
         result = telemetry.associate_commit(
-            run_context=run_context,
-            commit_hash="def456abc",
-            commit_source="llm"
+            run_context=run_context, commit_hash="def456abc", commit_source="llm"
         )
 
         # Verify result is True (success)
@@ -489,6 +485,7 @@ def test_associate_commit_retry_succeeds_on_second_attempt():
 
 def test_field_detection_v2_2_plus():
     """TC-VALID-01: Verify all fields supported for client v2.2.0+."""
+
     # Create mock client with v2.2.0
     class MockClient:
         __version__ = "2.2.0"
@@ -505,19 +502,20 @@ def test_field_detection_v2_2_plus():
     supported = telemetry._detect_supported_fields()
 
     # Verify git commit fields are supported
-    assert 'git_commit_hash' in supported
-    assert 'git_commit_source' in supported
-    assert 'git_commit_author' in supported
-    assert 'git_commit_timestamp' in supported
+    assert "git_commit_hash" in supported
+    assert "git_commit_source" in supported
+    assert "git_commit_author" in supported
+    assert "git_commit_timestamp" in supported
 
     # Verify base fields are also supported
-    assert 'agent_name' in supported
-    assert 'job_type' in supported
-    assert 'trigger_type' in supported
+    assert "agent_name" in supported
+    assert "job_type" in supported
+    assert "trigger_type" in supported
 
 
 def test_field_detection_v2_1():
     """TC-VALID-01: Verify git commit fields excluded for client v2.1.0."""
+
     # Create mock client with v2.1.0
     class MockClient:
         __version__ = "2.1.0"
@@ -534,15 +532,15 @@ def test_field_detection_v2_1():
     supported = telemetry._detect_supported_fields()
 
     # Verify git commit fields are NOT supported
-    assert 'git_commit_hash' not in supported
-    assert 'git_commit_source' not in supported
-    assert 'git_commit_author' not in supported
-    assert 'git_commit_timestamp' not in supported
+    assert "git_commit_hash" not in supported
+    assert "git_commit_source" not in supported
+    assert "git_commit_author" not in supported
+    assert "git_commit_timestamp" not in supported
 
     # Verify base fields are still supported
-    assert 'agent_name' in supported
-    assert 'job_type' in supported
-    assert 'trigger_type' in supported
+    assert "agent_name" in supported
+    assert "job_type" in supported
+    assert "trigger_type" in supported
 
 
 def test_warning_logged_for_old_version(caplog):
@@ -566,11 +564,12 @@ def test_warning_logged_for_old_version(caplog):
         supported = telemetry._detect_supported_fields()
 
     # Verify warning was logged
-    assert any("2.0.5" in record.message and "< 2.2.0" in record.message
-               for record in caplog.records)
+    assert any(
+        "2.0.5" in record.message and "< 2.2.0" in record.message for record in caplog.records
+    )
 
     # Verify git commit fields are excluded
-    assert 'git_commit_hash' not in supported
+    assert "git_commit_hash" not in supported
 
 
 def test_version_gte_comparison():
@@ -602,6 +601,7 @@ def test_field_filtering_in_context_builder():
             MockClient.received_kwargs = kwargs
             # Return a dummy context manager
             from src.observability.telemetry_integration import DummyRunContext
+
             return DummyRunContext()
 
     # Create telemetry with mock client
@@ -611,26 +611,23 @@ def test_field_filtering_in_context_builder():
     telemetry._supported_fields = telemetry._detect_supported_fields()
 
     # Build context (which calls track_run)
-    with tempfile.NamedTemporaryFile(mode='w', suffix='.md', delete=False) as f:
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".md", delete=False) as f:
         f.write("# Test")
         test_file = Path(f.name)
 
     try:
         telemetry._build_telemetry_context(
-            job_type="translate_file",
-            trigger_type="cli",
-            file_path=test_file,
-            target_langs=["fr"]
+            job_type="translate_file", trigger_type="cli", file_path=test_file, target_langs=["fr"]
         )
 
         # Verify git commit fields were NOT passed to track_run
         assert MockClient.received_kwargs is not None
-        assert 'git_commit_hash' not in MockClient.received_kwargs
-        assert 'git_commit_source' not in MockClient.received_kwargs
+        assert "git_commit_hash" not in MockClient.received_kwargs
+        assert "git_commit_source" not in MockClient.received_kwargs
 
         # Verify base fields WERE passed
-        assert 'agent_name' in MockClient.received_kwargs
-        assert 'job_type' in MockClient.received_kwargs
+        assert "agent_name" in MockClient.received_kwargs
+        assert "job_type" in MockClient.received_kwargs
 
     finally:
         test_file.unlink()
@@ -653,8 +650,8 @@ def test_no_version_defaults_to_conservative():
     supported = telemetry._detect_supported_fields()
 
     # Verify git commit fields are excluded (conservative fallback)
-    assert 'git_commit_hash' not in supported
-    assert 'git_commit_source' not in supported
+    assert "git_commit_hash" not in supported
+    assert "git_commit_source" not in supported
 
     # Verify base fields are supported
-    assert 'agent_name' in supported
+    assert "agent_name" in supported

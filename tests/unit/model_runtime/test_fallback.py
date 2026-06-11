@@ -6,6 +6,7 @@ Tests the 2-tier fallback implementation:
 2. Multilingual models (fallback for unsupported pairs)
 3. ValueError (only when no models available at all)
 """
+
 import logging
 
 import pytest
@@ -171,9 +172,7 @@ class TestMultilingualFallback:
         assert model.model_id == "m2m100_418m"
         assert model.supported_pairs == "all"
 
-    def test_fallback_logging(
-        self, registry_with_opus_and_multilingual, mock_hardware, caplog
-    ):
+    def test_fallback_logging(self, registry_with_opus_and_multilingual, mock_hardware, caplog):
         """INFO log should be emitted when falling back to multilingual."""
         with caplog.at_level(logging.INFO, logger="src.model_runtime.registry"):
             model = registry_with_opus_and_multilingual.recommend_model(
@@ -185,9 +184,7 @@ class TestMultilingualFallback:
         assert "multilingual fallback" in caplog.text.lower()
         assert model.model_id == "m2m100_418m"
 
-    def test_fallback_model_selection_heuristics(
-        self, registry_multilingual_only, mock_hardware
-    ):
+    def test_fallback_model_selection_heuristics(self, registry_multilingual_only, mock_hardware):
         """Best multilingual model should be selected using heuristics."""
         # Registry has m2m100_418m (1600MB) and nllb_200_distilled (1200MB)
         # Should prefer smaller model (nllb) for faster loading
@@ -206,22 +203,16 @@ class TestErrorHandling:
     def test_valueerror_if_no_models_at_all(self, registry_empty, mock_hardware):
         """ValueError should be raised if registry is empty."""
         with pytest.raises(ValueError) as exc_info:
-            registry_empty.recommend_model(
-                src_lang="en", tgt_lang="fr", hardware=mock_hardware
-            )
+            registry_empty.recommend_model(src_lang="en", tgt_lang="fr", hardware=mock_hardware)
 
         assert "No models available for en→fr" in str(exc_info.value)
-        assert "no models supporting this pair or multilingual models" in str(
-            exc_info.value
-        )
+        assert "no models supporting this pair or multilingual models" in str(exc_info.value)
 
     def test_valueerror_logging(self, registry_empty, mock_hardware, caplog):
         """WARNING log should be emitted before ValueError."""
         with caplog.at_level(logging.WARNING):
             with pytest.raises(ValueError):
-                registry_empty.recommend_model(
-                    src_lang="en", tgt_lang="fr", hardware=mock_hardware
-                )
+                registry_empty.recommend_model(src_lang="en", tgt_lang="fr", hardware=mock_hardware)
 
         assert "No models available for en→fr" in caplog.text
         assert "Registry contains 0 models total" in caplog.text
@@ -260,9 +251,7 @@ class TestHardwareConstraints:
 class TestBackwardCompatibility:
     """Test backward compatibility with existing usage patterns."""
 
-    def test_backward_compat_manual_model_id(
-        self, registry_with_opus_and_multilingual
-    ):
+    def test_backward_compat_manual_model_id(self, registry_with_opus_and_multilingual):
         """Manual model selection via get_model() should still work."""
         # Direct model access should not be affected
         opus = registry_with_opus_and_multilingual.get_model("opus_en_fr")
@@ -278,9 +267,7 @@ class TestBackwardCompatibility:
         assert len(all_models) == 2
 
         # List models for specific pair
-        fr_models = registry_with_opus_and_multilingual.list_models(
-            lang_pair=("en", "fr")
-        )
+        fr_models = registry_with_opus_and_multilingual.list_models(lang_pair=("en", "fr"))
         assert len(fr_models) == 2  # opus_en_fr + m2m100 (supports all)
 
 
@@ -348,9 +335,7 @@ models:
         registry_path.write_text(registry_content)
         registry = ModelRegistry(registry_path)
 
-        model = registry.recommend_model(
-            src_lang="en", tgt_lang="fr", hardware=mock_hardware
-        )
+        model = registry.recommend_model(src_lang="en", tgt_lang="fr", hardware=mock_hardware)
 
         # Should select v2 (ctranslate2 backend preferred)
         assert model.model_id == "opus_en_fr_v2"
@@ -362,7 +347,9 @@ models:
         """Fallback with multiple multilingual models should select best one."""
         with caplog.at_level(logging.INFO, logger="src.model_runtime.registry"):
             model = registry_multilingual_only.recommend_model(
-                src_lang="en", tgt_lang="ko", hardware=mock_hardware  # Korean
+                src_lang="en",
+                tgt_lang="ko",
+                hardware=mock_hardware,  # Korean
             )
 
         # Should log fallback with count

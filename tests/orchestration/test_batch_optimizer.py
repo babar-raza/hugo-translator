@@ -70,9 +70,7 @@ def test_process_batch_with_monitoring(optimizer):
     def mock_process(items):
         return [item.upper() for item in items]
 
-    result, success = optimizer.process_batch_with_monitoring(
-        batch, mock_process
-    )
+    result, success = optimizer.process_batch_with_monitoring(batch, mock_process)
 
     assert success is True
     assert result == ["ITEM1", "ITEM2", "ITEM3"]

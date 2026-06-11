@@ -10,6 +10,7 @@ Six cases:
   5. test_punctuation_heavy_skipped
   6. test_purity_threshold_reduction_bg (integration: BG 0.15 threshold + strip)
 """
+
 from __future__ import annotations
 
 import pytest
@@ -17,6 +18,7 @@ import pytest
 
 def _skip(line: str) -> bool:
     from src.translation_engine.engine import TranslationEngine
+
     return TranslationEngine._should_skip_purity_segment(line)
 
 
@@ -75,14 +77,15 @@ class TestPurityThresholdReductionBG:
 
         # Build a minimal engine with only the config attribute needed
         from src.translation_engine.engine import TranslationEngine
+
         engine = TranslationEngine.__new__(TranslationEngine)
 
         class FakeConfig:
             def get_config(self):
                 return {
-                    'translation_engine': {
-                        'language_detection_confidence_threshold': 0.80,
-                        'purity_threshold_overrides': {'bg': 0.15},
+                    "translation_engine": {
+                        "language_detection_confidence_threshold": 0.80,
+                        "purity_threshold_overrides": {"bg": 0.15},
                     }
                 }
 
@@ -121,14 +124,15 @@ class TestPurityThresholdReductionBG:
         detector.detect.side_effect = mock_detect
 
         from src.translation_engine.engine import TranslationEngine
+
         engine = TranslationEngine.__new__(TranslationEngine)
 
         class FakeConfig:
             def get_config(self):
                 return {
-                    'translation_engine': {
-                        'language_detection_confidence_threshold': 0.80,
-                        'purity_threshold_overrides': {'bg': 0.15},
+                    "translation_engine": {
+                        "language_detection_confidence_threshold": 0.80,
+                        "purity_threshold_overrides": {"bg": 0.15},
                     }
                 }
 

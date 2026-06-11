@@ -24,10 +24,7 @@ class TestRetryFeedbackGuard(unittest.TestCase):
         """Reproduce the guard logic from engine.py:2566-2580."""
         if retry_feedback:
             if isinstance(backend, LLMModelBackend):
-                texts = [
-                    f"{retry_feedback}\n\nSOURCE TEXT:\n{text}"
-                    for text in texts
-                ]
+                texts = [f"{retry_feedback}\n\nSOURCE TEXT:\n{text}" for text in texts]
                 return texts, True  # feedback applied
             else:
                 return texts, False  # feedback skipped
@@ -39,9 +36,7 @@ class TestRetryFeedbackGuard(unittest.TestCase):
         texts = ["Hello world", "Good morning"]
         feedback = "VALIDATION FEEDBACK - fix issues"
 
-        result_texts, applied = self._apply_feedback_guard(
-            backend, texts, feedback
-        )
+        result_texts, applied = self._apply_feedback_guard(backend, texts, feedback)
 
         self.assertFalse(applied)
         self.assertEqual(result_texts, ["Hello world", "Good morning"])
@@ -52,9 +47,7 @@ class TestRetryFeedbackGuard(unittest.TestCase):
         texts = ["Hello world", "Good morning"]
         feedback = "VALIDATION FEEDBACK - fix issues"
 
-        result_texts, applied = self._apply_feedback_guard(
-            backend, texts, feedback
-        )
+        result_texts, applied = self._apply_feedback_guard(backend, texts, feedback)
 
         self.assertTrue(applied)
         self.assertEqual(len(result_texts), 2)
@@ -69,15 +62,11 @@ class TestRetryFeedbackGuard(unittest.TestCase):
         texts = ["Hello world"]
 
         for backend in [llm_backend, mt_backend]:
-            result_texts, applied = self._apply_feedback_guard(
-                backend, texts, None
-            )
+            result_texts, applied = self._apply_feedback_guard(backend, texts, None)
             self.assertFalse(applied)
             self.assertEqual(result_texts, ["Hello world"])
 
-            result_texts, applied = self._apply_feedback_guard(
-                backend, texts, ""
-            )
+            result_texts, applied = self._apply_feedback_guard(backend, texts, "")
             self.assertFalse(applied)
 
     def test_isinstance_distinguishes_class_hierarchies(self):
@@ -103,9 +92,7 @@ class TestRetryFeedbackGuard(unittest.TestCase):
         texts = ["Test segment"]
         feedback = "Fix placeholder errors"
 
-        result_texts, applied = self._apply_feedback_guard(
-            backend, texts, feedback
-        )
+        result_texts, applied = self._apply_feedback_guard(backend, texts, feedback)
 
         self.assertTrue(applied)
         expected = "Fix placeholder errors\n\nSOURCE TEXT:\nTest segment"

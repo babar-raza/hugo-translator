@@ -8,7 +8,7 @@ TranslationEngine and preserves structure during translation.
 import sys
 from unittest.mock import Mock
 
-sys.path.insert(0, '.')
+sys.path.insert(0, ".")
 
 from src.translation_engine.handlers.multiline_handler import MultilineHandler
 from src.translation_engine.models import TranslationStats
@@ -121,8 +121,8 @@ class TestMultilineIntegration:
         assert results[3] == "- BULLET 1\n- BULLET 2"
 
         # Verify newlines preserved
-        assert results[1].count('\n') == 2
-        assert results[3].count('\n') == 1
+        assert results[1].count("\n") == 2
+        assert results[3].count("\n") == 1
 
     def test_bullet_structure_preservation(self):
         """Test that bullet list structure is preserved."""
@@ -156,7 +156,7 @@ class TestMultilineIntegration:
         result = results[0]
 
         # Verify structure
-        lines = result.split('\n')
+        lines = result.split("\n")
         assert len(lines) == 5, f"Expected 5 lines, got {len(lines)}"
 
         # Verify indentation preserved
@@ -193,7 +193,7 @@ class TestMultilineIntegration:
 
         # Verify empty line preserved
         assert "\n\n" in result
-        lines = result.split('\n')
+        lines = result.split("\n")
         assert len(lines) == 3
         assert lines[1] == ""  # Empty line
 
@@ -258,8 +258,8 @@ class TestMultilineHandlerDirectly:
 
         result = handler.translate(source, mock_translate)
 
-        source_newlines = source.count('\n')
-        result_newlines = result.translated_text.count('\n')
+        source_newlines = source.count("\n")
+        result_newlines = result.translated_text.count("\n")
 
         assert source_newlines == 5
         assert result_newlines == 5
@@ -289,7 +289,7 @@ class TestMultilineHandlerDirectly:
         assert result.line_count_translated == 5
 
         # Verify bullets and indentation
-        lines = result.translated_text.split('\n')
+        lines = result.translated_text.split("\n")
         assert lines[0].startswith("-   БГ:")
         assert lines[2].startswith("    -   БГ:")
 

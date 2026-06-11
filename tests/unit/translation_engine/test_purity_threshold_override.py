@@ -21,6 +21,7 @@ import pytest
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def _make_engine(purity_threshold_overrides=None, config_raises=False):
     """Return a minimal mock self that satisfies _verify_final_file_purity.
 
@@ -32,6 +33,7 @@ def _make_engine(purity_threshold_overrides=None, config_raises=False):
         When True, self.config.get_config() raises for fallback testing.
     """
     from src.translation_engine.engine import TranslationEngine
+
     mock_self = MagicMock()  # no spec: self.config is set in __init__, not class body
     mock_self.similarity_tracker = None
     te_cfg = {}
@@ -43,8 +45,8 @@ def _make_engine(purity_threshold_overrides=None, config_raises=False):
         mock_self.config.get_config.return_value = {"translation_engine": te_cfg}
     # Bind the real _get_purity_threshold so calls from _verify_final_file_purity
     # use the actual validation logic rather than a MagicMock auto-attribute.
-    mock_self._get_purity_threshold = (
-        lambda lang: TranslationEngine._get_purity_threshold(mock_self, lang)
+    mock_self._get_purity_threshold = lambda lang: TranslationEngine._get_purity_threshold(
+        mock_self, lang
     )
     # Bind the real _should_skip_purity_segment static method — MagicMock would
     # return a truthy Mock, skipping all paragraphs and causing early "no content" return.
@@ -79,6 +81,7 @@ def _build_content(num_paragraphs, char="x", length=25):
 # Tests
 # ---------------------------------------------------------------------------
 
+
 class TestDefaultThreshold:
     """Languages without an override use the hardcoded 6% default."""
 
@@ -89,28 +92,27 @@ class TestDefaultThreshold:
         over the limit.
         """
         from src.translation_engine.engine import TranslationEngine
+
         mock_self = _make_engine(purity_threshold_overrides={})
         detections = [("de", 0.95)] * 7 + [("sr", 0.95)] * 3
         detector = _make_detector(detections)
         content = _build_content(10)
-        result = TranslationEngine._verify_final_file_purity(
-            mock_self, content, "de", detector
-        )
+        result = TranslationEngine._verify_final_file_purity(mock_self, content, "de", detector)
         assert result["passed"] is False
         assert result["wrong_lang_percentage"] == pytest.approx(0.30, abs=0.01)
 
     def test_default_threshold_passes_5pct_wrong(self):
         """5% wrong (< 6% default) should PASS for a lang without an override."""
         from src.translation_engine.engine import TranslationEngine
+
         mock_self = _make_engine(purity_threshold_overrides={})
         detections = [("de", 0.95)] * 19 + [("sr", 0.95)] * 1
         detector = _make_detector(detections)
         content = _build_content(20)
-        result = TranslationEngine._verify_final_file_purity(
-            mock_self, content, "de", detector
-        )
+        result = TranslationEngine._verify_final_file_purity(mock_self, content, "de", detector)
         assert result["passed"] is True
         assert result["wrong_lang_percentage"] == pytest.approx(0.05, abs=0.001)
+
 
 class TestLanguageOverrides:
     """Per-language overrides change the acceptance threshold for that language only."""
@@ -121,26 +123,24 @@ class TestLanguageOverrides:
         The boundary is wrong_percentage > threshold, so equality is not a failure.
         """
         from src.translation_engine.engine import TranslationEngine
+
         mock_self = _make_engine(purity_threshold_overrides={"lt": 0.30, "lv": 0.20})
         # 3/10 == 0.30 == threshold -> NOT strictly greater -> PASS.
         detections = [("lt", 0.95)] * 7 + [("sr", 0.95)] * 3
         detector = _make_detector(detections)
         content = _build_content(10)
-        result = TranslationEngine._verify_final_file_purity(
-            mock_self, content, "lt", detector
-        )
+        result = TranslationEngine._verify_final_file_purity(mock_self, content, "lt", detector)
         assert result["passed"] is True
 
     def test_lt_override_fails_above_threshold(self):
         """lt override at 0.30: 40% wrong should FAIL."""
         from src.translation_engine.engine import TranslationEngine
+
         mock_self = _make_engine(purity_threshold_overrides={"lt": 0.30, "lv": 0.20})
         detections = [("lt", 0.95)] * 6 + [("sr", 0.95)] * 4
         detector = _make_detector(detections)
         content = _build_content(10)
-        result = TranslationEngine._verify_final_file_purity(
-            mock_self, content, "lt", detector
-        )
+        result = TranslationEngine._verify_final_file_purity(mock_self, content, "lt", detector)
         assert result["passed"] is False
         assert result["wrong_lang_percentage"] == pytest.approx(0.40, abs=0.01)
 
@@ -150,27 +150,25 @@ class TestLanguageOverrides:
         30% wrong for Arabic should FAIL.
         """
         from src.translation_engine.engine import TranslationEngine
+
         mock_self = _make_engine(purity_threshold_overrides={"lt": 0.30, "lv": 0.20})
         detections = [("ar", 0.95)] * 7 + [("sr", 0.95)] * 3
         detector = _make_detector(detections)
         content = _build_content(10)
-        result = TranslationEngine._verify_final_file_purity(
-            mock_self, content, "ar", detector
-        )
+        result = TranslationEngine._verify_final_file_purity(mock_self, content, "ar", detector)
         assert result["passed"] is False
         assert result["wrong_lang_percentage"] == pytest.approx(0.30, abs=0.01)
 
     def test_lv_override_independent_of_lt(self):
         """lv uses its own 0.20 override, not lt 0.30 override."""
         from src.translation_engine.engine import TranslationEngine
+
         mock_self = _make_engine(purity_threshold_overrides={"lt": 0.30, "lv": 0.20})
         # 25% wrong for lv -- above lv 0.20 but below lt 0.30.
         detections = [("lv", 0.95)] * 15 + [("sr", 0.95)] * 5
         detector = _make_detector(detections)
         content = _build_content(20)
-        result = TranslationEngine._verify_final_file_purity(
-            mock_self, content, "lv", detector
-        )
+        result = TranslationEngine._verify_final_file_purity(mock_self, content, "lv", detector)
         assert result["passed"] is False
         assert result["wrong_lang_percentage"] == pytest.approx(0.25, abs=0.01)
 
@@ -184,26 +182,24 @@ class TestConfigFallback:
         7 wrong out of 100 paragraphs = 7%, above 6% fallback -> FAIL.
         """
         from src.translation_engine.engine import TranslationEngine
+
         mock_self = _make_engine(config_raises=True)
         detections = [("de", 0.95)] * 93 + [("sr", 0.95)] * 7
         detector = _make_detector(detections)
         content = _build_content(100)
-        result = TranslationEngine._verify_final_file_purity(
-            mock_self, content, "de", detector
-        )
+        result = TranslationEngine._verify_final_file_purity(mock_self, content, "de", detector)
         assert result["passed"] is False  # 7% > 6% fallback
         assert result["wrong_lang_percentage"] == pytest.approx(0.07, abs=0.001)
 
     def test_no_purity_config_passes_below_default(self):
         """When config raises, 5% wrong (< 6% fallback) should still PASS."""
         from src.translation_engine.engine import TranslationEngine
+
         mock_self = _make_engine(config_raises=True)
         detections = [("de", 0.95)] * 95 + [("sr", 0.95)] * 5
         detector = _make_detector(detections)
         content = _build_content(100)
-        result = TranslationEngine._verify_final_file_purity(
-            mock_self, content, "de", detector
-        )
+        result = TranslationEngine._verify_final_file_purity(mock_self, content, "de", detector)
         assert result["passed"] is True
         assert result["wrong_lang_percentage"] == pytest.approx(0.05, abs=0.001)
 
@@ -218,9 +214,10 @@ class TestContentFiltering:
         Short lines are filtered; only long lines call detect().
         """
         from src.translation_engine.engine import TranslationEngine
+
         mock_self = _make_engine(purity_threshold_overrides={})
         short_line = "x" * 10  # 10 chars -- below 20-char minimum
-        long_line  = "y" * 25  # 25 chars -- above the minimum
+        long_line = "y" * 25  # 25 chars -- above the minimum
         lines = []
         for _ in range(10):
             lines.append(short_line)
@@ -228,9 +225,7 @@ class TestContentFiltering:
         content = ("\n").join(lines)
         detections = [("de", 0.95)] * 10
         detector = _make_detector(detections)
-        result = TranslationEngine._verify_final_file_purity(
-            mock_self, content, "de", detector
-        )
+        result = TranslationEngine._verify_final_file_purity(mock_self, content, "de", detector)
         assert result["passed"] is True
         assert detector.detect.call_count == 10
 
@@ -240,25 +235,23 @@ class TestContentFiltering:
         The boundary is strictly conf > 0.70; conf == 0.70 does not count.
         """
         from src.translation_engine.engine import TranslationEngine
+
         mock_self = _make_engine(purity_threshold_overrides={})
         detections = [("sr", 0.70)] * 10
         detector = _make_detector(detections)
         content = _build_content(10)
-        result = TranslationEngine._verify_final_file_purity(
-            mock_self, content, "de", detector
-        )
+        result = TranslationEngine._verify_final_file_purity(mock_self, content, "de", detector)
         assert result["passed"] is True
         assert result["wrong_lang_percentage"] == pytest.approx(0.0, abs=0.001)
 
     def test_empty_content_returns_passed(self):
         """Content with no valid paragraphs should return passed=True."""
         from src.translation_engine.engine import TranslationEngine
+
         mock_self = _make_engine()
         detector = _make_detector([])
         content = ""
-        result = TranslationEngine._verify_final_file_purity(
-            mock_self, content, "de", detector
-        )
+        result = TranslationEngine._verify_final_file_purity(mock_self, content, "de", detector)
         assert result["passed"] is True
         assert "reason" in result
 
@@ -274,15 +267,14 @@ class TestSimilarityTrackerSkip:
         Result: 0 wrong counted → passed=True (would FAIL without the skip).
         """
         from src.translation_engine.engine import TranslationEngine
+
         mock_self = _make_engine(purity_threshold_overrides={})
         mock_self.similarity_tracker = MagicMock()
         mock_self.similarity_tracker.are_similar.return_value = True
         detections = [("lt", 0.95)] * 5 + [("sr", 0.95)] * 5
         detector = _make_detector(detections)
         content = _build_content(10)
-        result = TranslationEngine._verify_final_file_purity(
-            mock_self, content, "lt", detector
-        )
+        result = TranslationEngine._verify_final_file_purity(mock_self, content, "lt", detector)
         assert result["passed"] is True
         # are_similar called once per wrong-candidate paragraph (5 sr detections)
         assert mock_self.similarity_tracker.are_similar.call_count == 5
@@ -294,15 +286,14 @@ class TestSimilarityTrackerSkip:
         Result: 5/10 = 50% wrong > 6% default → FAIL.
         """
         from src.translation_engine.engine import TranslationEngine
+
         mock_self = _make_engine(purity_threshold_overrides={})
         mock_self.similarity_tracker = MagicMock()
         mock_self.similarity_tracker.are_similar.return_value = False
         detections = [("lt", 0.95)] * 5 + [("de", 0.95)] * 5
         detector = _make_detector(detections)
         content = _build_content(10)
-        result = TranslationEngine._verify_final_file_purity(
-            mock_self, content, "lt", detector
-        )
+        result = TranslationEngine._verify_final_file_purity(mock_self, content, "lt", detector)
         assert result["passed"] is False
         assert result["wrong_lang_percentage"] == pytest.approx(0.50, abs=0.01)
 
@@ -316,13 +307,12 @@ class TestInvalidConfigValues:
         7% wrong for lt is above 6% default → FAIL; confirms fallback is 0.06 not 0.
         """
         from src.translation_engine.engine import TranslationEngine
+
         mock_self = _make_engine(purity_threshold_overrides={"lt": "aggressive"})
         detections = [("lt", 0.95)] * 93 + [("sr", 0.95)] * 7
         detector = _make_detector(detections)
         content = _build_content(100)
-        result = TranslationEngine._verify_final_file_purity(
-            mock_self, content, "lt", detector
-        )
+        result = TranslationEngine._verify_final_file_purity(mock_self, content, "lt", detector)
         assert result["passed"] is False  # 7% > 6% default; "aggressive" was rejected
         assert result["wrong_lang_percentage"] == pytest.approx(0.07, abs=0.001)
 
@@ -332,13 +322,12 @@ class TestInvalidConfigValues:
         7% wrong for lt → FAIL (same as default behaviour, 1.5 was rejected).
         """
         from src.translation_engine.engine import TranslationEngine
+
         mock_self = _make_engine(purity_threshold_overrides={"lt": 1.5})
         detections = [("lt", 0.95)] * 93 + [("sr", 0.95)] * 7
         detector = _make_detector(detections)
         content = _build_content(100)
-        result = TranslationEngine._verify_final_file_purity(
-            mock_self, content, "lt", detector
-        )
+        result = TranslationEngine._verify_final_file_purity(mock_self, content, "lt", detector)
         assert result["passed"] is False  # 7% > 6% default; 1.5 out-of-range rejected
         assert result["wrong_lang_percentage"] == pytest.approx(0.07, abs=0.001)
 
@@ -348,13 +337,12 @@ class TestInvalidConfigValues:
         Validates 0.0 passes the range check [0, 1] and is used as-is.
         """
         from src.translation_engine.engine import TranslationEngine
+
         mock_self = _make_engine(purity_threshold_overrides={"lt": 0.0})
         detections = [("lt", 0.95)] * 99 + [("sr", 0.95)] * 1
         detector = _make_detector(detections)
         content = _build_content(100)
-        result = TranslationEngine._verify_final_file_purity(
-            mock_self, content, "lt", detector
-        )
+        result = TranslationEngine._verify_final_file_purity(mock_self, content, "lt", detector)
         assert result["passed"] is False  # 1% > 0.0 threshold
         assert result["wrong_lang_percentage"] == pytest.approx(0.01, abs=0.001)
 
@@ -362,6 +350,7 @@ class TestInvalidConfigValues:
 # ---------------------------------------------------------------------------
 # SR27-T03: BUG-3 fix verification — Lithuanian threshold in global.yaml
 # ---------------------------------------------------------------------------
+
 
 class TestLithuanianThresholdConfig:
     """SR27-T03: Verify BUG-3 fix — global.yaml has lt: 0.30 and engine reads it."""
@@ -374,11 +363,9 @@ class TestLithuanianThresholdConfig:
         from pathlib import Path
 
         import yaml
+
         raw = yaml.safe_load(Path("config/global.yaml").read_text(encoding="utf-8"))
-        overrides = (
-            raw.get("translation_engine", {})
-               .get("purity_threshold_overrides", {})
-        )
+        overrides = raw.get("translation_engine", {}).get("purity_threshold_overrides", {})
         assert "lt" in overrides, (
             "Missing purity_threshold_overrides.lt in global.yaml — BUG-3 fix not applied"
         )
@@ -391,15 +378,15 @@ class TestLithuanianThresholdConfig:
     def test_engine_reads_lt_threshold_as_030(self):
         """_get_purity_threshold('lt') must return 0.30 when override is set."""
         from src.translation_engine.engine import TranslationEngine
+
         mock_self = _make_engine(purity_threshold_overrides={"lt": 0.30})
         threshold = TranslationEngine._get_purity_threshold(mock_self, "lt")
-        assert threshold == pytest.approx(0.30, abs=0.001), (
-            f"Expected 0.30 for lt, got {threshold}"
-        )
+        assert threshold == pytest.approx(0.30, abs=0.001), f"Expected 0.30 for lt, got {threshold}"
 
     def test_default_threshold_unaffected_by_lt_override(self):
         """_get_purity_threshold('de') must return 0.06 when only lt is overridden."""
         from src.translation_engine.engine import TranslationEngine
+
         mock_self = _make_engine(purity_threshold_overrides={"lt": 0.30})
         threshold = TranslationEngine._get_purity_threshold(mock_self, "de")
         assert threshold == pytest.approx(0.06, abs=0.001), (
@@ -409,6 +396,7 @@ class TestLithuanianThresholdConfig:
     def test_unknown_language_falls_back_to_default(self):
         """_get_purity_threshold for an unknown language must return 0.06."""
         from src.translation_engine.engine import TranslationEngine
+
         mock_self = _make_engine(purity_threshold_overrides={"lt": 0.30})
         threshold = TranslationEngine._get_purity_threshold(mock_self, "nonexistent")
         assert threshold == pytest.approx(0.06, abs=0.001)
@@ -418,37 +406,44 @@ class TestLithuanianThresholdConfig:
 # Direct _get_purity_threshold tests
 # ---------------------------------------------------------------------------
 
+
 class TestGetPurityThresholdDirect:
     """Direct tests for _get_purity_threshold method boundary conditions."""
 
     def test_returns_override_for_configured_lang(self):
         from src.translation_engine.engine import TranslationEngine
+
         mock_self = _make_engine(purity_threshold_overrides={"lt": 0.30, "ar": 0.15})
         assert TranslationEngine._get_purity_threshold(mock_self, "lt") == pytest.approx(0.30)
         assert TranslationEngine._get_purity_threshold(mock_self, "ar") == pytest.approx(0.15)
 
     def test_returns_default_for_unconfigured_lang(self):
         from src.translation_engine.engine import TranslationEngine
+
         mock_self = _make_engine(purity_threshold_overrides={"lt": 0.30})
         assert TranslationEngine._get_purity_threshold(mock_self, "de") == pytest.approx(0.06)
 
     def test_rejects_out_of_range_high(self):
         from src.translation_engine.engine import TranslationEngine
+
         mock_self = _make_engine(purity_threshold_overrides={"xx": 0.99})
         assert TranslationEngine._get_purity_threshold(mock_self, "xx") == pytest.approx(0.06)
 
     def test_rejects_string_value(self):
         from src.translation_engine.engine import TranslationEngine
+
         mock_self = _make_engine(purity_threshold_overrides={"xx": "high"})
         assert TranslationEngine._get_purity_threshold(mock_self, "xx") == pytest.approx(0.06)
 
     def test_accepts_zero_threshold(self):
         from src.translation_engine.engine import TranslationEngine
+
         mock_self = _make_engine(purity_threshold_overrides={"xx": 0.0})
         assert TranslationEngine._get_purity_threshold(mock_self, "xx") == pytest.approx(0.0)
 
     def test_config_exception_returns_default(self):
         from src.translation_engine.engine import TranslationEngine
+
         mock_self = _make_engine(config_raises=True)
         assert TranslationEngine._get_purity_threshold(mock_self, "lt") == pytest.approx(0.06)
 
@@ -456,6 +451,7 @@ class TestGetPurityThresholdDirect:
 # ---------------------------------------------------------------------------
 # SR27 SW-2: Purity gate failures must set retryable_gate_failure = True
 # ---------------------------------------------------------------------------
+
 
 class TestPurityGateRetryable:
     """SW-2 fix: purity gate failures must mark retryable_gate_failure=True.
@@ -469,9 +465,10 @@ class TestPurityGateRetryable:
         import inspect
 
         from src.translation_engine import engine as eng_module
+
         source = inspect.getsource(eng_module)
         # Find the purity check block
-        assert "purity_result['passed']" in source or "purity_result[\"passed\"]" in source, (
+        assert "purity_result['passed']" in source or 'purity_result["passed"]' in source, (
             "Purity check must exist in engine.py"
         )
         # Purity failure must block the write — validation_passed = False
@@ -482,17 +479,21 @@ class TestPurityGateRetryable:
     def test_retryable_gate_failure_true_in_purity_block(self):
         """Directly grep engine.py source for SW-2 fix at purity check."""
         from pathlib import Path
+
         engine_src = Path("src/translation_engine/engine.py").read_text(encoding="utf-8")
         lines = engine_src.splitlines()
         # Find line with purity check failure
         purity_fail_line = next(
-            (i for i, ln in enumerate(lines, 1)
-             if "purity_result" in ln and ("passed" in ln or "failed" in ln)),
-            None
+            (
+                i
+                for i, ln in enumerate(lines, 1)
+                if "purity_result" in ln and ("passed" in ln or "failed" in ln)
+            ),
+            None,
         )
         assert purity_fail_line is not None, "Purity check line not found in engine.py"
         # Within 10 lines after the purity check, validation_passed must be set to False
-        window = "\n".join(lines[purity_fail_line - 1: purity_fail_line + 10])
+        window = "\n".join(lines[purity_fail_line - 1 : purity_fail_line + 10])
         assert "validation_passed = False" in window, (
             f"validation_passed=False not found near purity check (line {purity_fail_line})"
         )

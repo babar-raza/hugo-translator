@@ -26,7 +26,9 @@ def sample_files(tmp_path):
     return files
 
 
-def create_metadata_with_ages(metadata_file: Path, ages_days: dict[str, int], sample_files: dict[str, Path]):
+def create_metadata_with_ages(
+    metadata_file: Path, ages_days: dict[str, int], sample_files: dict[str, Path]
+):
     """
     Create metadata file with entries of specified ages.
 
@@ -50,7 +52,7 @@ def create_metadata_with_ages(metadata_file: Path, ages_days: dict[str, int], sa
                 "size_bytes": 100,
                 "hash_computed_at": last_seen.isoformat(),
             },
-            "outputs": {}
+            "outputs": {},
         }
 
     metadata = {
@@ -62,7 +64,7 @@ def create_metadata_with_ages(metadata_file: Path, ages_days: dict[str, int], sa
             "total_files_tracked": len(files_dict),
             "total_translations": 0,
             "last_updated": now.isoformat(),
-        }
+        },
     }
 
     with open(metadata_file, "w", encoding="utf-8") as f:
@@ -78,19 +80,16 @@ class TestMetadataCleanup:
         create_metadata_with_ages(
             temp_metadata_file,
             {
-                "test_0": 10,   # Recent (keep)
-                "test_1": 40,   # Old (remove)
-                "test_2": 20,   # Recent (keep)
-                "test_3": 50,   # Old (remove)
-                "test_4": 5,    # Recent (keep)
+                "test_0": 10,  # Recent (keep)
+                "test_1": 40,  # Old (remove)
+                "test_2": 20,  # Recent (keep)
+                "test_3": 50,  # Old (remove)
+                "test_4": 5,  # Recent (keep)
             },
-            sample_files
+            sample_files,
         )
 
-        tracker = MetadataTracker(
-            metadata_file=temp_metadata_file,
-            hash_algorithm="md5"
-        )
+        tracker = MetadataTracker(metadata_file=temp_metadata_file, hash_algorithm="md5")
         tracker.load()
 
         # Cleanup with 30-day threshold
@@ -116,13 +115,10 @@ class TestMetadataCleanup:
                 "test_1": 10,
                 "test_2": 15,
             },
-            sample_files
+            sample_files,
         )
 
-        tracker = MetadataTracker(
-            metadata_file=temp_metadata_file,
-            hash_algorithm="md5"
-        )
+        tracker = MetadataTracker(metadata_file=temp_metadata_file, hash_algorithm="md5")
         tracker.load()
 
         removed = tracker.cleanup_old_entries(max_age_days=30)
@@ -140,13 +136,10 @@ class TestMetadataCleanup:
                 "test_1": 50,
                 "test_2": 60,
             },
-            sample_files
+            sample_files,
         )
 
-        tracker = MetadataTracker(
-            metadata_file=temp_metadata_file,
-            hash_algorithm="md5"
-        )
+        tracker = MetadataTracker(metadata_file=temp_metadata_file, hash_algorithm="md5")
         tracker.load()
 
         removed = tracker.cleanup_old_entries(max_age_days=30)
@@ -167,7 +160,7 @@ class TestMetadataCleanup:
                     "size_bytes": 100,
                     "hash_computed_at": "invalid-timestamp",
                 },
-                "outputs": {}
+                "outputs": {},
             },
             str(sample_files["test_1"]): {
                 "source": {
@@ -177,8 +170,8 @@ class TestMetadataCleanup:
                     "size_bytes": 100,
                     "hash_computed_at": (now - timedelta(days=40)).isoformat(),
                 },
-                "outputs": {}
-            }
+                "outputs": {},
+            },
         }
 
         metadata = {
@@ -190,16 +183,13 @@ class TestMetadataCleanup:
                 "total_files_tracked": 2,
                 "total_translations": 0,
                 "last_updated": now.isoformat(),
-            }
+            },
         }
 
         with open(temp_metadata_file, "w", encoding="utf-8") as f:
             json.dump(metadata, f, indent=2)
 
-        tracker = MetadataTracker(
-            metadata_file=temp_metadata_file,
-            hash_algorithm="md5"
-        )
+        tracker = MetadataTracker(metadata_file=temp_metadata_file, hash_algorithm="md5")
         tracker.load()
 
         removed = tracker.cleanup_old_entries(max_age_days=30)
@@ -216,10 +206,10 @@ class TestMetadataCleanup:
         create_metadata_with_ages(
             temp_metadata_file,
             {
-                "test_0": 10,   # Recent (keep)
-                "test_1": 40,   # Old (remove)
+                "test_0": 10,  # Recent (keep)
+                "test_1": 40,  # Old (remove)
             },
-            sample_files
+            sample_files,
         )
 
         tracker = MetadataTracker(
@@ -229,7 +219,7 @@ class TestMetadataCleanup:
                 "enabled": True,
                 "cleanup_on_load": True,
                 "max_age_days": 30,
-            }
+            },
         )
 
         # Load should trigger cleanup
@@ -247,7 +237,7 @@ class TestMetadataCleanup:
                 "test_0": 10,
                 "test_1": 40,
             },
-            sample_files
+            sample_files,
         )
 
         tracker = MetadataTracker(
@@ -257,7 +247,7 @@ class TestMetadataCleanup:
                 "enabled": True,
                 "cleanup_on_load": False,  # Disabled
                 "max_age_days": 30,
-            }
+            },
         )
 
         tracker.load()
@@ -273,7 +263,7 @@ class TestMetadataCleanup:
                 "test_0": 10,
                 "test_1": 40,
             },
-            sample_files
+            sample_files,
         )
 
         tracker = MetadataTracker(
@@ -284,7 +274,7 @@ class TestMetadataCleanup:
                 "cleanup_on_load": False,
                 "cleanup_on_save": True,
                 "max_age_days": 30,
-            }
+            },
         )
 
         tracker.load()
@@ -296,10 +286,7 @@ class TestMetadataCleanup:
         tracker.save()
 
         # Reload to verify cleanup happened
-        tracker2 = MetadataTracker(
-            metadata_file=temp_metadata_file,
-            hash_algorithm="md5"
-        )
+        tracker2 = MetadataTracker(metadata_file=temp_metadata_file, hash_algorithm="md5")
         tracker2.load()
 
         # Old entry should be gone
@@ -314,7 +301,7 @@ class TestMetadataCleanup:
                 "test_0": 10,
                 "test_1": 40,
             },
-            sample_files
+            sample_files,
         )
 
         tracker = MetadataTracker(
@@ -324,7 +311,7 @@ class TestMetadataCleanup:
                 "enabled": False,  # Disabled
                 "cleanup_on_load": True,
                 "max_age_days": 30,
-            }
+            },
         )
 
         tracker.load()
@@ -335,10 +322,7 @@ class TestMetadataCleanup:
         tracker.save()
 
         # Still should have both entries
-        tracker2 = MetadataTracker(
-            metadata_file=temp_metadata_file,
-            hash_algorithm="md5"
-        )
+        tracker2 = MetadataTracker(metadata_file=temp_metadata_file, hash_algorithm="md5")
         tracker2.load()
         assert len(tracker2._data) == 2
 
@@ -351,13 +335,10 @@ class TestMetadataCleanup:
                 "test_1": 15,
                 "test_2": 25,
             },
-            sample_files
+            sample_files,
         )
 
-        tracker = MetadataTracker(
-            metadata_file=temp_metadata_file,
-            hash_algorithm="md5"
-        )
+        tracker = MetadataTracker(metadata_file=temp_metadata_file, hash_algorithm="md5")
         tracker.load()
 
         # Cleanup with 10-day threshold
@@ -377,23 +358,17 @@ class TestMetadataCleanup:
                 "test_0": 10,
                 "test_1": 40,
             },
-            sample_files
+            sample_files,
         )
 
-        tracker = MetadataTracker(
-            metadata_file=temp_metadata_file,
-            hash_algorithm="md5"
-        )
+        tracker = MetadataTracker(metadata_file=temp_metadata_file, hash_algorithm="md5")
         tracker.load()
 
         # Perform cleanup
         tracker.cleanup_old_entries(max_age_days=30)
 
         # Load new tracker to verify persistence
-        tracker2 = MetadataTracker(
-            metadata_file=temp_metadata_file,
-            hash_algorithm="md5"
-        )
+        tracker2 = MetadataTracker(metadata_file=temp_metadata_file, hash_algorithm="md5")
         tracker2.load()
 
         # Should only have recent entry
@@ -402,10 +377,7 @@ class TestMetadataCleanup:
 
     def test_cleanup_empty_metadata(self, temp_metadata_file):
         """Test cleanup on empty metadata file."""
-        tracker = MetadataTracker(
-            metadata_file=temp_metadata_file,
-            hash_algorithm="md5"
-        )
+        tracker = MetadataTracker(metadata_file=temp_metadata_file, hash_algorithm="md5")
         tracker.load()
 
         removed = tracker.cleanup_old_entries(max_age_days=30)
@@ -423,13 +395,10 @@ class TestMetadataCleanup:
                 "test_1": 29,  # Just under threshold
                 "test_2": 31,  # Just over threshold
             },
-            sample_files
+            sample_files,
         )
 
-        tracker = MetadataTracker(
-            metadata_file=temp_metadata_file,
-            hash_algorithm="md5"
-        )
+        tracker = MetadataTracker(metadata_file=temp_metadata_file, hash_algorithm="md5")
         tracker.load()
 
         removed = tracker.cleanup_old_entries(max_age_days=30)

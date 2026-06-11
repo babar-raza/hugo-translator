@@ -7,6 +7,7 @@ Tests cover:
 3. Batch size bounds enforcement [1, 64]
 4. Thread count computation (<=physical cores)
 """
+
 import os
 from unittest.mock import MagicMock, patch
 
@@ -21,13 +22,9 @@ class TestCPUOptimizer:
         optimizer = CPUOptimizer()
 
         # Mock low-RAM system: 6GB total, 4GB available, 4 cores
-        with patch("psutil.cpu_count") as mock_cpu, patch(
-            "psutil.virtual_memory"
-        ) as mock_vm:
+        with patch("psutil.cpu_count") as mock_cpu, patch("psutil.virtual_memory") as mock_vm:
             mock_cpu.side_effect = lambda logical: 4 if not logical else 8
-            mock_vm.return_value = MagicMock(
-                total=6 * 1024**3, available=4 * 1024**3
-            )
+            mock_vm.return_value = MagicMock(total=6 * 1024**3, available=4 * 1024**3)
 
             config = optimizer.optimize()
 
@@ -49,13 +46,9 @@ class TestCPUOptimizer:
         optimizer = CPUOptimizer(memory_target_percent=0.7)
 
         # Mock high-RAM system: 16GB total, 12GB available, 8 cores
-        with patch("psutil.cpu_count") as mock_cpu, patch(
-            "psutil.virtual_memory"
-        ) as mock_vm:
+        with patch("psutil.cpu_count") as mock_cpu, patch("psutil.virtual_memory") as mock_vm:
             mock_cpu.side_effect = lambda logical: 8 if not logical else 16
-            mock_vm.return_value = MagicMock(
-                total=16 * 1024**3, available=12 * 1024**3
-            )
+            mock_vm.return_value = MagicMock(total=16 * 1024**3, available=12 * 1024**3)
 
             config = optimizer.optimize()
 
@@ -77,14 +70,10 @@ class TestCPUOptimizer:
         optimizer = CPUOptimizer()
 
         # Test lower bound: very low RAM
-        with patch("psutil.cpu_count") as mock_cpu, patch(
-            "psutil.virtual_memory"
-        ) as mock_vm:
+        with patch("psutil.cpu_count") as mock_cpu, patch("psutil.virtual_memory") as mock_vm:
             mock_cpu.side_effect = lambda logical: 2 if not logical else 4
             # 2GB total, 1GB available → too low for normal operation
-            mock_vm.return_value = MagicMock(
-                total=2 * 1024**3, available=1 * 1024**3
-            )
+            mock_vm.return_value = MagicMock(total=2 * 1024**3, available=1 * 1024**3)
 
             config = optimizer.optimize()
             assert config.batch_size >= CPUOptimizer.MIN_BATCH_SIZE
@@ -93,13 +82,9 @@ class TestCPUOptimizer:
         # Test upper bound: override with huge value
         optimizer_override = CPUOptimizer(batch_size_override=1000)
 
-        with patch("psutil.cpu_count") as mock_cpu, patch(
-            "psutil.virtual_memory"
-        ) as mock_vm:
+        with patch("psutil.cpu_count") as mock_cpu, patch("psutil.virtual_memory") as mock_vm:
             mock_cpu.side_effect = lambda logical: 8 if not logical else 16
-            mock_vm.return_value = MagicMock(
-                total=64 * 1024**3, available=32 * 1024**3
-            )
+            mock_vm.return_value = MagicMock(total=64 * 1024**3, available=32 * 1024**3)
 
             config = optimizer_override.optimize()
             assert config.batch_size <= CPUOptimizer.MAX_BATCH_SIZE
@@ -110,25 +95,17 @@ class TestCPUOptimizer:
         optimizer = CPUOptimizer()
 
         # Test with 4 cores: should use all 4
-        with patch("psutil.cpu_count") as mock_cpu, patch(
-            "psutil.virtual_memory"
-        ) as mock_vm:
+        with patch("psutil.cpu_count") as mock_cpu, patch("psutil.virtual_memory") as mock_vm:
             mock_cpu.side_effect = lambda logical: 4 if not logical else 8
-            mock_vm.return_value = MagicMock(
-                total=8 * 1024**3, available=6 * 1024**3
-            )
+            mock_vm.return_value = MagicMock(total=8 * 1024**3, available=6 * 1024**3)
 
             config = optimizer.optimize()
             assert config.num_threads == 4
 
         # Test with 16 cores: should reserve 1 → 15
-        with patch("psutil.cpu_count") as mock_cpu, patch(
-            "psutil.virtual_memory"
-        ) as mock_vm:
+        with patch("psutil.cpu_count") as mock_cpu, patch("psutil.virtual_memory") as mock_vm:
             mock_cpu.side_effect = lambda logical: 16 if not logical else 32
-            mock_vm.return_value = MagicMock(
-                total=32 * 1024**3, available=24 * 1024**3
-            )
+            mock_vm.return_value = MagicMock(total=32 * 1024**3, available=24 * 1024**3)
 
             config = optimizer.optimize()
             assert config.num_threads == 15
@@ -136,13 +113,9 @@ class TestCPUOptimizer:
         # Test thread override
         optimizer_override = CPUOptimizer(num_threads_override=6)
 
-        with patch("psutil.cpu_count") as mock_cpu, patch(
-            "psutil.virtual_memory"
-        ) as mock_vm:
+        with patch("psutil.cpu_count") as mock_cpu, patch("psutil.virtual_memory") as mock_vm:
             mock_cpu.side_effect = lambda logical: 8 if not logical else 16
-            mock_vm.return_value = MagicMock(
-                total=16 * 1024**3, available=12 * 1024**3
-            )
+            mock_vm.return_value = MagicMock(total=16 * 1024**3, available=12 * 1024**3)
 
             config = optimizer_override.optimize()
             assert config.num_threads == 6
@@ -150,13 +123,9 @@ class TestCPUOptimizer:
         # Test override clamped to physical cores
         optimizer_high = CPUOptimizer(num_threads_override=100)
 
-        with patch("psutil.cpu_count") as mock_cpu, patch(
-            "psutil.virtual_memory"
-        ) as mock_vm:
+        with patch("psutil.cpu_count") as mock_cpu, patch("psutil.virtual_memory") as mock_vm:
             mock_cpu.side_effect = lambda logical: 4 if not logical else 8
-            mock_vm.return_value = MagicMock(
-                total=8 * 1024**3, available=6 * 1024**3
-            )
+            mock_vm.return_value = MagicMock(total=8 * 1024**3, available=6 * 1024**3)
 
             config = optimizer_high.optimize()
             assert config.num_threads == 4  # Clamped to physical cores
@@ -165,13 +134,9 @@ class TestCPUOptimizer:
         """Test that environment variables are set correctly."""
         optimizer = CPUOptimizer()
 
-        with patch("psutil.cpu_count") as mock_cpu, patch(
-            "psutil.virtual_memory"
-        ) as mock_vm:
+        with patch("psutil.cpu_count") as mock_cpu, patch("psutil.virtual_memory") as mock_vm:
             mock_cpu.side_effect = lambda logical: 6 if not logical else 12
-            mock_vm.return_value = MagicMock(
-                total=12 * 1024**3, available=8 * 1024**3
-            )
+            mock_vm.return_value = MagicMock(total=12 * 1024**3, available=8 * 1024**3)
 
             config = optimizer.optimize()
 
@@ -189,14 +154,10 @@ class TestCPUOptimizer:
         """Test fallback when physical core count unavailable."""
         optimizer = CPUOptimizer()
 
-        with patch("psutil.cpu_count") as mock_cpu, patch(
-            "psutil.virtual_memory"
-        ) as mock_vm:
+        with patch("psutil.cpu_count") as mock_cpu, patch("psutil.virtual_memory") as mock_vm:
             # Simulate physical=None, logical=8
             mock_cpu.side_effect = lambda logical: 8 if logical else None
-            mock_vm.return_value = MagicMock(
-                total=8 * 1024**3, available=6 * 1024**3
-            )
+            mock_vm.return_value = MagicMock(total=8 * 1024**3, available=6 * 1024**3)
 
             config = optimizer.optimize()
 
@@ -235,13 +196,9 @@ class TestCPUOptimizer:
         """Test batch size override behavior."""
         optimizer = CPUOptimizer(batch_size_override=24)
 
-        with patch("psutil.cpu_count") as mock_cpu, patch(
-            "psutil.virtual_memory"
-        ) as mock_vm:
+        with patch("psutil.cpu_count") as mock_cpu, patch("psutil.virtual_memory") as mock_vm:
             mock_cpu.side_effect = lambda logical: 8 if not logical else 16
-            mock_vm.return_value = MagicMock(
-                total=16 * 1024**3, available=12 * 1024**3
-            )
+            mock_vm.return_value = MagicMock(total=16 * 1024**3, available=12 * 1024**3)
 
             config = optimizer.optimize()
             assert config.batch_size == 24  # Override should be used

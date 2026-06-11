@@ -1,6 +1,7 @@
 """
 Unit tests for Hardware Detection.
 """
+
 import pytest
 import torch
 
@@ -96,9 +97,7 @@ class TestHardwareDetector:
 
         # MPS should be consistent with torch
         expected_mps = (
-            torch.backends.mps.is_available()
-            if hasattr(torch.backends, "mps")
-            else False
+            torch.backends.mps.is_available() if hasattr(torch.backends, "mps") else False
         )
         assert info.has_mps == expected_mps
 
@@ -207,10 +206,7 @@ class TestHardwareDetector:
         recommendations = detector.get_recommendations(info)
 
         # Should have suggestion about using GPU
-        assert any(
-            "large model" in s.lower() or "GPU" in s
-            for s in recommendations["suggestions"]
-        )
+        assert any("large model" in s.lower() or "GPU" in s for s in recommendations["suggestions"])
 
     def test_get_recommendations_no_gpu(self):
         """Test recommendations without GPU."""
@@ -228,9 +224,7 @@ class TestHardwareDetector:
         recommendations = detector.get_recommendations(info)
 
         # Should have suggestion about CPU optimization
-        assert any(
-            "CTranslate2" in s or "CPU" in s for s in recommendations["suggestions"]
-        )
+        assert any("CTranslate2" in s or "CPU" in s for s in recommendations["suggestions"])
 
 
 class TestBenchmark:

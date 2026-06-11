@@ -6,6 +6,7 @@ Four cases:
   (c) invalid-language hit → returns False
   (d) short-text (<10 chars) → returns True (short-text exemption preserved)
 """
+
 from __future__ import annotations
 
 import logging

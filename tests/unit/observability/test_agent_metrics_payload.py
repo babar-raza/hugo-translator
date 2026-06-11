@@ -1,4 +1,5 @@
 """Tests for AgentMetricsPayload — exact 17 Google Sheet fields."""
+
 from __future__ import annotations
 
 import pytest

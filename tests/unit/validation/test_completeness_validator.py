@@ -144,9 +144,7 @@ class TestCompletenessValidator:
             "source_segments": ["Text with placeholders"],
             "translation_map": {0: "Texto con placeholders"},
         }
-        translation = (
-            "Texto {PLACEHOLDER_0} con {TERM_1} varios {SHORTCODE_2} marcadores"
-        )
+        translation = "Texto {PLACEHOLDER_0} con {TERM_1} varios {SHORTCODE_2} marcadores"
         result = self.validator.validate("Text with placeholders", translation, context)
 
         assert result.success is False
@@ -197,9 +195,7 @@ class TestCompletenessValidator:
                 2: "Tres",
             },  # 3 of 4 translated
         }
-        result = self.validator.validate(
-            "One Two Three Four", "Uno Dos Tres", context
-        )
+        result = self.validator.validate("One Two Three Four", "Uno Dos Tres", context)
 
         assert result.success is False
         assert result.error_count == 1  # 1 missing segment

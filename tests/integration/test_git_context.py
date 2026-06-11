@@ -3,6 +3,7 @@ Tests for git_context module (TEL-05-C).
 
 Tests git and environment context capture with mocked subprocess calls.
 """
+
 import subprocess
 from unittest.mock import MagicMock, patch
 

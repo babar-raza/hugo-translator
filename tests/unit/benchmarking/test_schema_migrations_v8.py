@@ -602,9 +602,7 @@ class TestMigrationValidation:
             # Analytics tables should still exist
             conn = manager._create_connection()
             try:
-                cursor = conn.execute(
-                    "SELECT name FROM sqlite_master WHERE type='table'"
-                )
+                cursor = conn.execute("SELECT name FROM sqlite_master WHERE type='table'")
                 tables = {row[0] for row in cursor.fetchall()}
                 assert "benchmark_trends" in tables
             finally:

@@ -1,4 +1,5 @@
 """Tests for env-var expansion at profile load time and in downstream consumers."""
+
 import os
 from unittest.mock import MagicMock, patch
 
@@ -37,6 +38,7 @@ class TestProfileLoadExpandvars:
         # Use a profile with a hardcoded path (or mock a fake one)
         with patch.object(config_service, "get_site_profile") as mock_gsp:
             from src.utils.models import SiteProfile
+
             mock_profile = MagicMock(spec=SiteProfile)
             mock_profile.content_roots = ["/content/blog"]
             mock_gsp.return_value = mock_profile
@@ -85,7 +87,6 @@ class TestFilePlacementValidatorExpandvars:
 
         # Should not emit "does not contain any defined content root" error/warning
         path_errors = [
-            i for i in result.issues
-            if "does not contain any defined content root" in i.message
+            i for i in result.issues if "does not contain any defined content root" in i.message
         ]
         assert path_errors == [], f"Unexpected path errors: {path_errors}"

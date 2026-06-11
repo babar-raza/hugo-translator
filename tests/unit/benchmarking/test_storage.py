@@ -122,9 +122,7 @@ class TestBenchmarkDatabase:
 
         # Verify tables exist
         conn = sqlite3.connect(str(temp_db))
-        cursor = conn.execute(
-            "SELECT name FROM sqlite_master WHERE type='table' ORDER BY name"
-        )
+        cursor = conn.execute("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name")
         tables = [row[0] for row in cursor.fetchall()]
         conn.close()
 
@@ -179,7 +177,9 @@ class TestBenchmarkDatabase:
         sample_throughputs = {r.throughput_tokens_per_sec for r in sample_run.results}
         assert retrieved_throughputs == sample_throughputs
 
-    def test_list_runs_filtering_pagination(self, temp_db, test_model, sample_run, sample_system_info):
+    def test_list_runs_filtering_pagination(
+        self, temp_db, test_model, sample_run, sample_system_info
+    ):
         """Test 3: Verify filtering and pagination of run listings."""
         db = BenchmarkDatabase(temp_db)
 
@@ -392,7 +392,9 @@ class TestBenchmarkDatabase:
         # Verify cascading deletion of system_info and results
         conn = sqlite3.connect(str(temp_db))
 
-        cursor = conn.execute("SELECT COUNT(*) FROM system_info WHERE run_id = ?", (sample_run.run_id,))
+        cursor = conn.execute(
+            "SELECT COUNT(*) FROM system_info WHERE run_id = ?", (sample_run.run_id,)
+        )
         assert cursor.fetchone()[0] == 0
 
         cursor = conn.execute(

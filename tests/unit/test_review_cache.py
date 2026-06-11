@@ -1,4 +1,5 @@
 """Tests for TC-05: File-level review cache."""
+
 from __future__ import annotations
 
 import json
@@ -134,6 +135,7 @@ class TestReviewCacheTTL:
     def test_expired_entry_returns_none(self, cache_path: Path):
         """Entry older than max_age_days is treated as a miss."""
         import time
+
         c = ReviewCache(cache_path=cache_path, max_age_days=1)
         c.put("old_key", decision="ACCEPT")
         # Manually backdate the entry
@@ -150,6 +152,7 @@ class TestReviewCacheTTL:
     def test_zero_max_age_disables_ttl(self, cache_path: Path):
         """max_age_days=0 means no expiration (TTL disabled)."""
         import time
+
         c = ReviewCache(cache_path=cache_path, max_age_days=0)
         c.put("k", decision="ACCEPT")
         with c._lock:
@@ -163,8 +166,8 @@ class TestReviewCacheEngineIntegration:
     def test_cache_hit_skips_validation(self):
         """On cache hit with ACCEPT, the validation suite must NOT be called."""
         # Simulate the engine's cache-check logic from engine.py lines 1540-1599
-        from unittest.mock import MagicMock
         import time
+        from unittest.mock import MagicMock
 
         cache = ReviewCache.__new__(ReviewCache)
         cache._lock = __import__("threading").Lock()

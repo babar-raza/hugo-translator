@@ -3,6 +3,7 @@ Contract test: CLI must fail (exit non-zero) when 0 files are discovered.
 
 This prevents silent no-op successes that can hide configuration errors.
 """
+
 import subprocess
 import sys
 import tempfile
@@ -28,12 +29,19 @@ def test_cli_exits_nonzero_on_empty_directory():
         # Run CLI on empty directory
         result = subprocess.run(
             [
-                sys.executable, "-m", "src.cli",
-                "--site", "e2e-reference-fixture",
-                "--input", str(empty_input),
-                "--output", str(empty_output),
-                "--target-langs", "fr",
-                "--log-level", "ERROR",
+                sys.executable,
+                "-m",
+                "src.cli",
+                "--site",
+                "e2e-reference-fixture",
+                "--input",
+                str(empty_input),
+                "--output",
+                str(empty_output),
+                "--target-langs",
+                "fr",
+                "--log-level",
+                "ERROR",
             ],
             capture_output=True,
             text=True,
@@ -67,12 +75,19 @@ def test_cli_exits_nonzero_on_nonexistent_input():
         # Run CLI with non-existent input
         result = subprocess.run(
             [
-                sys.executable, "-m", "src.cli",
-                "--site", "e2e-reference-fixture",
-                "--input", str(nonexistent_input),
-                "--output", str(empty_output),
-                "--target-langs", "fr",
-                "--log-level", "ERROR",
+                sys.executable,
+                "-m",
+                "src.cli",
+                "--site",
+                "e2e-reference-fixture",
+                "--input",
+                str(nonexistent_input),
+                "--output",
+                str(empty_output),
+                "--target-langs",
+                "fr",
+                "--log-level",
+                "ERROR",
             ],
             capture_output=True,
             text=True,
@@ -81,8 +96,7 @@ def test_cli_exits_nonzero_on_nonexistent_input():
 
         # Assert: CLI must return non-zero exit code
         assert result.returncode != 0, (
-            f"CLI must fail when input path doesn't exist. "
-            f"Got exit code {result.returncode}."
+            f"CLI must fail when input path doesn't exist. Got exit code {result.returncode}."
         )
 
 

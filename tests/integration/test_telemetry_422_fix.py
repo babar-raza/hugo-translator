@@ -17,6 +17,7 @@ Last Validation: Never
 These tests call the real telemetry API to ensure the fix works in production.
 Tests are skipped if TELEMETRY_API_URL is not configured.
 """
+
 import os
 
 import pytest
@@ -26,8 +27,8 @@ from src.translation_engine.models import TranslationStats
 
 # Skip all tests if telemetry API not configured
 pytestmark = pytest.mark.skipif(
-    not os.getenv('TELEMETRY_API_URL'),
-    reason="Telemetry API not configured - set TELEMETRY_API_URL to run"
+    not os.getenv("TELEMETRY_API_URL"),
+    reason="Telemetry API not configured - set TELEMETRY_API_URL to run",
 )
 
 
@@ -57,8 +58,7 @@ class TestTelemetry422Fix:
         # This should NOT raise 422 error
         try:
             with telemetry.track_translation_session(
-                job_type="test_none_duration",
-                trigger_type="integration_test"
+                job_type="test_none_duration", trigger_type="integration_test"
             ) as ctx:
                 telemetry.track_translation_stats(ctx, stats)
         except Exception as e:
@@ -78,18 +78,13 @@ class TestTelemetry422Fix:
 
         Ensures the fix doesn't break normal operation.
         """
-        stats = TranslationStats(
-            total_segments=100,
-            tm_hits=50,
-            duration_seconds=5.5
-        )
+        stats = TranslationStats(total_segments=100, tm_hits=50, duration_seconds=5.5)
 
         telemetry = TranslationTelemetry()
 
         try:
             with telemetry.track_translation_session(
-                job_type="test_valid_duration",
-                trigger_type="integration_test"
+                job_type="test_valid_duration", trigger_type="integration_test"
             ) as ctx:
                 telemetry.track_translation_stats(ctx, stats)
         except Exception as e:
@@ -107,18 +102,13 @@ class TestTelemetry422Fix:
 
         Distinguishes between None (fallback) and 0.0 (legitimate).
         """
-        stats = TranslationStats(
-            total_segments=100,
-            tm_hits=50,
-            duration_seconds=0.0
-        )
+        stats = TranslationStats(total_segments=100, tm_hits=50, duration_seconds=0.0)
 
         telemetry = TranslationTelemetry()
 
         try:
             with telemetry.track_translation_session(
-                job_type="test_zero_duration",
-                trigger_type="integration_test"
+                job_type="test_zero_duration", trigger_type="integration_test"
             ) as ctx:
                 telemetry.track_translation_stats(ctx, stats)
         except Exception as e:
@@ -143,8 +133,7 @@ class TestTelemetry422Fix:
 
         try:
             with telemetry.track_translation_session(
-                job_type="test_invalid_type",
-                trigger_type="integration_test"
+                job_type="test_invalid_type", trigger_type="integration_test"
             ) as ctx:
                 # Should handle gracefully, not raise 422
                 telemetry.track_translation_stats(ctx, stats)
@@ -168,8 +157,7 @@ class TestTelemetry422Fix:
 
         try:
             with telemetry.track_translation_session(
-                job_type="test_none_stats",
-                trigger_type="integration_test"
+                job_type="test_none_stats", trigger_type="integration_test"
             ) as ctx:
                 # Should handle gracefully
                 telemetry.track_translation_stats(ctx, stats)

@@ -1,4 +1,5 @@
 """Negative test cases and edge cases for ModelRecommender."""
+
 from datetime import UTC, datetime
 
 from src.benchmarking.feedback import RecommendationFeedback
@@ -18,8 +19,14 @@ def _make_system_info(cpu_cores=8, total_ram_gb=16.0):
     )
 
 
-def _make_feedback(recommendation_id, success=True, predicted_throughput=100.0,
-                   actual_throughput=95.0, predicted_memory_mb=1000.0, actual_memory_mb=1100.0):
+def _make_feedback(
+    recommendation_id,
+    success=True,
+    predicted_throughput=100.0,
+    actual_throughput=95.0,
+    predicted_memory_mb=1000.0,
+    actual_memory_mb=1100.0,
+):
     """Helper to create RecommendationFeedback with common defaults."""
     return RecommendationFeedback(
         feedback_id="feedback-001",
@@ -288,8 +295,9 @@ def test_confidence_score_always_in_range(temp_db):
 
     for _ in range(5):
         rec = recommender.recommend(system_info)
-        assert 0.0 <= rec.confidence_score <= 1.0, \
+        assert 0.0 <= rec.confidence_score <= 1.0, (
             f"Confidence {rec.confidence_score} outside valid range"
+        )
 
 
 def test_batch_size_always_positive(temp_db):
@@ -325,7 +333,7 @@ class TestOOMSafeBatchSize:
         recommender = ModelRecommender(temp_db)
 
         # Mock _detect_gpu_memory to return None (detection failed)
-        with patch.object(recommender, '_detect_gpu_memory', return_value=None):
+        with patch.object(recommender, "_detect_gpu_memory", return_value=None):
             result = recommender.get_oom_safe_batch_size("cuda:0")
 
         # Should use conservative fallback
@@ -347,9 +355,9 @@ class TestGPUMemoryDetection:
         recommender = ModelRecommender(temp_db)
 
         # Mock torch import to fail
-        with patch.dict('sys.modules', {'torch': None}):
+        with patch.dict("sys.modules", {"torch": None}):
             # Since torch is already imported, we need to mock the internal check
-            with patch.object(recommender, '_detect_gpu_memory') as mock_detect:
+            with patch.object(recommender, "_detect_gpu_memory") as mock_detect:
                 mock_detect.return_value = None
                 result = recommender._detect_gpu_memory("cuda:0")
                 assert result is None
@@ -363,8 +371,8 @@ class TestGPUMemoryDetection:
         mock_torch = MagicMock()
         mock_torch.cuda.is_available.return_value = False
 
-        with patch.dict('sys.modules', {'torch': mock_torch}):
-            with patch('src.benchmarking.recommender.torch', mock_torch, create=True):
+        with patch.dict("sys.modules", {"torch": mock_torch}):
+            with patch("src.benchmarking.recommender.torch", mock_torch, create=True):
                 # Need to call the actual implementation
                 result = recommender._detect_gpu_memory("cuda:0")
                 # When CUDA not available, should return None

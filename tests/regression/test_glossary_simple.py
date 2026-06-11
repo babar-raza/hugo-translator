@@ -3,6 +3,7 @@ Simple integration test for glossary corrections.
 
 Tests that glossary corrections work by directly injecting mistranslations.
 """
+
 import os
 import sys
 from pathlib import Path
@@ -35,7 +36,7 @@ def test_glossary_direct_application():
         default_source_lang="en",
         target_langs=["fr"],
         body=BodyRules(translate_markdown=True),
-        frontmatter={}
+        frontmatter={},
     )
 
     # Create reconstructor
@@ -78,33 +79,19 @@ Utilisez escanner de sécurité pour détecter les problèmes.
     print("=" * 80)
 
     # Verify corrections were applied
-    assert "métrage" not in corrected_markdown.lower(), (
-        "Found 'métrage' in corrected output"
-    )
-    assert "fusion" in corrected_markdown.lower(), (
-        "Did not find 'fusion' in corrected output"
-    )
+    assert "métrage" not in corrected_markdown.lower(), "Found 'métrage' in corrected output"
+    assert "fusion" in corrected_markdown.lower(), "Did not find 'fusion' in corrected output"
     print("[PASS] 'métrage' -> 'fusion' correction applied")
 
-    assert "textile" not in corrected_markdown.lower(), (
-        "Found 'textile' in corrected output"
-    )
-    assert "textuel" in corrected_markdown.lower(), (
-        "Did not find 'textuel' in corrected output"
-    )
+    assert "textile" not in corrected_markdown.lower(), "Found 'textile' in corrected output"
+    assert "textuel" in corrected_markdown.lower(), "Did not find 'textuel' in corrected output"
     print("[PASS] 'textile' -> 'textuel' correction applied")
 
-    assert "escanner" not in corrected_markdown.lower(), (
-        "Found 'escanner' in corrected output"
-    )
-    assert "analyser" in corrected_markdown.lower(), (
-        "Did not find 'analyser' in corrected output"
-    )
+    assert "escanner" not in corrected_markdown.lower(), "Found 'escanner' in corrected output"
+    assert "analyser" in corrected_markdown.lower(), "Did not find 'analyser' in corrected output"
     print("[PASS] 'escanner' -> 'analyser' correction applied")
 
-    assert len(corrections) == 3, (
-        f"Expected 3 corrections, got {len(corrections)}"
-    )
+    assert len(corrections) == 3, f"Expected 3 corrections, got {len(corrections)}"
     print(f"[PASS] Correct number of corrections: {len(corrections)}")
 
     print("\n" + "=" * 80)
@@ -126,6 +113,7 @@ if __name__ == "__main__":
     except (AssertionError, Exception) as e:
         print(f"\n[FAIL] Test FAILED: {e}\n")
         import traceback
+
         traceback.print_exc()
         raise
 

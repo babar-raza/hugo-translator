@@ -159,11 +159,7 @@ class TestHistogram:
 
     def test_histogram_custom_buckets(self):
         """Test histogram with custom buckets."""
-        hist = Histogram(
-            name="test",
-            help_text="Test",
-            buckets=[1.0, 5.0, 10.0]
-        )
+        hist = Histogram(name="test", help_text="Test", buckets=[1.0, 5.0, 10.0])
         hist.__post_init__()
 
         hist.observe(0.5)
@@ -276,9 +272,7 @@ class TestMetricsCollector:
         """Test Prometheus export with labels."""
         collector = MetricsCollector(worker_id="test")
         counter = collector.register_counter(
-            "requests_total",
-            "Total requests",
-            labels={"method": "GET", "status": "200"}
+            "requests_total", "Total requests", labels={"method": "GET", "status": "200"}
         )
         counter.increment(5.0)
 
@@ -391,9 +385,7 @@ class TestMetricsCollector:
         """Test histogram export in Prometheus format."""
         collector = MetricsCollector(worker_id="test")
         hist = collector.register_histogram(
-            "request_duration",
-            "Request duration",
-            labels={"worker_id": "test"}
+            "request_duration", "Request duration", labels={"worker_id": "test"}
         )
 
         hist.observe(0.05)
@@ -406,7 +398,7 @@ class TestMetricsCollector:
         assert "request_duration_bucket" in output
         assert "request_duration_sum" in output
         assert "request_duration_count" in output
-        assert 'le=' in output  # Bucket labels
+        assert "le=" in output  # Bucket labels
 
 
 class TestGlobalMetrics:
@@ -445,10 +437,12 @@ class TestMetricsWithLabels:
         collector.register_counter(
             "http_requests_total",
             "Total HTTP requests",
-            labels={"worker_id": "test", "method": "GET", "endpoint": "/api", "status": "200"}
+            labels={"worker_id": "test", "method": "GET", "endpoint": "/api", "status": "200"},
         )
 
-        collector.increment("http_requests_total", 5, {"method": "GET", "endpoint": "/api", "status": "200"})
+        collector.increment(
+            "http_requests_total", 5, {"method": "GET", "endpoint": "/api", "status": "200"}
+        )
 
         metrics = collector.get_all()
         assert any("http_requests_total" in k for k in metrics.keys())
@@ -462,9 +456,9 @@ class TestMetricsWithLabels:
         for _ in range(10):
             hist.observe(0.05)  # Fast
         for _ in range(5):
-            hist.observe(0.5)   # Medium
+            hist.observe(0.5)  # Medium
         for _ in range(2):
-            hist.observe(5.0)   # Slow
+            hist.observe(5.0)  # Slow
 
         stats = hist.get_stats()
         assert stats["count"] == 17

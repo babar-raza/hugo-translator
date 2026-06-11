@@ -3,14 +3,15 @@
 Evidence files are local-only and never posted to the Google Sheet.
 They preserve the full context of each metrics posting attempt.
 """
+
 from __future__ import annotations
 
 import hashlib
 import json
 import logging
-import os
 import threading
-from concurrent.futures import ThreadPoolExecutor, TimeoutError as FutureTimeoutError
+from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import TimeoutError as FutureTimeoutError
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -53,10 +54,13 @@ def compute_payload_hash(payload_dict: dict) -> str:
 class EvidenceWriter:
     """Manages evidence sidecars, posted markers, and JSONL ledger."""
 
-    def __init__(self, evidence_dir: str = "data/metrics/agent_evidence",
-                 ledger_file: str | None = None):
+    def __init__(
+        self, evidence_dir: str = "data/metrics/agent_evidence", ledger_file: str | None = None
+    ):
         self.evidence_dir = Path(evidence_dir)
-        self.ledger_file = Path(ledger_file) if ledger_file else self.evidence_dir / "metrics_ledger.jsonl"
+        self.ledger_file = (
+            Path(ledger_file) if ledger_file else self.evidence_dir / "metrics_ledger.jsonl"
+        )
         self._lock = threading.Lock()
 
     # ── Posted markers ──────────────────────────────────────────────
@@ -216,6 +220,12 @@ class EvidenceWriter:
         self.write_posted_marker(segment_run_id)
         self.append_ledger(segment_run_id, "post_confirmed", {"response_code": response_code})
 
-    def record_post_failure(self, segment_run_id: str, error: str, response_code: int | None = None) -> None:
-        self.update_sidecar_post_result(segment_run_id, "failed", response_code=response_code, error=error)
-        self.append_ledger(segment_run_id, "post_failed", {"error": error, "response_code": response_code})
+    def record_post_failure(
+        self, segment_run_id: str, error: str, response_code: int | None = None
+    ) -> None:
+        self.update_sidecar_post_result(
+            segment_run_id, "failed", response_code=response_code, error=error
+        )
+        self.append_ledger(
+            segment_run_id, "post_failed", {"error": error, "response_code": response_code}
+        )

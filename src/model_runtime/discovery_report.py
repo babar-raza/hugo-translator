@@ -4,13 +4,14 @@ Discovery run report manager.
 Persists evidence from each discovery run as JSON reports.
 Exports discovered models to registry YAML for ModelRegistry consumption.
 """
+
 from __future__ import annotations
 
 import json
 import logging
 import platform
 import uuid
-from dataclasses import asdict, dataclass, field
+from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -76,8 +77,7 @@ class DiscoveryReportManager:
         self._runs[run_id] = {
             "start_time": datetime.now(UTC),
             "scan_roots": [
-                r.to_dict() if hasattr(r, "to_dict") else {"path": str(r)}
-                for r in scan_roots
+                r.to_dict() if hasattr(r, "to_dict") else {"path": str(r)} for r in scan_roots
             ],
             "models": [],
             "errors": [],
@@ -92,10 +92,12 @@ class DiscoveryReportManager:
     def record_error(self, run_id: str, path: str, error: str) -> None:
         """Record an error in the run."""
         if run_id in self._runs:
-            self._runs[run_id]["errors"].append({
-                "path": path,
-                "error": error,
-            })
+            self._runs[run_id]["errors"].append(
+                {
+                    "path": path,
+                    "error": error,
+                }
+            )
 
     def finish_run(
         self,
@@ -137,7 +139,9 @@ class DiscoveryReportManager:
         if by_format.get("ollama", 0) > 0:
             recommendations.append("Ollama models available for LLM backend.")
         if by_format.get("gguf", 0) > 0:
-            recommendations.append("GGUF models found. Use with llama.cpp or Ollama for LLM translation.")
+            recommendations.append(
+                "GGUF models found. Use with llama.cpp or Ollama for LLM translation."
+            )
 
         system_info = {
             "platform": platform.platform(),
@@ -148,6 +152,7 @@ class DiscoveryReportManager:
         # Detect drives on Windows
         if platform.system() == "Windows":
             import string
+
             drives = []
             for letter in string.ascii_uppercase:
                 drive = Path(f"{letter}:/")
@@ -241,13 +246,15 @@ class DiscoveryReportManager:
                 with open(report_file, encoding="utf-8") as f:
                     data = json.load(f)
                 summary = data.get("summary", {})
-                reports.append({
-                    "run_id": data.get("run_id", ""),
-                    "timestamp": data.get("timestamp", ""),
-                    "models_found": summary.get("models_found", 0),
-                    "errors": len(data.get("errors", [])),
-                    "file": str(report_file),
-                })
+                reports.append(
+                    {
+                        "run_id": data.get("run_id", ""),
+                        "timestamp": data.get("timestamp", ""),
+                        "models_found": summary.get("models_found", 0),
+                        "errors": len(data.get("errors", [])),
+                        "file": str(report_file),
+                    }
+                )
             except (json.JSONDecodeError, OSError):
                 continue
 
@@ -277,7 +284,6 @@ class DiscoveryReportManager:
         Returns:
             Number of models written
         """
-        from .local_discovery import DiscoveredLocalModel
 
         exclude = exclude_existing or set()
         models_data: list[dict[str, Any]] = []

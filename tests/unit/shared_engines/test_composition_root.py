@@ -13,9 +13,21 @@ from unittest.mock import MagicMock, Mock, patch
 sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent / "src"))
 
 # Mock all external dependencies before importing modules
-for module in ['torch', 'transformers', 'lmdb', 'sentence_transformers', 'faiss',
-               'frontmatter', 'yaml', 'markdown', 'markdown_it', 'pydantic',
-               'redis', 'structlog', 'psutil']:
+for module in [
+    "torch",
+    "transformers",
+    "lmdb",
+    "sentence_transformers",
+    "faiss",
+    "frontmatter",
+    "yaml",
+    "markdown",
+    "markdown_it",
+    "pydantic",
+    "redis",
+    "structlog",
+    "psutil",
+]:
     sys.modules[module] = MagicMock()
 
 # Special handling for ruamel.yaml namespace package
@@ -23,10 +35,10 @@ ruamel_mock = MagicMock()
 ruamel_mock.yaml = MagicMock()
 ruamel_mock.yaml.comments = MagicMock()
 ruamel_mock.yaml.scalarstring = MagicMock()
-sys.modules['ruamel'] = ruamel_mock
-sys.modules['ruamel.yaml'] = ruamel_mock.yaml
-sys.modules['ruamel.yaml.comments'] = ruamel_mock.yaml.comments
-sys.modules['ruamel.yaml.scalarstring'] = ruamel_mock.yaml.scalarstring
+sys.modules["ruamel"] = ruamel_mock
+sys.modules["ruamel.yaml"] = ruamel_mock.yaml
+sys.modules["ruamel.yaml.comments"] = ruamel_mock.yaml.comments
+sys.modules["ruamel.yaml.scalarstring"] = ruamel_mock.yaml.scalarstring
 
 from src.shared_engines.composition_root import CompositionRoot, SharedEngines
 
@@ -34,14 +46,14 @@ from src.shared_engines.composition_root import CompositionRoot, SharedEngines
 class TestCompositionRoot(unittest.TestCase):
     """Test CompositionRoot factory."""
 
-    @patch('src.shared_engines.composition_root.MTBackend')
-    @patch('src.shared_engines.composition_root.HealingEngine')
-    @patch('src.shared_engines.composition_root.LimitingEngine')
-    @patch('src.shared_engines.composition_root.CommitEngine')
-    @patch('src.shared_engines.composition_root.JobEngine')
-    @patch('src.shared_engines.composition_root.TelemetryEngine')
-    @patch('src.shared_engines.composition_root.LoggingEngine')
-    @patch('src.shared_engines.composition_root.ProfileEngine')
+    @patch("src.shared_engines.composition_root.MTBackend")
+    @patch("src.shared_engines.composition_root.HealingEngine")
+    @patch("src.shared_engines.composition_root.LimitingEngine")
+    @patch("src.shared_engines.composition_root.CommitEngine")
+    @patch("src.shared_engines.composition_root.JobEngine")
+    @patch("src.shared_engines.composition_root.TelemetryEngine")
+    @patch("src.shared_engines.composition_root.LoggingEngine")
+    @patch("src.shared_engines.composition_root.ProfileEngine")
     def test_create_from_config_default(
         self,
         mock_profile,
@@ -51,12 +63,20 @@ class TestCompositionRoot(unittest.TestCase):
         mock_commit,
         mock_limiting,
         mock_healing,
-        mock_mt_backend
+        mock_mt_backend,
     ):
         """Test create_from_config() with default configuration."""
         # Mock engine instances
-        for mock in [mock_profile, mock_logging, mock_telemetry, mock_job,
-                     mock_commit, mock_limiting, mock_healing, mock_mt_backend]:
+        for mock in [
+            mock_profile,
+            mock_logging,
+            mock_telemetry,
+            mock_job,
+            mock_commit,
+            mock_limiting,
+            mock_healing,
+            mock_mt_backend,
+        ]:
             mock.return_value = Mock()
 
         engines = CompositionRoot.create_from_config({})
@@ -72,14 +92,14 @@ class TestCompositionRoot(unittest.TestCase):
         mock_healing.assert_called_once()
         mock_mt_backend.assert_called_once()
 
-    @patch('src.shared_engines.composition_root.MTBackend')
-    @patch('src.shared_engines.composition_root.HealingEngine')
-    @patch('src.shared_engines.composition_root.LimitingEngine')
-    @patch('src.shared_engines.composition_root.CommitEngine')
-    @patch('src.shared_engines.composition_root.JobEngine')
-    @patch('src.shared_engines.composition_root.TelemetryEngine')
-    @patch('src.shared_engines.composition_root.LoggingEngine')
-    @patch('src.shared_engines.composition_root.ProfileEngine')
+    @patch("src.shared_engines.composition_root.MTBackend")
+    @patch("src.shared_engines.composition_root.HealingEngine")
+    @patch("src.shared_engines.composition_root.LimitingEngine")
+    @patch("src.shared_engines.composition_root.CommitEngine")
+    @patch("src.shared_engines.composition_root.JobEngine")
+    @patch("src.shared_engines.composition_root.TelemetryEngine")
+    @patch("src.shared_engines.composition_root.LoggingEngine")
+    @patch("src.shared_engines.composition_root.ProfileEngine")
     def test_create_from_config_custom(
         self,
         mock_profile,
@@ -89,12 +109,20 @@ class TestCompositionRoot(unittest.TestCase):
         mock_commit,
         mock_limiting,
         mock_healing,
-        mock_mt_backend
+        mock_mt_backend,
     ):
         """Test create_from_config() with custom configuration."""
         # Mock engine instances
-        for mock in [mock_profile, mock_logging, mock_telemetry, mock_job,
-                     mock_commit, mock_limiting, mock_healing, mock_mt_backend]:
+        for mock in [
+            mock_profile,
+            mock_logging,
+            mock_telemetry,
+            mock_job,
+            mock_commit,
+            mock_limiting,
+            mock_healing,
+            mock_mt_backend,
+        ]:
             mock.return_value = Mock()
 
         config = {
@@ -102,7 +130,7 @@ class TestCompositionRoot(unittest.TestCase):
             "log_level": "DEBUG",
             "log_file": Path("logs/test.ndjson"),
             "job_backend": "memory",
-            "max_retries": 5
+            "max_retries": 5,
         }
 
         engines = CompositionRoot.create_from_config(config)
@@ -123,14 +151,14 @@ class TestCompositionRoot(unittest.TestCase):
         args = mock_healing.call_args
         self.assertEqual(args[1]["max_retries"], 5)
 
-    @patch('src.shared_engines.composition_root.MTBackend')
-    @patch('src.shared_engines.composition_root.HealingEngine')
-    @patch('src.shared_engines.composition_root.LimitingEngine')
-    @patch('src.shared_engines.composition_root.CommitEngine')
-    @patch('src.shared_engines.composition_root.JobEngine')
-    @patch('src.shared_engines.composition_root.TelemetryEngine')
-    @patch('src.shared_engines.composition_root.LoggingEngine')
-    @patch('src.shared_engines.composition_root.ProfileEngine')
+    @patch("src.shared_engines.composition_root.MTBackend")
+    @patch("src.shared_engines.composition_root.HealingEngine")
+    @patch("src.shared_engines.composition_root.LimitingEngine")
+    @patch("src.shared_engines.composition_root.CommitEngine")
+    @patch("src.shared_engines.composition_root.JobEngine")
+    @patch("src.shared_engines.composition_root.TelemetryEngine")
+    @patch("src.shared_engines.composition_root.LoggingEngine")
+    @patch("src.shared_engines.composition_root.ProfileEngine")
     def test_create_from_config_redis_backend(
         self,
         mock_profile,
@@ -140,19 +168,23 @@ class TestCompositionRoot(unittest.TestCase):
         mock_commit,
         mock_limiting,
         mock_healing,
-        mock_mt_backend
+        mock_mt_backend,
     ):
         """Test create_from_config() with Redis job backend."""
         # Mock engine instances
-        for mock in [mock_profile, mock_logging, mock_telemetry, mock_job,
-                     mock_commit, mock_limiting, mock_healing, mock_mt_backend]:
+        for mock in [
+            mock_profile,
+            mock_logging,
+            mock_telemetry,
+            mock_job,
+            mock_commit,
+            mock_limiting,
+            mock_healing,
+            mock_mt_backend,
+        ]:
             mock.return_value = Mock()
 
-        config = {
-            "job_backend": "redis",
-            "redis_host": "redis.example.com",
-            "redis_port": 6380
-        }
+        config = {"job_backend": "redis", "redis_host": "redis.example.com", "redis_port": 6380}
 
         engines = CompositionRoot.create_from_config(config)
 
@@ -163,14 +195,14 @@ class TestCompositionRoot(unittest.TestCase):
         self.assertEqual(args[1]["config"]["redis_host"], "redis.example.com")
         self.assertEqual(args[1]["config"]["redis_port"], 6380)
 
-    @patch('src.shared_engines.composition_root.LLMBackend')
-    @patch('src.shared_engines.composition_root.HealingEngine')
-    @patch('src.shared_engines.composition_root.LimitingEngine')
-    @patch('src.shared_engines.composition_root.CommitEngine')
-    @patch('src.shared_engines.composition_root.JobEngine')
-    @patch('src.shared_engines.composition_root.TelemetryEngine')
-    @patch('src.shared_engines.composition_root.LoggingEngine')
-    @patch('src.shared_engines.composition_root.ProfileEngine')
+    @patch("src.shared_engines.composition_root.LLMBackend")
+    @patch("src.shared_engines.composition_root.HealingEngine")
+    @patch("src.shared_engines.composition_root.LimitingEngine")
+    @patch("src.shared_engines.composition_root.CommitEngine")
+    @patch("src.shared_engines.composition_root.JobEngine")
+    @patch("src.shared_engines.composition_root.TelemetryEngine")
+    @patch("src.shared_engines.composition_root.LoggingEngine")
+    @patch("src.shared_engines.composition_root.ProfileEngine")
     def test_create_from_config_llm_backend(
         self,
         mock_profile,
@@ -180,19 +212,23 @@ class TestCompositionRoot(unittest.TestCase):
         mock_commit,
         mock_limiting,
         mock_healing,
-        mock_llm_backend
+        mock_llm_backend,
     ):
         """Test create_from_config() with LLM translation backend."""
         # Mock engine instances
-        for mock in [mock_profile, mock_logging, mock_telemetry, mock_job,
-                     mock_commit, mock_limiting, mock_healing, mock_llm_backend]:
+        for mock in [
+            mock_profile,
+            mock_logging,
+            mock_telemetry,
+            mock_job,
+            mock_commit,
+            mock_limiting,
+            mock_healing,
+            mock_llm_backend,
+        ]:
             mock.return_value = Mock()
 
-        config = {
-            "translation_backend": "llm",
-            "model_id": "gpt-4",
-            "api_key": "test-key"
-        }
+        config = {"translation_backend": "llm", "model_id": "gpt-4", "api_key": "test-key"}
 
         engines = CompositionRoot.create_from_config(config)
 
@@ -202,14 +238,14 @@ class TestCompositionRoot(unittest.TestCase):
         self.assertEqual(args[1]["model_id"], "gpt-4")
         self.assertEqual(args[1]["api_key"], "test-key")
 
-    @patch('src.shared_engines.composition_root.MTBackend')
-    @patch('src.shared_engines.composition_root.HealingEngine')
-    @patch('src.shared_engines.composition_root.LimitingEngine')
-    @patch('src.shared_engines.composition_root.CommitEngine')
-    @patch('src.shared_engines.composition_root.JobEngine')
-    @patch('src.shared_engines.composition_root.TelemetryEngine')
-    @patch('src.shared_engines.composition_root.LoggingEngine')
-    @patch('src.shared_engines.composition_root.ProfileEngine')
+    @patch("src.shared_engines.composition_root.MTBackend")
+    @patch("src.shared_engines.composition_root.HealingEngine")
+    @patch("src.shared_engines.composition_root.LimitingEngine")
+    @patch("src.shared_engines.composition_root.CommitEngine")
+    @patch("src.shared_engines.composition_root.JobEngine")
+    @patch("src.shared_engines.composition_root.TelemetryEngine")
+    @patch("src.shared_engines.composition_root.LoggingEngine")
+    @patch("src.shared_engines.composition_root.ProfileEngine")
     def test_create_from_config_invalid_backend(
         self,
         mock_profile,
@@ -219,12 +255,20 @@ class TestCompositionRoot(unittest.TestCase):
         mock_commit,
         mock_limiting,
         mock_healing,
-        mock_mt_backend
+        mock_mt_backend,
     ):
         """Test create_from_config() with invalid translation backend."""
         # Mock engine instances
-        for mock in [mock_profile, mock_logging, mock_telemetry, mock_job,
-                     mock_commit, mock_limiting, mock_healing, mock_mt_backend]:
+        for mock in [
+            mock_profile,
+            mock_logging,
+            mock_telemetry,
+            mock_job,
+            mock_commit,
+            mock_limiting,
+            mock_healing,
+            mock_mt_backend,
+        ]:
             mock.return_value = Mock()
 
         config = {"translation_backend": "invalid"}
@@ -235,14 +279,14 @@ class TestCompositionRoot(unittest.TestCase):
         self.assertIn("Invalid translation_backend", str(ctx.exception))
         self.assertIn("invalid", str(ctx.exception))
 
-    @patch('src.shared_engines.composition_root.MTBackend')
-    @patch('src.shared_engines.composition_root.HealingEngine')
-    @patch('src.shared_engines.composition_root.LimitingEngine')
-    @patch('src.shared_engines.composition_root.CommitEngine')
-    @patch('src.shared_engines.composition_root.JobEngine')
-    @patch('src.shared_engines.composition_root.TelemetryEngine')
-    @patch('src.shared_engines.composition_root.LoggingEngine')
-    @patch('src.shared_engines.composition_root.ProfileEngine')
+    @patch("src.shared_engines.composition_root.MTBackend")
+    @patch("src.shared_engines.composition_root.HealingEngine")
+    @patch("src.shared_engines.composition_root.LimitingEngine")
+    @patch("src.shared_engines.composition_root.CommitEngine")
+    @patch("src.shared_engines.composition_root.JobEngine")
+    @patch("src.shared_engines.composition_root.TelemetryEngine")
+    @patch("src.shared_engines.composition_root.LoggingEngine")
+    @patch("src.shared_engines.composition_root.ProfileEngine")
     def test_create_default(
         self,
         mock_profile,
@@ -252,12 +296,20 @@ class TestCompositionRoot(unittest.TestCase):
         mock_commit,
         mock_limiting,
         mock_healing,
-        mock_mt_backend
+        mock_mt_backend,
     ):
         """Test create_default() creates engines with defaults."""
         # Mock engine instances
-        for mock in [mock_profile, mock_logging, mock_telemetry, mock_job,
-                     mock_commit, mock_limiting, mock_healing, mock_mt_backend]:
+        for mock in [
+            mock_profile,
+            mock_logging,
+            mock_telemetry,
+            mock_job,
+            mock_commit,
+            mock_limiting,
+            mock_healing,
+            mock_mt_backend,
+        ]:
             mock.return_value = Mock()
 
         engines = CompositionRoot.create_default()
@@ -267,14 +319,14 @@ class TestCompositionRoot(unittest.TestCase):
         mock_profile.assert_called_once()
         mock_logging.assert_called_once()
 
-    @patch('src.shared_engines.composition_root.MTBackend')
-    @patch('src.shared_engines.composition_root.HealingEngine')
-    @patch('src.shared_engines.composition_root.LimitingEngine')
-    @patch('src.shared_engines.composition_root.CommitEngine')
-    @patch('src.shared_engines.composition_root.JobEngine')
-    @patch('src.shared_engines.composition_root.TelemetryEngine')
-    @patch('src.shared_engines.composition_root.LoggingEngine')
-    @patch('src.shared_engines.composition_root.ProfileEngine')
+    @patch("src.shared_engines.composition_root.MTBackend")
+    @patch("src.shared_engines.composition_root.HealingEngine")
+    @patch("src.shared_engines.composition_root.LimitingEngine")
+    @patch("src.shared_engines.composition_root.CommitEngine")
+    @patch("src.shared_engines.composition_root.JobEngine")
+    @patch("src.shared_engines.composition_root.TelemetryEngine")
+    @patch("src.shared_engines.composition_root.LoggingEngine")
+    @patch("src.shared_engines.composition_root.ProfileEngine")
     def test_create_for_testing(
         self,
         mock_profile,
@@ -284,12 +336,20 @@ class TestCompositionRoot(unittest.TestCase):
         mock_commit,
         mock_limiting,
         mock_healing,
-        mock_mt_backend
+        mock_mt_backend,
     ):
         """Test create_for_testing() creates engines optimized for tests."""
         # Mock engine instances
-        for mock in [mock_profile, mock_logging, mock_telemetry, mock_job,
-                     mock_commit, mock_limiting, mock_healing, mock_mt_backend]:
+        for mock in [
+            mock_profile,
+            mock_logging,
+            mock_telemetry,
+            mock_job,
+            mock_commit,
+            mock_limiting,
+            mock_healing,
+            mock_mt_backend,
+        ]:
             mock.return_value = Mock()
 
         engines = CompositionRoot.create_for_testing()
@@ -326,7 +386,7 @@ class TestSharedEngines(unittest.TestCase):
             "commit": Mock(),
             "limiting": Mock(),
             "healing": Mock(),
-            "translation": Mock()
+            "translation": Mock(),
         }
 
         engines = SharedEngines(**mock_engines)
@@ -334,8 +394,16 @@ class TestSharedEngines(unittest.TestCase):
         repr_str = repr(engines)
         self.assertIn("SharedEngines", repr_str)
         # Should contain all engine types
-        for engine_type in ["profile", "logging", "telemetry", "job",
-                            "commit", "limiting", "healing", "translation"]:
+        for engine_type in [
+            "profile",
+            "logging",
+            "telemetry",
+            "job",
+            "commit",
+            "limiting",
+            "healing",
+            "translation",
+        ]:
             # Check that Mock appears in repr (class name of mock objects)
             self.assertIn("Mock", repr_str)
 

@@ -59,7 +59,7 @@ def tracker(progress_dir, sample_files):
         site_id="test-site",
         source_dir=sample_files[0].parent,
         output_dir=Path("/output"),
-        target_langs=["es", "de", "fr"]
+        target_langs=["es", "de", "fr"],
     )
     tracker.initialize(sample_files)
     return tracker
@@ -159,17 +159,14 @@ def test_progress_persists_across_instances(progress_dir, sample_files):
         site_id="persist-test",
         source_dir=sample_files[0].parent,
         output_dir=Path("/output"),
-        target_langs=["es", "de"]
+        target_langs=["es", "de"],
     )
     tracker1.initialize(sample_files)
     tracker1.mark_completed(sample_files[0], "es")
     tracker1.mark_completed(sample_files[1], "de")
 
     # Simulate crash - create new tracker via find_latest
-    tracker2 = ProgressTracker.find_latest(
-        progress_dir=progress_dir,
-        site_id="persist-test"
-    )
+    tracker2 = ProgressTracker.find_latest(progress_dir=progress_dir, site_id="persist-test")
 
     assert tracker2 is not None, "Should find existing progress"
 
@@ -322,9 +319,9 @@ def test_statistics_reflect_completion_state(tracker, sample_files):
 
     stats = tracker.get_statistics()
 
-    assert stats['translations_completed'] == 2
-    assert stats['total_files'] == 3
-    assert stats['translations_pending'] == 7  # 9 - 2
+    assert stats["translations_completed"] == 2
+    assert stats["total_files"] == 3
+    assert stats["translations_pending"] == 7  # 9 - 2
 
 
 # ==============================================================================

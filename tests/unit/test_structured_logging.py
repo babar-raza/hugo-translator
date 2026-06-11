@@ -31,6 +31,7 @@ def reset_logger():
     """Reset global logger state between tests."""
     # Reset global logger instance
     import src.observability.logger as logger_module
+
     logger_module._global_logger = None
 
     # Reset context vars
@@ -39,7 +40,7 @@ def reset_logger():
     worker_id_var.set(None)
 
     # Clear all logging handlers to prevent mock contamination
-    for logger_name in ['hugo_translator.ndjson', 'translation_system', '']:
+    for logger_name in ["hugo_translator.ndjson", "translation_system", ""]:
         logger = logging.getLogger(logger_name)
         logger.handlers.clear()
         logger.filters.clear()
@@ -50,7 +51,7 @@ def reset_logger():
     logger_module._global_logger = None
 
     # Clear all logging handlers again
-    for logger_name in ['hugo_translator.ndjson', 'translation_system', '']:
+    for logger_name in ["hugo_translator.ndjson", "translation_system", ""]:
         logger = logging.getLogger(logger_name)
         logger.handlers.clear()
         logger.filters.clear()
@@ -85,9 +86,7 @@ class TestDualOutputProcessor:
         log_file = tmp_path / "test.ndjson"
 
         # Create processor with valid directory
-        processor = DualOutputProcessor(
-            log_file=log_file, max_bytes=1024, backup_count=3
-        )
+        processor = DualOutputProcessor(log_file=log_file, max_bytes=1024, backup_count=3)
 
         # Create a mock event dict
         event_dict = {
@@ -97,7 +96,9 @@ class TestDualOutputProcessor:
         }
 
         # Use patch to mock the file logger - this ensures cleanup
-        with patch.object(processor.file_logger, 'log', side_effect=OSError("Disk full")) as mock_log:
+        with patch.object(
+            processor.file_logger, "log", side_effect=OSError("Disk full")
+        ) as mock_log:
             # Should not raise exception - errors are caught and logged to stderr
             result = processor(None, "info", event_dict)
 
@@ -112,9 +113,7 @@ class TestDualOutputProcessor:
         log_file = tmp_path / "test.ndjson"
         log_file.parent.mkdir(parents=True, exist_ok=True)
 
-        processor = DualOutputProcessor(
-            log_file=log_file, max_bytes=1024, backup_count=3
-        )
+        processor = DualOutputProcessor(log_file=log_file, max_bytes=1024, backup_count=3)
 
         # Mock the JSON renderer to raise an exception
         processor.json_renderer = Mock(side_effect=ValueError("Invalid JSON"))
@@ -164,9 +163,7 @@ class TestLogContext:
 
     def test_job_and_worker_id_tracking(self):
         """Test that job_id and worker_id are tracked."""
-        with LogContext(
-            correlation_id="corr-123", job_id="job-456", worker_id="worker-1"
-        ):
+        with LogContext(correlation_id="corr-123", job_id="job-456", worker_id="worker-1"):
             assert correlation_id_var.get() == "corr-123"
             assert job_id_var.get() == "job-456"
             assert worker_id_var.get() == "worker-1"
@@ -206,9 +203,7 @@ class TestStructuredLogger:
     def test_basic_logging_methods(self, tmp_path):
         """Test basic logging methods (info, debug, warning, error)."""
         log_file = tmp_path / "test.ndjson"
-        setup_structured_logging(
-            log_level="DEBUG", log_file=log_file, console_output=False
-        )
+        setup_structured_logging(log_level="DEBUG", log_file=log_file, console_output=False)
 
         logger = get_logger("test")
 
@@ -229,9 +224,7 @@ class TestStructuredLogger:
     def test_correlation_ids_in_logs(self, tmp_path):
         """Test that correlation IDs appear in log output."""
         log_file = tmp_path / "test.ndjson"
-        setup_structured_logging(
-            log_level="DEBUG", log_file=log_file, console_output=False
-        )
+        setup_structured_logging(log_level="DEBUG", log_file=log_file, console_output=False)
 
         logger = get_logger("test")
 
@@ -245,9 +238,7 @@ class TestStructuredLogger:
     def test_error_logging_with_exception(self, tmp_path):
         """Test error logging includes exception details."""
         log_file = tmp_path / "test.ndjson"
-        setup_structured_logging(
-            log_level="DEBUG", log_file=log_file, console_output=False
-        )
+        setup_structured_logging(log_level="DEBUG", log_file=log_file, console_output=False)
 
         logger = get_logger("test")
 
@@ -268,9 +259,7 @@ class TestSetupStructuredLogging:
     def test_file_only_output(self, tmp_path):
         """Test file-only output (no console)."""
         log_file = tmp_path / "file-only.ndjson"
-        setup_structured_logging(
-            log_level="INFO", log_file=log_file, console_output=False
-        )
+        setup_structured_logging(log_level="INFO", log_file=log_file, console_output=False)
 
         logger = get_logger("test")
         logger.log_info("test_message", value=123)
@@ -296,9 +285,7 @@ class TestSetupStructuredLogging:
     def test_dual_output(self, tmp_path, capsys):
         """Test dual output (both console and file)."""
         log_file = tmp_path / "dual.ndjson"
-        setup_structured_logging(
-            log_level="INFO", log_file=log_file, console_output=True
-        )
+        setup_structured_logging(log_level="INFO", log_file=log_file, console_output=True)
 
         logger = get_logger("test")
         logger.log_info("dual_test", key="value")
@@ -319,9 +306,7 @@ class TestSetupStructuredLogging:
         log_file = tmp_path / "nested" / "dirs" / "test.ndjson"
         assert not log_file.parent.exists()
 
-        setup_structured_logging(
-            log_level="INFO", log_file=log_file, console_output=False
-        )
+        setup_structured_logging(log_level="INFO", log_file=log_file, console_output=False)
 
         logger = get_logger("test")
         logger.log_info("test")
@@ -383,9 +368,7 @@ class TestNDJSONFormat:
         import json
 
         log_file = tmp_path / "ndjson.ndjson"
-        setup_structured_logging(
-            log_level="DEBUG", log_file=log_file, console_output=False
-        )
+        setup_structured_logging(log_level="DEBUG", log_file=log_file, console_output=False)
 
         logger = get_logger("test")
         logger.log_info("event1", value=1)
@@ -408,9 +391,7 @@ class TestNDJSONFormat:
         import json
 
         log_file = tmp_path / "fields.ndjson"
-        setup_structured_logging(
-            log_level="DEBUG", log_file=log_file, console_output=False
-        )
+        setup_structured_logging(log_level="DEBUG", log_file=log_file, console_output=False)
 
         logger = get_logger("test")
 
@@ -437,9 +418,7 @@ class TestRobustness:
     def test_continues_after_file_error(self, tmp_path):
         """Test that system continues working even if file logging fails."""
         log_file = tmp_path / "test.ndjson"
-        setup_structured_logging(
-            log_level="DEBUG", log_file=log_file, console_output=False
-        )
+        setup_structured_logging(log_level="DEBUG", log_file=log_file, console_output=False)
 
         logger = get_logger("test")
 
@@ -457,9 +436,7 @@ class TestRobustness:
     def test_handles_non_serializable_data(self, tmp_path):
         """Test handling of non-JSON-serializable data."""
         log_file = tmp_path / "test.ndjson"
-        setup_structured_logging(
-            log_level="DEBUG", log_file=log_file, console_output=False
-        )
+        setup_structured_logging(log_level="DEBUG", log_file=log_file, console_output=False)
 
         logger = get_logger("test")
 

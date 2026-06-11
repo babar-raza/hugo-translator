@@ -1,6 +1,7 @@
 """
 Unit tests for TextUnit and BodyTranslationPlan data models (HP-06 TC-01).
 """
+
 import pytest
 
 from src.translation_engine.extractor.text_unit import (
@@ -581,9 +582,7 @@ class TestIntegration:
                 suffix_ws=" ",
             ),
             TextUnit(
-                unit_id=TextUnit.create_id(
-                    "p1.s1.t1", "Visual Studio", TextUnitKind.TEXT
-                ),
+                unit_id=TextUnit.create_id("p1.s1.t1", "Visual Studio", TextUnitKind.TEXT),
                 node_addr="p1.s1.t1",
                 kind=TextUnitKind.TEXT,
                 source_text="Visual Studio",

@@ -1,4 +1,5 @@
 """Unit tests for diagnose_lock() function."""
+
 import json
 import os
 import time
@@ -34,7 +35,7 @@ def test_diagnose_no_lock(capture_stdout, tmp_path, monkeypatch):
     def mock_get_lock_path(site_id):
         return tmp_path / f"{site_id}.lock"
 
-    monkeypatch.setattr('src.utils.file_lock.get_site_lock_path', mock_get_lock_path)
+    monkeypatch.setattr("src.utils.file_lock.get_site_lock_path", mock_get_lock_path)
 
     output = capture_stdout(diagnose_lock, "test.example.net")
 
@@ -47,17 +48,17 @@ def test_diagnose_dead_pid(capture_stdout, tmp_path, monkeypatch):
 
     lock_file = tmp_path / "test.example.net.lock"
     metadata = {
-        'pid': 999999,
-        'hostname': 'test-host',
-        'created': '2025-01-01T00:00:00',
-        'format_version': '1.0'
+        "pid": 999999,
+        "hostname": "test-host",
+        "created": "2025-01-01T00:00:00",
+        "format_version": "1.0",
     }
     lock_file.write_text(json.dumps(metadata))
 
     def mock_get_lock_path(site_id):
         return tmp_path / f"{site_id}.lock"
 
-    monkeypatch.setattr('src.utils.file_lock.get_site_lock_path', mock_get_lock_path)
+    monkeypatch.setattr("src.utils.file_lock.get_site_lock_path", mock_get_lock_path)
 
     output = capture_stdout(diagnose_lock, "test.example.net")
 
@@ -71,17 +72,17 @@ def test_diagnose_live_pid(capture_stdout, tmp_path, monkeypatch):
     """Test diagnose_lock with live PID."""
     lock_file = tmp_path / "test.example.net.lock"
     metadata = {
-        'pid': os.getpid(),
-        'hostname': 'test-host',
-        'created': '2025-01-01T00:00:00',
-        'format_version': '1.0'
+        "pid": os.getpid(),
+        "hostname": "test-host",
+        "created": "2025-01-01T00:00:00",
+        "format_version": "1.0",
     }
     lock_file.write_text(json.dumps(metadata))
 
     def mock_get_lock_path(site_id):
         return tmp_path / f"{site_id}.lock"
 
-    monkeypatch.setattr('src.utils.file_lock.get_site_lock_path', mock_get_lock_path)
+    monkeypatch.setattr("src.utils.file_lock.get_site_lock_path", mock_get_lock_path)
 
     output = capture_stdout(diagnose_lock, "test.example.net")
 
@@ -103,10 +104,10 @@ def test_diagnose_permission_error(capture_stdout, tmp_path, monkeypatch):
     def mock_get_lock_path(site_id):
         return tmp_path / f"{site_id}.lock"
 
-    monkeypatch.setattr('src.utils.file_lock.get_site_lock_path', mock_get_lock_path)
+    monkeypatch.setattr("src.utils.file_lock.get_site_lock_path", mock_get_lock_path)
 
     # Mock open to raise PermissionError
-    with patch('builtins.open', side_effect=PermissionError("Access denied")):
+    with patch("builtins.open", side_effect=PermissionError("Access denied")):
         output = capture_stdout(diagnose_lock, "test.example.net")
 
     assert "PermissionError" in output or "Cannot read" in output

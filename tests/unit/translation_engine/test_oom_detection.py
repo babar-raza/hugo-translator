@@ -4,6 +4,7 @@ Unit tests for OOM error detection in TranslationEngine.
 OOM-01: Tests for _is_oom_error() method to ensure correct pattern matching
 and debug logging for troubleshooting.
 """
+
 import logging
 from unittest.mock import Mock, patch
 
@@ -40,11 +41,12 @@ class TestOOMDetection:
         mock_tm = Mock()
         mock_loader = Mock()
 
-        with patch('src.translation_engine.engine.HugoParser'), \
-             patch('src.translation_engine.engine.SegmentExtractor'), \
-             patch('src.translation_engine.engine.ValidationSuite'), \
-             patch('src.translation_engine.engine.MarkdownReconstructor'):
-
+        with (
+            patch("src.translation_engine.engine.HugoParser"),
+            patch("src.translation_engine.engine.SegmentExtractor"),
+            patch("src.translation_engine.engine.ValidationSuite"),
+            patch("src.translation_engine.engine.MarkdownReconstructor"),
+        ):
             engine = TranslationEngine(
                 config_service=mock_config,
                 tm=mock_tm,
