@@ -8,11 +8,14 @@ on:
       - 'tests/**'
       - 'scripts/**'
       - 'config/**'
+      - 'requirements/**'
+      - '.github/workflows/release_gate.yml'
   push:
     branches: [main]
     paths:
       - 'src/**'
       - 'tests/**'
+      - 'requirements/**'
   workflow_dispatch:
     # Allow manual trigger
 
@@ -33,6 +36,11 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: '3.10'
+          cache: 'pip'
+          cache-dependency-path: |
+            requirements/base.txt
+            requirements/cpu.txt
+            requirements/dev.txt
 
       - name: Install dependencies
         run: |
@@ -77,6 +85,11 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: '3.10'
+          cache: 'pip'
+          cache-dependency-path: |
+            requirements/base.txt
+            requirements/cpu.txt
+            requirements/dev.txt
 
       - name: Install dependencies
         run: |
@@ -125,6 +138,11 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: '3.10'
+          cache: 'pip'
+          cache-dependency-path: |
+            requirements/base.txt
+            requirements/cpu.txt
+            requirements/dev.txt
 
       - name: Install dependencies
         run: |
@@ -151,23 +169,110 @@ jobs:
           path: reports/audit/audit-ci.json
           if-no-files-found: ignore
 
+  security-scan:
+    name: Security Scan
+    runs-on: windows-latest
+    needs: unit-tests
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+          cache: 'pip'
+          cache-dependency-path: |
+            requirements/base.txt
+            requirements/cpu.txt
+            requirements/dev.txt
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements/cpu.txt
+          pip install -r requirements/dev.txt
+        shell: pwsh
+
+      - name: Run Bandit SAST scan
+        run: |
+          New-Item -ItemType Directory -Force -Path reports | Out-Null
+          python -m bandit -r src/ -f json -o reports/bandit.json --exit-zero
+          Write-Host "Bandit scan complete (non-blocking)"
+        shell: pwsh
+
+      - name: Run pip-audit dependency scan
+        run: |
+          python -m pip_audit -r requirements/base.txt --format json -o reports/pip-audit.json --exit-zero
+          Write-Host "pip-audit scan complete (non-blocking)"
+        shell: pwsh
+
+      - name: Upload Security Reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: security-reports
+          path: reports/
+          if-no-files-found: ignore
+
+      - name: Security Summary (advisory)
+        if: always()
+        run: |
+          Write-Host ""
+          Write-Host ("=" * 60)
+          Write-Host "SECURITY SCAN SUMMARY (advisory - non-blocking)"
+          Write-Host ("=" * 60)
+          if (Test-Path reports/bandit.json) {
+            $bandit = Get-Content reports/bandit.json | ConvertFrom-Json
+            $count = $bandit.results.Count
+            $high   = ($bandit.results | Where-Object { $_.issue_severity -eq "HIGH" }).Count
+            $medium = ($bandit.results | Where-Object { $_.issue_severity -eq "MEDIUM" }).Count
+            $low    = ($bandit.results | Where-Object { $_.issue_severity -eq "LOW" }).Count
+            Write-Host "Bandit SAST: $count findings (HIGH=$high MEDIUM=$medium LOW=$low)"
+            foreach ($r in ($bandit.results | Where-Object { $_.issue_severity -in @("HIGH","MEDIUM") })) {
+              Write-Host "  [$($r.issue_severity)] $($r.issue_text) @ $($r.filename):$($r.line_number)"
+            }
+          } else {
+            Write-Host "Bandit: report not found"
+          }
+          if (Test-Path reports/pip-audit.json) {
+            $audit = Get-Content reports/pip-audit.json | ConvertFrom-Json
+            if ($audit.PSObject.Properties.Name -contains "dependencies") {
+              $vulns = ($audit.dependencies | Where-Object { $_.vulns.Count -gt 0 })
+              Write-Host "pip-audit: $($vulns.Count) vulnerable package(s)"
+              foreach ($v in $vulns) {
+                Write-Host "  $($v.name)==$($v.version): $($v.vulns.Count) vuln(s)"
+              }
+            } else {
+              Write-Host "pip-audit: no vulnerable packages"
+            }
+          } else {
+            Write-Host "pip-audit: report not found"
+          }
+          Write-Host ("=" * 60)
+          Write-Host "NOTE: Security issues are advisory. Review reports/bandit.json and reports/pip-audit.json."
+        shell: pwsh
+
   summary:
     name: Gate Summary
     runs-on: windows-latest
-    needs: [unit-tests, regression-tests, quality-gate]
+    needs: [unit-tests, regression-tests, quality-gate, security-scan]
     if: always()
 
     steps:
       - name: Report Status
         run: |
           Write-Host ""
-          Write-Host "=" * 60
+          Write-Host ("=" * 60)
           Write-Host "RELEASE GATE SUMMARY"
-          Write-Host "=" * 60
-          Write-Host "Unit Tests: ${{ needs.unit-tests.result }}"
+          Write-Host ("=" * 60)
+          Write-Host "Unit Tests:       ${{ needs.unit-tests.result }}"
           Write-Host "Regression Tests: ${{ needs.regression-tests.result }}"
-          Write-Host "Quality Gate: ${{ needs.quality-gate.result }}"
-          Write-Host "=" * 60
+          Write-Host "Quality Gate:     ${{ needs.quality-gate.result }}"
+          Write-Host "Security Scan:    ${{ needs.security-scan.result }} (advisory)"
+          Write-Host ("=" * 60)
 
           if ("${{ needs.unit-tests.result }}" -ne "success" -or
               "${{ needs.regression-tests.result }}" -ne "success" -or

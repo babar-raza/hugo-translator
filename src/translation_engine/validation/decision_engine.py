@@ -30,6 +30,59 @@ from .base import ValidationResult, ValidationSeverity
 from .post_translation_validator import DecisionResult, ValidationDecision
 
 
+class AdaptiveThresholdProvider:
+    """Adjusts validation thresholds based on run history.
+
+    - enabled: false by default (opt-in after confidence in data quality)
+    - Maximum delta from static config: +/-1
+    - Hard clamp: reject_on_error_count in [1, 5] always
+    - Minimum 5 data points before adapting
+    - Falls back to static config on any error
+    """
+
+    def __init__(self, run_history, config: dict[str, Any]) -> None:
+        self._run_history = run_history
+        self._enabled = config.get("enabled", False)
+        self._min_runs = config.get("min_history_runs", 5)
+        self._max_delta = config.get("max_delta", 1)
+
+    def get_thresholds(
+        self, site_id: str, target_lang: str, static_reject_count: int
+    ) -> dict[str, int]:
+        """Get adjusted thresholds based on run history.
+
+        Returns dict with 'reject_on_error_count'.
+        """
+        if not self._enabled or self._run_history is None:
+            return {"reject_on_error_count": static_reject_count}
+
+        try:
+            outcomes = self._run_history.get_recent_outcomes(site_id, target_lang, limit=20)
+            if len(outcomes) < self._min_runs:
+                return {"reject_on_error_count": static_reject_count}
+
+            acceptance_rate = sum(o.acceptance_rate for o in outcomes) / len(outcomes)
+
+            if acceptance_rate > 0.95:
+                adjusted = static_reject_count - 1
+            elif acceptance_rate < 0.70:
+                adjusted = static_reject_count + 1
+            else:
+                adjusted = static_reject_count
+
+            # Enforce max delta from static
+            adjusted = max(
+                static_reject_count - self._max_delta,
+                min(static_reject_count + self._max_delta, adjusted),
+            )
+            # Hard clamp [1, 5]
+            adjusted = max(1, min(5, adjusted))
+
+            return {"reject_on_error_count": adjusted}
+        except Exception:
+            return {"reject_on_error_count": static_reject_count}
+
+
 class ValidationDecisionEngine:
     """Makes automated ACCEPT/RETRY/REJECT decisions based on validation results.
 
@@ -73,16 +126,24 @@ class ValidationDecisionEngine:
         "ShortcodePreservationValidator",  # defense-in-depth: class default accept_after_max_retries=True creates gap when instantiated directly
     }
 
-    def __init__(self, config: dict[str, Any], telemetry=None, run_context=None) -> None:
+    def __init__(
+        self,
+        config: dict[str, Any],
+        telemetry=None,
+        run_context=None,
+        adaptive_provider: AdaptiveThresholdProvider | None = None,
+    ) -> None:
         """Initialize decision engine with configuration.
 
         Args:
             config: Decision rules from validation.yaml
             telemetry: Optional telemetry instance for tracking metrics
             run_context: Optional run context for telemetry events
+            adaptive_provider: Optional adaptive threshold provider (None = static behavior)
         """
         self.config = config
         self.decision_rules = config.get("decision_rules", {})
+        self._adaptive_provider = adaptive_provider
 
         # Load thresholds
         self.reject_on_error_count = self.decision_rules.get("reject_on_error_count", 3)
@@ -91,14 +152,22 @@ class ValidationDecisionEngine:
         self.accept_after_max_retries = self.decision_rules.get("accept_after_max_retries", True)
 
         # Specific rejection triggers
-        self.reject_on_placeholder_error = self.decision_rules.get("reject_on_placeholder_error", True)
-        self.reject_on_code_block_error = self.decision_rules.get("reject_on_code_block_error", True)
+        self.reject_on_placeholder_error = self.decision_rules.get(
+            "reject_on_placeholder_error", True
+        )
+        self.reject_on_code_block_error = self.decision_rules.get(
+            "reject_on_code_block_error", True
+        )
         self.reject_on_link_error = self.decision_rules.get("reject_on_link_error", True)
-        self.reject_on_repetition_error = self.decision_rules.get("reject_on_repetition_error", True)
+        self.reject_on_repetition_error = self.decision_rules.get(
+            "reject_on_repetition_error", True
+        )
 
         # Retry triggers
         self.retry_on_structure_error = self.decision_rules.get("retry_on_structure_error", True)
-        self.retry_on_terminology_warning = self.decision_rules.get("retry_on_terminology_warning", True)
+        self.retry_on_terminology_warning = self.decision_rules.get(
+            "retry_on_terminology_warning", True
+        )
 
         # Telemetry integration (DEC-03)
         self.telemetry = telemetry
@@ -109,6 +178,9 @@ class ValidationDecisionEngine:
         validation_result: ValidationResult,
         retry_count: int,
         source: str,
+        *,
+        site_id: str | None = None,
+        target_lang: str | None = None,
     ) -> DecisionResult:
         """Make ACCEPT/RETRY/REJECT decision based on validation result.
 
@@ -116,13 +188,19 @@ class ValidationDecisionEngine:
             validation_result: Aggregated validation result from all validators
             retry_count: Number of retries already attempted
             source: Original source text (for feedback generation)
+            site_id: Optional site identifier for adaptive threshold lookup
+            target_lang: Optional target language for adaptive threshold lookup
 
         Returns:
             DecisionResult with decision and optional retry feedback
         """
         # Count errors and warnings for telemetry
-        error_count = len([i for i in validation_result.issues if i.severity == ValidationSeverity.ERROR])
-        warning_count = len([i for i in validation_result.issues if i.severity == ValidationSeverity.WARNING])
+        error_count = len(
+            [i for i in validation_result.issues if i.severity == ValidationSeverity.ERROR]
+        )
+        warning_count = len(
+            [i for i in validation_result.issues if i.severity == ValidationSeverity.WARNING]
+        )
 
         # Collect validator results for telemetry
         validator_results = {}
@@ -131,6 +209,17 @@ class ValidationDecisionEngine:
                 validator_results[issue.validator] = False
         # Mark validators without errors as passed (if we have the full list)
         # For now, just track failed validators
+
+        # Resolve effective reject_on_error_count (adaptive or static)
+        if self._adaptive_provider is not None and site_id is not None and target_lang is not None:
+            thresholds = self._adaptive_provider.get_thresholds(
+                site_id=site_id,
+                target_lang=target_lang,
+                static_reject_count=self.reject_on_error_count,
+            )
+            effective_reject_count = thresholds["reject_on_error_count"]
+        else:
+            effective_reject_count = self.reject_on_error_count
 
         # Rule 1: Critical validator failed → REJECT
         critical_failure = self._check_critical_failure(validation_result)
@@ -141,19 +230,23 @@ class ValidationDecisionEngine:
                 retry_feedback=None,
                 validation_result=validation_result,
             )
-            self._track_decision(decision_result, retry_count, error_count, warning_count, validator_results)
+            self._track_decision(
+                decision_result, retry_count, error_count, warning_count, validator_results
+            )
             self._track_validation_errors(validation_result)
             return decision_result
 
         # Rule 2: Error count >= threshold → REJECT
-        if error_count >= self.reject_on_error_count:
+        if error_count >= effective_reject_count:
             decision_result = DecisionResult(
                 decision=ValidationDecision.REJECT,
-                decision_reason=f"Error count {error_count} >= threshold {self.reject_on_error_count}",
+                decision_reason=f"Error count {error_count} >= threshold {effective_reject_count}",
                 retry_feedback=None,
                 validation_result=validation_result,
             )
-            self._track_decision(decision_result, retry_count, error_count, warning_count, validator_results)
+            self._track_decision(
+                decision_result, retry_count, error_count, warning_count, validator_results
+            )
             self._track_validation_errors(validation_result)
             return decision_result
 
@@ -166,7 +259,9 @@ class ValidationDecisionEngine:
                     retry_feedback=None,
                     validation_result=validation_result,
                 )
-                self._track_decision(decision_result, retry_count, error_count, warning_count, validator_results)
+                self._track_decision(
+                    decision_result, retry_count, error_count, warning_count, validator_results
+                )
                 return decision_result
 
         # Rule 4: Errors + retries available → RETRY
@@ -179,7 +274,9 @@ class ValidationDecisionEngine:
                     retry_feedback=retry_feedback,
                     validation_result=validation_result,
                 )
-                self._track_decision(decision_result, retry_count, error_count, warning_count, validator_results)
+                self._track_decision(
+                    decision_result, retry_count, error_count, warning_count, validator_results
+                )
                 self._track_validation_errors(validation_result)
                 return decision_result
 
@@ -193,7 +290,9 @@ class ValidationDecisionEngine:
                 retry_feedback=None,
                 validation_result=validation_result,
             )
-            self._track_decision(decision_result, retry_count, error_count, warning_count, validator_results)
+            self._track_decision(
+                decision_result, retry_count, error_count, warning_count, validator_results
+            )
             self._track_validation_errors(validation_result)
             return decision_result
         else:
@@ -203,7 +302,9 @@ class ValidationDecisionEngine:
                 retry_feedback=None,
                 validation_result=validation_result,
             )
-            self._track_decision(decision_result, retry_count, error_count, warning_count, validator_results)
+            self._track_decision(
+                decision_result, retry_count, error_count, warning_count, validator_results
+            )
             self._track_validation_errors(validation_result)
             return decision_result
 
@@ -228,7 +329,10 @@ class ValidationDecisionEngine:
                     return "CodeBlockError"
                 if "link" in issue.message.lower() and self.reject_on_link_error:
                     return "LinkError"
-                if issue.validator == "RepetitionDetectorValidator" and self.reject_on_repetition_error:
+                if (
+                    issue.validator == "RepetitionDetectorValidator"
+                    and self.reject_on_repetition_error
+                ):
                     return "RepetitionError"
 
         return None
@@ -244,12 +348,18 @@ class ValidationDecisionEngine:
         """
         for issue in validation_result.issues:
             # Structure errors are retryable
-            if issue.severity == ValidationSeverity.ERROR and "structure" in issue.validator.lower():
+            if (
+                issue.severity == ValidationSeverity.ERROR
+                and "structure" in issue.validator.lower()
+            ):
                 if self.retry_on_structure_error:
                     return True
 
             # Terminology warnings may trigger retry
-            if issue.severity == ValidationSeverity.WARNING and "terminology" in issue.validator.lower():
+            if (
+                issue.severity == ValidationSeverity.WARNING
+                and "terminology" in issue.validator.lower()
+            ):
                 if self.retry_on_terminology_warning:
                     return True
 
@@ -280,9 +390,13 @@ class ValidationDecisionEngine:
         if retry_count == 0:
             feedback_parts.append("VALIDATION FEEDBACK - Please address the following issues:")
         elif retry_count == 1:
-            feedback_parts.append("CRITICAL VALIDATION FEEDBACK - Previous translation had issues. Pay close attention:")
+            feedback_parts.append(
+                "CRITICAL VALIDATION FEEDBACK - Previous translation had issues. Pay close attention:"
+            )
         else:
-            feedback_parts.append("FINAL ATTEMPT - This is the last retry. You MUST fix these issues:")
+            feedback_parts.append(
+                "FINAL ATTEMPT - This is the last retry. You MUST fix these issues:"
+            )
 
         # Group issues by severity and validator
         errors = [i for i in validation_result.issues if i.severity == ValidationSeverity.ERROR]
@@ -309,7 +423,9 @@ class ValidationDecisionEngine:
                         feedback_parts.append(f"   Location: {issue.location}")
                     if issue.details and "suggestion" in issue.details:
                         feedback_parts.append(f"   REQUIRED ACTION: {issue.details['suggestion']}")
-                    feedback_parts.append("   This is CRITICAL - translation will be REJECTED if not fixed.")
+                    feedback_parts.append(
+                        "   This is CRITICAL - translation will be REJECTED if not fixed."
+                    )
 
         # Add warnings for final attempt
         if warnings and retry_count >= 1:
@@ -321,16 +437,24 @@ class ValidationDecisionEngine:
         error_types = set(i.validator for i in errors)
 
         if "CompletenessValidator" in error_types:
-            feedback_parts.append("\n⚠ COMPLETENESS: Ensure ALL source segments are translated. No segments should be skipped.")
+            feedback_parts.append(
+                "\n⚠ COMPLETENESS: Ensure ALL source segments are translated. No segments should be skipped."
+            )
 
         if "TerminologyPreservationValidator" in error_types:
-            feedback_parts.append("\n⚠ TERMINOLOGY: Preserve company names (Aspose), product names (Aspose.Words), and platform names (.NET) EXACTLY as they appear in source.")
+            feedback_parts.append(
+                "\n⚠ TERMINOLOGY: Preserve company names (Aspose), product names (Aspose.Words), and platform names (.NET) EXACTLY as they appear in source."
+            )
 
         if "ShortcodePreservationValidator" in error_types:
-            feedback_parts.append("\n⚠ SHORTCODES: Hugo shortcodes ({{< ... >}}) must be preserved EXACTLY. Do not translate shortcode names or parameters.")
+            feedback_parts.append(
+                "\n⚠ SHORTCODES: Hugo shortcodes ({{< ... >}}) must be preserved EXACTLY. Do not translate shortcode names or parameters."
+            )
 
         if "StructureValidator" in error_types:
-            feedback_parts.append("\n⚠ STRUCTURE: Maintain the same number and level of headings, lists, and code blocks as the source.")
+            feedback_parts.append(
+                "\n⚠ STRUCTURE: Maintain the same number and level of headings, lists, and code blocks as the source."
+            )
 
         return "\n".join(feedback_parts)
 
@@ -418,6 +542,7 @@ def append_validation_metric(
         if _local_log_enabled is None:
             try:
                 from src.utils.config_loader import get_global_config
+
                 _local_log_enabled = bool(
                     get_global_config().get("telemetry", {}).get("local_validation_log", False)
                 )

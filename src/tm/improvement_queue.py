@@ -38,6 +38,7 @@ class ImprovementCandidate:
         metadata: Optional metadata (e.g., similarity_score, hit_count)
         candidate_hash: Unique hash for deduplication
     """
+
     site_id: str
     src_lang: str
     tgt_lang: str
@@ -67,6 +68,24 @@ class ImprovementCandidate:
         """
         hash_input = f"{self.site_id}:{self.src_lang}:{self.tgt_lang}:{self.text}"
         return hashlib.sha256(hash_input.encode()).hexdigest()[:16]
+
+
+def compute_uncertainty(candidate: ImprovementCandidate) -> float:
+    """Compute uncertainty score for prioritization.
+
+    Higher score = higher priority for improvement. Reads from the existing
+    metadata dict — no dataclass field changes needed.
+
+    Returns:
+        Float in [0.0, 1.0]
+    """
+    meta = candidate.metadata if candidate.metadata else {}
+    retry_count = meta.get("retry_count", 0)
+    quality_score = meta.get("quality_score", 0.5)
+    had_errors = 1 if meta.get("error_count", 0) > 0 else 0
+
+    score = retry_count * 0.4 + (1 - quality_score) * 0.3 + had_errors * 0.3
+    return max(0.0, min(1.0, score))
 
 
 class ImprovementQueue:
@@ -162,8 +181,7 @@ class ImprovementQueue:
                 to_remove = [next(it) for _ in range(excess)]
                 self._seen_hashes -= set(to_remove)
                 logger.info(
-                    f"TC-07: Rotated seen hashes — removed {excess}, "
-                    f"kept {len(self._seen_hashes)}"
+                    f"TC-07: Rotated seen hashes — removed {excess}, kept {len(self._seen_hashes)}"
                 )
             with open(self.seen_file, "w", encoding="utf-8") as f:
                 json.dump({"seen_hashes": list(self._seen_hashes)}, f)
@@ -296,14 +314,74 @@ class ImprovementQueue:
                     self.queue_file.unlink()
 
                 logger.info(
-                    f"Popped {len(candidates)} candidates from queue "
-                    f"({len(remaining)} remaining)"
+                    f"Popped {len(candidates)} candidates from queue ({len(remaining)} remaining)"
                 )
 
                 return candidates
 
             except Exception as e:
                 logger.error(f"Failed to pop candidates from queue: {e}")
+                return []
+
+    def pop_candidates_by_priority(self, limit: int = 50) -> list[ImprovementCandidate]:
+        """Pop candidates sorted by uncertainty (highest first).
+
+        Like pop_candidates() but returns the highest-uncertainty candidates
+        rather than FIFO order. Uses the same lock and atomic rewrite pattern.
+
+        Args:
+            limit: Maximum number of candidates to pop
+
+        Returns:
+            List of ImprovementCandidate sorted by uncertainty descending
+        """
+        if not self.queue_file.exists():
+            return []
+
+        with self._lock:
+            try:
+                all_candidates: list[ImprovementCandidate] = []
+                bad_lines: list[str] = []
+
+                with open(self.queue_file, encoding="utf-8") as f:
+                    for i, line in enumerate(f):
+                        line = line.strip()
+                        if not line:
+                            continue
+                        try:
+                            data = json.loads(line)
+                            all_candidates.append(ImprovementCandidate(**data))
+                        except Exception as e:
+                            logger.error(f"Failed to parse candidate at line {i}: {e}")
+                            bad_lines.append(line)
+
+                # Sort by uncertainty descending
+                all_candidates.sort(key=compute_uncertainty, reverse=True)
+
+                popped = all_candidates[:limit]
+                kept = all_candidates[limit:]
+
+                # Atomic rewrite
+                remaining_lines = bad_lines + [json.dumps(asdict(c)) for c in kept]
+                if remaining_lines:
+                    with tempfile.NamedTemporaryFile(
+                        mode="w",
+                        encoding="utf-8",
+                        dir=str(self.tm_path),
+                        delete=False,
+                        suffix=".tmp",
+                    ) as tmp:
+                        tmp.write("\n".join(remaining_lines) + "\n")
+                        tmp_path = tmp.name
+                    os.replace(tmp_path, self.queue_file)
+                else:
+                    self.queue_file.unlink()
+
+                logger.info(f"Popped {len(popped)} priority candidates ({len(kept)} remaining)")
+                return popped
+
+            except Exception as e:
+                logger.error(f"Failed to pop priority candidates: {e}")
                 return []
 
     def count(self) -> int:

@@ -1,0 +1,16 @@
+dry_run: true  # HARD DEFAULT: no live actions until operator opts in
+
+rules:
+  - metric: acceptance_rate
+    threshold: 0.70
+    comparison: below
+    action: log_alert       # V1: only LOG_ALERT. No RESTART, no REDUCE.
+    cooldown_minutes: 60
+    description: "Acceptance rate below 70%"
+
+  - metric: worker_failure_count
+    threshold: 3
+    comparison: above
+    action: log_alert
+    cooldown_minutes: 30
+    description: "Multiple worker failures"

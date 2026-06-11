@@ -190,8 +190,7 @@ class AutonomousContentTranslationWorker:
 
                 if budget:
                     logger.info(
-                        f"VRAM budget enforced: {max_memory_mb}MB "
-                        f"({budget.percent:.1f}% of total)"
+                        f"VRAM budget enforced: {max_memory_mb}MB ({budget.percent:.1f}% of total)"
                     )
                 else:
                     logger.warning("VRAM enforcement skipped (GPU disabled or unavailable)")
@@ -204,6 +203,7 @@ class AutonomousContentTranslationWorker:
             from src.tm import TranslationMemory
             from src.tm.l1_cache import L1Cache
             from src.tm.l2_persistent import L2_DB_NAME, L2PersistentTM
+
             try:
                 from src.tm.l3_semantic import L3SemanticTM
             except ImportError:
@@ -222,11 +222,16 @@ class AutonomousContentTranslationWorker:
             # Create TM components
             l1_cache = L1Cache(max_size=10000)
             l2_max_size_mb = raw_config.get("tm_defaults", {}).get("l2_max_size_mb", 1536)
-            l2_persistent = L2PersistentTM(db_path=tm_data_dir / L2_DB_NAME, max_size_mb=l2_max_size_mb)
+            l2_persistent = L2PersistentTM(
+                db_path=tm_data_dir / L2_DB_NAME, max_size_mb=l2_max_size_mb
+            )
             _l2s = l2_persistent.get_stats()
             logger.info(
                 "[L2] map used: %.0f / %.0f MiB (%.1f%%) — %d entries",
-                _l2s["used_mb"], _l2s["map_size_mb"], _l2s["used_pct"], _l2s["entries"],
+                _l2s["used_mb"],
+                _l2s["map_size_mb"],
+                _l2s["used_pct"],
+                _l2s["entries"],
             )
 
             # Try to initialize L3 semantic TM (optional)
@@ -235,7 +240,7 @@ class AutonomousContentTranslationWorker:
                 try:
                     l3_semantic = L3SemanticTM(
                         index_path=tm_data_dir / "l3_faiss",
-                        use_gpu=True  # TC-L3-002: ~80MB encoder, safe on RTX 4090; CPU fallback built-in
+                        use_gpu=True,  # TC-L3-002: ~80MB encoder, safe on RTX 4090; CPU fallback built-in
                     )
                 except Exception as e:
                     logger.warning(f"L3 semantic TM not available: {e}")
@@ -294,13 +299,17 @@ class AutonomousContentTranslationWorker:
         # Initialize TranslationEngine
         try:
             global_config = self.config_service.get_config()
-            content_hash_enabled = global_config.get('features', {}).get('enable_content_hash_tracking', False)
+            content_hash_enabled = global_config.get("features", {}).get(
+                "enable_content_hash_tracking", False
+            )
             self.translation_engine = TranslationEngine(
                 config_service=self.config_service,
                 tm=tm,
                 model_loader=model_loader,
                 enable_telemetry=True,  # Always enable telemetry for autonomous workers
-                model_id=global_config.get('model_defaults', {}).get('fallback_model', 'm2m100_1.2b'),
+                model_id=global_config.get("model_defaults", {}).get(
+                    "fallback_model", "m2m100_1.2b"
+                ),
                 enable_content_hash_tracking=content_hash_enabled,
             )
             logger.info("Initialized TranslationEngine")
@@ -344,11 +353,15 @@ class AutonomousContentTranslationWorker:
         """Write heartbeat file for watchdog monitoring."""
         heartbeat_path = Path("data/logs") / f"{self._worker_id}.heartbeat"
         heartbeat_path.parent.mkdir(parents=True, exist_ok=True)
-        heartbeat_path.write_text(json.dumps({
-            "timestamp": datetime.now().isoformat(),
-            "pid": os.getpid(),
-            "status": status,
-        }))
+        heartbeat_path.write_text(
+            json.dumps(
+                {
+                    "timestamp": datetime.now().isoformat(),
+                    "pid": os.getpid(),
+                    "status": status,
+                }
+            )
+        )
 
     def _record_state(self, state: str, *, success: bool = False, error: str | None = None) -> None:
         """Persist durable worker state for health audit tooling."""
@@ -362,6 +375,59 @@ class AutonomousContentTranslationWorker:
             )
         except Exception as exc:
             logger.debug(f"Worker state write failed (non-fatal): {exc}")
+
+    def _record_run_history(self) -> None:
+        """Record run outcome for cross-run learning (non-fatal)."""
+        try:
+            from src.observability.run_history import RunHistoryTracker, RunOutcome
+
+            run_new = getattr(self, "_run_new_files", {})
+            run_start = getattr(self, "_run_start", time.time())
+            files_accepted = sum(run_new.values())
+            # TC-FIX-03: Use real counters accumulated during the run; fall back safely
+            files_rejected = getattr(self, "_run_rejected_files", 0)
+            files_attempted = getattr(self, "_run_attempted_files", 0) or max(
+                files_accepted + files_rejected, 1
+            )
+            site_id = self.config.site or "all"
+
+            global_cfg = self.config_service.load_global_config()
+            rh_cfg = global_cfg.get("run_history", {})
+            if not rh_cfg.get("enabled", True):
+                return
+
+            db_path = rh_cfg.get("db_path", "data/metrics/run_history.db")
+            tracker = RunHistoryTracker(db_path)
+            try:
+                outcome = RunOutcome(
+                    run_id=str(uuid.uuid4()),
+                    site_id=site_id,
+                    target_lang="all",
+                    timestamp=datetime.utcnow().isoformat(),
+                    files_attempted=files_attempted,
+                    files_accepted=files_accepted,
+                    files_rejected=files_rejected,
+                    files_skipped=0,
+                    retry_count=0,
+                    acceptance_rate=files_accepted / files_attempted if files_attempted else 0.0,
+                    dominant_failure_type=None,
+                    elapsed_seconds=time.time() - run_start,
+                )
+                tracker.record_outcome(outcome)
+
+                threshold = rh_cfg.get("regression_threshold", 0.15)
+                alert = tracker.detect_regression(site_id, "all", threshold=threshold)
+                if alert:
+                    logger.warning(
+                        "Regression detected: acceptance_rate=%.2f (avg=%.2f, delta=%.2f)",
+                        alert.current_rate,
+                        alert.moving_avg,
+                        alert.delta,
+                    )
+            finally:
+                tracker.close()
+        except Exception as exc:
+            logger.debug("Run history recording failed (non-fatal): %s", exc)
 
     def _start_heartbeat_thread(self):
         """Start a daemon thread that writes heartbeat every 60 seconds."""
@@ -385,14 +451,15 @@ class AutonomousContentTranslationWorker:
 
     def _stop_heartbeat_thread(self):
         """Signal the heartbeat thread to stop."""
-        if hasattr(self, '_heartbeat_stop_event'):
+        if hasattr(self, "_heartbeat_stop_event"):
             self._heartbeat_stop_event.set()
-            if hasattr(self, '_heartbeat_thread'):
+            if hasattr(self, "_heartbeat_thread"):
                 self._heartbeat_thread.join(timeout=5)
 
     def _preflight_check(self) -> bool:
         """Validate dependencies before run. Returns True if safe to proceed."""
         import shutil
+
         checks_passed = True
 
         # 1. GPU available (if device=cuda) - Fall back to CPU if unavailable
@@ -400,19 +467,20 @@ class AutonomousContentTranslationWorker:
         if self.config.device == "cuda":
             try:
                 import torch
+
                 if not torch.cuda.is_available():
                     logger.warning(
                         "PREFLIGHT WARNING: CUDA requested but not available, falling back to CPU"
                     )
                     self.config.device = "cpu"  # Graceful fallback
             except ImportError:
-                logger.warning(
-                    "PREFLIGHT WARNING: torch not installed, falling back to CPU"
-                )
+                logger.warning("PREFLIGHT WARNING: torch not installed, falling back to CPU")
                 self.config.device = "cpu"  # Graceful fallback
 
         # 2. Config root exists
-        config_root = Path(self.config.config_root) if hasattr(self.config, 'config_root') else Path("config")
+        config_root = (
+            Path(self.config.config_root) if hasattr(self.config, "config_root") else Path("config")
+        )
         if not config_root.exists():
             logger.warning(f"PREFLIGHT FAIL: Config root missing: {config_root}")
             checks_passed = False
@@ -425,13 +493,17 @@ class AutonomousContentTranslationWorker:
                 try:
                     profile = self.config_service.get_site_profile(self.config.site)
                     if profile and profile.content_roots:
-                        resolved = self.config_service.resolve_content_root(profile.content_roots[0])
+                        resolved = self.config_service.resolve_content_root(
+                            profile.content_roots[0]
+                        )
                         disk_check_path = str(resolved)
                 except Exception:
                     pass  # Fall back to CWD
             total, used, free = shutil.disk_usage(disk_check_path)
             if (free / total) < 0.05:
-                logger.warning(f"PREFLIGHT FAIL: Disk space critical ({free / total * 100:.1f}% free on {disk_check_path})")
+                logger.warning(
+                    f"PREFLIGHT FAIL: Disk space critical ({free / total * 100:.1f}% free on {disk_check_path})"
+                )
                 checks_passed = False
         except Exception as e:
             logger.warning(f"PREFLIGHT WARNING: Could not check disk space: {e}")
@@ -455,9 +527,7 @@ class AutonomousContentTranslationWorker:
 
         # Log device fallback info
         if original_device != self.config.device:
-            logger.info(
-                f"Device fallback applied: {original_device} → {self.config.device}"
-            )
+            logger.info(f"Device fallback applied: {original_device} → {self.config.device}")
 
         return checks_passed
 
@@ -473,7 +543,8 @@ class AutonomousContentTranslationWorker:
         self._record_state("starting")
         self._start_heartbeat_thread()
         self._lifecycle_event_id = start_worker_run(
-            "content_worker", "worker_lifecycle",
+            "content_worker",
+            "worker_lifecycle",
             context={
                 "mode": self.config.mode,
                 "runs_per_day": getattr(self.config, "runs_per_day", None),
@@ -487,9 +558,9 @@ class AutonomousContentTranslationWorker:
             # This prevents accidental daemon spawning while scheduler safety
             # gates (TC-SCHED-01..06) are incomplete. Oneshot is not gated.
             if self.config.mode == "daemon":
-                _raw_cfg = getattr(self.config_service, '_raw_global_config', {})
-                _sched_cfg = _raw_cfg.get('scheduler', {})
-                if not _sched_cfg.get('campaign_mode_enabled', False):
+                _raw_cfg = getattr(self.config_service, "_raw_global_config", {})
+                _sched_cfg = _raw_cfg.get("scheduler", {})
+                if not _sched_cfg.get("campaign_mode_enabled", False):
                     logger.info(
                         "[SCHED] campaign_mode_enabled=false in config. "
                         "Daemon exiting safely. Set scheduler.campaign_mode_enabled=true "
@@ -502,7 +573,9 @@ class AutonomousContentTranslationWorker:
             elif self.config.mode == "daemon":
                 self._run_daemon()
             else:
-                raise ValueError(f"Invalid mode: {self.config.mode}. Expected 'oneshot' or 'daemon'")
+                raise ValueError(
+                    f"Invalid mode: {self.config.mode}. Expected 'oneshot' or 'daemon'"
+                )
         finally:
             self._stop_heartbeat_thread()
             self._write_heartbeat("stopped")
@@ -523,6 +596,7 @@ class AutonomousContentTranslationWorker:
             self._commit_orphaned_translations()
             self._execute_translation_run()
             self._recover_pending_commits()
+            self._record_run_history()
             _run_total_new = sum(getattr(self, "_run_new_files", {}).values())
             logger.info(f"Oneshot run completed: {_run_total_new} new translations")
             self._record_state("run_completed", success=(_run_total_new > 0))
@@ -536,7 +610,9 @@ class AutonomousContentTranslationWorker:
         logger.info("=" * 80)
         logger.info("DAEMON MODE: Starting continuous scheduler")
         logger.info(f"Schedule: {self.config.runs_per_day} runs/day")
-        logger.info(f"Window: {self.config.window_start}-{self.config.window_end} {self.config.timezone}")
+        logger.info(
+            f"Window: {self.config.window_start}-{self.config.window_end} {self.config.timezone}"
+        )
         logger.info("=" * 80)
 
         run_count = 0
@@ -563,7 +639,9 @@ class AutonomousContentTranslationWorker:
                     logger.debug("[VRAM] L3 reload skipped: %s", e)
 
                 logger.info("=" * 80)
-                logger.info(f"SCHEDULED RUN #{run_count} at {next_run.strftime('%Y-%m-%d %H:%M:%S %Z')}")
+                logger.info(
+                    f"SCHEDULED RUN #{run_count} at {next_run.strftime('%Y-%m-%d %H:%M:%S %Z')}"
+                )
                 logger.info("=" * 80)
 
                 if not self._preflight_check():
@@ -579,7 +657,10 @@ class AutonomousContentTranslationWorker:
                         job_type="worker_preflight_failure",
                         status="failure",
                         error_summary="Preflight checks failed",
-                        metrics={"run_number": run_count, "consecutive_failures": consecutive_failures},
+                        metrics={
+                            "run_number": run_count,
+                            "consecutive_failures": consecutive_failures,
+                        },
                     )
 
                     # Circuit breaker: exit after too many consecutive failures
@@ -606,6 +687,7 @@ class AutonomousContentTranslationWorker:
                     self._commit_orphaned_translations()
                     self._execute_translation_run()
                     self._recover_pending_commits()
+                    self._record_run_history()
                     _run_total_new = sum(getattr(self, "_run_new_files", {}).values())
                     logger.info(
                         f"Scheduled run #{run_count} completed: {_run_total_new} new translations"
@@ -627,7 +709,10 @@ class AutonomousContentTranslationWorker:
                         job_type="worker_run_failure",
                         status="failure",
                         error_summary=str(e)[:500],
-                        metrics={"run_number": run_count, "consecutive_failures": consecutive_failures},
+                        metrics={
+                            "run_number": run_count,
+                            "consecutive_failures": consecutive_failures,
+                        },
                     )
                     self._record_state("run_failed", error=str(e))
                     if consecutive_failures >= max_consecutive_failures:
@@ -677,6 +762,9 @@ class AutonomousContentTranslationWorker:
         # Also initializes _run_start so per-site time limits are enforced.
         self._run_new_files = {}
         self._run_start = time.time()
+        # TC-FIX-03: Real rejection tracking so acceptance_rate reflects actual quality
+        self._run_rejected_files = 0
+        self._run_attempted_files = 0
 
         # Determine sites to process
         if self.config.site:
@@ -741,12 +829,15 @@ class AutonomousContentTranslationWorker:
         # Process each content_root, expanding multi-family roots into per-family batches
         for content_root in site_profile.content_roots:
             effective_roots = self._expand_family_content_roots(
-                site_profile, content_root,
+                site_profile,
+                content_root,
             )
             for eff_root in effective_roots:
                 try:
                     self._translate_content_root(
-                        site_id, eff_root, site_profile.target_langs,
+                        site_id,
+                        eff_root,
+                        site_profile.target_langs,
                         profile_filename=f"{site_id}.yaml",
                         family_scope=site_profile.family_scope,
                         display_name=site_profile.display_name,
@@ -754,7 +845,10 @@ class AutonomousContentTranslationWorker:
                 except (TypeError, AttributeError) as e:
                     logger.critical(
                         "Code error in content_root %s for site %s (will recur on retry): %s",
-                        eff_root, site_id, e, exc_info=True,
+                        eff_root,
+                        site_id,
+                        e,
+                        exc_info=True,
                     )
                 except Exception as e:
                     logger.error(
@@ -838,6 +932,7 @@ class AutonomousContentTranslationWorker:
         try:
             from src.observability.family_extraction import discover_family_subdirs
             from src.observability.metrics_scope import DEFAULT_KNOWN_FAMILIES
+
             family_dirs = discover_family_subdirs(resolved_dir, DEFAULT_KNOWN_FAMILIES)
         except Exception as _fe:
             logger.debug("Family subdir discovery failed: %s", _fe)
@@ -879,7 +974,7 @@ class AutonomousContentTranslationWorker:
             except Exception:
                 continue
 
-            for content_root_str in (profile.content_roots or []):
+            for content_root_str in profile.content_roots or []:
                 try:
                     content_root = self.config_service.resolve_content_root(content_root_str)
                     git_root = find_git_root(content_root)
@@ -909,7 +1004,7 @@ class AutonomousContentTranslationWorker:
             except Exception:
                 continue
 
-            for content_root_str in (profile.content_roots or []):
+            for content_root_str in profile.content_roots or []:
                 try:
                     content_root = self.config_service.resolve_content_root(content_root_str)
                     if find_git_root(content_root) == git_root:
@@ -921,7 +1016,10 @@ class AutonomousContentTranslationWorker:
         return site_ids
 
     def _translate_content_root(
-        self, site_id: str, content_root: str, target_langs: list[str],
+        self,
+        site_id: str,
+        content_root: str,
+        target_langs: list[str],
         batch_idx: int = 1,
         profile_filename: str = "",
         family_scope: str | None = None,
@@ -961,8 +1059,7 @@ class AutonomousContentTranslationWorker:
 
         # Compute run_deadline (per-site override > global config)
         per_site_limits = (
-            raw_config
-            .get("autonomous_content_translation", {})
+            raw_config.get("autonomous_content_translation", {})
             .get("execution", {})
             .get("per_site_limits", {})
         )
@@ -971,7 +1068,9 @@ class AutonomousContentTranslationWorker:
             if isinstance(per_site_limits, dict)
             else None
         )
-        effective_max_seconds = site_max_seconds or getattr(self.config, "max_seconds_per_run", None)
+        effective_max_seconds = site_max_seconds or getattr(
+            self.config, "max_seconds_per_run", None
+        )
         _PRE_RUN_BUFFER = 300  # seconds reserved for clean shutdown
         run_deadline = (
             self._run_start + effective_max_seconds - _PRE_RUN_BUFFER
@@ -988,6 +1087,7 @@ class AutonomousContentTranslationWorker:
         self._last_metrics_ctx = None  # Expose to _process_site for crash/timeout recovery
         try:
             from src.observability.agent_metrics_integration import MetricsRunContext
+
             _metrics_ctx = MetricsRunContext(
                 site_id=site_id,
                 content_root_raw=content_root,
@@ -1008,7 +1108,9 @@ class AutonomousContentTranslationWorker:
         _cov_skipped = 0
 
         timeout_seconds = self.config.file_timeout_seconds * len(target_langs)
-        operation_name = f"translate_directory({resolved_content_dir.name}, {len(target_langs)} langs)"
+        operation_name = (
+            f"translate_directory({resolved_content_dir.name}, {len(target_langs)} langs)"
+        )
 
         # Safe default — overwritten by both the chunked loop and single-pass branch below.
         # Prevents UnboundLocalError if the chunked-mode deadline check fires before chunk 0.
@@ -1059,15 +1161,20 @@ class AutonomousContentTranslationWorker:
                         job_type="worker_timeout",
                         status="failure",
                         error_summary=str(e)[:500],
-                        metrics={"timeout_seconds": timeout_seconds,
-                                 "content_root": str(content_root),
-                                 "target_langs": target_langs},
+                        metrics={
+                            "timeout_seconds": timeout_seconds,
+                            "content_root": str(content_root),
+                            "target_langs": target_langs,
+                        },
                     )
                     raise
 
                 logger.info(
                     "Chunk %d: %d/%d files succeeded, %d failed",
-                    chunk_idx, result.successful_files, result.total_files, result.failed_files,
+                    chunk_idx,
+                    result.successful_files,
+                    result.total_files,
+                    result.failed_files,
                 )
 
                 # WS-COMP-8: Accumulate coverage counters across chunks
@@ -1078,14 +1185,27 @@ class AutonomousContentTranslationWorker:
                 # Log rejection rate for validation monitoring
                 try:
                     agg = result.aggregate_stats
-                    rejected = getattr(agg, 'rejected_count', 0) or 0
+                    rejected = getattr(agg, "rejected_count", 0) or 0
                     if rejected > 0 and result.total_files > 0:
                         rej_rate = rejected / result.total_files * 100
-                        logger.info("Chunk %d rejection rate: %d/%d (%.1f%%)",
-                                    chunk_idx, rejected, result.total_files, rej_rate)
+                        logger.info(
+                            "Chunk %d rejection rate: %d/%d (%.1f%%)",
+                            chunk_idx,
+                            rejected,
+                            result.total_files,
+                            rej_rate,
+                        )
                         if rej_rate > 10:
-                            logger.warning("High rejection rate %.1f%% in chunk %d — check validation config",
-                                           rej_rate, chunk_idx)
+                            logger.warning(
+                                "High rejection rate %.1f%% in chunk %d — check validation config",
+                                rej_rate,
+                                chunk_idx,
+                            )
+                    # TC-FIX-03: Accumulate run-level rejection/attempt counters
+                    self._run_rejected_files = getattr(self, "_run_rejected_files", 0) + rejected
+                    self._run_attempted_files = (
+                        getattr(self, "_run_attempted_files", 0) + result.total_files
+                    )
                 except (AttributeError, TypeError):
                     pass  # Gracefully handle incomplete result objects
 
@@ -1112,7 +1232,10 @@ class AutonomousContentTranslationWorker:
 
                 # Zero-progress guard: break if chunk produced nothing useful
                 if result.successful_files == 0 and result.failed_files == 0:
-                    logger.warning("Chunk %d: zero progress (0 successful, 0 failed) — breaking loop", chunk_idx)
+                    logger.warning(
+                        "Chunk %d: zero progress (0 successful, 0 failed) — breaking loop",
+                        chunk_idx,
+                    )
                     break
 
                 # Exit when the slice was smaller than the chunk size (last slice)
@@ -1142,9 +1265,11 @@ class AutonomousContentTranslationWorker:
                     job_type="worker_timeout",
                     status="failure",
                     error_summary=str(e)[:500],
-                    metrics={"timeout_seconds": timeout_seconds,
-                             "content_root": str(content_root),
-                             "target_langs": target_langs},
+                    metrics={
+                        "timeout_seconds": timeout_seconds,
+                        "content_root": str(content_root),
+                        "target_langs": target_langs,
+                    },
                 )
                 raise
 
@@ -1162,13 +1287,16 @@ class AutonomousContentTranslationWorker:
             # Log rejection rate for validation monitoring
             try:
                 agg = result.aggregate_stats
-                rejected = getattr(agg, 'rejected_count', 0) or 0
+                rejected = getattr(agg, "rejected_count", 0) or 0
                 if rejected > 0 and result.total_files > 0:
                     rej_rate = rejected / result.total_files * 100
-                    logger.info("Rejection rate: %d/%d (%.1f%%)",
-                                rejected, result.total_files, rej_rate)
+                    logger.info(
+                        "Rejection rate: %d/%d (%.1f%%)", rejected, result.total_files, rej_rate
+                    )
                     if rej_rate > 10:
-                        logger.warning("High rejection rate %.1f%% — check validation config", rej_rate)
+                        logger.warning(
+                            "High rejection rate %.1f%% — check validation config", rej_rate
+                        )
             except (AttributeError, TypeError):
                 pass  # Gracefully handle incomplete result objects
 
@@ -1179,7 +1307,7 @@ class AutonomousContentTranslationWorker:
 
             # LLM-WASTE-FIX-1: Skip commit when ALL file results have every language skipped
             _has_new_translations = True
-            if hasattr(result, 'file_results') and result.file_results:
+            if hasattr(result, "file_results") and result.file_results:
                 _has_new_translations = any(
                     set(fr.outputs.keys()) - set(fr.skipped_langs)
                     for fr in result.file_results
@@ -1239,6 +1367,7 @@ class AutonomousContentTranslationWorker:
         # WS-COMP-8: Emit structured coverage telemetry for this content root.
         try:
             from src.observability.metrics import record_coverage_snapshot
+
             record_coverage_snapshot(
                 site_id=site_id,
                 target_langs=target_langs,
@@ -1318,6 +1447,7 @@ class AutonomousContentTranslationWorker:
             per_language_stats = dict(getattr(self, "_run_new_files", {}))
 
             from datetime import timezone as _tz
+
             _now = datetime.now(_tz.utc)
             run_summary = {
                 "run_id": run_id,
@@ -1325,9 +1455,7 @@ class AutonomousContentTranslationWorker:
                 "timestamp": _now.isoformat(),
                 "files_translated": sum(per_language_stats.values()),
                 "per_language_stats": per_language_stats,
-                "validation_failures": int(
-                    stats.get("translations", {}).get("failed", 0)
-                ),
+                "validation_failures": int(stats.get("translations", {}).get("failed", 0)),
                 "tm_hit_rates": stats.get("tm", {}),
                 "retranslate_queue_size": retranslate_queue_size,
                 "translations": stats.get("translations", {}),
@@ -1341,6 +1469,7 @@ class AutonomousContentTranslationWorker:
             # Use a thread with timeout to guard against OneDrive-sync file write hangs
             # (Windows OneDrive can block write_text() indefinitely on synced paths).
             import concurrent.futures as _cf
+
             _content = _json.dumps(run_summary, indent=2, ensure_ascii=False)
             with _cf.ThreadPoolExecutor(max_workers=1) as _ex:
                 _fut = _ex.submit(run_file.write_text, _content, "utf-8")
@@ -1386,7 +1515,9 @@ class AutonomousContentTranslationWorker:
 
         script = Path(__file__).parents[2] / "scripts" / "scan_language_contamination.py"
         if not script.exists():
-            logger.warning("TC-14: scan_language_contamination.py not found — skipping post-run scan")
+            logger.warning(
+                "TC-14: scan_language_contamination.py not found — skipping post-run scan"
+            )
             return
 
         try:
@@ -1403,9 +1534,12 @@ class AutonomousContentTranslationWorker:
                 # TC-MLD-05: --fast removed — full langdetect scan detects same-script
                 # contamination (English in Spanish/French/German, etc.) that --fast misses.
                 "--all-languages",
-                "--repo", str(content_root),
-                "--workers", "16",
-                "--json-output", json_output_path,
+                "--repo",
+                str(content_root),
+                "--workers",
+                "16",
+                "--json-output",
+                json_output_path,
             ]
 
             logger.info("TC-14: Running post-run contamination scan for site %s ...", site_id)
@@ -1427,10 +1561,12 @@ class AutonomousContentTranslationWorker:
                 json_path = Path(json_output_path)
                 if json_path.exists() and json_path.stat().st_size > 0:
                     import json as _json
+
                     data = _json.loads(json_path.read_text(encoding="utf-8"))
                     contaminated_files = data.get("files", [])
                     queued = 0
                     from src.tm.retranslate_queue import add_to_queue
+
                     for entry in contaminated_files:
                         file_path = entry.get("file_path")
                         target_lang = entry.get("target_lang")
@@ -1447,7 +1583,9 @@ class AutonomousContentTranslationWorker:
                         queued,
                     )
                 else:
-                    logger.info("TC-14: Post-run contamination scan complete — no JSON output (no issues found)")
+                    logger.info(
+                        "TC-14: Post-run contamination scan complete — no JSON output (no issues found)"
+                    )
             except Exception as _parse_err:
                 logger.warning("TC-14: Failed to parse scan JSON output: %s", _parse_err)
             finally:
@@ -1458,7 +1596,11 @@ class AutonomousContentTranslationWorker:
 
             if result.returncode not in (0, 1):
                 # exit code 1 = quality issues found (normal); other codes = errors
-                logger.warning("TC-14: Contamination scan exited with code %d: %s", result.returncode, result.stderr.strip()[:200])
+                logger.warning(
+                    "TC-14: Contamination scan exited with code %d: %s",
+                    result.returncode,
+                    result.stderr.strip()[:200],
+                )
 
         except subprocess.TimeoutExpired:
             logger.warning("TC-14: Post-run contamination scan timed out after 180s — skipping")
@@ -1477,9 +1619,11 @@ class AutonomousContentTranslationWorker:
             return
         model_loader.unload_all()
         import gc
+
         gc.collect()
         try:
             import torch
+
             if torch.cuda.is_available():
                 torch.cuda.empty_cache()
         except ImportError:
@@ -1548,9 +1692,7 @@ class AutonomousContentTranslationWorker:
         n = len(files)
         subject = f"chore({scope}): translate {n} {content_type} (orphan recovery)"
 
-        lang_lines = "\n".join(
-            f"- {lang} ({count})" for lang, count in sorted(lang_counts.items())
-        )
+        lang_lines = "\n".join(f"- {lang} ({count})" for lang, count in sorted(lang_counts.items()))
         body = (
             f"{n} translation file(s) recovered across {site_id}.\n"
             f"- Model: orphan recovery\n"
@@ -1611,8 +1753,10 @@ class AutonomousContentTranslationWorker:
             result = subprocess.run(
                 ["git", "show", f"HEAD:{source_rel_posix}"],
                 cwd=str(git_root),
-                capture_output=True, text=True,
-                encoding="utf-8", errors="replace",
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
                 timeout=10,
             )
             if result.returncode != 0:
@@ -1623,7 +1767,8 @@ class AutonomousContentTranslationWorker:
             logger.error(
                 "[orphan_gate] git show FAILED for %s: %s — REJECTING (fail-safe; "
                 "fix git access before re-enabling orphan recovery)",
-                source_rel_posix, e,
+                source_rel_posix,
+                e,
             )
             return False  # fail-safe: unknown state is treated as corrupted
 
@@ -1633,7 +1778,8 @@ class AutonomousContentTranslationWorker:
         except OSError as e:
             logger.error(
                 "[orphan_gate] Cannot read orphan %s: %s — REJECTING (fail-safe)",
-                orphan_path.name, e,
+                orphan_path.name,
+                e,
             )
             return False  # fail-safe
 
@@ -1642,7 +1788,7 @@ class AutonomousContentTranslationWorker:
             if text.startswith("---"):
                 end = text.find("---", 3)
                 if end != -1:
-                    return text[end + 3:].lstrip("\n")
+                    return text[end + 3 :].lstrip("\n")
             return text
 
         source_body = strip_frontmatter(source_text)
@@ -1663,7 +1809,9 @@ class AutonomousContentTranslationWorker:
         if source_code_blocks > 0 and orphan_code_blocks < source_code_blocks:
             logger.error(
                 "[orphan_gate] REJECTED %s — code blocks decreased: source=%d orphan=%d",
-                orphan_path.name, source_code_blocks, orphan_code_blocks,
+                orphan_path.name,
+                source_code_blocks,
+                orphan_code_blocks,
             )
             return False
 
@@ -1674,7 +1822,9 @@ class AutonomousContentTranslationWorker:
         if orphan_headings >= source_headings + 3:
             logger.error(
                 "[orphan_gate] REJECTED %s — heading surplus: source=%d orphan=%d (+%d)",
-                orphan_path.name, source_headings, orphan_headings,
+                orphan_path.name,
+                source_headings,
+                orphan_headings,
                 orphan_headings - source_headings,
             )
             return False
@@ -1744,6 +1894,7 @@ class AutonomousContentTranslationWorker:
             recover_orphaned_commit_manifests,
             recover_pending_commits,
         )
+
         try:
             git_roots = self._iter_recovery_git_roots()
         except Exception as exc:
@@ -1762,13 +1913,9 @@ class AutonomousContentTranslationWorker:
                     )
                 n = recover_pending_commits(git_root)
                 if n > 0:
-                    logger.info(
-                        f"[pending_commit_recovery] Recovered {n} commit(s) in {git_root}"
-                    )
+                    logger.info(f"[pending_commit_recovery] Recovered {n} commit(s) in {git_root}")
             except Exception as exc:
-                logger.warning(
-                    f"[pending_commit_recovery] Error processing {git_root}: {exc}"
-                )
+                logger.warning(f"[pending_commit_recovery] Error processing {git_root}: {exc}")
 
 
 def parse_args() -> argparse.Namespace:
@@ -1902,6 +2049,7 @@ def main():
     # Enable faulthandler so C-level crashes (segfault in PyTorch/HTTPX) produce
     # a native stack trace to stderr rather than silently dying.
     import faulthandler as _fh
+
     _fh.enable()
 
     # Parse arguments
@@ -1914,25 +2062,34 @@ def main():
     # TC-SYS-02: Use RotatingFileHandler to prevent log files from growing unbounded.
     try:
         from src.utils.config_loader import get_global_config as _gcfg
-        _log_cfg = _gcfg().get('logging', {})
+
+        _log_cfg = _gcfg().get("logging", {})
     except Exception:
         _log_cfg = {}
-    _max_bytes = int(_log_cfg.get('max_log_size_mb', 50)) * 1024 * 1024
-    _backup_count = int(_log_cfg.get('max_log_backups', 3))
+    _max_bytes = int(_log_cfg.get("max_log_size_mb", 50)) * 1024 * 1024
+    _backup_count = int(_log_cfg.get("max_log_backups", 3))
     from logging.handlers import RotatingFileHandler as _RFH
+
     logging.basicConfig(
         level=getattr(logging, args.log_level),
         format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
         datefmt="%Y-%m-%d %H:%M:%S",
         handlers=[
             logging.StreamHandler(),
-            _RFH(log_path, maxBytes=_max_bytes, backupCount=_backup_count, delay=True, encoding="utf-8"),
+            _RFH(
+                log_path,
+                maxBytes=_max_bytes,
+                backupCount=_backup_count,
+                delay=True,
+                encoding="utf-8",
+            ),
         ],
         force=True,
     )
 
     # Ensure logs are flushed on any exit path (normal, exception, signal)
     import atexit
+
     atexit.register(logging.shutdown)
 
     # TC-REEXEC-09 / RISK-09: Route structlog through stdlib logging so Windows
@@ -1941,6 +2098,7 @@ def main():
     # PrintLoggerFactory calls print(msg, file=sys.stdout) directly, which
     # crashes on restricted pipes (Task Scheduler, redirected stdout).
     import structlog as _structlog
+
     _structlog.configure(
         processors=[
             _structlog.stdlib.filter_by_level,
@@ -1998,12 +2156,13 @@ def main():
 
     # Register signal handlers for graceful shutdown
     def _shutdown_handler(signum, frame):
-        sig_name = signal.Signals(signum).name if hasattr(signal, 'Signals') else str(signum)
+        sig_name = signal.Signals(signum).name if hasattr(signal, "Signals") else str(signum)
         logger.warning(f"Received {sig_name}, initiating graceful shutdown...")
         worker._stop_heartbeat_thread()
         worker._write_heartbeat("shutting_down")
         try:
             from src.observability.graceful_shutdown import cleanup_telemetry_contexts
+
             cleanup_telemetry_contexts(sig_name)
         except Exception:
             pass
@@ -2012,7 +2171,7 @@ def main():
 
     for sig in [signal.SIGINT, signal.SIGTERM]:
         signal.signal(sig, _shutdown_handler)
-    if platform.system() == "Windows" and hasattr(signal, 'SIGBREAK'):
+    if platform.system() == "Windows" and hasattr(signal, "SIGBREAK"):
         signal.signal(signal.SIGBREAK, _shutdown_handler)
 
     try:

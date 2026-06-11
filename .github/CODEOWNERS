@@ -1,0 +1,29 @@
+# CODEOWNERS — Hugo Translation System
+# Each line maps a file pattern to one or more owners.
+# GitHub auto-requests reviews from these owners on PRs that touch matching files.
+
+# Core translation engine
+/src/translation_engine/    @babar-raza
+/src/tm/                    @babar-raza
+
+# Observability and metrics
+/src/observability/         @babar-raza
+
+# Workers and orchestration
+/src/workers/               @babar-raza
+/src/orchestrator/          @babar-raza
+
+# Model runtime and benchmarking
+/src/model_runtime/         @babar-raza
+/src/benchmarking/          @babar-raza
+
+# CI/CD and deployment
+/.github/                   @babar-raza
+/scripts/                   @babar-raza
+/Dockerfile                 @babar-raza
+
+# Configuration
+/config/                    @babar-raza
+
+# Documentation
+/docs/                      @babar-raza
