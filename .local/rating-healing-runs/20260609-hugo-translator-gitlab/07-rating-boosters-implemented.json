@@ -1,0 +1,46 @@
+{
+  "boosters_implemented": [
+    {
+      "id": "B1",
+      "dimension": "functional_clarity",
+      "description": "Fixed shortcode regex to match all Hugo shortcode types ({{< >}}, {{% %}}, {{/* */}})",
+      "impact": "+1.0",
+      "evidence": "Debug output showing correct extraction; 39/39 shortcode tests pass"
+    },
+    {
+      "id": "B2",
+      "dimension": "functional_clarity",
+      "description": "Fixed extra-shortcode severity from ERROR to WARNING",
+      "impact": "included in B1",
+      "evidence": "Tests confirm WARNING severity for extras, ERROR for missing"
+    },
+    {
+      "id": "B3",
+      "dimension": "code_quality",
+      "description": "Fixed 65 ruff lint violations (29 src + 36 tests)",
+      "impact": "+1.0",
+      "evidence": "ruff check src/ and tests/ both report 'All checks passed'"
+    },
+    {
+      "id": "B4",
+      "dimension": "code_quality",
+      "description": "Fixed FutureWarning in L3 Semantic TM",
+      "impact": "included in B3",
+      "evidence": "Method renamed from get_sentence_embedding_dimension to get_embedding_dimension"
+    },
+    {
+      "id": "B5",
+      "dimension": "test_confidence",
+      "description": "Fixed 25 failing shortcode preservation tests",
+      "impact": "+1.5",
+      "evidence": "461/461 validation tests pass (was 436/461)"
+    },
+    {
+      "id": "B6",
+      "dimension": "operational_maturity",
+      "description": "Added local quality gate script (scripts/ci/run_local_gate.py)",
+      "impact": "+0.5",
+      "evidence": "File created; runs ruff + unit tests + contract tests"
+    }
+  ]
+}

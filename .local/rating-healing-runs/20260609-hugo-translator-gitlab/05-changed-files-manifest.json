@@ -1,0 +1,68 @@
+{
+  "sprint": "20260609-hugo-translator-gitlab",
+  "changed_files": {
+    "source_behavior_fixes": [
+      "src/translation_engine/validation/shortcode_preservation_validator.py",
+      "src/tm/l3_semantic.py"
+    ],
+    "ruff_auto_fixes_src": [
+      "src/model_runtime/discovery_report.py",
+      "src/model_runtime/local_discovery.py",
+      "src/model_runtime/model_cli.py",
+      "src/observability/agent_metrics_integration.py",
+      "src/observability/agent_metrics_payload.py",
+      "src/observability/agent_metrics_poster.py",
+      "src/observability/gitlab_context.py",
+      "src/observability/llm_run_context.py",
+      "src/observability/metrics_evidence.py",
+      "src/observability/metrics_scope.py",
+      "src/translation_engine/correction.py",
+      "src/translation_engine/validation/frontmatter_integrity_validator.py",
+      "src/translation_engine/validation/validation_suite.py"
+    ],
+    "test_fixes": [
+      "tests/unit/validation/test_shortcode_preservation_validator.py"
+    ],
+    "ruff_auto_fixes_tests": [
+      "tests/benchmark_l3_search.py",
+      "tests/integration/test_dry_run_matrix.py",
+      "tests/integration/test_provider_instrumentation.py",
+      "tests/integration/test_worker_orchestrator.py",
+      "tests/models/test_local_discovery.py",
+      "tests/unit/formatting/test_yaml_formatter_logging_safety.py",
+      "tests/unit/logging/test_safe_console_logging.py",
+      "tests/unit/observability/test_agent_metrics_poster.py",
+      "tests/unit/observability/test_idempotency.py",
+      "tests/unit/observability/test_metrics_evidence.py",
+      "tests/unit/observability/test_metrics_scope.py",
+      "tests/unit/test_asset_sync.py",
+      "tests/unit/test_ast_frontmatter_baseline.py",
+      "tests/unit/test_ast_frontmatter_reconstruction.py",
+      "tests/unit/test_batch_purity_skip_compensation.py",
+      "tests/unit/test_code_block_content.py",
+      "tests/unit/test_correction_scope.py",
+      "tests/unit/test_git_changed_files.py",
+      "tests/unit/test_llm_output_ratio.py",
+      "tests/unit/test_quality_score.py",
+      "tests/unit/test_review_cache.py",
+      "tests/unit/tm/test_l3_context_gate.py",
+      "tests/unit/translation_engine/test_repeated_feedback_guard.py",
+      "tests/unit/validation/test_frontmatter_key_integrity.py",
+      "tests/unit/validation/test_shortcode_hallucination.py",
+      "tests/unit/workers/test_family_partitioning.py",
+      "tests/unit/workers/test_queue_probes.py"
+    ],
+    "new_files": [
+      "scripts/ci/run_local_gate.py"
+    ],
+    "evidence_files": [
+      ".local/rating-healing-runs/20260609-hugo-translator-gitlab/"
+    ],
+    "pre_existing_uncommitted": [
+      "config/site_profiles/docs.aspose.org.yaml",
+      "config/site_profiles/reference.aspose.org.yaml"
+    ]
+  },
+  "total_files_changed_by_sprint": 44,
+  "new_files_created": 1
+}

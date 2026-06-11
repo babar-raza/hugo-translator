@@ -1,0 +1,46 @@
+{
+  "boosters_remaining": [
+    {
+      "id": "R1",
+      "dimension": "test_confidence",
+      "description": "Enable test coverage reporting and set minimum coverage gate",
+      "estimated_impact": "+0.5",
+      "effort": "Low - enable existing coverage config in quality_gates.yaml"
+    },
+    {
+      "id": "R2",
+      "dimension": "code_quality",
+      "description": "Reduce ruff ignore list in pyproject.toml (currently 20+ tracked-as-tech-debt ignores)",
+      "estimated_impact": "+0.5",
+      "effort": "Medium - requires fixing widespread patterns"
+    },
+    {
+      "id": "R3",
+      "dimension": "documentation_trustworthiness",
+      "description": "Audit and fix stale docs claims; test setup instructions end-to-end",
+      "estimated_impact": "+0.5",
+      "effort": "Medium"
+    },
+    {
+      "id": "R4",
+      "dimension": "operational_maturity",
+      "description": "Run local gate script in CI as a required check",
+      "estimated_impact": "+0.5",
+      "effort": "Low - add workflow step"
+    },
+    {
+      "id": "R5",
+      "dimension": "overall_adoption_confidence",
+      "description": "Document dev environment setup (venv + dev deps installation)",
+      "estimated_impact": "+0.5",
+      "effort": "Low"
+    },
+    {
+      "id": "R6",
+      "dimension": "agentic_workflow_maturity",
+      "description": "Add worker health integration tests",
+      "estimated_impact": "+0.5",
+      "effort": "Medium"
+    }
+  ]
+}

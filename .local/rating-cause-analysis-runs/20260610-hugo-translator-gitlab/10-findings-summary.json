@@ -1,0 +1,23 @@
+{
+  "total_findings": 13,
+  "by_severity": {
+    "HIGH": 4,
+    "MEDIUM": 6,
+    "LOW": 3
+  },
+  "findings": [
+    {"id": "RCA-001", "severity": "HIGH", "title": "God-Class TranslationEngine", "dimensions": ["architecture", "maintainability", "test_confidence"]},
+    {"id": "RCA-002", "severity": "HIGH", "title": "Exception Swallowing at Scale", "dimensions": ["code_quality", "operational_maturity", "functional_clarity"]},
+    {"id": "RCA-003", "severity": "MEDIUM", "title": "26 Suppressed Ruff Rules", "dimensions": ["code_quality", "maintainability"]},
+    {"id": "RCA-004", "severity": "HIGH", "title": "Test Coverage Gate Disabled", "dimensions": ["test_confidence", "operational_maturity"]},
+    {"id": "RCA-005", "severity": "MEDIUM", "title": "CI Runs Only Test Subset", "dimensions": ["operational_maturity", "test_confidence"]},
+    {"id": "RCA-006", "severity": "MEDIUM", "title": "CLI Mega-Module", "dimensions": ["maintainability", "architecture"]},
+    {"id": "RCA-007", "severity": "MEDIUM", "title": "Mypy Never Run", "dimensions": ["code_quality", "maintainability"]},
+    {"id": "RCA-008", "severity": "HIGH", "title": "1417-Line Method", "dimensions": ["architecture", "maintainability", "code_quality"]},
+    {"id": "RCA-009", "severity": "MEDIUM", "title": "Aspirational Documentation", "dimensions": ["documentation", "adoption_confidence"]},
+    {"id": "RCA-010", "severity": "MEDIUM", "title": "Convention-Only Worker Governance", "dimensions": ["agentic_workflow", "operational_maturity"]},
+    {"id": "RCA-011", "severity": "LOW", "title": "Incomplete Pre-commit Hooks", "dimensions": ["code_quality", "operational_maturity"]},
+    {"id": "RCA-012", "severity": "LOW", "title": "Subprocess Args Unsanitized", "dimensions": ["security"]},
+    {"id": "RCA-013", "severity": "LOW", "title": "Unbounded Dependency Versions", "dimensions": ["integration_fitness", "operational_maturity"]}
+  ]
+}
