@@ -205,9 +205,10 @@ jobs:
 
       - name: Run pip-audit dependency scan
         run: |
-          python -m pip_audit -r requirements/base.txt --format json -o reports/pip-audit.json --exit-zero
+          python -m pip_audit -r requirements/base.txt --format json -o reports/pip-audit.json
           Write-Host "pip-audit scan complete (non-blocking)"
         shell: pwsh
+        continue-on-error: true  # advisory — vulnerabilities do not block the gate
 
       - name: Upload Security Reports
         if: always()
