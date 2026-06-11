@@ -101,6 +101,7 @@ class DualOutputProcessor:
             # WS4: Write logging errors to both stderr AND stdout for visibility
             # This prevents logging failures from crashing the application
             import traceback
+
             error_msg = f"LOGGING ERROR: Failed to write NDJSON log: {e}"
             print(error_msg, file=sys.stderr)
             print(error_msg, file=sys.stdout, flush=True)
@@ -113,6 +114,7 @@ class DualOutputProcessor:
 
 # Global flag to prevent re-entrancy issues
 _logging_configured = False
+
 
 def setup_structured_logging(
     log_level: str = "INFO",
@@ -173,9 +175,7 @@ def setup_structured_logging(
     # Add dual output processor if both console and file are requested
     if log_file:
         log_file.parent.mkdir(parents=True, exist_ok=True)
-        base_processors.append(
-            DualOutputProcessor(log_file, max_bytes, backup_count)
-        )
+        base_processors.append(DualOutputProcessor(log_file, max_bytes, backup_count))
     print("DEBUG: setup_structured_logging: DualOutputProcessor handled", flush=True)
 
     # Add console renderer if console output is enabled
@@ -187,13 +187,13 @@ def setup_structured_logging(
         # Set up console handler for standard library logging
         # Wrap stdout with UTF-8 encoding to handle Unicode characters on Windows
         print("DEBUG: setup_structured_logging: About to wrap stdout", flush=True)
-        if hasattr(sys.stdout, 'buffer'):
+        if hasattr(sys.stdout, "buffer"):
             # Use UTF-8 encoding with error handling for Unicode support on Windows
             utf8_stdout = io.TextIOWrapper(
                 sys.stdout.buffer,
-                encoding='utf-8',
-                errors='replace',  # Replace unencodable chars instead of crashing
-                line_buffering=True
+                encoding="utf-8",
+                errors="replace",  # Replace unencodable chars instead of crashing
+                line_buffering=True,
             )
         else:
             # Fallback if stdout.buffer is not available
@@ -361,9 +361,7 @@ class StructuredLogger:
                 else 0,
                 2,
             ),
-            translated_segments=(
-                result.stats.translated_segments if result.stats else 0
-            ),
+            translated_segments=(result.stats.translated_segments if result.stats else 0),
             duration_seconds=result.stats.duration_seconds if result.stats else 0,
             words_translated=result.stats.words_translated if result.stats else 0,
             error_count=len(result.errors),
@@ -371,9 +369,7 @@ class StructuredLogger:
             worker_id=worker_id,
         )
 
-    def log_job_failed(
-        self, job: TranslationJob, error: Exception, worker_id: str
-    ) -> None:
+    def log_job_failed(self, job: TranslationJob, error: Exception, worker_id: str) -> None:
         """
         Log job failure.
 
@@ -739,9 +735,7 @@ class StructuredLogger:
             batch_size=batch_size,
             inference_time_seconds=inference_time_seconds,
             tokens_per_second=tokens_per_second,
-            time_per_segment=round(inference_time_seconds / batch_size, 4)
-            if batch_size > 0
-            else 0,
+            time_per_segment=round(inference_time_seconds / batch_size, 4) if batch_size > 0 else 0,
         )
 
     def log_gpu_stats(
@@ -769,9 +763,7 @@ class StructuredLogger:
             memory_allocated_mb=memory_allocated_mb,
             memory_reserved_mb=memory_reserved_mb,
             memory_total_mb=memory_total_mb,
-            memory_utilization_percent=round(
-                (memory_allocated_mb / memory_total_mb * 100), 2
-            )
+            memory_utilization_percent=round((memory_allocated_mb / memory_total_mb * 100), 2)
             if memory_total_mb > 0
             else 0,
             gpu_utilization_percent=utilization_percent,
@@ -952,6 +944,37 @@ class StructuredLogger:
             **kwargs: Additional context
         """
         self._log_both("debug", message, **kwargs)
+
+    def log_quality_metrics(
+        self,
+        repetition_detected_count: int = 0,
+        max_ngram_frequency: int = 0,
+        length_ratio_mean: float | None = None,
+        length_ratio_max: float | None = None,
+        validation_rejection_by_validator: dict | None = None,
+        segments_checked: int = 0,
+        total_validation_issues: int = 0,
+        error_count: int = 0,
+        warning_count: int = 0,
+        **kwargs: Any,
+    ) -> None:
+        """Log quality metrics at INFO level."""
+        payload: dict[str, Any] = {
+            "repetition_detected_count": repetition_detected_count,
+            "max_ngram_frequency": max_ngram_frequency,
+            "segments_checked": segments_checked,
+            "total_validation_issues": total_validation_issues,
+            "error_count": error_count,
+            "warning_count": warning_count,
+        }
+        if length_ratio_mean is not None:
+            payload["length_ratio_mean"] = round(length_ratio_mean, 3)
+        if length_ratio_max is not None:
+            payload["length_ratio_max"] = round(length_ratio_max, 3)
+        if validation_rejection_by_validator:
+            payload["validation_rejection_by_validator"] = validation_rejection_by_validator
+        payload.update(kwargs)
+        self._log_both("info", "quality_metrics", **payload)
 
 
 # Global logger instance

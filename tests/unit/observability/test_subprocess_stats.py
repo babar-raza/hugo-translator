@@ -411,7 +411,7 @@ class TestSubprocessStats:
     @patch("src.observability.subprocess_stats.logger")
     def test_telemetry_emission(self, mock_logger):
         """Test that telemetry events are emitted."""
-        with patch("src.observability.subprocess_stats.emit_event") as mock_emit:
+        with patch("src.observability.telemetry_integration.emit_event") as mock_emit:
             stats = SubprocessStats(enable_telemetry=True, summary_interval=1000)
 
             # Record success
@@ -434,7 +434,7 @@ class TestSubprocessStats:
     @patch("src.observability.subprocess_stats.logger")
     def test_telemetry_failure_emission(self, mock_logger):
         """Test that failure events are emitted."""
-        with patch("src.observability.subprocess_stats.emit_event") as mock_emit:
+        with patch("src.observability.telemetry_integration.emit_event") as mock_emit:
             stats = SubprocessStats(enable_telemetry=True, summary_interval=1000)
 
             # Record failure
@@ -456,7 +456,7 @@ class TestSubprocessStats:
     @patch("src.observability.subprocess_stats.logger")
     def test_telemetry_slow_emission(self, mock_logger):
         """Test that slow execution events are emitted."""
-        with patch("src.observability.subprocess_stats.emit_event") as mock_emit:
+        with patch("src.observability.telemetry_integration.emit_event") as mock_emit:
             stats = SubprocessStats(
                 slow_threshold=5.0, enable_telemetry=True, summary_interval=1000
             )

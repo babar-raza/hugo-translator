@@ -68,7 +68,9 @@ class Gauge(Metric):
 class Histogram(Metric):
     """Histogram metric for tracking distributions."""
 
-    buckets: list[float] = field(default_factory=lambda: [0.01, 0.1, 0.5, 1.0, 5.0, 10.0, 30.0, 60.0])
+    buckets: list[float] = field(
+        default_factory=lambda: [0.01, 0.1, 0.5, 1.0, 5.0, 10.0, 30.0, 60.0]
+    )
     values: list[float] = field(default_factory=list)
     bucket_counts: dict[float, int] = field(default_factory=dict)
     sum: float = 0.0
@@ -546,6 +548,60 @@ class MetricsCollector:
                 else:
                     logger.warning(f"Histogram {name} not registered")
 
+    def set(
+        self,
+        name: str,
+        value: float,
+        labels: dict[str, str] | None = None,
+    ) -> None:
+        """Alias for set_gauge()."""
+        self.set_gauge(name, value, labels)
+
+    def get_histogram(
+        self,
+        name: str,
+        labels: dict[str, str] | None = None,
+    ) -> "Histogram | None":
+        """Return the Histogram instance for (name, labels), or None."""
+        lbl = {"worker_id": self.worker_id}
+        if labels:
+            lbl.update(labels)
+        key = self._make_key(name, lbl)
+        with self._lock:
+            return self._histograms.get(key) or self._histograms.get(
+                self._make_key(name, {"worker_id": self.worker_id})
+            )
+
+    def get_counter(
+        self,
+        name: str,
+        labels: dict[str, str] | None = None,
+    ) -> "Counter | None":
+        """Return the Counter instance for (name, labels), or None."""
+        lbl = {"worker_id": self.worker_id}
+        if labels:
+            lbl.update(labels)
+        key = self._make_key(name, lbl)
+        with self._lock:
+            return self._counters.get(key) or self._counters.get(
+                self._make_key(name, {"worker_id": self.worker_id})
+            )
+
+    def get_gauge(
+        self,
+        name: str,
+        labels: dict[str, str] | None = None,
+    ) -> "Gauge | None":
+        """Return the Gauge instance for (name, labels), or None."""
+        lbl = {"worker_id": self.worker_id}
+        if labels:
+            lbl.update(labels)
+        key = self._make_key(name, lbl)
+        with self._lock:
+            return self._gauges.get(key) or self._gauges.get(
+                self._make_key(name, {"worker_id": self.worker_id})
+            )
+
     def get_all(self) -> dict[str, Any]:
         """Get all metrics."""
         with self._lock:
@@ -742,48 +798,40 @@ class MetricsCollector:
         with self._lock:
             # Get core counters
             translations_total = self._counters.get(
-                self._make_key("translations_total", {"worker_id": self.worker_id}),
-                Counter("", "")
+                self._make_key("translations_total", {"worker_id": self.worker_id}), Counter("", "")
             ).get()
             translations_success = self._counters.get(
                 self._make_key("translations_success", {"worker_id": self.worker_id}),
-                Counter("", "")
+                Counter("", ""),
             ).get()
             translations_failed = self._counters.get(
                 self._make_key("translations_failed", {"worker_id": self.worker_id}),
-                Counter("", "")
+                Counter("", ""),
             ).get()
 
             # Get TM counters
             tm_lookups = self._counters.get(
-                self._make_key("tm_lookups_total", {"worker_id": self.worker_id}),
-                Counter("", "")
+                self._make_key("tm_lookups_total", {"worker_id": self.worker_id}), Counter("", "")
             ).get()
             tm_l1_hits = self._counters.get(
-                self._make_key("tm_hits_l1", {"worker_id": self.worker_id}),
-                Counter("", "")
+                self._make_key("tm_hits_l1", {"worker_id": self.worker_id}), Counter("", "")
             ).get()
             tm_l2_hits = self._counters.get(
-                self._make_key("tm_hits_l2", {"worker_id": self.worker_id}),
-                Counter("", "")
+                self._make_key("tm_hits_l2", {"worker_id": self.worker_id}), Counter("", "")
             ).get()
             tm_l3_hits = self._counters.get(
-                self._make_key("tm_hits_l3", {"worker_id": self.worker_id}),
-                Counter("", "")
+                self._make_key("tm_hits_l3", {"worker_id": self.worker_id}), Counter("", "")
             ).get()
             tm_misses = self._counters.get(
-                self._make_key("tm_misses", {"worker_id": self.worker_id}),
-                Counter("", "")
+                self._make_key("tm_misses", {"worker_id": self.worker_id}), Counter("", "")
             ).get()
 
             # Get gauges
             queue_depth = self._gauges.get(
-                self._make_key("queue_depth", {"worker_id": self.worker_id}),
-                Gauge("", "")
+                self._make_key("queue_depth", {"worker_id": self.worker_id}), Gauge("", "")
             ).get()
             active_jobs = self._gauges.get(
-                self._make_key("active_jobs", {"worker_id": self.worker_id}),
-                Gauge("", "")
+                self._make_key("active_jobs", {"worker_id": self.worker_id}), Gauge("", "")
             ).get()
 
             # Get histogram stats
@@ -791,8 +839,7 @@ class MetricsCollector:
                 "translation_duration_seconds", {"worker_id": self.worker_id}
             )
             translation_stats = self._histograms.get(
-                translation_duration_key,
-                Histogram("", "")
+                translation_duration_key, Histogram("", "")
             ).get_stats()
 
             return {
@@ -801,7 +848,9 @@ class MetricsCollector:
                     "total": int(translations_total),
                     "success": int(translations_success),
                     "failed": int(translations_failed),
-                    "success_rate": translations_success / translations_total if translations_total > 0 else 0.0,
+                    "success_rate": translations_success / translations_total
+                    if translations_total > 0
+                    else 0.0,
                 },
                 "tm": {
                     "lookups": int(tm_lookups),
@@ -810,7 +859,9 @@ class MetricsCollector:
                     "l3_hits": int(tm_l3_hits),
                     "misses": int(tm_misses),
                     "total_hits": int(tm_l1_hits + tm_l2_hits + tm_l3_hits),
-                    "hit_rate": (tm_l1_hits + tm_l2_hits + tm_l3_hits) / tm_lookups if tm_lookups > 0 else 0.0,
+                    "hit_rate": (tm_l1_hits + tm_l2_hits + tm_l3_hits) / tm_lookups
+                    if tm_lookups > 0
+                    else 0.0,
                 },
                 "queue": {
                     "depth": int(queue_depth),
@@ -915,7 +966,9 @@ def record_coverage_snapshot(
             # coverage_pct = successful / (total_needing_work + already_current)
             "coverage_pct": round(
                 successful_files / (total_files + completion_filter_skipped) * 100, 1
-            ) if (total_files + completion_filter_skipped) > 0 else None,
+            )
+            if (total_files + completion_filter_skipped) > 0
+            else None,
         }
         records.append(new_entry)
 
@@ -928,8 +981,12 @@ def record_coverage_snapshot(
 
         logger.debug(
             "Coverage snapshot written: site=%s langs=%d total=%d succeeded=%d skipped=%d coverage=%.1f%%",
-            site_id, len(target_langs), total_files, successful_files,
-            completion_filter_skipped, new_entry.get("coverage_pct") or 0.0,
+            site_id,
+            len(target_langs),
+            total_files,
+            successful_files,
+            completion_filter_skipped,
+            new_entry.get("coverage_pct") or 0.0,
         )
     except Exception as exc:
         logger.warning("Failed to write coverage snapshot for %s: %s", site_id, exc)
