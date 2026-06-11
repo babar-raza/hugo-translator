@@ -51,42 +51,111 @@ SEVERITY_INFO = "info"
 
 # Language codes to detect translated files
 LANG_CODES = {
-    "ar", "bg", "ca", "cs", "da", "de", "el", "es", "fa", "fi", "fr",
-    "he", "hi", "hr", "hu", "id", "it", "ja", "ko", "lt", "lv", "ms",
-    "nl", "no", "pl", "pt", "ro", "ru", "sk", "sr", "sv", "th", "tr",
-    "uk", "vi", "zh",
+    "ar",
+    "bg",
+    "ca",
+    "cs",
+    "da",
+    "de",
+    "el",
+    "es",
+    "fa",
+    "fi",
+    "fr",
+    "he",
+    "hi",
+    "hr",
+    "hu",
+    "id",
+    "it",
+    "ja",
+    "ko",
+    "lt",
+    "lv",
+    "ms",
+    "nl",
+    "no",
+    "pl",
+    "pt",
+    "ro",
+    "ru",
+    "sk",
+    "sr",
+    "sv",
+    "th",
+    "tr",
+    "uk",
+    "vi",
+    "zh",
 }
 
 # YAML keys that must never be translated
 CANONICAL_PASSTHROUGH_KEYS = {
-    "layout", "type", "draft", "date", "lastmod", "weight", "url", "slug",
-    "aliases", "productname", "productkey", "platformkey", "productplatform",
-    "source_version", "generated_by", "enhanced", "howtoimage", "cart_id",
-    "gisthash", "gistfile", "enable", "linktitle",
+    "layout",
+    "type",
+    "draft",
+    "date",
+    "lastmod",
+    "weight",
+    "url",
+    "slug",
+    "aliases",
+    "productname",
+    "productkey",
+    "platformkey",
+    "productplatform",
+    "source_version",
+    "generated_by",
+    "enhanced",
+    "howtoimage",
+    "cart_id",
+    "gisthash",
+    "gistfile",
+    "enable",
+    "linktitle",
 }
 
 # Czech/German/French common translations of canonical keys (signals key translation)
 TRANSLATED_KEY_PATTERNS = {
     # Czech
-    "autor", "datum", "popis", "nazev", "nazev", "kategorie", "shrnutí", "shrnuty",
-    "posledni", "zvysena", "dny", "titulek",
+    "autor",
+    "datum",
+    "popis",
+    "nazev",
+    "kategorie",
+    "shrnutí",
+    "shrnuty",
+    "posledni",
+    "zvysena",
+    "dny",
+    "titulek",
     # French
-    "auteur", "date_creation", "titre", "description_fr",
+    "auteur",
+    "date_creation",
+    "titre",
+    "description_fr",
     # German
-    "autor", "datum", "titel", "beschreibung",
+    "titel",
+    "beschreibung",
     # Arabic
-    "مؤلف", "تاريخ", "وصف", "عنوان",
+    "مؤلف",
+    "تاريخ",
+    "وصف",
+    "عنوان",
     # Japanese
-    "著者", "日付",
+    "著者",
+    "日付",
 }
 
 # Hugo shortcode opening/closing pattern
-SHORTCODE_OPEN_RE = re.compile(r'\{\{[<%]\s*/?\s*(\w+)[^>%]*[>%]\}\}')
-SHORTCODE_PAIRS_RE = re.compile(r'\{\{[<%]\s*(/?)(\w+)[^>%]*[>%]\}\}')
-BLOCK_SCALAR_RE = re.compile(r'^(\s*)(\w[\w.-]*):\s*[|>][-+]?\s*$')
-MULTI_KV_RE = re.compile(r'\w[\w.-]*:\s+\S.*\w[\w.-]*:\s')
-URL_RE = re.compile(r'https?://\S+')
-CANONICAL_URL_PATTERN = re.compile(r'https?://(?:docs|releases|products|blog|kb)\.aspose\.(com|net|org|app)/')
+SHORTCODE_OPEN_RE = re.compile(r"\{\{[<%]\s*/?\s*(\w+)[^>%]*[>%]\}\}")
+SHORTCODE_PAIRS_RE = re.compile(r"\{\{[<%]\s*(/?)(\w+)[^>%]*[>%]\}\}")
+BLOCK_SCALAR_RE = re.compile(r"^(\s*)(\w[\w.-]*):\s*[|>][-+]?\s*$")
+MULTI_KV_RE = re.compile(r"\w[\w.-]*:\s+\S.*\w[\w.-]*:\s")
+URL_RE = re.compile(r"https?://\S+")
+CANONICAL_URL_PATTERN = re.compile(
+    r"https?://(?:docs|releases|products|blog|kb)\.aspose\.(com|net|org|app)/"
+)
 
 
 @dataclass
@@ -164,11 +233,12 @@ KNOWN_FAILING = {
 # Checks
 # ---------------------------------------------------------------------------
 
+
 def is_translated_file(path: Path) -> bool:
     """Return True if this looks like a translated (non-English) Markdown file."""
     name = path.name
     # pattern: index.XX.md or _index.md in a lang folder
-    m = re.match(r'^(?:index|_index)\.([a-z]{2})\.md$', name)
+    m = re.match(r"^(?:index|_index)\.([a-z]{2})\.md$", name)
     if m and m.group(1) in LANG_CODES:
         return True
     # Check parent directory is a lang code
@@ -183,7 +253,7 @@ def find_english_source(path: Path) -> Path | None:
     parent = path.parent
 
     # index.XX.md -> index.md (same dir)
-    m = re.match(r'^(index|_index)\.([a-z]{2})\.md$', name)
+    m = re.match(r"^(index|_index)\.([a-z]{2})\.md$", name)
     if m:
         src = parent / f"{m.group(1)}.md"
         if src.exists():
@@ -225,15 +295,17 @@ def check_yaml_parseable(fm_str: str, path_str: str) -> list[Issue]:
         # Extract line number
         m = re.search(r"line (\d+), column (\d+)", str(e))
         line = int(m.group(1)) + 1 if m else None  # +1 for the opening ---
-        issues.append(Issue(
-            path=path_str,
-            line=line,
-            kind="yaml_parse_failure",
-            message=f"YAML frontmatter fails to parse: {msg}",
-            severity=SEVERITY_ERROR,
-            safe_autofix=False,
-            manual_review=True,
-        ))
+        issues.append(
+            Issue(
+                path=path_str,
+                line=line,
+                kind="yaml_parse_failure",
+                message=f"YAML frontmatter fails to parse: {msg}",
+                severity=SEVERITY_ERROR,
+                safe_autofix=False,
+                manual_review=True,
+            )
+        )
     return issues
 
 
@@ -255,18 +327,20 @@ def check_block_scalar_indent(fm_str: str, path_str: str) -> list[Issue]:
                 content_line = lines[j]
                 content_indent = len(content_line) - len(content_line.lstrip())
                 if content_indent <= key_indent and content_line.strip():
-                    issues.append(Issue(
-                        path=path_str,
-                        line=i + 2,  # +1 for --- +1 for 0-index
-                        kind="block_scalar_indent_failure",
-                        message=(
-                            f"Block scalar '{m.group(2)}:' at indent {key_indent}, "
-                            f"but content at indent {content_indent} (must be deeper)"
-                        ),
-                        severity=SEVERITY_ERROR,
-                        safe_autofix=False,  # Need to know correct indentation
-                        manual_review=True,
-                    ))
+                    issues.append(
+                        Issue(
+                            path=path_str,
+                            line=i + 2,  # +1 for --- +1 for 0-index
+                            kind="block_scalar_indent_failure",
+                            message=(
+                                f"Block scalar '{m.group(2)}:' at indent {key_indent}, "
+                                f"but content at indent {content_indent} (must be deeper)"
+                            ),
+                            severity=SEVERITY_ERROR,
+                            safe_autofix=False,  # Need to know correct indentation
+                            manual_review=True,
+                        )
+                    )
         i += 1
     return issues
 
@@ -282,19 +356,23 @@ def check_collapsed_frontmatter(fm_str: str, path_str: str) -> list[Issue]:
         # Count colon-separated key patterns on one line
         # A line like "key1: val1 key2: val2" is suspicious
         if MULTI_KV_RE.search(line):
-            issues.append(Issue(
-                path=path_str,
-                line=i + 2,
-                kind="collapsed_frontmatter",
-                message=f"Multiple YAML key:value pairs on one line (collapsed structure): {line[:80]}",
-                severity=SEVERITY_ERROR,
-                safe_autofix=False,
-                manual_review=True,
-            ))
+            issues.append(
+                Issue(
+                    path=path_str,
+                    line=i + 2,
+                    kind="collapsed_frontmatter",
+                    message=f"Multiple YAML key:value pairs on one line (collapsed structure): {line[:80]}",
+                    severity=SEVERITY_ERROR,
+                    safe_autofix=False,
+                    manual_review=True,
+                )
+            )
     return issues
 
 
-def check_translated_keys(fm_str: str, path_str: str, source_fm_str: str | None = None) -> list[Issue]:
+def check_translated_keys(
+    fm_str: str, path_str: str, source_fm_str: str | None = None
+) -> list[Issue]:
     """Check that YAML keys haven't been translated."""
     issues = []
     try:
@@ -307,15 +385,17 @@ def check_translated_keys(fm_str: str, path_str: str, source_fm_str: str | None 
                 key_lower = str(key).lower()
                 # Check against known translated key patterns
                 if key_lower in TRANSLATED_KEY_PATTERNS:
-                    issues.append(Issue(
-                        path=path_str,
-                        line=None,
-                        kind="translated_yaml_key",
-                        message=f"YAML key '{key}' appears to be translated (expected canonical English key)",
-                        severity=SEVERITY_ERROR,
-                        safe_autofix=False,
-                        manual_review=True,
-                    ))
+                    issues.append(
+                        Issue(
+                            path=path_str,
+                            line=None,
+                            kind="translated_yaml_key",
+                            message=f"YAML key '{key}' appears to be translated (expected canonical English key)",
+                            severity=SEVERITY_ERROR,
+                            safe_autofix=False,
+                            manual_review=True,
+                        )
+                    )
                 # Check against source keys if available
                 val = data[key]
                 if isinstance(val, dict):
@@ -333,25 +413,29 @@ def check_translated_keys(fm_str: str, path_str: str, source_fm_str: str | None 
                     extra_keys = tgt_keys - src_keys - {"source_version", "generated_by"}
                     missing_keys = src_keys - tgt_keys - {"source_version", "generated_by"}
                     if extra_keys:
-                        issues.append(Issue(
-                            path=path_str,
-                            line=None,
-                            kind="translated_yaml_key",
-                            message=f"Translated file has extra keys not in source: {sorted(extra_keys)}",
-                            severity=SEVERITY_ERROR,
-                            safe_autofix=False,
-                            manual_review=True,
-                        ))
+                        issues.append(
+                            Issue(
+                                path=path_str,
+                                line=None,
+                                kind="translated_yaml_key",
+                                message=f"Translated file has extra keys not in source: {sorted(extra_keys)}",
+                                severity=SEVERITY_ERROR,
+                                safe_autofix=False,
+                                manual_review=True,
+                            )
+                        )
                     if missing_keys:
-                        issues.append(Issue(
-                            path=path_str,
-                            line=None,
-                            kind="missing_yaml_key",
-                            message=f"Translated file is missing keys from source: {sorted(missing_keys)}",
-                            severity=SEVERITY_WARNING,
-                            safe_autofix=False,
-                            manual_review=True,
-                        ))
+                        issues.append(
+                            Issue(
+                                path=path_str,
+                                line=None,
+                                kind="missing_yaml_key",
+                                message=f"Translated file is missing keys from source: {sorted(missing_keys)}",
+                                severity=SEVERITY_WARNING,
+                                safe_autofix=False,
+                                manual_review=True,
+                            )
+                        )
             except yaml.YAMLError:
                 pass
 
@@ -383,37 +467,43 @@ def check_type_drift(fm_str: str, path_str: str, source_fm_str: str) -> list[Iss
                     continue
                 # bool -> str is always wrong
                 if isinstance(src_val, bool) and not isinstance(tgt_val, bool):
-                    issues.append(Issue(
-                        path=path_str,
-                        line=None,
-                        kind="type_drift",
-                        message=f"Key '{key}': source is bool ({src_val!r}), translation is {tgt_type} ({tgt_val!r})",
-                        severity=SEVERITY_ERROR,
-                        safe_autofix=False,
-                        manual_review=True,
-                    ))
+                    issues.append(
+                        Issue(
+                            path=path_str,
+                            line=None,
+                            kind="type_drift",
+                            message=f"Key '{key}': source is bool ({src_val!r}), translation is {tgt_type} ({tgt_val!r})",
+                            severity=SEVERITY_ERROR,
+                            safe_autofix=False,
+                            manual_review=True,
+                        )
+                    )
                 # list -> scalar is always wrong
                 elif isinstance(src_val, list) and not isinstance(tgt_val, list):
-                    issues.append(Issue(
-                        path=path_str,
-                        line=None,
-                        kind="type_drift",
-                        message=f"Key '{key}': source is list, translation is {tgt_type} (structure changed)",
-                        severity=SEVERITY_ERROR,
-                        safe_autofix=False,
-                        manual_review=True,
-                    ))
+                    issues.append(
+                        Issue(
+                            path=path_str,
+                            line=None,
+                            kind="type_drift",
+                            message=f"Key '{key}': source is list, translation is {tgt_type} (structure changed)",
+                            severity=SEVERITY_ERROR,
+                            safe_autofix=False,
+                            manual_review=True,
+                        )
+                    )
                 # scalar -> list (unexpected)
-                elif not isinstance(src_val, (dict, list)) and isinstance(tgt_val, list):
-                    issues.append(Issue(
-                        path=path_str,
-                        line=None,
-                        kind="type_drift",
-                        message=f"Key '{key}': source is {src_type}, translation is list (structure changed)",
-                        severity=SEVERITY_ERROR,
-                        safe_autofix=False,
-                        manual_review=True,
-                    ))
+                elif not isinstance(src_val, dict | list) and isinstance(tgt_val, list):
+                    issues.append(
+                        Issue(
+                            path=path_str,
+                            line=None,
+                            kind="type_drift",
+                            message=f"Key '{key}': source is {src_type}, translation is list (structure changed)",
+                            severity=SEVERITY_ERROR,
+                            safe_autofix=False,
+                            manual_review=True,
+                        )
+                    )
     except yaml.YAMLError:
         pass
     return issues
@@ -433,15 +523,17 @@ def check_passthrough_fields(fm_str: str, path_str: str, source_fm_str: str) -> 
                 src_val = src_data[key]
                 tgt_val = fm_data[key]
                 if src_val != tgt_val:
-                    issues.append(Issue(
-                        path=path_str,
-                        line=None,
-                        kind="passthrough_field_changed",
-                        message=f"Passthrough field '{key}' changed: {src_val!r} -> {tgt_val!r}",
-                        severity=SEVERITY_ERROR,
-                        safe_autofix=False,
-                        manual_review=True,
-                    ))
+                    issues.append(
+                        Issue(
+                            path=path_str,
+                            line=None,
+                            kind="passthrough_field_changed",
+                            message=f"Passthrough field '{key}' changed: {src_val!r} -> {tgt_val!r}",
+                            severity=SEVERITY_ERROR,
+                            safe_autofix=False,
+                            manual_review=True,
+                        )
+                    )
     except yaml.YAMLError:
         pass
     return issues
@@ -469,15 +561,17 @@ def check_shortcode_balance(body_str: str, path_str: str) -> list[Issue]:
                         matching = j
                         break
                 if matching is None:
-                    issues.append(Issue(
-                        path=path_str,
-                        line=i,
-                        kind="orphan_closing_shortcode",
-                        message=f"Closing shortcode '{full}' has no matching opener",
-                        severity=SEVERITY_ERROR,
-                        safe_autofix=False,
-                        manual_review=True,
-                    ))
+                    issues.append(
+                        Issue(
+                            path=path_str,
+                            line=i,
+                            kind="orphan_closing_shortcode",
+                            message=f"Closing shortcode '{full}' has no matching opener",
+                            severity=SEVERITY_ERROR,
+                            safe_autofix=False,
+                            manual_review=True,
+                        )
+                    )
                 else:
                     stack.pop(matching)
             else:
@@ -487,15 +581,17 @@ def check_shortcode_balance(body_str: str, path_str: str) -> list[Issue]:
 
     # Any remaining in stack are unclosed openers
     for name, line_num in stack:
-        issues.append(Issue(
-            path=path_str,
-            line=line_num,
-            kind="orphan_opening_shortcode",
-            message=f"Opening shortcode '{{{{% {name} %}}}}' has no matching closer",
-            severity=SEVERITY_WARNING,
-            safe_autofix=False,
-            manual_review=True,
-        ))
+        issues.append(
+            Issue(
+                path=path_str,
+                line=line_num,
+                kind="orphan_opening_shortcode",
+                message=f"Opening shortcode '{{{{% {name} %}}}}' has no matching closer",
+                severity=SEVERITY_WARNING,
+                safe_autofix=False,
+                manual_review=True,
+            )
+        )
 
     return issues
 
@@ -507,25 +603,30 @@ def check_corrupted_shortcodes(text: str, path_str: str) -> list[Issue]:
 
     # Patterns that indicate shortcode corruption
     corruption_patterns = [
-        (r'<\s+figure', "Shortcode fragment '< figure' (missing {{ opening)"),
-        (r'figurální\s+harmonizace', "Translated Hugo shortcode parameter (figurální harmonizace = figure align)"),
-        (r'\{\{[^%<]', "Malformed shortcode delimiter (not {{ < or {{ %)"),
-        (r'[>%]\s*\}\s*\}', "Malformed shortcode closing (}>} or %>})"),
-        (r'\{\{<.*?>\s+\}', "Missing }} in shortcode closing"),
+        (r"<\s+figure", "Shortcode fragment '< figure' (missing {{ opening)"),
+        (
+            r"figurální\s+harmonizace",
+            "Translated Hugo shortcode parameter (figurální harmonizace = figure align)",
+        ),
+        (r"\{\{[^%<]", "Malformed shortcode delimiter (not {{ < or {{ %)"),
+        (r"[>%]\s*\}\s*\}", "Malformed shortcode closing (}>} or %>})"),
+        (r"\{\{<.*?>\s+\}", "Missing }} in shortcode closing"),
     ]
 
     for i, line in enumerate(lines, 1):
         for pattern, msg in corruption_patterns:
             if re.search(pattern, line):
-                issues.append(Issue(
-                    path=path_str,
-                    line=i,
-                    kind="corrupted_shortcode",
-                    message=msg,
-                    severity=SEVERITY_ERROR,
-                    safe_autofix=False,
-                    manual_review=True,
-                ))
+                issues.append(
+                    Issue(
+                        path=path_str,
+                        line=i,
+                        kind="corrupted_shortcode",
+                        message=msg,
+                        severity=SEVERITY_ERROR,
+                        safe_autofix=False,
+                        manual_review=True,
+                    )
+                )
 
     return issues
 
@@ -539,17 +640,19 @@ def check_url_corruption(fm_str: str, path_str: str) -> list[Issue]:
             url = url_match.group(0)
             # URLs with non-ASCII characters are likely corrupted
             try:
-                url.encode('ascii')
+                url.encode("ascii")
             except UnicodeEncodeError:
-                issues.append(Issue(
-                    path=path_str,
-                    line=i + 1,
-                    kind="url_corruption",
-                    message=f"URL contains non-ASCII characters (likely translated/corrupted): {url[:80]}",
-                    severity=SEVERITY_ERROR,
-                    safe_autofix=False,
-                    manual_review=True,
-                ))
+                issues.append(
+                    Issue(
+                        path=path_str,
+                        line=i + 1,
+                        kind="url_corruption",
+                        message=f"URL contains non-ASCII characters (likely translated/corrupted): {url[:80]}",
+                        severity=SEVERITY_ERROR,
+                        safe_autofix=False,
+                        manual_review=True,
+                    )
+                )
     return issues
 
 
@@ -558,33 +661,38 @@ def check_missing_delimiter(text: str, path_str: str) -> list[Issue]:
     issues = []
     stripped = text.lstrip("\n\r")
     if not stripped.startswith("---"):
-        issues.append(Issue(
-            path=path_str,
-            line=1,
-            kind="missing_frontmatter_delimiter",
-            message="File does not start with --- frontmatter delimiter",
-            severity=SEVERITY_ERROR,
-            safe_autofix=False,
-            manual_review=True,
-        ))
+        issues.append(
+            Issue(
+                path=path_str,
+                line=1,
+                kind="missing_frontmatter_delimiter",
+                message="File does not start with --- frontmatter delimiter",
+                severity=SEVERITY_ERROR,
+                safe_autofix=False,
+                manual_review=True,
+            )
+        )
         return issues
     parts = text.split("---", 2)
     if len(parts) < 3:
-        issues.append(Issue(
-            path=path_str,
-            line=None,
-            kind="missing_closing_delimiter",
-            message="No closing --- frontmatter delimiter found",
-            severity=SEVERITY_ERROR,
-            safe_autofix=False,
-            manual_review=True,
-        ))
+        issues.append(
+            Issue(
+                path=path_str,
+                line=None,
+                kind="missing_closing_delimiter",
+                message="No closing --- frontmatter delimiter found",
+                severity=SEVERITY_ERROR,
+                safe_autofix=False,
+                manual_review=True,
+            )
+        )
     return issues
 
 
 # ---------------------------------------------------------------------------
 # File scanner
 # ---------------------------------------------------------------------------
+
 
 def scan_file(
     path: Path,
@@ -597,13 +705,15 @@ def scan_file(
     try:
         text = path.read_text(encoding="utf-8")
     except Exception as e:
-        return [Issue(
-            path=str(path),
-            line=None,
-            kind="file_read_error",
-            message=f"Cannot read file: {e}",
-            severity=SEVERITY_ERROR,
-        )]
+        return [
+            Issue(
+                path=str(path),
+                line=None,
+                kind="file_read_error",
+                message=f"Cannot read file: {e}",
+                severity=SEVERITY_ERROR,
+            )
+        ]
 
     path_str = str(path)
 
@@ -703,6 +813,7 @@ def scan_directory(
 # Main
 # ---------------------------------------------------------------------------
 
+
 def scan_changed_files(
     paths: list[str],
     content_root: Path | None = None,
@@ -765,7 +876,7 @@ def main() -> int:
     parser.add_argument(
         "--content-dir",
         type=Path,
-        help="Root directory to scan (e.g., D:/onedrive/.../aspose.net/content)",
+        help="Root directory to scan (e.g., /path/to/aspose.net/content)",
     )
     parser.add_argument(
         "--file",
@@ -831,24 +942,29 @@ def main() -> int:
     total_issues = len(result.all_issues)
     affected_files = len(set(i.path for i in result.all_issues))
 
-    print(f"\nScan complete: {result.total_files_scanned} files, {total_issues} issues in {affected_files} files", file=sys.stderr)
+    print(
+        f"\nScan complete: {result.total_files_scanned} files, {total_issues} issues in {affected_files} files",
+        file=sys.stderr,
+    )
     if result.issues_by_category:
         for kind, count in sorted(result.issues_by_category.items()):
             print(f"  {kind}: {count}", file=sys.stderr)
 
     # Print all issues to stdout
     if args.summary or not args.output:
-        print(f"\n## Structural Scan Summary")
+        print("\n## Structural Scan Summary")
         print(f"- Total files scanned: {result.total_files_scanned}")
         print(f"- Known failing files found: {len(result.known_failures_found)}")
         print(f"- Additional failures found: {len(result.additional_failures_found)}")
         print(f"- Total issues: {total_issues}")
         print(f"- Issue categories: {result.issues_by_category}")
         if result.all_issues[:50]:
-            print(f"\n### Issues (first 50)")
+            print("\n### Issues (first 50)")
             for issue in result.all_issues[:50]:
                 line_str = f":{issue.line}" if issue.line else ""
-                print(f"- [{issue.severity.upper()}] {issue.path}{line_str}: [{issue.kind}] {issue.message}")
+                print(
+                    f"- [{issue.severity.upper()}] {issue.path}{line_str}: [{issue.kind}] {issue.message}"
+                )
 
     # Write JSON output
     if args.output:

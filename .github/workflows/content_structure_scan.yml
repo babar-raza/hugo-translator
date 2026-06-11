@@ -78,4 +78,4 @@ jobs:
       - name: Lint scan scripts
         run: |
           ruff check scripts/repair_translated_content.py scripts/ci/scan_changed_content.py \
-            --select E,W,F --ignore E501,W291,W293 || true
+            --select E,W,F --ignore E501,W291,W293
