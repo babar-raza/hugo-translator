@@ -1,0 +1,214 @@
+# .gitlab-ci.yml
+# Hugo Translator — GitLab CI Release Gate
+#
+# Mirrors .github/workflows/release_gate.yml
+# Runner: self-hosted, Windows, PowerShell 5.1 shell executor
+# Runner tags: windows, python, self-hosted
+# Runner registration: docs/operations/gitlab-runner-setup.md
+#
+# Trigger behaviour (mirrors GitHub Actions):
+#   Push to main:         src/**, tests/**, requirements/**
+#   Merge request:        src/**, tests/**, scripts/**, config/**, requirements/**, .gitlab-ci.yml
+#   Manual (web):         always
+
+workflow:
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+      changes:
+        - src/**/*
+        - tests/**/*
+        - scripts/**/*
+        - config/**/*
+        - requirements/**/*
+        - .gitlab-ci.yml
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+      changes:
+        - src/**/*
+        - tests/**/*
+        - requirements/**/*
+    - if: $CI_PIPELINE_SOURCE == "web"
+
+default:
+  tags:
+    - windows
+    - python
+    - self-hosted
+  # Fail fast on PowerShell errors (equivalent to bash set -e)
+  before_script:
+    - $ErrorActionPreference = 'Stop'
+
+variables:
+  PIP_CACHE_DIR: "$CI_PROJECT_DIR\\.pip-cache"
+
+cache:
+  key:
+    files:
+      - requirements/cpu.txt
+      - requirements/dev.txt
+  paths:
+    - .pip-cache/
+
+stages:
+  - test
+  - validate
+  - gate
+
+# ─── Stage 1: Unit Tests ─────────────────────────────────────────────────────
+
+unit-tests:
+  stage: test
+  timeout: 45 minutes
+  script:
+    - python -m pip install --upgrade pip
+    - pip install -r requirements/cpu.txt
+    - pip install -r requirements/dev.txt
+    - python -m ruff check src/ tests/ --output-format=concise
+    - python -m pytest tests/unit/translation_engine/ -v --tb=short --timeout=120
+    - python -m pytest tests/unit/validation/ -v --tb=short --timeout=120
+    - >-
+      python -m pytest
+      tests/contract/test_inv001_subprocess.py
+      tests/contract/test_inv002_atomic_writes.py
+      tests/contract/test_inv007_resume_skip.py
+      tests/contract/test_inv008_git_commit.py
+      -v --tb=short
+    - >-
+      python -m pytest
+      "tests/unit/phase-0"
+      "tests/unit/phase-1"
+      "tests/unit/phase-3/test_l1_cache.py"
+      "tests/unit/phase-3/test_l2_persistent.py"
+      "tests/unit/phase-4/test_registry.py"
+      -v --tb=short
+
+# ─── Stage 2: Parallel Validation ────────────────────────────────────────────
+
+manifest-check:
+  stage: validate
+  needs: [unit-tests]
+  timeout: 5 minutes
+  script:
+    - python scripts/ci/check_manifest.py --strict
+
+regression-tests:
+  stage: validate
+  needs: [unit-tests]
+  timeout: 20 minutes
+  script:
+    - python -m pip install --upgrade pip
+    - pip install -r requirements/cpu.txt
+    - pip install -r requirements/dev.txt
+    - python -m pytest tests/regression/test_signature_preservation.py -v --tb=short
+    - python -m pytest tests/regression/test_batch_size_recovery.py -v --tb=short
+    - |
+      $version = "0.154.5"
+      $hugoDir = Join-Path $env:TEMP "hugo_$version"
+      if (-not (Get-Command hugo -ErrorAction SilentlyContinue)) {
+        $url = "https://github.com/gohugoio/hugo/releases/download/v${version}/hugo_extended_${version}_windows-amd64.zip"
+        $hugoZip = Join-Path $env:TEMP "hugo.zip"
+        Invoke-WebRequest -Uri $url -OutFile $hugoZip -UseBasicParsing
+        Expand-Archive -Path $hugoZip -DestinationPath $hugoDir -Force
+        $env:PATH = "$hugoDir;$env:PATH"
+        Write-Host "Hugo $version installed to $hugoDir"
+      }
+      hugo version
+      hugo build --source tests/fixtures/hugo_site/ 2>&1
+      if ($LASTEXITCODE -ne 0) { exit 1 }
+
+quality-gate:
+  stage: validate
+  needs: [unit-tests]
+  timeout: 10 minutes
+  script:
+    - python -m pip install --upgrade pip
+    - pip install -r requirements/cpu.txt
+    - pip install -r requirements/dev.txt
+    - New-Item -ItemType Directory -Force -Path reports/audit | Out-Null
+    - |
+      python scripts/audit_translation_quality.py `
+        --mode ci `
+        --threshold 0.70 `
+        --output reports/audit/audit-ci.json `
+        --verbose
+  artifacts:
+    when: always
+    paths:
+      - reports/audit/audit-ci.json
+    expire_in: 7 days
+
+security-scan:
+  stage: validate
+  needs: [unit-tests]
+  timeout: 10 minutes
+  allow_failure: true   # advisory — vulnerabilities do not block the gate
+  script:
+    - python -m pip install --upgrade pip
+    - pip install -r requirements/cpu.txt
+    - pip install -r requirements/dev.txt
+    - New-Item -ItemType Directory -Force -Path reports | Out-Null
+    - python -m bandit -r src/ -f json -o reports/bandit.json --exit-zero
+    - python -m pip_audit -r requirements/base.txt --format json -o reports/pip-audit.json
+    - |
+      Write-Host ""
+      Write-Host ("=" * 60)
+      Write-Host "SECURITY SCAN SUMMARY (advisory - non-blocking)"
+      Write-Host ("=" * 60)
+      if (Test-Path reports/bandit.json) {
+        $bandit = Get-Content reports/bandit.json | ConvertFrom-Json
+        $count  = $bandit.results.Count
+        $high   = ($bandit.results | Where-Object { $_.issue_severity -eq "HIGH" }).Count
+        $medium = ($bandit.results | Where-Object { $_.issue_severity -eq "MEDIUM" }).Count
+        $low    = ($bandit.results | Where-Object { $_.issue_severity -eq "LOW" }).Count
+        Write-Host "Bandit SAST: $count findings (HIGH=$high MEDIUM=$medium LOW=$low)"
+        foreach ($r in ($bandit.results | Where-Object { $_.issue_severity -in @("HIGH","MEDIUM") })) {
+          Write-Host "  [$($r.issue_severity)] $($r.issue_text) @ $($r.filename):$($r.line_number)"
+        }
+      } else {
+        Write-Host "Bandit: report not found"
+      }
+      if (Test-Path reports/pip-audit.json) {
+        $audit = Get-Content reports/pip-audit.json | ConvertFrom-Json
+        if ($null -ne $audit.dependencies) {
+          $vulns = @($audit.dependencies | Where-Object { $_.vulns.Count -gt 0 })
+          Write-Host "pip-audit: $($vulns.Count) vulnerable package(s)"
+          foreach ($v in $vulns) {
+            Write-Host "  $($v.name)==$($v.version): $($v.vulns.Count) vuln(s)"
+          }
+        } else {
+          Write-Host "pip-audit: no vulnerable packages"
+        }
+      } else {
+        Write-Host "pip-audit: report not found"
+      }
+      Write-Host ("=" * 60)
+  artifacts:
+    when: always
+    paths:
+      - reports/
+    expire_in: 7 days
+
+# ─── Stage 3: Gate Summary ───────────────────────────────────────────────────
+
+gate-summary:
+  stage: gate
+  # Depends on all 4 required gates. security-scan is advisory (allow_failure: true)
+  # and does not block this job. Gate-summary only runs when all 4 required jobs pass.
+  needs:
+    - unit-tests
+    - manifest-check
+    - regression-tests
+    - quality-gate
+  script:
+    - |
+      Write-Host ""
+      Write-Host ("=" * 60)
+      Write-Host "RELEASE GATE SUMMARY"
+      Write-Host ("=" * 60)
+      Write-Host "Unit Tests:       success"
+      Write-Host "Manifest Check:   success"
+      Write-Host "Regression Tests: success"
+      Write-Host "Quality Gate:     success"
+      Write-Host "Security Scan:    advisory (see job artifacts)"
+      Write-Host ("=" * 60)
+      Write-Host "RELEASE GATE: PASS"
+      Write-Host ("=" * 60)
