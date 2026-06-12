@@ -13,6 +13,7 @@ It will:
 6. Create required data directories
 7. Print next steps
 """
+
 import os
 import platform
 import shutil
@@ -39,8 +40,10 @@ MIN_PYTHON = (3, 10)
 
 def check_python_version():
     if sys.version_info[:2] < MIN_PYTHON:
-        print(f"ERROR: Python {MIN_PYTHON[0]}.{MIN_PYTHON[1]}+ required, "
-              f"found {sys.version_info[0]}.{sys.version_info[1]}")
+        print(
+            f"ERROR: Python {MIN_PYTHON[0]}.{MIN_PYTHON[1]}+ required, "
+            f"found {sys.version_info[0]}.{sys.version_info[1]}"
+        )
         sys.exit(1)
     print(f"Python {sys.version_info[0]}.{sys.version_info[1]}.{sys.version_info[2]} OK")
 
@@ -108,7 +111,11 @@ def create_directories():
 
 
 def print_next_steps():
-    activate = ".venv\\Scripts\\activate" if platform.system() == "Windows" else "source .venv/bin/activate"
+    activate = (
+        ".venv\\Scripts\\activate"
+        if platform.system() == "Windows"
+        else "source .venv/bin/activate"
+    )
     print(f"""
 ========================================
   Setup complete!

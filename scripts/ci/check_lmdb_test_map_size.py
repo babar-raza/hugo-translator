@@ -8,6 +8,7 @@ Exit codes:
     0 — all calls compliant
     1 — violations found
 """
+
 from __future__ import annotations
 
 import ast
@@ -89,20 +90,26 @@ def check_file(filepath: Path) -> list[Violation]:
         lineno = node.lineno
 
         if not _has_max_size_kwarg(node):
-            violations.append(Violation(
-                relpath, lineno,
-                "missing max_size_mb (default 1536 MB pre-allocates 1.5 GB on Windows)",
-            ))
+            violations.append(
+                Violation(
+                    relpath,
+                    lineno,
+                    "missing max_size_mb (default 1536 MB pre-allocates 1.5 GB on Windows)",
+                )
+            )
             continue
 
         value = _get_max_size_mb(node)
         if value is not None and value > MAX_ALLOWED_WITHOUT_JUSTIFICATION:
             if not _has_justification(source_lines, lineno):
-                violations.append(Violation(
-                    relpath, lineno,
-                    f"max_size_mb={value} exceeds {MAX_ALLOWED_WITHOUT_JUSTIFICATION} without "
-                    f"{JUSTIFICATION_MARKER} comment",
-                ))
+                violations.append(
+                    Violation(
+                        relpath,
+                        lineno,
+                        f"max_size_mb={value} exceeds {MAX_ALLOWED_WITHOUT_JUSTIFICATION} without "
+                        f"{JUSTIFICATION_MARKER} comment",
+                    )
+                )
 
     return violations
 

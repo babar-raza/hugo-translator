@@ -588,7 +588,7 @@ rm -rf data/tm/l3_semantic
 **3. Run Baseline Translation:**
 
 ```bash
-time venv/Scripts/python.exe scripts/batch_translate.py \
+time venv/Scripts/python.exe scripts/content/batch_translate.py \
   --input test_content \
   --output test_output_baseline \
   --site products.aspose.net \
@@ -643,7 +643,7 @@ python scripts/compare_benchmarks.py results_a.json results_b.json
 python scripts/generate_test_content.py --num-files 1000 --output test_large/
 
 # Translate and measure
-time python scripts/batch_translate.py \
+time python scripts/content/batch_translate.py \
   --input test_large \
   --output test_large_output \
   --site products.aspose.net \
@@ -661,7 +661,7 @@ python scripts/analyze_metrics.py load_test_metrics.json \
 **CPU Profiling:**
 
 ```bash
-python -m cProfile -o profile.stats scripts/batch_translate.py \
+python -m cProfile -o profile.stats scripts/content/batch_translate.py \
   --input test_content \
   --output test_output
 
@@ -678,7 +678,7 @@ p.sort_stats('cumulative').print_stats(20)
 ```bash
 pip install memory_profiler
 
-python -m memory_profiler scripts/batch_translate.py \
+python -m memory_profiler scripts/content/batch_translate.py \
   --input test_content \
   --output test_output
 ```
@@ -696,7 +696,7 @@ python -m memory_profiler scripts/batch_translate.py \
 1. **Measure Current Hit Rate:**
    ```bash
    # Run translation and check hit rate
-   python scripts/batch_translate.py ... --report metrics.json
+   python scripts/content/batch_translate.py ... --report metrics.json
    cat metrics.json | jq '.tm_stats.overall_hit_rate'
    ```
 
@@ -722,7 +722,7 @@ python -m memory_profiler scripts/batch_translate.py \
 4. **Validate:**
    ```bash
    # Re-run and compare hit rates
-   python scripts/batch_translate.py ... --report metrics_after.json
+   python scripts/content/batch_translate.py ... --report metrics_after.json
    python scripts/compare_metrics.py metrics.json metrics_after.json
    ```
 
@@ -735,7 +735,7 @@ python -m memory_profiler scripts/batch_translate.py \
 1. **Profile Bottleneck:**
    ```bash
    # Enable detailed timing
-   python scripts/batch_translate.py ... --profile --report profile.json
+   python scripts/content/batch_translate.py ... --profile --report profile.json
    ```
 
 2. **Apply Optimization:**

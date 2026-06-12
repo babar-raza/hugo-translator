@@ -86,7 +86,7 @@ Translation Memory Documentation
 venv\Scripts\python.exe -c "from src.tm import create_translation_memory; from pathlib import Path; print(create_translation_memory(Path('data/tm')).get_stats())"
 
 # Translate with fresh cache (bypass mode)
-venv\Scripts\python.exe scripts/batch_translate.py --input ./content --output ./output --site products.aspose.net --override-mode bypass
+venv\Scripts\python.exe scripts/content/batch_translate.py --input ./content --output ./output --site products.aspose.net --override-mode bypass
 ```
 
 ### 🛠️ Site Operator (Ops/SRE)

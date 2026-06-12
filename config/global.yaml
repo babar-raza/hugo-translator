@@ -664,7 +664,7 @@ translation_engine:
   # WS-COMP-7: Per-language model routing overrides.
   # Routes specific target languages to a different model instead of the global fallback.
   # Only add languages with confirmed systematic failures (>30% coverage gap after 1+ weeks of data
-  # from WS-COMP-1: python scripts/measure_completeness.py).
+  # from WS-COMP-1: python scripts/analysis/measure_completeness.py).
   # Commented out by default — enable after baseline shows consistent language-specific failures.
   # language_routing_overrides:
   #   fa: "professionalize_llm"   # Persian: RTL + systematic M2M100 failures

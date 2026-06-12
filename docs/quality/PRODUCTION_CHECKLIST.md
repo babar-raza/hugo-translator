@@ -376,7 +376,7 @@ Production readiness is assessed across 6 categories:
 Run the automated checker:
 
 ```bash
-python scripts/check_production_ready.py --strict
+python scripts/quality/check_production_ready.py --strict
 ```
 
 **Requirements**:

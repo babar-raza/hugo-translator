@@ -13,6 +13,7 @@ Exit codes:
     1 = structural errors found (blocks merge/push)
     2 = unexpected error
 """
+
 from __future__ import annotations
 
 import argparse
@@ -48,9 +49,7 @@ BLOCKING_KINDS = {
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(
-        description="CI scan of changed translated content files"
-    )
+    parser = argparse.ArgumentParser(description="CI scan of changed translated content files")
     parser.add_argument(
         "--changed-files",
         help="Newline/space separated list of changed file paths",
@@ -131,23 +130,27 @@ def main() -> int:
     # Determine blocking issues
     allowed = set(args.allow_kinds or [])
     blocking_issues = [
-        i for i in result.all_issues
-        if i.severity == SEVERITY_ERROR
-        and i.kind in BLOCKING_KINDS
-        and i.kind not in allowed
+        i
+        for i in result.all_issues
+        if i.severity == SEVERITY_ERROR and i.kind in BLOCKING_KINDS and i.kind not in allowed
     ]
 
     total = len(result.all_issues)
     errors = len(blocking_issues)
     affected = len(set(i.path for i in blocking_issues))
 
-    print(f"\nScan results: {result.total_files_scanned} files checked, {total} issues total, {errors} blocking errors in {affected} files", file=sys.stderr)
+    print(
+        f"\nScan results: {result.total_files_scanned} files checked, {total} issues total, {errors} blocking errors in {affected} files",
+        file=sys.stderr,
+    )
 
     if blocking_issues:
         print("\nBlocking issues found:", file=sys.stderr)
         for issue in blocking_issues[:20]:
             line_str = f":{issue.line}" if issue.line else ""
-            print(f"  [{issue.kind}] {issue.path}{line_str}: {issue.message[:100]}", file=sys.stderr)
+            print(
+                f"  [{issue.kind}] {issue.path}{line_str}: {issue.message[:100]}", file=sys.stderr
+            )
         if len(blocking_issues) > 20:
             print(f"  ... and {len(blocking_issues) - 20} more", file=sys.stderr)
         return 1

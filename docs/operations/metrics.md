@@ -173,16 +173,16 @@ metrics.increment(
 
 ```bash
 # Text report for last hour
-python scripts/generate_metrics_report.py --since 1h
+python scripts/analysis/generate_metrics_report.py --since 1h
 
 # JSON report for last 24 hours
-python scripts/generate_metrics_report.py --since 24h --format json
+python scripts/analysis/generate_metrics_report.py --since 24h --format json
 
 # Prometheus format export
-python scripts/generate_metrics_report.py --format prometheus
+python scripts/analysis/generate_metrics_report.py --format prometheus
 
 # Save to file
-python scripts/generate_metrics_report.py --since 24h --output report.txt
+python scripts/analysis/generate_metrics_report.py --since 24h --output report.txt
 ```
 
 ### Query Prometheus

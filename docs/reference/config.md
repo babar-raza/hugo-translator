@@ -1227,7 +1227,7 @@ Check which path is being used:
 
 ```bash
 # View logs during startup
-python scripts/verify_telemetry.py --latest
+python scripts/diag/verify_telemetry.py --latest
 
 # Test with custom path
 set TELEMETRY_SRC_PATH=C:\custom\path

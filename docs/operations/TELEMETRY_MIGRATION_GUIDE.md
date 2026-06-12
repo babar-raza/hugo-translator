@@ -287,7 +287,7 @@ cp .env.example .env
 
 ```bash
 # Run telemetry verification script
-python scripts/verify_telemetry.py --check
+python scripts/diag/verify_telemetry.py --check
 
 # Expected output:
 # ============================================================
@@ -337,7 +337,7 @@ curl "http://localhost:8765/api/v1/runs?agent_name=hugo-translator&limit=1" | jq
 
 ```bash
 # Run verification script
-python scripts/verify_telemetry.py --check
+python scripts/diag/verify_telemetry.py --check
 
 # Should show latest translation run details
 ```
@@ -480,7 +480,7 @@ git pull origin main
 
 ### Q: How do I know if telemetry is working?
 
-**A**: Run `python scripts/verify_telemetry.py --check`. If it shows recent runs with correct field values, telemetry is working.
+**A**: Run `python scripts/diag/verify_telemetry.py --check`. If it shows recent runs with correct field values, telemetry is working.
 
 ### Q: What if I'm running multiple agents?
 
@@ -528,7 +528,7 @@ curl http://localhost:8765/metrics
 1. ✅ Verify environment variables are set correctly (`.env` file)
 2. ✅ Ensure telemetry API service is running (`python telemetry_service.py`)
 3. ✅ Install `requests` module in local-telemetry environment
-4. ✅ Run validation tests (`python scripts/verify_telemetry.py --check`)
+4. ✅ Run validation tests (`python scripts/diag/verify_telemetry.py --check`)
 
 **What You DON'T Need to Do**:
 - ❌ No code changes required
@@ -551,7 +551,7 @@ curl http://localhost:8765/metrics
 - Check [Troubleshooting](#troubleshooting) section above
 - Review [FAQ](#faq) section above
 - Check telemetry API service logs
-- Run verification script: `python scripts/verify_telemetry.py --check`
+- Run verification script: `python scripts/diag/verify_telemetry.py --check`
 
 ---
 

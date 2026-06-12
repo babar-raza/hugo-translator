@@ -12,23 +12,23 @@ AST-based translation provides 100% structure preservation for Hugo markdown fil
 
 ```bash
 # Enable
-python scripts/toggle_ast_translation.py --site products.aspose.net --enable
+python scripts/ops/toggle_ast_translation.py --site products.aspose.net --enable
 
 # Check status
-python scripts/toggle_ast_translation.py --status
+python scripts/ops/toggle_ast_translation.py --status
 
 # Disable (if needed)
-python scripts/toggle_ast_translation.py --site products.aspose.net --disable
+python scripts/ops/toggle_ast_translation.py --site products.aspose.net --disable
 ```
 
 ### For All Sites
 
 ```bash
 # Enable for all sites
-python scripts/toggle_ast_translation.py --all-sites --enable
+python scripts/ops/toggle_ast_translation.py --all-sites --enable
 
 # Preview changes (dry run)
-python scripts/toggle_ast_translation.py --all-sites --enable --dry-run
+python scripts/ops/toggle_ast_translation.py --all-sites --enable --dry-run
 ```
 
 ---
@@ -148,7 +148,7 @@ If you need to rollback:
 
 ```bash
 # Disable AST translation
-python scripts/toggle_ast_translation.py --site <site_id> --disable
+python scripts/ops/toggle_ast_translation.py --site <site_id> --disable
 
 # Re-translate affected files with legacy approach
 translate-hugo --site <site_id> --force path/to/file.md
@@ -173,7 +173,7 @@ When AST translation is enabled, you get:
 ## Files Reference
 
 - **Configuration**: `config/site_profiles/<site>.yaml`
-- **Toggle Script**: `scripts/toggle_ast_translation.py`
+- **Toggle Script**: `scripts/ops/toggle_ast_translation.py`
 - **Rollout Guide**: `docs/ast_translation_rollout.md` (full details)
 - **Monitoring Guide**: `docs/ast_translation_monitoring.md` (dashboards & alerts)
 - **This Guide**: `docs/ast_translation_quickstart.md`
@@ -182,7 +182,7 @@ When AST translation is enabled, you get:
 
 ## Getting Help
 
-1. **Check status**: `python scripts/toggle_ast_translation.py --status`
+1. **Check status**: `python scripts/ops/toggle_ast_translation.py --status`
 2. **Check logs**: `grep "AST Translation" /var/log/hugo-translator.log`
 3. **Check metrics**: Grafana → AST Translation dashboard
 4. **Read docs**: See `docs/ast_translation_rollout.md` for detailed troubleshooting
@@ -194,7 +194,7 @@ When AST translation is enabled, you get:
 
 ```bash
 # 1. Enable AST translation for test site
-python scripts/toggle_ast_translation.py --site test.aspose.net --enable
+python scripts/ops/toggle_ast_translation.py --site test.aspose.net --enable
 
 # 2. Translate test documents
 translate-hugo --site test.aspose.net /path/to/test/content/
@@ -208,7 +208,7 @@ grep "AST Translation: Successfully translated" /var/log/hugo-translator.log | t
 # 5. Spot-check translated files for quality
 
 # 6. If all good, enable for production site
-python scripts/toggle_ast_translation.py --site products.aspose.net --enable
+python scripts/ops/toggle_ast_translation.py --site products.aspose.net --enable
 ```
 
 ---

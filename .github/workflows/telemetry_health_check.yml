@@ -70,7 +70,7 @@ jobs:
 
       - name: Verify recent runs
         run: |
-          python scripts/verify_telemetry.py --latest
+          python scripts/diag/verify_telemetry.py --latest
         shell: pwsh
 
       - name: Health check summary

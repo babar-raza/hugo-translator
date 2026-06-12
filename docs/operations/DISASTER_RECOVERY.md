@@ -55,12 +55,12 @@ Server crash, hardware failure, or catastrophic software failure resulting in co
    scp user@backup-server:/backups/tm_latest.tar.gz ./backups/
 
    # Verify backup integrity
-   python scripts/restore_tm.py \
+   python scripts/tm/restore_tm.py \
        --backup backups/tm_latest.tar.gz \
        --test
 
    # Restore TM data and configs
-   python scripts/restore_tm.py \
+   python scripts/tm/restore_tm.py \
        --backup backups/tm_latest.tar.gz \
        --verify
    ```
@@ -164,12 +164,12 @@ grep "corruption\|corrupt" data/logs/translation.log
    ls -lht backups/tm_*.tar.gz | head -5
 
    # Test backup
-   python scripts/restore_tm.py \
+   python scripts/tm/restore_tm.py \
        --backup backups/tm_YYYYMMDD.tar.gz \
        --test
 
    # Restore
-   python scripts/restore_tm.py \
+   python scripts/tm/restore_tm.py \
        --backup backups/tm_YYYYMMDD.tar.gz \
        --verify
    ```
@@ -259,7 +259,7 @@ TM database needs complete rebuild from scratch.
 
 1. **Backup existing TM**:
    ```bash
-   python scripts/backup_tm.py \
+   python scripts/tm/backup_tm.py \
        --output backups/tm_before_rebuild.tar.gz
    ```
 
@@ -281,11 +281,11 @@ TM database needs complete rebuild from scratch.
 4. **Or restore and rebuild indexes**:
    ```bash
    # Restore L2
-   python scripts/restore_tm.py \
+   python scripts/tm/restore_tm.py \
        --backup backups/tm_latest.tar.gz
 
    # Rebuild L3 from L2
-   python scripts/build_l3_index.py --force
+   python scripts/tm/build_l3_index.py --force
    ```
 
 5. **Verify rebuild**:
@@ -312,7 +312,7 @@ Physical hardware failure (disk, memory, CPU).
 
 2. **Stop system gracefully if possible**:
    ```bash
-   python scripts/backup_tm.py \
+   python scripts/tm/backup_tm.py \
        --output backups/emergency_$(date +%Y%m%d_%H%M%S).tar.gz
 
    pkill -TERM -f translation_worker
@@ -368,7 +368,7 @@ curl http://worker-1:9090/metrics
 
 **Monthly**: Test backup restore
 ```bash
-python scripts/restore_tm.py \
+python scripts/tm/restore_tm.py \
     --backup backups/tm_latest.tar.gz \
     --target /tmp/dr_test \
     --verify

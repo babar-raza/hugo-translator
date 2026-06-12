@@ -147,6 +147,7 @@ ignore = [
 [tool.ruff.lint.per-file-ignores]
 "__init__.py" = ["F401"]
 "tests/**" = ["F401", "F811", "E722"]  # test files: re-export, override, and bare-except patterns
+"scripts/**" = ["E722", "F401", "F402", "F811", "E501"]  # dev/ops scripts: bare-except, try-import, and shadowed-import patterns are intentional
 # Intentional lazy/try-import patterns in src/ (checked for availability, not used directly)
 "src/cli.py" = ["F401"]
 "src/observability/git_commit_helper.py" = ["F401"]

@@ -27,17 +27,17 @@ def store(self, ...):
 
 ### 2. 🔧 Initial Build (One-Time)
 
-**Created:** [`scripts/build_l3_index.py`](scripts/build_l3_index.py)
+**Created:** [`scripts/tm/build_l3_index.py`](scripts/tm/build_l3_index.py)
 
 **Purpose:** Populate L3 from existing 6M+ entries in L2
 
 **Usage:**
 ```bash
 # GPU (recommended - 1-2 hours)
-python scripts/build_l3_index.py --use_gpu
+python scripts/tm/build_l3_index.py --use_gpu
 
 # CPU (fallback - 4-6 hours)
-python scripts/build_l3_index.py
+python scripts/tm/build_l3_index.py
 ```
 
 **What it does:**
@@ -49,17 +49,17 @@ python scripts/build_l3_index.py
 
 ### 3. 🔍 Periodic Verification (Scheduled)
 
-**Created:** [`scripts/sync_l3_index.py`](scripts/sync_l3_index.py)
+**Created:** [`scripts/tm/sync_l3_index.py`](scripts/tm/sync_l3_index.py)
 
 **Purpose:** Verify L3 hasn't drifted from L2
 
 **Usage:**
 ```bash
 # Check only (dry-run)
-python scripts/sync_l3_index.py --dry-run
+python scripts/tm/sync_l3_index.py --dry-run
 
 # Fix any drift
-python scripts/sync_l3_index.py
+python scripts/tm/sync_l3_index.py
 ```
 
 **When to run:**
@@ -79,14 +79,14 @@ User translates → TranslationMemory.store() → Updates L1, L2, L3 automatical
 
 ### After Migration (One-Time 🔧)
 ```bash
-python scripts/build_l3_index.py --use_gpu
+python scripts/tm/build_l3_index.py --use_gpu
 ```
 **Run once, takes 1-6 hours**
 
 ### Periodic Verification (Scheduled 🔍)
 ```bash
 # Weekly cron job
-python scripts/sync_l3_index.py --dry-run
+python scripts/tm/sync_l3_index.py --dry-run
 ```
 **Safety net, catches any drift**
 
@@ -103,8 +103,8 @@ python scripts/sync_l3_index.py --dry-run
 
 ## Documentation Created
 
-1. **[scripts/build_l3_index.py](scripts/build_l3_index.py)** - Build L3 from L2
-2. **[scripts/sync_l3_index.py](scripts/sync_l3_index.py)** - Verify and fix drift
+1. **[scripts/tm/build_l3_index.py](scripts/tm/build_l3_index.py)** - Build L3 from L2
+2. **[scripts/tm/sync_l3_index.py](scripts/tm/sync_l3_index.py)** - Verify and fix drift
 3. **[docs/L3_SYNC_STRATEGY.md](docs/L3_SYNC_STRATEGY.md)** - Complete strategy guide
 4. **[reports/MIGRATION_COMPLETION_REPORT.md](reports/MIGRATION_COMPLETION_REPORT.md)** - Updated with L3 status
 
@@ -114,7 +114,7 @@ python scripts/sync_l3_index.py --dry-run
 
 ### Option 1: Build Now (If You Have Time)
 ```bash
-python scripts/build_l3_index.py --use_gpu
+python scripts/tm/build_l3_index.py --use_gpu
 ```
 **Time:** 1-2 hours with GPU, 4-6 hours without
 

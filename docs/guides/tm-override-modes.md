@@ -29,7 +29,7 @@ The system uses a 3-layer TM architecture:
 **CLI Usage**:
 ```bash
 # Explicit normal mode (default behavior)
-python scripts/batch_translate.py --input ./content --output ./output --site products.aspose.net --override-mode normal
+python scripts/content/batch_translate.py --input ./content --output ./output --site products.aspose.net --override-mode normal
 ```
 
 ### Bypass Mode
@@ -43,7 +43,7 @@ python scripts/batch_translate.py --input ./content --output ./output --site pro
 **CLI Usage**:
 ```bash
 # Bypass TM entirely - always translate fresh
-python scripts/batch_translate.py --input ./content --output ./output --site products.aspose.net --override-mode bypass
+python scripts/content/batch_translate.py --input ./content --output ./output --site products.aspose.net --override-mode bypass
 ```
 
 ### Refresh Mode
@@ -57,7 +57,7 @@ python scripts/batch_translate.py --input ./content --output ./output --site pro
 **CLI Usage**:
 ```bash
 # Force fresh translation and update TM
-python scripts/batch_translate.py --input ./content --output ./output --site products.aspose.net --override-mode refresh
+python scripts/content/batch_translate.py --input ./content --output ./output --site products.aspose.net --override-mode refresh
 ```
 
 ### Validate Mode
@@ -72,7 +72,7 @@ python scripts/batch_translate.py --input ./content --output ./output --site pro
 **CLI Usage**:
 ```bash
 # Use cache but also translate for comparison
-python scripts/batch_translate.py --input ./content --output ./output --site products.aspose.net --override-mode validate
+python scripts/content/batch_translate.py --input ./content --output ./output --site products.aspose.net --override-mode validate
 ```
 
 ## Override Filters
@@ -85,7 +85,7 @@ Match segments based on text content using regex patterns.
 
 ```bash
 # Apply refresh mode only to segments containing "Aspose"
-python scripts/batch_translate.py --input ./content --output ./output --site products.aspose.net \
+python scripts/content/batch_translate.py --input ./content --output ./output --site products.aspose.net \
   --override-mode refresh \
   --override-filter-patterns "Aspose"
 ```
@@ -96,7 +96,7 @@ Apply override only to specific target languages.
 
 ```bash
 # Refresh TM only for German translations
-python scripts/batch_translate.py --input ./content --output ./output --site products.aspose.net \
+python scripts/content/batch_translate.py --input ./content --output ./output --site products.aspose.net \
   --langs de fr es \
   --override-mode refresh \
   --override-filter-langs de
@@ -108,7 +108,7 @@ Apply override based on frontmatter field names.
 
 ```bash
 # Bypass cache for title fields only
-python scripts/batch_translate.py --input ./content --output ./output --site products.aspose.net \
+python scripts/content/batch_translate.py --input ./content --output ./output --site products.aspose.net \
   --override-mode bypass \
   --override-filter-keys title
 ```
@@ -119,7 +119,7 @@ Multiple filter types can be combined for precise control.
 
 ```bash
 # Refresh TM for German titles containing "Aspose"
-python scripts/batch_translate.py --input ./content --output ./output --site products.aspose.net \
+python scripts/content/batch_translate.py --input ./content --output ./output --site products.aspose.net \
   --override-mode refresh \
   --override-filter-langs de \
   --override-filter-keys title \
@@ -132,14 +132,14 @@ python scripts/batch_translate.py --input ./content --output ./output --site pro
 
 ```bash
 # 1. Validate cache quality by comparing cached vs fresh translations
-python scripts/batch_translate.py --input ./content --output ./validation_output --site products.aspose.net \
+python scripts/content/batch_translate.py --input ./content --output ./validation_output --site products.aspose.net \
   --override-mode validate --report validation_report.json
 
 # 2. Review validation report for cache accuracy
 cat validation_report.json
 
 # 3. Refresh problematic segments if needed
-python scripts/batch_translate.py --input ./content --output ./refreshed_output --site products.aspose.net \
+python scripts/content/batch_translate.py --input ./content --output ./refreshed_output --site products.aspose.net \
   --override-mode refresh --override-filter-patterns "problematic_term"
 ```
 
@@ -147,7 +147,7 @@ python scripts/batch_translate.py --input ./content --output ./refreshed_output 
 
 ```bash
 # After updating product names or terminology
-python scripts/batch_translate.py --input ./content --output ./updated_output --site products.aspose.net \
+python scripts/content/batch_translate.py --input ./content --output ./updated_output --site products.aspose.net \
   --override-mode refresh --override-filter-patterns "old_product_name|new_product_name"
 ```
 
@@ -155,7 +155,7 @@ python scripts/batch_translate.py --input ./content --output ./updated_output --
 
 ```bash
 # Test translation quality without cache interference
-python scripts/batch_translate.py --input ./samples --output ./test_output --site products.aspose.net \
+python scripts/content/batch_translate.py --input ./samples --output ./test_output --site products.aspose.net \
   --override-mode bypass --langs de fr
 ```
 
@@ -163,7 +163,7 @@ python scripts/batch_translate.py --input ./samples --output ./test_output --sit
 
 ```bash
 # Bypass cache for dynamic content (dates, version numbers) but use cache for static content
-python scripts/batch_translate.py --input ./content --output ./output --site products.aspose.net \
+python scripts/content/batch_translate.py --input ./content --output ./output --site products.aspose.net \
   --override-mode bypass --override-filter-keys date version
 ```
 
@@ -173,7 +173,7 @@ Override operations provide detailed statistics:
 
 ```bash
 # Run with override mode and check stats
-python scripts/batch_translate.py --input ./content --output ./output --site products.aspose.net \
+python scripts/content/batch_translate.py --input ./content --output ./output --site products.aspose.net \
   --override-mode refresh --report stats.json
 
 # Stats include:
@@ -267,7 +267,7 @@ engine = TranslationEngine(
 ## Related Documentation
 
 - [Translation Memory Architecture](../architecture/translation-engine.md)
-- [Batch Translation Script](../../scripts/batch_translate.py)
+- [Batch Translation Script](../../scripts/content/batch_translate.py)
 - [CLI Reference](../reference/cli.md)
 - [Configuration Reference](../reference/config.md)
 c

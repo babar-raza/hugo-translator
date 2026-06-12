@@ -29,7 +29,7 @@ def test_benchmark_cpu_comprehensive_with_db():
 
     try:
         # Check if script exists
-        script_path = Path("scripts/benchmark_cpu_comprehensive.py")
+        script_path = Path("scripts/bench/benchmark_cpu_comprehensive.py")
         if not script_path.exists():
             pytest.skip("benchmark_cpu_comprehensive.py not found")
 
@@ -42,7 +42,7 @@ def test_benchmark_cpu_comprehensive_with_db():
         # Note: Full execution would require:
         # result = subprocess.run(
         #     [
-        #         "python", "scripts/benchmark_cpu_comprehensive.py",
+        #         "python", "scripts/bench/benchmark_cpu_comprehensive.py",
         #         "--models", "m2m100_418m",
         #         "--batch-sizes", "4",
         #         "--iterations", "1",
@@ -72,7 +72,7 @@ def test_benchmark_cpu_comprehensive_with_db():
 
 def test_benchmark_db_flag_is_optional():
     """Test that benchmark script works without --save-to-db (backward compatible)."""
-    script_path = Path("scripts/benchmark_cpu_comprehensive.py")
+    script_path = Path("scripts/bench/benchmark_cpu_comprehensive.py")
 
     if not script_path.exists():
         pytest.skip("benchmark_cpu_comprehensive.py not found")

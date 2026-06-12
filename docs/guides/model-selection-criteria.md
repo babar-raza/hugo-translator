@@ -344,7 +344,7 @@ cpu_optimizer:
 
 ```bash
 # 1. Test quality improvement
-python scripts/benchmark_quality.py \
+python scripts/bench/benchmark_quality.py \
   --models m2m100_418m,nllb_200_1.3b \
   --corpus test_samples \
   --metrics bleu,comet

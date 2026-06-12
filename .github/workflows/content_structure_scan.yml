@@ -54,7 +54,7 @@ jobs:
 
       - name: Validate scan script syntax
         run: |
-          python -m py_compile scripts/repair_translated_content.py
+          python -m py_compile scripts/content/repair_translated_content.py
           python -m py_compile scripts/ci/scan_changed_content.py
           echo "Syntax check passed"
 
@@ -77,5 +77,5 @@ jobs:
 
       - name: Lint scan scripts
         run: |
-          ruff check scripts/repair_translated_content.py scripts/ci/scan_changed_content.py \
+          ruff check scripts/content/repair_translated_content.py scripts/ci/scan_changed_content.py \
             --select E,W,F --ignore E501,W291,W293

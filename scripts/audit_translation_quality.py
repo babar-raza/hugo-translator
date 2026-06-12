@@ -29,7 +29,7 @@ import logging
 import random
 import re
 import sys
-from dataclasses import dataclass, field, asdict
+from dataclasses import asdict, dataclass, field
 from datetime import date
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
@@ -59,12 +59,52 @@ _SHORTCODE_RE = re.compile(r"(\{\{[<%].*?[%>]\}\})")
 # ---------------------------------------------------------------------------
 # Language codes — kept in sync with engine._ALL_LANGUAGE_CODES
 # ---------------------------------------------------------------------------
-_ALL_LANGUAGE_CODES = frozenset([
-    "af", "ar", "az", "bg", "ca", "cs", "da", "de", "el", "es", "et",
-    "fa", "fi", "fr", "ga", "he", "hi", "hr", "hu", "id", "it", "ja", "ko",
-    "lt", "lv", "ms", "nb", "nl", "no", "pl", "pt", "ro", "ru", "sk", "sl",
-    "sr", "sv", "th", "tr", "uk", "vi", "zh",
-])
+_ALL_LANGUAGE_CODES = frozenset(
+    [
+        "af",
+        "ar",
+        "az",
+        "bg",
+        "ca",
+        "cs",
+        "da",
+        "de",
+        "el",
+        "es",
+        "et",
+        "fa",
+        "fi",
+        "fr",
+        "ga",
+        "he",
+        "hi",
+        "hr",
+        "hu",
+        "id",
+        "it",
+        "ja",
+        "ko",
+        "lt",
+        "lv",
+        "ms",
+        "nb",
+        "nl",
+        "no",
+        "pl",
+        "pt",
+        "ro",
+        "ru",
+        "sk",
+        "sl",
+        "sr",
+        "sv",
+        "th",
+        "tr",
+        "uk",
+        "vi",
+        "zh",
+    ]
+)
 
 # Structural element regexes for fidelity scoring
 _RE_H1 = re.compile(r"^# ", re.MULTILINE)
@@ -78,6 +118,7 @@ _RE_TABLE_ROW = re.compile(r"^\|", re.MULTILINE)
 # ---------------------------------------------------------------------------
 # Data classes
 # ---------------------------------------------------------------------------
+
 
 @dataclass
 class SamplePair:
@@ -95,15 +136,15 @@ class FileScores:
     lang: str
     site: str
     content_type: str
-    completeness: Optional[float] = None
-    purity: Optional[float] = None
-    terminology: Optional[float] = None
-    structural_fidelity: Optional[float] = None
-    shortcode_preservation: Optional[float] = None
-    naturalness_llm: Optional[float] = None
-    overall: Optional[float] = None
-    flags: List[str] = field(default_factory=list)
-    error: Optional[str] = None
+    completeness: float | None = None
+    purity: float | None = None
+    terminology: float | None = None
+    structural_fidelity: float | None = None
+    shortcode_preservation: float | None = None
+    naturalness_llm: float | None = None
+    overall: float | None = None
+    flags: list[str] = field(default_factory=list)
+    error: str | None = None
 
 
 @dataclass
@@ -113,16 +154,17 @@ class AuditReport:
     threshold: float
     total_files: int
     flagged_files: int
-    aggregate: Dict
-    by_lang: Dict
-    by_site: Dict
-    by_content_type: Dict
-    files: List[Dict]
+    aggregate: dict
+    by_lang: dict
+    by_site: dict
+    by_content_type: dict
+    files: list[dict]
 
 
 # ---------------------------------------------------------------------------
 # Sampler
 # ---------------------------------------------------------------------------
+
 
 def _infer_content_type(path: Path) -> str:
     parts = {p.lower() for p in path.parts}
@@ -144,7 +186,9 @@ def _infer_site(path: Path, content_root: Path) -> str:
         return "unknown"
 
 
-def _find_translated_path_folder_based(source_path: Path, content_root: Path, lang: str) -> Optional[Path]:
+def _find_translated_path_folder_based(
+    source_path: Path, content_root: Path, lang: str
+) -> Path | None:
     """
     For per_language_folders layout: translated file is at content_root/lang/rel_path
     e.g. content_root/reference.aspose.net/slides/_index.md → content_root/fr/reference.aspose.net/slides/_index.md
@@ -157,7 +201,7 @@ def _find_translated_path_folder_based(source_path: Path, content_root: Path, la
     return candidate if candidate.exists() else None
 
 
-def _find_translated_path_file_based(source_path: Path, lang: str) -> Optional[Path]:
+def _find_translated_path_file_based(source_path: Path, lang: str) -> Path | None:
     """
     For filename layout: source.md → source.LANG.md
     e.g. index.md → index.fr.md
@@ -170,10 +214,10 @@ def _find_translated_path_file_based(source_path: Path, lang: str) -> Optional[P
 
 def sample_translation_pairs(
     content_root: Path,
-    langs: List[str],
+    langs: list[str],
     n_per_stratum: int = 5,
     seed: int = 42,
-) -> List[SamplePair]:
+) -> list[SamplePair]:
     """
     Sample source+translation pairs stratified by (site, lang, content_type).
 
@@ -194,7 +238,7 @@ def sample_translation_pairs(
     logger.info("Found %d source .md files under %s", len(source_files), content_root)
 
     # Build stratum → files mapping
-    stratum_map: Dict[Tuple, List[SamplePair]] = {}
+    stratum_map: dict[tuple, list[SamplePair]] = {}
 
     for lang in langs:
         for src in source_files:
@@ -219,7 +263,7 @@ def sample_translation_pairs(
             stratum_map.setdefault(key, []).append(pair)
 
     # Sample n_per_stratum from each stratum
-    sampled: List[SamplePair] = []
+    sampled: list[SamplePair] = []
     for key, pairs in stratum_map.items():
         chosen = rng.sample(pairs, min(n_per_stratum, len(pairs)))
         sampled.extend(chosen)
@@ -229,7 +273,7 @@ def sample_translation_pairs(
     return sampled
 
 
-def sample_fixture_pairs(fixtures_dir: Path) -> List[SamplePair]:
+def sample_fixture_pairs(fixtures_dir: Path) -> list[SamplePair]:
     """
     CI mode: use test fixtures as source+translation pairs.
     Discovers any .en.md / .fr.md / .de.md sibling pairs.
@@ -239,13 +283,15 @@ def sample_fixture_pairs(fixtures_dir: Path) -> List[SamplePair]:
         for lang in _ALL_LANGUAGE_CODES:
             tgt = src.parent / src.name.replace(".en.md", f".{lang}.md")
             if tgt.exists():
-                pairs.append(SamplePair(
-                    source_path=src,
-                    translated_path=tgt,
-                    lang=lang,
-                    site="fixtures",
-                    content_type="other",
-                ))
+                pairs.append(
+                    SamplePair(
+                        source_path=src,
+                        translated_path=tgt,
+                        lang=lang,
+                        site="fixtures",
+                        content_type="other",
+                    )
+                )
     # Also accept plain .md source files alongside .LANG.md translations
     for src in fixtures_dir.rglob("*.md"):
         stem = src.stem
@@ -257,13 +303,15 @@ def sample_fixture_pairs(fixtures_dir: Path) -> List[SamplePair]:
         for lang in _ALL_LANGUAGE_CODES:
             tgt = src.parent / f"{stem}.{lang}.md"
             if tgt.exists():
-                pairs.append(SamplePair(
-                    source_path=src,
-                    translated_path=tgt,
-                    lang=lang,
-                    site="fixtures",
-                    content_type="other",
-                ))
+                pairs.append(
+                    SamplePair(
+                        source_path=src,
+                        translated_path=tgt,
+                        lang=lang,
+                        site="fixtures",
+                        content_type="other",
+                    )
+                )
     logger.info("CI mode: found %d fixture pairs", len(pairs))
     return pairs
 
@@ -272,13 +320,14 @@ def sample_fixture_pairs(fixtures_dir: Path) -> List[SamplePair]:
 # Scorers
 # ---------------------------------------------------------------------------
 
+
 def _strip_frontmatter_and_code(text: str) -> str:
     """Remove YAML frontmatter and fenced code blocks for language detection."""
     # Remove frontmatter
     if text.startswith("---"):
         end = text.find("\n---", 3)
         if end != -1:
-            text = text[end + 4:]
+            text = text[end + 4 :]
     # Remove fenced code blocks
     text = re.sub(r"```[\s\S]*?```", "", text)
     text = re.sub(r"`[^`\n]+`", "", text)
@@ -292,6 +341,7 @@ def score_completeness(source_text: str, translated_text: str) -> float:
     Uses paragraphs as a simple proxy for translatable units, avoiding
     heavy AST parsing. Paragraphs are split on double newlines.
     """
+
     def count_paragraphs(text: str) -> int:
         text = _strip_frontmatter_and_code(text)
         paras = [p.strip() for p in re.split(r"\n\s*\n", text)]
@@ -305,7 +355,7 @@ def score_completeness(source_text: str, translated_text: str) -> float:
     return min(1.0, tgt_count / src_count)
 
 
-def score_purity(translated_text: str, expected_lang: str, fasttext_detector) -> Optional[float]:
+def score_purity(translated_text: str, expected_lang: str, fasttext_detector) -> float | None:
     """
     Score language purity using FastText paragraph-by-paragraph detection.
 
@@ -372,7 +422,8 @@ def score_structural_fidelity(source_text: str, translated_text: str) -> float:
 
     Returns Jaccard ratio averaged across element types with non-zero source count.
     """
-    def counts(text: str) -> Dict[str, int]:
+
+    def counts(text: str) -> dict[str, int]:
         return {
             "h1": len(_RE_H1.findall(text)),
             "h2": len(_RE_H2.findall(text)),
@@ -422,7 +473,7 @@ def score_naturalness_llm(
     translated_text: str,
     lang: str,
     llm_provider,
-) -> Optional[float]:
+) -> float | None:
     """
     Use professionalize_llm to score translation naturalness (0-10 → 0.0-1.0).
 
@@ -462,7 +513,11 @@ def score_naturalness_llm(
                 prompt,
             )
             score_text = text_response.strip().split()[0] if text_response.strip() else ""
-            score_val = int(re.search(r"\d+", score_text).group()) if re.search(r"\d+", score_text) else None
+            score_val = (
+                int(re.search(r"\d+", score_text).group())
+                if re.search(r"\d+", score_text)
+                else None
+            )
             if score_val is not None:
                 scores.append(max(0, min(10, score_val)) / 10.0)
         except Exception as e:
@@ -498,7 +553,7 @@ def compute_overall(scores: FileScores) -> float:
     return weighted_sum / total_weight
 
 
-def compute_flags(scores: FileScores, threshold: float) -> List[str]:
+def compute_flags(scores: FileScores, threshold: float) -> list[str]:
     flags = []
     for dim in _WEIGHTS:
         val = getattr(scores, dim)
@@ -510,6 +565,7 @@ def compute_flags(scores: FileScores, threshold: float) -> List[str]:
 # ---------------------------------------------------------------------------
 # Main scoring loop
 # ---------------------------------------------------------------------------
+
 
 def score_pair(
     pair: SamplePair,
@@ -576,18 +632,26 @@ def score_pair(
 # Aggregation
 # ---------------------------------------------------------------------------
 
-def _avg(values: List[float]) -> Optional[float]:
+
+def _avg(values: list[float]) -> float | None:
     vals = [v for v in values if v is not None]
     return sum(vals) / len(vals) if vals else None
 
 
 def build_report(
-    file_scores: List[FileScores],
+    file_scores: list[FileScores],
     mode: str,
     threshold: float,
 ) -> AuditReport:
-    def group_aggregate(scores_list: List[FileScores]) -> Dict:
-        dims = ["completeness", "purity", "terminology", "structural_fidelity", "shortcode_preservation", "overall"]
+    def group_aggregate(scores_list: list[FileScores]) -> dict:
+        dims = [
+            "completeness",
+            "purity",
+            "terminology",
+            "structural_fidelity",
+            "shortcode_preservation",
+            "overall",
+        ]
         agg = {}
         for dim in dims:
             vals = [getattr(s, dim) for s in scores_list]
@@ -596,9 +660,9 @@ def build_report(
         agg["flagged"] = sum(1 for s in scores_list if s.flags)
         return agg
 
-    by_lang: Dict[str, List[FileScores]] = {}
-    by_site: Dict[str, List[FileScores]] = {}
-    by_ct: Dict[str, List[FileScores]] = {}
+    by_lang: dict[str, list[FileScores]] = {}
+    by_site: dict[str, list[FileScores]] = {}
+    by_ct: dict[str, list[FileScores]] = {}
 
     for s in file_scores:
         by_lang.setdefault(s.lang, []).append(s)
@@ -623,21 +687,31 @@ def build_report(
 # Human-readable summary
 # ---------------------------------------------------------------------------
 
+
 def print_summary(report: AuditReport) -> None:
     agg = report.aggregate
-    print(f"\n{'='*60}")
+    print(f"\n{'=' * 60}")
     print(f"TRANSLATION QUALITY AUDIT — {report.generated_at}")
     print(f"Mode: {report.mode}  |  Threshold: {report.threshold}  |  Files: {report.total_files}")
-    print(f"{'='*60}")
-    print(f"\nOVERALL AGGREGATE")
-    for dim in ["completeness", "purity", "terminology", "structural_fidelity", "shortcode_preservation", "overall"]:
+    print(f"{'=' * 60}")
+    print("\nOVERALL AGGREGATE")
+    for dim in [
+        "completeness",
+        "purity",
+        "terminology",
+        "structural_fidelity",
+        "shortcode_preservation",
+        "overall",
+    ]:
         val = agg.get(dim)
         bar = "OK " if val is None or val >= report.threshold else "LOW"
         val_str = f"{val:.3f}" if val is not None else "N/A "
         print(f"  [{bar}] {dim:<28} {val_str}")
-    print(f"\n  Flagged: {report.flagged_files}/{report.total_files} files below threshold {report.threshold}")
+    print(
+        f"\n  Flagged: {report.flagged_files}/{report.total_files} files below threshold {report.threshold}"
+    )
 
-    print(f"\nBY LANGUAGE")
+    print("\nBY LANGUAGE")
     for lang, data in report.by_lang.items():
         overall = data.get("overall")
         flag_n = data.get("flagged", 0)
@@ -647,45 +721,73 @@ def print_summary(report: AuditReport) -> None:
         print(f"  [{bar}] {lang:<6} overall={overall_str}  flagged={flag_n}/{count}")
 
     if report.flagged_files > 0:
-        print(f"\nFLAGGED FILES (showing first 10)")
+        print("\nFLAGGED FILES (showing first 10)")
         shown = 0
         for f in report.files:
             if f.get("flags"):
-                print(f"  {Path(f['translated_path']).name}  [{f['lang']}]  overall={f.get('overall', 'N/A'):.3f}")
+                print(
+                    f"  {Path(f['translated_path']).name}  [{f['lang']}]  overall={f.get('overall', 'N/A'):.3f}"
+                )
                 print(f"    flags: {', '.join(f['flags'])}")
                 shown += 1
                 if shown >= 10:
                     break
 
-    print(f"\n{'='*60}\n")
+    print(f"\n{'=' * 60}\n")
 
 
 # ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
 
+
 def build_arg_parser() -> argparse.ArgumentParser:
-    p = argparse.ArgumentParser(
-        description="Audit translation quality across sampled file pairs"
+    p = argparse.ArgumentParser(description="Audit translation quality across sampled file pairs")
+    p.add_argument(
+        "--content-root",
+        type=Path,
+        default=None,
+        help="Root directory containing translated content (source + translations)",
     )
-    p.add_argument("--content-root", type=Path, default=None,
-                   help="Root directory containing translated content (source + translations)")
-    p.add_argument("--langs", nargs="+", default=["fr", "de", "es"],
-                   help="Target language codes to audit (default: fr de es)")
-    p.add_argument("--n-per-stratum", type=int, default=5,
-                   help="Files to sample per (site, lang, content_type) stratum (default: 5)")
-    p.add_argument("--seed", type=int, default=42,
-                   help="Random seed for reproducible sampling (default: 42)")
-    p.add_argument("--threshold", type=float, default=0.70,
-                   help="Score threshold below which files are flagged (default: 0.70)")
-    p.add_argument("--output", type=Path, default=None,
-                   help="Output JSON report path (default: reports/audit/audit_YYYY-MM-DD.json)")
-    p.add_argument("--mode", choices=["full", "ci"], default="full",
-                   help="'ci' uses test fixtures only, no FastText/LLM (default: full)")
-    p.add_argument("--use-llm", action="store_true",
-                   help="Enable optional LLM naturalness scoring via professionalize_llm")
-    p.add_argument("--verbose", action="store_true",
-                   help="Enable DEBUG logging")
+    p.add_argument(
+        "--langs",
+        nargs="+",
+        default=["fr", "de", "es"],
+        help="Target language codes to audit (default: fr de es)",
+    )
+    p.add_argument(
+        "--n-per-stratum",
+        type=int,
+        default=5,
+        help="Files to sample per (site, lang, content_type) stratum (default: 5)",
+    )
+    p.add_argument(
+        "--seed", type=int, default=42, help="Random seed for reproducible sampling (default: 42)"
+    )
+    p.add_argument(
+        "--threshold",
+        type=float,
+        default=0.70,
+        help="Score threshold below which files are flagged (default: 0.70)",
+    )
+    p.add_argument(
+        "--output",
+        type=Path,
+        default=None,
+        help="Output JSON report path (default: reports/audit/audit_YYYY-MM-DD.json)",
+    )
+    p.add_argument(
+        "--mode",
+        choices=["full", "ci"],
+        default="full",
+        help="'ci' uses test fixtures only, no FastText/LLM (default: full)",
+    )
+    p.add_argument(
+        "--use-llm",
+        action="store_true",
+        help="Enable optional LLM naturalness scoring via professionalize_llm",
+    )
+    p.add_argument("--verbose", action="store_true", help="Enable DEBUG logging")
     return p
 
 
@@ -711,13 +813,16 @@ def main() -> int:
     if terminology_path.exists():
         try:
             import yaml
+
             with open(terminology_path, encoding="utf-8") as f:
                 terminology_config = yaml.safe_load(f) or {}
             logger.info("Loaded terminology config from %s", terminology_path)
         except Exception as e:
             logger.warning("Could not load terminology config: %s", e)
     else:
-        logger.warning("Terminology config not found at %s — terminology scoring will be 1.0", terminology_path)
+        logger.warning(
+            "Terminology config not found at %s — terminology scoring will be 1.0", terminology_path
+        )
 
     # ---------------------------------------------------------------------------
     # Initialize FastText detector (skipped in CI mode or if model absent)
@@ -727,7 +832,10 @@ def main() -> int:
         fasttext_model_path = _PROJECT_ROOT / "data" / "models" / "fasttext" / "lid.176.bin"
         if fasttext_model_path.exists():
             try:
-                from src.translation_engine.language_detection.fasttext_detector import FastTextDetector
+                from src.translation_engine.language_detection.fasttext_detector import (
+                    FastTextDetector,
+                )
+
                 fasttext_detector = FastTextDetector(
                     cache_dir=fasttext_model_path.parent,
                     auto_download=False,
@@ -736,7 +844,9 @@ def main() -> int:
             except Exception as e:
                 logger.warning("FastText initialization failed: %s — purity scoring disabled", e)
         else:
-            logger.warning("FastText model not found at %s — purity scoring disabled", fasttext_model_path)
+            logger.warning(
+                "FastText model not found at %s — purity scoring disabled", fasttext_model_path
+            )
 
     # ---------------------------------------------------------------------------
     # Initialize LLM provider (optional)
@@ -744,15 +854,17 @@ def main() -> int:
     llm_provider = None
     if args.use_llm and args.mode != "ci":
         try:
-            from src.model_runtime.llm_providers import create_provider
-            from src.model_runtime.contracts import LLMProviderConfig
             import yaml
+
+            from src.model_runtime.contracts import LLMProviderConfig
+            from src.model_runtime.llm_providers import create_provider
+
             global_cfg_path = _PROJECT_ROOT / "config" / "global.yaml"
             with open(global_cfg_path, encoding="utf-8") as f:
                 global_cfg = yaml.safe_load(f) or {}
             # Use the same fallback_model as the content worker
-            fallback_model_id = (
-                global_cfg.get("model_defaults", {}).get("fallback_model", "professionalize_llm")
+            fallback_model_id = global_cfg.get("model_defaults", {}).get(
+                "fallback_model", "professionalize_llm"
             )
             model_registry_path = _PROJECT_ROOT / "config" / "model_registry.yaml"
             with open(model_registry_path, encoding="utf-8") as f:
@@ -775,9 +887,13 @@ def main() -> int:
                 llm_provider = create_provider(llm_cfg)
                 logger.info("LLM provider initialized: %s", fallback_model_id)
             else:
-                logger.warning("Model '%s' not found in registry — LLM scoring disabled", fallback_model_id)
+                logger.warning(
+                    "Model '%s' not found in registry — LLM scoring disabled", fallback_model_id
+                )
         except Exception as e:
-            logger.warning("LLM provider initialization failed: %s — naturalness scoring disabled", e)
+            logger.warning(
+                "LLM provider initialization failed: %s — naturalness scoring disabled", e
+            )
 
     # ---------------------------------------------------------------------------
     # Sample pairs
@@ -810,13 +926,16 @@ def main() -> int:
     # ---------------------------------------------------------------------------
     # Score all pairs
     # ---------------------------------------------------------------------------
-    file_scores: List[FileScores] = []
+    file_scores: list[FileScores] = []
     for i, pair in enumerate(pairs, 1):
-        logger.info("[%d/%d] Scoring %s → %s [%s]",
-                    i, len(pairs),
-                    pair.source_path.name,
-                    pair.translated_path.name,
-                    pair.lang)
+        logger.info(
+            "[%d/%d] Scoring %s → %s [%s]",
+            i,
+            len(pairs),
+            pair.source_path.name,
+            pair.translated_path.name,
+            pair.lang,
+        )
         scores = score_pair(
             pair=pair,
             terminology_config=terminology_config,

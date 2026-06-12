@@ -11,6 +11,7 @@ Each test documents:
 - Actual result (PASS/FAIL)
 - Error details if any
 """
+
 import os
 import subprocess
 import sys
@@ -21,6 +22,7 @@ from pathlib import Path
 # Ensure we're in project root
 PROJECT_ROOT = Path(__file__).parent.parent
 os.chdir(PROJECT_ROOT)
+
 
 @dataclass
 class TestResult:
@@ -33,22 +35,20 @@ class TestResult:
     passed: bool
     error: str | None = None
 
+
 def run_cli(args: list[str], timeout: int = 30) -> tuple:
     """Run CLI command and return (exit_code, stdout, stderr)."""
     cmd = [sys.executable, "-m", "src.cli"] + args
     try:
         result = subprocess.run(
-            cmd,
-            capture_output=True,
-            text=True,
-            timeout=timeout,
-            cwd=PROJECT_ROOT
+            cmd, capture_output=True, text=True, timeout=timeout, cwd=PROJECT_ROOT
         )
         return result.returncode, result.stdout, result.stderr
     except subprocess.TimeoutExpired:
         return -1, "", "TIMEOUT"
     except Exception as e:
         return -1, "", str(e)
+
 
 def test_help() -> TestResult:
     """TEST-001: --help should display usage without errors."""
@@ -62,8 +62,9 @@ def test_help() -> TestResult:
         stdout=stdout[:500],
         stderr=stderr[:500],
         passed=passed,
-        error=None if passed else "Help not displayed correctly"
+        error=None if passed else "Help not displayed correctly",
     )
+
 
 def test_version() -> TestResult:
     """TEST-002: --version should display version string."""
@@ -77,8 +78,9 @@ def test_version() -> TestResult:
         stdout=stdout[:200],
         stderr=stderr[:200],
         passed=passed,
-        error=None if passed else "Version not displayed"
+        error=None if passed else "Version not displayed",
     )
+
 
 def test_missing_required_site() -> TestResult:
     """TEST-003: Missing --site should error with exit 2."""
@@ -92,16 +94,15 @@ def test_missing_required_site() -> TestResult:
         stdout=stdout[:200],
         stderr=stderr[:500],
         passed=passed,
-        error=None if passed else "Should require --site"
+        error=None if passed else "Should require --site",
     )
+
 
 def test_mutual_exclusion_parallel_roundrobin() -> TestResult:
     """TEST-004: --parallel-languages + --global-lang-rounds should error."""
-    exit_code, stdout, stderr = run_cli([
-        "--site", "test",
-        "--parallel-languages", "2",
-        "--global-lang-rounds", "2"
-    ])
+    exit_code, stdout, stderr = run_cli(
+        ["--site", "test", "--parallel-languages", "2", "--global-lang-rounds", "2"]
+    )
     passed = exit_code == 2 and "cannot use both" in stderr.lower()
     return TestResult(
         name="TEST-004: Mutual exclusion parallel/round-robin",
@@ -111,15 +112,13 @@ def test_mutual_exclusion_parallel_roundrobin() -> TestResult:
         stdout=stdout[:200],
         stderr=stderr[:500],
         passed=passed,
-        error=None if passed else "Should reject conflicting flags"
+        error=None if passed else "Should reject conflicting flags",
     )
+
 
 def test_invalid_validation_mode() -> TestResult:
     """TEST-005: Invalid --validation-mode should error."""
-    exit_code, stdout, stderr = run_cli([
-        "--site", "test",
-        "--validation-mode", "invalid_mode"
-    ])
+    exit_code, stdout, stderr = run_cli(["--site", "test", "--validation-mode", "invalid_mode"])
     passed = exit_code == 2 and "invalid choice" in stderr.lower()
     return TestResult(
         name="TEST-005: Invalid validation mode",
@@ -129,18 +128,19 @@ def test_invalid_validation_mode() -> TestResult:
         stdout=stdout[:200],
         stderr=stderr[:500],
         passed=passed,
-        error=None if passed else "Should reject invalid mode"
+        error=None if passed else "Should reject invalid mode",
     )
+
 
 def test_dry_run_starts() -> TestResult:
     """TEST-006: --dry-run with valid site should start (may fail on missing config)."""
-    exit_code, stdout, stderr = run_cli([
-        "--site", "example",
-        "--dry-run",
-        "--log-level", "DEBUG"
-    ], timeout=10)
+    exit_code, stdout, stderr = run_cli(
+        ["--site", "example", "--dry-run", "--log-level", "DEBUG"], timeout=10
+    )
     # May fail due to missing site config, but should NOT have import errors
-    import_error = "ImportError" in stderr or "ModuleNotFoundError" in stderr or "NameError" in stderr
+    import_error = (
+        "ImportError" in stderr or "ModuleNotFoundError" in stderr or "NameError" in stderr
+    )
     passed = not import_error
     return TestResult(
         name="TEST-006: Dry-run startup (no import errors)",
@@ -150,16 +150,15 @@ def test_dry_run_starts() -> TestResult:
         stdout=stdout[:500],
         stderr=stderr[:500],
         passed=passed,
-        error="Import/Name error detected" if not passed else None
+        error="Import/Name error detected" if not passed else None,
     )
+
 
 def test_parallel_languages_valid() -> TestResult:
     """TEST-007: --parallel-languages alone should be accepted."""
-    exit_code, stdout, stderr = run_cli([
-        "--site", "example",
-        "--parallel-languages", "3",
-        "--dry-run"
-    ], timeout=10)
+    exit_code, stdout, stderr = run_cli(
+        ["--site", "example", "--parallel-languages", "3", "--dry-run"], timeout=10
+    )
     # Should not error on argument parsing
     arg_error = "not allowed" in stderr.lower() or "invalid" in stderr.lower()
     passed = not arg_error
@@ -171,17 +170,16 @@ def test_parallel_languages_valid() -> TestResult:
         stdout=stdout[:300],
         stderr=stderr[:500],
         passed=passed,
-        error="Argument rejected incorrectly" if not passed else None
+        error="Argument rejected incorrectly" if not passed else None,
     )
+
 
 def test_terminology_flags() -> TestResult:
     """TEST-008: --enable-terminology --terminology-mode both should work."""
-    exit_code, stdout, stderr = run_cli([
-        "--site", "example",
-        "--enable-terminology",
-        "--terminology-mode", "both",
-        "--dry-run"
-    ], timeout=10)
+    exit_code, stdout, stderr = run_cli(
+        ["--site", "example", "--enable-terminology", "--terminology-mode", "both", "--dry-run"],
+        timeout=10,
+    )
     arg_error = "not allowed" in stderr.lower() or "invalid" in stderr.lower()
     passed = not arg_error
     return TestResult(
@@ -192,17 +190,16 @@ def test_terminology_flags() -> TestResult:
         stdout=stdout[:300],
         stderr=stderr[:500],
         passed=passed,
-        error="Terminology flags rejected" if not passed else None
+        error="Terminology flags rejected" if not passed else None,
     )
+
 
 def test_batch_size_and_sort() -> TestResult:
     """TEST-009: --batch-size and --sort-segments-by-length should work."""
-    exit_code, stdout, stderr = run_cli([
-        "--site", "example",
-        "--batch-size", "16",
-        "--sort-segments-by-length",
-        "--dry-run"
-    ], timeout=10)
+    exit_code, stdout, stderr = run_cli(
+        ["--site", "example", "--batch-size", "16", "--sort-segments-by-length", "--dry-run"],
+        timeout=10,
+    )
     arg_error = "not allowed" in stderr.lower() or "invalid" in stderr.lower()
     passed = not arg_error
     return TestResult(
@@ -213,19 +210,17 @@ def test_batch_size_and_sort() -> TestResult:
         stdout=stdout[:300],
         stderr=stderr[:500],
         passed=passed,
-        error="Batch/sort flags rejected" if not passed else None
+        error="Batch/sort flags rejected" if not passed else None,
     )
+
 
 def test_resume_flags() -> TestResult:
     """TEST-010: --resume and --force-restart should be mutually exclusive."""
     # Actually these aren't mutually exclusive in argparse, --force-restart clears progress
     # Test that both can be specified (force-restart takes precedence)
-    exit_code, stdout, stderr = run_cli([
-        "--site", "example",
-        "--resume",
-        "--force-restart",
-        "--dry-run"
-    ], timeout=10)
+    exit_code, stdout, stderr = run_cli(
+        ["--site", "example", "--resume", "--force-restart", "--dry-run"], timeout=10
+    )
     arg_error = "not allowed" in stderr.lower() and "resume" in stderr.lower()
     passed = True  # Both should be accepted, --force-restart overrides
     return TestResult(
@@ -236,16 +231,15 @@ def test_resume_flags() -> TestResult:
         stdout=stdout[:300],
         stderr=stderr[:500],
         passed=passed,
-        error=None
+        error=None,
     )
+
 
 def test_cache_write_mode() -> TestResult:
     """TEST-011: --cache-write-mode should accept valid values (auto/always/never)."""
-    exit_code, stdout, stderr = run_cli([
-        "--site", "example",
-        "--cache-write-mode", "never",
-        "--dry-run"
-    ], timeout=10)
+    exit_code, stdout, stderr = run_cli(
+        ["--site", "example", "--cache-write-mode", "never", "--dry-run"], timeout=10
+    )
     arg_error = "invalid choice" in stderr.lower()
     passed = not arg_error
     return TestResult(
@@ -256,26 +250,41 @@ def test_cache_write_mode() -> TestResult:
         stdout=stdout[:300],
         stderr=stderr[:500],
         passed=passed,
-        error="Cache write mode rejected" if not passed else None
+        error="Cache write mode rejected" if not passed else None,
     )
+
 
 def test_full_production_command() -> TestResult:
     """TEST-012: Full production-like command should parse without errors."""
-    exit_code, stdout, stderr = run_cli([
-        "--site", "kb.aspose.net",
-        "--target-langs", "fr", "de", "es",
-        "--enable-terminology",
-        "--terminology-mode", "both",
-        "--load-mode", "fp16",
-        "--batch-size", "16",
-        "--parallel-languages", "3",
-        "--sort-segments-by-length",
-        "--auto-commit",
-        "--log-level", "INFO",
-        "--dry-run"
-    ], timeout=15)
+    exit_code, stdout, stderr = run_cli(
+        [
+            "--site",
+            "kb.aspose.net",
+            "--target-langs",
+            "fr",
+            "de",
+            "es",
+            "--enable-terminology",
+            "--terminology-mode",
+            "both",
+            "--load-mode",
+            "fp16",
+            "--batch-size",
+            "16",
+            "--parallel-languages",
+            "3",
+            "--sort-segments-by-length",
+            "--auto-commit",
+            "--log-level",
+            "INFO",
+            "--dry-run",
+        ],
+        timeout=15,
+    )
     # Check for import errors specifically
-    import_error = "ImportError" in stderr or "ModuleNotFoundError" in stderr or "NameError" in stderr
+    import_error = (
+        "ImportError" in stderr or "ModuleNotFoundError" in stderr or "NameError" in stderr
+    )
     passed = not import_error
     return TestResult(
         name="TEST-012: Full production command",
@@ -285,8 +294,9 @@ def test_full_production_command() -> TestResult:
         stdout=stdout[:500],
         stderr=stderr[:800],
         passed=passed,
-        error="Import/Name error in production command" if not passed else None
+        error="Import/Name error in production command" if not passed else None,
     )
+
 
 def test_benchmarking_cli_help() -> TestResult:
     """TEST-013: Benchmarking CLI --help should work without torch."""
@@ -302,7 +312,7 @@ def test_benchmarking_cli_help() -> TestResult:
             stdout=result.stdout[:500],
             stderr=result.stderr[:300],
             passed=passed,
-            error=None if passed else "Benchmarking help failed"
+            error=None if passed else "Benchmarking help failed",
         )
     except Exception as e:
         return TestResult(
@@ -313,8 +323,9 @@ def test_benchmarking_cli_help() -> TestResult:
             stdout="",
             stderr=str(e),
             passed=False,
-            error=str(e)
+            error=str(e),
         )
+
 
 def test_benchmarking_cli_version() -> TestResult:
     """TEST-014: Benchmarking CLI --version should work."""
@@ -330,7 +341,7 @@ def test_benchmarking_cli_version() -> TestResult:
             stdout=result.stdout[:200],
             stderr=result.stderr[:200],
             passed=passed,
-            error=None if passed else "Benchmarking version failed"
+            error=None if passed else "Benchmarking version failed",
         )
     except Exception as e:
         return TestResult(
@@ -341,8 +352,9 @@ def test_benchmarking_cli_version() -> TestResult:
             stdout="",
             stderr=str(e),
             passed=False,
-            error=str(e)
+            error=str(e),
         )
+
 
 def run_all_tests() -> list[TestResult]:
     """Run all CLI execution tests."""
@@ -373,6 +385,7 @@ def run_all_tests() -> list[TestResult]:
 
     return results
 
+
 def generate_report(results: list[TestResult]) -> str:
     """Generate markdown report of test results."""
     passed = sum(1 for r in results if r.passed)
@@ -389,7 +402,7 @@ Generated: {datetime.now().isoformat()}
 | Total Tests | {len(results)} |
 | Passed | {passed} |
 | Failed | {failed} |
-| Pass Rate | {passed/len(results)*100:.1f}% |
+| Pass Rate | {passed / len(results) * 100:.1f}% |
 
 ## Test Results
 
@@ -417,6 +430,7 @@ Generated: {datetime.now().isoformat()}
 
     return report
 
+
 def main():
     print("=" * 60)
     print("CLI Execution Test Suite")
@@ -441,6 +455,7 @@ def main():
 
     # Return exit code based on failures
     return 0 if failed == 0 else 1
+
 
 if __name__ == "__main__":
     sys.exit(main())

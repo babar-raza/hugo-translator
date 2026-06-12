@@ -580,7 +580,7 @@ Run validation scripts locally:
 
 ```bash
 # Verify latest telemetry record
-python scripts/verify_telemetry.py --latest
+python scripts/diag/verify_telemetry.py --latest
 
 # Run comprehensive health checks (requires local-telemetry repo)
 cd ../local-telemetry

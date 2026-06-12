@@ -56,7 +56,7 @@ For CPU production deployments:
 Run the gap analysis script to identify missing models:
 
 ```bash
-python scripts/find_missing_models.py
+python scripts/models/find_missing_models.py
 ```
 
 This script:
@@ -72,13 +72,13 @@ Execute the download plan:
 
 ```bash
 # Download all recommended models
-python scripts/download_models.py --all
+python scripts/models/download_models.py --all
 
 # Download specific model
-python scripts/download_models.py --model nllb_200_1.3b
+python scripts/models/download_models.py --model nllb_200_1.3b
 
 # Force re-download
-python scripts/download_models.py --model nllb_200_1.3b --force
+python scripts/models/download_models.py --model nllb_200_1.3b --force
 ```
 
 ## Verification
@@ -125,14 +125,14 @@ If disk space is limited:
 The download system supports resume:
 ```bash
 # Resume interrupted download
-python scripts/download_models.py --model nllb_200_1.3b
+python scripts/models/download_models.py --model nllb_200_1.3b
 ```
 
 ### Model Verification Fails
 
 Re-download with force flag:
 ```bash
-python scripts/download_models.py --model nllb_200_1.3b --force
+python scripts/models/download_models.py --model nllb_200_1.3b --force
 ```
 
 ## Next Steps
@@ -154,4 +154,4 @@ After successful download and verification:
 
 ---
 
-**Auto-generated recommendations**: Run `python scripts/find_missing_models.py` for current recommendations based on actual model registry state.
+**Auto-generated recommendations**: Run `python scripts/models/find_missing_models.py` for current recommendations based on actual model registry state.

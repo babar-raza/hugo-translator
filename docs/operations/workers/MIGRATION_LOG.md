@@ -409,7 +409,7 @@ Fixed JobEngine property access issue:
 | Benchmark Dashboard | ✅ | Optional engines param | `src/benchmarking/dashboard.py` |
 | Scheduled Backup | ✅ | Telemetry integration | `scripts/scheduled_backup.py` |
 | GH Actions | ✅ | Config/path updates | `.github/workflows/*.yml` |
-| Model Downloader | ✅ | Optional telemetry | `scripts/download_models.py` |
+| Model Downloader | ✅ | Optional telemetry | `scripts/models/download_models.py` |
 
 **Key Features:**
 - Dual-path support (SharedEngines vs Legacy)

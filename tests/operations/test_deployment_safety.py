@@ -172,7 +172,8 @@ def test_automated_checker_smoke_tests(mock_run):
         project_root = Path(tmpdir)
         scripts_dir = project_root / "scripts"
         scripts_dir.mkdir()
-        (scripts_dir / "run_smoke_tests.py").write_text('print("test")')
+        (scripts_dir / "smoke").mkdir()
+        (scripts_dir / "smoke" / "run_smoke_tests.py").write_text('print("test")')
 
         checker = AutomatedChecker(project_root)
 

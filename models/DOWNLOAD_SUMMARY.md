@@ -80,7 +80,7 @@ All 4 downloaded models support **all 36 target languages**:
 1. ✅ **BM-BENCH-01**: CPU benchmarking for all 36 languages
    - 4 models ready
    - Estimated runtime: 24-36 hours
-   - Command: `python scripts/benchmark_cpu_comprehensive.py --all-languages`
+   - Command: `python scripts/bench/benchmark_cpu_comprehensive.py --all-languages`
 
 2. ✅ **BM-BENCH-02**: GPU benchmarking for all 36 languages  
    - Same 4 models
@@ -114,7 +114,7 @@ du -sh models/*
 
 - All downloads use HuggingFace Hub with resume capability
 - Models are tracked in `models/MODEL_INVENTORY.md` (detailed documentation)
-- Download script: `scripts/download_models.py`
+- Download script: `scripts/models/download_models.py`
 - Verification script: `scripts/verify_models.py`
 - Models are properly gitignored (not tracked in version control)
 - Virtual environment `.venv` must be activated for downloads
@@ -126,4 +126,4 @@ If downloads fail:
 2. Check PyYAML is installed: `pip list | grep PyYAML`
 3. Verify internet connection
 4. Check disk space: `df -h .`
-5. Resume failed download: `python scripts/download_models.py --model <model_id> --force`
+5. Resume failed download: `python scripts/models/download_models.py --model <model_id> --force`

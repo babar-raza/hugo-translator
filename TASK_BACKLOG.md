@@ -88,15 +88,15 @@
 
 ### TC-MLD-02: L2 cache audit + purge script
 **Status**: IN_PROGRESS
-**Scope**: `scripts/audit_l2_cache_contamination.py`
+**Scope**: `scripts/tm/audit_l2_cache_contamination.py`
 
 ### TC-MLD-03: Detection enhancement
 **Status**: IN_PROGRESS
-**Scope**: `scripts/scan_language_contamination.py` — multi-site profiles, block-level, JSON output, parallelism
+**Scope**: `scripts/content/scan_language_contamination.py` — multi-site profiles, block-level, JSON output, parallelism
 
 ### TC-MLD-04: Force-retranslation script
 **Status**: IN_PROGRESS
-**Scope**: `scripts/force_retranslate_contaminated.py`
+**Scope**: `scripts/content/force_retranslate_contaminated.py`
 
 ### TC-MLD-05: Full scan run + cache repair + retranslation + verification
 **Status**: CLOSED — 2026-04-17
@@ -390,7 +390,7 @@ for r in multi[:5]:
 
 # Re-verify with new classification
 for file in $(cat multi_failure_candidates.txt); do
-    python scripts/e2e_verify_single_file.py \
+    python scripts/e2e/e2e_verify_single_file.py \
         --source "D:\...\content\\${file}" \
         --target "D:\...\content\\$(echo $file | sed 's/en/fr/')" \
         --lang fr \
@@ -579,7 +579,7 @@ for r in no_data:
 ---
 
 #### TASK-2.5: Add Verifier Pre-Flight Checks
-**File**: `scripts/e2e_verify_single_file.py`
+**File**: `scripts/e2e/e2e_verify_single_file.py`
 **Status**: PENDING (depends on TASK-2.2, TASK-2.4)
 
 **Description**: Add pre-flight validation to catch errors before JSON write failure.
@@ -599,7 +599,7 @@ for r in no_data:
 ---
 
 #### TASK-2.6: Add Verifier Exception Handling
-**File**: `scripts/e2e_verify_single_file.py`
+**File**: `scripts/e2e/e2e_verify_single_file.py`
 **Status**: PENDING (depends on TASK-2.4)
 
 **Description**: Wrap verifier logic in try-except to always produce JSON, even on error.
@@ -1160,7 +1160,7 @@ python -m src.cli \
 
 # Verify
 for file in $(cat smoke_test_files.txt); do
-    python scripts/e2e_verify_single_file.py \
+    python scripts/e2e/e2e_verify_single_file.py \
         --source "$file" \
         --target "${file/en/fr}" \
         --lang fr \

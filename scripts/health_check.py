@@ -40,7 +40,7 @@ def format_status_text(overall_status: HealthStatus, results, verbose: bool = Fa
     status_symbols = {
         HealthStatus.HEALTHY: "OK",
         HealthStatus.DEGRADED: "WARN",
-        HealthStatus.UNHEALTHY: "FAIL"
+        HealthStatus.UNHEALTHY: "FAIL",
     }
     symbol = status_symbols.get(overall_status, "?")
     lines.append(f"\nOverall Status: {symbol} {overall_status.value.upper()}")
@@ -52,7 +52,9 @@ def format_status_text(overall_status: HealthStatus, results, verbose: bool = Fa
 
     for result in results:
         symbol = status_symbols.get(result.status, "?")
-        lines.append(f"  {symbol} {result.component:20s} {result.status.value:10s} - {result.message}")
+        lines.append(
+            f"  {symbol} {result.component:20s} {result.status.value:10s} - {result.message}"
+        )
 
         if verbose and result.details:
             for key, value in result.details.items():
@@ -109,47 +111,39 @@ Exit Codes:
   0 - System is healthy
   1 - System is degraded
   2 - System is unhealthy
-        """
+        """,
     )
 
     parser.add_argument(
         "--tm-data",
         type=str,
         default="./data/tm",
-        help="TM data directory path. Default: ./data/tm"
+        help="TM data directory path. Default: ./data/tm",
     )
     parser.add_argument(
         "--config-root",
         type=str,
         default="./config",
-        help="Config root directory path. Default: ./config"
+        help="Config root directory path. Default: ./config",
     )
 
     parser.add_argument(
-        "--format",
-        choices=["text", "json"],
-        default="text",
-        help="Output format. Default: text"
+        "--format", choices=["text", "json"], default="text", help="Output format. Default: text"
     )
 
     parser.add_argument(
-        "--verbose",
-        "-v",
-        action="store_true",
-        help="Show detailed component information"
+        "--verbose", "-v", action="store_true", help="Show detailed component information"
     )
 
     parser.add_argument(
-        "--no-recovery",
-        action="store_true",
-        help="Disable automatic recovery attempts"
+        "--no-recovery", action="store_true", help="Disable automatic recovery attempts"
     )
 
     parser.add_argument(
         "--timeout",
         type=float,
         default=5.0,
-        help="Timeout for health checks in seconds. Default: 5.0"
+        help="Timeout for health checks in seconds. Default: 5.0",
     )
 
     args = parser.parse_args()
@@ -159,7 +153,7 @@ Exit Codes:
         tm_data_dir=Path(args.tm_data),
         config_root=Path(args.config_root),
         timeout=args.timeout,
-        enable_auto_recovery=not args.no_recovery
+        enable_auto_recovery=not args.no_recovery,
     )
 
     # Perform health check

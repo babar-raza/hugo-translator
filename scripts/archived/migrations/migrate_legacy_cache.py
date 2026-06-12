@@ -53,10 +53,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 from tm import TranslationMemory
 from tm.normalization import normalize_text
 
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(levelname)s - %(message)s'
-)
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
 
 
@@ -114,7 +111,7 @@ class LegacyCacheMigrator:
     def load_legacy_cache(self, file_path: Path) -> dict[str, str]:
         """Load legacy JSON cache file"""
         try:
-            with open(file_path, encoding='utf-8') as f:
+            with open(file_path, encoding="utf-8") as f:
                 cache = json.load(f)
 
             if not isinstance(cache, dict):
@@ -127,10 +124,7 @@ class LegacyCacheMigrator:
             return {}
 
     def migrate_language_cache(
-        self,
-        lang_code: str,
-        cache_data: dict[str, str],
-        subdomain: str = "default"
+        self, lang_code: str, cache_data: dict[str, str], subdomain: str = "default"
     ) -> int:
         """Migrate cache entries for a single language"""
         migrated_count = 0
@@ -168,7 +162,7 @@ class LegacyCacheMigrator:
                         text=source_text,
                         translation=translation,
                         # Legacy cache doesn't have metadata, use defaults
-                        context=""
+                        context="",
                     )
 
                 migrated_count += 1
@@ -179,9 +173,9 @@ class LegacyCacheMigrator:
                 if error_count <= 5:  # Log first 5 errors
                     logger.warning(f"Failed to migrate entry: {e}")
 
-        self.stats[f'{lang_code}_migrated'] = migrated_count
-        self.stats[f'{lang_code}_skipped'] = skipped_count
-        self.stats[f'{lang_code}_errors'] = error_count
+        self.stats[f"{lang_code}_migrated"] = migrated_count
+        self.stats[f"{lang_code}_skipped"] = skipped_count
+        self.stats[f"{lang_code}_errors"] = error_count
 
         return migrated_count
 
@@ -222,12 +216,12 @@ class LegacyCacheMigrator:
 
             logger.info(f"  ✓ Migrated {migrated} entries for {lang_code}")
             logger.info(f"  ⊘ Skipped {self.stats[f'{lang_code}_skipped']} invalid entries")
-            if self.stats[f'{lang_code}_errors'] > 0:
+            if self.stats[f"{lang_code}_errors"] > 0:
                 logger.warning(f"  ✗ {self.stats[f'{lang_code}_errors']} errors")
             logger.info("")
 
-        self.stats['total_migrated'] = total_migrated
-        self.stats['languages_processed'] = len(cache_files)
+        self.stats["total_migrated"] = total_migrated
+        self.stats["languages_processed"] = len(cache_files)
 
         # Print summary
         self.print_summary()
@@ -242,8 +236,8 @@ class LegacyCacheMigrator:
         logger.info(f"Languages processed: {self.stats['languages_processed']}")
         logger.info(f"Total entries migrated: {self.stats['total_migrated']}")
 
-        total_skipped = sum(v for k, v in self.stats.items() if k.endswith('_skipped'))
-        total_errors = sum(v for k, v in self.stats.items() if k.endswith('_errors'))
+        total_skipped = sum(v for k, v in self.stats.items() if k.endswith("_skipped"))
+        total_errors = sum(v for k, v in self.stats.items() if k.endswith("_errors"))
 
         logger.info(f"Total skipped: {total_skipped}")
         logger.info(f"Total errors: {total_errors}")
@@ -269,43 +263,31 @@ def main():
     parser = argparse.ArgumentParser(
         description="Migrate legacy JSON cache to new LMDB Translation Memory",
         formatter_class=argparse.RawDescriptionHelpFormatter,
-        epilog=__doc__
+        epilog=__doc__,
     )
 
     parser.add_argument(
-        '--legacy_cache',
-        required=True,
-        help='Path to legacy translation cache directory'
+        "--legacy_cache", required=True, help="Path to legacy translation cache directory"
     )
 
     parser.add_argument(
-        '--output',
-        default='./data/tm',
-        help='Output directory for new TM database (default: ./data/tm)'
+        "--output",
+        default="./data/tm",
+        help="Output directory for new TM database (default: ./data/tm)",
     )
 
     parser.add_argument(
-        '--subdomain',
-        default='default',
-        help='Subdomain for migrated entries (default: default)'
+        "--subdomain", default="default", help="Subdomain for migrated entries (default: default)"
     )
 
     parser.add_argument(
-        '--dry-run',
-        action='store_true',
-        help='Preview migration without writing to database'
+        "--dry-run", action="store_true", help="Preview migration without writing to database"
     )
 
-    parser.add_argument(
-        '--verbose',
-        action='store_true',
-        help='Enable verbose logging'
-    )
+    parser.add_argument("--verbose", action="store_true", help="Enable verbose logging")
 
     parser.add_argument(
-        '--populate-l3',
-        action='store_true',
-        help='Populate L3 semantic index after migration'
+        "--populate-l3", action="store_true", help="Populate L3 semantic index after migration"
     )
 
     args = parser.parse_args()
@@ -316,9 +298,7 @@ def main():
     try:
         # Execute migration
         migrator = LegacyCacheMigrator(
-            legacy_cache_dir=args.legacy_cache,
-            output_dir=args.output,
-            dry_run=args.dry_run
+            legacy_cache_dir=args.legacy_cache, output_dir=args.output, dry_run=args.dry_run
         )
 
         stats = migrator.migrate_all(subdomain=args.subdomain)
@@ -332,15 +312,18 @@ def main():
 
             try:
                 import subprocess
+
                 result = subprocess.run(
                     [
                         sys.executable,
                         str(Path(__file__).parent / "populate_l3_index.py"),
-                        "--tm-path", args.output,
-                        "--batch-size", "1000"
+                        "--tm-path",
+                        args.output,
+                        "--batch-size",
+                        "1000",
                     ],
                     capture_output=True,
-                    text=True
+                    text=True,
                 )
 
                 if result.returncode == 0:

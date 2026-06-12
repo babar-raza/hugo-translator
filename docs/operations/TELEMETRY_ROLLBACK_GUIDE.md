@@ -262,7 +262,7 @@ translate-hugo \
   --target-langs de
 
 # Check if telemetry written to database
-python scripts/verify_telemetry.py --check
+python scripts/diag/verify_telemetry.py --check
 
 # Should show latest run (with old architecture)
 ```
@@ -283,7 +283,7 @@ echo $TELEMETRY_DB_PATH
 # Expected: D:/agent-metrics/db/telemetry.sqlite
 
 # 3. Check telemetry data
-python scripts/verify_telemetry.py --check
+python scripts/diag/verify_telemetry.py --check
 # Expected: Latest run visible
 
 # 4. Test translation
@@ -356,7 +356,7 @@ python telemetry_service.py
 # (adjust for your deployment)
 
 # 5. Validate
-python scripts/verify_telemetry.py --check
+python scripts/diag/verify_telemetry.py --check
 ```
 
 ---

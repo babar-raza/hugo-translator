@@ -71,6 +71,28 @@ jobs:
           python -m pytest tests/unit/phase-0 tests/unit/phase-1 tests/unit/phase-3/test_l1_cache.py tests/unit/phase-3/test_l2_persistent.py tests/unit/phase-4/test_registry.py -v --tb=short
         shell: pwsh
 
+  manifest-check:
+    name: Scripts Manifest Check
+    runs-on: windows-latest
+    needs: unit-tests
+    timeout-minutes: 5
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Validate scripts/MANIFEST.toml
+        # Strict mode: fails if any unregistered script exists at scripts/ root.
+        # Also fails if a ci_critical script is missing or has a stale MANIFEST entry.
+        # To add a root script: add a [[script]] entry to scripts/MANIFEST.toml first.
+        run: python scripts/ci/check_manifest.py --strict
+        shell: pwsh
+
   regression-tests:
     name: Regression Tests
     runs-on: windows-latest
@@ -259,7 +281,7 @@ jobs:
   summary:
     name: Gate Summary
     runs-on: windows-latest
-    needs: [unit-tests, regression-tests, quality-gate, security-scan]
+    needs: [unit-tests, manifest-check, regression-tests, quality-gate, security-scan]
     if: always()
 
     steps:
@@ -270,16 +292,19 @@ jobs:
           Write-Host "RELEASE GATE SUMMARY"
           Write-Host ("=" * 60)
           Write-Host "Unit Tests:       ${{ needs.unit-tests.result }}"
+          Write-Host "Manifest Check:   ${{ needs.manifest-check.result }}"
           Write-Host "Regression Tests: ${{ needs.regression-tests.result }}"
           Write-Host "Quality Gate:     ${{ needs.quality-gate.result }}"
           Write-Host "Security Scan:    ${{ needs.security-scan.result }} (advisory)"
           Write-Host ("=" * 60)
 
           if ("${{ needs.unit-tests.result }}" -ne "success" -or
+              "${{ needs.manifest-check.result }}" -ne "success" -or
               "${{ needs.regression-tests.result }}" -ne "success" -or
               "${{ needs.quality-gate.result }}" -ne "success") {
             Write-Host "RELEASE GATE: FAIL"
             Write-Host "  Unit Tests:       ${{ needs.unit-tests.result }}"
+            Write-Host "  Manifest Check:   ${{ needs.manifest-check.result }}"
             Write-Host "  Regression Tests: ${{ needs.regression-tests.result }}"
             Write-Host "  Quality Gate:     ${{ needs.quality-gate.result }}"
             exit 1

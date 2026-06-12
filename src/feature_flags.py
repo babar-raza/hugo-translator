@@ -35,7 +35,7 @@ Environment variable override:
 Related:
     - config/global.yaml (feature flags configuration)
     - docs/ast_translation_rollout.md (AST feature rollout guide)
-    - scripts/toggle_ast_translation.py (per-site AST toggle)
+    - scripts/ops/toggle_ast_translation.py (per-site AST toggle)
 """
 
 import os
@@ -95,11 +95,9 @@ class FeatureFlags:
             "enable_parallel_processing": True,
             "enable_semantic_tm": True,
             "enable_auto_model_selection": True,
-
             # Experimental features (default off)
             "enable_model_benchmarking": False,
             "enable_quality_scoring": False,
-
             # Gradual rollout features (default off for safety)
             "use_ast_translation": False,
             "protect_hugo_shortcodes": True,  # Safety feature
@@ -122,7 +120,7 @@ class FeatureFlags:
         for env_var, value in os.environ.items():
             if env_var.startswith(env_prefix):
                 # Extract flag name (convert ENABLE_MODEL_BENCHMARKING to enable_model_benchmarking)
-                flag_name = env_var[len(env_prefix):].lower()
+                flag_name = env_var[len(env_prefix) :].lower()
 
                 # Parse boolean value
                 bool_value = value.lower() in ("true", "1", "yes", "on")

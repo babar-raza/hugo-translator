@@ -92,7 +92,7 @@ use_ast_body_reconstruction: false  # Disabled for rollback
 **Run smoke test:**
 ```bash
 # Test that traditional translation still works
-python scripts/smoke_test_ast_fixes.py
+python scripts/smoke/smoke_test_ast_fixes.py
 ```
 
 Expected result: All tests should pass (module imports, traditional translation path)

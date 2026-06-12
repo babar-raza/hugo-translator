@@ -219,7 +219,7 @@ Or in code, it will parse `cuda:2` to target GPU 2.
 For manual batch size calculation before running:
 
 ```bash
-python scripts/calculate_optimal_batch.py \
+python scripts/bench/calculate_optimal_batch.py \
   --model facebook/nllb-200-3.3B \
   --precision fp16 \
   --target-utilization 0.85

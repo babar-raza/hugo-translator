@@ -779,7 +779,7 @@ python scripts/restore_tm_backup.py --backup latest --force
 **Scenario 3: Hardware Migration**
 ```bash
 # 1. Create backup on old system
-python scripts/backup_tm.py --compact
+python scripts/tm/backup_tm.py --compact
 
 # 2. Copy backup to new system
 scp -r data/tm/backups/tm_backup_* newserver:/data/tm/backups/
@@ -812,7 +812,7 @@ python scripts/restore_tm_backup.py --backup <backup_name> --force
 **For Full System Backup:**
 ```bash
 # Backup L2 (LMDB)
-python scripts/backup_tm.py
+python scripts/tm/backup_tm.py
 
 # Backup L3 (FAISS) - separate script
 python scripts/backup_l3_index.py
@@ -1182,17 +1182,17 @@ def store(self, site_id, src_lang, tgt_lang, text, translation, context=None, me
 
 After migration or fresh installation, L2 may have entries but L3 is empty. Use the build script to populate L3:
 
-**Script:** [`scripts/build_l3_index.py`](../../scripts/build_l3_index.py)
+**Script:** [`scripts/tm/build_l3_index.py`](../../scripts/tm/build_l3_index.py)
 
 ```bash
 # CPU (slower, but works everywhere)
-python scripts/build_l3_index.py
+python scripts/tm/build_l3_index.py
 
 # GPU (faster, requires CUDA)
-python scripts/build_l3_index.py --use_gpu
+python scripts/tm/build_l3_index.py --use_gpu
 
 # Custom paths
-python scripts/build_l3_index.py \
+python scripts/tm/build_l3_index.py \
   --l2_path ./data/tm/l2.lmdb \
   --l3_path ./data/tm/l3.faiss \
   --embedding_model sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2
@@ -1211,17 +1211,17 @@ python scripts/build_l3_index.py \
 
 Use the sync script to verify and fix any drift between L2 and L3:
 
-**Script:** [`scripts/sync_l3_index.py`](../../scripts/sync_l3_index.py)
+**Script:** [`scripts/tm/sync_l3_index.py`](../../scripts/tm/sync_l3_index.py)
 
 ```bash
 # Dry run (check only, no changes)
-python scripts/sync_l3_index.py --dry-run
+python scripts/tm/sync_l3_index.py --dry-run
 
 # Sync (add missing entries)
-python scripts/sync_l3_index.py
+python scripts/tm/sync_l3_index.py
 
 # With GPU
-python scripts/sync_l3_index.py --use_gpu
+python scripts/tm/sync_l3_index.py --use_gpu
 ```
 
 **What It Does:**
@@ -1236,22 +1236,22 @@ python scripts/sync_l3_index.py --use_gpu
 **Initial Setup:**
 ```bash
 # After migration
-python scripts/build_l3_index.py --use_gpu
+python scripts/tm/build_l3_index.py --use_gpu
 ```
 
 **Regular Operations:**
 ```bash
 # Weekly verification (cron job)
-0 2 * * 0 python scripts/sync_l3_index.py --dry-run
+0 2 * * 0 python scripts/tm/sync_l3_index.py --dry-run
 
 # Monthly full sync (if drift detected)
-0 3 1 * * python scripts/sync_l3_index.py
+0 3 1 * * python scripts/tm/sync_l3_index.py
 ```
 
 **After Bulk Operations:**
 ```bash
 # After bulk import or manual L2 modifications
-python scripts/sync_l3_index.py
+python scripts/tm/sync_l3_index.py
 ```
 
 ### Synchronization Scenarios
@@ -1266,7 +1266,7 @@ python scripts/sync_l3_index.py
 **Problem:** L2 has 6M entries, L3 is empty
 **Solution:**
 ```bash
-python scripts/build_l3_index.py --use_gpu
+python scripts/tm/build_l3_index.py --use_gpu
 ```
 
 #### Scenario 3: Direct L2 Modification
@@ -1274,10 +1274,10 @@ python scripts/build_l3_index.py --use_gpu
 **Solution:**
 ```bash
 # Check drift
-python scripts/sync_l3_index.py --dry-run
+python scripts/tm/sync_l3_index.py --dry-run
 
 # Fix drift
-python scripts/sync_l3_index.py
+python scripts/tm/sync_l3_index.py
 ```
 
 #### Scenario 4: L3 Corruption
@@ -1285,7 +1285,7 @@ python scripts/sync_l3_index.py
 **Solution:**
 ```bash
 # Rebuild from scratch
-python scripts/build_l3_index.py --force
+python scripts/tm/build_l3_index.py --force
 ```
 
 #### Scenario 5: Embedding Model Change
@@ -1293,7 +1293,7 @@ python scripts/build_l3_index.py --force
 **Solution:**
 ```bash
 # Rebuild with new model
-python scripts/build_l3_index.py \
+python scripts/tm/build_l3_index.py \
   --force \
   --embedding_model sentence-transformers/new-model \
   --use_gpu
@@ -1364,7 +1364,7 @@ else:
 
 **L3 Build Fails with OOM:**
 ```bash
-python scripts/build_l3_index.py --batch_size 100
+python scripts/tm/build_l3_index.py --batch_size 100
 ```
 
 **Embeddings Too Slow:**
@@ -1374,7 +1374,7 @@ python scripts/build_l3_index.py --batch_size 100
 
 **Index File Corrupted:**
 ```bash
-python scripts/build_l3_index.py --force
+python scripts/tm/build_l3_index.py --force
 ```
 
 **Sync Script Hangs:**

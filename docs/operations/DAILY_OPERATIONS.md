@@ -121,7 +121,7 @@ Gracefully shut down the translation system to prevent data loss.
 
 1. **Check for active jobs**:
    ```bash
-   python scripts/generate_metrics_report.py --format json | \
+   python scripts/analysis/generate_metrics_report.py --format json | \
        grep -A 5 "queue"
    ```
 
@@ -130,7 +130,7 @@ Gracefully shut down the translation system to prevent data loss.
 2. **Wait for jobs to complete** (if needed):
    ```bash
    # Monitor queue until empty
-   watch -n 5 'python scripts/generate_metrics_report.py | grep "Queue Depth"'
+   watch -n 5 'python scripts/analysis/generate_metrics_report.py | grep "Queue Depth"'
    ```
 
 3. **Stop workers gracefully** (send SIGTERM):
@@ -165,7 +165,7 @@ Gracefully shut down the translation system to prevent data loss.
 
 7. **Create final backup**:
    ```bash
-   python scripts/backup_tm.py \
+   python scripts/tm/backup_tm.py \
        --output backups/tm_shutdown_$(date +%Y%m%d).tar.gz
    ```
 
@@ -213,7 +213,7 @@ Monitor system health and address issues proactively.
 
 3. **Check metrics dashboard**:
    ```bash
-   python scripts/generate_metrics_report.py --since 1h
+   python scripts/analysis/generate_metrics_report.py --since 1h
    ```
 
 4. **Review key metrics**:
@@ -236,7 +236,7 @@ Monitor system health and address issues proactively.
 
 **TM hit rate below 30%**:
 1. Check TM size: `du -sh data/tm/`
-2. Rebuild L3 index: `python scripts/build_l3_index.py`
+2. Rebuild L3 index: `python scripts/tm/build_l3_index.py`
 3. Verify TM not corrupted: `python scripts/health_check.py --test`
 
 **High memory usage**:
@@ -286,7 +286,7 @@ Create regular backups of TM data and configurations for disaster recovery.
 
 1. **Create manual backup**:
    ```bash
-   python scripts/backup_tm.py \
+   python scripts/tm/backup_tm.py \
        --output backups/tm_$(date +%Y%m%d_%H%M%S).tar.gz \
        --rotate 7
    ```
@@ -295,7 +295,7 @@ Create regular backups of TM data and configurations for disaster recovery.
 
 2. **Verify backup**:
    ```bash
-   python scripts/restore_tm.py \
+   python scripts/tm/restore_tm.py \
        --backup backups/tm_YYYYMMDD_HHMMSS.tar.gz \
        --test
    ```
@@ -311,7 +311,7 @@ Create regular backups of TM data and configurations for disaster recovery.
 
 4. **Test restore** (monthly):
    ```bash
-   python scripts/restore_tm.py \
+   python scripts/tm/restore_tm.py \
        --backup backups/tm_latest.tar.gz \
        --target /tmp/test_restore \
        --verify
@@ -364,7 +364,7 @@ Manage L1 cache to maintain optimal performance.
 
 1. **Check L1 cache size**:
    ```bash
-   python scripts/generate_metrics_report.py --format json | \
+   python scripts/analysis/generate_metrics_report.py --format json | \
        grep -A 5 "tm_cache_size"
    ```
 
@@ -389,7 +389,7 @@ Manage L1 cache to maintain optimal performance.
 
 4. **Monitor cache hit rate**:
    ```bash
-   python scripts/generate_metrics_report.py | grep "Hit Rate"
+   python scripts/analysis/generate_metrics_report.py | grep "Hit Rate"
    ```
 
 ### Verification
@@ -423,12 +423,12 @@ Maintain Translation Memory health and performance.
 
 3. **Rebuild L3 index** (if degraded):
    ```bash
-   python scripts/build_l3_index.py --force
+   python scripts/tm/build_l3_index.py --force
    ```
 
 4. **Sync L3 with L2** (ensure consistency):
    ```bash
-   python scripts/sync_l3_index.py
+   python scripts/tm/sync_l3_index.py
    ```
 
 ### Verification
@@ -502,7 +502,7 @@ Monitor and optimize system performance.
 
 1. **Generate performance report**:
    ```bash
-   python scripts/generate_metrics_report.py --since 24h
+   python scripts/analysis/generate_metrics_report.py --since 24h
    ```
 
 2. **Check Prometheus metrics**:

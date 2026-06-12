@@ -39,21 +39,21 @@ Create a one-time backup:
 
 ```bash
 # Basic backup
-python scripts/backup_tm.py --output backups/tm_20250101.tar.gz
+python scripts/tm/backup_tm.py --output backups/tm_20250101.tar.gz
 
 # Backup with rotation (keep last 7)
-python scripts/backup_tm.py \
+python scripts/tm/backup_tm.py \
     --output backups/tm_20250101.tar.gz \
     --rotate 7
 
 # Backup with custom paths
-python scripts/backup_tm.py \
+python scripts/tm/backup_tm.py \
     --output backups/tm_20250101.tar.gz \
     --tm-data ./data/tm \
     --config ./config
 
 # Uncompressed backup (faster)
-python scripts/backup_tm.py \
+python scripts/tm/backup_tm.py \
     --output backups/tm_20250101.tar \
     --compression none
 ```
@@ -100,12 +100,12 @@ Restore to original locations:
 
 ```bash
 # Restore with verification
-python scripts/restore_tm.py \
+python scripts/tm/restore_tm.py \
     --backup backups/tm_20250101.tar.gz \
     --verify
 
 # Restore without verification (faster)
-python scripts/restore_tm.py \
+python scripts/tm/restore_tm.py \
     --backup backups/tm_20250101.tar.gz
 ```
 
@@ -115,7 +115,7 @@ Restore to a different location for testing:
 
 ```bash
 # Restore to test location
-python scripts/restore_tm.py \
+python scripts/tm/restore_tm.py \
     --backup backups/tm_20250101.tar.gz \
     --target /tmp/test_restore \
     --verify
@@ -126,7 +126,7 @@ python scripts/restore_tm.py \
 See what would be restored without actually restoring:
 
 ```bash
-python scripts/restore_tm.py \
+python scripts/tm/restore_tm.py \
     --backup backups/tm_20250101.tar.gz \
     --dry-run
 ```
@@ -136,7 +136,7 @@ python scripts/restore_tm.py \
 Test if a backup is corrupted:
 
 ```bash
-python scripts/restore_tm.py \
+python scripts/tm/restore_tm.py \
     --backup backups/tm_20250101.tar.gz \
     --test
 ```
@@ -199,7 +199,7 @@ Rotation automatically removes old backups:
 
 ```bash
 # Keep last 7 backups
-python scripts/backup_tm.py \
+python scripts/tm/backup_tm.py \
     --output backups/tm_$(date +%Y%m%d).tar.gz \
     --rotate 7
 ```
@@ -270,7 +270,7 @@ Recommended retention policy:
 
 2. Restore most recent backup:
    ```bash
-   python scripts/restore_tm.py \
+   python scripts/tm/restore_tm.py \
        --backup backups/tm_latest.tar.gz \
        --verify
    ```
@@ -288,7 +288,7 @@ Restore specific components:
 
 ```bash
 # Restore to temporary location
-python scripts/restore_tm.py \
+python scripts/tm/restore_tm.py \
     --backup backups/tm_20250101.tar.gz \
     --target /tmp/restore \
     --verify
@@ -350,7 +350,7 @@ Test backups regularly:
 
 ```bash
 # Monthly restore test
-python scripts/restore_tm.py \
+python scripts/tm/restore_tm.py \
     --backup backups/tm_latest.tar.gz \
     --target /tmp/test_restore \
     --verify
@@ -443,7 +443,7 @@ For very large TM systems, consider incremental backups:
 
 ```bash
 # Full backup (weekly)
-python scripts/backup_tm.py --output backups/full_20250101.tar.gz
+python scripts/tm/backup_tm.py --output backups/full_20250101.tar.gz
 
 # Then use rsync for daily incremental
 rsync -av --link-dest=../full_20250101 \
@@ -456,13 +456,13 @@ Encrypt sensitive backups:
 
 ```bash
 # Create encrypted backup
-python scripts/backup_tm.py --output - | \
+python scripts/tm/backup_tm.py --output - | \
     gpg --encrypt --recipient backup@example.com \
     > backups/tm_20250101.tar.gz.gpg
 
 # Restore encrypted backup
 gpg --decrypt backups/tm_20250101.tar.gz.gpg | \
-    python scripts/restore_tm.py --backup - --target /tmp/restore
+    python scripts/tm/restore_tm.py --backup - --target /tmp/restore
 ```
 
 ### Remote Backups
@@ -471,7 +471,7 @@ Backup directly to remote server:
 
 ```bash
 # Backup and transfer
-python scripts/backup_tm.py --output - | \
+python scripts/tm/backup_tm.py --output - | \
     ssh user@backup-server "cat > /backups/tm_20250101.tar.gz"
 ```
 
@@ -480,7 +480,7 @@ python scripts/backup_tm.py --output - | \
 ### backup_tm.py
 
 ```bash
-python scripts/backup_tm.py [OPTIONS]
+python scripts/tm/backup_tm.py [OPTIONS]
 
 Options:
   --output, -o PATH       Output backup file (required)
@@ -495,7 +495,7 @@ Options:
 ### restore_tm.py
 
 ```bash
-python scripts/restore_tm.py [OPTIONS]
+python scripts/tm/restore_tm.py [OPTIONS]
 
 Options:
   --backup, -b PATH       Backup file to restore (required)

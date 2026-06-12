@@ -40,7 +40,7 @@ Multi-dimensional benchmarking system to measure translation model performance a
 **Current Gap:** No model discovery system. Registry is static with 12 hardcoded entries.
 
 **Evidence Required:**
-- `scripts/discover_models.py` exists and can discover ≥50 models from HuggingFace
+- `scripts/models/discover_models.py` exists and can discover ≥50 models from HuggingFace
 - Registry updated with discovered models marked `discovered: true`
 - Benchmarks executed for discovered models
 
@@ -126,9 +126,9 @@ Multi-dimensional benchmarking system to measure translation model performance a
 
 ### Benchmarking Execution
 
-**Primary Script:** `scripts/benchmark_cpu_comprehensive.py`
-**GPU Script:** `scripts/benchmark_production_optimized.py`
-**Quality Script:** `scripts/benchmark_quality.py` (to be implemented)
+**Primary Script:** `scripts/bench/benchmark_cpu_comprehensive.py`
+**GPU Script:** `scripts/bench/benchmark_production_optimized.py`
+**Quality Script:** `scripts/bench/benchmark_quality.py` (to be implemented)
 
 **Integration:**
 - Uses: `BenchmarkRunner` from `src/benchmarking/runner.py`
@@ -137,7 +137,7 @@ Multi-dimensional benchmarking system to measure translation model performance a
 
 ### Model Discovery
 
-**Primary Script:** `scripts/discover_models.py` (to be implemented)
+**Primary Script:** `scripts/models/discover_models.py` (to be implemented)
 
 **Integration:**
 - Uses: `ModelDiscovery` from `src/model_runtime/discovery.py` (to be implemented)
@@ -158,7 +158,7 @@ Multi-dimensional benchmarking system to measure translation model performance a
 ### Speed Benchmark Execution
 
 ```bash
-python scripts/benchmark_cpu_comprehensive.py \
+python scripts/bench/benchmark_cpu_comprehensive.py \
   --models m2m100_418m,m2m100_418m_ct2 \
   --batch-sizes 4,8,16 \
   --iterations 3 \
@@ -187,7 +187,7 @@ python scripts/benchmark_cpu_comprehensive.py \
 ### Quality Benchmark Execution
 
 ```bash
-python scripts/benchmark_quality.py \
+python scripts/bench/benchmark_quality.py \
   --models m2m100_418m \
   --corpus data/quality_corpus/wmt_newstest_2022.json \
   --metrics bleu,comet,chrf \
@@ -223,7 +223,7 @@ python scripts/benchmark_quality.py \
 ### Model Discovery
 
 ```bash
-python scripts/discover_models.py \
+python scripts/models/discover_models.py \
   --task translation \
   --min-downloads 1000 \
   --limit 50 \
@@ -298,7 +298,7 @@ python scripts/manage_model_cache.py --cleanup --older-than 30d
 
 6. **Discovery automation:**
    - System MUST support automated discovery of translation models from HuggingFace
-   - Evidence: `scripts/discover_models.py` exists, can discover ≥50 models
+   - Evidence: `scripts/models/discover_models.py` exists, can discover ≥50 models
    - Rationale: REQ-BM-02 requires trying many models, manual curation insufficient
 
 ### Should (Important)

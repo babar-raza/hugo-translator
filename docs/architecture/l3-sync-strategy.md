@@ -66,17 +66,17 @@ After migration, L2 has 6M+ entries but L3 is empty. This is expected because:
 
 ### Solution: Build Script
 
-Use [`scripts/build_l3_index.py`](../scripts/build_l3_index.py) to populate L3 from existing L2 data:
+Use [`scripts/tm/build_l3_index.py`](../scripts/tm/build_l3_index.py) to populate L3 from existing L2 data:
 
 ```bash
 # CPU (slower, but works everywhere)
-python scripts/build_l3_index.py
+python scripts/tm/build_l3_index.py
 
 # GPU (faster, requires CUDA)
-python scripts/build_l3_index.py --use_gpu
+python scripts/tm/build_l3_index.py --use_gpu
 
 # Custom paths
-python scripts/build_l3_index.py \
+python scripts/tm/build_l3_index.py \
   --l2_path ./data/tm/l2.lmdb \
   --l3_path ./data/tm/l3.faiss \
   --embedding_model sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2
@@ -112,17 +112,17 @@ Verify L3 hasn't drifted from L2 due to:
 
 ### Solution: Sync Script
 
-Use [`scripts/sync_l3_index.py`](../scripts/sync_l3_index.py) to verify and fix any drift:
+Use [`scripts/tm/sync_l3_index.py`](../scripts/tm/sync_l3_index.py) to verify and fix any drift:
 
 ```bash
 # Dry run (check only, no changes)
-python scripts/sync_l3_index.py --dry-run
+python scripts/tm/sync_l3_index.py --dry-run
 
 # Sync (add missing entries)
-python scripts/sync_l3_index.py
+python scripts/tm/sync_l3_index.py
 
 # With GPU
-python scripts/sync_l3_index.py --use_gpu
+python scripts/tm/sync_l3_index.py --use_gpu
 ```
 
 **What It Does:**
@@ -143,22 +143,22 @@ python scripts/sync_l3_index.py --use_gpu
 ### Initial Setup
 ```bash
 # After migration
-python scripts/build_l3_index.py --use_gpu
+python scripts/tm/build_l3_index.py --use_gpu
 ```
 
 ### Regular Operations
 ```bash
 # Weekly verification (cron job)
-0 2 * * 0 python scripts/sync_l3_index.py --dry-run
+0 2 * * 0 python scripts/tm/sync_l3_index.py --dry-run
 
 # Monthly full sync (if drift detected)
-0 3 1 * * python scripts/sync_l3_index.py
+0 3 1 * * python scripts/tm/sync_l3_index.py
 ```
 
 ### After Bulk Operations
 ```bash
 # After bulk import or manual L2 modifications
-python scripts/sync_l3_index.py
+python scripts/tm/sync_l3_index.py
 ```
 
 ---
@@ -176,7 +176,7 @@ python scripts/sync_l3_index.py
 **Problem:** L2 has 6M entries, L3 is empty
 **Solution:**
 ```bash
-python scripts/build_l3_index.py --use_gpu
+python scripts/tm/build_l3_index.py --use_gpu
 ```
 
 ### Scenario 3: Direct L2 Modification
@@ -184,10 +184,10 @@ python scripts/build_l3_index.py --use_gpu
 **Solution:**
 ```bash
 # Check drift
-python scripts/sync_l3_index.py --dry-run
+python scripts/tm/sync_l3_index.py --dry-run
 
 # Fix drift
-python scripts/sync_l3_index.py
+python scripts/tm/sync_l3_index.py
 ```
 
 ### Scenario 4: L3 Corruption
@@ -195,7 +195,7 @@ python scripts/sync_l3_index.py
 **Solution:**
 ```bash
 # Rebuild from scratch
-python scripts/build_l3_index.py --force
+python scripts/tm/build_l3_index.py --force
 ```
 
 ### Scenario 5: Embedding Model Change
@@ -203,7 +203,7 @@ python scripts/build_l3_index.py --force
 **Solution:**
 ```bash
 # Rebuild with new model
-python scripts/build_l3_index.py \
+python scripts/tm/build_l3_index.py \
   --force \
   --embedding_model sentence-transformers/new-model \
   --use_gpu
@@ -291,7 +291,7 @@ else:
 ### L3 Build Fails with OOM
 **Solution:** Reduce batch_size
 ```bash
-python scripts/build_l3_index.py --batch_size 100
+python scripts/tm/build_l3_index.py --batch_size 100
 ```
 
 ### Embeddings Too Slow
@@ -303,7 +303,7 @@ python scripts/build_l3_index.py --batch_size 100
 ### Index File Corrupted
 **Solution:** Rebuild from scratch
 ```bash
-python scripts/build_l3_index.py --force
+python scripts/tm/build_l3_index.py --force
 ```
 
 ### Sync Script Hangs
@@ -364,13 +364,13 @@ python scripts/build_l3_index.py --force
 
 ```bash
 # 1. Build L3 index (one-time, ~1-6 hours)
-python scripts/build_l3_index.py --use_gpu
+python scripts/tm/build_l3_index.py --use_gpu
 
 # 2. Verify build succeeded
-python scripts/sync_l3_index.py --dry-run
+python scripts/tm/sync_l3_index.py --dry-run
 
 # 3. Set up weekly health check (optional)
-# Add to cron: 0 2 * * 0 python scripts/sync_l3_index.py --dry-run
+# Add to cron: 0 2 * * 0 python scripts/tm/sync_l3_index.py --dry-run
 
 # 4. Use system normally
 # All new translations automatically update L3 ✅

@@ -31,10 +31,7 @@ except ImportError:
     print("ERROR: lmdb not installed. Run: pip install lmdb")
     sys.exit(1)
 
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(levelname)s - %(message)s'
-)
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
 
 
@@ -76,19 +73,19 @@ class MigrationMonitor:
                 file_size = os.path.getsize(db_file)
 
             stats = {
-                'entries': stat['entries'],
-                'page_size': stat['psize'],
-                'branch_pages': stat['branch_pages'],
-                'leaf_pages': stat['leaf_pages'],
-                'overflow_pages': stat['overflow_pages'],
-                'total_pages': stat['branch_pages'] + stat['leaf_pages'] + stat['overflow_pages'],
-                'map_size': info['map_size'],
-                'last_pgno': info['last_pgno'],
-                'last_txnid': info['last_txnid'],
-                'max_readers': info['max_readers'],
-                'num_readers': info['num_readers'],
-                'file_size': file_size,
-                'timestamp': datetime.now().isoformat(),
+                "entries": stat["entries"],
+                "page_size": stat["psize"],
+                "branch_pages": stat["branch_pages"],
+                "leaf_pages": stat["leaf_pages"],
+                "overflow_pages": stat["overflow_pages"],
+                "total_pages": stat["branch_pages"] + stat["leaf_pages"] + stat["overflow_pages"],
+                "map_size": info["map_size"],
+                "last_pgno": info["last_pgno"],
+                "last_txnid": info["last_txnid"],
+                "max_readers": info["max_readers"],
+                "num_readers": info["num_readers"],
+                "file_size": file_size,
+                "timestamp": datetime.now().isoformat(),
             }
 
             env.close()
@@ -112,11 +109,11 @@ class MigrationMonitor:
         remaining = max(0, self.expected_entries - current_entries)
 
         return {
-            'current': current_entries,
-            'expected': self.expected_entries,
-            'percentage': percentage,
-            'remaining': remaining,
-            'is_complete': percentage >= 95.0,  # 95% threshold for completion
+            "current": current_entries,
+            "expected": self.expected_entries,
+            "percentage": percentage,
+            "remaining": remaining,
+            "is_complete": percentage >= 95.0,  # 95% threshold for completion
         }
 
     def print_status(self, watch_mode: bool = False) -> None:
@@ -128,7 +125,7 @@ class MigrationMonitor:
         """
         try:
             stats = self.get_db_stats()
-            progress = self.calculate_progress(stats['entries'])
+            progress = self.calculate_progress(stats["entries"])
 
             if not watch_mode:
                 print("=" * 80)
@@ -157,10 +154,10 @@ class MigrationMonitor:
             print()
 
             # Status verdict
-            if progress['is_complete']:
+            if progress["is_complete"]:
                 print("STATUS: COMPLETE ✓")
                 print(f"Migration has reached {progress['percentage']:.1f}% completion threshold")
-            elif progress['percentage'] > 0:
+            elif progress["percentage"] > 0:
                 print("STATUS: IN PROGRESS...")
                 print(f"Migration is {progress['percentage']:.1f}% complete")
             else:
@@ -191,7 +188,7 @@ class MigrationMonitor:
 
         try:
             while True:
-                os.system('cls' if os.name == 'nt' else 'clear')
+                os.system("cls" if os.name == "nt" else "clear")
 
                 print("=" * 80)
                 print(f"LIVE MIGRATION MONITORING - {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
@@ -199,10 +196,10 @@ class MigrationMonitor:
                 print()
 
                 stats = self.get_db_stats()
-                progress = self.calculate_progress(stats['entries'])
+                progress = self.calculate_progress(stats["entries"])
 
                 # Calculate rate
-                current_entries = stats['entries']
+                current_entries = stats["entries"]
                 entries_per_second = 0
                 eta_str = "Calculating..."
 
@@ -214,10 +211,10 @@ class MigrationMonitor:
                         entries_per_second = entries_added / time_elapsed
 
                     # Calculate ETA
-                    if entries_per_second > 0 and progress['remaining'] > 0:
-                        seconds_remaining = progress['remaining'] / entries_per_second
+                    if entries_per_second > 0 and progress["remaining"] > 0:
+                        seconds_remaining = progress["remaining"] / entries_per_second
                         eta = datetime.now() + timedelta(seconds=seconds_remaining)
-                        eta_str = eta.strftime('%Y-%m-%d %H:%M:%S')
+                        eta_str = eta.strftime("%Y-%m-%d %H:%M:%S")
 
                 # Add current sample (keep last 10 samples)
                 samples.append((datetime.now(), current_entries))
@@ -234,12 +231,12 @@ class MigrationMonitor:
 
                 # Progress bar
                 bar_width = 50
-                filled = int(bar_width * progress['percentage'] / 100)
-                bar = '█' * filled + '░' * (bar_width - filled)
+                filled = int(bar_width * progress["percentage"] / 100)
+                bar = "█" * filled + "░" * (bar_width - filled)
                 print(f"  [{bar}] {progress['percentage']:.1f}%")
                 print()
 
-                if progress['is_complete']:
+                if progress["is_complete"]:
                     print("Migration COMPLETE! ✓")
                     break
 
@@ -255,46 +252,36 @@ def main():
     parser = argparse.ArgumentParser(
         description="Monitor legacy cache migration progress",
         formatter_class=argparse.RawDescriptionHelpFormatter,
-        epilog=__doc__
+        epilog=__doc__,
     )
 
     parser.add_argument(
-        '--status',
-        action='store_true',
-        help='Show current migration status (one-time)'
+        "--status", action="store_true", help="Show current migration status (one-time)"
     )
 
     parser.add_argument(
-        '--watch',
-        action='store_true',
-        help='Continuously monitor migration progress'
+        "--watch", action="store_true", help="Continuously monitor migration progress"
     )
 
     parser.add_argument(
-        '--tm-path',
-        default='./data/tm',
-        help='Path to TM directory (default: ./data/tm)'
+        "--tm-path", default="./data/tm", help="Path to TM directory (default: ./data/tm)"
     )
 
     parser.add_argument(
-        '--expected-entries',
+        "--expected-entries",
         type=int,
         default=6_097_941,
-        help='Expected total entries (default: 6,097,941)'
+        help="Expected total entries (default: 6,097,941)",
     )
 
     parser.add_argument(
-        '--interval',
+        "--interval",
         type=int,
         default=5,
-        help='Update interval in seconds for watch mode (default: 5)'
+        help="Update interval in seconds for watch mode (default: 5)",
     )
 
-    parser.add_argument(
-        '--verbose',
-        action='store_true',
-        help='Enable verbose logging'
-    )
+    parser.add_argument("--verbose", action="store_true", help="Enable verbose logging")
 
     args = parser.parse_args()
 
@@ -307,8 +294,7 @@ def main():
 
     try:
         monitor = MigrationMonitor(
-            tm_path=Path(args.tm_path),
-            expected_entries=args.expected_entries
+            tm_path=Path(args.tm_path), expected_entries=args.expected_entries
         )
 
         if args.watch:

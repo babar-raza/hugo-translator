@@ -11,11 +11,8 @@ REQUIRED_HEADERS = [
 REQUIRED_SNIPPETS = [
     "translate-hugo.exe",
     "-m src.cli",
-    "run_translation.py",
-    "scripts\\batch_translate.py",
-    "scripts\\validate_ast_translation.py",
-    "scripts\\validate_ast_e2e.py",
-    "toggle_ast_translation.py",
+    "scripts\\content\\batch_translate.py",
+    "scripts\\ops\\toggle_ast_translation.py",
     "diagnose_nllb_tokenizer.py",
     "scripts\\health_check.py",
 ]

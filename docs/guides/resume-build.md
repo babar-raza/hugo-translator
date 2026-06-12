@@ -17,7 +17,7 @@
    ```bash
    # Stop current build (Ctrl+C)
    # Immediately test resume
-   python scripts/build_l3_index.py --use_gpu --resume
+   python scripts/tm/build_l3_index.py --use_gpu --resume
    ```
 
 2. **Verify it works**:
@@ -39,7 +39,7 @@
 
 **Robust alternative**: Use the sync script instead:
 ```bash
-python scripts/sync_l3_index.py --use_gpu
+python scripts/tm/sync_l3_index.py --use_gpu
 ```
 - Slower (scans entire L2) but more robust
 - Already tested and known to work
@@ -82,7 +82,7 @@ The resume capability loads all entry IDs into memory:
 - **Large datasets (6M entries)**: ~600-900MB memory spike during startup
 - **Memory is freed** after entry ID set is built
 
-**If you have limited RAM**: Use the sync script instead (`scripts/sync_l3_index.py`)
+**If you have limited RAM**: Use the sync script instead (`scripts/tm/sync_l3_index.py`)
 
 ### Limitations
 1. **Requires valid existing L3 index**
@@ -105,8 +105,8 @@ The resume capability loads all entry IDs into memory:
 ### When NOT to Use Resume
 - **Index is corrupted**: Use `--force` to rebuild
 - **Changed embedding model**: Use `--force` to rebuild
-- **Low memory systems**: Use `scripts/sync_l3_index.py` instead
-- **Want true incremental sync**: Use `scripts/sync_l3_index.py`
+- **Low memory systems**: Use `scripts/tm/sync_l3_index.py` instead
+- **Want true incremental sync**: Use `scripts/tm/sync_l3_index.py`
 
 ---
 
@@ -124,14 +124,14 @@ The resume capability loads all entry IDs into memory:
 **Solutions:**
 ```bash
 # Option 1: Rebuild from scratch
-python scripts/build_l3_index.py --use_gpu --force
+python scripts/tm/build_l3_index.py --use_gpu --force
 
 # Option 2: Use sync script (more robust)
-python scripts/sync_l3_index.py --use_gpu
+python scripts/tm/sync_l3_index.py --use_gpu
 
 # Option 3: Delete corrupted index and restart
 rm -rf data/tm/l3.faiss
-python scripts/build_l3_index.py --use_gpu
+python scripts/tm/build_l3_index.py --use_gpu
 ```
 
 ### Resume Creates Duplicates
@@ -143,7 +143,7 @@ python scripts/build_l3_index.py --use_gpu
 **Solution:**
 ```bash
 # Rebuild index from scratch
-python scripts/build_l3_index.py --use_gpu --force
+python scripts/tm/build_l3_index.py --use_gpu --force
 
 # Verify counts match
 python scripts/inspect_l3_metadata.py
@@ -158,7 +158,7 @@ python scripts/inspect_l3_metadata.py
 **Solution:**
 ```bash
 # Use sync script instead (no memory spike)
-python scripts/sync_l3_index.py --use_gpu
+python scripts/tm/sync_l3_index.py --use_gpu
 ```
 
 ### "Cannot specify both --force and --resume"
@@ -168,8 +168,8 @@ python scripts/sync_l3_index.py --use_gpu
 **Solution:**
 ```bash
 # Choose one:
-python scripts/build_l3_index.py --use_gpu --resume  # Continue from existing
-python scripts/build_l3_index.py --use_gpu --force   # Rebuild from scratch
+python scripts/tm/build_l3_index.py --use_gpu --resume  # Continue from existing
+python scripts/tm/build_l3_index.py --use_gpu --force   # Rebuild from scratch
 ```
 
 ### Resume Shows "No valid entry IDs found"
@@ -184,7 +184,7 @@ python scripts/build_l3_index.py --use_gpu --force   # Rebuild from scratch
 python scripts/inspect_l3_metadata.py
 
 # If metadata is bad, rebuild
-python scripts/build_l3_index.py --use_gpu --force
+python scripts/tm/build_l3_index.py --use_gpu --force
 ```
 
 ### Build Seems Stuck After Resume
@@ -202,7 +202,7 @@ python scripts/build_l3_index.py --use_gpu --force
 # Ctrl+C to cancel
 # Check logs for errors
 # Try sync script instead
-python scripts/sync_l3_index.py --use_gpu
+python scripts/tm/sync_l3_index.py --use_gpu
 ```
 
 ---
@@ -222,10 +222,10 @@ python scripts/sync_l3_index.py --use_gpu
 ### Step 2: Restart Build Later
 ```bash
 # Resume with GPU (same as original)
-python scripts/build_l3_index.py --use_gpu --resume
+python scripts/tm/build_l3_index.py --use_gpu --resume
 
 # Resume with custom batch size
-python scripts/build_l3_index.py --use_gpu --resume --batch_size 1000
+python scripts/tm/build_l3_index.py --use_gpu --resume --batch_size 1000
 ```
 
 ### Step 3: Monitor Progress
@@ -313,19 +313,19 @@ Progress: 94,001 / 6,053,475 (1.6%) - [Continues from here]
 ### Original Build (No Resume)
 ```bash
 # Starts from scratch, fails if L3 exists
-python scripts/build_l3_index.py --use_gpu
+python scripts/tm/build_l3_index.py --use_gpu
 ```
 
 ### Resume Build (Bulletproof)
 ```bash
 # Continues from existing L3, skips processed entries
-python scripts/build_l3_index.py --use_gpu --resume
+python scripts/tm/build_l3_index.py --use_gpu --resume
 ```
 
 ### Force Rebuild (Nuclear Option)
 ```bash
 # Deletes existing L3 and starts over
-python scripts/build_l3_index.py --use_gpu --force
+python scripts/tm/build_l3_index.py --use_gpu --force
 ```
 
 ---
@@ -347,13 +347,13 @@ python scripts/build_l3_index.py --use_gpu --force
 ### For Long Builds (Like Yours)
 ```bash
 # Day 1: Build for a few hours, then shutdown
-python scripts/build_l3_index.py --use_gpu --resume
+python scripts/tm/build_l3_index.py --use_gpu --resume
 
 # Day 2: Resume and build more
-python scripts/build_l3_index.py --use_gpu --resume
+python scripts/tm/build_l3_index.py --use_gpu --resume
 
 # Day 3: Continue until complete
-python scripts/build_l3_index.py --use_gpu --resume
+python scripts/tm/build_l3_index.py --use_gpu --resume
 ```
 
 **Benefit:** Spread work over multiple days/sessions without losing progress
@@ -366,7 +366,7 @@ After each resume session completes (or you stop it):
 
 ```bash
 # Check how many entries are in L3
-python scripts/sync_l3_index.py --dry-run
+python scripts/tm/sync_l3_index.py --dry-run
 ```
 
 **Output:**
@@ -413,7 +413,7 @@ A: Yes! Use `sync_l3_index.py --dry-run` to see current count without changes.
 **Your Current Situation:**
 - Current build has ~94K entries saved
 - You can stop it now
-- Resume later with: `python scripts/build_l3_index.py --use_gpu --resume`
+- Resume later with: `python scripts/tm/build_l3_index.py --use_gpu --resume`
 - Continues from entry 94,001
 
 ---

@@ -153,7 +153,7 @@ python scripts/verify_implementation.py --syntax-only
 python scripts/verify_implementation.py --imports-only
 
 # 4. Run unit tests
-python scripts/run_all_tests.py --suite unit --timeout 60
+python scripts/ci/run_all_tests.py --suite unit --timeout 60
 
 # 5. Check code style (if linter configured)
 # python -m flake8 src/
@@ -195,7 +195,7 @@ python scripts/run_all_tests.py --suite unit --timeout 60
 
 # 3. Run checks
 python scripts/verify_implementation.py
-python scripts/run_all_tests.py --suite unit
+python scripts/ci/run_all_tests.py --suite unit
 
 # 4. Fix any failures
 # (Iterate until all checks pass)
@@ -227,13 +227,13 @@ python scripts/verify_implementation.py --checklist --phase implementation
 
 ```bash
 # 1. Run integration tests
-python scripts/run_all_tests.py --suite integration --timeout 300
+python scripts/ci/run_all_tests.py --suite integration --timeout 300
 
 # 2. Run smoke tests
-python scripts/run_all_tests.py --suite smoke --timeout 60
+python scripts/ci/run_all_tests.py --suite smoke --timeout 60
 
 # 3. Run all tests (regression check)
-python scripts/run_all_tests.py --suite all --timeout 600
+python scripts/ci/run_all_tests.py --suite all --timeout 600
 
 # 4. Verify observability
 python scripts/verify_implementation.py --check-logging
@@ -267,13 +267,13 @@ python scripts/verify_implementation.py --check-logging
 
 ```bash
 # 1. Run integration tests
-python scripts/run_all_tests.py --suite integration -v
+python scripts/ci/run_all_tests.py --suite integration -v
 
 # 2. Run smoke tests
-python scripts/run_all_tests.py --suite smoke -v
+python scripts/ci/run_all_tests.py --suite smoke -v
 
 # 3. Check for regressions
-python scripts/run_all_tests.py --suite all
+python scripts/ci/run_all_tests.py --suite all
 
 # 4. Review test results
 cat reports/test_execution.json
@@ -309,16 +309,16 @@ python scripts/verify_implementation.py --checklist --phase integration
 python scripts/verify_implementation.py --strict
 
 # 2. Run all tests with coverage
-python scripts/run_all_tests.py --suite all --timeout 600 --report reports/final_test_results.json
+python scripts/ci/run_all_tests.py --suite all --timeout 600 --report reports/final_test_results.json
 
 # 3. Run quality gates
-python scripts/quality_gates.py --gate all
+python scripts/quality/quality_gates.py --gate all
 
 # 4. Generate verification report
 python scripts/verify_implementation.py --report reports/production_readiness.json --markdown reports/production_readiness.md
 
 # 5. Run production readiness checklist
-python scripts/production_readiness_check.py --strict
+python scripts/quality/production_readiness_check.py --strict
 ```
 
 ### Manual Reviews
@@ -359,10 +359,10 @@ python scripts/production_readiness_check.py --strict
 python scripts/verify_implementation.py --strict --report reports/production_readiness.json
 
 # 2. Run all tests
-python scripts/run_all_tests.py --suite all --report reports/final_tests.json
+python scripts/ci/run_all_tests.py --suite all --report reports/final_tests.json
 
 # 3. Run quality gates
-python scripts/quality_gates.py --gate all
+python scripts/quality/quality_gates.py --gate all
 
 # 4. Review reports
 cat reports/production_readiness.json
@@ -418,7 +418,7 @@ git checkout <backup-branch>
 python scripts/verify_implementation.py
 
 # 2. Run smoke tests
-python scripts/run_all_tests.py --suite smoke
+python scripts/ci/run_all_tests.py --suite smoke
 
 # 3. Verify system is stable
 python scripts/health_check.py
@@ -460,13 +460,13 @@ EOF
 **Solution:**
 ```bash
 # 1. Increase timeout
-python scripts/run_all_tests.py --suite all --timeout 1200
+python scripts/ci/run_all_tests.py --suite all --timeout 1200
 
 # 2. Run tests in parallel
-python scripts/run_all_tests.py --suite all --parallel
+python scripts/ci/run_all_tests.py --suite all --parallel
 
 # 3. Run only failing tests
-python scripts/run_all_tests.py --suite critical --timeout 300
+python scripts/ci/run_all_tests.py --suite critical --timeout 300
 ```
 
 #### Issue: Import Errors
@@ -515,10 +515,10 @@ pytest tests/path/to/test.py --forked
 **Solution:**
 ```bash
 # 1. See which gates failed
-python scripts/quality_gates.py --gate all --verbose
+python scripts/quality/quality_gates.py --gate all --verbose
 
 # 2. Run specific gate
-python scripts/quality_gates.py --gate test_pass_rate
+python scripts/quality/quality_gates.py --gate test_pass_rate
 
 # 3. Check gate configuration
 cat config/quality_gates.yaml
@@ -538,20 +538,20 @@ cat config/quality_gates.yaml
 python scripts/verify_implementation.py --strict
 
 # Run all tests
-python scripts/run_all_tests.py --suite all
+python scripts/ci/run_all_tests.py --suite all
 
 # Run specific suite
-python scripts/run_all_tests.py --suite critical --timeout 300
+python scripts/ci/run_all_tests.py --suite critical --timeout 300
 
 # Check quality gates
-python scripts/quality_gates.py --gate all
+python scripts/quality/quality_gates.py --gate all
 
 # View checklist
 python scripts/verify_implementation.py --checklist
 
 # Generate reports
 python scripts/verify_implementation.py --report reports/verification.json
-python scripts/run_all_tests.py --suite all --report reports/tests.json
+python scripts/ci/run_all_tests.py --suite all --report reports/tests.json
 ```
 
 ### Phase Checklists Quick Access
@@ -579,7 +579,7 @@ git push origin main
 
 # 2. Verify rollback
 python scripts/verify_implementation.py
-python scripts/run_all_tests.py --suite smoke
+python scripts/ci/run_all_tests.py --suite smoke
 
 # 3. Check system health
 python scripts/health_check.py

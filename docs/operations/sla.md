@@ -411,16 +411,16 @@ Error Budget Status (December 2025)
 **Investigation Steps**:
 ```bash
 # Check performance metrics
-python scripts/generate_metrics_report.py --last 24h
+python scripts/analysis/generate_metrics_report.py --last 24h
 
 # Run performance baseline
-python scripts/benchmark_production.py --compare-to-baseline
+python scripts/bench/benchmark_production.py --compare-to-baseline
 
 # Check batch fallback reasons
 grep "Batch fallback" /var/log/translation/*.log | tail -100
 
 # Check TM performance
-python scripts/query_tm_cache.py --stats
+python scripts/tm/query_tm_cache.py --stats
 ```
 
 **Resolution Paths**:

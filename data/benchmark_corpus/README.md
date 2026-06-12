@@ -21,11 +21,11 @@
 
 | File | Generator | Notes |
 |------|-----------|-------|
-| `stratified_manifest.yaml` | `scripts/create_stratified_corpus.py` | Point-in-time snapshot of content repo samples. Regenerate before benchmarking if stale (dated in the file header). Do not commit — reflects local content repo state, not a canonical corpus artifact. |
+| `stratified_manifest.yaml` | `scripts/analysis/create_stratified_corpus.py` | Point-in-time snapshot of content repo samples. Regenerate before benchmarking if stale (dated in the file header). Do not commit — reflects local content repo state, not a canonical corpus artifact. |
 
 To regenerate the manifest:
 ```bash
-python scripts/create_stratified_corpus.py
+python scripts/analysis/create_stratified_corpus.py
 ```
 
 ---

@@ -264,7 +264,7 @@ def test_heading_level_preservation():
 4. Verify each file:
    ```bash
    for file in $(cat md_fidelity_filelist.txt); do
-     python scripts/e2e_verify_single_file.py \
+     python scripts/e2e/e2e_verify_single_file.py \
        --source "$file" \
        --target "${file/en/fr}" \
        --lang fr
@@ -420,7 +420,7 @@ python -m src.cli \
 
 ### Verify Results
 ```bash
-python scripts/e2e_verify_single_file.py \
+python scripts/e2e/e2e_verify_single_file.py \
   --source "D:\...\cells\en\_index.md" \
   --target "D:\...\cells\fr\_index.md" \
   --lang fr \

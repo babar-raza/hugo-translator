@@ -176,7 +176,7 @@ Verify performance meets requirements.
 python scripts/benchmark.py
 
 # Load testing
-python scripts/load_test.py
+python scripts/bench/load_test.py
 
 # Memory profiling
 python -m memory_profiler script.py

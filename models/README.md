@@ -41,13 +41,13 @@ models/
 
 ```bash
 # Download all essential models
-python scripts/download_models.py --essential
+python scripts/models/download_models.py --essential
 
 # Download specific model
-python scripts/download_models.py --model m2m100_418m
+python scripts/models/download_models.py --model m2m100_418m
 
 # Download all models (requires 50GB disk space)
-python scripts/download_models.py --all
+python scripts/models/download_models.py --all
 ```
 
 ### 2. Verify Models
@@ -115,7 +115,7 @@ Model binaries (*.bin, *.safetensors) are excluded from git:
 ```bash
 # Add to config/model_registry.yaml first
 # Then download automatically
-python scripts/download_models.py --model <model_id>
+python scripts/models/download_models.py --model <model_id>
 ```
 
 ## Removing a Model
@@ -123,7 +123,7 @@ python scripts/download_models.py --model <model_id>
 ### Safe Removal
 ```bash
 # Remove model and update inventory
-python scripts/remove_model.py <model_id>
+python scripts/models/remove_model.py <model_id>
 
 # Model moved to models/.trash/ (recoverable)
 ```
@@ -131,7 +131,7 @@ python scripts/remove_model.py <model_id>
 ### Force Removal
 ```bash
 # Permanently delete (cannot undo)
-python scripts/remove_model.py <model_id> --force
+python scripts/models/remove_model.py <model_id> --force
 ```
 
 ## Cache Management
@@ -180,7 +180,7 @@ The `models/inventory.json` file tracks all downloaded models:
 python scripts/list_models.py
 
 # Re-download if missing
-python scripts/download_models.py --model <model_id> --force
+python scripts/models/download_models.py --model <model_id> --force
 ```
 
 ### Corrupted Model
@@ -189,7 +189,7 @@ python scripts/download_models.py --model <model_id> --force
 python scripts/verify_models.py --model <model_id>
 
 # Re-download if verification fails
-python scripts/download_models.py --model <model_id> --force
+python scripts/models/download_models.py --model <model_id> --force
 ```
 
 ### Disk Space Full
@@ -198,7 +198,7 @@ python scripts/download_models.py --model <model_id> --force
 df -h models/
 
 # Remove unused models
-python scripts/cleanup_models.py --unused
+python scripts/models/cleanup_models.py --unused
 
 # Clear cache
 rm -rf models/cache/*
@@ -207,7 +207,7 @@ rm -rf models/cache/*
 ### Download Interrupted
 ```bash
 # Downloads support resume - just re-run
-python scripts/download_models.py --model <model_id>
+python scripts/models/download_models.py --model <model_id>
 # Will continue from where it stopped
 ```
 

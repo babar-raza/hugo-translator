@@ -37,22 +37,14 @@ except ImportError:
     sys.exit(1)
 
 
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(levelname)s - %(message)s'
-)
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
 
 
 class MigrationVerifier:
     """Verify LMDB migration completion and integrity."""
 
-    def __init__(
-        self,
-        tm_path: Path,
-        expected_entries: int = 6_097_941,
-        sample_size: int = 500
-    ):
+    def __init__(self, tm_path: Path, expected_entries: int = 6_097_941, sample_size: int = 500):
         """
         Initialize migration verifier.
 
@@ -93,15 +85,15 @@ class MigrationVerifier:
             file_size = os.path.getsize(db_file)
 
         db_info = {
-            'entries': stat['entries'],
-            'page_size': stat['psize'],
-            'branch_pages': stat['branch_pages'],
-            'leaf_pages': stat['leaf_pages'],
-            'overflow_pages': stat['overflow_pages'],
-            'total_pages': stat['branch_pages'] + stat['leaf_pages'] + stat['overflow_pages'],
-            'map_size': info['map_size'],
-            'file_size': file_size,
-            'last_txnid': info['last_txnid'],
+            "entries": stat["entries"],
+            "page_size": stat["psize"],
+            "branch_pages": stat["branch_pages"],
+            "leaf_pages": stat["leaf_pages"],
+            "overflow_pages": stat["overflow_pages"],
+            "total_pages": stat["branch_pages"] + stat["leaf_pages"] + stat["overflow_pages"],
+            "map_size": info["map_size"],
+            "file_size": file_size,
+            "last_txnid": info["last_txnid"],
         }
 
         env.close()
@@ -121,13 +113,13 @@ class MigrationVerifier:
         try:
             # Decode key
             try:
-                key_str = key.decode('utf-8')
+                key_str = key.decode("utf-8")
             except UnicodeDecodeError:
                 return False, "Key is not valid UTF-8"
 
             # Decode value
             try:
-                value_str = value.decode('utf-8')
+                value_str = value.decode("utf-8")
             except UnicodeDecodeError:
                 return False, "Value is not valid UTF-8"
 
@@ -138,25 +130,25 @@ class MigrationVerifier:
                 return False, f"Invalid JSON: {e}"
 
             # Validate required fields
-            required_fields = ['source_text', 'translation', 'site_id', 'src_lang', 'tgt_lang']
+            required_fields = ["source_text", "translation", "site_id", "src_lang", "tgt_lang"]
             for field in required_fields:
                 if field not in entry_data:
                     return False, f"Missing required field: {field}"
 
             # Validate field types
-            if not isinstance(entry_data['source_text'], str):
+            if not isinstance(entry_data["source_text"], str):
                 return False, "source_text must be string"
-            if not isinstance(entry_data['translation'], str):
+            if not isinstance(entry_data["translation"], str):
                 return False, "translation must be string"
 
             # Validate non-empty
-            if not entry_data['source_text'].strip():
+            if not entry_data["source_text"].strip():
                 return False, "source_text is empty"
-            if not entry_data['translation'].strip():
+            if not entry_data["translation"].strip():
                 return False, "translation is empty"
 
             # Validate language codes (basic check)
-            if len(entry_data['src_lang']) < 2 or len(entry_data['tgt_lang']) < 2:
+            if len(entry_data["src_lang"]) < 2 or len(entry_data["tgt_lang"]) < 2:
                 return False, "Invalid language codes"
 
             return True, None
@@ -178,17 +170,16 @@ class MigrationVerifier:
 
         samples = []
         with env.begin() as txn:
-            total_entries = txn.stat()['entries']
+            total_entries = txn.stat()["entries"]
 
             if total_entries == 0:
                 env.close()
                 return []
 
             # Generate random positions
-            sample_positions = sorted(random.sample(
-                range(total_entries),
-                min(num_samples, total_entries)
-            ))
+            sample_positions = sorted(
+                random.sample(range(total_entries), min(num_samples, total_entries))
+            )
 
             cursor = txn.cursor()
             cursor.first()
@@ -219,15 +210,15 @@ class MigrationVerifier:
 
         # Get database info
         db_info = self.get_db_info()
-        self.stats['total_entries'] = db_info['entries']
-        self.stats['file_size_mb'] = db_info['file_size'] / 1024 / 1024
+        self.stats["total_entries"] = db_info["entries"]
+        self.stats["file_size_mb"] = db_info["file_size"] / 1024 / 1024
 
         logger.info(f"Total entries: {db_info['entries']:,}")
         logger.info(f"File size: {self.stats['file_size_mb']:.2f} MB")
 
         # Check if migration is complete
-        completion_percentage = (db_info['entries'] / self.expected_entries) * 100
-        self.stats['completion_percentage'] = completion_percentage
+        completion_percentage = (db_info["entries"] / self.expected_entries) * 100
+        self.stats["completion_percentage"] = completion_percentage
 
         if completion_percentage < 95.0:
             self.warnings.append(
@@ -250,7 +241,7 @@ class MigrationVerifier:
 
                 # Parse for language statistics
                 try:
-                    value_str = value.decode('utf-8')
+                    value_str = value.decode("utf-8")
                     entry_data = json.loads(value_str)
                     lang_pair = f"{entry_data['src_lang']}->{entry_data['tgt_lang']}"
                     self.language_stats[lang_pair] += 1
@@ -260,17 +251,17 @@ class MigrationVerifier:
                 invalid_count += 1
                 self.errors.append(f"Invalid entry: {error_msg}")
 
-        self.stats['sampled_entries'] = len(samples)
-        self.stats['valid_entries'] = valid_count
-        self.stats['invalid_entries'] = invalid_count
-        self.stats['validation_rate'] = (valid_count / len(samples) * 100) if samples else 0
+        self.stats["sampled_entries"] = len(samples)
+        self.stats["valid_entries"] = valid_count
+        self.stats["invalid_entries"] = invalid_count
+        self.stats["validation_rate"] = (valid_count / len(samples) * 100) if samples else 0
 
         logger.info(f"Validated {valid_count} / {len(samples)} sampled entries")
 
         # Check file size expectations (6-8 GB expected)
         expected_size_gb_min = 5.0
         expected_size_gb_max = 10.0
-        actual_size_gb = db_info['file_size'] / 1024 / 1024 / 1024
+        actual_size_gb = db_info["file_size"] / 1024 / 1024 / 1024
 
         if actual_size_gb < expected_size_gb_min:
             self.warnings.append(
@@ -304,7 +295,9 @@ class MigrationVerifier:
         print(f"  Total entries: {self.stats['total_entries']:,}")
         print(f"  Expected entries: {self.expected_entries:,}")
         print(f"  Completion: {self.stats['completion_percentage']:.2f}%")
-        print(f"  Physical size: {self.stats['file_size_mb']:.2f} MB ({self.stats['file_size_mb']/1024:.2f} GB)")
+        print(
+            f"  Physical size: {self.stats['file_size_mb']:.2f} MB ({self.stats['file_size_mb'] / 1024:.2f} GB)"
+        )
         print(f"  Map size: {db_info['map_size'] / 1024 / 1024 / 1024:.2f} GB")
         print()
 
@@ -317,8 +310,10 @@ class MigrationVerifier:
 
         if self.language_stats:
             print("Language Pair Distribution (from sample):")
-            for lang_pair, count in sorted(self.language_stats.items(), key=lambda x: x[1], reverse=True):
-                percentage = (count / self.stats['sampled_entries']) * 100
+            for lang_pair, count in sorted(
+                self.language_stats.items(), key=lambda x: x[1], reverse=True
+            ):
+                percentage = (count / self.stats["sampled_entries"]) * 100
                 print(f"  {lang_pair}: {count:,} ({percentage:.1f}%)")
             print()
 
@@ -342,17 +337,21 @@ class MigrationVerifier:
         print("=" * 80)
         print("VERDICT:")
 
-        if self.stats['invalid_entries'] > 0:
+        if self.stats["invalid_entries"] > 0:
             print(f"FAILED: Found {self.stats['invalid_entries']} invalid entries in sample")
-        elif self.stats['completion_percentage'] < 95.0:
+        elif self.stats["completion_percentage"] < 95.0:
             print(f"INCOMPLETE: Only {self.stats['completion_percentage']:.1f}% migrated")
         elif len(self.warnings) > 0:
             print(f"PASSED WITH WARNINGS: {len(self.warnings)} warnings found")
         else:
             print("SUCCESS: Migration completed successfully")
-            print(f"  - {self.stats['total_entries']:,} entries migrated ({self.stats['completion_percentage']:.1f}%)")
-            print(f"  - {self.stats['validation_rate']:.1f}% validation rate from {self.stats['sampled_entries']} samples")
-            print(f"  - Database size: {self.stats['file_size_mb']/1024:.2f} GB")
+            print(
+                f"  - {self.stats['total_entries']:,} entries migrated ({self.stats['completion_percentage']:.1f}%)"
+            )
+            print(
+                f"  - {self.stats['validation_rate']:.1f}% validation rate from {self.stats['sampled_entries']} samples"
+            )
+            print(f"  - Database size: {self.stats['file_size_mb'] / 1024:.2f} GB")
 
         print("=" * 80)
         print()
@@ -377,7 +376,7 @@ class MigrationVerifier:
         report.append(f"- **Total Entries:** {self.stats['total_entries']:,}")
         report.append(f"- **Expected Entries:** {self.expected_entries:,}")
         report.append(f"- **Completion:** {self.stats['completion_percentage']:.2f}%")
-        report.append(f"- **Database Size:** {self.stats['file_size_mb']/1024:.2f} GB")
+        report.append(f"- **Database Size:** {self.stats['file_size_mb'] / 1024:.2f} GB")
         report.append(f"- **Validation Rate:** {self.stats['validation_rate']:.2f}%")
         report.append("")
 
@@ -399,8 +398,12 @@ class MigrationVerifier:
         report.append("")
         report.append("| Metric | Count | Percentage |")
         report.append("|--------|-------|------------|")
-        report.append(f"| Valid Entries | {self.stats['valid_entries']:,} | {self.stats['validation_rate']:.2f}% |")
-        report.append(f"| Invalid Entries | {self.stats['invalid_entries']:,} | {100 - self.stats['validation_rate']:.2f}% |")
+        report.append(
+            f"| Valid Entries | {self.stats['valid_entries']:,} | {self.stats['validation_rate']:.2f}% |"
+        )
+        report.append(
+            f"| Invalid Entries | {self.stats['invalid_entries']:,} | {100 - self.stats['validation_rate']:.2f}% |"
+        )
         report.append("")
 
         if self.language_stats:
@@ -410,8 +413,10 @@ class MigrationVerifier:
             report.append("")
             report.append("| Language Pair | Count | Percentage |")
             report.append("|---------------|-------|------------|")
-            for lang_pair, count in sorted(self.language_stats.items(), key=lambda x: x[1], reverse=True):
-                percentage = (count / self.stats['sampled_entries']) * 100
+            for lang_pair, count in sorted(
+                self.language_stats.items(), key=lambda x: x[1], reverse=True
+            ):
+                percentage = (count / self.stats["sampled_entries"]) * 100
                 report.append(f"| {lang_pair} | {count:,} | {percentage:.1f}% |")
             report.append("")
 
@@ -435,14 +440,16 @@ class MigrationVerifier:
 
         report.append("## Verdict")
         report.append("")
-        if self.stats['invalid_entries'] > 0:
+        if self.stats["invalid_entries"] > 0:
             report.append("**Status:** ❌ FAILED")
             report.append("")
             report.append(f"Found {self.stats['invalid_entries']} invalid entries in sample.")
-        elif self.stats['completion_percentage'] < 95.0:
+        elif self.stats["completion_percentage"] < 95.0:
             report.append("**Status:** ⚠️ INCOMPLETE")
             report.append("")
-            report.append(f"Only {self.stats['completion_percentage']:.1f}% of expected entries migrated.")
+            report.append(
+                f"Only {self.stats['completion_percentage']:.1f}% of expected entries migrated."
+            )
         elif len(self.warnings) > 0:
             report.append("**Status:** ✅ PASSED WITH WARNINGS")
             report.append("")
@@ -451,14 +458,16 @@ class MigrationVerifier:
             report.append("**Status:** ✅ SUCCESS")
             report.append("")
             report.append("Migration completed successfully:")
-            report.append(f"- {self.stats['total_entries']:,} entries migrated ({self.stats['completion_percentage']:.1f}%)")
+            report.append(
+                f"- {self.stats['total_entries']:,} entries migrated ({self.stats['completion_percentage']:.1f}%)"
+            )
             report.append(f"- {self.stats['validation_rate']:.1f}% validation rate")
-            report.append(f"- Database size: {self.stats['file_size_mb']/1024:.2f} GB")
+            report.append(f"- Database size: {self.stats['file_size_mb'] / 1024:.2f} GB")
 
         # Write report
         output_path.parent.mkdir(parents=True, exist_ok=True)
-        with open(output_path, 'w', encoding='utf-8') as f:
-            f.write('\n'.join(report))
+        with open(output_path, "w", encoding="utf-8") as f:
+            f.write("\n".join(report))
 
         logger.info(f"Report written to: {output_path}")
 
@@ -467,40 +476,32 @@ def main():
     parser = argparse.ArgumentParser(
         description="Verify legacy cache migration completion",
         formatter_class=argparse.RawDescriptionHelpFormatter,
-        epilog=__doc__
+        epilog=__doc__,
     )
 
     parser.add_argument(
-        '--tm-path',
-        default='./data/tm',
-        help='Path to TM directory (default: ./data/tm)'
+        "--tm-path", default="./data/tm", help="Path to TM directory (default: ./data/tm)"
     )
 
     parser.add_argument(
-        '--expected-entries',
+        "--expected-entries",
         type=int,
         default=6_097_941,
-        help='Expected total entries (default: 6,097,941)'
+        help="Expected total entries (default: 6,097,941)",
     )
 
     parser.add_argument(
-        '--sample-size',
+        "--sample-size",
         type=int,
         default=500,
-        help='Number of entries to sample for validation (default: 500)'
+        help="Number of entries to sample for validation (default: 500)",
     )
 
     parser.add_argument(
-        '--output-report',
-        type=Path,
-        help='Output path for markdown report (optional)'
+        "--output-report", type=Path, help="Output path for markdown report (optional)"
     )
 
-    parser.add_argument(
-        '--verbose',
-        action='store_true',
-        help='Enable verbose logging'
-    )
+    parser.add_argument("--verbose", action="store_true", help="Enable verbose logging")
 
     args = parser.parse_args()
 
@@ -511,7 +512,7 @@ def main():
         verifier = MigrationVerifier(
             tm_path=Path(args.tm_path),
             expected_entries=args.expected_entries,
-            sample_size=args.sample_size
+            sample_size=args.sample_size,
         )
 
         db_info = verifier.verify_database()
@@ -522,9 +523,9 @@ def main():
             verifier.generate_markdown_report(args.output_report, db_info)
 
         # Exit code based on verification result
-        if verifier.stats['invalid_entries'] > 0:
+        if verifier.stats["invalid_entries"] > 0:
             sys.exit(1)  # Failed
-        elif verifier.stats['completion_percentage'] < 95.0:
+        elif verifier.stats["completion_percentage"] < 95.0:
             sys.exit(1)  # Incomplete
         else:
             sys.exit(0)  # Success

@@ -47,10 +47,10 @@ The `_cleanup_test_lmdb` autouse fixture in `tests/conftest.py` cleans LMDB dire
 ### Orphaned temp files
 ```bash
 # Preview what would be deleted
-python scripts/cleanup_orphaned_lmdb_temp.py --dry-run
+python scripts/tm/cleanup_orphaned_lmdb_temp.py --dry-run
 
 # Actually delete (only after reviewing dry-run output)
-python scripts/cleanup_orphaned_lmdb_temp.py --apply
+python scripts/tm/cleanup_orphaned_lmdb_temp.py --apply
 ```
 
 ### Production migration

@@ -254,7 +254,7 @@ python scripts/import_tm.py --site siteB --input tm_export.json
 
 1. **Use Refresh Mode** to force new translation:
    ```bash
-   python scripts/batch_translate.py ... --override-mode refresh
+   python scripts/content/batch_translate.py ... --override-mode refresh
    ```
 
 2. **TM will update** with the new (correct) translation
@@ -273,7 +273,7 @@ python scripts/import_tm.py --site siteB --input tm_export.json
 
 ```bash
 # Backup first (recommended)
-python scripts/backup_tm.py
+python scripts/tm/backup_tm.py
 
 # Clear TM
 rm -rf data/tm/l2_lmdb
@@ -303,7 +303,7 @@ Remove-Item -Recurse -Force data\tm\l3_semantic
 **Check hit rate first:**
 
 ```powershell
-python scripts/batch_translate.py ... --report metrics.json
+python scripts/content/batch_translate.py ... --report metrics.json
 type metrics.json | findstr hit_rate
 ```
 
@@ -375,11 +375,11 @@ print(f'Corrupted: {report.corrupt_count}')
 2. **Or rebuild from scratch:**
    ```bash
    # Backup first
-   python scripts/backup_tm.py
+   python scripts/tm/backup_tm.py
 
    # Clear and rebuild
    rm -rf data/tm/l2_lmdb
-   python scripts/batch_translate.py ...
+   python scripts/content/batch_translate.py ...
    ```
 
 **See also:** [TM Troubleshooting Guide](../operations/tm-troubleshooting.md)

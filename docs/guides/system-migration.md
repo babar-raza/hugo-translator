@@ -208,7 +208,7 @@ Run both systems in parallel for validation before full cutover.
 
 ```bash
 # Preview migration without making changes
-python scripts/migrate_legacy_cache.py \
+python scripts/archived/migrations/migrate_legacy_cache.py \
     --legacy_cache ./translation \
     --output ./data/tm \
     --dry-run \
@@ -228,7 +228,7 @@ Dry run complete - no changes made
 
 ```bash
 # Execute actual migration
-python scripts/migrate_legacy_cache.py \
+python scripts/archived/migrations/migrate_legacy_cache.py \
     --legacy_cache ./translation \
     --output ./data/tm \
     --subdomain default \
@@ -306,7 +306,7 @@ engine.translate_directory(
 
 ```bash
 # Run comparison tool
-python scripts/compare_systems.py \
+python scripts/bench/compare_systems.py \
     --legacy test_migration/sample \
     --new test_migration/sample_new \
     --output reports/migration_comparison.md \
@@ -455,7 +455,7 @@ curl http://localhost:9090/api/v1/query?query=translation_success_total
 docker-compose logs --tail=100 orchestrator | grep ERROR
 
 # Compare sample outputs
-python scripts/compare_systems.py \
+python scripts/bench/compare_systems.py \
     --legacy content/legacy/de \
     --new content/new/de \
     --sample_size 10
@@ -534,7 +534,7 @@ pytest tests/ -v --cov=src --cov-report=html
 pytest tests/migration/ -v
 
 # Run comparison on larger sample
-python scripts/compare_systems.py \
+python scripts/bench/compare_systems.py \
     --legacy content/legacy \
     --new content/new \
     --sample_size 1000 \
@@ -594,7 +594,7 @@ If only specific components have issues:
 ```bash
 # Rollback TM only (keep new engine)
 rm -rf data/tm
-python scripts/migrate_legacy_cache.py --legacy_cache backups/legacy_cache
+python scripts/archived/migrations/migrate_legacy_cache.py --legacy_cache backups/legacy_cache
 
 # Rollback configuration
 cp backups/config/global.yaml config/
@@ -716,7 +716,7 @@ pip install -r requirements/base.txt
 df -h .
 
 # Run with verbose logging
-python scripts/migrate_legacy_cache.py \
+python scripts/archived/migrations/migrate_legacy_cache.py \
     --legacy_cache ./translation \
     --dry-run \
     --verbose 2>&1 | tee migration.log
@@ -807,7 +807,7 @@ print(detect_hardware())
 "
 
 # Profile translation
-python scripts/benchmark_production.py
+python scripts/bench/benchmark_production.py
 
 # Check if GPU available but not used
 nvidia-smi  # Should show Python process if using GPU
@@ -857,7 +857,7 @@ For additional help:
 3. **Run Diagnostics:**
    ```bash
    pytest tests/migration/ -v
-   python scripts/compare_systems.py --help
+   python scripts/bench/compare_systems.py --help
    ```
 
 4. **Community Support:**

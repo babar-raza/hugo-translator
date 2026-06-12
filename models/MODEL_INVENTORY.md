@@ -236,17 +236,17 @@ du -sh models/*
 
 ### Download Individual Model
 ```bash
-python scripts/download_models.py --model <model_id> --models-dir models
+python scripts/models/download_models.py --model <model_id> --models-dir models
 ```
 
 ### Download All Models
 ```bash
-python scripts/download_models.py --all --models-dir models
+python scripts/models/download_models.py --all --models-dir models
 ```
 
 ### Force Re-download
 ```bash
-python scripts/download_models.py --model <model_id> --models-dir models --force
+python scripts/models/download_models.py --model <model_id> --models-dir models --force
 ```
 
 ## Verification

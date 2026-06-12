@@ -899,7 +899,7 @@ Evidence:
 
 **Fix (code)**: All workers now call `acquire_pid_file()` from `src/workers/worker_state.py` which checks if the existing PID is alive before starting. Duplicate launches exit with code 1.
 
-**Fix (runtime)**: Kill orphan PIDs via `taskkill /PID <pid> /F`. Use `scripts/admin/apply_worker_scheduler_cleanup.ps1` to disable Task Scheduler tasks that auto-restart workers.
+**Fix (runtime)**: Kill orphan PIDs via `taskkill /PID <pid> /F`. Use `scripts/ops/admin/apply_worker_scheduler_cleanup.ps1` to disable Task Scheduler tasks that auto-restart workers.
 
 ### Queue Depth Monitoring
 
@@ -940,7 +940,7 @@ Tasks are registered at `\` root (not `\HugoTranslator\`). Names use `HugoTransl
 
 To disable worker tasks (requires admin):
 ```powershell
-powershell -ExecutionPolicy Bypass -File scripts/admin/apply_worker_scheduler_cleanup.ps1 -Mode apply -WorkersToDisable ContentWorker,TMWorker,AutonomousVerification
+powershell -ExecutionPolicy Bypass -File scripts/ops/admin/apply_worker_scheduler_cleanup.ps1 -Mode apply -WorkersToDisable ContentWorker,TMWorker,AutonomousVerification
 ```
 
 ### LMDB Maintenance

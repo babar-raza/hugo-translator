@@ -16,14 +16,14 @@ Batch optimization automatically tunes processing parameters for large-scale tra
 
 ```bash
 # With optimization
-python scripts/batch_translate.py \
+python scripts/content/batch_translate.py \
   --input content/ \
   --output translated/ \
   --optimize \
   --report results.json
 
 # Without optimization (baseline)
-python scripts/batch_translate.py \
+python scripts/content/batch_translate.py \
   --input content/ \
   --output translated/
 ```

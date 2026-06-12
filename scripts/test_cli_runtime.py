@@ -14,6 +14,7 @@ Run: python scripts/test_cli_runtime.py [--quick] [--full]
 
 Results are saved to: reports/cli_runtime_test_report.md
 """
+
 import argparse
 import os
 import subprocess
@@ -25,6 +26,7 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).parent.parent
 os.chdir(PROJECT_ROOT)
 
+
 @dataclass
 class TestResult:
     name: str
@@ -35,6 +37,7 @@ class TestResult:
     passed: bool
     error_type: str | None = None
     duration_ms: float = 0.0
+
 
 @dataclass
 class TestSuite:
@@ -50,7 +53,9 @@ class TestSuite:
         return sum(1 for r in self.results if not r.passed)
 
 
-def run_cli(args: list[str], timeout: int = 60, env_override: dict = None) -> tuple[int, str, str, float]:
+def run_cli(
+    args: list[str], timeout: int = 60, env_override: dict = None
+) -> tuple[int, str, str, float]:
     """Run CLI command and return (exit_code, stdout, stderr, duration_ms)."""
     cmd = [sys.executable, "-m"] + args
     env = os.environ.copy()
@@ -58,16 +63,12 @@ def run_cli(args: list[str], timeout: int = 60, env_override: dict = None) -> tu
         env.update(env_override)
 
     import time
+
     start = time.time()
 
     try:
         result = subprocess.run(
-            cmd,
-            capture_output=True,
-            text=True,
-            timeout=timeout,
-            cwd=PROJECT_ROOT,
-            env=env
+            cmd, capture_output=True, text=True, timeout=timeout, cwd=PROJECT_ROOT, env=env
         )
         duration = (time.time() - start) * 1000
         return result.returncode, result.stdout, result.stderr, duration
@@ -135,7 +136,7 @@ def test_basic_flags() -> TestSuite:
             stderr=stderr[:1000] if stderr else "",
             passed=passed,
             error_type=error_type,
-            duration_ms=duration
+            duration_ms=duration,
         )
         suite.results.append(result)
         print("PASS" if passed else f"FAIL ({error_type or 'exit ' + str(exit_code)})")
@@ -149,27 +150,38 @@ def test_argument_validation() -> TestSuite:
 
     tests = [
         # Mutual exclusion
-        ("parallel + roundrobin conflict",
-         ["src.cli", "--site", "test", "--parallel-languages", "2", "--global-lang-rounds", "2"],
-         2, "cannot use both"),
-
+        (
+            "parallel + roundrobin conflict",
+            ["src.cli", "--site", "test", "--parallel-languages", "2", "--global-lang-rounds", "2"],
+            2,
+            "cannot use both",
+        ),
         # Invalid choices
-        ("invalid validation-mode",
-         ["src.cli", "--site", "test", "--validation-mode", "invalid"],
-         2, "invalid choice"),
-
-        ("invalid terminology-mode",
-         ["src.cli", "--site", "test", "--terminology-mode", "invalid"],
-         2, "invalid choice"),
-
+        (
+            "invalid validation-mode",
+            ["src.cli", "--site", "test", "--validation-mode", "invalid"],
+            2,
+            "invalid choice",
+        ),
+        (
+            "invalid terminology-mode",
+            ["src.cli", "--site", "test", "--terminology-mode", "invalid"],
+            2,
+            "invalid choice",
+        ),
         # Valid combinations that should parse
-        ("parallel-languages valid",
-         ["src.cli", "--site", "test", "--parallel-languages", "3", "--dry-run", "--help"],
-         0, None),
-
-        ("global-lang-rounds valid",
-         ["src.cli", "--site", "test", "--global-lang-rounds", "5", "--dry-run", "--help"],
-         0, None),
+        (
+            "parallel-languages valid",
+            ["src.cli", "--site", "test", "--parallel-languages", "3", "--dry-run", "--help"],
+            0,
+            None,
+        ),
+        (
+            "global-lang-rounds valid",
+            ["src.cli", "--site", "test", "--global-lang-rounds", "5", "--dry-run", "--help"],
+            0,
+            None,
+        ),
     ]
 
     for name, args, expected_code, expected_text in tests:
@@ -191,7 +203,7 @@ def test_argument_validation() -> TestSuite:
             stderr=stderr[:1000] if stderr else "",
             passed=passed,
             error_type=error_type,
-            duration_ms=duration
+            duration_ms=duration,
         )
         suite.results.append(result)
         print("PASS" if passed else f"FAIL ({error_type or 'exit ' + str(exit_code)})")
@@ -209,24 +221,46 @@ def test_dry_run_startup() -> TestSuite:
 
     option_combos = [
         ("minimal", ["--site", "example", "--dry-run"]),
-        ("with terminology", ["--site", "example", "--dry-run", "--enable-terminology", "--terminology-mode", "both"]),
-        ("with batch options", ["--site", "example", "--dry-run", "--batch-size", "16", "--sort-segments-by-length"]),
+        (
+            "with terminology",
+            [
+                "--site",
+                "example",
+                "--dry-run",
+                "--enable-terminology",
+                "--terminology-mode",
+                "both",
+            ],
+        ),
+        (
+            "with batch options",
+            ["--site", "example", "--dry-run", "--batch-size", "16", "--sort-segments-by-length"],
+        ),
         ("with validation", ["--site", "example", "--dry-run", "--validation-mode", "strict"]),
         ("with parallel", ["--site", "example", "--dry-run", "--parallel-languages", "2"]),
         ("with resume flags", ["--site", "example", "--dry-run", "--resume"]),
         ("with force-restart", ["--site", "example", "--dry-run", "--force-restart"]),
         ("with auto-commit", ["--site", "example", "--dry-run", "--auto-commit"]),
         ("with cache options", ["--site", "example", "--dry-run", "--force-retranslate"]),
-        ("production-like", [
-            "--site", "example",
-            "--dry-run",
-            "--enable-terminology", "--terminology-mode", "both",
-            "--batch-size", "16",
-            "--parallel-languages", "2",
-            "--sort-segments-by-length",
-            "--auto-commit",
-            "--log-level", "WARNING"
-        ]),
+        (
+            "production-like",
+            [
+                "--site",
+                "example",
+                "--dry-run",
+                "--enable-terminology",
+                "--terminology-mode",
+                "both",
+                "--batch-size",
+                "16",
+                "--parallel-languages",
+                "2",
+                "--sort-segments-by-length",
+                "--auto-commit",
+                "--log-level",
+                "WARNING",
+            ],
+        ),
     ]
 
     for name, extra_args in option_combos:
@@ -252,7 +286,7 @@ def test_dry_run_startup() -> TestSuite:
             stderr=stderr[:1500] if stderr else "",
             passed=passed,
             error_type=error_type,
-            duration_ms=duration
+            duration_ms=duration,
         )
         suite.results.append(result)
         print("PASS" if passed else f"FAIL ({error_type})")
@@ -294,7 +328,7 @@ def test_benchmarking_commands() -> TestSuite:
             stderr=stderr[:1000] if stderr else "",
             passed=passed,
             error_type=error_type,
-            duration_ms=duration
+            duration_ms=duration,
         )
         suite.results.append(result)
         print("PASS" if passed else f"FAIL ({error_type or 'exit ' + str(exit_code)})")
@@ -444,9 +478,18 @@ def test_option_matrix() -> TestSuite:
 
     # Phase 1a: Test each individual option in isolation first
     all_individual_opts = (
-        validation_opts + terminology_opts + model_opts + parallel_opts +
-        resume_opts + cache_opts + verification_opts + output_opts +
-        logging_opts + metrics_opts + commit_opts + benchmark_opts
+        validation_opts
+        + terminology_opts
+        + model_opts
+        + parallel_opts
+        + resume_opts
+        + cache_opts
+        + verification_opts
+        + output_opts
+        + logging_opts
+        + metrics_opts
+        + commit_opts
+        + benchmark_opts
     )
 
     for opt in all_individual_opts:
@@ -470,7 +513,7 @@ def test_option_matrix() -> TestSuite:
             stderr=stderr[:500] if not passed else "",
             passed=passed,
             error_type=error_type,
-            duration_ms=duration
+            duration_ms=duration,
         )
         suite.results.append(result)
         print("PASS" if passed else f"FAIL ({error_type})")
@@ -511,7 +554,7 @@ def test_option_matrix() -> TestSuite:
                         stderr=stderr[:500] if not passed else "",
                         passed=passed,
                         error_type=error_type,
-                        duration_ms=duration
+                        duration_ms=duration,
                     )
                     suite.results.append(result)
                     print("PASS" if passed else f"FAIL ({error_type})")
@@ -540,7 +583,7 @@ def test_option_matrix() -> TestSuite:
                 stderr=stderr[:500] if not passed else "",
                 passed=passed,
                 error_type=error_type,
-                duration_ms=duration
+                duration_ms=duration,
             )
             suite.results.append(result)
             print("PASS" if passed else f"FAIL ({error_type})")
@@ -569,7 +612,7 @@ def test_option_matrix() -> TestSuite:
                 stderr=stderr[:500] if not passed else "",
                 passed=passed,
                 error_type=error_type,
-                duration_ms=duration
+                duration_ms=duration,
             )
             suite.results.append(result)
             print("PASS" if passed else f"FAIL ({error_type})")
@@ -583,7 +626,13 @@ def test_option_matrix() -> TestSuite:
             for commit_opt in commit_opts:
                 for bench_opt in benchmark_opts:
                     combo_name = f"misc_{count}"
-                    args = ["src.cli", "--site", "example", "--dry-run"] + log_opt + metric_opt + commit_opt + bench_opt
+                    args = (
+                        ["src.cli", "--site", "example", "--dry-run"]
+                        + log_opt
+                        + metric_opt
+                        + commit_opt
+                        + bench_opt
+                    )
 
                     print(f"  Testing {combo_name}...", end=" ", flush=True)
                     exit_code, stdout, stderr, duration = run_cli(args, timeout=15)
@@ -600,7 +649,7 @@ def test_option_matrix() -> TestSuite:
                         stderr=stderr[:500] if not passed else "",
                         passed=passed,
                         error_type=error_type,
-                        duration_ms=duration
+                        duration_ms=duration,
                     )
                     suite.results.append(result)
                     print("PASS" if passed else f"FAIL ({error_type})")
@@ -611,21 +660,65 @@ def test_option_matrix() -> TestSuite:
     # Phase 5: Production-like realistic combinations
     production_combos = [
         # Typical production run
-        ["--enable-terminology", "--terminology-mode", "both", "--batch-size", "16",
-         "--sort-segments-by-length", "--parallel-languages", "3", "--auto-commit",
-         "--log-level", "INFO"],
+        [
+            "--enable-terminology",
+            "--terminology-mode",
+            "both",
+            "--batch-size",
+            "16",
+            "--sort-segments-by-length",
+            "--parallel-languages",
+            "3",
+            "--auto-commit",
+            "--log-level",
+            "INFO",
+        ],
         # High-throughput GPU
-        ["--batch-size", "32", "--load-mode", "fp16", "--device", "auto",
-         "--sort-segments-by-length", "--parallel-languages", "4", "--no-progress"],
+        [
+            "--batch-size",
+            "32",
+            "--load-mode",
+            "fp16",
+            "--device",
+            "auto",
+            "--sort-segments-by-length",
+            "--parallel-languages",
+            "4",
+            "--no-progress",
+        ],
         # Conservative CPU
-        ["--batch-size", "8", "--device", "cpu", "--load-mode", "fp32",
-         "--validation-mode", "strict", "--enable-terminology"],
+        [
+            "--batch-size",
+            "8",
+            "--device",
+            "cpu",
+            "--load-mode",
+            "fp32",
+            "--validation-mode",
+            "strict",
+            "--enable-terminology",
+        ],
         # Quick validation disabled
-        ["--disable-validation", "--disable-terminology", "--batch-size", "16",
-         "--no-progress", "--log-level", "WARNING"],
+        [
+            "--disable-validation",
+            "--disable-terminology",
+            "--batch-size",
+            "16",
+            "--no-progress",
+            "--log-level",
+            "WARNING",
+        ],
         # Full validation + verification
-        ["--validation-mode", "strict", "--enable-terminology", "--terminology-mode", "both",
-         "--verify", "--fix", "--save-rejected"],
+        [
+            "--validation-mode",
+            "strict",
+            "--enable-terminology",
+            "--terminology-mode",
+            "both",
+            "--verify",
+            "--fix",
+            "--save-rejected",
+        ],
         # Resume mode with cache control
         ["--resume", "--cache-write-mode", "auto", "--validate-output-integrity"],
         # Force restart with fresh translation
@@ -657,7 +750,7 @@ def test_option_matrix() -> TestSuite:
             stderr=stderr[:500] if not passed else "",
             passed=passed,
             error_type=error_type,
-            duration_ms=duration
+            duration_ms=duration,
         )
         suite.results.append(result)
         print("PASS" if passed else f"FAIL ({error_type})")
@@ -682,7 +775,7 @@ Generated: {datetime.now().isoformat()}
 | Total Tests | {total} |
 | Passed | {total_passed} |
 | Failed | {total_failed} |
-| Pass Rate | {total_passed/total*100:.1f}% |
+| Pass Rate | {total_passed / total * 100:.1f}% |
 
 ## Test Suites
 
@@ -701,9 +794,9 @@ Generated: {datetime.now().isoformat()}
             for r in suite.results:
                 if not r.passed:
                     report += f"""**{r.name}**
-- Command: `{' '.join(r.command)}`
+- Command: `{" ".join(r.command)}`
 - Exit Code: {r.exit_code}
-- Error Type: {r.error_type or 'Unknown'}
+- Error Type: {r.error_type or "Unknown"}
 
 ```
 {r.stderr[:800]}
@@ -735,10 +828,12 @@ Generated: {datetime.now().isoformat()}
 
 def main():
     parser = argparse.ArgumentParser(description="CLI Runtime Test Suite")
-    parser.add_argument("--quick", action="store_true", default=True,
-                        help="Run quick tests only (default)")
-    parser.add_argument("--full", action="store_true",
-                        help="Run full test suite including option matrix")
+    parser.add_argument(
+        "--quick", action="store_true", default=True, help="Run quick tests only (default)"
+    )
+    parser.add_argument(
+        "--full", action="store_true", help="Run full test suite including option matrix"
+    )
     args = parser.parse_args()
 
     print("=" * 60)

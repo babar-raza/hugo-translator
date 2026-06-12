@@ -3,6 +3,7 @@ L2 Persistent Translation Memory using LMDB.
 
 Durable key-value store for exact translation matches across sessions.
 """
+
 import json
 import logging
 import threading
@@ -107,7 +108,7 @@ class L2PersistentTM:
         # TC-TM-02: Warn if a sibling LMDB directory exists next to the canonical
         # path.  Two live L2 databases imply split writes and diverging caches.
         # The canonical name is L2_DB_NAME ("l2.lmdb"); anything else alongside it
-        # is a migration artefact.  Run scripts/migrate_l2_lmdb.py to consolidate.
+        # is a migration artefact.  Run scripts/tm/migrate_l2_lmdb.py to consolidate.
         self._warn_on_sibling_l2_dirs()
 
         # Convert MB to bytes for LMDB
@@ -130,29 +131,27 @@ class L2PersistentTM:
         Two live LMDB databases imply split writes (TC-TM-02 gap).  This is a
         warning, not a hard error, so the worker can still start.  To fix, run::
 
-            python scripts/migrate_l2_lmdb.py --dry-run
-            python scripts/migrate_l2_lmdb.py --apply
+            python scripts/tm/migrate_l2_lmdb.py --dry-run
+            python scripts/tm/migrate_l2_lmdb.py --apply
         """
         import warnings
+
         parent = self.db_path.parent
         canonical_name = self.db_path.name
         # Match both "l2.lmdb" (dot-style) and "l2_lmdb" (underscore-style) variants.
-        siblings = [
-            p for p in parent.glob("l2*")
-            if p.is_dir() and p.name != canonical_name
-        ]
+        siblings = [p for p in parent.glob("l2*") if p.is_dir() and p.name != canonical_name]
         if siblings:
             names = ", ".join(p.name for p in siblings)
             warnings.warn(
                 f"L2PersistentTM: sibling LMDB director{'y' if len(siblings) == 1 else 'ies'} "
                 f"found alongside canonical '{canonical_name}': {names}. "
-                "This indicates split writes. Run scripts/migrate_l2_lmdb.py to consolidate.",
+                "This indicates split writes. Run scripts/tm/migrate_l2_lmdb.py to consolidate.",
                 UserWarning,
                 stacklevel=3,
             )
             logger.warning(
                 "TC-TM-02: sibling L2 LMDB dir(s) detected: %s (canonical: %s). "
-                "Run scripts/migrate_l2_lmdb.py --apply to consolidate.",
+                "Run scripts/tm/migrate_l2_lmdb.py --apply to consolidate.",
                 names,
                 self.db_path,
             )
@@ -264,14 +263,13 @@ class L2PersistentTM:
                 # Similarity groups: languages FastText confuses at high confidence
                 # (mutually intelligible or script-similar pairs — false positive protection)
                 _TM_SIMILAR_GROUPS = [
-                    {"ms", "id"},        # Malay/Indonesian
-                    {"cs", "sk"},        # Czech/Slovak
+                    {"ms", "id"},  # Malay/Indonesian
+                    {"cs", "sk"},  # Czech/Slovak
                     {"hr", "sr", "bs"},  # South Slavic
                     {"nb", "da", "no"},  # North Germanic
                 ]
                 _in_same_group = any(
-                    tgt_lang in grp and detected_lang in grp
-                    for grp in _TM_SIMILAR_GROUPS
+                    tgt_lang in grp and detected_lang in grp for grp in _TM_SIMILAR_GROUPS
                 )
 
                 # Block storage only on high-confidence mismatch (>80%)
@@ -392,7 +390,9 @@ class L2PersistentTM:
                         try:
                             value_json = json.dumps(entry.to_dict())
                         except (TypeError, ValueError) as e:
-                            logger.error(f"JSON serialization failed in batch at index {count}: {e}")
+                            logger.error(
+                                f"JSON serialization failed in batch at index {count}: {e}"
+                            )
                             raise RuntimeError(f"Failed to serialize entry at index {count}: {e}")
 
                         txn.put(key.encode("utf-8"), value_json.encode("utf-8"))
@@ -405,9 +405,7 @@ class L2PersistentTM:
             logger.error(f"Batch cache write failed (integrity safeguard triggered): error={e}")
             raise
 
-    def delete(
-        self, site_id: str, src_lang: str, tgt_lang: str, text: str
-    ) -> bool:
+    def delete(self, site_id: str, src_lang: str, tgt_lang: str, text: str) -> bool:
         """
         Delete translation entry.
 
@@ -445,9 +443,7 @@ class L2PersistentTM:
                 txn.drop(self.env.open_db())
 
     def export_all(
-        self,
-        site_id: str | None = None,
-        tgt_lang: str | None = None
+        self, site_id: str | None = None, tgt_lang: str | None = None
     ) -> list[TranslationEntry]:
         """
         Export all entries from L2 cache.
@@ -466,7 +462,7 @@ class L2PersistentTM:
                 cursor = txn.cursor()
                 for key, value in cursor:
                     try:
-                        entry_dict = json.loads(value.decode('utf-8'))
+                        entry_dict = json.loads(value.decode("utf-8"))
                         entry = TranslationEntry.from_dict(entry_dict)
 
                         # Apply filters

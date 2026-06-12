@@ -263,7 +263,7 @@ export NUMEXPR_MAX_THREADS=4
 
 ```bash
 # Compare HF vs CT2
-python scripts/benchmark_cpu_comprehensive.py \
+python scripts/bench/benchmark_cpu_comprehensive.py \
     --models m2m100_418m,m2m100_418m_ct2 \
     --batch-sizes 4,8 \
     --iterations 1 \
@@ -277,7 +277,7 @@ python scripts/benchmark_cpu_comprehensive.py \
 
 ```bash
 # Test all configurations
-python scripts/benchmark_cpu_comprehensive.py \
+python scripts/bench/benchmark_cpu_comprehensive.py \
     --models m2m100_418m,m2m100_418m_ct2,m2m100_418m_ct2_int8 \
     --batch-sizes 4,8,16,32 \
     --threads 1,2,4 \
@@ -292,7 +292,7 @@ python scripts/benchmark_cpu_comprehensive.py \
 
 ```bash
 # Full benchmark suite
-python scripts/benchmark_cpu_comprehensive.py \
+python scripts/bench/benchmark_cpu_comprehensive.py \
     --models m2m100_418m_ct2 \
     --batch-sizes 4,8,16 \
     --iterations 5 \

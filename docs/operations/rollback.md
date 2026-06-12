@@ -156,10 +156,10 @@ Before initiating rollback, complete this checklist:
 cd /path/to/hugo-translator
 
 # 2. Run automated rollback to previous version
-python scripts/rollback.py --to-previous
+python scripts/ops/rollback.py --to-previous
 
 # 3. Verify rollback
-python scripts/run_smoke_tests.py --quick
+python scripts/smoke/run_smoke_tests.py --quick
 ```
 
 #### Targeted Rollback (Specific Commit)
@@ -169,15 +169,15 @@ python scripts/run_smoke_tests.py --quick
 git log --oneline -10
 
 # 2. Dry-run to preview changes
-python scripts/rollback.py --dry-run --to-commit abc123
+python scripts/ops/rollback.py --dry-run --to-commit abc123
 
 # 3. Review dry-run output carefully
 
 # 4. Execute rollback
-python scripts/rollback.py --to-commit abc123
+python scripts/ops/rollback.py --to-commit abc123
 
 # 5. Verify rollback
-python scripts/run_smoke_tests.py --full
+python scripts/smoke/run_smoke_tests.py --full
 python scripts/validate_production_readiness.py --strict
 ```
 
@@ -188,13 +188,13 @@ python scripts/validate_production_readiness.py --strict
 git tag -l
 
 # 2. Dry-run rollback to tag
-python scripts/rollback.py --dry-run --to-tag v1.2.0
+python scripts/ops/rollback.py --dry-run --to-tag v1.2.0
 
 # 3. Execute rollback
-python scripts/rollback.py --to-tag v1.2.0
+python scripts/ops/rollback.py --to-tag v1.2.0
 
 # 4. Verify
-python scripts/run_smoke_tests.py --full
+python scripts/smoke/run_smoke_tests.py --full
 ```
 
 ### Manual Rollback (If Automation Fails)
@@ -311,7 +311,7 @@ After rollback, verify system is working correctly:
 
 ```bash
 # Run quick smoke tests
-python scripts/run_smoke_tests.py --quick
+python scripts/smoke/run_smoke_tests.py --quick
 
 # Expected: All tests pass in <30 seconds
 # If failed: Check logs, may need further rollback
@@ -341,7 +341,7 @@ python tests/live_translation_simple.py
 
 ```bash
 # Run performance benchmark
-python scripts/benchmark_production.py --quick
+python scripts/bench/benchmark_production.py --quick
 
 # Expected: Performance within acceptable range
 # Compare to baseline from before failed deployment
@@ -570,7 +570,7 @@ Before re-deploying:
 
 ### Rollback Script
 
-The automated rollback script (`scripts/rollback.py`) provides:
+The automated rollback script (`scripts/ops/rollback.py`) provides:
 
 - **Dry-run mode:** Preview changes before execution
 - **Multiple targets:** Rollback to commit, tag, or previous version
@@ -582,22 +582,22 @@ The automated rollback script (`scripts/rollback.py`) provides:
 
 ```bash
 # Dry-run (safe preview)
-python scripts/rollback.py --dry-run --to-previous
+python scripts/ops/rollback.py --dry-run --to-previous
 
 # Rollback to previous version
-python scripts/rollback.py --to-previous
+python scripts/ops/rollback.py --to-previous
 
 # Rollback to specific commit
-python scripts/rollback.py --to-commit abc123
+python scripts/ops/rollback.py --to-commit abc123
 
 # Rollback to tagged version
-python scripts/rollback.py --to-tag v1.2.0
+python scripts/ops/rollback.py --to-tag v1.2.0
 
 # Rollback with verbose output
-python scripts/rollback.py --to-previous --verbose
+python scripts/ops/rollback.py --to-previous --verbose
 
 # Skip verification (not recommended)
-python scripts/rollback.py --to-previous --skip-verify
+python scripts/ops/rollback.py --to-previous --skip-verify
 ```
 
 ### Automation Best Practices
@@ -663,7 +663,7 @@ python scripts/rollback.py --to-previous --skip-verify
 
 - [Deployment Checklist](DEPLOYMENT_SAFETY_CHECKLIST.md)
 - [Production Readiness Guide](../PRODUCTION_READY.md)
-- [Backup and Restore Procedures](../scripts/backup_tm.py)
+- [Backup and Restore Procedures](../scripts/tm/backup_tm.py)
 - [Incident Response Plan](INCIDENT_RESPONSE.md) (if exists)
 
 ---

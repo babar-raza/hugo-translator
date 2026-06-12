@@ -313,8 +313,10 @@ def test_rollback_verifier_verify_success(mock_run, mock_commit):
         (project_root / "src").mkdir()
         (project_root / "src" / "__init__.py").touch()
         (project_root / "scripts").mkdir()
-        (project_root / "scripts" / "production_readiness_check.py").touch()
-        (project_root / "scripts" / "run_smoke_tests.py").write_text('print("test")')
+        (project_root / "scripts" / "quality").mkdir()
+        (project_root / "scripts" / "quality" / "production_readiness_check.py").touch()
+        (project_root / "scripts" / "smoke").mkdir()
+        (project_root / "scripts" / "smoke" / "run_smoke_tests.py").write_text('print("test")')
 
         verifier = RollbackVerifier(project_root)
 

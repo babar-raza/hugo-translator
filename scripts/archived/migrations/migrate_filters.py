@@ -2,6 +2,7 @@
 """
 Migration script to convert legacy filter.json to new site profile YAML format.
 """
+
 import json
 import sys
 from pathlib import Path
@@ -90,9 +91,7 @@ def migrate_site(site_id: str, legacy_config: dict[str, Any], output_dir: Path) 
             target_langs=DEFAULT_TARGET_LANGS,
             frontmatter=frontmatter,
             body=body_rules,
-            output_layout=OutputLayout(
-                per_language_folders=True, pattern="{lang}/{path}"
-            ),
+            output_layout=OutputLayout(per_language_folders=True, pattern="{lang}/{path}"),
             tm_prefs=TMPreferences(use_semantic_tm=True, min_similarity_score=0.8),
         )
 
@@ -100,8 +99,9 @@ def migrate_site(site_id: str, legacy_config: dict[str, Any], output_dir: Path) 
 
         output_file = output_dir / f"{site_id}.yaml"
         with open(output_file, "w", encoding="utf-8") as f:
-            yaml.dump(profile_dict, f, default_flow_style=False,
-                     sort_keys=False, allow_unicode=True)
+            yaml.dump(
+                profile_dict, f, default_flow_style=False, sort_keys=False, allow_unicode=True
+            )
 
         print(f"[OK] Migrated {site_id} -> {output_file.name}")
         print(f"  - {len(frontmatter)} frontmatter rules")
@@ -143,9 +143,9 @@ def main():
         else:
             failed_count += 1
 
-    print(f"\n{'='*60}")
+    print(f"\n{'=' * 60}")
     print(f"Migration complete: Success {success_count} | Failed {failed_count}")
-    print(f"{'='*60}\n")
+    print(f"{'=' * 60}\n")
 
     if success_count > 0:
         print("Validating generated profiles...\n")

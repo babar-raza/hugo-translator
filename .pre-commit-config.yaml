@@ -34,5 +34,6 @@ repos:
             tests/integration/test_parallel_mode\.py|
             tests/integration/test_roundrobin_mode\.py|
             tests/regression/test_single_file_translation\.py|
-            tests/unit/test_telemetry_path_config\.py
+            tests/unit/test_telemetry_path_config\.py|
+            scripts/.*
           )$

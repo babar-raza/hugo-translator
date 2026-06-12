@@ -1,0 +1,88 @@
+# scripts/MANIFEST.toml
+#
+# Machine-readable registry for scripts at the scripts/ ROOT ONLY.
+# Scripts in subdirectories (ci/, ops/, tm/, bench/, etc.) are NOT listed here.
+#
+# RULES:
+# 1. Every file directly in scripts/ MUST have an entry below.
+# 2. ci_critical = true means this file is referenced BY PATH in a CI workflow or
+#    CONTRIBUTING.md. Do NOT move or rename without a coordinated CI + docs update.
+# 3. To add a new script to scripts/ root: add the entry here FIRST, then add the file.
+#    CI (scripts/ci/check_manifest.py --strict) will reject unregistered root scripts.
+# 4. To retire a script: set status = "deprecated", move the file to scripts/archived/,
+#    and remove the entry here. See scripts/README.md for the full retirement policy.
+#
+# CI ENFORCEMENT:
+#   Default mode  — verifies all ci_critical scripts exist; warns on unregistered files.
+#   --strict mode — additionally fails if any root script is unregistered.
+#                   The release gate runs in --strict mode.
+#
+# MIGRATION STATUS (as of 2026-06-11): COMPLETE.
+# Root contains exactly 7 CI-critical scripts. All others live in subdirectories.
+
+# ---------------------------------------------------------------------------
+# CI-CRITICAL SCRIPTS (must stay at root; referenced by path in CI / docs)
+# ---------------------------------------------------------------------------
+
+[[script]]
+path = "analyze_cli_imports.py"
+category = "ci-gate"
+status = "active"
+ci_critical = true
+ci_references = [".github/workflows/cli_tests.yml"]
+purpose = "Static analysis of CLI imports — blocking gate before runtime CLI tests"
+last_verified = "2026-06-11"
+
+[[script]]
+path = "test_cli_execution.py"
+category = "ci-gate"
+status = "active"
+ci_critical = true
+ci_references = [".github/workflows/cli_tests.yml"]
+purpose = "Runtime CLI option validation — blocking gate before runtime tests"
+last_verified = "2026-06-11"
+
+[[script]]
+path = "test_cli_runtime.py"
+category = "ci-gate"
+status = "active"
+ci_critical = true
+ci_references = [".github/workflows/cli_tests.yml"]
+purpose = "Comprehensive CLI option matrix testing — gates release"
+last_verified = "2026-06-11"
+
+[[script]]
+path = "audit_translation_quality.py"
+category = "ci-gate"
+status = "active"
+ci_critical = true
+ci_references = [".github/workflows/release_gate.yml"]
+purpose = "Quality threshold gate — blocks release if CI fixtures fail 0.70 threshold"
+last_verified = "2026-06-11"
+
+[[script]]
+path = "setup_dev_env.py"
+category = "setup"
+status = "active"
+ci_critical = true
+ci_references = ["CONTRIBUTING.md", "README.md"]
+purpose = "Bootstrap: creates venv, installs deps, copies .env template"
+last_verified = "2026-06-11"
+
+[[script]]
+path = "check_share_safe.sh"
+category = "ops"
+status = "active"
+ci_critical = true
+ci_references = ["CONTRIBUTING.md"]
+purpose = "Pre-push safety check — prevents private path leaks"
+last_verified = "2026-06-11"
+
+[[script]]
+path = "health_check.py"
+category = "ops"
+status = "active"
+ci_critical = true
+ci_references = [".github/workflows/worker_health_check.yml"]
+purpose = "Lightweight system health check"
+last_verified = "2026-06-11"

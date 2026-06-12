@@ -14,6 +14,7 @@ Default: src/cli.py
 
 This catches NameError issues BEFORE runtime.
 """
+
 import ast
 import builtins
 import sys
@@ -25,17 +26,37 @@ from typing import Optional
 BUILTIN_NAMES = set(dir(builtins))
 # Add common typing names
 TYPING_NAMES = {
-    'Dict', 'List', 'Set', 'Tuple', 'Optional', 'Union', 'Any',
-    'Callable', 'Type', 'Sequence', 'Mapping', 'Iterable',
-    'TYPE_CHECKING', 'cast', 'overload', 'Final', 'Literal',
-    'TypeVar', 'Generic', 'Protocol', 'ClassVar', 'NamedTuple',
-    'TypedDict', 'Annotated'
+    "Dict",
+    "List",
+    "Set",
+    "Tuple",
+    "Optional",
+    "Union",
+    "Any",
+    "Callable",
+    "Type",
+    "Sequence",
+    "Mapping",
+    "Iterable",
+    "TYPE_CHECKING",
+    "cast",
+    "overload",
+    "Final",
+    "Literal",
+    "TypeVar",
+    "Generic",
+    "Protocol",
+    "ClassVar",
+    "NamedTuple",
+    "TypedDict",
+    "Annotated",
 }
 
 
 @dataclass
 class FunctionScope:
     """Track names available in a function scope."""
+
     name: str
     lineno: int
     qualified_name: str  # Full path like outer_func.inner_func
@@ -45,12 +66,13 @@ class FunctionScope:
     names_used: dict[str, int] = field(default_factory=dict)  # name -> first line used
     comprehension_vars: set[str] = field(default_factory=set)
     nested_function_names: set[str] = field(default_factory=set)
-    parent_scope: Optional['FunctionScope'] = None
+    parent_scope: Optional["FunctionScope"] = None
 
 
 @dataclass
 class UndefinedName:
     """Record of an undefined name usage."""
+
     name: str
     function: str
     lineno: int
@@ -80,7 +102,7 @@ class ImportAnalyzer(ast.NodeVisitor):
         return ""
 
     def visit_Import(self, node: ast.Import):
-        names = {alias.asname or alias.name.split('.')[0] for alias in node.names}
+        names = {alias.asname or alias.name.split(".")[0] for alias in node.names}
         if self.current_scope:
             self.current_scope.local_imports.update(names)
         elif self.in_type_checking_block:
@@ -92,7 +114,7 @@ class ImportAnalyzer(ast.NodeVisitor):
     def visit_ImportFrom(self, node: ast.ImportFrom):
         names = set()
         for alias in node.names:
-            if alias.name == '*':
+            if alias.name == "*":
                 continue
             names.add(alias.asname or alias.name)
 
@@ -152,7 +174,7 @@ class ImportAnalyzer(ast.NodeVisitor):
             params.add(args.kwarg.arg)
         for arg in args.kwonlyargs:
             params.add(arg.arg)
-        if hasattr(args, 'posonlyargs'):
+        if hasattr(args, "posonlyargs"):
             for arg in args.posonlyargs:
                 params.add(arg.arg)
         return params
@@ -183,7 +205,9 @@ class ImportAnalyzer(ast.NodeVisitor):
         if self.current_scope:
             for item in node.items:
                 if item.optional_vars:
-                    self._extract_assigned_names(item.optional_vars, self.current_scope.local_assignments)
+                    self._extract_assigned_names(
+                        item.optional_vars, self.current_scope.local_assignments
+                    )
         self.generic_visit(node)
 
     def visit_ExceptHandler(self, node: ast.ExceptHandler):
@@ -231,7 +255,7 @@ class ImportAnalyzer(ast.NodeVisitor):
         self.generic_visit(node)
 
     def visit_If(self, node: ast.If):
-        if isinstance(node.test, ast.Name) and node.test.id == 'TYPE_CHECKING':
+        if isinstance(node.test, ast.Name) and node.test.id == "TYPE_CHECKING":
             old_in_type_checking = self.in_type_checking_block
             self.in_type_checking_block = True
             for child in node.body:
@@ -260,32 +284,34 @@ class ImportAnalyzer(ast.NodeVisitor):
         for scope in self.function_scopes:
             # Collect all available names
             available = (
-                self.module_level_names |
-                scope.parameters |
-                scope.local_assignments |
-                scope.local_imports |
-                scope.comprehension_vars |
-                scope.nested_function_names |
-                self._get_closure_names(scope) |
-                BUILTIN_NAMES |
-                TYPING_NAMES
+                self.module_level_names
+                | scope.parameters
+                | scope.local_assignments
+                | scope.local_imports
+                | scope.comprehension_vars
+                | scope.nested_function_names
+                | self._get_closure_names(scope)
+                | BUILTIN_NAMES
+                | TYPING_NAMES
             )
 
             for name, lineno in scope.names_used.items():
                 if name not in available:
-                    self.undefined_names.append(UndefinedName(
-                        name=name,
-                        function=scope.qualified_name,
-                        lineno=lineno,
-                        context=self.get_line_context(lineno)
-                    ))
+                    self.undefined_names.append(
+                        UndefinedName(
+                            name=name,
+                            function=scope.qualified_name,
+                            lineno=lineno,
+                            context=self.get_line_context(lineno),
+                        )
+                    )
 
         return self.undefined_names
 
 
 def analyze_file(file_path: Path) -> list[UndefinedName]:
     """Analyze a Python file for undefined names."""
-    source_code = file_path.read_text(encoding='utf-8')
+    source_code = file_path.read_text(encoding="utf-8")
 
     try:
         tree = ast.parse(source_code)

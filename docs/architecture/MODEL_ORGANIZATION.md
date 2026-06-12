@@ -229,7 +229,7 @@ Every model directory MUST contain `.metadata.json`:
 Identify candidate models from HuggingFace Hub or model registries.
 
 **Tools:**
-- `scripts/discover_models.py` - Search HuggingFace for translation models
+- `scripts/models/discover_models.py` - Search HuggingFace for translation models
 - Manual curation in `config/model_registry.yaml`
 
 ### 2. Registration
@@ -254,7 +254,7 @@ Download model files to correct directory structure.
 
 **Command:**
 ```bash
-python scripts/download_models.py --model m2m100_418m
+python scripts/models/download_models.py --model m2m100_418m
 ```
 
 **Process:**
@@ -301,7 +301,7 @@ Remove unused or outdated models.
 
 **Command:**
 ```bash
-python scripts/cleanup_models.py --unused
+python scripts/models/cleanup_models.py --unused
 ```
 
 **Safety:**
@@ -509,7 +509,7 @@ cat models/inventory.json
 **Solution:**
 ```bash
 # Download missing model
-python scripts/download_models.py --model m2m100_418m
+python scripts/models/download_models.py --model m2m100_418m
 ```
 
 ---
@@ -530,7 +530,7 @@ python scripts/verify_models.py --model m2m100_418m
 **Solutions:**
 1. **Corrupted download:**
    ```bash
-   python scripts/download_models.py --model m2m100_418m --force
+   python scripts/models/download_models.py --model m2m100_418m --force
    ```
 
 2. **Incompatible PyTorch version:**
@@ -541,7 +541,7 @@ python scripts/verify_models.py --model m2m100_418m
 3. **Insufficient memory:**
    ```bash
    # Use smaller variant or INT8 quantization
-   python scripts/download_models.py --model m2m100_418m_ct2_int8
+   python scripts/models/download_models.py --model m2m100_418m_ct2_int8
    ```
 
 ---
@@ -567,14 +567,14 @@ du -sh models/*
 
 2. **Remove unused models:**
    ```bash
-   python scripts/cleanup_models.py --unused
+   python scripts/models/cleanup_models.py --unused
    ```
 
 3. **Use INT8 variants:**
    ```bash
    # Replace FP32 with INT8 (50% space savings)
-   python scripts/remove_model.py m2m100_418m
-   python scripts/download_models.py --model m2m100_418m_ct2_int8
+   python scripts/models/remove_model.py m2m100_418m
+   python scripts/models/download_models.py --model m2m100_418m_ct2_int8
    ```
 
 ---

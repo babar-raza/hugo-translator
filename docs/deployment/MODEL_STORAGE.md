@@ -281,16 +281,16 @@ COPY requirements.txt .
 RUN pip install -r requirements.txt
 
 # Pre-download models
-COPY scripts/download_models.py .
+COPY scripts/models/download_models.py .
 COPY config/model_registry.yaml ./config/
-RUN python scripts/download_models.py --registry config/model_registry.yaml
+RUN python scripts/models/download_models.py --registry config/model_registry.yaml
 
 # Copy application code
 COPY . .
 CMD ["python", "src/cli.py"]
 ```
 
-**Download script** (`scripts/download_models.py`):
+**Download script** (`scripts/models/download_models.py`):
 ```python
 #!/usr/bin/env python3
 """Pre-download HuggingFace models to warm cache."""

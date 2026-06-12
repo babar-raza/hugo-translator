@@ -360,7 +360,7 @@ except RuntimeError as e:
 
 ```bash
 # Run comprehensive CPU benchmarks
-python scripts/benchmark_cpu_comprehensive.py \
+python scripts/bench/benchmark_cpu_comprehensive.py \
   --models m2m100_418m_ct2 \
   --batch-sizes 4,8,16 \
   --iterations 3 \
@@ -372,7 +372,7 @@ python scripts/benchmark_cpu_comprehensive.py \
 
 ```bash
 # GPU translation benchmark
-python scripts/benchmark_gpu_translation.py \
+python scripts/bench/benchmark_gpu_translation.py \
   --model m2m100_418m \
   --batch-sizes 16,32,64 \
   --iterations 5 \
@@ -514,7 +514,7 @@ python -c "from transformers import AutoModel; AutoModel.from_pretrained('models
 cp data/tm/tm.lmdb data/tm/tm.lmdb.backup
 
 # Rebuild TM index
-python scripts/build_l3_index.py --use-gpu
+python scripts/tm/build_l3_index.py --use-gpu
 ```
 
 ---
@@ -593,7 +593,7 @@ cat test_translated.md
 
 ```bash
 # Quick performance test
-python scripts/benchmark_cpu_comprehensive.py \
+python scripts/bench/benchmark_cpu_comprehensive.py \
   --models m2m100_418m_ct2 \
   --batch-sizes 8 \
   --iterations 1 \

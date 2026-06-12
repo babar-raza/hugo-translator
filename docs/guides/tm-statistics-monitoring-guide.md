@@ -35,7 +35,7 @@ Effective monitoring ensures each layer operates efficiently and provides approp
 curl http://localhost:9090/api/v1/query?query=tm_hit_rate
 
 # Generate TM statistics report
-python scripts/generate_metrics_report.py --since 1h --format json | jq '.tm'
+python scripts/analysis/generate_metrics_report.py --since 1h --format json | jq '.tm'
 ```
 
 ### Cache Performance Metrics
@@ -170,13 +170,13 @@ histogram_quantile(0.95, rate(tm_lookup_duration_seconds_bucket[5m]))
 **Generate TM Performance Report**:
 ```bash
 # Last hour summary
-python scripts/generate_metrics_report.py --since 1h --output tm_report.txt
+python scripts/analysis/generate_metrics_report.py --since 1h --output tm_report.txt
 
 # JSON format for analysis
-python scripts/generate_metrics_report.py --since 24h --format json --output tm_stats.json
+python scripts/analysis/generate_metrics_report.py --since 24h --format json --output tm_stats.json
 
 # Prometheus export format
-python scripts/generate_metrics_report.py --format prometheus > tm_metrics.txt
+python scripts/analysis/generate_metrics_report.py --format prometheus > tm_metrics.txt
 ```
 
 ## Alert Monitoring
@@ -367,7 +367,7 @@ python scripts/monitor_cache_eviction.py
 python scripts/check_system_health.py
 
 # TM performance summary
-python scripts/generate_metrics_report.py --since 24h | grep -A 10 "TM"
+python scripts/analysis/generate_metrics_report.py --since 24h | grep -A 10 "TM"
 ```
 
 **Weekly Maintenance**:

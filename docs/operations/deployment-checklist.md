@@ -49,7 +49,7 @@ Before approving real-file translation runs, review the [Hugo Translator Shippin
   - Quick smoke tests (<30s): Pass
   - Full smoke tests (<60s): Pass
   - All critical paths validated
-  - Evidence: `python scripts/run_smoke_tests.py --full`
+  - Evidence: `python scripts/smoke/run_smoke_tests.py --full`
 
 - [ ] **Static Analysis Clean**
   - No high severity issues
@@ -95,7 +95,7 @@ Before approving real-file translation runs, review the [Hugo Translator Shippin
   - Baseline metrics collected
   - Performance benchmarks run
   - No regressions detected
-  - Evidence: `python scripts/benchmark_production.py`
+  - Evidence: `python scripts/bench/benchmark_production.py`
 
 - [ ] **Load Testing Completed**
   - System tested under expected load
@@ -267,7 +267,7 @@ Before approving real-file translation runs, review the [Hugo Translator Shippin
   - Quick smoke tests: Passed
   - Critical paths: Validated
   - No errors: Confirmed
-  - Evidence: `python scripts/run_smoke_tests.py --quick`
+  - Evidence: `python scripts/smoke/run_smoke_tests.py --quick`
 
 - [ ] **Health Checks Passing**
   - Application health: OK
@@ -395,7 +395,7 @@ Before approving real-file translation runs, review the [Hugo Translator Shippin
   - Rollback script: Available
   - Rollback command: Prepared
   - Rollback verification: Automated
-  - Evidence: `python scripts/rollback.py --dry-run`
+  - Evidence: `python scripts/ops/rollback.py --dry-run`
 
 ### Rollback Criteria
 
@@ -467,7 +467,7 @@ Before approving real-file translation runs, review the [Hugo Translator Shippin
 
 ## Automated Checks
 
-The following checks can be automated using `python scripts/check_deployment_safety.py`:
+The following checks can be automated using `python scripts/quality/check_deployment_safety.py`:
 
 ### Code Quality Checks
 
@@ -479,7 +479,7 @@ pytest tests/ -v --cov=src --cov-report=term
 pytest --cov=src --cov-report=term --cov-fail-under=80
 
 # Run smoke tests
-python scripts/run_smoke_tests.py --full
+python scripts/smoke/run_smoke_tests.py --full
 
 # Linting
 pylint src/ --fail-under=8.0
@@ -505,7 +505,7 @@ bandit -r src/ -ll
 
 ```bash
 # Performance benchmark
-python scripts/benchmark_production.py --quick
+python scripts/bench/benchmark_production.py --quick
 
 # Check for performance regressions
 python scripts/compare_performance.py baseline.json current.json
@@ -528,13 +528,13 @@ python scripts/check_resources.py
 
 ```bash
 # Run all automated checks
-python scripts/check_deployment_safety.py --checklist
+python scripts/quality/check_deployment_safety.py --checklist
 
 # Enforce checklist (block if incomplete)
-python scripts/check_deployment_safety.py --enforce
+python scripts/quality/check_deployment_safety.py --enforce
 
 # Generate approval report
-python scripts/check_deployment_safety.py --approve --report reports/deployment_approval.json
+python scripts/quality/check_deployment_safety.py --approve --report reports/deployment_approval.json
 ```
 
 ---

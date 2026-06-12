@@ -65,9 +65,7 @@ class FakeEntryDetector:
             if path.exists():
                 return str(path)
 
-        raise FileNotFoundError(
-            "Could not find telemetry database. Specify with --db-path option."
-        )
+        raise FileNotFoundError("Could not find telemetry database. Specify with --db-path option.")
 
     def connect(self) -> None:
         """Connect to telemetry database."""
@@ -127,14 +125,16 @@ class FakeEntryDetector:
             # Detection criteria: langs_translated is NULL or 0
             if langs_translated is None or langs_translated == 0:
                 reason = self._determine_reason(row, metrics)
-                fake_entries.append({
-                    "event_id": row["event_id"],
-                    "timestamp": row["timestamp"],
-                    "job_type": row["job_type"],
-                    "status": row["status"],
-                    "output_summary": row["output_summary"],
-                    "reason": reason,
-                })
+                fake_entries.append(
+                    {
+                        "event_id": row["event_id"],
+                        "timestamp": row["timestamp"],
+                        "job_type": row["job_type"],
+                        "status": row["status"],
+                        "output_summary": row["output_summary"],
+                        "reason": reason,
+                    }
+                )
 
         return fake_entries
 
