@@ -46,7 +46,7 @@ jobs:
       - name: Run content structure scan (import test)
         run: |
           python -c "
-          from scripts.repair_translated_content import scan_changed_files, ScanResult
+          from scripts.content.repair_translated_content import scan_changed_files, ScanResult
           print('Module import OK: scan_changed_files, ScanResult available')
           result = scan_changed_files([])
           print(f'Empty scan: {result.total_files_scanned} files scanned')
