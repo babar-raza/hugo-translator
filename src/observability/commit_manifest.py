@@ -25,7 +25,7 @@ def _utc_now() -> str:
 
 def _safe_name(run_id: str) -> str:
     slug = re.sub(r"[^A-Za-z0-9._-]+", "_", run_id).strip("_")
-    digest = hashlib.sha1(run_id.encode("utf-8")).hexdigest()[:12]
+    digest = hashlib.sha1(run_id.encode("utf-8"), usedforsecurity=False).hexdigest()[:12]
     return f"{slug[:80] or 'run'}_{digest}.json"
 
 

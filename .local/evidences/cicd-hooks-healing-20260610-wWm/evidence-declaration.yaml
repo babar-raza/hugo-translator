@@ -38,8 +38,12 @@ commits:
     message: "chore(scripts): add run_local_gate.py and verify_metrics_dryrun.py"
     note: Lane 4 — governance scripts
 pushes:
-  gitlab: "5370681..6bbf0a5 HEAD -> main (SUCCESS)"
-  github: "237ea59..6bbf0a5 HEAD -> main (SUCCESS)"
+  gitlab_initial: "5370681..6bbf0a5 HEAD -> main (SUCCESS)"
+  github_initial: "237ea59..6bbf0a5 HEAD -> main (SUCCESS)"
+  gitlab_final: "82e5f0c..890bf7d HEAD -> main (SUCCESS)"
+  github_final: "82e5f0c..890bf7d HEAD -> main (SUCCESS)"
+  final_head: "890bf7d"
+  note: "3 additional commits after initial push: 995aad8 (evidence bundle), 82e5f0c (pip-audit fix), 890bf7d (verdict update)"
 ci_run:
   platform: GitHub Actions
   run_id: "27354541269"
