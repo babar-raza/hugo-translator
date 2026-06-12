@@ -40,6 +40,10 @@ default:
     - if (-not (Test-Path .venv)) { python -m venv .venv }
     - .\.venv\Scripts\Activate.ps1
 
+variables:
+  # Preserve .venv across the git-clean step so the cached venv survives between jobs.
+  GIT_CLEAN_FLAGS: -ffdx --exclude=.venv
+
 cache:
   key:
     files:
@@ -59,7 +63,7 @@ unit-tests:
   stage: test
   timeout: 45 minutes
   script:
-    - pip install -r requirements/cpu.txt -r requirements/dev.txt
+    - pip install -q -r requirements/cpu.txt -r requirements/dev.txt
     - python -m ruff check src/ tests/ --output-format=concise
     - python -m pytest tests/unit/translation_engine/ -v --tb=short --timeout=120
     - python -m pytest tests/unit/validation/ -v --tb=short --timeout=120
@@ -93,7 +97,7 @@ regression-tests:
   needs: [unit-tests]
   timeout: 20 minutes
   script:
-    - pip install -r requirements/cpu.txt -r requirements/dev.txt
+    - pip install -q -r requirements/cpu.txt -r requirements/dev.txt
     - python -m pytest tests/regression/test_signature_preservation.py -v --tb=short
     - python -m pytest tests/regression/test_batch_size_recovery.py -v --tb=short
     - |
@@ -116,7 +120,7 @@ quality-gate:
   needs: [unit-tests]
   timeout: 10 minutes
   script:
-    - pip install -r requirements/cpu.txt -r requirements/dev.txt
+    - pip install -q -r requirements/cpu.txt -r requirements/dev.txt
     - New-Item -ItemType Directory -Force -Path reports/audit | Out-Null
     - |
       python scripts/audit_translation_quality.py `
@@ -136,7 +140,7 @@ security-scan:
   timeout: 10 minutes
   allow_failure: true   # advisory — vulnerabilities do not block the gate
   script:
-    - pip install -r requirements/cpu.txt -r requirements/dev.txt
+    - pip install -q -r requirements/cpu.txt -r requirements/dev.txt
     - New-Item -ItemType Directory -Force -Path reports | Out-Null
     - python -m bandit -r src/ -f json -o reports/bandit.json --exit-zero
     - python -m pip_audit -r requirements/base.txt --format json -o reports/pip-audit.json
