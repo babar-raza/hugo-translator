@@ -171,11 +171,11 @@ security-scan:
     - New-Item -ItemType Directory -Force -Path reports | Out-Null
     - python -m bandit -r src/ -f json -o reports/bandit.json --severity-level high
     - |
-      try {
-        python -m pip_audit -r requirements/base.txt --format json -o reports/pip-audit.json
-      } catch {
-        Write-Host "pip-audit found vulnerabilities (advisory, non-blocking)"
-      }
+      $prevEAP = $ErrorActionPreference
+      $ErrorActionPreference = 'Continue'
+      python -m pip_audit -r requirements/base.txt --format json -o reports/pip-audit.json
+      $ErrorActionPreference = $prevEAP
+      Write-Host "pip-audit complete (advisory, non-blocking)"
     - |
       Write-Host ""
       Write-Host ("=" * 60)
