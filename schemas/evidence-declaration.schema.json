@@ -1,0 +1,177 @@
+{
+  "description": "Schema for evidence-declaration.yaml files.\n\nCaptures run metadata, inspected artifacts, findings summary,\nand final verdict for any sprint or investigation run.",
+  "properties": {
+    "autonomy_gaps_found": {
+      "default": 0,
+      "title": "Autonomy Gaps Found",
+      "type": "integer"
+    },
+    "base_commit": {
+      "default": "",
+      "description": "Git HEAD SHA at run start",
+      "title": "Base Commit",
+      "type": "string"
+    },
+    "branch": {
+      "default": "main",
+      "description": "Git branch",
+      "title": "Branch",
+      "type": "string"
+    },
+    "commands_inspected": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Commands Inspected",
+      "type": "array"
+    },
+    "completed_at": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Completed At"
+    },
+    "date": {
+      "description": "Run date (YYYY-MM-DD)",
+      "title": "Date",
+      "type": "string"
+    },
+    "extra": {
+      "additionalProperties": true,
+      "title": "Extra",
+      "type": "object"
+    },
+    "files_inspected": {
+      "additionalProperties": {
+        "items": {
+          "type": "string"
+        },
+        "type": "array"
+      },
+      "description": "Category -> list of inspected file paths",
+      "title": "Files Inspected",
+      "type": "object"
+    },
+    "final_verdict": {
+      "default": "PENDING",
+      "title": "Final Verdict",
+      "type": "string"
+    },
+    "llm_professionalize_configs_inspected": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Llm Professionalize Configs Inspected",
+      "type": "array"
+    },
+    "maturity_levels_assigned": {
+      "additionalProperties": true,
+      "title": "Maturity Levels Assigned",
+      "type": "object"
+    },
+    "opportunities_identified": {
+      "default": 0,
+      "title": "Opportunities Identified",
+      "type": "integer"
+    },
+    "recommended_roadmap": {
+      "additionalProperties": true,
+      "title": "Recommended Roadmap",
+      "type": "object"
+    },
+    "repo_path": {
+      "description": "Absolute path to repository root",
+      "title": "Repo Path",
+      "type": "string"
+    },
+    "reviewer_app_exists": {
+      "default": false,
+      "title": "Reviewer App Exists",
+      "type": "boolean"
+    },
+    "reviewer_app_path": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Reviewer App Path"
+    },
+    "reviewer_facing_artifacts_found": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Reviewer Facing Artifacts Found"
+    },
+    "risks_identified": {
+      "default": 0,
+      "title": "Risks Identified",
+      "type": "integer"
+    },
+    "run_id": {
+      "description": "Unique run identifier",
+      "title": "Run Id",
+      "type": "string"
+    },
+    "started_at": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Started At"
+    },
+    "state_queue_files_inspected": {
+      "items": {
+        "type": "string"
+      },
+      "title": "State Queue Files Inspected",
+      "type": "array"
+    },
+    "supervisor_reviewer_files_inspected": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Supervisor Reviewer Files Inspected",
+      "type": "array"
+    },
+    "taskcards_proposed": {
+      "default": 0,
+      "title": "Taskcards Proposed",
+      "type": "integer"
+    },
+    "workflows_inspected": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Workflows Inspected",
+      "type": "array"
+    }
+  },
+  "required": [
+    "run_id",
+    "repo_path"
+  ],
+  "title": "EvidenceDeclaration",
+  "type": "object"
+}
