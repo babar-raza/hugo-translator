@@ -426,6 +426,23 @@ Hugo Markdown
     → Git auto-commit
 ```
 
+### Agentic Architecture
+
+The system includes autonomous decision-making and cross-session state management:
+
+- **Supervisor Loop** (`src/workers/supervisor_loop.py`) — Inspect-decide-execute control loop that reads run signals, classifies outcomes, and selects next work units. Decisions: PROCEED, SKIP, BLOCK, CIRCUIT_BREAK, RESUME.
+- **Task Queue** (`src/workers/task_queue.py`) — Programmatic task queue with priority levels (P0-P2), dependency resolution, and blocker tracking. Replaces manual task backlog.
+- **Continuation State** (`src/workers/continuation_state.py`) — Cross-session state machine (IDLE/RUNNING/COMPLETED/FAILED/INTERRUPTED) with atomic writes. Enables resume-after-failure and circuit breaker patterns.
+- **Run Signal Emitter** (`src/observability/run_signal_emitter.py`) — Emits structured JSON signals after each run with verdict (CLEAN_RUN/DEGRADED_RUN/FAILED_RUN/BLOCKED), file stats, and autonomy score.
+- **Model Selector** (`src/translation_engine/model_selector.py`) — Selects the best translation model per (site, language) pair based on historical acceptance rates.
+- **Blocker Classifier** (`src/observability/blocker_classifier.py`) — LLM-backed classification of stuck items by root cause (CONFIG_ERROR, DATA_QUALITY, MODEL_LIMITATION, etc.).
+- **Contradiction Detector** (`src/observability/contradiction_detector.py`) — Audits config claims against observed runtime behavior to detect drift.
+- **Run Summarizer** (`src/observability/run_summarizer.py`) — LLM-backed generation of human-readable run summaries.
+- **Evidence Declaration** (`src/observability/evidence_declaration.py`) — Pydantic-validated evidence schema with JSON schema export for audit trails.
+- **Reviewer Bridge** (`scripts/ops/reviewer_bridge.py`) — MCP JSON-RPC 2.0 bridge for posting run signals to external review systems.
+
+All agentic modules default to `enabled: false` / `dry_run: true` in `config/global.yaml` and can be activated per-module.
+
 ### Directory Structure
 
 ```

@@ -1,0 +1,38 @@
+# Hugo Translation System — Code Ownership
+#
+# These owners are automatically requested for review on merge requests
+# that modify files matching the listed patterns.
+#
+# See: https://docs.gitlab.com/ee/user/project/codeowners/
+
+# Default: all files require maintainer review
+*                                   @translation-system-team
+
+# Core translation engine
+src/translation_engine/              @translation-system-team
+src/tm/                              @translation-system-team
+
+# Autonomous workers (safety-critical)
+src/workers/                         @translation-system-team
+AGENTS.md                            @translation-system-team
+
+# Observability and metrics
+src/observability/                   @translation-system-team
+
+# CI/CD pipelines
+.gitlab-ci.yml                       @translation-system-team
+.github/workflows/                   @translation-system-team
+
+# Configuration (affects production behavior)
+config/global.yaml                   @translation-system-team
+config/site_profiles/                @translation-system-team
+config/quality_gates.yaml            @translation-system-team
+
+# Security-sensitive files
+SECURITY.md                          @translation-system-team
+.env.example                         @translation-system-team
+requirements/                        @translation-system-team
+
+# Governance and process
+CONTRIBUTING.md                      @translation-system-team
+pyproject.toml                       @translation-system-team

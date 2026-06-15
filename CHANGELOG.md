@@ -4,6 +4,37 @@ All notable changes to the Hugo Translation System are documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+- **Agentic Architecture Modules** — 9 modules providing autonomous runtime capabilities:
+  - `supervisor_loop` — inspect-decide-execute cycle for autonomous workers
+  - `task_queue` — persistent priority queue with retry and dead-letter support
+  - `continuation_state` — cross-session run state tracking
+  - `run_signal_emitter` — emits structured run-signal JSON after translation runs
+  - `blocker_classifier` — LLM-backed classification of translation blockers
+  - `contradiction_detector` — detects contradictions in translated content
+  - `run_summarizer` — generates natural-language summaries of translation runs
+  - `evidence_declaration` — structured evidence schema for review/audit consumption
+  - `model_selector` — adaptive model selection based on run history
+  - All modules disabled by default (`enabled: false`); config stubs in `global.yaml`
+  - 197 unit tests across all modules
+- **Daemon mode agentic hooks** — continuation state and signal emission wired into `_run_daemon()` (mirrors oneshot pattern)
+- **Governance CI gate** — `check_governance.py --strict` added to both GitLab CI and GitHub Actions
+- **Incident response runbook** — 5 failure scenarios with detection/response/prevention (`docs/operations/incident-response.md`)
+- **SBOM** — 844-package software bill of materials (`requirements/sbom.json`)
+
+### Changed
+
+- **Security scan now blocking** — bandit SAST fails pipeline on HIGH severity findings (0 HIGH baseline verified)
+- **Coverage gate enforced** — `pytest --cov-fail-under=15` in CI (previously config-only, unenforced)
+- **GitHub Actions parity** — governance-check job, agentic module tests, and coverage gate added to `release_gate.yml`
+
+### Fixed
+
+- **Worker hook config access** — hooks now call `config_service.get_config()` instead of non-existent `load_global_config()`
+
+---
+
 > **Deployment note**: The features below are fully implemented. However, CHH-02 through CHH-05
 > (Redis locking, Docker metadata volume, Prometheus metrics, automatic cleanup) are only
 > active in the **Docker / distributed deployment** path. The default **Windows-native deployment**
