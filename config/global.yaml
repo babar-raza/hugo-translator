@@ -851,6 +851,42 @@ agent_metrics:
     - reportingservices
     - sharepoint
 
+# --- Agentic Architecture Modules ---
+# These modules provide autonomous runtime capabilities (signal emission,
+# state tracking, supervision, classification). All disabled by default.
+# Enable per-module after verifying integration tests pass.
+
+run_signal_emitter:
+  enabled: false
+  # Set to true to emit run-signal JSON after each translation run
+
+continuation_state:
+  enabled: false
+  # Set to true to track cross-session run state
+
+supervisor_loop:
+  enabled: false
+
+task_queue:
+  enabled: false
+
+blocker_classifier:
+  enabled: false
+  dry_run: true
+
+contradiction_detector:
+  enabled: false
+  dry_run: true
+
+run_summarizer:
+  enabled: false
+  dry_run: true
+
+model_selector:
+  enabled: false
+  min_history_runs: 5
+  default_model: m2m100
+
 # TC-SYS-02: Worker log rotation.
 # Workers use RotatingFileHandler with these limits so log files never grow unbounded.
 logging:

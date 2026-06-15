@@ -82,6 +82,25 @@ unit-tests:
       "tests/unit/phase-3/test_l2_persistent.py"
       "tests/unit/phase-4/test_registry.py"
       -v --tb=short
+    - >-
+      python -m pytest
+      tests/unit/workers/test_continuation_state.py
+      tests/unit/workers/test_task_queue.py
+      tests/unit/workers/test_supervisor_loop.py
+      tests/unit/observability/test_run_signal_emitter.py
+      tests/unit/observability/test_blocker_classifier.py
+      tests/unit/observability/test_contradiction_detector.py
+      tests/unit/observability/test_run_summarizer.py
+      tests/unit/observability/test_evidence_declaration.py
+      tests/unit/translation_engine/test_model_selector.py
+      -v --tb=short
+    # Coverage gate: enforce minimum test coverage across src/
+    - >-
+      python -m pytest
+      tests/unit/translation_engine/
+      tests/unit/validation/
+      --cov=src --cov-fail-under=15
+      -q --timeout=120
 
 # ─── Stage 2: Parallel Validation ────────────────────────────────────────────
 
@@ -91,6 +110,13 @@ manifest-check:
   timeout: 5 minutes
   script:
     - python scripts/ci/check_manifest.py --strict
+
+governance-check:
+  stage: validate
+  needs: [unit-tests]
+  timeout: 5 minutes
+  script:
+    - python scripts/ci/check_governance.py --strict
 
 regression-tests:
   stage: validate
@@ -138,11 +164,11 @@ security-scan:
   stage: validate
   needs: [unit-tests]
   timeout: 10 minutes
-  allow_failure: true   # advisory — vulnerabilities do not block the gate
+  allow_failure: false   # blocks on HIGH severity findings (0 HIGH baseline verified)
   script:
     - pip install -q -r requirements/cpu.txt -r requirements/dev.txt
     - New-Item -ItemType Directory -Force -Path reports | Out-Null
-    - python -m bandit -r src/ -f json -o reports/bandit.json --exit-zero
+    - python -m bandit -r src/ -f json -o reports/bandit.json --severity-level high
     - python -m pip_audit -r requirements/base.txt --format json -o reports/pip-audit.json
     - |
       Write-Host ""
@@ -192,6 +218,7 @@ gate-summary:
   needs:
     - unit-tests
     - manifest-check
+    - governance-check
     - regression-tests
     - quality-gate
   script:
@@ -202,6 +229,7 @@ gate-summary:
       Write-Host ("=" * 60)
       Write-Host "Unit Tests:       success"
       Write-Host "Manifest Check:   success"
+      Write-Host "Governance Check: success"
       Write-Host "Regression Tests: success"
       Write-Host "Quality Gate:     success"
       Write-Host "Security Scan:    advisory (see job artifacts)"

@@ -47,11 +47,11 @@ gates:
 
   # Test Coverage Gates
   test_coverage:
-    enabled: false  # Disabled by default (requires coverage tool)
+    enabled: true
     severity: warning
     description: "Test coverage meets minimum threshold"
     threshold:
-      min_coverage_percentage: 0.70  # At least 70% code coverage
+      min_coverage_percentage: 0.15  # 15% — enforced via --cov-fail-under in CI
 
   # Documentation Gates
   documentation_complete:
