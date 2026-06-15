@@ -73,7 +73,7 @@ jobs:
 
       - name: Agentic Module Tests
         run: |
-          python -m pytest tests/unit/workers/test_continuation_state.py tests/unit/workers/test_task_queue.py tests/unit/workers/test_supervisor_loop.py tests/unit/observability/test_run_signal_emitter.py tests/unit/observability/test_blocker_classifier.py tests/unit/observability/test_contradiction_detector.py tests/unit/observability/test_run_summarizer.py tests/unit/observability/test_evidence_declaration.py tests/unit/translation_engine/test_model_selector.py -v --tb=short
+          python -m pytest tests/unit/workers/test_continuation_state.py tests/unit/workers/test_task_queue.py tests/unit/workers/test_supervisor_loop.py tests/unit/workers/test_agentic_hook_dispatch.py tests/unit/observability/test_run_signal_emitter.py tests/unit/observability/test_blocker_classifier.py tests/unit/observability/test_contradiction_detector.py tests/unit/observability/test_run_summarizer.py tests/unit/observability/test_evidence_declaration.py tests/unit/translation_engine/test_model_selector.py -v --tb=short
         shell: pwsh
 
       - name: Coverage Gate
@@ -98,6 +98,17 @@ jobs:
 
       - name: Validate governance rules
         run: python scripts/ci/check_governance.py --strict
+        shell: pwsh
+
+      - name: Guard agent_metrics committed config
+        run: |
+          $yaml = Get-Content config/global.yaml -Raw
+          if ($yaml -match '(?m)^\s*enabled:\s*true' -and $yaml -match 'agent_metrics:') {
+            Write-Host "ERROR: config/global.yaml has agent_metrics.enabled=true committed."
+            Write-Host "Production enablement must be a local runtime override, never committed."
+            exit 1
+          }
+          Write-Host "agent_metrics config guard: OK (enabled is not true in committed config)"
         shell: pwsh
 
   manifest-check:

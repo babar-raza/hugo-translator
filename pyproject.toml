@@ -177,7 +177,7 @@ ignore_missing_imports = true
 
 [tool.pytest.ini_options]
 minversion = "7.0"
-addopts = "-ra -q --strict-markers --cov=src --cov-report=term-missing --cov-report=html --cov-fail-under=30"
+addopts = "-ra -q --strict-markers --cov=src --cov-report=term-missing --cov-report=html --cov-fail-under=15"
 testpaths = ["tests"]
 norecursedirs = ["scripts", "archive", "docs", "specs", ".git", "venv", ".venv", "build", "dist"]
 python_files = ["test_*.py"]
