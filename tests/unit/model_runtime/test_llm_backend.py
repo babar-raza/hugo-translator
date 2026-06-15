@@ -145,7 +145,7 @@ class TestContracts:
         assert config.base_url is None
 
     def test_llm_provider_config_validation(self):
-        with pytest.raises(Exception):
+        with pytest.raises((ValueError, KeyError)):
             LLMProviderConfig(provider="invalid_provider", model_name="test")
 
     def test_llm_provider_config_from_model_info(self, ollama_model_info):

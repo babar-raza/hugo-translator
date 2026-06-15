@@ -4748,7 +4748,7 @@ class TranslationEngine:
                 result.completion_filter_skipped = skipped_complete
             else:
                 # No completion filter active — all files are candidates; treat as missing
-                _priority_flags = {f: True for f in md_files}
+                _priority_flags = dict.fromkeys(md_files, True)
 
             # Sort deterministically for pagination.
             # file_priority_strategy="missing_first" (default): files with ANY missing output
@@ -5039,11 +5039,13 @@ class TranslationEngine:
                             self.batch_size = original_batch_size
 
                     # WS2-CALLBACK: Define OOM recovery learning callback
-                    def handle_oom_recovery(failed_batch_size: int, success_batch_size: int):
+                    def handle_oom_recovery(
+                        failed_batch_size: int, success_batch_size: int, _file=md_file
+                    ):
                         """Teach BatchStatsTracker when OOM retry succeeds."""
                         logger.info(
                             f"OOM RECOVERY: {failed_batch_size}→{success_batch_size}, "
-                            f"teaching adaptive tracker for file {md_file.name}"
+                            f"teaching adaptive tracker for file {_file.name}"
                         )
 
                         # Guard: Only proceed if batch_stats_tracker exists

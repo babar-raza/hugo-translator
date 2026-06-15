@@ -120,25 +120,19 @@ ignore = [
     "B008",  # do not perform function calls in argument defaults
     "C901",  # too complex
     "F821",  # undefined-name — false positives from TYPE_CHECKING lazy imports
-    "B904",  # raise-without-from — widespread existing pattern; tracked as tech debt
-    "B007",  # unused-loop-control-variable — widespread; tracked as tech debt
-    "F841",  # local-variable-is-assigned-to-but-never-used — widespread; tracked as tech debt
-    "E741",  # ambiguous-variable-name — widespread; tracked as tech debt
-    "E712",  # true-false-comparison — widespread in tests; tracked as tech debt
-    "E711",  # none-comparison — tracked as tech debt
+    "B904",  # raise-without-from — 38 violations
+    "B007",  # unused-loop-control-variable — 41 violations
+    "F841",  # local-variable-is-assigned-to-but-never-used — 26 violations
+    "E741",  # ambiguous-variable-name — 4 violations
+    "E712",  # true-false-comparison — 30 violations
+    "E711",  # none-comparison — 5 violations
     "E402",  # module-import-not-at-top — intentional in workers (conditional GPU imports)
-    "B027",  # empty-method-without-abstract-decorator — intentional stub pattern
-    "B905",  # zip-without-explicit-strict — tracked as tech debt
-    "C401",  # unnecessary-generator-set — tracked as tech debt
-    "C416",  # unnecessary-comprehension — tracked as tech debt
-    "C414",  # unnecessary-double-cast — tracked as tech debt
-    "B005",  # strip-with-multi-characters — tracked as tech debt
-    "B023",  # function-uses-loop-variable — tracked as tech debt
-    "B017",  # assert-raises-exception — tracked as tech debt
-    "C408",  # unnecessary-dict-call — tracked as tech debt
-    "C420",  # unnecessary-dict-comprehension — tracked as tech debt
-    "F601",  # multi-value-repeated-key-literal — tracked as tech debt
-    "E721",  # type-comparison — tracked as tech debt
+    "B027",  # empty-method-without-abstract-decorator — 3 violations
+    "B905",  # zip-without-explicit-strict — 5 violations
+    "C401",  # unnecessary-generator-set — 13 violations
+    "C416",  # unnecessary-comprehension — 4 violations
+    "C414",  # unnecessary-double-cast — 2 violations
+    "C408",  # unnecessary-dict-call — 4 violations
     "UP035", # deprecated-import — tracked as tech debt
     "UP038", # isinstance-with-tuple — deprecated in ruff 0.11; kept for pre-commit v0.11.13 compat
     "UP045", # non-pep604-annotation-optional — can break when type aliases evaluate to None at runtime

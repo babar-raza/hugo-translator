@@ -496,7 +496,7 @@ class TestExceptionInheritance:
             retry_feedback="Test",
         )
 
-        assert type(rejected) != type(retryable)
+        assert type(rejected) is not type(retryable)
         assert not isinstance(rejected, TranslationRetryableError)
         assert not isinstance(retryable, TranslationRejectedError)
 

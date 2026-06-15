@@ -24,6 +24,7 @@ Example output:
 
         Co-authored-by: Hugo Translator <hugo-translator@aspose.net>
 """
+
 import logging
 from collections import defaultdict
 from pathlib import Path
@@ -183,6 +184,7 @@ class CommitMessageGenerator:
             if self.config_service is None:
                 # Try to create ConfigService if not provided
                 from src.utils.config_loader import ConfigService
+
                 try:
                     self.config_service = ConfigService("./config")
                 except Exception as e:
@@ -199,7 +201,9 @@ class CommitMessageGenerator:
                         content_root_normalized = content_root.replace("\\", "/")
                         if content_root_normalized in file_str:
                             # Primary site matches, use only this one
-                            logger.debug(f"Primary site {primary_site_id} matches files, using only this site")
+                            logger.debug(
+                                f"Primary site {primary_site_id} matches files, using only this site"
+                            )
                             return [primary_site_id]
             except Exception as e:
                 logger.warning(f"Failed to check primary site {primary_site_id}: {e}")
@@ -290,7 +294,13 @@ class CommitMessageGenerator:
             aspose_idx = None
             for i, part in enumerate(parts):
                 # Match more specific patterns to avoid false positives
-                if part in ["docs.aspose.net", "products.aspose.net", "blog.aspose.net", "kb.aspose.net", "reference.aspose.net"]:
+                if part in [
+                    "docs.aspose.net",
+                    "products.aspose.net",
+                    "blog.aspose.net",
+                    "kb.aspose.net",
+                    "reference.aspose.net",
+                ]:
                     if i + 1 < len(parts):
                         aspose_idx = i + 1  # The next part is the product name
                         break
@@ -311,12 +321,29 @@ class CommitMessageGenerator:
                 for i in range(aspose_idx + 1, min(aspose_idx + 4, len(parts))):
                     part = parts[i]
                     # Skip language codes and common directories
-                    if part in ["en", "de", "cs", "fr", "es", "zh", "ja", "ru", "net", "java", "cpp", "python"]:
+                    if part in [
+                        "en",
+                        "de",
+                        "cs",
+                        "fr",
+                        "es",
+                        "zh",
+                        "ja",
+                        "ru",
+                        "net",
+                        "java",
+                        "cpp",
+                        "python",
+                    ]:
                         continue
                     # This is likely the section
                     if len(part) > 3:
                         section = part.replace("-", " ").replace("_", " ").title()
-                        if not analysis["section"] and section not in ["Products", "Content", "Blog"]:
+                        if not analysis["section"] and section not in [
+                            "Products",
+                            "Content",
+                            "Blog",
+                        ]:
                             analysis["section"] = part
                             analysis["section_display"] = section
                             break
@@ -431,7 +458,7 @@ class CommitMessageGenerator:
 
         sorted_langs = sorted(target_langs)
         if not sorted_langs:
-            return prefix.rstrip(" to ")
+            return prefix.removesuffix(" to")
 
         # Try fitting all languages first
         all_langs_str = ", ".join(sorted_langs)
@@ -559,7 +586,7 @@ class CommitMessageGenerator:
             matched_count = 0
             passed_count = 0
             for fr in translation_result.file_results:
-                if hasattr(fr, 'outputs') and fr.outputs:
+                if hasattr(fr, "outputs") and fr.outputs:
                     for lang, output_path in fr.outputs.items():
                         if output_path in output_paths:
                             matched_count += 1
@@ -593,9 +620,9 @@ class CommitMessageGenerator:
         counts: dict[str, int] = {}
 
         # Tier 1: Use structured data from translation_result (most reliable)
-        if translation_result and hasattr(translation_result, 'file_results'):
+        if translation_result and hasattr(translation_result, "file_results"):
             for fr in translation_result.file_results:
-                if hasattr(fr, 'outputs') and fr.outputs:
+                if hasattr(fr, "outputs") and fr.outputs:
                     for lang, output_path in fr.outputs.items():
                         if output_path in output_set:
                             counts[lang] = counts.get(lang, 0) + 1
@@ -614,7 +641,7 @@ class CommitMessageGenerator:
 
         # Tier 3: Filename suffix matching (e.g., index.de.md)
         for f in output_files:
-            stem_parts = f.stem.split('.')
+            stem_parts = f.stem.split(".")
             for lang in target_langs:
                 if lang in stem_parts:
                     counts[lang] = counts.get(lang, 0) + 1
