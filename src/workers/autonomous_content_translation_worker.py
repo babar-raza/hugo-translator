@@ -38,6 +38,135 @@ from src.workers.worker_state import record_worker_state
 logger = logging.getLogger(__name__)
 
 
+def _emit_run_signal_safe(
+    site_id: str,
+    run_new_files: dict,
+    run_rejected: int,
+    run_attempted: int,
+    run_start: float,
+    config_service: "ConfigService",
+) -> None:
+    """Emit a run signal after a translation run (non-fatal).
+
+    Guarded by ``run_signal_emitter.enabled`` in global.yaml (default: false).
+    """
+    try:
+        cfg = config_service.get_config().get("run_signal_emitter", {})
+        if not cfg.get("enabled", False):
+            return
+
+        from src.observability.run_signal_emitter import (
+            build_signal_from_run_stats,
+            emit_run_signal,
+        )
+
+        accepted = sum(run_new_files.values())
+        stats = {
+            "files_processed": run_attempted or max(accepted + run_rejected, 1),
+            "files_accepted": accepted,
+            "files_rejected": run_rejected,
+            # Not yet surfaced from engine to worker; requires TranslationResult plumbing
+            "files_retried": 0,
+            "validators_run": 0,
+            "validators_passed": 0,
+            "validators_failed": 0,
+        }
+        signal = build_signal_from_run_stats(
+            site_id=site_id or "all",
+            stats=stats,
+        )
+        emit_run_signal(signal)
+    except Exception as e:
+        logger.debug("run_signal_emitter: skipped (%s)", e)
+
+
+def _continuation_start_safe(
+    run_id: str, site_id: str, target_langs: list[str], config_service: "ConfigService"
+) -> bool:
+    """Record continuation state start (non-fatal).
+
+    Returns True if continuation tracking is active.
+    """
+    try:
+        cfg = config_service.get_config().get("continuation_state", {})
+        if not cfg.get("enabled", False):
+            return False
+
+        from src.workers.continuation_state import start_run
+
+        start_run(run_id, site_id or "all", target_langs)
+        return True
+    except Exception as e:
+        logger.debug("continuation_state: start skipped (%s)", e)
+        return False
+
+
+def _continuation_complete_safe(
+    files_accepted: int, files_rejected: int, config_service: "ConfigService"
+) -> None:
+    """Record continuation state completion (non-fatal)."""
+    try:
+        cfg = config_service.get_config().get("continuation_state", {})
+        if not cfg.get("enabled", False):
+            return
+
+        from src.workers.continuation_state import complete_run
+
+        complete_run(
+            files_processed=files_accepted + files_rejected,
+            files_accepted=files_accepted,
+            files_rejected=files_rejected,
+        )
+    except Exception as e:
+        logger.debug("continuation_state: complete skipped (%s)", e)
+
+
+def _continuation_fail_safe(error: str, config_service: "ConfigService") -> None:
+    """Record continuation state failure (non-fatal)."""
+    try:
+        cfg = config_service.get_config().get("continuation_state", {})
+        if not cfg.get("enabled", False):
+            return
+
+        from src.workers.continuation_state import fail_run
+
+        fail_run(error=error)
+    except Exception as e:
+        logger.debug("continuation_state: fail skipped (%s)", e)
+
+
+def _model_selector_recommend_safe(
+    site_id: str, tgt_lang: str, config_service: "ConfigService"
+) -> str | None:
+    """Query the history-based model selector for a recommendation (non-fatal).
+
+    Returns the recommended model_id if one is found with sufficient confidence,
+    or None if disabled, insufficient history, or on error.
+    """
+    try:
+        cfg = config_service.get_config().get("model_selector", {})
+        if not cfg.get("enabled", False):
+            return None
+
+        from src.translation_engine.model_selector import select_model
+
+        rec = select_model(site_id, tgt_lang)
+        if rec.get("recommended_model") and not rec.get("fallback_used"):
+            confidence = rec.get("confidence", 0.0)
+            logger.info(
+                "model_selector: recommends %s for %s/%s (confidence=%.2f)",
+                rec["recommended_model"],
+                site_id,
+                tgt_lang,
+                confidence,
+            )
+            return rec["recommended_model"]
+        return None
+    except Exception as e:
+        logger.debug("model_selector: skipped (%s)", e)
+        return None
+
+
 class AutonomousWorkerConfig:
     """
     Configuration for autonomous content translation worker.
@@ -391,7 +520,7 @@ class AutonomousContentTranslationWorker:
             )
             site_id = self.config.site or "all"
 
-            global_cfg = self.config_service.load_global_config()
+            global_cfg = self.config_service.get_config()
             rh_cfg = global_cfg.get("run_history", {})
             if not rh_cfg.get("enabled", True):
                 return
@@ -592,6 +721,14 @@ class AutonomousContentTranslationWorker:
             self._record_state("preflight_failed", error="Preflight checks failed")
             return  # Graceful exit, not sys.exit(1)
 
+        _run_id = str(uuid.uuid4())
+        _cont_active = _continuation_start_safe(
+            _run_id,
+            self.config.site or "all",
+            [],
+            self.config_service,
+        )
+
         try:
             self._commit_orphaned_translations()
             self._execute_translation_run()
@@ -600,9 +737,29 @@ class AutonomousContentTranslationWorker:
             _run_total_new = sum(getattr(self, "_run_new_files", {}).values())
             logger.info(f"Oneshot run completed: {_run_total_new} new translations")
             self._record_state("run_completed", success=(_run_total_new > 0))
+
+            # TC-AGT-01: Emit run signal for reviewer consumption
+            _emit_run_signal_safe(
+                site_id=self.config.site,
+                run_new_files=getattr(self, "_run_new_files", {}),
+                run_rejected=getattr(self, "_run_rejected_files", 0),
+                run_attempted=getattr(self, "_run_attempted_files", 0),
+                run_start=getattr(self, "_run_start", time.time()),
+                config_service=self.config_service,
+            )
+            # TC-AGT-07: Record run completion in continuation state
+            if _cont_active:
+                _continuation_complete_safe(
+                    files_accepted=_run_total_new,
+                    files_rejected=getattr(self, "_run_rejected_files", 0),
+                    config_service=self.config_service,
+                )
         except Exception as e:
             logger.error(f"Oneshot run failed: {e}", exc_info=True)
             self._record_state("run_failed", error=str(e))
+            # TC-AGT-07: Record failure in continuation state
+            if _cont_active:
+                _continuation_fail_safe(str(e), self.config_service)
             sys.exit(1)
 
     def _run_daemon(self) -> None:
@@ -683,6 +840,15 @@ class AutonomousContentTranslationWorker:
                         sys.exit(1)
                     continue
 
+                # TC-AGT: Agentic hooks per daemon cycle (mirrors oneshot pattern)
+                _run_id = str(uuid.uuid4())
+                _cont_active = _continuation_start_safe(
+                    _run_id,
+                    self.config.site or "all",
+                    [],
+                    self.config_service,
+                )
+
                 try:
                     self._commit_orphaned_translations()
                     self._execute_translation_run()
@@ -697,6 +863,23 @@ class AutonomousContentTranslationWorker:
                     # but do not advance last_success_ts so health checks remain accurate.
                     self._record_state("run_completed", success=(_run_total_new > 0))
                     consecutive_failures = 0
+
+                    # TC-AGT-01: Emit run signal for reviewer consumption
+                    _emit_run_signal_safe(
+                        site_id=self.config.site,
+                        run_new_files=getattr(self, "_run_new_files", {}),
+                        run_rejected=getattr(self, "_run_rejected_files", 0),
+                        run_attempted=getattr(self, "_run_attempted_files", 0),
+                        run_start=getattr(self, "_run_start", time.time()),
+                        config_service=self.config_service,
+                    )
+                    # TC-AGT-07: Record run completion in continuation state
+                    if _cont_active:
+                        _continuation_complete_safe(
+                            files_accepted=_run_total_new,
+                            files_rejected=getattr(self, "_run_rejected_files", 0),
+                            config_service=self.config_service,
+                        )
                 except Exception as e:
                     consecutive_failures += 1
                     logger.error(
@@ -715,6 +898,9 @@ class AutonomousContentTranslationWorker:
                         },
                     )
                     self._record_state("run_failed", error=str(e))
+                    # TC-AGT-07: Record failure in continuation state
+                    if _cont_active:
+                        _continuation_fail_safe(str(e), self.config_service)
                     if consecutive_failures >= max_consecutive_failures:
                         logger.critical(
                             f"Aborting daemon: {max_consecutive_failures} consecutive failures"
@@ -1081,6 +1267,10 @@ class AutonomousContentTranslationWorker:
 
         logger.info(f"Translating content_root: {resolved_content_dir}")
         logger.info(f"Target languages: {', '.join(target_langs)}")
+
+        # TC-AGT-15: Advisory model recommendation from run history
+        for _tl in target_langs:
+            _model_selector_recommend_safe(site_id, _tl, self.config_service)
 
         # Agent Metrics: start per-content-root LLM context tracking
         _metrics_ctx = None

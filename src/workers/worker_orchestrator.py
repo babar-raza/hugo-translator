@@ -26,6 +26,7 @@ from typing import Any
 
 try:
     from dotenv import load_dotenv as _load_dotenv
+
     _HAVE_DOTENV = True
 except ImportError:
     _HAVE_DOTENV = False
@@ -56,6 +57,7 @@ _EVENT_LOG = Path("data/logs/worker_events.jsonl")
 # State persistence
 # ---------------------------------------------------------------------------
 
+
 def _load_state() -> dict[str, Any]:
     if _STATE_FILE.exists():
         try:
@@ -81,6 +83,7 @@ def _append_event(event: dict[str, Any]) -> None:
 # ---------------------------------------------------------------------------
 # Trigger evaluation
 # ---------------------------------------------------------------------------
+
 
 def evaluate_trigger(trigger: dict[str, Any], state: dict[str, Any]) -> bool:
     """Return True if the trigger condition is met.  Never raises."""
@@ -141,12 +144,14 @@ def _expand_env(s: str) -> str:
     if "${" not in s:
         return s
     import re
+
     return re.sub(r"\$\{(\w+)\}", lambda m: os.environ.get(m.group(1), m.group(0)), s)
 
 
 # ---------------------------------------------------------------------------
 # Launch logic
 # ---------------------------------------------------------------------------
+
 
 def should_launch(
     name: str,
@@ -176,17 +181,25 @@ def should_launch(
             try:
                 stale_pid = pid_file.read_text(encoding="utf-8").strip()
                 pid_file.unlink(missing_ok=True)
-                logger.info("Worker %s: removed stale PID file %s (dead PID %s)", name, pid_file, stale_pid)
+                logger.info(
+                    "Worker %s: removed stale PID file %s (dead PID %s)", name, pid_file, stale_pid
+                )
             except OSError as exc:
-                logger.warning("Worker %s: could not remove stale PID file %s: %s", name, pid_file, exc)
+                logger.warning(
+                    "Worker %s: could not remove stale PID file %s: %s", name, pid_file, exc
+                )
             # Update state file so it no longer shows "starting" after a crash
             try:
                 from src.workers.worker_state import load_worker_state, record_worker_state
+
                 ws = load_worker_state(name)
                 if ws.get("state") not in ("stopped", ""):
-                    record_worker_state(name, "stopped",
-                                       error="process found dead on orchestrator startup check")
-                    logger.info("Worker %s: state file updated to stopped (dead process cleanup)", name)
+                    record_worker_state(
+                        name, "stopped", error="process found dead on orchestrator startup check"
+                    )
+                    logger.info(
+                        "Worker %s: state file updated to stopped (dead process cleanup)", name
+                    )
             except Exception as _exc:
                 logger.debug("Worker %s: could not update state file: %s", name, _exc)
 
@@ -240,12 +253,14 @@ def launch_worker(
 
     if dry_run:
         logger.info("[DRY-RUN] Would launch %s: %s", name, cmd)
-        _append_event({
-            "ts": datetime.now(timezone.utc).isoformat(),
-            "event": "dry_run_launch",
-            "worker": name,
-            "command": cmd,
-        })
+        _append_event(
+            {
+                "ts": datetime.now(timezone.utc).isoformat(),
+                "event": "dry_run_launch",
+                "worker": name,
+                "command": cmd,
+            }
+        )
         return True
 
     logger.info("Launching %s: %s", name, cmd)
@@ -265,28 +280,79 @@ def launch_worker(
         hour_ago = now - 3600
         state["launch_history"] = [t for t in state["launch_history"] if t > hour_ago]
 
-        _append_event({
-            "ts": datetime.now(timezone.utc).isoformat(),
-            "event": "worker_launched",
-            "worker": name,
-            "pid": proc.pid,
-            "command": cmd,
-        })
+        _append_event(
+            {
+                "ts": datetime.now(timezone.utc).isoformat(),
+                "event": "worker_launched",
+                "worker": name,
+                "pid": proc.pid,
+                "command": cmd,
+            }
+        )
         return True
     except Exception as exc:
         logger.error("Failed to launch %s: %s", name, exc)
-        _append_event({
-            "ts": datetime.now(timezone.utc).isoformat(),
-            "event": "launch_failed",
-            "worker": name,
-            "error": str(exc),
-        })
+        _append_event(
+            {
+                "ts": datetime.now(timezone.utc).isoformat(),
+                "event": "launch_failed",
+                "worker": name,
+                "error": str(exc),
+            }
+        )
         return False
 
 
 # ---------------------------------------------------------------------------
 # Main loop
 # ---------------------------------------------------------------------------
+
+
+def _supervisor_preflight(dry_run: bool = False) -> bool:
+    """Run supervisor pre-flight check if enabled.
+
+    Returns True if the cycle should proceed, False if circuit-broken/blocked.
+    """
+    try:
+        from src.utils.config_loader import ConfigService
+
+        cfg = ConfigService().get_config().get("supervisor_loop", {})
+        if not cfg.get("enabled", False):
+            return True
+
+        from src.workers.supervisor_loop import run_cycle
+
+        result = run_cycle(dry_run=dry_run)
+        decision = result.get("decision", {}).get("decision", "proceed")
+        reason = result.get("decision", {}).get("reason", "")
+
+        if decision == "circuit_break":
+            logger.warning("Supervisor pre-flight: CIRCUIT_BREAK — %s", reason)
+            _append_event(
+                {
+                    "ts": datetime.now(timezone.utc).isoformat(),
+                    "event": "supervisor_circuit_break",
+                    "reason": reason,
+                }
+            )
+            return False
+        if decision == "block":
+            logger.warning("Supervisor pre-flight: BLOCKED — %s", reason)
+            _append_event(
+                {
+                    "ts": datetime.now(timezone.utc).isoformat(),
+                    "event": "supervisor_blocked",
+                    "reason": reason,
+                }
+            )
+            return False
+
+        logger.info("Supervisor pre-flight: %s — %s", decision, reason)
+        return True
+    except Exception as exc:
+        logger.debug("Supervisor pre-flight skipped: %s", exc)
+        return True  # fail-open: if supervisor module errors, don't block workers
+
 
 def run_check_cycle(
     registry: dict[str, Any],
@@ -297,6 +363,17 @@ def run_check_cycle(
 
     Returns list of worker names that were launched (or would be in dry-run).
     """
+    # Supervisor pre-flight: skip cycle if circuit-broken or blocked
+    if not _supervisor_preflight(dry_run=dry_run):
+        logger.info("Cycle skipped by supervisor pre-flight decision")
+        _append_event(
+            {
+                "ts": datetime.now(timezone.utc).isoformat(),
+                "event": "cycle_skipped_by_supervisor",
+            }
+        )
+        return []
+
     workers = registry.get("workers", {})
     launched: list[str] = []
 
@@ -312,10 +389,12 @@ def run_check_cycle(
 
     if not launched:
         logger.info("No workers launched this cycle")
-        _append_event({
-            "ts": datetime.now(timezone.utc).isoformat(),
-            "event": "no_work_available",
-        })
+        _append_event(
+            {
+                "ts": datetime.now(timezone.utc).isoformat(),
+                "event": "no_work_available",
+            }
+        )
 
     # Mark completed workers for next cycle's worker_completed triggers
     state["recently_launched_workers"] = launched
@@ -392,7 +471,11 @@ def print_status(
 
     # Queue depths
     queues: dict[str, int] = {}
-    for qpath in ["data/retranslate_queue.jsonl", "data/quarantine.jsonl", "data/tm/improvement_queue.jsonl"]:
+    for qpath in [
+        "data/retranslate_queue.jsonl",
+        "data/quarantine.jsonl",
+        "data/tm/improvement_queue.jsonl",
+    ]:
         p = Path(qpath)
         if p.exists():
             try:
@@ -421,37 +504,52 @@ def print_status(
             enabled = "enabled" if w.get("enabled") else "DISABLED"
             trigger = "ACTIVE" if w.get("trigger_active") else "inactive"
             campaign = " [CAMPAIGN]" if w.get("campaign_sentinel") else ""
-            cooldown = f" cooldown={w['cooldown_remaining_s']}s" if w.get("cooldown_remaining_s", 0) > 0 else ""
+            cooldown = (
+                f" cooldown={w['cooldown_remaining_s']}s"
+                if w.get("cooldown_remaining_s", 0) > 0
+                else ""
+            )
             state_str = w.get("state", "unknown")
-            print(f"  {name}: {alive} ({pid_str}) {enabled} trigger={trigger}{campaign}{cooldown} state={state_str}")
+            print(
+                f"  {name}: {alive} ({pid_str}) {enabled} trigger={trigger}{campaign}{cooldown} state={state_str}"
+            )
         print()
         for qpath, depth in report.get("queues", {}).items():
             print(f"  Queue {qpath}: {depth} entries")
         cb = report["circuit_breaker"]
-        print(f"\n  Circuit breaker: {cb['launches_last_hour']}/{cb['max_per_hour']} launches/hour"
-              f" ({'OPEN' if cb['open'] else 'closed'})")
+        print(
+            f"\n  Circuit breaker: {cb['launches_last_hour']}/{cb['max_per_hour']} launches/hour"
+            f" ({'OPEN' if cb['open'] else 'closed'})"
+        )
 
     return report
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Worker orchestrator")
-    parser.add_argument("--config", default="config/workers.yaml",
-                        help="Path to worker registry YAML")
-    parser.add_argument("--check-interval", type=int, default=900,
-                        help="Seconds between check cycles (default: 900)")
-    parser.add_argument("--once", action="store_true",
-                        help="Run one check cycle and exit")
-    parser.add_argument("--status", action="store_true",
-                        help="Print worker status and exit")
-    parser.add_argument("--json", action="store_true",
-                        help="Output status as JSON (use with --status)")
-    parser.add_argument("--dry-run", action="store_true",
-                        help="Evaluate triggers but do not launch workers")
-    parser.add_argument("--log-level", default="INFO",
-                        choices=["DEBUG", "INFO", "WARNING", "ERROR"])
-    parser.add_argument("--log-file", default=None,
-                        help="Append log output to this file in addition to stderr")
+    parser.add_argument(
+        "--config", default="config/workers.yaml", help="Path to worker registry YAML"
+    )
+    parser.add_argument(
+        "--check-interval",
+        type=int,
+        default=900,
+        help="Seconds between check cycles (default: 900)",
+    )
+    parser.add_argument("--once", action="store_true", help="Run one check cycle and exit")
+    parser.add_argument("--status", action="store_true", help="Print worker status and exit")
+    parser.add_argument(
+        "--json", action="store_true", help="Output status as JSON (use with --status)"
+    )
+    parser.add_argument(
+        "--dry-run", action="store_true", help="Evaluate triggers but do not launch workers"
+    )
+    parser.add_argument(
+        "--log-level", default="INFO", choices=["DEBUG", "INFO", "WARNING", "ERROR"]
+    )
+    parser.add_argument(
+        "--log-file", default=None, help="Append log output to this file in addition to stderr"
+    )
     args = parser.parse_args()
 
     handlers: list[logging.Handler] = [logging.StreamHandler()]
@@ -503,8 +601,9 @@ def main() -> None:
         sys.exit(0)
 
     # Daemon loop
-    logger.info("Orchestrator starting (check-interval=%ds, dry-run=%s)",
-                args.check_interval, args.dry_run)
+    logger.info(
+        "Orchestrator starting (check-interval=%ds, dry-run=%s)", args.check_interval, args.dry_run
+    )
     while True:
         try:
             launched = run_check_cycle(registry, state, dry_run=args.dry_run)
@@ -516,14 +615,14 @@ def main() -> None:
             _save_state(state)
             sys.exit(0)
         except Exception as exc:
-            logger.error(
-                "Unhandled error in check cycle — retrying in 60s: %s", exc, exc_info=True
+            logger.error("Unhandled error in check cycle — retrying in 60s: %s", exc, exc_info=True)
+            _append_event(
+                {
+                    "ts": datetime.now(timezone.utc).isoformat(),
+                    "event": "cycle_error",
+                    "error": str(exc),
+                }
             )
-            _append_event({
-                "ts": datetime.now(timezone.utc).isoformat(),
-                "event": "cycle_error",
-                "error": str(exc),
-            })
             time.sleep(60)
         time.sleep(args.check_interval)
 
