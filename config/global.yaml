@@ -770,6 +770,7 @@ agent_metrics:
     - "nested-list-test"
     - "realworld"
     - "example"
+    - "tm_improvement"  # TC-ENABLE-02: suppress TM posting until TC-METRICS-15 fixes scope
 
   # Website: source domain passes through as-is (no cross-TLD normalization)
   metrics_website_mapping: {}
@@ -961,3 +962,19 @@ adaptive_thresholds:
   enabled: false
   min_history_runs: 5
   max_delta: 1
+
+# Post-Sprint Autonomy Loop — Sprint governance loop controller and quality scorer.
+# Disabled by default. Enable only for active sprint governance sessions.
+# Rubric: config/sprint_quality_rubric.yaml
+# Scripts: scripts/ops/sprint_loop_controller.py, scripts/ops/sprint_quality_scorer.py
+# Prompts: docs/governance/prompts/
+sprint_loop:
+  enabled: false
+  dry_run: true
+  run_dir: "data/sprint-loop"
+  quality:
+    overall_minimum: 4.0
+    dimension_minimum: 3.0
+  evidence:
+    root: ".local/evidences"
+    require_bundle: true

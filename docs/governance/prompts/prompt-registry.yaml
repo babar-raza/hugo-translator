@@ -1,0 +1,142 @@
+# Post-Sprint Autonomy Loop — Prompt Registry
+# All prompt assets for the 3-stage sprint loop + controller.
+# Location: docs/governance/prompts/
+
+version: "1.0"
+registry_path: docs/governance/prompts/prompt-registry.yaml
+
+prompts:
+  - id: PROMPT_1
+    name: "Post-Sprint Strict Evidence Audit"
+    path: docs/governance/prompts/prompt1-post-sprint-audit.md
+    stage: 1
+    mode: audit
+    description: >
+      Strict evidence-based sprint audit. Produces L1/L2/L3 issues,
+      claim classification matrix, evidence quality verdict, and
+      next-stage recommendation.
+    input_contract:
+      - Sprint evidence (evidence-declaration.yaml, artifacts, logs)
+      - Current repository state
+    output_contract:
+      schema: schemas/stage1-issue-model.schema.json
+      required_files:
+        - stage1-audit/issues.json
+        - stage1-audit/audit-summary.md
+        - stage1-audit/next-stage-recommendation.yaml
+    successor_stages:
+      - PROMPT_2
+      - PROMPT_1  # rerun if evidence insufficient
+      - BLOCKED_EXTERNAL
+    validation_rules:
+      - Every issue must have root_cause
+      - Every claim must have proof_level
+      - evidence_quality_verdict required
+
+  - id: PROMPT_2
+    name: "Plan Hardening from Sprint Audit"
+    path: docs/governance/prompts/prompt2-plan-hardening.md
+    stage: 2
+    mode: plan
+    description: >
+      Reads Stage 1 audit output, extracts gaps, and produces
+      taskcard-driven, gate-managed execution plan with verification
+      matrix and anti-overclaim rules.
+    input_contract:
+      - Stage 1 outputs (issues.json, audit-summary.md)
+      - Active master plan (if available)
+      - Current repository state
+    output_contract:
+      schema: schemas/stage2-taskcard-contract.schema.json
+      required_files:
+        - stage2-plan/taskcards.jsonl
+        - stage2-plan/verification-matrix.json
+        - stage2-plan/plan-delta.md
+        - stage2-plan/ready-for-execution-verdict.yaml
+    successor_stages:
+      - PROMPT_3
+      - BLOCKED_EXTERNAL
+    validation_rules:
+      - Every actionable issue must map to a taskcard
+      - No prose-only recommendations
+      - plan_verdict required
+
+  - id: PROMPT_3
+    name: "Controlled Taskcard Execution"
+    path: docs/governance/prompts/prompt3-controlled-execution.md
+    stage: 3
+    mode: execution
+    description: >
+      Executes approved plan with taskcard-driven, gate-managed,
+      multi-lane execution. Includes quality scoring, reroute,
+      evidence packaging, and Prompt 1-style self-review.
+    input_contract:
+      - Stage 2 outputs (taskcards.jsonl, verification-matrix.json)
+      - Current repository state
+    output_contract:
+      schema: schemas/stage3-quality-score.schema.json
+      required_files:
+        - stage3-execution/quality-scores.json
+        - stage3-execution/taskcard-status.yaml
+        - stage3-execution/final-sprint-summary.yaml
+        - stage3-execution/self-review-issues.json
+    successor_stages:
+      - TERMINATED  # if all green
+      - PROMPT_2    # if rework needed
+      - PROMPT_1    # if summary missing
+    validation_rules:
+      - Every executed taskcard must be scored
+      - summary_type must be STRUCTURED
+      - evidence_bundle_path must not be null
+      - No below-4 scores accepted without reroute
+
+  - id: LOOP_CONTROLLER
+    name: "Post-Sprint Loop Controller"
+    path: docs/governance/prompts/prompt-loop-controller.md
+    stage: null  # meta-stage
+    mode: advisory
+    description: >
+      Agent-facing instructions for reading the loop controller's
+      directives and routing between stages automatically.
+    input_contract:
+      - loop-state.json
+      - next-directive.json
+      - Stage outputs from any completed stage
+    output_contract: null  # controller output is next-directive.json
+    successor_stages: []
+    validation_rules: []
+
+  - id: PROJECT_ADAPTER
+    name: "Project Adapter Template"
+    path: docs/governance/prompts/project-adapter-template.md
+    stage: null
+    mode: template
+    description: >
+      Template for adapting the autonomy loop to other projects.
+      Defines configurable paths, commands, and gates.
+    input_contract: []
+    output_contract: null
+    successor_stages: []
+    validation_rules: []
+
+schemas:
+  - id: STAGE1_ISSUES
+    path: schemas/stage1-issue-model.schema.json
+    stage: 1
+  - id: STAGE2_TASKCARDS
+    path: schemas/stage2-taskcard-contract.schema.json
+    stage: 2
+  - id: STAGE3_SCORES
+    path: schemas/stage3-quality-score.schema.json
+    stage: 3
+  - id: LOOP_STATE
+    path: schemas/loop-decision-state.schema.json
+    stage: null
+
+scripts:
+  - id: LOOP_CONTROLLER_SCRIPT
+    path: scripts/ops/sprint_loop_controller.py
+    description: "Python loop controller — parses outputs, classifies summaries, decides next stage"
+  - id: QUALITY_SCORER_SCRIPT
+    path: scripts/ops/sprint_quality_scorer.py
+    description: "Quality scorer — evaluates taskcards against sprint rubric, triggers reroute"

@@ -1,0 +1,167 @@
+{
+  "description": "Schema for Stage 2 (plan hardening) taskcard output.\n\nEach taskcard represents one actionable unit of work generated\nfrom Stage 1 audit issues. Extends the task_queue.py entry format\nwith sprint-governance fields.",
+  "type": "object",
+  "required": ["taskcards", "plan_verdict"],
+  "properties": {
+    "run_id": {
+      "type": "string",
+      "description": "Unique identifier for the plan-hardening run"
+    },
+    "source_audit_run_id": {
+      "type": "string",
+      "description": "run_id of the Stage 1 audit that produced the source issues"
+    },
+    "taskcards": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["taskcard_id", "title", "source_issue_id", "current_status", "required_verification", "acceptance_criteria"],
+        "properties": {
+          "taskcard_id": {
+            "type": "string",
+            "description": "Unique taskcard ID (e.g. TC-LOOP-01)"
+          },
+          "title": {"type": "string"},
+          "source_issue_id": {
+            "type": "string",
+            "description": "Stage 1 issue_id this taskcard addresses"
+          },
+          "source_issue_level": {
+            "type": "string",
+            "enum": ["L1_EXECUTION", "L2_INTEGRATION", "L3_SYSTEM"]
+          },
+          "source_audit_finding": {
+            "type": "string",
+            "description": "Summary of the audit finding"
+          },
+          "why_it_matters": {"type": "string"},
+          "risk_addressed": {"type": "string"},
+          "current_status": {
+            "type": "string",
+            "enum": [
+              "PROPOSED", "READY", "BLOCKED", "IN_PROGRESS",
+              "IMPLEMENTED", "VERIFIED", "SCORED", "REROUTED",
+              "REWORKING", "REWORKED", "ACCEPTED",
+              "ACCEPTED_WITH_LIMITATIONS", "BLOCKED_EXTERNAL",
+              "DEFERRED_WITH_REASON"
+            ]
+          },
+          "lane": {
+            "type": "string",
+            "description": "Execution lane (A-M)"
+          },
+          "priority": {
+            "type": "string",
+            "enum": ["P0", "P1", "P2", "P3"]
+          },
+          "lane_owner": {"type": "string"},
+          "supervisor_role": {"type": "string"},
+          "required_implementation": {"type": "string"},
+          "required_verification": {
+            "type": "array",
+            "items": {"type": "string"},
+            "description": "Verification commands or steps"
+          },
+          "required_evidence": {
+            "type": "array",
+            "items": {"type": "string"},
+            "description": "Evidence artifacts that must be produced"
+          },
+          "quality_dimensions": {
+            "type": "array",
+            "items": {"type": "string"},
+            "description": "Quality dimensions this taskcard is scored on"
+          },
+          "scoring_rubric_ref": {
+            "type": "string",
+            "description": "Path to the quality scoring rubric"
+          },
+          "reroute_rule": {
+            "type": "string",
+            "default": "reroute if any required dimension < 4/5"
+          },
+          "acceptance_criteria": {
+            "type": "array",
+            "items": {"type": "string"}
+          },
+          "stop_conditions": {
+            "type": "array",
+            "items": {"type": "string"}
+          },
+          "allowed_paths": {
+            "type": "array",
+            "items": {"type": "string"}
+          },
+          "forbidden_paths": {
+            "type": "array",
+            "items": {"type": "string"}
+          },
+          "dependencies": {
+            "type": "array",
+            "items": {"type": "string"},
+            "description": "taskcard_ids this depends on"
+          },
+          "machine_state": {
+            "type": "object",
+            "description": "Machine-readable state for the taskcard state machine",
+            "properties": {
+              "last_transition": {"type": "string"},
+              "last_transition_at": {"type": "string"},
+              "reroute_count": {"type": "integer", "default": 0},
+              "evidence_paths": {
+                "type": "array",
+                "items": {"type": "string"}
+              }
+            }
+          }
+        }
+      }
+    },
+    "verification_matrix": {
+      "type": "array",
+      "description": "Cross-reference of taskcards to verification methods",
+      "items": {
+        "type": "object",
+        "properties": {
+          "taskcard_id": {"type": "string"},
+          "verification_type": {
+            "type": "string",
+            "enum": ["unit_test", "integration_test", "manual_inspection", "cli_run", "evidence_review", "gate_check"]
+          },
+          "command": {"type": "string"},
+          "expected_result": {"type": "string"}
+        }
+      }
+    },
+    "execution_dag": {
+      "type": "array",
+      "description": "Dependency graph as adjacency list",
+      "items": {
+        "type": "object",
+        "properties": {
+          "taskcard_id": {"type": "string"},
+          "depends_on": {
+            "type": "array",
+            "items": {"type": "string"}
+          }
+        }
+      }
+    },
+    "anti_overclaim_rules": {
+      "type": "array",
+      "items": {"type": "string"},
+      "description": "Rules the execution agent must follow to prevent overclaiming"
+    },
+    "plan_verdict": {
+      "type": "string",
+      "enum": [
+        "PLAN_HARDENED_FROM_AUDIT_READY_FOR_EXECUTION",
+        "PLAN_HARDENED_FROM_AUDIT_WITH_PARTIAL_CONTEXT",
+        "PLAN_NOT_READY_AUDIT_PLAN_MISMATCH",
+        "PLAN_NOT_READY_MISSING_ACTIVE_PLAN",
+        "PLAN_NOT_READY_MISSING_AUDIT_SUMMARY",
+        "BLOCKED_EXTERNAL"
+      ]
+    }
+  }
+}

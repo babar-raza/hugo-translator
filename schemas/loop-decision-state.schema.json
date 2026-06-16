@@ -1,0 +1,142 @@
+{
+  "description": "Schema for the post-sprint loop controller state machine.\n\nTracks which stage the loop is in, what decisions have been made,\nand what the next directive is. The controller reads stage outputs,\nclassifies summaries, and transitions between states automatically.",
+  "type": "object",
+  "required": ["run_id", "current_state"],
+  "properties": {
+    "run_id": {
+      "type": "string",
+      "description": "Unique loop run identifier"
+    },
+    "sprint_id": {
+      "type": "string",
+      "description": "Sprint being processed"
+    },
+    "current_state": {
+      "type": "string",
+      "enum": [
+        "IDLE",
+        "STAGE1_PENDING",
+        "STAGE1_COMPLETE",
+        "STAGE2_PENDING",
+        "STAGE2_COMPLETE",
+        "STAGE3_PENDING",
+        "STAGE3_COMPLETE",
+        "REWORK_PENDING",
+        "ADVERSARIAL_REVIEW",
+        "TERMINATED"
+      ]
+    },
+    "cycle_count": {
+      "type": "integer",
+      "default": 0,
+      "description": "Number of full P1-P2-P3 cycles completed"
+    },
+    "transitions": {
+      "type": "array",
+      "description": "History of state transitions",
+      "items": {
+        "type": "object",
+        "required": ["from_state", "to_state", "reason", "timestamp"],
+        "properties": {
+          "from_state": {"type": "string"},
+          "to_state": {"type": "string"},
+          "reason": {"type": "string"},
+          "timestamp": {"type": "string"},
+          "trigger": {
+            "type": "string",
+            "description": "What triggered this transition"
+          }
+        }
+      }
+    },
+    "summary_classification": {
+      "type": ["string", "null"],
+      "enum": [
+        "STRUCTURED_ALL_GREEN",
+        "STRUCTURED_NOT_GREEN",
+        "PROSE_ONLY",
+        "MISSING",
+        "CONTRADICTORY",
+        "EVIDENCE_MISSING",
+        "SCORES_MISSING",
+        "TASKCARDS_INCOMPLETE",
+        "BLOCKED_EXTERNAL",
+        null
+      ],
+      "default": null
+    },
+    "next_directive": {
+      "type": ["object", "null"],
+      "description": "Instruction for the agent on what to do next",
+      "properties": {
+        "action": {
+          "type": "string",
+          "enum": [
+            "RUN_PROMPT_1",
+            "RUN_PROMPT_2",
+            "RUN_PROMPT_3",
+            "RUN_ADVERSARIAL_REVIEW",
+            "RUN_EVIDENCE_REPAIR",
+            "RUN_QUALITY_SCORING",
+            "ACCEPT",
+            "BLOCK"
+          ]
+        },
+        "prompt_asset_path": {
+          "type": "string",
+          "description": "Path to the prompt markdown file to use"
+        },
+        "input_dir": {
+          "type": "string",
+          "description": "Directory containing inputs for the stage"
+        },
+        "output_dir": {
+          "type": "string",
+          "description": "Directory where the agent should write outputs"
+        },
+        "open_issues": {
+          "type": "array",
+          "items": {"type": "string"},
+          "description": "Issue IDs to feed into the next stage"
+        },
+        "reason": {"type": "string"}
+      }
+    },
+    "invalid_final_states": {
+      "type": "array",
+      "description": "States that are never valid as terminal states",
+      "items": {"type": "string"},
+      "default": [
+        "NEXT_PROMPT_NEEDED",
+        "HUMAN_REVIEW_NEEDED_BEFORE_AGENT_REVIEW",
+        "PROSE_ONLY_ACCEPTED",
+        "SUMMARY_MISSING_ACCEPTED",
+        "SCORE_BELOW_4_ACCEPTED",
+        "EVIDENCE_PACKAGE_MISSING_ACCEPTED",
+        "PLAN_UPDATED_NOT_EXECUTED",
+        "EXECUTED_NOT_EVALUATED",
+        "PROMPT_ASSETS_DISCONNECTED",
+        "TASKCARDS_MISSING_ACCEPTED"
+      ]
+    }
+  },
+  "valid_transitions": {
+    "description": "Allowed state transitions (informational, enforced in code)",
+    "transitions": [
+      {"from": "IDLE", "to": "STAGE1_PENDING"},
+      {"from": "STAGE1_PENDING", "to": "STAGE1_COMPLETE"},
+      {"from": "STAGE1_COMPLETE", "to": "STAGE2_PENDING"},
+      {"from": "STAGE2_PENDING", "to": "STAGE2_COMPLETE"},
+      {"from": "STAGE2_COMPLETE", "to": "STAGE3_PENDING"},
+      {"from": "STAGE3_PENDING", "to": "STAGE3_COMPLETE"},
+      {"from": "STAGE3_COMPLETE", "to": "REWORK_PENDING"},
+      {"from": "STAGE3_COMPLETE", "to": "ADVERSARIAL_REVIEW"},
+      {"from": "STAGE3_COMPLETE", "to": "TERMINATED"},
+      {"from": "REWORK_PENDING", "to": "STAGE1_PENDING"},
+      {"from": "REWORK_PENDING", "to": "STAGE2_PENDING"},
+      {"from": "REWORK_PENDING", "to": "STAGE3_PENDING"},
+      {"from": "ADVERSARIAL_REVIEW", "to": "TERMINATED"},
+      {"from": "ADVERSARIAL_REVIEW", "to": "REWORK_PENDING"}
+    ]
+  }
+}

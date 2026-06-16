@@ -1,0 +1,414 @@
+"""Unit tests for scripts/ops/sprint_loop_controller.py.
+
+Tests state machine transitions, summary classification, directive
+emission, and negative controls (fail-closed behavior).
+"""
+
+from __future__ import annotations
+
+import json
+from pathlib import Path
+
+import pytest
+
+# Import the controller module
+import sys
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
+from scripts.ops.sprint_loop_controller import (
+    InvalidTransitionError,
+    classify_summary,
+    decide_next_stage,
+    emit_directive,
+    load_loop_state,
+    parse_stage1_output,
+    parse_stage3_output,
+    run_cycle,
+    save_loop_state,
+    transition,
+    validate_no_invalid_final_state,
+)
+
+
+# ---------------------------------------------------------------------------
+# Fixtures
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture()
+def run_dir(tmp_path: Path) -> Path:
+    """Create a temporary run directory."""
+    d = tmp_path / "test-run"
+    d.mkdir()
+    return d
+
+
+def _write_stage3_summary(run_dir: Path, **overrides) -> None:
+    """Write a stage3 final-sprint-summary.yaml with given fields."""
+    stage_dir = run_dir / "stage3-execution"
+    stage_dir.mkdir(parents=True, exist_ok=True)
+    defaults = {
+        "verdict": "EXECUTION_COMPLETE_VERIFIED",
+        "summary_type": "STRUCTURED",
+        "all_green": "true",
+        "accepted_count": "3",
+        "rerouted_count": "0",
+        "blocked_count": "0",
+        "evidence_bundle_path": "/tmp/evidence",
+        "open_issues": "",
+    }
+    defaults.update(overrides)
+    lines = [f"{k}: {v}" for k, v in defaults.items()]
+    (stage_dir / "final-sprint-summary.yaml").write_text("\n".join(lines), encoding="utf-8")
+
+
+def _write_stage3_scores(run_dir: Path, evaluations: list) -> None:
+    """Write quality-scores.json."""
+    stage_dir = run_dir / "stage3-execution"
+    stage_dir.mkdir(parents=True, exist_ok=True)
+    (stage_dir / "quality-scores.json").write_text(
+        json.dumps({"evaluations": evaluations, "reroute_log": []}),
+        encoding="utf-8",
+    )
+
+
+def _write_stage1_issues(run_dir: Path, issues: list) -> None:
+    """Write stage1-audit/issues.json."""
+    stage_dir = run_dir / "stage1-audit"
+    stage_dir.mkdir(parents=True, exist_ok=True)
+    (stage_dir / "issues.json").write_text(
+        json.dumps(
+            {
+                "issues": issues,
+                "claim_classifications": [],
+                "evidence_quality_verdict": "STRONG",
+                "next_stage_recommendation": {"next_stage": "PROMPT_2", "reason": "test"},
+            }
+        ),
+        encoding="utf-8",
+    )
+
+
+# ---------------------------------------------------------------------------
+# State management tests
+# ---------------------------------------------------------------------------
+
+
+class TestStateManagement:
+    def test_load_creates_idle_state(self, run_dir: Path) -> None:
+        state = load_loop_state(run_dir)
+        assert state["current_state"] == "IDLE"
+        assert state["cycle_count"] == 0
+
+    def test_save_and_reload(self, run_dir: Path) -> None:
+        state = load_loop_state(run_dir)
+        state["current_state"] = "STAGE1_PENDING"
+        save_loop_state(state, run_dir)
+        reloaded = load_loop_state(run_dir)
+        assert reloaded["current_state"] == "STAGE1_PENDING"
+
+    def test_transition_valid(self, run_dir: Path) -> None:
+        state = load_loop_state(run_dir)
+        transition(state, "STAGE1_PENDING", "test")
+        assert state["current_state"] == "STAGE1_PENDING"
+        assert len(state["transitions"]) == 1
+
+    def test_transition_invalid_rejected(self, run_dir: Path) -> None:
+        state = load_loop_state(run_dir)
+        with pytest.raises(InvalidTransitionError):
+            transition(state, "STAGE3_COMPLETE", "skip ahead")
+
+    def test_transition_skip_verified_rejected(self, run_dir: Path) -> None:
+        """NC-8: State transition that skips VERIFIED is rejected."""
+        state = load_loop_state(run_dir)
+        transition(state, "STAGE1_PENDING", "start")
+        # Cannot jump from STAGE1_PENDING to STAGE3_COMPLETE
+        with pytest.raises(InvalidTransitionError):
+            transition(state, "STAGE3_COMPLETE", "skip")
+
+
+# ---------------------------------------------------------------------------
+# Summary classification tests
+# ---------------------------------------------------------------------------
+
+
+class TestSummaryClassification:
+    def test_missing_summary(self) -> None:
+        """NC-2: Missing summary -> MISSING."""
+        assert classify_summary(None) == "MISSING"
+
+    def test_missing_summary_type(self) -> None:
+        assert classify_summary({"summary_type": "MISSING"}) == "MISSING"
+
+    def test_prose_only(self) -> None:
+        """NC-1: Prose-only summary -> PROSE_ONLY."""
+        assert classify_summary({"summary_type": "PROSE_ONLY"}) == "PROSE_ONLY"
+
+    def test_structured_all_green(self) -> None:
+        output = {
+            "summary_type": "STRUCTURED",
+            "verdict": "EXECUTION_COMPLETE_VERIFIED",
+            "all_green": True,
+            "evidence_bundle_path": "/tmp/evidence",
+            "evaluations": [{"verdict": "ACCEPTED"}],
+            "reroute_log": [],
+            "open_issues": [],
+            "accepted_count": 1,
+            "rerouted_count": 0,
+            "blocked_count": 0,
+        }
+        assert classify_summary(output) == "STRUCTURED_ALL_GREEN"
+
+    def test_structured_not_green_with_rerouted(self) -> None:
+        output = {
+            "summary_type": "STRUCTURED",
+            "verdict": "EXECUTION_REROUTED_REWORK_REQUIRED",
+            "all_green": False,
+            "evidence_bundle_path": "/tmp/evidence",
+            "evaluations": [{"verdict": "REROUTED"}],
+            "reroute_log": [],
+            "accepted_count": 0,
+            "rerouted_count": 1,
+            "blocked_count": 0,
+        }
+        assert classify_summary(output) == "STRUCTURED_NOT_GREEN"
+
+    def test_contradictory_all_green_but_reroute_log(self) -> None:
+        """NC-3/NC-7: All-green claim but reroute log non-empty -> CONTRADICTORY."""
+        output = {
+            "summary_type": "STRUCTURED",
+            "verdict": "EXECUTION_COMPLETE_VERIFIED",
+            "all_green": True,
+            "evidence_bundle_path": "/tmp/evidence",
+            "evaluations": [{"verdict": "ACCEPTED"}],
+            "reroute_log": [{"taskcard_id": "TC-01", "reason": "test"}],
+            "accepted_count": 1,
+            "rerouted_count": 0,
+            "blocked_count": 0,
+        }
+        assert classify_summary(output) == "CONTRADICTORY"
+
+    def test_contradictory_all_green_but_open_issues(self) -> None:
+        output = {
+            "summary_type": "STRUCTURED",
+            "verdict": "EXECUTION_COMPLETE_VERIFIED",
+            "all_green": True,
+            "evidence_bundle_path": "/tmp/evidence",
+            "evaluations": [{"verdict": "ACCEPTED"}],
+            "reroute_log": [],
+            "open_issues": ["L1-001"],
+            "accepted_count": 1,
+            "rerouted_count": 0,
+            "blocked_count": 0,
+        }
+        assert classify_summary(output) == "CONTRADICTORY"
+
+    def test_evidence_missing(self) -> None:
+        """NC-5: Evidence bundle missing -> EVIDENCE_MISSING."""
+        output = {
+            "summary_type": "STRUCTURED",
+            "verdict": "EXECUTION_COMPLETE_VERIFIED",
+            "evidence_bundle_path": None,
+            "evaluations": [{"verdict": "ACCEPTED"}],
+            "accepted_count": 1,
+            "rerouted_count": 0,
+            "blocked_count": 0,
+        }
+        assert classify_summary(output) == "EVIDENCE_MISSING"
+
+    def test_scores_missing(self) -> None:
+        output = {
+            "summary_type": "STRUCTURED",
+            "verdict": "EXECUTION_COMPLETE_VERIFIED",
+            "evidence_bundle_path": "/tmp/evidence",
+            "evaluations": [],
+            "accepted_count": 1,
+            "rerouted_count": 0,
+            "blocked_count": 0,
+        }
+        assert classify_summary(output) == "SCORES_MISSING"
+
+    def test_blocked_external(self) -> None:
+        output = {
+            "summary_type": "STRUCTURED",
+            "verdict": "BLOCKED_EXTERNAL",
+        }
+        assert classify_summary(output) == "BLOCKED_EXTERNAL"
+
+    def test_taskcards_incomplete(self) -> None:
+        output = {
+            "summary_type": "STRUCTURED",
+            "verdict": "EXECUTION_COMPLETE_VERIFIED",
+            "evidence_bundle_path": "/tmp/evidence",
+            "evaluations": [{"verdict": "ACCEPTED"}],
+            "accepted_count": 0,
+            "rerouted_count": 0,
+            "blocked_count": 0,
+        }
+        assert classify_summary(output) == "TASKCARDS_INCOMPLETE"
+
+
+# ---------------------------------------------------------------------------
+# Decision logic tests
+# ---------------------------------------------------------------------------
+
+
+class TestDecisionLogic:
+    def test_missing_routes_to_prompt1(self, run_dir: Path) -> None:
+        """NC-2: Missing summary -> P1+P2+P3."""
+        state = {
+            "current_state": "STAGE3_COMPLETE",
+            "transitions": [],
+            "cycle_count": 0,
+            "summary_classification": None,
+            "next_directive": None,
+        }
+        directive = decide_next_stage(state, "MISSING", run_dir)
+        assert directive["action"] == "RUN_PROMPT_1"
+
+    def test_prose_only_routes_to_prompt2(self, run_dir: Path) -> None:
+        """NC-1: Prose-only -> P2+P3."""
+        state = {
+            "current_state": "STAGE3_COMPLETE",
+            "transitions": [],
+            "cycle_count": 0,
+            "summary_classification": None,
+            "next_directive": None,
+        }
+        directive = decide_next_stage(state, "PROSE_ONLY", run_dir)
+        assert directive["action"] == "RUN_PROMPT_2"
+
+    def test_not_green_routes_to_prompt2(self, run_dir: Path) -> None:
+        state = {
+            "current_state": "STAGE3_COMPLETE",
+            "transitions": [],
+            "cycle_count": 0,
+            "summary_classification": None,
+            "next_directive": None,
+        }
+        directive = decide_next_stage(state, "STRUCTURED_NOT_GREEN", run_dir)
+        assert directive["action"] == "RUN_PROMPT_2"
+
+    def test_all_green_routes_to_adversarial(self, run_dir: Path) -> None:
+        state = {
+            "current_state": "STAGE3_COMPLETE",
+            "transitions": [],
+            "cycle_count": 0,
+            "summary_classification": None,
+            "next_directive": None,
+        }
+        directive = decide_next_stage(state, "STRUCTURED_ALL_GREEN", run_dir)
+        assert directive["action"] == "RUN_ADVERSARIAL_REVIEW"
+        assert state["current_state"] == "ADVERSARIAL_REVIEW"
+
+    def test_blocked_external_terminates(self, run_dir: Path) -> None:
+        state = {
+            "current_state": "STAGE3_COMPLETE",
+            "transitions": [],
+            "cycle_count": 0,
+            "summary_classification": None,
+            "next_directive": None,
+        }
+        directive = decide_next_stage(state, "BLOCKED_EXTERNAL", run_dir)
+        assert directive["action"] == "BLOCK"
+        assert state["current_state"] == "TERMINATED"
+
+
+# ---------------------------------------------------------------------------
+# Invalid final state tests
+# ---------------------------------------------------------------------------
+
+
+class TestInvalidFinalStates:
+    def test_next_prompt_needed_rejected(self) -> None:
+        """NC-6: NEXT_PROMPT_NEEDED is never valid as final state."""
+        state = {"current_state": "NEXT_PROMPT_NEEDED"}
+        with pytest.raises(InvalidTransitionError, match="never valid"):
+            validate_no_invalid_final_state(state)
+
+    def test_prose_only_accepted_rejected(self) -> None:
+        state = {"current_state": "PROSE_ONLY_ACCEPTED"}
+        with pytest.raises(InvalidTransitionError):
+            validate_no_invalid_final_state(state)
+
+    def test_score_below_4_accepted_rejected(self) -> None:
+        state = {"current_state": "SCORE_BELOW_4_ACCEPTED"}
+        with pytest.raises(InvalidTransitionError):
+            validate_no_invalid_final_state(state)
+
+    def test_evidence_package_missing_accepted_rejected(self) -> None:
+        state = {"current_state": "EVIDENCE_PACKAGE_MISSING_ACCEPTED"}
+        with pytest.raises(InvalidTransitionError):
+            validate_no_invalid_final_state(state)
+
+    def test_valid_terminal_state_ok(self) -> None:
+        state = {"current_state": "TERMINATED"}
+        validate_no_invalid_final_state(state)  # Should not raise
+
+
+# ---------------------------------------------------------------------------
+# Stage output parsing tests
+# ---------------------------------------------------------------------------
+
+
+class TestStageOutputParsing:
+    def test_parse_stage1_missing(self, run_dir: Path) -> None:
+        assert parse_stage1_output(run_dir) is None
+
+    def test_parse_stage1_present(self, run_dir: Path) -> None:
+        _write_stage1_issues(run_dir, [{"issue_id": "L1-001", "blocker": True}])
+        result = parse_stage1_output(run_dir)
+        assert result is not None
+        assert len(result["issues"]) == 1
+
+    def test_parse_stage3_missing(self, run_dir: Path) -> None:
+        result = parse_stage3_output(run_dir)
+        assert result is not None
+        assert result["summary_type"] == "MISSING"
+
+    def test_parse_stage3_structured(self, run_dir: Path) -> None:
+        _write_stage3_summary(run_dir)
+        _write_stage3_scores(run_dir, [{"taskcard_id": "TC-01", "verdict": "ACCEPTED"}])
+        result = parse_stage3_output(run_dir)
+        assert result is not None
+        assert result["summary_type"] == "STRUCTURED"
+        assert len(result["evaluations"]) == 1
+
+
+# ---------------------------------------------------------------------------
+# Directive emission tests
+# ---------------------------------------------------------------------------
+
+
+class TestDirectiveEmission:
+    def test_emit_writes_file(self, run_dir: Path) -> None:
+        state = {"next_directive": {"action": "RUN_PROMPT_1", "reason": "test"}}
+        path = emit_directive(state, run_dir)
+        assert path.exists()
+        data = json.loads(path.read_text(encoding="utf-8"))
+        assert data["action"] == "RUN_PROMPT_1"
+
+
+# ---------------------------------------------------------------------------
+# Full cycle tests
+# ---------------------------------------------------------------------------
+
+
+class TestFullCycle:
+    def test_initial_cycle_starts_stage1(self, run_dir: Path) -> None:
+        state = run_cycle(run_dir, dry_run=True)
+        assert state["current_state"] == "STAGE1_PENDING"
+        assert state["next_directive"]["action"] == "RUN_PROMPT_1"
+
+    def test_advance_after_stage1(self, run_dir: Path) -> None:
+        # Initialize
+        run_cycle(run_dir)
+        # Write stage1 output
+        _write_stage1_issues(run_dir, [])
+        # Advance
+        state = run_cycle(run_dir, advance=True)
+        assert state["current_state"] == "STAGE2_PENDING"
+
+    def test_force_stage(self, run_dir: Path) -> None:
+        state = run_cycle(run_dir, force_stage=1)
+        assert state["current_state"] == "STAGE1_PENDING"

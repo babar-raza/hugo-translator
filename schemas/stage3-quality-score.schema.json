@@ -1,0 +1,137 @@
+{
+  "description": "Schema for Stage 3 (controlled execution) quality scoring output.\n\nCaptures per-taskcard quality evaluations across 15 dimensions\n(5 base + 10 sprint-specific) and reroute decisions.",
+  "type": "object",
+  "required": ["evaluations", "final_sprint_summary"],
+  "properties": {
+    "run_id": {
+      "type": "string",
+      "description": "Unique identifier for the execution run"
+    },
+    "rubric_path": {
+      "type": "string",
+      "description": "Path to the quality rubric used",
+      "default": "config/sprint_quality_rubric.yaml"
+    },
+    "evaluations": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["taskcard_id", "dimension_scores", "weighted_overall", "verdict"],
+        "properties": {
+          "taskcard_id": {"type": "string"},
+          "dimension_scores": {
+            "type": "object",
+            "description": "Score per dimension (1-5)",
+            "properties": {
+              "correctness": {"type": "number", "minimum": 1, "maximum": 5},
+              "completeness": {"type": "number", "minimum": 1, "maximum": 5},
+              "production_ready": {"type": "number", "minimum": 1, "maximum": 5},
+              "documentation": {"type": "number", "minimum": 1, "maximum": 5},
+              "testability": {"type": "number", "minimum": 1, "maximum": 5},
+              "evidence_quality": {"type": "number", "minimum": 1, "maximum": 5},
+              "claim_verification": {"type": "number", "minimum": 1, "maximum": 5},
+              "root_cause_depth": {"type": "number", "minimum": 1, "maximum": 5},
+              "taskcard_precision": {"type": "number", "minimum": 1, "maximum": 5},
+              "dependency_mapping": {"type": "number", "minimum": 1, "maximum": 5},
+              "rollback_safety": {"type": "number", "minimum": 1, "maximum": 5},
+              "pilot_proof": {"type": "number", "minimum": 1, "maximum": 5},
+              "regression_check": {"type": "number", "minimum": 1, "maximum": 5},
+              "contract_compliance": {"type": "number", "minimum": 1, "maximum": 5},
+              "governance_adherence": {"type": "number", "minimum": 1, "maximum": 5}
+            }
+          },
+          "weighted_overall": {
+            "type": "number",
+            "minimum": 1.0,
+            "maximum": 5.0,
+            "description": "Weighted overall score (base 60% + sprint 40%)"
+          },
+          "verdict": {
+            "type": "string",
+            "enum": ["ACCEPTED", "REROUTED", "BLOCKED"]
+          },
+          "rework_items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "dimension": {"type": "string"},
+                "score": {"type": "number"},
+                "threshold": {"type": "number"},
+                "reason": {"type": "string"}
+              }
+            },
+            "description": "Dimensions that failed threshold"
+          },
+          "reroute_count": {
+            "type": "integer",
+            "default": 0
+          }
+        }
+      }
+    },
+    "reroute_log": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "taskcard_id": {"type": "string"},
+          "rerouted_at": {"type": "string"},
+          "reason": {"type": "string"},
+          "rework_owner": {"type": "string"},
+          "resolution": {
+            "type": "string",
+            "enum": ["REWORKED", "BLOCKED_EXTERNAL", "DEFERRED"]
+          }
+        }
+      }
+    },
+    "final_sprint_summary": {
+      "type": "object",
+      "required": ["verdict", "summary_type"],
+      "properties": {
+        "verdict": {
+          "type": "string",
+          "enum": [
+            "EXECUTION_COMPLETE_VERIFIED",
+            "EXECUTION_COMPLETE_WITH_LIMITATIONS",
+            "EXECUTION_REROUTED_REWORK_REQUIRED",
+            "PLAN_NOT_READY_HEALED_ONLY",
+            "BLOCKED_BY_FAILED_GATE",
+            "BLOCKED_BY_REPO_SAFETY",
+            "BLOCKED_EXTERNAL",
+            "NEEDS_HUMAN_DECISION"
+          ]
+        },
+        "summary_type": {
+          "type": "string",
+          "enum": ["STRUCTURED", "PROSE_ONLY", "MISSING"],
+          "description": "Whether this is a machine-parseable structured summary"
+        },
+        "all_green": {
+          "type": "boolean",
+          "description": "True only if all taskcards ACCEPTED and no blockers remain"
+        },
+        "accepted_count": {"type": "integer"},
+        "rerouted_count": {"type": "integer"},
+        "blocked_count": {"type": "integer"},
+        "evidence_bundle_path": {
+          "type": ["string", "null"],
+          "description": "Path to the evidence bundle (null = missing)"
+        },
+        "open_issues": {
+          "type": "array",
+          "items": {"type": "string"},
+          "description": "issue_ids still open after execution"
+        }
+      }
+    },
+    "self_review_issues": {
+      "type": "array",
+      "description": "Prompt 1-style self-review issues from Stage 3",
+      "items": {
+        "$ref": "stage1-issue-model.schema.json#/properties/issues/items"
+      }
+    }
+  }
+}

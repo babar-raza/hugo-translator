@@ -1,0 +1,166 @@
+# Sprint quality assessment rubric
+# Extends config/quality_rubric.yaml with 10 sprint-specific dimensions.
+# Used by: scripts/ops/sprint_quality_scorer.py
+# Schema: schemas/stage3-quality-score.schema.json
+
+base_dimensions:
+  # Inherited from quality_rubric.yaml (60% total weight)
+  correctness:
+    weight: 0.18   # 0.30 * 0.60
+    description: "Functional accuracy, no bugs"
+    criteria:
+      5: "Works perfectly, all edge cases handled"
+      4: "Works correctly, minor edge cases may fail"
+      3: "Works mostly, minor bugs"
+      2: "Works partially, major bugs"
+      1: "Fundamentally broken"
+
+  completeness:
+    weight: 0.15   # 0.25 * 0.60
+    description: "All requirements implemented"
+    criteria:
+      5: "100% complete, no TODOs"
+      4: "95%+ complete, minor TODOs"
+      3: "80%+ complete, some gaps"
+      2: "50-80% complete"
+      1: "<50% complete"
+
+  production_ready:
+    weight: 0.15   # 0.25 * 0.60
+    description: "No stubs, TODOs, hardcoded values"
+    criteria:
+      5: "Fully production-ready"
+      4: "Mostly production-ready, minor polish"
+      3: "Mostly production-ready, some TODOs"
+      2: "Not production-safe"
+      1: "Prototype code"
+
+  documentation:
+    weight: 0.06   # 0.10 * 0.60
+    description: "Clear docs, examples, diagrams"
+    criteria:
+      5: "Excellent docs, examples, diagrams"
+      4: "Good docs, basic examples"
+      3: "Basic docs"
+      2: "Sparse docs"
+      1: "No documentation"
+
+  testability:
+    weight: 0.06   # 0.10 * 0.60
+    description: "Test coverage, edge cases"
+    criteria:
+      5: "100% coverage, all edge cases"
+      4: ">90% coverage, most edge cases"
+      3: ">70% coverage, basic tests"
+      2: "40-70% coverage"
+      1: "<40% coverage"
+
+sprint_dimensions:
+  # Sprint-specific (40% total weight, equally distributed)
+  evidence_quality:
+    weight: 0.04
+    description: "Evidence completeness and verifiability"
+    criteria:
+      5: "Full evidence bundle, all claims backed by artifacts"
+      4: "Good evidence, minor gaps"
+      3: "Basic evidence, some claims unverified"
+      2: "Sparse evidence"
+      1: "No evidence"
+
+  claim_verification:
+    weight: 0.04
+    description: "Claims verified against actual behavior"
+    criteria:
+      5: "All claims verified with raw proof"
+      4: "Most claims verified, minor gaps"
+      3: "Some claims verified"
+      2: "Few claims verified"
+      1: "No verification"
+
+  root_cause_depth:
+    weight: 0.04
+    description: "Root cause analysis depth (not just symptoms)"
+    criteria:
+      5: "Deep structural root causes identified and addressed"
+      4: "Root causes identified, fixes are durable"
+      3: "Some root causes, some symptoms"
+      2: "Mostly symptom-level fixes"
+      1: "No root cause analysis"
+
+  taskcard_precision:
+    weight: 0.04
+    description: "Taskcards are specific, actionable, verifiable"
+    criteria:
+      5: "All taskcards precise with verification commands"
+      4: "Most taskcards precise"
+      3: "Some taskcards vague"
+      2: "Most taskcards vague"
+      1: "No taskcards"
+
+  dependency_mapping:
+    weight: 0.04
+    description: "Dependencies correctly identified and ordered"
+    criteria:
+      5: "Complete DAG, all dependencies verified"
+      4: "Good dependency map, minor gaps"
+      3: "Basic dependencies"
+      2: "Dependencies unclear"
+      1: "No dependency analysis"
+
+  rollback_safety:
+    weight: 0.04
+    description: "Changes are reversible or have rollback plan"
+    criteria:
+      5: "Full rollback plan, tested"
+      4: "Rollback plan documented"
+      3: "Basic rollback notes"
+      2: "Rollback unclear"
+      1: "No rollback consideration"
+
+  pilot_proof:
+    weight: 0.04
+    description: "End-to-end pilot demonstrates real behavior"
+    criteria:
+      5: "Pilot proves full loop with real data"
+      4: "Pilot proves key paths"
+      3: "Partial pilot"
+      2: "Synthetic-only proof"
+      1: "No pilot"
+
+  regression_check:
+    weight: 0.04
+    description: "Existing functionality not broken"
+    criteria:
+      5: "Full regression suite passes"
+      4: "Key regression tests pass"
+      3: "Basic regression check"
+      2: "Minimal regression check"
+      1: "No regression check"
+
+  contract_compliance:
+    weight: 0.04
+    description: "Outputs conform to defined schemas/contracts"
+    criteria:
+      5: "All outputs validate against schemas"
+      4: "Most outputs conform"
+      3: "Some outputs conform"
+      2: "Few outputs conform"
+      1: "No schema compliance"
+
+  governance_adherence:
+    weight: 0.04
+    description: "Sprint follows governance rules and gates"
+    criteria:
+      5: "All governance gates pass"
+      4: "Most gates pass"
+      3: "Some gates pass"
+      2: "Few gates pass"
+      1: "No governance compliance"
+
+passing_criteria:
+  overall_minimum: 4.0
+  dimension_minimum: 3.0
+  critical_dimensions:
+    - correctness: 4.0
+    - completeness: 4.0
+  reroute_trigger: "any required dimension < 4"

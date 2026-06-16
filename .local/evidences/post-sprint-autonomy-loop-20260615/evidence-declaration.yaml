@@ -1,0 +1,114 @@
+run_id: post-sprint-autonomy-loop-20260615
+repo_path: c:\Users\prora\OneDrive\Documents\GitHub\hugo-translator-gitlab
+branch: main
+base_commit: d9e45cd096020d29ebcc96cf21e8916be241a60a
+date: 2026-06-15
+closeout_date: 2026-06-16
+
+prompt_folder_selected: docs/governance/prompts
+prompt_assets_created:
+  - docs/governance/prompts/prompt1-post-sprint-audit.md
+  - docs/governance/prompts/prompt2-plan-hardening.md
+  - docs/governance/prompts/prompt3-controlled-execution.md
+  - docs/governance/prompts/prompt-loop-controller.md
+  - docs/governance/prompts/prompt-output-contracts.md
+  - docs/governance/prompts/project-adapter-template.md
+  - docs/governance/prompts/prompt-registry.yaml
+
+schemas_created:
+  - schemas/stage1-issue-model.schema.json
+  - schemas/stage2-taskcard-contract.schema.json
+  - schemas/stage3-quality-score.schema.json
+  - schemas/loop-decision-state.schema.json
+
+scripts_created:
+  - scripts/ops/sprint_loop_controller.py
+  - scripts/ops/sprint_quality_scorer.py
+
+config_created:
+  - config/sprint_quality_rubric.yaml
+
+config_modified:
+  - config/global.yaml  # Added sprint_loop: section (enabled: false, dry_run: true)
+
+tests_created:
+  - tests/unit/scripts/test_sprint_loop_controller.py
+  - tests/unit/scripts/test_sprint_quality_scorer.py
+
+prompt_registry_updated: true
+stage1_contract_installed: true
+stage2_contract_installed: true
+stage3_contract_installed: true
+loop_controller_installed: true
+summary_parser_installed: true
+quality_scoring_installed: true
+reroute_controller_installed: true
+project_adapter_installed: true  # template only
+
+lint_check:
+  tool: ruff
+  target: scripts/ops/sprint_loop_controller.py scripts/ops/sprint_quality_scorer.py
+  result: All checks passed (C420 fixed)
+
+governance_check:
+  manifest_check: OK (7/7 CI-critical, 0 unregistered, no new root scripts)
+  governance_check: PASS (all checks passed)
+
+schema_validation:
+  stage1_issue_model: OK
+  stage2_taskcard_contract: OK
+  stage3_quality_score: OK
+  loop_decision_state: OK
+  evidence_declaration: OK
+
+test_results:
+  total: 51
+  passed: 51
+  failed: 0
+  test_command: "python -m pytest tests/unit/scripts/test_sprint_loop_controller.py tests/unit/scripts/test_sprint_quality_scorer.py -v"
+
+regression_check:
+  suite: tests/unit/scripts/ (excluding 2 pre-existing broken import tests)
+  result: 83 passed, 16 skipped, 2 pre-existing failures (test_cleanup_orphaned_lmdb_temp, test_opus_registry_generator - scripts reorganization gap, not from this sprint)
+  new_failures_from_this_sprint: 0
+
+negative_controls_run: true
+negative_controls_passed: 10
+negative_controls_total: 10
+negative_controls:
+  NC-1_prose_only_routes_to_p2: PASS
+  NC-2_missing_routes_to_p1: PASS
+  NC-3_contradictory_blocked: PASS
+  NC-4_score_below_4_rerouted: PASS
+  NC-5_evidence_missing_blocked: PASS
+  NC-6_invalid_final_state_rejected: PASS
+  NC-7_contradictory_summary_detected: PASS
+  NC-8_state_skip_rejected: PASS
+  NC-9_no_evidence_rerouted: PASS
+  NC-10_evidence_manifest_mismatch: PASS
+
+e2e_cycle_proven: true
+e2e_cycle_steps:
+  - "IDLE -> STAGE1_PENDING (init)"
+  - "STAGE1_PENDING -> STAGE1_COMPLETE -> STAGE2_PENDING (after s1)"
+  - "STAGE2_PENDING -> STAGE2_COMPLETE -> STAGE3_PENDING (after s2)"
+  - "STAGE3_PENDING -> STAGE3_COMPLETE -> ADVERSARIAL_REVIEW (all-green)"
+  - "ADVERSARIAL_REVIEW -> TERMINATED (accepted)"
+
+edge_cases_run: 10
+edge_cases_passed: 10
+
+pilot_run: true
+pilot_fixture: .local/evidences/agentic-maturity-deepdive-20260613-d9e45cd
+pilot_results:
+  controller_classification: STRUCTURED_ALL_GREEN
+  controller_decision: ADVERSARIAL_REVIEW
+  scorer_accepted: 3
+  scorer_rerouted: 0
+  scorer_all_green: true
+
+integration_review: ALL OK (19 integration points verified)
+
+evidence_package_created: true
+
+final_verdict: ACCEPTED_VERIFIED

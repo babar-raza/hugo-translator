@@ -1,0 +1,187 @@
+{
+  "description": "Schema for Stage 1 (post-sprint audit) issue records.\n\nEach issue represents an execution, integration, or system weakness\nfound during the strict sprint audit. Issues are classified into\nthree levels: L1 (execution), L2 (integration), L3 (system).",
+  "type": "object",
+  "required": ["issues", "claim_classifications", "evidence_quality_verdict", "next_stage_recommendation"],
+  "properties": {
+    "run_id": {
+      "type": "string",
+      "description": "Unique identifier for the audit run"
+    },
+    "sprint_id": {
+      "type": "string",
+      "description": "Identifier of the sprint being audited"
+    },
+    "date": {
+      "type": "string",
+      "description": "Audit date (YYYY-MM-DD)"
+    },
+    "issues": {
+      "type": "array",
+      "description": "All issues found during audit",
+      "items": {
+        "type": "object",
+        "required": ["issue_id", "issue_level", "title", "description", "severity", "blocker"],
+        "properties": {
+          "issue_id": {
+            "type": "string",
+            "description": "Unique issue identifier (e.g. L1-001, L2-003)"
+          },
+          "issue_level": {
+            "type": "string",
+            "enum": ["L1_EXECUTION", "L2_INTEGRATION", "L3_SYSTEM"],
+            "description": "Issue classification level"
+          },
+          "title": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "evidence": {
+            "type": "array",
+            "items": {"type": "string"},
+            "description": "Paths or references to supporting evidence"
+          },
+          "missing_evidence": {
+            "type": "array",
+            "items": {"type": "string"},
+            "description": "Evidence that should exist but does not"
+          },
+          "root_cause": {
+            "type": "string",
+            "description": "Root cause analysis (required, not just symptom)"
+          },
+          "why_not_only_symptom": {
+            "type": "string",
+            "description": "Explanation of why the root_cause is structural, not superficial"
+          },
+          "affected_files": {
+            "type": "array",
+            "items": {"type": "string"}
+          },
+          "affected_components": {
+            "type": "array",
+            "items": {"type": "string"}
+          },
+          "affected_connection_points": {
+            "type": "array",
+            "items": {"type": "string"},
+            "description": "Downstream consumers, registries, or integration points affected"
+          },
+          "severity": {
+            "type": "string",
+            "enum": ["CRITICAL", "HIGH", "MEDIUM", "LOW"]
+          },
+          "blocker": {
+            "type": "boolean",
+            "description": "Whether this issue blocks sprint acceptance"
+          },
+          "recurrence_risk": {
+            "type": "string",
+            "enum": ["HIGH", "MEDIUM", "LOW"]
+          },
+          "required_fix_type": {
+            "type": "string",
+            "enum": ["IMPLEMENTATION", "VERIFICATION", "EVIDENCE_REPAIR", "GOVERNANCE_CHANGE", "TASKCARD_REQUIRED", "REEXECUTION"]
+          },
+          "requires_plan_update": {"type": "boolean"},
+          "requires_taskcard": {"type": "boolean"},
+          "requires_system_healing": {"type": "boolean"},
+          "requires_reexecution": {"type": "boolean"},
+          "requires_governance_change": {"type": "boolean"},
+          "requires_evidence_repair": {"type": "boolean"},
+          "recommended_next_stage": {
+            "type": "string",
+            "enum": ["PROMPT_2", "PROMPT_3", "PROMPT_1_RERUN", "BLOCKED_EXTERNAL"]
+          }
+        }
+      }
+    },
+    "claim_classifications": {
+      "type": "array",
+      "description": "Classification of every major sprint claim",
+      "items": {
+        "type": "object",
+        "required": ["claim", "classification", "proof_level"],
+        "properties": {
+          "claim": {
+            "type": "string",
+            "description": "The sprint claim being evaluated"
+          },
+          "classification": {
+            "type": "string",
+            "enum": [
+              "ACCEPTED_VERIFIED",
+              "ACCEPTED_WITH_LIMITATIONS",
+              "PARTIAL",
+              "UNVERIFIED",
+              "FAILED",
+              "STALE",
+              "MISLEADING",
+              "DAMAGED_OR_REGRESSED",
+              "EXTERNAL_BLOCKED"
+            ]
+          },
+          "proof_level": {
+            "type": "string",
+            "enum": [
+              "implementation_only",
+              "partial_validation",
+              "focused_validation",
+              "integration_validation",
+              "end_to_end_proof",
+              "pilot_proof",
+              "no_proof_yet"
+            ]
+          },
+          "evidence_refs": {
+            "type": "array",
+            "items": {"type": "string"}
+          },
+          "limitations": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "evidence_quality_verdict": {
+      "type": "string",
+      "enum": ["STRONG", "ADEQUATE_WITH_LIMITATIONS", "WEAK", "INSUFFICIENT", "MISLEADING"]
+    },
+    "final_verdict": {
+      "type": "string",
+      "enum": [
+        "SPRINT_ALL_GREEN_VERIFIED",
+        "SPRINT_ACCEPTED_WITH_LIMITATIONS",
+        "SPRINT_REQUIRES_PLAN_HARDENING",
+        "SPRINT_REQUIRES_REEXECUTION",
+        "SPRINT_REQUIRES_EVIDENCE_REPAIR",
+        "SPRINT_BLOCKED_EXTERNAL",
+        "SPRINT_SUMMARY_INSUFFICIENT"
+      ]
+    },
+    "next_stage_recommendation": {
+      "type": "object",
+      "required": ["next_stage", "reason"],
+      "properties": {
+        "next_stage": {
+          "type": "string",
+          "enum": ["PROMPT_2", "PROMPT_3_EVIDENCE_REPAIR", "PROMPT_1_RERUN", "ADVERSARIAL_REVIEW", "BLOCKED_EXTERNAL"]
+        },
+        "reason": {"type": "string"},
+        "blocking_issues": {
+          "type": "array",
+          "items": {"type": "string"},
+          "description": "issue_ids that drive this recommendation"
+        }
+      }
+    },
+    "blocker_count": {
+      "type": "integer",
+      "default": 0
+    },
+    "l1_count": {"type": "integer", "default": 0},
+    "l2_count": {"type": "integer", "default": 0},
+    "l3_count": {"type": "integer", "default": 0}
+  }
+}
