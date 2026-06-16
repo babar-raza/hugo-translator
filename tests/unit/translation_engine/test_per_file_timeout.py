@@ -78,9 +78,9 @@ def test_engine_parallel_uses_per_file_timeout():
     """
     import inspect
 
-    from src.translation_engine.engine import TranslationEngine
+    from src.translation_engine.directory_orchestrator import DirectoryOrchestrator
 
-    src = inspect.getsource(TranslationEngine._translate_directory_parallel)
+    src = inspect.getsource(DirectoryOrchestrator._translate_directory_parallel)
     assert "future.result(timeout=" in src, (
         "_translate_directory_parallel must call future.result(timeout=...) "
         "to implement TC-CW-02 per-file timeout. Bare future.result() was found instead."

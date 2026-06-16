@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from src.translation_engine.engine import TranslationEngine
 from src.translation_engine.handlers.multiline_handler import MultilineHandler
 from src.translation_engine.models import TranslationStats
+from src.translation_engine.segment_translator import SegmentTranslator
 
 
 @dataclass
@@ -32,6 +33,7 @@ def test_multiline_batched_calls_and_structure_preserved():
     engine.multiline_handler = MultilineHandler()
     engine.batch_size = 4
     engine.sort_segments_by_length = False
+    engine._segment_translator = SegmentTranslator(engine)
 
     backend = RecordingBackend()
     segments = [

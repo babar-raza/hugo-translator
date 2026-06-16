@@ -32,7 +32,7 @@ def _make_engine(purity_threshold_overrides=None, config_raises=False):
     config_raises:
         When True, self.config.get_config() raises for fallback testing.
     """
-    from src.translation_engine.engine import TranslationEngine
+    from src.translation_engine.write_gate import WriteGateEvaluator
 
     mock_self = MagicMock()  # no spec: self.config is set in __init__, not class body
     mock_self.similarity_tracker = None
@@ -43,14 +43,17 @@ def _make_engine(purity_threshold_overrides=None, config_raises=False):
         mock_self.config.get_config.side_effect = Exception("config unavailable")
     else:
         mock_self.config.get_config.return_value = {"translation_engine": te_cfg}
-    # Bind the real _get_purity_threshold so calls from _verify_final_file_purity
-    # use the actual validation logic rather than a MagicMock auto-attribute.
-    mock_self._get_purity_threshold = lambda lang: TranslationEngine._get_purity_threshold(
-        mock_self, lang
+    # Wire a real WriteGateEvaluator so delegate methods work
+    mock_self._write_gate = WriteGateEvaluator(
+        detector=None,
+        similarity_tracker=None,
+        config=mock_self.config,
+        force_accept=False,
     )
-    # Bind the real _should_skip_purity_segment static method — MagicMock would
-    # return a truthy Mock, skipping all paragraphs and causing early "no content" return.
-    mock_self._should_skip_purity_segment = TranslationEngine._should_skip_purity_segment
+    # Bind the real _get_purity_threshold via write gate
+    mock_self._get_purity_threshold = mock_self._write_gate._get_purity_threshold
+    # Bind the real _should_skip_purity_segment static method
+    mock_self._should_skip_purity_segment = WriteGateEvaluator._should_skip_purity_segment
     return mock_self
 
 
@@ -269,15 +272,16 @@ class TestSimilarityTrackerSkip:
         from src.translation_engine.engine import TranslationEngine
 
         mock_self = _make_engine(purity_threshold_overrides={})
-        mock_self.similarity_tracker = MagicMock()
-        mock_self.similarity_tracker.are_similar.return_value = True
+        sim_tracker = MagicMock()
+        sim_tracker.are_similar.return_value = True
+        mock_self._write_gate._similarity_tracker = sim_tracker
         detections = [("lt", 0.95)] * 5 + [("sr", 0.95)] * 5
         detector = _make_detector(detections)
         content = _build_content(10)
         result = TranslationEngine._verify_final_file_purity(mock_self, content, "lt", detector)
         assert result["passed"] is True
         # are_similar called once per wrong-candidate paragraph (5 sr detections)
-        assert mock_self.similarity_tracker.are_similar.call_count == 5
+        assert sim_tracker.are_similar.call_count == 5
 
     def test_non_similar_language_counts_as_wrong(self):
         """When are_similar returns False the paragraph IS counted as wrong.
@@ -288,8 +292,9 @@ class TestSimilarityTrackerSkip:
         from src.translation_engine.engine import TranslationEngine
 
         mock_self = _make_engine(purity_threshold_overrides={})
-        mock_self.similarity_tracker = MagicMock()
-        mock_self.similarity_tracker.are_similar.return_value = False
+        sim_tracker = MagicMock()
+        sim_tracker.are_similar.return_value = False
+        mock_self._write_gate._similarity_tracker = sim_tracker
         detections = [("lt", 0.95)] * 5 + [("de", 0.95)] * 5
         detector = _make_detector(detections)
         content = _build_content(10)
@@ -461,27 +466,27 @@ class TestPurityGateRetryable:
     """
 
     def test_purity_check_sets_retryable_gate_failure(self):
-        """engine.py purity check block must set retryable_gate_failure = True."""
+        """Write gate purity check must set result.passed = False on failure."""
         import inspect
 
-        from src.translation_engine import engine as eng_module
+        from src.translation_engine import write_gate as wg_module
 
-        source = inspect.getsource(eng_module)
-        # Find the purity check block
-        assert "purity_result['passed']" in source or 'purity_result["passed"]' in source, (
-            "Purity check must exist in engine.py"
+        source = inspect.getsource(wg_module)
+        # Find the purity check block in write_gate.py (extracted from engine.py)
+        assert "purity_result" in source and "passed" in source, (
+            "Purity check must exist in write_gate.py"
         )
-        # Purity failure must block the write — validation_passed = False
-        assert "validation_passed = False" in source, (
-            "Purity check block must set validation_passed = False in engine.py"
+        # Purity failure must block the write — result.passed = False
+        assert "result.passed = False" in source, (
+            "Purity check block must set result.passed = False in write_gate.py"
         )
 
     def test_retryable_gate_failure_true_in_purity_block(self):
-        """Directly grep engine.py source for SW-2 fix at purity check."""
+        """Directly grep write_gate.py source for purity check failure handling."""
         from pathlib import Path
 
-        engine_src = Path("src/translation_engine/engine.py").read_text(encoding="utf-8")
-        lines = engine_src.splitlines()
+        wg_src = Path("src/translation_engine/write_gate.py").read_text(encoding="utf-8")
+        lines = wg_src.splitlines()
         # Find line with purity check failure
         purity_fail_line = next(
             (
@@ -491,9 +496,9 @@ class TestPurityGateRetryable:
             ),
             None,
         )
-        assert purity_fail_line is not None, "Purity check line not found in engine.py"
-        # Within 10 lines after the purity check, validation_passed must be set to False
+        assert purity_fail_line is not None, "Purity check line not found in write_gate.py"
+        # Within 10 lines after the purity check, result.passed must be set to False
         window = "\n".join(lines[purity_fail_line - 1 : purity_fail_line + 10])
-        assert "validation_passed = False" in window, (
-            f"validation_passed=False not found near purity check (line {purity_fail_line})"
+        assert "result.passed = False" in window, (
+            f"result.passed=False not found near purity check (line {purity_fail_line})"
         )

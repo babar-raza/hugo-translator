@@ -82,10 +82,10 @@ def test_engine_raises_translation_incomplete_on_fallback(tmp_path):
     """
     import inspect
 
-    from src.translation_engine.engine import TranslationEngine
+    from src.translation_engine.segment_translator import SegmentTranslator
 
     # Verify the guard is present in source (static regression check)
-    src = inspect.getsource(TranslationEngine._translate_body_ast)
+    src = inspect.getsource(SegmentTranslator._translate_body_ast)
     assert "TranslationIncomplete" in src, (
         "TC-AST-01: _translate_body_ast must raise TranslationIncomplete "
         "when fallback ratio exceeds tolerance."

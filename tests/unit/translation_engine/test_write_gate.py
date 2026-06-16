@@ -1,0 +1,243 @@
+"""Unit tests for WriteGateEvaluator (TC-TEST-01).
+
+Tests gates 2-8 in isolation:
+  Gate 2: Language detection mismatch (B-7.1)
+  Gate 3: Overwrite protection (B-7.4)
+  Gate 4: File purity (B-7.5)
+  Gate 5: Soft contamination queue (TC-MLD-01)
+  Gate 6: Code block count
+  Gate 7: Heading surplus / TITLE hallucination
+  Gate 8: YAML frontmatter structural (RC-5/RC-6)
+"""
+
+from pathlib import Path
+from unittest.mock import MagicMock
+
+import pytest
+
+from src.translation_engine.write_gate import WriteGateEvaluator, WriteGateResult
+
+
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+
+
+def _make_evaluator(detector=None, similarity_tracker=None, config=None, force_accept=False):
+    if config is None:
+        config = MagicMock()
+        config.get_config.return_value = {"translation_engine": {}}
+    return WriteGateEvaluator(
+        detector=detector,
+        similarity_tracker=similarity_tracker,
+        config=config,
+        force_accept=force_accept,
+    )
+
+
+def _make_detector(lang="de", confidence=0.95):
+    """Return a mock detector that always returns (lang, confidence)."""
+    d = MagicMock()
+    d.detect.return_value = (lang, confidence)
+    return d
+
+
+def _md(body="Hallo Welt.", fm_keys=None):
+    """Build minimal markdown with optional frontmatter keys."""
+    if fm_keys is None:
+        fm_keys = {"title": "Test"}
+    fm = "\n".join(f"{k}: {v}" for k, v in fm_keys.items())
+    return f"---\n{fm}\n---\n{body}"
+
+
+# ---------------------------------------------------------------------------
+# Gate 2: Language mismatch (B-7.1)
+# ---------------------------------------------------------------------------
+
+
+class TestGateLanguageMismatch:
+    def test_pass_when_detected_matches_target(self):
+        gate = _make_evaluator(detector=_make_detector("de", 0.95))
+        r = gate.evaluate(_md(), "", "de", Path("test.md"))
+        assert r.passed
+
+    def test_fail_when_detected_differs_high_confidence(self):
+        gate = _make_evaluator(detector=_make_detector("en", 0.90))
+        r = gate.evaluate(_md(), "", "de", Path("test.md"))
+        assert not r.passed
+        assert "mismatch" in r.error.lower()
+
+    def test_pass_when_confidence_below_threshold(self):
+        gate = _make_evaluator(detector=_make_detector("en", 0.60))
+        r = gate.evaluate(_md(), "", "de", Path("test.md"))
+        assert r.passed
+
+    def test_pass_when_force_accept(self):
+        gate = _make_evaluator(detector=_make_detector("en", 0.95), force_accept=True)
+        r = gate.evaluate(_md(), "", "de", Path("test.md"))
+        assert r.passed
+
+    def test_pass_when_similar_languages(self):
+        tracker = MagicMock()
+        tracker.are_similar.return_value = True
+        gate = _make_evaluator(detector=_make_detector("bs", 0.90), similarity_tracker=tracker)
+        r = gate.evaluate(_md(), "", "hr", Path("test.md"))
+        assert r.passed
+
+
+# ---------------------------------------------------------------------------
+# Gate 3: Overwrite protection (B-7.4)
+# ---------------------------------------------------------------------------
+
+
+class TestGateOverwriteProtection:
+    def test_pass_when_no_existing_file(self, tmp_path):
+        gate = _make_evaluator(detector=_make_detector("de", 0.95))
+        out = tmp_path / "new.md"
+        r = gate.evaluate(_md(), "", "de", out)
+        assert r.passed
+
+    def test_block_case1_existing_correct_new_wrong(self, tmp_path):
+        """CASE 1: existing is correct target lang, new is wrong."""
+        out = tmp_path / "existing.md"
+        out.write_text("existing content", encoding="utf-8")
+
+        det = MagicMock()
+        # First call: new content detection (gate 2: lang matches so passes)
+        # But overwrite gate detects differently:
+        # detect calls: gate2(new_content), gate3(new_content), gate3(existing)
+        det.detect.side_effect = [
+            ("de", 0.95),  # gate 2: new content → matches target, passes
+            ("en", 0.90),  # gate 3: new content → wrong lang
+            ("de", 0.92),  # gate 3: existing content → correct lang
+        ]
+        gate = _make_evaluator(detector=det)
+        r = gate.evaluate(_md(), "", "de", out)
+        assert not r.passed
+        assert "overwrite" in r.error.lower() or "blocked" in r.error.lower()
+
+    def test_case4_both_wrong_queues_retranslate(self, tmp_path):
+        """CASE 4: both existing and new are wrong language → block + queue."""
+        out = tmp_path / "existing.md"
+        out.write_text("existing content", encoding="utf-8")
+
+        det = MagicMock()
+        det.detect.side_effect = [
+            ("de", 0.95),  # gate 2: matches target
+            ("fr", 0.90),  # gate 3: new content wrong
+            ("es", 0.88),  # gate 3: existing content also wrong
+        ]
+        gate = _make_evaluator(detector=det)
+        r = gate.evaluate(_md(), "", "de", out)
+        assert not r.passed
+        assert r.retranslate_queued
+        assert len(r.retranslate_paths) == 1
+
+
+# ---------------------------------------------------------------------------
+# Gate 6: Code block count
+# ---------------------------------------------------------------------------
+
+
+class TestGateCodeBlock:
+    def test_pass_when_counts_match(self):
+        src = _md("```python\ncode\n```\n\ntext")
+        tgt = _md("```python\ncode\n```\n\ntext translated")
+        gate = _make_evaluator()  # no detector needed for structural gates
+        r = gate.evaluate(tgt, src, "de", Path("test.md"))
+        assert r.passed
+
+    def test_fail_when_code_blocks_lost(self):
+        src = _md("```python\ncode\n```\n\ntext")
+        tgt = _md("text without code")
+        gate = _make_evaluator()
+        r = gate.evaluate(tgt, src, "de", Path("test.md"))
+        assert not r.passed
+        assert "code block" in r.error.lower()
+
+    def test_pass_when_source_has_no_code_blocks(self):
+        src = _md("just text")
+        tgt = _md("just translated text")
+        gate = _make_evaluator()
+        r = gate.evaluate(tgt, src, "de", Path("test.md"))
+        assert r.passed
+
+
+# ---------------------------------------------------------------------------
+# Gate 7: Heading surplus / TITLE hallucination
+# ---------------------------------------------------------------------------
+
+
+class TestGateHeadingSurplus:
+    def test_fail_when_too_many_headings(self):
+        src = _md("# One\ntext")
+        tgt = _md("# One\n# Two\n# Three\n# Four\ntext")
+        gate = _make_evaluator()
+        r = gate.evaluate(tgt, src, "de", Path("test.md"))
+        assert not r.passed
+        assert "heading" in r.error.lower()
+
+    def test_pass_when_heading_surplus_below_threshold(self):
+        src = _md("# One\n# Two\ntext")
+        tgt = _md("# One\n# Two\n# Three\ntext")
+        gate = _make_evaluator()
+        r = gate.evaluate(tgt, src, "de", Path("test.md"))
+        assert r.passed
+
+    def test_fail_on_title_hallucination(self):
+        src = _md("Normal content here")
+        tgt = _md("TITLE: Some hallucinated title\nMore content")
+        gate = _make_evaluator()
+        r = gate.evaluate(tgt, src, "de", Path("test.md"))
+        assert not r.passed
+        assert "TITLE" in r.error
+
+
+# ---------------------------------------------------------------------------
+# Gate 8: YAML frontmatter structural (RC-5/RC-6)
+# ---------------------------------------------------------------------------
+
+
+class TestGateYamlFrontmatter:
+    def test_pass_valid_frontmatter(self):
+        src_doc = MagicMock()
+        src_doc.frontmatter = {"title": "Test", "description": "Desc"}
+        tgt = "---\ntitle: Test DE\ndescription: Desc DE\n---\nbody"
+        gate = _make_evaluator()
+        r = gate.evaluate(tgt, "", "de", Path("test.md"), source_doc=src_doc)
+        assert r.passed
+
+    def test_fail_missing_frontmatter_delimiters(self):
+        src_doc = MagicMock()
+        src_doc.frontmatter = {"title": "Test"}
+        tgt = "no frontmatter here\njust body"
+        gate = _make_evaluator()
+        r = gate.evaluate(tgt, "", "de", Path("test.md"), source_doc=src_doc)
+        assert not r.passed
+        assert r.clear_tm_buffer
+        assert "frontmatter" in r.error.lower()
+
+    def test_fail_mismatched_keys(self):
+        src_doc = MagicMock()
+        src_doc.frontmatter = {"title": "Test", "description": "Desc"}
+        tgt = "---\ntitle: Test DE\nextra_key: bad\n---\nbody"
+        gate = _make_evaluator()
+        r = gate.evaluate(tgt, "", "de", Path("test.md"), source_doc=src_doc)
+        assert not r.passed
+        assert r.quarantine_content is not None
+
+
+# ---------------------------------------------------------------------------
+# WriteGateResult dataclass
+# ---------------------------------------------------------------------------
+
+
+class TestWriteGateResult:
+    def test_default_passed(self):
+        r = WriteGateResult(passed=True)
+        assert r.passed
+        assert r.error is None
+        assert not r.overwrite_blocked
+        assert not r.contamination_queued
+        assert r.retranslate_paths == []
+        assert not r.clear_tm_buffer

@@ -19,6 +19,7 @@ from unittest import mock
 import pytest
 
 import src.tm.retranslate_queue as rtq
+from src.translation_engine.directory_orchestrator import DirectoryOrchestrator
 from src.translation_engine.engine import TranslationEngine
 from src.translation_engine.models import DirectoryResult
 
@@ -66,6 +67,26 @@ def _make_engine(tmp_path: Path, force_retranslate: bool = False) -> Translation
     engine._review_cache = None  # review cache (none in tests)
     engine._rtq_llm_output_paths = set()  # LLM escalation queue (empty)
 
+    # Attributes required by DirectoryOrchestrator and translate_file (via engine ref)
+    engine._shutdown_requested = False
+    engine._shutdown_lock = mock.Mock()
+    engine._shutdown_callbacks = []
+    engine.batch_stats_tracker = None
+    engine.retry_handler = None
+    engine.progress_tracker = None
+    engine.batch_size = 16
+    engine.model_loader = mock.Mock()
+    engine.enable_content_hash = False
+    engine.metadata_tracker = None
+    engine.enable_verification = False
+    engine.enable_verification_fix = False
+    engine.similarity_tracker = None
+    engine.production_ingestor = None
+    engine.dry_run = False
+
+    # TC-DECOMP-01: Wire extracted DirectoryOrchestrator
+    engine._dir_orchestrator = DirectoryOrchestrator(engine)
+
     return engine
 
 
@@ -111,7 +132,9 @@ class TestCaseASkipComplete:
 
         engine = _make_engine(tmp_path)
 
-        with mock.patch.object(engine, "_translate_directory_sequential") as seq_mock:
+        with mock.patch.object(
+            engine._dir_orchestrator, "_translate_directory_sequential"
+        ) as seq_mock:
             seq_mock.return_value = DirectoryResult(success=True, directory=src_dir)
             result = engine._translate_directory_locked(
                 site_id="test",
@@ -143,7 +166,9 @@ class TestCaseASkipComplete:
 
         engine = _make_engine(tmp_path)
 
-        with mock.patch.object(engine, "_translate_directory_sequential") as seq_mock:
+        with mock.patch.object(
+            engine._dir_orchestrator, "_translate_directory_sequential"
+        ) as seq_mock:
             seq_mock.return_value = DirectoryResult(success=True, directory=src_dir)
             result = engine._translate_directory_locked(
                 site_id="test",
@@ -186,7 +211,9 @@ class TestCaseBIncludeStale:
             result.successful_files = 1
             return result
 
-        with mock.patch.object(engine, "_translate_directory_sequential", side_effect=_capture_seq):
+        with mock.patch.object(
+            engine._dir_orchestrator, "_translate_directory_sequential", side_effect=_capture_seq
+        ):
             engine._translate_directory_locked(
                 site_id="test",
                 directory=src_dir,
@@ -241,7 +268,9 @@ class TestCaseCQueuedForceIncluded:
             result.successful_files = 1
             return result
 
-        with mock.patch.object(engine, "_translate_directory_sequential", side_effect=_capture_seq):
+        with mock.patch.object(
+            engine._dir_orchestrator, "_translate_directory_sequential", side_effect=_capture_seq
+        ):
             result = engine._translate_directory_locked(
                 site_id="test",
                 directory=src_dir,
@@ -287,7 +316,9 @@ class TestCaseDForceRetranslate:
             result.successful_files = 1
             return result
 
-        with mock.patch.object(engine, "_translate_directory_sequential", side_effect=_capture_seq):
+        with mock.patch.object(
+            engine._dir_orchestrator, "_translate_directory_sequential", side_effect=_capture_seq
+        ):
             result = engine._translate_directory_locked(
                 site_id="test",
                 directory=src_dir,
