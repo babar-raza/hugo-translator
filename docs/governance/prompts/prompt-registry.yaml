@@ -11,6 +11,7 @@ prompts:
     path: docs/governance/prompts/prompt1-post-sprint-audit.md
     stage: 1
     mode: audit
+    system_type: advisory
     description: >
       Strict evidence-based sprint audit. Produces L1/L2/L3 issues,
       claim classification matrix, evidence quality verdict, and
@@ -38,6 +39,7 @@ prompts:
     path: docs/governance/prompts/prompt2-plan-hardening.md
     stage: 2
     mode: plan
+    system_type: advisory
     description: >
       Reads Stage 1 audit output, extracts gaps, and produces
       taskcard-driven, gate-managed execution plan with verification
@@ -66,6 +68,7 @@ prompts:
     path: docs/governance/prompts/prompt3-controlled-execution.md
     stage: 3
     mode: execution
+    system_type: advisory
     description: >
       Executes approved plan with taskcard-driven, gate-managed,
       multi-lane execution. Includes quality scoring, reroute,
@@ -95,6 +98,7 @@ prompts:
     path: docs/governance/prompts/prompt-loop-controller.md
     stage: null  # meta-stage
     mode: advisory
+    system_type: advisory
     description: >
       Agent-facing instructions for reading the loop controller's
       directives and routing between stages automatically.
@@ -111,6 +115,7 @@ prompts:
     path: docs/governance/prompts/project-adapter-template.md
     stage: null
     mode: template
+    system_type: advisory
     description: >
       Template for adapting the autonomy loop to other projects.
       Defines configurable paths, commands, and gates.

@@ -356,7 +356,19 @@ class TestStageOutputParsing:
         assert parse_stage1_output(run_dir) is None
 
     def test_parse_stage1_present(self, run_dir: Path) -> None:
-        _write_stage1_issues(run_dir, [{"issue_id": "L1-001", "blocker": True}])
+        _write_stage1_issues(
+            run_dir,
+            [
+                {
+                    "issue_id": "L1-001",
+                    "issue_level": "L1_EXECUTION",
+                    "title": "Test issue",
+                    "description": "A test issue for schema validation",
+                    "severity": "HIGH",
+                    "blocker": True,
+                }
+            ],
+        )
         result = parse_stage1_output(run_dir)
         assert result is not None
         assert len(result["issues"]) == 1
@@ -412,3 +424,226 @@ class TestFullCycle:
     def test_force_stage(self, run_dir: Path) -> None:
         state = run_cycle(run_dir, force_stage=1)
         assert state["current_state"] == "STAGE1_PENDING"
+
+
+# ---------------------------------------------------------------------------
+# TC-HARDEN-01: Schema validation tests
+# ---------------------------------------------------------------------------
+
+
+class TestSchemaValidation:
+    """TC-HARDEN-01: parse_stage1_output and parse_stage3_output validate schemas."""
+
+    def test_parse_stage1_rejects_nonconforming_output(self, run_dir: Path) -> None:
+        """Stage 1 issues.json missing claim_classifications must return None."""
+        stage_dir = run_dir / "stage1-audit"
+        stage_dir.mkdir(parents=True, exist_ok=True)
+        # Missing required 'claim_classifications' field
+        (stage_dir / "issues.json").write_text(
+            json.dumps(
+                {
+                    "issues": [],
+                    "evidence_quality_verdict": "STRONG",
+                    "next_stage_recommendation": {"next_stage": "PROMPT_2", "reason": "x"},
+                    # claim_classifications intentionally omitted
+                }
+            ),
+            encoding="utf-8",
+        )
+        result = parse_stage1_output(run_dir)
+        assert result is None, (
+            "parse_stage1_output must return None when issues.json violates the schema"
+        )
+
+    def test_parse_stage1_accepts_conforming_output(self, run_dir: Path) -> None:
+        """Schema-valid issues.json must return the parsed dict."""
+        _write_stage1_issues(run_dir, [])
+        result = parse_stage1_output(run_dir)
+        assert result is not None
+        assert "issues" in result
+
+    def test_parse_stage3_handles_nonconforming_scores_safely(self, run_dir: Path) -> None:
+        """Stage 3 scores missing 'final_sprint_summary' must NOT crash (only warn)."""
+        _write_stage3_summary(run_dir)
+        stage_dir = run_dir / "stage3-execution"
+        stage_dir.mkdir(parents=True, exist_ok=True)
+        # Missing required 'final_sprint_summary' field
+        (stage_dir / "quality-scores.json").write_text(
+            json.dumps({"evaluations": [], "reroute_log": []}),
+            encoding="utf-8",
+        )
+        # Should not raise — warning is logged, output is handled safely
+        result = parse_stage3_output(run_dir)
+        assert result is not None
+        assert "evaluations" in result
+
+
+# ---------------------------------------------------------------------------
+# TC-HARDEN-02: YAML parser tests
+# ---------------------------------------------------------------------------
+
+
+class TestYAMLParser:
+    """TC-HARDEN-02: parse_stage3_output uses yaml.safe_load for YAML files."""
+
+    def test_parse_stage3_multiline_open_issues(self, run_dir: Path) -> None:
+        """open_issues as a YAML list must parse as a Python list with 2 elements."""
+        stage_dir = run_dir / "stage3-execution"
+        stage_dir.mkdir(parents=True, exist_ok=True)
+        yaml_content = (
+            "verdict: EXECUTION_COMPLETE_VERIFIED\n"
+            "summary_type: STRUCTURED\n"
+            "all_green: true\n"
+            "accepted_count: 1\n"
+            "rerouted_count: 0\n"
+            "blocked_count: 0\n"
+            "evidence_bundle_path: /tmp/evidence\n"
+            "open_issues:\n"
+            "  - issue1\n"
+            "  - issue2\n"
+        )
+        (stage_dir / "final-sprint-summary.yaml").write_text(yaml_content, encoding="utf-8")
+        result = parse_stage3_output(run_dir)
+        assert result is not None
+        open_issues = result.get("open_issues", "NOT_PARSED")
+        assert isinstance(open_issues, list), (
+            f"open_issues must be a Python list, got {type(open_issues)}: {open_issues!r}"
+        )
+        assert len(open_issues) == 2
+
+    def test_classify_summary_detects_contradiction_with_list_open_issues(
+        self,
+    ) -> None:
+        """all_green=True with non-empty open_issues list must return CONTRADICTORY."""
+        output = {
+            "summary_type": "STRUCTURED",
+            "verdict": "EXECUTION_COMPLETE_VERIFIED",
+            "all_green": True,  # Python bool (as yaml.safe_load returns)
+            "evidence_bundle_path": "/tmp/evidence",
+            "evaluations": [{"verdict": "ACCEPTED"}],
+            "reroute_log": [],
+            "open_issues": ["issue1", "issue2"],  # Python list, not empty string
+            "accepted_count": 1,
+            "rerouted_count": 0,
+            "blocked_count": 0,
+        }
+        assert classify_summary(output) == "CONTRADICTORY"
+
+    def test_classify_summary_bool_all_green_accepted(self) -> None:
+        """Python bool True (from yaml.safe_load) must be handled as all_green=True."""
+        output = {
+            "summary_type": "STRUCTURED",
+            "verdict": "EXECUTION_COMPLETE_VERIFIED",
+            "all_green": True,  # bool, not string
+            "evidence_bundle_path": "/tmp/evidence",
+            "evaluations": [{"verdict": "ACCEPTED"}],
+            "reroute_log": [],
+            "open_issues": [],
+            "accepted_count": 1,
+            "rerouted_count": 0,
+            "blocked_count": 0,
+        }
+        assert classify_summary(output) == "STRUCTURED_ALL_GREEN"
+
+
+# ---------------------------------------------------------------------------
+# TC-HARDEN-03: Adversarial review gate tests
+# ---------------------------------------------------------------------------
+
+
+def _setup_adversarial_review_state(run_dir: Path) -> None:
+    """Set loop state to ADVERSARIAL_REVIEW so run_cycle --advance enters that branch."""
+    state = {
+        "run_id": run_dir.name,
+        "current_state": "ADVERSARIAL_REVIEW",
+        "cycle_count": 1,
+        "transitions": [
+            {"from_state": "STAGE3_COMPLETE", "to_state": "ADVERSARIAL_REVIEW", "reason": "test"}
+        ],
+        "summary_classification": "STRUCTURED_ALL_GREEN",
+        "next_directive": None,
+    }
+    save_loop_state(state, run_dir)
+
+
+class TestAdversarialReviewGate:
+    """TC-HARDEN-03: Adversarial review requires review-result.json with final_decision."""
+
+    def test_adversarial_review_requires_review_result_json(self, run_dir: Path) -> None:
+        """Directory only (no review-result.json) must NOT transition to TERMINATED."""
+        _setup_adversarial_review_state(run_dir)
+        ar_dir = run_dir / "adversarial-review"
+        ar_dir.mkdir(parents=True, exist_ok=True)
+        # No review-result.json — directory only
+        state = run_cycle(run_dir, advance=True)
+        assert state["current_state"] == "ADVERSARIAL_REVIEW", (
+            "Directory existence alone must not advance state to TERMINATED"
+        )
+
+    def test_adversarial_review_accepts_on_accepted_decision(self, run_dir: Path) -> None:
+        """review-result.json with final_decision=ACCEPTED must transition to TERMINATED."""
+        _setup_adversarial_review_state(run_dir)
+        ar_dir = run_dir / "adversarial-review"
+        ar_dir.mkdir(parents=True, exist_ok=True)
+        (ar_dir / "review-result.json").write_text(
+            json.dumps(
+                {
+                    "review_date": "2026-06-17",
+                    "challenges": [],
+                    "final_decision": "ACCEPTED",
+                    "reason": "All issues addressed.",
+                }
+            ),
+            encoding="utf-8",
+        )
+        state = run_cycle(run_dir, advance=True)
+        assert state["current_state"] == "TERMINATED"
+        assert state["next_directive"]["action"] == "ACCEPT"
+
+    def test_adversarial_review_reroutes_on_rerouted_decision(self, run_dir: Path) -> None:
+        """review-result.json with final_decision=REROUTED must transition to REWORK_PENDING."""
+        _setup_adversarial_review_state(run_dir)
+        ar_dir = run_dir / "adversarial-review"
+        ar_dir.mkdir(parents=True, exist_ok=True)
+        (ar_dir / "review-result.json").write_text(
+            json.dumps(
+                {
+                    "review_date": "2026-06-17",
+                    "challenges": ["Evidence gap found in TC-01"],
+                    "final_decision": "REROUTED",
+                    "reason": "Evidence gap requires rework.",
+                }
+            ),
+            encoding="utf-8",
+        )
+        state = run_cycle(run_dir, advance=True)
+        assert state["current_state"] == "REWORK_PENDING"
+        assert state["next_directive"]["action"] == "RUN_PROMPT_2"
+
+
+# ---------------------------------------------------------------------------
+# TC-HARDEN-05: NC-10 proof tests
+# ---------------------------------------------------------------------------
+
+
+class TestNC10EvidenceBundleEnforcement:
+    """TC-HARDEN-05: null evidence_bundle_path must produce EVIDENCE_MISSING classification."""
+
+    def test_nc10_evidence_bundle_path_null_rejected(self) -> None:
+        """NC-10: null evidence_bundle_path must return EVIDENCE_MISSING."""
+        output = {
+            "summary_type": "STRUCTURED",
+            "verdict": "EXECUTION_COMPLETE_VERIFIED",
+            "all_green": True,
+            "evidence_bundle_path": None,  # null — NC-10 trigger
+            "evaluations": [{"verdict": "ACCEPTED"}],
+            "reroute_log": [],
+            "open_issues": [],
+            "accepted_count": 1,
+            "rerouted_count": 0,
+            "blocked_count": 0,
+        }
+        result = classify_summary(output)
+        assert result == "EVIDENCE_MISSING", (
+            "classify_summary must return EVIDENCE_MISSING when evidence_bundle_path is None"
+        )

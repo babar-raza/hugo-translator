@@ -85,3 +85,29 @@ python scripts/ops/sprint_loop_controller.py --run-dir <path> --advance
 # Force a specific stage (override)
 python scripts/ops/sprint_loop_controller.py --run-dir <path> --force-stage 1
 ```
+
+## Advisory-Only Constraint (enforced)
+
+ADVISORY-ONLY CONSTRAINT (enforced)
+This system is advisory. The controller writes `next-directive.json` containing the routing
+decision. It does NOT invoke prompts. It does NOT execute sprints. A human or Claude agent
+must read the directive and manually run the indicated prompt.
+
+When describing this system in any context (plans, evidence, summaries, commit messages,
+comments), use ONLY these terms:
+- advisory routing
+- machine-emitted directive
+- directive-driven routing
+- decision-advisory loop
+- routing recommendation
+
+Do NOT use:
+- autonomous
+- self-executing
+- auto-invokes
+- runs itself
+- machine-controlled execution (incorrect — the decision is machine-controlled,
+  the execution is manual)
+
+Violation of this constraint constitutes a claim error and must be corrected before
+the session closes.

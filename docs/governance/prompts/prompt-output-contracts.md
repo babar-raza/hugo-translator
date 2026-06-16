@@ -96,3 +96,25 @@ The loop controller classifies Stage 3 output as:
 - **Critical dimensions:** correctness >= 4.0, completeness >= 4.0
 - **Reroute trigger:** Any required dimension < 4/5
 - **Rubric:** `config/sprint_quality_rubric.yaml`
+
+## System Accuracy Rules
+
+This system is **advisory only**. The loop controller writes `next-directive.json`
+but does NOT invoke prompts or execute stages. A Claude agent or human operator reads
+the directive and manually runs the indicated prompt.
+
+**Required terminology** (use only these terms when describing this system):
+- advisory routing
+- machine-emitted directive
+- directive-driven routing
+- decision-advisory loop
+- routing recommendation
+
+**Prohibited terminology** (these misrepresent what the system does):
+- autonomous
+- self-executing
+- auto-invokes
+- runs itself
+
+Any output, plan, summary, commit message, or evidence file that uses prohibited
+terminology must be corrected before the session closes.

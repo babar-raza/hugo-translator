@@ -24,7 +24,46 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+try:
+    import jsonschema  # type: ignore[import-untyped]
+
+    JSONSCHEMA_AVAILABLE = True
+except ImportError:
+    JSONSCHEMA_AVAILABLE = False
+
+try:
+    import yaml  # type: ignore[import-untyped]
+
+    YAML_AVAILABLE = True
+except ImportError:
+    YAML_AVAILABLE = False
+
 logger = logging.getLogger(__name__)
+
+# ---------------------------------------------------------------------------
+# Schema loading
+# ---------------------------------------------------------------------------
+
+_SCHEMA_CACHE: dict[str, dict] = {}
+
+
+def _repo_root() -> Path:
+    """Return repository root (2 levels up from scripts/ops/)."""
+    return Path(__file__).resolve().parent.parent.parent
+
+
+def _load_schema(schema_path: Path) -> dict | None:
+    """Load and cache a JSON schema from the given path."""
+    key = str(schema_path)
+    if key in _SCHEMA_CACHE:
+        return _SCHEMA_CACHE[key]
+    if not schema_path.exists():
+        logger.warning("Schema file not found: %s", schema_path)
+        return None
+    schema = json.loads(schema_path.read_text(encoding="utf-8"))
+    _SCHEMA_CACHE[key] = schema
+    return schema
+
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -178,16 +217,30 @@ def validate_no_invalid_final_state(state: dict[str, Any]) -> None:
 
 
 def parse_stage1_output(run_dir: Path) -> dict[str, Any] | None:
-    """Parse Stage 1 audit output."""
+    """Parse Stage 1 audit output.
+
+    Validates issues.json against stage1-issue-model.schema.json when jsonschema
+    is available.  Returns None if the file is absent or schema-invalid.
+    """
     stage_dir = run_dir / STAGE_DIRS[1]
     issues_file = stage_dir / "issues.json"
     if not issues_file.exists():
         return None
-    return json.loads(issues_file.read_text(encoding="utf-8"))
+    data = json.loads(issues_file.read_text(encoding="utf-8"))
+    if JSONSCHEMA_AVAILABLE:
+        schema_path = _repo_root() / "schemas" / "stage1-issue-model.schema.json"
+        stage1_schema = _load_schema(schema_path)
+        if stage1_schema is not None:
+            try:
+                jsonschema.validate(data, stage1_schema)
+            except jsonschema.ValidationError as exc:
+                logger.warning("Stage 1 issues.json failed schema validation: %s", exc.message)
+                return None
+    return data
 
 
 def parse_stage2_output(run_dir: Path) -> dict[str, Any] | None:
-    """Parse Stage 2 plan output."""
+    """Parse Stage 2 plan output using yaml.safe_load for the verdict file."""
     stage_dir = run_dir / STAGE_DIRS[2]
     verdict_file = stage_dir / "ready-for-execution-verdict.yaml"
     taskcards_file = stage_dir / "taskcards.jsonl"
@@ -199,15 +252,31 @@ def parse_stage2_output(run_dir: Path) -> dict[str, Any] | None:
             taskcards.append(json.loads(line))
     result: dict[str, Any] = {"taskcards": taskcards}
     if verdict_file.exists():
-        # Simple YAML key: value parsing for the verdict field
-        for vline in verdict_file.read_text(encoding="utf-8").splitlines():
-            if vline.startswith("plan_verdict:"):
-                result["plan_verdict"] = vline.split(":", 1)[1].strip().strip('"')
+        if YAML_AVAILABLE:
+            try:
+                verdict_data = yaml.safe_load(verdict_file.read_text(encoding="utf-8")) or {}
+            except yaml.YAMLError as exc:
+                logger.warning("Failed to parse ready-for-execution-verdict.yaml: %s", exc)
+                verdict_data = {}
+            if isinstance(verdict_data, dict):
+                plan_verdict = verdict_data.get("plan_verdict", "")
+                if plan_verdict:
+                    result["plan_verdict"] = str(plan_verdict)
+        else:
+            # Fallback: single-line key: value extraction
+            for vline in verdict_file.read_text(encoding="utf-8").splitlines():
+                if vline.startswith("plan_verdict:"):
+                    result["plan_verdict"] = vline.split(":", 1)[1].strip().strip('"')
     return result
 
 
 def parse_stage3_output(run_dir: Path) -> dict[str, Any] | None:
-    """Parse Stage 3 execution output."""
+    """Parse Stage 3 execution output.
+
+    Uses yaml.safe_load for the summary file (supports multi-line values and
+    YAML lists).  Validates quality-scores.json against the stage3 schema when
+    jsonschema is available.
+    """
     stage_dir = run_dir / STAGE_DIRS[3]
     summary_file = stage_dir / "final-sprint-summary.yaml"
     scores_file = stage_dir / "quality-scores.json"
@@ -215,21 +284,42 @@ def parse_stage3_output(run_dir: Path) -> dict[str, Any] | None:
     if not summary_file.exists():
         return {"summary_type": "MISSING"}
 
-    # Parse YAML-style summary
-    summary: dict[str, Any] = {}
-    for line in summary_file.read_text(encoding="utf-8").splitlines():
-        line = line.strip()
-        if ":" in line and not line.startswith("#"):
-            key, _, val = line.partition(":")
-            summary[key.strip()] = val.strip().strip('"')
+    # Parse summary with yaml.safe_load when available
+    if YAML_AVAILABLE:
+        try:
+            summary = yaml.safe_load(summary_file.read_text(encoding="utf-8")) or {}
+        except yaml.YAMLError as exc:
+            logger.warning("Failed to parse final-sprint-summary.yaml: %s", exc)
+            summary = {}
+        if not isinstance(summary, dict):
+            summary = {}
+    else:
+        # Fallback: single-line key: value extraction (does not support YAML lists)
+        summary = {}
+        for line in summary_file.read_text(encoding="utf-8").splitlines():
+            line = line.strip()
+            if ":" in line and not line.startswith("#"):
+                key, _, val = line.partition(":")
+                summary[key.strip()] = val.strip().strip('"')
 
     # Check for structured vs prose
     if "verdict" not in summary or "summary_type" not in summary:
         summary["summary_type"] = "PROSE_ONLY"
 
-    # Load scores if available
+    # Load and validate scores if available
     if scores_file.exists():
         scores_data = json.loads(scores_file.read_text(encoding="utf-8"))
+        if JSONSCHEMA_AVAILABLE:
+            schema_path = _repo_root() / "schemas" / "stage3-quality-score.schema.json"
+            stage3_schema = _load_schema(schema_path)
+            if stage3_schema is not None:
+                try:
+                    jsonschema.validate(scores_data, stage3_schema)
+                except jsonschema.ValidationError as exc:
+                    logger.warning(
+                        "Stage 3 quality-scores.json failed schema validation: %s",
+                        exc.message,
+                    )
         summary["evaluations"] = scores_data.get("evaluations", [])
         summary["reroute_log"] = scores_data.get("reroute_log", [])
     else:
@@ -288,10 +378,12 @@ def classify_summary(stage3_output: dict[str, Any] | None) -> str:
     if total == 0:
         return "TASKCARDS_INCOMPLETE"
 
-    # Check for contradictions
-    all_green = stage3_output.get("all_green", "false")
+    # Check for contradictions (handle both str and bool from yaml.safe_load)
+    all_green = stage3_output.get("all_green", False)
     if isinstance(all_green, str):
         all_green = all_green.lower() == "true"
+    elif not isinstance(all_green, bool):
+        all_green = bool(all_green)
     reroute_log = stage3_output.get("reroute_log", [])
     open_issues = stage3_output.get("open_issues", [])
 
@@ -596,16 +688,53 @@ def run_cycle(
                 state["cycle_count"] = state.get("cycle_count", 0) + 1
 
         elif current == "ADVERSARIAL_REVIEW":
-            # After adversarial review, accept or rework
+            # After adversarial review, require review-result.json with final_decision.
+            # Directory existence alone is insufficient — content must be parsed.
             ar_dir = run_dir / "adversarial-review"
-            if ar_dir.exists():
-                transition(state, "TERMINATED", "Adversarial review complete — accepted")
-                state["next_directive"] = {
-                    "action": "ACCEPT",
-                    "reason": "All green. Adversarial review passed. Loop complete.",
-                }
+            review_result_file = ar_dir / "review-result.json"
+            if not review_result_file.exists():
+                logger.warning(
+                    "Adversarial review result not found or not parseable"
+                    " — staying in ADVERSARIAL_REVIEW"
+                )
             else:
-                logger.warning("Adversarial review output not found.")
+                try:
+                    review_result = json.loads(review_result_file.read_text(encoding="utf-8"))
+                except json.JSONDecodeError as exc:
+                    logger.warning(
+                        "Adversarial review result not parseable: %s"
+                        " — staying in ADVERSARIAL_REVIEW",
+                        exc,
+                    )
+                    review_result = None
+                if review_result is not None:
+                    final_decision = review_result.get("final_decision", "")
+                    if final_decision == "ACCEPTED":
+                        transition(state, "TERMINATED", "Adversarial review complete — accepted")
+                        state["next_directive"] = {
+                            "action": "ACCEPT",
+                            "reason": "All green. Adversarial review passed. Loop complete.",
+                        }
+                    elif final_decision == "REROUTED":
+                        reroute_reason = review_result.get(
+                            "reason", "Adversarial review required rework"
+                        )
+                        logger.info("Adversarial review REROUTED: %s", reroute_reason)
+                        transition(state, "REWORK_PENDING", "Adversarial review required rework")
+                        state["next_directive"] = {
+                            "action": "RUN_PROMPT_2",
+                            "prompt_asset_path": PROMPT_PATHS[2],
+                            "input_dir": str(run_dir / STAGE_DIRS[3]),
+                            "output_dir": str(run_dir / STAGE_DIRS[2]),
+                            "open_issues": review_result.get("challenges", []),
+                            "reason": reroute_reason,
+                        }
+                    else:
+                        logger.warning(
+                            "Adversarial review result has unknown final_decision: %r"
+                            " — staying in ADVERSARIAL_REVIEW",
+                            final_decision,
+                        )
 
     validate_no_invalid_final_state(state)
 
