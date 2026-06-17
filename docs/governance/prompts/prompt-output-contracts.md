@@ -73,6 +73,32 @@ This document specifies the required outputs for each stage of the post-sprint a
 | `loop-events.jsonl` | JSONL | Decision event log |
 | `next-directive.json` | JSON | What the agent should do next |
 
+## Adversarial Review
+
+**Schema:** `schemas/adversarial-review-result.schema.json`
+
+**Required file:** `adversarial-review/review-result.json`
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `review_date` | string (ISO-8601) | YES | Date of adversarial review |
+| `challenges` | array of strings | YES | Challenges raised during review (empty array `[]` is valid) |
+| `final_decision` | enum: ACCEPTED, REROUTED | YES | ACCEPTED → TERMINATED; REROUTED → REWORK_PENDING |
+| `reason` | string | YES | Human-readable rationale for the final decision |
+
+**State transition rules:**
+- `final_decision: ACCEPTED` — controller transitions ADVERSARIAL_REVIEW → TERMINATED; action = ACCEPT
+- `final_decision: REROUTED` — controller transitions ADVERSARIAL_REVIEW → REWORK_PENDING; action = RUN_PROMPT_2; `challenges` become open_issues in the reroute directive
+- File missing or directory absent — controller stays in ADVERSARIAL_REVIEW (no advance)
+- File present but not valid JSON — controller logs warning, stays in ADVERSARIAL_REVIEW
+- File fails schema validation — controller logs warning, stays in ADVERSARIAL_REVIEW
+
+**Rejection criteria:**
+- Missing `final_decision` field
+- `final_decision` value other than ACCEPTED or REROUTED
+- Missing `reason` field (schema violation)
+- File absent or not valid JSON
+
 ## Summary Classification Rules
 
 The loop controller classifies Stage 3 output as:

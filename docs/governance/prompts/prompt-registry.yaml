@@ -137,6 +137,9 @@ schemas:
   - id: LOOP_STATE
     path: schemas/loop-decision-state.schema.json
     stage: null
+  - id: ADVERSARIAL_REVIEW_RESULT
+    path: schemas/adversarial-review-result.schema.json
+    stage: null  # meta-stage: adversarial review gate
 
 scripts:
   - id: LOOP_CONTROLLER_SCRIPT

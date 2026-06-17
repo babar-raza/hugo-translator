@@ -85,7 +85,18 @@ negative_controls:
   NC-7_contradictory_summary_detected: PASS
   NC-8_state_skip_rejected: PASS
   NC-9_no_evidence_rerouted: PASS
-  NC-10_evidence_manifest_mismatch: PASS
+  NC-10_evidence_manifest_mismatch: PASS  # Phase 2 update: enforced via classify_summary() null check on evidence_bundle_path (primary) + jsonschema.validate wired in TC-HARDEN-01 (secondary). NOT enforced by stage3 schema alone — evidence_bundle_path is typed ["string","null"] in schema by design.
+
+phase2_additions:
+  commit: 45f362d
+  date: 2026-06-17
+  changes:
+    - "TC-HARDEN-01: jsonschema.validate() wired in parse_stage1_output() and parse_stage3_output()"
+    - "TC-HARDEN-02: yaml.safe_load() replaces line-by-line YAML parser; YAML list open_issues now triggers CONTRADICTORY"
+    - "TC-HARDEN-03: adversarial review gate requires review-result.json with final_decision; REROUTED path added"
+    - "TC-HARDEN-04: real-input end-to-end proof — TERMINATED from actual evidence inspection; 10 loop events, STRUCTURED_ALL_GREEN"
+    - "TC-HARDEN-05: test_nc10_evidence_bundle_path_null_rejected passes — null evidence_bundle_path returns EVIDENCE_MISSING"
+    - "TC-HARDEN-06: advisory-only constraint added to prompt docs; system_type: advisory in all 5 registry entries"
 
 e2e_cycle_proven: true
 e2e_cycle_steps:

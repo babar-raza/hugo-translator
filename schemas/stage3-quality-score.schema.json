@@ -1,7 +1,8 @@
 {
   "description": "Schema for Stage 3 (controlled execution) quality scoring output.\n\nCaptures per-taskcard quality evaluations across 15 dimensions\n(5 base + 10 sprint-specific) and reroute decisions.",
   "type": "object",
-  "required": ["evaluations", "final_sprint_summary"],
+  "required": ["evaluations"],
+  "_note": "final_sprint_summary is loaded separately from final-sprint-summary.yaml, not from quality-scores.json. Do not add it to required here.",
   "properties": {
     "run_id": {
       "type": "string",

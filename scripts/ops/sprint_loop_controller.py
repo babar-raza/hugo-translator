@@ -707,6 +707,21 @@ def run_cycle(
                         exc,
                     )
                     review_result = None
+                if review_result is not None and JSONSCHEMA_AVAILABLE:
+                    ar_schema_path = (
+                        _repo_root() / "schemas" / "adversarial-review-result.schema.json"
+                    )
+                    ar_schema = _load_schema(ar_schema_path)
+                    if ar_schema is not None:
+                        try:
+                            jsonschema.validate(review_result, ar_schema)
+                        except jsonschema.ValidationError as exc:
+                            logger.warning(
+                                "Adversarial review result failed schema validation: %s"
+                                " — staying in ADVERSARIAL_REVIEW",
+                                exc.message,
+                            )
+                            review_result = None
                 if review_result is not None:
                     final_decision = review_result.get("final_decision", "")
                     if final_decision == "ACCEPTED":

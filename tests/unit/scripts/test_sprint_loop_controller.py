@@ -15,6 +15,7 @@ import pytest
 import sys
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
+import scripts.ops.sprint_loop_controller as controller_module
 from scripts.ops.sprint_loop_controller import (
     InvalidTransitionError,
     classify_summary,
@@ -22,6 +23,7 @@ from scripts.ops.sprint_loop_controller import (
     emit_directive,
     load_loop_state,
     parse_stage1_output,
+    parse_stage2_output,
     parse_stage3_output,
     run_cycle,
     save_loop_state,
@@ -620,6 +622,28 @@ class TestAdversarialReviewGate:
         assert state["current_state"] == "REWORK_PENDING"
         assert state["next_directive"]["action"] == "RUN_PROMPT_2"
 
+    def test_adversarial_review_rejects_schema_invalid_result(self, run_dir: Path) -> None:
+        """review-result.json missing required 'reason' field must NOT advance state."""
+        _setup_adversarial_review_state(run_dir)
+        ar_dir = run_dir / "adversarial-review"
+        ar_dir.mkdir(parents=True, exist_ok=True)
+        # Missing 'reason' — violates adversarial-review-result.schema.json
+        (ar_dir / "review-result.json").write_text(
+            json.dumps(
+                {
+                    "review_date": "2026-06-17",
+                    "challenges": [],
+                    "final_decision": "ACCEPTED",
+                    # 'reason' intentionally absent
+                }
+            ),
+            encoding="utf-8",
+        )
+        state = run_cycle(run_dir, advance=True)
+        assert state["current_state"] == "ADVERSARIAL_REVIEW", (
+            "Schema-invalid review-result.json (missing 'reason') must not advance state to TERMINATED"
+        )
+
 
 # ---------------------------------------------------------------------------
 # TC-HARDEN-05: NC-10 proof tests
@@ -646,4 +670,122 @@ class TestNC10EvidenceBundleEnforcement:
         result = classify_summary(output)
         assert result == "EVIDENCE_MISSING", (
             "classify_summary must return EVIDENCE_MISSING when evidence_bundle_path is None"
+        )
+
+
+# ---------------------------------------------------------------------------
+# TC-PHASE3-01: Fallback path tests (YAML_AVAILABLE=False, JSONSCHEMA_AVAILABLE=False)
+# ---------------------------------------------------------------------------
+
+
+class TestFallbackPaths:
+    """TC-PHASE3-01: Verify graceful degradation when pyyaml or jsonschema are absent."""
+
+    def test_jsonschema_unavailable_parse_stage1_accepts_without_validation(
+        self, run_dir: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """When JSONSCHEMA_AVAILABLE=False, schema-invalid stage1 output is returned (not None)."""
+        # Write an issues.json that violates the schema (missing required fields).
+        # With jsonschema available this would be rejected; without it should pass through.
+        stage_dir = run_dir / "stage1-audit"
+        stage_dir.mkdir(parents=True, exist_ok=True)
+        (stage_dir / "issues.json").write_text(
+            json.dumps({"issues": [{"issue_id": "L1-001"}]}),  # missing claim_classifications etc.
+            encoding="utf-8",
+        )
+        monkeypatch.setattr(controller_module, "JSONSCHEMA_AVAILABLE", False)
+        result = parse_stage1_output(run_dir)
+        assert result is not None, (
+            "When JSONSCHEMA_AVAILABLE=False, parse_stage1_output must skip validation "
+            "and return the data instead of None"
+        )
+        assert "issues" in result
+
+    def test_yaml_unavailable_parse_stage3_uses_line_parser(
+        self, run_dir: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """When YAML_AVAILABLE=False, parse_stage3_output falls back to line-by-line parser."""
+        stage_dir = run_dir / "stage3-execution"
+        stage_dir.mkdir(parents=True, exist_ok=True)
+        # Write a flat YAML file parseable by the line-by-line fallback.
+        (stage_dir / "final-sprint-summary.yaml").write_text(
+            "verdict: EXECUTION_COMPLETE_VERIFIED\nsummary_type: STRUCTURED\nall_green: true\n"
+            "accepted_count: 1\nrerouted_count: 0\nblocked_count: 0\n"
+            "evidence_bundle_path: /tmp/evidence\nopen_issues: \n",
+            encoding="utf-8",
+        )
+        # Write a minimal scores file to avoid scores-related branches.
+        (stage_dir / "quality-scores.json").write_text(
+            json.dumps(
+                {
+                    "evaluations": [{"taskcard_id": "TC-01", "verdict": "ACCEPTED"}],
+                    "reroute_log": [],
+                }
+            ),
+            encoding="utf-8",
+        )
+        monkeypatch.setattr(controller_module, "YAML_AVAILABLE", False)
+        # Also disable jsonschema to avoid spurious schema warning on scores
+        monkeypatch.setattr(controller_module, "JSONSCHEMA_AVAILABLE", False)
+        result = parse_stage3_output(run_dir)
+        assert result is not None
+        assert result.get("summary_type") == "STRUCTURED", (
+            "Fallback line-by-line parser must extract summary_type from flat YAML"
+        )
+
+
+# ---------------------------------------------------------------------------
+# TC-PHASE3-02: parse_stage2_output unit tests
+# ---------------------------------------------------------------------------
+
+
+class TestParseStage2Output:
+    """TC-PHASE3-02: Unit tests for parse_stage2_output (absent/present/multiline)."""
+
+    def test_parse_stage2_absent_returns_none(self, run_dir: Path) -> None:
+        """parse_stage2_output returns None when stage2-plan/ directory is absent."""
+        result = parse_stage2_output(run_dir)
+        assert result is None
+
+    def test_parse_stage2_present_flat_verdict(self, run_dir: Path) -> None:
+        """parse_stage2_output extracts plan_verdict and taskcards from valid stage2 output."""
+        stage_dir = run_dir / "stage2-plan"
+        stage_dir.mkdir(parents=True, exist_ok=True)
+        # Write one JSONL taskcard line.
+        (stage_dir / "taskcards.jsonl").write_text(
+            json.dumps({"task_id": "TC-01", "title": "Fix gap"}) + "\n",
+            encoding="utf-8",
+        )
+        # Write a flat YAML verdict file.
+        (stage_dir / "ready-for-execution-verdict.yaml").write_text(
+            "plan_verdict: PLAN_HARDENED\n",
+            encoding="utf-8",
+        )
+        result = parse_stage2_output(run_dir)
+        assert result is not None
+        assert result["plan_verdict"] == "PLAN_HARDENED"
+        assert isinstance(result["taskcards"], list)
+        assert len(result["taskcards"]) == 1
+        assert result["taskcards"][0]["task_id"] == "TC-01"
+
+    def test_parse_stage2_multiline_verdict_yaml(self, run_dir: Path) -> None:
+        """parse_stage2_output handles multi-line YAML in ready-for-execution-verdict.yaml."""
+        stage_dir = run_dir / "stage2-plan"
+        stage_dir.mkdir(parents=True, exist_ok=True)
+        (stage_dir / "taskcards.jsonl").write_text(
+            json.dumps({"task_id": "TC-02", "title": "Multiline test"}) + "\n",
+            encoding="utf-8",
+        )
+        # Multi-line YAML with a block scalar note field that would break a line parser.
+        (stage_dir / "ready-for-execution-verdict.yaml").write_text(
+            "plan_verdict: PLAN_HARDENED_WITH_CAVEATS\n"
+            "notes: |\n"
+            "  Line one of notes.\n"
+            "  Line two of notes.\n",
+            encoding="utf-8",
+        )
+        result = parse_stage2_output(run_dir)
+        assert result is not None
+        assert result["plan_verdict"] == "PLAN_HARDENED_WITH_CAVEATS", (
+            "yaml.safe_load must correctly extract plan_verdict from multi-line YAML"
         )
