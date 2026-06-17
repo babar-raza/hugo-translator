@@ -92,6 +92,7 @@ unit-tests:
       tests/unit/observability/test_contradiction_detector.py
       tests/unit/observability/test_run_summarizer.py
       tests/unit/observability/test_evidence_declaration.py
+      tests/unit/observability/test_metrics_guards.py
       tests/unit/translation_engine/test_model_selector.py
       tests/unit/workers/test_agentic_hook_dispatch.py
       -v --tb=short

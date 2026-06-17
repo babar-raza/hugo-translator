@@ -4,6 +4,10 @@ TC-ENABLE-03: Zero-item suppression guard
 TC-ENABLE-04: Low-confidence scope suppression guard
 TC-ENABLE-06: Config toggle guard (runtime env var)
 
+CI scope: included in unit-tests agentic module block (gitlab-ci.yml +
+release_gate.yml). 6 tests validate implemented behaviour; 3 xfail for
+unimplemented guards (TC-ENABLE-03/04/06).
+
 xfail policy:
   Tests for TC-ENABLE-03/04/06 are marked xfail(strict=False) because the
   corresponding guard features are not yet implemented in
