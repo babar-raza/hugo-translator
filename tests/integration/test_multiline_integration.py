@@ -85,6 +85,10 @@ class TestMultilineIntegration:
         engine.multiline_handler = MultilineHandler()
         engine.placeholder_manager = Mock()
 
+        from src.translation_engine.segment_translator import SegmentTranslator
+
+        engine._segment_translator = SegmentTranslator(engine)
+
         # Create mock backend
         backend = MockBackend()
 
@@ -132,6 +136,10 @@ class TestMultilineIntegration:
         engine.multiline_handler = MultilineHandler()
         engine.placeholder_manager = Mock()
 
+        from src.translation_engine.segment_translator import SegmentTranslator
+
+        engine._segment_translator = SegmentTranslator(engine)
+
         backend = MockBackend()
 
         # Aspose-style bullet content
@@ -173,6 +181,10 @@ class TestMultilineIntegration:
         engine.multiline_handler = MultilineHandler()
         engine.placeholder_manager = Mock()
 
+        from src.translation_engine.segment_translator import SegmentTranslator
+
+        engine._segment_translator = SegmentTranslator(engine)
+
         backend = MockBackend()
 
         source = "Paragraph 1\n\nParagraph 2"
@@ -204,6 +216,10 @@ class TestMultilineIntegration:
         engine = TranslationEngine.__new__(TranslationEngine)
         engine.multiline_handler = MultilineHandler()
         engine.placeholder_manager = Mock()
+
+        from src.translation_engine.segment_translator import SegmentTranslator
+
+        engine._segment_translator = SegmentTranslator(engine)
 
         backend = MockBackend()
 

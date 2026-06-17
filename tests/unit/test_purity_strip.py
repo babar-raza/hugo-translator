@@ -92,6 +92,15 @@ class TestPurityThresholdReductionBG:
         engine.config = FakeConfig()
         engine.similarity_tracker = None
 
+        from src.translation_engine.write_gate import WriteGateEvaluator
+
+        engine._write_gate = WriteGateEvaluator(
+            detector=None,
+            similarity_tracker=None,
+            config=engine.config,
+            force_accept=False,
+        )
+
         # Content: mostly Bulgarian prose, with 3 barcode spec lines scattered in
         content = (
             "---\ntitle: Баркод\n---\n"
@@ -138,6 +147,15 @@ class TestPurityThresholdReductionBG:
 
         engine.config = FakeConfig()
         engine.similarity_tracker = None
+
+        from src.translation_engine.write_gate import WriteGateEvaluator
+
+        engine._write_gate = WriteGateEvaluator(
+            detector=None,
+            similarity_tracker=None,
+            config=engine.config,
+            force_accept=False,
+        )
 
         # Content: 2 good BG paragraphs + 3 Russian paragraphs (>15% threshold)
         content = (
