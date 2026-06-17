@@ -138,6 +138,12 @@ ehthumbs.db
 Desktop.ini
 $RECYCLE.BIN/
 
+# GitLab runner local state (machine-specific, never commit)
+/.runner_system_id
+
+# Local evidence / rating-healing run bundles (dev-only, not for commit)
+/.local/
+
 # Pre-commit (config is now tracked)
 
 # Backup files

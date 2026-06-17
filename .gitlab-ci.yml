@@ -118,6 +118,24 @@ governance-check:
   timeout: 5 minutes
   script:
     - python scripts/ci/check_governance.py --strict
+    - |
+      # Walk the YAML line-by-line to check enabled: only within the agent_metrics: block.
+      # A broad regex like '^\s*enabled:\s*true' false-positives on the many other
+      # enabled: true lines throughout config/global.yaml (validation, caching, terminology, etc.)
+      $lines = Get-Content config/global.yaml
+      $inBlock = $false
+      $agentEnabled = $false
+      foreach ($line in $lines) {
+        if ($line -match '^agent_metrics\s*:') { $inBlock = $true; continue }
+        if ($inBlock -and $line -match '^\S') { $inBlock = $false }
+        if ($inBlock -and $line -match '^\s+enabled:\s*true(\s*#.*)?$') { $agentEnabled = $true }
+      }
+      if ($agentEnabled) {
+        Write-Host "ERROR: config/global.yaml has agent_metrics.enabled=true committed."
+        Write-Host "Production enablement must be a local runtime override, never committed."
+        exit 1
+      }
+      Write-Host "agent_metrics config guard: OK (enabled is not true in committed config)"
 
 regression-tests:
   stage: validate

@@ -62,6 +62,22 @@ class ModelRecommendation:
     fallback_used: bool = False
 
 
+def _extract_site_from_path(file_path: str) -> str:
+    """Extract site_id from a validation metrics file path.
+
+    Paths follow the pattern: .../content/{domain}/{product}/en/...
+    e.g. "D:\\...\\docs.aspose.net\\words\\en\\..." → "docs.aspose.net.words"
+    """
+    parts = Path(file_path).parts
+    # Find "en" (source language dir) and walk back to get domain.product
+    for i, part in enumerate(parts):
+        if part == "en" and i >= 2:
+            domain = parts[i - 2]  # e.g. "docs.aspose.net"
+            product = parts[i - 1]  # e.g. "words"
+            return f"{domain}.{product}"
+    return ""
+
+
 def _load_validation_metrics(
     site_id: str,
     target_lang: str,
@@ -69,7 +85,14 @@ def _load_validation_metrics(
     metrics_file: Path | None = None,
     limit: int = 500,
 ) -> list[dict[str, Any]]:
-    """Load validation metrics entries for a (site, lang) pair."""
+    """Load validation metrics entries for a (site, lang) pair.
+
+    The real JSONL schema (from decision_engine.py) uses ``lang`` (not
+    ``target_lang``) and has no ``site_id`` field — the site is inferred
+    from the ``file`` path.  For backward compatibility with synthetic test
+    data that may use ``site_id``/``target_lang``, both field names are
+    accepted.
+    """
     path = metrics_file or _VALIDATION_METRICS_FILE
     if not path.exists():
         return []
@@ -81,7 +104,10 @@ def _load_validation_metrics(
                 continue
             try:
                 entry = json.loads(line)
-                if entry.get("site_id") == site_id and entry.get("target_lang") == target_lang:
+                # Accept both real schema (lang, file) and synthetic (target_lang, site_id)
+                entry_lang = entry.get("lang") or entry.get("target_lang", "")
+                entry_site = entry.get("site_id") or _extract_site_from_path(entry.get("file", ""))
+                if entry_site == site_id and entry_lang == target_lang:
                     entries.append(entry)
                     if len(entries) >= limit:
                         break
@@ -112,21 +138,28 @@ def _load_run_history(
 
 def compute_model_scores(
     metrics: list[dict[str, Any]],
+    *,
+    default_model: str = "unknown",
 ) -> dict[str, ModelScore]:
-    """Compute per-model quality scores from validation metrics."""
+    """Compute per-model quality scores from validation metrics.
+
+    Handles both real JSONL (``decision`` as int 0/1/2 per
+    ``ValidationDecision`` enum, no ``model_id``) and synthetic test data
+    (``decision`` as string "ACCEPT"/"REJECT"/"RETRY", ``model_id`` present).
+    """
     scores: dict[str, ModelScore] = {}
     for entry in metrics:
-        model = entry.get("model_id", "unknown")
+        model = entry.get("model_id") or default_model
         if model not in scores:
             scores[model] = ModelScore(model_id=model)
         score = scores[model]
         score.total_files += 1
         decision = entry.get("decision", "")
-        if decision == "ACCEPT":
+        if decision in (0, "ACCEPT"):
             score.accepted_files += 1
-        elif decision == "REJECT":
+        elif decision in (2, "REJECT"):
             score.rejected_files += 1
-        elif decision == "RETRY":
+        elif decision in (1, "RETRY"):
             score.retried_files += 1
     return scores
 
@@ -174,7 +207,7 @@ def select_model(
         )
 
     # Compute scores per model
-    scores = compute_model_scores(metrics)
+    scores = compute_model_scores(metrics, default_model=default_model)
 
     if not scores:
         return ModelRecommendation(

@@ -45,6 +45,11 @@ def _emit_run_signal_safe(
     run_attempted: int,
     run_start: float,
     config_service: "ConfigService",
+    *,
+    run_retried: int = 0,
+    run_validators_run: int = 0,
+    run_validators_passed: int = 0,
+    run_validators_failed: int = 0,
 ) -> None:
     """Emit a run signal after a translation run (non-fatal).
 
@@ -65,11 +70,10 @@ def _emit_run_signal_safe(
             "files_processed": run_attempted or max(accepted + run_rejected, 1),
             "files_accepted": accepted,
             "files_rejected": run_rejected,
-            # Not yet surfaced from engine to worker; requires TranslationResult plumbing
-            "files_retried": 0,
-            "validators_run": 0,
-            "validators_passed": 0,
-            "validators_failed": 0,
+            "files_retried": run_retried,
+            "validators_run": run_validators_run,
+            "validators_passed": run_validators_passed,
+            "validators_failed": run_validators_failed,
         }
         signal = build_signal_from_run_stats(
             site_id=site_id or "all",
@@ -746,6 +750,10 @@ class AutonomousContentTranslationWorker:
                 run_attempted=getattr(self, "_run_attempted_files", 0),
                 run_start=getattr(self, "_run_start", time.time()),
                 config_service=self.config_service,
+                run_retried=getattr(self, "_run_retried_files", 0),
+                run_validators_run=getattr(self, "_run_validators_run", 0),
+                run_validators_passed=getattr(self, "_run_validators_passed", 0),
+                run_validators_failed=getattr(self, "_run_validators_failed", 0),
             )
             # TC-AGT-07: Record run completion in continuation state
             if _cont_active:
@@ -872,6 +880,10 @@ class AutonomousContentTranslationWorker:
                         run_attempted=getattr(self, "_run_attempted_files", 0),
                         run_start=getattr(self, "_run_start", time.time()),
                         config_service=self.config_service,
+                        run_retried=getattr(self, "_run_retried_files", 0),
+                        run_validators_run=getattr(self, "_run_validators_run", 0),
+                        run_validators_passed=getattr(self, "_run_validators_passed", 0),
+                        run_validators_failed=getattr(self, "_run_validators_failed", 0),
                     )
                     # TC-AGT-07: Record run completion in continuation state
                     if _cont_active:
@@ -951,6 +963,11 @@ class AutonomousContentTranslationWorker:
         # TC-FIX-03: Real rejection tracking so acceptance_rate reflects actual quality
         self._run_rejected_files = 0
         self._run_attempted_files = 0
+        # TC-AGT-20: Real signal stats aggregated from DirectoryResult.file_results
+        self._run_retried_files = 0
+        self._run_validators_run = 0
+        self._run_validators_passed = 0
+        self._run_validators_failed = 0
 
         # Determine sites to process
         if self.config.site:
@@ -1398,6 +1415,20 @@ class AutonomousContentTranslationWorker:
                     getattr(self, "_run_attempted_files", 0) + result.total_files
                 )
 
+                # TC-AGT-20: Aggregate validation/retry stats from DirectoryResult.file_results
+                for _fr in getattr(result, "file_results", []):
+                    if getattr(_fr, "retry_attempts", 0) > 0:
+                        self._run_retried_files += 1
+                    if getattr(_fr, "validation_result", None) is not None:
+                        self._run_validators_run += 1
+                    _vd = getattr(_fr, "validation_decision", None)
+                    if _vd is not None:
+                        _vd_name = getattr(_vd, "name", str(_vd))
+                        if _vd_name == "ACCEPT":
+                            self._run_validators_passed += 1
+                        elif _vd_name == "REJECT":
+                            self._run_validators_failed += 1
+
                 # BUG-2 FIX: Accumulate successful file count for run-level health tracking
                 _site_files = getattr(self, "_run_new_files", {})
                 _site_files[site_id] = _site_files.get(site_id, 0) + result.successful_files
@@ -1489,6 +1520,20 @@ class AutonomousContentTranslationWorker:
             self._run_attempted_files = (
                 getattr(self, "_run_attempted_files", 0) + result.total_files
             )
+
+            # TC-AGT-20: Aggregate validation/retry stats from DirectoryResult.file_results
+            for _fr in getattr(result, "file_results", []):
+                if getattr(_fr, "retry_attempts", 0) > 0:
+                    self._run_retried_files += 1
+                if getattr(_fr, "validation_result", None) is not None:
+                    self._run_validators_run += 1
+                _vd = getattr(_fr, "validation_decision", None)
+                if _vd is not None:
+                    _vd_name = getattr(_vd, "name", str(_vd))
+                    if _vd_name == "ACCEPT":
+                        self._run_validators_passed += 1
+                    elif _vd_name == "REJECT":
+                        self._run_validators_failed += 1
 
             # BUG-2 FIX: Accumulate successful file count for run-level health tracking
             _site_files = getattr(self, "_run_new_files", {})

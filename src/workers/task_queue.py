@@ -1,5 +1,9 @@
 """TC-AGT-06: Programmatic task queue — JSONL-based machine-readable task backlog.
 
+Standalone utility — not yet consumed by worker_orchestrator.
+Integration deferred to a future horizon pending supervisor loop stabilization.
+See TC-AGT-22 in the agentic maturity plan for details.
+
 Replaces the prose-based TASK_BACKLOG.md with a structured, programmatic task
 queue that the worker orchestrator can read for autonomous task selection.
 
