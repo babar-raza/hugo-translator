@@ -328,7 +328,6 @@ class EngineBuilder:
     def _init_locks(engine, p):
         engine._tm_lock = Lock()
         engine._model_lock = Lock()
-        engine._file_write_lock = Lock()
 
         engine._shutdown_requested = False
         engine._shutdown_lock = Lock()

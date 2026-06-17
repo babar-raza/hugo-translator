@@ -136,7 +136,7 @@ print(f"Memory delta: {after - before:.1f} MB")
 | 4 | 32GB | 8+ cores | NVMe SSD |
 
 **Thread Safety:**
-- Uses locks for shared resources: TM access (`_tm_lock`), model loading (`_model_lock`), file writes (`_file_write_lock`)
+- Uses locks for shared resources: TM access (`_tm_lock`), model loading (`_model_lock`)
 - Pre-loading models prevents race conditions during initialization
 - Each worker maintains isolated file processing context
 

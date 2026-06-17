@@ -250,14 +250,12 @@ Content.
         # Verify locks are initialized
         assert hasattr(translation_engine, "_tm_lock")
         assert hasattr(translation_engine, "_model_lock")
-        assert hasattr(translation_engine, "_file_write_lock")
 
         # Verify locks are Lock objects
         from threading import Lock
 
         assert isinstance(translation_engine._tm_lock, Lock)
         assert isinstance(translation_engine._model_lock, Lock)
-        assert isinstance(translation_engine._file_write_lock, Lock)
 
     def test_parallel_error_handling(self, translation_engine, temp_dir):
         """Test that parallel processing handles errors gracefully."""
