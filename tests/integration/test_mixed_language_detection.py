@@ -55,7 +55,7 @@ class TestContaminationScannerDetection:
         """File with ~15% English paragraphs in German content is flagged."""
         pytest.importorskip("langdetect", reason="langdetect required")
 
-        from scripts.scan_language_contamination import LanguageContaminationScanner
+        from scripts.content.scan_language_contamination import LanguageContaminationScanner
 
         # 15 German paragraphs + 3 English = ~17% contamination (above 5% threshold)
         german_paras = [
@@ -92,7 +92,7 @@ class TestContaminationScannerDetection:
         """File with 100% German content is NOT flagged as contaminated."""
         pytest.importorskip("langdetect", reason="langdetect required")
 
-        from scripts.scan_language_contamination import LanguageContaminationScanner
+        from scripts.content.scan_language_contamination import LanguageContaminationScanner
 
         german_paras = [
             "Dies ist ein vollständig auf Deutsch übersetzter Absatz ohne englische Inhalte.",
@@ -120,7 +120,7 @@ class TestContaminationScannerDetection:
         """Block-level detection identifies which specific paragraphs are English."""
         pytest.importorskip("langdetect", reason="langdetect required")
 
-        from scripts.scan_language_contamination import LanguageContaminationScanner
+        from scripts.content.scan_language_contamination import LanguageContaminationScanner
 
         # Build file with clearly labelled English contamination
         content = (
@@ -141,7 +141,7 @@ class TestContaminationScannerDetection:
 
     def test_fast_mode_detects_script_mixing(self, tmp_path):
         """Fast mode (no langdetect) catches Arabic script in German content."""
-        from scripts.scan_language_contamination import LanguageContaminationScanner
+        from scripts.content.scan_language_contamination import LanguageContaminationScanner
 
         # German file with Arabic script embedded (clear script mismatch)
         content = (
@@ -172,7 +172,7 @@ class TestResultToJson:
         """result_to_json() output contains all fields required by force_retranslate script."""
         from datetime import datetime
 
-        from scripts.scan_language_contamination import (
+        from scripts.content.scan_language_contamination import (
             FileAnalysis,
             LanguageContaminationScanner,
             ScanResult,
@@ -237,7 +237,7 @@ class TestResultToJson:
         """Clean files (no quality issues) are not included in JSON 'files' list."""
         from datetime import datetime
 
-        from scripts.scan_language_contamination import (
+        from scripts.content.scan_language_contamination import (
             FileAnalysis,
             LanguageContaminationScanner,
             ScanResult,

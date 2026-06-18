@@ -3,6 +3,7 @@
 Tests that benchmark scripts properly persist results to the BenchmarkDatabase.
 """
 
+import os
 import subprocess
 import tempfile
 from pathlib import Path
@@ -78,11 +79,18 @@ def test_benchmark_db_flag_is_optional():
         pytest.skip("benchmark_cpu_comprehensive.py not found")
 
     # Verify help shows --save-to-db as optional
+    import sys
+
+    repo_root = str(Path(__file__).resolve().parent.parent.parent)
+    env = os.environ.copy()
+    existing = env.get("PYTHONPATH", "")
+    env["PYTHONPATH"] = os.pathsep.join(filter(None, [repo_root, existing]))
     result = subprocess.run(
         ["python", str(script_path), "--help"],
         capture_output=True,
         text=True,
         timeout=10,
+        env=env,
     )
 
     assert result.returncode == 0, f"Help failed: {result.stderr}"

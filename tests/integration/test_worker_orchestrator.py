@@ -224,9 +224,18 @@ class TestLivePidBlocks:
             },
         )
         state = _make_state()
-        with patch("src.workers.worker_orchestrator.worker_pid_alive", return_value=True):
-            launched = run_check_cycle(registry, state, dry_run=True)
-        assert "tm_improvement_worker" not in launched
+
+        # Orchestrator checks pid_file.exists() before calling worker_pid_alive().
+        # Create the PID file so the existence check passes and the mock is reached.
+        pid_file = Path("data/logs") / "tm_improvement_worker.pid"
+        pid_file.parent.mkdir(parents=True, exist_ok=True)
+        pid_file.write_text("99999\n", encoding="utf-8")
+        try:
+            with patch("src.workers.worker_orchestrator.worker_pid_alive", return_value=True):
+                launched = run_check_cycle(registry, state, dry_run=True)
+            assert "tm_improvement_worker" not in launched
+        finally:
+            pid_file.unlink(missing_ok=True)
 
 
 class TestDisabledWorker:
@@ -340,6 +349,6 @@ class TestWorkerCompletedTrigger:
                 "trigger": {"type": "worker_completed", "worker": "content_worker"},
             },
         )
-        state = _make_state(recently_completed_workers=["content_worker"])
+        state = _make_state(recently_launched_workers=["content_worker"])
         launched = run_check_cycle(registry, state, dry_run=True)
         assert "verification_worker" in launched

@@ -74,7 +74,7 @@ jobs:
 
       - name: Agentic Module Tests
         run: |
-          python -m pytest tests/unit/workers/test_continuation_state.py tests/unit/workers/test_task_queue.py tests/unit/workers/test_supervisor_loop.py tests/unit/workers/test_agentic_hook_dispatch.py tests/unit/observability/test_run_signal_emitter.py tests/unit/observability/test_blocker_classifier.py tests/unit/observability/test_contradiction_detector.py tests/unit/observability/test_run_summarizer.py tests/unit/observability/test_evidence_declaration.py tests/unit/translation_engine/test_model_selector.py -v --tb=short
+          python -m pytest tests/unit/workers/test_continuation_state.py tests/unit/workers/test_task_queue.py tests/unit/workers/test_supervisor_loop.py tests/unit/workers/test_agentic_hook_dispatch.py tests/unit/observability/test_run_signal_emitter.py tests/unit/observability/test_blocker_classifier.py tests/unit/observability/test_contradiction_detector.py tests/unit/observability/test_run_summarizer.py tests/unit/observability/test_evidence_declaration.py tests/unit/observability/test_metrics_guards.py tests/unit/translation_engine/test_model_selector.py -v --tb=short
         shell: pwsh
 
       - name: Coverage Gate
@@ -121,6 +121,11 @@ jobs:
           }
           Write-Host "agent_metrics config guard: OK (enabled is not true in committed config)"
         shell: pwsh
+
+      - name: Validate autonomous loop structure (advisory)
+        run: python scripts/quality/validate_autonomous_loop.py
+        shell: pwsh
+        continue-on-error: true  # advisory until TC-LOOP-12 pilot confirms zero false-positives
 
   docs-check:
     name: Docs Link Check (advisory)

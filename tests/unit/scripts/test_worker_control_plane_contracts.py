@@ -8,7 +8,7 @@ from pathlib import Path
 
 def test_scheduler_setup_includes_autonomous_verification_task():
     """Scheduler script must register verification task and verify all 4 tasks."""
-    script = Path("scripts/setup_task_scheduler.ps1").read_text(encoding="utf-8")
+    script = Path("scripts/ops/setup_task_scheduler.ps1").read_text(encoding="utf-8")
 
     assert "[4/4] Creating task: HugoTranslator-AutonomousVerification" in script
     assert '-TaskName "HugoTranslator-AutonomousVerification"' in script
@@ -18,7 +18,7 @@ def test_scheduler_setup_includes_autonomous_verification_task():
 
 def test_health_check_reports_auditable_provenance_and_avoids_pid_collision():
     """Health check script must expose provenance fields and avoid read-only $PID assignment."""
-    script = Path("scripts/check_worker_health.ps1").read_text(encoding="utf-8")
+    script = Path("scripts/ops/check_worker_health.ps1").read_text(encoding="utf-8")
 
     assert "last_success_ts" in script
     assert "last_error_ts" in script

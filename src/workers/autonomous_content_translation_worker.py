@@ -945,6 +945,21 @@ class AutonomousContentTranslationWorker:
                     output_summary=f"Interrupted after {run_count} runs",
                 )
 
+    def _accumulate_file_result_stats(self, result) -> None:
+        """TC-AGT-20/30: Aggregate validation/retry stats from DirectoryResult.file_results."""
+        for _fr in getattr(result, "file_results", []):
+            if getattr(_fr, "retry_attempts", 0) > 0:
+                self._run_retried_files += 1
+            if getattr(_fr, "validation_result", None) is not None:
+                self._run_validators_run += 1
+            _vd = getattr(_fr, "validation_decision", None)
+            if _vd is not None:
+                _vd_name = getattr(_vd, "name", str(_vd))
+                if _vd_name == "ACCEPT":
+                    self._run_validators_passed += 1
+                elif _vd_name == "REJECT":
+                    self._run_validators_failed += 1
+
     def _execute_translation_run(self) -> None:
         """
         Execute a single translation run.
@@ -1415,19 +1430,8 @@ class AutonomousContentTranslationWorker:
                     getattr(self, "_run_attempted_files", 0) + result.total_files
                 )
 
-                # TC-AGT-20: Aggregate validation/retry stats from DirectoryResult.file_results
-                for _fr in getattr(result, "file_results", []):
-                    if getattr(_fr, "retry_attempts", 0) > 0:
-                        self._run_retried_files += 1
-                    if getattr(_fr, "validation_result", None) is not None:
-                        self._run_validators_run += 1
-                    _vd = getattr(_fr, "validation_decision", None)
-                    if _vd is not None:
-                        _vd_name = getattr(_vd, "name", str(_vd))
-                        if _vd_name == "ACCEPT":
-                            self._run_validators_passed += 1
-                        elif _vd_name == "REJECT":
-                            self._run_validators_failed += 1
+                # TC-AGT-20/30: Aggregate validation/retry stats
+                self._accumulate_file_result_stats(result)
 
                 # BUG-2 FIX: Accumulate successful file count for run-level health tracking
                 _site_files = getattr(self, "_run_new_files", {})
@@ -1521,19 +1525,8 @@ class AutonomousContentTranslationWorker:
                 getattr(self, "_run_attempted_files", 0) + result.total_files
             )
 
-            # TC-AGT-20: Aggregate validation/retry stats from DirectoryResult.file_results
-            for _fr in getattr(result, "file_results", []):
-                if getattr(_fr, "retry_attempts", 0) > 0:
-                    self._run_retried_files += 1
-                if getattr(_fr, "validation_result", None) is not None:
-                    self._run_validators_run += 1
-                _vd = getattr(_fr, "validation_decision", None)
-                if _vd is not None:
-                    _vd_name = getattr(_vd, "name", str(_vd))
-                    if _vd_name == "ACCEPT":
-                        self._run_validators_passed += 1
-                    elif _vd_name == "REJECT":
-                        self._run_validators_failed += 1
+            # TC-AGT-20/30: Aggregate validation/retry stats
+            self._accumulate_file_result_stats(result)
 
             # BUG-2 FIX: Accumulate successful file count for run-level health tracking
             _site_files = getattr(self, "_run_new_files", {})

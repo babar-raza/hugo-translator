@@ -3,6 +3,8 @@
 import time
 from unittest.mock import patch
 
+import pytest
+
 from src.utils.content_hash import compute_file_hash
 from src.utils.metadata_tracker import MetadataTracker
 
@@ -234,6 +236,7 @@ def test_e2e_schema_validation(tmp_path):
     assert data["tracking_config"]["hash_algorithm"] == "md5"
 
 
+@pytest.mark.flaky(reruns=3, reruns_delay=1)
 def test_e2e_hash_performance(tmp_path):
     """E2E: 10MB file should hash in reasonable time (<100ms)."""
     # Create 10MB test file

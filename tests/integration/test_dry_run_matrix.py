@@ -224,7 +224,11 @@ class TestM8CIMode:
 
 class TestM9FallbackProfile:
     def test_m9(self):
-        """Profile with no family → product=*.Total, reporting_confidence=medium."""
+        """Profile with no family → product=*.Mixed, reporting_confidence=low.
+
+        family_scope: total is the ONLY legitimate way to emit .Total.
+        Missing/unknown family_scope → "unknown" → Aspose.Mixed (per family-aware sprint).
+        """
         r = _build_scenario(
             site_id="blog.aspose.net",
             content_root_raw="${ASPOSE_NET_CONTENT}/blog.aspose.net",
@@ -234,8 +238,8 @@ class TestM9FallbackProfile:
             token_usage=300,
             api_calls_count=3,
         )
-        assert "Total" in r["resolved"].product
-        assert r["resolved"].reporting_confidence == "medium"
+        assert "Mixed" in r["resolved"].product
+        assert r["resolved"].reporting_confidence == "low"
 
 
 class TestM10ContentRootIdStability:

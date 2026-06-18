@@ -132,7 +132,7 @@ class L3SemanticTM:
         # Load embedding model
         self.device = device
         self.encoder = SentenceTransformer(embedding_model, device=device)
-        self.embedding_dim = self.encoder.get_embedding_dimension()
+        self.embedding_dim = self.encoder.get_sentence_embedding_dimension()
 
         # FAISS GPU flag
         self.use_faiss_gpu = use_faiss_gpu and device == "cuda"

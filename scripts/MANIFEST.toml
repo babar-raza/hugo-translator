@@ -86,3 +86,12 @@ ci_critical = true
 ci_references = [".github/workflows/worker_health_check.yml"]
 purpose = "Lightweight system health check"
 last_verified = "2026-06-11"
+
+[[script]]
+path = "__init__.py"
+category = "package-init"
+status = "active"
+ci_critical = false
+ci_references = []
+purpose = "Package marker — makes scripts/ importable as a Python package for import-style script references"
+last_verified = "2026-06-18"

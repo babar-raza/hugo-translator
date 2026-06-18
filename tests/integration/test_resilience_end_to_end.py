@@ -371,8 +371,12 @@ class TestModulesExist:
 
         # Check RES feature markers
         assert "RES-06" in content  # Graceful shutdown
-        assert "RES-08" in content  # File locking
         assert "RES-09" in content  # Error handling
+
+        # RES-08 (file locking) moved to DirectoryOrchestrator during god-class decomposition
+        orchestrator_path = src_path / "translation_engine" / "directory_orchestrator.py"
+        assert orchestrator_path.exists()
+        assert "RES-08" in orchestrator_path.read_text(encoding="utf-8")
 
     def test_cli_integration(self):
         """Verify cli.py integrates with resilience features."""
@@ -398,7 +402,12 @@ class TestResilienceSystemComplete:
             (src_path / "translation_engine" / "progress.py", ["RES-07"]),
             (
                 src_path / "translation_engine" / "engine.py",
-                ["RES-05", "RES-06", "RES-08", "RES-09"],
+                ["RES-05", "RES-06", "RES-09"],
+            ),
+            # RES-08 (file locking) moved to DirectoryOrchestrator during god-class decomposition
+            (
+                src_path / "translation_engine" / "directory_orchestrator.py",
+                ["RES-08"],
             ),
             (src_path / "cli.py", ["RES-02", "RES-06", "RES-07"]),
         ]

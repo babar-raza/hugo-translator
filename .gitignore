@@ -229,8 +229,8 @@ m2m100_test_output.txt
 # Diagnostic scripts (dev-only)
 diagnose_*.py
 
-# Development prompts
-/prompts/
+# prompts/autonomous/ contains production autonomous loop contracts — tracked in git.
+# (Previous /prompts/ gitignore removed; that dir now only contains production contracts.)
 
 # Generated translation samples (keep structure)
 samples/**/de/

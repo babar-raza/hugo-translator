@@ -137,6 +137,13 @@ governance-check:
         exit 1
       }
       Write-Host "agent_metrics config guard: OK (enabled is not true in committed config)"
+    - |
+      # Autonomous loop structural validator (advisory — blocks only if files committed)
+      python scripts/quality/validate_autonomous_loop.py
+      if ($LASTEXITCODE -ne 0) {
+        Write-Host "WARNING: autonomous loop validator failed (advisory — see TC-LOOP-12)"
+        $global:LASTEXITCODE = 0
+      }
 
 regression-tests:
   stage: validate
