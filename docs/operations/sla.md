@@ -125,7 +125,7 @@ This document defines the Service Level Agreements (SLAs), Service Level Objecti
 - >1.0% for >2 hours → P2 incident (data quality issue)
 - >5.0% for >30 min → P1 incident (systemic duration tracking failure)
 
-**Related**: PR-04 Telemetry Fix (archived), [Troubleshooting Guide](telemetry_troubleshooting.md)
+**Related**: PR-04 Telemetry Fix (archived), [Troubleshooting Guide](telemetry-troubleshooting.md)
 
 ---
 
@@ -628,7 +628,7 @@ systemctl status translation-worker  # If using systemd
 
 - [Deployment Checklist](deployment-checklist.md) - Pre-deployment validation
 - [Rollback Procedure](rollback.md) - Emergency rollback runbook
-- [Telemetry Troubleshooting](telemetry_troubleshooting.md) - Debugging telemetry issues
+- [Telemetry Troubleshooting](telemetry-troubleshooting.md) - Debugging telemetry issues
 - [Grafana Guide](grafana.md) - Dashboard usage
 - [Metrics Reference](metrics.md) - Prometheus metrics catalog
 

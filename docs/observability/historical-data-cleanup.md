@@ -336,7 +336,7 @@ python -m json.tool fake_entries.json | head -50
 
 Provide to local-telemetry agent:
 - ✅ `fake_entries.json` file
-- ✅ This documentation file (`historical_data_cleanup.md`)
+- ✅ This documentation file (`historical-data-cleanup.md`)
 - ✅ Detection criteria explanation
 - ✅ Recommended cleanup option (Option 1 or 3)
 
@@ -485,7 +485,7 @@ python -m json.tool fake_entries.json | head -30
 python scripts/telemetry_cleanup/identify_fake_skip_entries.py --dry-run --count
 
 # Review documentation
-cat docs/observability/historical_data_cleanup.md
+cat docs/observability/historical-data-cleanup.md
 
 # Test with custom database
 python scripts/telemetry_cleanup/identify_fake_skip_entries.py \

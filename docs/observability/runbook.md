@@ -21,7 +21,7 @@ This runbook provides operational guidance for monitoring and troubleshooting th
 - Access to telemetry database or API
 - Basic SQL knowledge
 - Understanding of translation workflow
-- Familiarity with [Telemetry Event Schema](./telemetry_events.md)
+- Familiarity with [Telemetry Event Schema](./telemetry-events.md)
 
 ## Quick Reference
 
@@ -627,7 +627,7 @@ sqlite3 telemetry.db "SELECT * FROM telemetry_events WHERE JSON_EXTRACT(metrics_
 1. `completed_no_changes` is an **event type**, not a status
 2. Status field remains `"completed"` for successful runs
 3. Look for `completed_no_changes` in events array or as separate event record
-4. See [Telemetry Event Schema](./telemetry_events.md#event-status-values) for clarification
+4. See [Telemetry Event Schema](./telemetry-events.md#event-status-values) for clarification
 
 ### Issue 3: High Skip Rate But Token Usage Shows Charges
 
@@ -700,7 +700,7 @@ ls -l output/es/example.md output/fr/example.md output/de/example.md
 
 ## Related Documentation
 
-- **Schema Reference**: [Telemetry Event Schema](./telemetry_events.md)
+- **Schema Reference**: [Telemetry Event Schema](./telemetry-events.md)
 - **Metrics Guide**: [Content Hash Metrics](./content-hash-metrics.md)
 - **Source Code**:
   - `src/translation_engine/models.py` - TranslationStats model
