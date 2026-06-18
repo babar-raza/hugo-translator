@@ -31,6 +31,7 @@ from src.observability.worker_telemetry import (
 )
 from src.translation_engine.engine import TranslationEngine
 from src.utils.config_loader import ConfigService
+from src.utils.file_lock import LockError as _LockError
 from src.utils.timeout_guard import TimeoutError, timeout_guard
 from src.workers.window_scheduler import ScheduleConfig, WindowScheduler
 from src.workers.worker_state import record_worker_state
@@ -739,6 +740,13 @@ class AutonomousContentTranslationWorker:
             self._recover_pending_commits()
             self._record_run_history()
             _run_total_new = sum(getattr(self, "_run_new_files", {}).values())
+            _run_lock_errors = getattr(self, "_run_lock_errors", 0)
+            if _run_lock_errors > 0 and _run_total_new == 0:
+                logger.error(
+                    f"Oneshot run blocked: {_run_lock_errors} content root(s) failed to "
+                    f"acquire translation lock. 0 files translated. Exiting with code 1."
+                )
+                sys.exit(1)
             logger.info(f"Oneshot run completed: {_run_total_new} new translations")
             self._record_state("run_completed", success=(_run_total_new > 0))
 
@@ -983,6 +991,7 @@ class AutonomousContentTranslationWorker:
         self._run_validators_run = 0
         self._run_validators_passed = 0
         self._run_validators_failed = 0
+        self._run_lock_errors: int = 0
 
         # Determine sites to process
         if self.config.site:
@@ -1073,6 +1082,8 @@ class AutonomousContentTranslationWorker:
                         f"Failed to translate content_root {eff_root} for site {site_id}: {e}",
                         exc_info=True,
                     )
+                    if isinstance(e, _LockError):
+                        self._run_lock_errors = getattr(self, "_run_lock_errors", 0) + 1
                     # Ensure agent metrics fires even on timeout/crash
                     _metrics_ctx = getattr(self, "_last_metrics_ctx", None)
                     if _metrics_ctx is not None:
