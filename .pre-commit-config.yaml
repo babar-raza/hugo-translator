@@ -22,6 +22,16 @@ repos:
 
   - repo: local
     hooks:
+      - id: markdownlint-advisory
+        name: Markdown lint (advisory — does not block commit)
+        # Runs npx markdownlint-cli2 on docs/**/*.md; exits 0 always (advisory phase).
+        # To promote to blocking: change entry to fail on violations (TC-DOC-M-01).
+        # Requires Node.js on PATH. Skips silently if Node is not available.
+        entry: python scripts/quality/run_markdownlint_advisory.py
+        language: python
+        pass_filenames: false
+        files: '\.md$'
+
       - id: no-hardcoded-paths
         name: Check for hardcoded user paths
         entry: 'D:\\onedrive|D:/onedrive|C:\\Users\\prora|C:/Users/prora'

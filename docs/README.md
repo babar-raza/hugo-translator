@@ -16,10 +16,10 @@ A production-ready automated translation system for Hugo static sites with built
 Translate Hugo content with quality assurance.
 
 **Key Tasks:**
-- [Translate single files](guides/translation-workflows.md#single-file-translation)
+- [Translate single files](guides/ast-translation-quickstart.md)
 - [Batch translate directories](guides/batch-optimization.md)
 - [Configure validation rules](guides/quality-improvement.md)
-- [Handle terminology](guides/quality-improvement.md#terminology-protection)
+- [Handle terminology](guides/quality-improvement.md)
 
 **Translation Memory:**
 - [TM Getting Started](guides/tm-getting-started.md) - Understanding TM and cache performance
@@ -43,6 +43,9 @@ Deploy, monitor, and maintain production systems.
 - [TM Statistics & Monitoring](guides/tm-statistics-monitoring-guide.md) - Monitor hit rates and health
 - [TM Troubleshooting](operations/tm-troubleshooting.md) - Diagnose corruption, performance issues
 - [TM Performance Tuning](operations/tm-performance-tuning.md) - Optimize L1/L2/L3 layers
+
+**Autonomous Operation:**
+- [Autonomous Operation Guide](guides/autonomous-operation.md) - Supervisor loop, task queue, continuation state, run signals
 
 **Reference:**
 - [Deployment Guide](operations/deployment.md) - Production setup
@@ -76,7 +79,7 @@ Understand, extend, and contribute to the codebase.
 
 ### ⚙️ Configuration
 - [Global Config](reference/config.md#globalyaml) - System-wide settings
-- [Site Profiles](reference/config.md#site-profiles) - Per-site configuration
+- [Site Profiles](reference/config.md#site-profile-validation) - Per-site configuration
 - [Validation Rules](reference/config.md#validationyaml) - Quality controls
 - [Terminology](reference/config.md#terminologyyaml) - Protected terms
 
@@ -114,6 +117,16 @@ Understand, extend, and contribute to the codebase.
 - **Segment Sorting**: [Segment Sorting Guide](features/segment-sorting.md) - Length-based sorting for improved GPU batching (0-20% throughput improvement)
 - **Batch Optimization**: [Batch Optimization Guide](guides/batch-optimization.md) - Dynamic batch sizing and memory management
 - **CPU Optimization**: [CPU Performance](performance/cpu-benchmarks.md) - CPU-specific tuning and recommendations
+
+### 🏛️ Governance
+- [Documentation Standards](development/docs-standards.md) - Documentation authoring guidelines
+- [Schemas Reference](reference/schemas.md) - JSON schemas for sprint governance
+- [Local Data Policy](governance/local-data-policy.md) - .local/ retention and cleanup policy
+- [Governance Overview](governance/README.md) - All governance policies and prompt index
+- [Sprint Loop Governance](governance/sprint-loop-governance.md) - 10-state sprint controller, classifications, quality scorer
+
+### 🗂️ Architecture Decisions (ADR)
+- [ADR-004: Engine Decomposition](adr/004-engine-decomposition.md) - TranslationEngine god-class → 5 components
 
 ### 🧪 Development
 - [Setup](user-guide/setup.md) - Development environment
@@ -168,4 +181,4 @@ Follow the [documentation standards](development/docs-standards.md).
 
 ---
 
-**Version**: 0.1.0 | **Last Updated**: 2026-04-28
+**Version**: 0.1.0 | **Last Updated**: 2026-06-17

@@ -296,27 +296,34 @@ class EvidenceValidator:
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Validate evidence citations in specs",
+        description="Validate evidence citations in docs",
         formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog=(
+            "Examples:\n"
+            "  python scripts/quality/validate-evidence.py --all\n"
+            "  python scripts/quality/validate-evidence.py --all --docs docs/\n"
+            "  python scripts/quality/validate-evidence.py docs/guides/autonomous-operation.md\n"
+        ),
     )
-    parser.add_argument("files", nargs="*", help="Spec files to validate")
-    parser.add_argument("--all", action="store_true", help="Validate all specs")
+    parser.add_argument("files", nargs="*", help="Doc files to validate")
+    parser.add_argument("--all", action="store_true", help="Validate all docs in --docs path")
+    parser.add_argument(
+        "--docs",
+        default="docs",
+        metavar="PATH",
+        help="Root docs directory to scan when --all is used (default: docs/)",
+    )
     parser.add_argument("--report", help="Output report path (default: stdout)")
 
     args = parser.parse_args()
 
     # Determine files to validate
     if args.all:
-        specs_dir = Path("specs/features")
-        if not specs_dir.exists():
-            print("Error: specs/features not found", file=sys.stderr)
+        docs_dir = Path(args.docs)
+        if not docs_dir.exists():
+            print(f"Error: docs directory not found: {docs_dir}", file=sys.stderr)
             return 2
-        spec_files = sorted(specs_dir.glob("*.md"))
-
-        # Also check core_invariants.md
-        core_inv = Path("specs/core_invariants.md")
-        if core_inv.exists():
-            spec_files.append(core_inv)
+        spec_files = sorted(docs_dir.rglob("*.md"))
 
     elif args.files:
         spec_files = [Path(f) for f in args.files]
@@ -326,7 +333,7 @@ def main():
 
     # Validate
     validator = EvidenceValidator()
-    print(f"Validating {len(spec_files)} spec file(s)...")
+    print(f"Validating {len(spec_files)} doc file(s)...")
 
     for spec_file in spec_files:
         if not spec_file.exists():
@@ -339,12 +346,12 @@ def main():
     report = validator.generate_report(output_path)
 
     if not output_path:
-        print(report)
+        sys.stdout.buffer.write(report.encode("utf-8"))
+        sys.stdout.buffer.write(b"\n")
 
     # Summary
-    print(f"\n{'=' * 60}")
-    print(f"Validation complete: {validator.valid_count} valid, {validator.invalid_count} invalid")
-    print(f"{'=' * 60}\n")
+    summary = f"\n{'=' * 60}\nValidation complete: {validator.valid_count} valid, {validator.invalid_count} invalid\n{'=' * 60}\n"
+    sys.stdout.buffer.write(summary.encode("utf-8"))
 
     return 0 if validator.invalid_count == 0 else 1
 

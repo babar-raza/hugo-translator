@@ -84,7 +84,25 @@ The root should contain only essential project files (~13 files). Everything els
 
 ## Autonomous Agents
 
-This project uses autonomous worker agents. See [AGENTS.md](AGENTS.md) for worker details and [Agent Guardrails](docs/AGENT_GUARDRAILS.md) for safety rules.
+This project uses autonomous worker agents. See [AGENTS.md](AGENTS.md) for worker details and [Agent Guardrails](docs/operations/agent-guardrails.md) for safety rules.
+
+## Documentation Requirements
+
+When contributing code or documentation changes:
+
+1. **Run the link checker before pushing:**
+   ```bash
+   python scripts/quality/check_docs_links.py --dir docs/
+   ```
+   Fix any broken links you introduce. Pre-existing broken links (119 baseline) are tracked separately.
+
+2. **When adding a new source feature (`src/**`), create or update a corresponding docs entry.** The minimum is a reference stub in the appropriate `docs/` subdirectory. Follow the folder taxonomy in `docs/development/docs-standards.md`.
+
+3. **When making architecture-level changes** (refactoring a core component, changing module structure), update or create an Architecture Decision Record in `docs/adr/`. If no `docs/adr/` directory exists yet, create one.
+
+4. **Documentation must follow `docs/development/docs-standards.md`** — in particular: use kebab-case filenames, place files in appropriate subdirectories (not at `docs/` root), and use status markers (✅📋) to indicate verification level.
+
+5. **Do not place files at `docs/` root.** Use the existing subdirectory taxonomy (`docs/guides/`, `docs/reference/`, `docs/architecture/`, `docs/operations/`, etc.).
 
 ## Pull Requests
 

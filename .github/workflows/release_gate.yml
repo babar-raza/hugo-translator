@@ -9,6 +9,7 @@ on:
       - 'scripts/**'
       - 'config/**'
       - 'requirements/**'
+      - 'docs/**'
       - '.github/workflows/release_gate.yml'
   push:
     branches: [main]
@@ -119,6 +120,35 @@ jobs:
             exit 1
           }
           Write-Host "agent_metrics config guard: OK (enabled is not true in committed config)"
+        shell: pwsh
+
+  docs-check:
+    name: Docs Link Check (advisory)
+    runs-on: windows-latest
+    # Advisory phase: runs independently; does not block other jobs.
+    # After 2-week pilot with zero false positives, remove continue-on-error (TC-DOC-M-01).
+    timeout-minutes: 5
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.10'
+
+      - name: Check docs links
+        run: python scripts/quality/check_docs_links.py --dir docs/
+        shell: pwsh
+        continue-on-error: true  # advisory — broken links warn but do not block merge
+
+      - name: Docs Check Summary
+        if: always()
+        run: |
+          Write-Host ""
+          Write-Host "NOTE: docs-check is advisory (pilot phase). Broken links warn but do not block the gate."
+          Write-Host "See TC-DOC-M-01 to promote this job to blocking after a 2-week clean pilot."
         shell: pwsh
 
   manifest-check:
@@ -331,7 +361,7 @@ jobs:
   summary:
     name: Gate Summary
     runs-on: windows-latest
-    needs: [unit-tests, governance-check, manifest-check, regression-tests, quality-gate, security-scan]
+    needs: [unit-tests, governance-check, docs-check, manifest-check, regression-tests, quality-gate, security-scan]
     if: always()
 
     steps:
@@ -343,6 +373,7 @@ jobs:
           Write-Host ("=" * 60)
           Write-Host "Unit Tests:       ${{ needs.unit-tests.result }}"
           Write-Host "Governance Check: ${{ needs.governance-check.result }}"
+          Write-Host "Docs Check:       ${{ needs.docs-check.result }} (advisory)"
           Write-Host "Manifest Check:   ${{ needs.manifest-check.result }}"
           Write-Host "Regression Tests: ${{ needs.regression-tests.result }}"
           Write-Host "Quality Gate:     ${{ needs.quality-gate.result }}"

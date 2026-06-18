@@ -188,7 +188,7 @@ This means:
 
 ### Custom Target Utilization
 
-Currently hardcoded to 85%, but can be modified in [cli.py:1315](../src/cli.py#L1315):
+Currently hardcoded to 85%, but can be modified in [cli.py:1315](../../src/cli.py#L1315):
 
 ```python
 gpu_optimizer = GPUOptimizer(
@@ -257,7 +257,7 @@ batch_size = int(available / vram_per_batch_item)
 
 ### Constants
 
-Defined in [gpu_optimizer.py](../src/model_runtime/gpu_optimizer.py):
+Defined in [gpu_optimizer.py](../../src/model_runtime/gpu_optimizer.py):
 
 - `CUDA_RESERVED_MB = 500`: Reserved for CUDA overhead
 - `MIN_BATCH_SIZE = 1`: Minimum allowed
@@ -339,10 +339,10 @@ The benchmarking system can use historical GPU memory data to recommend safe bat
 
 ## Related Documentation
 
-- [CPU Optimization](./CPU_OPTIMIZATION.md) (if exists)
-- [Model Registry](./MODEL_REGISTRY.md) (if exists)
-- [Telemetry Migration Guide](./operations/TELEMETRY_MIGRATION_GUIDE.md)
-- [Benchmarking System Architecture](./architecture/benchmarking-system.md)
+- [CPU Optimization](../performance/cpu-benchmarks.md) (if exists)
+- [Model Registry](../reference/api.md) (if exists)
+- [Telemetry Migration Guide](../operations/TELEMETRY_MIGRATION_GUIDE.md)
+- [Benchmarking System Architecture](../architecture/benchmarking-system.md)
 
 ## Future Enhancements
 
@@ -353,4 +353,4 @@ Potential improvements (not yet implemented):
 3. **Memory profiling**: Learn actual VRAM usage patterns over time
 4. **OOM recovery**: Automatically reduce batch size on OOM and retry
 
-These features would integrate the existing `BatchOptimizer` module ([batch_optimizer.py](../src/orchestration/batch_optimizer.py)) which has been built but not yet connected.
+These features would integrate the existing `BatchOptimizer` module ([batch_optimizer.py](../../src/orchestration/batch_optimizer.py)) which has been built but not yet connected.

@@ -1,45 +1,73 @@
 # Translation Engine Architecture
 
+📋 Reported: Updated 2026-06-17 to reflect 5-component decomposition from commit `0a684b8` (refactor: decompose TranslationEngine god-class). See [ADR-004](../adr/004-engine-decomposition.md) when created.
+
 **Status**: Core system component - orchestrates complete translation workflow
 
 ## Overview
 
-The Hugo Translation System implements a comprehensive translation pipeline that converts Hugo Markdown content while preserving structure, terminology, and quality. The system is built around a modular architecture with clear separation of concerns.
+The Hugo Translation System implements a comprehensive translation pipeline that converts Hugo Markdown content while preserving structure, terminology, and quality. The engine was refactored in commit `0a684b8` from a single monolithic class into five collaborating components with clear separation of concerns.
 
 ## Core Architecture
 
 ### System Components
 
 ```
-┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
-│   CLI Layer     │    │  Orchestrator   │    │   MCP Server    │
-│                 │    │                 │    │                 │
-│ • Command Line  │    │ • File Watching │    │ • API Interface │
-│ • Configuration │    │ • Job Queue     │    │ • Distributed   │
-│ • User Interface│    │ • Scheduling    │    │ • Workers       │
-└─────────────────┘    └─────────────────┘    └─────────────────┘
-         │                       │                       │
-         └───────────────────────┼───────────────────────┘
-                                 │
-                    ┌─────────────────┐
-                    │ Translation     │
-                    │ Engine          │
-                    │                 │
-                    │ • Parser        │
-                    │ • Extractor     │
-                    │ • Translator    │
-                    │ • Validator     │
-                    │ • Reconstructor │
-                    └─────────────────┘
-                             │
-                    ┌─────────────────┐
-                    │   Storage       │
-                    │                 │
-                    │ • TM (L1/L2/L3) │
-                    │ • Models        │
-                    │ • Cache         │
-                    └─────────────────┘
+┌─────────────────┐    ┌─────────────────┐
+│   CLI Layer     │    │  Worker Layer   │
+│ src/cli.py      │    │ src/workers/    │
+└────────┬────────┘    └────────┬────────┘
+         │                      │
+         └──────────┬───────────┘
+                    │
+         ┌──────────▼──────────┐
+         │  TranslationEngine  │   engine.py — orchestrator shell
+         │  (entry point only) │   delegates to 4 specialist components
+         └──────────┬──────────┘
+                    │
+      ┌─────────────┼─────────────┐
+      │             │             │
+┌─────▼──────┐ ┌────▼────┐ ┌────▼──────────┐
+│EngineBuilder│ │FilePipe-│ │SegmentTrans-  │
+│engine_      │ │line     │ │lator          │
+│builder.py   │ │file_    │ │segment_       │
+│             │ │pipeline │ │translator.py  │
+│Construction │ │.py      │ │               │
+│logic: deps, │ │Per-file │ │Segment-level  │
+│validation,  │ │retry,   │ │translation:   │
+│TM, models   │ │pipeline │ │TM lookup,     │
+└─────────────┘ └────┬────┘ │model calls,   │
+                     │      │validation     │
+                ┌────▼────┐ └───────────────┘
+                │WriteGate│
+                │Evaluator│
+                │write_   │
+                │gate.py  │
+                │         │
+                │Output   │
+                │safety:  │
+                │accept/  │
+                │reject   │
+                └─────────┘
+                    │
+         ┌──────────▼──────────┐
+         │   Storage Layer     │
+         │                     │
+         │ • TM (L1/L2/L3)     │
+         │ • Models (M2M100)   │
+         │ • Content Hashes    │
+         └─────────────────────┘
 ```
+
+### Five Engine Components (post-refactor, commit `0a684b8`)
+
+| File | Class | Responsibility |
+|------|-------|---------------|
+| `engine.py` | `TranslationEngine` | Entry point / orchestration shell; delegates to 4 components |
+| `engine_builder.py` | `EngineBuilder` | Construction logic: loads TM, models, validators, site config |
+| `file_pipeline.py` | `FileTranslationPipeline` | Per-file retry/validation/correction pipeline per language |
+| `segment_translator.py` | `SegmentTranslator` | Segment-level translation: TM lookup → model call → validation |
+| `write_gate.py` | `WriteGateEvaluator` | Output safety gate: accept/reject/reroute based on quality |
 
 ### Data Flow
 

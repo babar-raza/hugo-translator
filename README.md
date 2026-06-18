@@ -610,7 +610,7 @@ python scripts/validate_installation.py
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for development setup, code style, and PR guidelines.
 
-For autonomous agent guardrails, see [AGENTS.md](AGENTS.md) and [Agent Guardrails](docs/AGENT_GUARDRAILS.md).
+For autonomous agent guardrails, see [AGENTS.md](AGENTS.md) and [Agent Guardrails](docs/operations/agent-guardrails.md).
 
 ## Version
 

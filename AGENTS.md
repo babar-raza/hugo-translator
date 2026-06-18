@@ -161,7 +161,7 @@ This ensures VRAM is free during the sleep window for other processes.
 
 ## Related Documentation
 
-- [Agent Guardrails](docs/AGENT_GUARDRAILS.md) - Safety rules and constraints for autonomous agents
+- [Agent Guardrails](docs/operations/agent-guardrails.md) - Safety rules and constraints for autonomous agents
 - [Worker Deployment](docs/workers/WORKER_DEPLOYMENT.md) - Detailed deployment procedures
 - [Windows-Native Deployment](docs/operations/windows-native-deployment.md) - Production deployment on Windows
 - [ONBOARDING.md](docs/getting-started/ONBOARDING.md) - New contributor onboarding

@@ -272,7 +272,7 @@ LIMIT 30;
 
 ## Related Documentation
 
-- [GPU Optimization](../GPU_OPTIMIZATION.md) - General GPU optimization guide
+- [GPU Optimization](../guides/gpu-optimization.md) - General GPU optimization guide
 - [Benchmarking System Architecture](../architecture/benchmarking-system.md) - System design
 - [Production Metrics](./PRODUCTION_METRICS.md) - Continuous learning system
 

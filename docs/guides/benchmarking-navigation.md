@@ -36,26 +36,26 @@ docs/
 
 | File | Purpose | Lines | Status |
 |------|---------|-------|--------|
-| [features/benchmarking.md](features/benchmarking.md) | Main feature overview | 650+ | ✅ Complete |
-| [architecture/benchmarking-system.md](architecture/benchmarking-system.md) | Technical architecture | 900+ | ✅ Complete |
-| [operations/benchmarking-operations.md](operations/benchmarking-operations.md) | Operations guide | 750+ | ✅ Complete |
-| [api/benchmarking-api.md](api/benchmarking-api.md) | API reference | 600+ | ✅ Complete |
+| [features/benchmarking.md](../features/benchmarking.md) | Main feature overview | 650+ | ✅ Complete |
+| [architecture/benchmarking-system.md](../architecture/benchmarking-system.md) | Technical architecture | 900+ | ✅ Complete |
+| [operations/benchmarking-operations.md](../operations/benchmarking-operations.md) | Operations guide | 750+ | ✅ Complete |
+| [api/benchmarking-api.md](../api/benchmarking-api.md) | API reference | 600+ | ✅ Complete |
 
 ### Supporting Documentation
 
 | File | Purpose | Lines | Status |
 |------|---------|-------|--------|
-| [examples/benchmarking-examples.md](examples/benchmarking-examples.md) | Usage examples | 150+ | ✅ Complete |
-| [runbooks/benchmarking-runbook.md](runbooks/benchmarking-runbook.md) | Quick reference | 150+ | ✅ Complete |
-| [architecture/translation-memory.md](architecture/translation-memory.md) | Updated with BM-08 | N/A | ✅ Updated |
+| [examples/benchmarking-examples.md](../examples/benchmarking-examples.md) | Usage examples | 150+ | ✅ Complete |
+| [runbooks/benchmarking-runbook.md](../runbooks/benchmarking-runbook.md) | Quick reference | 150+ | ✅ Complete |
+| [architecture/translation-memory.md](../architecture/translation-memory.md) | Updated with BM-08 | N/A | ✅ Updated |
 
 ### Updated Files
 
 | File | Changes | Status |
 |------|---------|--------|
 | [README.md](../README.md) | Added benchmarking features section | ✅ Updated |
-| [CHANGELOG.md](../CHANGELOG.md) | Added v1.0 benchmarking entries | ✅ Updated |
-| [docs/README.md](README.md) | Added benchmarking navigation section | ✅ Updated |
+| [CHANGELOG.md](../../CHANGELOG.md) | Added v1.0 benchmarking entries | ✅ Updated |
+| [docs/README.md](../README.md) | Added benchmarking navigation section | ✅ Updated |
 
 ## Component Coverage
 
@@ -223,23 +223,23 @@ All docs include production safety considerations:
 
 ### For Developers
 
-1. Start with [Benchmarking Features](features/benchmarking.md)
-2. Review [API Reference](api/benchmarking-api.md)
-3. Try [Usage Examples](examples/benchmarking-examples.md)
-4. Deep dive into [Architecture](architecture/benchmarking-system.md)
+1. Start with [Benchmarking Features](../features/benchmarking.md)
+2. Review [API Reference](../api/benchmarking-api.md)
+3. Try [Usage Examples](../examples/benchmarking-examples.md)
+4. Deep dive into [Architecture](../architecture/benchmarking-system.md)
 
 ### For Operators
 
-1. Start with [Benchmarking Features](features/benchmarking.md)
-2. Review [Operations Guide](operations/benchmarking-operations.md)
-3. Use [Quick Runbook](runbooks/benchmarking-runbook.md)
+1. Start with [Benchmarking Features](../features/benchmarking.md)
+2. Review [Operations Guide](../operations/benchmarking-operations.md)
+3. Use [Quick Runbook](../runbooks/benchmarking-runbook.md)
 4. Monitor using guidance from Operations Guide
 
 ### For Contributors
 
-1. Review [Architecture](architecture/benchmarking-system.md)
-2. Understand [API Reference](api/benchmarking-api.md)
-3. Study [Translation Memory Integration](architecture/translation-memory.md)
+1. Review [Architecture](../architecture/benchmarking-system.md)
+2. Understand [API Reference](../api/benchmarking-api.md)
+3. Study [Translation Memory Integration](../architecture/translation-memory.md)
 4. Follow existing patterns from examples
 
 ## Maintenance
