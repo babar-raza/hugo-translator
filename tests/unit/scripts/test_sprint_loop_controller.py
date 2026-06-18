@@ -733,6 +733,38 @@ class TestFallbackPaths:
             "Fallback line-by-line parser must extract summary_type from flat YAML"
         )
 
+    def test_yaml_unavailable_parse_stage2_uses_line_scanner(
+        self, run_dir: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """When YAML_AVAILABLE=False, parse_stage2_output falls back to line-by-line key scanner.
+
+        The stage2 fallback (controller lines 266-269) scans for 'plan_verdict: VALUE' using a
+        simple startswith check.  It must return a dict containing plan_verdict, not crash or
+        return None.
+        """
+        stage_dir = run_dir / "stage2-plan"
+        stage_dir.mkdir(parents=True, exist_ok=True)
+        # Write a single-task JSONL taskcard file.
+        (stage_dir / "taskcards.jsonl").write_text(
+            json.dumps({"task_id": "TC-P4-01", "title": "Stage2 fallback test"}) + "\n",
+            encoding="utf-8",
+        )
+        # Write a flat single-line verdict file extractable by the fallback scanner.
+        (stage_dir / "ready-for-execution-verdict.yaml").write_text(
+            "plan_verdict: PLAN_HARDENED\n",
+            encoding="utf-8",
+        )
+        monkeypatch.setattr(controller_module, "YAML_AVAILABLE", False)
+        result = parse_stage2_output(run_dir)
+        assert result is not None, (
+            "When YAML_AVAILABLE=False and taskcards.jsonl exists, "
+            "parse_stage2_output must return a dict (not None)"
+        )
+        assert result.get("plan_verdict") == "PLAN_HARDENED", (
+            "Fallback line scanner must extract plan_verdict from 'plan_verdict: VALUE' line"
+        )
+        assert "taskcards" in result, "Result must include parsed taskcards list"
+
 
 # ---------------------------------------------------------------------------
 # TC-PHASE3-02: parse_stage2_output unit tests
