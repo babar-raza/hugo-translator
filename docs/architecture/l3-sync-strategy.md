@@ -45,7 +45,7 @@ def store(self, site_id, src_lang, tgt_lang, text, translation, context=None, me
     return entry_id
 ```
 
-**Location:** [`src/tm/translation_memory.py:162-189`](../src/tm/translation_memory.py#L162-L189)
+**Location:** [`src/tm/translation_memory.py:162-189`](../../src/tm/translation_memory.py#L162-L189)
 
 ### Guarantees
 
@@ -66,7 +66,7 @@ After migration, L2 has 6M+ entries but L3 is empty. This is expected because:
 
 ### Solution: Build Script
 
-Use [`scripts/tm/build_l3_index.py`](../scripts/tm/build_l3_index.py) to populate L3 from existing L2 data:
+Use [`scripts/tm/build_l3_index.py`](../../scripts/tm/build_l3_index.py) to populate L3 from existing L2 data:
 
 ```bash
 # CPU (slower, but works everywhere)
@@ -112,7 +112,7 @@ Verify L3 hasn't drifted from L2 due to:
 
 ### Solution: Sync Script
 
-Use [`scripts/tm/sync_l3_index.py`](../scripts/tm/sync_l3_index.py) to verify and fix any drift:
+Use [`scripts/tm/sync_l3_index.py`](../../scripts/tm/sync_l3_index.py) to verify and fix any drift:
 
 ```bash
 # Dry run (check only, no changes)

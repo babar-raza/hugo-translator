@@ -661,10 +661,10 @@ python scripts/ops/rollback.py --to-previous --skip-verify
 
 ### D. Related Documents
 
-- [Deployment Checklist](DEPLOYMENT_SAFETY_CHECKLIST.md)
-- [Production Readiness Guide](../PRODUCTION_READY.md)
-- [Backup and Restore Procedures](../scripts/tm/backup_tm.py)
-- [Incident Response Plan](INCIDENT_RESPONSE.md) (if exists)
+- Deployment Checklist (see deployment-checklist.md in this directory)
+- Production Readiness Guide (archived)
+- [Backup and Restore Procedures](../../scripts/tm/backup_tm.py)
+- Incident Response Plan
 
 ---
 

@@ -767,8 +767,8 @@ segments = extractor.extract_from_body(ast, "en")
 
 ## References
 
-- [Site Profile Schema](../phase-1/site-profile-schema.md)
-- [Hugo Parser Documentation](hugo-parser.md)
+- Site Profile Schema (phase-1 archived)
+- Hugo Parser Documentation (planned — not yet created)
 - [Hugo Shortcode Reference](https://gohugo.io/content-management/shortcodes/)
 - [Regex Pattern Reference](https://docs.python.org/3/library/re.html)
 

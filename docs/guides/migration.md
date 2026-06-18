@@ -340,11 +340,11 @@ Possible additions to profiles:
 
 ## References
 
-- **Legacy Config**: [legacy/filter.json](../legacy/filter.json)
-- **Generated Profiles**: [config/site_profiles/](../config/site_profiles/)
-- **Migration Script**: [scripts/migrate_filters.py](../scripts/migrate_filters.py)
-- **Schema Definition**: [config/schemas/site_profile.schema.json](../config/schemas/site_profile.schema.json)
-- **Pydantic Models**: [src/utils/models.py](../src/utils/models.py)
+- **Legacy Config**: legacy/filter.json (archived)
+- **Generated Profiles**: [config/site_profiles/](../../config/site_profiles/)
+- **Migration Script**: scripts/migrate_filters.py (archived)
+- **Schema Definition**: [config/schemas/site_profile.schema.json](../../config/schemas/site_profile.schema.json)
+- **Pydantic Models**: [src/utils/models.py](../../src/utils/models.py)
 
 ---
 

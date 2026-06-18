@@ -289,7 +289,7 @@ decision_rules:
 
 ### LinkValidator Errors
 
-#### Error: "Link missing in translation: [Text](./docs/README.md)"
+#### Error: "Link missing in translation: \[Text\](./docs/README.md)"
 
 **Symptom**:
 ```
@@ -869,9 +869,9 @@ translate-hugo --site reference.aspose.net --validation-config ./reference-valid
 
 ## Related Documentation
 
-- [Validation Guide](./validation_guide.md) - How validators work and decision logic
+- [Validation Guide](../guides/validation-guide.md) - How validators work and decision logic
 - [Terminology Pattern Syntax](../reference/terminology-pattern-syntax.md) - Regex patterns for terminology protection
-- [Configuration Reference](./configuration_reference.md) - Complete config file reference
+- [Configuration Reference](../reference/config.md) - Complete config file reference
 
 ## Update — 2026-02-16 22:36 PKT
 

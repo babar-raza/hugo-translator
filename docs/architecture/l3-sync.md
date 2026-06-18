@@ -27,7 +27,7 @@ def store(self, ...):
 
 ### 2. 🔧 Initial Build (One-Time)
 
-**Created:** [`scripts/tm/build_l3_index.py`](scripts/tm/build_l3_index.py)
+**Created:** [`scripts/tm/build_l3_index.py`](../../scripts/tm/build_l3_index.py)
 
 **Purpose:** Populate L3 from existing 6M+ entries in L2
 
@@ -49,7 +49,7 @@ python scripts/tm/build_l3_index.py
 
 ### 3. 🔍 Periodic Verification (Scheduled)
 
-**Created:** [`scripts/tm/sync_l3_index.py`](scripts/tm/sync_l3_index.py)
+**Created:** [`scripts/tm/sync_l3_index.py`](../../scripts/tm/sync_l3_index.py)
 
 **Purpose:** Verify L3 hasn't drifted from L2
 
@@ -103,10 +103,10 @@ python scripts/tm/sync_l3_index.py --dry-run
 
 ## Documentation Created
 
-1. **[scripts/tm/build_l3_index.py](scripts/tm/build_l3_index.py)** - Build L3 from L2
-2. **[scripts/tm/sync_l3_index.py](scripts/tm/sync_l3_index.py)** - Verify and fix drift
-3. **[docs/L3_SYNC_STRATEGY.md](docs/L3_SYNC_STRATEGY.md)** - Complete strategy guide
-4. **[reports/MIGRATION_COMPLETION_REPORT.md](reports/MIGRATION_COMPLETION_REPORT.md)** - Updated with L3 status
+1. **[scripts/tm/build_l3_index.py](../../scripts/tm/build_l3_index.py)** - Build L3 from L2
+2. **[scripts/tm/sync_l3_index.py](../../scripts/tm/sync_l3_index.py)** - Verify and fix drift
+3. **[docs/architecture/l3-sync-strategy.md](l3-sync-strategy.md)** - Complete strategy guide
+4. reports/MIGRATION_COMPLETION_REPORT.md - Updated with L3 status
 
 ---
 

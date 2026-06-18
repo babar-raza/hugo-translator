@@ -398,7 +398,7 @@ def custom_quality_gate(result: TranslationResult) -> bool:
 
 ## Related Documentation
 
-- [Validation Guide](validation-guide.md) - Detailed validator documentation
+- [Validation Guide](../guides/validation-guide.md) - Detailed validator documentation
 - [Terminology Pattern Syntax](../reference/terminology-pattern-syntax.md) - Regex patterns for terminology protection
 - [CLI Reference](../reference/cli.md) - Quality-related command flags
 - [Configuration Reference](../reference/config.md) - Quality configuration options

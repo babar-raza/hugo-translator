@@ -163,7 +163,7 @@ package using the following command.
 
 **Resolution:**
 
-This is a known WSL/Ubuntu issue and is **documented in the setup guide** ([docs/user-guide/setup.md](../docs/user-guide/setup.md#wsl-windows-subsystem-for-linux)):
+This is a known WSL/Ubuntu issue and is **documented in the setup guide** ([docs/user-guide/setup.md](../user-guide/setup.md#wsl-windows-subsystem-for-linux)):
 
 ```bash
 sudo apt update

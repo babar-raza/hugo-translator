@@ -342,9 +342,9 @@ Adjust based on storage capacity:
 
 ## Related Documentation
 
-- [Metrics Collection](../src/observability/metrics.py) - Metrics implementation
-- [Prometheus Configuration](../docker/prometheus/prometheus.yml) - Prometheus setup
-- [Docker Compose](../docker-compose.yml) - Service configuration
+- [Metrics Collection](../../src/observability/metrics.py) - Metrics implementation
+- [Prometheus Configuration](../../docker/prometheus/prometheus.yml) - Prometheus setup
+- [Docker Compose](../../docker-compose.yml) - Service configuration
 
 ## Support
 

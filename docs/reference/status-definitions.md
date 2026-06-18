@@ -344,7 +344,7 @@ Agent reports all tests passing.
 
 ## Integration with Documentation Standards
 
-The two-tier status system integrates with [DOCUMENTATION_STANDARDS.md](DOCUMENTATION_STANDARDS.md):
+The two-tier status system integrates with documentation standards (see [CONTRIBUTING.md](../../CONTRIBUTING.md#documentation-requirements)):
 
 - ✅ **Verified claims** require `[Verification: ✅ Complete]`
 - 📋 **Reported claims** typically have `[Verification: ⏳ Not Started]` or `[Verification: ⚠️ Partial]`

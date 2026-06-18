@@ -559,9 +559,9 @@ find /content -name "*.md" -exec du -h {} \; | sort -rh | head -20
 
 ## References
 
-- [CHH Plan File](../../plans/healing/content-hash-production-hardening.md)
+- CHH Plan File (archived)
 - [Base Architecture](content-hash-tracking.md)
 - [Operations Guide](../operations/content-hash-operations.md)
 - [Metrics Guide](../observability/content-hash-metrics.md)
 - [User Guide](../guides/content-hash-tracking.md)
-- [Implementation Summary](../../CHH-05_IMPLEMENTATION_SUMMARY.md)
+- Implementation Summary (archived)

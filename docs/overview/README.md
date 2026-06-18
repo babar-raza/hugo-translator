@@ -366,12 +366,12 @@ black src/ tests/ && ruff check src/ tests/ && mypy src/
 
 Detailed documentation is available in `docs/`:
 
-- [User Guide](docs/USER_GUIDE.md) - Complete usage instructions
-- [Configuration Reference](docs/CONFIGURATION.md) - All configuration options
-- [Deployment Guide](docs/DEPLOYMENT.md) - Production deployment
-- [Operations Manual](docs/OPERATIONS.md) - Day-to-day operations
-- [Troubleshooting](docs/TROUBLESHOOTING.md) - Common issues and solutions
-- [CLI Reference](docs/CLI_FLAGS_REFERENCE.md) - All CLI flags explained
+- [User Guide](../user-guide/setup.md) - Complete usage instructions
+- [Configuration Reference](../reference/config.md) - All configuration options
+- [Deployment Guide](../deployment/docker.md) - Production deployment
+- [Operations Manual](../operations/README.md) - Day-to-day operations
+- [Troubleshooting](../operations/troubleshooting.md) - Common issues and solutions
+- [CLI Reference](../reference/cli.md) - All CLI flags explained
 
 ## License
 

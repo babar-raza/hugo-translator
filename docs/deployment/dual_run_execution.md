@@ -390,7 +390,7 @@ CUDA_VISIBLE_DEVICES:
 
 ## References
 
-- [TASK-AW-03: Dual-Run Execution Layer Specification](../../specs/task_aw_03_dual_run.md)
-- [Phase 5: Autonomous Workers Unification](../../reports/agents/agent_a/phase5_complete/)
-- [SharedEngines Architecture](../../docs/architecture/shared_engines.md)
-- [Worker Configuration Guide](../../docs/configuration/workers.md)
+- TASK-AW-03: Dual-Run Execution Layer Specification (archived)
+- Phase 5: Autonomous Workers Unification (archived)
+- SharedEngines Architecture (archived)
+- Worker Configuration Guide (archived)

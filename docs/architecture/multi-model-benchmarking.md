@@ -826,7 +826,7 @@ alerts = {
 - [Benchmarking System Architecture](benchmarking-system.md) - Detailed system design
 - [Model Storage Strategy](../deployment/MODEL_STORAGE.md) - Storage and caching
 - [Model Selection Criteria](../guides/model-selection-criteria.md) - Selection guide
-- [Benchmark Implementation Report](../../BENCHMARK_IMPLEMENTATION_REPORT.md) - Complete results
+- Benchmark Implementation Report - Complete results (archived)
 - [Model Parameterization](../testing/MODEL_PARAMETERIZATION.md) - Testing infrastructure
 
 ## Changelog

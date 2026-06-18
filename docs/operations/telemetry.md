@@ -411,14 +411,14 @@ Potential improvements for future versions:
 
 ## Related Documentation
 
-- [TEL-03: Python Telemetry Library](../local-telemetry/reports/TEL-03.md)
-- [TEL-04: Hugo-Translator Integration Plan](../local-telemetry/reports/TEL-04.md)
-- [Telemetry Platform Architecture](../local-telemetry/docs/architecture.md)
+- TEL-03: Python Telemetry Library (local-telemetry project — external)
+- TEL-04: Hugo-Translator Integration Plan (local-telemetry project — external)
+- Telemetry Platform Architecture (local-telemetry project — external)
 
 ## Support
 
 For issues or questions:
 
-1. Check the [TEL-04 Integration Plan](../local-telemetry/reports/TEL-04.md)
+1. Check the TEL-04 Integration Plan (local-telemetry project — external)
 2. Review telemetry logs for errors
 3. Disable telemetry if blocking translation work

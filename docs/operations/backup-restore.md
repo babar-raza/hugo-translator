@@ -509,7 +509,7 @@ Options:
 
 ## See Also
 
-- [Operations Guide](./OPERATIONS.md)
-- [Disaster Recovery Runbook](./runbooks/DISASTER_RECOVERY.md)
-- [Health Monitoring](./HEALTH_MONITORING.md)
-- [Troubleshooting Guide](./TROUBLESHOOTING.md)
+- [Operations Guide](./README.md)
+- [Disaster Recovery Runbook](./DISASTER_RECOVERY.md)
+- Health Monitoring (archived)
+- [Troubleshooting Guide](./troubleshooting.md)

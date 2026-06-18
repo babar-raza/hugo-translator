@@ -499,9 +499,9 @@ def _compute_field(self, key, frontmatter, target_lang):
 
 ## References
 
-- [Hugo Parser Documentation](hugo-parser.md)
+- Hugo Parser Documentation (planned — not yet created)
 - [Segment Extractor Documentation](segment-extractor.md)
-- [Site Profile Schema](../phase-1/site-profile-schema.md)
+- Site Profile Schema (phase-1 archived)
 - [Hugo Frontmatter Reference](https://gohugo.io/content-management/front-matter/)
 
 ---

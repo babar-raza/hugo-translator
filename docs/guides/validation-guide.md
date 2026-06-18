@@ -765,5 +765,5 @@ translate-hugo --site reference.aspose.net --validation-config ./custom-validati
 ## Related Documentation
 
 - [Terminology Pattern Syntax](../reference/terminology-pattern-syntax.md) - Regex patterns for terminology protection
-- [Configuration Reference](./configuration_reference.md) - Complete config file reference
-- [Troubleshooting](./troubleshooting.md) - Common validation errors and fixes
+- [Configuration Reference](../reference/config.md) - Complete config file reference
+- [Troubleshooting](../operations/troubleshooting.md) - Common validation errors and fixes

@@ -518,8 +518,8 @@ def validate_path(file_path: Path, allowed_dir: Path) -> bool:
 ## References
 
 - [User Guide](../guides/content-hash-tracking.md)
-- [Implementation Plan](../../plans/healing/content-hash-implementation.md)
-- [Design Document](../../plans/healing/content-hash-tracking.md)
+- Implementation Plan (archived)
+- Design Document (archived)
 - [Atomic Write Utility](../../src/utils/atomic_write.py)
 - [Content Hash Utility](../../src/utils/content_hash.py)
 - [Metadata Tracker](../../src/utils/metadata_tracker.py)

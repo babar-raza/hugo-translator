@@ -552,5 +552,5 @@ Monitor and optimize system performance.
 
 - [Troubleshooting Guide](./TROUBLESHOOTING.md)
 - [Disaster Recovery](./DISASTER_RECOVERY.md)
-- [Health Monitoring](../HEALTH_MONITORING.md)
-- [Backup and Restore](../BACKUP_RESTORE.md)
+- Health Monitoring (archived)
+- [Backup and Restore](./backup-restore.md)

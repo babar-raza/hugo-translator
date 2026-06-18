@@ -1145,7 +1145,7 @@ class BufferedTelemetry:
 
 ## See Also
 
-- **Detailed Endpoint Specs:** [specs/features/](../../specs/features/)
-- **System Architecture:** [specs/_index.md](../../specs/_index.md)
-- **Deployment Guide:** [docs/DEPLOYMENT_GUIDE.md](../DEPLOYMENT_GUIDE.md)
+- **Detailed Endpoint Specs:** specs/features/ (archived)
+- **System Architecture:** specs/_index.md (archived)
+- **Deployment Guide:** docs/DEPLOYMENT_GUIDE.md (archived)
 - **Python Client SDK:** Use `TelemetryClient` from `src/telemetry/client.py` for automatic buffer failover and retry logic

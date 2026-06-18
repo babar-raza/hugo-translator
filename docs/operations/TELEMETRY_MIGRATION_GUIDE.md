@@ -541,7 +541,7 @@ curl http://localhost:8765/metrics
 
 - [Telemetry Operations Guide](telemetry.md) - Day-to-day telemetry usage
 - [Telemetry Rollback Guide](TELEMETRY_ROLLBACK_GUIDE.md) - How to rollback if needed
-- [Local-Telemetry Migration Plan](../../plans/APP_MIGRATION_hugo-translator.md) - Technical migration details
+- Local-Telemetry Migration Plan - Technical migration details (archived)
 
 ---
 

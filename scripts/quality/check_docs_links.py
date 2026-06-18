@@ -44,10 +44,17 @@ def check_links(doc_path: Path) -> list[str]:
     broken_links = []
     content = doc_path.read_text(encoding="utf-8")
 
+    # Strip inline code spans and fenced code blocks before scanning for links
+    # to avoid false positives from example link syntax like `[text](url)`
+    stripped = re.sub(r"```.*?```", "", content, flags=re.DOTALL)
+    stripped = re.sub(r"`[^`]+`", "", stripped)
+    # Strip escaped brackets like \[Text\](url) — Markdown-escaped, not real links
+    stripped = re.sub(r"\\\[([^\]]*)\\\]\([^)]*\)", "", stripped)
+
     # Find all markdown links: [text](path) or [text](path#anchor)
     link_pattern = r"\[([^\]]+)\]\(([^)]+)\)"
 
-    for match in re.finditer(link_pattern, content):
+    for match in re.finditer(link_pattern, stripped):
         link_text, link_path = match.groups()
 
         # Skip external links

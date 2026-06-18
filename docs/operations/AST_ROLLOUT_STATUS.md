@@ -19,8 +19,8 @@ AST-based translation provides **100% formatting preservation** (bold, italic, l
 **Documentation:**
 - [AST Translation Quick Start](../guides/ast-translation-quickstart.md)
 - [AST Rollback Procedures](AST_FIX_ROLLBACK.md)
-- [Root Cause Analysis](../../plans/FORMATTING_ISSUES_ROOT_CAUSE_ANALYSIS.md)
-- [Rollout Audit Report](../../plans/healing/ast-rollout-audit.md)
+- Root Cause Analysis (plans/FORMATTING_ISSUES_ROOT_CAUSE_ANALYSIS.md)
+- Rollout Audit Report (plans/healing/ast-rollout-audit.md)
 
 ---
 
@@ -84,10 +84,10 @@ ast_batch_size: 50
 
 #### Evidence
 
-- [AST-03 Validation Results Report](../../plans/healing/ast-validation-results.md) ✅ COMPLETE
-- [Formatting Issues Root Cause Analysis](../../plans/FORMATTING_ISSUES_ROOT_CAUSE_ANALYSIS.md)
-- [Test Output Directory](../../tests/work/real_world_test/)
-- [Rollout Audit](../../plans/healing/ast-rollout-audit.md)
+- AST-03 Validation Results Report ✅ COMPLETE
+- Formatting Issues Root Cause Analysis (archived)
+- Test Output Directory: tests/work/real_world_test/
+- Rollout Audit (archived)
 
 #### Observed Issues with Legacy Mode (Before AST)
 
@@ -147,7 +147,7 @@ ast_batch_size: 50
 
 #### Evidence
 
-- [AST Multi-Site Verification Report](../../tests/work/ast_multi_site_test/AST_MULTI_SITE_VERIFICATION_REPORT.md) ✅ COMPLETE
+- AST Multi-Site Verification Report ✅ COMPLETE
 
 ---
 
@@ -176,7 +176,7 @@ ast_batch_size: 50
 
 #### Evidence
 
-- [AST Critical Sites Verification Report](../../plans/healing/ast-critical-sites-verification.md) ✅ COMPLETE
+- AST Critical Sites Verification Report ✅ COMPLETE
 
 ---
 
@@ -203,7 +203,7 @@ ast_batch_size: 50
 
 #### Evidence
 
-- [AST Critical Sites Verification Report](../../plans/healing/ast-critical-sites-verification.md) ✅ COMPLETE
+- AST Critical Sites Verification Report ✅ COMPLETE
 
 ---
 
@@ -228,7 +228,7 @@ ast_batch_size: 50
 
 #### Evidence
 
-- [AST Critical Sites Verification Report](../../plans/healing/ast-critical-sites-verification.md) ✅ COMPLETE
+- AST Critical Sites Verification Report ✅ COMPLETE
 
 ---
 

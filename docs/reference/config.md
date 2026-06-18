@@ -1243,6 +1243,6 @@ python -c "from src.observability.telemetry_integration import TELEMETRY_SRC_PAT
 
 ## Related Documentation
 
-- [Validation Guide](./validation_guide.md) - How validators work and decision logic
+- [Validation Guide](../guides/validation-guide.md) - How validators work and decision logic
 - [Terminology Pattern Syntax](./terminology-pattern-syntax.md) - Regex patterns for terminology protection
-- [Troubleshooting](./troubleshooting.md) - Common configuration errors and fixes
+- [Troubleshooting](../operations/troubleshooting.md) - Common configuration errors and fixes

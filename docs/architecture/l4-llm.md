@@ -380,10 +380,10 @@ print(f"Avg latency: {stats['l4_avg_latency_ms']}ms")
 
 ## Related Documentation
 
-- [Translation Memory (TM)](../src/tm/README.md)
-- [LLM Client](../src/intelligence/llm_client.py)
-- [Configuration](../config/global.yaml)
-- [Performance Tuning](PERFORMANCE.md)
+- Translation Memory (TM): `src/tm/`
+- [LLM Client](../../src/intelligence/llm_client.py)
+- [Configuration](../../config/global.yaml)
+- Performance Tuning
 
 ## FAQ
 

@@ -822,7 +822,7 @@ git commit -am "Save config state"
 ```
 
 **Code Reference:** [src/tm/backup.py](../../src/tm/backup.py) (200+ lines)
-**Operational Guide:** [TM Maintenance Runbook - Backup Section](../operations/tm-maintenance.md#backup-creation)
+**Operational Guide:** [TM Maintenance Runbook - Backup Section](../operations/tm-maintenance.md#creating-backups)
 
 ---
 

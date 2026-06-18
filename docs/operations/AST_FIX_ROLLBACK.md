@@ -341,7 +341,7 @@ sum(rate(batch_translation_attempts_total[5m]))
 
 ## Related Documents
 
-- [AST_FIX_IMPLEMENTATION_SUMMARY.md](../../reports/AST_FIX_IMPLEMENTATION_SUMMARY.md) - Implementation details
-- [AST_FIX_VALIDATION.md](../../plans/healing/AST_FIX_VALIDATION.md) - Validation plan
-- [AST_FIX_CORRECTIONS.md](../../plans/healing/AST_FIX_CORRECTIONS.md) - Bug fixes plan
-- [TROUBLESHOOTING.md](../TROUBLESHOOTING.md) - General troubleshooting guide
+- AST_FIX_IMPLEMENTATION_SUMMARY.md - Implementation details (archived)
+- AST_FIX_VALIDATION.md - Validation plan (archived)
+- AST_FIX_CORRECTIONS.md - Bug fixes plan (archived)
+- [TROUBLESHOOTING.md](troubleshooting.md) - General troubleshooting guide

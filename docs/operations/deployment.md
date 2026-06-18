@@ -950,16 +950,16 @@ docker-compose up -d
 
 3. **Enable log aggregation:**
    - Optional: Configure ELK stack or similar
-   - See OPERATIONS.md
+   - See [README.md](README.md)
 
 ---
 
 ## Next Steps
 
-- Review [Operations Manual](OPERATIONS.md) for daily operations
+- Review [Operations Manual](README.md) for daily operations
 - Set up monitoring and alerting
 - Configure backup procedures
-- Review [Troubleshooting Guide](TROUBLESHOOTING.md)
+- Review [Troubleshooting Guide](troubleshooting.md)
 
 ---
 

@@ -1022,9 +1022,9 @@ Based on workload:
 
 ## Next Steps
 
-- Review [Troubleshooting Guide](TROUBLESHOOTING.md) for problem resolution
-- See [User Guide](USER_GUIDE.md) for feature usage
-- Check [Configuration Reference](CONFIGURATION.md) for tuning options
+- Review [Troubleshooting Guide](troubleshooting.md) for problem resolution
+- See [User Guide](../user-guide/setup.md) for feature usage
+- Check [Configuration Reference](../reference/config.md) for tuning options
 
 ---
 

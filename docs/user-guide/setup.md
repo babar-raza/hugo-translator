@@ -24,7 +24,7 @@ This guide covers installation and setup of the Hugo Translation System for firs
 - **8GB+ RAM** - Minimum recommended for translation workloads
 - **10GB+ free disk space** - For dependencies and models
 
-**Note:** Line endings are automatically managed via [.gitattributes](.gitattributes) for cross-platform compatibility. Shell scripts use LF, PowerShell scripts use CRLF.
+**Note:** Line endings are automatically managed via [.gitattributes](../../.gitattributes) for cross-platform compatibility. Shell scripts use LF, PowerShell scripts use CRLF.
 
 ### Windows-Specific
 

@@ -317,9 +317,9 @@ The following are gitignored and should never be committed:
 
 ## See Also
 
-- [FILE_ORGANIZATION.md](../../reports/autonomous_workers/FILE_ORGANIZATION.md) - Detailed organization plan
-- [FILE_MANIFEST.json](../../reports/autonomous_workers/FILE_MANIFEST.json) - Complete file inventory
-- [MASTER_PLAN.md](../../plans/autonomous_workers/MASTER_PLAN.md) - Phase 6 implementation plan
+- FILE_ORGANIZATION.md - Detailed organization plan (archived)
+- FILE_MANIFEST.json - Complete file inventory (archived)
+- MASTER_PLAN.md - Phase 6 implementation plan (archived)
 
 ---
 

@@ -429,5 +429,5 @@ python scripts/tm/restore_tm.py \
 
 - [Daily Operations](./DAILY_OPERATIONS.md)
 - [Troubleshooting](./TROUBLESHOOTING.md)
-- [Backup and Restore](../BACKUP_RESTORE.md)
-- [Health Monitoring](../HEALTH_MONITORING.md)
+- [Backup and Restore](./backup-restore.md)
+- Health Monitoring (archived)

@@ -125,7 +125,7 @@ This document defines the Service Level Agreements (SLAs), Service Level Objecti
 - >1.0% for >2 hours → P2 incident (data quality issue)
 - >5.0% for >30 min → P1 incident (systemic duration tracking failure)
 
-**Related**: [PR-04 Telemetry Fix](../../TI-04_COMPLETION_SUMMARY.md), [Troubleshooting Guide](telemetry_troubleshooting.md)
+**Related**: PR-04 Telemetry Fix (archived), [Troubleshooting Guide](telemetry_troubleshooting.md)
 
 ---
 

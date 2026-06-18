@@ -415,5 +415,5 @@ pattern: "\\b\\w+(?:\\s+\\w+)*\\b"  # Faster
 ## Related Documentation
 
 - [Terminology Configuration](../reference/config.md#terminologyyaml) - Complete config reference
-- [Quality Improvement Guide](../guides/quality-improvement.md#terminology-protection) - Usage and setup
+- [Quality Improvement Guide](../guides/quality-improvement.md#11-implement-terminology-protection-system) - Usage and setup
 - [Validation Guide](../guides/validation-guide.md) - Validation system overview

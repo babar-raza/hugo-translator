@@ -394,5 +394,5 @@ This is separate from Prometheus metrics and is currently in dry-run mode.
 - [Prometheus Documentation](https://prometheus.io/docs/)
 - [Grafana Documentation](https://grafana.com/docs/)
 - [Metrics Best Practices](https://prometheus.io/docs/practices/naming/)
-- [Alert Rules](../docker/prometheus/alert_rules.yml)
-- [Troubleshooting Guide](./runbooks/TROUBLESHOOTING.md)
+- [Alert Rules](../../docker/prometheus/alert_rules.yml)
+- [Troubleshooting Guide](./troubleshooting.md)

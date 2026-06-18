@@ -472,7 +472,7 @@ model = AutoModelForSeq2SeqLM.from_pretrained(
 
 ## Related Documentation
 
-- [Model Registry](../MODEL_REGISTRY.md) - Registry format and model metadata
-- [CTranslate2 Guide](../deployment/CTRANSLATE2.md) - Converting and using CT2 models
+- Model Registry - Registry format and model metadata (archived)
+- CTranslate2 Guide - Converting and using CT2 models (archived)
 - [Docker Deployment](../deployment/DOCKER.md) - Container deployment strategies
 - [HuggingFace Hub Documentation](https://huggingface.co/docs/huggingface_hub/guides/download) - Official cache documentation

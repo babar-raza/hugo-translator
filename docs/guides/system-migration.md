@@ -844,9 +844,9 @@ docker-compose up orchestrator
 For additional help:
 
 1. **Check Documentation:**
-   - [User Guide](USER_GUIDE.md)
-   - [Troubleshooting Guide](TROUBLESHOOTING.md)
-   - [Operations Manual](OPERATIONS.md)
+   - [User Guide](../user-guide/setup.md)
+   - [Troubleshooting Guide](../operations/troubleshooting.md)
+   - [Operations Manual](../operations/README.md)
 
 2. **Review Logs:**
    ```bash
@@ -927,9 +927,9 @@ Post-Migration
 
 ### C. References
 
-- [Migration Roadmap](../plans/MIGRATION_ROADMAP.md)
-- [System Comparison](../plans/MIGRATION_ROADMAP.md#current-system-vs-proposed-system)
-- [Production Readiness](PRODUCTION_READY.md)
+- Migration Roadmap (archived)
+- System Comparison (archived)
+- Production Readiness (archived)
 
 ---
 

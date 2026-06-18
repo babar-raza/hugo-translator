@@ -283,9 +283,9 @@ cat logs/*.log | jq 'select(.message | contains("Duration fallback")) | .extra.c
 4. Set up log aggregation for "Duration fallback" messages
 
 **Runbook Links**:
-- [Telemetry System Architecture](./telemetry_architecture.md) (TODO)
-- [Translation Engine Debugging](./translation_debugging.md) (TODO)
-- [Production Incident Response](./incident_response.md) (TODO)
+- Telemetry System Architecture (TODO — not yet created)
+- Translation Engine Debugging (TODO — not yet created)
+- Production Incident Response (TODO — not yet created)
 
 ---
 
@@ -386,10 +386,10 @@ curl http://localhost:9090/metrics | grep telemetry_duration_fallback
 
 ## Related Documentation
 
-- **Implementation**: [TI-01 Completion Summary](../../TI-01_COMPLETION_SUMMARY.md)
+- **Implementation**: TI-01 Completion Summary (archived)
 - **Code**: [telemetry_integration.py](../../src/observability/telemetry_integration.py)
 - **Tests**: [test_telemetry_observability.py](../../tests/unit/test_telemetry_observability.py)
-- **Original Fix**: [PR-04 Implementation](../../SESSION_PROGRESS_CONTINUE.md#-pr-04-telemetry-api-422-error-fix)
+- **Original Fix**: PR-04 Implementation (archived)
 
 ---
 
