@@ -29,6 +29,7 @@ Read the latest Stage 1 sprint audit outputs. Extract every unresolved gap, rema
 5. Current taskcards / roadmap / governance docs
 6. Sprint history
 7. Current repository state
+8. **Live file verification** — when a Stage 1 issue references a file path (e.g. "scripts/foo.ps1 does not exist"), read that path directly from the repository before assuming it does or does not exist. Session summaries may contain stale or imprecise paths from compacted context.
 
 If multiple sprint summaries exist, use the latest one. If multiple plans exist, use the most recent active plan. If active plan is not visible, do not hallucinate — extract pending work from audit summary, mark PLAN_CONTEXT_PARTIAL.
 

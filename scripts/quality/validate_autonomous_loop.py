@@ -99,7 +99,15 @@ AUDIT_REQUIRED_TERM = "loop-signal.yaml"
 TASKCARD_CONTRACT_FILE = "loop-taskcard-contract.md"
 TASKCARD_REQUIRED_TERM = "taskcard-registry.yaml"
 
-# --- Check 12 (optional): run directory structure ---
+# --- Check 13: loop-runbook.md references loop-signal ---
+RUNBOOK_FILE = "loop-runbook.md"
+RUNBOOK_REQUIRED_TERM = "loop-signal"
+
+# --- Check 14: loop-evidence-contract.md contains evidence_level term ---
+EVIDENCE_CONTRACT_FILE = "loop-evidence-contract.md"
+EVIDENCE_REQUIRED_TERM = "Evidence Level"
+
+# --- Check 15 (optional): run directory structure ---
 RUN_DIR_REQUIRED_FILES = [
     "loop-signal.yaml",
     "loop-state.yaml",
@@ -255,7 +263,29 @@ def main() -> int:
     else:
         fail(f"Taskcard contract file missing: {taskcard_contract_path}")
 
-    # Check 12 (optional): run directory structure
+    # Check 12: loop-runbook.md references loop-signal
+    runbook_path = PROMPTS_DIR / RUNBOOK_FILE
+    if runbook_path.exists():
+        if not _check_file_contains(runbook_path, RUNBOOK_REQUIRED_TERM):
+            fail(
+                f"{RUNBOOK_FILE} does not reference '{RUNBOOK_REQUIRED_TERM}' "
+                f"(runbook must describe loop-signal.yaml outputs)"
+            )
+    else:
+        fail(f"Runbook file missing: {runbook_path}")
+
+    # Check 13: loop-evidence-contract.md defines evidence levels
+    evidence_contract_path = PROMPTS_DIR / EVIDENCE_CONTRACT_FILE
+    if evidence_contract_path.exists():
+        if not _check_file_contains(evidence_contract_path, EVIDENCE_REQUIRED_TERM):
+            fail(
+                f"{EVIDENCE_CONTRACT_FILE} does not contain '{EVIDENCE_REQUIRED_TERM}' "
+                f"(evidence contract must define evidence levels)"
+            )
+    else:
+        fail(f"Evidence contract file missing: {evidence_contract_path}")
+
+    # Check 15 (optional): run directory structure
     if args.run_dir is not None:
         if not args.run_dir.is_dir():
             fail(f"Run directory does not exist: {args.run_dir}")
