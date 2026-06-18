@@ -126,6 +126,7 @@ Understand, extend, and contribute to the codebase.
 - [Sprint Loop Governance](governance/sprint-loop-governance.md) - 10-state sprint controller, classifications, quality scorer
 
 ### 🗂️ Architecture Decisions (ADR)
+- [ADR Index](adr/README.md) - All decisions with template
 - [ADR-004: Engine Decomposition](adr/004-engine-decomposition.md) - TranslationEngine god-class → 5 components
 
 ### 🧪 Development

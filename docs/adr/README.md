@@ -9,6 +9,7 @@ This directory contains Architecture Decision Records for the Hugo Translation S
 | [001](001-translation-memory-three-layer.md) | Three-Layer Translation Memory | Accepted | 2025-12-24 |
 | [002](002-validation-decision-engine.md) | Validation Decision Engine | Accepted | 2026-01-15 |
 | [003](003-content-hash-tracking.md) | Content Hash Tracking | Accepted | 2026-04-20 |
+| [004](004-engine-decomposition.md) | Engine God-Class Decomposition | Accepted | 2026-06-17 |
 
 ## Template
 
