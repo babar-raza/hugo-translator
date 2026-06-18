@@ -245,8 +245,10 @@ security-scan:
 
 gate-summary:
   stage: gate
-  # Depends on all 5 required gates. security-scan blocks on HIGH severity (allow_failure: false).
-  # and does not block this job. Gate-summary only runs when all 4 required jobs pass.
+  # Depends on all 5 required gates (unit-tests, manifest-check, governance-check,
+  # regression-tests, quality-gate). security-scan has allow_failure: false (blocks on HIGH
+  # severity findings) but is NOT in this job's needs list — it runs in parallel and its
+  # result is visible in job artifacts.
   needs:
     - unit-tests
     - manifest-check

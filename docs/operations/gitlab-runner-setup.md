@@ -25,17 +25,27 @@
 
 ## Starting the Runner
 
-The runner is **not** installed as a Windows Service (requires admin). Start it manually:
+The runner is **not** installed as a Windows Service (requires admin). Start it manually.
+
+> **SAFETY RULE (F-012):** Never run two instances of `gitlab-runner.exe` from the same
+> `config.toml`. Duplicate processes cause a race condition where both claim jobs from the
+> same pipeline, producing unpredictable failures. Before starting, verify no instance
+> is already running: `ps aux | grep gitlab-runner` (Git Bash) or check Task Manager.
 
 ```powershell
-Start-Process -NoNewWindow ~/bin/gitlab-runner.exe -ArgumentList "run","--config","$HOME/gitlab-runner-config/config.toml","--working-directory","$HOME/gitlab-runner-config/work"
+# Check for existing process first
+Get-Process -Name "gitlab-runner" -ErrorAction SilentlyContinue
+# If none found, start:
+Start-Process -WindowStyle Hidden -FilePath "$env:USERPROFILE\bin\gitlab-runner.exe" `
+  -ArgumentList "run","--config","$env:USERPROFILE\gitlab-runner-config\config.toml"
 ```
 
 Or from Git Bash:
 ```bash
-~/bin/gitlab-runner.exe run \
-  --config ~/gitlab-runner-config/config.toml \
-  --working-directory ~/gitlab-runner-config/work &
+# Check first
+ps aux | grep gitlab-runner | grep -v grep
+# If none running:
+~/bin/gitlab-runner.exe run --config ~/gitlab-runner-config/config.toml &
 ```
 
 To check if the runner is online:
@@ -139,8 +149,12 @@ Run on 2026-06-12. All 5 required jobs passed:
 | regression-tests | 548s | ✓ success |
 | quality-gate | 355s | ✓ success |
 | gate-summary | 194s | ✓ success |
-| security-scan | 281s | advisory (allow_failure: true) |
+| security-scan | 281s | ✓ success |
 
 **Overall: success**
 
 Second run will be significantly faster due to venv cache hit.
+
+> **Note:** `security-scan` was marked advisory in early pipelines. As of the current
+> `.gitlab-ci.yml`, it has `allow_failure: false` — Bandit HIGH findings block the pipeline.
+> pip-audit remains advisory (non-zero exit is tolerated).
