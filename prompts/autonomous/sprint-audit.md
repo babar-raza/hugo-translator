@@ -1032,6 +1032,29 @@ After completing the audit, write to the run directory:
      next_action field; orchestrator handles the stop)
    - Genuine external blocker → BLOCKED_EXTERNAL
 
+ADVERSARIAL RE-REVIEW (anti-self-audit mitigation):
+
+After writing audit-report-iter<N>.md, perform the following re-review:
+
+1. Adopt the persona: "I am a skeptical external reviewer. I did not run this
+   plan. I am reading the audit report cold."
+
+2. For each finding classified ACCEPTED or PARTIAL:
+   - Ask: "What is the weakest part of the evidence for this finding?"
+   - Ask: "If the executing agent was wrong, what would that look like in this evidence?"
+   - If evidence_level < 3 (no runtime subprocess or test result): downgrade to PARTIAL
+
+3. Append a `## ADVERSARIAL REVIEW` section to audit-report-iter<N>.md:
+   - List any findings you would downgrade and why
+   - State whether your adversarial review changes the blocking_gaps count
+   - If blocking_gaps count changes: update loop-signal.yaml accordingly
+
+4. If adversarial review finds no downgrades: state "ADVERSARIAL REVIEW: No
+   additional blocking gaps identified."
+
+This does not eliminate the self-audit conflict — it mitigates it by forcing
+an explicit skeptical pass over every ACCEPTED finding.
+
 STOP SEMANTICS SUPPRESSION:
 
 Do NOT stop after writing the audit report. The orchestrator reads
