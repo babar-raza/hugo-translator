@@ -99,6 +99,10 @@ AUDIT_REQUIRED_TERM = "loop-signal.yaml"
 TASKCARD_CONTRACT_FILE = "loop-taskcard-contract.md"
 TASKCARD_REQUIRED_TERM = "taskcard-registry.yaml"
 
+# --- Check 12: loop-swarm-contract.md contains COORDINATOR key term ---
+SWARM_CONTRACT_FILE = "loop-swarm-contract.md"
+SWARM_REQUIRED_TERM = "COORDINATOR"
+
 # --- Check 13: loop-runbook.md references loop-signal ---
 RUNBOOK_FILE = "loop-runbook.md"
 RUNBOOK_REQUIRED_TERM = "loop-signal"
@@ -263,7 +267,18 @@ def main() -> int:
     else:
         fail(f"Taskcard contract file missing: {taskcard_contract_path}")
 
-    # Check 12: loop-runbook.md references loop-signal
+    # Check 12: loop-swarm-contract.md contains COORDINATOR key term
+    swarm_contract_path = PROMPTS_DIR / SWARM_CONTRACT_FILE
+    if swarm_contract_path.exists():
+        if not _check_file_contains(swarm_contract_path, SWARM_REQUIRED_TERM):
+            fail(
+                f"{SWARM_CONTRACT_FILE} does not contain '{SWARM_REQUIRED_TERM}' "
+                f"(swarm contract must define coordinator role)"
+            )
+    else:
+        fail(f"Swarm contract file missing: {swarm_contract_path}")
+
+    # Check 13: loop-runbook.md references loop-signal
     runbook_path = PROMPTS_DIR / RUNBOOK_FILE
     if runbook_path.exists():
         if not _check_file_contains(runbook_path, RUNBOOK_REQUIRED_TERM):
@@ -274,7 +289,7 @@ def main() -> int:
     else:
         fail(f"Runbook file missing: {runbook_path}")
 
-    # Check 13: loop-evidence-contract.md defines evidence levels
+    # Check 14: loop-evidence-contract.md defines evidence levels
     evidence_contract_path = PROMPTS_DIR / EVIDENCE_CONTRACT_FILE
     if evidence_contract_path.exists():
         if not _check_file_contains(evidence_contract_path, EVIDENCE_REQUIRED_TERM):
