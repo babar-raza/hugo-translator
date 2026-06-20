@@ -252,7 +252,11 @@ class TestLLMBackend(unittest.TestCase):
         mock_provider = Mock()
         # translate_batch uses a packed batch call with numbered format
         mock_provider.generate.side_effect = [
-            ("[1] hola\n[2] mundo", 10, 5),  # Single packed call returns both translations
+            (
+                "<<<SEG_1>>> hola\n<<<SEG_2>>> mundo",
+                10,
+                5,
+            ),  # Single packed call returns both translations
         ]
         mock_create.return_value = mock_provider
 
