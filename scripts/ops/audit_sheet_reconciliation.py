@@ -41,7 +41,6 @@ def classify_row(sidecar: dict) -> str:
         return "ZERO_ITEM"
 
     confidence = scope.get("reporting_confidence", "high")
-    fallback = scope.get("fallback_used", False)
     if confidence == "low":
         return "LOW_CONFIDENCE"
 

@@ -5,14 +5,8 @@ TC-ENABLE-04: Low-confidence scope suppression guard
 TC-ENABLE-06: Config toggle guard (runtime env var)
 
 CI scope: included in unit-tests agentic module block (gitlab-ci.yml +
-release_gate.yml). 6 tests validate implemented behaviour; 3 xfail for
-unimplemented guards (TC-ENABLE-03/04/06).
-
-xfail policy:
-  Tests for TC-ENABLE-03/04/06 are marked xfail(strict=False) because the
-  corresponding guard features are not yet implemented in
-  agent_metrics_integration.py.  When those features land the markers
-  should be removed.
+release_gate.yml). All 9 tests validate implemented guards (TC-ENABLE-03/04/06).
+Guards were implemented in commit f65d51e — all 9 tests pass, 0 xfail.
 """
 
 from __future__ import annotations
