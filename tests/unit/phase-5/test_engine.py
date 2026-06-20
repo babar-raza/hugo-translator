@@ -13,7 +13,6 @@ import src.tm.retranslate_queue as _rtq
 from src.tm.models import LookupResult
 from src.translation_engine import (
     TranslationEngine,
-    TranslationRejectedError,
 )
 from src.translation_engine.extractor import Segment
 from src.translation_engine.parser import HugoDocument
@@ -39,7 +38,7 @@ def mock_config_service():
     profile = Mock()
     profile.site_id = "test_site"
     profile.default_source_lang = "en"
-    profile.default_model = "m2m100_418m"
+    profile.default_model = "llm_test"
     profile.output_dir = "output"
     profile.frontmatter = {}  # Empty dict to avoid iteration errors
     profile.body = Mock()
@@ -47,6 +46,7 @@ def mock_config_service():
     profile.body.preserve_patterns = []
     profile.body.preserve_blocks = []
     profile.body.placeholder_syntax = []
+    profile.body.use_ast_body_reconstruction = False  # Prevent AST path in unit tests
 
     service.get_site_profile.return_value = profile
 
@@ -88,16 +88,18 @@ def mock_model_loader():
     )
 
     loader.load_model.return_value = backend
+    loader.get_tokenizer_for_counting.return_value = None  # Use estimate_token_count fallback
     return loader
 
 
 @pytest.fixture
 def translation_engine(mock_config_service, mock_tm, mock_model_loader):
-    """Create TranslationEngine with mocks."""
+    """Create TranslationEngine with mocks (validation disabled for unit isolation)."""
     return TranslationEngine(
         config_service=mock_config_service,
         tm=mock_tm,
         model_loader=mock_model_loader,
+        enable_validation=False,
     )
 
 
@@ -167,13 +169,9 @@ class TestExtractSegments:
 class TestTranslateFile:
     """Test file translation."""
 
-    @pytest.mark.xfail(
-        reason="Post-decomposition: patches at engine.* don't intercept segment_translator/engine_builder",
-        strict=True,
-    )
     @patch("src.translation_engine.engine.HugoParser")
     @patch("src.translation_engine.engine.SegmentExtractor")
-    @patch("src.translation_engine.engine.MarkdownReconstructor")
+    @patch("src.translation_engine.segment_translator.MarkdownReconstructor")
     def test_translate_file_success(
         self,
         mock_reconstructor_class,
@@ -186,6 +184,7 @@ class TestTranslateFile:
         """Test successful file translation."""
         # Setup mocks
         mock_parser = mock_parser_class.return_value
+        translation_engine.parser = mock_parser  # wire mock to engine instance
         mock_doc = Mock(spec=HugoDocument)
         mock_doc.file_path = sample_markdown_file
         mock_doc.body = "# Hello World\n\nTest content"
@@ -213,7 +212,9 @@ class TestTranslateFile:
         # Mock reconstructor
         mock_reconstructor = mock_reconstructor_class.return_value
         mock_reconstructor.reconstruct_document.return_value = Mock(
-            __str__=lambda x: "# Translated Content\n\nTranslated body"
+            __str__=lambda x: (
+                "---\ntitle: Translated Title\n---\n\n# Translated Content\n\nTranslated body"
+            )
         )
 
         # Mock output path in site profile
@@ -273,13 +274,9 @@ class TestTranslateFile:
 class TestTranslateWithTM:
     """Test translation with Translation Memory."""
 
-    @pytest.mark.xfail(
-        reason="Post-decomposition: patches at engine.* don't intercept segment_translator/engine_builder",
-        strict=True,
-    )
     @patch("src.translation_engine.engine.HugoParser")
     @patch("src.translation_engine.engine.SegmentExtractor")
-    @patch("src.translation_engine.engine.MarkdownReconstructor")
+    @patch("src.translation_engine.segment_translator.MarkdownReconstructor")
     def test_translate_with_tm_hit(
         self,
         mock_reconstructor_class,
@@ -292,6 +289,7 @@ class TestTranslateWithTM:
         """Test translation with TM hit."""
         # Setup mocks
         mock_parser = mock_parser_class.return_value
+        translation_engine.parser = mock_parser  # wire mock to engine instance
         mock_doc = Mock(spec=HugoDocument)
         mock_doc.file_path = sample_markdown_file
         mock_doc.body = "# Hello World\n\nTest content"
@@ -329,7 +327,9 @@ class TestTranslateWithTM:
         # Mock reconstructor
         mock_reconstructor = mock_reconstructor_class.return_value
         mock_reconstructor.reconstruct_document.return_value = Mock(
-            __str__=lambda x: "# Translated Content\n\nTranslated body"
+            __str__=lambda x: (
+                "---\ntitle: Translated Title\n---\n\n# Translated Content\n\nTranslated body"
+            )
         )
 
         # Mock output path
@@ -350,13 +350,9 @@ class TestTranslateWithTM:
         assert result.stats.l1_hits == 1
         assert result.stats.translated_segments == 0  # No new translations
 
-    @pytest.mark.xfail(
-        reason="Post-decomposition: patches at engine.* don't intercept segment_translator/engine_builder",
-        strict=True,
-    )
     @patch("src.translation_engine.engine.HugoParser")
     @patch("src.translation_engine.engine.SegmentExtractor")
-    @patch("src.translation_engine.engine.MarkdownReconstructor")
+    @patch("src.translation_engine.segment_translator.MarkdownReconstructor")
     def test_translate_force_bypass_tm(
         self,
         mock_reconstructor_class,
@@ -369,6 +365,7 @@ class TestTranslateWithTM:
         """Test force translation bypasses TM."""
         # Setup mocks similar to tm_hit test
         mock_parser = mock_parser_class.return_value
+        translation_engine.parser = mock_parser  # wire mock to engine instance
         mock_doc = Mock(spec=HugoDocument)
         mock_doc.file_path = sample_markdown_file
         mock_doc.body = "# Hello World\n\nTest content"
@@ -403,7 +400,9 @@ class TestTranslateWithTM:
 
         mock_reconstructor = mock_reconstructor_class.return_value
         mock_reconstructor.reconstruct_document.return_value = Mock(
-            __str__=lambda x: "# Translated Content\n\nTranslated body"
+            __str__=lambda x: (
+                "---\ntitle: Translated Title\n---\n\n# Translated Content\n\nTranslated body"
+            )
         )
 
         translation_engine.config.get_site_profile.return_value.output_dir = str(
@@ -427,30 +426,23 @@ class TestTranslateWithTM:
 class TestTranslateDirectory:
     """Test directory translation."""
 
-    @pytest.mark.xfail(
-        reason="Post-decomposition: DirectoryOrchestrator does real filtering; mock profile insufficient",
-        strict=True,
-    )
     def test_translate_directory(self, translation_engine, tmp_path):
         """Test translating directory of files."""
-        # Create test files
+        from src.translation_engine.models import DirectoryResult
+
+        # Create test files (content doesn't matter — orchestrator is mocked)
         (tmp_path / "file1.md").write_text("# Test 1", encoding="utf-8")
         (tmp_path / "file2.md").write_text("# Test 2", encoding="utf-8")
 
-        # Mock translate_file to return success
-        original_translate = translation_engine.translate_file
-        translation_engine.translate_file = Mock(
-            side_effect=lambda **kwargs: Mock(
-                success=True,
-                file_path=kwargs["file_path"],
-                outputs={"fr": Path("output/fr/test.md")},
-                stats=Mock(
-                    total_segments=1,
-                    tm_hits=0,
-                    translated_segments=1,
-                ),
-            )
+        # Mock DirectoryOrchestrator directly (post-decomposition approach)
+        expected = DirectoryResult(
+            success=True,
+            directory=tmp_path,
+            total_files=2,
+            successful_files=2,
+            file_results=[Mock(), Mock()],
         )
+        translation_engine._dir_orchestrator.translate_directory = Mock(return_value=expected)
 
         # Translate directory
         result = translation_engine.translate_directory(
@@ -676,7 +668,7 @@ class TestRetryLoop:
 
     @patch("src.translation_engine.engine.HugoParser")
     @patch("src.translation_engine.engine.SegmentExtractor")
-    @patch("src.translation_engine.engine.MarkdownReconstructor")
+    @patch("src.translation_engine.segment_translator.MarkdownReconstructor")
     def test_accept_on_first_try(
         self,
         mock_reconstructor_class,
@@ -691,9 +683,12 @@ class TestRetryLoop:
         """Test ACCEPT decision on first translation attempt."""
         # Setup mocks
         mock_parser = mock_parser_class.return_value
+        engine_with_validation.parser = mock_parser  # wire mock to engine instance
         mock_doc = Mock(spec=HugoDocument)
         mock_doc.file_path = sample_markdown_file
         mock_doc.body = "# Test Content"
+        mock_doc.ast = []
+        mock_doc.frontmatter = {}
         mock_parser.parse_string.return_value = mock_doc
 
         # Mock segment
@@ -717,7 +712,9 @@ class TestRetryLoop:
         # Mock reconstructor
         mock_reconstructor = mock_reconstructor_class.return_value
         mock_reconstructor.reconstruct_document.return_value = Mock(
-            __str__=lambda x: "# Translated Content\n\nTranslated body"
+            __str__=lambda x: (
+                "---\ntitle: Translated Title\n---\n\n# Translated Content\n\nTranslated body"
+            )
         )
 
         # Set output directory
@@ -742,13 +739,9 @@ class TestRetryLoop:
         # Verify decision engine was called once
         mock_decision_engine.make_decision.assert_called_once()
 
-    @pytest.mark.xfail(
-        reason="Post-decomposition: patches at engine.* don't intercept segment_translator/engine_builder",
-        strict=True,
-    )
     @patch("src.translation_engine.engine.HugoParser")
     @patch("src.translation_engine.engine.SegmentExtractor")
-    @patch("src.translation_engine.engine.MarkdownReconstructor")
+    @patch("src.translation_engine.segment_translator.MarkdownReconstructor")
     def test_retry_on_validation_failure(
         self,
         mock_reconstructor_class,
@@ -763,9 +756,12 @@ class TestRetryLoop:
         """Test RETRY decision with feedback."""
         # Setup mocks
         mock_parser = mock_parser_class.return_value
+        engine_with_validation.parser = mock_parser  # wire mock to engine instance
         mock_doc = Mock(spec=HugoDocument)
         mock_doc.file_path = sample_markdown_file
         mock_doc.body = "# Test Content"
+        mock_doc.ast = []
+        mock_doc.frontmatter = {}
         mock_parser.parse_string.return_value = mock_doc
 
         segment = Mock(spec=Segment)
@@ -788,7 +784,9 @@ class TestRetryLoop:
         # Mock reconstructor
         mock_reconstructor = mock_reconstructor_class.return_value
         mock_reconstructor.reconstruct_document.return_value = Mock(
-            __str__=lambda x: "# Translated Content\n\nTranslated body"
+            __str__=lambda x: (
+                "---\ntitle: Translated Title\n---\n\n# Translated Content\n\nTranslated body"
+            )
         )
 
         engine_with_validation.config.get_site_profile.return_value.output_dir = str(
@@ -844,13 +842,9 @@ class TestRetryLoop:
         assert "fr" in result.outputs
         assert result.outputs["fr"].exists()
 
-    @pytest.mark.xfail(
-        reason="Post-decomposition: patches at engine.* don't intercept segment_translator/engine_builder",
-        strict=True,
-    )
     @patch("src.translation_engine.engine.HugoParser")
     @patch("src.translation_engine.engine.SegmentExtractor")
-    @patch("src.translation_engine.engine.MarkdownReconstructor")
+    @patch("src.translation_engine.segment_translator.MarkdownReconstructor")
     def test_reject_after_max_retries(
         self,
         mock_reconstructor_class,
@@ -865,9 +859,12 @@ class TestRetryLoop:
         """Test REJECT decision after exhausting retry attempts."""
         # Setup mocks
         mock_parser = mock_parser_class.return_value
+        engine_with_validation.parser = mock_parser  # wire mock to engine instance
         mock_doc = Mock(spec=HugoDocument)
         mock_doc.file_path = sample_markdown_file
         mock_doc.body = "# Test Content"
+        mock_doc.ast = []
+        mock_doc.frontmatter = {}
         mock_parser.parse_string.return_value = mock_doc
 
         segment = Mock(spec=Segment)
@@ -889,7 +886,9 @@ class TestRetryLoop:
 
         mock_reconstructor = mock_reconstructor_class.return_value
         mock_reconstructor.reconstruct_document.return_value = Mock(
-            __str__=lambda x: "# Translated Content\n\nTranslated body"
+            __str__=lambda x: (
+                "---\ntitle: Translated Title\n---\n\n# Translated Content\n\nTranslated body"
+            )
         )
 
         engine_with_validation.config.get_site_profile.return_value.output_dir = str(
@@ -915,30 +914,28 @@ class TestRetryLoop:
 
         mock_decision_engine.make_decision.return_value = reject_decision
 
-        # Translate - should raise TranslationRejectedError
-        with pytest.raises(TranslationRejectedError) as exc_info:
-            engine_with_validation.translate_file(
-                site_id="test_site",
-                file_path=sample_markdown_file,
-                target_langs=["fr"],
-                validate=True,
-            )
+        # In the decomposed architecture, REJECT is caught per-locale in
+        # FileTranslationPipeline.translate_language() and NOT re-raised.
+        # The result reflects failure without propagating an exception.
+        result = engine_with_validation.translate_file(
+            site_id="test_site",
+            file_path=sample_markdown_file,
+            target_langs=["fr"],
+            validate=True,
+        )
 
-        # Verify exception details
-        assert "Translation rejected" in str(exc_info.value)
-        assert exc_info.value.rejection_reason == "Critical validation failure"
+        # Verify rejection recorded — no exception propagated
+        assert result.success is False
+        assert len(result.errors) > 0
+        assert "rejected" in result.errors[0].lower()
 
         # Verify file was NOT written
         output_path = tmp_path / "output" / "fr" / sample_markdown_file.name
         assert not output_path.exists()
 
-    @pytest.mark.xfail(
-        reason="Post-decomposition: patches at engine.* don't intercept segment_translator/engine_builder",
-        strict=True,
-    )
     @patch("src.translation_engine.engine.HugoParser")
     @patch("src.translation_engine.engine.SegmentExtractor")
-    @patch("src.translation_engine.engine.MarkdownReconstructor")
+    @patch("src.translation_engine.segment_translator.MarkdownReconstructor")
     def test_feedback_applied_to_retry_prompt(
         self,
         mock_reconstructor_class,
@@ -953,9 +950,12 @@ class TestRetryLoop:
         """Test that feedback is passed to retry translation attempt."""
         # Setup mocks
         mock_parser = mock_parser_class.return_value
+        engine_with_validation.parser = mock_parser  # wire mock to engine instance
         mock_doc = Mock(spec=HugoDocument)
         mock_doc.file_path = sample_markdown_file
         mock_doc.body = "# Test Content"
+        mock_doc.ast = []
+        mock_doc.frontmatter = {}
         mock_parser.parse_string.return_value = mock_doc
 
         segment = Mock(spec=Segment)
@@ -977,7 +977,9 @@ class TestRetryLoop:
 
         mock_reconstructor = mock_reconstructor_class.return_value
         mock_reconstructor.reconstruct_document.return_value = Mock(
-            __str__=lambda x: "# Translated Content\n\nTranslated body"
+            __str__=lambda x: (
+                "---\ntitle: Translated Title\n---\n\n# Translated Content\n\nTranslated body"
+            )
         )
 
         engine_with_validation.config.get_site_profile.return_value.output_dir = str(
@@ -1033,13 +1035,16 @@ class TestRetryLoop:
             patch("src.translation_engine.engine.HugoParser") as mock_parser_class,
             patch("src.translation_engine.engine.SegmentExtractor") as mock_extractor_class,
             patch(
-                "src.translation_engine.engine.MarkdownReconstructor"
+                "src.translation_engine.segment_translator.MarkdownReconstructor"
             ) as mock_reconstructor_class,
         ):
             mock_parser = mock_parser_class.return_value
+            translation_engine.parser = mock_parser  # wire mock to engine instance
             mock_doc = Mock(spec=HugoDocument)
             mock_doc.file_path = sample_markdown_file
             mock_doc.body = "# Test"
+            mock_doc.ast = []
+            mock_doc.frontmatter = {}
             mock_parser.parse_string.return_value = mock_doc
 
             segment = Mock(spec=Segment)
@@ -1061,7 +1066,7 @@ class TestRetryLoop:
 
             mock_reconstructor = mock_reconstructor_class.return_value
             mock_reconstructor.reconstruct_document.return_value = Mock(
-                __str__=lambda x: "Translated"
+                __str__=lambda x: "---\ntitle: Translated Title\n---\n\nTranslated"
             )
 
             translation_engine.config.get_site_profile.return_value.output_dir = str(
@@ -1085,39 +1090,31 @@ class TestRetryLoop:
 class TestINT02RetryFeedback:
     """INT-02: Test retry feedback integration and temperature variation."""
 
-    @pytest.mark.xfail(
-        reason="Post-decomposition: patches at engine.* don't intercept segment_translator/engine_builder",
-        strict=True,
-    )
-    @patch("src.translation_engine.engine.HugoParser")
-    @patch("src.translation_engine.engine.SegmentExtractor")
-    @patch("src.translation_engine.engine.MarkdownReconstructor")
+    @patch("src.translation_engine.segment_translator.MarkdownReconstructor")
     def test_retry_feedback_prepended_to_text(
         self,
         mock_reconstructor_class,
-        mock_extractor_class,
-        mock_parser_class,
         translation_engine,
         tmp_path,
     ):
         """INT-02: Test that retry_feedback is prepended to source texts."""
-        # Setup mocks
-        mock_parser = mock_parser_class.return_value
+        # doc and segments are passed directly — no parse/extract needed
         mock_doc = Mock(spec=HugoDocument)
         mock_doc.source_path = Path("test.md")
         mock_doc.body = "# Test"
-        mock_parser.parse_string.return_value = mock_doc
+        mock_doc.ast = []
+        mock_doc.frontmatter = {}
 
         segment = Mock(spec=Segment)
         segment.source_text = "Original text"
         segment.id = "seg1"
         segment.context = None
 
-        mock_extractor = mock_extractor_class.return_value
-        mock_extractor.extract_all.return_value = [segment]
+        # Create a mock LLM backend that captures the translate call
+        # Must be an LLMModelBackend instance for feedback injection (isinstance check)
+        from src.model_runtime.llm_backend import LLMModelBackend
 
-        # Create a mock backend that captures the translate call
-        mock_backend = Mock()
+        mock_backend = Mock(spec=LLMModelBackend)
         translate_calls = []
 
         def capture_translate(texts, src_lang, tgt_lang):
@@ -1165,39 +1162,31 @@ class TestINT02RetryFeedback:
         assert "SOURCE TEXT:" in translated_text
         assert "Original text" in translated_text
 
-    @pytest.mark.xfail(
-        reason="Post-decomposition: patches at engine.* don't intercept segment_translator/engine_builder",
-        strict=True,
-    )
-    @patch("src.translation_engine.engine.HugoParser")
-    @patch("src.translation_engine.engine.SegmentExtractor")
-    @patch("src.translation_engine.engine.MarkdownReconstructor")
+    @patch("src.translation_engine.segment_translator.MarkdownReconstructor")
     def test_no_feedback_on_first_attempt(
         self,
         mock_reconstructor_class,
-        mock_extractor_class,
-        mock_parser_class,
         translation_engine,
         tmp_path,
     ):
         """INT-02: Test that no feedback is applied on first attempt (retry_count=0)."""
-        # Setup mocks
-        mock_parser = mock_parser_class.return_value
+        # doc and segments are passed directly — no parse/extract needed
         mock_doc = Mock(spec=HugoDocument)
         mock_doc.source_path = Path("test.md")
         mock_doc.body = "# Test"
-        mock_parser.parse_string.return_value = mock_doc
+        mock_doc.ast = []
+        mock_doc.frontmatter = {}
 
         segment = Mock(spec=Segment)
         segment.source_text = "Original text"
         segment.id = "seg1"
         segment.context = None
 
-        mock_extractor = mock_extractor_class.return_value
-        mock_extractor.extract_all.return_value = [segment]
-
         # Capture translate calls
-        mock_backend = Mock()
+        # Must be LLMModelBackend for feedback path (isinstance check)
+        from src.model_runtime.llm_backend import LLMModelBackend
+
+        mock_backend = Mock(spec=LLMModelBackend)
         translate_calls = []
 
         def capture_translate(texts, src_lang, tgt_lang):
@@ -1244,38 +1233,27 @@ class TestINT02RetryFeedback:
         assert translated_text == "Original text"  # Unchanged
         assert "SOURCE TEXT:" not in translated_text
 
-    @pytest.mark.xfail(
-        reason="Post-decomposition: temperature logging moved to segment_translator; engine.logger patch misses it",
-        strict=True,
-    )
-    @patch("src.translation_engine.engine.logger")
-    @patch("src.translation_engine.engine.HugoParser")
-    @patch("src.translation_engine.engine.SegmentExtractor")
-    @patch("src.translation_engine.engine.MarkdownReconstructor")
+    @patch("src.translation_engine.segment_translator.MarkdownReconstructor")
+    @patch("src.translation_engine.segment_translator.logger")
     def test_temperature_variation_logged(
         self,
-        mock_reconstructor_class,
-        mock_extractor_class,
-        mock_parser_class,
         mock_logger,
+        mock_reconstructor_class,
         translation_engine,
         tmp_path,
     ):
         """INT-02: Test that temperature variation is calculated and logged."""
-        # Setup mocks
-        mock_parser = mock_parser_class.return_value
+        # doc and segments are passed directly — no parse/extract needed
         mock_doc = Mock(spec=HugoDocument)
         mock_doc.source_path = Path("test.md")
         mock_doc.body = "# Test"
-        mock_parser.parse_string.return_value = mock_doc
+        mock_doc.ast = []
+        mock_doc.frontmatter = {}
 
         segment = Mock(spec=Segment)
         segment.source_text = "Text"
         segment.id = "seg1"
         segment.context = None
-
-        mock_extractor = mock_extractor_class.return_value
-        mock_extractor.extract_all.return_value = [segment]
 
         mock_backend = Mock()
         mock_backend.translate.return_value = ["Translated"]
@@ -1311,51 +1289,44 @@ class TestINT02RetryFeedback:
             retry_count=1,
         )
 
-        # Verify temperature was logged
-        # Should have logged: "Retry 1: temperature adjusted to 0.8"
+        # Verify temperature was logged in segment_translator
+        # Message format: "Retry {n}: applied temperature={t} to LLM backend"
         debug_calls = [call for call in mock_logger.debug.call_args_list]
         temperature_log = None
         for call in debug_calls:
-            if len(call[0]) > 0 and "temperature adjusted" in str(call[0][0]):
+            if len(call[0]) > 0 and "applied temperature" in str(call[0][0]):
                 temperature_log = call[0][0]
                 break
 
         assert temperature_log is not None
-        assert "temperature adjusted to 0.8" in temperature_log
+        # 0.7 + 0.1 may be 0.7999... due to float precision — check prefix only
+        assert (
+            "applied temperature=0.7999" in temperature_log
+            or "applied temperature=0.8" in temperature_log
+        )
         assert "Retry 1" in temperature_log
 
-    @pytest.mark.xfail(
-        reason="Post-decomposition: temperature logging moved to segment_translator; engine.logger patch misses it",
-        strict=True,
-    )
-    @patch("src.translation_engine.engine.logger")
-    @patch("src.translation_engine.engine.HugoParser")
-    @patch("src.translation_engine.engine.SegmentExtractor")
-    @patch("src.translation_engine.engine.MarkdownReconstructor")
+    @patch("src.translation_engine.segment_translator.MarkdownReconstructor")
+    @patch("src.translation_engine.segment_translator.logger")
     def test_temperature_maxes_out(
         self,
-        mock_reconstructor_class,
-        mock_extractor_class,
-        mock_parser_class,
         mock_logger,
+        mock_reconstructor_class,
         translation_engine,
         tmp_path,
     ):
         """INT-02: Test that temperature caps at max_temperature."""
-        # Setup mocks
-        mock_parser = mock_parser_class.return_value
+        # doc and segments are passed directly — no parse/extract needed
         mock_doc = Mock(spec=HugoDocument)
         mock_doc.source_path = Path("test.md")
         mock_doc.body = "# Test"
-        mock_parser.parse_string.return_value = mock_doc
+        mock_doc.ast = []
+        mock_doc.frontmatter = {}
 
         segment = Mock(spec=Segment)
         segment.source_text = "Text"
         segment.id = "seg1"
         segment.context = None
-
-        mock_extractor = mock_extractor_class.return_value
-        mock_extractor.extract_all.return_value = [segment]
 
         mock_backend = Mock()
         mock_backend.translate.return_value = ["Translated"]
@@ -1391,21 +1362,33 @@ class TestINT02RetryFeedback:
             retry_count=10,  # Very high retry count
         )
 
-        # Verify temperature was capped at 1.0
+        # Verify temperature was capped at 1.0 in segment_translator
+        # Message format: "Retry {n}: applied temperature={t} to LLM backend"
         debug_calls = [call for call in mock_logger.debug.call_args_list]
         temperature_log = None
         for call in debug_calls:
-            if len(call[0]) > 0 and "temperature adjusted" in str(call[0][0]):
+            if len(call[0]) > 0 and "applied temperature" in str(call[0][0]):
                 temperature_log = call[0][0]
                 break
 
         assert temperature_log is not None
         # Temperature should be: min(0.7 + (10 * 0.1), 1.0) = min(1.7, 1.0) = 1.0
-        assert "temperature adjusted to 1.0" in temperature_log
+        assert "applied temperature=1.0" in temperature_log
+        assert "Retry 10" in temperature_log
 
 
 class TestINT05PostWriteValidation:
     """INT-05: Test post-write validation integration."""
+
+    @pytest.fixture
+    def translation_engine(self, mock_config_service, mock_tm, mock_model_loader):
+        """Engine with validation enabled so _post_write_validation logic runs."""
+        return TranslationEngine(
+            config_service=mock_config_service,
+            tm=mock_tm,
+            model_loader=mock_model_loader,
+            enable_validation=True,
+        )
 
     def test_post_write_validation_success(self, translation_engine, tmp_path):
         """Test successful post-write validation."""
