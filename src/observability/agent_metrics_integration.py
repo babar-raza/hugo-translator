@@ -7,6 +7,7 @@ one call after.
 from __future__ import annotations
 
 import logging
+import os
 import time
 import uuid
 
@@ -73,6 +74,11 @@ class MetricsRunContext:
         self._cfg = _load_agent_metrics_config(config_service)
         self._enabled = self._cfg.get("enabled", False)
         self._dry_run = self._cfg.get("dry_run", True)
+        # TC-ENABLE-06: If enabled and not already dry_run, require explicit env var approval.
+        # Prevents accidental live posting when config is toggled without conscious intent.
+        if self._enabled and not self._dry_run:
+            if os.environ.get("AGENT_METRICS_LIVE_APPROVED") != "1":
+                self._dry_run = True
         self._start_time: float | None = None
         self._parent_run_id = str(uuid.uuid4())
         self._llm_ctx = None
@@ -122,6 +128,11 @@ class MetricsRunContext:
         """Call after translation completes. Returns post result or None."""
         if not self.enabled:
             return None
+
+        # TC-ENABLE-03: Skip posting for no-op runs (no items found).
+        # abort() passes error_detail, so error runs always post regardless of item count.
+        if items_discovered == 0 and error_detail is None:
+            return {"action": "skipped_zero_items", "site_id": self.site_id}
 
         run_duration_ms = int((time.time() - (self._start_time or time.time())) * 1000)
 
@@ -203,6 +214,15 @@ class MetricsRunContext:
             family_scope=self.family_scope,
         )
         resolved = resolver.resolve(scope_input)
+
+        # TC-ENABLE-04: Skip posting when scope resolution is low-confidence.
+        # Posting unreliable product/section data would pollute the metrics sheet.
+        if resolved.reporting_confidence == "low":
+            return {
+                "action": "skipped_low_confidence",
+                "site_id": self.site_id,
+                "product": resolved.product,
+            }
 
         # Generate IDs
         gitlab_ctx = collect_gitlab_context()

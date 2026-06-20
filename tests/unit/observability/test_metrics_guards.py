@@ -44,9 +44,6 @@ def _make_config_service(enabled: bool = True, dry_run: bool = True) -> MagicMoc
 class TestZeroItemSuppression(unittest.TestCase):
     """TC-ENABLE-03: finish() skips posting when items_discovered == 0."""
 
-    @pytest.mark.xfail(
-        strict=False, reason="TC-ENABLE-03: zero-item suppression not yet implemented in finish()"
-    )
     def test_zero_items_returns_skipped(self):
         from src.observability.agent_metrics_integration import MetricsRunContext
 
@@ -123,10 +120,6 @@ class TestLowConfidenceSuppression(unittest.TestCase):
         resolved.warnings = ["product_family_token could not be resolved"]
         return resolved
 
-    @pytest.mark.xfail(
-        strict=False,
-        reason="TC-ENABLE-04: low-confidence suppression not yet implemented in _build_and_post()",
-    )
     @patch("src.observability.agent_metrics_integration.MetricsRunContext._detect_llm_provider")
     @patch("src.observability.metrics_scope.ScopeResolver.resolve")
     def test_low_confidence_returns_skipped(self, mock_resolve, mock_llm):
@@ -202,10 +195,6 @@ class TestLowConfidenceSuppression(unittest.TestCase):
 class TestConfigToggleGuard(unittest.TestCase):
     """TC-ENABLE-06: Runtime guard requires AGENT_METRICS_LIVE_APPROVED=1."""
 
-    @pytest.mark.xfail(
-        strict=False,
-        reason="TC-ENABLE-06: AGENT_METRICS_LIVE_APPROVED guard not yet implemented in MetricsRunContext.__init__()",
-    )
     def test_live_posting_without_env_var_forces_dry_run(self):
         from src.observability.agent_metrics_integration import MetricsRunContext
 
