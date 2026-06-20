@@ -23,20 +23,48 @@ logger = logging.getLogger(__name__)
 
 # ISO 639-1 → full language name for translation prompts
 LANGUAGE_NAMES = {
-    "af": "Afrikaans", "ar": "Arabic", "az": "Azerbaijani",
-    "bg": "Bulgarian", "ca": "Catalan", "cs": "Czech",
-    "da": "Danish", "de": "German", "el": "Greek",
-    "en": "English", "es": "Spanish", "et": "Estonian",
-    "fa": "Persian", "fi": "Finnish", "fr": "French",
-    "ga": "Irish", "he": "Hebrew", "hi": "Hindi",
-    "hr": "Croatian", "hu": "Hungarian", "id": "Indonesian",
-    "it": "Italian", "ja": "Japanese", "ko": "Korean",
-    "lt": "Lithuanian", "lv": "Latvian", "ms": "Malay",
-    "nb": "Norwegian Bokmål", "nl": "Dutch", "no": "Norwegian",
-    "pl": "Polish", "pt": "Portuguese", "ro": "Romanian",
-    "ru": "Russian", "sk": "Slovak", "sl": "Slovenian",
-    "sr": "Serbian", "sv": "Swedish", "th": "Thai",
-    "tr": "Turkish", "uk": "Ukrainian", "vi": "Vietnamese",
+    "af": "Afrikaans",
+    "ar": "Arabic",
+    "az": "Azerbaijani",
+    "bg": "Bulgarian",
+    "ca": "Catalan",
+    "cs": "Czech",
+    "da": "Danish",
+    "de": "German",
+    "el": "Greek",
+    "en": "English",
+    "es": "Spanish",
+    "et": "Estonian",
+    "fa": "Persian",
+    "fi": "Finnish",
+    "fr": "French",
+    "ga": "Irish",
+    "he": "Hebrew",
+    "hi": "Hindi",
+    "hr": "Croatian",
+    "hu": "Hungarian",
+    "id": "Indonesian",
+    "it": "Italian",
+    "ja": "Japanese",
+    "ko": "Korean",
+    "lt": "Lithuanian",
+    "lv": "Latvian",
+    "ms": "Malay",
+    "nb": "Norwegian Bokmål",
+    "nl": "Dutch",
+    "no": "Norwegian",
+    "pl": "Polish",
+    "pt": "Portuguese",
+    "ro": "Romanian",
+    "ru": "Russian",
+    "sk": "Slovak",
+    "sl": "Slovenian",
+    "sr": "Serbian",
+    "sv": "Swedish",
+    "th": "Thai",
+    "tr": "Turkish",
+    "uk": "Ukrainian",
+    "vi": "Vietnamese",
     "zh": "Chinese",
     # BCP-47 regional variants used by Aspose sites
     "zh-CN": "Simplified Chinese",
@@ -98,15 +126,15 @@ class LLMModelBackend:
         # Read from global config so it survives model reloads without restarts.
         try:
             from src.utils.config_loader import get_global_config
-            _te_cfg = get_global_config().get('translation_engine', {})
+
+            _te_cfg = get_global_config().get("translation_engine", {})
             self._max_hallucination_ratio: float = float(
-                _te_cfg.get('max_llm_output_to_input_ratio', 4.0)
+                _te_cfg.get("max_llm_output_to_input_ratio", 4.0)
             )
             # TC-H2: Per-language overrides (e.g. hi: 3.0, pl: 5.0, cs: 5.0).
             # Key: ISO 639-1 lang code → float ratio. Falls back to global when absent.
             self._hallucination_ratio_overrides: dict[str, float] = {
-                str(k): float(v)
-                for k, v in _te_cfg.get('llm_output_ratio_overrides', {}).items()
+                str(k): float(v) for k, v in _te_cfg.get("llm_output_ratio_overrides", {}).items()
             }
         except Exception:
             self._max_hallucination_ratio = 4.0
@@ -120,6 +148,7 @@ class LLMModelBackend:
                 from src.translation_engine.terminology.terminology_manager import (
                     TerminologyManager,
                 )
+
                 _cfg = Path("config/terminology.yaml")
                 if not _cfg.exists():
                     # Fallback: resolve relative to this source file
@@ -127,7 +156,9 @@ class LLMModelBackend:
                 self._terminology_manager = TerminologyManager(str(_cfg))
                 logger.debug("TerminologyManager loaded for LLM backend term protection")
             except Exception as e:
-                logger.warning("TerminologyManager unavailable: %s — terms sent unprotected to LLM", e)
+                logger.warning(
+                    "TerminologyManager unavailable: %s — terms sent unprotected to LLM", e
+                )
                 self._terminology_manager = False  # sentinel: don't retry
         return self._terminology_manager if self._terminology_manager else None
 
@@ -219,7 +250,7 @@ class LLMModelBackend:
 
         # Process non-empty texts in packed sub-batches
         for sub_start in range(0, len(non_empty_indices), self.MAX_SEGMENTS_PER_PROMPT):
-            sub_indices = non_empty_indices[sub_start:sub_start + self.MAX_SEGMENTS_PER_PROMPT]
+            sub_indices = non_empty_indices[sub_start : sub_start + self.MAX_SEGMENTS_PER_PROMPT]
 
             if len(sub_indices) == 1:
                 # Single segment — use direct prompt (no packing overhead)
@@ -287,7 +318,13 @@ class LLMModelBackend:
                 logger.error(
                     "LLM hallucination detected: segment %d/%d output is %.1fx input "
                     "(%d→%d chars). Truncating to %.1fx source length (max_llm_output_to_input_ratio=%.1f).",
-                    idx + 1, total, output_len / input_len, input_len, output_len, _max_ratio, _max_ratio,
+                    idx + 1,
+                    total,
+                    output_len / input_len,
+                    input_len,
+                    output_len,
+                    _max_ratio,
+                    _max_ratio,
                 )
                 self.last_truncation_detected = True
                 self.truncation_count += 1
@@ -295,7 +332,7 @@ class LLMModelBackend:
                 hard_limit = int(input_len * _max_ratio)
                 truncated = result[:hard_limit]
                 # Back up to last whitespace or newline so we don't cut mid-word.
-                last_ws = max(truncated.rfind(' '), truncated.rfind('\n'))
+                last_ws = max(truncated.rfind(" "), truncated.rfind("\n"))
                 if last_ws > hard_limit * 0.8:
                     result = truncated[:last_ws].rstrip()
                 else:
@@ -303,7 +340,11 @@ class LLMModelBackend:
             elif input_len > 0 and output_len > 3 * input_len:
                 logger.warning(
                     "LLM output unusually long: segment %d/%d is %.1fx input (%d→%d chars)",
-                    idx + 1, total, output_len / input_len, input_len, output_len,
+                    idx + 1,
+                    total,
+                    output_len / input_len,
+                    input_len,
+                    output_len,
                 )
 
             if protected:
@@ -342,11 +383,11 @@ class LLMModelBackend:
                 p = tm.protect(texts[idx])
                 if p:
                     protected_map[idx] = p
-                    lines.append(f"[{seq}] {p.protected_text}")
+                    lines.append(f"<<<SEG_{seq}>>> {p.protected_text}")
                 else:
-                    lines.append(f"[{seq}] {texts[idx]}")
+                    lines.append(f"<<<SEG_{seq}>>> {texts[idx]}")
             else:
-                lines.append(f"[{seq}] {texts[idx]}")
+                lines.append(f"<<<SEG_{seq}>>> {texts[idx]}")
 
         packed_input = "\n".join(lines)
 
@@ -400,13 +441,13 @@ class LLMModelBackend:
         """Parse numbered LLM output back into individual translations.
 
         Expected format:
-            [1] Translation one
-            [2] Translation two
+            <<<SEG_1>>> Translation one
+            <<<SEG_2>>> Translation two
 
         Returns list of translations (0-indexed) or None if parsing fails.
         """
-        # Match lines starting with [N] (with optional leading whitespace)
-        pattern = re.compile(r"^\s*\[(\d+)\]\s*(.*)$", re.MULTILINE)
+        # Match lines starting with <<<SEG_N>>> (with optional leading whitespace)
+        pattern = re.compile(r"^\s*<<<SEG_(\d+)>>>\s*(.*)$", re.MULTILINE)
         matches = list(pattern.finditer(raw))
 
         if len(matches) != expected_count:
@@ -443,9 +484,9 @@ class LLMModelBackend:
         return (
             f"You are a professional translator. Translate each numbered segment "
             f"from {src_name} to {tgt_name}.\n\n"
-            f"Input: {segment_count} numbered segments, each prefixed with [N].\n"
+            f"Input: {segment_count} numbered segments, each prefixed with <<<SEG_N>>>.\n"
             f"Output: {segment_count} translated segments, each on its own line "
-            f"prefixed with the SAME number [N].\n\n"
+            f"prefixed with the SAME tag <<<SEG_N>>>.\n\n"
             f"Rules:\n"
             f"- Output ONLY the translations with their numbers, nothing else\n"
             f"- Preserve all formatting: markdown, HTML tags, code blocks, links\n"

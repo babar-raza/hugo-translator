@@ -21,41 +21,83 @@ logger = logging.getLogger(__name__)
 
 
 # Batch translation tuning constants
-LANGUAGE_PURITY_MIN_LENGTH = 15   # Minimum text length for reliable language detection
+LANGUAGE_PURITY_MIN_LENGTH = 15  # Minimum text length for reliable language detection
 LANGUAGE_PURITY_MIN_SCRIPT_RATIO = 0.4  # Minimum target-script ratio to accept mixed-script text
-FALLBACK_RATE_THRESHOLD = 0.05    # Alert threshold for fallback rate (5%)
-TOKEN_PER_WORD_ESTIMATE = 1.3     # Average tokens per word for M2M100 estimation
+FALLBACK_RATE_THRESHOLD = 0.05  # Alert threshold for fallback rate (5%)
+TOKEN_PER_WORD_ESTIMATE = 1.3  # Average tokens per word for M2M100 estimation
+
+# Circuit breaker constants (TC-03, plan: validated-mixing-biscuit)
+# Fires when run-level purity failure rate exceeds threshold after min batches.
+# Threshold ≤ 67.7% to catch Serbian (the lower of the two known-failing languages).
+# 50 min_batches provides statistical stability before aborting.
+CIRCUIT_BREAKER_MIN_BATCHES = 50
+CIRCUIT_BREAKER_THRESHOLD = 0.50
+
+
+class LanguagePurityCircuitBreakerError(RuntimeError):
+    """Raised when run-level purity failure rate is catastrophic.
+
+    Aborts the language run to stop wasted compute. Use
+    translation_engine.language_routing_overrides in global.yaml to route
+    the affected language to a capable model.
+    """
+
 
 # DEPRECATED: Use SimilarityTracker baseline_groups in global.yaml instead.
 # This is kept for backward compatibility with older site profiles.
 # Script-similar languages that may be confused by langdetect
 # Languages that share the same script often get misdetected
 SCRIPT_SIMILAR_LANGUAGES = {
-    'ar': {'fa', 'it', 'es', 'fr', 'pt'},  # Arabic <-> Farsi (same script) + Romance languages (Latin script terms trigger false positives)
-    'fa': {'ar'},  # Farsi/Persian <-> Arabic
+    "ar": {
+        "fa",
+        "it",
+        "es",
+        "fr",
+        "pt",
+    },  # Arabic <-> Farsi (same script) + Romance languages (Latin script terms trigger false positives)
+    "fa": {"ar"},  # Farsi/Persian <-> Arabic
+    "sr": {
+        "hr",
+        "bs",
+    },  # Serbian Latin ≈ Croatian/Bosnian: LLM produces Latin-script Serbian; FastText classifies it as 'hr'. Linguistically identical at text level (TC-06, plan: validated-mixing-biscuit).
     # Add more script-similar pairs as needed:
     # 'hi': {'ne', 'mr'},  # Hindi, Nepali, Marathi all use Devanagari
-    # 'sr': {'ru', 'uk', 'bg'},  # Serbian, Russian, Ukrainian, Bulgarian use Cyrillic
 }
 
 # Script ranges for target-language ratio checks
-ARABIC_SCRIPT_RE = re.compile(r'[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]')
+ARABIC_SCRIPT_RE = re.compile(
+    r"[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]"
+)
 TARGET_SCRIPT_REGEX = {
-    'ar': ARABIC_SCRIPT_RE,
-    'fa': ARABIC_SCRIPT_RE,
-    'ur': ARABIC_SCRIPT_RE,
-    'ps': ARABIC_SCRIPT_RE,
+    "ar": ARABIC_SCRIPT_RE,
+    "fa": ARABIC_SCRIPT_RE,
+    "ur": ARABIC_SCRIPT_RE,
+    "ps": ARABIC_SCRIPT_RE,
 }
 
 # Frontmatter translation configuration (FIX-BT-03)
 TRANSLATABLE_FRONTMATTER_FIELDS = {
-    'title', 'description', 'keywords',
-    'step1', 'step2', 'step3', 'step4', 'step5'
+    "title",
+    "description",
+    "keywords",
+    "step1",
+    "step2",
+    "step3",
+    "step4",
+    "step5",
 }
 
 NON_TRANSLATABLE_FRONTMATTER_FIELDS = {
-    'slug', 'productname', 'productkey', 'platformkey', 'productplatform',
-    'date', 'lastmod', 'weight', 'draft', 'type'
+    "slug",
+    "productname",
+    "productkey",
+    "platformkey",
+    "productplatform",
+    "date",
+    "lastmod",
+    "weight",
+    "draft",
+    "type",
 }
 
 # Validate constants at module load time (VLD-04, PH-01)
@@ -118,7 +160,7 @@ def analyze_segment_variance(segments: list[str]) -> dict[str, Any]:
     lengths = [len(s) for s in segments]
     avg = sum(lengths) / len(lengths)
     variance = sum((l - avg) ** 2 for l in lengths) / len(lengths)
-    std_dev = variance ** 0.5
+    std_dev = variance**0.5
 
     # High variance = use smaller batches
     # Coefficient of variation > 0.5 indicates high variability
@@ -154,6 +196,13 @@ class TextUnitExtractor:
     - Deterministic extraction
     """
 
+    # Run-level purity failure tracking (class-level, shared across instances per process).
+    # Each language runs in its own subprocess (--_single-lang-mode), so these accumulators
+    # provide true run-level circuit breaking without cross-language contamination.
+    _run_purity_failures: dict = {}  # tgt_lang → cumulative purity failure count
+    _run_total_batches: dict = {}  # tgt_lang → cumulative batch count
+    _circuit_breaker_enabled: bool = True  # class-level toggle (for testing)
+
     def __init__(
         self,
         segmentation_strategy: str = "sentence_only",
@@ -165,7 +214,7 @@ class TextUnitExtractor:
         fasttext_detector: Any | None = None,
         similarity_tracker: Any | None = None,
         script_validation_thresholds: dict | None = None,
-        batch_purity_skip_langs: list[str] | None = None
+        batch_purity_skip_langs: list[str] | None = None,
     ):
         """
         Initialize extractor for native batch translation.
@@ -188,22 +237,22 @@ class TextUnitExtractor:
         extraction_config = self._load_extraction_config()
 
         # Language purity configuration
-        self.language_purity_min_length = extraction_config.get('language_purity', {}).get(
-            'min_length', LANGUAGE_PURITY_MIN_LENGTH
+        self.language_purity_min_length = extraction_config.get("language_purity", {}).get(
+            "min_length", LANGUAGE_PURITY_MIN_LENGTH
         )
-        self.language_purity_min_script_ratio = extraction_config.get('language_purity', {}).get(
-            'min_script_ratio', LANGUAGE_PURITY_MIN_SCRIPT_RATIO
+        self.language_purity_min_script_ratio = extraction_config.get("language_purity", {}).get(
+            "min_script_ratio", LANGUAGE_PURITY_MIN_SCRIPT_RATIO
         )
-        self.script_similar_languages = extraction_config.get('language_purity', {}).get(
-            'script_similar_languages', SCRIPT_SIMILAR_LANGUAGES
+        self.script_similar_languages = extraction_config.get("language_purity", {}).get(
+            "script_similar_languages", SCRIPT_SIMILAR_LANGUAGES
         )
 
         # Batch translation tuning
-        self.fallback_rate_threshold = extraction_config.get('batch_translation', {}).get(
-            'fallback_rate_threshold', FALLBACK_RATE_THRESHOLD
+        self.fallback_rate_threshold = extraction_config.get("batch_translation", {}).get(
+            "fallback_rate_threshold", FALLBACK_RATE_THRESHOLD
         )
-        self.token_per_word_estimate = extraction_config.get('batch_translation', {}).get(
-            'token_per_word_estimate', TOKEN_PER_WORD_ESTIMATE
+        self.token_per_word_estimate = extraction_config.get("batch_translation", {}).get(
+            "token_per_word_estimate", TOKEN_PER_WORD_ESTIMATE
         )
 
         # Validate extraction config values
@@ -214,43 +263,63 @@ class TextUnitExtractor:
         self.placeholder_manager = None
         if self.preserve_patterns:
             from .placeholder_manager import PlaceholderManager
+
             self.placeholder_manager = PlaceholderManager()
-            logger.info(f"[DEBUG] PlaceholderManager initialized with {len(self.preserve_patterns)} preserve patterns")
+            logger.info(
+                f"[DEBUG] PlaceholderManager initialized with {len(self.preserve_patterns)} preserve patterns"
+            )
             for i, pattern in enumerate(self.preserve_patterns):
                 logger.debug(f"[DEBUG]   Pattern {i}: {pattern}")
 
         # Load terminology dictionary (product names, etc.)
         self.terminology_dict = set()
         if terminology_file and terminology_file.exists():
-            with open(terminology_file, encoding='utf-8') as f:
+            with open(terminology_file, encoding="utf-8") as f:
                 for line in f:
                     term = line.strip()
                     if term:
                         self.terminology_dict.add(term)
 
         # Default Aspose-specific terms
-        self.terminology_dict.update({
-            "Aspose.Slides", "Aspose.Cells", "Aspose.Words",
-            "Aspose.PDF", "Aspose.Email", "Aspose.Imaging",
-            "PowerPoint", "Excel", "Word",
-            "API", "SDK", "JSON", "XML", "HTTP", "HTTPS",
-            "SaveFormat.Pptx", "SaveFormat.Pdf",
-            "LowCode", "C#", "Java", "Python",
-        })
+        self.terminology_dict.update(
+            {
+                "Aspose.Slides",
+                "Aspose.Cells",
+                "Aspose.Words",
+                "Aspose.PDF",
+                "Aspose.Email",
+                "Aspose.Imaging",
+                "PowerPoint",
+                "Excel",
+                "Word",
+                "API",
+                "SDK",
+                "JSON",
+                "XML",
+                "HTTP",
+                "HTTPS",
+                "SaveFormat.Pptx",
+                "SaveFormat.Pdf",
+                "LowCode",
+                "C#",
+                "Java",
+                "Python",
+            }
+        )
 
         # Initialize NLP model for NER (optional, lazy loaded)
         self._nlp = None
 
         # Batch statistics tracking
         self.batch_stats = {
-            'total_batches': 0,
-            'successful_batches': 0,
-            'fallback_batches': 0,
-            'mapping_failures': 0,
-            'translation_errors': 0,
-            'individual_translations': 0,
-            'individual_translation_errors': 0,
-            'empty_translations': 0,
+            "total_batches": 0,
+            "successful_batches": 0,
+            "fallback_batches": 0,
+            "mapping_failures": 0,
+            "translation_errors": 0,
+            "individual_translations": 0,
+            "individual_translation_errors": 0,
+            "empty_translations": 0,
         }
 
         # Load technical terms whitelist for language purity bypass (PO-01)
@@ -272,6 +341,7 @@ class TextUnitExtractor:
         Returns:
             Dictionary with extraction configuration, or empty dict if not available.
         """
+
         def _normalize_section(section: Any, seen: set[int] | None = None) -> Any:
             if seen is None:
                 seen = set()
@@ -295,7 +365,7 @@ class TextUnitExtractor:
                     return _normalize_section(section.dict(), seen)
                 except Exception:
                     pass
-            if hasattr(section, '__dict__'):
+            if hasattr(section, "__dict__"):
                 module_name = section.__class__.__module__
                 if module_name.startswith("unittest.mock"):
                     return {}
@@ -304,11 +374,11 @@ class TextUnitExtractor:
 
         if self.site_profile:
             # Handle both dict and object attribute access
-            if hasattr(self.site_profile, 'extraction'):
+            if hasattr(self.site_profile, "extraction"):
                 extraction = self.site_profile.extraction
                 return _normalize_section(extraction)
             elif isinstance(self.site_profile, dict):
-                return _normalize_section(self.site_profile.get('extraction', {}))
+                return _normalize_section(self.site_profile.get("extraction", {}))
         return {}
 
     def _validate_extraction_config(self):
@@ -370,9 +440,9 @@ class TextUnitExtractor:
         config_path = Path("config/terminology/technical_terms.yaml")
         if config_path.exists():
             try:
-                with open(config_path, encoding='utf-8') as f:
+                with open(config_path, encoding="utf-8") as f:
                     data = yaml.safe_load(f)
-                    terms = set(data.get('terms', []))
+                    terms = set(data.get("terms", []))
                     logger.info(f"Loaded {len(terms)} technical terms from {config_path}")
                     return terms
             except Exception as e:
@@ -380,8 +450,17 @@ class TextUnitExtractor:
 
         # Fallback to hardcoded defaults
         default_terms = {
-            'C#', 'Aspose', 'Excel', 'HTML', 'PDF', '.NET',
-            'NuGet', 'API', 'SDK', 'BarCode', 'PowerPoint'
+            "C#",
+            "Aspose",
+            "Excel",
+            "HTML",
+            "PDF",
+            ".NET",
+            "NuGet",
+            "API",
+            "SDK",
+            "BarCode",
+            "PowerPoint",
         }
         logger.debug(f"Using {len(default_terms)} default technical terms")
         return default_terms
@@ -432,26 +511,26 @@ class TextUnitExtractor:
         if density > 0:
             logger.debug(
                 f"Technical density: {density:.2f} ({matched_word_count}/{len(words)} words)",
-                extra={"text": sanitize_for_log(text, 200)}
+                extra={"text": sanitize_for_log(text, 200)},
             )
 
         return density
 
     def _get_translatable_frontmatter_fields(self):
         """Get translatable frontmatter fields from config or defaults."""
-        if self.site_profile and hasattr(self.site_profile, 'frontmatter'):
+        if self.site_profile and hasattr(self.site_profile, "frontmatter"):
             # Extract fields with mode='translate' or mode='translate_list'
             translatable = set()
             for field_name, field_rule in self.site_profile.frontmatter.items():
                 # Handle both dict access and object attribute access
-                if hasattr(field_rule, 'mode'):
+                if hasattr(field_rule, "mode"):
                     mode = field_rule.mode
                 elif isinstance(field_rule, dict):
-                    mode = field_rule.get('mode', '')
+                    mode = field_rule.get("mode", "")
                 else:
                     continue
 
-                if mode in ('translate', 'translate_list'):
+                if mode in ("translate", "translate_list"):
                     translatable.add(field_name)
 
             if translatable:  # Only use if non-empty
@@ -462,19 +541,19 @@ class TextUnitExtractor:
 
     def _get_protected_frontmatter_fields(self):
         """Get protected frontmatter fields from config or defaults."""
-        if self.site_profile and hasattr(self.site_profile, 'frontmatter'):
+        if self.site_profile and hasattr(self.site_profile, "frontmatter"):
             # Extract fields with mode='passthrough'
             protected = set()
             for field_name, field_rule in self.site_profile.frontmatter.items():
                 # Handle both dict access and object attribute access
-                if hasattr(field_rule, 'mode'):
+                if hasattr(field_rule, "mode"):
                     mode = field_rule.mode
                 elif isinstance(field_rule, dict):
-                    mode = field_rule.get('mode', '')
+                    mode = field_rule.get("mode", "")
                 else:
                     continue
 
-                if mode == 'passthrough':
+                if mode == "passthrough":
                     protected.add(field_name)
 
             if protected:  # Only use if non-empty
@@ -519,16 +598,18 @@ class TextUnitExtractor:
             # Handle string fields
             if isinstance(field_value, str) and field_value.strip():
                 unit = TextUnit(
-                    unit_id=TextUnit.create_id(f"frontmatter.{field_name}", field_value, TextUnitKind.TEXT),
+                    unit_id=TextUnit.create_id(
+                        f"frontmatter.{field_name}", field_value, TextUnitKind.TEXT
+                    ),
                     node_addr=f"frontmatter.{field_name}",
                     kind=TextUnitKind.TEXT,
                     source_text=field_value,
-                    metadata={'field_name': field_name, 'field_type': 'string'}
+                    metadata={"field_name": field_name, "field_type": "string"},
                 )
                 units.append(unit)
                 logger.debug(
                     f"Extracted frontmatter field '{field_name}'",
-                    extra={"field_value": sanitize_for_log(field_value, 200)}
+                    extra={"field_value": sanitize_for_log(field_value, 200)},
                 )
 
             # Handle array fields (e.g., keywords)
@@ -536,16 +617,18 @@ class TextUnitExtractor:
                 for i, item in enumerate(field_value):
                     if isinstance(item, str) and item.strip():
                         unit = TextUnit(
-                            unit_id=TextUnit.create_id(f"frontmatter.{field_name}[{i}]", item, TextUnitKind.TEXT),
+                            unit_id=TextUnit.create_id(
+                                f"frontmatter.{field_name}[{i}]", item, TextUnitKind.TEXT
+                            ),
                             node_addr=f"frontmatter.{field_name}[{i}]",
                             kind=TextUnitKind.TEXT,
                             source_text=item,
-                            metadata={'field_name': field_name, 'field_type': 'array', 'index': i}
+                            metadata={"field_name": field_name, "field_type": "array", "index": i},
                         )
                         units.append(unit)
                         logger.debug(
                             f"Extracted frontmatter array '{field_name}[{i}]'",
-                            extra={"item": sanitize_for_log(item, 200)}
+                            extra={"item": sanitize_for_log(item, 200)},
                         )
 
         logger.info(f"Extracted {len(units)} frontmatter text units")
@@ -568,23 +651,25 @@ class TextUnitExtractor:
                 logger.warning(f"Frontmatter unit has no translation: {unit.metadata}")
                 continue
 
-            field_name = unit.metadata.get('field_name')
-            field_type = unit.metadata.get('field_type')
+            field_name = unit.metadata.get("field_name")
+            field_type = unit.metadata.get("field_type")
 
-            if field_type == 'string':
+            if field_type == "string":
                 # Simple string field
                 frontmatter_dict[field_name] = unit.translated_text
                 logger.debug(f"Applied translation to frontmatter field '{field_name}'")
                 applied_count += 1
 
-            elif field_type == 'array':
+            elif field_type == "array":
                 # Array item
-                index = unit.metadata.get('index')
+                index = unit.metadata.get("index")
                 if field_name in frontmatter_dict:
                     if isinstance(frontmatter_dict[field_name], list):
                         if index < len(frontmatter_dict[field_name]):
                             frontmatter_dict[field_name][index] = unit.translated_text
-                            logger.debug(f"Applied translation to frontmatter array '{field_name}[{index}]'")
+                            logger.debug(
+                                f"Applied translation to frontmatter array '{field_name}[{index}]'"
+                            )
                             applied_count += 1
 
         logger.info(f"Applied {applied_count} frontmatter translations")
@@ -608,10 +693,7 @@ class TextUnitExtractor:
         return int(word_count * self.token_per_word_estimate)
 
     def _yield_safe_batches(
-        self,
-        units: list[TextUnit],
-        max_units: int,
-        max_tokens: int
+        self, units: list[TextUnit], max_units: int, max_tokens: int
     ) -> list[list[TextUnit]]:
         """
         Split units into batches respecting both unit count and token limits.
@@ -641,8 +723,8 @@ class TextUnitExtractor:
             unit_tokens = self._estimate_token_count(unit.source_text)
 
             # Check if adding this unit would exceed limits
-            would_exceed_tokens = (current_token_estimate + unit_tokens > max_tokens)
-            would_exceed_units = (len(current_batch) >= max_units)
+            would_exceed_tokens = current_token_estimate + unit_tokens > max_tokens
+            would_exceed_units = len(current_batch) >= max_units
 
             if current_batch and (would_exceed_tokens or would_exceed_units):
                 # Save current batch and start new one
@@ -679,11 +761,7 @@ class TextUnitExtractor:
         return batches
 
     def _fallback_to_individual(
-        self,
-        batch: list[TextUnit],
-        mt_model: Any,
-        src_lang: str,
-        tgt_lang: str
+        self, batch: list[TextUnit], mt_model: Any, src_lang: str, tgt_lang: str
     ):
         """
         Fallback: translate each unit individually.
@@ -714,7 +792,9 @@ class TextUnitExtractor:
                             if detected != tgt_lang and conf > 0.70:
                                 is_similar = False
                                 if self.similarity_tracker:
-                                    is_similar = self.similarity_tracker.are_similar(tgt_lang, detected)
+                                    is_similar = self.similarity_tracker.are_similar(
+                                        tgt_lang, detected
+                                    )
 
                                 if not is_similar:
                                     logger.warning(
@@ -724,28 +804,32 @@ class TextUnitExtractor:
                                     # Set None (not "") so get_final_text() returns source_text,
                                     # making the failure visible to the file-level purity gate
                                     # rather than silently writing a blank paragraph.
-                                    unit.translated_text = None  # Mark as failed — purity gate will catch
-                                    self.batch_stats['individual_purity_failures'] = \
-                                        self.batch_stats.get('individual_purity_failures', 0) + 1
+                                    unit.translated_text = (
+                                        None  # Mark as failed — purity gate will catch
+                                    )
+                                    self.batch_stats["individual_purity_failures"] = (
+                                        self.batch_stats.get("individual_purity_failures", 0) + 1
+                                    )
                                     continue
                         except Exception as e:
                             logger.debug(f"Could not validate individual translation: {e}")
 
                     unit.translated_text = translated
                     if unit.translated_text == "":
-                        self.batch_stats['individual_translation_errors'] += 1
+                        self.batch_stats["individual_translation_errors"] += 1
                 else:
-                    self.batch_stats['individual_translation_errors'] += 1
+                    self.batch_stats["individual_translation_errors"] += 1
                     # Set None so get_final_text() surfaces source_text to purity gate
                     unit.translated_text = None
             except Exception as e:
                 logger.error(f"Individual translation failed for unit: {e}")
-                self.batch_stats['individual_translation_errors'] += 1
+                self.batch_stats["individual_translation_errors"] += 1
                 # Set None so get_final_text() surfaces source_text to purity gate
                 unit.translated_text = None
 
-        self.batch_stats['individual_translations'] = \
-            self.batch_stats.get('individual_translations', 0) + len(batch)
+        self.batch_stats["individual_translations"] = self.batch_stats.get(
+            "individual_translations", 0
+        ) + len(batch)
 
     def _translate_single_batch(
         self,
@@ -753,7 +837,7 @@ class TextUnitExtractor:
         mt_model: Any,
         src_lang: str,
         tgt_lang: str,
-        generation_params: dict[str, Any] | None = None
+        generation_params: dict[str, Any] | None = None,
     ) -> bool:
         """
         Translate a single batch using native list-based batching.
@@ -790,8 +874,7 @@ class TextUnitExtractor:
                 )
 
             translations = mt_model.translate(
-                batch_texts, src_lang, tgt_lang,
-                generation_params=generation_params
+                batch_texts, src_lang, tgt_lang, generation_params=generation_params
             )
 
             # DEBUG: Log translation results
@@ -812,13 +895,15 @@ class TextUnitExtractor:
                     f"MAPPING VALIDATION FAILED: Expected {batch_count} translations, "
                     f"got {len(translations)}. Falling back to individual translation."
                 )
-                self.batch_stats['mapping_failures'] += 1
+                self.batch_stats["mapping_failures"] += 1
                 self._fallback_to_individual(batch, mt_model, src_lang, tgt_lang)
                 return False
 
         except Exception as e:
             logger.error(f"TRANSLATION ERROR: {e}. Falling back to individual translation.")
-            self.batch_stats['translation_errors'] = self.batch_stats.get('translation_errors', 0) + 1
+            self.batch_stats["translation_errors"] = (
+                self.batch_stats.get("translation_errors", 0) + 1
+            )
             self._fallback_to_individual(batch, mt_model, src_lang, tgt_lang)
             return False
 
@@ -833,7 +918,7 @@ class TextUnitExtractor:
         # LLM-WASTE-FIX-2b: Skip purity check for languages with known FastText false-positive rates
         if tgt_lang in self.batch_purity_skip_langs:
             logger.debug(f"Skipping batch purity check for {tgt_lang} (in batch_purity_skip_langs)")
-            self.batch_stats['successful_batches'] += 1
+            self.batch_stats["successful_batches"] += 1
             return True
 
         if not self._verify_translation_language_purity(batch, tgt_lang):
@@ -841,7 +926,13 @@ class TextUnitExtractor:
                 f"LANGUAGE PURITY CHECK FAILED: Batch produced mixed-language output. "
                 f"Attempting reactive batch splitting (batch_size={batch_count})."
             )
-            self.batch_stats['language_purity_failures'] = self.batch_stats.get('language_purity_failures', 0) + 1
+            self.batch_stats["language_purity_failures"] = (
+                self.batch_stats.get("language_purity_failures", 0) + 1
+            )
+            # Update run-level counter for circuit breaker (TC-03)
+            TextUnitExtractor._run_purity_failures[tgt_lang] = (
+                TextUnitExtractor._run_purity_failures.get(tgt_lang, 0) + 1
+            )
 
             # REACTIVE SPLITTING: Try smaller batches before individual fallback
             if batch_count > 1 and self.batch_stats_tracker:
@@ -867,7 +958,7 @@ class TextUnitExtractor:
             self._fallback_to_individual(batch, mt_model, src_lang, tgt_lang)
             return False
 
-        self.batch_stats['successful_batches'] += 1
+        self.batch_stats["successful_batches"] += 1
         logger.debug(f"Batch translation successful ({batch_count} units)")
 
         return True
@@ -875,13 +966,13 @@ class TextUnitExtractor:
     def _log_batch_statistics(self):
         """Log comprehensive batch translation statistics."""
         stats = self.batch_stats
-        total = stats['total_batches']
+        total = stats["total_batches"]
 
         if total == 0:
             return
 
-        success_rate = (stats['successful_batches'] / total) * 100
-        fallback_rate = (stats['fallback_batches'] / total) * 100
+        success_rate = (stats["successful_batches"] / total) * 100
+        fallback_rate = (stats["fallback_batches"] / total) * 100
 
         logger.info(
             f"\n"
@@ -903,9 +994,7 @@ class TextUnitExtractor:
             f"===================================="
         )
 
-    def _verify_translation_language_purity(
-        self, units: list[TextUnit], target_lang: str
-    ) -> bool:
+    def _verify_translation_language_purity(self, units: list[TextUnit], target_lang: str) -> bool:
         """
         Verify all translated units are in target language.
 
@@ -938,6 +1027,7 @@ class TextUnitExtractor:
             try:
                 import langdetect
                 from langdetect import DetectorFactory
+
                 DetectorFactory.seed = 0  # Reproducible results
                 has_langdetect = True
             except ImportError:
@@ -969,7 +1059,7 @@ class TextUnitExtractor:
             if density >= 0.25:  # 25% threshold (tuned for Aspose technical docs)
                 logger.debug(
                     f"Bypassing purity check (technical density={density:.2f})",
-                    extra={"translation": sanitize_for_log(translated, 200)}
+                    extra={"translation": sanitize_for_log(translated, 200)},
                 )
                 bypassed_count += 1
                 continue
@@ -1002,13 +1092,15 @@ class TextUnitExtractor:
                         f"(confidence={confidence:.2f}), expected={target_lang}: "
                         f"{sanitize_for_log(translated[:50], 50)}"
                     )
-                    failed_units.append({
-                        'text': translated[:60] + "..." if len(translated) > 60 else translated,
-                        'expected': target_lang,
-                        'detected': detected_lang,
-                        'confidence': f"{confidence:.2f}",
-                        'method': 'fasttext',
-                    })
+                    failed_units.append(
+                        {
+                            "text": translated[:60] + "..." if len(translated) > 60 else translated,
+                            "expected": target_lang,
+                            "detected": detected_lang,
+                            "confidence": f"{confidence:.2f}",
+                            "method": "fasttext",
+                        }
+                    )
 
             else:
                 # Langdetect fallback (legacy behavior)
@@ -1030,7 +1122,9 @@ class TextUnitExtractor:
                         continue
 
                     # Check adaptive similarity tracker
-                    if self.similarity_tracker and self.similarity_tracker.are_similar(target_lang, detected):
+                    if self.similarity_tracker and self.similarity_tracker.are_similar(
+                        target_lang, detected
+                    ):
                         logger.debug(
                             f"Accepting similar language (adaptive): detected={detected}, "
                             f"target={target_lang}"
@@ -1057,12 +1151,14 @@ class TextUnitExtractor:
                         continue
 
                     # Failed all checks
-                    failed_units.append({
-                        'text': translated[:60] + "..." if len(translated) > 60 else translated,
-                        'expected': target_lang,
-                        'detected': detected,
-                        'method': 'langdetect',
-                    })
+                    failed_units.append(
+                        {
+                            "text": translated[:60] + "..." if len(translated) > 60 else translated,
+                            "expected": target_lang,
+                            "detected": detected,
+                            "method": "langdetect",
+                        }
+                    )
 
                     # Record failed detection for adaptive learning
                     if self.similarity_tracker:
@@ -1080,10 +1176,16 @@ class TextUnitExtractor:
 
         # Calculate truly detected count
         total_validated = len(units)
-        truly_detected_count = total_validated - bypassed_count - similarity_accepted_count - script_override_count - len(failed_units)
+        truly_detected_count = (
+            total_validated
+            - bypassed_count
+            - similarity_accepted_count
+            - script_override_count
+            - len(failed_units)
+        )
 
         # Determine detection method
-        detection_method = 'FastText' if has_fasttext else 'langdetect'
+        detection_method = "FastText" if has_fasttext else "langdetect"
 
         # Log comprehensive summary with breakdown
         if failed_units:
@@ -1091,11 +1193,11 @@ class TextUnitExtractor:
             logger.error(
                 f"Language purity check FAILED for batch (method={detection_method}):\n"
                 f"  Total units: {total_validated}\n"
-                f"  - Failed (wrong language): {len(failed_units)} ({len(failed_units)/total_validated*100:.1f}%)\n"
-                f"  - Detected correctly: {truly_detected_count} ({truly_detected_count/total_validated*100:.1f}%)\n"
-                f"  - Bypassed (technical): {bypassed_count} ({bypassed_count/total_validated*100:.1f}%)\n"
-                f"  - Accepted (similarity): {similarity_accepted_count} ({similarity_accepted_count/total_validated*100:.1f}%)\n"
-                f"  - Accepted (script): {script_override_count} ({script_override_count/total_validated*100:.1f}%)"
+                f"  - Failed (wrong language): {len(failed_units)} ({len(failed_units) / total_validated * 100:.1f}%)\n"
+                f"  - Detected correctly: {truly_detected_count} ({truly_detected_count / total_validated * 100:.1f}%)\n"
+                f"  - Bypassed (technical): {bypassed_count} ({bypassed_count / total_validated * 100:.1f}%)\n"
+                f"  - Accepted (similarity): {similarity_accepted_count} ({similarity_accepted_count / total_validated * 100:.1f}%)\n"
+                f"  - Accepted (script): {script_override_count} ({script_override_count / total_validated * 100:.1f}%)"
             )
             return False
         else:
@@ -1103,10 +1205,10 @@ class TextUnitExtractor:
             logger.info(
                 f"Language purity check PASSED (method={detection_method}):\n"
                 f"  Total units: {total_validated}\n"
-                f"  - Detected as {target_lang}: {truly_detected_count} ({truly_detected_count/total_validated*100:.1f}%)\n"
-                f"  - Bypassed (technical ≥25%): {bypassed_count} ({bypassed_count/total_validated*100:.1f}%)\n"
-                f"  - Accepted (similarity): {similarity_accepted_count} ({similarity_accepted_count/total_validated*100:.1f}%)\n"
-                f"  - Accepted (script): {script_override_count} ({script_override_count/total_validated*100:.1f}%)"
+                f"  - Detected as {target_lang}: {truly_detected_count} ({truly_detected_count / total_validated * 100:.1f}%)\n"
+                f"  - Bypassed (technical ≥25%): {bypassed_count} ({bypassed_count / total_validated * 100:.1f}%)\n"
+                f"  - Accepted (similarity): {similarity_accepted_count} ({similarity_accepted_count / total_validated * 100:.1f}%)\n"
+                f"  - Accepted (script): {script_override_count} ({script_override_count / total_validated * 100:.1f}%)"
             )
             return True
 
@@ -1126,7 +1228,9 @@ class TextUnitExtractor:
         script_count = len(pattern.findall(text))
         return script_count / letter_count
 
-    def extract_from_ast(self, ast: list[ASTNode], frontmatter: dict[str, Any] | None = None) -> BodyTranslationPlan:
+    def extract_from_ast(
+        self, ast: list[ASTNode], frontmatter: dict[str, Any] | None = None
+    ) -> BodyTranslationPlan:
         """
         Extract all translatable TextUnits from AST and frontmatter.
 
@@ -1157,11 +1261,13 @@ class TextUnitExtractor:
             units=units,
             ast_fingerprint=ast_fingerprint,
             metadata={
-                'segmentation_strategy': self.segmentation_strategy,
-                'total_units': len(units),
-                'translatable_units': len([u for u in units if not u.do_not_translate]),
-                'frontmatter_units': len([u for u in units if u.node_addr and u.node_addr.startswith('frontmatter.')])
-            }
+                "segmentation_strategy": self.segmentation_strategy,
+                "total_units": len(units),
+                "translatable_units": len([u for u in units if not u.do_not_translate]),
+                "frontmatter_units": len(
+                    [u for u in units if u.node_addr and u.node_addr.startswith("frontmatter.")]
+                ),
+            },
         )
 
     def _traverse_node(self, node: ASTNode, units: list[TextUnit]) -> None:
@@ -1193,8 +1299,13 @@ class TextUnitExtractor:
             # Extract alt text but preserve src
             self._extract_image(node, units)
 
-        elif node.type in (NodeType.HEADING, NodeType.PARAGRAPH, NodeType.LIST_ITEM,
-                          NodeType.BLOCKQUOTE, NodeType.TABLE_CELL):
+        elif node.type in (
+            NodeType.HEADING,
+            NodeType.PARAGRAPH,
+            NodeType.LIST_ITEM,
+            NodeType.BLOCKQUOTE,
+            NodeType.TABLE_CELL,
+        ):
             # Container nodes: check segmentation strategy
             if self._should_extract_full_sentence(node):
                 # Extract full content as single unit
@@ -1219,7 +1330,7 @@ class TextUnitExtractor:
             logger.debug(
                 "Skipping text node without address: type=%s, raw_preview=%s",
                 node.type.value if node.type else "unknown",
-                (node.raw[:50] + "...") if node.raw and len(node.raw) > 50 else node.raw
+                (node.raw[:50] + "...") if node.raw and len(node.raw) > 50 else node.raw,
             )
             return
 
@@ -1232,12 +1343,12 @@ class TextUnitExtractor:
 
         if stripped_text:
             # Find prefix whitespace
-            prefix_match = re.match(r'^(\s*)', text)
+            prefix_match = re.match(r"^(\s*)", text)
             if prefix_match:
                 prefix_ws = prefix_match.group(1)
 
             # Find suffix whitespace
-            suffix_match = re.search(r'(\s*)$', text)
+            suffix_match = re.search(r"(\s*)$", text)
             if suffix_match:
                 suffix_ws = suffix_match.group(1)
         else:
@@ -1254,7 +1365,7 @@ class TextUnitExtractor:
         if self.placeholder_manager and stripped_text and not do_not_translate:
             logger.debug(
                 "[DEBUG] Applying protection",
-                extra={"source_text": sanitize_for_log(stripped_text, 200)}
+                extra={"source_text": sanitize_for_log(stripped_text, 200)},
             )
             protected_text, placeholder_map = self.placeholder_manager.protect(
                 stripped_text, self.preserve_patterns
@@ -1262,12 +1373,12 @@ class TextUnitExtractor:
             if placeholder_map:
                 logger.info(
                     f"[DEBUG] Protected {len(placeholder_map)} instances",
-                    extra={"source_text": sanitize_for_log(stripped_text, 200)}
+                    extra={"source_text": sanitize_for_log(stripped_text, 200)},
                 )
                 for placeholder, original in placeholder_map.items():
                     logger.debug(
                         f"[DEBUG]   {placeholder}",
-                        extra={"original": sanitize_for_log(original, 200)}
+                        extra={"original": sanitize_for_log(original, 200)},
                     )
 
         # Create TextUnit with protected text and placeholder map
@@ -1279,11 +1390,11 @@ class TextUnitExtractor:
             prefix_ws=prefix_ws,
             suffix_ws=suffix_ws,
             do_not_translate=do_not_translate,
-            metadata={'placeholder_map': placeholder_map} if placeholder_map else {}
+            metadata={"placeholder_map": placeholder_map} if placeholder_map else {},
         )
         logger.debug(
             f"[DEBUG] Created TextUnit: do_not_translate={do_not_translate}",
-            extra={"source_text": sanitize_for_log(protected_text, 200)}
+            extra={"source_text": sanitize_for_log(protected_text, 200)},
         )
         units.append(unit)
 
@@ -1296,7 +1407,7 @@ class TextUnitExtractor:
         if not node.node_addr:
             logger.debug(
                 "Skipping code span without address: raw_preview=%s",
-                (node.raw[:30] + "...") if len(node.raw) > 30 else node.raw
+                (node.raw[:30] + "...") if len(node.raw) > 30 else node.raw,
             )
             return
 
@@ -1305,7 +1416,7 @@ class TextUnitExtractor:
             node_addr=node.node_addr,
             kind=TextUnitKind.CODE_SPAN,
             source_text=node.raw,
-            do_not_translate=True  # Code is NEVER translated
+            do_not_translate=True,  # Code is NEVER translated
         )
         units.append(unit)
 
@@ -1319,7 +1430,7 @@ class TextUnitExtractor:
             logger.debug(
                 "Skipping code block without address: lang=%s, lines=%d",
                 node.attrs.get("language", "none") if node.attrs else "none",
-                node.raw.count("\n") + 1
+                node.raw.count("\n") + 1,
             )
             return
 
@@ -1329,7 +1440,7 @@ class TextUnitExtractor:
             node_addr=node.node_addr,
             kind=TextUnitKind.CODE_SPAN,
             source_text=node.raw,
-            do_not_translate=True  # Code is NEVER translated
+            do_not_translate=True,  # Code is NEVER translated
         )
         units.append(unit)
 
@@ -1346,7 +1457,7 @@ class TextUnitExtractor:
                         node_addr=child.node_addr,
                         kind=TextUnitKind.LINK_TEXT,
                         source_text=text,
-                        do_not_translate=self._is_non_translatable(text)
+                        do_not_translate=self._is_non_translatable(text),
                     )
                     units.append(unit)
             else:
@@ -1357,14 +1468,14 @@ class TextUnitExtractor:
 
     def _extract_image(self, node: ASTNode, units: list[TextUnit]) -> None:
         """Extract image alt text (not src)."""
-        alt_text = node.attrs.get('alt', '').strip()
+        alt_text = node.attrs.get("alt", "").strip()
         if alt_text:
             unit = TextUnit(
                 unit_id=TextUnit.create_id(node.node_addr, alt_text, TextUnitKind.IMAGE_ALT),
                 node_addr=node.node_addr,
                 kind=TextUnitKind.IMAGE_ALT,
                 source_text=alt_text,
-                do_not_translate=self._is_non_translatable(alt_text)
+                do_not_translate=self._is_non_translatable(alt_text),
             )
             units.append(unit)
 
@@ -1394,11 +1505,11 @@ class TextUnitExtractor:
         stripped_text = full_text.strip()
 
         if stripped_text:
-            prefix_match = re.match(r'^(\s*)', full_text)
+            prefix_match = re.match(r"^(\s*)", full_text)
             if prefix_match:
                 prefix_ws = prefix_match.group(1)
 
-            suffix_match = re.search(r'(\s*)$', full_text)
+            suffix_match = re.search(r"(\s*)$", full_text)
             if suffix_match:
                 suffix_ws = suffix_match.group(1)
 
@@ -1411,7 +1522,7 @@ class TextUnitExtractor:
         if self.placeholder_manager and stripped_text and not do_not_translate:
             logger.debug(
                 "[DEBUG] Applying protection to full sentence",
-                extra={"source_text": sanitize_for_log(stripped_text, 200)}
+                extra={"source_text": sanitize_for_log(stripped_text, 200)},
             )
             protected_text, placeholder_map = self.placeholder_manager.protect(
                 stripped_text, self.preserve_patterns
@@ -1419,12 +1530,12 @@ class TextUnitExtractor:
             if placeholder_map:
                 logger.info(
                     f"[DEBUG] Protected {len(placeholder_map)} instances in full sentence",
-                    extra={"source_text": sanitize_for_log(stripped_text, 200)}
+                    extra={"source_text": sanitize_for_log(stripped_text, 200)},
                 )
                 for placeholder, original in placeholder_map.items():
                     logger.debug(
                         f"[DEBUG]   {placeholder}",
-                        extra={"original": sanitize_for_log(original, 200)}
+                        extra={"original": sanitize_for_log(original, 200)},
                     )
 
         unit = TextUnit(
@@ -1435,11 +1546,11 @@ class TextUnitExtractor:
             prefix_ws=prefix_ws,
             suffix_ws=suffix_ws,
             do_not_translate=do_not_translate,
-            metadata={'placeholder_map': placeholder_map} if placeholder_map else {}
+            metadata={"placeholder_map": placeholder_map} if placeholder_map else {},
         )
         logger.debug(
             f"[DEBUG] Created full sentence TextUnit: do_not_translate={do_not_translate}",
-            extra={"source_text": sanitize_for_log(protected_text, 200)}
+            extra={"source_text": sanitize_for_log(protected_text, 200)},
         )
         units.append(unit)
 
@@ -1458,21 +1569,21 @@ class TextUnitExtractor:
                 escaped_title = title.replace('"', '\\"')
                 return f'[{text}]({url} "{escaped_title}")'
             else:
-                return f'[{text}]({url})'
+                return f"[{text}]({url})"
 
         elif node.type == NodeType.STRONG:
             # Reconstruct bold: **text**
             text = "".join(self._collect_text_from_node(child) for child in node.children)
-            return f'**{text}**'
+            return f"**{text}**"
 
         elif node.type == NodeType.EMPHASIS:
             # Reconstruct italic: *text*
             text = "".join(self._collect_text_from_node(child) for child in node.children)
-            return f'*{text}*'
+            return f"*{text}*"
 
         elif node.type == NodeType.CODE_SPAN:
             # Preserve inline code: `code`
-            return f'`{node.raw}`' if node.raw else ''
+            return f"`{node.raw}`" if node.raw else ""
 
         elif node.type == NodeType.IMAGE:
             # Reconstruct image: ![alt](src) or ![alt](src "title")
@@ -1483,7 +1594,7 @@ class TextUnitExtractor:
                 escaped_title = title.replace('"', '\\"')
                 return f'![{alt}]({src} "{escaped_title}")'
             else:
-                return f'![{alt}]({src})'
+                return f"![{alt}]({src})"
 
         elif node.type == NodeType.SOFT_BREAK:
             return " "
@@ -1528,7 +1639,9 @@ class TextUnitExtractor:
             has_block = self._has_block_content(node)
             if has_formatting or has_block:
                 # Don't extract full sentence - content would be lost
-                logger.debug(f"FIX-B: Skipping full-sentence extraction for {node.node_addr} (has inline formatting or block content)")
+                logger.debug(
+                    f"FIX-B: Skipping full-sentence extraction for {node.node_addr} (has inline formatting or block content)"
+                )
                 return False
             return True
         elif self.segmentation_strategy == "adaptive":
@@ -1542,14 +1655,19 @@ class TextUnitExtractor:
             return not has_formatting and not has_technical
         else:
             # Default to leaf_only for unknown strategies
-            logger.warning(f"Unknown segmentation strategy: {self.segmentation_strategy}, using leaf_only")
+            logger.warning(
+                f"Unknown segmentation strategy: {self.segmentation_strategy}, using leaf_only"
+            )
             return False
 
     def _has_inline_formatting(self, node: ASTNode) -> bool:
         """Check if node contains inline formatting (strong/em/link/shortcodes/etc.)."""
         formatting_types = {
-            NodeType.STRONG, NodeType.EMPHASIS, NodeType.CODE_SPAN,
-            NodeType.LINK, NodeType.IMAGE,
+            NodeType.STRONG,
+            NodeType.EMPHASIS,
+            NodeType.CODE_SPAN,
+            NodeType.LINK,
+            NodeType.IMAGE,
             # INLINE_HTML intentionally excluded: shortcodes are self-contained leaf nodes
             # that _collect_text_from_node handles via node.raw. Excluding them allows
             # full-sentence extraction so placeholder_manager can protect inline shortcodes.
@@ -1616,10 +1734,10 @@ class TextUnitExtractor:
 
         # Strategy 0: Hugo shortcodes - NEVER translate
         # Patterns: {{% steps %}}, {{< ref >}}, {{% /steps %}}, etc.
-        if re.match(r'^\{\{[%<].*?[%>]\}\}$', text_stripped):
+        if re.match(r"^\{\{[%<].*?[%>]\}\}$", text_stripped):
             logger.debug(
                 "Hugo shortcode detected (protected)",
-                extra={"source_text": sanitize_for_log(text_stripped, 200)}
+                extra={"source_text": sanitize_for_log(text_stripped, 200)},
             )
             return True
 
@@ -1630,7 +1748,7 @@ class TextUnitExtractor:
             # Pure punctuation/symbols/separators: , . : ; - — → ← ↔ | / \ etc.
             logger.debug(
                 "Punctuation-only text detected (protected)",
-                extra={"source_text": sanitize_for_log(text_stripped, 50)}
+                extra={"source_text": sanitize_for_log(text_stripped, 50)},
             )
             return True
 
@@ -1643,6 +1761,7 @@ class TextUnitExtractor:
         # Strategy 1: NER-based detection (requires spaCy)
         try:
             import spacy
+
             if self._nlp is None:
                 try:
                     self._nlp = spacy.load("en_core_web_sm")
@@ -1685,15 +1804,15 @@ class TextUnitExtractor:
         - Version numbers: v1.2.3, 2.0.1, 1.0+
         """
         # CamelCase: Starts with capital, has lowercase, then capital
-        if re.match(r'^[A-Z][a-z]+(?:[A-Z][a-z]+)+$', text):
+        if re.match(r"^[A-Z][a-z]+(?:[A-Z][a-z]+)+$", text):
             return True
 
         # PascalCase.With.Dots
-        if re.match(r'^[A-Z][a-z]+\.[A-Z]', text):
+        if re.match(r"^[A-Z][a-z]+\.[A-Z]", text):
             return True
 
         # snake_case (lowercase with underscores)
-        if '_' in text and text.islower():
+        if "_" in text and text.islower():
             return True
 
         # ALL_CAPS (2+ characters)
@@ -1701,7 +1820,7 @@ class TextUnitExtractor:
             return True
 
         # Version numbers: v1.2, 1.2.3, 2.0+
-        if re.match(r'^v?\d+\.?\d*[\.\+\-]?', text):
+        if re.match(r"^v?\d+\.?\d*[\.\+\-]?", text):
             return True
 
         return False
@@ -1735,11 +1854,11 @@ class TextUnitExtractor:
         # Matches: BarCodeReader(string), BarCodeReader\(string\), Foo(int, bool)
         # Prefix: identifier or dotted.identifier
         # Inside parentheses: type names (letters, digits, underscore, space, comma, [], <>, etc.)
-        signature_pattern = r'^(?:[A-Za-z_][A-Za-z0-9_]*\.)*[A-Za-z_][A-Za-z0-9_]*\\?\([\w\s,\[\]<>?&|*@.]*\\?\)$'
+        signature_pattern = (
+            r"^(?:[A-Za-z_][A-Za-z0-9_]*\.)*[A-Za-z_][A-Za-z0-9_]*\\?\([\w\s,\[\]<>?&|*@.]*\\?\)$"
+        )
         if re.match(signature_pattern, text_stripped):
-            logger.debug(
-                f"Method signature detected (protected): {text_stripped[:80]}"
-            )
+            logger.debug(f"Method signature detected (protected): {text_stripped[:80]}")
             return True
 
         # Pattern 2: HTML anchor with method signature following
@@ -1747,18 +1866,18 @@ class TextUnitExtractor:
         # This catches headings with anchors that contain method signatures
         anchor_with_signature = r'^<a\s+id="[^"]*"[^>]*>\s*</a>\s*(?:[A-Za-z_][A-Za-z0-9_]*\.)*[A-Za-z_][A-Za-z0-9_]*\\?\([\w\s,\[\]<>?&|*@.]*\\?\)$'
         if re.match(anchor_with_signature, text_stripped):
-            logger.debug(
-                f"Anchor + method signature detected (protected): {text_stripped[:80]}"
-            )
+            logger.debug(f"Anchor + method signature detected (protected): {text_stripped[:80]}")
             return True
 
         # Pattern 3: Text ending with method signature (for mixed content)
         # Matches text that ends with: SomeMethod(params)
-        ends_with_signature = r'(?:[A-Za-z_][A-Za-z0-9_]*\.)*[A-Za-z_][A-Za-z0-9_]*\\?\([\w\s,\[\]<>?&|*@.]*\\?\)$'
+        ends_with_signature = (
+            r"(?:[A-Za-z_][A-Za-z0-9_]*\.)*[A-Za-z_][A-Za-z0-9_]*\\?\([\w\s,\[\]<>?&|*@.]*\\?\)$"
+        )
         if re.search(ends_with_signature, text_stripped):
             # Only protect if the main content is the signature (not a sentence about methods)
             # Check if text starts with identifier or anchor
-            if re.match(r'^(?:<a\s|[A-Za-z_])', text_stripped):
+            if re.match(r"^(?:<a\s|[A-Za-z_])", text_stripped):
                 # Check ratio of signature to total text - if signature is >50%, protect it
                 match = re.search(ends_with_signature, text_stripped)
                 if match:
@@ -1784,7 +1903,7 @@ class TextUnitExtractor:
             List of normalized words (lowercase)
         """
         # Remove punctuation and split on whitespace
-        words = re.findall(r'\b[\w]+\b', text.lower())
+        words = re.findall(r"\b[\w]+\b", text.lower())
         return words
 
     def _detect_batch_repetition(
@@ -1818,7 +1937,7 @@ class TextUnitExtractor:
             if len(words) < 3:
                 continue
 
-            ngrams = [tuple(words[i:i+3]) for i in range(len(words) - 2)]
+            ngrams = [tuple(words[i : i + 3]) for i in range(len(words) - 2)]
             ngram_counts = Counter(ngrams)
 
             # Check if any 3-gram exceeds threshold
@@ -1866,7 +1985,7 @@ class TextUnitExtractor:
                 continue
 
             # Normalize translation: lowercase, strip, collapse whitespace
-            normalized = ' '.join(unit.translated_text.strip().lower().split())
+            normalized = " ".join(unit.translated_text.strip().lower().split())
             translation_groups[normalized].append(unit)
 
         problematic = []
@@ -1877,8 +1996,7 @@ class TextUnitExtractor:
 
             # Check if the source texts are actually different
             source_texts = set(
-                ' '.join(u.source_text.strip().lower().split())
-                for u in group if u.source_text
+                " ".join(u.source_text.strip().lower().split()) for u in group if u.source_text
             )
 
             if len(source_texts) >= 2:
@@ -1887,9 +2005,7 @@ class TextUnitExtractor:
                     f"Cross-unit duplicate detected: {len(group)} different sources "
                     f"translated to '{translation[:50]}...'"
                 )
-                logger.debug(
-                    f"  Source texts: {[u.source_text[:30] for u in group[:3]]}..."
-                )
+                logger.debug(f"  Source texts: {[u.source_text[:30] for u in group[:3]]}...")
                 problematic.extend(group)
 
         return problematic
@@ -1900,7 +2016,7 @@ class TextUnitExtractor:
         mt_model: Any,
         src_lang: str,
         tgt_lang: str,
-        retry_count: int = 0
+        retry_count: int = 0,
     ) -> bool:
         """
         Translate batch with real-time repetition detection and retry.
@@ -1933,8 +2049,9 @@ class TextUnitExtractor:
             return True  # Success, no repetition
 
         # Step 3: Repetition detected, track stats
-        self.batch_stats['repetition_detected_count'] = \
-            self.batch_stats.get('repetition_detected_count', 0) + 1
+        self.batch_stats["repetition_detected_count"] = (
+            self.batch_stats.get("repetition_detected_count", 0) + 1
+        )
 
         logger.warning(
             f"Repetition detected in batch (size={len(batch)}). "
@@ -1944,19 +2061,19 @@ class TextUnitExtractor:
         # Step 4: Retry with adaptive parameters (first attempt only)
         if retry_count == 0:
             logger.info("Retrying batch with stronger anti-repetition parameters")
-            self.batch_stats['repetition_retry_count'] = \
-                self.batch_stats.get('repetition_retry_count', 0) + 1
+            self.batch_stats["repetition_retry_count"] = (
+                self.batch_stats.get("repetition_retry_count", 0) + 1
+            )
 
             # Retry with adaptive params
             adaptive_params = {
-                "no_repeat_ngram_size": 4,    # Stronger (was 3)
-                "repetition_penalty": 1.5,    # Stronger (was 1.2)
-                "num_beams": 2                # Add diversity
+                "no_repeat_ngram_size": 4,  # Stronger (was 3)
+                "repetition_penalty": 1.5,  # Stronger (was 1.2)
+                "num_beams": 2,  # Add diversity
             }
 
             success = self._translate_single_batch(
-                batch, mt_model, src_lang, tgt_lang,
-                generation_params=adaptive_params
+                batch, mt_model, src_lang, tgt_lang, generation_params=adaptive_params
             )
 
             if not success:
@@ -1965,8 +2082,9 @@ class TextUnitExtractor:
             # Check again after retry
             has_repetition, _ = self._detect_batch_repetition(batch)
             if not has_repetition:
-                self.batch_stats['repetition_retry_success'] = \
-                    self.batch_stats.get('repetition_retry_success', 0) + 1
+                self.batch_stats["repetition_retry_success"] = (
+                    self.batch_stats.get("repetition_retry_success", 0) + 1
+                )
                 logger.info("Retry with adaptive params succeeded!")
                 return True
 
@@ -1974,10 +2092,11 @@ class TextUnitExtractor:
         if len(batch) > 1 and retry_count < 2:  # Max 2 recursive splits
             logger.warning(
                 f"Repetition persists after retry. Splitting batch "
-                f"(size={len(batch)} -> {len(batch)//2} + {len(batch) - len(batch)//2})"
+                f"(size={len(batch)} -> {len(batch) // 2} + {len(batch) - len(batch) // 2})"
             )
-            self.batch_stats['repetition_split_count'] = \
-                self.batch_stats.get('repetition_split_count', 0) + 1
+            self.batch_stats["repetition_split_count"] = (
+                self.batch_stats.get("repetition_split_count", 0) + 1
+            )
 
             mid = len(batch) // 2
             success_1 = self._translate_single_batch_with_repetition_check(
@@ -1989,17 +2108,16 @@ class TextUnitExtractor:
             return success_1 and success_2
 
         # Step 6: Final fallback to individual translation
-        logger.error(
-            "Repetition could not be resolved. Falling back to individual translation."
+        logger.error("Repetition could not be resolved. Falling back to individual translation.")
+        self.batch_stats["repetition_fallback_count"] = (
+            self.batch_stats.get("repetition_fallback_count", 0) + 1
         )
-        self.batch_stats['repetition_fallback_count'] = \
-            self.batch_stats.get('repetition_fallback_count', 0) + 1
         self._fallback_to_individual(batch, mt_model, src_lang, tgt_lang)
         return False
 
     def _is_tokenizer_available(self, model: Any) -> bool:
         """Check whether the model has a usable tokenizer attribute."""
-        return getattr(model, 'tokenizer', None) is not None
+        return getattr(model, "tokenizer", None) is not None
 
     def batch_translate_units(
         self,
@@ -2008,7 +2126,7 @@ class TextUnitExtractor:
         src_lang: str,
         tgt_lang: str,
         batch_size: int = 20,
-        max_tokens_per_batch: int = 512
+        max_tokens_per_batch: int = 512,
     ) -> list[TextUnit]:
         """
         Batch translate multiple TextUnits using native list-based batching.
@@ -2059,9 +2177,7 @@ class TextUnitExtractor:
 
         # Dynamic batch sizing
         batches = self._yield_safe_batches(
-            translatable,
-            max_units=batch_size,
-            max_tokens=max_tokens_per_batch
+            translatable, max_units=batch_size, max_tokens=max_tokens_per_batch
         )
 
         # Translate each batch
@@ -2074,7 +2190,11 @@ class TextUnitExtractor:
 
             # Use native batch translation (no delimiters!)
             if batch:
-                self.batch_stats['total_batches'] += 1
+                self.batch_stats["total_batches"] += 1
+                # Update run-level counter for circuit breaker (TC-03)
+                TextUnitExtractor._run_total_batches[tgt_lang] = (
+                    TextUnitExtractor._run_total_batches.get(tgt_lang, 0) + 1
+                )
 
                 # Translate using native list-based batching with repetition detection
                 try:
@@ -2087,28 +2207,28 @@ class TextUnitExtractor:
                         fallback_reason = None
                         if not success:
                             # Determine reason from batch_stats
-                            if self.batch_stats.get('language_purity_failures', 0) > 0:
-                                fallback_reason = 'language_purity'
-                            elif self.batch_stats.get('mapping_failures', 0) > 0:
-                                fallback_reason = 'mapping'
+                            if self.batch_stats.get("language_purity_failures", 0) > 0:
+                                fallback_reason = "language_purity"
+                            elif self.batch_stats.get("mapping_failures", 0) > 0:
+                                fallback_reason = "mapping"
                             else:
-                                fallback_reason = 'translation_error'
+                                fallback_reason = "translation_error"
 
                         self.batch_stats_tracker.record_batch_result(
                             language=tgt_lang,
                             batch_size=len(batch),
                             success=success,
-                            fallback_reason=fallback_reason
+                            fallback_reason=fallback_reason,
                         )
 
                     if not success:
                         # Fallback occurred, counted internally
-                        self.batch_stats['fallback_batches'] += 1
+                        self.batch_stats["fallback_batches"] += 1
                 except Exception as e:
                     # EXCEPTION: Any error during batch processing
                     logger.error(f"Batch translation error in batch {batch_num}: {e}")
-                    self.batch_stats['fallback_batches'] += 1
-                    self.batch_stats['translation_errors'] += 1
+                    self.batch_stats["fallback_batches"] += 1
+                    self.batch_stats["translation_errors"] += 1
 
                     # Record exception to adaptive tracker
                     if self.batch_stats_tracker:
@@ -2116,29 +2236,47 @@ class TextUnitExtractor:
                             language=tgt_lang,
                             batch_size=len(batch),
                             success=False,
-                            fallback_reason='exception'
+                            fallback_reason="exception",
                         )
 
                     # Fallback to individual translation
                     self._fallback_to_individual(batch, mt_model, src_lang, tgt_lang)
 
+            # Circuit breaker: check run-level purity failure rate after each batch (TC-03)
+            # This check is OUTSIDE the try/except so it propagates up the call stack.
+            _run_total = TextUnitExtractor._run_total_batches.get(tgt_lang, 0)
+            _run_fails = TextUnitExtractor._run_purity_failures.get(tgt_lang, 0)
+            if (
+                TextUnitExtractor._circuit_breaker_enabled
+                and _run_total >= CIRCUIT_BREAKER_MIN_BATCHES
+                and _run_fails > 0
+                and _run_fails / _run_total > CIRCUIT_BREAKER_THRESHOLD
+            ):
+                raise LanguagePurityCircuitBreakerError(
+                    f"Language purity circuit breaker fired for '{tgt_lang}': "
+                    f"{_run_fails / _run_total:.1%} of {_run_total} run-level batches "
+                    f"produced wrong-language output. "
+                    f"Use translation_engine.language_routing_overrides in global.yaml "
+                    f"to route '{tgt_lang}' to a capable model (e.g., professionalize_llm)."
+                )
+
         # Log comprehensive statistics
         self._log_batch_statistics()
 
         empty_units = [
-            u for u in translatable
-            if not u.translated_text or u.translated_text.strip() == ""
+            u for u in translatable if not u.translated_text or u.translated_text.strip() == ""
         ]
         if empty_units:
-            self.batch_stats['empty_translations'] = len(empty_units)
+            self.batch_stats["empty_translations"] = len(empty_units)
             samples = [u.node_addr or u.unit_id for u in empty_units[:3]]
             logger.error(
-                f"Empty translations detected for {len(empty_units)} units. "
-                f"Samples: {samples}"
+                f"Empty translations detected for {len(empty_units)} units. Samples: {samples}"
             )
 
         # Alert if fallback rate exceeds threshold
-        fallback_rate = self.batch_stats['fallback_batches'] / max(self.batch_stats['total_batches'], 1)
+        fallback_rate = self.batch_stats["fallback_batches"] / max(
+            self.batch_stats["total_batches"], 1
+        )
         if fallback_rate > self.fallback_rate_threshold:
             self._alert_high_fallback_rate(fallback_rate)
 
@@ -2154,13 +2292,14 @@ class TextUnitExtractor:
 
     def _calculate_ast_fingerprint(self, ast: list[ASTNode]) -> str:
         """Calculate fingerprint of AST structure for sanity checks."""
+
         def node_signature(node: ASTNode) -> str:
             """Get structural signature of node (type + children count)."""
             child_sigs = [node_signature(child) for child in node.children]
             return f"{node.type.value}({len(node.children)})[{','.join(child_sigs)}]"
 
         ast_sig = ",".join([node_signature(node) for node in ast])
-        return hashlib.sha256(ast_sig.encode('utf-8')).hexdigest()[:16]
+        return hashlib.sha256(ast_sig.encode("utf-8")).hexdigest()[:16]
 
     def _alert_high_fallback_rate(self, fallback_rate: float):
         """Alert if fallback rate exceeds acceptable threshold."""

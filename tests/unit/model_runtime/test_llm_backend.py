@@ -354,9 +354,9 @@ class TestLLMModelBackend:
         backend.loaded = True
 
         mock_provider = MagicMock()
-        # Packed prompt returns [N] numbered output (single call)
+        # Packed prompt returns <<<SEG_N>>> numbered output (single call)
         mock_provider.generate.return_value = (
-            "[1] Bonjour\n[2] Au revoir",
+            "<<<SEG_1>>> Bonjour\n<<<SEG_2>>> Au revoir",
             10,
             7,
         )
@@ -373,9 +373,9 @@ class TestLLMModelBackend:
         backend.loaded = True
 
         mock_provider = MagicMock()
-        # Packed prompt returns [N] numbered output (single call)
+        # Packed prompt returns <<<SEG_N>>> numbered output (single call)
         mock_provider.generate.return_value = (
-            "[1] Bonjour\n[2] Au revoir",
+            "<<<SEG_1>>> Bonjour\n<<<SEG_2>>> Au revoir",
             11,
             7,
         )

@@ -1,6 +1,7 @@
 """
 Segment extraction module.
 """
+
 from .placeholder_manager import PlaceholderManager
 from .segment_extractor import (
     Segment,
@@ -13,7 +14,7 @@ from .text_unit import (
     TextUnit,
     TextUnitKind,
 )
-from .text_unit_extractor import TextUnitExtractor
+from .text_unit_extractor import LanguagePurityCircuitBreakerError, TextUnitExtractor
 
 __all__ = [
     "Segment",
@@ -25,4 +26,5 @@ __all__ = [
     "TextUnitKind",
     "BodyTranslationPlan",
     "TextUnitExtractor",
+    "LanguagePurityCircuitBreakerError",
 ]

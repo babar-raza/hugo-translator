@@ -3,6 +3,7 @@ Model Loader and Lifecycle Manager.
 
 Manages loading, caching, and lifecycle of translation models across different backends.
 """
+
 import gc
 import logging
 import time
@@ -53,7 +54,7 @@ class ModelBackend(ABC):
         src_lang: str,
         tgt_lang: str,
         max_new_tokens: int | None = None,
-        generation_params: dict[str, Any] | None = None
+        generation_params: dict[str, Any] | None = None,
     ) -> list[str]:
         """
         Translate batch of texts.
@@ -85,6 +86,7 @@ def _check_sentencepiece_available() -> bool:
     """Check if sentencepiece is installed."""
     try:
         import sentencepiece  # noqa: F401
+
         return True
     except ImportError:
         return False
@@ -101,11 +103,7 @@ def _model_requires_sentencepiece(model_id: str, hf_model_id: str | None = None)
         check_ids.append(hf_model_id.lower())
 
     sentencepiece_models = ["m2m100", "nllb", "mbart", "xlm"]
-    return any(
-        sp_model in check_id
-        for check_id in check_ids
-        for sp_model in sentencepiece_models
-    )
+    return any(sp_model in check_id for check_id in check_ids for sp_model in sentencepiece_models)
 
 
 class HuggingFaceBackend(ModelBackend):
@@ -118,7 +116,7 @@ class HuggingFaceBackend(ModelBackend):
         max_memory_mb: int | None = None,
         use_fp16: bool | None = None,
         use_int8: bool = False,
-        generation_config: dict | None = None
+        generation_config: dict | None = None,
     ):
         """
         Initialize HuggingFace backend.
@@ -202,14 +200,14 @@ class HuggingFaceBackend(ModelBackend):
                 )
 
             # Load tokenizer
-            self.tokenizer = AutoTokenizer.from_pretrained(
-                model_id, use_fast=True
-            )
+            self.tokenizer = AutoTokenizer.from_pretrained(model_id, use_fast=True)
 
             # Load model with precision mode (T104: federated-splashing-panda)
             if self.use_int8:
                 precision_str = "int8"
-                logger.info(f"Loading HuggingFace model {model_id} on {self.device} ({precision_str})")
+                logger.info(
+                    f"Loading HuggingFace model {model_id} on {self.device} ({precision_str})"
+                )
 
                 # Load FP32 model first, then quantize to INT8
                 self.model = AutoModelForSeq2SeqLM.from_pretrained(model_id)
@@ -223,7 +221,9 @@ class HuggingFaceBackend(ModelBackend):
 
             elif self.use_fp16:
                 precision_str = "fp16"
-                logger.info(f"Loading HuggingFace model {model_id} on {self.device} ({precision_str})")
+                logger.info(
+                    f"Loading HuggingFace model {model_id} on {self.device} ({precision_str})"
+                )
 
                 # Load with FP16 precision (halves GPU memory)
                 self.model = AutoModelForSeq2SeqLM.from_pretrained(
@@ -234,7 +234,9 @@ class HuggingFaceBackend(ModelBackend):
 
             else:
                 precision_str = "fp32"
-                logger.info(f"Loading HuggingFace model {model_id} on {self.device} ({precision_str})")
+                logger.info(
+                    f"Loading HuggingFace model {model_id} on {self.device} ({precision_str})"
+                )
 
                 # Load with FP32 precision (full precision)
                 self.model = AutoModelForSeq2SeqLM.from_pretrained(model_id)
@@ -245,7 +247,9 @@ class HuggingFaceBackend(ModelBackend):
             if self.device.startswith("cuda"):
                 device_id = 0 if ":" not in self.device else int(self.device.split(":")[1])
                 allocated = torch.cuda.memory_allocated(device_id) / (1024**2)
-                logger.info(f"Model loaded ({precision_str}). GPU memory allocated: {allocated:.0f}MB")
+                logger.info(
+                    f"Model loaded ({precision_str}). GPU memory allocated: {allocated:.0f}MB"
+                )
             else:
                 logger.info(f"Model loaded ({precision_str}) on CPU")
 
@@ -265,13 +269,15 @@ class HuggingFaceBackend(ModelBackend):
                 f"Reduce max_memory_mb or use CPU fallback."
             ) from e
         except Exception as e:
-            raise RuntimeError(
-                f"Failed to load HuggingFace model {self.model_info.model_id}: {e}"
-            )
+            raise RuntimeError(f"Failed to load HuggingFace model {self.model_info.model_id}: {e}")
 
     def translate(
-        self, texts: list[str], src_lang: str, tgt_lang: str, max_new_tokens: int | None = None,
-        generation_params: dict[str, Any] | None = None
+        self,
+        texts: list[str],
+        src_lang: str,
+        tgt_lang: str,
+        max_new_tokens: int | None = None,
+        generation_params: dict[str, Any] | None = None,
     ) -> list[str]:
         """
         Translate texts using HuggingFace model.
@@ -298,8 +304,12 @@ class HuggingFaceBackend(ModelBackend):
         return translations
 
     def translate_with_token_counts(
-        self, texts: list[str], src_lang: str, tgt_lang: str, max_new_tokens: int | None = None,
-        generation_params: dict[str, Any] | None = None
+        self,
+        texts: list[str],
+        src_lang: str,
+        tgt_lang: str,
+        max_new_tokens: int | None = None,
+        generation_params: dict[str, Any] | None = None,
     ) -> tuple[list[str], int, int]:
         """
         Translate texts and return token counts.
@@ -330,14 +340,10 @@ class HuggingFaceBackend(ModelBackend):
             # M2M100 uses ISO 639-1 codes (en, es, de)
             # NLLB uses language_Script format (eng_Latn, spa_Latn, deu_Latn)
             mapped_src_lang = map_language_code(
-                src_lang,
-                self.model_info.model_id,
-                self.model_info.hf_model_id
+                src_lang, self.model_info.model_id, self.model_info.hf_model_id
             )
             mapped_tgt_lang = map_language_code(
-                tgt_lang,
-                self.model_info.model_id,
-                self.model_info.hf_model_id
+                tgt_lang, self.model_info.model_id, self.model_info.hf_model_id
             )
 
             logger.debug(
@@ -352,24 +358,24 @@ class HuggingFaceBackend(ModelBackend):
             self.model.eval()
 
             # Step 2: Set source language on tokenizer
-            if hasattr(self.tokenizer, 'src_lang'):
-                old_src = getattr(self.tokenizer, 'src_lang', None)
+            if hasattr(self.tokenizer, "src_lang"):
+                old_src = getattr(self.tokenizer, "src_lang", None)
                 if old_src and old_src != mapped_src_lang:
                     logger.debug(f"Language switch detected: src {old_src} -> {mapped_src_lang}")
 
                 self.tokenizer.src_lang = mapped_src_lang
                 # NLLB tokenizers also need special tokens set
-                if hasattr(self.tokenizer, 'set_src_lang_special_tokens'):
+                if hasattr(self.tokenizer, "set_src_lang_special_tokens"):
                     self.tokenizer.set_src_lang_special_tokens(mapped_src_lang)
 
             # Step 3: Set target language for NLLB tokenizers
-            if hasattr(self.tokenizer, 'tgt_lang'):
-                old_tgt = getattr(self.tokenizer, 'tgt_lang', None)
+            if hasattr(self.tokenizer, "tgt_lang"):
+                old_tgt = getattr(self.tokenizer, "tgt_lang", None)
                 if old_tgt and old_tgt != mapped_tgt_lang:
                     logger.debug(f"Language switch detected: tgt {old_tgt} -> {mapped_tgt_lang}")
 
                 self.tokenizer.tgt_lang = mapped_tgt_lang
-                if hasattr(self.tokenizer, 'set_tgt_lang_special_tokens'):
+                if hasattr(self.tokenizer, "set_tgt_lang_special_tokens"):
                     self.tokenizer.set_tgt_lang_special_tokens(mapped_tgt_lang)
                     logger.debug(f"Set NLLB target language: {mapped_tgt_lang} (from {tgt_lang})")
 
@@ -377,9 +383,7 @@ class HuggingFaceBackend(ModelBackend):
 
             # Tokenize
             tokenize_start = time.perf_counter()
-            inputs = self.tokenizer(
-                texts, return_tensors="pt", padding=True, truncation=True
-            )
+            inputs = self.tokenizer(texts, return_tensors="pt", padding=True, truncation=True)
             inputs = {k: v.to(self.device) for k, v in inputs.items()}
             tokenize_ms = (time.perf_counter() - tokenize_start) * 1000
 
@@ -395,7 +399,7 @@ class HuggingFaceBackend(ModelBackend):
             forced_bos_token_id = None
 
             # Try M2M100 method
-            if hasattr(self.tokenizer, 'get_lang_id'):
+            if hasattr(self.tokenizer, "get_lang_id"):
                 try:
                     forced_bos_token_id = self.tokenizer.get_lang_id(mapped_tgt_lang)
                     logger.debug(
@@ -408,19 +412,36 @@ class HuggingFaceBackend(ModelBackend):
                         f"not found in tokenizer via get_lang_id()"
                     )
             # Try NLLB method
-            elif hasattr(self.tokenizer, 'convert_tokens_to_ids') and hasattr(self.tokenizer, 'tgt_lang'):
+            elif hasattr(self.tokenizer, "convert_tokens_to_ids") and hasattr(
+                self.tokenizer, "tgt_lang"
+            ):
                 try:
                     forced_bos_token_id = self.tokenizer.convert_tokens_to_ids(mapped_tgt_lang)
-                    logger.debug(
-                        f"Set forced_bos_token_id={forced_bos_token_id} for {mapped_tgt_lang} "
-                        f"(from {tgt_lang}) using convert_tokens_to_ids() [NLLB]"
-                    )
+                    # Validate: convert_tokens_to_ids returns unk_token_id silently for unknown tokens
+                    _unk_id = getattr(self.tokenizer, "unk_token_id", None)
+                    if _unk_id is not None and forced_bos_token_id == _unk_id:
+                        logger.error(
+                            "LANG_ROUTE_FAIL: forced_bos_token_id for '%s' resolved to "
+                            "unk_token_id (%d). Token '%s' is not in tokenizer vocabulary. "
+                            "Language forcing disabled — output language will be incorrect. "
+                            "Use translation_engine.language_routing_overrides in global.yaml "
+                            "to route this language to a capable model.",
+                            tgt_lang,
+                            _unk_id,
+                            mapped_tgt_lang,
+                        )
+                        forced_bos_token_id = None
+                    else:
+                        logger.debug(
+                            f"Set forced_bos_token_id={forced_bos_token_id} for {mapped_tgt_lang} "
+                            f"(from {tgt_lang}) using convert_tokens_to_ids() [NLLB]"
+                        )
                 except Exception as e:
                     logger.warning(
                         f"Failed to get token ID for '{mapped_tgt_lang}' via convert_tokens_to_ids(): {e}"
                     )
             # Try generic lang_code_to_id
-            elif hasattr(self.tokenizer, 'lang_code_to_id'):
+            elif hasattr(self.tokenizer, "lang_code_to_id"):
                 forced_bos_token_id = self.tokenizer.lang_code_to_id.get(mapped_tgt_lang)
                 if forced_bos_token_id:
                     logger.debug(
@@ -502,15 +523,15 @@ class HuggingFaceBackend(ModelBackend):
 
             # Decode
             decode_start = time.perf_counter()
-            translations = self.tokenizer.batch_decode(
-                outputs, skip_special_tokens=True
-            )
+            translations = self.tokenizer.batch_decode(outputs, skip_special_tokens=True)
             decode_ms = (time.perf_counter() - decode_start) * 1000
 
             # EMPTY TRANSLATION FALLBACK (Iter6 empty-translation fix)
             # Detect empty translations and retry with safer generation parameters
             empty_indices = []
-            for idx, (translation, source_text) in enumerate(zip(translations, texts, strict=False)):
+            for idx, (translation, source_text) in enumerate(
+                zip(translations, texts, strict=False)
+            ):
                 source_stripped = source_text.strip()
                 translation_stripped = translation.strip()
                 # Check if source is non-empty but translation is empty
@@ -534,9 +555,15 @@ class HuggingFaceBackend(ModelBackend):
 
                 # Attempt recovery using fallback ladder
                 translations, recovered_count = self._recover_empty_translations(
-                    texts, empty_indices, translations, inputs,
-                    src_lang, tgt_lang, mapped_src_lang, mapped_tgt_lang,
-                    forced_bos_token_id
+                    texts,
+                    empty_indices,
+                    translations,
+                    inputs,
+                    src_lang,
+                    tgt_lang,
+                    mapped_src_lang,
+                    mapped_tgt_lang,
+                    forced_bos_token_id,
                 )
 
                 if metrics and recovered_count > 0:
@@ -552,7 +579,9 @@ class HuggingFaceBackend(ModelBackend):
                     # Log detailed error for unrecovered empties
                     error_details = []
                     for idx in still_empty[:5]:  # Limit to 5 for logging
-                        source_preview = texts[idx][:100] + "..." if len(texts[idx]) > 100 else texts[idx]
+                        source_preview = (
+                            texts[idx][:100] + "..." if len(texts[idx]) > 100 else texts[idx]
+                        )
                         error_details.append(f"  [{idx}] '{source_preview}'")
 
                     logger.error(
@@ -604,7 +633,7 @@ class HuggingFaceBackend(ModelBackend):
         tgt_lang: str,
         mapped_src_lang: str,
         mapped_tgt_lang: str,
-        forced_bos_token_id: int | None
+        forced_bos_token_id: int | None,
     ) -> tuple[list[str], int]:
         """
         Attempt to recover empty translations using a fallback ladder.
@@ -679,9 +708,9 @@ class HuggingFaceBackend(ModelBackend):
                 # Prepare text for this strategy
                 if strip_markdown:
                     # Strip common markdown formatting
-                    processed_text = re.sub(r'\*\*([^*]+)\*\*', r'\1', source_text)  # Bold
-                    processed_text = re.sub(r'\*([^*]+)\*', r'\1', processed_text)  # Italic
-                    processed_text = re.sub(r'`([^`]+)`', r'\1', processed_text)  # Code
+                    processed_text = re.sub(r"\*\*([^*]+)\*\*", r"\1", source_text)  # Bold
+                    processed_text = re.sub(r"\*([^*]+)\*", r"\1", processed_text)  # Italic
+                    processed_text = re.sub(r"`([^`]+)`", r"\1", processed_text)  # Code
                     logger.debug(
                         f"Strategy '{strategy_name}': stripped markdown "
                         f"'{source_text[:50]}...' -> '{processed_text[:50]}...'"
@@ -712,9 +741,7 @@ class HuggingFaceBackend(ModelBackend):
                         )
 
                     # Decode
-                    translation = self.tokenizer.batch_decode(
-                        output, skip_special_tokens=True
-                    )[0]
+                    translation = self.tokenizer.batch_decode(output, skip_special_tokens=True)[0]
 
                     # Check if we got a non-empty translation
                     if translation.strip():
@@ -729,9 +756,7 @@ class HuggingFaceBackend(ModelBackend):
                             # Only if source had bold and translation doesn't
                             if "**" not in translation:
                                 translation = f"**{translation}**"
-                                logger.debug(
-                                    f"Re-wrapped translation in bold: '{translation}'"
-                                )
+                                logger.debug(f"Re-wrapped translation in bold: '{translation}'")
 
                         updated_translations[idx] = translation
                         recovered_count += 1
@@ -743,9 +768,7 @@ class HuggingFaceBackend(ModelBackend):
                         )
 
                 except Exception as e:
-                    logger.warning(
-                        f"Strategy '{strategy_name}' failed for index {idx}: {e}"
-                    )
+                    logger.warning(f"Strategy '{strategy_name}' failed for index {idx}: {e}")
                     continue
 
         return updated_translations, recovered_count
@@ -833,9 +856,7 @@ class CTranslate2Backend(ModelBackend):
             import ctranslate2
             from transformers import AutoTokenizer
 
-            model_path = str(
-                self.model_info.local_path or self.model_info.model_id
-            )
+            model_path = str(self.model_info.local_path or self.model_info.model_id)
 
             # NOTE: GPU memory limit enforcement is handled by vram_enforcer.py
             # Do NOT set torch.cuda.set_per_process_memory_fraction here
@@ -877,9 +898,7 @@ class CTranslate2Backend(ModelBackend):
                 f"Reduce max_memory_mb or use CPU fallback."
             ) from e
         except Exception as e:
-            raise RuntimeError(
-                f"Failed to load CTranslate2 model {self.model_info.model_id}: {e}"
-            )
+            raise RuntimeError(f"Failed to load CTranslate2 model {self.model_info.model_id}: {e}")
 
     def _convert_to_nllb_code(self, lang_code: str) -> str:
         """
@@ -889,16 +908,44 @@ class CTranslate2Backend(ModelBackend):
         """
         # Map common codes to NLLB format
         nllb_map = {
-            "en": "eng_Latn", "fr": "fra_Latn", "de": "deu_Latn", "es": "spa_Latn",
-            "it": "ita_Latn", "pt": "por_Latn", "nl": "nld_Latn", "ru": "rus_Cyrl",
-            "zh": "zho_Hans", "ja": "jpn_Jpan", "ko": "kor_Hang", "ar": "arb_Arab",
-            "hi": "hin_Deva", "tr": "tur_Latn", "pl": "pol_Latn", "uk": "ukr_Cyrl",
-            "cs": "ces_Latn", "sv": "swe_Latn", "da": "dan_Latn", "no": "nob_Latn",
-            "fi": "fin_Latn", "el": "ell_Grek", "he": "heb_Hebr", "th": "tha_Thai",
-            "vi": "vie_Latn", "id": "ind_Latn", "ro": "ron_Latn", "hu": "hun_Latn",
-            "bg": "bul_Cyrl", "sk": "slk_Latn", "hr": "hrv_Latn", "sr": "srp_Cyrl",
-            "sl": "slv_Latn", "et": "est_Latn", "lv": "lvs_Latn", "lt": "lit_Latn",
-            "fa": "pes_Arab", "ca": "cat_Latn",
+            "en": "eng_Latn",
+            "fr": "fra_Latn",
+            "de": "deu_Latn",
+            "es": "spa_Latn",
+            "it": "ita_Latn",
+            "pt": "por_Latn",
+            "nl": "nld_Latn",
+            "ru": "rus_Cyrl",
+            "zh": "zho_Hans",
+            "ja": "jpn_Jpan",
+            "ko": "kor_Hang",
+            "ar": "arb_Arab",
+            "hi": "hin_Deva",
+            "tr": "tur_Latn",
+            "pl": "pol_Latn",
+            "uk": "ukr_Cyrl",
+            "cs": "ces_Latn",
+            "sv": "swe_Latn",
+            "da": "dan_Latn",
+            "no": "nob_Latn",
+            "fi": "fin_Latn",
+            "el": "ell_Grek",
+            "he": "heb_Hebr",
+            "th": "tha_Thai",
+            "vi": "vie_Latn",
+            "id": "ind_Latn",
+            "ro": "ron_Latn",
+            "hu": "hun_Latn",
+            "bg": "bul_Cyrl",
+            "sk": "slk_Latn",
+            "hr": "hrv_Latn",
+            "sr": "srp_Cyrl",
+            "sl": "slv_Latn",
+            "et": "est_Latn",
+            "lv": "lvs_Latn",
+            "lt": "lit_Latn",
+            "fa": "pes_Arab",
+            "ca": "cat_Latn",
         }
         return nllb_map.get(lang_code, f"{lang_code}_Latn")
 
@@ -908,7 +955,7 @@ class CTranslate2Backend(ModelBackend):
         src_lang: str,
         tgt_lang: str,
         max_new_tokens: int | None = None,
-        generation_params: dict[str, Any] | None = None
+        generation_params: dict[str, Any] | None = None,
     ) -> list[str]:
         """
         Translate texts using CTranslate2.
@@ -942,7 +989,9 @@ class CTranslate2Backend(ModelBackend):
 
             # Tokenize: encode to IDs, then convert to token strings
             tokenized = [
-                self.tokenizer.convert_ids_to_tokens(self.tokenizer.encode(text, add_special_tokens=True))
+                self.tokenizer.convert_ids_to_tokens(
+                    self.tokenizer.encode(text, add_special_tokens=True)
+                )
                 for text in texts
             ]
 
@@ -954,11 +1003,11 @@ class CTranslate2Backend(ModelBackend):
             if generation_params is None:
                 generation_params = {}
 
-            beam_size = generation_params.get('num_beams', generation_params.get('beam_size', 4))
-            max_decoding_length = max_new_tokens or generation_params.get('max_new_tokens', 512)
-            repetition_penalty = generation_params.get('repetition_penalty', 1.0)
-            length_penalty = generation_params.get('length_penalty', 1.0)
-            no_repeat_ngram_size = generation_params.get('no_repeat_ngram_size', 0)
+            beam_size = generation_params.get("num_beams", generation_params.get("beam_size", 4))
+            max_decoding_length = max_new_tokens or generation_params.get("max_new_tokens", 512)
+            repetition_penalty = generation_params.get("repetition_penalty", 1.0)
+            length_penalty = generation_params.get("length_penalty", 1.0)
+            no_repeat_ngram_size = generation_params.get("no_repeat_ngram_size", 0)
 
             # Translate with generation parameters
             results = self.translator.translate_batch(
@@ -968,7 +1017,7 @@ class CTranslate2Backend(ModelBackend):
                 max_decoding_length=max_decoding_length,
                 repetition_penalty=repetition_penalty,
                 length_penalty=length_penalty,
-                no_repeat_ngram_size=no_repeat_ngram_size
+                no_repeat_ngram_size=no_repeat_ngram_size,
             )
 
             # Detokenize: strip language token if present, convert tokens to IDs, decode
@@ -980,15 +1029,16 @@ class CTranslate2Backend(ModelBackend):
                     output_tokens = output_tokens[1:]
                 # Convert tokens to IDs and decode
                 translation = self.tokenizer.decode(
-                    self.tokenizer.convert_tokens_to_ids(output_tokens),
-                    skip_special_tokens=True
+                    self.tokenizer.convert_tokens_to_ids(output_tokens), skip_special_tokens=True
                 )
                 translations.append(translation)
 
             # EMPTY TRANSLATION FALLBACK (parity with HuggingFaceBackend)
             # Detect empty translations and fall back to source text
             empty_indices = []
-            for idx, (translation, source_text) in enumerate(zip(translations, texts, strict=False)):
+            for idx, (translation, source_text) in enumerate(
+                zip(translations, texts, strict=False)
+            ):
                 source_stripped = source_text.strip()
                 translation_stripped = translation.strip()
                 # Check if source is non-empty but translation is empty
@@ -1002,6 +1052,7 @@ class CTranslate2Backend(ModelBackend):
             # If empty translations detected, fall back to source text
             if empty_indices:
                 from ..observability.metrics import get_metrics
+
                 metrics = get_metrics()
                 if metrics:
                     metrics.increment("ct2_empty_translation_detected", len(empty_indices))
@@ -1015,9 +1066,7 @@ class CTranslate2Backend(ModelBackend):
                 for idx in empty_indices:
                     translations[idx] = texts[idx]
                     recovered_count += 1
-                    logger.debug(
-                        f"CT2: Fallback applied for index {idx}: '{texts[idx][:100]}...'"
-                    )
+                    logger.debug(f"CT2: Fallback applied for index {idx}: '{texts[idx][:100]}...'")
 
                 if metrics and recovered_count > 0:
                     metrics.increment("ct2_empty_translation_recovered", recovered_count)
@@ -1053,7 +1102,7 @@ class CTranslate2Backend(ModelBackend):
             self.tokenizer = None
 
         gc.collect()
-        if torch.cuda.is_available() and getattr(self, 'device', '') == 'cuda':
+        if torch.cuda.is_available() and getattr(self, "device", "") == "cuda":
             torch.cuda.empty_cache()
         self.loaded = False
 
@@ -1089,7 +1138,7 @@ class ModelLoader:
         device: str = "cpu",
         max_memory_mb: int | None = None,
         load_mode: str | None = None,
-        config: dict | None = None
+        config: dict | None = None,
     ):
         """
         Initialize model loader.
@@ -1113,7 +1162,9 @@ class ModelLoader:
         hardware_config = self.config.get("hardware", {})
         clear_every_n = hardware_config.get("clear_cache_frequency", 10)  # Default: every 10 files
         self.gpu_cache_manager = GPUCacheManager(clear_every_n_files=clear_every_n)
-        logger.debug(f"ModelLoader initialized with GPU cache manager (clear_every_n_files={clear_every_n})")
+        logger.debug(
+            f"ModelLoader initialized with GPU cache manager (clear_every_n_files={clear_every_n})"
+        )
         translation_config = self.config.get("translation") or {}
         self.generation_config = translation_config.get("generation") or {}
 
@@ -1149,9 +1200,7 @@ class ModelLoader:
 
         return backend
 
-    def _create_backend(
-        self, model_info: ModelInfo, device: str
-    ) -> ModelBackend:
+    def _create_backend(self, model_info: ModelInfo, device: str) -> ModelBackend:
         """
         Create appropriate backend for model.
 
@@ -1181,18 +1230,17 @@ class ModelLoader:
                 device,
                 self.max_memory_mb,
                 use_fp16=use_fp16,  # None = auto, True = force, False = disable
-                use_int8=use_int8,   # T104: federated-splashing-panda
-                generation_config=self.generation_config
+                use_int8=use_int8,  # T104: federated-splashing-panda
+                generation_config=self.generation_config,
             )
         elif model_info.backend == "ctranslate2":
             return CTranslate2Backend(model_info, device, self.max_memory_mb)
         elif model_info.backend in ("llm", "local_llm"):
             from .llm_backend import LLMModelBackend
+
             return LLMModelBackend(model_info, device="api")
         else:
-            raise ValueError(
-                f"Unsupported backend: {model_info.backend}"
-            )
+            raise ValueError(f"Unsupported backend: {model_info.backend}")
 
     def get_loaded_model(self, model_id: str) -> ModelBackend | None:
         """

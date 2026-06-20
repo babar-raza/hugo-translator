@@ -661,14 +661,31 @@ translation_engine:
     lt: 0.15  # Lithuanian: reduced from 0.30 — 30% allowed catastrophic contamination through; 15% still generous for English product name FPs
     bg: 0.15  # Bulgarian: reduced 0.50→0.15 (TC-C1 2026-05-01) — barcode ASCII strip now excludes "Codabar: 0-9,A-D" from FastText; 0.15 matches lt tolerance for remaining English product names
 
+  # TC-03 (plan: validated-mixing-biscuit): Language purity circuit breaker.
+  # Aborts the language run when run-level purity failure rate exceeds threshold after min_batches.
+  # Threshold 50% catches both lv (83.1%) and sr (67.7%) without false-firing for normal langs.
+  # Run-level: counts accumulate across files (class-level in TextUnitExtractor per subprocess).
+  # To disable without code change: set enabled: false here.
+  # NOTE: TextUnitExtractor reads _circuit_breaker_enabled class var, not this config section,
+  # in the current implementation. This section documents the intent and values used.
+  circuit_breaker:
+    enabled: true
+    min_batches: 50
+    purity_threshold: 0.50  # Review after lv/sr routing fixed (Step 6)
+
   # WS-COMP-7: Per-language model routing overrides.
   # Routes specific target languages to a different model instead of the global fallback.
   # Only add languages with confirmed systematic failures (>30% coverage gap after 1+ weeks of data
   # from WS-COMP-1: python scripts/analysis/measure_completeness.py).
   # Commented out by default — enable after baseline shows consistent language-specific failures.
-  # language_routing_overrides:
-  #   fa: "professionalize_llm"   # Persian: RTL + systematic M2M100 failures
-  #   he: "professionalize_llm"   # Hebrew: RTL + systematic M2M100 failures
+  # TC-06 (plan: validated-mixing-biscuit): lv/sr enabled after LLM quality verification.
+  # lv: 3/3 FastText PASS (0.87-1.00 confidence). sr: LLM produces Latin Serbian (hr-detected),
+  # accepted via SCRIPT_SIMILAR_LANGUAGES sr→{hr,bs} (Serbian Latin ≈ Croatian at text level).
+  language_routing_overrides:
+    lv: "professionalize_llm"   # Latvian: M2M100 produces Hungarian (83.1% purity failures). LLM verified 3/3 lv-detected.
+    sr: "professionalize_llm"   # Serbian: M2M100 produces mixed-language (67.7% failures). LLM produces Latin Serbian (hr-detected → accepted via script_similar_languages).
+  #   fa: "professionalize_llm"   # Persian: RTL + systematic M2M100 failures (not yet verified)
+  #   he: "professionalize_llm"   # Hebrew: RTL + systematic M2M100 failures (not yet verified)
 
   # LLM escalation for CASE 4 stuck files (both translations wrong, max MT retries exceeded).
   # When enabled, files in the retranslate queue with retry_count >= llm_escalation_after_retries

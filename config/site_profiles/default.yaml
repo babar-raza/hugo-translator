@@ -104,9 +104,9 @@ extraction:
     script_similar_languages:
       ar: [fa]  # Arabic <-> Farsi/Persian (both use Arabic script)
       fa: [ar]  # Farsi/Persian <-> Arabic
+      sr: [hr, bs]  # Serbian Latin ≈ Croatian/Bosnian: LLM produces Latin-script Serbian; FastText classifies as 'hr'. Linguistically identical at text level. (TC-06, plan: validated-mixing-biscuit)
       # Add more script-similar pairs as needed:
       # hi: [ne, mr]  # Hindi, Nepali, Marathi all use Devanagari
-      # sr: [ru, uk, bg]  # Serbian, Russian, Ukrainian, Bulgarian use Cyrillic
 
   # Batch translation tuning
   # Controls batch processing efficiency and quality
