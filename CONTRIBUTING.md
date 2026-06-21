@@ -121,3 +121,5 @@ When contributing code or documentation changes:
 - **Config backups** — do not commit `model_registry.backup.yaml` or similar variants. Only `model_registry.yaml` is canonical.
 - **Pre-commit hooks are mandatory** — run `pre-commit install` after cloning.
 - Run `bash scripts/check_share_safe.sh` before pushing to verify no private data leaks.
+- **xfail-to-pass sync rule:** When removing `@pytest.mark.xfail` from a test in any commit, you MUST update the containing file's module docstring in the same commit. If the docstring says "N xfail" or "not yet implemented", update it to reflect the new passing state. Failure to do this causes stale documentation that misleads future auditors. There is no automated enforcement — this is a contributor obligation.
+- **Sprint closeout:** Run `python scripts/ops/close_sprint.py --sprint-name <name> --verdict <verdict>` before the final push of any sprint. This generates `.local/evidences/<name>/evidence-declaration.yaml`, which the sprint loop controller requires for auditing. Sprints without an evidence bundle force the loop controller to re-derive facts from scratch on every audit.
