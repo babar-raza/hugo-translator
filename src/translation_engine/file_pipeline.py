@@ -375,7 +375,8 @@ class FileTranslationPipeline:
                         # TC-BUGFIX-B: MT backends cannot act on retry feedback —
                         # they produce identical output. Skip directly to REJECT.
                         _model_used = getattr(result.stats, "model_used", "") or ""
-                        if _model_used and not _model_used.startswith("llm_"):
+                        _is_llm_backend = "llm" in _model_used.lower()
+                        if _model_used and not _is_llm_backend:
                             logger.warning(
                                 f"MT backend ({_model_used}) cannot act on feedback — "
                                 f"escalating to reject + retranslate queue for {file_path} to {target_lang}"
