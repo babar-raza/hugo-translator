@@ -541,10 +541,11 @@ class TranslationEngine:
         CT2-002: Implements language-aware model selection via ModelSelector if available.
 
         Selection priority:
-        1. CLI --model override (highest priority)
-        2. Dynamic selection via model_selector (CT2 models preferred for language pairs)
-        3. Site profile default_model
-        4. Global fallback "m2m100_418m"
+        1. Per-language routing override from config (highest specificity — WS-COMP-7)
+        2. CLI --model override / programmatic model_id (global default)
+        3. Dynamic selection via model_selector (CT2 models preferred for language pairs)
+        4. Site profile default_model
+        5. Global fallback "m2m100_418m"
 
         Args:
             site_profile: Site profile with default_model attribute
@@ -554,7 +555,31 @@ class TranslationEngine:
         Returns:
             Model ID to use for translation
         """
-        # Priority 1: CLI override (explicit user choice)
+        # Priority 1: WS-COMP-7 — per-language routing override (highest specificity).
+        # Must be checked BEFORE model_id_override because the autonomous worker always
+        # sets model_id_override to the global fallback model, which would otherwise
+        # shadow language-specific routing (e.g. lv/sr → professionalize_llm).
+        # Config: translation_engine.language_routing_overrides: {lv: "professionalize_llm"}
+        # Only active when tgt_lang is explicitly provided.
+        if tgt_lang:
+            try:
+                _te_cfg_lr = (
+                    self.config.get_config().get("translation_engine", {})
+                    if hasattr(self.config, "get_config")
+                    else {}
+                )
+                _lang_routing = _te_cfg_lr.get("language_routing_overrides", {})
+                if _lang_routing and tgt_lang in _lang_routing:
+                    _routed_model = _lang_routing[tgt_lang]
+                    logger.info(
+                        f"Language routing override: {tgt_lang} \u2192 '{_routed_model}' "
+                        f"(from translation_engine.language_routing_overrides)"
+                    )
+                    return _routed_model
+            except Exception:
+                pass
+
+        # Priority 2: CLI/programmatic model override (global default for all languages).
         if self.model_id_override:
             if src_lang and tgt_lang:
                 _p1_origin = (
@@ -570,29 +595,7 @@ class TranslationEngine:
                 )
             return self.model_id_override
 
-        # Priority 1b: WS-COMP-7 — per-language routing override from config.
-        # Allows routing high-failure languages (fa, he) to LLM backend without changing global fallback.
-        # Config: translation_engine.language_routing_overrides: {fa: "professionalize_llm"}
-        # Only active when tgt_lang is explicitly provided.
-        if tgt_lang:
-            try:
-                _te_cfg_lr = (
-                    self.config.get_config().get("translation_engine", {})
-                    if hasattr(self.config, "get_config")
-                    else {}
-                )
-                _lang_routing = _te_cfg_lr.get("language_routing_overrides", {})
-                if _lang_routing and tgt_lang in _lang_routing:
-                    _routed_model = _lang_routing[tgt_lang]
-                    logger.info(
-                        f"Language routing override: {tgt_lang} → '{_routed_model}' "
-                        f"(from translation_engine.language_routing_overrides)"
-                    )
-                    return _routed_model
-            except Exception:
-                pass
-
-        # Priority 2: Dynamic selection via model_selector (CT2-002)
+        # Priority 3: Dynamic selection via model_selector (CT2-002)
         # Only if both languages provided and selector available
         if src_lang and tgt_lang and self.model_selector:
             try:
@@ -625,8 +628,8 @@ class TranslationEngine:
                     f"Falling back to site profile or global default."
                 )
 
-        # Priority 3: Site profile default
-        # Priority 4: Global config fallback_model
+        # Priority 4: Site profile default
+        # Priority 5: Global config fallback_model
         # Priority 5: Hardcoded default
         global_fallback = "m2m100_418m"
         if self.config and hasattr(self.config, "global_config"):

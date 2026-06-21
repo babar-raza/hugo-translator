@@ -19,17 +19,19 @@ class TestValidationSuite:
         """Test suite with default validators."""
         suite = ValidationSuite()
 
-        # Should have 6 default validators (3 legacy + 3 new)
-        assert len(suite.validators) == 6
+        # Should have 8 default validators (3 legacy + 5 post-translation)
+        assert len(suite.validators) == 8
         validator_names = [v.name for v in suite.validators]
         # Legacy validators
         assert "PlaceholderValidator" in validator_names
         assert "StructureValidator" in validator_names
         assert "LinkValidator" in validator_names
-        # New post-translation validators
+        # Post-translation validators
         assert "CompletenessValidator" in validator_names
         assert "LanguageConsistencyValidator" in validator_names
         assert "ShortcodePreservationValidator" in validator_names
+        assert "MetadataMarkdownContaminationValidator" in validator_names
+        assert "RepetitionDetectorValidator" in validator_names
 
     def test_custom_validators(self):
         """Test suite with custom validators."""

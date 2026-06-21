@@ -101,8 +101,11 @@ extra_key: "Should not be here"
 """
         result = validator.validate(source, translation)
 
-        assert result.warning_count > 0
-        assert any("extra keys" in issue.message.lower() for issue in result.issues)
+        assert result.error_count > 0
+        assert any(
+            "extra" in issue.message.lower() and "key" in issue.message.lower()
+            for issue in result.issues
+        )
 
     def test_type_mismatch(self, validator):
         """Test with type mismatches."""
