@@ -644,7 +644,7 @@ translation_engine:
   # COMPENSATING CONTROL: validation.yaml per_language_overrides enforce es=98%/it=98%/cs=97%
   # file-level purity via LanguageConsistencyValidator. Tests: test_batch_purity_skip_compensation.py.
   # MANDATORY REVIEW: 2026-07-01. If measurement script does not exist by then, deferral expires.
-  batch_purity_skip_langs: [ar, ca, cs, de, el, es, fa, fr, ga, he, hu, id, it, ja, ko, lt, ms, nl, pl, pt, ro, ru, sk, tr, uk, zh]
+  batch_purity_skip_langs: [ar, ca, cs, de, el, es, fa, fr, ga, he, hu, id, it, ja, ko, lt, lv, ms, nl, pl, pt, ro, ru, sk, sr, tr, uk, zh]
 
   min_file_purity_percentage: 0.95  # Require 95% of segments match target language (5% tolerance for mixed content)
 

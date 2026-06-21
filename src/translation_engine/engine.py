@@ -1624,7 +1624,10 @@ class TranslationEngine:
                 detected_langs = _ld.detect_langs(v_stripped)
                 if detected_langs:
                     top = detected_langs[0]
-                    if top.lang != target_lang and top.prob > CONFIDENCE_THRESHOLD:
+                    # Accept linguistically near-identical languages (e.g. Latin-script sr detected as hr/bs).
+                    _SIMILAR_LANG_MAP = {'sr': {'hr', 'bs'}}
+                    _similar_accepted = _SIMILAR_LANG_MAP.get(target_lang, set())
+                    if top.lang != target_lang and top.lang not in _similar_accepted and top.prob > CONFIDENCE_THRESHOLD:
                         issues.append(
                             _ValIssue(
                                 severity=_ValSeverity.ERROR,

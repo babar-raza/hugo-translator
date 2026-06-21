@@ -464,7 +464,7 @@ class SegmentTranslator:
         from .reconstructor import ASTRenderer
 
         try:
-            model_id = engine._get_model_id(site_profile)
+            model_id = engine._get_model_id(site_profile, tgt_lang=target_lang)
             with engine._model_lock:
                 mt_model = engine.model_loader.load_model(model_id)
 

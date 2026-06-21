@@ -220,7 +220,11 @@ class LanguageConsistencyValidator(PostTranslationValidator):
                     detected_code = top_lang.lang
                     confidence = top_lang.prob
 
-                    if detected_code == target_lang and confidence >= effective_confidence:
+                    # Accept linguistically near-identical languages that share FastText/langdetect space.
+                    # Latin-script Serbian is correctly classified as hr/bs by most detectors.
+                    _SIMILAR_LANG_MAP = {'sr': {'hr', 'bs'}}
+                    _similar_accepted = _SIMILAR_LANG_MAP.get(target_lang, set())
+                    if (detected_code == target_lang or detected_code in _similar_accepted) and confidence >= effective_confidence:
                         correct_lang_count += 1
                     else:
                         # Log wrong language sentence (truncate for readability)
