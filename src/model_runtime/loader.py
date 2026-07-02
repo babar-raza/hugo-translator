@@ -459,25 +459,20 @@ class HuggingFaceBackend(ModelBackend):
                     "Target language may be set via tokenizer.tgt_lang instead."
                 )
 
-            # Generate translations (using settings from legacy/ast-translator.py)
-            # Note: max_new_tokens reduced to 256 for better memory efficiency
-            # (was 512, but caused OOM with larger batches)
-            # TR-01: Allow override via max_new_tokens parameter
-            effective_max_tokens = max_new_tokens if max_new_tokens is not None else 256
+            # Generate translations. Keep the default aligned with the model
+            # registry; 256 truncates normal products.aspose.org prose in M2M100.
+            effective_max_tokens = max_new_tokens if max_new_tokens is not None else 512
             speed_mode = self.generation_config.get("speed_mode", True)
             generate_kwargs = {
                 "max_new_tokens": effective_max_tokens,
                 "num_beams": 1,
                 "do_sample": False,
                 "use_cache": True,
+                "no_repeat_ngram_size": self.generation_config.get("no_repeat_ngram_size", 2),
+                "repetition_penalty": self.generation_config.get("repetition_penalty", 1.2),
             }
             if not speed_mode:
-                generate_kwargs["no_repeat_ngram_size"] = self.generation_config.get(
-                    "no_repeat_ngram_size", 2
-                )
-                generate_kwargs["repetition_penalty"] = self.generation_config.get(
-                    "repetition_penalty", 1.2
-                )
+                generate_kwargs["num_beams"] = self.generation_config.get("num_beams", 1)
             if forced_bos_token_id is not None:
                 generate_kwargs["forced_bos_token_id"] = forced_bos_token_id
 

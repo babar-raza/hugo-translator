@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import logging
 import math
+import re
 import time
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -38,6 +39,440 @@ class SegmentTranslator:
 
     def __init__(self, engine: TranslationEngine) -> None:
         self._engine = engine
+
+    @staticmethod
+    def _should_preserve_multiline_line(text: str) -> bool:
+        placeholders = re.findall(r"\{PLACEHOLDER_\d+\}", text)
+        if len(placeholders) >= 3:
+            return True
+        if placeholders and len("".join(placeholders)) / max(len(text), 1) > 0.45:
+            return True
+        return False
+
+    @staticmethod
+    def _has_fenced_code(text: str) -> bool:
+        return bool(re.search(r"```.*?```", text, flags=re.DOTALL))
+
+    @staticmethod
+    def _placeholder_is_fenced_code(token: str, placeholder_map: dict[str, str] | None) -> bool:
+        if not placeholder_map:
+            return False
+        return SegmentTranslator._has_fenced_code(placeholder_map.get(token, ""))
+
+    @staticmethod
+    def _has_fenced_code_or_placeholder(text: str, placeholder_map: dict[str, str] | None) -> bool:
+        if SegmentTranslator._has_fenced_code(text):
+            return True
+        return any(
+            SegmentTranslator._placeholder_is_fenced_code(token, placeholder_map)
+            for token in re.findall(r"\{PLACEHOLDER_\d+\}", text)
+        )
+
+    @staticmethod
+    def _split_fenced_code(
+        text: str, placeholder_map: dict[str, str] | None = None
+    ) -> list[tuple[str, str]]:
+        parts: list[tuple[str, str]] = []
+        pos = 0
+        pattern = r"```.*?```|\{PLACEHOLDER_\d+\}"
+        for match in re.finditer(pattern, text, flags=re.DOTALL):
+            token = match.group(0)
+            is_code = token.startswith("```") or SegmentTranslator._placeholder_is_fenced_code(
+                token, placeholder_map
+            )
+            if not is_code:
+                continue
+            if match.start() > pos:
+                parts.append(("text", text[pos:match.start()]))
+            parts.append(("code", token))
+            pos = match.end()
+        if pos < len(text):
+            parts.append(("text", text[pos:]))
+        return parts
+
+    @staticmethod
+    def _split_preserved_code(
+        text: str, placeholder_map: dict[str, str] | None = None
+    ) -> list[tuple[str, str]]:
+        parts: list[tuple[str, str]] = []
+        pos = 0
+        pattern = r"```.*?```|`[^`\n]+`|\{PLACEHOLDER_\d+\}"
+        for match in re.finditer(pattern, text, flags=re.DOTALL):
+            token = match.group(0)
+            is_code = (
+                token.startswith("```")
+                or token.startswith("`")
+                or SegmentTranslator._placeholder_is_fenced_code(token, placeholder_map)
+            )
+            if not is_code:
+                continue
+            if match.start() > pos:
+                parts.append(("text", text[pos:match.start()]))
+            parts.append(("code", token))
+            pos = match.end()
+        if pos < len(text):
+            parts.append(("text", text[pos:]))
+        return parts
+
+    @staticmethod
+    def _is_effectively_untranslated(source: str, translated: str) -> bool:
+        return source.strip() == translated.strip()
+
+    @staticmethod
+    def _product_title_suffix_parts(text: str) -> tuple[str, str, str] | None:
+        match = re.match(
+            r"^(Aspose\.[A-Za-z0-9.+#-]+(?:\s+FOSS)?)(\s+(?:[\u2013\u2014-])\s+)(.+)$",
+            text.strip(),
+        )
+        if not match:
+            return None
+        suffix = match.group(3).strip()
+        if not suffix or not re.search(r"[A-Za-z]{3,}", suffix):
+            return None
+        return match.group(1), match.group(2), suffix
+
+    def _repair_untranslated_product_title(
+        self,
+        backend,
+        source_text: str,
+        translated_text: str,
+        source_lang: str,
+        target_lang: str,
+        stats: TranslationStats,
+    ) -> str:
+        if not self._is_effectively_untranslated(source_text, translated_text):
+            return translated_text
+
+        parts = self._product_title_suffix_parts(source_text)
+        if not parts:
+            return translated_text
+
+        prefix, separator, suffix = parts
+        logger.info("Retrying untranslated product title suffix while preserving identity prefix")
+        if hasattr(backend, "translate_with_token_counts"):
+            translations, input_tokens, output_tokens = backend.translate_with_token_counts(
+                [suffix], source_lang, target_lang
+            )
+            stats.tokens_input += input_tokens
+            stats.tokens_output += output_tokens
+        else:
+            translations = backend.translate([suffix], source_lang, target_lang)
+            stats.tokens_input += estimate_token_count(suffix)
+            stats.tokens_output += sum(estimate_token_count(t) for t in translations)
+
+        candidate = translations[0].strip() if translations else ""
+        if not candidate or self._is_effectively_untranslated(suffix, candidate):
+            return translated_text
+        return f"{prefix}{separator}{candidate}"
+
+    def _retry_untranslated_text_by_sentence(
+        self,
+        backend,
+        source_text: str,
+        translated_text: str,
+        source_lang: str,
+        target_lang: str,
+        stats: TranslationStats,
+    ) -> str:
+        if not self._is_effectively_untranslated(source_text, translated_text):
+            return translated_text
+        if len(source_text.strip()) >= 20 and not self._has_fenced_code(source_text):
+            candidate = self._translate_core_with_residue_variants(
+                backend,
+                source_text.strip(),
+                source_lang,
+                target_lang,
+                stats,
+            )
+            if candidate.strip() and not self._is_effectively_untranslated(source_text, candidate):
+                return candidate
+        if len(source_text.strip()) < 80:
+            return translated_text
+        if self._has_fenced_code(source_text):
+            return translated_text
+
+        pieces = re.findall(r"(.+?(?:[.!?]+|$))(\s*)", source_text, flags=re.DOTALL)
+        sentence_items = []
+        rendered = []
+        for sentence, spacing in pieces:
+            if not sentence.strip():
+                rendered.append(sentence + spacing)
+                continue
+            rendered.append("")
+            sentence_items.append((len(rendered) - 1, sentence, spacing))
+
+        if len(sentence_items) < 2:
+            return translated_text
+
+        logger.info(
+            "Retrying effectively untranslated text as sentence chunks "
+            f"({len(sentence_items)} chunks, target={target_lang})"
+        )
+        cores = [sentence.strip() for _, sentence, _ in sentence_items]
+        if hasattr(backend, "translate_with_token_counts"):
+            translations, input_tokens, output_tokens = backend.translate_with_token_counts(
+                cores, source_lang, target_lang
+            )
+            stats.tokens_input += input_tokens
+            stats.tokens_output += output_tokens
+        else:
+            translations = backend.translate(cores, source_lang, target_lang)
+            stats.tokens_input += sum(estimate_token_count(t) for t in cores)
+            stats.tokens_output += sum(estimate_token_count(t) for t in translations)
+
+        for (rendered_idx, sentence, spacing), translation in zip(
+            sentence_items, translations, strict=False
+        ):
+            rendered[rendered_idx] = f"{translation.strip() if translation.strip() else sentence.strip()}{spacing}"
+
+        candidate = "".join(rendered)
+        if not candidate.strip() or self._is_effectively_untranslated(source_text, candidate):
+            return translated_text
+        return candidate
+
+    @staticmethod
+    def _english_source_residue_count(source_text: str, translated_text: str) -> int:
+        if not source_text or not translated_text:
+            return 0
+        if source_text.strip() == translated_text.strip():
+            return 0
+
+        def _strip_technical(text: str) -> str:
+            text = re.sub(r"```.*?```", " ", text, flags=re.DOTALL)
+            return re.sub(
+                r"Aspose\.[A-Za-z0-9.+#-]+|Aspose|FOSS|API|SDK|\.NET|Java|Python|TypeScript|"
+                r"Node\.js|C\+\+|C#|HTML|PDF|CSV|JSON|TSV|XLSX|Excel|Markdown|NuGet|Maven|pip|GitHub|"
+                r"Microsoft|Office|Outlook|Visio|AutoCAD|DWG|DXF|DGN|MSG|EML|CFB|GDI|"
+                r"Workbook|Worksheet|Cell|Style|Font|Color|PageSetup",
+                " ",
+                text,
+            )
+
+        source_normalized = re.sub(r"\s+", " ", _strip_technical(source_text)).lower()
+        target_text = _strip_technical(translated_text)
+        english_function_words = {
+            "the",
+            "and",
+            "for",
+            "with",
+            "without",
+            "that",
+            "which",
+            "from",
+            "into",
+            "your",
+            "you",
+            "can",
+            "are",
+            "this",
+            "these",
+            "using",
+            "support",
+            "supports",
+            "provides",
+            "allows",
+            "enables",
+            "library",
+            "developers",
+            "operations",
+            "options",
+            "fully",
+            "functional",
+        }
+        count = 0
+        for match in re.finditer(r"\b(?:[A-Z]?[a-z]{3,}\s+){4,}[A-Z]?[a-z]{3,}\b", target_text):
+            phrase = re.sub(r"\s+", " ", match.group(0).strip()).lower()
+            words = set(re.findall(r"[a-z]{3,}", phrase))
+            if len(words & english_function_words) < 2:
+                continue
+            if phrase in source_normalized:
+                count += 1
+        return count
+
+    def _retry_english_residue_by_sentence(
+        self,
+        backend,
+        source_text: str,
+        translated_text: str,
+        source_lang: str,
+        target_lang: str,
+        stats: TranslationStats,
+    ) -> str:
+        residue_before = self._english_source_residue_count(source_text, translated_text)
+        if residue_before == 0:
+            return translated_text
+        if len(source_text.strip()) < 40 or self._has_fenced_code(source_text):
+            return translated_text
+
+        pieces = re.findall(r"(.+?(?:[.!?]+|$))(\s*)", source_text, flags=re.DOTALL)
+        sentence_items = []
+        rendered = []
+        for sentence, spacing in pieces:
+            if not sentence.strip():
+                rendered.append(sentence + spacing)
+                continue
+            rendered.append("")
+            sentence_items.append((len(rendered) - 1, sentence, spacing))
+
+        if not sentence_items:
+            return translated_text
+
+        logger.info(
+            "Retrying text with English source residue as sentence chunks "
+            f"(residue={residue_before}, chunks={len(sentence_items)}, target={target_lang})"
+        )
+        cores = [sentence.strip() for _, sentence, _ in sentence_items]
+        if hasattr(backend, "translate_with_token_counts"):
+            translations, input_tokens, output_tokens = backend.translate_with_token_counts(
+                cores, source_lang, target_lang
+            )
+            stats.tokens_input += input_tokens
+            stats.tokens_output += output_tokens
+        else:
+            translations = backend.translate(cores, source_lang, target_lang)
+            stats.tokens_input += sum(estimate_token_count(t) for t in cores)
+            stats.tokens_output += sum(estimate_token_count(t) for t in translations)
+
+        for (rendered_idx, sentence, spacing), translation in zip(
+            sentence_items, translations, strict=False
+        ):
+            rendered[rendered_idx] = f"{translation.strip() if translation.strip() else sentence.strip()}{spacing}"
+
+        candidate = "".join(rendered)
+        if not candidate.strip():
+            return translated_text
+        if self._english_source_residue_count(source_text, candidate) < residue_before:
+            return candidate
+        if "`" in source_text or re.search(r"\{PLACEHOLDER_\d+\}", source_text):
+            chunk_candidate = self._translate_fenced_code_prose_chunks(
+                backend,
+                source_text,
+                source_lang,
+                target_lang,
+                stats,
+            )
+            if self._english_source_residue_count(source_text, chunk_candidate) < residue_before:
+                return chunk_candidate
+        return translated_text
+
+    def _translate_fenced_code_prose_chunks(
+        self,
+        backend,
+        source_text: str,
+        source_lang: str,
+        target_lang: str,
+        stats: TranslationStats,
+        placeholder_map: dict[str, str] | None = None,
+    ) -> str:
+        """Translate prose around fenced code blocks while preserving code exactly."""
+        chunks = self._split_preserved_code(source_text, placeholder_map)
+        prose_items: list[tuple[int, str]] = []
+        rendered: list[str] = []
+
+        for kind, value in chunks:
+            if kind == "code" or not value.strip():
+                rendered.append(value)
+                continue
+            rendered.append("")
+            prose_items.append((len(rendered) - 1, value))
+
+        for rendered_idx, prose in prose_items:
+            leading_match = re.match(r"^\s*", prose)
+            trailing_match = re.search(r"\s*$", prose)
+            leading = leading_match.group(0) if leading_match else ""
+            trailing = trailing_match.group(0) if trailing_match else ""
+            core = prose[len(leading): len(prose) - len(trailing) if trailing else len(prose)]
+            if not core:
+                rendered[rendered_idx] = prose
+                continue
+            candidate = self._translate_core_with_residue_variants(
+                backend,
+                core,
+                source_lang,
+                target_lang,
+                stats,
+            )
+            rendered[rendered_idx] = f"{leading}{candidate if candidate.strip() else core}{trailing}"
+
+        return "".join(rendered)
+
+    @staticmethod
+    def _residue_retry_variants(text: str) -> list[str]:
+        variants = []
+        normalized = text.replace("fit-to-page", "fit to page")
+        normalized = normalized.replace("per-format", "per format")
+        normalized = normalized.replace("Open-Source", "Open Source")
+        normalized = normalized.replace("open-source", "open source")
+        normalized = normalized.replace("Cross-Platform", "Cross Platform")
+        normalized = normalized.replace("cross-platform", "cross platform")
+        normalized = normalized.replace("CMake-based", "CMake based")
+        normalized = normalized.replace("header-and-source", "header and source")
+        normalized = normalized.replace("control formula visibility", "hide formulas")
+        normalized = normalized.replace("Control formula visibility", "Hide formulas")
+        normalized = normalized.replace("Lock individual cells", "Protect cells by locking individual cells")
+        normalized = normalized.replace("lock individual cells", "protect cells by locking individual cells")
+        normalized = normalized.replace("export styled workbooks", "export formatted workbooks")
+        normalized = normalized.replace(
+            "Library for Word Document Conversion",
+            "Software library for converting Word documents",
+        )
+        normalized = normalized.replace(
+            "library for Word Document Conversion",
+            "software library for converting Word documents",
+        )
+        if normalized != text:
+            variants.append(normalized)
+        if re.match(r"^\s*Set\b", normalized):
+            variants.append(re.sub(r"^\s*Set\b", "Configure", normalized, count=1))
+        if re.match(r"^\s*set\b", normalized):
+            variants.append(re.sub(r"^\s*set\b", "configure", normalized, count=1))
+        return [variant for idx, variant in enumerate(variants) if variant and variant not in variants[:idx]]
+
+    def _translate_core_with_residue_variants(
+        self,
+        backend,
+        core: str,
+        source_lang: str,
+        target_lang: str,
+        stats: TranslationStats,
+    ) -> str:
+        if hasattr(backend, "translate_with_token_counts"):
+            translations, input_tokens, output_tokens = backend.translate_with_token_counts(
+                [core], source_lang, target_lang
+            )
+            stats.tokens_input += input_tokens
+            stats.tokens_output += output_tokens
+        else:
+            translations = backend.translate([core], source_lang, target_lang)
+            stats.tokens_input += estimate_token_count(core)
+            stats.tokens_output += sum(estimate_token_count(t) for t in translations)
+
+        candidate = translations[0] if translations else core
+        if (
+            not self._is_effectively_untranslated(core, candidate)
+            and self._english_source_residue_count(core, candidate) == 0
+        ):
+            return candidate
+
+        for variant in self._residue_retry_variants(core):
+            logger.info(
+                "Retrying residue-prone short phrase with normalized source variant "
+                f"(target={target_lang})"
+            )
+            if hasattr(backend, "translate_with_token_counts"):
+                retry_translations, input_tokens, output_tokens = backend.translate_with_token_counts(
+                    [variant], source_lang, target_lang
+                )
+                stats.tokens_input += input_tokens
+                stats.tokens_output += output_tokens
+            else:
+                retry_translations = backend.translate([variant], source_lang, target_lang)
+                stats.tokens_input += estimate_token_count(variant)
+                stats.tokens_output += sum(estimate_token_count(t) for t in retry_translations)
+            retry_candidate = retry_translations[0] if retry_translations else ""
+            if retry_candidate and self._english_source_residue_count(variant, retry_candidate) == 0:
+                return retry_candidate
+        return candidate
 
     def translate_to_language(
         self,
@@ -356,6 +791,7 @@ class SegmentTranslator:
 
         if use_ast:
             logger.info("Using AST-based body reconstruction for translation")
+            ast_body_rendered = False
             try:
                 translated_body = self._translate_body_ast(
                     doc,
@@ -365,6 +801,7 @@ class SegmentTranslator:
                     segments=segments,
                     translations=translations,
                 )
+                ast_body_rendered = True
 
                 _fm_reconstructor = MarkdownReconstructor(site_profile)
                 translated_frontmatter = _fm_reconstructor.reconstruct_frontmatter(
@@ -397,20 +834,15 @@ class SegmentTranslator:
                     )
 
                 # RC-3 FIX: Verify frontmatter keys were not translated
-                import yaml as _yaml_check
-
                 _source_keys = set(doc.frontmatter.keys())
-                try:
-                    _out_data = _yaml_check.safe_load(frontmatter_yaml.split("---", 2)[1])
-                    _out_keys = set(_out_data.keys()) if isinstance(_out_data, dict) else set()
-                    if _source_keys != _out_keys:
-                        _diff = _source_keys ^ _out_keys
-                        raise ValueError(
-                            f"Frontmatter key integrity check failed after translation. "
-                            f"Mismatched keys: {_diff}"
-                        )
-                except _yaml_check.YAMLError as _e:
-                    raise ValueError(f"Frontmatter key integrity: YAML parse failed: {_e}") from _e
+                _out_data = self._parse_formatted_frontmatter(frontmatter_yaml)
+                _out_keys = set(_out_data.keys()) if isinstance(_out_data, dict) else set()
+                if _source_keys != _out_keys:
+                    _diff = _source_keys ^ _out_keys
+                    raise ValueError(
+                        f"Frontmatter key integrity check failed after translation. "
+                        f"Mismatched keys: {_diff}"
+                    )
 
                 translated_content = f"{frontmatter_yaml}\n{translated_body}"
                 logger.info("AST Translation: Successfully reconstructed document")
@@ -418,6 +850,13 @@ class SegmentTranslator:
             except TranslationRetryableError:
                 raise
             except Exception as e:
+                if ast_body_rendered:
+                    logger.error(
+                        "AST reconstruction failed after body rendering; refusing legacy fallback "
+                        "because the document may already be partially mutated",
+                        exc_info=True,
+                    )
+                    raise
                 logger.error(f"AST reconstruction failed: {e}", exc_info=True)
                 logger.warning("AST translation failed, falling back to legacy reconstruction")
                 use_ast = False
@@ -447,6 +886,28 @@ class SegmentTranslator:
         stats.tokens_total = stats.tokens_cached + stats.tokens_input + stats.tokens_output
 
         return translated_content
+
+    @staticmethod
+    def _parse_formatted_frontmatter(frontmatter_yaml: str) -> dict:
+        """Parse YAMLFormatter output and require Hugo frontmatter delimiters."""
+        import re
+        import yaml
+
+        match = re.match(r"^---\s*\n(.*?)\n?---\s*(?:\n)?$", frontmatter_yaml, re.DOTALL)
+        if not match:
+            raise ValueError("Frontmatter key integrity: missing YAML frontmatter delimiters")
+
+        try:
+            data = yaml.safe_load(match.group(1)) or {}
+        except yaml.YAMLError as exc:
+            raise ValueError(f"Frontmatter key integrity: YAML parse failed: {exc}") from exc
+
+        if not isinstance(data, dict):
+            raise ValueError(
+                f"Frontmatter key integrity: parsed frontmatter is not a mapping "
+                f"(got {type(data).__name__})"
+            )
+        return data
 
     def _translate_body_ast(
         self,
@@ -879,7 +1340,30 @@ class SegmentTranslator:
                 unsorted_translations[original_list_idx] = batch_translations[sorted_idx]
 
             for list_idx, original_idx in enumerate(singleline_indices):
-                translated_texts[original_idx] = unsorted_translations[list_idx]
+                candidate = self._retry_untranslated_text_by_sentence(
+                    backend,
+                    texts[original_idx],
+                    unsorted_translations[list_idx],
+                    source_lang,
+                    target_lang,
+                    stats,
+                )
+                candidate = self._retry_english_residue_by_sentence(
+                    backend,
+                    texts[original_idx],
+                    candidate,
+                    source_lang,
+                    target_lang,
+                    stats,
+                )
+                translated_texts[original_idx] = self._repair_untranslated_product_title(
+                    backend,
+                    texts[original_idx],
+                    candidate,
+                    source_lang,
+                    target_lang,
+                    stats,
+                )
 
         # Translate multiline texts with structure preservation
         if multiline_indices:
@@ -887,17 +1371,39 @@ class SegmentTranslator:
                 f"MSP-02: Processing {len(multiline_indices)} multiline segments "
                 f"with structure preservation"
             )
+            multiline_batch_size = 1
+            logger.info("MSP-02: Using batch_size=1 for multiline lines")
             multiline_line_items = []
             multiline_line_info = {}
+            fenced_code_indices = set()
 
             for original_idx in multiline_indices:
                 text = texts[original_idx]
+                segment = segments[original_idx]
+                if self._has_fenced_code_or_placeholder(
+                    segment.source_text, getattr(segment, "placeholder_map", None)
+                ):
+                    fenced_code_indices.add(original_idx)
+                    translated_texts[original_idx] = self._translate_fenced_code_prose_chunks(
+                        backend,
+                        segment.source_text,
+                        source_lang,
+                        target_lang,
+                        stats,
+                        getattr(segment, "placeholder_map", None),
+                    )
+                    continue
                 lines_info = engine.multiline_handler.parse_lines(text)
                 multiline_line_info[original_idx] = lines_info
                 for line_info in lines_info:
                     if line_info.is_empty:
                         continue
                     if not line_info.content.strip():
+                        continue
+                    if self._should_preserve_multiline_line(line_info.content):
+                        logger.debug(
+                            "MSP-02: Preserving placeholder-dense multiline line without MT"
+                        )
                         continue
                     multiline_line_items.append(
                         (original_idx, line_info.line_index, line_info.content)
@@ -928,8 +1434,8 @@ class SegmentTranslator:
                 batch_translations = []
                 total_lines = len(sorted_texts)
 
-                for chunk_start in range(0, total_lines, batch_size):
-                    chunk_end = min(chunk_start + batch_size, total_lines)
+                for chunk_start in range(0, total_lines, multiline_batch_size):
+                    chunk_end = min(chunk_start + multiline_batch_size, total_lines)
                     chunk_texts = sorted_texts[chunk_start:chunk_end]
                     multiline_backend_calls += 1
 
@@ -952,10 +1458,10 @@ class SegmentTranslator:
 
                     batch_translations.extend(chunk_translations)
 
-                    if total_lines > batch_size:
+                    if total_lines > multiline_batch_size:
                         logger.debug(
-                            f"MSP-02: Translated multiline batch {chunk_start // batch_size + 1}/"
-                            f"{(total_lines + batch_size - 1) // batch_size} "
+                            f"MSP-02: Translated multiline batch {chunk_start // multiline_batch_size + 1}/"
+                            f"{(total_lines + multiline_batch_size - 1) // multiline_batch_size} "
                             f"({len(chunk_texts)} lines)"
                         )
 
@@ -969,6 +1475,8 @@ class SegmentTranslator:
             stats.multiline_backend_calls += multiline_backend_calls
 
             for original_idx in multiline_indices:
+                if original_idx in fenced_code_indices:
+                    continue
                 segment = segments[original_idx]
                 lines_info = multiline_line_info.get(original_idx, [])
                 translated_lines = []
@@ -986,11 +1494,44 @@ class SegmentTranslator:
                     translated_content = translated_line_map.get(
                         (original_idx, line_info.line_index), line_info.content
                     )
+                    translated_content = self._retry_untranslated_text_by_sentence(
+                        backend,
+                        line_info.content,
+                        translated_content,
+                        source_lang,
+                        target_lang,
+                        stats,
+                    )
+                    translated_content = self._retry_english_residue_by_sentence(
+                        backend,
+                        line_info.content,
+                        translated_content,
+                        source_lang,
+                        target_lang,
+                        stats,
+                    )
                     translated_lines.append(
                         f"{line_info.indent}{line_info.prefix}{translated_content}"
                     )
 
                 translated_text = "\n".join(translated_lines)
+                if (
+                    self._has_fenced_code_or_placeholder(
+                        segment.source_text, getattr(segment, "placeholder_map", None)
+                    )
+                    and self._is_effectively_untranslated(segment.source_text, translated_text)
+                ):
+                    logger.info(
+                        "MSP-02: Retrying fenced-code multiline segment as prose/code chunks"
+                    )
+                    translated_text = self._translate_fenced_code_prose_chunks(
+                        backend,
+                        segment.source_text,
+                        source_lang,
+                        target_lang,
+                        stats,
+                        getattr(segment, "placeholder_map", None),
+                    )
                 structure_preserved = len(translated_lines) == len(lines_info)
 
                 if not structure_preserved:

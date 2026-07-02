@@ -1,0 +1,103 @@
+policy_id: products-org-governed-v2-code-identity-repetition
+site_id: products.aspose.org
+source_language: en
+acceptance_bar: manual-review-2026-07-01
+
+hard_gates:
+  frontmatter_structure:
+    severity: error
+    requirement: Target frontmatter must preserve the material source key/list/type structure.
+    allow_drift_only_for:
+      - provenance.*
+      - grade
+      - grade_reasons
+      - graded_*
+  protected_fields:
+    severity: error
+    requirement: Protected/passthrough fields must remain byte-equivalent after parsing.
+    examples:
+      - layout
+      - type
+      - family_name
+      - plugin_platform
+      - github_url
+      - url
+      - slug
+      - draft
+      - date
+      - "*.enable"
+  product_identity:
+    severity: error
+    requirement: Aspose product identity strings from source must survive unchanged in target.
+    patterns:
+      - "Aspose\\.[A-Za-z0-9.+#-]+(?:\\s+FOSS)?(?:\\s+for\\s+[A-Za-z0-9.+#-]+)?"
+  code_blocks:
+    severity: error
+    requirement: Fenced code blocks in frontmatter and body are immutable source assets.
+    checks:
+      - source_target_code_fence_count_equal
+      - source_code_block_language_equal
+      - source_code_block_body_equal_after_normalization
+  markdown_html_shortcodes:
+    severity: error
+    requirement: Markdown links, anchors, HTML tags, Hugo shortcodes, placeholders, variables, file paths, and inline code must not be damaged or localized as prose.
+  completeness:
+    severity: error
+    requirement: Translatable prose must not remain substantially unchanged English in localized targets.
+  repetition:
+    severity: error
+    requirement: Reject model degeneration such as repeated titles, repeated words, punctuation loops, or symbol loops.
+  source_integrity:
+    severity: error
+    requirement: English source pages must not be mutated during translation.
+
+automated_repairs_allowed:
+  material_copy_fields:
+    description: Restore configured passthrough/material fields from source before final verification.
+  product_identity_restore:
+    description: Restore Aspose.* product identity substrings when the target lost or corrupted them.
+  code_block_restore:
+    description: Restore source fenced code blocks when source and target block counts match.
+  retry_untranslated_prose:
+    description: Retry unchanged or English-residue prose at smaller chunk/sentence granularity.
+
+automated_repairs_forbidden:
+  - Fake or placeholder translations.
+  - Dropping pages or locales to make counts pass.
+  - Silently accepting translator failures.
+  - Weakening hard gates to accept known-bad content.
+  - Mutating English source pages.
+
+locale_routing:
+  default_device: cuda
+  default_model: m2m100_418m
+  required_backend_independent_gates: true
+  known_overrides:
+    lv: professionalize_llm
+    sr: professionalize_llm
+
+evidence_required:
+  - baseline inventory of required source/locale pairs
+  - source hash snapshot before execution
+  - per-file translator logs
+  - per-file source/target comparison JSON
+  - failure JSON with typed reason
+  - resolved-failure records
+  - accepted receipts with policy version/hash
+  - accepted reverify report
+  - final execution report
+
+final_verdict_rules:
+  accepted:
+    - all required source/locale pairs accepted
+    - failed checkpoint count is zero
+    - final accepted reverify reports only VERIFIED_ACCEPT
+    - source hash snapshot is unchanged
+  accepted_with_known_blockers:
+    - one or more blockers are proven with evidence
+    - no failed item is hidden or silently skipped
+  rejected:
+    - source mutation is detected
+    - validator cannot run
+    - required pages/locales cannot be discovered
+    - hard-gate failures remain without proven external blocker
