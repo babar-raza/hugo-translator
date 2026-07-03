@@ -6,6 +6,7 @@ Manages loading, caching, and lifecycle of translation models across different b
 
 import gc
 import logging
+import re
 import time
 from abc import ABC, abstractmethod
 from pathlib import Path
@@ -520,6 +521,21 @@ class HuggingFaceBackend(ModelBackend):
             decode_start = time.perf_counter()
             translations = self.tokenizer.batch_decode(outputs, skip_special_tokens=True)
             decode_ms = (time.perf_counter() - decode_start) * 1000
+
+            # POST-DECODE ARTIFACT CLEANUP
+            # NLLB-200 is trained on subtitle corpora (OpenSubtitles/OPUS) and generates
+            # SSA subtitle position markers like {\pos (190,230) } appended to translations.
+            # Strip these unconditionally — they are never valid translation content.
+            _NLLB_SSA_ARTIFACT_RE = re.compile(
+                r"\{\\?pos\s+\(\d+,\s*\d+\)\s*\}", re.UNICODE
+            )
+            for i, t in enumerate(translations):
+                cleaned = _NLLB_SSA_ARTIFACT_RE.sub("", t).strip()
+                if cleaned != t.strip():
+                    logger.debug(
+                        f"Stripped NLLB SSA artifact from translation[{i}]: {t[:80]!r}"
+                    )
+                    translations[i] = cleaned
 
             # EMPTY TRANSLATION FALLBACK (Iter6 empty-translation fix)
             # Detect empty translations and retry with safer generation parameters

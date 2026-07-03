@@ -69,7 +69,7 @@ models:
     optimal_device: cuda
     parameters: 1300000000
     license: CC-BY-NC-4.0
-    local_path: models/nllb_200_1.3b
+    local_path: F:\huggingface\hub\models--facebook--nllb-200-1.3B\snapshots\b0de46b488af0cf31749cd8da5ed3171e11b2309
     hf_model_id: facebook/nllb-200-1.3B
     description: "Larger NLLB model. Excellent quality for 200 languages."
 
@@ -117,6 +117,336 @@ models:
     license: CC-BY-4.0
     hf_model_id: Helsinki-NLP/opus-mt-en-de
     description: "Specialized English-German model. Fast and lightweight."
+
+  # OpusMT English-Arabic
+  - model_id: opus_en_ar
+    name: "Opus-MT English-Arabic"
+    backend: huggingface
+    supported_pairs:
+      - ["en", "ar"]
+    model_size_mb: 300
+    min_ram_gb: 1
+    optimal_device: cuda
+    parameters: 77000000
+    license: CC-BY-4.0
+    hf_model_id: Helsinki-NLP/opus-mt-en-ar
+    local_path: "F:/huggingface/hub/models--Helsinki-NLP--opus-mt-en-ar/snapshots"
+    description: "Specialized English-Arabic model. Better quality than NLLB for Arabic."
+
+  # OpusMT English-Bulgarian
+  - model_id: opus_en_bg
+    name: "Opus-MT English-Bulgarian"
+    backend: huggingface
+    supported_pairs:
+      - ["en", "bg"]
+    model_size_mb: 300
+    min_ram_gb: 1
+    optimal_device: cuda
+    parameters: 77000000
+    license: CC-BY-4.0
+    hf_model_id: Helsinki-NLP/opus-mt-en-bg
+    local_path: "F:/huggingface/hub/models--Helsinki-NLP--opus-mt-en-bg/snapshots"
+    description: "Specialized English-Bulgarian model."
+
+  # OpusMT English-Catalan
+  - model_id: opus_en_ca
+    name: "Opus-MT English-Catalan"
+    backend: huggingface
+    supported_pairs:
+      - ["en", "ca"]
+    model_size_mb: 300
+    min_ram_gb: 1
+    optimal_device: cuda
+    parameters: 77000000
+    license: CC-BY-4.0
+    hf_model_id: Helsinki-NLP/opus-mt-en-ca
+    local_path: "F:/huggingface/hub/models--Helsinki-NLP--opus-mt-en-ca/snapshots"
+    description: "Specialized English-Catalan model."
+
+  # OpusMT English-Czech
+  - model_id: opus_en_cs
+    name: "Opus-MT English-Czech"
+    backend: huggingface
+    supported_pairs:
+      - ["en", "cs"]
+    model_size_mb: 300
+    min_ram_gb: 1
+    optimal_device: cuda
+    parameters: 77000000
+    license: CC-BY-4.0
+    hf_model_id: Helsinki-NLP/opus-mt-en-cs
+    local_path: "F:/huggingface/hub/models--Helsinki-NLP--opus-mt-en-cs/snapshots"
+    description: "Specialized English-Czech model."
+
+  # OpusMT English-Danish
+  - model_id: opus_en_da
+    name: "Opus-MT English-Danish"
+    backend: huggingface
+    supported_pairs:
+      - ["en", "da"]
+    model_size_mb: 300
+    min_ram_gb: 1
+    optimal_device: cuda
+    parameters: 77000000
+    license: CC-BY-4.0
+    hf_model_id: Helsinki-NLP/opus-mt-en-da
+    local_path: "F:/huggingface/hub/models--Helsinki-NLP--opus-mt-en-da/snapshots"
+    description: "Specialized English-Danish model."
+
+  # OpusMT English-Greek
+  - model_id: opus_en_el
+    name: "Opus-MT English-Greek"
+    backend: huggingface
+    supported_pairs:
+      - ["en", "el"]
+    model_size_mb: 300
+    min_ram_gb: 1
+    optimal_device: cuda
+    parameters: 77000000
+    license: CC-BY-4.0
+    hf_model_id: Helsinki-NLP/opus-mt-en-el
+    local_path: "F:/huggingface/hub/models--Helsinki-NLP--opus-mt-en-el/snapshots"
+    description: "Specialized English-Greek model."
+
+  # OpusMT English-Finnish
+  - model_id: opus_en_fi
+    name: "Opus-MT English-Finnish"
+    backend: huggingface
+    supported_pairs:
+      - ["en", "fi"]
+    model_size_mb: 300
+    min_ram_gb: 1
+    optimal_device: cuda
+    parameters: 77000000
+    license: CC-BY-4.0
+    hf_model_id: Helsinki-NLP/opus-mt-en-fi
+    local_path: "F:/huggingface/hub/models--Helsinki-NLP--opus-mt-en-fi/snapshots"
+    description: "Specialized English-Finnish model."
+
+  # OpusMT English-Hebrew
+  - model_id: opus_en_he
+    name: "Opus-MT English-Hebrew"
+    backend: huggingface
+    supported_pairs:
+      - ["en", "he"]
+    model_size_mb: 300
+    min_ram_gb: 1
+    optimal_device: cuda
+    parameters: 77000000
+    license: CC-BY-4.0
+    hf_model_id: Helsinki-NLP/opus-mt-en-he
+    local_path: "F:/huggingface/hub/models--Helsinki-NLP--opus-mt-en-he/snapshots"
+    description: "Specialized English-Hebrew model."
+
+  # OpusMT English-Hindi
+  - model_id: opus_en_hi
+    name: "Opus-MT English-Hindi"
+    backend: huggingface
+    supported_pairs:
+      - ["en", "hi"]
+    model_size_mb: 300
+    min_ram_gb: 1
+    optimal_device: cuda
+    parameters: 77000000
+    license: CC-BY-4.0
+    hf_model_id: Helsinki-NLP/opus-mt-en-hi
+    local_path: "F:/huggingface/hub/models--Helsinki-NLP--opus-mt-en-hi/snapshots"
+    description: "Specialized English-Hindi model."
+
+  # OpusMT English-Hungarian
+  - model_id: opus_en_hu
+    name: "Opus-MT English-Hungarian"
+    backend: huggingface
+    supported_pairs:
+      - ["en", "hu"]
+    model_size_mb: 300
+    min_ram_gb: 1
+    optimal_device: cuda
+    parameters: 77000000
+    license: CC-BY-4.0
+    hf_model_id: Helsinki-NLP/opus-mt-en-hu
+    local_path: "F:/huggingface/hub/models--Helsinki-NLP--opus-mt-en-hu/snapshots"
+    description: "Specialized English-Hungarian model."
+
+  # OpusMT English-Indonesian
+  - model_id: opus_en_id
+    name: "Opus-MT English-Indonesian"
+    backend: huggingface
+    supported_pairs:
+      - ["en", "id"]
+    model_size_mb: 300
+    min_ram_gb: 1
+    optimal_device: cuda
+    parameters: 77000000
+    license: CC-BY-4.0
+    hf_model_id: Helsinki-NLP/opus-mt-en-id
+    local_path: "F:/huggingface/hub/models--Helsinki-NLP--opus-mt-en-id/snapshots"
+    description: "Specialized English-Indonesian model."
+
+  # OpusMT English-Italian
+  - model_id: opus_en_it
+    name: "Opus-MT English-Italian"
+    backend: huggingface
+    supported_pairs:
+      - ["en", "it"]
+    model_size_mb: 300
+    min_ram_gb: 1
+    optimal_device: cuda
+    parameters: 77000000
+    license: CC-BY-4.0
+    hf_model_id: Helsinki-NLP/opus-mt-en-it
+    local_path: "F:/huggingface/hub/models--Helsinki-NLP--opus-mt-en-it/snapshots"
+    description: "Specialized English-Italian model."
+
+  # OpusMT English-Japanese
+  - model_id: opus_en_ja
+    name: "Opus-MT English-Japanese"
+    backend: huggingface
+    supported_pairs:
+      - ["en", "ja"]
+    model_size_mb: 300
+    min_ram_gb: 1
+    optimal_device: cuda
+    parameters: 77000000
+    license: CC-BY-4.0
+    hf_model_id: Helsinki-NLP/opus-mt-en-jap
+    local_path: "F:/huggingface/hub/models--Helsinki-NLP--opus-mt-en-jap/snapshots"
+    description: "Specialized English-Japanese model."
+
+  # OpusMT English-Dutch
+  - model_id: opus_en_nl
+    name: "Opus-MT English-Dutch"
+    backend: huggingface
+    supported_pairs:
+      - ["en", "nl"]
+    model_size_mb: 300
+    min_ram_gb: 1
+    optimal_device: cuda
+    parameters: 77000000
+    license: CC-BY-4.0
+    hf_model_id: Helsinki-NLP/opus-mt-en-nl
+    local_path: "F:/huggingface/hub/models--Helsinki-NLP--opus-mt-en-nl/snapshots"
+    description: "Specialized English-Dutch model."
+
+  # OpusMT English-Romanian
+  - model_id: opus_en_ro
+    name: "Opus-MT English-Romanian"
+    backend: huggingface
+    supported_pairs:
+      - ["en", "ro"]
+    model_size_mb: 300
+    min_ram_gb: 1
+    optimal_device: cuda
+    parameters: 77000000
+    license: CC-BY-4.0
+    hf_model_id: Helsinki-NLP/opus-mt-en-ro
+    local_path: "F:/huggingface/hub/models--Helsinki-NLP--opus-mt-en-ro/snapshots"
+    description: "Specialized English-Romanian model."
+
+  # OpusMT English-Russian
+  - model_id: opus_en_ru
+    name: "Opus-MT English-Russian"
+    backend: huggingface
+    supported_pairs:
+      - ["en", "ru"]
+    model_size_mb: 300
+    min_ram_gb: 1
+    optimal_device: cuda
+    parameters: 77000000
+    license: CC-BY-4.0
+    hf_model_id: Helsinki-NLP/opus-mt-en-ru
+    local_path: "F:/huggingface/hub/models--Helsinki-NLP--opus-mt-en-ru/snapshots"
+    description: "Specialized English-Russian model."
+
+  # OpusMT English-Slovak
+  - model_id: opus_en_sk
+    name: "Opus-MT English-Slovak"
+    backend: huggingface
+    supported_pairs:
+      - ["en", "sk"]
+    model_size_mb: 300
+    min_ram_gb: 1
+    optimal_device: cuda
+    parameters: 77000000
+    license: CC-BY-4.0
+    hf_model_id: Helsinki-NLP/opus-mt-en-sk
+    local_path: "F:/huggingface/hub/models--Helsinki-NLP--opus-mt-en-sk/snapshots"
+    description: "Specialized English-Slovak model."
+
+  # OpusMT English-Swedish
+  - model_id: opus_en_sv
+    name: "Opus-MT English-Swedish"
+    backend: huggingface
+    supported_pairs:
+      - ["en", "sv"]
+    model_size_mb: 300
+    min_ram_gb: 1
+    optimal_device: cuda
+    parameters: 77000000
+    license: CC-BY-4.0
+    hf_model_id: Helsinki-NLP/opus-mt-en-sv
+    local_path: "F:/huggingface/hub/models--Helsinki-NLP--opus-mt-en-sv/snapshots"
+    description: "Specialized English-Swedish model."
+
+  # OpusMT English-Turkish (Turkic languages group)
+  - model_id: opus_en_tr
+    name: "Opus-MT English-Turkish"
+    backend: huggingface
+    supported_pairs:
+      - ["en", "tr"]
+    model_size_mb: 300
+    min_ram_gb: 1
+    optimal_device: cuda
+    parameters: 77000000
+    license: CC-BY-4.0
+    hf_model_id: Helsinki-NLP/opus-mt-en-trk
+    local_path: "F:/huggingface/hub/models--Helsinki-NLP--opus-mt-en-trk/snapshots"
+    description: "Specialized English-Turkish (Turkic) model."
+
+  # OpusMT English-Ukrainian
+  - model_id: opus_en_uk
+    name: "Opus-MT English-Ukrainian"
+    backend: huggingface
+    supported_pairs:
+      - ["en", "uk"]
+    model_size_mb: 300
+    min_ram_gb: 1
+    optimal_device: cuda
+    parameters: 77000000
+    license: CC-BY-4.0
+    hf_model_id: Helsinki-NLP/opus-mt-en-uk
+    local_path: "F:/huggingface/hub/models--Helsinki-NLP--opus-mt-en-uk/snapshots"
+    description: "Specialized English-Ukrainian model."
+
+  # OpusMT English-Vietnamese
+  - model_id: opus_en_vi
+    name: "Opus-MT English-Vietnamese"
+    backend: huggingface
+    supported_pairs:
+      - ["en", "vi"]
+    model_size_mb: 300
+    min_ram_gb: 1
+    optimal_device: cuda
+    parameters: 77000000
+    license: CC-BY-4.0
+    hf_model_id: Helsinki-NLP/opus-mt-en-vi
+    local_path: "F:/huggingface/hub/models--Helsinki-NLP--opus-mt-en-vi/snapshots"
+    description: "Specialized English-Vietnamese model."
+
+  # OpusMT English-Chinese
+  - model_id: opus_en_zh
+    name: "Opus-MT English-Chinese"
+    backend: huggingface
+    supported_pairs:
+      - ["en", "zh"]
+    model_size_mb: 300
+    min_ram_gb: 1
+    optimal_device: cuda
+    parameters: 77000000
+    license: CC-BY-4.0
+    hf_model_id: Helsinki-NLP/opus-mt-en-zh
+    local_path: "F:/huggingface/hub/models--Helsinki-NLP--opus-mt-en-zh/snapshots"
+    description: "Specialized English-Chinese model."
 
   # Marian-MT English-Romance languages
   - model_id: marian_en_romance

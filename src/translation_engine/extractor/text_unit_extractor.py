@@ -1888,6 +1888,21 @@ class TextUnitExtractor:
                         )
                         return True
 
+        # Pattern 4: Sentences/segments starting with a dotted PascalCase identifier
+        # e.g. "EntityRendererKey.EntityRendererKey creates a key with..."
+        #       "FVector4.FVector4 initializes a new instance."
+        # These are API documentation prose sentences where the leading identifier is the
+        # subject. NLLB consistently mutates the identifier (FVector4 → FVecter4, etc.)
+        # because it treats dotted identifiers as transliterable English text.
+        # Marking as non-translatable preserves the identifier exactly; the English
+        # technical sentence is more useful than a corrupted Arabic sentence.
+        dotted_pascal_lead = r"^[A-Z][A-Za-z0-9_]+\.[A-Z][A-Za-z0-9_.]*(?:\s|$)"
+        if re.match(dotted_pascal_lead, text_stripped):
+            logger.debug(
+                f"API identifier-led sentence (protected): {text_stripped[:80]}"
+            )
+            return True
+
         return False
 
     def _tokenize_for_repetition_check(self, text: str) -> list[str]:
@@ -2127,6 +2142,7 @@ class TextUnitExtractor:
         tgt_lang: str,
         batch_size: int = 20,
         max_tokens_per_batch: int = 512,
+        sort_by_length: bool = False,
     ) -> list[TextUnit]:
         """
         Batch translate multiple TextUnits using native list-based batching.
@@ -2145,6 +2161,9 @@ class TextUnitExtractor:
             tgt_lang: Target language code
             batch_size: Maximum units per batch (hard limit, default: 20)
             max_tokens_per_batch: Maximum estimated tokens per batch (default: 512)
+            sort_by_length: If True, sort translatable units by estimated token length
+                before batching to improve batch homogeneity. Output order is always
+                preserved because translations are applied in-place to unit objects.
 
         Returns:
             Units with translated_text populated
@@ -2163,6 +2182,13 @@ class TextUnitExtractor:
         translatable = [u for u in units if not u.do_not_translate and not u.translated_text]
         non_translatable = [u for u in units if u.do_not_translate]
         already_translated = [u for u in units if not u.do_not_translate and u.translated_text]
+
+        # TC-SCHED-001-C: optional length bucketing for batch homogeneity.
+        # Sorting translatable by token length improves GPU efficiency without
+        # affecting output order, because translations are applied in-place to
+        # unit objects and the caller's `units` list is returned unchanged.
+        if sort_by_length and translatable:
+            translatable = sorted(translatable, key=lambda u: self._estimate_token_count(u.source_text))
 
         # Non-translatable: copy source to translated (NEVER sent to MT)
         for unit in non_translatable:
