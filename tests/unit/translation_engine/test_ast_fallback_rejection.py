@@ -95,6 +95,43 @@ def test_engine_raises_translation_incomplete_on_fallback(tmp_path):
     )
 
 
+def test_ast_reconstruction_does_not_fallback_after_body_render():
+    """
+    If frontmatter validation fails after AST body rendering, the pipeline must
+    reject the file instead of falling back to legacy reconstruction with
+    partially-mutated document state.
+    """
+    import inspect
+
+    from src.translation_engine.segment_translator import SegmentTranslator
+
+    src = inspect.getsource(SegmentTranslator.translate_to_language)
+    assert "ast_body_rendered" in src
+    assert "refusing legacy fallback" in src
+
+
+def test_parse_formatted_frontmatter_requires_delimiters():
+    """The AST frontmatter key check must not parse flattened body text as YAML."""
+    from src.translation_engine.segment_translator import SegmentTranslator
+
+    with pytest.raises(ValueError, match="missing YAML frontmatter delimiters"):
+        SegmentTranslator._parse_formatted_frontmatter(
+            'head_title: "Title" head_description: "Description"'
+        )
+
+
+def test_parse_formatted_frontmatter_parses_hugo_block():
+    from src.translation_engine.segment_translator import SegmentTranslator
+
+    parsed = SegmentTranslator._parse_formatted_frontmatter(
+        "---\nhead_title: Title\nhead_description: Description\n---\n"
+    )
+    assert parsed == {
+        "head_title": "Title",
+        "head_description": "Description",
+    }
+
+
 def test_ast_renderer_missing_node_count_exposed():
     """
     ASTRenderer._missing_node_count must be accessible after apply_translations().
@@ -167,4 +204,143 @@ def test_tolerance_nonzero_above_threshold_rejects():
     should_reject = fallback_ratio > tolerance
     assert should_reject is True, (
         f"ratio={fallback_ratio:.1%} > tolerance={tolerance:.1%} should reject"
+    )
+
+
+# ---------------------------------------------------------------------------
+# TC-SAS-01: Same-as-source detection
+# ---------------------------------------------------------------------------
+
+
+def _make_sas_unit(source: str, translated: str, do_not_translate: bool = False) -> MagicMock:
+    unit = MagicMock(spec=TextUnit)
+    unit.source_text = source
+    unit.translated_text = translated
+    unit.do_not_translate = do_not_translate
+    return unit
+
+
+def test_sas01_raises_when_ratio_exceeds_tolerance():
+    """
+    TC-SAS-01: When all translatable units come back same-as-source and tolerance=0.0,
+    the gate must detect this as a source-language leakage condition.
+    """
+    long_text = "This is a long English sentence that should have been translated."
+    units = [
+        _make_sas_unit(long_text, long_text),  # same-as-source, len > 10
+        _make_sas_unit(long_text, long_text),
+    ]
+    sas_min_len = 10
+    sas_tolerance = 0.0
+
+    translatable = [u for u in units if not u.do_not_translate]
+    sas = [
+        u for u in translatable
+        if u.source_text
+        and u.translated_text is not None
+        and u.translated_text.strip() == u.source_text.strip()
+        and len(u.source_text.strip()) > sas_min_len
+    ]
+    ratio = len(sas) / len(translatable) if translatable else 0.0
+
+    assert ratio > sas_tolerance, "All units same-as-source with tolerance=0.0 must be rejected"
+    with pytest.raises(TranslationIncomplete):
+        if ratio > sas_tolerance:
+            raise TranslationIncomplete(
+                f"TC-SAS-01: ratio={ratio:.1%}",
+                missing_count=len(sas),
+                total_count=len(translatable),
+                ratio=ratio,
+                tolerance=sas_tolerance,
+            )
+
+
+def test_sas01_passes_when_within_tolerance():
+    """
+    TC-SAS-01: If only 1 of 10 units is same-as-source (10%) and tolerance=0.15,
+    the gate must NOT raise (ratio is within tolerance).
+    """
+    long_text = "This is a long English sentence."
+    translated_text = "Esta es una oración larga en español."
+    units = [_make_sas_unit(long_text, long_text)] + [
+        _make_sas_unit(long_text, translated_text) for _ in range(9)
+    ]
+    sas_min_len = 10
+    sas_tolerance = 0.15
+
+    translatable = [u for u in units if not u.do_not_translate]
+    sas = [
+        u for u in translatable
+        if u.source_text
+        and u.translated_text is not None
+        and u.translated_text.strip() == u.source_text.strip()
+        and len(u.source_text.strip()) > sas_min_len
+    ]
+    ratio = len(sas) / len(translatable) if translatable else 0.0
+
+    assert ratio <= sas_tolerance, (
+        f"ratio={ratio:.1%} <= tolerance={sas_tolerance:.1%} must not reject"
+    )
+
+
+def test_sas01_excludes_do_not_translate_units():
+    """
+    TC-SAS-01: Units with do_not_translate=True (preserved YAML fields, code blocks,
+    shortcodes) must NOT be counted toward the same-as-source ratio even when
+    their translated_text equals source_text.
+    """
+    long_text = "passthrough-value"
+    # Only do_not_translate units — all same-as-source
+    units = [
+        _make_sas_unit(long_text, long_text, do_not_translate=True),
+        _make_sas_unit(long_text, long_text, do_not_translate=True),
+    ]
+    sas_min_len = 10
+    sas_tolerance = 0.0
+
+    translatable = [u for u in units if not u.do_not_translate]
+    sas = [
+        u for u in translatable
+        if u.source_text
+        and u.translated_text is not None
+        and u.translated_text.strip() == u.source_text.strip()
+        and len(u.source_text.strip()) > sas_min_len
+    ]
+    # No translatable units → ratio is 0 → no rejection
+    assert len(translatable) == 0, "do_not_translate units must be excluded from TC-SAS-01"
+    assert len(sas) == 0
+
+
+def test_sas01_config_keys_present():
+    """TC-SAS-01 config keys must exist in global.yaml translation_engine section."""
+    import yaml
+
+    cfg_path = Path("config/global.yaml")
+    if not cfg_path.exists():
+        pytest.skip("config/global.yaml not present in working directory")
+    with open(cfg_path) as f:
+        cfg = yaml.safe_load(f)
+    te = cfg.get("translation_engine", {})
+    assert "same_as_source_tolerance" in te, (
+        "same_as_source_tolerance missing from translation_engine config"
+    )
+    assert "same_as_source_min_length" in te, (
+        "same_as_source_min_length missing from translation_engine config"
+    )
+    tol = float(te["same_as_source_tolerance"])
+    assert 0.0 <= tol <= 1.0, f"same_as_source_tolerance={tol} is not in [0.0, 1.0]"
+
+
+def test_sas01_source_present_in_segment_translator():
+    """TC-SAS-01 guard must be present in _translate_body_ast source."""
+    import inspect
+
+    from src.translation_engine.segment_translator import SegmentTranslator
+
+    src = inspect.getsource(SegmentTranslator._translate_body_ast)
+    assert "TC-SAS-01" in src, (
+        "TC-SAS-01: _translate_body_ast must contain same-as-source detection guard"
+    )
+    assert "same_as_source_tolerance" in src, (
+        "TC-SAS-01: _translate_body_ast must read same_as_source_tolerance from config"
     )

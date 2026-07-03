@@ -113,12 +113,18 @@ class TranslationRetryableError(TranslationError):
 
 
 class TranslationIncomplete(TranslationError):
-    """Raised when AST reconstruction leaves too many nodes without a translation unit.
+    """Raised when a translation pass leaves too many units untranslated.
 
     TC-AST-01: When the fraction of fallback (untranslated) nodes exceeds
     ``ast_fallback_node_tolerance`` in ``config/global.yaml``, the output would
     contain source-language text mixed into the target-language document.
-    The engine must treat this as a retryable failure rather than writing the file.
+
+    TC-SAS-01: When the fraction of translatable units returned same-as-source
+    (model returned source text unchanged) exceeds ``same_as_source_tolerance``
+    in ``config/global.yaml``, the output would contain undetected source-language
+    leakage. Excluded: ``do_not_translate=True`` units (preserved YAML fields, code).
+
+    The engine must treat both cases as a blocking failure rather than writing the file.
 
     Attributes:
         missing_count: Number of AST nodes with no translation unit.

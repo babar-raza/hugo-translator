@@ -1082,6 +1082,43 @@ class SegmentTranslator:
                 f"AST DIAG: After batch translate: {len(_cb_after_batch)} code block units, {len(_cb_with_content)} with content"
             )
 
+            # TC-SAS-01: Detect translatable units the model returned unchanged (source-lang leakage).
+            # do_not_translate=True units are intentionally excluded — they are preserved YAML
+            # passthrough fields, code blocks, and shortcodes that must not be translated.
+            _te_cfg_sas = (
+                engine.config.get_config().get("translation_engine", {})
+                if hasattr(engine.config, "get_config")
+                else {}
+            )
+            _sas_min_len = int(_te_cfg_sas.get("same_as_source_min_length", 10))
+            _sas_tolerance = float(_te_cfg_sas.get("same_as_source_tolerance", 0.0))
+            _translatable_count = sum(1 for u in translated_units if not u.do_not_translate)
+            _sas_units = [
+                u for u in translated_units
+                if not u.do_not_translate
+                and u.source_text
+                and u.translated_text is not None
+                and u.translated_text.strip() == u.source_text.strip()
+                and len(u.source_text.strip()) > _sas_min_len
+            ]
+            if _sas_units:
+                _sas_ratio = len(_sas_units) / _translatable_count if _translatable_count > 0 else 0.0
+                logger.warning(
+                    f"TC-SAS-01: {len(_sas_units)}/{_translatable_count} translatable units returned "
+                    f"same-as-source (ratio={_sas_ratio:.1%}, tolerance={_sas_tolerance:.1%}) "
+                    f"-- source text will appear in output."
+                )
+                if _sas_ratio > _sas_tolerance:
+                    from .exceptions import TranslationIncomplete
+                    raise TranslationIncomplete(
+                        f"TC-SAS-01: same-as-source ratio {_sas_ratio:.1%} exceeds tolerance "
+                        f"{_sas_tolerance:.1%} ({len(_sas_units)}/{_translatable_count} units unchanged)",
+                        missing_count=len(_sas_units),
+                        total_count=_translatable_count,
+                        ratio=_sas_ratio,
+                        tolerance=_sas_tolerance,
+                    )
+
             # AGENT B-7.3: Check batch-level purity failures
             batch_stats = extractor.batch_stats
             if batch_stats.get("language_purity_failures", 0) > 0 and target_lang not in (

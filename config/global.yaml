@@ -15,7 +15,7 @@ execution:
   modes:
     # Windows native with CUDA GPU support
     windows_cuda:
-      device: "auto"  # Auto-detect best device (cuda/cpu/mps)
+      device: "cuda"  # Require CUDA GPU
       enable_gpu: true
       max_gpu_memory_percent: 50  # Balanced - target batch_size ~8-10 with max_new_tokens=256
       max_gpu_memory_mb: null  # Optional explicit override
@@ -64,8 +64,8 @@ tm_defaults:
 
 # Default model preferences
 model_defaults:
-  fallback_model: "disc_tra_m2m100_418m_hf"
-  device: "auto"  # auto, cpu, cuda, mps
+  fallback_model: "m2m100_418m"
+  device: "cuda"  # Require CUDA GPU
   batch_size: 4  # Conservative default to prevent CUDA OOM (GPU optimizer will calculate optimal)
   cache_models: true
   max_cached_models: 2
@@ -81,7 +81,7 @@ asset_sync:
 # TC-05: File-level review cache — skip re-validation when source+translation
 # content pair was already validated and ACCEPTED in a previous run.
 review_cache:
-  enabled: true    # TC-M1 2026-05-01: enabled — SHA256-keyed validation cache prevents redundant re-validation
+  enabled: false   # TC-M1B safety: disabled until config fingerprint added to cache key (ethereal-sauteeing-brook)
   max_entries: 10000
   max_age_days: 14
 
@@ -89,7 +89,7 @@ review_cache:
 # failed output + validation issues to an LLM for targeted fixes before
 # final rejection. Only attempted once per file+lang per run.
 correction_pass:
-  enabled: true    # TC-C5 2026-05-01: enabled — LLM fix attempt before retranslate queue
+  enabled: false   # TC-C5B safety: disabled until issue-type allowlist added (ethereal-sauteeing-brook)
   model: professionalize_llm
   # NOTE: purity failures bypass correction pass by architecture — they occur after the
   # correction+revalidation cycle completes. Correction only handles validation-suite rejections.
@@ -268,7 +268,7 @@ features:
   # additionally checked via fasttext language sampling to detect wrong-language outputs.
   # Results are cached per-file for quality_aware_filter_ttl_days days to keep overhead low.
   # Default: off. Enable in off-peak windows; monitor with scan_wrong_language_outputs.py.
-  enable_quality_aware_completion_filter: true   # TC-C2 2026-05-01: enabled — re-checks "done" files for wrong-language content
+  enable_quality_aware_completion_filter: false  # TC-C2B safety: disabled until smoke proof written (ethereal-sauteeing-brook)
   quality_aware_filter_ttl_days: 7      # Re-validate each "complete" file every N days
   quality_aware_filter_confidence: 0.80  # fasttext confidence threshold for flagging
   quality_aware_filter_paragraphs: 2     # Max body paragraphs to sample per output file
@@ -718,6 +718,14 @@ translation_engine:
   # Tolerance reset to 0.0 (intended strict production setting).
   ast_fallback_node_tolerance: 0.0  # float in [0.0, 1.0]
 
+  # TC-SAS-01: Same-as-source detection — reject files where MT model returned source text
+  # unchanged for translatable units (source-language leakage without structural mismatch).
+  # Ratio = (same-as-source units) / (total translatable units). 0.0 = zero tolerance.
+  same_as_source_tolerance: 0.0
+  # Minimum source character length to count a unit toward TC-SAS-01 (avoids flagging
+  # short symbols/punctuation/codes that are legitimately identical across languages).
+  same_as_source_min_length: 10
+
   # T2-D: Terminology protection for M2M100 MT backend.
   # When true, TerminologyManager.protect()/restore() wraps each segment before/after
   # M2M100 translation to preserve Aspose product names, file format identifiers, etc.
@@ -879,14 +887,14 @@ run_signal_emitter:
   # Set to true to emit run-signal JSON after each translation run
 
 continuation_state:
-  enabled: false
+  enabled: true
   # Set to true to track cross-session run state
 
 supervisor_loop:
-  enabled: false
+  enabled: true
 
 task_queue:
-  enabled: false
+  enabled: true
 
 blocker_classifier:
   enabled: false
