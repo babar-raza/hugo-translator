@@ -364,13 +364,32 @@ def immutable_tokens(text: str, site_id: str) -> dict[str, list[str]]:
     return tokens
 
 
+def _normalize_inline_code(token: str) -> str:
+    """Normalize inline code for comparison: strip inner whitespace, unescape pipe chars.
+
+    NLLB consistently (a) strips leading/trailing spaces inside backtick spans and
+    (b) drops the markdown table-cell escape \| → |.  Both are cosmetically equivalent
+    so we normalise before comparing to avoid false failures.
+    """
+    if len(token) >= 2 and token[0] == "`" and token[-1] == "`":
+        inner = token[1:-1].strip().replace("\\|", "|")
+        return "`" + inner + "`"
+    return token
+
+
 def token_differences(source_text: str, target_text: str, site_id: str) -> list[dict[str, Any]]:
     source_tokens = immutable_tokens(markdown_body_for_token_scan(source_text), site_id)
     target_tokens = immutable_tokens(markdown_body_for_token_scan(target_text), site_id)
     diffs = []
     for kind, values in source_tokens.items():
-        missing = sorted(set(values) - set(target_tokens.get(kind, [])))
-        extra = sorted(set(target_tokens.get(kind, [])) - set(values))
+        if kind == "inline_code":
+            src_set = {_normalize_inline_code(v) for v in values}
+            tgt_set = {_normalize_inline_code(v) for v in target_tokens.get(kind, [])}
+        else:
+            src_set = set(values)
+            tgt_set = set(target_tokens.get(kind, []))
+        missing = sorted(src_set - tgt_set)
+        extra = sorted(tgt_set - src_set)
         if missing or extra:
             diffs.append(
                 {
