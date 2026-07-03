@@ -365,14 +365,18 @@ def immutable_tokens(text: str, site_id: str) -> dict[str, list[str]]:
 
 
 def _normalize_inline_code(token: str) -> str:
-    """Normalize inline code for comparison: strip inner whitespace, unescape pipe chars.
+    """Normalize inline code for comparison: strip/collapse whitespace, unescape pipe chars.
 
-    NLLB consistently (a) strips leading/trailing spaces inside backtick spans and
-    (b) drops the markdown table-cell escape \| → |.  Both are cosmetically equivalent
-    so we normalise before comparing to avoid false failures.
+    NLLB and markdown table formatting introduce cosmetic whitespace differences:
+    (a) strips leading/trailing spaces inside backtick spans,
+    (b) table-column padding adds extra internal spaces (e.g. '| Read   |' vs '| Read |'),
+    (c) drops the markdown table-cell escape \\| to |.
+    All are cosmetically equivalent so we normalise before comparing.
     """
     if len(token) >= 2 and token[0] == "`" and token[-1] == "`":
-        inner = token[1:-1].strip().replace("\\|", "|")
+        inner = token[1:-1].strip()
+        inner = re.sub(r" +", " ", inner)  # collapse multiple spaces to single
+        inner = inner.replace("\\|", "|")
         return "`" + inner + "`"
     return token
 
