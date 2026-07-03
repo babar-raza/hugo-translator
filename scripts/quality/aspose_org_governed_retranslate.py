@@ -110,7 +110,11 @@ FILE_PATH_PATTERN = re.compile(
 )
 FENCED_CODE_PATTERN = re.compile(r"```[^\n`]*\n.*?```", re.DOTALL)
 API_IDENTIFIER_PATTERN = re.compile(
-    r"\b(?:[A-Z][A-Za-z0-9_]*\.)+[A-Z][A-Za-z0-9_]*\b|\bI[A-Z][A-Za-z0-9_]{2,}\b|\b[A-Z][a-zA-Z0-9_]+(?:Exception|Options|Builder|Factory|Collection|Renderer|Exporter|Importer|Constants)\b"
+    # Use (?<![a-zA-Z0-9_]) instead of \b so that Arabic/RTL conjunctions (e.g. وGltfExporter)
+    # don't prevent matching — Arabic letters are \w in Python Unicode regex, so \b fails there.
+    r"(?<![a-zA-Z0-9_])(?:[A-Z][A-Za-z0-9_]*\.)+[A-Z][A-Za-z0-9_]*(?![a-zA-Z0-9_])"
+    r"|(?<![a-zA-Z0-9_])I[A-Z][A-Za-z0-9_]{2,}(?![a-zA-Z0-9_])"
+    r"|(?<![a-zA-Z0-9_])[A-Z][a-zA-Z0-9_]+(?:Exception|Options|Builder|Factory|Collection|Renderer|Exporter|Importer|Constants)(?![a-zA-Z0-9_])"
 )
 REFERENCE_IDENTIFIER_PATTERN = re.compile(r"^[A-Z][A-Za-z0-9_]*(?:\.[A-Z][A-Za-z0-9_]*)*$")
 LANGUAGE_MIXING_FAILURE_TYPES = {
