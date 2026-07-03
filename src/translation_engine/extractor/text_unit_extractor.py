@@ -1888,15 +1888,17 @@ class TextUnitExtractor:
                         )
                         return True
 
-        # Pattern 4: Sentences/segments starting with a dotted PascalCase identifier
+        # Pattern 4: Sentences/segments starting with a dotted API identifier
         # e.g. "EntityRendererKey.EntityRendererKey creates a key with..."
-        #       "FVector4.FVector4 initializes a new instance."
+        #       "VertexElement.getType returns the element's VertexElementType."
         # These are API documentation prose sentences where the leading identifier is the
         # subject. NLLB consistently mutates the identifier (FVector4 → FVecter4, etc.)
         # because it treats dotted identifiers as transliterable English text.
+        # Covers both PascalCase methods (EntityRendererKey.Create) and
+        # camelCase methods (VertexElement.getType, A3DObject.findProperty).
         # Marking as non-translatable preserves the identifier exactly; the English
         # technical sentence is more useful than a corrupted Arabic sentence.
-        dotted_pascal_lead = r"^[A-Z][A-Za-z0-9_]+\.[A-Z][A-Za-z0-9_.]*(?:\s|$)"
+        dotted_pascal_lead = r"^[A-Z][A-Za-z0-9_]+\.[A-Za-z][A-Za-z0-9_.]*(?:\s|$)"
         if re.match(dotted_pascal_lead, text_stripped):
             logger.debug(
                 f"API identifier-led sentence (protected): {text_stripped[:80]}"

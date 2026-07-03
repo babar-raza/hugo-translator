@@ -2,6 +2,7 @@
 Placeholder management for protecting non-translatable content.
 """
 import re
+import difflib
 
 
 class PlaceholderManager:
@@ -64,14 +65,31 @@ class PlaceholderManager:
         for placeholder, original in placeholder_map.items():
             restored = restored.replace(placeholder, original)
 
-        # Fuzzy replacement: handle translator-modified tokens like {Platch_1}
+        # Fuzzy replacement: handle translator-modified tokens like {Platch_1} or
+        # { PLACHEHOLODER _1 } (NLLB adds spaces and misspells the keyword).
+        # Pattern: any {…N…} where N is the digit sequence, with optional trailing
+        # whitespace/garbage before the closing brace.
         def fuzzy_replace(match: re.Match) -> str:
             token = match.group(0)
             number = match.group(1)
             key = f"{{PLACEHOLDER_{number}}}"
             return placeholder_map.get(key, token)
 
-        restored = re.sub(r"\{[^{}]*?(\d+)\}", fuzzy_replace, restored)
+        restored = re.sub(r"\{[^{}]*?(\d+)[^{}]*?\}", fuzzy_replace, restored)
+
+        # Third pass: handle cases where NLLB completely replaced the placeholder token
+        # with a "guessed" variant of the original (e.g. PropertyCollection →
+        # PropertiesCollection). If the original term is absent but a close variant
+        # exists in the text, replace the variant with the original.
+        _PASCAL_RE = re.compile(r"\b[A-Z][A-Za-z0-9]+\b")
+        for placeholder, original in placeholder_map.items():
+            if original not in restored and re.match(r"^[A-Z]", original):
+                # Find all PascalCase-ish words in restored text
+                candidates = _PASCAL_RE.findall(restored)
+                matches = difflib.get_close_matches(original, candidates, n=1, cutoff=0.85)
+                if matches and matches[0] != original:
+                    restored = restored.replace(matches[0], original, 1)
+
         return restored
 
     def extract_placeholders(self, text: str) -> list[str]:
