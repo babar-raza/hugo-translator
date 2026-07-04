@@ -471,7 +471,7 @@ Examples:
 
     validation_group.add_argument(
         "--validation-mode",
-        choices=["strict", "normal", "lenient", "off"],
+        choices=["strict", "normal", "lenient", "fast", "off"],
         help="Validation strictness level (overrides config)",
     )
 

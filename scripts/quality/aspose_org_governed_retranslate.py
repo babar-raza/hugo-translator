@@ -669,6 +669,27 @@ def repair_target(profile, parser_obj: HugoParser, source: Path, target: Path) -
         if after != before:
             target.write_text(after, encoding="utf-8")
             repairs["body_code_blocks_exact"] = {"changed": True}
+            before = after
+        after = restore_body_bold_label_inline_codes(
+            source.read_text(encoding="utf-8", errors="replace"), before
+        )
+        if after != before:
+            target.write_text(after, encoding="utf-8")
+            repairs["body_bold_label_inline_codes"] = {"changed": True}
+            before = after
+        after = restore_body_dropped_link_list_items(
+            source.read_text(encoding="utf-8", errors="replace"), before
+        )
+        if after != before:
+            target.write_text(after, encoding="utf-8")
+            repairs["body_dropped_link_list_items"] = {"changed": True}
+            before = after
+        after = restore_spurious_table_code_fences(
+            source.read_text(encoding="utf-8", errors="replace"), before
+        )
+        if after != before:
+            target.write_text(after, encoding="utf-8")
+            repairs["spurious_table_code_fences"] = {"changed": True}
     repairs["changed"] = any(
         bool(value.get("changed")) for value in repairs.values() if isinstance(value, dict)
     )
@@ -713,6 +734,170 @@ def restore_body_code_blocks_exact(source_text: str, target_text: str) -> str:
         return target_text
     iterator = iter(source_blocks)
     return FENCED_CODE_PATTERN.sub(lambda _match: next(iterator), target_text)
+
+
+# Matches "**Label**: `code`" lines in markdown body (Python reference page "Package" etc.)
+_BOLD_LABEL_CODE_RE = re.compile(r"^\*\*[^*]+\*\*:\s+`[^`]+`\s*$", re.MULTILINE)
+# Line that starts a bold-label section but has no inline code, or has mutated inline code
+_BOLD_LABEL_ANY_RE = re.compile(r"^\*\*[^*]+\*\*:\s*", re.MULTILINE)
+
+
+def restore_body_bold_label_inline_codes(source_text: str, target_text: str) -> str:
+    """Restore bold-label lines that NLLB mutated or dropped inline code from.
+
+    Pattern: ``**Label**: `value` `` — e.g. ``**Package**: `aspose.threed` ``.
+    NLLB sometimes:
+      - Drops bold markers: ``**Package**`` → ``Package``
+      - Mutates the inline code content: `` `aspose.threed` `` → `` `til form—l` ``
+      - Drops the inline code entirely
+
+    Since these lines are non-translatable metadata, we restore the full source line
+    at the matching position in the target.
+    """
+    src_lines = [m.group(0).rstrip() for m in _BOLD_LABEL_CODE_RE.finditer(source_text)]
+    if not src_lines:
+        return target_text
+
+    # Check if target already has all source bold-label-code lines verbatim
+    already_present = all(sl in target_text for sl in src_lines)
+    if already_present:
+        return target_text
+
+    # Find positions of bold-label-code lines in source and corresponding lines in target
+    source_all_lines = source_text.splitlines(keepends=True)
+    target_all_lines = target_text.splitlines(keepends=True)
+
+    # Map source line index → source bold-label-code line for each occurrence
+    src_bold_positions = [
+        i for i, l in enumerate(source_all_lines)
+        if _BOLD_LABEL_CODE_RE.match(l.rstrip("\n\r"))
+    ]
+    if not src_bold_positions:
+        return target_text
+
+    # For each source bold-label-code line, find the best matching target line
+    # by proximity (same relative position in document)
+    src_total = len(source_all_lines)
+    tgt_total = len(target_all_lines)
+    changed = False
+
+    for src_idx in src_bold_positions:
+        src_line_content = source_all_lines[src_idx].rstrip("\n\r")
+        # If already verbatim in target at this position, skip
+        tgt_idx = round(src_idx * tgt_total / src_total) if src_total else src_idx
+        tgt_idx = max(0, min(tgt_idx, tgt_total - 1))
+
+        # Search ±5 lines for a line that starts a bold-label or plain-label
+        search_window = range(max(0, tgt_idx - 5), min(tgt_total, tgt_idx + 6))
+        best = None
+        for ti in search_window:
+            tl = target_all_lines[ti].rstrip("\n\r")
+            if _BOLD_LABEL_ANY_RE.match(tl) or re.match(r"^\w[\w ]+:\s*", tl):
+                best = ti
+                break
+
+        if best is not None and target_all_lines[best].rstrip("\n\r") != src_line_content:
+            nl = "\n" if target_all_lines[best].endswith("\n") else ""
+            target_all_lines[best] = src_line_content + nl
+            changed = True
+
+    return "".join(target_all_lines) if changed else target_text
+
+
+_LINK_LIST_ITEM_RE = re.compile(r"^- \[.*?\]\((/[^)]+)\)\s*$", re.MULTILINE)
+
+
+def restore_body_dropped_link_list_items(source_text: str, target_text: str) -> str:
+    """Restore markdown list-item links that NLLB dropped from the target body.
+
+    NLLB sometimes omits entire list items that contain internal markdown links,
+    e.g. ``- [Aspose.3D Python API Reference home](/3d/python/)``.
+    We detect missing link destinations and append the corresponding source lines.
+    """
+    src_items = {m.group(1): m.group(0).rstrip() for m in _LINK_LIST_ITEM_RE.finditer(source_text)}
+    if not src_items:
+        return target_text
+
+    tgt_destinations = set(m.group(1) for m in _LINK_LIST_ITEM_RE.finditer(target_text))
+    missing = {dest: line for dest, line in src_items.items() if dest not in tgt_destinations}
+    if not missing:
+        return target_text
+
+    # Append missing list items after the last "---" separator or at end of body
+    separator_pos = target_text.rfind("\n---\n")
+    if separator_pos != -1:
+        insert_after = separator_pos + 4  # after "\n---\n"
+        append_block = "\n".join(missing.values())
+        return target_text[:insert_after] + "\n" + append_block + "\n" + target_text[insert_after:]
+    else:
+        append_block = "\n".join(missing.values())
+        return target_text.rstrip("\n") + "\n\n" + append_block + "\n"
+
+
+_FENCE_OPEN_RE = re.compile(r"^```[^\n`]*$", re.MULTILINE)
+_FENCE_CLOSE_RE = re.compile(r"^```\s*$", re.MULTILINE)
+
+
+def restore_spurious_table_code_fences(source_text: str, target_text: str) -> str:
+    """Remove code fences that NLLB spuriously inserts inside markdown table cells.
+
+    When a source table cell contains a multi-line TypeScript/JSON type (e.g.
+    ```: {\n        foo?: number;\n    }```) NLLB misinterprets the indented block
+    and wraps it in ``` fences in the translation.  The verifier then flags
+    CODE_FENCE_MISMATCH because source has 0 fences but target has 2+.
+
+    Strategy: if source body has 0 code fences and target body has code fences
+    where the line immediately before each opening fence is a table row, strip
+    the fence markers (the content itself is kept as-is).
+    """
+
+    def body_of(text: str) -> tuple[str, int]:
+        pos = text.rfind("\n---\n")
+        return (text[pos + 4 :], pos + 4) if pos != -1 else (text, 0)
+
+    src_body, _ = body_of(source_text)
+    tgt_body, tgt_body_start = body_of(target_text)
+
+    if src_body.count("```") > 0:
+        return target_text  # Source already has fences — not this pattern
+    if tgt_body.count("```") == 0:
+        return target_text  # Nothing to do
+
+    lines = tgt_body.splitlines(keepends=True)
+    result = []
+    i = 0
+    changed = False
+    while i < len(lines):
+        line = lines[i]
+        stripped = line.rstrip("\r\n")
+        if _FENCE_OPEN_RE.match(stripped):
+            # Check if the previous non-empty line is a table row
+            prev_content = ""
+            for r in reversed(result):
+                rs = r.rstrip("\r\n")
+                if rs:
+                    prev_content = rs
+                    break
+            if "|" in prev_content:
+                # Spurious fence — skip the opening marker, keep content until closing
+                changed = True
+                i += 1
+                while i < len(lines):
+                    cl = lines[i]
+                    if _FENCE_CLOSE_RE.match(cl.rstrip("\r\n")):
+                        i += 1  # skip closing fence marker too
+                        break
+                    result.append(cl)
+                    i += 1
+                continue
+        result.append(line)
+        i += 1
+
+    if not changed:
+        return target_text
+
+    new_body = "".join(result)
+    return target_text[:tgt_body_start] + new_body
 
 
 def write_acceptance(

@@ -274,6 +274,14 @@ class EngineBuilder:
         elif validation_mode == "lenient":
             decision_config["decision_rules"]["reject_on_error_count"] = 5
             decision_config["decision_rules"]["accept_warnings"] = True
+        elif validation_mode == "fast":
+            # Fast mode for MT batch runs: accepts non-critical single errors.
+            # max_retry_attempts=0 skips RETRY→REJECT loop; accept_after_max_retries=True
+            # allows non-critical validator failures to pass (LanguageConsistency, etc.).
+            # Critical validators (Placeholder, CodeBlock, Link, Structure) still block.
+            decision_config["decision_rules"]["max_retry_attempts"] = 0
+            decision_config["decision_rules"]["accept_after_max_retries"] = True
+            decision_config["decision_rules"]["accept_warnings"] = True
 
         if p["decision_engine"] is not None:
             engine.decision_engine = p["decision_engine"]

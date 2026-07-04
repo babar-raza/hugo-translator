@@ -581,6 +581,11 @@ def looks_like_prose(value: Any) -> bool:
     # correctly leaves it unchanged.  Do not flag as untranslated.
     if re.fullmatch(r"[A-Za-z][A-Za-z0-9_]* \u2014 Aspose\.\S+ FOSS .+ API Reference", text):
         return False
+    # Inline-code identifier ± trailing technical keyword(s) — not translatable prose.
+    # e.g. "`TextureMapping` enum", "`BooleanOperation`", "`MappingMode` enum class"
+    _TECH_KW = r"(?:enum|class|struct|interface|type|namespace|record|method|property|field|event|delegate|const|abstract|readonly|module|package)"
+    if re.fullmatch(rf"`[^`]+`(\s+{_TECH_KW})*", text):
+        return False
     return bool(re.search(r"[A-Za-z]{3,}", text))
 
 
