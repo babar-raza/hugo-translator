@@ -1593,7 +1593,13 @@ class TranslationEngine:
 
         CHECKED_FIELDS = {"title", "description", "seoTitle", "summary"}
         MIN_CHARS = 20
-        CONFIDENCE_THRESHOLD = 0.65
+        # Raised from 0.65 to 0.80: descriptions with C++ API identifiers (::, _xxx)
+        # cause langdetect to weakly classify translated text as English.
+        # At 0.80, only high-confidence genuine language violations are flagged.
+        CONFIDENCE_THRESHOLD = 0.80
+        # Regex: C++ scope resolution (mapi_message::from_file) or multiple underscored
+        # identifiers — these inflate apparent English ratio in langdetect.
+        _API_IDENTIFIER_RE = _re.compile(r'[A-Za-z_]\w*::[A-Za-z_]\w*|(?:\b[a-z]+_[a-z_]+\b.*){2}')
 
         issues = []
         # Extract frontmatter block
@@ -1642,6 +1648,7 @@ class TranslationEngine:
             if field in ("title", "description") and (
                 any(v_stripped.startswith(p) for p in _API_PREFIXES)
                 or _re.match(r"^[A-Z][A-Za-z0-9.]+$", v_stripped)
+                or _API_IDENTIFIER_RE.search(v_stripped)
             ):
                 continue
             try:

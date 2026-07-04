@@ -5,10 +5,13 @@ This module orchestrates all validators (legacy and new post-translation validat
 and provides config-based validator loading from validation.yaml.
 """
 
+import logging
 from pathlib import Path
 from typing import Any
 
 import yaml
+
+logger = logging.getLogger(__name__)
 
 from .base import ValidationResult, Validator
 from .completeness_validator import CompletenessValidator
@@ -85,8 +88,10 @@ class ValidationSuite:
             lc = cfg.get("validators", {}).get("language_consistency", {})
             defaults["confidence_threshold"] = lc.get("confidence_threshold", 0.85)
             defaults["per_language_overrides"] = lc.get("per_language_overrides", {})
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.warning(
+                "validation_suite: failed to load config/validation.yaml — using defaults: %s", exc
+            )
         return defaults
 
     def _create_default_validators(self) -> list[Validator]:

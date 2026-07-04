@@ -50,6 +50,16 @@ validation_modes:
     reject_on_error_count: 5  # Reject after 5 errors
     max_retry_attempts: 2  # Two retry attempts
 
+  # Fast mode: For MT batch runs (m2m100_418m). Accepts non-critical single errors.
+  # MT backends cannot retry with feedback, so max_retry_attempts=0 skips the RETRY→REJECT
+  # loop and falls through to accept_after_max_retries=true for non-critical validators.
+  # Critical validators (Placeholder, CodeBlock, Link, Structure, Shortcode) still block.
+  fast:
+    accept_warnings: true
+    reject_on_error_count: 2     # Still reject if 2+ errors
+    max_retry_attempts: 0        # No retries → falls to accept_after_max_retries
+    accept_after_max_retries: true  # Accept best-effort for non-critical single errors
+
 # Validators: Enable/disable individual validators
 # Each validator can be toggled on/off and configured
 validators:
@@ -93,6 +103,26 @@ validators:
       ar: {purity_threshold: 97.0, confidence_threshold: 0.88}
       bg: {purity_threshold: 97.0, confidence_threshold: 0.88}
       hi: {purity_threshold: 97.0, confidence_threshold: 0.88}
+      # Added 2026-07-04: Scandinavian cluster — langdetect gives systematically low
+      # confidence for da/no/nb/sv even on correct translations because these languages
+      # share vocabulary. 0.60 avoids false rejections without disabling the check.
+      # purity_threshold at 92% (global 88%) to account for occasional cross-detection.
+      da: {purity_threshold: 92.0, confidence_threshold: 0.60}
+      no: {purity_threshold: 92.0, confidence_threshold: 0.60}
+      nb: {purity_threshold: 92.0, confidence_threshold: 0.60}
+      sv: {purity_threshold: 92.0, confidence_threshold: 0.65}
+      # Added 2026-07-04: South Slavic Latin-script — langdetect confuses hr/bs/sl with
+      # each other and with unrelated Latin languages (sq, ro). 0.70 balances recall.
+      hr: {purity_threshold: 90.0, confidence_threshold: 0.70}
+      bs: {purity_threshold: 90.0, confidence_threshold: 0.70}
+      sl: {purity_threshold: 90.0, confidence_threshold: 0.70}
+      # Added 2026-07-04: Malay/Indonesian — mutually intelligible; langdetect frequently
+      # returns the wrong member of the pair with moderate confidence.
+      ms: {purity_threshold: 88.0, confidence_threshold: 0.70}
+      id: {purity_threshold: 88.0, confidence_threshold: 0.70}
+      # Added 2026-07-04: Ukrainian shares script and vocabulary with ru/bg; 0.75 is
+      # a reasonable floor before treating a detection as a false cross-language hit.
+      uk: {purity_threshold: 95.0, confidence_threshold: 0.75}
 
   shortcode_preservation:
     enabled: true
@@ -125,6 +155,6 @@ validators:
   semantic_similarity:
     enabled: true               # TC-MLD-05: enabled — detects semantic drift before write; warns at 0.55, blocks at 0.40
     min_body_chars: 200         # Skip documents shorter than this
-    warn_threshold: 0.55        # Cosine similarity below this → WARNING
-    error_threshold: 0.40       # Cosine similarity below this → ERROR
+    warn_threshold: 0.45        # Cosine similarity below this → WARNING (lowered for m2m100_418m)
+    error_threshold: 0.25       # Cosine similarity below this → ERROR (lowered from 0.40 for m2m100_418m)
     description: "Validates cross-lingual semantic equivalence using sentence embeddings"

@@ -353,7 +353,21 @@ class FastTextDetector:
             "it": "latin", "ro": "latin", "gl": "latin",
             # Germanic/Nordic → Latin
             "en": "latin", "de": "latin", "nl": "latin", "da": "latin",
-            "no": "latin", "sv": "latin", "is": "latin",
+            "no": "latin", "sv": "latin", "is": "latin", "af": "latin",
+            # Latin-script Slavic (South, West) — FastText confuses these with each other
+            # and with unrelated Latin languages (e.g. hr↔sq, cs↔sk, pl↔cs)
+            "hr": "latin", "bs": "latin", "sl": "latin",   # South Slavic Latin-script
+            "cs": "latin", "sk": "latin", "pl": "latin",   # West Slavic Latin-script
+            # Latin-script Uralic / Finnic
+            "fi": "latin", "hu": "latin", "et": "latin",
+            # Latin-script Baltic
+            "lt": "latin", "lv": "latin",
+            # Latin-script Turkic / Altaic
+            "tr": "latin", "az": "latin",
+            # Latin-script Austronesian
+            "id": "latin", "ms": "latin",
+            # Latin-script Southeast Asian
+            "vi": "latin",
             # Slavic → Cyrillic
             "bg": "cyrillic", "ru": "cyrillic", "mk": "cyrillic",
             "uk": "cyrillic", "sr": "cyrillic", "be": "cyrillic",

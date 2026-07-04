@@ -721,7 +721,10 @@ translation_engine:
   # TC-SAS-01: Same-as-source detection — reject files where MT model returned source text
   # unchanged for translatable units (source-language leakage without structural mismatch).
   # Ratio = (same-as-source units) / (total translatable units). 0.0 = zero tolerance.
-  same_as_source_tolerance: 0.0
+  # Raised from 0.0 to 0.03: technical KB content has API names/identifiers that M2M100
+  # legitimately leaves unchanged (up to ~3 units per 100). Zero tolerance caused false
+  # rejections for no/hr/cs and other languages on technical articles.
+  same_as_source_tolerance: 0.03
   # Minimum source character length to count a unit toward TC-SAS-01 (avoids flagging
   # short symbols/punctuation/codes that are legitimately identical across languages).
   same_as_source_min_length: 10
