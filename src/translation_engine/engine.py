@@ -778,6 +778,30 @@ class TranslationEngine:
             logger.warning(f"Output validation failed for {output_path}: {e}")
             return False
 
+    @staticmethod
+    def _compute_quality_score(stats) -> str:
+        """Compute the per-file quality signal from validation stats."""
+        if stats.validation_errors > 0:
+            return "FAIL"
+        if stats.ast_missing_nodes > 1 or stats.validation_warnings > 0:
+            return "PARTIAL"
+        return "PASS"
+
+    def _get_dir_orchestrator(self):
+        """Return the directory orchestrator, creating it for lightweight test instances."""
+        orchestrator = getattr(self, "_dir_orchestrator", None)
+        if orchestrator is None:
+            from .directory_orchestrator import DirectoryOrchestrator
+
+            orchestrator = DirectoryOrchestrator(self)
+            self._dir_orchestrator = orchestrator
+
+        ft_model = getattr(self, "_quality_filter_ft_model", None)
+        if ft_model is not None and getattr(orchestrator, "_quality_filter_ft_model", None) is None:
+            orchestrator._quality_filter_ft_model = ft_model
+
+        return orchestrator
+
     def _quality_check_complete_file(
         self,
         source_path: Path,
@@ -788,7 +812,7 @@ class TranslationEngine:
         max_paragraphs: int = 2,
     ) -> bool:
         """Delegate to DirectoryOrchestrator."""
-        return self._dir_orchestrator._quality_check_complete_file(
+        return self._get_dir_orchestrator()._quality_check_complete_file(
             source_path=source_path,
             target_langs=target_langs,
             site_profile=site_profile,
@@ -1785,7 +1809,7 @@ class TranslationEngine:
         run_deadline: float | None = None,
     ) -> DirectoryResult:
         """Translate all eligible files in a directory (delegates to DirectoryOrchestrator)."""
-        return self._dir_orchestrator.translate_directory(
+        return self._get_dir_orchestrator().translate_directory(
             site_id=site_id,
             directory=directory,
             target_langs=target_langs,
@@ -1813,7 +1837,7 @@ class TranslationEngine:
         run_deadline: float | None = None,
     ) -> DirectoryResult:
         """Delegate to DirectoryOrchestrator."""
-        return self._dir_orchestrator._translate_directory_locked(
+        return self._get_dir_orchestrator()._translate_directory_locked(
             site_id,
             directory,
             target_langs,
@@ -1835,7 +1859,7 @@ class TranslationEngine:
         run_deadline: float | None = None,
     ) -> DirectoryResult:
         """Delegate to DirectoryOrchestrator."""
-        return self._dir_orchestrator._translate_directory_sequential(
+        return self._get_dir_orchestrator()._translate_directory_sequential(
             site_id, md_files, target_langs, result, run_deadline=run_deadline
         )
 
@@ -1849,7 +1873,7 @@ class TranslationEngine:
         run_deadline: float | None = None,
     ) -> DirectoryResult:
         """Delegate to DirectoryOrchestrator."""
-        return self._dir_orchestrator._translate_directory_parallel(
+        return self._get_dir_orchestrator()._translate_directory_parallel(
             site_id, md_files, target_langs, result, max_workers, run_deadline=run_deadline
         )
 
@@ -1857,7 +1881,7 @@ class TranslationEngine:
         self, site_id: str, file_path: Path, target_langs: list[str]
     ) -> TranslationResult:
         """Thread-safe wrapper for translate_file (delegates to DirectoryOrchestrator)."""
-        return self._dir_orchestrator._translate_file_safe(site_id, file_path, target_langs)
+        return self._get_dir_orchestrator()._translate_file_safe(site_id, file_path, target_langs)
 
     def extract_segments(self, site_id: str, file_path: Path) -> list:
         """

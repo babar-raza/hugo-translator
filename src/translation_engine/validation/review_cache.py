@@ -1,13 +1,19 @@
 """File-level review cache for validation results.
 
-Caches validation outcomes keyed by hash(source_body + translated_body + target_lang).
-When the same source+translation pair is seen again, the cached decision is returned
-without re-running the full validation suite.
+Caches validation outcomes keyed by:
+  SHA256(source_body + translated_body + target_lang + config_fingerprint + schema_version)
 
-Cache is stored as a JSON file and invalidated automatically when content changes
-(different hash = cache miss).
+The config_fingerprint is a SHA256 digest of the validation-relevant config (purity thresholds,
+skip-langs, confidence threshold, etc.).  When any of those values change, all prior cache
+entries automatically become misses — preventing stale ACCEPT decisions from being served after
+a validator rule tightening.
+
+Cache is stored as a JSON file.  ``make_key()`` requires the caller to supply the
+``config_fingerprint`` (see ``ReviewCache.compute_config_fingerprint()`` for the helper).
 
 Config: ``review_cache.enabled`` in global.yaml (default: false).
+
+TC-M1B: config fingerprint added 2026-06-11 (ethereal-sauteeing-brook sprint 2).
 """
 from __future__ import annotations
 
@@ -26,6 +32,9 @@ _DEFAULT_CACHE_PATH = Path("data/cache/review_cache.json")
 
 # Max entries before oldest are evicted (LRU-style by timestamp)
 _DEFAULT_MAX_ENTRIES = 10_000
+
+# Increment when the cache entry schema changes to auto-invalidate all prior entries.
+_CACHE_SCHEMA_VERSION = "2"  # v2: config_fingerprint added (TC-M1B)
 
 
 class ReviewCache:
@@ -48,12 +57,70 @@ class ReviewCache:
     # ── public API ──────────────────────────────────────────────────
 
     @staticmethod
-    def make_key(source_body: str, translated_body: str, target_lang: str) -> str:
-        """Deterministic cache key from content + language."""
+    def make_key(
+        source_body: str,
+        translated_body: str,
+        target_lang: str,
+        config_fingerprint: str = "",
+    ) -> str:
+        """Deterministic cache key from content + language + validation config fingerprint.
+
+        ``config_fingerprint`` must be produced by ``compute_config_fingerprint()``.
+        When it is absent or empty (e.g., legacy callers) the resulting key differs from
+        any fingerprint-bearing key, so old entries are automatically treated as misses.
+        The schema version is always included so a future schema change auto-invalidates.
+        """
         digest = hashlib.sha256(
-            (source_body + "\x00" + translated_body + "\x00" + target_lang).encode("utf-8", errors="replace")
+            (
+                source_body
+                + "\x00"
+                + translated_body
+                + "\x00"
+                + target_lang
+                + "\x00"
+                + config_fingerprint
+                + "\x00"
+                + _CACHE_SCHEMA_VERSION
+            ).encode("utf-8", errors="replace")
         ).hexdigest()[:32]
         return digest
+
+    @staticmethod
+    def compute_config_fingerprint(translation_engine_cfg: dict) -> str:
+        """Compute a short fingerprint of validation-relevant config fields.
+
+        Only includes keys that, if changed, should invalidate existing cache entries:
+        purity thresholds, skip-langs list, confidence threshold, and enabled flags.
+        Changes to non-validation keys (e.g., batch size, GPU settings) do NOT
+        invalidate the cache.
+
+        Args:
+            translation_engine_cfg: The ``translation_engine`` section of global.yaml.
+        Returns:
+            8-char hex digest that changes when any validation rule changes.
+        """
+        relevant: dict = {
+            "purity_threshold_overrides": translation_engine_cfg.get(
+                "purity_threshold_overrides", {}
+            ),
+            "min_file_purity_percentage": translation_engine_cfg.get(
+                "min_file_purity_percentage", None
+            ),
+            "language_detection_confidence_threshold": translation_engine_cfg.get(
+                "language_detection_confidence_threshold", None
+            ),
+            "batch_purity_skip_langs": sorted(
+                translation_engine_cfg.get("batch_purity_skip_langs", [])
+            ),
+            "llm_output_ratio_overrides": translation_engine_cfg.get(
+                "llm_output_ratio_overrides", {}
+            ),
+            "max_llm_output_to_input_ratio": translation_engine_cfg.get(
+                "max_llm_output_to_input_ratio", None
+            ),
+        }
+        payload = json.dumps(relevant, sort_keys=True, separators=(",", ":"))
+        return hashlib.sha256(payload.encode("utf-8")).hexdigest()[:8]
 
     def get(self, key: str) -> dict[str, Any] | None:
         """Return cached entry or None on miss/expired."""

@@ -56,6 +56,22 @@ class TestShouldSkipPuritySegment:
         """Empty string returns False without errors."""
         assert _skip("") is False
 
+    # TC-C1B: Verify the token-dominance replacement for Pattern 3 (2026-06-11)
+
+    def test_prose_with_product_name_not_skipped(self):
+        """TC-C1B: Natural-language prose that mentions an Aspose product must NOT be skipped.
+        These lines have one product token among many prose words (dominance < 50%)."""
+        assert _skip("Aspose.BarCode provides comprehensive barcode generation functionality for enterprise document workflows") is False
+        assert _skip("For more information about Aspose.PDF see the official documentation page") is False
+        assert _skip("Aspose.Words supports all major document formats including DOCX PDF and RTF") is False
+
+    def test_product_name_only_line_still_skipped(self):
+        """TC-C1B: Lines that are predominantly product-name tokens are still skipped.
+        These lines have product tokens as majority of words (dominance > 50%)."""
+        assert _skip("Aspose.BarCode for .NET") is True
+        assert _skip("Aspose.PDF Cloud") is True
+        assert _skip("Aspose.Words") is True
+
 
 class TestPurityThresholdReductionBG:
     """Integration test: BG file with barcode ASCII passes at 0.15 threshold after strip."""

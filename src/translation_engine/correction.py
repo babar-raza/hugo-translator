@@ -1,10 +1,15 @@
-"""TC-06: Two-stage translate + correct for failed validations.
+"""TC-06 / TC-C5B: Two-stage translate + correct for correctable validation failures.
 
-When validation rejects a translation, this module sends the failed output
-plus the specific validation issues to an LLM and asks it to fix them.
-The corrected text is then re-validated through the normal pipeline.
+When validation rejects a translation, this module checks whether the issues are
+correctable (LLM can plausibly fix them) before making an API call.  Structural
+failures (shortcode loss, code block count, YAML parse, frontmatter integrity,
+wrong-language purity) are in the BYPASS list — the LLM cannot reliably fix them
+and attempting correction wastes credits and risks further corruption.
 
 Config: ``correction_pass.enabled`` in global.yaml (default: false).
+
+TC-C5B fix 2026-06-11 (ethereal-sauteeing-brook sprint 2):
+  Added _BYPASS_VALIDATORS allowlist and _all_issues_bypass_correction() guard.
 """
 
 from __future__ import annotations
@@ -13,6 +18,44 @@ import logging
 from typing import Any
 
 logger = logging.getLogger(__name__)
+
+# Validators whose issues must NOT trigger LLM correction.
+# These represent structural or language-identity failures that an LLM cannot
+# reliably repair — attempting correction wastes API credits and risks producing
+# output that fails the same checks again (or fails new checks).
+#
+# Validator names must match ValidationIssue.validator values emitted by each class:
+#   ShortcodePreservationValidator — shortcode loss/hallucination (structural)
+#   StructureValidator             — code block count, heading, link structure (structural)
+#   YamlValidator                  — YAML parse errors (structural)
+#   FrontmatterIntegrityValidator  — frontmatter key/type corruption (structural)
+#   LanguageConsistencyValidator   — wrong-language content (purity; LLM is wrong tool)
+_BYPASS_VALIDATORS: frozenset[str] = frozenset({
+    "ShortcodePreservationValidator",
+    "StructureValidator",
+    "YAMLValidator",
+    "FrontmatterIntegrityValidator",
+    "LanguageConsistencyValidator",
+})
+
+
+def _all_issues_bypass_correction(issues: list) -> bool:
+    """Return True if every issue in the list is in the bypass set.
+
+    If ALL issues are bypass-type, there is nothing the LLM can fix — skip the call.
+    If ANY issue is correctable (not in the bypass set), proceed with correction.
+    An empty issues list also bypasses (nothing to correct).
+    """
+    if not issues:
+        return True
+    for issue in issues:
+        if isinstance(issue, dict):
+            validator = issue.get("validator", "")
+        else:
+            validator = getattr(issue, "validator", "")
+        if validator not in _BYPASS_VALIDATORS:
+            return False  # Found a correctable issue — do not bypass
+    return True  # All issues are bypass-type
 
 # Prompt template — keeps the source, failed translation, and issues together
 # so the LLM can make targeted fixes without re-translating from scratch.
@@ -78,8 +121,25 @@ def attempt_correction(
 ) -> str | None:
     """Call LLM to correct a failed translation.
 
-    Returns the corrected body text, or None if correction fails.
+    Returns the corrected body text, or None if correction should not be attempted
+    (bypass) or if the LLM call fails.
+
+    TC-C5B: structural and purity failures are bypassed before the LLM call.
+    Only correctable issues (placeholder leaks, length anomalies, repetitions, etc.)
+    proceed to the LLM.
     """
+    # TC-C5B: Bypass check — skip correction entirely if all issues are structural/purity
+    if _all_issues_bypass_correction(issues):
+        _bypass_validators = {
+            (getattr(i, "validator", None) or i.get("validator", "?") if isinstance(i, dict) else "?")
+            for i in issues
+        }
+        logger.info(
+            "Correction pass bypassed for %s->%s: all issues are structural/purity (%s)",
+            src_lang, tgt_lang, ", ".join(sorted(_bypass_validators)) or "empty",
+        )
+        return None
+
     try:
         from ..model_runtime.llm_backend import LLMModelBackend
         from ..model_runtime.registry import ModelRegistry

@@ -1,13 +1,20 @@
-"""TC-C5: Correction pass scope guard tests.
+"""TC-C5 / TC-C5B: Correction pass scope guard tests.
 
-Four cases:
+Original four cases (TC-C5):
   1. test_purity_failure_skips_correction — purity check is post-correction by architecture
   2. test_placeholder_leak_triggers_correction — attempt_correction called on validation reject
-  3. test_failed_correction_does_not_write — correction returns None → not written
-  4. test_correction_revalidated — correction returns text → revalidation called before write
+  3. test_failed_correction_returns_none — correction returns None when model not found
+  4. test_correction_prompt_excludes_purity_type_issues — prompt builder handles all issue types
 
-Note: tests 3 and 4 test the attempt_correction function directly (correction.py),
-not the engine integration, to avoid standing up the full engine.
+TC-C5B bypass cases (added 2026-06-11, ethereal-sauteeing-brook sprint 2):
+  5. test_shortcode_loss_bypasses_correction
+  6. test_structure_violation_bypasses_correction
+  7. test_yaml_failure_bypasses_correction
+  8. test_frontmatter_integrity_bypasses_correction
+  9. test_language_consistency_bypasses_correction
+  10. test_mixed_bypass_and_correctable_proceeds
+  11. test_all_bypass_types_are_real_validator_names
+  12. test_empty_issues_bypasses_correction
 """
 
 from __future__ import annotations
@@ -105,3 +112,104 @@ class TestCorrectionScope:
         assert "PURITY" in prompt  # included in issues_text if passed
         assert "placeholder leak" in prompt
         assert "Fix ONLY the issues listed below" in prompt
+
+
+class TestCorrectionBypassAllowlist:
+    """TC-C5B: verify that structural/purity issues bypass the LLM correction call."""
+
+    def _make_issue(self, validator: str, message: str = "test issue") -> object:
+        """Create a minimal ValidationIssue-like object."""
+        from unittest.mock import MagicMock
+        issue = MagicMock()
+        issue.validator = validator
+        issue.message = message
+        return issue
+
+    def test_shortcode_loss_bypasses_correction(self):
+        """ShortcodePreservationValidator issues must bypass correction (structural)."""
+        from src.translation_engine.correction import attempt_correction
+        issue = self._make_issue("ShortcodePreservationValidator", "shortcode {{< tabs >}} lost")
+        result = attempt_correction("src", "tgt", "en", "de", [issue])
+        assert result is None, "Shortcode loss must bypass LLM correction"
+
+    def test_structure_violation_bypasses_correction(self):
+        """StructureValidator issues (e.g., code block count) must bypass correction."""
+        from src.translation_engine.correction import attempt_correction
+        issue = self._make_issue("StructureValidator", "code block count mismatch: 3 vs 2")
+        result = attempt_correction("src", "tgt", "en", "fr", [issue])
+        assert result is None, "Code block count mismatch must bypass LLM correction"
+
+    def test_yaml_failure_bypasses_correction(self):
+        """YAMLValidator issues must bypass correction."""
+        from src.translation_engine.correction import attempt_correction
+        issue = self._make_issue("YAMLValidator", "YAML parse error at line 3")
+        result = attempt_correction("src", "tgt", "en", "es", [issue])
+        assert result is None, "YAML parse error must bypass LLM correction"
+
+    def test_frontmatter_integrity_bypasses_correction(self):
+        """FrontmatterIntegrityValidator issues must bypass correction."""
+        from src.translation_engine.correction import attempt_correction
+        issue = self._make_issue("FrontmatterIntegrityValidator", "title field missing")
+        result = attempt_correction("src", "tgt", "en", "it", [issue])
+        assert result is None, "Frontmatter integrity failure must bypass LLM correction"
+
+    def test_language_consistency_bypasses_correction(self):
+        """LanguageConsistencyValidator issues (wrong-language content) must bypass correction."""
+        from src.translation_engine.correction import attempt_correction
+        issue = self._make_issue("LanguageConsistencyValidator", "44% wrong language detected")
+        result = attempt_correction("src", "tgt", "en", "bg", [issue])
+        assert result is None, "Language consistency failure must bypass LLM correction"
+
+    def test_mixed_bypass_and_correctable_proceeds(self):
+        """If ANY issue is correctable, the LLM is called (bypass only when ALL bypass)."""
+        from src.translation_engine.correction import attempt_correction
+        from unittest.mock import patch, MagicMock
+
+        bypass_issue = self._make_issue("StructureValidator", "code block count mismatch")
+        correctable_issue = self._make_issue("PlaceholderValidator", "placeholder %s leaked")
+
+        with patch("src.model_runtime.registry.ModelRegistry") as MockReg:
+            with patch("src.model_runtime.llm_backend.LLMModelBackend") as MockBackend:
+                mock_reg = MagicMock()
+                mock_reg.get_model.return_value = MagicMock()
+                MockReg.return_value = mock_reg
+                mock_be = MagicMock()
+                mock_be._provider.generate.return_value = "Fixed text"
+                MockBackend.return_value = mock_be
+
+                result = attempt_correction(
+                    "src", "tgt", "en", "pl",
+                    [bypass_issue, correctable_issue],
+                )
+
+        assert result == "Fixed text", (
+            "When at least one correctable issue exists, the LLM must be called"
+        )
+
+    def test_all_bypass_types_are_real_validator_names(self):
+        """Verify that every name in _BYPASS_VALIDATORS matches an actual validator class."""
+        from src.translation_engine.correction import _BYPASS_VALIDATORS
+        import importlib, pkgutil, inspect
+        import src.translation_engine.validation as val_pkg
+
+        # Collect all class names in the validation package
+        actual_validator_classes: set[str] = set()
+        for _importer, modname, _ispkg in pkgutil.iter_modules(val_pkg.__path__):
+            try:
+                mod = importlib.import_module(f"src.translation_engine.validation.{modname}")
+                for name, obj in inspect.getmembers(mod, inspect.isclass):
+                    actual_validator_classes.add(name)
+            except Exception:
+                pass
+
+        for bypass_name in _BYPASS_VALIDATORS:
+            assert bypass_name in actual_validator_classes, (
+                f"'{bypass_name}' in _BYPASS_VALIDATORS is not an actual validator class. "
+                f"Known classes: {sorted(actual_validator_classes)}"
+            )
+
+    def test_empty_issues_bypasses_correction(self):
+        """Empty issues list → bypass (nothing to correct)."""
+        from src.translation_engine.correction import attempt_correction
+        result = attempt_correction("src", "tgt", "en", "de", [])
+        assert result is None, "Empty issues list must bypass correction (nothing to fix)"

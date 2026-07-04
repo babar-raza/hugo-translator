@@ -158,6 +158,7 @@ class EngineBuilder:
     @staticmethod
     def _init_review_cache(engine, p):
         engine._review_cache = None
+        engine._review_cache_config_fingerprint = ""
         try:
             _rc_cfg = (
                 engine.config.get_config().get("review_cache", {})
@@ -172,7 +173,19 @@ class EngineBuilder:
                     max_entries=_rc_cfg.get("max_entries", 10_000),
                     max_age_days=_rc_cfg.get("max_age_days", 14),
                 )
-                logger.info("Review cache enabled (%d entries loaded)", engine._review_cache.size)
+                _te_cfg = (
+                    engine.config.get_config().get("translation_engine", {})
+                    if hasattr(engine.config, "get_config")
+                    else {}
+                )
+                engine._review_cache_config_fingerprint = (
+                    ReviewCache.compute_config_fingerprint(_te_cfg)
+                )
+                logger.info(
+                    "Review cache enabled (%d entries loaded, config_fingerprint=%s)",
+                    engine._review_cache.size,
+                    engine._review_cache_config_fingerprint,
+                )
         except Exception as _rc_err:
             logger.debug("Review cache init failed (disabled): %s", _rc_err)
 
