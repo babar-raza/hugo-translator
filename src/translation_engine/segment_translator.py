@@ -891,6 +891,7 @@ class SegmentTranslator:
     def _parse_formatted_frontmatter(frontmatter_yaml: str) -> dict:
         """Parse YAMLFormatter output and require Hugo frontmatter delimiters."""
         import re
+
         import yaml
 
         match = re.match(r"^---\s*\n(.*?)\n?---\s*(?:\n)?$", frontmatter_yaml, re.DOTALL)

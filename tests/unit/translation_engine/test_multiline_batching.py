@@ -28,7 +28,9 @@ class RecordingBackend:
         return translations, input_tokens, output_tokens
 
 
-def test_multiline_batched_calls_and_structure_preserved():
+def test_multiline_structure_preserved():
+    # MSP-02: multiline texts are processed with batch_size=1 per line for quality;
+    # structure (newlines) must be preserved in the output.
     engine = TranslationEngine.__new__(TranslationEngine)
     engine.multiline_handler = MultilineHandler()
     engine.batch_size = 4
@@ -52,7 +54,6 @@ def test_multiline_batched_calls_and_structure_preserved():
         stats=stats,
     )
 
-    assert any(len(call) > 1 for call in backend.calls)
     assert results[0] == "- FIRST\n- SECOND\n- THIRD"
     assert results[1] == "> QUOTE ONE\n> QUOTE TWO"
     assert results[0].count("\n") == 2

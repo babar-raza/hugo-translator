@@ -1,8 +1,8 @@
 """
 Placeholder management for protecting non-translatable content.
 """
-import re
 import difflib
+import re
 
 
 class PlaceholderManager:
@@ -76,6 +76,13 @@ class PlaceholderManager:
             return placeholder_map.get(key, token)
 
         restored = re.sub(r"\{[^{}]*?(\d+)[^{}]*?\}", fuzzy_replace, restored)
+
+        # Inter-pass cleanup: remove corrupted placeholder tokens where M2M100 dropped the
+        # digit entirely (e.g. {PLACEHOLDER_1} → {PROLEXHOODERS}}).
+        # Pattern: { followed by ALL-CAPS/underscore only (no digit) followed by one or more }
+        # This can only be a corrupted placeholder — valid translated content never looks like this.
+        if placeholder_map:
+            restored = re.sub(r'\{[A-Z][A-Z_]*[A-Z]\}+', '', restored)
 
         # Third pass: handle cases where NLLB completely replaced the placeholder token
         # with a "guessed" variant of the original (e.g. PropertyCollection →
