@@ -79,6 +79,7 @@ TARGET_SCRIPT_REGEX = {
 TRANSLATABLE_FRONTMATTER_FIELDS = {
     "title",
     "description",
+    "keywords",
     "step1",
     "step2",
     "step3",
