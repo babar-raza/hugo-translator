@@ -565,7 +565,16 @@ def looks_like_prose(value: Any) -> bool:
         text,
     ):
         return False
+    # Covers all-uppercase acronyms and dotted brand names: "FOSS API SDK .NET"
     if re.fullmatch(r"(Aspose|FOSS|API|SDK|[A-Z0-9.+#-]+)(\s+(Aspose|FOSS|API|SDK|[A-Z0-9.+#-]+))*", text):
+        return False
+    # Extended brand/acronym boilerplate — adds "Reference", "Documentation", version
+    # strings (v0.1.0), and Aspose.X dotted names.  Handles titles like:
+    #   "Aspose FOSS API Reference"
+    #   "Aspose.3D FOSS Python API Reference"
+    #   "Aspose.Email.Foss v0.1.0"
+    _BW = r"(?:Aspose(?:\.[A-Za-z0-9.+#-]+)?|FOSS|API|SDK|Hub|Reference|Documentation|v\d[\d.]*[a-z]?|[A-Z0-9][A-Z0-9.+#-]*)"
+    if re.fullmatch(rf"{_BW}(?:\s+{_BW})*", text):
         return False
     # Reference API page titles: "ClassName — Aspose.X FOSS Lang API Reference"
     # The entire value is protected content (API identifier + brand template), so NLLB

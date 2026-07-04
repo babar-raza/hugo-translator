@@ -204,9 +204,19 @@ class MetadataTracker:
             }
         }
 
-        # Atomic write with fsync
+        # Atomic write with fsync.
+        # On Windows, OneDrive or antivirus can briefly hold an exclusive lock on
+        # the metadata file.  A failed metadata save must not abort the translation
+        # — it is progress tracking only, not part of the output.
         content = json.dumps(output, indent=2, ensure_ascii=False)
-        atomic_write(self.metadata_file, content, fsync=True)
+        try:
+            atomic_write(self.metadata_file, content, fsync=True)
+        except OSError as exc:
+            logger.warning(
+                "Metadata save skipped (file locked or permission denied): %s — %s",
+                self.metadata_file,
+                exc,
+            )
 
     def get_source_hash(self, source_path: Path) -> str | None:
         """Get stored hash for source file."""

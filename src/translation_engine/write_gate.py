@@ -587,7 +587,10 @@ class WriteGateEvaluator:
         if inline_code_count >= 2:
             return True
         api_identifiers = re.findall(
-            r"\b(?:[A-Z][A-Za-z0-9_]*\.)+[A-Z][A-Za-z0-9_]*\b|\b[A-Z][a-zA-Z0-9_]+(?:Exception|Options|Builder|Factory|Collection|Renderer|Exporter|Importer|Constants)\b|\b[A-Za-z_][A-Za-z0-9_]*\([^)]*\)",
+            r"\b(?:[A-Z][A-Za-z0-9_]*\.)+[A-Z][A-Za-z0-9_]*\b"
+            r"|\b[A-Z][a-zA-Z0-9_]+(?:Exception|Options|Builder|Factory|Collection|Renderer|Exporter|Importer|Constants)\b"
+            r"|\b[A-Z][a-z0-9]+(?:[A-Z][a-z0-9]+)+\b"
+            r"|\b[A-Za-z_][A-Za-z0-9_]*\([^)]*\)",
             line,
         )
         if api_identifiers:

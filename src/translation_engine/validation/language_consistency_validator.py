@@ -170,7 +170,7 @@ class LanguageConsistencyValidator(PostTranslationValidator):
         # Resolve per-language overrides (ES/IT/CS have stricter thresholds)
         lang_overrides = self.per_language_overrides.get(target_lang, {})
         effective_confidence = lang_overrides.get('confidence_threshold', self.confidence_threshold)
-        effective_purity = lang_overrides.get('purity_threshold', 88.0)
+        effective_purity = lang_overrides.get('purity_threshold', 88.0)  # 88% default; 95% in comment is outdated
 
         # Unicode script-mixing check (fast, no ML, catches inline foreign phrases).
         # Runs before the slower langdetect pass but does NOT short-circuit so that
@@ -238,7 +238,14 @@ class LanguageConsistencyValidator(PostTranslationValidator):
                         'da': {'no', 'nb'},
                     }
                     _similar_accepted = _SIMILAR_LANG_MAP.get(target_lang, set())
-                    if (detected_code == target_lang or detected_code in _similar_accepted) and confidence >= effective_confidence:
+                    if detected_code == target_lang:
+                        # Top detection IS target language — count correct regardless of confidence.
+                        # langdetect returns low confidence for near-identical languages (da/no/nb,
+                        # sv/da, etc.) even when detection is correct; requiring high confidence
+                        # causes systematic false rejections for Scandinavian and similar languages.
+                        correct_lang_count += 1
+                    elif detected_code in _similar_accepted and confidence >= effective_confidence:
+                        # Similar language detected with sufficient confidence — count as correct.
                         correct_lang_count += 1
                     else:
                         # Log wrong language sentence (truncate for readability)
@@ -269,7 +276,7 @@ class LanguageConsistencyValidator(PostTranslationValidator):
             purity_pct = (correct_lang_count / total_sentences) * 100
 
             # Require effective_purity% of sentences to be in correct language
-            # (default 95%; stricter for ES/IT/CS via per_language_overrides)
+            # (default 88%; stricter for ES/IT/CS via per_language_overrides)
             if purity_pct < effective_purity:
                 # Create detailed error message
                 examples = "; ".join([
