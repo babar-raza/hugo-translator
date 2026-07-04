@@ -93,7 +93,9 @@ class PlaceholderManager:
             if original not in restored and re.match(r"^[A-Z]", original):
                 # Find all PascalCase-ish words in restored text
                 candidates = _PASCAL_RE.findall(restored)
-                matches = difflib.get_close_matches(original, candidates, n=1, cutoff=0.85)
+                # cutoff=0.92: strict enough to avoid substituting real translated words
+                # that happen to resemble the original (e.g. PropertiesCollection ≈ PropertyCollection)
+                matches = difflib.get_close_matches(original, candidates, n=1, cutoff=0.92)
                 if matches and matches[0] != original:
                     restored = restored.replace(matches[0], original, 1)
 

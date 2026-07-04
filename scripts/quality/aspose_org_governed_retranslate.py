@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import copy
 import hashlib
 import json
 import os
@@ -15,6 +16,14 @@ from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
+
+# Windows structured-exception codes that indicate a hard CUDA/CTranslate2 crash.
+# On these codes we automatically retry on CPU.
+_CUDA_CRASH_CODES = {
+    3221225477,  # 0xC0000005  STATUS_ACCESS_VIOLATION
+    3221226091,  # 0xC000026B  STATUS_GUARD_PAGE_VIOLATION
+    3221226505,  # 0xC0000409  STATUS_STACK_BUFFER_OVERRUN
+}
 
 ROOT = Path(__file__).resolve().parents[2]
 if str(ROOT) not in sys.path:
@@ -594,7 +603,7 @@ def run_translate(args, item: WorkItem, log_path: Path) -> subprocess.CompletedP
     cmd = build_translate_cmd(args, item, log_path)
     with log_path.open("w", encoding="utf-8") as log:
         try:
-            return subprocess.run(
+            result = subprocess.run(
                 cmd,
                 cwd=ROOT,
                 text=True,
@@ -605,6 +614,35 @@ def run_translate(args, item: WorkItem, log_path: Path) -> subprocess.CompletedP
         except subprocess.TimeoutExpired:
             log.write(f"\nTranslation timed out after {args.timeout_seconds} seconds\n")
             return subprocess.CompletedProcess(cmd, 124)
+
+    # CPU fallback: NLLB's CTranslate2 CUDA backend can crash with Windows structured
+    # exceptions (access violation, guard page, stack overrun) on certain inputs or when
+    # GPU memory is fragmented.  Retry on CPU which has no such constraints.
+    if result.returncode in _CUDA_CRASH_CODES and getattr(args, "device", "cuda") == "cuda":
+        log_path_cpu = log_path.with_name(log_path.stem + ".cpu.log")
+        with log_path.open("a", encoding="utf-8") as log:
+            log.write(
+                f"\n[cpu-fallback] CUDA crash (exit={result.returncode:#010x}), retrying on CPU\n"
+            )
+        cpu_args = copy.copy(args)
+        cpu_args.device = "cpu"
+        cmd_cpu = build_translate_cmd(cpu_args, item, log_path_cpu)
+        log_path_cpu.parent.mkdir(parents=True, exist_ok=True)
+        with log_path_cpu.open("w", encoding="utf-8") as cpu_log:
+            try:
+                result = subprocess.run(
+                    cmd_cpu,
+                    cwd=ROOT,
+                    text=True,
+                    stdout=cpu_log,
+                    stderr=subprocess.STDOUT,
+                    timeout=args.timeout_seconds * 3,  # CPU is ~3× slower
+                )
+            except subprocess.TimeoutExpired:
+                cpu_log.write(f"\nCPU fallback timed out\n")
+                result = subprocess.CompletedProcess(cmd_cpu, 124)
+
+    return result
 
 
 def repair_target(profile, parser_obj: HugoParser, source: Path, target: Path) -> dict[str, Any]:

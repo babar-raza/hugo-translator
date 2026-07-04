@@ -567,6 +567,11 @@ def looks_like_prose(value: Any) -> bool:
         return False
     if re.fullmatch(r"(Aspose|FOSS|API|SDK|[A-Z0-9.+#-]+)(\s+(Aspose|FOSS|API|SDK|[A-Z0-9.+#-]+))*", text):
         return False
+    # Reference API page titles: "ClassName — Aspose.X FOSS Lang API Reference"
+    # The entire value is protected content (API identifier + brand template), so NLLB
+    # correctly leaves it unchanged.  Do not flag as untranslated.
+    if re.fullmatch(r"[A-Za-z][A-Za-z0-9_]* \u2014 Aspose\.\S+ FOSS .+ API Reference", text):
+        return False
     return bool(re.search(r"[A-Za-z]{3,}", text))
 
 
@@ -789,8 +794,12 @@ def overlay_main_checkpoint_for_items(
     main_checkpoint: dict[str, Any],
     item_ids: set[str],
 ) -> None:
-    accepted = checkpoint.setdefault("accepted", {})
-    failed = checkpoint.setdefault("failed", {})
+    if not isinstance(checkpoint.get("accepted"), dict):
+        checkpoint["accepted"] = {}
+    if not isinstance(checkpoint.get("failed"), dict):
+        checkpoint["failed"] = {}
+    accepted = checkpoint["accepted"]
+    failed = checkpoint["failed"]
 
     for item_id, receipt in (main_checkpoint.get("accepted") or {}).items():
         if item_id in item_ids:
@@ -805,8 +814,10 @@ def merge_shard_checkpoints(evidence_root: Path) -> dict[str, Any]:
     checkpoint_dir = evidence_root / "checkpoints"
     main_path = checkpoint_dir / "checkpoint.json"
     main = load_checkpoint(main_path)
-    main.setdefault("accepted", {})
-    main.setdefault("failed", {})
+    if not isinstance(main.get("accepted"), dict):
+        main["accepted"] = {}
+    if not isinstance(main.get("failed"), dict):
+        main["failed"] = {}
 
     shard_paths = sorted(checkpoint_dir.glob("checkpoint.*.json"))
     for shard_path in shard_paths:
@@ -832,8 +843,30 @@ def merge_shard_checkpoints(evidence_root: Path) -> dict[str, Any]:
 
 
 def write_json(path: Path, data: Any) -> None:
+    import time as _time
+    import tempfile
+    import os
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
+    text = json.dumps(data, indent=2, ensure_ascii=False)
+    # Write atomically via temp file to avoid OneDrive sync conflicts
+    for attempt in range(5):
+        try:
+            tmp_fd, tmp_path = tempfile.mkstemp(dir=path.parent, suffix=".tmp")
+            try:
+                with os.fdopen(tmp_fd, "w", encoding="utf-8") as f:
+                    f.write(text)
+                os.replace(tmp_path, path)
+            except BaseException:
+                try:
+                    os.unlink(tmp_path)
+                except OSError:
+                    pass
+                raise
+            return
+        except OSError:
+            if attempt == 4:
+                raise
+            _time.sleep(1 + attempt)
 
 
 def load_checkpoint(path: Path) -> dict[str, Any]:
@@ -875,6 +908,11 @@ def build_translate_cmd(args, item: WorkItem, log_path: Path) -> list[str]:
 def run_translate(args, item: WorkItem, log_path: Path) -> subprocess.CompletedProcess[str]:
     cmd = build_translate_cmd(args, item, log_path)
     log_path.parent.mkdir(parents=True, exist_ok=True)
+    # On Windows, CREATE_NEW_PROCESS_GROUP detaches the child from the parent's
+    # job object so it is NOT killed when this shard process dies unexpectedly.
+    # The child completes independently; the next shard restart will fast-accept
+    # the finished target via pre-verification.
+    creation_flags = subprocess.CREATE_NEW_PROCESS_GROUP if sys.platform == "win32" else 0
     with log_path.open("w", encoding="utf-8") as log:
         try:
             return subprocess.run(
@@ -884,6 +922,7 @@ def run_translate(args, item: WorkItem, log_path: Path) -> subprocess.CompletedP
                 stdout=log,
                 stderr=subprocess.STDOUT,
                 timeout=args.timeout_seconds,
+                creationflags=creation_flags,
             )
         except subprocess.TimeoutExpired:
             log.write(f"\nTranslation timed out after {args.timeout_seconds} seconds\n")
