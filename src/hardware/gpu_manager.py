@@ -13,8 +13,14 @@ from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any
 
-import psutil
-import torch
+try:
+    import psutil
+except ImportError:
+    psutil = None
+try:
+    import torch
+except ImportError:
+    torch = None
 
 logger = logging.getLogger(__name__)
 
@@ -120,8 +126,8 @@ class GPUManager:
             GPUCapabilities with full system information
         """
         # CPU info
-        cpu_count = psutil.cpu_count(logical=True) or 0
-        total_ram = psutil.virtual_memory().total / (1024**3)  # GB
+        cpu_count = psutil.cpu_count(logical=True) if psutil else 0
+        total_ram = (psutil.virtual_memory().total / (1024**3)) if psutil else 0  # GB
 
         # CUDA detection
         has_cuda = torch.cuda.is_available()

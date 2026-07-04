@@ -189,7 +189,12 @@ class FileTranslationPipeline:
                     if engine._review_cache is not None and retry_count == 0:
                         from .validation.review_cache import ReviewCache
 
-                        _rc_key = ReviewCache.make_key(source_body, translated_body, target_lang)
+                        _rc_key = ReviewCache.make_key(
+                            source_body,
+                            translated_body,
+                            target_lang,
+                            getattr(engine, "_review_cache_config_fingerprint", ""),
+                        )
                         _rc_entry = engine._review_cache.get(_rc_key)
                         if _rc_entry and _rc_entry.get("decision") == "ACCEPT":
                             _rc_hit = True

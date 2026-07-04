@@ -20,13 +20,13 @@ def test_yaml_format_fallback_logs_warning(caplog):
     parser = HugoParser()
     content = "---\ntitle: Test Title\ndate: 2024-01-01\n---\n\nBody text."
 
-    with patch.object(parser, "_parse_yaml_with_comments", return_value=None):
+    with patch.object(parser, "_parse_yaml_content", return_value=None):
         with caplog.at_level(logging.WARNING, logger="src.translation_engine.parser.hugo_parser"):
             doc = parser.parse_string(content)
 
     assert "YAML_FORMAT_FALLBACK" in caplog.text
-    assert doc.frontmatter.get("title") == "Test Title"
-    assert doc.frontmatter.get("date") is not None
+    assert doc.frontmatter == {}
+    assert len(doc.ast) == 1
 
 
 class TestListParsing:
@@ -349,3 +349,23 @@ class TestInlineParsing:
         para = doc.ast[0]
         texts = [n for n in para.children if n.type == NodeType.TEXT]
         assert len(texts) >= 1
+def test_parse_frontmatter_with_top_level_content_key():
+    """A Hugo frontmatter key named 'content' must not make YAML parse as body."""
+    source = """---
+layout: plugin
+head_title: Example
+content:
+  enable: true
+  block:
+    - title_left: Left
+      content_left: Body text
+---
+
+Markdown body.
+"""
+
+    doc = HugoParser().parse_string(source)
+
+    assert doc.frontmatter["layout"] == "plugin"
+    assert doc.frontmatter["content"]["enable"] is True
+    assert len(doc.ast) == 1

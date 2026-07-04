@@ -1,5 +1,9 @@
+<<<<<<< Updated upstream
 """Tests for TC-05: File-level review cache."""
 
+=======
+"""Tests for TC-05 / TC-M1B: File-level review cache + config fingerprint."""
+>>>>>>> Stashed changes
 from __future__ import annotations
 
 import json
@@ -7,7 +11,7 @@ from pathlib import Path
 
 import pytest
 
-from src.translation_engine.validation.review_cache import ReviewCache
+from src.translation_engine.validation.review_cache import ReviewCache, _CACHE_SCHEMA_VERSION
 
 
 @pytest.fixture
@@ -40,6 +44,67 @@ class TestReviewCacheKeyGeneration:
         k1 = ReviewCache.make_key("hello", "hola", "es")
         k2 = ReviewCache.make_key("goodbye", "hola", "es")
         assert k1 != k2
+
+
+class TestReviewCacheConfigFingerprint:
+    """TC-M1B: config fingerprint invalidates cache entries when validation rules change."""
+
+    def test_different_fingerprints_produce_different_keys(self):
+        """Different config fingerprints → different keys for identical content."""
+        fp_a = ReviewCache.compute_config_fingerprint(
+            {"purity_threshold_overrides": {"bg": 0.15}, "min_file_purity_percentage": 0.95}
+        )
+        fp_b = ReviewCache.compute_config_fingerprint(
+            {"purity_threshold_overrides": {"bg": 0.50}, "min_file_purity_percentage": 0.95}
+        )
+        assert fp_a != fp_b, "Different purity thresholds must produce different fingerprints"
+
+        k1 = ReviewCache.make_key("src", "tgt", "es", fp_a)
+        k2 = ReviewCache.make_key("src", "tgt", "es", fp_b)
+        assert k1 != k2, "Different config fingerprints must produce different cache keys"
+
+    def test_same_fingerprint_produces_same_key(self):
+        """Same config → same fingerprint → same key for same content."""
+        cfg = {"purity_threshold_overrides": {"lt": 0.15}, "min_file_purity_percentage": 0.95}
+        fp1 = ReviewCache.compute_config_fingerprint(cfg)
+        fp2 = ReviewCache.compute_config_fingerprint(cfg)
+        assert fp1 == fp2
+
+        k1 = ReviewCache.make_key("src", "tgt", "bg", fp1)
+        k2 = ReviewCache.make_key("src", "tgt", "bg", fp2)
+        assert k1 == k2
+
+    def test_empty_fingerprint_key_differs_from_fingerprinted_key(self):
+        """Legacy callers that omit config_fingerprint get a different key than fingerprinted callers.
+        This ensures all v1 (no-fingerprint) entries are automatic misses under v2."""
+        fp = ReviewCache.compute_config_fingerprint({"purity_threshold_overrides": {}})
+        k_legacy = ReviewCache.make_key("src", "tgt", "de")        # no fingerprint
+        k_new = ReviewCache.make_key("src", "tgt", "de", fp)       # with fingerprint
+        assert k_legacy != k_new, "v1 (no fingerprint) key must differ from v2 (with fingerprint) key"
+
+    def test_compute_fingerprint_deterministic(self):
+        """compute_config_fingerprint is deterministic regardless of dict ordering."""
+        cfg = {
+            "batch_purity_skip_langs": ["de", "ar", "fr"],
+            "language_detection_confidence_threshold": 0.80,
+            "purity_threshold_overrides": {"bg": 0.15, "lt": 0.15},
+        }
+        assert ReviewCache.compute_config_fingerprint(cfg) == ReviewCache.compute_config_fingerprint(cfg)
+
+    def test_fingerprint_changes_on_skip_lang_list_change(self):
+        """Adding a language to batch_purity_skip_langs changes the fingerprint."""
+        fp_before = ReviewCache.compute_config_fingerprint(
+            {"batch_purity_skip_langs": ["de", "fr"]}
+        )
+        fp_after = ReviewCache.compute_config_fingerprint(
+            {"batch_purity_skip_langs": ["de", "fr", "it"]}
+        )
+        assert fp_before != fp_after
+
+    def test_schema_version_exported(self):
+        """_CACHE_SCHEMA_VERSION must be importable and non-empty."""
+        assert _CACHE_SCHEMA_VERSION, "Schema version must be a non-empty string"
+        assert _CACHE_SCHEMA_VERSION == "2", "Expected schema version 2 (TC-M1B upgrade)"
 
 
 class TestReviewCachePutGet:

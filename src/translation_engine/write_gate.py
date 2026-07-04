@@ -578,6 +578,11 @@ class WriteGateEvaluator:
             non_letter = sum(1 for c in visible if not c.isalpha())
             if non_letter / len(visible) > 0.60:
                 return True
-        if re.search(r"Aspose\.[A-Z]", line):
-            return True
+        if re.search(r"Aspose\.\w+", line):
+            remaining = re.sub(r"Aspose\.\w+", "", line)
+            prose_words = [
+                word for word in remaining.split() if word.isalpha() and len(word) > 3
+            ]
+            if len(prose_words) < 3:
+                return True
         return False

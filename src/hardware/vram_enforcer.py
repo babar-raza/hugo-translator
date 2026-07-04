@@ -9,7 +9,10 @@ import logging
 import threading
 from contextlib import contextmanager
 
-import torch
+try:
+    import torch
+except ImportError:
+    torch = None
 
 from .vram_budget import VRAMBudget, get_gpu_total_memory_mb, resolve_vram_budget_mb
 

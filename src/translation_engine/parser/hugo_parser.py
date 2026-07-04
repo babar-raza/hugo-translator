@@ -112,25 +112,28 @@ class HugoParser:
         # Some Hugo files use NBSP (\xa0) for indentation which YAML parsers don't recognize
         content = content.replace('\xa0', ' ')
 
-        # Use python-frontmatter to split frontmatter from body
-        try:
-            post = fm.loads(content)
-            body_content = post.content
-
-            # Re-parse the YAML using ruamel.yaml to preserve comments/quotes
-            # Extract raw YAML from the original content
-            frontmatter_dict = self._parse_yaml_with_comments(content)
+        # Split frontmatter ourselves before using python-frontmatter. Some Hugo pages
+        # have a top-level YAML key named "content", which collides with
+        # python-frontmatter's Post(content, **metadata) constructor path.
+        frontmatter_split = self._split_frontmatter(content)
+        if frontmatter_split is not None:
+            yaml_content, body_content = frontmatter_split
+            frontmatter_dict = self._parse_yaml_content(yaml_content)
             if frontmatter_dict is None:
-                _fm_key_count = len(post.metadata) if post.metadata else 0
                 logger.warning(
-                    "YAML_FORMAT_FALLBACK: ruamel.yaml failed to parse frontmatter "
-                    f"(frontmatter keys: {_fm_key_count}); "
-                    "falling back to dict(post.metadata) - YAML comments and formatting will be lost."
+                    "YAML_FORMAT_FALLBACK: ruamel.yaml failed to parse frontmatter; "
+                    "using empty frontmatter to avoid treating YAML as Markdown body."
                 )
+                frontmatter_dict = CommentedMap()
+        else:
+            # Backward-compatible fallback for documents without standard Hugo delimiters.
+            try:
+                post = fm.loads(content)
+                body_content = post.content
                 frontmatter_dict = dict(post.metadata)
-        except Exception:
-            frontmatter_dict = {}
-            body_content = content
+            except Exception:
+                frontmatter_dict = {}
+                body_content = content
 
         # Parse body to AST
         ast = self._parse_markdown_to_ast(body_content)
@@ -146,6 +149,25 @@ class HugoParser:
 
         return HugoDocument(frontmatter=frontmatter_dict, ast=ast)
 
+    def _split_frontmatter(self, content: str) -> tuple[str, str] | None:
+        """Split standard Hugo YAML frontmatter from body content."""
+        match = re.match(
+            r'^\ufeff?---[ \t]*\r?\n(.*?)\r?\n---[ \t]*(?:\r?\n|$)',
+            content,
+            re.DOTALL,
+        )
+        if not match:
+            return None
+        return match.group(1), content[match.end():]
+
+    def _parse_yaml_content(self, yaml_content: str) -> CommentedMap | dict[str, Any] | None:
+        """Parse a YAML frontmatter payload using ruamel.yaml."""
+        try:
+            result = _yaml_parser.load(StringIO(yaml_content))
+            return result if result is not None else CommentedMap()
+        except Exception:
+            return None
+
     def _parse_yaml_with_comments(self, content: str) -> CommentedMap | dict[str, Any] | None:
         """Extract and parse YAML frontmatter using ruamel.yaml for comment preservation.
 
@@ -155,19 +177,12 @@ class HugoParser:
         Returns:
             CommentedMap with preserved comments/quotes, or None if parsing fails
         """
-        # Match YAML frontmatter between --- delimiters
-        match = re.match(r'^---\s*\n(.*?)\n---', content, re.DOTALL)
-        if not match:
+        frontmatter_split = self._split_frontmatter(content)
+        if frontmatter_split is None:
             return None
 
-        yaml_content = match.group(1)
-
-        try:
-            # Use ruamel.yaml to parse - returns CommentedMap preserving structure
-            result = _yaml_parser.load(StringIO(yaml_content))
-            return result if result is not None else CommentedMap()
-        except Exception:
-            return None
+        yaml_content, _body_content = frontmatter_split
+        return self._parse_yaml_content(yaml_content)
 
     def _parse_markdown_to_ast(self, markdown: str) -> list[ASTNode]:
         """Parse Markdown content to AST."""
