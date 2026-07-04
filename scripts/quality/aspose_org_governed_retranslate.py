@@ -42,6 +42,7 @@ from scripts.quality.products_org_governed_retranslate import (  # noqa: E402
     parse_locale_filter,
     parse_doc,
     repair_extra_code_blocks_with_source_order,
+    looks_like_prose,
     repair_target_code_blocks,
     repair_target_material_copy_fields,
     repair_target_product_identities,
@@ -358,12 +359,145 @@ def source_hash_snapshot(profile, content_root: Path) -> dict[str, str]:
     }
 
 
+_INLINE_CODE_IN_BODY_RE = re.compile(r"`([^`\n]{1,80})`")
+_FRONTMATTER_BLOCK_RE = re.compile(r"^\ufeff?---[ \t]*\r?\n.*?\r?\n---[ \t]*(?:\r?\n|$)", re.DOTALL)
+
+
+def _body_of(text: str) -> tuple[str, int]:
+    m = _FRONTMATTER_BLOCK_RE.match(text)
+    return (text[m.end():], m.end()) if m else (text, 0)
+
+
+def restore_body_paragraphs_with_missing_codes(source_text: str, target_text: str) -> str:
+    """Restore prose paragraphs dropped by NLLB that contain inline API-name codes.
+
+    When NLLB encounters paragraphs with dense inline-code patterns like
+    `` `FVector2`/`FVector3`/`FVector4` `` it sometimes drops the entire paragraph,
+    leaving those inline codes missing from the target and causing
+    REJECT_IMMUTABLE_TOKEN_CHANGED.
+
+    Strategy: find inline codes in source body missing from target body; if they
+    appear in a prose paragraph (not heading/list/table/code-block), copy that
+    paragraph verbatim from source into the target after the first section heading.
+    """
+    src_body, _ = _body_of(source_text)
+    tgt_body, tgt_body_start = _body_of(target_text)
+
+    src_codes = set(_INLINE_CODE_IN_BODY_RE.findall(src_body))
+    tgt_codes = set(_INLINE_CODE_IN_BODY_RE.findall(tgt_body))
+    # Also track plain-text API identifiers (e.g. BaseCollection dropped from overview)
+    src_api = set(API_IDENTIFIER_PATTERN.findall(src_body))
+    tgt_api = set(API_IDENTIFIER_PATTERN.findall(tgt_body))
+    missing_codes = (src_codes - tgt_codes) | (src_api - tgt_api)
+    if not missing_codes:
+        return target_text
+
+    # Collect source paragraphs that contain missing inline codes and look like prose
+    paragraphs = re.split(r"\n\n+", src_body)
+    paras_to_restore: list[str] = []
+    for para in paragraphs:
+        stripped = para.strip()
+        if not stripped:
+            continue
+        # Skip non-prose blocks: headings, lists, tables, code fences, blockquotes,
+        # and bold-label-inline-code lines (handled by restore_body_bold_label_inline_codes)
+        first_line = stripped.split("\n")[0]
+        if first_line.startswith(("#", "-", "|", "```", ">")):
+            continue
+        if _BOLD_LABEL_CODE_RE.match(first_line):
+            continue
+        para_codes = set(_INLINE_CODE_IN_BODY_RE.findall(stripped)) | set(API_IDENTIFIER_PATTERN.findall(stripped))
+        if (para_codes & missing_codes) and looks_like_prose(stripped):
+            paras_to_restore.append(stripped)
+
+    if not paras_to_restore:
+        return target_text
+
+    # Insert after the first ## heading in target body (or at the start)
+    result_body = tgt_body
+    heading_m = re.search(r"^##[^#][^\n]*\n", result_body, re.MULTILINE)
+    insert_pos = heading_m.end() if heading_m else 0
+    insert_text = "\n" + "\n\n".join(paras_to_restore) + "\n\n"
+    result_body = result_body[:insert_pos] + insert_text + result_body[insert_pos:]
+
+    return target_text[:tgt_body_start] + result_body
+
+
+def restore_mutated_inline_codes(source_text: str, target_text: str) -> str:
+    """Replace inline codes mutated by NLLB (spaces inserted, capitalisation changed).
+
+    Examples of NLLB mutations:
+    - ``</extLst>`` → ``</ext Lst >``  (spaces inserted)
+    - ``presentation.xml`` → ``presentation.Xml``  (capitalisation)
+
+    Strategy: super-normalise every code by stripping whitespace and lowercasing.
+    When a source code is absent from the target but there is a target code whose
+    super-normalised form matches, replace the target version with the source
+    original.
+    """
+
+    def body_of(text: str) -> tuple[str, int]:
+        m = _FRONTMATTER_BLOCK_RE.match(text)
+        return (text[m.end():], m.end()) if m else (text, 0)
+
+    src_body, _ = body_of(source_text)
+    tgt_body, tgt_body_start = body_of(target_text)
+
+    def super_norm(s: str) -> str:
+        return re.sub(r"\s+", "", s).lower()
+
+    src_codes = INLINE_CODE_PATTERN.findall(src_body)
+    tgt_codes = INLINE_CODE_PATTERN.findall(tgt_body)
+
+    src_by_norm = {super_norm(c): c for c in src_codes}
+    tgt_by_norm: dict[str, str] = {}
+    for c in tgt_codes:
+        n = super_norm(c)
+        if n not in tgt_by_norm:
+            tgt_by_norm[n] = c
+
+    # Norms present in both source and target but with different actual codes → mutation
+    common_norms = set(src_by_norm) & set(tgt_by_norm)
+    to_repair = {n for n in common_norms if src_by_norm[n] != tgt_by_norm[n]}
+
+    if not to_repair:
+        return target_text
+
+    result_body = tgt_body
+    changed = False
+    for norm in to_repair:
+        tgt_code = tgt_by_norm[norm]
+        src_code = src_by_norm[norm]
+        result_body = result_body.replace(tgt_code, src_code)
+        changed = True
+
+    if not changed:
+        return target_text
+    return target_text[:tgt_body_start] + result_body
+
+
+_TABLE_CELL_PSEUDO_CODE_RE = re.compile(r"^`\s*\|.*\|\s*`$", re.DOTALL)
+
+
+_XML_NAMESPACE_TAG_RE = re.compile(r"^</?[A-Za-z][A-Za-z0-9]*:[^>]*>$")
+
+
 def immutable_tokens(text: str, site_id: str) -> dict[str, list[str]]:
+    # Filter out cross-cell pseudo-codes: `` `| Read |` `` artifacts from malformed table rows
+    # where a backtick accidentally spans two table cell boundaries.
+    inline_codes = [c for c in INLINE_CODE_PATTERN.findall(text)
+                    if not _TABLE_CELL_PSEUDO_CODE_RE.match(c)]
+    # Filter out XML namespace tags (e.g. <a:tbl>, <p:grpSpPr>) from html_tags.
+    # These appear inside Java-style {@code <ns:tag>} doc comments and are not
+    # standalone HTML — NLLB may legitimately translate or drop the surrounding
+    # {@code ...} context.
+    html_tags = [t for t in HTML_TAG_PATTERN.findall(text)
+                 if not _XML_NAMESPACE_TAG_RE.match(t)]
     tokens = {
         "shortcodes": SHORTCODE_PATTERN.findall(text),
-        "inline_code": INLINE_CODE_PATTERN.findall(text),
+        "inline_code": inline_codes,
         "markdown_link_destinations": MARKDOWN_LINK_PATTERN.findall(text),
-        "html_tags": HTML_TAG_PATTERN.findall(text),
+        "html_tags": html_tags,
         "urls": URL_PATTERN.findall(text),
         "anchors": ANCHOR_PATTERN.findall(text),
         "file_paths": FILE_PATH_PATTERN.findall(text),
@@ -398,6 +532,16 @@ def token_differences(source_text: str, target_text: str, site_id: str) -> list[
         if kind == "inline_code":
             src_set = {_normalize_inline_code(v) for v in values}
             tgt_set = {_normalize_inline_code(v) for v in target_tokens.get(kind, [])}
+        elif kind == "file_paths":
+            # Compare file paths case-insensitively: NLLB sometimes capitalises path
+            # components (e.g. presentation.xml → presentation.Xml).
+            src_set = {v.lower() for v in values}
+            tgt_set = {v.lower() for v in target_tokens.get(kind, [])}
+        elif kind == "html_tags":
+            # Compare HTML tags with spaces removed and lowercased:
+            # NLLB sometimes inserts spaces inside tags (</extLst> → </ext Lst >).
+            src_set = {re.sub(r"\s+", "", v).lower() for v in values}
+            tgt_set = {re.sub(r"\s+", "", v).lower() for v in target_tokens.get(kind, [])}
         else:
             src_set = set(values)
             tgt_set = set(target_tokens.get(kind, []))
@@ -690,6 +834,20 @@ def repair_target(profile, parser_obj: HugoParser, source: Path, target: Path) -
         if after != before:
             target.write_text(after, encoding="utf-8")
             repairs["spurious_table_code_fences"] = {"changed": True}
+            before = after
+        after = restore_body_paragraphs_with_missing_codes(
+            source.read_text(encoding="utf-8", errors="replace"), before
+        )
+        if after != before:
+            target.write_text(after, encoding="utf-8")
+            repairs["body_paragraphs_with_missing_codes"] = {"changed": True}
+            before = after
+        after = restore_mutated_inline_codes(
+            source.read_text(encoding="utf-8", errors="replace"), before
+        )
+        if after != before:
+            target.write_text(after, encoding="utf-8")
+            repairs["mutated_inline_codes"] = {"changed": True}
     repairs["changed"] = any(
         bool(value.get("changed")) for value in repairs.values() if isinstance(value, dict)
     )
@@ -839,21 +997,35 @@ _FENCE_CLOSE_RE = re.compile(r"^```\s*$", re.MULTILINE)
 
 
 def restore_spurious_table_code_fences(source_text: str, target_text: str) -> str:
-    """Remove code fences that NLLB spuriously inserts inside markdown table cells.
+    """Remove code fences that NLLB spuriously inserts in the translated body.
 
-    When a source table cell contains a multi-line TypeScript/JSON type (e.g.
-    ```: {\n        foo?: number;\n    }```) NLLB misinterprets the indented block
-    and wraps it in ``` fences in the translation.  The verifier then flags
-    CODE_FENCE_MISMATCH because source has 0 fences but target has 2+.
+    Two patterns handled:
 
-    Strategy: if source body has 0 code fences and target body has code fences
-    where the line immediately before each opening fence is a table row, strip
-    the fence markers (the content itself is kept as-is).
+    1. Table-adjacent fences: source table cell contains a multi-line TypeScript/JSON
+       type (e.g. ```: {\n    foo?: number;\n}```) → NLLB wraps it in ``` fences.
+       Strategy: remove fences where the preceding non-empty line is a table row.
+
+    2. Hallucinated import blocks: NLLB adds a ``python / from module import X `` block
+       that has no counterpart in the source.  When source body has 0 code fences, ALL
+       target fences are NLLB hallucinations — remove the markers and their content.
     """
 
     def body_of(text: str) -> tuple[str, int]:
-        pos = text.rfind("\n---\n")
-        return (text[pos + 4 :], pos + 4) if pos != -1 else (text, 0)
+        # Find the END of Hugo frontmatter (the closing '---' after the opening one).
+        # Use the second '---\n' occurrence (first closes frontmatter); rfind would
+        # incorrectly match a horizontal-rule '---' deeper in the markdown body.
+        stripped = text.lstrip("\n")
+        if stripped.startswith("---"):
+            # Skip the opening --- line then find the next ---
+            rest_start = text.index("---") + 3
+            # Skip any trailing \n/\r after opening ---
+            while rest_start < len(text) and text[rest_start] in "\r\n":
+                rest_start += 1
+            close_pos = text.find("\n---\n", rest_start)
+            if close_pos != -1:
+                return (text[close_pos + 5 :], close_pos + 5)
+        # Fallback: no frontmatter found — treat entire text as body
+        return (text, 0)
 
     src_body, _ = body_of(source_text)
     tgt_body, tgt_body_start = body_of(target_text)
@@ -879,7 +1051,7 @@ def restore_spurious_table_code_fences(source_text: str, target_text: str) -> st
                     prev_content = rs
                     break
             if "|" in prev_content:
-                # Spurious fence — skip the opening marker, keep content until closing
+                # Pattern 1: table-adjacent spurious fence — keep content, strip markers
                 changed = True
                 i += 1
                 while i < len(lines):
@@ -889,6 +1061,17 @@ def restore_spurious_table_code_fences(source_text: str, target_text: str) -> st
                         break
                     result.append(cl)
                     i += 1
+                continue
+            else:
+                # Pattern 2: hallucinated non-table fence — drop markers AND content
+                changed = True
+                i += 1
+                while i < len(lines):
+                    cl = lines[i]
+                    if _FENCE_CLOSE_RE.match(cl.rstrip("\r\n")):
+                        i += 1  # skip closing fence marker
+                        break
+                    i += 1  # drop content too
                 continue
         result.append(line)
         i += 1

@@ -185,6 +185,19 @@ def is_audit_path(path: str) -> bool:
         normalized.startswith("provenance.")
         or normalized in {"grade", "grade_reasons", "graded_content_hash"}
         or normalized.startswith("graded_")
+        # evidence.* is engine-generated metadata (model_sha, apis, claims, formats,
+        # sections) written during translation. Structural and value differences here
+        # reflect engine version drift, not translation quality. Exclude from comparison.
+        or normalized.startswith("evidence.")
+        or normalized == "evidence"
+        # categories is a Hugo taxonomy field. It must not be compared structurally
+        # because taxonomy terms differ per locale configuration, not per translation.
+        or normalized == "categories"
+        or normalized.startswith("categories[")
+        # type is a Hugo rendering-configuration field written by the engine as a
+        # passthrough. Old engine versions wrote type: reference_single; current engine
+        # may omit it. Structural differences here are engine version artifacts.
+        or normalized == "type"
     )
 
 
@@ -263,7 +276,8 @@ def extract_product_requirements(value: Any) -> list[dict[str, str | None]]:
         platform = None
         platform_match = re.search(r"\s+for\s+([A-Za-z0-9.+#-]+)$", identity)
         if platform_match:
-            platform = platform_match.group(1)
+            # Strip trailing punctuation that end-of-sentence may attach (e.g. "Java.")
+            platform = platform_match.group(1).rstrip(".,:;!?")
         requirements.append({"identity": identity, "core": core_match.group(0), "platform": platform})
     return requirements
 
@@ -279,7 +293,12 @@ def product_identity_violations(src_value: Any, tgt_value: Any, path: str) -> li
         if core and core not in tgt_value:
             missing.append(core)
         if platform and platform not in tgt_value:
-            missing.append(platform)
+            # Inflected languages (Czech, Polish, etc.) decline platform names:
+            # Java → Javu, Python → Pythonu.  Accept if the first N-2 chars of the
+            # platform appear in the target (stem match, minimum 3 chars).
+            stem = platform[: max(3, len(platform) - 2)]
+            if stem not in tgt_value:
+                missing.append(platform)
         if missing:
             violations.append(
                 {
@@ -624,8 +643,16 @@ def verify_pair(profile, parser: HugoParser, source: Path, target: Path, locale:
     translate_paths = translatable_paths(profile, source_doc)
     translate_norm = {normalize_rule_path(path) for path in translate_paths}
 
-    missing = sorted(path for path in set(src_all) - set(tgt_all) if not is_audit_path(path))
-    extra = sorted(path for path in set(tgt_all) - set(src_all) if not is_audit_path(path))
+    missing_raw = sorted(path for path in set(src_all) - set(tgt_all) if not is_audit_path(path))
+    extra_raw = sorted(path for path in set(tgt_all) - set(src_all) if not is_audit_path(path))
+
+    # Hugo YAML keys are case-insensitive (e.g. linkTitle == linktitle).  Remove
+    # pairs where the only difference is key-name case (e.g. linkTitle vs linktitle).
+    _missing_lower = {p.lower(): p for p in missing_raw}
+    _extra_lower = {p.lower(): p for p in extra_raw}
+    _cancel = set(_missing_lower) & set(_extra_lower)
+    missing = sorted(p for p in missing_raw if p.lower() not in _cancel)
+    extra = sorted(p for p in extra_raw if p.lower() not in _cancel)
     type_mismatches = []
     list_length_mismatches = []
     protected_changes = []
