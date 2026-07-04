@@ -97,6 +97,20 @@ def test_merge_shard_checkpoints_updates_main_and_drops_accepted_failures(tmp_pa
     assert set(merged["failed"]) == {"b"}
 
 
+def test_merge_shard_checkpoints_normalizes_null_failed(tmp_path):
+    evidence = tmp_path / "evidence"
+    checkpoints = evidence / "checkpoints"
+    write_json(checkpoints / "checkpoint.json", {"accepted": {}, "failed": None})
+    write_json(checkpoints / "checkpoint.gpu0.json", {"accepted": {"a": {"receipt": 1}}, "failed": {}})
+
+    result = merge_shard_checkpoints(evidence)
+
+    merged = __import__("json").loads((checkpoints / "checkpoint.json").read_text(encoding="utf-8"))
+    assert result["accepted"] == 1
+    assert result["failed"] == 0
+    assert merged["failed"] == {}
+
+
 def test_translate_cmd_forces_configured_device(tmp_path):
     args = type(
         "Args",

@@ -355,3 +355,4 @@ scripts/list_conda_envs.py
 scripts/inspect_l3.bat
 scripts/inspect_cache.py
 /docs/plans
+/.local

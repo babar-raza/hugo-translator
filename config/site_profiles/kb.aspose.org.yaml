@@ -88,7 +88,7 @@ frontmatter:
     mode: translate
     strategy: null
   keywords:
-    mode: translate
+    mode: passthrough
     strategy: null
   draft:
     mode: passthrough
@@ -116,6 +116,12 @@ body:
   preserve_patterns:
   - ^\{\{<.*?>\}\}
   - ^\{\{%.*?%\}\}
+  # Protect Aspose product names (Aspose.Email, Aspose.3D, Aspose.Cells, etc.)
+  - \bAspose\.[A-Za-z][A-Za-z0-9.]*\b
+  # Protect C++ scope resolution (mapi_message::from_stream, MapiMessage::FromStream)
+  - \b\w+::\w+(?:\s*\([^)]*\))?\b
+  # Protect email file format abbreviations (MSG, EML, PST, ICS, MIME, mbox)
+  - \b(?:MSG|EML|PST|ICS|mbox|MIME|MAPI|SMTP|IMAP|POP3|RFC)\b
   placeholder_syntax:
   - \{\{<.*?>\}\}
   - \{\{%.*?%\}\}
@@ -171,7 +177,6 @@ frontmatter_translation:
   translatable_fields:
   - title
   - description
-  - keywords
   - step1
   - step2
   - step3

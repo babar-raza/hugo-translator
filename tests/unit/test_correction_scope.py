@@ -189,7 +189,9 @@ class TestCorrectionBypassAllowlist:
     def test_all_bypass_types_are_real_validator_names(self):
         """Verify that every name in _BYPASS_VALIDATORS matches an actual validator class."""
         from src.translation_engine.correction import _BYPASS_VALIDATORS
-        import importlib, pkgutil, inspect
+        import importlib
+        import inspect
+        import pkgutil
         import src.translation_engine.validation as val_pkg
 
         # Collect all class names in the validation package

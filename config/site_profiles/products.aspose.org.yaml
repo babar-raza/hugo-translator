@@ -150,6 +150,54 @@ frontmatter:
   app.title:
     mode: translate
     strategy: null
+  product.heading:
+    mode: translate
+    strategy: null
+  product.summary:
+    mode: translate
+    strategy: null
+  product.available_title:
+    mode: translate
+    strategy: null
+  product.available_summary:
+    mode: translate
+    strategy: null
+  product.enable:
+    mode: passthrough
+    strategy: null
+  limitations.title:
+    mode: translate
+    strategy: null
+  limitations.content:
+    mode: translate
+    strategy: null
+  limitations.enable:
+    mode: passthrough
+    strategy: null
+  banner.enable:
+    mode: passthrough
+    strategy: null
+  banner.button_try.enable:
+    mode: passthrough
+    strategy: null
+  banner.button_buy.enable:
+    mode: passthrough
+    strategy: null
+  testimonialswrapper.enable:
+    mode: passthrough
+    strategy: null
+  testimonialswrapper.poster:
+    mode: passthrough
+    strategy: null
+  testimonialswrapper.caseStudiesLink:
+    mode: passthrough
+    strategy: null
+  support.enable:
+    mode: passthrough
+    strategy: null
+  enterprise_backlink_injected:
+    mode: passthrough
+    strategy: null
   draft:
     mode: passthrough
     strategy: null

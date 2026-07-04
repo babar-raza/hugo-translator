@@ -47,6 +47,24 @@ class TestShouldSkipPuritySegment:
         assert _skip("0-9,A-Z,...") is True
         assert _skip("1234567890") is True  # all digits
 
+    def test_reference_table_row_skipped(self):
+        """Generated API reference table rows are identifier-heavy, not language evidence."""
+        assert _skip("| `MAXREGSECT` | `uint` | Read | Defines the maximum regular sectors |") is True
+
+    def test_reference_api_signature_line_skipped(self):
+        """API signature-heavy lines are excluded from FastText purity scoring."""
+        assert _skip("`A3DObject(name: String)` creates an A3D object") is True
+
+    def test_hugo_shortcode_line_skipped(self):
+        """Hugo shortcode-only lines are structure, not language evidence."""
+        assert _skip('{{< sections cols="4" >}}') is True
+        assert _skip('{{% alert color="primary" %}}') is True
+
+    def test_format_acronym_selector_line_skipped(self):
+        """Format selector lines are immutable technical inventories, not prose."""
+        assert _skip("MSG (read/write), CFB (read/write), EML (via conversion)") is True
+        assert _skip("DOCX, DOC, RTF, TXT, PDF, Markdown") is True
+
     def test_legitimate_wrong_language_not_skipped(self):
         """Russian text in a BG file is legitimate wrong-language — must NOT be skipped."""
         russian_text = "Привет мир, как дела сегодня вечером"

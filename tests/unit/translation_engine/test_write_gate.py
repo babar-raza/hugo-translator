@@ -77,6 +77,16 @@ class TestGateLanguageMismatch:
         r = gate.evaluate(_md(), "", "de", Path("test.md"))
         assert r.passed
 
+    def test_force_accept_bypasses_final_purity_for_governed_verifier(self):
+        detector = _make_detector("en", 0.95)
+        gate = _make_evaluator(detector=detector, force_accept=True)
+        body = "This is a long English paragraph that would normally fail for a German target language."
+
+        r = gate.evaluate(_md(body), _md("source"), "de", Path("test.md"))
+
+        assert r.passed
+        assert r._purity_result["reason"].startswith("Skipped by force_accept")
+
     def test_pass_when_similar_languages(self):
         tracker = MagicMock()
         tracker.are_similar.return_value = True

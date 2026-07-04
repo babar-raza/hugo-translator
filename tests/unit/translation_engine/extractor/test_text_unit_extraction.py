@@ -1181,5 +1181,88 @@ class TestFrontmatterTranslation:
         assert plan.units[1].source_text == "another"
 
 
+class TestBatchTranslateUnitsSortByLength:
+    """TC-SCHED-001-C: Optional unit sorting by estimated token length.
+
+    MS-SCHED-001-C-02/03/04: Verify that sort_by_length=True does NOT affect
+    the output order of units — translations are applied in-place so the
+    original `units` list order is always preserved.
+    """
+
+    def _make_mock_model(self):
+        model = MagicMock()
+        def fake_translate(texts, src_lang, tgt_lang):
+            return [f"[{t}]" for t in texts]
+        model.translate.side_effect = fake_translate
+        return model
+
+    def _make_unit(self, uid: str, text: str) -> TextUnit:
+        return TextUnit(
+            unit_id=uid,
+            node_addr=f"p.{uid}",
+            kind=TextUnitKind.TEXT,
+            source_text=text,
+            do_not_translate=False,
+        )
+
+    def test_sort_by_length_false_preserves_natural_order(self):
+        """Default (sort_by_length=False) returns units in original order."""
+        extractor = TextUnitExtractor(segmentation_strategy="leaf_only")
+        units = [
+            self._make_unit("1", "a very long string with many words here"),
+            self._make_unit("2", "short"),
+            self._make_unit("3", "medium length text"),
+        ]
+        model = self._make_mock_model()
+
+        result = extractor.batch_translate_units(units, model, "en", "de", sort_by_length=False)
+
+        assert [u.unit_id for u in result] == ["1", "2", "3"]
+
+    def test_sort_by_length_true_preserves_original_unit_order(self):
+        """sort_by_length=True must not change the output unit order.
+
+        This is the key regression guard for TC-SCHED-001-C-03.
+        Translations are applied in-place, so `units` order is always preserved.
+        """
+        extractor = TextUnitExtractor(segmentation_strategy="leaf_only")
+        units = [
+            self._make_unit("long", "a very long string with many words here"),
+            self._make_unit("short", "hi"),
+            self._make_unit("medium", "medium length text"),
+        ]
+        model = self._make_mock_model()
+
+        result = extractor.batch_translate_units(units, model, "en", "de", sort_by_length=True)
+
+        assert [u.unit_id for u in result] == ["long", "short", "medium"]
+
+    def test_sort_by_length_translations_assigned_to_correct_units(self):
+        """Negative control: each unit receives its own translation, not another's.
+
+        MS-SCHED-001-C-04: mixed-length unit mapping negative control.
+        """
+        extractor = TextUnitExtractor(segmentation_strategy="leaf_only")
+        units = [
+            self._make_unit("u1", "alpha beta gamma delta epsilon"),
+            self._make_unit("u2", "x"),
+            self._make_unit("u3", "hello world"),
+        ]
+
+        model = MagicMock()
+        def identity_translate(texts, src_lang, tgt_lang):
+            return [f"T:{t}" for t in texts]
+        model.translate.side_effect = identity_translate
+
+        result = extractor.batch_translate_units(units, model, "en", "de", sort_by_length=True)
+
+        for unit in result:
+            assert unit.translated_text is not None
+            assert unit.source_text in unit.translated_text, (
+                f"unit {unit.unit_id}: translation '{unit.translated_text}' "
+                f"does not contain source '{unit.source_text}'"
+            )
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

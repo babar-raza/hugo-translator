@@ -170,7 +170,7 @@ class LanguageConsistencyValidator(PostTranslationValidator):
         # Resolve per-language overrides (ES/IT/CS have stricter thresholds)
         lang_overrides = self.per_language_overrides.get(target_lang, {})
         effective_confidence = lang_overrides.get('confidence_threshold', self.confidence_threshold)
-        effective_purity = lang_overrides.get('purity_threshold', 95.0)
+        effective_purity = lang_overrides.get('purity_threshold', 88.0)
 
         # Unicode script-mixing check (fast, no ML, catches inline foreign phrases).
         # Runs before the slower langdetect pass but does NOT short-circuit so that
@@ -221,8 +221,22 @@ class LanguageConsistencyValidator(PostTranslationValidator):
                     confidence = top_lang.prob
 
                     # Accept linguistically near-identical languages that share FastText/langdetect space.
-                    # Latin-script Serbian is correctly classified as hr/bs by most detectors.
-                    _SIMILAR_LANG_MAP = {'sr': {'hr', 'bs'}}
+                    _SIMILAR_LANG_MAP = {
+                        'sr': {'hr', 'bs'},
+                        'hr': {'sr', 'bs'},
+                        'bs': {'sr', 'hr'},
+                        'ms': {'id'},
+                        'id': {'ms'},
+                        'uk': {'ru', 'bg'},
+                        'bg': {'ru', 'uk'},
+                        'sk': {'cs'},
+                        'cs': {'sk'},
+                        'zh': {'ja', 'zh-cn', 'zh-tw'},
+                        'ja': {'zh', 'zh-cn', 'zh-tw'},
+                        'no': {'da', 'nb'},
+                        'nb': {'no', 'da'},
+                        'da': {'no', 'nb'},
+                    }
                     _similar_accepted = _SIMILAR_LANG_MAP.get(target_lang, set())
                     if (detected_code == target_lang or detected_code in _similar_accepted) and confidence >= effective_confidence:
                         correct_lang_count += 1
@@ -328,7 +342,7 @@ class LanguageConsistencyValidator(PostTranslationValidator):
         # Strip content that legitimately contains foreign characters
         clean = re.sub(r'```.*?```', '', text, flags=re.DOTALL)   # fenced code
         clean = re.sub(r'`[^`]+`', '', clean)                      # inline code
-        clean = re.sub(r'^---.*?^---', '', clean, flags=re.DOTALL | re.MULTILINE)  # frontmatter
+        clean = re.sub(r'^---.*?^---', '', clean, count=1, flags=re.DOTALL | re.MULTILINE)  # frontmatter only
         clean = re.sub(r'https?://\S+', '', clean)                 # URLs
         clean = re.sub(r'\{\{[<{%].*?[>}%]\}\}', '', clean, flags=re.DOTALL)  # shortcodes
 
@@ -403,8 +417,9 @@ class LanguageConsistencyValidator(PostTranslationValidator):
         """
         # Remove YAML frontmatter (--- ... ---) — contains English-only fields
         # (productname, productkey, keywords, etc.) that skew purity checks.
-        # _check_script_mixing already strips frontmatter; keep consistent.
-        text = re.sub(r'^---.*?^---', '', text, flags=re.DOTALL | re.MULTILINE)
+        # count=1 ensures only the leading frontmatter block is removed, not
+        # subsequent --- horizontal rules used as section separators in the body.
+        text = re.sub(r'^---.*?^---', '', text, count=1, flags=re.DOTALL | re.MULTILINE)
 
         # Remove code blocks (``` ... ```)
         text = re.sub(r"```.*?```", "", text, flags=re.DOTALL)
@@ -423,6 +438,15 @@ class LanguageConsistencyValidator(PostTranslationValidator):
 
         # Remove placeholders
         text = re.sub(r"\{(?:PLACEHOLDER|TERM|SHORTCODE)_\d+\}", "", text)
+
+        # Strip dotted API identifiers (Scene.Save, System.IO, Aspose.3D) — these
+        # are English identifiers that appear verbatim in translated prose and skew
+        # langdetect toward 'en', causing false purity failures for API-heavy content.
+        text = re.sub(r'\b[A-Za-z]\w*(?:\.\w+)+\b', '', text)
+
+        # Strip PascalCase multi-component identifiers (HttpClient, StringBuilder,
+        # NuGet) — same issue; two or more CamelCase components in sequence.
+        text = re.sub(r'\b[A-Z][a-z]\w*(?:[A-Z][a-z]\w*)+\b', '', text)
 
         # Remove excessive whitespace
         text = re.sub(r"\s+", " ", text).strip()

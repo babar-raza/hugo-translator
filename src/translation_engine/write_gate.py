@@ -284,6 +284,14 @@ class WriteGateEvaluator:
         detector: FastTextDetector,
         result: WriteGateResult,
     ) -> None:
+        if self._force_accept:
+            result._purity_result = {  # type: ignore[attr-defined]
+                "passed": True,
+                "reason": "Skipped by force_accept; governed verifier remains authoritative",
+                "wrong_lang_percentage": 0.0,
+                "detected_languages": {},
+            }
+            return
         purity_result = self._verify_final_file_purity(translated_content, target_lang, detector)
         if not purity_result["passed"]:
             result.passed = False
@@ -571,7 +579,32 @@ class WriteGateEvaluator:
         """Return True if a line should be excluded from FastText language detection."""
         if not line:
             return False
+        if re.fullmatch(r"\{\{[<%].*?[>%]\}\}", line):
+            return True
+        if line.startswith("|") and line.endswith("|"):
+            return True
+        inline_code_count = len(re.findall(r"`[^`]+`", line))
+        if inline_code_count >= 2:
+            return True
+        api_identifiers = re.findall(
+            r"\b(?:[A-Z][A-Za-z0-9_]*\.)+[A-Z][A-Za-z0-9_]*\b|\b[A-Z][a-zA-Z0-9_]+(?:Exception|Options|Builder|Factory|Collection|Renderer|Exporter|Importer|Constants)\b|\b[A-Za-z_][A-Za-z0-9_]*\([^)]*\)",
+            line,
+        )
+        if api_identifiers:
+            remaining = line
+            for token in api_identifiers:
+                remaining = remaining.replace(token, " ")
+            prose_words = [
+                word for word in re.findall(r"[A-Za-z]{4,}", remaining)
+                if word.lower() not in {"class", "method", "property", "properties"}
+            ]
+            if len(prose_words) < 4:
+                return True
         if re.match(r"^[A-Z][a-zA-Z0-9 ]+:\s*[0-9A-Za-z+\-,. /]+$", line):
+            return True
+        acronym_tokens = re.findall(r"\b[A-Z][A-Z0-9]{1,}\b", line)
+        prose_words = re.findall(r"[A-Za-z]{4,}", line)
+        if len(acronym_tokens) >= 3 and len(prose_words) <= len(acronym_tokens) + 3:
             return True
         visible = [c for c in line if not c.isspace()]
         if visible:

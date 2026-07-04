@@ -1648,8 +1648,24 @@ class TranslationEngine:
                 detected_langs = _ld.detect_langs(v_stripped)
                 if detected_langs:
                     top = detected_langs[0]
-                    # Accept linguistically near-identical languages (e.g. Latin-script sr detected as hr/bs).
-                    _SIMILAR_LANG_MAP = {'sr': {'hr', 'bs'}}
+                    # Accept linguistically near-identical languages that share script/vocabulary space.
+                    # langdetect frequently confuses these pairs on short technical text.
+                    _SIMILAR_LANG_MAP = {
+                        'sr': {'hr', 'bs'},        # South Slavic Latin-script
+                        'hr': {'sr', 'bs'},
+                        'bs': {'sr', 'hr'},
+                        'ms': {'id'},              # Malay ↔ Indonesian
+                        'id': {'ms'},
+                        'uk': {'ru', 'bg'},        # East Slavic Cyrillic
+                        'bg': {'ru', 'uk'},
+                        'sk': {'cs'},              # West Slavic
+                        'cs': {'sk'},
+                        'zh': {'ja', 'zh-cn', 'zh-tw'},  # CJK — shared characters
+                        'ja': {'zh', 'zh-cn', 'zh-tw'},
+                        'no': {'da', 'nb'},        # North Germanic
+                        'nb': {'no', 'da'},
+                        'da': {'no', 'nb'},
+                    }
                     _similar_accepted = _SIMILAR_LANG_MAP.get(target_lang, set())
                     if top.lang != target_lang and top.lang not in _similar_accepted and top.prob > CONFIDENCE_THRESHOLD:
                         issues.append(

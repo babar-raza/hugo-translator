@@ -1,9 +1,4 @@
-<<<<<<< Updated upstream
-"""Tests for TC-05: File-level review cache."""
-
-=======
 """Tests for TC-05 / TC-M1B: File-level review cache + config fingerprint."""
->>>>>>> Stashed changes
 from __future__ import annotations
 
 import json

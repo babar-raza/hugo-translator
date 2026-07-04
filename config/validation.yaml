@@ -20,7 +20,7 @@ decision_rules:
 
   # Acceptance thresholds - when to accept despite issues
   accept_warnings: true  # Accept translation with warnings (non-critical issues)
-  accept_after_max_retries: false  # Reject after max retries if quality errors remain (prevents publishing corrupted ES/CS/IT)
+  accept_after_max_retries: false  # Reject after max retries if still failing
 
 # Retry Strategy: How to modify retry attempts
 retry_strategy:
@@ -86,7 +86,7 @@ validators:
     per_language_overrides:
       es: {purity_threshold: 98.0, confidence_threshold: 0.90}
       it: {purity_threshold: 98.0, confidence_threshold: 0.90}
-      cs: {purity_threshold: 97.0, confidence_threshold: 0.88}
+      cs: {purity_threshold: 90.0, confidence_threshold: 0.88}  # Lowered 97→90: .NET API names in prose (Scene, Node) cause false English detection
       # Added 2026-04-20: high queue counts (th:25, ar/bg/hi: cluster) — non-Latin scripts
       # have low FP rates for English technical terms, can safely use strict thresholds
       th: {purity_threshold: 99.0, confidence_threshold: 0.88}

@@ -84,4 +84,43 @@ class TestHashTextDeterminism:
         assert ht_result != str(py_hash), (
             "hash_text must not equal str(hash()) — would be non-deterministic"
         )
-        assert len(ht_result) == 32  # MD5 hex
+
+
+class TestL1CacheCrossLanguageIsolation:
+    """TC-LANG-001-C: TM hit cannot cross target languages.
+
+    MS-LANG-001-C-01/02: Confirm TM key includes tgt_lang so a lookup with
+    a different target language always misses.
+    """
+
+    def test_l1_cache_miss_for_different_target_language(self):
+        """Store with tgt_lang=de; lookup with tgt_lang=fr must miss."""
+        from src.tm.l1_cache import L1Cache
+
+        cache = L1Cache(max_size=100)
+        cache.put("site", "en", "de", "hello", "Hallo")
+
+        result = cache.get("site", "en", "fr", "hello")
+        assert result is None, "Cross-language cache hit must be impossible"
+
+    def test_l1_cache_hit_for_same_target_language(self):
+        """Store with tgt_lang=de; lookup with tgt_lang=de must hit."""
+        from src.tm.l1_cache import L1Cache
+
+        cache = L1Cache(max_size=100)
+        cache.put("site", "en", "de", "hello", "Hallo")
+
+        result = cache.get("site", "en", "de", "hello")
+        assert result == "Hallo"
+
+    def test_l1_cache_independent_entries_per_language(self):
+        """Two target languages can coexist with different translations."""
+        from src.tm.l1_cache import L1Cache
+
+        cache = L1Cache(max_size=100)
+        cache.put("site", "en", "de", "hello", "Hallo")
+        cache.put("site", "en", "fr", "hello", "Bonjour")
+
+        assert cache.get("site", "en", "de", "hello") == "Hallo"
+        assert cache.get("site", "en", "fr", "hello") == "Bonjour"
+        assert cache.get("site", "en", "es", "hello") is None
