@@ -1,0 +1,15 @@
+policy_id: docs-aspose-org-governed-v1
+inherits: aspose-org-common-governed-v1
+site_id: docs.aspose.org
+layout: per_language_folders
+site_specific_gates:
+  preserve_terms:
+    - API
+    - SDK
+    - Aspose
+  required_sample_types:
+    - getting-started
+    - developer-guide
+    - _index
+    - code-heavy
+    - shortcode-link-heavy

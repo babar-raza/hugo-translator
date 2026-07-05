@@ -1,0 +1,12 @@
+policy_id: reference-aspose-org-governed-v1
+inherits: aspose-org-common-governed-v1
+site_id: reference.aspose.org
+layout: per_language_folders
+site_specific_gates:
+  preserve_api_identifiers: true
+  required_sample_types:
+    - namespace
+    - class
+    - method-property
+    - enum-constants
+    - api-index

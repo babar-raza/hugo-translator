@@ -1,0 +1,69 @@
+policy_id: aspose-org-common-governed-v1
+acceptance_bar: products-org-manual-review-2026-07-01
+
+hard_gates:
+  frontmatter_structure:
+    severity: error
+    requirement: Target frontmatter must preserve source key, list, and scalar type structure except explicit audit metadata.
+  protected_fields:
+    severity: error
+    requirement: Protected and passthrough fields must remain equivalent after parsing.
+    common_fields:
+      - layout
+      - type
+      - date
+      - lastmod
+      - draft
+      - url
+      - slug
+      - weight
+      - aliases
+      - menu
+      - author
+      - authors
+      - categories
+      - tags
+      - productname
+      - productkey
+      - platformkey
+      - productplatform
+      - family_name
+  immutable_tokens:
+    severity: error
+    requirement: Markdown links, anchors, URLs, HTML tags, Hugo shortcodes, placeholders, variables, file paths, inline code, and fenced code blocks must not be damaged.
+  identity_terms:
+    severity: error
+    requirement: Aspose product identities and API identifiers must survive unchanged.
+  completeness:
+    severity: error
+    requirement: Translatable prose must not remain substantially unchanged English in localized targets.
+  repetition:
+    severity: error
+    requirement: Reject model degeneration such as repeated titles, repeated words, punctuation loops, or symbol loops.
+  source_integrity:
+    severity: error
+    requirement: English source pages must not be mutated during translation.
+
+automated_repairs_allowed:
+  - restore configured passthrough/material fields from source
+  - restore Aspose product identity substrings
+  - restore immutable fenced code blocks when counts match
+  - retry untranslated prose with smaller translation granularity
+
+automated_repairs_forbidden:
+  - fake or placeholder translations
+  - dropping pages or locales to make counts pass
+  - silently accepting translator failures
+  - weakening hard gates to accept known-bad content
+  - mutating English source pages
+
+evidence_required:
+  - baseline inventory of required source/locale pairs
+  - source hash snapshot before and after execution
+  - per-file source/target comparison JSON
+  - failure JSON with typed reason
+  - resolved-failure records
+  - accepted receipts with policy version/hash
+  - accepted reverify report
+  - monitored sample report
+  - final execution report

@@ -449,16 +449,33 @@ def restore_mutated_inline_codes(source_text: str, target_text: str) -> str:
     src_codes = INLINE_CODE_PATTERN.findall(src_body)
     tgt_codes = INLINE_CODE_PATTERN.findall(tgt_body)
 
-    src_by_norm = {super_norm(c): c for c in src_codes}
+    # Build norm→code maps; track norms that map to multiple distinct originals.
+    src_by_norm: dict[str, str] = {}
+    src_ambiguous: set[str] = set()
+    for c in src_codes:
+        n = super_norm(c)
+        if n in src_by_norm and src_by_norm[n] != c:
+            src_ambiguous.add(n)
+        src_by_norm[n] = c
+
     tgt_by_norm: dict[str, str] = {}
+    tgt_ambiguous: set[str] = set()
     for c in tgt_codes:
         n = super_norm(c)
-        if n not in tgt_by_norm:
+        if n in tgt_by_norm and tgt_by_norm[n] != c:
+            tgt_ambiguous.add(n)
+        elif n not in tgt_by_norm:
             tgt_by_norm[n] = c
 
-    # Norms present in both source and target but with different actual codes → mutation
+    # Norms present in both source and target but with different actual codes → mutation.
+    # Skip ambiguous norms (norm maps to >1 distinct code in src or tgt).
     common_norms = set(src_by_norm) & set(tgt_by_norm)
-    to_repair = {n for n in common_norms if src_by_norm[n] != tgt_by_norm[n]}
+    to_repair = {
+        n for n in common_norms
+        if src_by_norm[n] != tgt_by_norm[n]
+        and n not in src_ambiguous
+        and n not in tgt_ambiguous
+    }
 
     if not to_repair:
         return target_text
@@ -474,6 +491,56 @@ def restore_mutated_inline_codes(source_text: str, target_text: str) -> str:
     if not changed:
         return target_text
     return target_text[:tgt_body_start] + result_body
+
+
+def restore_mutated_file_paths(source_text: str, target_text: str) -> str:
+    """Replace file paths mutated by NLLB (letter inserted/removed, capitalisation changed).
+
+    Example: ``ppt/slideLayouts/slideLayoutN.xml`` → ``ppt/slidesLayouts/SlideLayOutN.xml``
+    (extra 's' inserted, capitalisation changed).
+
+    Strategy: for each source file path not found (case-insensitively) in target,
+    find the closest target file path by SequenceMatcher similarity. If similarity
+    >= 0.80 and no other source path matches the same target path, replace.
+    """
+    import difflib
+
+    def body_of(text: str) -> tuple[str, int]:
+        m = _FRONTMATTER_BLOCK_RE.match(text)
+        return (text[m.end():], m.end()) if m else (text, 0)
+
+    src_body, _ = body_of(source_text)
+    tgt_body, tgt_body_start = body_of(target_text)
+
+    src_paths = list(dict.fromkeys(FILE_PATH_PATTERN.findall(src_body)))  # deduplicated
+    tgt_paths = list(dict.fromkeys(FILE_PATH_PATTERN.findall(tgt_body)))
+
+    if not src_paths or not tgt_paths:
+        return target_text
+
+    tgt_lower = {p.lower() for p in tgt_paths}
+    result_body = tgt_body
+    changed = False
+
+    for src_path in src_paths:
+        if src_path.lower() in tgt_lower:
+            continue  # already present (case-insensitive match)
+        # Find closest target path
+        matches = difflib.get_close_matches(src_path.lower(), [p.lower() for p in tgt_paths], n=1, cutoff=0.80)
+        if not matches:
+            continue
+        matched_lower = matches[0]
+        # Find actual target path string with this lowercase form
+        tgt_original = next((p for p in tgt_paths if p.lower() == matched_lower), None)
+        if tgt_original is None or tgt_original == src_path:
+            continue
+        result_body = result_body.replace(tgt_original, src_path)
+        # Update tgt_lower to reflect the replacement
+        tgt_lower.discard(matched_lower)
+        tgt_lower.add(src_path.lower())
+        changed = True
+
+    return target_text[:tgt_body_start] + result_body if changed else target_text
 
 
 _TABLE_CELL_PSEUDO_CODE_RE = re.compile(r"^`\s*\|.*\|\s*`$", re.DOTALL)
@@ -828,6 +895,13 @@ def repair_target(profile, parser_obj: HugoParser, source: Path, target: Path) -
             target.write_text(after, encoding="utf-8")
             repairs["body_dropped_link_list_items"] = {"changed": True}
             before = after
+        after = restore_stripped_markdown_links(
+            source.read_text(encoding="utf-8", errors="replace"), before
+        )
+        if after != before:
+            target.write_text(after, encoding="utf-8")
+            repairs["stripped_markdown_links"] = {"changed": True}
+            before = after
         after = restore_spurious_table_code_fences(
             source.read_text(encoding="utf-8", errors="replace"), before
         )
@@ -848,6 +922,13 @@ def repair_target(profile, parser_obj: HugoParser, source: Path, target: Path) -
         if after != before:
             target.write_text(after, encoding="utf-8")
             repairs["mutated_inline_codes"] = {"changed": True}
+            before = after
+        after = restore_mutated_file_paths(
+            source.read_text(encoding="utf-8", errors="replace"), before
+        )
+        if after != before:
+            target.write_text(after, encoding="utf-8")
+            repairs["mutated_file_paths"] = {"changed": True}
     repairs["changed"] = any(
         bool(value.get("changed")) for value in repairs.values() if isinstance(value, dict)
     )
@@ -963,20 +1044,71 @@ def restore_body_bold_label_inline_codes(source_text: str, target_text: str) -> 
 
 
 _LINK_LIST_ITEM_RE = re.compile(r"^- \[.*?\]\((/[^)]+)\)\s*$", re.MULTILINE)
+# Matches list items with external https:// links (e.g. Enterprise API Reference)
+_EXT_LINK_LIST_ITEM_RE = re.compile(r"^- \[([^\]]+)\]\((https?://[^)]+)\)\s*$", re.MULTILINE)
+_ALL_LINKS_RE = re.compile(r"\[([^\]]+)\]\(([^)]+)\)")
+
+
+def restore_stripped_markdown_links(source_text: str, target_text: str) -> str:
+    """Restore markdown link syntax that NLLB stripped, keeping only display text.
+
+    NLLB sometimes de-links anchors, e.g.:
+      source: ``- [Aspose.3D FOSS Python API Reference home](/3d/python/)``
+      target: ``- Aspose.3D FOSS Python API Reference home``
+
+    We find source link destinations missing from the target body, then look for
+    the bare display text in the target and restore the full ``[text](url)`` syntax.
+    """
+    src_body, src_offset = _body_of(source_text)
+    tgt_body, tgt_offset = _body_of(target_text)
+
+    src_links = _ALL_LINKS_RE.findall(src_body)  # [(text, url), ...]
+    tgt_urls = {url for _, url in _ALL_LINKS_RE.findall(tgt_body)}
+
+    result_body = tgt_body
+    changed = False
+
+    for link_text, url in src_links:
+        if url in tgt_urls:
+            continue
+        if not link_text or len(link_text) < 4:
+            continue
+        # Restore link syntax only when the bare display text is present in target
+        # (i.e. NLLB stripped the [...](...) wrapper but kept the text).
+        # Do NOT append fully-dropped items here — restore_body_dropped_link_list_items
+        # handles that case and avoids false positives on outdated translations.
+        if link_text in result_body and f"[{link_text}]" not in result_body:
+            result_body = result_body.replace(link_text, f"[{link_text}]({url})", 1)
+            tgt_urls.add(url)
+            changed = True
+
+    return target_text[:tgt_offset] + result_body if changed else target_text
 
 
 def restore_body_dropped_link_list_items(source_text: str, target_text: str) -> str:
     """Restore markdown list-item links that NLLB dropped from the target body.
 
-    NLLB sometimes omits entire list items that contain internal markdown links,
-    e.g. ``- [Aspose.3D Python API Reference home](/3d/python/)``.
+    NLLB sometimes omits entire list items that contain markdown links, both internal
+    (e.g. ``- [Aspose.3D Python API Reference home](/3d/python/)``) and external
+    (e.g. ``- [Aspose.Slides — Enterprise API Reference](https://reference.aspose.com/slides/)``).
     We detect missing link destinations and append the corresponding source lines.
     """
-    src_items = {m.group(1): m.group(0).rstrip() for m in _LINK_LIST_ITEM_RE.finditer(source_text)}
+    # Internal paths (starting with /)
+    src_items: dict[str, str] = {m.group(1): m.group(0).rstrip()
+                                  for m in _LINK_LIST_ITEM_RE.finditer(source_text)}
+    # External https:// URLs
+    src_items.update({m.group(2): m.group(0).rstrip()
+                      for m in _EXT_LINK_LIST_ITEM_RE.finditer(source_text)})
     if not src_items:
         return target_text
 
-    tgt_destinations = set(m.group(1) for m in _LINK_LIST_ITEM_RE.finditer(target_text))
+    # Collect all known destinations in target (both internal and external)
+    tgt_destinations: set[str] = set()
+    tgt_destinations.update(m.group(1) for m in _LINK_LIST_ITEM_RE.finditer(target_text))
+    tgt_destinations.update(m.group(2) for m in _EXT_LINK_LIST_ITEM_RE.finditer(target_text))
+    # Also check all [text](url) to catch links not in list-item format
+    tgt_destinations.update(m.group(2) for m in _ALL_LINKS_RE.finditer(target_text))
+
     missing = {dest: line for dest, line in src_items.items() if dest not in tgt_destinations}
     if not missing:
         return target_text

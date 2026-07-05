@@ -1,0 +1,19 @@
+policy_id: blog-aspose-org-governed-v1
+inherits: aspose-org-common-governed-v1
+site_id: blog.aspose.org
+layout: file_suffix
+site_specific_gates:
+  preserve_fields:
+    - author
+    - authors
+    - date
+    - categories
+    - tags
+    - slug
+    - url
+  required_sample_types:
+    - root-archive
+    - post-index-bundle
+    - product-announcement
+    - old-new-posts
+    - taxonomy-heavy
