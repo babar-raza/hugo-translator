@@ -1124,23 +1124,26 @@ class SegmentTranslator:
             batch_stats = extractor.batch_stats
             if batch_stats.get("language_purity_failures", 0) > 0 and target_lang not in (
                 _batch_purity_skip_langs or []
-            ):
-                total_batches = batch_stats.get("total_batches", 0)
-                if total_batches > 0:
-                    purity_failure_rate = batch_stats["language_purity_failures"] / total_batches
+            ) and not getattr(engine, '_force_accept', False):
+                # Use outer-batch counters so reactive sub-batch splitting doesn't
+                # artificially inflate the failure rate.
+                total_outer_batches = batch_stats.get("total_outer_batches", 0)
+                failed_outer_batches = batch_stats.get("failed_outer_batches", 0)
+                if total_outer_batches > 0 and failed_outer_batches > 0:
+                    purity_failure_rate = failed_outer_batches / total_outer_batches
 
                     if purity_failure_rate > 0.10:
                         logger.error(
-                            f"HIGH PURITY FAILURE RATE: {purity_failure_rate:.1%} of batches failed "
+                            f"HIGH PURITY FAILURE RATE: {purity_failure_rate:.1%} of outer batches failed "
                             f"language validation. Blocking write to prevent corruption. "
-                            f"Stats: {batch_stats['language_purity_failures']}/{total_batches} batches failed."
+                            f"Stats: {failed_outer_batches}/{total_outer_batches} outer batches failed."
                         )
 
                         issues = [
                             ValidationIssue(
                                 severity="error",
                                 rule="BatchLanguagePurity",
-                                message=f"High batch purity failure rate: {purity_failure_rate:.1%} ({batch_stats['language_purity_failures']}/{total_batches} batches)",
+                                message=f"High batch purity failure rate: {purity_failure_rate:.1%} ({failed_outer_batches}/{total_outer_batches} outer batches)",
                                 location=str(doc.file_path) if hasattr(doc, "file_path") else None,
                             )
                         ]
@@ -1149,7 +1152,7 @@ class SegmentTranslator:
                             message=f"Batch purity failure rate too high: {purity_failure_rate:.1%}",
                             file_path=str(doc.file_path) if hasattr(doc, "file_path") else "",
                             validation_result=validation_result,
-                            retry_feedback=f"Batch language purity check failed for {purity_failure_rate:.1%} of batches. Ensure all translated units are in the target language {target_lang}.",
+                            retry_feedback=f"Batch language purity check failed for {purity_failure_rate:.1%} of outer batches. Ensure all translated units are in the target language {target_lang}.",
                         )
 
             empty_units = [

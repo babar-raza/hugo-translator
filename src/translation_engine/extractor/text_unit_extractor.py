@@ -20,6 +20,27 @@ from .text_unit import BodyTranslationPlan, TextUnit, TextUnitKind
 logger = logging.getLogger(__name__)
 
 
+def _normalize_lang_code(code: str) -> str:
+    """Normalize language codes to base ISO 639-1 for skip-list matching."""
+    code = code.lower().strip()
+    _VARIANTS = {
+        "nb": "no",
+        "nn": "no",
+        "zh-cn": "zh",
+        "zh-tw": "zh",
+        "zh-hk": "zh",
+        "pt-br": "pt",
+        "pt-pt": "pt",
+        "en-us": "en",
+        "en-gb": "en",
+    }
+    if code in _VARIANTS:
+        return _VARIANTS[code]
+    if "-" in code:
+        return code.split("-")[0]
+    return code
+
+
 # Batch translation tuning constants
 LANGUAGE_PURITY_MIN_LENGTH = 15  # Minimum text length for reliable language detection
 LANGUAGE_PURITY_MIN_SCRIPT_RATIO = 0.4  # Minimum target-script ratio to accept mixed-script text
@@ -313,6 +334,8 @@ class TextUnitExtractor:
         # Batch statistics tracking
         self.batch_stats = {
             "total_batches": 0,
+            "total_outer_batches": 0,    # incremented once per outer loop iteration
+            "failed_outer_batches": 0,   # outer batches where all sub-retries failed
             "successful_batches": 0,
             "fallback_batches": 0,
             "mapping_failures": 0,
@@ -597,18 +620,32 @@ class TextUnitExtractor:
 
             # Handle string fields
             if isinstance(field_value, str) and field_value.strip():
+                stripped = field_value.strip()
+                do_not_translate = self._is_non_translatable(stripped)
+                protected_text = field_value
+                placeholder_map = {}
+                if not do_not_translate and self.placeholder_manager:
+                    protected_text, placeholder_map = self.placeholder_manager.protect(
+                        field_value, self.preserve_patterns
+                    )
                 unit = TextUnit(
                     unit_id=TextUnit.create_id(
-                        f"frontmatter.{field_name}", field_value, TextUnitKind.TEXT
+                        f"frontmatter.{field_name}", protected_text, TextUnitKind.TEXT
                     ),
                     node_addr=f"frontmatter.{field_name}",
                     kind=TextUnitKind.TEXT,
-                    source_text=field_value,
-                    metadata={"field_name": field_name, "field_type": "string"},
+                    source_text=protected_text,
+                    do_not_translate=do_not_translate,
+                    metadata={
+                        "field_name": field_name,
+                        "field_type": "string",
+                        "placeholder_map": placeholder_map,
+                        "original_text": field_value,
+                    },
                 )
                 units.append(unit)
                 logger.debug(
-                    f"Extracted frontmatter field '{field_name}'",
+                    f"Extracted frontmatter field '{field_name}' do_not_translate={do_not_translate}",
                     extra={"field_value": sanitize_for_log(field_value, 200)},
                 )
 
@@ -616,18 +653,33 @@ class TextUnitExtractor:
             elif isinstance(field_value, list):
                 for i, item in enumerate(field_value):
                     if isinstance(item, str) and item.strip():
+                        item_stripped = item.strip()
+                        do_not_translate = self._is_non_translatable(item_stripped)
+                        protected_item = item
+                        placeholder_map = {}
+                        if not do_not_translate and self.placeholder_manager:
+                            protected_item, placeholder_map = self.placeholder_manager.protect(
+                                item, self.preserve_patterns
+                            )
                         unit = TextUnit(
                             unit_id=TextUnit.create_id(
-                                f"frontmatter.{field_name}[{i}]", item, TextUnitKind.TEXT
+                                f"frontmatter.{field_name}[{i}]", protected_item, TextUnitKind.TEXT
                             ),
                             node_addr=f"frontmatter.{field_name}[{i}]",
                             kind=TextUnitKind.TEXT,
-                            source_text=item,
-                            metadata={"field_name": field_name, "field_type": "array", "index": i},
+                            source_text=protected_item,
+                            do_not_translate=do_not_translate,
+                            metadata={
+                                "field_name": field_name,
+                                "field_type": "array",
+                                "index": i,
+                                "placeholder_map": placeholder_map,
+                                "original_text": item,
+                            },
                         )
                         units.append(unit)
                         logger.debug(
-                            f"Extracted frontmatter array '{field_name}[{i}]'",
+                            f"Extracted frontmatter array '{field_name}[{i}]' do_not_translate={do_not_translate}",
                             extra={"item": sanitize_for_log(item, 200)},
                         )
 
@@ -655,18 +707,28 @@ class TextUnitExtractor:
             field_type = unit.metadata.get("field_type")
 
             if field_type == "string":
-                # Simple string field
-                frontmatter_dict[field_name] = unit.translated_text
+                # Simple string field — restore placeholders if any
+                translated = unit.translated_text
+                placeholder_map = unit.metadata.get("placeholder_map")
+                if placeholder_map and self.placeholder_manager:
+                    translated = self.placeholder_manager.restore(translated, placeholder_map)
+                frontmatter_dict[field_name] = translated
                 logger.debug(f"Applied translation to frontmatter field '{field_name}'")
                 applied_count += 1
 
             elif field_type == "array":
-                # Array item
+                # Array item — restore placeholders if any
                 index = unit.metadata.get("index")
                 if field_name in frontmatter_dict:
                     if isinstance(frontmatter_dict[field_name], list):
                         if index < len(frontmatter_dict[field_name]):
-                            frontmatter_dict[field_name][index] = unit.translated_text
+                            translated = unit.translated_text
+                            placeholder_map = unit.metadata.get("placeholder_map")
+                            if placeholder_map and self.placeholder_manager:
+                                translated = self.placeholder_manager.restore(
+                                    translated, placeholder_map
+                                )
+                            frontmatter_dict[field_name][index] = translated
                             logger.debug(
                                 f"Applied translation to frontmatter array '{field_name}[{index}]'"
                             )
@@ -916,7 +978,7 @@ class TextUnitExtractor:
 
         # LANGUAGE PURITY CHECK: Verify all translations are in target language
         # LLM-WASTE-FIX-2b: Skip purity check for languages with known FastText false-positive rates
-        if tgt_lang in self.batch_purity_skip_langs:
+        if _normalize_lang_code(tgt_lang) in self.batch_purity_skip_langs:
             logger.debug(f"Skipping batch purity check for {tgt_lang} (in batch_purity_skip_langs)")
             self.batch_stats["successful_batches"] += 1
             return True
@@ -2219,12 +2281,14 @@ class TextUnitExtractor:
             # Use native batch translation (no delimiters!)
             if batch:
                 self.batch_stats["total_batches"] += 1
+                self.batch_stats["total_outer_batches"] += 1
                 # Update run-level counter for circuit breaker (TC-03)
                 TextUnitExtractor._run_total_batches[tgt_lang] = (
                     TextUnitExtractor._run_total_batches.get(tgt_lang, 0) + 1
                 )
 
                 # Translate using native list-based batching with repetition detection
+                _purity_before = self.batch_stats.get("language_purity_failures", 0)
                 try:
                     success = self._translate_single_batch_with_repetition_check(
                         batch, mt_model, src_lang, tgt_lang
@@ -2252,6 +2316,10 @@ class TextUnitExtractor:
                     if not success:
                         # Fallback occurred, counted internally
                         self.batch_stats["fallback_batches"] += 1
+                        # Count as a fully-failed outer batch if purity was the cause
+                        _purity_now = self.batch_stats.get("language_purity_failures", 0)
+                        if _purity_now > _purity_before:
+                            self.batch_stats["failed_outer_batches"] += 1
                 except Exception as e:
                     # EXCEPTION: Any error during batch processing
                     logger.error(f"Batch translation error in batch {batch_num}: {e}")

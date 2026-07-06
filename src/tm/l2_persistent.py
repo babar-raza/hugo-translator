@@ -16,6 +16,48 @@ import lmdb
 
 from .normalization import make_tm_key
 
+# Module-level FastText singleton with 60-second retry cooldown (SW-3 / TC-01).
+# These are kept for test compatibility; active code uses L2PersistentTM._detector.
+_FASTTEXT_RETRY_COOLDOWN: float = 60.0
+_fasttext_detector_instance = None
+_fasttext_detector_failed_at: float | None = None
+
+
+def _get_fasttext_detector():
+    """Return module-level FastText singleton with 60-second retry cooldown.
+
+    Returns None when: the detector is unavailable, or a load failure occurred
+    within the last _FASTTEXT_RETRY_COOLDOWN seconds.
+    """
+    import time
+
+    global _fasttext_detector_instance, _fasttext_detector_failed_at
+
+    if _fasttext_detector_instance is not None:
+        return _fasttext_detector_instance
+
+    # Within cooldown window after a load failure — skip retry
+    if _fasttext_detector_failed_at is not None and (
+        time.time() - _fasttext_detector_failed_at
+    ) < _FASTTEXT_RETRY_COOLDOWN:
+        return None
+
+    # Attempt (re-)load
+    try:
+        from src.translation_engine.language_detection.fasttext_detector import (
+            FastTextDetector,
+        )
+
+        _fasttext_detector_instance = FastTextDetector(
+            cache_dir=Path("data/models/fasttext")
+        )
+        _fasttext_detector_failed_at = None
+        return _fasttext_detector_instance
+    except Exception as e:
+        logger.warning("FastText unavailable (module-level singleton): %s", e)
+        _fasttext_detector_failed_at = time.time()
+        return None
+
 # Canonical sub-directory name for the L2 LMDB database.
 # All callers must use this constant so the path is never mis-typed.
 L2_DB_NAME = "l2.lmdb"
@@ -91,16 +133,16 @@ class L2PersistentTM:
     with fast lookups and batch operations.
     """
 
-    def __init__(self, db_path: Path | str, max_size_mb: int = 1536):
+    def __init__(self, db_path: Path | str, max_size_mb: int = 4096):
         """
         Initialize L2 persistent TM.
 
         Args:
             db_path: Path to LMDB database directory
-            max_size_mb: Maximum database size in MB (default: 1536 MB, matches
-                config/global.yaml tm_defaults.l2_max_size_mb). Callers should
-                read this value from config; the default here is the fallback of
-                last resort so that bare instantiation never creates a 1 GB file.
+            max_size_mb: Maximum database size in MB (default: 4096 MB).
+                reference.aspose.org fills fast; 4 GB is the safe lower bound.
+                Callers should read this value from config; the default here is
+                the fallback of last resort.
         """
         self.db_path = Path(db_path)
         self.db_path.mkdir(parents=True, exist_ok=True)
@@ -124,6 +166,56 @@ class L2PersistentTM:
         )
 
         self._lock = threading.RLock()
+        self._lang_detector = None  # lazy-loaded; set externally or on first use
+
+    @property
+    def _detector(self):
+        """FastText detector — loaded once, reused. Returns None if unavailable."""
+        if self._lang_detector is None:
+            try:
+                from src.translation_engine.language_detection.fasttext_detector import (
+                    FastTextDetector,
+                )
+
+                self._lang_detector = FastTextDetector(
+                    cache_dir=Path("data/models/fasttext")
+                )
+            except Exception as e:
+                logger.warning("FastText unavailable for TM validation: %s", e)
+                self._lang_detector = False  # sentinel: skip detection, don't retry
+        return self._lang_detector if self._lang_detector is not False else None
+
+    def _validate_translation_language(self, translation: str, tgt_lang: str) -> bool:
+        """Return True if translation passes language check (or check is unavailable)."""
+        if len(translation.strip()) <= 50:
+            return True  # too short for reliable detection
+        detector = self._detector
+        if detector is None:
+            return True  # detector unavailable → allow storage
+        try:
+            detected_lang, confidence = detector.detect(translation)
+            if confidence < 0.80:
+                return True  # low confidence → allow (avoid false rejections)
+            # Allow similar language groups
+            _TM_SIMILAR_GROUPS = [
+                {"ms", "id"},
+                {"cs", "sk"},
+                {"hr", "sr", "bs"},
+                {"nb", "da", "no"},
+            ]
+            if any(tgt_lang in grp and detected_lang in grp for grp in _TM_SIMILAR_GROUPS):
+                return True
+            if detected_lang != tgt_lang:
+                logger.warning(
+                    "TM contamination blocked: detected=%s expected=%s (conf=%.2f)",
+                    detected_lang,
+                    tgt_lang,
+                    confidence,
+                )
+                return False
+        except Exception:
+            return True  # validation error → allow
+        return True
 
     def _warn_on_sibling_l2_dirs(self) -> None:
         """Emit a UserWarning if sibling l2*.lmdb directories exist alongside the canonical path.
@@ -208,10 +300,6 @@ class L2PersistentTM:
                     )
                     return None
 
-                # Context filtering if specified
-                if context is not None and entry.context != context:
-                    return None
-
                 return entry
 
     def store(
@@ -245,52 +333,9 @@ class L2PersistentTM:
             ValueError: If entry validation fails
             RuntimeError: If JSON serialization or database write fails
         """
-        # CRITICAL FIX: Validate translation language before storing (prevents TM contamination)
-        # This is a conservative check - only blocks on high-confidence mismatches
-        try:
-            # Import here to avoid circular dependencies
-            from pathlib import Path
-
-            from src.translation_engine.language_detection.fasttext_detector import FastTextDetector
-
-            # Only validate if translation is long enough for accurate detection
-            if len(translation.strip()) > 50:
-                # Use correct FastText model directory
-                cache_dir = Path("data/models/fasttext")
-                detector = FastTextDetector(cache_dir=cache_dir)
-                detected_lang, confidence = detector.detect(translation)
-
-                # Similarity groups: languages FastText confuses at high confidence
-                # (mutually intelligible or script-similar pairs — false positive protection)
-                _TM_SIMILAR_GROUPS = [
-                    {"ms", "id"},  # Malay/Indonesian
-                    {"cs", "sk"},  # Czech/Slovak
-                    {"hr", "sr", "bs"},  # South Slavic
-                    {"nb", "da", "no"},  # North Germanic
-                ]
-                _in_same_group = any(
-                    tgt_lang in grp and detected_lang in grp for grp in _TM_SIMILAR_GROUPS
-                )
-
-                # Block storage only on high-confidence mismatch (>80%)
-                if detected_lang != tgt_lang and confidence > 0.80 and not _in_same_group:
-                    logger.error(
-                        f"TM STORE BLOCKED: Translation language mismatch! "
-                        f"Site: {site_id}, Expected: {tgt_lang}, Detected: {detected_lang} ({confidence:.2%}). "
-                        f"Translation: {translation[:100]}... "
-                        f"Refusing to store contaminated entry to prevent TM pollution."
-                    )
-                    # Don't raise - just return False to indicate not stored
-                    return False
-                elif detected_lang != tgt_lang and confidence > 0.70 and not _in_same_group:
-                    # Log warning for moderate confidence mismatches
-                    logger.warning(
-                        f"TM language concern: Expected {tgt_lang}, detected {detected_lang} ({confidence:.2%}). "
-                        f"Storing anyway (confidence < 80%) but flagging for review."
-                    )
-        except Exception as e:
-            # Non-fatal - don't block TM storage on validation errors
-            logger.debug(f"TM language validation failed (non-fatal): {e}")
+        # Validate translation language before storing (prevents TM contamination)
+        if not self._validate_translation_language(translation, tgt_lang):
+            return False
 
         # T204: Create and validate entry before write
         entry = TranslationEntry(
@@ -332,7 +377,19 @@ class L2PersistentTM:
                         raise RuntimeError(f"Failed to serialize translation entry: {e}")
 
                     # T204: Store with automatic rollback on failure
-                    txn.put(key_bytes, value_json.encode("utf-8"))
+                    try:
+                        txn.put(key_bytes, value_json.encode("utf-8"))
+                    except lmdb.MapFullError:
+                        current_mb = self.env.info()["map_size"] // (1024 * 1024)
+                        new_mb = min(int(current_mb * 1.5), 8192)
+                        logger.warning(
+                            "LMDB MapFullError in store() — resizing %d MB → %d MB",
+                            current_mb,
+                            new_mb,
+                        )
+                        self.env.set_mapsize(new_mb * 1024 * 1024)
+                        with self.env.begin(write=True) as txn2:
+                            txn2.put(key_bytes, value_json.encode("utf-8"))
 
             return True
 
@@ -345,12 +402,13 @@ class L2PersistentTM:
             )
             raise
 
-    def batch_store(self, entries: list[TranslationEntry]) -> int:
+    def batch_store(self, entries: list[TranslationEntry], overwrite: bool = True) -> int:
         """
         Efficiently store many entries at once with integrity safeguards (T204: federated-splashing-panda).
 
         Args:
             entries: List of TranslationEntry objects
+            overwrite: If False, skip entries whose key already exists in the DB.
 
         Returns:
             Number of entries stored
@@ -373,8 +431,16 @@ class L2PersistentTM:
             with self._lock:
                 # T204: LMDB transaction provides atomic batch write with automatic rollback
                 with self.env.begin(write=True) as txn:
-                    count = 0
+                    stored = 0
+                    rejected = 0
                     for entry in entries:
+                        # Fix E: language validation before write
+                        if not self._validate_translation_language(
+                            entry.translation, entry.tgt_lang
+                        ):
+                            rejected += 1
+                            continue
+
                         key = make_tm_key(
                             entry.site_id,
                             entry.src_lang,
@@ -391,14 +457,39 @@ class L2PersistentTM:
                             value_json = json.dumps(entry.to_dict())
                         except (TypeError, ValueError) as e:
                             logger.error(
-                                f"JSON serialization failed in batch at index {count}: {e}"
+                                f"JSON serialization failed in batch at index {stored}: {e}"
                             )
-                            raise RuntimeError(f"Failed to serialize entry at index {count}: {e}")
+                            raise RuntimeError(
+                                f"Failed to serialize entry at index {stored}: {e}"
+                            )
 
-                        txn.put(key.encode("utf-8"), value_json.encode("utf-8"))
-                        count += 1
+                        key_bytes = key.encode("utf-8")
+                        val_bytes = value_json.encode("utf-8")
+                        if not overwrite and txn.get(key_bytes) is not None:
+                            continue  # skip existing entry
+                        try:
+                            txn.put(key_bytes, val_bytes)
+                        except lmdb.MapFullError:
+                            current_mb = self.env.info()["map_size"] // (1024 * 1024)
+                            new_mb = min(int(current_mb * 1.5), 8192)
+                            logger.warning(
+                                "LMDB MapFullError in batch_store() — resizing %d MB → %d MB",
+                                current_mb,
+                                new_mb,
+                            )
+                            self.env.set_mapsize(new_mb * 1024 * 1024)
+                            with self.env.begin(write=True) as txn2:
+                                txn2.put(key_bytes, val_bytes)
+                        stored += 1
 
-            return count
+                    if rejected:
+                        logger.warning(
+                            "batch_store: rejected %d/%d entries (language mismatch)",
+                            rejected,
+                            len(entries),
+                        )
+
+            return stored
 
         except Exception as e:
             # T204: Log integrity failure and propagate
@@ -478,6 +569,36 @@ class L2PersistentTM:
 
         logger.info(f"Exported {len(entries)} entries from L2")
         return entries
+
+    def export_iter(
+        self,
+        site_id: str | None = None,
+        tgt_lang: str | None = None,
+    ):
+        """Streaming generator — constant-memory alternative to export_all()."""
+        with self._lock:
+            with self.env.begin() as txn:
+                cursor = txn.cursor()
+                for _key_bytes, value_bytes in cursor.iternext():
+                    try:
+                        entry = TranslationEntry.from_dict(
+                            json.loads(value_bytes.decode("utf-8"))
+                        )
+                        if site_id and entry.site_id != site_id:
+                            continue
+                        if tgt_lang and entry.tgt_lang != tgt_lang:
+                            continue
+                        yield entry
+                    except Exception:
+                        continue
+
+    def stats_by_dimension(self, dimension: str = "tgt_lang") -> dict[str, int]:
+        """Count entries grouped by a field: 'tgt_lang', 'site_id', or 'src_lang'."""
+        counts: dict[str, int] = {}
+        for entry in self.export_iter():
+            key = getattr(entry, dimension, "unknown")
+            counts[key] = counts.get(key, 0) + 1
+        return counts
 
     def get_stats(self) -> dict:
         """

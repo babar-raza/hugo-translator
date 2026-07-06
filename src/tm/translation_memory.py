@@ -76,6 +76,10 @@ class TranslationMemory:
         self._language_detector = language_detector
         self._similarity_tracker = similarity_tracker
 
+        # Share language detector with L2 to avoid duplicate model loads
+        if language_detector is not None and hasattr(l2_persistent, "_lang_detector"):
+            l2_persistent._lang_detector = language_detector
+
         # Statistics
         self._total_lookups = 0
         self._total_hits = 0

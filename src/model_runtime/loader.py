@@ -416,22 +416,19 @@ class HuggingFaceBackend(ModelBackend):
             elif hasattr(self.tokenizer, "convert_tokens_to_ids") and hasattr(
                 self.tokenizer, "tgt_lang"
             ):
+                _lang_route_fail_msg = None
                 try:
                     forced_bos_token_id = self.tokenizer.convert_tokens_to_ids(mapped_tgt_lang)
                     # Validate: convert_tokens_to_ids returns unk_token_id silently for unknown tokens
                     _unk_id = getattr(self.tokenizer, "unk_token_id", None)
                     if _unk_id is not None and forced_bos_token_id == _unk_id:
-                        logger.error(
-                            "LANG_ROUTE_FAIL: forced_bos_token_id for '%s' resolved to "
-                            "unk_token_id (%d). Token '%s' is not in tokenizer vocabulary. "
-                            "Language forcing disabled — output language will be incorrect. "
-                            "Use translation_engine.language_routing_overrides in global.yaml "
-                            "to route this language to a capable model.",
-                            tgt_lang,
-                            _unk_id,
-                            mapped_tgt_lang,
+                        _lang_route_fail_msg = (
+                            f"LANG_ROUTE_FAIL: Target language '{tgt_lang}' resolved to "
+                            f"unk_token_id ({_unk_id}). Token '{mapped_tgt_lang}' is not in "
+                            f"tokenizer vocabulary. Model cannot generate in this language. "
+                            f"Add a routing override in config/global.yaml "
+                            f"translation_engine.language_routing_overrides."
                         )
-                        forced_bos_token_id = None
                     else:
                         logger.debug(
                             f"Set forced_bos_token_id={forced_bos_token_id} for {mapped_tgt_lang} "
@@ -441,6 +438,8 @@ class HuggingFaceBackend(ModelBackend):
                     logger.warning(
                         f"Failed to get token ID for '{mapped_tgt_lang}' via convert_tokens_to_ids(): {e}"
                     )
+                if _lang_route_fail_msg:
+                    raise RuntimeError(_lang_route_fail_msg)
             # Try generic lang_code_to_id
             elif hasattr(self.tokenizer, "lang_code_to_id"):
                 forced_bos_token_id = self.tokenizer.lang_code_to_id.get(mapped_tgt_lang)
