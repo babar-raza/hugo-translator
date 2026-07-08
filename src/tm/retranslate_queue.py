@@ -21,6 +21,8 @@ import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
 
+from src.utils.global_failure_log import log_failure as _global_log_failure
+
 logger = logging.getLogger(__name__)
 
 _QUEUE_FILE = Path("data/retranslate_queue.jsonl")
@@ -84,6 +86,14 @@ def add_to_queue(output_path: Path, tgt_lang: str) -> None:
         logger.info(
             f"retranslate_queue: added {output_path.name} ({tgt_lang}) — "
             f"will bypass completion filter on next run"
+        )
+        _global_log_failure(
+            site_id="",
+            locale=tgt_lang,
+            rel_path=resolved,
+            source="retranslate_queue",
+            error_type="case4_wrong_language",
+            error_category="CASE4_OVERWRITE_BLOCKED",
         )
     except Exception as e:
         logger.warning(f"retranslate_queue: failed to add {output_path}: {e}")
@@ -246,6 +256,15 @@ def _quarantine_entry(entry: dict) -> None:
         logger.warning(
             f"retranslate_queue: quarantined {Path(entry.get('output_path', '')).name} "
             f"— requires manual review (data/quarantine.jsonl)"
+        )
+        _global_log_failure(
+            site_id="",
+            locale=entry.get("tgt_lang", ""),
+            rel_path=entry.get("output_path", ""),
+            source="retranslate_queue",
+            error_type="quarantined",
+            error_category="MAX_RETRIES_EXCEEDED",
+            attempt=entry.get("retry_count", 3),
         )
     except Exception as e:
         logger.warning(f"retranslate_queue: failed to write quarantine entry: {e}")

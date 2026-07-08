@@ -143,7 +143,7 @@ class TestMigrationScript:
     def _run_migrate(self, *args: str) -> int:
         """Call migrate_l2_lmdb.main() with the given CLI args. Returns exit code."""
         # Import fresh each call so sys.argv doesn't leak
-        from scripts import migrate_l2_lmdb
+        from scripts.tm import migrate_l2_lmdb
 
         try:
             migrate_l2_lmdb.main(list(args))
@@ -158,7 +158,7 @@ class TestMigrationScript:
         _make_lmdb(src, {b"k1": b"v1", b"k2": b"v2"})
         _make_lmdb(dst, {})
 
-        from scripts.migrate_l2_lmdb import migrate
+        from scripts.tm.migrate_l2_lmdb import migrate
 
         migrate(src, dst, dry_run=True)
 
@@ -175,7 +175,7 @@ class TestMigrationScript:
         _make_lmdb(src, {b"k1": b"v1", b"k2": b"v2"})
         _make_lmdb(dst, {b"k1": b"already_there"})  # k1 already present
 
-        from scripts.migrate_l2_lmdb import migrate
+        from scripts.tm.migrate_l2_lmdb import migrate
 
         migrate(src, dst, dry_run=False)
 
@@ -190,7 +190,7 @@ class TestMigrationScript:
         _make_lmdb(src, {b"k1": b"v1"})
         _make_lmdb(dst, {})
 
-        from scripts.migrate_l2_lmdb import migrate
+        from scripts.tm.migrate_l2_lmdb import migrate
 
         migrate(src, dst, dry_run=False)
         after_first = _read_lmdb(dst)
@@ -206,7 +206,7 @@ class TestMigrationScript:
         dst = tmp_path / "l2.lmdb"
         _make_lmdb(dst, {b"k": b"v"})
 
-        from scripts.migrate_l2_lmdb import migrate
+        from scripts.tm.migrate_l2_lmdb import migrate
 
         # Should not raise — just report nothing to migrate
         migrate(src, dst, dry_run=False)
@@ -215,7 +215,7 @@ class TestMigrationScript:
     def test_cli_requires_dry_run_or_apply(self, tmp_path: Path, monkeypatch):
         """Running without --dry-run or --apply must exit with an error."""
         monkeypatch.chdir(tmp_path)
-        from scripts.migrate_l2_lmdb import main
+        from scripts.tm.migrate_l2_lmdb import main
 
         with pytest.raises(SystemExit) as exc_info:
             main([])

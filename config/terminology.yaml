@@ -259,12 +259,44 @@ global:
       preserve_mode: protect
       severity: info
 
+    # API reference phrase protection — prevent hallucination ("API Usage" → "Use of fire" etc.)
+    - term: "API Usage"
+      category: api_phrase
+      case_sensitive: false
+      preserve_mode: protect
+      severity: error
+    - term: "API Reference"
+      category: api_phrase
+      case_sensitive: false
+      preserve_mode: protect
+      severity: error
+    - term: "API Guide"
+      category: api_phrase
+      case_sensitive: false
+      preserve_mode: protect
+      severity: error
+    - term: "API Reference Guide"
+      category: api_phrase
+      case_sensitive: false
+      preserve_mode: protect
+      severity: error
+    - term: "Quick Reference"
+      category: api_phrase
+      case_sensitive: false
+      preserve_mode: protect
+      severity: warning
+    - term: "API"
+      category: technical_term
+      case_sensitive: true
+      preserve_mode: protect
+      severity: warning
+
   # Pattern-based matches: Regular expressions for dynamic terminology
   patterns:
-    # Aspose product families (e.g., Aspose.Words, Aspose.Cells, Aspose.PDF)
-    - pattern: "Aspose\\.[A-Z][a-z]+"
+    # Aspose product families (e.g., Aspose.Words, Aspose.Cells, Aspose.PDF, Aspose.3D)
+    - pattern: "Aspose\\.\\S+"
       category: product_family
-      description: "Aspose product families (Aspose.Words, Aspose.Cells, etc.)"
+      description: "Aspose product families (Aspose.Words, Aspose.Cells, Aspose.3D, etc.)"
       preserve_mode: protect  # Prevent translation of product names
       severity: error
 

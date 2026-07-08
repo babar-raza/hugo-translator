@@ -82,6 +82,8 @@ body:
   - link
   preserve_patterns:
   - ^\{\{<.*>\}\}
+  # Aspose product names: Aspose.3D, Aspose.Words, Aspose.Cells.Python via .NET, etc.
+  - \bAspose\.\S+
   # Dotted API identifier: ClassName.METHOD, Enum.CONSTANT, Class.Class (constructor refs)
   - \b[A-Z][A-Za-z0-9_]*(?:\.[A-Z][A-Za-z0-9_]+)+\b
   # Interface names: ISerializable, IIndexedVertexElement (I + PascalCase, 2+ chars after I)

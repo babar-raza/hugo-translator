@@ -2,6 +2,8 @@
 Segment extraction from HugoDocument based on Site Profile rules.
 """
 import hashlib
+import os
+import re
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any
@@ -143,18 +145,21 @@ class SegmentExtractor:
                     # Fallback: try simple path (backward compatibility)
                     value = self._get_nested_value(frontmatter, key)
                     if value is not None and isinstance(value, str) and value.strip():
-                        seg = self._create_frontmatter_segment(
-                            key, value, source_lang
-                        )
-                        segments.append(seg)
+                        # Skip pure identifiers — m2m translates placeholder tokens literally
+                        if not self._is_pure_identifier(value):
+                            seg = self._create_frontmatter_segment(
+                                key, value, source_lang
+                            )
+                            segments.append(seg)
                 else:
                     # Process all matches from array-aware extraction
                     for indexed_key, value in matches:
                         if isinstance(value, str) and value.strip():
-                            seg = self._create_frontmatter_segment(
-                                indexed_key, value, source_lang
-                            )
-                            segments.append(seg)
+                            if not self._is_pure_identifier(value):
+                                seg = self._create_frontmatter_segment(
+                                    indexed_key, value, source_lang
+                                )
+                                segments.append(seg)
 
             elif rule.mode == FrontmatterMode.TRANSLATE_LIST:
                 # For TRANSLATE_LIST, the final value is expected to be a list of strings
@@ -372,8 +377,45 @@ class SegmentExtractor:
 
         return segment
 
+    def _is_pure_identifier(self, text: str) -> bool:
+        """Return True if the entire text is a non-translatable technical identifier.
+
+        Used to skip frontmatter fields whose value is purely an API identifier
+        (e.g. linkTitle/title = "VertexDeclaration") so they are never sent to
+        the MT model — placeholders for pure identifiers confuse m2m100 which
+        translates the token literally instead of preserving it.
+        """
+        t = text.strip()
+        if not t:
+            return False
+        # Multi-hump PascalCase: VertexDeclaration, AnimationNode, FbxFormat
+        if re.match(r"^[A-Z][a-z0-9]+(?:[A-Z][a-z0-9]+)+$", t):
+            return True
+        # PascalCase.With.Dots: Aspose.Slides, VertexDeclaration.Clear
+        if re.match(r"^[A-Z][a-zA-Z0-9_]*(?:\.[A-Z][a-zA-Z0-9_]+)+$", t):
+            return True
+        # ALL_CAPS identifiers: API, SDK, ARGB
+        if re.match(r"^[A-Z]{2,}(?:_[A-Z0-9]+)*$", t):
+            return True
+        # snake_case
+        if "_" in t and t.replace("_", "").islower():
+            return True
+        # Matches any preserve_pattern in full
+        all_patterns = self.shortcode_patterns + self.preserve_patterns
+        for pat in all_patterns:
+            try:
+                if re.fullmatch(pat, t):
+                    return True
+            except re.error:
+                pass
+        return False
+
     def _protect_content(self, text: str) -> tuple[str, dict[str, str]]:
         """Protect non-translatable content with placeholders."""
+        # m2m100 translates {PLACEHOLDER_N} tokens as prose (e.g. "Τον Χάρη 0") with no
+        # recovery path — bypass placeholder substitution entirely for that model.
+        if os.environ.get("BYPASS_PLACEHOLDER_PROTECTION"):
+            return text, {}
         # Combine shortcode patterns with preserve patterns
         all_patterns = self.shortcode_patterns + self.preserve_patterns
         return self.placeholder_manager.protect(text, all_patterns)
