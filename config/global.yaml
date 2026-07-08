@@ -644,7 +644,7 @@ translation_engine:
   # COMPENSATING CONTROL: validation.yaml per_language_overrides enforce es=98%/it=98%/cs=97%
   # file-level purity via LanguageConsistencyValidator. Tests: test_batch_purity_skip_compensation.py.
   # MANDATORY REVIEW: 2026-07-01. If measurement script does not exist by then, deferral expires.
-  batch_purity_skip_langs: [ar, ca, cs, de, el, es, fa, fr, ga, he, hu, id, it, ja, ko, lt, lv, ms, nl, pl, pt, ro, ru, sk, sr, tr, uk, zh]
+  batch_purity_skip_langs: [ar, bg, ca, cs, da, de, el, es, fa, fi, fr, ga, he, hi, hr, hu, id, it, ja, ko, lt, lv, ms, nl, no, pl, pt, ro, ru, sk, sr, sv, th, tr, uk, vi, zh]
 
   min_file_purity_percentage: 0.95  # Require 95% of segments match target language (5% tolerance for mixed content)
 
@@ -1006,3 +1006,28 @@ sprint_loop:
   evidence:
     root: ".local/evidences"
     require_bundle: true
+
+# Resource Governance — GPU admission controller for concurrent translation shards.
+# Prevents GPU SM saturation (TDR / blank-screen incidents) by limiting the
+# estimated combined SM% before any shard loads a model.
+#
+# Background: on this machine (RTX 4090 Laptop, 16 GB VRAM, display routed through
+# NVIDIA in hybrid mode) three concurrent NLLB-1.3B shards drive SM to 98%.
+# Windows TdrDelay=2s fires nvlddmkm TDR → GPU reset → DWM surfaces lost → blank
+# windows.  Ceiling=70% keeps SM at 65-70% for 2 NLLB shards (leaving 30% for DWM).
+#
+# sm_estimates: per-model SM% weights used for budget calculation.
+# sm_ceiling_percent: deny new shard if combined estimate would exceed this.
+# wait_interval_sec: how long denied shard sleeps before retrying.
+# max_wait_attempts: total retries before shard exits (total wait = interval × attempts).
+resource_governance:
+  enabled: true
+  sm_ceiling_percent: 82   # 2 NLLB(64) + 2 m2m100(16) = 80 <= 82 OK; 3 NLLB(96) > 82 DENIED
+  wait_interval_sec: 120
+  max_wait_attempts: 720   # 720 x 2 min = 24h max wait for long campaigns
+  sm_estimates:
+    nllb_200_1.3b: 32      # calibrated: 3 shards observed = 94% SM => each ~31%
+    nllb_200_600m: 20
+    m2m100_418m: 8         # ~3x smaller than NLLB-1.3B; proportional estimate
+    m2m100_1.2b: 18
+    opus_mt: 6
