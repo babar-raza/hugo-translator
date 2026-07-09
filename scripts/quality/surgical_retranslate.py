@@ -329,6 +329,129 @@ def _cell_is_non_translatable(cell: str) -> bool:
     return False
 
 
+def _build_table_from_ast(table_node, NodeType) -> str:
+    """Render a TABLE AST node back to a markdown table string."""
+
+    def _walk(node):
+        yield node
+        for child in getattr(node, "children", []):
+            yield from _walk(child)
+
+    def _cell_text(cell_node) -> str:
+        parts = []
+        for n in _walk(cell_node):
+            if not hasattr(n, "raw") or not n.raw:
+                continue
+            if n.type == NodeType.CODE_SPAN:
+                parts.append(f"`{n.raw.strip()}`")
+            elif n.type == NodeType.TEXT:
+                parts.append(n.raw)
+        return " ".join(parts).strip()
+
+    rows_data: list[tuple[bool, list[str], list[str]]] = []
+    for row_node in table_node.children:
+        if row_node.type != NodeType.TABLE_ROW:
+            continue
+        is_header = bool(row_node.attrs.get("is_header", False))
+        cells, aligns = [], []
+        for cell_node in row_node.children:
+            if cell_node.type != NodeType.TABLE_CELL:
+                continue
+            cells.append(_cell_text(cell_node))
+            aligns.append(cell_node.attrs.get("align") or "left")
+        rows_data.append((is_header, cells, aligns))
+
+    if not rows_data:
+        return ""
+
+    col_count = max(len(r[1]) for r in rows_data)
+    header_aligns = rows_data[0][2] if rows_data else ["left"] * col_count
+    widths: list[int] = [3] * col_count
+    for c in range(col_count):
+        for _, cells, _ in rows_data:
+            if c < len(cells):
+                widths[c] = max(widths[c], len(cells[c]))
+
+    lines: list[str] = []
+    for row_idx, (_, cells, _) in enumerate(rows_data):
+        row_cells = [
+            (cells[c] if c < len(cells) else "").ljust(widths[c])
+            for c in range(col_count)
+        ]
+        lines.append("| " + " | ".join(row_cells) + " |")
+        if row_idx == 0:
+            sep = []
+            for c in range(col_count):
+                align = header_aligns[c] if c < len(header_aligns) else "left"
+                w = widths[c]
+                if align == "center":
+                    sep.append(":" + "-" * max(w - 2, 1) + ":")
+                elif align == "right":
+                    sep.append("-" * max(w - 1, 2) + ":")
+                else:
+                    sep.append("-" * w)
+            lines.append("| " + " | ".join(sep) + " |")
+
+    return "\n".join(lines) + "\n"
+
+
+def _repair_too_few_blocks(
+    en_content: str,
+    tr_content: str,
+    tables: list,
+    tr_matches: list,
+    table_re,
+) -> tuple[str, int]:
+    """Fallback repair for when TR has fewer table blocks than EN has tables.
+
+    Rebuilds all EN tables from AST and substitutes them into TR content:
+    - Existing TR table blocks are replaced 1:1 with corresponding EN tables.
+    - If TR has fewer blocks than EN tables, remaining EN tables are appended
+      directly after the last replaced block (separated by a blank line).
+
+    All cell content comes from the EN source AST — identifiers and API terms
+    stay in English (correct), description text stays in English (placeholder;
+    shards will retranslate on next run with the fixed pipeline).
+    """
+    try:
+        _proj_root = str(Path(__file__).resolve().parent.parent.parent)
+        if _proj_root not in sys.path:
+            sys.path.insert(0, _proj_root)
+        from src.translation_engine.parser.ast_nodes import NodeType  # type: ignore
+    except ImportError:
+        return tr_content, 0
+
+    en_table_texts = [_build_table_from_ast(t, NodeType) for t in tables]
+    en_table_texts = [t for t in en_table_texts if t]
+    if not en_table_texts:
+        return tr_content, 0
+
+    repaired = tr_content
+    offset = 0
+    fixed = 0
+    last_insert_pos = len(tr_content)  # fallback: end of file
+
+    for i, en_table_text in enumerate(en_table_texts):
+        if i < len(tr_matches):
+            # Replace existing TR block with EN table
+            m = tr_matches[i]
+            start = m.start() + offset
+            end = m.end() + offset
+            repaired = repaired[:start] + en_table_text + repaired[end:]
+            offset += len(en_table_text) - (m.end() - m.start())
+            last_insert_pos = start + len(en_table_text)
+            fixed += 1
+        else:
+            # Append remaining EN tables after the last inserted/replaced position
+            insertion = "\n" + en_table_text
+            repaired = repaired[:last_insert_pos] + insertion + repaired[last_insert_pos:]
+            last_insert_pos += len(insertion)
+            offset += len(insertion)
+            fixed += 1
+
+    return repaired, fixed
+
+
 def _repair_table_corruption_no_gpu(
     en_content: str,
     tr_content: str,
@@ -390,7 +513,9 @@ def _repair_table_corruption_no_gpu(
     _TABLE_BLOCK_RE = re.compile(r"((?:^[ \t]*\|[^\n]*\n)+)", re.MULTILINE)
     tr_table_matches = list(_TABLE_BLOCK_RE.finditer(tr_content))
     if len(tr_table_matches) < len(tables):
-        return tr_content, 0  # Can't align source tables to TR blocks
+        # Fallback for "too few blocks" (model dropped entire tables):
+        # Rebuild all EN tables from AST and replace/append into TR content.
+        return _repair_too_few_blocks(en_content, tr_content, tables, tr_table_matches, _TABLE_BLOCK_RE)
 
     repaired = tr_content
     offset = 0
@@ -459,6 +584,22 @@ def _repair_table_corruption_no_gpu(
         repaired = repaired[:tr_start] + repaired_table + repaired[tr_end:]
         offset += len(repaired_table) - (tr_end - tr_start)
         tables_fixed += 1
+
+    # Remove any extra TR table blocks beyond what EN has (hallucinated extra tables).
+    # Re-scan the repaired content for remaining unmatched blocks and delete them.
+    if len(tr_table_matches) > len(tables):
+        extra_count = len(tr_table_matches) - len(tables)
+        # Re-find all table blocks in the current repaired content
+        extra_blocks = list(_TABLE_BLOCK_RE.finditer(repaired))
+        # Keep only the first len(tables) blocks; remove the rest
+        to_remove = extra_blocks[len(tables):]
+        rm_offset = 0
+        for blk in to_remove:
+            start = blk.start() + rm_offset
+            end = blk.end() + rm_offset
+            repaired = repaired[:start] + repaired[end:]
+            rm_offset -= (end - start)
+            tables_fixed += 1
 
     return repaired, tables_fixed
 
