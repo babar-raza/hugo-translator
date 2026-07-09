@@ -21,7 +21,7 @@ from typing import TYPE_CHECKING
 from ..observability.progress import get_progress_tracker
 from .engine import estimate_token_count
 from .exceptions import TranslationRetryableError
-from .extractor import SegmentExtractor
+from .extractor import SegmentExtractor, TextUnitKind
 from .models import TranslationStats, ValidationIssue, ValidationResult
 from .reconstructor import MarkdownReconstructor
 
@@ -876,12 +876,61 @@ class SegmentTranslator:
                 if segment.context and segment.context.node_id:
                     segment_map[segment.context.node_id] = segment.id
 
+            # TC-TBL-012 / Layer 3: Protect markdown tables before passing to legacy
+            # MarkdownReconstructor. The legacy path sends raw markdown to the model;
+            # if the model sees pipe characters it generates tables with 3×+ extra rows.
+            # Solution: replace each table block with a placeholder, reconstruct without
+            # table content, then restore original tables from placeholders.
+            _TABLE_BLOCK_RE = _re_legacy_diag.compile(
+                r"((?:^[ \t]*\|[^\n]+\n)+)",
+                _re_legacy_diag.MULTILINE,
+            )
+            _table_placeholder_map: dict[str, str] = {}
+            _table_counter = [0]
+
+            def _replace_table(m: "_re_legacy_diag.Match") -> str:  # type: ignore[name-defined]
+                key = f"\x00TABLE_{_table_counter[0]}\x00"
+                _table_placeholder_map[key] = m.group(0)
+                _table_counter[0] += 1
+                return key
+
+            _raw_for_legacy = ""
+            if getattr(doc, "source_path", None):
+                try:
+                    from pathlib import Path as _Path
+                    _raw_for_legacy = _Path(doc.source_path).read_text(
+                        encoding=getattr(doc, "encoding", None) or "utf-8",
+                        errors="replace",
+                    )
+                except OSError:
+                    pass
+            if _table_placeholder_map or _TABLE_BLOCK_RE.search(_raw_for_legacy):
+                _protected_content = _TABLE_BLOCK_RE.sub(_replace_table, _raw_for_legacy)
+                if _table_placeholder_map:
+                    logger.info(
+                        f"TABLE-PROTECT: shielded {len(_table_placeholder_map)} table(s) "
+                        f"from legacy reconstruction to prevent row-count corruption"
+                    )
+                    # Temporarily swap doc.content for the protected version
+                    _original_doc_content = getattr(doc, "content", None)
+                    if hasattr(doc, "content"):
+                        doc.content = _protected_content
+
             reconstructor = MarkdownReconstructor(site_profile)
             translated_doc = reconstructor.reconstruct_document(
                 doc, translations, target_lang, segment_map=segment_map
             )
 
             translated_content = str(translated_doc)
+
+            # Restore protected tables (tables stay in source language in fallback path —
+            # this is preferable to model-corrupted tables with 3× extra rows)
+            if _table_placeholder_map:
+                for _key, _original_table in _table_placeholder_map.items():
+                    translated_content = translated_content.replace(_key, _original_table)
+                # Restore doc.content
+                if hasattr(doc, "content") and _original_doc_content is not None:
+                    doc.content = _original_doc_content
 
         stats.tokens_total = stats.tokens_cached + stats.tokens_input + stats.tokens_output
 
@@ -1101,6 +1150,12 @@ class SegmentTranslator:
                 and u.translated_text is not None
                 and u.translated_text.strip() == u.source_text.strip()
                 and len(u.source_text.strip()) > _sas_min_len
+                # TC-TBL-012 / Layer 2: Exclude table cells from SAS ratio.
+                # A table cell the model fails to translate stays as English text —
+                # bad for quality but handled by Gate 15 / purity check. Counting
+                # them toward SAS ratio triggers legacy fallback which corrupts table
+                # structure far more severely (3×+ row count expansion).
+                and u.kind != TextUnitKind.TABLE_CELL_TEXT
             ]
             if _sas_units:
                 _sas_ratio = len(_sas_units) / _translatable_count if _translatable_count > 0 else 0.0

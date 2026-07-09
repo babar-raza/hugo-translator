@@ -40,6 +40,70 @@ _yaml_parser.width = 4096  # Prevent line wrapping
 _yaml_parser.allow_duplicate_keys = True  # Hugo files may have duplicate keys across sections
 
 
+def normalize_table_cells(text: str) -> str:
+    """Merge multi-line table cell openers into single-line rows.
+
+    Some Hugo source files (API reference) use multi-line cells where a row
+    opener starts with | but doesn't end with |, and continuation lines follow::
+
+        | `normalTexture` | `TextureBase` | Read | Gets the texture
+         @return the texture
+         / |
+
+    markdown-it treats each physical line as a separate TABLE_ROW.  This
+    pre-processor merges continuation lines into the preceding opener row so
+    the resulting text has only complete single-line ``|…|`` rows.
+
+    INVARIANT: Complete single-line rows (starting AND ending with ``|``) are unchanged.
+    INVARIANT: Lines outside table blocks are unchanged.
+    INVARIANT: Content inside fenced code blocks (`````) is passed through untouched.
+
+    This function is called by ``HugoParser._normalize_table_cells()`` and may also
+    be imported by write_gate.py and surgical_retranslate.py for consistent counting.
+    """
+    lines = text.splitlines(keepends=True)
+    result = []
+    in_code_block = False
+    i = 0
+    while i < len(lines):
+        raw = lines[i]
+        stripped = raw.rstrip("\n\r")
+
+        if stripped.lstrip().startswith("```"):
+            in_code_block = not in_code_block
+            result.append(raw)
+            i += 1
+            continue
+
+        if in_code_block:
+            result.append(raw)
+            i += 1
+            continue
+
+        if (
+            stripped.startswith("|")
+            and stripped.count("|") >= 2
+            and not stripped.endswith("|")
+        ):
+            merged = stripped
+            j = i + 1
+            while j < len(lines):
+                next_stripped = lines[j].rstrip("\n\r").strip()
+                if not next_stripped or next_stripped.startswith("|") or next_stripped.startswith("#"):
+                    break
+                merged += " " + next_stripped
+                j += 1
+            if not merged.endswith("|"):
+                merged += " |"
+            result.append(merged + "\n")
+            i = j
+        else:
+            result.append(raw)
+            i += 1
+
+    return "".join(result)
+
+
 class HugoDocument:
     """Internal representation of a parsed Hugo Markdown file."""
 
@@ -184,8 +248,13 @@ class HugoParser:
         yaml_content, _body_content = frontmatter_split
         return self._parse_yaml_content(yaml_content)
 
+    def _normalize_table_cells(self, text: str) -> str:
+        """Delegate to module-level normalize_table_cells()."""
+        return normalize_table_cells(text)
+
     def _parse_markdown_to_ast(self, markdown: str) -> list[ASTNode]:
         """Parse Markdown content to AST."""
+        markdown = self._normalize_table_cells(markdown)
         tokens = self.md.parse(markdown)
         ast = []
 

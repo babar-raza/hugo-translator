@@ -369,3 +369,89 @@ Markdown body.
     assert doc.frontmatter["layout"] == "plugin"
     assert doc.frontmatter["content"]["enable"] is True
     assert len(doc.ast) == 1
+
+
+# ---------------------------------------------------------------------------
+# TC-HUGOP-013: _normalize_table_cells() tests
+# ---------------------------------------------------------------------------
+
+class TestNormalizeTableCells:
+    """Tests for HugoParser._normalize_table_cells() multi-line cell merging."""
+
+    def setup_method(self):
+        self.parser = HugoParser()
+
+    def _rows(self, md: str) -> int:
+        """Count TABLE_ROW nodes produced for a given markdown body."""
+        from src.translation_engine.parser.ast_nodes import NodeType
+
+        doc = self.parser.parse_string(f"---\ntitle: test\n---\n\n{md}")
+
+        def _walk(node):
+            yield node
+            for child in getattr(node, "children", []):
+                yield from _walk(child)
+
+        all_nodes = [n for root in doc.ast for n in _walk(root)]
+        return sum(1 for n in all_nodes if n.type == NodeType.TABLE_ROW)
+
+    def test_single_line_rows_unchanged(self):
+        """Complete single-line rows (start AND end with |) are not affected."""
+        md = (
+            "| Name | Type | Description |\n"
+            "| --- | --- | --- |\n"
+            "| `foo` | `int` | Gets foo. |\n"
+            "| `bar` | `str` | Gets bar. |\n"
+        )
+        # header + 2 data rows = 3 TABLE_ROW nodes
+        assert self._rows(md) == 3
+
+    def test_multi_line_cell_merged_into_single_row(self):
+        """Multi-line cell opener + continuation lines become one TABLE_ROW."""
+        md = (
+            "| Name | Type | Description |\n"
+            "| --- | --- | --- |\n"
+            "| `foo` | `int` | Gets the foo value\n"
+            " @return the foo value\n"
+            " / |\n"
+        )
+        # header + 1 data row = 2 TABLE_ROW nodes (not 4)
+        assert self._rows(md) == 2
+
+    def test_mixed_single_and_multi_line_rows(self):
+        """Mix of complete rows and multi-line cells gives correct count."""
+        md = (
+            "| Name | Type | Description |\n"
+            "| --- | --- | --- |\n"
+            "| `alpha` | `int` | Simple one-liner. |\n"
+            "| `beta` | `str` | Multi-line description\n"
+            " @return beta value\n"
+            " / |\n"
+            "| `gamma` | `bool` | Another one-liner. |\n"
+        )
+        # header + 3 data rows = 4 TABLE_ROW nodes
+        assert self._rows(md) == 4
+
+    def test_code_block_pipes_not_treated_as_table(self):
+        """Lines with | inside fenced code blocks are never treated as table rows."""
+        md = (
+            "```java\n"
+            "| not a table | still not |\n"
+            "```\n\n"
+            "| Name | Value |\n"
+            "| --- | --- |\n"
+            "| `x` | 1 |\n"
+        )
+        # Only the real table: header + 1 data row = 2 TABLE_ROW nodes
+        assert self._rows(md) == 2
+
+    def test_normalize_produces_trailing_pipe(self):
+        """Merged multi-line row ends with | (valid markdown table row)."""
+        raw = (
+            "| `foo` | `int` | Gets the value\n"
+            " @return value\n"
+        )
+        normalized = self.parser._normalize_table_cells(raw)
+        lines = normalized.splitlines()
+        assert len(lines) == 1
+        assert lines[0].endswith("|"), f"Expected trailing |, got: {lines[0]!r}"

@@ -99,9 +99,17 @@ def _strip_code_blocks(text: str) -> str:
 
 
 def _get_table_row_count(text: str) -> int:
-    """Count table rows (lines starting with |) in text, excluding code blocks."""
+    """Count table rows (lines that start AND end with |) in text, excluding code blocks.
+
+    Requires both start and end pipe to match Gate 15 logic and avoid counting
+    multi-line cell continuation openers that only start with |.
+    """
     clean = _strip_code_blocks(text)
-    return sum(1 for line in clean.splitlines() if line.strip().startswith("|"))
+    return sum(
+        1
+        for line in clean.splitlines()
+        if line.strip().startswith("|") and line.strip().endswith("|")
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -275,11 +283,18 @@ def _detect_description_hallucination(
 def _detect_table_corruption(
     en_content: str, tr_content: str
 ) -> list[tuple[int, str, str, str]]:
-    """Detect table row count mismatch >50%."""
+    """Detect table row count mismatch >50%.
+
+    EN source is normalized before counting (multi-line cell openers merged into
+    single-line rows) so that repaired translations with single-line cells are not
+    false-positively flagged as corrupted.
+    """
+    from src.translation_engine.parser.hugo_parser import normalize_table_cells
+
     en_body = _get_body(en_content)
     tr_body = _get_body(tr_content)
 
-    en_rows = _get_table_row_count(en_body)
+    en_rows = _get_table_row_count(normalize_table_cells(en_body))
     tr_rows = _get_table_row_count(tr_body)
 
     if en_rows < 4:
@@ -288,6 +303,164 @@ def _detect_table_corruption(
     if tr_rows < en_rows * 0.5 or tr_rows > en_rows * 2.0:
         return [(0, str(en_rows), str(tr_rows), "table_row_corruption")]
     return []
+
+
+_PASCAL_RE = re.compile(r"^[A-Z][a-z0-9]{3,}(?:[A-Z][a-z0-9]*)*$")
+_DOTTED_RE = re.compile(r"^[A-Z][A-Za-z0-9]*\.[A-Z]")
+_IFACE_RE = re.compile(r"^I[A-Z][a-zA-Z]{2,}$")
+_ALLCAPS_RE = re.compile(r"^[A-Z_]{2,}$")
+
+
+def _cell_is_non_translatable(cell: str) -> bool:
+    """Return True if a table cell should stay in English (API term or identifier)."""
+    c = cell.strip()
+    if not c:
+        return True
+    if c in _API_HEADING_TERMS:
+        return True
+    if _PASCAL_RE.match(c):
+        return True
+    if _DOTTED_RE.match(c):
+        return True
+    if _IFACE_RE.match(c):
+        return True
+    if _ALLCAPS_RE.match(c):
+        return True
+    return False
+
+
+def _repair_table_corruption_no_gpu(
+    en_content: str,
+    tr_content: str,
+) -> tuple[str, int]:
+    """
+    Repair table row corruption using English source structure as template (no GPU).
+
+    TC-TBL-012 / surgical repair:
+    Uses HugoParser to extract the SOURCE table's row/column structure (the authoritative
+    template) and renders a new table with that structure. Cell content:
+      - Non-translatable cells (API heading terms, PascalCase/dotted identifiers):
+        English is the correct value — passthrough unchanged.
+      - Translatable description/summary cells: kept in English as a structural
+        placeholder. The shards will provide proper translations on next run (now
+        that Layers 1+2 prevent the legacy fallback that caused the corruption).
+
+    Row count is structurally guaranteed correct (taken from source, never from model).
+
+    Returns (repaired_content, num_tables_fixed).
+    """
+    try:
+        _proj_root = str(Path(__file__).resolve().parent.parent.parent)
+        if _proj_root not in sys.path:
+            sys.path.insert(0, _proj_root)
+        from src.translation_engine.parser.hugo_parser import HugoParser  # type: ignore
+        from src.translation_engine.parser.ast_nodes import NodeType  # type: ignore
+    except ImportError:
+        return tr_content, 0
+
+    try:
+        parser = HugoParser()
+        en_doc = parser.parse_string(en_content)
+    except Exception:
+        return tr_content, 0
+
+    def _walk(node):
+        yield node
+        for child in getattr(node, "children", []):
+            yield from _walk(child)
+
+    def _cell_text(cell_node) -> str:
+        parts = []
+        for n in _walk(cell_node):
+            if not hasattr(n, "raw") or not n.raw:
+                continue
+            if n.type == NodeType.CODE_SPAN:
+                parts.append(f"`{n.raw.strip()}`")
+            elif n.type == NodeType.TEXT:
+                parts.append(n.raw)
+        return " ".join(parts).strip()
+
+    # en_doc.ast may be a list of root nodes or a single root node
+    ast_roots = en_doc.ast if isinstance(en_doc.ast, list) else ([en_doc.ast] if en_doc.ast else [])
+    tables = [n for root in ast_roots for n in _walk(root) if n.type == NodeType.TABLE]
+    if not tables:
+        return tr_content, 0
+
+    # Locate table blocks in TR content (contiguous lines starting with |)
+    _TABLE_BLOCK_RE = re.compile(r"((?:^[ \t]*\|[^\n]*\n)+)", re.MULTILINE)
+    tr_table_matches = list(_TABLE_BLOCK_RE.finditer(tr_content))
+    if len(tr_table_matches) < len(tables):
+        return tr_content, 0  # Can't align source tables to TR blocks
+
+    repaired = tr_content
+    offset = 0
+    tables_fixed = 0
+
+    for en_table, tr_match in zip(tables, tr_table_matches):
+        # Extract rows: (is_header, [cell_text, ...], [align, ...])
+        rows_data: list[tuple[bool, list[str], list[str]]] = []
+        for row_node in en_table.children:
+            if row_node.type != NodeType.TABLE_ROW:
+                continue
+            is_header = bool(row_node.attrs.get("is_header", False))
+            cells = []
+            aligns = []
+            for cell_node in row_node.children:
+                if cell_node.type != NodeType.TABLE_CELL:
+                    continue
+                cells.append(_cell_text(cell_node))
+                aligns.append(cell_node.attrs.get("align") or "left")
+            rows_data.append((is_header, cells, aligns))
+
+        if not rows_data:
+            continue
+
+        col_count = max(len(r[1]) for r in rows_data)
+        header_aligns = rows_data[0][2] if rows_data else ["left"] * col_count
+
+        # Column widths
+        widths: list[int] = []
+        for c in range(col_count):
+            w = 3  # minimum for separator ---
+            for _, cells, _ in rows_data:
+                if c < len(cells):
+                    w = max(w, len(cells[c]))
+            widths.append(w)
+
+        def _pad(text: str, width: int) -> str:
+            return text.ljust(width)
+
+        lines: list[str] = []
+        for row_idx, (is_header, cells, _) in enumerate(rows_data):
+            row_cells = [
+                _pad(cells[c] if c < len(cells) else "", widths[c])
+                for c in range(col_count)
+            ]
+            lines.append("| " + " | ".join(row_cells) + " |")
+            if row_idx == 0:
+                # Separator row after header
+                sep_parts = []
+                for c in range(col_count):
+                    align = header_aligns[c] if c < len(header_aligns) else "left"
+                    w = widths[c]
+                    if align == "center":
+                        sep_parts.append(":" + "-" * max(w - 2, 1) + ":")
+                    elif align == "right":
+                        sep_parts.append("-" * max(w - 1, 2) + ":")
+                    else:
+                        sep_parts.append("-" * w)
+                lines.append("| " + " | ".join(sep_parts) + " |")
+
+        repaired_table = "\n".join(lines) + "\n"
+
+        # Replace corrupted block in repaired string (offset-adjusted for prior repairs)
+        tr_start = tr_match.start() + offset
+        tr_end = tr_match.end() + offset
+        repaired = repaired[:tr_start] + repaired_table + repaired[tr_end:]
+        offset += len(repaired_table) - (tr_end - tr_start)
+        tables_fixed += 1
+
+    return repaired, tables_fixed
 
 
 def _detect_mixed_language(
@@ -434,6 +607,13 @@ def _apply_no_gpu_repairs(en_content: str, tr_content: str) -> tuple[str, list[s
         working = _fix_double_periods(working)
         applied.append("double_period")
 
+    # 4. Table row corruption — rebuild from EN source structure (no GPU needed)
+    if _detect_table_corruption(en_content, working):
+        repaired_table, n_fixed = _repair_table_corruption_no_gpu(en_content, working)
+        if n_fixed > 0:
+            working = repaired_table
+            applied.append(f"table_row_corruption:{n_fixed}_tables")
+
     return working, applied
 
 
@@ -481,7 +661,7 @@ def process_file(
         print(f"  [{', '.join(sorted(issue_types))}] {rel}")
 
     # Determine which issues are no-GPU fixable
-    no_gpu_issue_types = {"inline_code_translation", "duplicate_content", "double_period"}
+    no_gpu_issue_types = {"inline_code_translation", "duplicate_content", "double_period", "table_row_corruption"}
     has_no_gpu = bool(issue_types & no_gpu_issue_types)
     has_model_needed = bool(issue_types - no_gpu_issue_types)
 

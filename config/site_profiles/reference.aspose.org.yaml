@@ -210,4 +210,13 @@ terminology:
     description: Exception class names (BarCodeException, InvalidCodeException)
     preserve_mode: protect
     severity: error
+translation_engine:
+  # TC-TBL-012 / Layer 1: API reference pages are short (5-30 units); even one model
+  # failure on a cell breaches the 3% global tolerance and triggers legacy fallback → table
+  # corruption. Raise to 10% so up to ~3 units per 30-unit file can come back unchanged
+  # before fallback is considered.
+  same_as_source_tolerance: 0.10
+  # Raise minimum length: very short cell texts (e.g. "String", "int") should not count
+  # toward the SAS ratio even if the model echoes them unchanged.
+  same_as_source_min_length: 15
 max_parallel_files: 2

@@ -817,7 +817,9 @@ class WriteGateEvaluator:
                     count += 1
             return count
 
-        src_rows = _count_table_rows(src_body)
+        from src.translation_engine.parser.hugo_parser import normalize_table_cells
+
+        src_rows = _count_table_rows(normalize_table_cells(src_body))
         tgt_rows = _count_table_rows(tgt_body)
 
         if src_rows < 4:
