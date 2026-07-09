@@ -1004,6 +1004,18 @@ class WriteGateEvaluator:
         wrong_percentage = wrong_lang_count / total_count
         purity_threshold = self._get_purity_threshold(expected_lang)
 
+        # Short-file quorum: for files with ≤10 evaluatable paragraphs, a single wrong-
+        # language paragraph produces 10-33% — far above the 6% threshold — causing false
+        # failures on API stubs and index pages that legitimately contain English identifiers.
+        # For short files, require at least 2 wrong-language paragraphs before blocking.
+        # For longer files (>10 paragraphs), the percentage-based threshold handles this.
+        if total_count <= 10 and wrong_lang_count <= 1:
+            return {
+                "passed": True,
+                "wrong_lang_percentage": wrong_percentage,
+                "detected_languages": detected_languages,
+            }
+
         if wrong_percentage > purity_threshold:
             return {
                 "passed": False,

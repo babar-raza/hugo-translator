@@ -377,96 +377,129 @@ class FileTranslationPipeline:
                             )
 
                     elif decision_result.decision == PostValidationDecision.RETRY:
-                        # TC-BUGFIX-B: MT backends cannot act on retry feedback —
-                        # they produce identical output. Skip directly to REJECT.
+                        # TC-RETRY-FIX-018: MT backends produce identical output on retry.
+                        # Split by severity: critical issues still reject; non-critical → accept best-effort.
+                        # This aligns with accept_after_max_retries=True semantics (skip futile retries).
+                        # LLM backends (professionalize_llm) CAN improve on retry — leave their path unchanged.
+                        # BUG-019-FIX: model_used can be empty when all content is TM/passthrough (no model call).
+                        # In that case _is_llm_backend=False; the old `if _model_used and ...` skipped the MT path.
+                        # Drop _model_used from the guard — empty model_used is definitely not an LLM backend.
+                        # BUG-020-FIX: Do NOT `break` for MT best-effort accept. The write path (lines 508+) is
+                        # INSIDE this while loop. `break` exits the loop, bypassing the write entirely. Instead,
+                        # restructure: MT path falls through to line 500 (ACCEPT); LLM path goes into `else`
+                        # which runs the repeated-feedback guard and issues `continue`.
                         _model_used = getattr(result.stats, "model_used", "") or ""
                         _is_llm_backend = "llm" in _model_used.lower()
-                        if _model_used and not _is_llm_backend:
-                            logger.warning(
-                                f"MT backend ({_model_used}) cannot act on feedback — "
-                                f"escalating to reject + retranslate queue for {file_path} to {target_lang}"
+                        if not _is_llm_backend:
+                            _critical = (
+                                engine.decision_engine._check_critical_failure(validation_result)
+                                if validation_result is not None
+                                and hasattr(engine, "decision_engine")
+                                and engine.decision_engine is not None
+                                else None
                             )
-                            raise TranslationRejectedError(
-                                message=f"MT backend cannot retry with feedback: {decision_result.decision_reason}",
-                                file_path=str(file_path),
-                                validation_result=validation_result,
-                                rejection_reason="MT backend cannot use feedback — retries are futile",
-                            )
-
-                        # Repeated feedback guard
-                        try:
-                            _current_validators = frozenset(
-                                (
-                                    getattr(iss, "validator", ""),
-                                    getattr(iss, "severity", ""),
+                            if _critical:
+                                logger.warning(
+                                    f"MT backend ({_model_used or 'tm/passthrough'}) CRITICAL validation failure "
+                                    f"({_critical}) — escalating to reject + retranslate queue "
+                                    f"for {file_path} to {target_lang}"
                                 )
-                                for iss in (validation_result.issues if validation_result else [])
-                                if getattr(getattr(iss, "severity", None), "value", "") == "error"
-                            )
-                        except Exception:
-                            _current_validators = frozenset()
-                        if (
-                            _prev_retry_validators is not None
-                            and _current_validators
-                            and _current_validators == _prev_retry_validators
-                        ):
-                            logger.warning(
-                                f"Repeated feedback for {file_path} to {target_lang}: "
-                                f"same validators on retry {retry_count}. Failing early. "
-                                f"Validators: {_current_validators}"
-                            )
-                            raise TranslationRejectedError(
-                                message=f"Repeated identical feedback: {decision_result.decision_reason}",
-                                file_path=str(file_path),
-                                validation_result=validation_result,
-                                rejection_reason="Repeated feedback -- LLM cannot resolve this issue",
-                            )
-                        _prev_retry_validators = _current_validators
+                                raise TranslationRejectedError(
+                                    message=f"MT backend cannot retry with feedback: {decision_result.decision_reason}",
+                                    file_path=str(file_path),
+                                    validation_result=validation_result,
+                                    rejection_reason=f"MT backend: critical issue ({_critical}) cannot be resolved by retrying",
+                                )
+                            else:
+                                # Non-critical issues (terminology warnings, minor checks).
+                                # MT model cannot improve on retry. Accept best-effort.
+                                # Fall through to line 500 (ACCEPT) → write path runs normally.
+                                _issue_summary = "; ".join(
+                                    f"{getattr(iss, 'validator', '?')}: "
+                                    f"{str(getattr(iss, 'message', ''))[:60]}"
+                                    for iss in (validation_result.issues if validation_result else [])
+                                )
+                                logger.info(
+                                    f"MT backend ({_model_used or 'tm/passthrough'}): non-critical validation issues, "
+                                    f"accepting best-effort for {file_path} to {target_lang}. "
+                                    f"Issues: [{_issue_summary}]"
+                                )
+                                # (no break, no continue — fall through to ACCEPT path below)
+                        else:
+                            # LLM backend: repeated feedback guard + retry with feedback
+                            try:
+                                _current_validators = frozenset(
+                                    (
+                                        getattr(iss, "validator", ""),
+                                        getattr(iss, "severity", ""),
+                                    )
+                                    for iss in (validation_result.issues if validation_result else [])
+                                    if getattr(getattr(iss, "severity", None), "value", "") == "error"
+                                )
+                            except Exception:
+                                _current_validators = frozenset()
+                            if (
+                                _prev_retry_validators is not None
+                                and _current_validators
+                                and _current_validators == _prev_retry_validators
+                            ):
+                                logger.warning(
+                                    f"Repeated feedback for {file_path} to {target_lang}: "
+                                    f"same validators on retry {retry_count}. Failing early. "
+                                    f"Validators: {_current_validators}"
+                                )
+                                raise TranslationRejectedError(
+                                    message=f"Repeated identical feedback: {decision_result.decision_reason}",
+                                    file_path=str(file_path),
+                                    validation_result=validation_result,
+                                    rejection_reason="Repeated feedback -- LLM cannot resolve this issue",
+                                )
+                            _prev_retry_validators = _current_validators
 
-                        # Retry with feedback
-                        retry_count += 1
+                            # Retry with feedback
+                            retry_count += 1
 
-                        if retry_count > max_retry_attempts:
-                            logger.error(
-                                f"Max retry attempts ({max_retry_attempts}) exceeded for {file_path} "
-                                f"to {target_lang}. Validation kept returning RETRY. "
-                                f"Reason: {decision_result.decision_reason}"
-                            )
-                            raise TranslationRejectedError(
-                                message=f"Max retry attempts exceeded: {decision_result.decision_reason}",
-                                file_path=str(file_path),
-                                validation_result=validation_result,
-                                rejection_reason=decision_result.decision_reason,
-                            )
+                            if retry_count > max_retry_attempts:
+                                logger.error(
+                                    f"Max retry attempts ({max_retry_attempts}) exceeded for {file_path} "
+                                    f"to {target_lang}. Validation kept returning RETRY. "
+                                    f"Reason: {decision_result.decision_reason}"
+                                )
+                                raise TranslationRejectedError(
+                                    message=f"Max retry attempts exceeded: {decision_result.decision_reason}",
+                                    file_path=str(file_path),
+                                    validation_result=validation_result,
+                                    rejection_reason=decision_result.decision_reason,
+                                )
 
-                        retry_feedback = decision_result.retry_feedback
-                        result.stats.validation_retried += 1
-                        # Progress tracking
-                        progress = get_progress_tracker()
-                        if progress:
-                            progress.file_translation_retry(segments_to_undo=len(segments))
-                        logger.info(
-                            f"Retrying translation for {file_path} to {target_lang} "
-                            f"(attempt {retry_count}/{max_retry_attempts}): "
-                            f"{decision_result.decision_reason}"
-                        )
-
-                        result.retry_history.append(
-                            {
-                                "attempt": retry_count,
-                                "reason": decision_result.decision_reason,
-                                "feedback": retry_feedback,
-                            }
-                        )
-
-                        # BM-08: Track retry reason
-                        with engine._retry_metrics_lock:
-                            reason_key = "validation_retry"
-                            engine._retry_metrics["retry_reasons"][reason_key] = (
-                                engine._retry_metrics["retry_reasons"].get(reason_key, 0) + 1
+                            retry_feedback = decision_result.retry_feedback
+                            result.stats.validation_retried += 1
+                            # Progress tracking
+                            progress = get_progress_tracker()
+                            if progress:
+                                progress.file_translation_retry(segments_to_undo=len(segments))
+                            logger.info(
+                                f"Retrying translation for {file_path} to {target_lang} "
+                                f"(attempt {retry_count}/{max_retry_attempts}): "
+                                f"{decision_result.decision_reason}"
                             )
 
-                        continue  # Loop again with feedback
+                            result.retry_history.append(
+                                {
+                                    "attempt": retry_count,
+                                    "reason": decision_result.decision_reason,
+                                    "feedback": retry_feedback,
+                                }
+                            )
+
+                            # BM-08: Track retry reason
+                            with engine._retry_metrics_lock:
+                                reason_key = "validation_retry"
+                                engine._retry_metrics["retry_reasons"][reason_key] = (
+                                    engine._retry_metrics["retry_reasons"].get(reason_key, 0) + 1
+                                )
+
+                            continue  # Loop again with feedback (LLM only)
 
                     # ACCEPT - fall through to write file
 
