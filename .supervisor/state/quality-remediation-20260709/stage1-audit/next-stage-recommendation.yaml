@@ -1,0 +1,37 @@
+next_stage: PROMPT_3  # controlled execution — plan is already hardened (EF-0..EF-12 in plan)
+reason: >
+  Plan is already taskcard-driven with gates, verification matrix, evidence contract
+  (EF-3 through EF-8 in plan file). No hardening needed. Proceed directly to Stage 3
+  controlled execution for: AUD-QR-001 (shard restart), AUD-QR-002 (smoke test),
+  AUD-QR-003 (gate integration tests).
+
+material_findings: 3
+actionable_findings_l1: 2
+actionable_findings_l2: 1
+actionable_findings_l3_deferred: 2
+
+skip_prompt_2_because: >
+  Plan already has full EF-0 through EF-12 execution framework (requirements registry,
+  parent/child taskcards, micro-steps, DAG, state machine, validation matrix, evidence
+  contract, quality scoring, reconciliation). Further hardening would duplicate existing
+  plan structure. Only execution work remains.
+
+execution_items:
+  - id: EXEC-1
+    taskcard: TC-VRF-011-03
+    action: restart_shards_s1_through_s5
+    priority: 1
+    blocks: EXEC-2
+  - id: EXEC-2
+    taskcard: TC-VRF-011-04
+    action: monitor_30_min_acceptance_rate
+    priority: 2
+    depends_on: EXEC-1
+  - id: EXEC-3
+    taskcard: TC-WGT-003-12 (new gate tests)
+    action: write_pytest_tests_for_gates_9_17
+    priority: 3
+    parallel_safe: true  # can run before or after shard restart
+
+evidence_quality_verdict: PARTIAL
+routing_confidence: HIGH

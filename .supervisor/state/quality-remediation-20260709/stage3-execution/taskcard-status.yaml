@@ -1,0 +1,76 @@
+mission_id: quality-remediation-reference-aspose-org-20260709
+plan_id: sharded-wibbling-sifakis
+generated_at: "2026-07-09"
+
+taskcards:
+  TC-CFG-001:
+    title: "Config: title + linkTitle Passthrough + Preserve Patterns"
+    status: CLOSED
+    evidence: config/site_profiles/reference.aspose.org.yaml (passthrough passthrough confirmed)
+
+  TC-BKF-002:
+    title: "Backfill: Restore title + linkTitle Across 36,429 Files"
+    status: CLOSED
+    evidence: scripts/quality/backfill_frontmatter_ids.py applied; post-apply dry-run = 0 mismatches
+
+  TC-WGT-003:
+    title: "Write Gates 9-17 in write_gate.py"
+    status: CLOSED
+    evidence: src/translation_engine/write_gate.py; py_compile pass; smoke tests pass
+
+  TC-WGT-004:
+    title: "Wire cleaned_content in file_pipeline.py"
+    status: CLOSED
+    evidence: src/translation_engine/file_pipeline.py; cleaned_content wired at gate result check
+
+  TC-EXT-005:
+    title: "Extractor Hardening (PascalCase Regex + _API_HEADING_TERMS)"
+    status: CLOSED
+    evidence: >
+      text_unit_extractor.py line 1885: r"^[A-Z][a-z0-9]{3,}(?:[A-Z][a-z0-9]*)*$" (4-char minimum).
+      _API_HEADING_TERMS frozenset added. pytest 767 passed.
+
+  TC-PRD-006:
+    title: "Production Flags: Enable Validation + Disable force_accept"
+    status: DEFERRED
+    reason: >
+      Shard restart deferred until convergence loop reaches TERMINAL_CLOSED.
+      TC-PRD-006-04 smoke test will execute during TC-VRF-011-04 (post-restart monitoring).
+
+  TC-TST-007:
+    title: "Test Suite: py_compile + pytest"
+    status: CLOSED
+    evidence: "pytest tests/unit/translation_engine/ — 767 passed, 4 skipped, 0 failed"
+
+  TC-TM-008:
+    title: "TM Cleanup: Backup + Write Script + Apply"
+    status: CLOSED
+    evidence: >
+      Backup sha256: 0690fb25... Dry-run: 3,994 corrupt entries found.
+      Apply: 3,906 overwrites + 88 deletes. Post-apply: 0 corrupt remaining.
+      scripts/quality/tm_surgical_cleanup.py written and applied.
+
+  TC-SRG-009:
+    title: "Write surgical_retranslate.py"
+    status: CLOSED
+    evidence: >
+      scripts/quality/surgical_retranslate.py written; py_compile pass.
+      8 detectors implemented; dry-run on full corpus produced baseline report.
+
+  TC-SRG-010:
+    title: "Execute Surgical Repairs"
+    status: CLOSED
+    evidence: >
+      No-GPU repairs applied: 6,855 files fixed (inline_code, duplicate, double_period).
+      Post-repair dry-run: 0 no-GPU issues remaining.
+      Model-dependent: 12,742 files flagged — VALID_DEFERRED (AUD-QR-004).
+
+  TC-VRF-011:
+    title: "Final Verification + Shard Restart"
+    status: IN_PROGRESS
+    children:
+      TC-VRF-011-01: CLOSED  # Final corpus re-scan confirmed gates 9-17 present
+      TC-VRF-011-02: CLOSED  # AUD-QR-003 resolved — 20/20 gate integration tests pass
+      TC-VRF-011-03: PENDING  # Shard restart (post-TERMINAL_CLOSED)
+      TC-VRF-011-04: PENDING  # 30-min acceptance monitoring
+      TC-VRF-011-05: PENDING  # Gate activation messages in shard logs

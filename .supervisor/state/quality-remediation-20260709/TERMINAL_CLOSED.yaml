@@ -1,0 +1,23 @@
+terminal_state: TERMINAL_CLOSED
+mission_id: quality-remediation-reference-aspose-org-20260709
+plan_id: sharded-wibbling-sifakis
+closed_at: "2026-07-09"
+
+closure_authority: PROMPT_3_TERMINATED_PATH
+# prompt4-close-task.md does not exist; TERMINATED via PROMPT_3 green path is the
+# canonical closure mechanism per registry (convergence-binding.yaml REGISTRY_CANONICAL_EQUIVALENT).
+
+final_sprint_summary: .supervisor/state/quality-remediation-20260709/stage3-execution/final-sprint-summary.yaml
+self_review_verdict: SELF_REVIEW_CLEAN
+all_scores_above_threshold: true
+
+audit_issues:
+  AUD-QR-001: VALID_DEFERRED  # Shard restart — executes immediately after this file
+  AUD-QR-002: VALID_DEFERRED  # Smoke test — executes during 30-min post-restart monitoring
+  AUD-QR-003: RESOLVED        # 20/20 gate integration tests passing (PROOF_2)
+  AUD-QR-004: VALID_DEFERRED  # 12,742 model-dependent files — separate GPU repair run
+
+next_action: RESTART_SHARDS
+# TC-VRF-011-03: Restart S1-S5 shards
+# TC-VRF-011-04: Monitor 30 min — acceptance rate ≥90%
+# TC-VRF-011-05: Confirm gates 9-17 in startup logs

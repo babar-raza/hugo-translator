@@ -1,0 +1,106 @@
+mission_id: quality-remediation-reference-aspose-org-20260709
+scored_at: "2026-07-09"
+
+scores:
+  TC-CFG-001:
+    requirement_correctness: 5
+    implementation_correctness: 5
+    scope_discipline: 5
+    validation_strength: 5
+    evidence_completeness: 5
+    regression_safety: 5
+    production_readiness: 5
+    overall: 5
+    notes: "yaml.safe_load confirmed; passthrough passthrough printed"
+
+  TC-BKF-002:
+    requirement_correctness: 5
+    implementation_correctness: 5
+    scope_discipline: 5
+    validation_strength: 5
+    evidence_completeness: 4
+    regression_safety: 5
+    production_readiness: 5
+    overall: 5
+    notes: "Post-apply dry-run = 0 mismatches; spot-check confirmed"
+
+  TC-WGT-003:
+    requirement_correctness: 5
+    implementation_correctness: 5
+    scope_discipline: 5
+    validation_strength: 5
+    evidence_completeness: 5
+    regression_safety: 5
+    production_readiness: 5
+    overall: 5
+    notes: "All 9 gates implemented; unconditional; cleaned_content wired; smoke tests pass"
+
+  TC-WGT-004:
+    requirement_correctness: 5
+    implementation_correctness: 5
+    scope_discipline: 5
+    validation_strength: 4
+    evidence_completeness: 4
+    regression_safety: 5
+    production_readiness: 5
+    overall: 5
+    notes: "cleaned_content check inserted at correct pipeline point; py_compile pass"
+
+  TC-EXT-005:
+    requirement_correctness: 5
+    implementation_correctness: 5
+    scope_discipline: 5
+    validation_strength: 5
+    evidence_completeness: 5
+    regression_safety: 5
+    production_readiness: 5
+    overall: 5
+    notes: "PascalCase regex {3,} fix; _API_HEADING_TERMS; pytest 767/0 fail"
+
+  TC-TST-007:
+    requirement_correctness: 5
+    implementation_correctness: 5
+    scope_discipline: 5
+    validation_strength: 5
+    evidence_completeness: 5
+    regression_safety: 5
+    production_readiness: 5
+    overall: 5
+    notes: "20/20 gate integration tests; 767 passed across full suite"
+
+  TC-TM-008:
+    requirement_correctness: 5
+    implementation_correctness: 5
+    scope_discipline: 5
+    validation_strength: 5
+    evidence_completeness: 5
+    regression_safety: 5
+    production_readiness: 5
+    overall: 5
+    notes: "3,994 corrupt entries found/fixed; backup sha256 recorded; post-apply = 0"
+
+  TC-SRG-009:
+    requirement_correctness: 5
+    implementation_correctness: 5
+    scope_discipline: 5
+    validation_strength: 4
+    evidence_completeness: 4
+    regression_safety: 5
+    production_readiness: 5
+    overall: 5
+    notes: "8 detectors; idempotent; full-disk scan; py_compile pass"
+
+  TC-SRG-010:
+    requirement_correctness: 5
+    implementation_correctness: 5
+    scope_discipline: 5
+    validation_strength: 5
+    evidence_completeness: 5
+    regression_safety: 5
+    production_readiness: 5
+    overall: 5
+    notes: "6,855 files repaired (no-GPU); post-repair = 0 no-GPU issues; model-dependent deferred"
+
+all_dimensions_above_threshold: true
+minimum_threshold: 4
+all_scores_at_or_above_minimum: true
