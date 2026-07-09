@@ -45,10 +45,10 @@ target_langs:
 
 frontmatter:
   title:
-    mode: translate
+    mode: passthrough   # API object name — never translate
     strategy: null
   linkTitle:
-    mode: translate
+    mode: passthrough   # API object name — never translate
     strategy: null
   description:
     mode: translate
@@ -93,6 +93,10 @@ body:
   - ^<.*>
   - <[A-Z][a-zA-Z0-9]+>
   - ^[A-Z][A-Za-z0-9_]*\s*\(.*\)$
+  # Inline code spans — API identifiers inside backticks must not be translated
+  - "`[^`]+`"
+  # API heading terms — preserved verbatim (Methods, Properties, Returns, etc.)
+  - ^(?:Name|Type|Description|Returns|Parameters|Properties|Methods|Fields|Constructors|Events|Exceptions|Remarks|Examples|See Also|Inheritance|Implements|Namespace|Assembly|Syntax|Value)$
   placeholder_syntax:
   - \{\{<.*?>\}\}
   - \{\{%.*?%\}\}

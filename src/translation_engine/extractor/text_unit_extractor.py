@@ -121,6 +121,15 @@ NON_TRANSLATABLE_FRONTMATTER_FIELDS = {
     "type",
 }
 
+# API reference heading terms that must never be translated.
+# Used by _is_non_translatable() and write_gate.py Gate 9.
+_API_HEADING_TERMS: frozenset[str] = frozenset({
+    "Name", "Type", "Description", "Returns", "Parameters",
+    "Properties", "Methods", "Fields", "Constructors", "Events",
+    "Exceptions", "Remarks", "Examples", "See Also", "Inheritance",
+    "Implements", "Namespace", "Assembly", "Syntax", "Value",
+})
+
 # Validate constants at module load time (VLD-04, PH-01)
 # Use ValueError instead of assert to ensure validation works with -O flag
 if not (5 <= LANGUAGE_PURITY_MIN_LENGTH <= 100):
@@ -1803,6 +1812,10 @@ class TextUnitExtractor:
             )
             return True
 
+        # Strategy 0.4: API heading terms - NEVER translate (Methods, Properties, Returns, etc.)
+        if text_stripped in _API_HEADING_TERMS:
+            return True
+
         # Strategy 0.5: Punctuation-only or separator-only strings - NEVER translate
         # These cause corruption like ",et," when the model tries to "translate" commas
         # Detect: strings with no alphanumeric content after stripping
@@ -1865,8 +1878,12 @@ class TextUnitExtractor:
         - ALL_CAPS: API, SDK, URL
         - Version numbers: v1.2.3, 2.0.1, 1.0+
         """
-        # CamelCase: Starts with capital, has lowercase, then capital
-        if re.match(r"^[A-Z][a-z]+(?:[A-Z][a-z]+)+$", text):
+        # PascalCase: Starts with capital + 3+ lowercase/digits, optional additional PascalCase segments.
+        # Matches single-word API identifiers (Body, Cell, Camera) AND multi-word (VertexDeclaration).
+        # Requires 4+ chars total to avoid false-positive on common 3-char words (Use, The, For, See).
+        # Changed from r"^[A-Z][a-z]+(?:[A-Z][a-z]+)+$" which required 2+ components
+        # and incorrectly allowed translation of single-word API class names.
+        if re.match(r"^[A-Z][a-z0-9]{3,}(?:[A-Z][a-z0-9]*)*$", text):
             return True
 
         # PascalCase.With.Dots

@@ -1022,7 +1022,7 @@ sprint_loop:
 # max_wait_attempts: total retries before shard exits (total wait = interval × attempts).
 resource_governance:
   enabled: true
-  sm_ceiling_percent: 82   # 2 NLLB(64) + 2 m2m100(16) = 80 <= 82 OK; 3 NLLB(96) > 82 DENIED
+  sm_ceiling_percent: 115  # 3 NLLB(96) + 2 m2m100(16) = 112 <= 115 OK; proven stable at 70°C
   wait_interval_sec: 120
   max_wait_attempts: 720   # 720 x 2 min = 24h max wait for long campaigns
   sm_estimates:

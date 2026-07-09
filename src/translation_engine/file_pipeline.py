@@ -657,6 +657,10 @@ class FileTranslationPipeline:
                             except Exception as _rtq_err:
                                 logger.debug(f"soft contamination queue failed: {_rtq_err}")
 
+                # Apply auto-cleaned content from gates 9-12/16 (if any gate cleaned it)
+                if validation_passed and "_gate_result" in locals() and _gate_result.cleaned_content is not None:
+                    translated_content = _gate_result.cleaned_content
+
                 # PHASE 2: WRITE (only if ALL validation passed)
                 if validation_passed:
                     try:
