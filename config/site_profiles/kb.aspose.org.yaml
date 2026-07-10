@@ -194,3 +194,9 @@ frontmatter_translation:
   - draft
   - type
 max_parallel_files: 2
+translation_engine:
+  # TC-TBL-012 / Layer 1: kb articles are short with many technical terms (function names,
+  # parameter types) that models leave unchanged. Raise tolerance so TC-SAS-01 doesn't
+  # trigger legacy fallback → table destruction on short API stubs.
+  same_as_source_tolerance: 0.10
+  same_as_source_min_length: 15

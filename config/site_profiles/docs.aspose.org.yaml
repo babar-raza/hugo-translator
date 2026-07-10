@@ -133,3 +133,9 @@ terminology:
     preserve_mode: both
     severity: error
 max_parallel_files: 2
+translation_engine:
+  # TC-TBL-012 / Layer 1: docs articles contain many API identifiers and code references
+  # that models leave unchanged. Raise tolerance to prevent TC-SAS-01 → legacy fallback
+  # → table/structure destruction on short technical articles.
+  same_as_source_tolerance: 0.10
+  same_as_source_min_length: 15
