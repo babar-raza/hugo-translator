@@ -1192,15 +1192,44 @@ class SegmentTranslator:
                     f"-- source text will appear in output."
                 )
                 if _sas_ratio > _sas_tolerance:
-                    from .exceptions import TranslationIncomplete
-                    raise TranslationIncomplete(
-                        f"TC-SAS-01: same-as-source ratio {_sas_ratio:.1%} exceeds tolerance "
-                        f"{_sas_tolerance:.1%} ({len(_sas_units)}/{_translatable_count} units unchanged)",
-                        missing_count=len(_sas_units),
-                        total_count=_translatable_count,
-                        ratio=_sas_ratio,
-                        tolerance=_sas_tolerance,
-                    )
+                    # TC-TBL-012 / Layer 2: Suppress legacy fallback for table-containing
+                    # documents. MarkdownReconstructor corrupts tables (3×+ row expansion)
+                    # when raw markdown pipe chars are sent to the model. A partial AST
+                    # result (some cells in source language) is far better than structurally
+                    # corrupted tables. Only suppress if the document actually has tables.
+                    _ast_has_tables = False
+                    if doc.ast:
+                        from .parser.ast_nodes import NodeType as _NT_SAS
+
+                        def _check_ast_tables(nodes: list) -> bool:
+                            for _n in nodes:
+                                if getattr(_n, "type", None) == _NT_SAS.TABLE:
+                                    return True
+                                if getattr(_n, "children", None) and _check_ast_tables(_n.children):
+                                    return True
+                            return False
+
+                        _ast_nodes = doc.ast if isinstance(doc.ast, list) else [doc.ast]
+                        _ast_has_tables = _check_ast_tables(_ast_nodes)
+
+                    if _ast_has_tables:
+                        logger.warning(
+                            f"TC-SAS-01: ratio {_sas_ratio:.1%} > {_sas_tolerance:.1%} but "
+                            f"document contains tables — suppressing legacy fallback to preserve "
+                            f"table structure. Proceeding with partial AST result "
+                            f"({len(_sas_units)} untranslated units, "
+                            f"{len(_sas_units)}/{_translatable_count})."
+                        )
+                    else:
+                        from .exceptions import TranslationIncomplete
+                        raise TranslationIncomplete(
+                            f"TC-SAS-01: same-as-source ratio {_sas_ratio:.1%} exceeds tolerance "
+                            f"{_sas_tolerance:.1%} ({len(_sas_units)}/{_translatable_count} units unchanged)",
+                            missing_count=len(_sas_units),
+                            total_count=_translatable_count,
+                            ratio=_sas_ratio,
+                            tolerance=_sas_tolerance,
+                        )
 
             # AGENT B-7.3: Check batch-level purity failures
             batch_stats = extractor.batch_stats
