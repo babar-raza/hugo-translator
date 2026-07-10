@@ -95,6 +95,10 @@ body:
   - ^[A-Z][A-Za-z0-9_]*\s*\(.*\)$
   # Inline code spans — API identifiers inside backticks must not be translated
   - "`[^`]+`"
+  # TC-AUDIT-001 (RC-B): Mixed-case dotted identifiers — PascalCase.snake_case and
+  # PascalCase.camelCase — e.g. FileNode.file_node_id, VertexElement.getType.
+  # Protects these as placeholders so description sentences can be translated around them.
+  - \b[A-Z][A-Za-z0-9_]+\.[a-z][A-Za-z0-9_.]*\b
   # TC-HDG-TRANS-019: Heading terms removed from preserve_patterns.
   # Gate 9 in write_gate.py validates translated headings and restores English on corruption.
   # - ^(?:Name|Type|Description|Returns|Parameters|Properties|Methods|Fields|Constructors|Events|Exceptions|Remarks|Examples|See Also|Inheritance|Implements|Namespace|Assembly|Syntax|Value)$

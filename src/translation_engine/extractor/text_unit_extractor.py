@@ -121,13 +121,28 @@ NON_TRANSLATABLE_FRONTMATTER_FIELDS = {
     "type",
 }
 
-# API reference heading terms that must never be translated.
-# Used by _is_non_translatable() and write_gate.py Gate 9.
+# API reference heading terms validated by Gate 9 in write_gate.py.
+# TC-HDG-TRANS-019: these must NEVER be blocked from translation;
+# they appear as section headings (## Methods) and must reach the model.
 _API_HEADING_TERMS: frozenset[str] = frozenset({
     "Name", "Type", "Description", "Returns", "Parameters",
     "Properties", "Methods", "Fields", "Constructors", "Events",
     "Exceptions", "Remarks", "Examples", "See Also", "Inheritance",
     "Implements", "Namespace", "Assembly", "Syntax", "Value",
+    # RC-A additions (TC-AUDIT-001): common section heading words also
+    # caught by the PascalCase heuristic in _is_technical_identifier.
+    "Overview", "Example", "Notes", "Enumerations", "Deprecated",
+    "Requirements", "Installation", "Usage", "Introduction",
+    "Output", "Input", "Result", "Results", "Summary", "Details",
+    "Options", "Configuration", "Features", "Limitations",
+})
+
+# Words that must always be translated regardless of PascalCase appearance.
+# These are NOT headings (Gate 9 does not apply), but they match the
+# PascalCase heuristic and would otherwise be left in English.
+# RC-A additions (TC-AUDIT-001): table Access column values.
+_ALWAYS_TRANSLATE_WORDS: frozenset[str] = frozenset({
+    "Read", "Write", "Execute", "Create", "Delete", "Update",
 })
 
 # Validate constants at module load time (VLD-04, PH-01)
@@ -1858,10 +1873,11 @@ class TextUnitExtractor:
             # spaCy not available, skip NER detection
             pass
 
-        # TC-HDG-TRANS-019: API heading terms override PascalCase heuristic.
-        # These are section headings (## Methods, ## Properties) not class names.
-        # They must reach the model to be translated.
-        if text_stripped in _API_HEADING_TERMS:
+        # TC-AUDIT-001: Always-translate override for heading terms and table values
+        # that the PascalCase heuristic (Strategy 2) would incorrectly block.
+        # _API_HEADING_TERMS: section headings (## Overview, ## Methods, ## Example …)
+        # _ALWAYS_TRANSLATE_WORDS: table cell values (Read, Write …)
+        if text_stripped in _API_HEADING_TERMS or text_stripped in _ALWAYS_TRANSLATE_WORDS:
             return False
 
         # Strategy 2: Heuristic-based detection
@@ -1975,22 +1991,25 @@ class TextUnitExtractor:
                         )
                         return True
 
-        # Pattern 4: Sentences/segments starting with a dotted API identifier
-        # e.g. "EntityRendererKey.EntityRendererKey creates a key with..."
-        #       "VertexElement.getType returns the element's VertexElementType."
-        # These are API documentation prose sentences where the leading identifier is the
-        # subject. NLLB consistently mutates the identifier (FVector4 → FVecter4, etc.)
-        # because it treats dotted identifiers as transliterable English text.
-        # Covers both PascalCase methods (EntityRendererKey.Create) and
-        # camelCase methods (VertexElement.getType, A3DObject.findProperty).
-        # Marking as non-translatable preserves the identifier exactly; the English
-        # technical sentence is more useful than a corrupted Arabic sentence.
+        # Pattern 4: Short segments that ARE a dotted API identifier (with no real prose).
+        # e.g. "FileNode.file_node_id" alone → protect (identifier = the whole text).
+        # TC-AUDIT-001 (RC-B): Long description sentences starting with a dotted identifier
+        # (e.g. "FileNode.file_node_id is the integer identifier...") are now sent to the
+        # model instead of being blocked.  The new preserve_pattern
+        # \b[A-Z][A-Za-z0-9_]+\.[a-z][A-Za-z0-9_.]*\b in reference.aspose.org.yaml protects
+        # the identifier as a placeholder, so the surrounding prose is translated correctly.
+        # Threshold: protect whole text only when identifier occupies >80% of the chars.
         dotted_pascal_lead = r"^[A-Z][A-Za-z0-9_]+\.[A-Za-z][A-Za-z0-9_.]*(?:\s|$)"
-        if re.match(dotted_pascal_lead, text_stripped):
-            logger.debug(
-                f"API identifier-led sentence (protected): {text_stripped[:80]}"
-            )
-            return True
+        m4 = re.match(dotted_pascal_lead, text_stripped)
+        if m4:
+            identifier_len = len(m4.group().rstrip())
+            if identifier_len > len(text_stripped) * 0.80:
+                logger.debug(
+                    f"API identifier-led segment (protected): {text_stripped[:80]}"
+                )
+                return True
+            # Sentence is longer than identifier — fall through to let model translate it
+            # with identifier protected via preserve_patterns.
 
         return False
 
