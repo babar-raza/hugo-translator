@@ -72,6 +72,7 @@ class TMStats:
 
     # L3 Semantic stats
     l3_size: int
+    l3_hits: int
 
     # Combined stats
     total_lookups: int

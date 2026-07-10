@@ -83,6 +83,7 @@ class TranslationMemory:
         # Statistics
         self._total_lookups = 0
         self._total_hits = 0
+        self._l3_hits = 0
         self._override_bypasses = 0
         self._poisoned_hits_rejected = 0
 
@@ -418,6 +419,7 @@ class TranslationMemory:
                     if self._validate_hit_language(best.translation, req.tgt_lang):
                         self.l1.put(req.site_id, req.src_lang, req.tgt_lang, req.text, best.translation)
                         self._total_hits += 1
+                        self._l3_hits += 1
                         results[i] = LookupResult(
                             hit=True, translation=best.translation,
                             source="l3_semantic", confidence=best.similarity,
@@ -502,6 +504,7 @@ class TranslationMemory:
             l2_size=l2_size,
             # L3 Semantic
             l3_size=l3_size,
+            l3_hits=self._l3_hits,
             # Combined
             total_lookups=self._total_lookups,
             total_hits=self._total_hits,
