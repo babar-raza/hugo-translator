@@ -29,6 +29,12 @@ def _make_engine():
     engine._l3 = None
     engine._check_shutdown.return_value = False
 
+    # Wire batch_lookup to mirror lookup().return_value for each request (for unit tests).
+    # segment_translator now calls batch_lookup() instead of per-segment lookup().
+    def _batch_lookup_side_effect(requests, use_semantic=True, **kwargs):
+        return [engine.tm.lookup.return_value for _ in requests]
+    engine.tm.batch_lookup.side_effect = _batch_lookup_side_effect
+
     # Model loader
     backend = MagicMock()
     backend.translate_batch.return_value = ["Translated text"]

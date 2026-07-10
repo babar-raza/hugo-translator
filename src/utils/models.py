@@ -6,7 +6,7 @@ These models provide runtime validation and type safety for configuration data.
 from __future__ import annotations
 
 from enum import Enum
-from typing import Literal
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field, field_validator
 
@@ -226,6 +226,10 @@ class SiteProfile(BaseModel):
             "translation batching), 'total' (explicitly Aspose.Total umbrella), or None (auto-detect). "
             "Never use 'total' for multi-family subdomains."
         ),
+    )
+    translation_engine: dict[str, Any] | None = Field(
+        default=None,
+        description="Site-specific translation engine overrides (e.g. same_as_source_tolerance, same_as_source_min_length). Overrides global config values.",
     )
 
     @field_validator("target_langs", mode="before")

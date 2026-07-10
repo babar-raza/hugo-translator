@@ -511,6 +511,42 @@ class SegmentTranslator:
 
         # Step 1: TM lookup (unless force=True)
         if not force:
+            # Batch TM lookup: L1+L2 per-request, then L3 for all misses in one GPU forward pass.
+            # RC-4 FIX preserved: frontmatter segments use use_semantic=False (no L3).
+            from ..tm.models import LookupRequest as _TMLookupRequest  # noqa: PLC0415
+
+            def _is_fm_seg(seg):
+                return bool(
+                    seg.context
+                    and hasattr(seg.context, "context_type")
+                    and str(seg.context.context_type) == "SegmentContextType.FRONTMATTER"
+                )
+
+            def _make_tm_req(seg):
+                return _TMLookupRequest(
+                    site_id=site_id,
+                    src_lang=source_lang,
+                    tgt_lang=target_lang,
+                    text=seg.source_text,
+                    context=str(seg.context) if seg.context else None,
+                )
+
+            _fm_idx = [i for i, s in enumerate(segments) if _is_fm_seg(s)]
+            _body_idx = [i for i, s in enumerate(segments) if not _is_fm_seg(s)]
+            _tm_batch_results: list = [None] * len(segments)
+            if _fm_idx:
+                _fm_res = engine.tm.batch_lookup(
+                    [_make_tm_req(segments[i]) for i in _fm_idx], use_semantic=False
+                )
+                for _bi, _br in zip(_fm_idx, _fm_res):
+                    _tm_batch_results[_bi] = _br
+            if _body_idx:
+                _body_res = engine.tm.batch_lookup(
+                    [_make_tm_req(segments[i]) for i in _body_idx], use_semantic=True
+                )
+                for _bi, _br in zip(_body_idx, _body_res):
+                    _tm_batch_results[_bi] = _br
+
             for idx, segment in enumerate(segments, 1):
                 # TMO-03: Build lookup context for override filtering
                 lookup_context = {
@@ -527,22 +563,8 @@ class SegmentTranslator:
 
                 stats.total_lookups += 1
 
-                # RC-4 FIX: Disable L3 semantic search for frontmatter segments.
-                _is_frontmatter_segment = bool(
-                    segment.context
-                    and hasattr(segment.context, "context_type")
-                    and str(segment.context.context_type) == "SegmentContextType.FRONTMATTER"
-                )
-
-                tm_result = engine.tm.lookup(
-                    site_id=site_id,
-                    src_lang=source_lang,
-                    tgt_lang=target_lang,
-                    text=segment.source_text,
-                    context=str(segment.context) if segment.context else None,
-                    lookup_context=lookup_context,
-                    use_semantic=not _is_frontmatter_segment,
-                )
+                # RC-4 FIX applied in pre-batch split above (frontmatter → use_semantic=False).
+                tm_result = _tm_batch_results[idx - 1]
 
                 if tm_result.hit:
                     restored = self._restore_placeholders(tm_result.translation or "", segment)
@@ -1135,11 +1157,16 @@ class SegmentTranslator:
             # TC-SAS-01: Detect translatable units the model returned unchanged (source-lang leakage).
             # do_not_translate=True units are intentionally excluded — they are preserved YAML
             # passthrough fields, code blocks, and shortcodes that must not be translated.
-            _te_cfg_sas = (
+            # TC-SAS-FIX-016: Merge global + site-specific config; site wins.
+            # SiteProfile.translation_engine was previously silently dropped by Pydantic
+            # (no field declared) so site overrides were never applied.
+            _te_cfg_sas_global = (
                 engine.config.get_config().get("translation_engine", {})
                 if hasattr(engine.config, "get_config")
                 else {}
             )
+            _te_cfg_sas_site = getattr(site_profile, "translation_engine", None) or {}
+            _te_cfg_sas = {**_te_cfg_sas_global, **_te_cfg_sas_site}
             _sas_min_len = int(_te_cfg_sas.get("same_as_source_min_length", 10))
             _sas_tolerance = float(_te_cfg_sas.get("same_as_source_tolerance", 0.0))
             _translatable_count = sum(1 for u in translated_units if not u.do_not_translate)
