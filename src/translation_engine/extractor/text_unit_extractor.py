@@ -1812,9 +1812,11 @@ class TextUnitExtractor:
             )
             return True
 
-        # Strategy 0.4: API heading terms - NEVER translate (Methods, Properties, Returns, etc.)
-        if text_stripped in _API_HEADING_TERMS:
-            return True
+        # Strategy 0.4 DISABLED (TC-HDG-TRANS-019): API heading terms should be translated.
+        # Gate 9 (write_gate.py) validates translated headings and restores English on corruption.
+        # Keeping _API_HEADING_TERMS frozenset: still used by write_gate.py Gate 9.
+        # if text_stripped in _API_HEADING_TERMS:
+        #     return True
 
         # Strategy 0.5: Punctuation-only or separator-only strings - NEVER translate
         # These cause corruption like ",et," when the model tries to "translate" commas
@@ -1855,6 +1857,12 @@ class TextUnitExtractor:
         except ImportError:
             # spaCy not available, skip NER detection
             pass
+
+        # TC-HDG-TRANS-019: API heading terms override PascalCase heuristic.
+        # These are section headings (## Methods, ## Properties) not class names.
+        # They must reach the model to be translated.
+        if text_stripped in _API_HEADING_TERMS:
+            return False
 
         # Strategy 2: Heuristic-based detection
         if self._is_technical_identifier(text_stripped):

@@ -95,8 +95,9 @@ body:
   - ^[A-Z][A-Za-z0-9_]*\s*\(.*\)$
   # Inline code spans — API identifiers inside backticks must not be translated
   - "`[^`]+`"
-  # API heading terms — preserved verbatim (Methods, Properties, Returns, etc.)
-  - ^(?:Name|Type|Description|Returns|Parameters|Properties|Methods|Fields|Constructors|Events|Exceptions|Remarks|Examples|See Also|Inheritance|Implements|Namespace|Assembly|Syntax|Value)$
+  # TC-HDG-TRANS-019: Heading terms removed from preserve_patterns.
+  # Gate 9 in write_gate.py validates translated headings and restores English on corruption.
+  # - ^(?:Name|Type|Description|Returns|Parameters|Properties|Methods|Fields|Constructors|Events|Exceptions|Remarks|Examples|See Also|Inheritance|Implements|Namespace|Assembly|Syntax|Value)$
   placeholder_syntax:
   - \{\{<.*?>\}\}
   - \{\{%.*?%\}\}

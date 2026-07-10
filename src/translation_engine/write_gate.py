@@ -571,11 +571,18 @@ class WriteGateEvaluator:
 
         working = translated_content
         cleaned_count = 0
+        untranslated_count = 0
         for (s_level, s_text), (t_level, t_text) in zip(src_headings, tgt_headings):
             s_stripped = s_text.strip()
             t_stripped = t_text.strip()
-            if s_stripped in self._API_HEADING_TERMS and t_stripped != s_stripped:
-                if self._contains_corruption(t_stripped, s_stripped):
+            if s_stripped in self._API_HEADING_TERMS:
+                if t_stripped == s_stripped:
+                    # Model returned heading unchanged (failed to translate).
+                    # Content is already English — no modification needed, but log for monitoring.
+                    # TC-HDG-TRANS-019: these terms are now sent to model; model failure is expected
+                    # occasionally. Gate 9 accepts English fallback (same as pre-fix behavior).
+                    untranslated_count += 1
+                elif self._contains_corruption(t_stripped, s_stripped):
                     old_line = f"{t_level} {t_text}"
                     new_line = f"{s_level} {s_text.strip()}"
                     working = working.replace(old_line, new_line, 1)
@@ -585,6 +592,13 @@ class WriteGateEvaluator:
             logger.info(
                 "GATE9 auto-cleaned %d corrupted heading(s) in %s",
                 cleaned_count,
+                output_path.name,
+            )
+        if untranslated_count:
+            logger.debug(
+                "GATE9 %d API heading(s) untranslated (model returned source) in %s — "
+                "English retained",
+                untranslated_count,
                 output_path.name,
             )
         return working
