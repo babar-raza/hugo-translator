@@ -168,8 +168,8 @@ class ResourceGovernor:
             # Lock timeout: another shard holds it; be conservative and deny
             return False, "could not acquire registry lock within 30 s"
         except Exception as exc:
-            logger.warning("[governor] request_slot error (allowing through): %s", exc)
-            return True, f"governor error — allowing through: {exc}"
+            logger.warning("[governor] request_slot error (denying for safety): %s", exc)
+            return False, f"governor error — denying for safety: {exc}"
 
     def release_slot(self) -> None:
         """
