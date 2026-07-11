@@ -137,7 +137,8 @@ def _build_engine(config_service):
 
     l1 = L1Cache()
     try:
-        l2 = L2PersistentTM(db_path=ROOT / "data" / "tm_cache")
+        from src.tm.l2_persistent import L2_DB_NAME
+        l2 = L2PersistentTM(db_path=ROOT / "data" / "tm" / L2_DB_NAME)
     except Exception as e:
         logger.warning(f"L2 TM init failed (non-fatal): {e}")
         l2 = None

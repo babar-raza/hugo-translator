@@ -66,8 +66,9 @@ class L3IndexPopulator:
             use_gpu: Whether to use GPU for embeddings
             save_interval: Save index every N entries
         """
+        from src.tm.l2_persistent import L2_DB_NAME
         self.tm_path = Path(tm_path)
-        self.db_path = self.tm_path / "l2_lmdb"
+        self.db_path = self.tm_path / L2_DB_NAME
         self.l3_path = self.tm_path / "l3_faiss"
         self.batch_size = batch_size
         self.save_interval = save_interval

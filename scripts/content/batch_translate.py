@@ -103,7 +103,8 @@ def main():
 
     # Build Translation Memory layers
     l1_cache = L1Cache(max_size=50000)
-    l2_path = tm_data_dir / "l2_lmdb"
+    from src.tm.l2_persistent import L2_DB_NAME
+    l2_path = tm_data_dir / L2_DB_NAME
     l2_path.mkdir(parents=True, exist_ok=True)
     l2_persistent = L2PersistentTM(str(l2_path))
 

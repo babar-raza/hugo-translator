@@ -2359,6 +2359,8 @@ def translate_site(args: argparse.Namespace) -> int:
         l1_cache = L1Cache(max_size=10000)  # Default L1 cache size
 
         from .tm.l2_persistent import L2_DB_NAME
+        from src.tm import lmdb_registry as _lmdb_reg
+        _lmdb_reg.set_project_root(Path(__file__).parent.parent)
         _raw = config_service.get_config() if hasattr(config_service, "get_config") else {}
         _l2_max_mb = _raw.get("tm_defaults", {}).get("l2_max_size_mb", 1536)
         l2_path = tm_data_dir / L2_DB_NAME

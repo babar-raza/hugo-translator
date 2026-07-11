@@ -1,0 +1,56 @@
+# Convergence Binding Record
+# Generated: 2026-07-11
+# Protocol: POST-PLAN AUTONOMOUS CONVERGENCE AND GOVERNED CLOSURE
+# Mission: LMDB Consolidation and Enforcement
+
+convergence_binding:
+  mission_id: lmdb-consolidation-20260711
+  plan_id: rosy-skipping-zephyr
+  plan_path: "C:/Users/prora/.claude/plans/rosy-skipping-zephyr.md"  # external to repo (Claude plans dir)
+  plan_revision: "1 (executed 2026-07-11)"
+  plan_hash: ad3cc4136c98ef49810173da2d47ed83bf2a2b9fa25b4c610c9c22f1473acfbd
+
+  post_sprint_audit:
+    expected: .supervisor/prompts/prompt1-post-sprint-audit.md
+    path: .supervisor/state/prompts/prompt1-post-sprint-audit.md
+    hash: 263dab3dadad6845f5dd2874fe22cd860403151156cadb2dffedef5258103099
+    role_verified: TRUE  # "POST-SPRINT STRICT EVIDENCE AUDIT" — audit role confirmed from file content
+
+  plan_hardening:
+    expected: .supervisor/prompts/prompt2-plan-hardening.md
+    path: .supervisor/state/prompts/prompt2-plan-hardening.md
+    hash: 4fe227b68c0e58e08381f89f5381bb8d29eebd89cba328ea3fb33c957c5d3d00
+    role_verified: TRUE  # prompt2 role confirmed from prompt-registry.yaml: "Plan hardening from audit output with taskcard generation"
+
+  controlled_execution:
+    expected: .supervisor/prompts/prompt3-controlled-execution.md
+    path: .supervisor/state/prompts/prompt3-controlled-execution.md
+    hash: 5246d218a39a8464cdc32c542d5411d2f29ad034f3e867651c0f731e1269edd9
+    role_verified: TRUE  # prompt3 role confirmed from prompt-registry.yaml: "Controlled taskcard execution with 15-dimension quality scoring"
+
+  close_task:
+    expected: .supervisor/prompts/prompt4-close-task.md
+    resolved: .supervisor/state/prompts/prompt4-close-task.md
+    hash: 3196a5bd52bd6e037b84d602dbde8d32a8dbac31798c0947bac03784ff6ef81b
+    role_verified: TRUE  # Content: "Close this task cleanly" with commit/plan-update/closure requirements
+
+  prompt_registry:
+    path: .supervisor/state/prompts/prompt-registry.yaml
+    status: FOUND_AND_READ
+
+  evidence_root: reports/agents/lmdb_migration/
+  evidence_files:
+    - reports/agents/lmdb_migration/backup_manifest.json
+    - reports/agents/lmdb_migration/dry_run_results.json
+    - reports/agents/lmdb_migration/migration_summary.json
+    - reports/agents/lmdb_migration/migration_conflicts.jsonl
+    - reports/agents/lmdb_migration/post_merge_verdict.json
+    - reports/agents/lmdb_migration/e2e_results.json
+    - reports/agents/lmdb_migration/final_report.json
+
+  status: BOUND_ALL_FOUR_PROMPTS_VERIFIED
+  binding_decision: >
+    All four prompts bound and role-verified from file contents and registry.
+    Plan identity unambiguous (LMDB consolidation, 12-step plan, rosy-skipping-zephyr.md).
+    Evidence root confirmed at reports/agents/lmdb_migration/ with 7 evidence files.
+    Proceed to stage 1 audit.

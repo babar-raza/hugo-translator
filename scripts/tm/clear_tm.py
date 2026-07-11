@@ -51,7 +51,8 @@ def clear_tm(l1_only=False, l2_only=False, l3_only=False):
     # Clear L2
     if clear_l2:
         print("Clearing L2 Persistent (LMDB)...")
-        l2_path = tm_data_dir / "l2_lmdb"
+        from src.tm.l2_persistent import L2_DB_NAME
+        l2_path = tm_data_dir / L2_DB_NAME
         l2_path.mkdir(parents=True, exist_ok=True)
         l2 = L2PersistentTM(db_path=str(l2_path))
         try:

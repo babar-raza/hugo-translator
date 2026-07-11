@@ -15,6 +15,7 @@ import hashlib
 import json
 import logging
 import os
+import shutil
 import sys
 import tarfile
 from datetime import datetime
@@ -98,10 +99,11 @@ def create_backup_metadata(tm_data_dir: Path, config_dir: Path, version: str = "
     }
 
     # L2 LMDB metadata
-    l2_path = tm_data_dir / "l2_lmdb"
+    from src.tm.l2_persistent import L2_DB_NAME
+    l2_path = tm_data_dir / L2_DB_NAME
     if l2_path.exists():
-        metadata["components"]["l2_lmdb"] = {
-            "path": "tm_data/l2_lmdb",
+        metadata["components"][L2_DB_NAME] = {
+            "path": f"tm_data/{L2_DB_NAME}",
             "size_bytes": get_directory_size(l2_path),
             "file_count": count_directory_files(l2_path),
             "exists": True,
@@ -210,11 +212,21 @@ def create_backup(
             tar.add(metadata_path, arcname="metadata.json")
             metadata_path.unlink()
 
-            # Add L2 LMDB
-            l2_path = tm_data_dir / "l2_lmdb"
+            # Add L2 LMDB — use lmdb.copy() for an atomic consistent snapshot
+            import lmdb as _lmdb
+            from src.tm.l2_persistent import L2_DB_NAME as _L2_DB_NAME
+            l2_path = tm_data_dir / _L2_DB_NAME
             if l2_path.exists():
-                logger.info("Backing up L2 LMDB database...")
-                tar.add(l2_path, arcname="tm_data/l2_lmdb")
+                logger.info("Backing up L2 LMDB database (atomic snapshot)...")
+                _l2_tmp = output_path.parent / "_l2_snapshot_tmp"
+                _l2_tmp.mkdir(parents=True, exist_ok=True)
+                try:
+                    _l2_env = _lmdb.open(str(l2_path), readonly=True, lock=False, max_dbs=1)
+                    _l2_env.copy(str(_l2_tmp), compact=False)
+                    _l2_env.close()
+                    tar.add(str(_l2_tmp), arcname=f"tm_data/{_L2_DB_NAME}")
+                finally:
+                    shutil.rmtree(str(_l2_tmp), ignore_errors=True)
 
             # Add L3 FAISS
             l3_path = tm_data_dir / "l3_faiss"

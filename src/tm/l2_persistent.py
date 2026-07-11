@@ -147,6 +147,10 @@ class L2PersistentTM:
         self.db_path = Path(db_path)
         self.db_path.mkdir(parents=True, exist_ok=True)
 
+        # Hard enforcement: reject unapproved LMDB paths at runtime
+        from src.tm import lmdb_registry as _reg
+        _reg.assert_approved_path(self.db_path)
+
         # TC-TM-02: Warn if a sibling LMDB directory exists next to the canonical
         # path.  Two live L2 databases imply split writes and diverging caches.
         # The canonical name is L2_DB_NAME ("l2.lmdb"); anything else alongside it
