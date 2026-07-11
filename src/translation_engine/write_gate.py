@@ -825,7 +825,15 @@ class WriteGateEvaluator:
             for line in text.splitlines():
                 stripped = line.strip()
                 if stripped.startswith("```"):
-                    in_code = not in_code
+                    if in_code:
+                        # Closing fence — exit code mode
+                        in_code = False
+                    elif stripped != "```":
+                        # Opening fence with language tag — enter code mode
+                        in_code = True
+                    # else: bare ``` when not in code → stray/orphaned closer
+                    # (e.g. model dropped opening fence but kept closer); ignore
+                    # so it doesn't falsely suppress table rows that follow
                     continue
                 if not in_code and stripped.startswith("|") and stripped.endswith("|"):
                     count += 1
@@ -834,7 +842,7 @@ class WriteGateEvaluator:
         from src.translation_engine.parser.hugo_parser import normalize_table_cells
 
         src_rows = _count_table_rows(normalize_table_cells(src_body))
-        tgt_rows = _count_table_rows(tgt_body)
+        tgt_rows = _count_table_rows(normalize_table_cells(tgt_body))
 
         if src_rows < 4:
             return  # Too few rows to be meaningful
@@ -846,6 +854,23 @@ class WriteGateEvaluator:
                 f"translation={tgt_rows} rows (ratio={tgt_rows/max(src_rows,1):.2f})"
             )
             logger.error("GATE15 BLOCKED %s: %s", output_path.name, result.error)
+            if src_rows >= 4:
+                # Dump full translated content to temp file for diagnosis
+                import tempfile, os as _os
+                _dump_path = _os.path.join(
+                    tempfile.gettempdir(),
+                    f"gate15_dump_{output_path.name}"
+                )
+                try:
+                    with open(_dump_path, "w", encoding="utf-8") as _f:
+                        _f.write(f"=== tgt_rows={tgt_rows} src_rows={src_rows} ===\n")
+                        _f.write(f"=== tgt_body (len={len(tgt_body)}) ===\n")
+                        _f.write(tgt_body)
+                        _f.write(f"\n=== translated_content (len={len(translated_content)}) ===\n")
+                        _f.write(translated_content)
+                    print(f"GATE15 DUMP: {_dump_path}", flush=True)
+                except Exception as _e:
+                    print(f"GATE15 DUMP FAILED: {_e}", flush=True)
 
     # ------------------------------------------------------------------
     # Gate 16: Duplicate content detection (auto-clean)
