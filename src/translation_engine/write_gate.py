@@ -868,9 +868,8 @@ class WriteGateEvaluator:
                         _f.write(tgt_body)
                         _f.write(f"\n=== translated_content (len={len(translated_content)}) ===\n")
                         _f.write(translated_content)
-                    print(f"GATE15 DUMP: {_dump_path}", flush=True)
                 except Exception as _e:
-                    print(f"GATE15 DUMP FAILED: {_e}", flush=True)
+                    logger.debug("GATE15 DUMP FAILED: %s", _e)
 
     # ------------------------------------------------------------------
     # Gate 16: Duplicate content detection (auto-clean)

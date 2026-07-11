@@ -369,12 +369,54 @@ class FileTranslationPipeline:
 
                         # After correction attempt, re-check decision
                         if decision_result.decision == PostValidationDecision.REJECT:
-                            raise TranslationRejectedError(
-                                message=f"Translation rejected: {decision_result.decision_reason}",
-                                file_path=str(file_path),
-                                validation_result=validation_result,
-                                rejection_reason=decision_result.decision_reason,
-                            )
+                            # BUG-022-FIX: MT backends (NLLB, m2m100) cannot improve on rejection
+                            # with feedback. For non-critical rejections (terminology, completeness,
+                            # language consistency) accept best-effort — write gates (unconditional,
+                            # gates 9-17) provide adequate quality protection. Critical failures
+                            # (placeholder corruption, code blocks, shortcodes, links, structure)
+                            # still hard-reject. LLM backends can benefit from correction, so they
+                            # retain the original reject behaviour. Pattern matches BUG-010 / TC-RETRY-FIX-018.
+                            _model_used_rej = getattr(result.stats, "model_used", "") or ""
+                            _is_llm_rej = "llm" in _model_used_rej.lower()
+                            if not _is_llm_rej:
+                                _critical_rej = (
+                                    engine.decision_engine._check_critical_failure(validation_result)
+                                    if validation_result is not None
+                                    and hasattr(engine, "decision_engine")
+                                    and engine.decision_engine is not None
+                                    else None
+                                )
+                                if _critical_rej:
+                                    logger.warning(
+                                        f"MT backend ({_model_used_rej or 'tm/passthrough'}) CRITICAL reject "
+                                        f"({_critical_rej}) — hard-rejecting {file_path} to {target_lang}"
+                                    )
+                                    raise TranslationRejectedError(
+                                        message=f"Translation rejected: {decision_result.decision_reason}",
+                                        file_path=str(file_path),
+                                        validation_result=validation_result,
+                                        rejection_reason=decision_result.decision_reason,
+                                    )
+                                else:
+                                    # Non-critical REJECT: accept best-effort, fall through to write.
+                                    _issue_summary_rej = "; ".join(
+                                        f"{getattr(iss, 'validator', '?')}: "
+                                        f"{str(getattr(iss, 'message', ''))[:60]}"
+                                        for iss in (validation_result.issues if validation_result else [])
+                                    )
+                                    logger.info(
+                                        f"MT backend ({_model_used_rej or 'tm/passthrough'}): non-critical REJECT, "
+                                        f"accepting best-effort for {file_path} to {target_lang}. "
+                                        f"Issues: [{_issue_summary_rej}]"
+                                    )
+                                    # (fall through to ACCEPT path below — no raise)
+                            else:
+                                raise TranslationRejectedError(
+                                    message=f"Translation rejected: {decision_result.decision_reason}",
+                                    file_path=str(file_path),
+                                    validation_result=validation_result,
+                                    rejection_reason=decision_result.decision_reason,
+                                )
 
                     elif decision_result.decision == PostValidationDecision.RETRY:
                         # TC-RETRY-FIX-018: MT backends produce identical output on retry.
@@ -833,7 +875,7 @@ class FileTranslationPipeline:
 
                 break  # Success, exit retry loop
 
-            except TranslationRejectedError:
+            except TranslationRejectedError as _rej_err:
                 # Per-locale rejection: record failure, queue for retry, continue
                 # to next locale. Do NOT re-raise.
                 result.errors.append(
