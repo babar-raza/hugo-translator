@@ -5,17 +5,22 @@ Scans ALL translated files on disk (not JSONL-dependent) and applies surgical re
 across reference.aspose.org, docs.aspose.org, and kb.aspose.org.
 
 No-GPU repairs (applied immediately with --apply):
-  - inline_code_translation : Restore EN backtick spans (pure string replace)
-  - duplicate_content       : Remove repeated paragraphs
-  - double_period           : Replace ".." with "." outside code blocks
+  - inline_code_translation   : Restore EN backtick spans (pure string replace)
+  - duplicate_content         : Remove repeated paragraphs
+  - double_period             : Replace ".." with "." outside code blocks
+  - description_hallucination : Replace bloated/shrunken description with EN source value
+  - newline_explosion         : Collapse 3+ consecutive blank lines to 2
+  - shortcode_leak            : Remove shortcode lines in tgt not present in src
+  - artifact_corruption       : Remove body lines with known model artifact patterns
+  - eu_hallucination          : Remove GDPR/cookie paragraphs not in source
 
-Model-required repairs (detected but require --apply-model + GPU):
-  - description_hallucination : Description >3x source length or <0.3x
+Model-required (detected only, cannot be fixed without GPU retranslation):
   - table_row_corruption      : Table row count mismatch >50%
   - mixed_language            : English paragraphs in non-Latin target
   - heading_count_mismatch    : Extra or missing headings vs source
-  - eu_hallucination          : GDPR/cookie text not in source
-  - newline_explosion         : >2.5x newline count vs source
+  - body_identical_to_en      : Translated body identical to EN source
+  - empty_body                : Translation is empty while EN has content
+  - purity_issue              : >30% ASCII prose lines in non-Latin locale
 
 Usage:
   python scripts/quality/surgical_retranslate.py --dry-run                  # default
@@ -77,6 +82,21 @@ _EU_HALLUCINATION_PATTERNS = [
     re.compile(r"(?:European Union|EU regulation|DSGVO|Datenschutz)", re.IGNORECASE),
 ]
 
+# Artifact patterns — lines containing these are model output corruption
+_ARTIFACT_PATTERNS = [
+    re.compile(r"\?\?\?\?+"),                     # repeated question marks (garbled output)
+    re.compile(r"\{\\?pos\s*\(\d+,\s*\d+\)\}"),  # SSA subtitle position tags
+    re.compile(r"\[Pr[e\xe9]c[e\xe9]dent\]"),     # French "Previous" leaked artifact
+    re.compile(r"\u041f\u0440\u0435\u0434\u044b\u0434\u0443\u0449\u0438\u0439"),  # Cyrillic "Previous"
+]
+
+# Shortcode start pattern (Hugo shortcodes: {{< ... >}} and {{% ... %}})
+_SHORTCODE_START_RE = re.compile(r"\{\{[<%]")
+
+NON_LATIN_LOCALES = frozenset({
+    "ar", "bg", "el", "fa", "he", "hi", "ja", "ko", "ru", "th", "uk", "vi", "zh",
+})
+
 
 def _resolve_content_root() -> Path:
     env = os.environ.get("ASPOSE_ORG_CONTENT")
@@ -114,6 +134,31 @@ def _get_body(content: str) -> str:
 def _strip_code_blocks(text: str) -> str:
     """Remove fenced code blocks from text (for line-level analysis)."""
     return re.sub(r"```[\s\S]*?```", "", text)
+
+
+def _extract_fm_field(content: str, field_name: str) -> str | None:
+    """Extract a frontmatter field's raw line (after 'field: '), stripping quotes."""
+    m = re.search(
+        r"^" + re.escape(field_name) + r":\s*(.+)$",
+        content[:2000],
+        re.MULTILINE,
+    )
+    if not m:
+        return None
+    value = m.group(1).strip()
+    if len(value) >= 2 and value[0] in ('"', "'") and value[-1] == value[0]:
+        value = value[1:-1]
+    return value or None
+
+
+def _get_fm_section(content: str) -> tuple[str, str]:
+    """Split content into (frontmatter_with_delimiters, body). Returns ('', content) if no FM."""
+    if not content.startswith("---"):
+        return "", content
+    end = content.find("\n---", 4)
+    if end == -1:
+        return "", content
+    return content[:end + 4], content[end + 4:]
 
 
 def _get_table_row_count(text: str) -> int:
@@ -696,6 +741,30 @@ def _detect_newline_explosion(
     return []
 
 
+def _detect_shortcode_leak(
+    en_content: str, tr_content: str
+) -> list[tuple[int, str, str, str]]:
+    """Detect shortcode patterns in tgt body not present in src body."""
+    src_body = _get_body(en_content)
+    tgt_body = _get_body(tr_content)
+    src_codes = set(_SHORTCODE_START_RE.findall(src_body))
+    tgt_codes = set(_SHORTCODE_START_RE.findall(tgt_body))
+    if tgt_codes - src_codes:
+        return [(0, "", "", "shortcode_leak")]
+    return []
+
+
+def _detect_artifact_corruption(
+    tr_content: str,
+) -> list[tuple[int, str, str, str]]:
+    """Detect known model artifact patterns in body."""
+    body = _get_body(tr_content)
+    for pat in _ARTIFACT_PATTERNS:
+        if pat.search(body):
+            return [(0, "", "", "artifact_corruption")]
+    return []
+
+
 def detect_all_corruption(
     en_content: str, tr_content: str, target_lang: str
 ) -> list[tuple[int, str, str, str]]:
@@ -710,7 +779,81 @@ def detect_all_corruption(
     issues += _detect_heading_mismatch(en_content, tr_content)
     issues += _detect_eu_hallucination(en_content, tr_content)
     issues += _detect_newline_explosion(en_content, tr_content)
+    issues += _detect_shortcode_leak(en_content, tr_content)
+    issues += _detect_artifact_corruption(tr_content)
     return issues
+
+
+# ---------------------------------------------------------------------------
+# New no-GPU repair functions
+# ---------------------------------------------------------------------------
+
+
+def _fix_description_hallucination(en_content: str, tr_content: str) -> str:
+    """Replace tgt frontmatter description with the EN source description line verbatim."""
+    en_m = re.search(r"^(description:\s*.+)$", en_content[:2000], re.MULTILINE)
+    if not en_m:
+        return tr_content
+    en_line = en_m.group(1)  # e.g. 'description: "Learn how to..."'
+    new = re.sub(r"^description:\s*.+$", en_line, tr_content, count=1, flags=re.MULTILINE)
+    return new
+
+
+def _fix_newline_explosion(tr_content: str) -> str:
+    """Collapse runs of 3+ consecutive newlines down to 2 (one blank line max)."""
+    return re.sub(r"\n{3,}", "\n\n", tr_content)
+
+
+def _fix_shortcode_leak(en_content: str, tr_content: str) -> str:
+    """Remove shortcode lines from tgt body that are not present in src body."""
+    src_body = _get_body(en_content)
+    # Build set of shortcode-containing stripped lines from src
+    src_shortcode_lines: set[str] = set()
+    for line in src_body.splitlines():
+        if _SHORTCODE_START_RE.search(line):
+            src_shortcode_lines.add(line.strip())
+
+    fm, body = _get_fm_section(tr_content)
+    body_lines = body.splitlines(keepends=True)
+    result_lines = []
+    for line in body_lines:
+        if _SHORTCODE_START_RE.search(line) and line.strip() not in src_shortcode_lines:
+            continue  # drop leaked shortcode line
+        result_lines.append(line)
+    return fm + "".join(result_lines)
+
+
+def _fix_artifact_corruption(tr_content: str) -> str:
+    """Remove body lines containing known model artifact patterns."""
+    fm, body = _get_fm_section(tr_content)
+    body_lines = body.splitlines(keepends=True)
+    result_lines = [
+        line for line in body_lines
+        if not any(p.search(line) for p in _ARTIFACT_PATTERNS)
+    ]
+    return fm + "".join(result_lines)
+
+
+def _fix_eu_hallucination(en_content: str, tr_content: str) -> str:
+    """Remove EU/GDPR paragraphs from tgt body that are not present in src."""
+    src_body = _get_body(en_content)
+    # Check which EU patterns fire in src (those are legitimate)
+    src_eu = {i for i, p in enumerate(_EU_HALLUCINATION_PATTERNS) if p.search(src_body)}
+
+    fm, body = _get_fm_section(tr_content)
+    # Split body into paragraph chunks (preserving separator whitespace)
+    segments = re.split(r"(\n{2,})", body)
+    result = []
+    for segment in segments:
+        # Identify if this segment matches EU pattern not in src
+        is_hallucinated = any(
+            i not in src_eu and p.search(segment)
+            for i, p in enumerate(_EU_HALLUCINATION_PATTERNS)
+        )
+        if is_hallucinated:
+            continue
+        result.append(segment)
+    return fm + "".join(result)
 
 
 # ---------------------------------------------------------------------------
@@ -773,6 +916,41 @@ def _apply_no_gpu_repairs(en_content: str, tr_content: str) -> tuple[str, list[s
             working = repaired_table
             applied.append(f"table_row_corruption:{n_fixed}_tables")
 
+    # 5. Description hallucination — replace bloated/shrunken description with EN value
+    if _detect_description_hallucination(en_content, working):
+        fixed = _fix_description_hallucination(en_content, working)
+        if fixed != working:
+            working = fixed
+            applied.append("description_hallucination")
+
+    # 6. Newline explosion — collapse 3+ blank lines to 1
+    if _detect_newline_explosion(en_content, working):
+        fixed = _fix_newline_explosion(working)
+        if fixed != working:
+            working = fixed
+            applied.append("newline_explosion")
+
+    # 7. Shortcode leak — remove shortcode lines not in source
+    if _detect_shortcode_leak(en_content, working):
+        fixed = _fix_shortcode_leak(en_content, working)
+        if fixed != working:
+            working = fixed
+            applied.append("shortcode_leak")
+
+    # 8. Artifact corruption — remove lines with known bad model output patterns
+    if _detect_artifact_corruption(working):
+        fixed = _fix_artifact_corruption(working)
+        if fixed != working:
+            working = fixed
+            applied.append("artifact_corruption")
+
+    # 9. EU hallucination — remove GDPR/cookie paragraphs not in source
+    if _detect_eu_hallucination(en_content, working):
+        fixed = _fix_eu_hallucination(en_content, working)
+        if fixed != working:
+            working = fixed
+            applied.append("eu_hallucination")
+
     return working, applied
 
 
@@ -822,7 +1000,11 @@ def process_file(
         print(f"  [{', '.join(sorted(issue_types))}] {rel}")
 
     # Determine which issues are no-GPU fixable
-    no_gpu_issue_types = {"inline_code_translation", "duplicate_content", "double_period", "table_row_corruption"}
+    no_gpu_issue_types = {
+        "inline_code_translation", "duplicate_content", "double_period",
+        "table_row_corruption", "description_hallucination", "newline_explosion",
+        "shortcode_leak", "artifact_corruption", "eu_hallucination",
+    }
     has_no_gpu = bool(issue_types & no_gpu_issue_types)
     has_model_needed = bool(issue_types - no_gpu_issue_types)
 

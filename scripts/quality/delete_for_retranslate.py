@@ -161,19 +161,35 @@ def _detect_description_hallucination(en_content: str, tr_content: str) -> bool:
 
 
 def _detect_purity_issue(en_content: str, tr_content: str, locale: str) -> bool:
-    """More than 10% of non-trivial lines are pure ASCII in a non-Latin locale."""
+    """More than 30% of non-trivial prose lines are pure ASCII in a non-Latin locale.
+
+    Prose lines only: headings (#), table rows (|), shortcodes ({{) and blank
+    lines are excluded. Minimum source body 100 chars to skip stubs.
+    30% threshold avoids false positives on API reference files that legitimately
+    have many English code identifiers in surrounding translated text.
+    """
     if locale not in NON_LATIN_LOCALES:
+        return False
+    src_body = _get_body(en_content)
+    if len(src_body.strip()) < 100:
         return False
     body = _get_body(tr_content)
     clean = _strip_code_blocks(body)
-    lines = [l.strip() for l in clean.splitlines() if len(l.strip()) >= 20]
-    if not lines:
-        return False
+    prose_lines = []
+    for raw in clean.splitlines():
+        s = raw.strip()
+        if len(s) < 30:
+            continue
+        if s.startswith("#") or s.startswith("|") or s.startswith("{{") or s.startswith(">"):
+            continue
+        prose_lines.append(s)
+    if len(prose_lines) < 5:
+        return False  # too few prose lines to judge
     ascii_count = sum(
-        1 for l in lines
+        1 for l in prose_lines
         if re.fullmatch(r"[A-Za-z0-9\s.,;:!?\-'\"()\[\]{}@#$%^&*+=/<>|~`_\\]+", l)
     )
-    return (ascii_count / len(lines)) > 0.10
+    return (ascii_count / len(prose_lines)) > 0.30
 
 
 def _detect_newline_explosion(en_content: str, tr_content: str) -> bool:
