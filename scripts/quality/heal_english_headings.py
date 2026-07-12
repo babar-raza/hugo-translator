@@ -145,6 +145,18 @@ def _check_file(tr_path: Path, locale: str, en_path: Path | None = None) -> dict
                     issues["body_identical_to_en"] = ["identical"]
                 elif len(tr_body) < 20:
                     issues["empty_body"] = ["empty"]
+
+            # 4. Description hallucination — description length ratio too far off source
+            # These MUST be GPU-retranslated, not patched with English source text.
+            en_desc_m = re.search(r"^description:\s*(.+)$", en_text[:2000], re.MULTILINE)
+            tr_desc_m = re.search(r"^description:\s*(.+)$", text[:2000], re.MULTILINE)
+            if en_desc_m and tr_desc_m:
+                en_desc = en_desc_m.group(1).strip().strip('"').strip("'")
+                tr_desc = tr_desc_m.group(1).strip().strip('"').strip("'")
+                if len(en_desc) >= 20 and tr_desc:
+                    ratio = len(tr_desc) / len(en_desc)
+                    if ratio > 3.0 or ratio < 0.3:
+                        issues["description_hallucination"] = [f"ratio={ratio:.1f}"]
         except Exception:
             pass
 

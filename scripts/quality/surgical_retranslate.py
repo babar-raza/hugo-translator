@@ -8,13 +8,14 @@ No-GPU repairs (applied immediately with --apply):
   - inline_code_translation   : Restore EN backtick spans (pure string replace)
   - duplicate_content         : Remove repeated paragraphs
   - double_period             : Replace ".." with "." outside code blocks
-  - description_hallucination : Replace bloated/shrunken description with EN source value
   - newline_explosion         : Collapse 3+ consecutive blank lines to 2
   - shortcode_leak            : Remove shortcode lines in tgt not present in src
   - artifact_corruption       : Remove body lines with known model artifact patterns
   - eu_hallucination          : Remove GDPR/cookie paragraphs not in source
 
-Model-required (detected only, cannot be fixed without GPU retranslation):
+Model-required (detected only; require GPU retranslation):
+  - description_hallucination : Description >3x or <0.3x source length — MUST be retranslated,
+                                NOT replaced with English source text
   - table_row_corruption      : Table row count mismatch >50%
   - mixed_language            : English paragraphs in non-Latin target
   - heading_count_mismatch    : Extra or missing headings vs source
@@ -916,14 +917,10 @@ def _apply_no_gpu_repairs(en_content: str, tr_content: str) -> tuple[str, list[s
             working = repaired_table
             applied.append(f"table_row_corruption:{n_fixed}_tables")
 
-    # 5. Description hallucination — replace bloated/shrunken description with EN value
-    if _detect_description_hallucination(en_content, working):
-        fixed = _fix_description_hallucination(en_content, working)
-        if fixed != working:
-            working = fixed
-            applied.append("description_hallucination")
+    # NOTE: description_hallucination is intentionally NOT repaired here.
+    # Descriptions must be retranslated by GPU, not replaced with English source text.
 
-    # 6. Newline explosion — collapse 3+ blank lines to 1
+    # 5. Newline explosion — collapse 3+ blank lines to 1
     if _detect_newline_explosion(en_content, working):
         fixed = _fix_newline_explosion(working)
         if fixed != working:
@@ -1000,9 +997,11 @@ def process_file(
         print(f"  [{', '.join(sorted(issue_types))}] {rel}")
 
     # Determine which issues are no-GPU fixable
+    # NOTE: description_hallucination is NOT in this set — descriptions must be
+    # retranslated by the GPU engine, not replaced with English source text.
     no_gpu_issue_types = {
         "inline_code_translation", "duplicate_content", "double_period",
-        "table_row_corruption", "description_hallucination", "newline_explosion",
+        "table_row_corruption", "newline_explosion",
         "shortcode_leak", "artifact_corruption", "eu_hallucination",
     }
     has_no_gpu = bool(issue_types & no_gpu_issue_types)
