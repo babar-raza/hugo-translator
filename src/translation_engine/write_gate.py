@@ -123,6 +123,8 @@ class WriteGateEvaluator:
                 self._gate_table_row_integrity(source_content, working, output_path, result)
             if result.passed:
                 self._gate_newline_explosion(source_content, working, output_path, result)
+            if result.passed:
+                self._gate_description_hallucination(source_content, working, output_path, result)
             return result
 
         # Gate 2: Language detection mismatch (B-7.1)
@@ -178,7 +180,7 @@ class WriteGateEvaluator:
         if working != translated_content:
             result.cleaned_content = working
 
-        # Blocking gates (13, 14, 15, 17): short-circuit on first failure.
+        # Blocking gates (13, 14, 15, 17, 18): short-circuit on first failure.
         if result.passed:
             self._gate_eu_hallucination(source_content, working, output_path, result)
         if result.passed:
@@ -187,6 +189,8 @@ class WriteGateEvaluator:
             self._gate_table_row_integrity(source_content, working, output_path, result)
         if result.passed:
             self._gate_newline_explosion(source_content, working, output_path, result)
+        if result.passed:
+            self._gate_description_hallucination(source_content, working, output_path, result)
 
         return result
 
@@ -785,6 +789,18 @@ class WriteGateEvaluator:
                 continue
             if in_code_block:
                 continue
+            # Check headings explicitly before length/word-count filters.
+            # Short API headings like "## Methods" (10 chars, 2 words) are bypassed
+            # by the < 20 char and < 5 word checks below, but they MUST be translated
+            # in non-Latin-script locales.
+            if stripped.startswith("#"):
+                m = re.match(r"^#{1,6}\s+(.+)$", stripped)
+                if m:
+                    heading_text = m.group(1).strip()
+                    # Pure ASCII heading in a non-Latin locale = untranslated
+                    if re.fullmatch(r"[A-Za-z0-9\s.,\-_()'\"]+", heading_text):
+                        untranslated_count += 1
+                continue  # heading lines handled above; skip main loop
             if len(stripped) < 20:
                 continue
             if stripped.startswith("|"):
@@ -947,6 +963,64 @@ class WriteGateEvaluator:
                 f"translation={tgt_lines} lines (ratio={ratio:.1f}x)"
             )
             logger.error("GATE17 BLOCKED %s: %s", output_path.name, result.error)
+
+    # ------------------------------------------------------------------
+    # Gate 18: Description hallucination detection (BLOCKING)
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _extract_fm_field(content: str, field_name: str) -> str | None:
+        """Extract a named field value from YAML frontmatter.
+
+        Returns the raw string value (quotes stripped) or None if absent.
+        Only reads up to the closing '---' delimiter to avoid scanning body.
+        """
+        # Frontmatter is between the first and second '---' lines
+        parts = content.split("\n---", 2)
+        if len(parts) < 2:
+            return None
+        fm_block = parts[0]
+        m = re.search(
+            r"^" + re.escape(field_name) + r":\s*(.+)$",
+            fm_block,
+            re.MULTILINE,
+        )
+        if not m:
+            return None
+        value = m.group(1).strip()
+        # Strip surrounding single or double quotes
+        if len(value) >= 2 and value[0] in ('"', "'") and value[-1] == value[0]:
+            value = value[1:-1]
+        return value
+
+    def _gate_description_hallucination(
+        self,
+        source_content: str,
+        translated_content: str,
+        output_path: Path,
+        result: WriteGateResult,
+    ) -> None:
+        """Block if translated description is >3x longer than source description.
+
+        Hallucinated descriptions balloon 3-10x because the model generates
+        additional explanatory text instead of translating the original concisely.
+        Short source descriptions (< 30 chars) are excluded to avoid false positives
+        on brief stubs like 'Gets the value.' that may have verbose translations.
+        """
+        src_desc = self._extract_fm_field(source_content, "description")
+        tgt_desc = self._extract_fm_field(translated_content, "description")
+        if not src_desc or not tgt_desc:
+            return
+        if len(src_desc) < 30:
+            return  # too short for reliable ratio
+        ratio = len(tgt_desc) / len(src_desc)
+        if ratio > 3.0:
+            result.passed = False
+            result.error = (
+                f"Gate 18 description hallucination: tgt={len(tgt_desc)}ch "
+                f"vs src={len(src_desc)}ch (ratio={ratio:.1f}x)"
+            )
+            logger.error("GATE18 BLOCKED %s: %s", output_path.name, result.error)
 
     # ------------------------------------------------------------------
     # OW-01 extension: check existing file when new translation failed

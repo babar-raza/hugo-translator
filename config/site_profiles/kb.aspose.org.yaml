@@ -116,6 +116,7 @@ body:
   preserve_patterns:
   - ^\{\{<.*?>\}\}
   - ^\{\{%.*?%\}\}
+  - '`[^`]+`'
   # Protect Aspose product names (Aspose.Email, Aspose.3D, Aspose.Cells, etc.)
   - \bAspose\.[A-Za-z][A-Za-z0-9.]*\b
   # Protect C++ scope resolution (mapi_message::from_stream, MapiMessage::FromStream)

@@ -1,7 +1,8 @@
 """
-surgical_retranslate.py — Full-disk scan repair for reference.aspose.org translations.
+surgical_retranslate.py — Full-disk scan repair for aspose.org translations.
 
-Scans ALL translated files on disk (not JSONL-dependent) and applies surgical repairs:
+Scans ALL translated files on disk (not JSONL-dependent) and applies surgical repairs
+across reference.aspose.org, docs.aspose.org, and kb.aspose.org.
 
 No-GPU repairs (applied immediately with --apply):
   - inline_code_translation : Restore EN backtick spans (pure string replace)
@@ -17,11 +18,13 @@ Model-required repairs (detected but require --apply-model + GPU):
   - newline_explosion         : >2.5x newline count vs source
 
 Usage:
-  python scripts/quality/surgical_retranslate.py --dry-run          # default
-  python scripts/quality/surgical_retranslate.py --apply            # no-GPU repairs
+  python scripts/quality/surgical_retranslate.py --dry-run                  # default
+  python scripts/quality/surgical_retranslate.py --apply                    # no-GPU repairs
+  python scripts/quality/surgical_retranslate.py --apply --sites all        # all 3 sites
   python scripts/quality/surgical_retranslate.py --dry-run --locales ar,bg,ru
   python scripts/quality/surgical_retranslate.py --apply --issue-type inline_code_translation
   python scripts/quality/surgical_retranslate.py --dry-run --max-files 500
+  python scripts/quality/surgical_retranslate.py --apply --update-tm        # also update L2 TM
 """
 from __future__ import annotations
 
@@ -38,8 +41,23 @@ sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 # Content root resolution
 # ---------------------------------------------------------------------------
 
-SITE = "reference.aspose.org"
+ALL_SITES = ["reference.aspose.org", "docs.aspose.org", "kb.aspose.org"]
 EN_LOCALE = "en"
+
+# ---------------------------------------------------------------------------
+# Optional TM integration
+# ---------------------------------------------------------------------------
+
+try:
+    import sys as _sys
+    _proj_root = str(Path(__file__).resolve().parent.parent.parent)
+    if _proj_root not in _sys.path:
+        _sys.path.insert(0, _proj_root)
+    from src.tm.l2_persistent import L2PersistentTM  # type: ignore
+    _TM_AVAILABLE = True
+except ImportError:
+    _TM_AVAILABLE = False
+    L2PersistentTM = None  # type: ignore
 
 LATIN_SCRIPT_LANGS = frozenset({
     "af", "az", "ca", "cs", "da", "de", "en", "es", "et", "fi",
@@ -771,6 +789,8 @@ def process_file(
     only_issues: set[str] | None,
     stats: dict,
     verbose: bool,
+    site_id: str = "reference.aspose.org",
+    tm: object | None = None,
 ) -> None:
     if not en_path.exists():
         stats["en_missing"] += 1
@@ -818,9 +838,66 @@ def process_file(
                 stats["files_repaired"] += 1
                 for a in applied:
                     stats[f"repaired_{a.split(':')[0]}"] += 1
+
+                # Update L2 TM: store repaired inline-code lines so future
+                # retranslations pick up the corrected form from TM hit.
+                if tm is not None and "inline_code_translation" in {a.split(":")[0] for a in applied}:
+                    _update_tm_inline_code(
+                        tm, site_id, locale, en_content, repaired, stats
+                    )
+
             except OSError as e:
                 print(f"  ERROR writing {tr_path}: {e}", file=sys.stderr)
                 stats["write_errors"] += 1
+
+
+def _update_tm_inline_code(
+    tm: object,
+    site_id: str,
+    locale: str,
+    en_content: str,
+    repaired_content: str,
+    stats: dict,
+) -> None:
+    """Store repaired body lines into L2 TM as (en_line -> repaired_line) pairs.
+
+    Only stores lines where the repaired content differs from the English source
+    (i.e., the translated surrounding text is preserved, only the backtick spans
+    were corrected). Pure passthrough lines (en == repaired) are skipped to avoid
+    polluting the TM with identity entries that bypass future translation.
+    """
+    try:
+        en_body = _get_body(en_content)
+        rep_body = _get_body(repaired_content)
+        en_lines = en_body.splitlines()
+        rep_lines = rep_body.splitlines()
+
+        stored = 0
+        for en_line, rep_line in zip(en_lines, rep_lines):
+            en_stripped = en_line.strip()
+            rep_stripped = rep_line.strip()
+            if not en_stripped or rep_stripped == en_stripped:
+                continue  # skip empty or identity
+            # Only store if EN line has backtick spans (this is an inline-code line)
+            if not re.search(r"`[^`]+`", en_stripped):
+                continue
+            try:
+                tm.store(  # type: ignore[attr-defined]
+                    site_id=site_id,
+                    src_lang="en",
+                    tgt_lang=locale,
+                    text=en_stripped,
+                    translation=rep_stripped,
+                    overwrite=True,
+                )
+                stored += 1
+            except Exception:
+                pass  # TM store failure is non-fatal
+
+        if stored:
+            stats["tm_entries_stored"] = stats.get("tm_entries_stored", 0) + stored
+    except Exception:
+        pass  # TM update failure is always non-fatal
 
 
 def run(
@@ -830,54 +907,80 @@ def run(
     only_issues: set[str] | None,
     max_files: int | None,
     verbose: bool,
+    sites: list[str] | None = None,
+    update_tm: bool = False,
+    tm_db_path: Path | None = None,
 ) -> dict:
-    site_root = content_root / SITE
-    if not site_root.exists():
-        raise FileNotFoundError(f"Site root not found: {site_root}")
-
-    en_root = site_root / EN_LOCALE
+    sites_to_run = sites if sites else ["reference.aspose.org"]
     stats: dict = defaultdict(int)
 
-    locales = sorted(
-        d.name
-        for d in site_root.iterdir()
-        if d.is_dir() and d.name != EN_LOCALE
-        and (not only_locales or d.name in only_locales)
-    )
+    # Open TM once for all sites if requested
+    tm = None
+    if apply and update_tm and _TM_AVAILABLE:
+        _db = tm_db_path or (
+            Path(__file__).resolve().parent.parent.parent / "data" / "tm" / "l2.lmdb"
+        )
+        try:
+            tm = L2PersistentTM(db_path=_db)
+            print(f"TM: {_db} (update-tm enabled)")
+        except Exception as e:
+            print(f"WARNING: TM open failed ({e}); continuing without TM update", file=sys.stderr)
+    elif apply and update_tm and not _TM_AVAILABLE:
+        print("WARNING: L2PersistentTM not importable; --update-tm skipped", file=sys.stderr)
 
-    print(f"Content root: {site_root}")
-    print(f"Locales: {locales}")
     print(f"Mode: {'APPLY (no-GPU repairs)' if apply else 'DRY-RUN'}")
     if only_issues:
         print(f"Issue filter: {', '.join(sorted(only_issues))}")
     print()
 
     files_processed = 0
-    for locale in locales:
-        locale_root = site_root / locale
-        locale_files = list(locale_root.rglob("*.md"))
 
-        print(f"  {locale}: {len(locale_files)} files", end="", flush=True)
+    for site_id in sites_to_run:
+        site_root = content_root / site_id
+        if not site_root.exists():
+            print(f"  SKIP {site_id}: not found at {site_root}")
+            continue
 
-        for tr_path in locale_files:
-            if max_files and files_processed >= max_files:
-                break
-            stats["files_scanned"] += 1
-            files_processed += 1
+        en_root = site_root / EN_LOCALE
 
-            rel = tr_path.relative_to(locale_root)
-            en_path = en_root / rel
-            process_file(tr_path, en_path, locale, apply, only_issues, stats, verbose)
-
-        locale_issues = sum(
-            v for k, v in stats.items()
-            if k.startswith("issue_") and not k.startswith("issue_type")
+        locales = sorted(
+            d.name
+            for d in site_root.iterdir()
+            if d.is_dir() and d.name != EN_LOCALE
+            and (not only_locales or d.name in only_locales)
         )
-        print(f"  (scanned={stats['files_scanned']}, with_issues={stats['files_with_issues']})")
+
+        print(f"Site: {site_id}  ({len(locales)} locales)")
+
+        for locale in locales:
+            locale_root = site_root / locale
+            locale_files = list(locale_root.rglob("*.md"))
+
+            print(f"  {locale}: {len(locale_files)} files", end="", flush=True)
+
+            for tr_path in locale_files:
+                if max_files and files_processed >= max_files:
+                    break
+                stats["files_scanned"] += 1
+                files_processed += 1
+
+                rel = tr_path.relative_to(locale_root)
+                en_path = en_root / rel
+                process_file(
+                    tr_path, en_path, locale, apply, only_issues, stats, verbose,
+                    site_id=site_id, tm=tm,
+                )
+
+            print(f"  (scanned={stats['files_scanned']}, with_issues={stats['files_with_issues']})")
+
+            if max_files and files_processed >= max_files:
+                print(f"  Reached --max-files={max_files} limit.")
+                break
 
         if max_files and files_processed >= max_files:
-            print(f"  Reached --max-files={max_files} limit.")
             break
+
+        print()
 
     return dict(stats)
 
@@ -889,7 +992,7 @@ def run(
 
 def main() -> None:
     parser = argparse.ArgumentParser(
-        description="Surgical per-file repair for reference.aspose.org translations"
+        description="Surgical per-file repair for aspose.org translations (all sites)"
     )
     parser.add_argument(
         "--dry-run", action="store_true", default=True,
@@ -902,6 +1005,10 @@ def main() -> None:
     parser.add_argument(
         "--content-root", type=Path,
         help="Path to aspose.org/content directory",
+    )
+    parser.add_argument(
+        "--sites", type=str, default="reference.aspose.org",
+        help="Comma-separated site names or 'all' (default: reference.aspose.org)",
     )
     parser.add_argument(
         "--locales", type=str,
@@ -919,15 +1026,27 @@ def main() -> None:
         "--verbose", action="store_true",
         help="Print each file with issues",
     )
+    parser.add_argument(
+        "--update-tm", action="store_true",
+        help="Update L2 TM with repaired inline-code translations (requires --apply)",
+    )
+    parser.add_argument(
+        "--tm-db", type=Path,
+        help="Path to L2 LMDB file (default: data/tm/l2.lmdb)",
+    )
     args = parser.parse_args()
 
     apply = args.apply
     content_root = args.content_root or _resolve_content_root()
-    only_locales = [l.strip() for l in args.locales.split(",")] if args.locales else None
+    only_locales = [loc.strip() for loc in args.locales.split(",")] if args.locales else None
     only_issues = (
         {i.strip() for i in args.issue_type.split(",")}
         if args.issue_type else None
     )
+    if args.sites.lower() == "all":
+        sites = ALL_SITES
+    else:
+        sites = [s.strip() for s in args.sites.split(",")]
 
     stats = run(
         content_root=content_root,
@@ -936,6 +1055,9 @@ def main() -> None:
         only_issues=only_issues,
         max_files=args.max_files,
         verbose=args.verbose,
+        sites=sites,
+        update_tm=args.update_tm,
+        tm_db_path=args.tm_db,
     )
 
     print()
@@ -968,6 +1090,8 @@ def main() -> None:
         repair_keys = [k for k in sorted(stats) if k.startswith("repaired_")]
         for k in repair_keys:
             print(f"  {k.replace('repaired_', ''):35s} {stats[k]:>6,}")
+        if stats.get("tm_entries_stored"):
+            print(f"TM entries stored:          {stats.get('tm_entries_stored', 0):>8,}")
         print(f"Write errors:               {stats.get('write_errors', 0):>8,}")
 
     print(f"EN source missing:          {stats.get('en_missing', 0):>8,}")
