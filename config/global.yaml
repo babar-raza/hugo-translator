@@ -1060,3 +1060,9 @@ resource_governance:
     m2m100_418m: 8         # ~3x smaller than NLLB-1.3B; proportional estimate
     m2m100_1.2b: 18
     opus_mt: 6
+  # Thermal watchdog thresholds (scripts/quality/thermal_watchdog.py)
+  temperature_warn_celsius: 78       # log WARNING, no action
+  temperature_kill_celsius: 83       # kill one process (prevents TDR at ~84°C)
+  temperature_recover_celsius: 70    # restart killed process when cooled
+  temperature_poll_interval_sec: 30  # nvidia-smi sampling interval
+  temperature_auto_restart: true     # restart killed process when temp recovers
