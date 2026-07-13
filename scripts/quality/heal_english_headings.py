@@ -366,13 +366,25 @@ def run_retranslate(
     ROOT = Path(__file__).parent.parent.parent
     sys.path.insert(0, str(ROOT))
 
+    # Progress tracking: done-file records completed (site, locale, rel) tuples
+    # so restarts skip already-healed files instead of re-processing them.
+    done_path = queue_path.parent / (queue_path.stem + "_done.jsonl")
+    done_set: set[tuple[str, str, str]] = set()
+    if done_path.exists():
+        with done_path.open(encoding="utf-8") as dfh:
+            for line in dfh:
+                if line.strip():
+                    d = json.loads(line)
+                    done_set.add((d["site"], d["locale"], d["rel"]))
+        print(f"Resuming: {len(done_set)} entries already done (from {done_path.name})")
+
     print(f"Loading TranslationEngine with model={model} on cuda…")
     engine = _build_engine(model, ROOT)
     print("Engine ready.\n")
 
     content_root = _resolve_content_root()
 
-    ok = fail = 0
+    ok = fail = skipped = 0
     locale_filter = set(locales) if locales else None
     site_filter_set = set(sites_filter) if sites_filter else None
 
@@ -400,41 +412,54 @@ def run_retranslate(
 
     import time
     t0 = time.time()
+    done_fh = done_path.open("a", encoding="utf-8")
 
-    for i, entry in enumerate(entries, 1):
-        site_id = entry.get("site", "reference.aspose.org")
-        locale = entry["locale"]
-        rel = Path(entry["rel"])
-        src_path = content_root / site_id / EN_LOCALE / rel
+    try:
+        for i, entry in enumerate(entries, 1):
+            site_id = entry.get("site", "reference.aspose.org")
+            locale = entry["locale"]
+            rel = Path(entry["rel"])
+            done_key = (site_id, locale, str(rel))
 
-        if not src_path.exists():
-            fail += 1
-            continue
+            if done_key in done_set:
+                skipped += 1
+                continue
 
-        try:
-            engine.translate_file(
-                site_id=site_id,
-                file_path=src_path,
-                target_langs=[locale],
-                force=True,
-                force_overwrite=True,
-            )
-            ok += 1
-        except Exception as e:
-            print(f"  [{i}] FAIL {site_id}/{locale}/{rel}: {e!s:.100}", flush=True)
-            fail += 1
+            src_path = content_root / site_id / EN_LOCALE / rel
 
-        if i % 100 == 0:
-            elapsed = time.time() - t0
-            rate = i / elapsed if elapsed > 0 else 0
-            eta = (len(entries) - i) / rate if rate > 0 else 0
-            print(
-                f"  [{i}/{len(entries)}] {ok} OK, {fail} fail | "
-                f"{rate:.2f} files/s | ETA {eta/60:.0f} min",
-                flush=True,
-            )
+            if not src_path.exists():
+                fail += 1
+                continue
 
-    print(f"\nDone: {ok} OK, {fail} fail out of {len(entries)} files.")
+            try:
+                engine.translate_file(
+                    site_id=site_id,
+                    file_path=src_path,
+                    target_langs=[locale],
+                    force=True,
+                    force_overwrite=True,
+                )
+                ok += 1
+                done_fh.write(json.dumps({"site": site_id, "locale": locale, "rel": str(rel)}) + "\n")
+                done_fh.flush()
+            except Exception as e:
+                print(f"  [{i}] FAIL {site_id}/{locale}/{rel}: {e!s:.100}", flush=True)
+                fail += 1
+
+            if i % 100 == 0:
+                elapsed = time.time() - t0
+                rate = (ok + fail) / elapsed if elapsed > 0 else 0
+                remaining = len(entries) - i - skipped
+                eta = remaining / rate if rate > 0 else 0
+                print(
+                    f"  [{i}/{len(entries)}] {ok} OK, {fail} fail, {skipped} skipped | "
+                    f"{rate:.2f} files/s | ETA {eta/60:.0f} min",
+                    flush=True,
+                )
+    finally:
+        done_fh.close()
+
+    print(f"\nDone: {ok} OK, {fail} fail, {skipped} skipped out of {len(entries)} unique files.")
 
 
 # ---------------------------------------------------------------------------
@@ -479,6 +504,21 @@ def main() -> None:
     print()
 
     if args.retranslate:
+        lock_path = queue_path.parent / "heal_headings.lock"
+        if lock_path.exists():
+            try:
+                import psutil
+                locked_pid = int(lock_path.read_text().strip())
+                if psutil.pid_exists(locked_pid):
+                    proc = psutil.Process(locked_pid)
+                    if "heal_english_headings" in " ".join(proc.cmdline()):
+                        print(f"ERROR: Another heal instance is already running as PID {locked_pid}. Exiting.")
+                        sys.exit(1)
+            except Exception:
+                pass  # stale lock or bad pid — overwrite below
+        lock_path.write_text(str(os.getpid()))
+        import atexit
+        atexit.register(lambda: lock_path.unlink(missing_ok=True))
         run_retranslate(queue_path, args.model, locales, sites if args.sites.strip().lower() != "all" else None, args.max_files)
     elif args.build_queue:
         run_build_queue(sites, locales, categories, queue_path, args.max_files)
