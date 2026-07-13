@@ -683,7 +683,7 @@ translation_engine:
   # accepted via SCRIPT_SIMILAR_LANGUAGES sr→{hr,bs} (Serbian Latin ≈ Croatian at text level).
   language_routing_overrides:
     lv: "professionalize_llm"   # Latvian: M2M100 produces Hungarian (83.1% purity failures). LLM verified 3/3 lv-detected.
-    sr: "professionalize_llm"   # Serbian: M2M100 produces mixed-language (67.7% failures). LLM produces Latin Serbian (hr-detected → accepted via script_similar_languages).
+  #   sr: "professionalize_llm"   # Serbian: M2M100 produces mixed-language (67.7% failures). LLM produces Latin Serbian (hr-detected → accepted via script_similar_languages). TEMPORARILY DISABLED for heal run (NLLB used instead).
   #   fa: "professionalize_llm"   # Persian: RTL + systematic M2M100 failures (not yet verified)
   #   he: "professionalize_llm"   # Hebrew: RTL + systematic M2M100 failures (not yet verified)
 
@@ -696,6 +696,35 @@ translation_engine:
   llm_escalation_enabled: true
   llm_escalation_after_retries: 2  # Escalate after this many MT failures (see retranslate_queue.py)
   llm_escalation_model: "professionalize_llm"  # Model ID to use for escalated files
+
+  # TC-HDN-005: Content-type routing — assigns specific translation backends to unit types.
+  # Rules are evaluated in order; first matching rule wins.  null model = use shard default.
+  # Generic: no site-specific logic here; works for all 3 sites.
+  content_type_routing:
+    table_cell_text:
+      # Short API property descriptions: "Gets the X." patterns → route directly to LLM
+      # (MT models hallucinate on these — "Gets the shrink to fit." → "Will make a psychiatrist")
+      - condition:
+          max_chars: 60
+          pattern: '^(?:Gets?|Sets?|Indicates?|Enables?|Disables?|Represents?)\s'
+        preferred_model: professionalize_llm
+        context_hint: api_property_description
+      # All other table cells: use MT with LLM escalation on gate failure
+      - condition: {}
+        preferred_model: null
+        gate_failure_escalation_model: professionalize_llm
+        gate_failure_escalation_threshold: 2
+    frontmatter_description:
+      # API description field: always LLM for quality (TM contamination risk is high here)
+      - condition: {}
+        preferred_model: professionalize_llm
+        context_hint: frontmatter_description
+    default:
+      # All other units: use MT; escalate to LLM after 2 gate failures
+      - condition: {}
+        preferred_model: null
+        gate_failure_escalation_model: professionalize_llm
+        gate_failure_escalation_threshold: 2
 
   # TC-14: Post-run contamination scan — runs scan_language_contamination.py after each
   # translation run and queues contaminated files for retranslation. Set to false to disable.

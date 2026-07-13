@@ -1624,6 +1624,22 @@ class TextUnitExtractor:
                         extra={"original": sanitize_for_log(original, 200)},
                     )
 
+        # TC-OPS-001: short API description cells (≤60 chars, "Gets/Sets/…" pattern) must
+        # go to professionalize_llm, NOT to NLLB/m2m.  MT models hallucinate "psychiatrist"
+        # for "Gets the shrink to fit." — the context is too sparse for MT.
+        _unit_metadata: dict = {"placeholder_map": placeholder_map} if placeholder_map else {}
+        if (
+            kind is TextUnitKind.TABLE_CELL_TEXT
+            and not do_not_translate
+            and len(stripped_text) <= 60
+            and re.match(
+                r"^(?:Gets?|Sets?|Indicates?|Enables?|Disables?|Represents?)\s",
+                stripped_text,
+            )
+        ):
+            _unit_metadata["preferred_model"] = "professionalize_llm"
+            _unit_metadata["context_hint"] = "api_property_description"
+
         unit = TextUnit(
             unit_id=TextUnit.create_id(node.node_addr, protected_text, kind),
             node_addr=node.node_addr,
@@ -1632,7 +1648,7 @@ class TextUnitExtractor:
             prefix_ws=prefix_ws,
             suffix_ws=suffix_ws,
             do_not_translate=do_not_translate,
-            metadata={"placeholder_map": placeholder_map} if placeholder_map else {},
+            metadata=_unit_metadata,
         )
         logger.debug(
             f"[DEBUG] Created full sentence TextUnit: do_not_translate={do_not_translate}",
@@ -1910,8 +1926,10 @@ class TextUnitExtractor:
         if re.match(r"^[A-Z][a-z0-9]{3,}(?:[A-Z][a-z0-9]*)*$", text):
             return True
 
-        # PascalCase.With.Dots
-        if re.match(r"^[A-Z][a-z]+\.[A-Z]", text):
+        # PascalCase.With.Dots — full match required; no trailing words/spaces
+        # Old pattern lacked $ anchor and incorrectly marked description sentences
+        # like "Header.SectorSize represents the size..." as non-translatable.
+        if re.match(r"^[A-Z][a-z]+(?:\.[A-Z][A-Za-z0-9]*)+$", text):
             return True
 
         # snake_case (lowercase with underscores)

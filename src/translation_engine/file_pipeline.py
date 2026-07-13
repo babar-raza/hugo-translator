@@ -53,6 +53,7 @@ class LanguageTranslationContext:
     should_fix: bool
     max_retry_attempts: int
     output_paths_cache: dict[str, Path]
+    force_overwrite: bool = False
     llm_model_override: str | None = None
 
 
@@ -685,6 +686,7 @@ class FileTranslationPipeline:
                         target_lang=target_lang,
                         output_path=output_path,
                         source_doc=doc,
+                        force_overwrite=ctx.force_overwrite,
                     )
                     if not _gate_result.passed:
                         validation_passed = False
@@ -775,7 +777,39 @@ class FileTranslationPipeline:
                         except Exception:
                             pass
                     lang_result.error = validation_error
-                    break  # Validation failure is deterministic
+
+                    # TC-HDN-007b: Gate-failure escalation.
+                    # After N consecutive write-gate failures with an MT backend,
+                    # escalate to the LLM model configured in translation_engine.
+                    # Uses existing _llm_model_override wiring (already passed to
+                    # _translate_to_language() at line 161 as model_id_override).
+                    _escalated = False
+                    if _llm_model_override is None and retry_count < max_retry_attempts:
+                        try:
+                            _te_cfg_esc = (
+                                engine.config.get_config().get("translation_engine", {})
+                                if hasattr(engine.config, "get_config")
+                                else {}
+                            )
+                            _esc_enabled = _te_cfg_esc.get("llm_escalation_enabled", False)
+                            _esc_threshold = int(
+                                _te_cfg_esc.get("llm_escalation_after_retries", 2)
+                            )
+                            _esc_model = _te_cfg_esc.get("llm_escalation_model")
+                            if _esc_enabled and _esc_model and retry_count >= _esc_threshold - 1:
+                                logger.warning(
+                                    f"Gate-failure escalation: switching to LLM backend "
+                                    f"'{_esc_model}' for {output_path.name} after "
+                                    f"{retry_count + 1} write-gate failure(s)"
+                                )
+                                _llm_model_override = _esc_model
+                                retry_count += 1
+                                result.stats.validation_retried += 1
+                                _escalated = True
+                        except Exception as _esc_err:
+                            logger.debug(f"Gate-failure escalation check failed: {_esc_err}")
+                    if not _escalated:
+                        break  # Validation failure is deterministic (no escalation available)
 
                 # File successfully written
                 result.outputs[target_lang] = output_path

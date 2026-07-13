@@ -913,6 +913,7 @@ class TranslationEngine:
         file_path: Path,
         target_langs: list[str],
         force: bool = False,
+        force_overwrite: bool = False,
         validate: bool | None = None,
         trigger_type: str = "cli",
     ) -> TranslationResult:
@@ -1166,6 +1167,7 @@ class TranslationEngine:
                     output_path=output_path,
                     file_path=file_path,
                     force=force,
+                    force_overwrite=force_overwrite,
                     should_validate=should_validate,
                     should_verify=should_verify,
                     should_fix=should_fix,

@@ -371,3 +371,137 @@ class TestGatesUnconditional:
 
         assert r.cleaned_content is not None
         assert "VertexDeclaration" in r.cleaned_content
+
+
+# =============================================================================
+# TC-HDN-002 / TC-HDN-010: New gates 17-22
+# =============================================================================
+
+def _make_evaluator_no_detector():
+    """Evaluator with no language detector — only structural gates run."""
+    from src.translation_engine.write_gate import WriteGateEvaluator
+    return WriteGateEvaluator(detector=None, similarity_tracker=None, config=None)
+
+
+def _make_content_simple(body: str, fm: str = "title: Test\n") -> str:
+    return f"---\n{fm}---\n{body}"
+
+
+_OUT = Path("test_output/zh/test.md")
+
+
+class TestGate22EncodingClean:
+    """Gate 22: mojibake / encoding corruption."""
+
+    def test_blocks_em_dash_mojibake(self):
+        from src.translation_engine.write_gate import WriteGateResult
+        ev = _make_evaluator_no_detector()
+        body = "text \u00e2\u20ac\u2014 corruption"
+        r = WriteGateResult(passed=True)
+        ev._gate_encoding_clean(_make_content_simple("clean"), _make_content_simple(body), _OUT, r)
+        assert not r.passed and "Gate 22" in r.error
+
+    def test_passes_clean_ukrainian(self):
+        from src.translation_engine.write_gate import WriteGateResult
+        ev = _make_evaluator_no_detector()
+        body = "\u041f\u0440\u0438\u0432\u0456\u0442 \u0441\u0432\u0456\u0442\u0435."
+        r = WriteGateResult(passed=True)
+        ev._gate_encoding_clean(_make_content_simple(body), _make_content_simple(body), _OUT, r)
+        assert r.passed
+
+    def test_passes_clean_arabic(self):
+        from src.translation_engine.write_gate import WriteGateResult
+        ev = _make_evaluator_no_detector()
+        body = "\u0645\u0631\u062d\u0628\u0627 \u0628\u0627\u0644\u0639\u0627\u0644\u0645"
+        r = WriteGateResult(passed=True)
+        ev._gate_encoding_clean(_make_content_simple(body), _make_content_simple(body), _OUT, r)
+        assert r.passed
+
+
+class TestGate20ShortcodeBodyLeak:
+    """Gate 20: shortcode body leak."""
+
+    def test_blocks_shortcode_in_tgt_not_in_src(self):
+        from src.translation_engine.write_gate import WriteGateResult
+        ev = _make_evaluator_no_detector()
+        en = _make_content_simple("Plain paragraph without shortcodes.")
+        tr = _make_content_simple("{{< note >}} Some leaked shortcode.")
+        r = WriteGateResult(passed=True)
+        ev._gate_shortcode_body_leak(en, tr, _OUT, r)
+        assert not r.passed and "Gate 20" in r.error
+
+    def test_passes_shortcode_in_both(self):
+        from src.translation_engine.write_gate import WriteGateResult
+        ev = _make_evaluator_no_detector()
+        en = _make_content_simple("{{< note >}} See this.")
+        tr = _make_content_simple("{{< note >}} \u0413\u043b\u0435\u0434\u0430\u0458.")
+        r = WriteGateResult(passed=True)
+        ev._gate_shortcode_body_leak(en, tr, _OUT, r)
+        assert r.passed
+
+    def test_passes_no_shortcodes(self):
+        from src.translation_engine.write_gate import WriteGateResult
+        ev = _make_evaluator_no_detector()
+        r = WriteGateResult(passed=True)
+        ev._gate_shortcode_body_leak(_make_content_simple("plain"), _make_content_simple("plain"), _OUT, r)
+        assert r.passed
+
+
+class TestGate21InlineCodeIntegrity:
+    """Gate 21: inline code integrity."""
+
+    def test_blocks_translated_code_span(self):
+        from src.translation_engine.write_gate import WriteGateResult
+        ev = _make_evaluator_no_detector()
+        en = _make_content_simple("Use `AssetInfo`, `GetValue`, and `SetProperty` methods.")
+        tr = _make_content_simple("Use `\u0645\u0639\u0644\u0648\u0645\u0627\u062a`, `\u0627\u0644\u062d\u0635\u0648\u0644`, and `\u0648\u0636\u0639`.")
+        r = WriteGateResult(passed=True)
+        ev._gate_inline_code_integrity(en, tr, _OUT, r)
+        assert not r.passed and "Gate 21" in r.error
+
+    def test_passes_ascii_spans_preserved(self):
+        from src.translation_engine.write_gate import WriteGateResult
+        ev = _make_evaluator_no_detector()
+        en = _make_content_simple("Use `AssetInfo`, `GetValue`, and `SetProperty` methods.")
+        tr = _make_content_simple("\u0418\u0441\u043f\u043e\u043b\u044c\u0437\u0443\u0439\u0442\u0435 `AssetInfo`, `GetValue` \u0438 `SetProperty`.")
+        r = WriteGateResult(passed=True)
+        ev._gate_inline_code_integrity(en, tr, _OUT, r)
+        assert r.passed
+
+    def test_skips_when_fewer_than_3_spans(self):
+        from src.translation_engine.write_gate import WriteGateResult
+        ev = _make_evaluator_no_detector()
+        en = _make_content_simple("Use `AssetInfo` only.")
+        tr = _make_content_simple("\u0418\u0441\u043f\u043e\u043b\u044c\u0437\u0443\u0439\u0442\u0435 `\u043d\u0435\u0447\u0442\u043e`.")
+        r = WriteGateResult(passed=True)
+        ev._gate_inline_code_integrity(en, tr, _OUT, r)
+        assert r.passed  # below threshold of 3
+
+
+class TestGateEmptyBody:
+    """Gate 19b: empty body."""
+
+    def test_blocks_near_empty_tgt_with_large_src(self):
+        from src.translation_engine.write_gate import WriteGateResult
+        ev = _make_evaluator_no_detector()
+        src = _make_content_simple("A" * 300)
+        tgt = _make_content_simple("Hi.")
+        r = WriteGateResult(passed=True)
+        ev._gate_empty_body(src, tgt, _OUT, r)
+        assert not r.passed and "Gate 19" in r.error
+
+    def test_passes_when_src_also_small(self):
+        from src.translation_engine.write_gate import WriteGateResult
+        ev = _make_evaluator_no_detector()
+        r = WriteGateResult(passed=True)
+        ev._gate_empty_body(_make_content_simple("Short."), _make_content_simple("Kurz."), _OUT, r)
+        assert r.passed
+
+    def test_passes_normal_content(self):
+        from src.translation_engine.write_gate import WriteGateResult
+        ev = _make_evaluator_no_detector()
+        src = _make_content_simple("A" * 500)
+        tgt = _make_content_simple("\u041f\u0440\u0438\u0432\u0456\u0442 " * 30)
+        r = WriteGateResult(passed=True)
+        ev._gate_empty_body(src, tgt, _OUT, r)
+        assert r.passed

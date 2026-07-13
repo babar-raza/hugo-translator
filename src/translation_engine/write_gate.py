@@ -29,6 +29,15 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
+# Gate 22: mojibake / encoding corruption patterns
+_MOJIBAKE_GATE_RE = re.compile(r"\u00e2\u20ac|\u00c3\u00a9|\u00c3\u00a8|\u00c3\u00bc|\u00c3\u00b6")
+
+# Gate 20: shortcode leak patterns
+_SHORTCODE_GATE_RE = re.compile(r"\{\{[<%]")
+
+# Gate 17 (inline code integrity) helper
+_BACKTICK_SPAN_RE = re.compile(r"`([^`]+)`")
+
 
 @dataclass
 class WriteGateResult:
@@ -55,7 +64,54 @@ class WriteGateEvaluator:
 
     Pure evaluator — no side effects (no file writes, no TM mutations).
     Returns a WriteGateResult that the caller uses to decide next steps.
+
+    Adding a new gate:
+    1. Add an entry to GATE_REGISTRY (gate_id, method_name, category, action).
+    2. Implement the method.
+    3. ``_verify_gate_registry()`` will assert the method exists at startup.
+
+    ``action`` values:
+    - ``"block"``      — set ``result.passed = False`` on failure (gate returns None).
+    - ``"auto_clean"`` — return modified content string; evaluator applies it to ``working``.
+    - ``"warn"``       — log but never set result.passed = False.
+    - ``"early_return"`` — block AND return immediately from evaluate() (gates 2-8).
+    - ``"no_op"``      — always passes; used for soft/informational gates (gate 5).
     """
+
+    # Authoritative list of all gates in execution order.
+    # Entries: (gate_id, method_name, category, action)
+    #
+    # Gates 2-8 are "early_return" — they are called explicitly in evaluate()
+    # because they have special early-exit logic and non-uniform signatures
+    # (some need `detector`, `source_doc`, `force_overwrite`, `target_lang`).
+    # Gates 9-22 are content quality gates driven by the loop in
+    # _run_content_gates(); adding a new entry here + implementing the method
+    # is sufficient to wire it in.
+    GATE_REGISTRY: list[tuple[int, str, str, str]] = [
+        # id   method                             category       action
+        (2,  "_gate_language_mismatch",           "structural",  "early_return"),
+        (3,  "_gate_overwrite_protection",        "safety",      "early_return"),
+        (4,  "_gate_file_purity",                 "content",     "early_return"),
+        (5,  "_gate_soft_contamination",          "content",     "no_op"),
+        (6,  "_gate_code_block",                  "structural",  "early_return"),
+        (7,  "_gate_heading_surplus",             "structural",  "early_return"),
+        (8,  "_gate_yaml_frontmatter",            "structural",  "early_return"),
+        (9,  "_gate_heading_integrity",           "content",     "auto_clean"),
+        (10, "_gate_frontmatter_backticks",       "content",     "auto_clean"),
+        (11, "_gate_frontmatter_id_corruption",   "content",     "auto_clean"),
+        (12, "_gate_double_periods",              "cosmetic",    "auto_clean"),
+        (13, "_gate_eu_hallucination",            "content",     "block"),
+        (14, "_gate_mixed_language",              "content",     "block"),
+        (15, "_gate_table_row_integrity",         "structural",  "block"),
+        (16, "_gate_duplicate_content",           "content",     "auto_clean"),
+        (17, "_gate_newline_explosion",           "structural",  "block"),
+        (18, "_gate_description_hallucination",   "content",     "block"),
+        (19, "_gate_code_fence_count",            "structural",  "block"),
+        (20, "_gate_empty_body",                  "content",     "block"),
+        (21, "_gate_shortcode_body_leak",         "structural",  "block"),
+        (22, "_gate_inline_code_integrity",       "content",     "block"),
+        (23, "_gate_encoding_clean",              "structural",  "block"),
+    ]
 
     def __init__(
         self,
@@ -68,6 +124,19 @@ class WriteGateEvaluator:
         self._similarity_tracker = similarity_tracker
         self._config = config
         self._force_accept = force_accept
+        self._verify_gate_registry()
+
+    def _verify_gate_registry(self) -> None:
+        """Assert every GATE_REGISTRY entry has a corresponding method."""
+        missing = [
+            (gate_id, method)
+            for gate_id, method, _, _ in self.GATE_REGISTRY
+            if not hasattr(self, method)
+        ]
+        if missing:
+            raise AttributeError(
+                f"WriteGateEvaluator: GATE_REGISTRY references missing method(s): {missing}"
+            )
 
     def evaluate(
         self,
@@ -76,6 +145,7 @@ class WriteGateEvaluator:
         target_lang: str,
         output_path: Path,
         source_doc: Any = None,
+        force_overwrite: bool = False,
     ) -> WriteGateResult:
         """Run gates 2-8 on translated content.
 
@@ -105,26 +175,11 @@ class WriteGateEvaluator:
                 self._gate_yaml_frontmatter(
                     translated_content, output_path, target_lang, source_doc, result
                 )
-            working = translated_content
-            working = self._gate_heading_integrity(
-                source_content, working, output_path, source_doc, result
+            working = self._run_content_gates(
+                source_content, translated_content, target_lang, output_path, source_doc, result
             )
-            working = self._gate_frontmatter_backticks(working, output_path, source_doc, result)
-            working = self._gate_frontmatter_id_corruption(working, output_path, source_doc, result)
-            working = self._gate_double_periods(source_content, working, output_path, result)
-            working = self._gate_duplicate_content(working, output_path, result)
             if working != translated_content:
                 result.cleaned_content = working
-            if result.passed:
-                self._gate_eu_hallucination(source_content, working, output_path, result)
-            if result.passed:
-                self._gate_mixed_language(working, target_lang, output_path, result)
-            if result.passed:
-                self._gate_table_row_integrity(source_content, working, output_path, result)
-            if result.passed:
-                self._gate_newline_explosion(source_content, working, output_path, result)
-            if result.passed:
-                self._gate_description_hallucination(source_content, working, output_path, result)
             return result
 
         # Gate 2: Language detection mismatch (B-7.1)
@@ -134,7 +189,8 @@ class WriteGateEvaluator:
 
         # Gate 3: Overwrite protection (B-7.4, 4 CASEs)
         self._gate_overwrite_protection(
-            translated_content, target_lang, output_path, detector, result
+            translated_content, target_lang, output_path, detector, result,
+            force_overwrite=force_overwrite,
         )
         if not result.passed:
             return result
@@ -164,33 +220,15 @@ class WriteGateEvaluator:
         )
 
         # ------------------------------------------------------------------
-        # Gates 9-17: Content quality gates — run UNCONDITIONALLY regardless
-        # of force_accept. These protect against corruption that gates 1-8
-        # do not cover (content quality, not just structure).
+        # Gates 9+: Content quality gates — run UNCONDITIONALLY regardless
+        # of force_accept. Driven by GATE_REGISTRY entries with action
+        # "auto_clean" or "block". See _run_content_gates() for dispatch logic.
         # ------------------------------------------------------------------
-        # Auto-clean gates (9, 10, 11, 12, 16): set cleaned_content if changed.
-        working = translated_content
-        working = self._gate_heading_integrity(
-            source_content, working, output_path, source_doc, result
+        working = self._run_content_gates(
+            source_content, translated_content, target_lang, output_path, source_doc, result
         )
-        working = self._gate_frontmatter_backticks(working, output_path, source_doc, result)
-        working = self._gate_frontmatter_id_corruption(working, output_path, source_doc, result)
-        working = self._gate_double_periods(source_content, working, output_path, result)
-        working = self._gate_duplicate_content(working, output_path, result)
         if working != translated_content:
             result.cleaned_content = working
-
-        # Blocking gates (13, 14, 15, 17, 18): short-circuit on first failure.
-        if result.passed:
-            self._gate_eu_hallucination(source_content, working, output_path, result)
-        if result.passed:
-            self._gate_mixed_language(working, target_lang, output_path, result)
-        if result.passed:
-            self._gate_table_row_integrity(source_content, working, output_path, result)
-        if result.passed:
-            self._gate_newline_explosion(source_content, working, output_path, result)
-        if result.passed:
-            self._gate_description_hallucination(source_content, working, output_path, result)
 
         return result
 
@@ -249,6 +287,7 @@ class WriteGateEvaluator:
         output_path: Path,
         detector: FastTextDetector,
         result: WriteGateResult,
+        force_overwrite: bool = False,
     ) -> None:
         if self._force_accept:
             return
@@ -285,8 +324,10 @@ class WriteGateEvaluator:
             return
 
         # CASE 2: Both correct but existing higher quality → BLOCK
+        # Skip when force_overwrite=True (e.g. heal runs targeting confirmed bad files)
         if (
-            existing_lang == target_lang
+            not force_overwrite
+            and existing_lang == target_lang
             and detected_lang == target_lang
             and existing_conf > confidence + 0.05
         ):
@@ -551,6 +592,89 @@ class WriteGateEvaluator:
         return False
 
     # ------------------------------------------------------------------
+    # Registry-driven content gate runner (gates 9+)
+    # ------------------------------------------------------------------
+
+    def _run_content_gates(
+        self,
+        source_content: str,
+        translated_content: str,
+        target_lang: str,
+        output_path: Path,
+        source_doc: object,
+        result: WriteGateResult,
+    ) -> str:
+        """Run all content quality gates (GATE_REGISTRY entries with action
+        'auto_clean' or 'block').  Returns the (possibly cleaned) content.
+
+        Each gate has a different signature.  We normalize all of them to the
+        common interface ``(src, working, path, result) -> str | None`` via
+        explicit lambdas so the loop body stays uniform.  Auto-clean gates
+        return the (possibly modified) content string; blocking gates return None.
+        """
+        # Normalize all gate signatures to (src, working, path, result) -> str | None
+        # This table is the single place where signature differences are encoded.
+        _dispatch: dict[str, object] = {
+            "_gate_heading_integrity":
+                lambda src, w, path, res: self._gate_heading_integrity(src, w, path, source_doc, res),
+            "_gate_frontmatter_backticks":
+                lambda src, w, path, res: self._gate_frontmatter_backticks(w, path, source_doc, res),
+            "_gate_frontmatter_id_corruption":
+                lambda src, w, path, res: self._gate_frontmatter_id_corruption(w, path, source_doc, res),
+            "_gate_double_periods":
+                lambda src, w, path, res: self._gate_double_periods(src, w, path, res),
+            "_gate_eu_hallucination":
+                lambda src, w, path, res: self._gate_eu_hallucination(src, w, path, res),
+            "_gate_mixed_language":
+                lambda src, w, path, res: self._gate_mixed_language(w, target_lang, path, res),
+            "_gate_table_row_integrity":
+                lambda src, w, path, res: self._gate_table_row_integrity(src, w, path, res),
+            "_gate_duplicate_content":
+                lambda src, w, path, res: self._gate_duplicate_content(w, path, res),
+            "_gate_newline_explosion":
+                lambda src, w, path, res: self._gate_newline_explosion(src, w, path, res),
+            "_gate_description_hallucination":
+                lambda src, w, path, res: self._gate_description_hallucination(src, w, path, res),
+            "_gate_code_fence_count":
+                lambda src, w, path, res: self._gate_code_fence_count(src, w, path, res),
+            "_gate_empty_body":
+                lambda src, w, path, res: self._gate_empty_body(src, w, path, res),
+            "_gate_shortcode_body_leak":
+                lambda src, w, path, res: self._gate_shortcode_body_leak(src, w, path, res),
+            "_gate_inline_code_integrity":
+                lambda src, w, path, res: self._gate_inline_code_integrity(src, w, path, res),
+            "_gate_encoding_clean":
+                lambda src, w, path, res: self._gate_encoding_clean(src, w, path, res),
+        }
+
+        working = translated_content
+
+        for _, method_name, _, action in self.GATE_REGISTRY:
+            if action not in ("auto_clean", "block"):
+                continue  # skip early_return / no_op entries (handled elsewhere)
+
+            fn = _dispatch.get(method_name)
+            if fn is None:
+                # Method exists (verified by _verify_gate_registry) but has no
+                # dispatch entry — call it with the standard signature and log.
+                logger.warning(
+                    "WriteGate: no dispatch entry for %s — calling with standard args",
+                    method_name,
+                )
+                fn = lambda src, w, path, res, _m=method_name: getattr(self, _m)(src, w, path, res)  # noqa: E731
+
+            if action == "auto_clean":
+                new_working = fn(source_content, working, output_path, result)
+                if new_working is not None:
+                    working = new_working
+            else:  # "block"
+                if not result.passed:
+                    continue  # short-circuit: stop on first blocking failure
+                fn(source_content, working, output_path, result)
+
+        return working
+
+    # ------------------------------------------------------------------
     # Gate 9: Heading integrity (source-comparison, auto-clean)
     # ------------------------------------------------------------------
 
@@ -804,7 +928,25 @@ class WriteGateEvaluator:
             if len(stripped) < 20:
                 continue
             if stripped.startswith("|"):
-                continue  # table row
+                # Check table description cells for English prose
+                # Pattern: | `ClassName` | Description sentence in English. |
+                cells = [c.strip() for c in stripped.strip("|").split("|")]
+                if len(cells) >= 2:
+                    desc = cells[-1]
+                    # Remove inline code spans from description
+                    desc_clean = re.sub(r"`[^`]+`", "", desc).strip()
+                    # Separator rows (| --- | --- |) and short cells are skipped
+                    if (
+                        len(desc_clean) >= 25
+                        and not re.fullmatch(r":?-+:?", desc_clean)
+                        and _ascii_word_re.fullmatch(desc_clean)
+                    ):
+                        # Count lowercase English words; skip if mostly identifiers
+                        words = desc_clean.split()
+                        lower_en = sum(1 for w in words if re.match(r"^[a-z]{3,}$", w))
+                        if len(words) >= 4 and lower_en / len(words) >= 0.4:
+                            untranslated_count += 1
+                continue  # table row (description check done above)
             if stripped.startswith("{{"):
                 continue  # shortcode
             if len(stripped.split()) < _min_words:
@@ -1021,6 +1163,150 @@ class WriteGateEvaluator:
                 f"vs src={len(src_desc)}ch (ratio={ratio:.1f}x)"
             )
             logger.error("GATE18 BLOCKED %s: %s", output_path.name, result.error)
+
+    # ------------------------------------------------------------------
+    # Gate 19: Code fence count check (BLOCKING)
+    # ------------------------------------------------------------------
+
+    def _gate_code_fence_count(
+        self,
+        source_content: str,
+        translated_content: str,
+        output_path: Path,
+        result: WriteGateResult,
+    ) -> None:
+        """Block if translated body has fewer fenced code blocks than source.
+
+        Models in the legacy fallback path drop opening ``` fences, leaving
+        code as plain paragraph text.  Require at least as many fences in the
+        translation as in the source (allow one missing block as tolerance).
+        Only fires when source has ≥4 fences (≥2 code blocks).
+        """
+        src_body = self._get_body(source_content)
+        tgt_body = self._get_body(translated_content)
+
+        # Count ``` fence lines (opening or closing)
+        src_fences = sum(1 for ln in src_body.splitlines() if ln.strip().startswith("```"))
+        tgt_fences = sum(1 for ln in tgt_body.splitlines() if ln.strip().startswith("```"))
+
+        if src_fences < 4:
+            return  # too few to be meaningful; single-block files are ok
+
+        # Allow up to 1 missing fence pair (opening + closing = 2 fences)
+        if tgt_fences < src_fences - 2:
+            result.passed = False
+            result.error = (
+                f"Gate 19 code fence loss: src={src_fences} fences, "
+                f"tgt={tgt_fences} fences (lost {src_fences - tgt_fences})"
+            )
+            logger.error("GATE19 BLOCKED %s: %s", output_path.name, result.error)
+
+    # ------------------------------------------------------------------
+    # Gate 17 (TC-HDN-010): Shortcode body leak
+    # ------------------------------------------------------------------
+
+    def _gate_shortcode_body_leak(
+        self,
+        source_content: str,
+        translated_content: str,
+        output_path: Path,
+        result: WriteGateResult,
+    ) -> None:
+        """Block writes where {{< or {{% appear in tgt body but NOT in en source.
+
+        Shortcodes that are correctly preserved should exist in both source and
+        translation. If they appear ONLY in the translation, the model reproduced
+        or corrupted a shortcode token.
+        """
+        tgt_body = self._get_body(translated_content)
+        if not _SHORTCODE_GATE_RE.search(tgt_body):
+            return
+        src_body = self._get_body(source_content)
+        if _SHORTCODE_GATE_RE.search(src_body):
+            return  # shortcode exists in EN source — correctly preserved, not a leak
+        result.passed = False
+        result.error = "Gate 20 shortcode body leak: {{< or {{% in translated body but not in EN source"
+        logger.error("GATE20 BLOCKED %s: %s", output_path.name, result.error)
+
+    # ------------------------------------------------------------------
+    # Gate 18 (TC-HDN-010): Inline code integrity
+    # ------------------------------------------------------------------
+
+    def _gate_inline_code_integrity(
+        self,
+        source_content: str,
+        translated_content: str,
+        output_path: Path,
+        result: WriteGateResult,
+    ) -> None:
+        """Block writes where ASCII backtick spans in EN were translated to non-ASCII.
+
+        Zero tolerance: any `code` span that was ASCII in English must remain
+        ASCII in the translation. Only fires when EN has ≥3 inline code spans.
+        """
+        src_body = self._get_body(source_content)
+        tgt_body = self._get_body(translated_content)
+
+        en_spans = _BACKTICK_SPAN_RE.findall(src_body)
+        if len(en_spans) < 3:
+            return  # too few spans to fire (avoids noise on trivial files)
+
+        tr_spans = _BACKTICK_SPAN_RE.findall(tgt_body)
+        for en_span, tr_span in zip(en_spans, tr_spans):
+            if en_span.isascii() and not tr_span.isascii():
+                result.passed = False
+                result.error = (
+                    f"Gate 21 inline code translated: `{en_span[:40]}` → `{tr_span[:40]}`"
+                )
+                logger.error("GATE21 BLOCKED %s: %s", output_path.name, result.error)
+                return
+
+    # ------------------------------------------------------------------
+    # Gate 19 (TC-HDN-010): Empty body
+    # ------------------------------------------------------------------
+
+    def _gate_empty_body(
+        self,
+        source_content: str,
+        translated_content: str,
+        output_path: Path,
+        result: WriteGateResult,
+    ) -> None:
+        """Block writes where translated body is near-empty while EN body is substantial."""
+        src_body = self._get_body(source_content)
+        tgt_body = self._get_body(translated_content)
+        if len(tgt_body.strip()) < 50 and len(src_body.strip()) > 200:
+            result.passed = False
+            result.error = (
+                f"Gate 19 empty body: tgt={len(tgt_body.strip())} chars "
+                f"vs src={len(src_body.strip())} chars"
+            )
+            logger.error("GATE19b BLOCKED %s: %s", output_path.name, result.error)
+
+    # ------------------------------------------------------------------
+    # Gate 22 (TC-HDN-002): Encoding clean / mojibake detector
+    # ------------------------------------------------------------------
+
+    def _gate_encoding_clean(
+        self,
+        source_content: str,
+        translated_content: str,
+        output_path: Path,
+        result: WriteGateResult,
+    ) -> None:
+        """Block writes where translated body contains cp1252 mojibake sequences.
+
+        Even with repair_mojibake() in loader.py, this gate provides a second
+        layer of defence for any patterns that slip through the repair map.
+        """
+        tgt_body = self._get_body(translated_content)
+        m = _MOJIBAKE_GATE_RE.search(tgt_body)
+        if m:
+            result.passed = False
+            result.error = (
+                f"Gate 22 encoding corruption: mojibake pattern {m.group()!r} found in body"
+            )
+            logger.error("GATE22 BLOCKED %s: %s", output_path.name, result.error)
 
     # ------------------------------------------------------------------
     # OW-01 extension: check existing file when new translation failed

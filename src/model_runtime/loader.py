@@ -27,6 +27,55 @@ except ImportError:
 
 logger = logging.getLogger(__name__)
 
+# --- Mojibake repair (TC-HDN-001) ---
+# MT models trained on web-scraped corpora reproduce cp1252-decoded-as-UTF-8 patterns.
+# These are Unicode code points that look like cp1252 double-decoded garbage.
+# Applied post-decode to ALL model output (NLLB, m2m100, LLM).
+_MOJIBAKE_MAP: dict[int, str] = {
+    # em-dash and en-dash
+    ord("\u00e2"): None,   # â — start of multi-char sequence; handled by str.translate below
+}
+
+# Use str.replace() chain for multi-char sequences (str.translate is single-char only)
+_MOJIBAKE_PAIRS: list[tuple[str, str]] = [
+    ("\u00e2\u20ac\u2014", "\u2014"),   # â€" → — (em-dash)
+    ("\u00e2\u20ac\u2013", "\u2013"),   # â€" → – (en-dash)
+    ("\u00e2\u20ac\u2122", "\u2019"),   # â€™ → ' (right single quote)
+    ("\u00e2\u20ac\u0153", "\u201c"),   # â€œ → " (left double quote)
+    ("\u00e2\u20ac\u009d", "\u201d"),   # â€ → " (right double quote)
+    ("\u00e2\u20ac\u0161", "\u2018"),   # â€˜ → ' (left single quote)
+    ("\u00e2\u20ac\u00a6", "\u2026"),   # â€¦ → … (ellipsis)
+    ("\u00c3\u00a9", "\u00e9"),         # Ã© → é
+    ("\u00c3\u00a8", "\u00e8"),         # Ã¨ → è
+    ("\u00c3\u00aa", "\u00ea"),         # Ãª → ê
+    ("\u00c3\u00ab", "\u00eb"),         # Ã« → ë
+    ("\u00c3\u00a0", "\u00e0"),         # Ã  → à
+    ("\u00c3\u00a2", "\u00e2"),         # Ã¢ → â
+    ("\u00c3\u00bc", "\u00fc"),         # Ã¼ → ü
+    ("\u00c3\u00b6", "\u00f6"),         # Ã¶ → ö
+    ("\u00c3\u00a4", "\u00e4"),         # Ã¤ → ä
+    ("\u00c3\u009f", "\u00df"),         # ÃŸ → ß
+    ("\u00c3\u00b1", "\u00f1"),         # Ã± → ñ
+    ("\u00c3\u00ad", "\u00ed"),         # Ã­ → í
+    ("\u00c3\u00b3", "\u00f3"),         # Ã³ → ó
+    ("\u00c3\u00ba", "\u00fa"),         # Ãº → ú
+]
+
+
+def repair_mojibake(text: str) -> str:
+    """Fix cp1252-decoded-as-UTF-8 patterns produced by MT/LLM models.
+
+    These patterns arise when models were trained on web data that contained
+    cp1252 characters (like em-dash, curly quotes) that were subsequently
+    mis-decoded as Latin-1 and stored as multi-byte UTF-8 sequences.
+
+    Applied post-decode so that display text is clean before any gate checks.
+    """
+    for bad, good in _MOJIBAKE_PAIRS:
+        if bad in text:
+            text = text.replace(bad, good)
+    return text
+
 
 class ModelBackend(ABC):
     """Abstract base for translation model backends."""
@@ -534,7 +583,8 @@ class HuggingFaceBackend(ModelBackend):
                     logger.debug(
                         f"Stripped NLLB SSA artifact from translation[{i}]: {t[:80]!r}"
                     )
-                    translations[i] = cleaned
+                cleaned = repair_mojibake(cleaned)
+                translations[i] = cleaned
 
             # EMPTY TRANSLATION FALLBACK (Iter6 empty-translation fix)
             # Detect empty translations and retry with safer generation parameters
@@ -1041,7 +1091,7 @@ class CTranslate2Backend(ModelBackend):
                 translation = self.tokenizer.decode(
                     self.tokenizer.convert_tokens_to_ids(output_tokens), skip_special_tokens=True
                 )
-                translations.append(translation)
+                translations.append(repair_mojibake(translation))
 
             # EMPTY TRANSLATION FALLBACK (parity with HuggingFaceBackend)
             # Detect empty translations and fall back to source text

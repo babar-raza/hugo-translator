@@ -17,6 +17,7 @@ from typing import Any
 
 from .contracts import LLMProviderConfig
 from .llm_providers import BaseLLMProvider, create_provider
+from .loader import repair_mojibake
 from .registry import ModelInfo
 
 logger = logging.getLogger(__name__)
@@ -202,6 +203,86 @@ class LLMModelBackend:
         )
         return translations
 
+    def translate_with_context(
+        self,
+        texts: list[str],
+        src_lang: str,
+        tgt_lang: str,
+        context_hint: str | None = None,
+        file_context: dict[str, str] | None = None,
+    ) -> list[str]:
+        """Translate with optional content-type context for enriched prompting.
+
+        When ``context_hint == "api_property_description"``, the system prompt
+        is enriched with class/product information from ``file_context`` and
+        the batch size is increased to 30 (short descriptions are cheap).
+
+        Args:
+            texts: Source texts.
+            src_lang: Source language code.
+            tgt_lang: Target language code.
+            context_hint: Content-type hint from ContentTypeRouter
+                (e.g. ``"api_property_description"``, ``"frontmatter_description"``).
+            file_context: Optional dict with keys ``class_name``, ``product``, etc.
+                Derived from the output file path via :meth:`_derive_file_context`.
+
+        Returns:
+            List of translated texts in original order.
+        """
+        if not texts:
+            return []
+
+        # Stash context for sub-methods; cleared in finally block
+        self._ctx_hint: str | None = context_hint
+        self._ctx_file: dict[str, str] | None = file_context
+        try:
+            # Use larger batch for short API descriptions (avg ~8 tokens each)
+            _saved_max = self.MAX_SEGMENTS_PER_PROMPT
+            if context_hint == "api_property_description":
+                self.MAX_SEGMENTS_PER_PROMPT = 30
+            try:
+                translations, _, _ = self.translate_with_token_counts(
+                    texts, src_lang, tgt_lang
+                )
+            finally:
+                self.MAX_SEGMENTS_PER_PROMPT = _saved_max
+        finally:
+            self._ctx_hint = None
+            self._ctx_file = None
+        return translations
+
+    @staticmethod
+    def _derive_file_context(output_path: str | None) -> dict[str, str]:
+        """Extract class name and product from a reference.aspose.org file path.
+
+        Example path:
+          ``D:/content/reference.aspose.org/content/zh/cells/python/Alignment.md``
+        Extracted: ``{"class_name": "Alignment", "product": "cells/python"}``
+
+        Returns an empty dict for non-reference paths or when path is None.
+        """
+        if not output_path:
+            return {}
+        p = Path(output_path)
+        if "reference.aspose.org" not in str(p):
+            return {}
+        # Parts after the locale segment: product/module/ClassName.md
+        parts = p.parts
+        try:
+            # Find locale segment index (2-letter language code)
+            content_idx = next(
+                i for i, part in enumerate(parts) if part == "content"
+            )
+            # locale is content_idx + 1; product parts follow, class name is last
+            after_locale = parts[content_idx + 2:]  # skip content/<locale>/
+            if len(after_locale) >= 2:
+                class_name = p.stem  # filename without extension
+                product = "/".join(after_locale[:-1])
+                return {"class_name": class_name, "product": product}
+        except (StopIteration, IndexError):
+            pass
+        return {}
+
     # LLM-WASTE-FIX-3: max segments packed into a single LLM prompt.
     # Each segment gets a numbered tag; the LLM returns numbered translations.
     # If parsing fails, we fall back to per-segment calls for that sub-batch.
@@ -351,7 +432,7 @@ class LLMModelBackend:
                 protected.protected_text = result
                 result = tm.restore(protected)
 
-            translations[idx] = result
+            translations[idx] = repair_mojibake(result)
             return inp_tokens, out_tokens
 
         except Exception as e:
@@ -470,6 +551,9 @@ class LLMModelBackend:
     def _build_batch_system_prompt(self, src_lang: str, tgt_lang: str, segment_count: int) -> str:
         """Build system prompt for packed multi-segment translation.
 
+        When a context hint is active (set via :meth:`translate_with_context`),
+        injects class context for API property descriptions.
+
         Args:
             src_lang: Source language code.
             tgt_lang: Target language code.
@@ -480,6 +564,24 @@ class LLMModelBackend:
         """
         src_name = LANGUAGE_NAMES.get(src_lang, src_lang.upper())
         tgt_name = LANGUAGE_NAMES.get(tgt_lang, tgt_lang.upper())
+        hint: str | None = getattr(self, "_ctx_hint", None)
+        file_ctx: dict[str, str] = getattr(self, "_ctx_file", None) or {}
+
+        if hint == "api_property_description":
+            class_name = file_ctx.get("class_name", "")
+            class_clause = f" Class context: `{class_name}`." if class_name else ""
+            return (
+                f"You are an API documentation translator.{class_clause} "
+                f"Translate each numbered property description from {src_name} to {tgt_name}.\n\n"
+                f"Input: {segment_count} numbered items, each prefixed with <<<SEG_N>>>.\n"
+                f"Output: {segment_count} translated items, each on its own line "
+                f"prefixed with the SAME tag <<<SEG_N>>>.\n\n"
+                f"Rules:\n"
+                f"- Output ONLY the translations with their numbers, nothing else\n"
+                f"- Property names, class names, and code identifiers MUST NOT be translated\n"
+                f"- Keep the exact tense and voice of each description\n"
+                f"- Preserve backtick spans and markdown formatting"
+            )
 
         return (
             f"You are a professional translator. Translate each numbered segment "
@@ -525,6 +627,9 @@ class LLMModelBackend:
     def _build_system_prompt(self, src_lang: str, tgt_lang: str) -> str:
         """Build the translation system prompt.
 
+        When a context hint is active (set via :meth:`translate_with_context`),
+        an enriched prompt is returned for known hint types.
+
         Args:
             src_lang: Source language code.
             tgt_lang: Target language code.
@@ -532,14 +637,38 @@ class LLMModelBackend:
         Returns:
             Formatted system prompt string.
         """
+        src_name = LANGUAGE_NAMES.get(src_lang, src_lang.upper())
+        tgt_name = LANGUAGE_NAMES.get(tgt_lang, tgt_lang.upper())
+        hint: str | None = getattr(self, "_ctx_hint", None)
+        file_ctx: dict[str, str] = getattr(self, "_ctx_file", None) or {}
+
+        if hint == "api_property_description":
+            class_name = file_ctx.get("class_name", "")
+            class_clause = f" of the `{class_name}` class" if class_name else ""
+            return (
+                f"You are an API documentation translator. "
+                f"Translate each property description{class_clause} from {src_name} to {tgt_name}.\n\n"
+                "Rules:\n"
+                "- Property names, class names, and code identifiers MUST NOT be translated\n"
+                "- Keep the exact tense and voice of each description\n"
+                "- Output ONLY the translation, nothing else\n"
+                "- Preserve all formatting: markdown, backtick spans, links"
+            )
+        if hint == "frontmatter_description":
+            return (
+                f"You are a technical documentation translator. "
+                f"Translate this API class description from {src_name} to {tgt_name}.\n\n"
+                "Rules:\n"
+                "- Keep class names, method names, and identifiers in English\n"
+                "- Output ONLY the translation, nothing else\n"
+                "- Keep the same concise register as the source"
+            )
+
         template = (
             self.model_info.system_prompt_template
             if self.model_info.system_prompt_template
             else DEFAULT_SYSTEM_PROMPT
         )
-        src_name = LANGUAGE_NAMES.get(src_lang, src_lang.upper())
-        tgt_name = LANGUAGE_NAMES.get(tgt_lang, tgt_lang.upper())
-
         return template.format(
             src_lang_name=src_name,
             tgt_lang_name=tgt_name,

@@ -14,7 +14,7 @@ from typing import Any
 
 import lmdb
 
-from .normalization import make_tm_key
+from .normalization import make_tm_key, make_tm_key_scoped
 
 # Module-level FastText singleton with 60-second retry cooldown (SW-3 / TC-01).
 # These are kept for test compatibility; active code uses L2PersistentTM._detector.
@@ -259,9 +259,14 @@ class L2PersistentTM:
         tgt_lang: str,
         text: str,
         context: str | None = None,
+        field_name: str = "",
     ) -> TranslationEntry | None:
         """
         Find exact match for text with corruption detection (T204: federated-splashing-panda).
+
+        When field_name is given, tries the scoped key first (prevents cross-field
+        contamination), then falls back to the legacy unscoped key for backward
+        compatibility with entries stored before H2 (TC-HDN-003).
 
         Args:
             site_id: Site identifier
@@ -269,15 +274,26 @@ class L2PersistentTM:
             tgt_lang: Target language code
             text: Source text to look up
             context: Optional context for disambiguation
+            field_name: Optional field scope (e.g. "description", "title")
 
         Returns:
             TranslationEntry if found and valid, None otherwise
         """
-        key = make_tm_key(site_id, src_lang, tgt_lang, text)
+        keys_to_try: list[str]
+        if field_name:
+            scoped = make_tm_key_scoped(site_id, src_lang, tgt_lang, text, field_name)
+            unscoped = make_tm_key(site_id, src_lang, tgt_lang, text)
+            keys_to_try = [scoped, unscoped]  # scoped first; unscoped fallback
+        else:
+            keys_to_try = [make_tm_key(site_id, src_lang, tgt_lang, text)]
 
         with self._lock:
             with self.env.begin() as txn:
-                value_bytes = txn.get(key.encode("utf-8"))
+                value_bytes = None
+                for key in keys_to_try:
+                    value_bytes = txn.get(key.encode("utf-8"))
+                    if value_bytes is not None:
+                        break
 
                 if value_bytes is None:
                     return None
@@ -316,9 +332,14 @@ class L2PersistentTM:
         context: str | None = None,
         metadata: dict[str, Any] | None = None,
         overwrite: bool = True,
+        field_name: str = "",
     ) -> bool:
         """
         Store translation entry with integrity safeguards (T204: federated-splashing-panda).
+
+        When field_name is given, stores under the scoped key to prevent cross-field
+        TM contamination (TC-HDN-003). Unscoped legacy entries remain in place and
+        are still resolved by exact_lookup() via its fallback path.
 
         Args:
             site_id: Site identifier
@@ -329,6 +350,7 @@ class L2PersistentTM:
             context: Optional context (frontmatter key, AST path)
             metadata: Optional additional metadata
             overwrite: If True, overwrite existing entry. If False, skip if exists.
+            field_name: Optional field scope (e.g. "description", "title")
 
         Returns:
             True if stored, False if skipped (existing entry and overwrite=False)
@@ -360,7 +382,7 @@ class L2PersistentTM:
             )
             raise ValueError("Translation entry failed validation")
 
-        key = make_tm_key(site_id, src_lang, tgt_lang, text)
+        key = make_tm_key_scoped(site_id, src_lang, tgt_lang, text, field_name)
         key_bytes = key.encode("utf-8")
 
         try:

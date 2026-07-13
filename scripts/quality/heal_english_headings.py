@@ -134,6 +134,37 @@ def _check_file(tr_path: Path, locale: str, en_path: Path | None = None) -> dict
         if access_cells:
             issues["table_access"] = access_cells
 
+    # 2b. Table description cells not translated (non-Latin only)
+    # Caused by extractor bug: regex ^[A-Z][a-z]+\.[A-Z] (no $ anchor) marked sentences
+    # starting with "Header.SectorSize..." as non-translatable.
+    if locale in _NON_LATIN_LOCALES and "|" in body:
+        _lower_en = re.compile(r"^[a-z]{3,}$")
+        _ascii_line = re.compile(r"^[A-Za-z0-9\s.,;:!?\-\'\"()\[\]{}|#*`~_>]+$")
+        in_code = False
+        en_cells, total_cells = 0, 0
+        for line in body.splitlines():
+            s = line.strip()
+            if s.startswith("```"):
+                in_code = not in_code
+            if in_code or not s.startswith("|"):
+                continue
+            cells = [c.strip() for c in s.strip("|").split("|")]
+            if len(cells) < 2:
+                continue
+            if all(re.fullmatch(r":?-+:?", c) for c in cells if c):
+                continue  # separator row
+            desc = cells[-1]
+            desc_clean = re.sub(r"`[^`]+`", "", desc).strip()
+            if len(desc_clean) < 20:
+                continue
+            total_cells += 1
+            words = desc_clean.split()
+            lower_en = sum(1 for w in words if _lower_en.match(w))
+            if len(words) >= 4 and lower_en / len(words) >= 0.4 and _ascii_line.match(desc_clean):
+                en_cells += 1
+        if total_cells >= 3 and en_cells / total_cells >= 0.5:
+            issues["table_desc_not_translated"] = [f"{en_cells}/{total_cells}"]
+
     # 3. Body identical to English source OR empty body (requires en_path)
     if en_path is not None and en_path.exists():
         try:
@@ -157,6 +188,15 @@ def _check_file(tr_path: Path, locale: str, en_path: Path | None = None) -> dict
                     ratio = len(tr_desc) / len(en_desc)
                     if ratio > 3.0 or ratio < 0.3:
                         issues["description_hallucination"] = [f"ratio={ratio:.1f}"]
+
+            # 5. Code fence dropped — translation has fewer ``` fences than source
+            def _count_fences(b: str) -> int:
+                return sum(1 for ln in b.splitlines() if ln.strip().startswith("```"))
+
+            en_fences = _count_fences(en_body)
+            tr_fences = _count_fences(body)
+            if en_fences >= 4 and tr_fences < en_fences - 2:
+                issues["code_fence_dropped"] = [f"src={en_fences} tgt={tr_fences}"]
         except Exception:
             pass
 
@@ -289,7 +329,7 @@ def _build_engine(model_id: str, root: Path):
 
     config_service = ConfigService(str(root / "config"))
     registry = ModelRegistry(str(root / "config/model_registry.yaml"))
-    model_loader = ModelLoader(registry=registry, device="cuda", max_memory_mb=8000)
+    model_loader = ModelLoader(registry=registry, device="cuda", max_memory_mb=7000)
 
     l1 = L1Cache(max_size=50000)
     l2 = L2PersistentTM(db_path=root / "data/tm/l2.lmdb")
@@ -377,6 +417,7 @@ def run_retranslate(
                 file_path=src_path,
                 target_langs=[locale],
                 force=True,
+                force_overwrite=True,
             )
             ok += 1
         except Exception as e:
@@ -412,7 +453,7 @@ def main() -> None:
                         help="Comma-separated site names or 'all' (default: reference.aspose.org)")
     parser.add_argument("--locales", type=str, default="", help="Comma-separated locale list (default: all)")
     parser.add_argument("--categories", type=str, default="",
-                        help="Filter: api_headings,section_headings,table_access,body_identical_to_en,empty_body")
+                        help="Filter: api_headings,section_headings,table_access,body_identical_to_en,empty_body,code_fence_dropped,table_desc_not_translated,description_hallucination")
     parser.add_argument("--model", type=str, default="nllb_200_1.3b",
                         help="Model name for --retranslate (nllb_200_1.3b or m2m100_418m)")
     parser.add_argument("--queue-file", type=str,
