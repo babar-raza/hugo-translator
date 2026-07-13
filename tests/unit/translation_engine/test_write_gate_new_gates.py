@@ -505,3 +505,102 @@ class TestGateEmptyBody:
         r = WriteGateResult(passed=True)
         ev._gate_empty_body(src, tgt, _OUT, r)
         assert r.passed
+
+
+# ---------------------------------------------------------------------------
+# Gate 24: Description reverted to English
+# ---------------------------------------------------------------------------
+
+
+class TestGate24DescriptionRevertedToEnglish:
+    """Gate 24: ASCII-only description in non-Latin locale → BLOCK."""
+
+    def _make_desc_content(self, description: str, body: str = "text") -> str:
+        return f"---\ntitle: Test\ndescription: {description}\n---\n{body}\n"
+
+    def test_blocks_ascii_description_in_arabic(self):
+        from src.translation_engine.write_gate import WriteGateResult
+        ev = _make_evaluator_no_detector()
+        src = self._make_desc_content("Gets the font size in points.")
+        tgt = self._make_desc_content("Gets the font size in points.")  # EN copied verbatim
+        r = WriteGateResult(passed=True)
+        ev._gate_description_reverted_to_english(src, tgt, "ar", _OUT, r)
+        assert not r.passed
+        assert "Gate 24" in r.error
+
+    def test_passes_translated_arabic_description(self):
+        from src.translation_engine.write_gate import WriteGateResult
+        ev = _make_evaluator_no_detector()
+        src = self._make_desc_content("Gets the font size in points.")
+        tgt = self._make_desc_content("تحصل على حجم الخط")
+        r = WriteGateResult(passed=True)
+        ev._gate_description_reverted_to_english(src, tgt, "ar", _OUT, r)
+        assert r.passed
+
+    def test_skips_latin_locale(self):
+        """Gate 24 only fires for non-Latin-script locales."""
+        from src.translation_engine.write_gate import WriteGateResult
+        ev = _make_evaluator_no_detector()
+        src = self._make_desc_content("Gets the font size in points.")
+        tgt = self._make_desc_content("Gets the font size in points.")  # ASCII = English
+        r = WriteGateResult(passed=True)
+        ev._gate_description_reverted_to_english(src, tgt, "de", _OUT, r)
+        assert r.passed  # German is Latin-script: gate should not fire
+
+    def test_skips_short_source_description(self):
+        """Gate 24 ignores when EN description is <20 chars."""
+        from src.translation_engine.write_gate import WriteGateResult
+        ev = _make_evaluator_no_detector()
+        src = self._make_desc_content("Too short.")  # 10 chars
+        tgt = self._make_desc_content("Too short.")
+        r = WriteGateResult(passed=True)
+        ev._gate_description_reverted_to_english(src, tgt, "ar", _OUT, r)
+        assert r.passed  # too short to be reliable signal
+
+
+# ---------------------------------------------------------------------------
+# Gate 25: Code block content truncated
+# ---------------------------------------------------------------------------
+
+
+class TestGate25CodeBlockContentTruncated:
+    """Gate 25: code block loses >30% of its lines → BLOCK."""
+
+    def _code_file(self, code_lines: list[str]) -> str:
+        code = "\n".join(code_lines)
+        return f"---\ntitle: Test\n---\n\n```python\n{code}\n```\n"
+
+    def test_blocks_truncated_code_block(self):
+        from src.translation_engine.write_gate import WriteGateResult
+        ev = _make_evaluator_no_detector()
+        src_lines = [f"line_{i} = value_{i}" for i in range(15)]  # 15 lines
+        tgt_lines = src_lines[:8]  # only 8 lines = 53% retained → BLOCK (< 70%)
+        src = self._code_file(src_lines)
+        tgt = self._code_file(tgt_lines)
+        r = WriteGateResult(passed=True)
+        ev._gate_code_block_content_truncated(src, tgt, _OUT, r)
+        assert not r.passed
+        assert "Gate 25" in r.error
+
+    def test_passes_minimally_retained_code_block(self):
+        from src.translation_engine.write_gate import WriteGateResult
+        ev = _make_evaluator_no_detector()
+        src_lines = [f"line_{i} = value_{i}" for i in range(12)]  # 12 lines
+        tgt_lines = src_lines[:10]  # 83% retained → passes (≥ 70%)
+        src = self._code_file(src_lines)
+        tgt = self._code_file(tgt_lines)
+        r = WriteGateResult(passed=True)
+        ev._gate_code_block_content_truncated(src, tgt, _OUT, r)
+        assert r.passed
+
+    def test_skips_small_code_block(self):
+        """Gate 25 ignores blocks with <10 source lines."""
+        from src.translation_engine.write_gate import WriteGateResult
+        ev = _make_evaluator_no_detector()
+        src_lines = [f"line_{i}" for i in range(5)]  # only 5 lines
+        tgt_lines = src_lines[:2]  # 40% retained, but src < 10 lines
+        src = self._code_file(src_lines)
+        tgt = self._code_file(tgt_lines)
+        r = WriteGateResult(passed=True)
+        ev._gate_code_block_content_truncated(src, tgt, _OUT, r)
+        assert r.passed  # gate skips small blocks

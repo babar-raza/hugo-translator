@@ -38,6 +38,19 @@ _SHORTCODE_GATE_RE = re.compile(r"\{\{[<%]")
 # Gate 17 (inline code integrity) helper
 _BACKTICK_SPAN_RE = re.compile(r"`([^`]+)`")
 
+# Gate 24: description reverted to English (non-Latin locales only)
+_NON_LATIN_SCRIPT_LOCALES = frozenset({
+    "ar", "bg", "el", "fa", "he", "hi", "ja", "ko", "ru", "th", "uk", "vi", "zh",
+})
+_FM_DESCRIPTION_RE = re.compile(
+    r'^description:\s*["\']?(.*?)["\']?\s*$', re.MULTILINE
+)
+
+# Gate 25: code block content truncated
+_CODE_BLOCK_CONTENT_RE = re.compile(
+    r"```[^\n]*\n(.*?)```", re.DOTALL
+)
+
 
 @dataclass
 class WriteGateResult:
@@ -111,6 +124,8 @@ class WriteGateEvaluator:
         (21, "_gate_shortcode_body_leak",         "structural",  "block"),
         (22, "_gate_inline_code_integrity",       "content",     "block"),
         (23, "_gate_encoding_clean",              "structural",  "block"),
+        (24, "_gate_description_reverted_to_english", "content", "block"),
+        (25, "_gate_code_block_content_truncated", "structural", "block"),
     ]
 
     def __init__(
@@ -645,6 +660,10 @@ class WriteGateEvaluator:
                 lambda src, w, path, res: self._gate_inline_code_integrity(src, w, path, res),
             "_gate_encoding_clean":
                 lambda src, w, path, res: self._gate_encoding_clean(src, w, path, res),
+            "_gate_description_reverted_to_english":
+                lambda src, w, path, res: self._gate_description_reverted_to_english(src, w, target_lang, path, res),
+            "_gate_code_block_content_truncated":
+                lambda src, w, path, res: self._gate_code_block_content_truncated(src, w, path, res),
         }
 
         working = translated_content
@@ -1307,6 +1326,82 @@ class WriteGateEvaluator:
                 f"Gate 22 encoding corruption: mojibake pattern {m.group()!r} found in body"
             )
             logger.error("GATE22 BLOCKED %s: %s", output_path.name, result.error)
+
+    # ------------------------------------------------------------------
+    # Gate 24: Description reverted to English
+    # ------------------------------------------------------------------
+
+    def _gate_description_reverted_to_english(
+        self,
+        source_content: str,
+        translated_content: str,
+        target_lang: str,
+        output_path: Path,
+        result: WriteGateResult,
+    ) -> None:
+        """Block writes where description: frontmatter is ASCII-only in non-Latin locales.
+
+        If EN description is >30 chars and the target locale uses non-Latin script,
+        a fully ASCII translated description means either (a) the model copied the EN
+        value verbatim, or (b) a heal run wrote body only and left stale EN frontmatter.
+        Both cases must be blocked so the shard retranslates properly.
+        """
+        if target_lang not in _NON_LATIN_SCRIPT_LOCALES:
+            return
+        m_src = _FM_DESCRIPTION_RE.search(source_content[:2000])
+        if not m_src or len(m_src.group(1).strip()) < 20:
+            return  # short source description — not enough signal
+        m_tgt = _FM_DESCRIPTION_RE.search(translated_content[:2000])
+        if not m_tgt:
+            return
+        tgt_desc = m_tgt.group(1).strip()
+        if not tgt_desc:
+            return
+        if tgt_desc.isascii():
+            result.passed = False
+            result.error = (
+                f"Gate 24 description reverted to English: "
+                f"'{tgt_desc[:60]}' is ASCII-only in non-Latin locale {target_lang}"
+            )
+            logger.error("GATE24 BLOCKED %s: %s", output_path.name, result.error)
+
+    # ------------------------------------------------------------------
+    # Gate 25: Code block content truncated
+    # ------------------------------------------------------------------
+
+    def _gate_code_block_content_truncated(
+        self,
+        source_content: str,
+        translated_content: str,
+        output_path: Path,
+        result: WriteGateResult,
+    ) -> None:
+        """Block writes where a translated code block lost >30% of its lines.
+
+        Models truncate long code blocks at context limits, losing the last N lines.
+        This causes rendered pages to show incomplete examples.  Only fires when
+        source block has ≥10 lines (avoids noise on trivial snippets).
+        """
+        src_body = self._get_body(source_content)
+        tgt_body = self._get_body(translated_content)
+
+        src_blocks = _CODE_BLOCK_CONTENT_RE.findall(src_body)
+        tgt_blocks = _CODE_BLOCK_CONTENT_RE.findall(tgt_body)
+
+        for i, (src_block, tgt_block) in enumerate(zip(src_blocks, tgt_blocks)):
+            src_lines = len([l for l in src_block.splitlines() if l.strip()])
+            if src_lines < 10:
+                continue  # too small to judge
+            tgt_lines = len([l for l in tgt_block.splitlines() if l.strip()])
+            if tgt_lines < src_lines * 0.70:
+                result.passed = False
+                result.error = (
+                    f"Gate 25 code block truncated: block #{i + 1} "
+                    f"has {tgt_lines} lines vs source {src_lines} lines "
+                    f"({tgt_lines / max(src_lines, 1) * 100:.0f}% retained)"
+                )
+                logger.error("GATE25 BLOCKED %s: %s", output_path.name, result.error)
+                return
 
     # ------------------------------------------------------------------
     # OW-01 extension: check existing file when new translation failed
