@@ -1,0 +1,69 @@
+# Close-Task Result Record
+# Mission: quality-protection-repair-20260712
+# Session: 2026-07-13 / 2026-07-14
+# Protocol: POST-PLAN AUTONOMOUS CONVERGENCE AND GOVERNED CLOSURE
+
+close_task:
+  mission_id: quality-protection-repair-20260712
+  session_dates: ["2026-07-13", "2026-07-14"]
+  closure_status: CLOSED
+
+  deliverables_completed:
+    - id: D48
+      tc: TC-WGT-GATE22-FIX
+      state: VERIFIED
+      commits: ["0eb8aca", "e3117e4"]
+      what_changed:
+        - "Added _STRAY_TABLE_BACKTICK_RE at write_gate.py module level"
+        - "Pre-clean tgt_body before span extraction in _gate_inline_code_integrity"
+        - "result.cleaned_content set when stray backtick removed (auto-clean)"
+        - "GATE_REGISTRY action changed from 'block' to 'auto_clean' (MS-GATE22-FIX-05)"
+        - "3 tests added to test_write_gate_new_gates.py (6/6 pass)"
+      verification: "8/8 segment_translator tests pass; 1173 core tests pass"
+
+    - id: D49
+      tc: TC-LLM-AVAIL-001
+      state: VERIFIED
+      commits: ["0eb8aca", "e3117e4"]
+      what_changed:
+        - "segment_translator.py except block: on LLM failure, sets unit.translated_text=source_text"
+        - "Marks unit.metadata['llm_passthrough_reason']='professionalize_llm_unavailable'"
+        - "Units NOT re-routed to MT batch (MT produces worse output for short API descriptions)"
+        - "test_llm_down_sets_english_passthrough (MS-LLM-AVAIL-001-06) added and passing"
+        - "test_llm_up_returns_translated_content (MS-LLM-AVAIL-001-07) added and passing"
+      verification: "8/8 segment_translator tests pass; 1173 core tests pass"
+
+  verification_performed:
+    - command: "pytest tests/unit/translation_engine/test_segment_translator.py -v"
+      result: "8/8 passed"
+    - command: "pytest tests/unit/translation_engine/ tests/unit/tm/ tests/unit/model_runtime/ tests/unit/hardware/ -q"
+      result: "1173 passed, 4 skipped, 4 failed (pre-existing failures unrelated to session changes)"
+
+  remaining_follow_ups:
+    - id: UWR-001
+      description: "table_desc m2m ru+fa re-run (57 files blocked by Gate 22 FP) — gate fix committed; re-run queued. Acceptance criterion: ≤5 Gate 22 blocks after re-run."
+      blocking: false
+    - id: UWR-002
+      description: "2 files blocked by Gate 14 (genuine mixed language) — manual inspection needed"
+      blocking: false
+    - id: UWR-003
+      description: "7 files hard rejected (TranslationRejectedError) — need investigation of .local/heal_table_desc_m2m.err"
+      blocking: false
+
+  plan_sections_updated:
+    - "DELIVERABLE 5 (State Machine): TC-WGT-GATE22-FIX and TC-LLM-AVAIL-001 updated to VERIFIED"
+    - "DELIVERABLE 41 (Plan Evidence Log): Two new VERIFIED entries added"
+    - "DELIVERABLE 48 (TC-WGT-GATE22-FIX): State changed NOT_STARTED → VERIFIED"
+    - "DELIVERABLE 49 (TC-LLM-AVAIL-001): State changed NOT_STARTED → VERIFIED"
+
+  audit_trail:
+    - stage: "stage1-audit"
+      verdict: "SPRINT_REQUIRES_REEXECUTION"
+      findings: 2
+    - stage: "stage3-execution"
+      actions: ["MS-GATE22-FIX-05 (GATE_REGISTRY action)", "MS-LLM-AVAIL-001-06/07 (tests)"]
+    - stage: "stage2-reaudit"
+      verdict: "ALL_GREEN_WITH_DEFERRED"
+      actionable_findings: 0
+
+  final_verdict: CLOSED

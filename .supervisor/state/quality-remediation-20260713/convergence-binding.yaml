@@ -1,0 +1,41 @@
+# Convergence Binding Record
+# Generated: 2026-07-13
+# Protocol: POST-PLAN AUTONOMOUS CONVERGENCE AND GOVERNED CLOSURE
+
+convergence_binding:
+  mission_id: quality-protection-repair-20260712
+  plan_id: sharded-wibbling-sifakis
+  plan_path: C:\Users\prora\.claude\plans\sharded-wibbling-sifakis.md
+  plan_revision: "session-2026-07-13"
+  plan_hash: 1A949BB5B9EAFB6557BDAE0B813E80B2C51EEFA4C86E8ADA66879473F7E06AB2
+
+  post_sprint_audit:
+    expected: .supervisor/prompts/prompt1-post-sprint-audit.md
+    path: .supervisor/prompts/prompt1-post-sprint-audit.md
+    hash: 263DAB3DADAD6845F5DD2874FE22CD860403151156CADB2DFFEDEF5258103099
+    role_verified: TRUE  # "POST-SPRINT STRICT EVIDENCE AUDIT" confirmed
+
+  plan_hardening:
+    expected: .supervisor/prompts/prompt2-plan-hardening.md
+    path: .supervisor/prompts/prompt2-plan-hardening.md
+    hash: 4FE227B68C0E58E08381F89F5381BB8D29EEBD89CBA328EA3FB33C957C5D3D00
+    role_verified: TRUE  # "PLAN MODE: HARDEN CURRENT PLAN FROM LATEST SPRINT AUDIT" confirmed
+
+  controlled_execution:
+    expected: .supervisor/prompts/prompt3-controlled-execution.md
+    path: .supervisor/prompts/prompt3-controlled-execution.md
+    hash: 5246D218A39A8464CDC32C542D5411D2F29AD034F3E867651C0F731E1269EDD9
+    role_verified: TRUE  # "EXECUTION MODE: CONTROLLED TASKCARD EXECUTION" confirmed
+
+  close_task:
+    expected: .supervisor/prompts/prompt4-close-task.md
+    resolved: .supervisor/prompts/prompt4-close-task.md
+    hash: 3196A5BD52BD6E037B84D602DBDE8D32A8DBAC31798C0947BAC03784FF6EF81B
+    role_verified: TRUE  # "Close this task cleanly" — session-closure role confirmed
+
+  status: BOUND_ALL_FOUR_PROMPTS_VERIFIED
+  binding_decision: >
+    All four prompts found at expected paths. Roles verified from contents.
+    Authoritative plan is sharded-wibbling-sifakis.md (Quality Protection & Repair
+    Master Plan). Plan identity unambiguous: current session executed D48/D49/D50/D51.
+    Proceeding with convergence lifecycle.

@@ -1,0 +1,57 @@
+# Convergence Binding Record
+# Generated: 2026-07-03
+# Protocol: POST-PLAN AUTONOMOUS CONVERGENCE AND GOVERNED CLOSURE
+
+convergence_binding:
+  mission_id: aspose-org-multisite-speed-language-mixing-20260702
+  plan_id: aspose-org-multisite-speed-language-mixing-micro-task-plan
+  plan_path: docs/quality/aspose-org-multisite-speed-language-mixing-micro-task-plan.md
+  plan_revision: untracked (untracked file, never committed to git)
+  plan_hash_current: 9af7174cb7d41c00baa3da65f396e457a9529bfcc8c8552cdec9a440b3a4e761
+  plan_hash_at_evidence_binding: 049841E3F25320F1A93E5E8822B2F79EEF2EACA68D95172663F6AAD0653C23F3
+  plan_hash_mismatch: TRUE  # plan was modified after initial evidence binding
+  plan_hash_mismatch_note: >
+    Plan file is untracked (no git history). Cannot diff against binding hash.
+    Known modification: status updates applied during execution cycle 2026-07-03.
+    Current file shows TODO/READY for all taskcards (status update did not persist).
+
+  post_sprint_audit:
+    expected: .supervisor/prompts/prompt1-post-sprint-audit.md
+    path: docs/governance/prompts/prompt1-post-sprint-audit.md
+    hash: 0ef1d742dc4cdf2c84b6f24ed81ce36b54f61df67a13a263e0855edcd7f8746e
+    role_verified: TRUE  # "EVIDENCE-BASED LAST-SPRINT ACHIEVEMENT REVIEW" — post-sprint audit role confirmed
+
+  plan_hardening:
+    expected: .supervisor/prompts/prompt2-plan-hardening.md
+    path: docs/governance/prompts/prompt2-plan-hardening.md
+    hash: caa18bf6b6aff76df98d4ff91cfc3d8b40ea0a0621e2d3cdaabe06a7c85a7085
+    role_verified: TRUE  # "Transform the approved/current plan into a technically sound, execution-ready, taskcard-driven plan" — hardening role confirmed
+
+  controlled_execution:
+    expected: .supervisor/prompts/prompt3-controlled-execution.md
+    path: docs/governance/prompts/prompt3-controlled-execution.md
+    hash: 77729a3c2c47426b4eb30e9c83b7aad9fbf92e2947cda3cd6c84402c5c895869
+    role_verified: TRUE  # "PLAN-BOUND AUTONOMOUS EXECUTION PROTOCOL" — execution role confirmed
+
+  close_task:
+    expected: .supervisor/prompts/prompt4-close-task.md
+    resolved: REGISTRY_CANONICAL_EQUIVALENT
+    resolution_path: docs/governance/prompts/prompt-registry.yaml
+    resolution_rule: >
+      prompt-registry.yaml PROMPT_3.successor_stages = [TERMINATED] when all green.
+      TERMINATED state IS the canonical closure mechanism for this registry.
+      No separate close-task prompt exists; closure is embedded in PROMPT_3's green path
+      with required outputs: stage3-execution/final-sprint-summary.yaml (closure record).
+    hash: null  # no separate file; TERMINATED is a state in the registry, not a file
+    role_verified: PARTIAL  # TERMINATED path in registry serves closure role; no separate prompt file
+
+  prompt_registry:
+    path: docs/governance/prompts/prompt-registry.yaml
+    status: FOUND_AND_READ
+
+  status: BOUND_WITH_CLOSE_TASK_GAP
+  binding_decision: >
+    Proceeding with bound prompts 1–3. Close-task role satisfied via PROMPT_3 TERMINATED
+    path per registry. Reject criteria NOT triggered: plan identity is unambiguous
+    (evidence index mission_id matches), prompt roles 1–3 verified from contents,
+    contracts are compatible. Only prompt4 is missing as a discrete file.

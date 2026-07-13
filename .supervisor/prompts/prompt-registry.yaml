@@ -1,0 +1,160 @@
+# Prompt Registry — Post-Sprint Autonomy Loop
+# Lists all prompt assets with stable IDs, descriptions, inputs, outputs, and successor rules.
+# Location: .supervisor/prompts/prompt-registry.yaml
+
+version: "1.0"
+created: "2026-06-15"
+
+prompts:
+  - id: PSL-PROMPT-1
+    name: prompt1-post-sprint-audit
+    file: .supervisor/prompts/prompt1-post-sprint-audit.md
+    description: "Post-sprint strict evidence audit with L1/L2/L3 issue discovery"
+    stage: 1
+    mode: audit
+    inputs:
+      - reports/supervisor/session-resume.md
+      - reports/supervisor/work-item-grades.yaml
+      - .local/supervisor/continuation-signal.json
+      - .local/evidences/<run_id>/evidence-declaration.yaml
+    outputs:
+      - stage1-issue-model.json
+      - stage1-sprint-audit-summary.md
+      - stage1-next-stage-recommendation.yaml
+    output_schema: .supervisor/schemas/stage1-issue-model.schema.json
+    successor_rules:
+      - condition: "final_verdict == SPRINT_ALL_GREEN_VERIFIED"
+        next: PSL-PROMPT-3
+      - condition: "final_verdict in [SPRINT_REQUIRES_PLAN_HARDENING, SPRINT_REQUIRES_REEXECUTION]"
+        next: PSL-PROMPT-2
+      - condition: "final_verdict == SPRINT_REQUIRES_EVIDENCE_REPAIR"
+        next: PSL-PROMPT-3
+      - condition: "final_verdict == SPRINT_SUMMARY_INSUFFICIENT"
+        next: PSL-PROMPT-1
+    validation_rules:
+      - "issues must have root_cause field"
+      - "achievements must have proof_level field"
+      - "claim_classification_matrix must be present"
+
+  - id: PSL-PROMPT-2
+    name: prompt2-plan-hardening
+    file: .supervisor/prompts/prompt2-plan-hardening.md
+    description: "Plan hardening from audit output with taskcard generation"
+    stage: 2
+    mode: plan
+    inputs:
+      - stage1-issue-model.json
+      - stage1-l1-execution-issues.yaml
+      - stage1-l2-integration-issues.yaml
+      - stage1-l3-system-weaknesses.yaml
+      - plans/master-plan.md
+    outputs:
+      - stage2-taskcard-contract.json
+      - stage2-taskcard-index.yaml
+      - stage2-ready-for-execution-verdict.yaml
+    output_schema: .supervisor/schemas/stage2-taskcard-contract.schema.json
+    successor_rules:
+      - condition: "plan_verdict == PLAN_HARDENED_FROM_AUDIT_READY_FOR_EXECUTION"
+        next: PSL-PROMPT-3
+      - condition: "plan_verdict starts with PLAN_NOT_READY"
+        next: PSL-PROMPT-2
+      - condition: "plan_verdict == BLOCKED_EXTERNAL"
+        next: null
+    validation_rules:
+      - "every actionable issue must have a taskcard"
+      - "plan_delta must have linked issue_ids"
+      - "hardening_score >= 18 for execution readiness"
+
+  - id: PSL-PROMPT-3
+    name: prompt3-controlled-execution
+    file: .supervisor/prompts/prompt3-controlled-execution.md
+    description: "Controlled taskcard execution with 15-dimension quality scoring"
+    stage: 3
+    mode: execution
+    inputs:
+      - stage2-taskcard-contract.json
+      - stage2-taskcard-index.yaml
+      - stage2-ready-for-execution-verdict.yaml
+    outputs:
+      - stage3-quality-scoring-rubric.json
+      - stage3-final-sprint-summary.yaml
+      - declaration-review-package-<run_id>.zip
+    output_schema: .supervisor/schemas/stage3-quality-scoring-rubric.schema.json
+    successor_rules:
+      - condition: "all_green == true"
+        next: null
+      - condition: "overall_verdict == EXECUTION_REROUTED_REWORK_REQUIRED"
+        next: PSL-PROMPT-2
+      - condition: "overall_verdict == PLAN_NOT_READY_HEALED_ONLY"
+        next: PSL-PROMPT-3
+    validation_rules:
+      - "must include self_review section (not prose-only)"
+      - "must include quality_scores for every taskcard"
+      - "must include evidence_bundle_path"
+      - "rerouted items cannot be accepted without rescoring"
+
+  - id: PSL-LOOP-CTRL
+    name: prompt-loop-controller
+    file: .supervisor/prompts/prompt-loop-controller.md
+    description: "Loop controller decision logic documentation"
+    stage: control
+    mode: control
+    inputs:
+      - stage3-quality-scoring-rubric.json
+    outputs:
+      - loop-decision.yaml
+      - loop-summary-classification.yaml
+    output_schema: .supervisor/schemas/loop-decision-state-machine.schema.json
+    successor_rules: []
+    validation_rules:
+      - "must never produce NEXT_PROMPT_NEEDED as final state"
+      - "must never accept prose-only summaries"
+      - "must never accept scores below 4/5"
+
+  - id: PSL-CONTRACTS
+    name: prompt-output-contracts
+    file: .supervisor/prompts/prompt-output-contracts.md
+    description: "Reference document for all stage output formats"
+    stage: reference
+    mode: documentation
+    inputs: []
+    outputs: []
+    output_schema: null
+    successor_rules: []
+    validation_rules: []
+
+  - id: PSL-ADAPTER
+    name: project-adapter-template
+    file: .supervisor/prompts/project-adapter-template.md
+    description: "Template for adapting the loop to other projects"
+    stage: reference
+    mode: documentation
+    inputs: []
+    outputs: []
+    output_schema: .supervisor/schemas/project-adapter-contract.schema.json
+    successor_rules: []
+    validation_rules: []
+
+# Pre-existing prompts (for completeness)
+existing_prompts:
+  - id: LEGACY-EVIDENCE-REVIEW
+    file: .supervisor/prompts/evidence-review.md
+    note: "Preserved. Enhanced version is PSL-PROMPT-1."
+  - id: LEGACY-ADVERSARIAL-REVIEW
+    file: .supervisor/prompts/adversarial-review.md
+    note: "Preserved. Used by PSL-PROMPT-3 Phase 7 and PSL-LOOP-CTRL."
+  - id: LEGACY-APPROVAL-GATE
+    file: .supervisor/prompts/approval-gate-classifier.md
+    note: "Preserved unchanged."
+  - id: LEGACY-MEMORY-SYNC
+    file: .supervisor/prompts/memory-sync.md
+    note: "Preserved unchanged."
+  - id: LEGACY-POC-GAP
+    file: .supervisor/prompts/poc-gap-extractor.md
+    note: "Preserved unchanged."
+  - id: LEGACY-NEXT-SPRINT
+    file: .supervisor/prompts/next-sprint-generator.md
+    note: "Preserved unchanged."
+  - id: LEGACY-MEGA-TRAIN
+    file: .supervisor/prompts/mega-train-template.md
+    note: "Preserved unchanged."

@@ -1,0 +1,53 @@
+{
+  "reaudit_id": "quality-remediation-20260713-reaudit-001",
+  "mission_id": "quality-protection-repair-20260712",
+  "prior_audit": "quality-remediation-20260713-audit-001",
+  "prior_verdict": "SPRINT_REQUIRES_REEXECUTION",
+  "issues_from_prior_audit": [
+    {
+      "issue_id": "AUDIT-001",
+      "title": "GATE_REGISTRY action for gate 22 still 'block'",
+      "prior_status": "OPEN",
+      "resolution": "FIXED",
+      "fix_commit": "e3117e4",
+      "fix_description": "GATE_REGISTRY line 128 changed from 'block' to 'auto_clean' for _gate_inline_code_integrity",
+      "evidence": "git diff e3117e4 shows: -        (22, \"_gate_inline_code_integrity\", \"content\", \"block\"), +        (22, \"_gate_inline_code_integrity\", \"content\", \"auto_clean\"),"
+    },
+    {
+      "issue_id": "AUDIT-002",
+      "title": "TC-LLM-AVAIL-001 missing unit tests",
+      "prior_status": "OPEN",
+      "resolution": "FIXED",
+      "fix_commit": "e3117e4",
+      "fix_description": "Added TestContentTypeRouterLLMPassthrough class with 2 tests: test_llm_down_sets_english_passthrough (MS-LLM-AVAIL-001-06) and test_llm_up_returns_translated_content (MS-LLM-AVAIL-001-07)",
+      "evidence": "pytest tests/unit/translation_engine/test_segment_translator.py: 8/8 passed including both new tests"
+    },
+    {
+      "issue_id": "AUDIT-003",
+      "title": "Heal re-run (UWR-001) result unverified",
+      "prior_status": "VALID_DEFERRED",
+      "resolution": "VALID_DEFERRED",
+      "notes": "UWR-001 re-run is in progress. TC-WGT-GATE22-FIX code fix is committed; acceptance criterion (Gate 22 block count ≤5) pending heal run completion."
+    }
+  ],
+  "regression_test_result": {
+    "command": "pytest tests/unit/translation_engine/ tests/unit/tm/ tests/unit/model_runtime/ tests/unit/hardware/ -q",
+    "passed": 1173,
+    "failed": 4,
+    "skipped": 4,
+    "failed_tests": [
+      "test_ct2_converter.py::test_init_without_ctranslate2 (pre-existing)",
+      "test_ct2_converter.py::test_real_model_conversion (pre-existing)",
+      "test_forced_bos_validation.py::test_forced_bos_not_passed_to_generate_when_unk_token (pre-existing)",
+      "test_forced_bos_validation.py::test_lang_route_fail_logged_when_unk_token (pre-existing)"
+    ],
+    "pre_existing_failures": true,
+    "our_changes_passed": true
+  },
+  "new_findings": [],
+  "final_verdict": "ALL_GREEN_WITH_DEFERRED",
+  "deferred_items": ["AUDIT-003 (UWR-001 heal re-run)"],
+  "actionable_findings": 0,
+  "next_stage": "PSL-PROMPT-4",
+  "ready_for_closure": true
+}

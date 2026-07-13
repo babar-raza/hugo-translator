@@ -1,0 +1,98 @@
+{
+  "audit_id": "quality-remediation-20260713-audit-001",
+  "mission_id": "quality-protection-repair-20260712",
+  "audited_deliverables": ["D48", "D49", "D50", "D51"],
+  "issues": [
+    {
+      "issue_id": "AUDIT-001",
+      "issue_level": "L1_EXECUTION",
+      "title": "GATE_REGISTRY action for gate 22 still 'block' after auto-clean implementation",
+      "description": "MS-GATE22-FIX-05 was not executed. GATE_REGISTRY line 128 still has action='block' for _gate_inline_code_integrity. The implementation now auto-cleans stray backticks and sets result.cleaned_content, which is the 'auto_clean' contract. Registry mismatch means evaluate() applies wrong downstream logic.",
+      "evidence": "Grep of write_gate.py GATE_REGISTRY confirmed: (22, '_gate_inline_code_integrity', 'content', 'block')",
+      "missing_evidence": "None — grep is direct code evidence",
+      "root_cause": "MS-GATE22-FIX-05 was listed in the micro-steps but not executed during implementation",
+      "why_not_only_symptom": "Registry drives evaluate() behavior — misclassified action could cause incorrect flow in downstream gate processing",
+      "affected_files": ["src/translation_engine/write_gate.py"],
+      "affected_components": ["WriteGateEvaluator.GATE_REGISTRY"],
+      "severity": "HIGH",
+      "blocker": false,
+      "recurrence_risk": "LOW",
+      "required_fix_type": "one-line edit to GATE_REGISTRY tuple",
+      "requires_plan_update": false,
+      "requires_taskcard": false,
+      "requires_reexecution": true,
+      "recommended_next_stage": "PSL-PROMPT-3",
+      "acceptance_impact": "TC-WGT-GATE22-FIX cannot move to VERIFIED without this fix"
+    },
+    {
+      "issue_id": "AUDIT-002",
+      "issue_level": "L1_EXECUTION",
+      "title": "TC-LLM-AVAIL-001 missing unit tests (MS-LLM-AVAIL-001-06 and -07)",
+      "description": "Micro-steps MS-LLM-AVAIL-001-06 (test: LLM DOWN → passthrough) and MS-LLM-AVAIL-001-07 (test: LLM UP → translated) were not executed. No test covers the passthrough behavior in segment_translator.py. Current proof level: IMPLEMENTATION_ONLY (proof level 1).",
+      "evidence": "Grep of test_segment_translator.py: 0 matches for 'ContentTypeRouter', '_llm_units', 'professionalize_llm'",
+      "missing_evidence": "pytest output showing passthrough test passing",
+      "root_cause": "Implementation was done first; tests were described in micro-steps but not executed before committing",
+      "why_not_only_symptom": "Without tests, the passthrough behavior is unverified. A future refactor could silently reintroduce the MT-fallthrough bug.",
+      "affected_files": ["tests/unit/translation_engine/test_segment_translator.py"],
+      "affected_components": ["segment_translator.py ContentTypeRouter exception handler"],
+      "severity": "HIGH",
+      "blocker": false,
+      "recurrence_risk": "MEDIUM",
+      "required_fix_type": "add 2 test methods to test_segment_translator.py",
+      "requires_plan_update": false,
+      "requires_taskcard": false,
+      "requires_reexecution": true,
+      "recommended_next_stage": "PSL-PROMPT-3",
+      "acceptance_impact": "TC-LLM-AVAIL-001 cannot move to VERIFIED without behavioral tests"
+    },
+    {
+      "issue_id": "AUDIT-003",
+      "issue_level": "L1_EXECUTION",
+      "title": "Heal re-run (UWR-001) result unverified — no log output yet",
+      "description": "Table_desc m2m re-run (PID 60936) for ru+fa (57 files) was launched 10 minutes ago. Gate 22 block count must drop from 55 to <5 per acceptance criteria. No log evidence exists yet.",
+      "evidence": "Process launched: PID 60936, log at .local/heal_table_desc_m2m_rerun.log",
+      "missing_evidence": "Gate 22 block count from re-run log",
+      "root_cause": "Heal run is genuinely in-progress; verification requires waiting for process completion",
+      "why_not_only_symptom": "This is the primary acceptance criterion for TC-WGT-GATE22-FIX VERIFIED state",
+      "affected_files": [".local/heal_table_desc_m2m_rerun.log"],
+      "affected_components": ["heal_english_headings.py", "write_gate.py Gate 22"],
+      "severity": "MEDIUM",
+      "blocker": true,
+      "recurrence_risk": "LOW",
+      "required_fix_type": "VALID_DEFERRED — await process completion, check log",
+      "requires_plan_update": false,
+      "requires_taskcard": false,
+      "requires_reexecution": false,
+      "recommended_next_stage": "PSL-PROMPT-3",
+      "acceptance_impact": "TC-WGT-GATE22-FIX VERIFIED transition blocked until heal re-run completes"
+    }
+  ],
+  "claim_classification": [
+    {
+      "claim": "TC-WGT-GATE22-FIX: Gate 22 auto-cleans stray backtick",
+      "classification": "ACCEPTED_WITH_LIMITATIONS",
+      "limitation": "GATE_REGISTRY action not updated; heal re-run not verified"
+    },
+    {
+      "claim": "TC-LLM-AVAIL-001: LLM failure results in English passthrough",
+      "classification": "PARTIAL",
+      "limitation": "Implementation committed but no behavioral tests"
+    },
+    {
+      "claim": "6/6 Gate 21 tests pass",
+      "classification": "ACCEPTED_VERIFIED"
+    },
+    {
+      "claim": "997 other unit tests pass",
+      "classification": "ACCEPTED_VERIFIED"
+    },
+    {
+      "claim": "TC-OPS-THM-001 VERIFIED",
+      "classification": "ACCEPTED_VERIFIED"
+    }
+  ],
+  "final_verdict": "SPRINT_REQUIRES_REEXECUTION",
+  "next_stage": "PSL-PROMPT-3",
+  "actionable_findings": 2,
+  "valid_deferred_findings": 1
+}

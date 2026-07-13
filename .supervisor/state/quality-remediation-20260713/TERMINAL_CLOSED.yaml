@@ -1,0 +1,55 @@
+# TERMINAL_CLOSED — Mission quality-protection-repair-20260712
+# Session: 2026-07-13 / 2026-07-14
+# Closed by: Claude (PSL-PROMPT-4 close-task protocol)
+
+terminal_closed:
+  mission_id: quality-protection-repair-20260712
+  session_id: quality-remediation-20260713
+  closed_at: "2026-07-14"
+  closed_by: "claude-sonnet-4-6"
+  protocol: "POST-PLAN AUTONOMOUS CONVERGENCE AND GOVERNED CLOSURE / PSL-PROMPT-4"
+
+  audit_chain:
+    - stage: stage1-audit
+      verdict: SPRINT_REQUIRES_REEXECUTION
+      findings: 2
+      file: ".supervisor/state/quality-remediation-20260713/stage1-audit/issues.json"
+    - stage: stage3-execution
+      actions:
+        - "MS-GATE22-FIX-05: GATE_REGISTRY action 'block'→'auto_clean' for gate 22"
+        - "MS-LLM-AVAIL-001-06: test_llm_down_sets_english_passthrough"
+        - "MS-LLM-AVAIL-001-07: test_llm_up_returns_translated_content"
+      commit: "e3117e4"
+    - stage: stage2-reaudit
+      verdict: ALL_GREEN_WITH_DEFERRED
+      actionable_findings: 0
+      file: ".supervisor/state/quality-remediation-20260713/stage2-reaudit/reaudit.json"
+
+  deliverables_verified:
+    - tc: TC-WGT-GATE22-FIX
+      state: VERIFIED
+      commits: ["0eb8aca", "e3117e4"]
+    - tc: TC-LLM-AVAIL-001
+      state: VERIFIED
+      commits: ["0eb8aca", "e3117e4"]
+
+  test_results:
+    command: "pytest tests/unit/translation_engine/test_segment_translator.py -v"
+    result: "8/8 passed"
+    regression_command: "pytest tests/unit/translation_engine/ tests/unit/tm/ tests/unit/model_runtime/ tests/unit/hardware/ -q"
+    regression_result: "1173 passed, 4 skipped, 4 failed (pre-existing, unrelated to session)"
+
+  open_follow_ups:
+    - id: UWR-001
+      description: "table_desc m2m ru+fa re-run (55 files) — fix committed; re-run pending"
+    - id: UWR-002
+      description: "2 files Gate 14 genuine mixed language — needs manual inspection"
+    - id: UWR-003
+      description: "7 files hard TranslationRejectedError — needs .local/heal_table_desc_m2m.err inspection"
+
+  plan_file: "C:\\Users\\prora\\.claude\\plans\\sharded-wibbling-sifakis.md"
+  plan_sections_updated:
+    - "DELIVERABLE 5 (State Machine): TC-WGT-GATE22-FIX + TC-LLM-AVAIL-001 → VERIFIED"
+    - "DELIVERABLE 41 (Evidence Log): 2 new VERIFIED entries"
+
+  final_status: CLOSED
