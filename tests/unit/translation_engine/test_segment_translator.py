@@ -282,3 +282,129 @@ class TestTemperatureOnRetry:
 
         # Temperature: min(0.7 + 10*0.1, 1.0) = 1.0
         assert provider_config.temperature == pytest.approx(1.0)
+
+
+# ---------------------------------------------------------------------------
+# TC-LLM-AVAIL-001: professionalize_llm unavailability graceful degrade
+# ---------------------------------------------------------------------------
+
+
+class TestContentTypeRouterLLMPassthrough:
+    """MS-LLM-AVAIL-001-06 / -07: passthrough on LLM down; translation on LLM up."""
+
+    _ROUTING_CONFIG = {
+        "table_cell_text": [
+            {
+                "condition": {"max_chars": 60, "pattern": "^Gets? the "},
+                "preferred_model": "professionalize_llm",
+                "context_hint": "api_property_description",
+            }
+        ]
+    }
+
+    def _make_engine(self, *, llm_raises=False, llm_translation="Translated"):
+        engine = MagicMock()
+        engine.config.get_config.return_value = {
+            "translation_engine": {"content_type_routing": self._ROUTING_CONFIG},
+        }
+        engine._get_model_id.return_value = "m2m100_418M"
+        engine._check_shutdown.return_value = False
+        engine._force_accept = False
+
+        mt_backend = MagicMock()
+        mt_backend.translate_batch.return_value = []
+
+        if llm_raises:
+            def _load(model_id):
+                if "professionalize_llm" in str(model_id):
+                    raise ConnectionError("LLM service unavailable")
+                return mt_backend
+        else:
+            llm_backend = MagicMock()
+            llm_backend.translate_with_context.return_value = [llm_translation]
+
+            def _load(model_id):
+                if "professionalize_llm" in str(model_id):
+                    return llm_backend
+                return mt_backend
+
+        engine.model_loader.load_model.side_effect = _load
+        return engine
+
+    def _make_doc_and_unit(self, source_text="Gets the width."):
+        from src.translation_engine.extractor.text_unit import (
+            BodyTranslationPlan,
+            TextUnit,
+            TextUnitKind,
+        )
+
+        unit = TextUnit(
+            unit_id="test-unit-001",
+            node_addr="body.table.0.row.1.cell.2",
+            kind=TextUnitKind.TABLE_CELL_TEXT,
+            source_text=source_text,
+            do_not_translate=False,
+        )
+        plan = BodyTranslationPlan(ast=[], units=[unit], ast_fingerprint="test-fp")
+        doc = MagicMock()
+        doc.ast = []
+        doc.frontmatter = {}
+        doc.output_path = None
+        return doc, plan, unit
+
+    def _run_translate(self, engine, doc, plan):
+        translator = SegmentTranslator(engine)
+        site_profile = MagicMock()
+        site_profile.default_source_lang = "en"
+
+        with patch("src.translation_engine.extractor.TextUnitExtractor") as MockExt, patch(
+            "src.translation_engine.reconstructor.ASTRenderer"
+        ) as MockRenderer:
+            mock_ext = MagicMock()
+            mock_ext.extract_from_ast.return_value = plan
+            mock_ext.batch_translate_units.return_value = plan.units
+            mock_ext.batch_stats = {}
+            mock_ext._batch_calls = 0
+            mock_ext._individual_fallbacks = 0
+            MockExt.return_value = mock_ext
+
+            mock_renderer = MagicMock()
+            mock_renderer.placeholder_leak_count = 0
+            mock_renderer._missing_node_count = 0
+            mock_renderer.applied_units = []
+            mock_renderer.render_to_markdown.return_value = "body\n"
+            MockRenderer.return_value = mock_renderer
+
+            translator._translate_body_ast(
+                doc=doc,
+                target_lang="uk",
+                site_profile=site_profile,
+                stats=MagicMock(),
+            )
+
+    def test_llm_down_sets_english_passthrough(self):
+        """LLM raises ConnectionError → unit gets source_text + passthrough metadata."""
+        engine = self._make_engine(llm_raises=True)
+        doc, plan, unit = self._make_doc_and_unit("Gets the width.")
+
+        self._run_translate(engine, doc, plan)
+
+        assert unit.translated_text == "Gets the width.", (
+            "English passthrough expected when LLM is unavailable"
+        )
+        assert unit.metadata is not None
+        assert unit.metadata.get("llm_passthrough_reason") == "professionalize_llm_unavailable"
+
+    def test_llm_up_returns_translated_content(self):
+        """LLM succeeds → unit gets translated content, no passthrough metadata."""
+        engine = self._make_engine(llm_raises=False, llm_translation="Отримує ширину.")
+        doc, plan, unit = self._make_doc_and_unit("Gets the width.")
+
+        self._run_translate(engine, doc, plan)
+
+        assert unit.translated_text == "Отримує ширину.", (
+            "Translated content expected when LLM is available"
+        )
+        assert not (unit.metadata or {}).get("llm_passthrough_reason"), (
+            "No passthrough metadata expected when LLM succeeds"
+        )

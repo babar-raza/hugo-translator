@@ -125,7 +125,7 @@ class WriteGateEvaluator:
         (19, "_gate_code_fence_count",            "structural",  "block"),
         (20, "_gate_empty_body",                  "content",     "block"),
         (21, "_gate_shortcode_body_leak",         "structural",  "block"),
-        (22, "_gate_inline_code_integrity",       "content",     "block"),
+        (22, "_gate_inline_code_integrity",       "content",     "auto_clean"),
         (23, "_gate_encoding_clean",              "structural",  "block"),
         (24, "_gate_description_reverted_to_english", "content", "block"),
         (25, "_gate_code_block_content_truncated", "structural", "block"),
