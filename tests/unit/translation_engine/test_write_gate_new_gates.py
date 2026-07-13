@@ -477,6 +477,67 @@ class TestGate21InlineCodeIntegrity:
         ev._gate_inline_code_integrity(en, tr, _OUT, r)
         assert r.passed  # below threshold of 3
 
+    def test_stray_table_backtick_auto_cleans(self):
+        """m2m100 stray '`' before table rows must be stripped, not treated as violation."""
+        from src.translation_engine.write_gate import WriteGateResult
+        ev = _make_evaluator_no_detector()
+        # EN body: 3+ real inline code spans
+        en = _make_content_simple(
+            "Use `AssetInfo`, `GetValue`, and `SetProperty` in table.\n"
+            "| Name | Description |\n"
+            "| `AssetInfo` | Gets the asset. |\n"
+        )
+        # m2m100 tgt: stray ` at start of table row; real code spans preserved
+        tgt_body = (
+            "\u0418\u0441\u043f\u043e\u043b\u044c\u0437\u0443\u0435\u0442 `AssetInfo`, `GetValue` \u0438 `SetProperty`.\n"
+            "` | \u041d\u0430\u0437\u0432\u0430\u043d\u0438\u0435 | \u041e\u043f\u0438\u0441\u0430\u043d\u0438\u0435 |\n"           # stray backtick before pipe
+            "| `AssetInfo` | \u041f\u043e\u043b\u0443\u0447\u0430\u0435\u0442 \u0430\u043a\u0442\u0438\u0432. |\n"
+        )
+        tr = _make_content_simple(tgt_body)
+        r = WriteGateResult(passed=True)
+        ev._gate_inline_code_integrity(en, tr, _OUT, r)
+        import re as _re
+        assert r.passed, f"Expected pass after auto-clean; error={r.error}"
+        assert r.cleaned_content is not None, "Expected cleaned_content to be set"
+        # No line should START with a stray backtick followed by a pipe
+        assert not _re.search(r"(?m)^\s*`\s*\|", r.cleaned_content), (
+            "Stray line-start backtick should be removed from cleaned_content"
+        )
+
+    def test_genuine_violation_still_blocks_after_stray_clean(self):
+        """Real inline-code translation must block even when stray backtick also present."""
+        from src.translation_engine.write_gate import WriteGateResult
+        ev = _make_evaluator_no_detector()
+        en = _make_content_simple(
+            "Use `AssetInfo`, `GetValue`, and `SetProperty`.\n"
+            "| Name |\n"
+        )
+        # tgt has BOTH stray backtick AND genuine code-span translation
+        tgt_body = (
+            "\u0418\u0441\u043f\u043e\u043b\u044c\u0437\u0443\u0435\u0442 `\u0418\u043d\u0444\u043e`, `\u0417\u043d\u0430\u0447`, "
+            "\u0438 `\u0421\u0432\u043e\u0439\u0441\u0442\u0432\u043e`.\n"
+            "` | \u041d\u0430\u0437\u0432\u0430\u043d\u0438\u0435 |\n"
+        )
+        tr = _make_content_simple(tgt_body)
+        r = WriteGateResult(passed=True)
+        ev._gate_inline_code_integrity(en, tr, _OUT, r)
+        assert not r.passed, "Should block when code spans are genuinely translated"
+        assert "Gate 21" in r.error
+
+    def test_no_stray_backtick_no_violation_passes_cleanly(self):
+        """Clean tgt body: no stray backtick and no violation \u2192 pass, no cleaned_content."""
+        from src.translation_engine.write_gate import WriteGateResult
+        ev = _make_evaluator_no_detector()
+        en = _make_content_simple("Use `AssetInfo`, `GetValue`, and `SetProperty`.")
+        tr = _make_content_simple(
+            "\u0418\u0441\u043f\u043e\u043b\u044c\u0437\u0443\u0439\u0442\u0435 "
+            "`AssetInfo`, `GetValue` \u0438 `SetProperty`."
+        )
+        r = WriteGateResult(passed=True)
+        ev._gate_inline_code_integrity(en, tr, _OUT, r)
+        assert r.passed
+        assert r.cleaned_content is None  # no cleaning needed
+
 
 class TestGateEmptyBody:
     """Gate 19b: empty body."""

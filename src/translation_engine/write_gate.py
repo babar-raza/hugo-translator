@@ -37,6 +37,9 @@ _SHORTCODE_GATE_RE = re.compile(r"\{\{[<%]")
 
 # Gate 17 (inline code integrity) helper
 _BACKTICK_SPAN_RE = re.compile(r"`([^`]+)`")
+# m2m100 inserts a stray `` ` `` before table rows (e.g. "` | Чтение | …").
+# Matches only at line-start followed by optional space + pipe — unambiguous artifact.
+_STRAY_TABLE_BACKTICK_RE = re.compile(r"(?m)^\s*`(\s*\|)")
 
 # Gate 24: description reverted to English (non-Latin locales only)
 _NON_LATIN_SCRIPT_LOCALES = frozenset({
@@ -1269,6 +1272,14 @@ class WriteGateEvaluator:
         en_spans = _BACKTICK_SPAN_RE.findall(src_body)
         if len(en_spans) < 3:
             return  # too few spans to fire (avoids noise on trivial files)
+
+        # Strip stray leading backticks from table rows (m2m100 artifact: "` | Чтение |").
+        # These cause _BACKTICK_SPAN_RE to manufacture a cross-row "span" containing
+        # Cyrillic table content, triggering a false positive against ASCII en_spans.
+        tgt_body_clean = _STRAY_TABLE_BACKTICK_RE.sub(r"\1", tgt_body)
+        if tgt_body_clean != tgt_body:
+            result.cleaned_content = translated_content.replace(tgt_body, tgt_body_clean, 1)
+            tgt_body = tgt_body_clean
 
         tr_spans = _BACKTICK_SPAN_RE.findall(tgt_body)
         for en_span, tr_span in zip(en_spans, tr_spans):

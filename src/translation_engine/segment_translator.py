@@ -1266,9 +1266,20 @@ class SegmentTranslator:
                                     _llm_unit.translated_text = _llm_result[0]
                         except Exception as _llm_err:
                             logger.warning(
-                                f"ContentTypeRouter LLM pre-translate failed: {_llm_err}; "
-                                f"LLM-routed units will fall through to MT batch"
+                                f"ContentTypeRouter LLM pre-translate failed "
+                                f"({type(_llm_err).__name__}): {_llm_err}; "
+                                f"{len(_llm_units)} units marked as English passthrough "
+                                f"(NOT routed to MT — MT output for short API descriptions "
+                                f"is worse than keeping English)"
                             )
+                            for _u in _llm_units:
+                                if not _u.translated_text:
+                                    _u.translated_text = _u.source_text
+                                    if _u.metadata is None:
+                                        _u.metadata = {}
+                                    _u.metadata[
+                                        "llm_passthrough_reason"
+                                    ] = "professionalize_llm_unavailable"
             except Exception as _ctr_err:
                 logger.debug(f"ContentTypeRouter init skipped: {_ctr_err}")
 
