@@ -1314,6 +1314,43 @@ class TextUnitExtractor:
         script_count = len(pattern.findall(text))
         return script_count / letter_count
 
+    def _build_cell_header_map(self, ast: list[ASTNode]) -> dict[str, str]:
+        """Pre-pass: map each TABLE_CELL node_id → column header text.
+
+        Used by _extract_full_sentence to populate column_header metadata on
+        TABLE_CELL_TEXT units so LLM backend has column context.
+        """
+        result: dict[str, str] = {}
+
+        def _scan(node: ASTNode) -> None:
+            if node.type == NodeType.TABLE:
+                # Find first header row
+                header_texts: list[str] = []
+                for row in node.children:
+                    if row.type == NodeType.TABLE_ROW and row.attrs.get("is_header"):
+                        for cell in row.children:
+                            if cell.type == NodeType.TABLE_CELL:
+                                header_texts.append(
+                                    self._collect_text_from_node(cell).strip()
+                                )
+                        break
+                # Map body cells: cell.node_id → header_texts[col_idx]
+                for row in node.children:
+                    if row.type == NodeType.TABLE_ROW and not row.attrs.get("is_header"):
+                        for col_idx, cell in enumerate(row.children):
+                            if (
+                                cell.type == NodeType.TABLE_CELL
+                                and cell.node_id
+                                and col_idx < len(header_texts)
+                            ):
+                                result[cell.node_id] = header_texts[col_idx]
+            for child in node.children:
+                _scan(child)
+
+        for root in ast:
+            _scan(root)
+        return result
+
     def extract_from_ast(
         self, ast: list[ASTNode], frontmatter: dict[str, Any] | None = None
     ) -> BodyTranslationPlan:
@@ -1329,6 +1366,9 @@ class TextUnitExtractor:
         """
         units: list[TextUnit] = []
 
+        # TC-EXT-001: pre-compute column headers for all table cells
+        self._cell_column_header: dict[str, str] = self._build_cell_header_map(ast)
+
         # Extract frontmatter fields (FIX-BT-03)
         if frontmatter:
             frontmatter_units = self._extract_frontmatter_units(frontmatter)
@@ -1338,6 +1378,8 @@ class TextUnitExtractor:
         # Traverse each root node
         for node in ast:
             self._traverse_node(node, units)
+
+        self._cell_column_header = {}  # clear after use
 
         # Calculate AST fingerprint for sanity checks
         ast_fingerprint = self._calculate_ast_fingerprint(ast)
@@ -1628,6 +1670,12 @@ class TextUnitExtractor:
         # go to professionalize_llm, NOT to NLLB/m2m.  MT models hallucinate "psychiatrist"
         # for "Gets the shrink to fit." — the context is too sparse for MT.
         _unit_metadata: dict = {"placeholder_map": placeholder_map} if placeholder_map else {}
+
+        # TC-EXT-001: add column_header for table cells so LLM has column context
+        if kind is TextUnitKind.TABLE_CELL_TEXT and node.node_id:
+            _col_header = getattr(self, "_cell_column_header", {}).get(node.node_id, "")
+            if _col_header:
+                _unit_metadata["column_header"] = _col_header
         if (
             kind is TextUnitKind.TABLE_CELL_TEXT
             and not do_not_translate
