@@ -504,7 +504,7 @@ def main() -> None:
     print()
 
     if args.retranslate:
-        lock_path = queue_path.parent / "heal_headings.lock"
+        lock_path = queue_path.parent / f"{queue_path.stem}.lock"
         if lock_path.exists():
             try:
                 import psutil
