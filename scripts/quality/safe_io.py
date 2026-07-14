@@ -29,6 +29,7 @@ if _PROJ_ROOT not in sys.path:
 
 from ruamel.yaml.comments import CommentedMap  # noqa: E402
 
+from src.translation_engine import consumer_intake  # noqa: E402
 from src.translation_engine.parser.hugo_parser import HugoParser  # noqa: E402
 from src.translation_engine.reconstructor.yaml_formatter import YAMLFormatter  # noqa: E402
 from src.translation_engine.write_gate import WriteGateEvaluator  # noqa: E402
@@ -107,13 +108,16 @@ def save(
     source_content: str,
     target_lang: str,
     source_doc: object | None = None,
+    existing_target_check: bool = True,
 ) -> SaveResult:
     """Serialize, gate-check, and write a repaired content file.
 
     Writes ``out_path`` ONLY if the rendered candidate passes
-    ``WriteGateEvaluator``. On any gate failure the candidate is quarantined
-    under ``workspace/quarantine/`` instead, and nothing is written to
-    ``out_path``.
+    ``WriteGateEvaluator`` AND, when ``out_path`` already exists and
+    ``existing_target_check`` is True, the vendored consumer-repo checks
+    (TC-HT-007) run against the EXISTING target as the "old" side. On any
+    failure the candidate is quarantined under ``workspace/quarantine/``
+    instead, and nothing is written to ``out_path``.
     """
     if frontmatter:
         try:
@@ -128,6 +132,22 @@ def save(
         rendered = fm_yaml + body
     else:
         rendered = body
+
+    if existing_target_check and out_path.exists():
+        old_text = out_path.read_text(encoding="utf-8", errors="replace")
+        intake_reasons = [
+            f"consumer_intake:{code}"
+            for code in consumer_intake.check_text(rendered, str(out_path))
+        ] + [
+            f"consumer_intake:{code}"
+            for code in consumer_intake.check_pair(rendered, old_text, target_lang)
+        ]
+        if intake_reasons:
+            qpath = _quarantine(rendered, out_path, intake_reasons)
+            return SaveResult(
+                written=False, output_path=out_path, quarantined=qpath is not None,
+                quarantine_path=qpath, reasons=intake_reasons,
+            )
 
     evaluator = WriteGateEvaluator(
         detector=None, similarity_tracker=None, config=None, force_accept=False,
