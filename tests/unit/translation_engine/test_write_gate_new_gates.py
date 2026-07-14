@@ -822,3 +822,183 @@ class TestGate25CodeBlockContentTruncated:
         r = WriteGateResult(passed=True)
         ev._gate_code_block_content_truncated(src, tgt, _OUT, r)
         assert r.passed  # gate skips small blocks
+
+
+# ---------------------------------------------------------------------------
+# Gate 26: Fence parity (zero-tolerance)
+# ---------------------------------------------------------------------------
+
+
+class TestGate26FenceParity:
+    """Gate 26: any code-fence-line loss, or an odd target fence count, blocks."""
+
+    def _fenced_file(self, n_blocks: int, drop_last_fence: bool = False) -> str:
+        body_lines = []
+        for i in range(n_blocks):
+            body_lines.append(f"```python")
+            body_lines.append(f"code_{i}")
+            if not (drop_last_fence and i == n_blocks - 1):
+                body_lines.append("```")
+        return "---\ntitle: Test\n---\n" + "\n".join(body_lines) + "\n"
+
+    def test_blocks_any_fence_loss_below_gate19_threshold(self):
+        """A single dropped fence (odd count) is below Gate 19's -2 tolerance
+        but must still be blocked by Gate 26 (zero tolerance)."""
+        from src.translation_engine.write_gate import WriteGateResult
+        ev = _make_evaluator_no_detector()
+        src = self._fenced_file(3)  # 3 blocks = 6 fence lines
+        tgt = self._fenced_file(3, drop_last_fence=True)  # 5 fence lines (odd)
+        r = WriteGateResult(passed=True)
+        ev._gate_fence_parity(src, tgt, _OUT, r)
+        assert not r.passed
+        assert "Gate 26" in r.error
+
+    def test_blocks_small_file_fence_loss_gate19_never_checks(self):
+        """Gate 19 only fires when src has >=4 fences; a 1-block (2-fence)
+        file with a dropped fence must still be caught by Gate 26."""
+        from src.translation_engine.write_gate import WriteGateResult
+        ev = _make_evaluator_no_detector()
+        src = self._fenced_file(1)  # 2 fences
+        tgt = "---\ntitle: Test\n---\ncode_0\n"  # 0 fences — dropped entirely
+        r = WriteGateResult(passed=True)
+        ev._gate_fence_parity(src, tgt, _OUT, r)
+        assert not r.passed
+
+    def test_passes_matching_fence_count(self):
+        from src.translation_engine.write_gate import WriteGateResult
+        ev = _make_evaluator_no_detector()
+        src = self._fenced_file(2)
+        tgt = self._fenced_file(2)
+        r = WriteGateResult(passed=True)
+        ev._gate_fence_parity(src, tgt, _OUT, r)
+        assert r.passed
+
+    def test_passes_target_gains_fences(self):
+        """More fences in target than source is not a loss — passes."""
+        from src.translation_engine.write_gate import WriteGateResult
+        ev = _make_evaluator_no_detector()
+        src = self._fenced_file(1)
+        tgt = self._fenced_file(2)
+        r = WriteGateResult(passed=True)
+        ev._gate_fence_parity(src, tgt, _OUT, r)
+        assert r.passed
+
+    def test_force_accept_does_not_bypass(self):
+        from src.translation_engine.write_gate import WriteGateEvaluator, WriteGateResult
+        ev = WriteGateEvaluator(detector=None, similarity_tracker=None, config=None, force_accept=True)
+        src = self._fenced_file(2)
+        tgt = self._fenced_file(2, drop_last_fence=True)
+        r = WriteGateResult(passed=True)
+        ev._gate_fence_parity(src, tgt, _OUT, r)
+        assert not r.passed
+
+
+# ---------------------------------------------------------------------------
+# Gate 27: Multi-line frontmatter scalar preservation
+# ---------------------------------------------------------------------------
+
+
+class TestGate27MultilineScalarPreservation:
+    """Gate 27: a multi-line/folded source scalar must survive translation intact."""
+
+    def test_blocks_truncated_folded_scalar(self):
+        """The exact wave-3 signature: a folded multi-line description
+        collapsed to (effectively) its first line only."""
+        from src.translation_engine.write_gate import WriteGateResult
+        ev = _make_evaluator_no_detector()
+        src = (
+            "---\ntitle: Test\ndescription: >-\n"
+            "  This is a long folded description that\n"
+            "  continues across a second physical line here.\n---\nbody\n"
+        )
+        tgt = "---\ntitle: Test\ndescription: Esto es una descripcion.\n---\nbody\n"
+        r = WriteGateResult(passed=True)
+        ev._gate_multiline_scalar_preservation(src, tgt, "es", _OUT, r)
+        assert not r.passed
+        assert "Gate 27" in r.error
+
+    def test_blocks_empty_target_field(self):
+        from src.translation_engine.write_gate import WriteGateResult
+        ev = _make_evaluator_no_detector()
+        src = (
+            "---\ntitle: Test\ndescription: |\n"
+            "  Line one of a literal multi-line description.\n"
+            "  Line two of the same description value here.\n---\nbody\n"
+        )
+        tgt = "---\ntitle: Test\ndescription: ''\n---\nbody\n"
+        r = WriteGateResult(passed=True)
+        ev._gate_multiline_scalar_preservation(src, tgt, "es", _OUT, r)
+        assert not r.passed
+
+    def test_blocks_target_reverted_to_english_source(self):
+        from src.translation_engine.write_gate import WriteGateResult
+        ev = _make_evaluator_no_detector()
+        src = (
+            "---\ntitle: Test\ndescription: >-\n"
+            "  This is a long folded description that\n"
+            "  continues across a second physical line here.\n---\nbody\n"
+        )
+        # Target is byte-identical to the parsed English source value.
+        tgt = (
+            "---\ntitle: Test\ndescription: >-\n"
+            "  This is a long folded description that\n"
+            "  continues across a second physical line here.\n---\nbody\n"
+        )
+        r = WriteGateResult(passed=True)
+        ev._gate_multiline_scalar_preservation(src, tgt, "es", _OUT, r)
+        assert not r.passed
+
+    def test_passes_proportional_full_translation(self):
+        from src.translation_engine.write_gate import WriteGateResult
+        ev = _make_evaluator_no_detector()
+        src = (
+            "---\ntitle: Test\ndescription: >-\n"
+            "  This is a long folded description that\n"
+            "  continues across a second physical line here.\n---\nbody\n"
+        )
+        tgt = (
+            "---\ntitle: Test\ndescription: >-\n"
+            "  Esta es una descripcion larga y plegada que\n"
+            "  continua a traves de una segunda linea fisica aqui.\n---\nbody\n"
+        )
+        r = WriteGateResult(passed=True)
+        ev._gate_multiline_scalar_preservation(src, tgt, "es", _OUT, r)
+        assert r.passed
+
+    def test_skips_single_line_source_field(self):
+        """A field that was already single-line in the source is not this
+        gate's concern (Gate 18/24 cover single-line description issues)."""
+        from src.translation_engine.write_gate import WriteGateResult
+        ev = _make_evaluator_no_detector()
+        src = "---\ntitle: Test\ndescription: Short single line.\n---\nbody\n"
+        tgt = "---\ntitle: Test\ndescription: X\n---\nbody\n"
+        r = WriteGateResult(passed=True)
+        ev._gate_multiline_scalar_preservation(src, tgt, "es", _OUT, r)
+        assert r.passed
+
+    def test_allows_english_target_byte_identical(self):
+        """target_lang == 'en' is exempt from the byte-identical check."""
+        from src.translation_engine.write_gate import WriteGateResult
+        ev = _make_evaluator_no_detector()
+        src = (
+            "---\ntitle: Test\ndescription: >-\n"
+            "  This is a long folded description that\n"
+            "  continues across a second physical line here.\n---\nbody\n"
+        )
+        tgt = src
+        r = WriteGateResult(passed=True)
+        ev._gate_multiline_scalar_preservation(src, tgt, "en", _OUT, r)
+        assert r.passed
+
+    def test_force_accept_does_not_bypass(self):
+        from src.translation_engine.write_gate import WriteGateEvaluator, WriteGateResult
+        ev = WriteGateEvaluator(detector=None, similarity_tracker=None, config=None, force_accept=True)
+        src = (
+            "---\ntitle: Test\ndescription: >-\n"
+            "  This is a long folded description that\n"
+            "  continues across a second physical line here.\n---\nbody\n"
+        )
+        tgt = "---\ntitle: Test\ndescription: Esto es una descripcion.\n---\nbody\n"
+        r = WriteGateResult(passed=True)
+        ev._gate_multiline_scalar_preservation(src, tgt, "es", _OUT, r)
+        assert not r.passed

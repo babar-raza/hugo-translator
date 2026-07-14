@@ -146,6 +146,8 @@ class WriteGateEvaluator:
         (23, "_gate_encoding_clean",              "structural",  "block"),
         (24, "_gate_description_reverted_to_english", "content", "block"),
         (25, "_gate_code_block_content_truncated", "structural", "block"),
+        (26, "_gate_fence_parity",                 "structural", "block"),
+        (27, "_gate_multiline_scalar_preservation", "content",   "block"),
     ]
 
     def __init__(
@@ -684,6 +686,10 @@ class WriteGateEvaluator:
                 lambda src, w, path, res: self._gate_description_reverted_to_english(src, w, target_lang, path, res),
             "_gate_code_block_content_truncated":
                 lambda src, w, path, res: self._gate_code_block_content_truncated(src, w, path, res),
+            "_gate_fence_parity":
+                lambda src, w, path, res: self._gate_fence_parity(src, w, path, res),
+            "_gate_multiline_scalar_preservation":
+                lambda src, w, path, res: self._gate_multiline_scalar_preservation(src, w, target_lang, path, res),
         }
 
         working = translated_content
@@ -1429,6 +1435,118 @@ class WriteGateEvaluator:
                     f"({tgt_lines / max(src_lines, 1) * 100:.0f}% retained)"
                 )
                 logger.error("GATE25 BLOCKED %s: %s", output_path.name, result.error)
+                return
+
+    # ------------------------------------------------------------------
+    # Gate 26: Fence parity (zero-tolerance code fence loss)
+    # ------------------------------------------------------------------
+
+    def _gate_fence_parity(
+        self,
+        source_content: str,
+        translated_content: str,
+        output_path: Path,
+        result: WriteGateResult,
+    ) -> None:
+        """Block when target fence-line count is odd, or less than source at all.
+
+        TC-HT-005: Gate 19 only fires when src has >=4 fences AND target lost
+        more than one fence pair — small files and small losses pass through.
+        Gate 26 is zero-tolerance: any fence-line loss, or an odd fence-line
+        count (an unterminated/dangling fence), blocks the write. This closes
+        the wave-3 Bug B corruption class (silently dropped opening fences)
+        independently of Gate 19's threshold. Gate 19 is kept alongside this
+        gate (its condition is a strict subset) rather than removed, to avoid
+        touching its own passing test suite for no functional gain.
+        """
+        src_body = self._get_body(source_content)
+        tgt_body = self._get_body(translated_content)
+
+        src_fences = sum(1 for ln in src_body.splitlines() if ln.strip().startswith("```"))
+        tgt_fences = sum(1 for ln in tgt_body.splitlines() if ln.strip().startswith("```"))
+
+        if tgt_fences % 2 == 1 or tgt_fences < src_fences:
+            result.passed = False
+            result.error = (
+                f"Gate 26 fence parity: src={src_fences} fences, tgt={tgt_fences} fences "
+                f"({'odd count' if tgt_fences % 2 == 1 else 'fence loss'})"
+            )
+            logger.error("GATE26 BLOCKED %s: %s", output_path.name, result.error)
+
+    # ------------------------------------------------------------------
+    # Gate 27: Multi-line frontmatter scalar preservation
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _is_multiline_source_field(yaml_text: str, field_name: str) -> bool:
+        """True if field_name's value spans more than one physical line in
+        the RAW source YAML text (folded '>' scalars parse to a single joined
+        string with no embedded '\\n', so this must scan raw text, not the
+        parsed value, to catch them)."""
+        lines = yaml_text.splitlines()
+        start = None
+        for i, line in enumerate(lines):
+            if re.match(r"^" + re.escape(field_name) + r":", line):
+                start = i
+                break
+        if start is None:
+            return False
+        end = len(lines)
+        for j in range(start + 1, len(lines)):
+            if re.match(r"^[A-Za-z_][\w.-]*:", lines[j]):
+                end = j
+                break
+        return (end - start) > 1
+
+    def _gate_multiline_scalar_preservation(
+        self,
+        source_content: str,
+        translated_content: str,
+        target_lang: str,
+        output_path: Path,
+        result: WriteGateResult,
+    ) -> None:
+        """Block writes that lose/corrupt a multi-line frontmatter scalar.
+
+        TC-HT-005: for every translated field whose SOURCE value was written
+        as a multi-line/folded YAML scalar, the target field must parse,
+        be non-empty, retain at least half the source length, and (for
+        non-English targets) not be byte-identical to the English source —
+        the exact signature of the wave-3 description-truncation bug.
+        """
+        src_split = _fm_parser._split_frontmatter(source_content)
+        tgt_split = _fm_parser._split_frontmatter(translated_content)
+        if src_split is None or tgt_split is None:
+            return
+        src_yaml_text, _ = src_split
+        src_data = _fm_parser._parse_yaml_content(src_yaml_text)
+        tgt_data = _fm_parser._parse_yaml_content(tgt_split[0])
+        if not isinstance(src_data, dict) or not isinstance(tgt_data, dict):
+            return
+
+        for field_name, src_val in src_data.items():
+            if not isinstance(src_val, str):
+                continue
+            if not self._is_multiline_source_field(src_yaml_text, field_name):
+                continue
+
+            tgt_val = tgt_data.get(field_name)
+            reason = None
+            if not isinstance(tgt_val, str):
+                reason = "target field missing or not a string"
+            elif not tgt_val.strip():
+                reason = "target field is empty"
+            elif len(tgt_val) < 0.5 * len(src_val):
+                reason = f"target retained only {len(tgt_val)}/{len(src_val)} chars"
+            elif target_lang != "en" and tgt_val == src_val:
+                reason = "target is byte-identical to English source"
+
+            if reason:
+                result.passed = False
+                result.error = (
+                    f"Gate 27 multi-line scalar preservation: field '{field_name}' — {reason}"
+                )
+                logger.error("GATE27 BLOCKED %s: %s", output_path.name, result.error)
                 return
 
     # ------------------------------------------------------------------
