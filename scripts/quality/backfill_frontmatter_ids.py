@@ -28,6 +28,11 @@ from pathlib import Path
 
 sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
+# Ensure sibling modules (e.g. safe_io) import correctly regardless of
+# invocation mode (direct script run vs. pytest package import).
+if str(Path(__file__).resolve().parent) not in sys.path:
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+
 # ---------------------------------------------------------------------------
 # Constants
 # ---------------------------------------------------------------------------
@@ -176,12 +181,22 @@ def process_file(
         content = tr_head  # already read full file
         for field, (old_val, new_val) in patches.items():
             content = _replace_fm_field(content, field, old_val, new_val)
-        try:
-            tr_path.write_text(content, encoding="utf-8")
+
+        import safe_io
+
+        frontmatter, body = safe_io.parse_content(content)
+        save_result = safe_io.save(
+            tr_path, tr_path, frontmatter, body,
+            source_content=en_head, target_lang=locale,
+        )
+        if save_result.written:
             stats["files_patched"] += 1
-        except OSError as e:
-            print(f"  ERROR writing {tr_path}: {e}", file=sys.stderr)
-            stats["write_errors"] += 1
+        else:
+            stats["write_gate_blocked"] += 1
+            print(
+                f"  QUARANTINED (write gate blocked): {tr_path} — {save_result.reasons}",
+                file=sys.stderr,
+            )
 
 
 def run(

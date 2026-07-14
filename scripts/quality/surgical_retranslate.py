@@ -808,7 +808,14 @@ def _fix_newline_explosion(tr_content: str) -> str:
 
 
 def _fix_shortcode_leak(en_content: str, tr_content: str) -> str:
-    """Remove shortcode lines from tgt body that are not present in src body."""
+    """Remove shortcode lines from tgt body that are not present in src body.
+
+    Fence-aware (TC-HT-002): only scans/drops lines in UNFENCED segments, so
+    a shortcode-like string shown as example code inside a fenced block is
+    never touched.
+    """
+    from fence_spans import split_fenced_segments
+
     src_body = _get_body(en_content)
     # Build set of shortcode-containing stripped lines from src
     src_shortcode_lines: set[str] = set()
@@ -817,45 +824,73 @@ def _fix_shortcode_leak(en_content: str, tr_content: str) -> str:
             src_shortcode_lines.add(line.strip())
 
     fm, body = _get_fm_section(tr_content)
-    body_lines = body.splitlines(keepends=True)
     result_lines = []
-    for line in body_lines:
-        if _SHORTCODE_START_RE.search(line) and line.strip() not in src_shortcode_lines:
-            continue  # drop leaked shortcode line
-        result_lines.append(line)
+    for is_fenced, lines in split_fenced_segments(body):
+        if is_fenced:
+            result_lines.extend(lines)
+            continue
+        for line in lines:
+            if _SHORTCODE_START_RE.search(line) and line.strip() not in src_shortcode_lines:
+                continue  # drop leaked shortcode line
+            result_lines.append(line)
     return fm + "".join(result_lines)
 
 
 def _fix_artifact_corruption(tr_content: str) -> str:
-    """Remove body lines containing known model artifact patterns."""
+    """Remove body lines containing known model artifact patterns.
+
+    Fence-aware (TC-HT-002): only drops lines in UNFENCED segments.
+    """
+    from fence_spans import split_fenced_segments
+
     fm, body = _get_fm_section(tr_content)
-    body_lines = body.splitlines(keepends=True)
-    result_lines = [
-        line for line in body_lines
-        if not any(p.search(line) for p in _ARTIFACT_PATTERNS)
-    ]
+    result_lines = []
+    for is_fenced, lines in split_fenced_segments(body):
+        if is_fenced:
+            result_lines.extend(lines)
+            continue
+        result_lines.extend(
+            line for line in lines
+            if not any(p.search(line) for p in _ARTIFACT_PATTERNS)
+        )
     return fm + "".join(result_lines)
 
 
 def _fix_eu_hallucination(en_content: str, tr_content: str) -> str:
-    """Remove EU/GDPR paragraphs from tgt body that are not present in src."""
+    """Remove EU/GDPR paragraphs from tgt body that are not present in src.
+
+    Fence-aware (TC-HT-002): a paragraph chunk that overlaps any fenced line
+    is never scanned/dropped — a code example that happens to mention
+    "cookie" is preserved. Paragraph-splitting runs over the WHOLE body
+    first (not per-fence-segment) so a blank-line separator immediately
+    after a closing fence is still recognized as a paragraph break.
+    """
+    from fence_spans import fenced_line_mask
+
     src_body = _get_body(en_content)
     # Check which EU patterns fire in src (those are legitimate)
     src_eu = {i for i, p in enumerate(_EU_HALLUCINATION_PATTERNS) if p.search(src_body)}
 
     fm, body = _get_fm_section(tr_content)
-    # Split body into paragraph chunks (preserving separator whitespace)
-    segments = re.split(r"(\n{2,})", body)
+    mask = fenced_line_mask(body)
+
     result = []
-    for segment in segments:
-        # Identify if this segment matches EU pattern not in src
+    pos = 0
+    for chunk in re.split(r"(\n{2,})", body):
+        start_line = body[:pos].count("\n")
+        end_line = start_line + chunk.count("\n") + (0 if chunk.endswith("\n") else 1)
+        if any(mask[start_line:end_line]):
+            result.append(chunk)  # overlaps a fenced line: never touch
+            pos += len(chunk)
+            continue
+
         is_hallucinated = any(
-            i not in src_eu and p.search(segment)
+            i not in src_eu and p.search(chunk)
             for i, p in enumerate(_EU_HALLUCINATION_PATTERNS)
         )
-        if is_hallucinated:
-            continue
-        result.append(segment)
+        if not is_hallucinated:
+            result.append(chunk)
+        pos += len(chunk)
     return fm + "".join(result)
 
 
@@ -879,28 +914,35 @@ def _apply_no_gpu_repairs(en_content: str, tr_content: str) -> tuple[str, list[s
         tr_body = _get_body(working)
         en_lines = en_body.splitlines()
         tr_lines = tr_body.splitlines()
-        repaired_lines = list(tr_lines)
 
-        in_code = False
-        for i, (en_line, tr_line) in enumerate(zip(en_lines, tr_lines)):
-            if en_line.strip().startswith("```"):
-                in_code = not in_code
-                continue
-            if in_code:
-                continue
-            repaired_line = _repair_inline_code_line(en_line, tr_line)
-            if repaired_line != tr_line:
-                repaired_lines[i] = repaired_line
+        if len(en_lines) != len(tr_lines):
+            # TC-HT-002: hard-bail instead of zip()'s silent shortest-wins
+            # truncation, which used to drop trailing lines whenever EN/TR
+            # line counts diverged.
+            applied.append("inline_code_translation_skipped_line_count_mismatch")
+        else:
+            repaired_lines = list(tr_lines)
 
-        # Reconstruct with repaired body
-        if working.startswith("---"):
-            end = working.find("\n---", 4)
-            if end != -1:
-                fm = working[:end + 4]
-                new_body = "\n".join(repaired_lines)
-                working = fm + "\n" + new_body if not new_body.startswith("\n") else fm + new_body
-            # edge case: no proper body separator — skip
-        applied.append(f"inline_code_translation:{len(inline_issues)}_lines")
+            in_code = False
+            for i, (en_line, tr_line) in enumerate(zip(en_lines, tr_lines)):
+                if en_line.strip().startswith("```"):
+                    in_code = not in_code
+                    continue
+                if in_code:
+                    continue
+                repaired_line = _repair_inline_code_line(en_line, tr_line)
+                if repaired_line != tr_line:
+                    repaired_lines[i] = repaired_line
+
+            # Reconstruct with repaired body
+            if working.startswith("---"):
+                end = working.find("\n---", 4)
+                if end != -1:
+                    fm = working[:end + 4]
+                    new_body = "\n".join(repaired_lines)
+                    working = fm + "\n" + new_body if not new_body.startswith("\n") else fm + new_body
+                # edge case: no proper body separator — skip
+            applied.append(f"inline_code_translation:{len(inline_issues)}_lines")
 
     # 2. Duplicate content
     if _detect_duplicate_content(working):
@@ -1016,8 +1058,21 @@ def process_file(
     if apply and has_no_gpu:
         repaired, applied = _apply_no_gpu_repairs(en_content, tr_content)
         if repaired != tr_content:
+            import safe_io
+
+            frontmatter, body = safe_io.parse_content(repaired)
+            save_result = safe_io.save(
+                tr_path, tr_path, frontmatter, body,
+                source_content=en_content, target_lang=locale,
+            )
+            if not save_result.written:
+                stats["write_gate_blocked"] += 1
+                print(
+                    f"  QUARANTINED (write gate blocked): {tr_path} — {save_result.reasons}",
+                    file=sys.stderr,
+                )
+                return
             try:
-                tr_path.write_text(repaired, encoding="utf-8")
                 stats["files_repaired"] += 1
                 for a in applied:
                     stats[f"repaired_{a.split(':')[0]}"] += 1
@@ -1030,7 +1085,7 @@ def process_file(
                     )
 
             except OSError as e:
-                print(f"  ERROR writing {tr_path}: {e}", file=sys.stderr)
+                print(f"  ERROR updating TM for {tr_path}: {e}", file=sys.stderr)
                 stats["write_errors"] += 1
 
 

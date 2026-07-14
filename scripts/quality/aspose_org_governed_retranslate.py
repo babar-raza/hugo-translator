@@ -856,79 +856,53 @@ def run_translate(args, item: WorkItem, log_path: Path) -> subprocess.CompletedP
     return result
 
 
-def repair_target(profile, parser_obj: HugoParser, source: Path, target: Path) -> dict[str, Any]:
+def repair_target(
+    profile, parser_obj: HugoParser, source: Path, target: Path, locale: str = "und",
+) -> dict[str, Any]:
     repairs = {
-        "material_copy": repair_target_material_copy_fields(profile, parser_obj, source, target),
-        "product_identity": repair_target_product_identities(parser_obj, source, target),
-        "code_blocks": repair_target_code_blocks(profile, parser_obj, source, target),
+        "material_copy": repair_target_material_copy_fields(profile, parser_obj, source, target, locale),
+        "product_identity": repair_target_product_identities(parser_obj, source, target, locale),
+        "code_blocks": repair_target_code_blocks(profile, parser_obj, source, target, locale),
         "reference_identifier_titles": repair_reference_identifier_titles(
-            profile, parser_obj, source, target
+            profile, parser_obj, source, target, locale
         ),
     }
     if target.exists():
-        before = target.read_text(encoding="utf-8", errors="replace")
-        after = repair_extra_code_blocks_with_source_order(
-            source.read_text(encoding="utf-8", errors="replace"), before
-        )
-        if after != before:
-            target.write_text(after, encoding="utf-8")
-            repairs["extra_code_block_order"] = {"changed": True}
-            before = after
-        after = restore_body_code_blocks_exact(
-            source.read_text(encoding="utf-8", errors="replace"), before
-        )
-        if after != before:
-            target.write_text(after, encoding="utf-8")
-            repairs["body_code_blocks_exact"] = {"changed": True}
-            before = after
-        after = restore_body_bold_label_inline_codes(
-            source.read_text(encoding="utf-8", errors="replace"), before
-        )
-        if after != before:
-            target.write_text(after, encoding="utf-8")
-            repairs["body_bold_label_inline_codes"] = {"changed": True}
-            before = after
-        after = restore_body_dropped_link_list_items(
-            source.read_text(encoding="utf-8", errors="replace"), before
-        )
-        if after != before:
-            target.write_text(after, encoding="utf-8")
-            repairs["body_dropped_link_list_items"] = {"changed": True}
-            before = after
-        after = restore_stripped_markdown_links(
-            source.read_text(encoding="utf-8", errors="replace"), before
-        )
-        if after != before:
-            target.write_text(after, encoding="utf-8")
-            repairs["stripped_markdown_links"] = {"changed": True}
-            before = after
-        after = restore_spurious_table_code_fences(
-            source.read_text(encoding="utf-8", errors="replace"), before
-        )
-        if after != before:
-            target.write_text(after, encoding="utf-8")
-            repairs["spurious_table_code_fences"] = {"changed": True}
-            before = after
-        after = restore_body_paragraphs_with_missing_codes(
-            source.read_text(encoding="utf-8", errors="replace"), before
-        )
-        if after != before:
-            target.write_text(after, encoding="utf-8")
-            repairs["body_paragraphs_with_missing_codes"] = {"changed": True}
-            before = after
-        after = restore_mutated_inline_codes(
-            source.read_text(encoding="utf-8", errors="replace"), before
-        )
-        if after != before:
-            target.write_text(after, encoding="utf-8")
-            repairs["mutated_inline_codes"] = {"changed": True}
-            before = after
-        after = restore_mutated_file_paths(
-            source.read_text(encoding="utf-8", errors="replace"), before
-        )
-        if after != before:
-            target.write_text(after, encoding="utf-8")
-            repairs["mutated_file_paths"] = {"changed": True}
+        source_content = source.read_text(encoding="utf-8", errors="replace")
+        original = target.read_text(encoding="utf-8", errors="replace")
+        before = original
+
+        for repair_fn, repair_key in (
+            (repair_extra_code_blocks_with_source_order, "extra_code_block_order"),
+            (restore_body_code_blocks_exact, "body_code_blocks_exact"),
+            (restore_body_bold_label_inline_codes, "body_bold_label_inline_codes"),
+            (restore_body_dropped_link_list_items, "body_dropped_link_list_items"),
+            (restore_stripped_markdown_links, "stripped_markdown_links"),
+            (restore_spurious_table_code_fences, "spurious_table_code_fences"),
+            (restore_body_paragraphs_with_missing_codes, "body_paragraphs_with_missing_codes"),
+            (restore_mutated_inline_codes, "mutated_inline_codes"),
+            (restore_mutated_file_paths, "mutated_file_paths"),
+        ):
+            after = repair_fn(source_content, before)
+            if after != before:
+                repairs[repair_key] = {"changed": True}
+                before = after
+
+        # TC-HT-002: a single gated write for the cumulative repair result,
+        # instead of one raw write_text() per repair pass.
+        if before != original:
+            from scripts.quality import safe_io
+
+            frontmatter, body = safe_io.parse_content(before)
+            save_result = safe_io.save(
+                target, target, frontmatter, body,
+                source_content=source_content, target_lang=locale,
+            )
+            if not save_result.written:
+                repairs["write_gate_blocked"] = {"reasons": save_result.reasons}
+                for key in list(repairs.keys()):
+                    if isinstance(repairs.get(key), dict) and repairs[key].get("changed"):
+                        repairs[key]["written"] = False
     repairs["changed"] = any(
         bool(value.get("changed")) for value in repairs.values() if isinstance(value, dict)
     )
@@ -936,7 +910,7 @@ def repair_target(profile, parser_obj: HugoParser, source: Path, target: Path) -
 
 
 def repair_reference_identifier_titles(
-    profile, parser_obj: HugoParser, source: Path, target: Path
+    profile, parser_obj: HugoParser, source: Path, target: Path, locale: str = "und",
 ) -> dict[str, Any]:
     if profile.site_id != "reference.aspose.org" or not target.exists():
         return {"changed": False, "repairs": []}
@@ -962,8 +936,11 @@ def repair_reference_identifier_titles(
             repairs.append({"path": path, "reason": "reference_identifier_title_restored"})
     if not repairs:
         return {"changed": False, "repairs": []}
-    module.write_target_frontmatter(target, target_frontmatter, target_body)
-    return {"changed": True, "repairs": repairs}
+    written = module.write_target_frontmatter(
+        target, target_frontmatter, target_body,
+        source_content=source.read_text(encoding="utf-8", errors="replace"), locale=locale,
+    )
+    return {"changed": written, "repairs": repairs}
 
 
 def restore_body_code_blocks_exact(source_text: str, target_text: str) -> str:
@@ -1608,7 +1585,7 @@ def main() -> int:
 
         if target.exists():
             try:
-                repairs = {"changed": False} if args.validate_only else repair_target(profile, parser_obj, source, target)
+                repairs = {"changed": False} if args.validate_only else repair_target(profile, parser_obj, source, target, item.locale)
                 if repairs.get("changed"):
                     write_json(evidence_root / "repairs" / item.locale / f"{item.work_item_id}.json", {"work_item": asdict(item), "repairs": repairs, "repaired_at": utc_now()})
                 comparison = verify_pair(profile, parser_obj, source, target, item.locale)
@@ -1655,7 +1632,7 @@ def main() -> int:
             print(f"SKIP: translation failed for {item.locale} {item.relative_path}")
             continue
         try:
-            repairs = repair_target(profile, parser_obj, source, target)
+            repairs = repair_target(profile, parser_obj, source, target, item.locale)
             if repairs.get("changed"):
                 write_json(evidence_root / "repairs" / item.locale / f"{item.work_item_id}.json", {"work_item": asdict(item), "repairs": repairs, "repaired_at": utc_now()})
             comparison = verify_pair(profile, parser_obj, source, target, item.locale)

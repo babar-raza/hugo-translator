@@ -355,13 +355,30 @@ def load_target_frontmatter(target: Path) -> tuple[Any, str] | None:
     return target_frontmatter, target_body
 
 
-def write_target_frontmatter(target: Path, frontmatter: Any, body: str) -> None:
+def write_target_frontmatter(
+    target: Path, frontmatter: Any, body: str, *, source_content: str, locale: str = "und",
+) -> bool:
+    """Serialize and gate-check a frontmatter repair before writing (TC-HT-002).
+
+    Returns True if written, False if the write gate blocked the candidate
+    (quarantined under workspace/quarantine/ instead).
+    """
+    from scripts.quality import safe_io
+
     out = io.StringIO()
     YAML_DUMPER.dump(frontmatter, out)
-    target.write_text(f"---\n{out.getvalue()}---\n{body}", encoding="utf-8")
+    rendered = f"---\n{out.getvalue()}---\n{body}"
+    fm, repaired_body = safe_io.parse_content(rendered)
+    result = safe_io.save(
+        target, target, fm, repaired_body,
+        source_content=source_content, target_lang=locale,
+    )
+    return result.written
 
 
-def repair_target_product_identities(parser: HugoParser, source: Path, target: Path) -> dict[str, Any]:
+def repair_target_product_identities(
+    parser: HugoParser, source: Path, target: Path, locale: str = "und",
+) -> dict[str, Any]:
     if not target.exists():
         return {"changed": False, "repairs": []}
     source_doc = parse_doc(parser, source)
@@ -384,11 +401,16 @@ def repair_target_product_identities(parser: HugoParser, source: Path, target: P
 
     if not repairs:
         return {"changed": False, "repairs": []}
-    write_target_frontmatter(target, target_frontmatter, target_body)
-    return {"changed": True, "repairs": repairs}
+    written = write_target_frontmatter(
+        target, target_frontmatter, target_body,
+        source_content=source.read_text(encoding="utf-8", errors="replace"), locale=locale,
+    )
+    return {"changed": written, "repairs": repairs}
 
 
-def repair_target_material_copy_fields(profile, parser: HugoParser, source: Path, target: Path) -> dict[str, Any]:
+def repair_target_material_copy_fields(
+    profile, parser: HugoParser, source: Path, target: Path, locale: str = "und",
+) -> dict[str, Any]:
     if not target.exists():
         return {"changed": False, "repairs": []}
     source_doc = parse_doc(parser, source)
@@ -414,11 +436,16 @@ def repair_target_material_copy_fields(profile, parser: HugoParser, source: Path
 
     if not repairs:
         return {"changed": False, "repairs": []}
-    write_target_frontmatter(target, target_frontmatter, target_body)
-    return {"changed": True, "repairs": repairs}
+    written = write_target_frontmatter(
+        target, target_frontmatter, target_body,
+        source_content=source.read_text(encoding="utf-8", errors="replace"), locale=locale,
+    )
+    return {"changed": written, "repairs": repairs}
 
 
-def repair_target_code_blocks(profile, parser: HugoParser, source: Path, target: Path) -> dict[str, Any]:
+def repair_target_code_blocks(
+    profile, parser: HugoParser, source: Path, target: Path, locale: str = "und",
+) -> dict[str, Any]:
     if not target.exists():
         return {"changed": False, "repairs": []}
     source_doc = parse_doc(parser, source)
@@ -442,8 +469,11 @@ def repair_target_code_blocks(profile, parser: HugoParser, source: Path, target:
 
     if not repairs:
         return {"changed": False, "repairs": []}
-    write_target_frontmatter(target, target_frontmatter, target_body)
-    return {"changed": True, "repairs": repairs}
+    written = write_target_frontmatter(
+        target, target_frontmatter, target_body,
+        source_content=source.read_text(encoding="utf-8", errors="replace"), locale=locale,
+    )
+    return {"changed": written, "repairs": repairs}
 
 
 def repair_known_scalar_translations(
@@ -477,8 +507,11 @@ def repair_known_scalar_translations(
 
     if not repairs:
         return {"changed": False, "repairs": []}
-    write_target_frontmatter(target, target_frontmatter, target_body)
-    return {"changed": True, "repairs": repairs}
+    written = write_target_frontmatter(
+        target, target_frontmatter, target_body,
+        source_content=source.read_text(encoding="utf-8", errors="replace"), locale=locale,
+    )
+    return {"changed": written, "repairs": repairs}
 
 
 def repeated_token_violations(value: Any, path: str) -> list[dict[str, Any]]:
@@ -980,9 +1013,9 @@ def repair_and_record_product_identities(
     stage: str,
 ) -> dict[str, Any]:
     repairs = {
-        "material_copy": repair_target_material_copy_fields(profile, parser_obj, source, target),
-        "product_identity": repair_target_product_identities(parser_obj, source, target),
-        "code_blocks": repair_target_code_blocks(profile, parser_obj, source, target),
+        "material_copy": repair_target_material_copy_fields(profile, parser_obj, source, target, item.locale),
+        "product_identity": repair_target_product_identities(parser_obj, source, target, item.locale),
+        "code_blocks": repair_target_code_blocks(profile, parser_obj, source, target, item.locale),
         "known_scalars": repair_known_scalar_translations(profile, parser_obj, source, target, item.locale),
     }
     changed = any(repair.get("changed") for repair in repairs.values())
