@@ -791,8 +791,6 @@ def build_translate_cmd(args, item: WorkItem, log_path: Path) -> list[str]:
         "--force-retranslate",
         "--force-restart",
         "--no-commit",
-        "--disable-validation",
-        "--force-accept",
         "--model",
         args.model,
         "--max-files",

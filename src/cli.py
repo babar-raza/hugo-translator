@@ -488,6 +488,15 @@ Examples:
     )
 
     validation_group.add_argument(
+        "--i-understand-data-loss",
+        action="store_true",
+        help=(
+            "Required alongside --force-accept. Confirms you understand this disables "
+            "the safety gates that catch corrupted output (TC-HT-006)."
+        ),
+    )
+
+    validation_group.add_argument(
         "--strict-reject",
         action="store_true",
         help="Reject translations on any validation issue (no retries, fail fast)",
@@ -1359,6 +1368,18 @@ def _log_startup_configuration(args: argparse.Namespace, site_profile, global_co
     # Validation settings
     if args.force_accept:
         logger.info("Validation: FORCE ACCEPT (all translations accepted)")
+        # TC-HT-006: audit line (who/when/paths) -- --force-accept disables
+        # the safety gates entirely, so every use must be traceable.
+        import getpass
+
+        logger.warning(
+            "AUDIT force-accept: user=%s time=%s site=%s output=%s target_langs=%s",
+            getpass.getuser(),
+            datetime.now(timezone.utc).isoformat(),
+            args.site,
+            args.output or "(default from site profile)",
+            ",".join(target_langs),
+        )
     elif args.strict_reject:
         logger.info("Validation: STRICT REJECT (strict validation enabled)")
     elif args.disable_validation:
@@ -2325,6 +2346,17 @@ def translate_site(args: argparse.Namespace) -> int:
         # Log validation settings
         if overrides.force_accept:
             logger.info("Validation: FORCE ACCEPT - all translations accepted without validation")
+            # TC-HT-006: audit line (who/when/paths).
+            import getpass
+
+            logger.warning(
+                "AUDIT force-accept: user=%s time=%s site=%s output=%s target_langs=%s",
+                getpass.getuser(),
+                datetime.now(timezone.utc).isoformat(),
+                args.site,
+                args.output or "(default from site profile)",
+                ",".join(target_langs),
+            )
         elif overrides.strict_reject:
             logger.info("Validation: STRICT REJECT - fail fast on any validation issue (max retries: 0)")
         elif overrides.disable_validation:
@@ -3131,6 +3163,27 @@ def main() -> int:
 
     parser = create_parser()
     args = parser.parse_args()
+
+    # TC-HT-006: fast CLI-level feedback. This does NOT cover
+    # .local/unified_translate.py (constructs TranslationEngine directly,
+    # never goes through this argparse) -- the enforcement that actually
+    # closes the gap is the FATAL check in TranslationEngine.__init__.
+    if os.environ.get("BYPASS_PLACEHOLDER_PROTECTION"):
+        print(
+            "ERROR: BYPASS_PLACEHOLDER_PROTECTION is set. This env var disables "
+            "placeholder protection and directly caused the 2026-07-12 wave-3 "
+            "corruption. Unset it to proceed.",
+            file=sys.stderr,
+        )
+        return 1
+
+    if getattr(args, "force_accept", False) and not getattr(args, "i_understand_data_loss", False):
+        print(
+            "ERROR: --force-accept requires --i-understand-data-loss (confirms you "
+            "understand this disables the safety gates that catch corrupted output).",
+            file=sys.stderr,
+        )
+        return 1
 
     return translate_site(args)
 

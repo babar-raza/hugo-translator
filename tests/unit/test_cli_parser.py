@@ -489,3 +489,74 @@ def test_load_mode_override_stores_correctly(mock_dependencies):
     args = parser.parse_args(["--site", "test", "--load-mode", "fp32"])
     overrides = CLIConfigOverrides(args)
     assert overrides.load_mode == "fp32"
+
+
+# ---------------------------------------------------------------------------
+# TC-HT-006: --i-understand-data-loss flag
+# ---------------------------------------------------------------------------
+
+
+def test_i_understand_data_loss_flag_defaults_false(mock_dependencies):
+    from src.cli import create_parser
+
+    parser = create_parser()
+    args = parser.parse_args(["--site", "test"])
+    assert args.i_understand_data_loss is False
+
+
+def test_i_understand_data_loss_flag_can_be_set(mock_dependencies):
+    from src.cli import create_parser
+
+    parser = create_parser()
+    args = parser.parse_args(["--site", "test", "--force-accept", "--i-understand-data-loss"])
+    assert args.force_accept is True
+    assert args.i_understand_data_loss is True
+
+
+def test_force_accept_without_escape_hatch_is_rejected_by_main(mock_dependencies, monkeypatch, capsys):
+    """main() must exit 1 (not call translate_site) when --force-accept is
+    passed without --i-understand-data-loss (TC-HT-006)."""
+    import src.cli as cli_mod
+
+    monkeypatch.setattr("sys.argv", ["translate-hugo", "--site", "test", "--force-accept"])
+    monkeypatch.setattr(cli_mod, "translate_site", MagicMock(side_effect=AssertionError(
+        "translate_site must not be called when the escape hatch is missing"
+    )))
+    monkeypatch.delenv("BYPASS_PLACEHOLDER_PROTECTION", raising=False)
+
+    exit_code = cli_mod.main()
+    assert exit_code == 1
+    captured = capsys.readouterr()
+    assert "--i-understand-data-loss" in captured.err
+
+
+def test_force_accept_with_escape_hatch_proceeds_to_translate_site(mock_dependencies, monkeypatch):
+    import src.cli as cli_mod
+
+    monkeypatch.setattr(
+        "sys.argv",
+        ["translate-hugo", "--site", "test", "--force-accept", "--i-understand-data-loss"],
+    )
+    mock_translate = MagicMock(return_value=0)
+    monkeypatch.setattr(cli_mod, "translate_site", mock_translate)
+    monkeypatch.delenv("BYPASS_PLACEHOLDER_PROTECTION", raising=False)
+
+    exit_code = cli_mod.main()
+    assert exit_code == 0
+    mock_translate.assert_called_once()
+
+
+def test_bypass_placeholder_protection_env_blocks_main(mock_dependencies, monkeypatch, capsys):
+    """TC-HT-006: fast CLI-level feedback for the BYPASS env var."""
+    import src.cli as cli_mod
+
+    monkeypatch.setattr("sys.argv", ["translate-hugo", "--site", "test"])
+    monkeypatch.setattr(cli_mod, "translate_site", MagicMock(side_effect=AssertionError(
+        "translate_site must not be called when BYPASS_PLACEHOLDER_PROTECTION is set"
+    )))
+    monkeypatch.setenv("BYPASS_PLACEHOLDER_PROTECTION", "1")
+
+    exit_code = cli_mod.main()
+    assert exit_code == 1
+    captured = capsys.readouterr()
+    assert "BYPASS_PLACEHOLDER_PROTECTION" in captured.err

@@ -11,6 +11,7 @@ Orchestrates the complete translation workflow:
 """
 
 import logging
+import os
 import re
 import time
 from pathlib import Path
@@ -275,6 +276,20 @@ class TranslationEngine:
             redis_client: Optional Redis client for distributed locking (multi-worker coordination)
             **kwargs: Additional options (for future extensibility)
         """
+        # TC-HT-006: BYPASS_PLACEHOLDER_PROTECTION disables placeholder
+        # protection (extractor/segment_extractor.py:417) and directly
+        # caused the 2026-07-12 wave-3 corruption. This is the one choke
+        # point both cli.py's main() AND .local/unified_translate.py (which
+        # never goes through cli.py's argparse) pass through, so it is the
+        # only place a fatal check here actually covers both invocation
+        # paths.
+        if os.environ.get("BYPASS_PLACEHOLDER_PROTECTION"):
+            raise RuntimeError(
+                "FATAL: BYPASS_PLACEHOLDER_PROTECTION is set. This env var disables "
+                "placeholder protection and directly caused the 2026-07-12 wave-3 "
+                "corruption. Unset it to proceed."
+            )
+
         # TC-DECOMP-05: All initialization delegated to EngineBuilder
         from .engine_builder import EngineBuilder
 
