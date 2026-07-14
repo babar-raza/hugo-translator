@@ -96,6 +96,18 @@ DEFAULT_SYSTEM_PROMPT = (
     "- Maintain the same tone and register as the source"
 )
 
+# TC-HT-003: prompt-echo / refusal detection patterns.
+_REFUSAL_RE = re.compile(
+    r"^(i cannot|i can'?t|i'?m sorry|as an ai|i am (an ai|unable))",
+    re.IGNORECASE,
+)
+# Short single-token/phrase line ending in a colon (EN "Rules:" or a
+# translated equivalent like "Reglas:"/"Regeln:") — language-agnostic,
+# matched structurally rather than against a fixed word list.
+_RULE_HEADER_LINE_RE = re.compile(r"^\s*[^\s:：]{1,24}[:：]\s*$")
+_LIST_MARKER_RE = re.compile(r"^\s*[-*]\s")
+_NUMBERED_MARKER_RE = re.compile(r"^\s*\d+[.)]\s")
+
 
 class LLMModelBackend:
     """LLM-based translation backend conforming to the ModelBackend interface.
@@ -122,6 +134,10 @@ class LLMModelBackend:
         self.last_output_tokens: int = 0
         self.last_truncation_detected: bool = False
         self.truncation_count: int = 0
+
+        # TC-HT-003: prompt-echo/refusal rejects from the most recent
+        # translate_with_token_counts() call, keyed by index into `texts`.
+        self.last_reject_reasons: dict[int, str] = {}
 
         # TC-AST-02: Configurable hallucination cap (default 4.0× input length).
         # Read from global config so it survives model reloads without restarts.
@@ -322,6 +338,7 @@ class LLMModelBackend:
         total_output = 0
         start_time = time.perf_counter()
         tm = self._term_manager
+        self.last_reject_reasons = {}
 
         # Separate empty/whitespace-only texts (no API call needed)
         non_empty_indices = [i for i, t in enumerate(texts) if t.strip()]
@@ -364,6 +381,77 @@ class LLMModelBackend:
 
         return translations, total_input, total_output
 
+    @staticmethod
+    def _validate_llm_response(response: str, source_text: str, system_prompt: str) -> str | None:
+        """Return a rejection reason if `response` looks like a leaked
+        prompt-rule echo or a refusal rather than an actual translation,
+        else None.
+
+        TC-HT-003: a response dominated by the system prompt's own rule text
+        (in English or translated) or a refusal phrase must never reach
+        output — this is the direct fix for the wave-3 TITLE_MISMATCH bug,
+        where such text was accepted verbatim into title/linkTitle.
+        Checks are independent of response length, so short legitimate
+        translations can never trip them.
+        """
+        stripped = response.strip()
+        if not stripped:
+            return "refusal"
+        if _REFUSAL_RE.match(stripped):
+            return "refusal"
+
+        lines = stripped.splitlines()
+
+        # Structural rule-header leak: a short single-token/phrase line
+        # ending in a colon, immediately followed by >=2 list/numbered
+        # lines — catches "Rules:"/"Reglas:"/"Regeln:" style leaks without
+        # needing a fixed word list per language.
+        for i, line in enumerate(lines[:-1]):
+            if not _RULE_HEADER_LINE_RE.match(line):
+                continue
+            following = lines[i + 1 : i + 4]
+            marker_count = sum(
+                1 for ln in following
+                if _LIST_MARKER_RE.match(ln) or _NUMBERED_MARKER_RE.match(ln)
+            )
+            if marker_count >= 2:
+                return "rule_header_leak"
+
+        # List-marker leak: response has >=2 list-marker lines while the
+        # source has none at all.
+        response_list_lines = sum(1 for ln in lines if _LIST_MARKER_RE.match(ln))
+        if response_list_lines >= 2:
+            source_has_list = any(
+                _LIST_MARKER_RE.match(ln) for ln in source_text.splitlines()
+            )
+            if not source_has_list:
+                return "list_marker_leak"
+
+        # English rule n-gram overlap: system_prompt is always our own text,
+        # so rule-line extraction is exact, not fuzzy.
+        rule_lines = [
+            ln.strip().lstrip("- ")
+            for ln in system_prompt.splitlines()
+            if ln.strip().startswith("- ")
+        ]
+        if rule_lines:
+            def _words(s: str) -> set[str]:
+                return set(re.findall(r"[a-z0-9]+", s.lower()))
+
+            for resp_line in lines:
+                resp_words = _words(resp_line)
+                if not resp_words:
+                    continue
+                for rule_line in rule_lines:
+                    rule_words = _words(rule_line)
+                    if not rule_words:
+                        continue
+                    overlap = len(resp_words & rule_words) / len(rule_words)
+                    if overlap >= 0.6:
+                        return "prompt_echo_en"
+
+        return None
+
     def _translate_single_segment(
         self,
         text: str,
@@ -388,6 +476,20 @@ class LLMModelBackend:
                 user_text=input_text,
             )
 
+            # TC-HT-003: reject prompt-echo/refusal responses before any
+            # other processing — a rule-echo must never reach output, even
+            # truncated (truncating rule-garbage into e.g. `title` still
+            # leaves garbage; only reject+passthrough is safe).
+            reject_reason = self._validate_llm_response(result, input_text, system_prompt)
+            if reject_reason is not None:
+                logger.error(
+                    "LLM response rejected (%s) for segment %d/%d: prompt-echo/refusal guard fired",
+                    reject_reason, idx + 1, total,
+                )
+                self.last_reject_reasons[idx] = reject_reason
+                translations[idx] = text
+                return inp_tokens, out_tokens
+
             # TC-AST-02 / TC-H2: Configurable hallucination cap with per-language overrides.
             # Per-language override takes precedence; falls back to global ratio.
             input_len = len(input_text)
@@ -396,6 +498,20 @@ class LLMModelBackend:
                 tgt_lang, self._max_hallucination_ratio
             )
             if input_len > 0 and output_len > _max_ratio * input_len:
+                excess_text = result[int(input_len * _max_ratio):]
+                if re.search(r"^\s*[-*]\s", excess_text, re.MULTILINE):
+                    # TC-HT-003: the overflow itself looks like leaked
+                    # rule/list text rather than a verbose-but-legitimate
+                    # translation — reject and passthrough rather than
+                    # truncate.
+                    logger.error(
+                        "LLM hallucination with list-marker overflow rejected for segment %d/%d "
+                        "(%d→%d chars, %.1fx input)",
+                        idx + 1, total, input_len, output_len, output_len / input_len,
+                    )
+                    self.last_reject_reasons[idx] = "hallucination_list_marker_reject"
+                    translations[idx] = text
+                    return inp_tokens, out_tokens
                 logger.error(
                     "LLM hallucination detected: segment %d/%d output is %.1fx input "
                     "(%d→%d chars). Truncating to %.1fx source length (max_llm_output_to_input_ratio=%.1f).",
@@ -485,6 +601,22 @@ class LLMModelBackend:
                 # Successfully parsed — assign translations
                 for seq, idx in enumerate(indices):
                     trans = parsed[seq]
+
+                    # TC-HT-003: reject prompt-echo/refusal per-item before
+                    # term restore, same guard as the single-segment path.
+                    reject_reason = self._validate_llm_response(
+                        trans, texts[idx], system_prompt
+                    )
+                    if reject_reason is not None:
+                        logger.error(
+                            "LLM response rejected (%s) for packed segment idx=%d: "
+                            "prompt-echo/refusal guard fired",
+                            reject_reason, idx,
+                        )
+                        self.last_reject_reasons[idx] = reject_reason
+                        translations[idx] = texts[idx]
+                        continue
+
                     if idx in protected_map:
                         protected_map[idx].protected_text = trans
                         trans = tm.restore(protected_map[idx])

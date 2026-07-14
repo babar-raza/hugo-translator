@@ -1264,6 +1264,15 @@ class SegmentTranslator:
                                 )
                                 if _llm_result and _llm_result[0]:
                                     _llm_unit.translated_text = _llm_result[0]
+                                    # TC-HT-003: tag units the LLM backend
+                                    # rejected as prompt-echo/refusal and
+                                    # passed through as source text.
+                                    if 0 in getattr(_llm_backend, "last_reject_reasons", {}):
+                                        if _llm_unit.metadata is None:
+                                            _llm_unit.metadata = {}
+                                        _llm_unit.metadata[
+                                            "llm_passthrough_reason"
+                                        ] = "llm_echo_reject"
                         except Exception as _llm_err:
                             logger.warning(
                                 f"ContentTypeRouter LLM pre-translate failed "

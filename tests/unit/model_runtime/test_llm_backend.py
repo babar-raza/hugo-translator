@@ -512,3 +512,149 @@ class TestLanguageNames:
         prompt = backend._build_system_prompt("xx", "yy")
         assert "XX" in prompt
         assert "YY" in prompt
+
+
+# ---------------------------------------------------------------------------
+# TC-HT-003: Prompt-echo / refusal validation
+# ---------------------------------------------------------------------------
+
+
+class TestValidateLlmResponse:
+    """Unit tests for LLMModelBackend._validate_llm_response()."""
+
+    def _prompt(self):
+        return LLMModelBackend(
+            ModelInfo(
+                model_id="x", name="x", backend="llm", supported_pairs="all",
+                model_size_mb=0, min_ram_gb=0, optimal_device="api",
+                provider="ollama", model_name="x", base_url="http://x",
+            ),
+            device="api",
+        )._build_system_prompt("en", "es")
+
+    def test_english_rule_echo_rejected(self):
+        response = (
+            "Rules:\n"
+            "- Output ONLY the translation, nothing else\n"
+            "- Preserve all formatting: markdown, HTML tags, links\n"
+        )
+        reason = LLMModelBackend._validate_llm_response(response, "Do", self._prompt())
+        assert reason in ("rule_header_leak", "prompt_echo_en")
+
+    def test_translated_rule_dump_rejected(self):
+        response = (
+            "- Salida SOLO la traduccion, nada mas\n"
+            "- Preservar todo el formato: markdown, etiquetas HTML, enlaces\n"
+        )
+        reason = LLMModelBackend._validate_llm_response(response, "Do", self._prompt())
+        assert reason == "list_marker_leak"
+
+    def test_refusal_rejected(self):
+        response = "I cannot translate this content."
+        reason = LLMModelBackend._validate_llm_response(response, "Do", self._prompt())
+        assert reason == "refusal"
+
+    def test_empty_response_rejected_as_refusal(self):
+        reason = LLMModelBackend._validate_llm_response("   ", "Do", self._prompt())
+        assert reason == "refusal"
+
+    def test_legitimate_short_translation_passes(self):
+        reason = LLMModelBackend._validate_llm_response("Faire", "Do", self._prompt())
+        assert reason is None
+
+    def test_genuine_list_translation_passes(self):
+        """Source itself has list markers — response having them too is fine."""
+        source = "- Step one\n- Step two"
+        response = "- Paso uno\n- Paso dos"
+        reason = LLMModelBackend._validate_llm_response(response, source, self._prompt())
+        assert reason is None
+
+    def test_rule_header_leak_structural_translated(self):
+        """Language-agnostic structural match: a short colon-terminated
+        header line followed by list markers, regardless of the word used
+        for 'Rules' in the target language."""
+        response = "Reglas:\n- uno\n- dos\n"
+        reason = LLMModelBackend._validate_llm_response(response, "Do", self._prompt())
+        assert reason in ("rule_header_leak", "list_marker_leak")
+
+
+class TestLlmEchoRejectIntegration:
+    """End-to-end: translate() must passthrough source on an echo/refusal
+    response, and record the reject reason for provenance."""
+
+    def test_translate_passes_through_on_rule_echo(self, ollama_model_info):
+        backend = LLMModelBackend(ollama_model_info, device="api")
+        backend.loaded = True
+
+        mock_provider = MagicMock()
+        mock_provider.generate.return_value = (
+            "Rules:\n- Output ONLY the translation\n- Do not add commentary\n",
+            10,
+            8,
+        )
+        backend._provider = mock_provider
+
+        result = backend.translate(["Do"], "en", "es")
+        assert result == ["Do"]  # passthrough, not the echoed rules
+        assert backend.last_reject_reasons.get(0) is not None
+
+    def test_translate_passes_through_on_refusal(self, ollama_model_info):
+        backend = LLMModelBackend(ollama_model_info, device="api")
+        backend.loaded = True
+
+        mock_provider = MagicMock()
+        mock_provider.generate.return_value = ("I cannot translate this.", 5, 5)
+        backend._provider = mock_provider
+
+        result = backend.translate(["Hello"], "en", "es")
+        assert result == ["Hello"]
+        assert backend.last_reject_reasons.get(0) == "refusal"
+
+    def test_translate_accepts_legitimate_translation(self, ollama_model_info):
+        backend = LLMModelBackend(ollama_model_info, device="api")
+        backend.loaded = True
+
+        mock_provider = MagicMock()
+        mock_provider.generate.return_value = ("Hola", 5, 3)
+        backend._provider = mock_provider
+
+        result = backend.translate(["Hello"], "en", "es")
+        assert result == ["Hola"]
+        assert 0 not in backend.last_reject_reasons
+
+    def test_packed_batch_rejects_per_item_echo(self, ollama_model_info):
+        """One segment in a packed batch refuses; the other is legit — only
+        the refusing segment should be rejected/passed-through. (Packed
+        output is one line per <<<SEG_N>>> marker, so the echo/refusal
+        fixture here must be single-line to survive _parse_packed_output.)
+        """
+        backend = LLMModelBackend(ollama_model_info, device="api")
+        backend.loaded = True
+
+        mock_provider = MagicMock()
+        mock_provider.generate.return_value = (
+            "<<<SEG_1>>> Hola\n<<<SEG_2>>> I cannot translate this content.",
+            20,
+            15,
+        )
+        backend._provider = mock_provider
+
+        result = backend.translate(["Hello", "Goodbye"], "en", "es")
+        assert result[0] == "Hola"
+        assert result[1] == "Goodbye"  # rejected → passthrough source
+        assert 1 in backend.last_reject_reasons
+        assert 0 not in backend.last_reject_reasons
+
+    def test_reject_reasons_reset_between_calls(self, ollama_model_info):
+        backend = LLMModelBackend(ollama_model_info, device="api")
+        backend.loaded = True
+
+        mock_provider = MagicMock()
+        mock_provider.generate.return_value = ("I cannot translate this.", 5, 5)
+        backend._provider = mock_provider
+        backend.translate(["Hello"], "en", "es")
+        assert 0 in backend.last_reject_reasons
+
+        mock_provider.generate.return_value = ("Hola", 5, 3)
+        backend.translate(["Hello"], "en", "es")
+        assert 0 not in backend.last_reject_reasons
