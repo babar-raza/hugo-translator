@@ -162,6 +162,95 @@ class TestTMLookupAndTranslation:
 
 
 # ---------------------------------------------------------------------------
+# TC-HT-004: legacy reconstruction path retired
+# ---------------------------------------------------------------------------
+
+
+def _make_legacy_site_profile(*, allow_legacy_reconstruction=False):
+    """Real BodyRules (not MagicMock) so use_ast_body_reconstruction/
+    allow_legacy_reconstruction booleans behave normally -- MagicMock
+    auto-vivifies any attribute access as a truthy Mock, which would
+    silently defeat the `not use_ast` / `not allow_legacy` guard. Uses the
+    real pydantic model so all other attributes SegmentExtractor needs
+    (preserve_patterns, preserve_blocks, ...) have correct defaults.
+    """
+    from src.utils.models import BodyRules
+
+    body = BodyRules(
+        translate_markdown=True,
+        use_ast_body_reconstruction=False,
+        allow_legacy_reconstruction=allow_legacy_reconstruction,
+    )
+    site_profile = MagicMock()
+    site_profile.site_id = "test-site"
+    site_profile.body = body
+    return site_profile
+
+
+class TestLegacyReconstructionRetired:
+    def test_profile_false_without_escape_hatch_raises(self):
+        from src.translation_engine.exceptions import SiteProfileConfigError
+
+        engine = _make_engine()
+        translator = SegmentTranslator(engine)
+        stats = _make_stats()
+        seg = _make_segment()
+        tm_result = MagicMock()
+        tm_result.hit = False
+        tm_result.source = None
+        engine.tm.lookup.return_value = tm_result
+
+        site_profile = _make_legacy_site_profile(allow_legacy_reconstruction=False)
+
+        with pytest.raises(SiteProfileConfigError, match="allow_legacy_reconstruction"):
+            translator.translate_to_language(
+                site_id="test",
+                site_profile=site_profile,
+                doc=MagicMock(ast=None, frontmatter={"title": "Test"}),
+                segments=[seg],
+                source_lang="en",
+                target_lang="de",
+                force=False,
+                stats=stats,
+            )
+
+    def test_profile_false_with_escape_hatch_proceeds(self):
+        """allow_legacy_reconstruction=true permits the legacy path (no raise)."""
+        from src.translation_engine.exceptions import SiteProfileConfigError
+
+        engine = _make_engine()
+        translator = SegmentTranslator(engine)
+        stats = _make_stats()
+        seg = _make_segment()
+        tm_result = MagicMock()
+        tm_result.hit = False
+        tm_result.source = None
+        engine.tm.lookup.return_value = tm_result
+
+        site_profile = _make_legacy_site_profile(allow_legacy_reconstruction=True)
+
+        # Should not raise our config error -- proceeds into the legacy
+        # MarkdownReconstructor path (may hit unrelated mock-shape errors
+        # deeper in that path given the minimal engine mock; only our
+        # config error is this test's concern).
+        try:
+            translator.translate_to_language(
+                site_id="test",
+                site_profile=site_profile,
+                doc=MagicMock(ast=None, frontmatter={"title": "Test"}),
+                segments=[seg],
+                source_lang="en",
+                target_lang="de",
+                force=False,
+                stats=stats,
+            )
+        except SiteProfileConfigError:
+            pytest.fail("allow_legacy_reconstruction=True must not raise SiteProfileConfigError")
+        except Exception:
+            pass  # unrelated downstream mock-shape errors are not this test's concern
+
+
+# ---------------------------------------------------------------------------
 # TC-BUGFIX-A: Temperature application on retries
 # ---------------------------------------------------------------------------
 

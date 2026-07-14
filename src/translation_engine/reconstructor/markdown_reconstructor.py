@@ -243,6 +243,11 @@ class MarkdownReconstructor:
             # Preserve code blocks as-is
             lang = node.attrs.get("lang", "")
             code = node.raw or ""
+            # TC-HT-004: ensure a newline before the closing fence idempotently
+            # -- code already ends with \n in the common case, so appending
+            # unconditionally would introduce a spurious blank line.
+            if code and not code.endswith("\n"):
+                code += "\n"
             if lang:
                 return f"```{lang}\n{code}```"
             else:

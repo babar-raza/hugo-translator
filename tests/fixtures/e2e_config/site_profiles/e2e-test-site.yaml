@@ -31,7 +31,9 @@ body:
     - "html_block"
   translate_image_alt: true
   translate_link_titles: true
+  # TC-HT-004: legacy path retired; escape hatch required.
   use_ast_body_reconstruction: false
+  allow_legacy_reconstruction: true
 
 # Output configuration
 output_layout:

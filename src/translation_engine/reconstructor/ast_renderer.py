@@ -14,6 +14,23 @@ from ..parser.ast_nodes import ASTNode, NodeType
 
 logger = logging.getLogger(__name__)
 
+# TC-HT-004: block-level node types that must survive paragraph
+# flatten/reparse alongside inline-formatted text. Previously only
+# CODE_BLOCK/LIST were preserved, silently dropping BLOCKQUOTE, TABLE, and
+# THEMATIC_BREAK children that coexist with translatable inline text.
+_BLOCK_LEVEL_TYPES = frozenset({
+    NodeType.HEADING,
+    NodeType.LIST,
+    NodeType.LIST_ITEM,
+    NodeType.BLOCKQUOTE,
+    NodeType.CODE_BLOCK,
+    NodeType.TABLE,
+    NodeType.TABLE_ROW,
+    NodeType.TABLE_CELL,
+    NodeType.THEMATIC_BREAK,
+    NodeType.BLOCK_HTML,
+})
+
 
 class ASTRenderer:
     """
@@ -682,11 +699,12 @@ class ASTRenderer:
                         strong_count = sum(1 for c in new_children if c.type == NodeType.STRONG)
                         logger.info(f"[FIX-MARKDOWN-PRESERVATION]   STRONG nodes: {strong_count}")
 
-                    # Preserve block-level children (nested LIST, CODE_BLOCK) that
-                    # coexist with inline formatting — same fix as the flatten path below.
+                    # Preserve ALL block-level children (not just LIST/CODE_BLOCK)
+                    # that coexist with inline formatting — same fix as the
+                    # flatten path below (TC-HT-004).
                     block_children = [
                         child for child in node.children
-                        if child.type in (NodeType.CODE_BLOCK, NodeType.LIST)
+                        if child.type in _BLOCK_LEVEL_TYPES
                     ]
 
                     # Replace children with re-parsed inline nodes + preserved block children
@@ -704,12 +722,14 @@ class ASTRenderer:
 
                     # Bug 4: Preserve block-level children — flattening must not destroy them.
                     # A container can have a full-sentence TextUnit for its inline text
-                    # AND also contain CODE_BLOCK or nested LIST children (which are either
-                    # extracted as do_not_translate units or have their own units). Keep
-                    # block-level children alongside the translated text node.
+                    # AND also contain CODE_BLOCK, LIST, BLOCKQUOTE, TABLE, or other
+                    # block-level children (which are either extracted as
+                    # do_not_translate units or have their own units). Keep ALL
+                    # block-level children alongside the translated text node
+                    # (TC-HT-004: widened from CODE_BLOCK/LIST only).
                     block_children = [
                         child for child in node.children
-                        if child.type in (NodeType.CODE_BLOCK, NodeType.LIST)
+                        if child.type in _BLOCK_LEVEL_TYPES
                     ]
 
                     text_node = ASTNode(
@@ -866,7 +886,13 @@ class ASTRenderer:
         elif node.type == NodeType.CODE_BLOCK:
             lang = node.attrs.get('lang', '')
             code = node.raw or ""
-            return f"```{lang}\n{code}\n```\n\n"
+            # TC-HT-004: idempotent newline before the closing fence -- code
+            # already ends with \n in the common case; unconditionally
+            # appending one (as this site used to) produced a spurious blank
+            # line inside every code fence.
+            if code and not code.endswith("\n"):
+                code += "\n"
+            return f"```{lang}\n{code}```\n\n"
 
         elif node.type == NodeType.LINK:
             url = node.attrs.get('url', '')

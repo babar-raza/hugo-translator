@@ -64,10 +64,14 @@ body:
   # Translate link titles
   translate_link_titles: true
 
-  # AST-based body reconstruction (NEW)
+  # AST-based body reconstruction
   # When enabled, uses node-addressed AST translation for 100% structure preservation
-  # When disabled, uses legacy placeholder-based approach
-  use_ast_body_reconstruction: false  # Default: false (gradual rollout)
+  # When disabled, uses legacy placeholder-based approach.
+  # TC-HT-004: the legacy path is retired everywhere except this
+  # intentional backward-compat test fixture (test_cli_backward_compat.py
+  # etc.) -- allow_legacy_reconstruction is required to set this to false.
+  use_ast_body_reconstruction: false
+  allow_legacy_reconstruction: true
 
   # AST segmentation strategy (only used if use_ast_body_reconstruction is true)
   # Options:

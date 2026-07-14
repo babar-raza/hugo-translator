@@ -1760,6 +1760,10 @@ class TextUnitExtractor:
             # Return fenced representation with trailing \n\n to match renderer output.
             lang = node.attrs.get("lang", "") if node.attrs else ""
             code = node.raw or ""
+            # TC-HT-004: idempotent newline before the closing fence -- code
+            # already ends with \n in the common case.
+            if code and not code.endswith("\n"):
+                code += "\n"
             return f"```{lang}\n{code}```\n\n"
 
         # Default: recurse through children

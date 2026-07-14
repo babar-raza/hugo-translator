@@ -213,6 +213,10 @@ class TestASTEndToEnd:
         # Get site profile and modify AST flag
         site_profile = config_service.get_site_profile("kb.aspose.net")
         site_profile.body.use_ast_body_reconstruction = use_ast
+        if not use_ast:
+            # TC-HT-004: legacy path retired -- escape hatch required for
+            # this intentional legacy-vs-AST comparison test.
+            site_profile.body.allow_legacy_reconstruction = True
 
         # Translate
         result = engine.translate_file(

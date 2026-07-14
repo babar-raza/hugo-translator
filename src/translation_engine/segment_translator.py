@@ -809,7 +809,18 @@ class SegmentTranslator:
                 raise RuntimeError(f"Translation failed: {e}")
 
         # Step 3: Reconstruct document (AST-based or legacy)
-        use_ast = getattr(site_profile.body, "use_ast_body_reconstruction", False)
+        # TC-HT-004: legacy path retired -- default flipped to True. An
+        # explicit `false` requires the allow_legacy_reconstruction escape
+        # hatch (tests-only) or this raises immediately.
+        use_ast = getattr(site_profile.body, "use_ast_body_reconstruction", True)
+        if not use_ast and not getattr(site_profile.body, "allow_legacy_reconstruction", False):
+            from .exceptions import SiteProfileConfigError
+
+            raise SiteProfileConfigError(
+                f"{getattr(site_profile, 'site_id', '<unknown>')}: "
+                "use_ast_body_reconstruction=false requires allow_legacy_reconstruction=true "
+                "(legacy path is retired; this is a tests-only escape hatch)."
+            )
 
         if use_ast:
             logger.info("Using AST-based body reconstruction for translation")
@@ -898,147 +909,12 @@ class SegmentTranslator:
                 if segment.context and segment.context.node_id:
                     segment_map[segment.context.node_id] = segment.id
 
-            # TC-TBL-012 / Layer 3: Protect markdown tables before passing to legacy
-            # MarkdownReconstructor. The legacy path sends raw markdown to the model;
-            # if the model sees pipe characters it generates tables with 3×+ extra rows.
-            # Solution: replace each table block with a placeholder, reconstruct without
-            # table content, then restore original tables from placeholders.
-            _TABLE_BLOCK_RE = _re_legacy_diag.compile(
-                r"((?:^[ \t]*\|[^\n]+\n)+)",
-                _re_legacy_diag.MULTILINE,
-            )
-            _table_placeholder_map: dict[str, str] = {}
-            _table_counter = [0]
-
-            def _replace_table(m: "_re_legacy_diag.Match") -> str:  # type: ignore[name-defined]
-                key = f"\x00TABLE_{_table_counter[0]}\x00"
-                _table_placeholder_map[key] = m.group(0)
-                _table_counter[0] += 1
-                return key
-
-            # Protect Hugo shortcodes first — before code blocks so that shortcodes
-            # inside prose paragraphs are hidden from the model.  Pattern covers both
-            # {{< ... >}} (regular) and {{% ... %}} (markdown) shortcodes.  Each tag is
-            # protected individually; multi-line block shortcodes (open + close) are
-            # captured as two separate tokens, which restores cleanly.
-            _SHORTCODE_LEGACY_RE = _re_legacy_diag.compile(
-                r"(\{\{[<%][^\n]*?[>%]\}\})"
-            )
-            _shortcode_placeholder_map: dict[str, str] = {}
-            _shortcode_counter = [0]
-
-            def _replace_shortcode(m: "_re_legacy_diag.Match") -> str:  # type: ignore[name-defined]
-                key = f"\x00SHORTCODE_{_shortcode_counter[0]}\x00"
-                _shortcode_placeholder_map[key] = m.group(0)
-                _shortcode_counter[0] += 1
-                return key
-
-            # Protect fenced code blocks after shortcodes. Models in the legacy
-            # path drop opening ``` fences, leaving code as plain text. Code blocks must
-            # be protected so that pipe characters inside code blocks are not
-            # mistakenly matched by the table regex above.
-            _CODE_BLOCK_RE = _re_legacy_diag.compile(
-                r"(```[^\n]*\n(?:(?!```)[\s\S])*?```[ \t]*)",
-                _re_legacy_diag.MULTILINE,
-            )
-            _code_placeholder_map: dict[str, str] = {}
-            _code_counter = [0]
-
-            def _replace_code(m: "_re_legacy_diag.Match") -> str:  # type: ignore[name-defined]
-                key = f"\x00CODE_{_code_counter[0]}\x00"
-                _code_placeholder_map[key] = m.group(0)
-                _code_counter[0] += 1
-                return key
-
-            _raw_for_legacy = ""
-            if getattr(doc, "source_path", None):
-                try:
-                    from pathlib import Path as _Path
-                    _raw_for_legacy = _Path(doc.source_path).read_text(
-                        encoding=getattr(doc, "encoding", None) or "utf-8",
-                        errors="replace",
-                    )
-                except OSError:
-                    pass
-
-            # Protect link URLs so relative paths like ../../path/ are not
-            # corrupted by the model.  Only the URL portion is replaced; the
-            # link text [text] is still translated.  Applied AFTER code block
-            # protection so that URLs inside code blocks are already hidden.
-            _LINK_URL_RE = _re_legacy_diag.compile(
-                r"(\[(?:[^\[\]]*)\])\(([^)]+)\)"
-            )
-            _link_url_map: dict[str, str] = {}
-            _link_counter = [0]
-
-            def _replace_link_url(m: "_re_legacy_diag.Match") -> str:  # type: ignore[name-defined]
-                key = f"\x00LINK_{_link_counter[0]}\x00"
-                _link_url_map[key] = m.group(2)
-                _link_counter[0] += 1
-                # Keep [text] intact; only the URL inside (...) is replaced
-                return m.group(1) + f"({key})"
-
-            # Apply shortcode protection first, then code blocks, link URLs, then tables
-            _protected_raw = _SHORTCODE_LEGACY_RE.sub(_replace_shortcode, _raw_for_legacy)
-            if _shortcode_placeholder_map:
-                logger.info(
-                    f"SHORTCODE-PROTECT: shielded {len(_shortcode_placeholder_map)} shortcode(s) "
-                    f"from legacy reconstruction to prevent shortcode corruption"
-                )
-
-            _protected_raw = _CODE_BLOCK_RE.sub(_replace_code, _protected_raw)
-            if _code_placeholder_map:
-                logger.info(
-                    f"CODE-PROTECT: shielded {len(_code_placeholder_map)} code block(s) "
-                    f"from legacy reconstruction to prevent fence dropping"
-                )
-
-            _protected_raw = _LINK_URL_RE.sub(_replace_link_url, _protected_raw)
-            if _link_url_map:
-                logger.info(
-                    f"LINK-PROTECT: shielded {len(_link_url_map)} link URL(s) "
-                    f"from legacy reconstruction to prevent path corruption"
-                )
-
-            if _TABLE_BLOCK_RE.search(_protected_raw):
-                _protected_content = _TABLE_BLOCK_RE.sub(_replace_table, _protected_raw)
-            else:
-                _protected_content = _protected_raw
-
-            if _table_placeholder_map:
-                logger.info(
-                    f"TABLE-PROTECT: shielded {len(_table_placeholder_map)} table(s) "
-                    f"from legacy reconstruction to prevent row-count corruption"
-                )
-
-            # Temporarily swap doc.content for the protected version
-            _original_doc_content = getattr(doc, "content", None)
-            if (_shortcode_placeholder_map or _code_placeholder_map or _table_placeholder_map) and hasattr(doc, "content"):
-                doc.content = _protected_content
-
             reconstructor = MarkdownReconstructor(site_profile)
             translated_doc = reconstructor.reconstruct_document(
                 doc, translations, target_lang, segment_map=segment_map
             )
 
             translated_content = str(translated_doc)
-
-            # Restore protected tables, link URLs, code blocks, then shortcodes
-            if _table_placeholder_map:
-                for _key, _original_table in _table_placeholder_map.items():
-                    translated_content = translated_content.replace(_key, _original_table)
-            if _link_url_map:
-                for _key, _original_url in _link_url_map.items():
-                    translated_content = translated_content.replace(_key, _original_url)
-            if _code_placeholder_map:
-                for _key, _original_code in _code_placeholder_map.items():
-                    translated_content = translated_content.replace(_key, _original_code)
-            if _shortcode_placeholder_map:
-                for _key, _original_sc in _shortcode_placeholder_map.items():
-                    translated_content = translated_content.replace(_key, _original_sc)
-            # Restore doc.content
-            if (_shortcode_placeholder_map or _code_placeholder_map or _table_placeholder_map) and hasattr(doc, "content") and _original_doc_content is not None:
-                doc.content = _original_doc_content
 
         stats.tokens_total = stats.tokens_cached + stats.tokens_input + stats.tokens_output
 

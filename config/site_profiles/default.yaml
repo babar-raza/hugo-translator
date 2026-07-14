@@ -78,6 +78,7 @@ frontmatter:
 # Default Body Processing Rules
 body:
   translate_markdown: true
+  use_ast_body_reconstruction: true
   preserve_blocks:
     - block_code
     - codespan

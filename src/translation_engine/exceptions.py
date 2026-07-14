@@ -189,3 +189,15 @@ class ShutdownRequested(TranslationError):
         super().__init__(message)
         self.file_path = file_path
         self.segments_completed = segments_completed
+
+
+class SiteProfileConfigError(TranslationError):
+    """Raised when a site profile's configuration is invalid or unsafe.
+
+    TC-HT-004: used when a profile explicitly disables AST body
+    reconstruction without the ``allow_legacy_reconstruction`` escape
+    hatch -- the legacy path is retired, so this must fail fast at
+    translate-time rather than silently falling back to a corruption-prone
+    code path.
+    """
+    pass

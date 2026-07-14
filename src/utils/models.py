@@ -56,10 +56,18 @@ class BodyRules(BaseModel):
 
     # AST-based complete body reconstruction
     use_ast_body_reconstruction: bool = Field(
-        default=False,
+        default=True,
         description="Use AST-based complete body reconstruction for translation. "
                     "When true, uses node-addressed translation with full structure preservation. "
-                    "When false, uses existing placeholder approach."
+                    "When false, uses the retired legacy placeholder approach (requires "
+                    "allow_legacy_reconstruction=true; TC-HT-004)."
+    )
+    allow_legacy_reconstruction: bool = Field(
+        default=False,
+        description="TC-HT-004: tests-only escape hatch. Required alongside "
+                    "use_ast_body_reconstruction=false -- the legacy reconstruction path "
+                    "is retired in production; setting this without understanding why is "
+                    "not supported."
     )
     ast_segmentation_strategy: str = Field(
         default="adaptive",

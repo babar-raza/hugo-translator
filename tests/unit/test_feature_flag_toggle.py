@@ -45,7 +45,7 @@ class TestFeatureFlagToggle:
             content_roots=["content"],
             default_source_lang="en",
             target_langs=["de", "fr"],
-            body=BodyRules(translate_markdown=True),  # use_ast defaults to False
+            body=BodyRules(translate_markdown=True),  # use_ast defaults to True (TC-HT-004)
             frontmatter={},
         )
 
@@ -67,19 +67,19 @@ class TestFeatureFlagToggle:
         use_ast = getattr(site_profile_ast_disabled.body, "use_ast_body_reconstruction", False)
         assert use_ast is False
 
-    def test_flag_default_is_false(self, site_profile_default):
-        """Default value for use_ast_body_reconstruction is False."""
-        # Verify default is False
-        assert site_profile_default.body.use_ast_body_reconstruction is False
+    def test_flag_default_is_true(self, site_profile_default):
+        """Default value for use_ast_body_reconstruction is True (TC-HT-004: legacy retired)."""
+        # Verify default is True
+        assert site_profile_default.body.use_ast_body_reconstruction is True
 
-        # Verify getattr returns False for default
-        use_ast = getattr(site_profile_default.body, "use_ast_body_reconstruction", False)
-        assert use_ast is False
+        # Verify getattr returns True for default
+        use_ast = getattr(site_profile_default.body, "use_ast_body_reconstruction", True)
+        assert use_ast is True
 
     def test_body_rules_default_value(self):
-        """BodyRules has correct default for use_ast_body_reconstruction."""
+        """BodyRules has correct default for use_ast_body_reconstruction (TC-HT-004)."""
         body_rules = BodyRules(translate_markdown=True)
-        assert body_rules.use_ast_body_reconstruction is False
+        assert body_rules.use_ast_body_reconstruction is True
 
     def test_body_rules_explicit_true(self):
         """BodyRules accepts explicit True value."""
@@ -105,7 +105,7 @@ class TestFeatureFlagToggle:
         assert profile.body.use_ast_body_reconstruction is True
 
     def test_flag_missing_from_dict_uses_default(self):
-        """Missing flag in config uses default (False)."""
+        """Missing flag in config uses default (True, TC-HT-004)."""
         config_dict = {
             "site_id": "test.site.net",
             "content_roots": ["content"],
@@ -115,7 +115,7 @@ class TestFeatureFlagToggle:
             "frontmatter": {},
         }
         profile = SiteProfile(**config_dict)
-        assert profile.body.use_ast_body_reconstruction is False
+        assert profile.body.use_ast_body_reconstruction is True
 
 
 class TestASTMethodExists:
@@ -156,7 +156,7 @@ class TestFlagInEngineLogic:
         use_ast = getattr(profile_legacy.body, "use_ast_body_reconstruction", False)
         assert use_ast is False, "Flag=False should trigger legacy path"
 
-        # Test with missing attribute (fallback to False)
+        # Test with missing attribute (fallback to True, TC-HT-004: legacy retired)
         class MockBodyNoAttr:
             pass
 
@@ -165,8 +165,8 @@ class TestFlagInEngineLogic:
                 self.body = MockBodyNoAttr()
 
         profile_no_attr = MockProfileNoAttr()
-        use_ast = getattr(profile_no_attr.body, "use_ast_body_reconstruction", False)
-        assert use_ast is False, "Missing attribute should default to False"
+        use_ast = getattr(profile_no_attr.body, "use_ast_body_reconstruction", True)
+        assert use_ast is True, "Missing attribute should default to True"
 
 
 if __name__ == "__main__":

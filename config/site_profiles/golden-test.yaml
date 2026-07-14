@@ -32,7 +32,10 @@ body:
     - "codespan"
   translate_image_alt: false
   translate_link_titles: false
+  # TC-HT-004: legacy path retired everywhere except this intentional
+  # backward-compat/dry-run/cache-refresh test fixture.
   use_ast_body_reconstruction: false
+  allow_legacy_reconstruction: true
 
 # Output configuration
 output_layout:
