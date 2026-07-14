@@ -1,0 +1,44 @@
+mission_id: HT-PRODUCER-FIX-001
+session_id: translator-producer-fix-20260714
+stage: 3
+review_type: independent_adversarial_self_review
+issues:
+  - id: L1-SR-001
+    title: "TC-HT-003 LLM-echo validation remains mocked-provider-only"
+    status: ACCEPTED_LIMITATION
+    detail: >
+      Not a new finding -- pre-accepted in the master plan's own "Remaining
+      True Blockers" section before this convergence session began. Carried
+      forward here for completeness of the self-review, not because it is
+      newly discovered or reopened.
+    disposition: no_action_this_mission
+  - id: L1-SR-002
+    title: "TC-HT-007 consumer_intake leak-phrase list is fixed EN/ES only"
+    status: ACCEPTED_LIMITATION
+    detail: >
+      Documented in the original TC-HT-007 implementation as a known,
+      disclosed limitation; TC-HT-003's language-agnostic structural
+      validation is the intended backstop for other locales.
+    disposition: no_action_this_mission
+  - id: L1-SR-003
+    title: "TC-HT-002-A / TC-HT-006-A proofs are one-off runs, not added as permanent regression tests"
+    status: ACCEPTED_LIMITATION
+    detail: >
+      Both taskcards were explicitly scoped as proof-only
+      (required_implementation: none) in Stage 2. This is a deliberate,
+      correct scope choice for LOW-severity, non-blocking follow-ups, not an
+      oversight -- adding permanent tests for a one-time audit proof would
+      be scope creep beyond what Stage 1 flagged as necessary.
+    disposition: no_action_this_mission
+  - id: L1-SR-004
+    title: "workspace/quarantine/ test-artifact side effect from AUDIT-002 proof"
+    status: RESOLVED_NON_ISSUE
+    detail: >
+      Confirmed via git check-ignore that /workspace/ is gitignored
+      (.gitignore:205) -- no tracked-file impact. Left in place as harmless
+      local debris, consistent with pre-existing quarantine files already
+      present from prior real runs.
+    disposition: no_action_needed
+count_total: 4
+count_blocking: 0
+count_requiring_action: 0

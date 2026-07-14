@@ -1,0 +1,55 @@
+# Terminal Closure Record
+mission_id: HT-PRODUCER-FIX-001
+session_id: translator-producer-fix-20260714
+closed: 2026-07-14
+closure_type: RETROACTIVE_CONVERGENCE
+terminal_state: TERMINAL_CLOSED_WITHIN_MISSION_SCOPE
+
+scope_of_this_closure: >
+  This TERMINAL_CLOSED record covers this repository's (hugo-translator's)
+  own producer-side scope only: the 11 core mission taskcards
+  (TC-HT-001..011) plus this session's 3 governance follow-up taskcards
+  (TC-HT-AUDIT-001, TC-HT-002-A, TC-HT-006-A), all `completed_verified` /
+  CLOSED with real evidence, all quality dimensions >= 4/5, zero reroutes,
+  zero fabricated evidence, zero net-new code regressions.
+
+  This closure does NOT and cannot claim the parent 2026-07-12 wave-3
+  incident is fully closed end-to-end. Two items remain explicitly
+  operator-owned and outside this session's autonomous authority:
+    1. The push decision for 9 local mission commits (f29c7cc..3112844) to origin.
+    2. The separate, operator-supervised aspose.org pilot-to-production
+       session (TC-HT-011's deferred write-and-commit-gate proof step).
+  Per stage2-plan/stage2-anti-overclaim-rules.md rule 3, these must always
+  be reported as separate open items, never conflated with this repo's own
+  closure.
+
+  TC-HT-INFRA-001 (pytest full-suite non-determinism root-cause) is
+  recorded as PROPOSED_DEFERRED for a future infrastructure session — not
+  part of this mission's scope, not a blocker.
+
+verdict: EXECUTION_COMPLETE_VERIFIED
+final_all_green_candidate_status: ALL_GREEN_WITHIN_MISSION_SCOPE
+final_all_green_candidate_record: final-all-green-candidate.yaml
+
+evidence_trail:
+  - stage1-audit/ (post-sprint strict evidence audit; 5 issues found, all dispositioned)
+  - stage2-plan/ (plan hardening: master plan synced, 2 follow-up taskcards closed, 1 deferred, 18 required Stage 2 outputs produced)
+  - stage3-execution/ (controlled execution scoring: 13 taskcards x 15 dimensions, all >=4/5, zero reroutes; declaration-review-package zip bundling all evidence)
+  - convergence-binding.yaml (binding record, including post-hardening plan hash)
+  - Master plan of record: C:/Users/prora/.claude/plans/translator-producer-fix.md (hardened, governance closure record appended)
+
+commits_this_session: []
+commits_this_session_note: >
+  This convergence session's own work (governance artifacts + 2 proof runs)
+  produced no code changes and therefore no code commits. The one repo
+  commit from this closure step is the addition of the
+  .supervisor/state/translator-producer-fix-20260714/ directory itself
+  (force-added per established precedent from 3 prior missions under
+  .supervisor/state/, since /.supervisor/state is gitignored for new files).
+  The 9 real mission commits (f29c7cc..3112844) were made in the PRIOR
+  implementation session, before this governance binding existed.
+
+do_not_reopen_without:
+  - "New evidence contradicting a specific CLOSED taskcard's proof"
+  - "A code change to any file this mission touched"
+  - "Operator decision on the push or aspose.org session, which would advance (not reopen) this record"

@@ -1,0 +1,24 @@
+mission_id: HT-PRODUCER-FIX-001
+session_id: translator-producer-fix-20260714
+lanes:
+  retroactive-convergence-session:
+    owner: this session (Claude, bound per convergence-binding.yaml)
+    taskcards: [TC-HT-AUDIT-001, TC-HT-002-A, TC-HT-006-A]
+    status: all_closed
+  operator-owned-followups:
+    owner: human operator (prorata.net@gmail.com)
+    items:
+      - "Push decision for 9 local-only mission commits (f29c7cc..3112844) to origin"
+      - "Separate, operator-supervised aspose.org session for TC-HT-011's pilot-to-production copy-and-commit-gate-proof step"
+    status: not_started
+    blocking_this_mission_closure: false
+    reason_not_blocking: >
+      Both items were explicitly scoped out of this repo's autonomous work
+      in check-and-plan-modular-ladybug.md's own "Scope decisions" section
+      and reaffirmed in the master plan's Closeout Criteria (4, 5 marked
+      NOT YET DONE / operator-owned).
+  future-infrastructure-session:
+    owner: unassigned (future session, not this mission)
+    taskcards: [TC-HT-INFRA-001]
+    status: proposed_deferred
+    blocking_this_mission_closure: false

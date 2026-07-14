@@ -1,0 +1,25 @@
+mission_id: HT-PRODUCER-FIX-001
+session_id: translator-producer-fix-20260714
+stage: 2
+note: >
+  This DAG covers only the 4 new follow-up taskcards from this convergence
+  pass. The original 11-taskcard mission DAG (dependency order 001 -> 002 ->
+  005 -> 003 -> 006 -> 004 -> 007 -> 010 -> 011, with 009 independent) is
+  already recorded in check-and-plan-modular-ladybug.md's "Execution order"
+  section and was already fully executed; it is not re-derived here.
+nodes:
+  TC-HT-AUDIT-001:
+    depends_on: []
+    state: CLOSED
+  TC-HT-002-A:
+    depends_on: [TC-HT-002, TC-HT-007]
+    state: CLOSED
+  TC-HT-006-A:
+    depends_on: [TC-HT-006]
+    state: CLOSED
+  TC-HT-INFRA-001:
+    depends_on: []
+    state: PROPOSED_DEFERRED
+    note: "Independent of and non-blocking to all other nodes; intentionally not executed this mission"
+critical_path_to_closure: [TC-HT-AUDIT-001, TC-HT-002-A, TC-HT-006-A]
+critical_path_status: all_closed

@@ -1,0 +1,39 @@
+taskcard_id: TC-HT-006-A
+title: Verify .local/unified_translate.py syntax after startup-safety-log addition
+source_issue_ids: [AUDIT-003]
+source_issue_level: L1_EXECUTION
+source_audit_finding: >
+  A print() line was added to the gitignored .local/unified_translate.py
+  (startup safety-flag logging, part of TC-HT-006) and reviewed by direct
+  code read, but the script was never executed or syntax-checked this
+  session.
+why_it_matters: >
+  A syntax or indentation error in this line would only surface the next
+  time this script is actually launched for a real shard — an operator
+  action outside this session's scope, at which point it would block a real
+  translation run.
+risk_addressed: >
+  Operator-facing runtime failure on next shard launch due to an unverified
+  code change.
+status: completed_verified
+lane_owner: this-session (retroactive convergence)
+supervisor_role: plan-hardening-agent
+required_implementation: none (no code change required — verification-only taskcard)
+required_verification: "python -m py_compile .local/unified_translate.py"
+required_evidence: "Command output: SYNTAX OK, exit 0"
+quality_dimensions: [correctness, low_risk_verification]
+scoring_rubric: "5/5 — trivial, safe, conclusive check performed and passed"
+reroute_rule_if_score_below_4: "N/A — closed at 5/5"
+acceptance_criteria:
+  - "py_compile succeeds with no SyntaxError/IndentationError"
+stop_conditions:
+  - "A compile error would have reopened this as a real defect requiring a code fix before mission closure"
+allowed_paths: [".local/unified_translate.py"]
+forbidden_paths: []
+dependencies: [TC-HT-006]
+closeout_rules: "Close on successful py_compile output; no code change expected or made"
+machine_state: CLOSED
+validation_commands:
+  - ".venv/Scripts/python.exe -m py_compile .local/unified_translate.py"
+disposition: taskcard_required
+outcome: closed_this_session

@@ -1,0 +1,42 @@
+mission_id: HT-PRODUCER-FIX-001
+session_id: translator-producer-fix-20260714
+stage: 2
+taskcards:
+  - id: TC-HT-AUDIT-001
+    title: Synchronize external master plan with actual mission completion state
+    source: AUDIT-001
+    machine_state: CLOSED
+    file: stage2-taskcards/TC-HT-AUDIT-001.yaml
+  - id: TC-HT-002-A
+    title: Prove safe_io.py batch-scale write/quarantine behavior against real content
+    source: AUDIT-002
+    machine_state: CLOSED
+    file: stage2-taskcards/TC-HT-002-A.yaml
+  - id: TC-HT-006-A
+    title: Verify .local/unified_translate.py syntax after startup-safety-log addition
+    source: AUDIT-003
+    machine_state: CLOSED
+    file: stage2-taskcards/TC-HT-006-A.yaml
+  - id: TC-HT-INFRA-001
+    title: Root-cause pytest full-suite non-determinism at ~7000-test scale on Windows
+    source: AUDIT-004
+    machine_state: PROPOSED_DEFERRED
+    file: stage2-taskcards/TC-HT-INFRA-001.yaml
+    note: "Explicitly out of this mission's scope; not a blocker for closure"
+pre_existing_taskcards_not_regenerated:
+  note: >
+    TC-HT-001 through TC-HT-011 are the original mission taskcards from
+    plans/HT-PRODUCER-FIX-001-implementation-brief.md and
+    check-and-plan-modular-ladybug.md. They were fully executed in the prior
+    (non-.supervisor-tracked) implementation session, not re-generated here.
+    Their status is recorded in the master plan
+    (C:/Users/prora/.claude/plans/translator-producer-fix.md) and summarized
+    in stage1-audit/stage1-sprint-audit-summary.md. Regenerating them as
+    stage2-taskcards/*.yaml would duplicate, not add, information.
+  ids: [TC-HT-001, TC-HT-002, TC-HT-003, TC-HT-004, TC-HT-005, TC-HT-006, TC-HT-007, TC-HT-009, TC-HT-010, TC-HT-011]
+  all_status: completed_verified
+summary:
+  total_new_taskcards: 4
+  closed: 3
+  proposed_deferred: 1
+  blocking_this_mission: 0

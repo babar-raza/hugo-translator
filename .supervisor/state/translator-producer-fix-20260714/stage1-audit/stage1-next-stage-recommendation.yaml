@@ -1,0 +1,19 @@
+final_verdict: SPRINT_REQUIRES_PLAN_HARDENING
+reasoning: >
+  Core implementation, verification, and E2E proof are strong (see
+  stage1-evidence-quality-verdict.md: ADEQUATE_WITH_LIMITATIONS, not WEAK).
+  However AUDIT-001 (master plan not synced) requires a plan amendment
+  before this mission can be honestly classified all-green, and AUDIT-002/
+  003 are small, cheap, safe follow-ups that should be taskcarded and
+  closed in the same pass rather than silently dropped. None of the
+  findings indicate the underlying code is wrong.
+recommended_next_prompt: PSL-PROMPT-2
+next_stage_scope:
+  - "Harden translator-producer-fix.md: update all 11 taskcard statuses to reflect real completion state with evidence"
+  - "Add taskcard for AUDIT-002 (safe_io.py batch-scale --apply proof) as VALID_DEFERRED or quick-close"
+  - "Add taskcard for AUDIT-003 (.local/unified_translate.py syntax verification) as quick-close"
+  - "Record AUDIT-004 (pytest non-determinism) as a governance note / future infrastructure taskcard, out of this mission's scope"
+  - "Record AUDIT-005 (detector-vs-fixer deviation) as accepted, no action needed"
+do_not:
+  - "Do not reduce proof targets to reach green"
+  - "Do not treat AUDIT-004 as blocking this mission's closure -- it is an environment property, independently confirmed via isolation"

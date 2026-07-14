@@ -1,0 +1,50 @@
+taskcard_id: TC-HT-002-A
+title: Prove safe_io.py batch-scale write/quarantine behavior against real content
+source_issue_ids: [AUDIT-002]
+source_issue_level: L1_EXECUTION
+source_audit_finding: >
+  safe_io.save() had 10 unit tests but no real scripts/quality/*.py --apply
+  invocation this session, leaving the quality-script call path (as opposed
+  to the translation-pipeline call path already proven by TC-HT-011) proven
+  only at focused_validation, not integration scale.
+why_it_matters: >
+  safe_io.py is the single choke point converting every raw content write in
+  scripts/quality/*.py into a gated, quarantine-on-failure write. A
+  detect-repair-write path exercised only against synthetic fixtures could
+  hide real-content edge cases (encoding, path handling, gate interaction)
+  that unit tests wouldn't surface.
+risk_addressed: >
+  Silent unsafe write from a quality script against real aspose.org content
+  in a future run, if the choke point had an untested real-content defect.
+status: completed_verified
+lane_owner: this-session (retroactive convergence)
+supervisor_role: plan-hardening-agent
+required_implementation: none (no code change required — proof-only taskcard)
+required_verification: >
+  Run surgical_retranslate.py's real process_file() against real golden-corpus
+  content with a real injected double-period artifact, inside an isolated
+  tempfile.TemporaryDirectory content-root. Confirm detection, repair-attempt,
+  gate-evaluation, and correct quarantine-or-write outcome.
+required_evidence: >
+  stage1-audit/evidence/audit-002-safe-io-proof.md — command run, full stats
+  dict, quarantine file listing, git check-ignore confirmation that no
+  tracked repo state was affected.
+quality_dimensions: [correctness, safety, evidence_quality, real_data_proof]
+scoring_rubric: "5/5 — real content, real defect, real gate, real quarantine outcome, zero synthetic-only substitution"
+reroute_rule_if_score_below_4: "N/A — closed at 5/5, no reroute needed"
+acceptance_criteria:
+  - "process_file() correctly detects the injected defect"
+  - "safe_io.save() runs real WriteGateEvaluator + consumer_intake checks (not mocked)"
+  - "On gate block, target path is left unchanged (no partial/unsafe write)"
+  - "Quarantine files are written in the established layout (.quarantine.md + .error.json)"
+stop_conditions:
+  - "Any unsafe write to the target path on gate failure would have stopped this taskcard and reopened AUDIT-002 as a real defect, not a proof gap"
+allowed_paths: ["tests/golden_corpus/wave3/**", "<tempdir>"]
+forbidden_paths: ["d:/onedrive/Documents/GitHub/aspose.org/**", "c:/Users/prora/OneDrive/Documents/GitHub/aspose.org/**", "c:/Users/prora/OneDrive/Documents/GitHub/aspose.net/**"]
+dependencies: [TC-HT-002, TC-HT-007]
+closeout_rules: "Close on real-content proof recorded with evidence file; no code change expected or made"
+machine_state: CLOSED
+validation_commands:
+  - ".venv/Scripts/python.exe -c \"<inline process_file proof script, see evidence file>\""
+disposition: taskcard_required
+outcome: closed_this_session

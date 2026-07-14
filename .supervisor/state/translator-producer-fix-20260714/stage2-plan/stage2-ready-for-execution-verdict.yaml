@@ -1,0 +1,34 @@
+mission_id: HT-PRODUCER-FIX-001
+session_id: translator-producer-fix-20260714
+stage: 2
+verdict: PLAN_HARDENED_FROM_AUDIT_READY_FOR_EXECUTION
+reasoning: >
+  All 5 Stage 1 findings have a disposition: AUDIT-001 fixed via direct
+  master-plan edit; AUDIT-002 and AUDIT-003 taskcarded (TC-HT-002-A,
+  TC-HT-006-A) and CLOSED this session with genuine real-content/real-command
+  evidence; AUDIT-004 recorded as a proposed, explicitly-deferred future
+  taskcard (TC-HT-INFRA-001), correctly out of this mission's scope per
+  Stage 1's own recommendation; AUDIT-005 rejected-with-reason (a disclosed,
+  reasoned engineering deviation, not a defect). Zero open, blocking items
+  remain within this mission's scope. The master plan (plan of record) has
+  been hardened to reflect real state, including this stage's own follow-up
+  closures.
+outstanding_items_explicitly_not_blocking:
+  - "Operator push decision for 9 local commits to origin"
+  - "Operator-supervised separate aspose.org pilot-to-production session"
+  - "TC-HT-INFRA-001 (pytest non-determinism root-cause) -- future infra session"
+resolved_this_stage:
+  - "One remaining action item flagged in stage2-master-plan-delta.md (update master plan follow-up lines from 'deferred' to 'closed') -- applied directly to the master plan before this verdict was written."
+schema_conformance_note: >
+  .supervisor/schemas/stage2-taskcard-contract.schema.json is referenced by
+  prompt2-plan-hardening.md but does not exist anywhere in this repository
+  (confirmed via directory listing -- .supervisor/schemas/ is absent
+  entirely). All Stage 2 outputs in this directory are produced in the
+  documented shape from prompt2's "Taskcard Requirements" section instead,
+  and this gap is disclosed here rather than silently asserting schema
+  conformance that cannot be checked. This does not block the verdict above
+  -- it is a pre-existing framework-completeness gap, not a mission defect.
+next_recommended_prompt: PSL-PROMPT-3
+do_not:
+  - "Do not treat schema_conformance_note as a mission blocker -- it predates this mission and applies to the framework itself"
+  - "Do not re-litigate AUDIT-005 -- already accepted as a non-defect"

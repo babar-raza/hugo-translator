@@ -1,0 +1,40 @@
+taskcard_id: TC-HT-AUDIT-001
+title: Synchronize external master plan with actual mission completion state
+source_issue_ids: [AUDIT-001]
+source_issue_level: L2_INTEGRATION
+source_audit_finding: >
+  All 11 taskcards were implemented, tested, and committed, but the master
+  plan at C:/Users/prora/.claude/plans/translator-producer-fix.md still
+  showed every taskcard as "Status: open" — a governance-plan-of-record gap,
+  not an implementation gap.
+why_it_matters: >
+  The master plan is the operator's source of truth for mission status. An
+  operator reading it without this fix would incorrectly believe zero
+  progress had been made.
+risk_addressed: "Operator confusion / duplicated or misdirected future work due to a stale plan of record."
+status: completed_verified
+lane_owner: this-session (retroactive convergence)
+supervisor_role: plan-hardening-agent
+required_implementation: >
+  Direct edit of C:/Users/prora/.claude/plans/translator-producer-fix.md:
+  update all 10 open-status taskcard entries to completed_verified with
+  evidence; rewrite Gate Contract section with real baseline numbers;
+  rewrite Closeout Criteria section; append new Session Closeout section.
+required_verification: "Direct re-read of the edited file sections to confirm edits applied as intended"
+required_evidence: "See stage2-master-plan-delta.md for the itemized section-by-section diff description"
+quality_dimensions: [accuracy, completeness, evidence_traceability]
+scoring_rubric: "5/5 — every taskcard status backed by a real commit hash and test count, no unsupported claims"
+reroute_rule_if_score_below_4: "N/A — closed at 5/5"
+acceptance_criteria:
+  - "Every TC-HT-001..011 Status line reflects real state"
+  - "Gate Contract reflects actually-measured numbers, not the brief's unverified claim"
+  - "Prior session-closeout sections preserved, not overwritten"
+stop_conditions: []
+allowed_paths: ["C:/Users/prora/.claude/plans/translator-producer-fix.md"]
+forbidden_paths: []
+dependencies: []
+closeout_rules: "Close once the edit is applied and re-read for correctness"
+machine_state: CLOSED
+validation_commands: []
+disposition: updated_plan_item_required
+outcome: closed_this_session

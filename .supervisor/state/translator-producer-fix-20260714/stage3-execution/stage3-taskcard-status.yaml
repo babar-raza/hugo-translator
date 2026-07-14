@@ -1,0 +1,24 @@
+mission_id: HT-PRODUCER-FIX-001
+session_id: translator-producer-fix-20260714
+stage: 3
+taskcards:
+  TC-HT-001: { machine_state: CLOSED, status: completed_verified, commit: f29c7cc, executed_in: prior_session }
+  TC-HT-002: { machine_state: CLOSED, status: completed_verified, commit: 140faf5, executed_in: prior_session }
+  TC-HT-003: { machine_state: CLOSED, status: completed_verified, commit: 2fdd054, executed_in: prior_session, known_limitation: "mocked-provider tests only, pre-accepted" }
+  TC-HT-004: { machine_state: CLOSED, status: completed_verified, commit: 7b2937c, executed_in: prior_session }
+  TC-HT-005: { machine_state: CLOSED, status: completed_verified, commit: abb3041, executed_in: prior_session }
+  TC-HT-006: { machine_state: CLOSED, status: completed_verified, commit: ad36b87, executed_in: prior_session }
+  TC-HT-007: { machine_state: CLOSED, status: completed_verified, commit: a268cac, executed_in: prior_session }
+  TC-HT-009: { machine_state: CLOSED, status: completed_verified, commit: null, executed_in: prior_session, note: "read-only disposition note, no code commit expected" }
+  TC-HT-010: { machine_state: CLOSED, status: completed_verified, commit: 319f030, executed_in: prior_session }
+  TC-HT-011: { machine_state: CLOSED, status: completed_verified, commit: 3112844, executed_in: prior_session, known_limitation: "pilot_proof scoped to temp-dir only; aspose.org write/commit-gate step explicitly deferred to operator session" }
+  TC-HT-AUDIT-001: { machine_state: CLOSED, status: completed_verified, commit: null, executed_in: this_session, note: "external plan-file edit, not a repo commit" }
+  TC-HT-002-A: { machine_state: CLOSED, status: completed_verified, commit: null, executed_in: this_session, note: "proof-only, evidence file recorded" }
+  TC-HT-006-A: { machine_state: CLOSED, status: completed_verified, commit: null, executed_in: this_session, note: "verification-only, py_compile output recorded" }
+  TC-HT-INFRA-001: { machine_state: PROPOSED_DEFERRED, status: proposed, commit: null, executed_in: not_executed, note: "explicitly out of this mission's scope" }
+summary:
+  total: 14
+  closed: 13
+  proposed_deferred: 1
+  blocked: 0
+  rerouted: 0

@@ -1,0 +1,51 @@
+taskcard_id: TC-HT-INFRA-001
+title: Root-cause pytest full-suite non-determinism at ~7000-test scale on Windows
+source_issue_ids: [AUDIT-004]
+source_issue_level: L3_SYSTEM_WEAKNESS
+source_audit_finding: >
+  Full-tree pytest runs differ run-to-run at this repo's current scale
+  (baseline 756F/6188P/172S/37E vs final-closeout 772F/6289P/171S/36E, a
+  +16F/+101P delta). Isolated reruns of every "new" failing test (902 tests)
+  were 100% clean; a separate full run of tests/unit/ alone independently
+  crashed with an unrelated pytest-capture-plugin error
+  (ValueError: I/O operation on closed file in _pytest/capture.py).
+  This proves environment/harness-level non-determinism, not a code
+  regression from this mission's changes.
+why_it_matters: >
+  Without root-causing this, a future session could misread a full-suite
+  delta as a real regression (false alarm) or, worse, a real regression
+  could hide inside the noise (false negative). The scoped-regression-check
+  convention (same directory subset, run after every commit) proved reliable
+  throughout this mission and should be documented as the trusted signal
+  until this is root-caused.
+risk_addressed: "False-positive/false-negative regression signal in future full-suite CI or local runs at this repo's scale."
+status: proposed
+lane_owner: future-infrastructure-session (NOT this mission)
+supervisor_role: governance-designer
+required_implementation: >
+  Suspected cause: one or more scripts/quality/*.py modules call
+  sys.stdout.reconfigure() at import time; bisect across ~50 test files to
+  find the specific interaction with pytest's capture plugin at full-suite
+  scale on Windows. Out of scope for this mission — recorded here so the
+  finding is not lost, not to imply it should be done now.
+required_verification: "N/A — not started; this is a proposal record, not an active taskcard"
+required_evidence: "N/A — not started"
+quality_dimensions: []
+scoring_rubric: "N/A — not scored; proposed only"
+reroute_rule_if_score_below_4: "N/A"
+acceptance_criteria: []
+stop_conditions: []
+allowed_paths: []
+forbidden_paths: []
+dependencies: []
+closeout_rules: "Not applicable to this mission's closure — see governance note below"
+machine_state: PROPOSED_DEFERRED
+validation_commands: []
+disposition: governance_change_required
+outcome: >
+  Explicitly NOT part of HT-PRODUCER-FIX-001's closure scope, per Stage 1's
+  own do_not rule ("Do not treat AUDIT-004 as blocking this mission's
+  closure — it is an environment property, independently confirmed via
+  isolation"). This taskcard exists purely so the finding is durably
+  recorded for whichever future session picks up test-infrastructure work,
+  and must NOT be treated as a blocker in this mission's Stage 3/4.

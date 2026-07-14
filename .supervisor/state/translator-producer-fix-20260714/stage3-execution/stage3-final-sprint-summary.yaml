@@ -1,0 +1,29 @@
+mission_id: HT-PRODUCER-FIX-001
+session_id: translator-producer-fix-20260714
+stage: 3
+verdict: EXECUTION_COMPLETE_VERIFIED
+taskcards_total: 14
+taskcards_closed: 13
+taskcards_proposed_deferred: 1
+taskcards_blocked: 0
+taskcards_rerouted: 0
+min_quality_score_any_dimension: 4
+quality_acceptance_bar: 4
+quality_bar_met: true
+regression_status: "0 net-new code regressions; full-suite delta traced to environment-level pytest non-determinism (AUDIT-004), not code (see stage1-audit/stage1-evidence-quality-verdict.md)"
+evidence_fabrication_found: false
+retroactive_convergence: true
+retroactive_convergence_note: >
+  This mission's 11 core taskcards (TC-HT-001..011) were implemented in a
+  session prior to this .supervisor binding, per the user's explicit choice
+  to retroactively onboard already-completed work. Stage 3 of this
+  convergence pass scored that prior work using its real, pre-existing
+  evidence, and separately executed + scored 2 new proof-only taskcards
+  (TC-HT-002-A, TC-HT-006-A) plus 1 plan-sync taskcard (TC-HT-AUDIT-001)
+  that were genuinely done inside this session.
+outstanding_operator_owned_items:
+  - "Push decision for 9 local mission commits to origin"
+  - "Separate, operator-supervised aspose.org pilot-to-production session"
+outstanding_deferred_non_blocking:
+  - "TC-HT-INFRA-001 (pytest non-determinism root-cause) -- future infrastructure session, explicitly out of this mission's scope"
+next_stage: PSL-PROMPT-4

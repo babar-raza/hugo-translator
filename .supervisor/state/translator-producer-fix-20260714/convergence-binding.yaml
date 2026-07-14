@@ -1,0 +1,116 @@
+# Convergence Binding Record
+# Generated: 2026-07-14
+# Protocol: POST-PLAN AUTONOMOUS CONVERGENCE AND GOVERNED CLOSURE
+#
+# NOTE ON PROVENANCE: this mission's implementation work (all 11 taskcards)
+# was already fully executed, tested, and committed via Claude Code's native
+# plan-mode BEFORE this binding record was created — it was never run
+# through .supervisor/prompts/ stage1-3 in real time. This is a retroactive
+# onboarding, explicitly requested by the operator after being offered the
+# alternative (running this protocol against quality-remediation-20260713's
+# open follow-ups instead) and choosing this path. Stage 1 below is a
+# genuine after-the-fact evidence audit against the real repository state,
+# not a fabricated record — every claim is checked against actual git
+# history, test output, and file contents at binding time.
+
+convergence_binding:
+  mission_id: HT-PRODUCER-FIX-001
+  session_id: translator-producer-fix-20260714
+  plan_id: translator-producer-fix
+  plan_path: "C:/Users/prora/.claude/plans/translator-producer-fix.md"
+  plan_revision: untracked (outside repo, in operator's ~/.claude/plans/ — same pattern
+    used by the prior quality-remediation-20260713 mission, whose plan_file was
+    "C:\\Users\\prora\\.claude\\plans\\sharded-wibbling-sifakis.md")
+  plan_hash_at_binding: e3fdf2a5063dfbc9d995397badd59667c7c49350fed8efc318fc92960ea91bf3
+  plan_hash_mismatch: FALSE  # first binding for this mission
+  plan_hash_post_hardening: a9d7e90ee6ab3a7327007c036b0bb43ff57a19cc545a9f8887ed86d5be495daf
+  plan_hash_post_hardening_note: >
+    Recomputed 2026-07-14 (Stage 3, self-review finding L2-SR-001) after two
+    rounds of direct plan edits: the Stage 1/2 hardening pass (all taskcard
+    statuses, Gate Contract, Closeout Criteria, new Session Closeout
+    section) and this stage's follow-up edit closing TC-HT-002-A/006-A.
+    This is the CURRENT hash as of Stage 3/4 of this convergence session —
+    a divergence from plan_hash_at_binding is expected and correct (that
+    field captures pre-hardening state by design), not a integrity failure.
+    Any future session resuming this mission should diff against this
+    post-hardening hash, not the original binding-time hash.
+
+  implementation_brief:
+    path: plans/HT-PRODUCER-FIX-001-implementation-brief.md
+    role: "Detailed taskcard specification the plan derives from"
+
+  execution_plan_artifact:
+    path: "C:/Users/prora/.claude/plans/check-and-plan-modular-ladybug.md"
+    role: "The actual approved execution plan followed this session (Claude Code plan-mode)"
+
+  repo_state_at_binding:
+    head_commit: 3112844e82e5a1baa98b7c132fc078ae74bbaa46
+    baseline_commit: 4c26085  # session start; also close of quality-remediation-20260713
+    commits_this_mission:
+      - f29c7cc  # TC-HT-001
+      - 140faf5  # TC-HT-002
+      - abb3041  # TC-HT-005
+      - 2fdd054  # TC-HT-003
+      - ad36b87  # TC-HT-006
+      - 7b2937c  # TC-HT-004
+      - a268cac  # TC-HT-007
+      - 319f030  # TC-HT-010
+      - 3112844  # TC-HT-011 (pilot_report.py)
+
+  post_sprint_audit:
+    expected: .supervisor/prompts/prompt1-post-sprint-audit.md
+    path: .supervisor/prompts/prompt1-post-sprint-audit.md
+    hash: 263dab3dadad6845f5dd2874fe22cd860403151156cadb2dffedef5258103099
+    role_verified: TRUE  # "POST-SPRINT STRICT EVIDENCE AUDIT" header + L1/L2/L3 issue model — role confirmed by content
+
+  plan_hardening:
+    expected: .supervisor/prompts/prompt2-plan-hardening.md
+    path: .supervisor/prompts/prompt2-plan-hardening.md
+    hash: 4fe227b68c0e58e08381f89f5381bb8d29eebd89cba328ea3fb33c957c5d3d00
+    role_verified: TRUE  # "PLAN MODE: HARDEN CURRENT PLAN FROM LATEST SPRINT AUDIT" — role confirmed by content
+
+  controlled_execution:
+    expected: .supervisor/prompts/prompt3-controlled-execution.md
+    path: .supervisor/prompts/prompt3-controlled-execution.md
+    hash: 5246d218a39a8464cdc32c542d5411d2f29ad034f3e867651c0f731e1269edd9
+    role_verified: TRUE  # "EXECUTION MODE: CONTROLLED TASKCARD EXECUTION" + 15-dim scoring — role confirmed by content
+
+  close_task:
+    expected: .supervisor/prompts/prompt4-close-task.md
+    path: .supervisor/prompts/prompt4-close-task.md
+    hash: 3196a5bd52bd6e037b84d602dbde8d32a8dbac31798c0947bac03784ff6ef81b
+    role_verified: TRUE  # discrete file exists (unlike the 2026-07-03 binding where it was
+      # missing and resolved via registry TERMINATED-path equivalence). Content ("Close this
+      # task cleanly... commit... update master plan... mark closed only if all complete")
+      # matches the close-task role directly.
+
+  prompt_registry:
+    path: .supervisor/prompts/prompt-registry.yaml
+    status: FOUND_AND_READ
+    note: >
+      Registry's PSL-PROMPT-3 successor_rules still describe the older
+      TERMINATED-in-registry closure model from the 2026-06-15 registry version.
+      prompt4-close-task.md (added 2026-06-24, after the registry) is the
+      current discrete closure prompt and takes precedence per this binding's
+      "expected" path resolving directly to an existing, role-verified file.
+
+  schemas:
+    path: .supervisor/schemas/
+    status: NOT_FOUND
+    resolution: >
+      No schema directory exists in this repo. Machine-readable outputs below
+      are structured to match the field lists documented directly in
+      prompt1/2/3 ("Issue Record Format", "Taskcard Requirements", 15
+      quality dimensions) and the concrete shape of the prior mission's
+      real output (.supervisor/state/quality-remediation-20260713/stage1-audit/issues.json),
+      since no formal schema is available to validate against.
+
+  status: BOUND
+  binding_decision: >
+    Proceeding with all 4 prompts bound and role-verified directly from file
+    contents. No ambiguity in prompt roles. Plan identity for THIS binding is
+    explicit (operator resolved the earlier ambiguity by choosing retroactive
+    onboarding of HT-PRODUCER-FIX-001 over resuming quality-remediation-20260713's
+    open follow-ups, which remain separately tracked and untouched under
+    .supervisor/state/quality-remediation-20260713/ with their own TERMINAL_CLOSED
+    record).

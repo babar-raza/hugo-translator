@@ -1,0 +1,41 @@
+mission_id: HT-PRODUCER-FIX-001
+session_id: translator-producer-fix-20260714
+stage: 3
+review_type: independent_adversarial_self_review
+issues:
+  - id: L2-SR-001
+    title: "convergence-binding.yaml's plan_hash_at_binding is now stale"
+    status: RESOLVED
+    detail: >
+      convergence-binding.yaml recorded
+      plan_hash_at_binding: e3fdf2a5063dfbc9d995397badd59667c7c49350fed8efc318fc92960ea91bf3
+      before the master plan was edited (twice: the original Stage 1/2
+      hardening pass, and this stage's follow-up edit closing
+      TC-HT-002-A/006-A). The recorded hash no longer matches the plan's
+      current content. This is expected and correct process (the binding
+      captures state AT BINDING TIME, and hardening is supposed to change
+      the plan) but the binding record should be updated with a
+      post-hardening hash at Stage 4 closure so future sessions can verify
+      plan integrity against the CURRENT state, not the pre-hardening one.
+    disposition: fixed
+    owner: this_session
+    resolution: >
+      Added plan_hash_post_hardening
+      (a9d7e90ee6ab3a7327007c036b0bb43ff57a19cc545a9f8887ed86d5be495daf) and
+      an explanatory note to convergence-binding.yaml, computed via
+      Get-FileHash -Algorithm SHA256 against the current plan file content.
+  - id: L2-SR-002
+    title: "TC-HT-011's temp-dir pilot scope boundary is a cross-taskcard dependency for full mission closure"
+    status: ACCEPTED_SCOPE_BOUNDARY
+    detail: >
+      TC-HT-011 depends on TC-HT-006/010 and is itself a dependency for any
+      future full end-to-end mission closure claim. Its deliberate scope
+      stop (no aspose.org write) means this mission's OWN closure (Stage 4
+      of this convergence pass) must not claim full incident closure --
+      only producer-side closure. This is already correctly reflected in
+      stage2-plan/stage2-anti-overclaim-rules.md rule 5 and 6.
+    disposition: no_action_needed_already_governed
+count_total: 2
+count_blocking: 0
+count_requiring_action: 0
+action_required_before_stage_4_close: []

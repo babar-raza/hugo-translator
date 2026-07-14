@@ -1,0 +1,13 @@
+claim,taskcard,classification,proof_level,notes
+"Description-truncation regex bug class removed from all sites",TC-HT-001,ACCEPTED_VERIFIED,integration_validation,"Proven against real bg_cells_features wave-3 pair; discovered+fixed 2 undocumented sites (write_gate Gates 18/24)"
+"Safe-write choke point converts all raw content writes",TC-HT-002,ACCEPTED_WITH_LIMITATIONS,focused_validation,"Unit-tested; no real batch --apply run this session (AUDIT-002)"
+"Gate 26/27 block real fence-strip and truncation corruption",TC-HT-005,ACCEPTED_VERIFIED,integration_validation,"Proven against real ja_slides_presentation and en_cells_features pairs"
+"LLM prompt-echo/refusal responses rejected before output",TC-HT-003,ACCEPTED_WITH_LIMITATIONS,focused_validation,"Mocked-provider tests only; pre-accepted limitation per master plan"
+"Permissive validation flags locked down repo-wide",TC-HT-006,ACCEPTED_VERIFIED,end_to_end_proof,"Real CLI invocation via TC-HT-011 pilot confirms safe-flags path; .local script half unexecuted (AUDIT-003, low severity)"
+"Legacy reconstruction path retired safely",TC-HT-004,ACCEPTED_VERIFIED,end_to_end_proof,"AST path (now default) exercised live by all 15 TC-HT-011 pilot files; dead-code claim proven by direct code read, not just test"
+"Consumer-repo intake checks vendored and wired in",TC-HT-007,ACCEPTED_VERIFIED,integration_validation,"Proven against real es_pdf_do wave-3 pair"
+"Golden corpus + adversarial resurrection proves gates catch the class independent of code fix",TC-HT-010,ACCEPTED_VERIFIED,end_to_end_proof,"Resurrected bug reproduces exact real damage signature; safe_io.save() blocks it"
+"E2E pilot shows zero corruption-class findings",TC-HT-011,ACCEPTED_VERIFIED,pilot_proof,"Real GPU translation, real gates, real aspose.org comparison; low write-success rate is a pre-existing m2m100 quality issue (Gate 21), not a regression"
+"Sibling checkouts disposition: stale, no execution evidence, nothing to adopt",TC-HT-009,ACCEPTED_VERIFIED,focused_validation,"Direct git/filesystem inspection, read-only as scoped"
+"Zero net-new test regressions from this mission's changes",ALL,ACCEPTED_VERIFIED,integration_validation,"8x identical scoped-check reruns clean; full-suite +16 delta traced to environment non-determinism (AUDIT-004), not code, via isolated 902-test rerun"
+"Master plan reflects current mission status",GOVERNANCE,UNVERIFIED,no_proof_yet,"Plan was not updated during execution (AUDIT-001) -- being corrected in Stage 2/3 of this pass"

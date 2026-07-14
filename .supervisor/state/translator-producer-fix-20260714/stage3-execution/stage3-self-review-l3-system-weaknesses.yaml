@@ -1,0 +1,38 @@
+mission_id: HT-PRODUCER-FIX-001
+session_id: translator-producer-fix-20260714
+stage: 3
+review_type: independent_adversarial_self_review
+issues:
+  - id: L3-SR-001
+    title: "Full-tree pytest non-determinism at ~7000-test scale on Windows"
+    status: CONFIRMED_OUT_OF_SCOPE
+    detail: >
+      Restated from AUDIT-004 (stage1-audit/issues.json). Genuine system
+      weakness, independently confirmed via isolated reruns, correctly
+      scoped as a future infrastructure taskcard (TC-HT-INFRA-001) rather
+      than a blocker for this mission's closure.
+    disposition: recorded_for_future_session
+  - id: L3-SR-002
+    title: ".supervisor/schemas/ directory referenced by all 4 prompts does not exist in this repository"
+    status: CONFIRMED_FRAMEWORK_GAP
+    detail: >
+      All four prompt files (prompt1..prompt4) declare an
+      "Output contract: .supervisor/schemas/<name>.schema.json" header, but
+      no .supervisor/schemas/ directory exists anywhere in this repo
+      (confirmed via directory search). This means no stage output in this
+      or any prior mission (quality-remediation-20260709,
+      quality-remediation-20260713, lmdb-consolidation-20260711 -- all
+      checked via git ls-files) could have been mechanically schema-validated;
+      conformance has only ever been achieved by structurally following the
+      prompt's prose field lists. This is a pre-existing framework
+      completeness gap, not something introduced by or specific to this
+      mission.
+    disposition: recorded_governance_note
+    recommendation: >
+      A future governance-infrastructure session should either author the
+      missing schema files or remove the "Output contract" header claims
+      from the prompt files so they stop asserting a conformance check that
+      cannot run. Out of scope for this mission to fix unilaterally --
+      touching shared prompt files affects all missions, not just this one.
+count_total: 2
+count_blocking_this_mission: 0

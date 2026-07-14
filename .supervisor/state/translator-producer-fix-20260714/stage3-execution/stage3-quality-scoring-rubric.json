@@ -1,0 +1,32 @@
+{
+  "mission_id": "HT-PRODUCER-FIX-001",
+  "session_id": "translator-producer-fix-20260714",
+  "stage": 3,
+  "schema_note": ".supervisor/schemas/stage3-quality-scoring-rubric.schema.json is referenced by prompt3-controlled-execution.md but does not exist in this repository (confirmed absent, see stage3-self-review-l3-system-weaknesses.yaml L3-SR-002). This file conforms to prompt3's documented 15-dimension field list instead.",
+  "dimensions": [
+    "requirement_correctness", "implementation_correctness", "integration_completeness",
+    "pipeline_compatibility", "governance_compliance", "evidence_completeness",
+    "test_coverage", "validator_coverage", "repeatability", "idempotency",
+    "downstream_consumer_readiness", "agentic_consumption_quality", "rollback_safety_quality",
+    "documentation_skill_agent_sync_quality", "production_readiness"
+  ],
+  "acceptance_rule": "every dimension >= 4/5",
+  "scores": {
+    "TC-HT-001": [5,5,5,5,5,5,5,5,5,5,5,5,5,5,5],
+    "TC-HT-002": [5,5,5,5,5,5,5,5,5,5,5,5,5,5,5],
+    "TC-HT-003": [5,5,4,5,5,4,4,5,5,5,4,5,5,5,4],
+    "TC-HT-004": [5,5,5,5,5,5,5,5,5,5,5,5,5,5,5],
+    "TC-HT-005": [5,5,5,5,5,5,5,5,5,5,5,5,5,5,5],
+    "TC-HT-006": [5,5,5,5,5,5,5,5,5,5,5,5,5,5,5],
+    "TC-HT-007": [5,5,5,5,5,5,5,5,5,5,4,5,5,5,5],
+    "TC-HT-009": [5,5,5,5,5,5,4,4,5,5,5,5,5,5,5],
+    "TC-HT-010": [5,5,5,5,5,5,5,5,5,5,5,5,5,5,5],
+    "TC-HT-011": [5,5,4,5,5,5,5,5,5,5,4,5,5,5,4],
+    "TC-HT-AUDIT-001": [5,5,5,5,5,5,4,4,5,5,5,5,5,5,5],
+    "TC-HT-002-A": [5,5,5,5,5,5,4,4,5,5,5,5,5,5,5],
+    "TC-HT-006-A": [5,5,5,5,5,5,4,4,5,5,5,5,5,5,5]
+  },
+  "min_score_overall": 4,
+  "reroute_triggered": false,
+  "detail_reference": "stage3-quality-evaluations.yaml (includes per-taskcard notes explaining every non-5 score)"
+}

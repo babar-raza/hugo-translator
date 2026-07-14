@@ -1,0 +1,16 @@
+mission_id: HT-PRODUCER-FIX-001
+session_id: translator-producer-fix-20260714
+stage: 3
+lanes:
+  lane_0_coordinator: { status: COMPLETE, note: "Preflight + isolation check performed" }
+  lane_a_preflight: { status: COMPLETE, artifact: stage3-preflight-state.md }
+  lane_b_taskcard_execution: { status: COMPLETE, taskcards_executed: [TC-HT-002-A, TC-HT-006-A], note: "Both proof-only, no code change required or made" }
+  lane_c_system_healing: { status: NOT_TRIGGERED, note: "Plan already healthy post-Stage-2; no healing pass needed" }
+  lane_d_verification_qa: { status: COMPLETE, note: "Real command runs for this stage's own items; prior mission verification already exhaustively documented in Stage 1" }
+  lane_e_governance_evidence_state: { status: COMPLETE, artifacts: [".supervisor/state/translator-producer-fix-20260714/**", "C:/Users/prora/.claude/plans/translator-producer-fix.md"] }
+  lane_f_docs_skills_agent_sync: { status: COMPLETE, note: "Master plan updated (the relevant doc); no skill/agent registry touched this mission" }
+  lane_g_work_ahead_repeatability: { status: RECORDED_NOT_EXECUTED, taskcard: TC-HT-INFRA-001, note: "Correctly deferred, not this mission's scope" }
+  lane_h_quality_scoring_reroute: { status: COMPLETE, artifact: stage3-quality-evaluations.yaml }
+  lane_i_adversarial_review: { status: COMPLETE, artifacts: [stage3-self-review-l1-execution-issues.yaml, stage3-self-review-l2-integration-issues.yaml, stage3-self-review-l3-system-weaknesses.yaml] }
+overall_lane_status: ALL_REQUIRED_LANES_COMPLETE
+blocked_lanes: []

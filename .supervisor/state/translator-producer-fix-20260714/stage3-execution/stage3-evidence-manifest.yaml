@@ -1,0 +1,33 @@
+mission_id: HT-PRODUCER-FIX-001
+session_id: translator-producer-fix-20260714
+stage: 3
+evidence_items:
+  - taskcard: TC-HT-001
+    evidence: "commit f29c7cc; 69 tests; golden-corpus proof (tests/golden_corpus/wave3/description_truncation/)"
+  - taskcard: TC-HT-002
+    evidence: "commit 140faf5; 10 unit tests; stage1-audit/evidence/audit-002-safe-io-proof.md (this session)"
+  - taskcard: TC-HT-003
+    evidence: "commit 2fdd054; 12 tests (mocked provider)"
+  - taskcard: TC-HT-004
+    evidence: "commit 7b2937c; unit tests + live AST reconstruction via TC-HT-011 pilot (15 files)"
+  - taskcard: TC-HT-005
+    evidence: "commit abb3041; 12 tests; golden-corpus proof"
+  - taskcard: TC-HT-006
+    evidence: "commit ad36b87; 8 tests + real CLI invocation (TC-HT-011); .local script: py_compile SYNTAX OK (this session)"
+  - taskcard: TC-HT-007
+    evidence: "commit a268cac; 13 tests incl. real golden-corpus proof (tests/golden_corpus/wave3/title_prompt_leak/)"
+  - taskcard: TC-HT-009
+    evidence: "direct git/filesystem inspection of sibling checkouts (no commit expected -- read-only)"
+  - taskcard: TC-HT-010
+    evidence: "commit 319f030; 13 tests against real production damage; adversarial resurrection test"
+  - taskcard: TC-HT-011
+    evidence: "commit 3112844; real GPU/model translation, 15 files written, pilot_report.py output (0/0/0 corruption findings in piloted slice)"
+  - taskcard: TC-HT-AUDIT-001
+    evidence: "direct edit of C:/Users/prora/.claude/plans/translator-producer-fix.md (external, not a repo commit); re-read confirmed"
+  - taskcard: TC-HT-002-A
+    evidence: ".supervisor/state/translator-producer-fix-20260714/stage1-audit/evidence/audit-002-safe-io-proof.md"
+  - taskcard: TC-HT-006-A
+    evidence: "python -m py_compile .local/unified_translate.py -> SYNTAX OK, exit 0 (command output captured in issues.json closure_evidence and master plan)"
+evidence_gaps: []
+fabricated_evidence_found: false
+manifest_conforms_to: stage2-plan/stage2-evidence-contract.md

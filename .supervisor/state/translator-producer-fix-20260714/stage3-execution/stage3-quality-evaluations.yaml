@@ -1,0 +1,40 @@
+mission_id: HT-PRODUCER-FIX-001
+session_id: translator-producer-fix-20260714
+stage: 3
+dimension_order:
+  - requirement_correctness
+  - implementation_correctness
+  - integration_completeness
+  - pipeline_compatibility
+  - governance_compliance
+  - evidence_completeness
+  - test_coverage
+  - validator_coverage
+  - repeatability
+  - idempotency
+  - downstream_consumer_readiness
+  - agentic_consumption_quality
+  - rollback_safety_quality
+  - documentation_skill_agent_sync_quality
+  - production_readiness
+acceptance_rule: "every dimension >= 4/5"
+scores:
+  TC-HT-001: { values: [5,5,5,5,5,5,5,5,5,5,5,5,5,5,5], min: 5, accepted: true, notes: "integration_validation against real bg_cells_features wave-3 pair; no caveats" }
+  TC-HT-002: { values: [5,5,5,5,5,5,5,5,5,5,5,5,5,5,5], min: 5, accepted: true, notes: "upgraded to full score after this session's AUDIT-002 real-content batch proof closed the prior integration_completeness/evidence_completeness gap" }
+  TC-HT-003: { values: [5,5,4,5,5,4,4,5,5,5,4,5,5,5,4], min: 4, accepted: true, notes: "mocked-provider tests only (pre-accepted master-plan limitation) dents integration_completeness, evidence_completeness, test_coverage, downstream_consumer_readiness, production_readiness to 4 -- still accepted, not a defect" }
+  TC-HT-004: { values: [5,5,5,5,5,5,5,5,5,5,5,5,5,5,5], min: 5, accepted: true, notes: "end_to_end_proof: AST path exercised live by all 15 TC-HT-011 pilot files; dead-code deletion proven by direct read" }
+  TC-HT-005: { values: [5,5,5,5,5,5,5,5,5,5,5,5,5,5,5], min: 5, accepted: true, notes: "integration_validation against real ja_slides_presentation and en_cells_features pairs" }
+  TC-HT-006: { values: [5,5,5,5,5,5,5,5,5,5,5,5,5,5,5], min: 5, accepted: true, notes: "end_to_end_proof via real CLI invocation (TC-HT-011); .local script half closed this session (AUDIT-003/TC-HT-006-A)" }
+  TC-HT-007: { values: [5,5,5,5,5,5,5,5,5,5,4,5,5,5,5], min: 4, accepted: true, notes: "agentic_consumption_quality dented to 4: check_pair's leak-phrase list is fixed EN/ES, won't auto-generalize to other locales -- documented limitation, TC-HT-003 is the language-agnostic backstop" }
+  TC-HT-009: { values: [5,5,5,5,5,5,4,4,5,5,5,5,5,5,5], min: 4, accepted: true, notes: "test_coverage/validator_coverage dented to 4: read-only disposition note verified by direct inspection, not automated test -- correct for this taskcard's nature" }
+  TC-HT-010: { values: [5,5,5,5,5,5,5,5,5,5,5,5,5,5,5], min: 5, accepted: true, notes: "end_to_end_proof: real historical damage + adversarial resurrection proves gates independent of the code fix" }
+  TC-HT-011: { values: [5,5,4,5,5,5,5,5,5,5,4,5,5,5,4], min: 4, accepted: true, notes: "integration_completeness, downstream_consumer_readiness, production_readiness dented to 4: pilot_proof deliberately scoped to temp-dir only, aspose.org write/commit-gate step explicitly deferred to a separate operator session -- disclosed scope boundary, not a defect" }
+  TC-HT-AUDIT-001: { values: [5,5,5,5,5,5,4,4,5,5,5,5,5,5,5], min: 4, accepted: true, notes: "test_coverage/validator_coverage dented to 4: plan-sync is a doc edit verified by direct re-read, not an automated test" }
+  TC-HT-002-A: { values: [5,5,5,5,5,5,4,4,5,5,5,5,5,5,5], min: 4, accepted: true, notes: "test_coverage/validator_coverage dented to 4: this was a one-off proof run, not added as a permanent regression test to the suite -- honest limitation, not a defect (see stage2-taskcards/TC-HT-002-A.yaml required_implementation: none)" }
+  TC-HT-006-A: { values: [5,5,5,5,5,5,4,4,5,5,5,5,5,5,5], min: 4, accepted: true, notes: "same reasoning as TC-HT-002-A: syntax-check-only, not a permanent added test" }
+summary:
+  total_scored: 13
+  all_accepted: true
+  min_score_overall: 4
+  taskcards_below_4_any_dimension: []
+  reroute_triggered: false

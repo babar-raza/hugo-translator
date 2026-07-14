@@ -1,0 +1,62 @@
+{
+  "mission_id": "HT-PRODUCER-FIX-001",
+  "session_id": "translator-producer-fix-20260714",
+  "stage": 2,
+  "schema_note": ".supervisor/schemas/stage2-taskcard-contract.schema.json is referenced by prompt2-plan-hardening.md but does not exist in this repository. This file conforms to prompt2's documented 'Taskcard Requirements' field list instead; see stage2-ready-for-execution-verdict.yaml for full disclosure.",
+  "taskcards": [
+    {
+      "taskcard_id": "TC-HT-AUDIT-001",
+      "title": "Synchronize external master plan with actual mission completion state",
+      "source_issue_ids": ["AUDIT-001"],
+      "source_issue_level": "L2_INTEGRATION",
+      "status": "completed_verified",
+      "machine_state": "CLOSED",
+      "lane_owner": "this-session",
+      "disposition": "updated_plan_item_required",
+      "dependencies": []
+    },
+    {
+      "taskcard_id": "TC-HT-002-A",
+      "title": "Prove safe_io.py batch-scale write/quarantine behavior against real content",
+      "source_issue_ids": ["AUDIT-002"],
+      "source_issue_level": "L1_EXECUTION",
+      "status": "completed_verified",
+      "machine_state": "CLOSED",
+      "lane_owner": "this-session",
+      "disposition": "taskcard_required",
+      "dependencies": ["TC-HT-002", "TC-HT-007"],
+      "evidence_path": "stage1-audit/evidence/audit-002-safe-io-proof.md"
+    },
+    {
+      "taskcard_id": "TC-HT-006-A",
+      "title": "Verify .local/unified_translate.py syntax after startup-safety-log addition",
+      "source_issue_ids": ["AUDIT-003"],
+      "source_issue_level": "L1_EXECUTION",
+      "status": "completed_verified",
+      "machine_state": "CLOSED",
+      "lane_owner": "this-session",
+      "disposition": "taskcard_required",
+      "dependencies": ["TC-HT-006"],
+      "evidence_command": "python -m py_compile .local/unified_translate.py",
+      "evidence_result": "SYNTAX OK"
+    },
+    {
+      "taskcard_id": "TC-HT-INFRA-001",
+      "title": "Root-cause pytest full-suite non-determinism at ~7000-test scale on Windows",
+      "source_issue_ids": ["AUDIT-004"],
+      "source_issue_level": "L3_SYSTEM_WEAKNESS",
+      "status": "proposed",
+      "machine_state": "PROPOSED_DEFERRED",
+      "lane_owner": "future-infrastructure-session",
+      "disposition": "governance_change_required",
+      "dependencies": [],
+      "blocking_this_mission_closure": false
+    }
+  ],
+  "pre_existing_mission_taskcards": {
+    "ids": ["TC-HT-001", "TC-HT-002", "TC-HT-003", "TC-HT-004", "TC-HT-005", "TC-HT-006", "TC-HT-007", "TC-HT-009", "TC-HT-010", "TC-HT-011"],
+    "status": "completed_verified",
+    "source_of_truth": "C:/Users/prora/.claude/plans/translator-producer-fix.md"
+  },
+  "verdict": "PLAN_HARDENED_FROM_AUDIT_READY_FOR_EXECUTION"
+}
