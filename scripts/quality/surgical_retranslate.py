@@ -43,6 +43,11 @@ from pathlib import Path
 
 sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
+# Ensure sibling modules (e.g. frontmatter_utils) import correctly regardless
+# of invocation mode (direct script run vs. pytest package import).
+if str(Path(__file__).resolve().parent) not in sys.path:
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+
 # ---------------------------------------------------------------------------
 # Content root resolution
 # ---------------------------------------------------------------------------
@@ -327,14 +332,16 @@ def _fix_double_periods(tr_content: str) -> str:
 def _detect_description_hallucination(
     en_content: str, tr_content: str
 ) -> list[tuple[int, str, str, str]]:
-    """Detect description field with >3x or <0.3x the source length."""
-    en_fm_match = re.search(r"^description:\s*(.+?)$", en_content[:2000], re.MULTILINE)
-    tr_fm_match = re.search(r"^description:\s*(.+?)$", tr_content[:2000], re.MULTILINE)
-    if not en_fm_match or not tr_fm_match:
-        return []
+    """Detect description field with >3x or <0.3x the source length.
 
-    en_desc = en_fm_match.group(1).strip().strip('"').strip("'")
-    tr_desc = tr_fm_match.group(1).strip().strip('"').strip("'")
+    Parses frontmatter via HugoParser rather than a first-line regex, so
+    multi-line folded/literal scalars are compared by their full value
+    instead of being truncated to the first physical line (TC-HT-001).
+    """
+    from frontmatter_utils import get_frontmatter_field
+
+    en_desc = get_frontmatter_field(en_content, "description")
+    tr_desc = get_frontmatter_field(tr_content, "description")
     if not en_desc or not tr_desc:
         return []
 
@@ -788,16 +795,11 @@ def detect_all_corruption(
 # ---------------------------------------------------------------------------
 # New no-GPU repair functions
 # ---------------------------------------------------------------------------
-
-
-def _fix_description_hallucination(en_content: str, tr_content: str) -> str:
-    """Replace tgt frontmatter description with the EN source description line verbatim."""
-    en_m = re.search(r"^(description:\s*.+)$", en_content[:2000], re.MULTILINE)
-    if not en_m:
-        return tr_content
-    en_line = en_m.group(1)  # e.g. 'description: "Learn how to..."'
-    new = re.sub(r"^description:\s*.+$", en_line, tr_content, count=1, flags=re.MULTILINE)
-    return new
+# NOTE: description_hallucination is intentionally NOT repaired here — a
+# regex line-substitution "fix" (formerly _fix_description_hallucination)
+# truncated multi-line YAML scalars and left unterminated quotes, which was
+# the root cause of the 2026-07-12 wave-3 corruption (TC-HT-001). Files with
+# this issue must be GPU-retranslated, never patched with English source text.
 
 
 def _fix_newline_explosion(tr_content: str) -> str:

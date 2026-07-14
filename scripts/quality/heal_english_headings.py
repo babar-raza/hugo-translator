@@ -36,6 +36,11 @@ from pathlib import Path
 
 sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
+# Ensure sibling modules (e.g. frontmatter_utils) import correctly regardless
+# of invocation mode (direct script run vs. pytest package import).
+if str(Path(__file__).resolve().parent) not in sys.path:
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+
 # ---------------------------------------------------------------------------
 # Constants
 # ---------------------------------------------------------------------------
@@ -179,15 +184,16 @@ def _check_file(tr_path: Path, locale: str, en_path: Path | None = None) -> dict
 
             # 4. Description hallucination — description length ratio too far off source
             # These MUST be GPU-retranslated, not patched with English source text.
-            en_desc_m = re.search(r"^description:\s*(.+)$", en_text[:2000], re.MULTILINE)
-            tr_desc_m = re.search(r"^description:\s*(.+)$", text[:2000], re.MULTILINE)
-            if en_desc_m and tr_desc_m:
-                en_desc = en_desc_m.group(1).strip().strip('"').strip("'")
-                tr_desc = tr_desc_m.group(1).strip().strip('"').strip("'")
-                if len(en_desc) >= 20 and tr_desc:
-                    ratio = len(tr_desc) / len(en_desc)
-                    if ratio > 3.0 or ratio < 0.3:
-                        issues["description_hallucination"] = [f"ratio={ratio:.1f}"]
+            # Parses frontmatter via HugoParser rather than a first-line regex, so
+            # multi-line folded/literal scalars compare by full value (TC-HT-001).
+            from frontmatter_utils import get_frontmatter_field
+
+            en_desc = get_frontmatter_field(en_text, "description")
+            tr_desc = get_frontmatter_field(text, "description")
+            if en_desc and tr_desc and len(en_desc) >= 20:
+                ratio = len(tr_desc) / len(en_desc)
+                if ratio > 3.0 or ratio < 0.3:
+                    issues["description_hallucination"] = [f"ratio={ratio:.1f}"]
 
             # 5. Code fence dropped — translation has fewer ``` fences than source
             def _count_fences(b: str) -> int:

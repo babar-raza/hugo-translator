@@ -22,12 +22,32 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
+from .parser.hugo_parser import HugoParser
+from .reconstructor.yaml_formatter import YAMLFormatter
+
 if TYPE_CHECKING:
     from ..utils.config_loader import ConfigService
     from .language_detection.fasttext_detector import FastTextDetector
     from .language_detection.similarity_tracker import SimilarityTracker
 
 logger = logging.getLogger(__name__)
+
+# TC-HT-001: shared parser instance for frontmatter-field extraction. Parses
+# full YAML scalars (folded/literal/multi-line) instead of first-line regex,
+# which was the root cause of the 2026-07-12 wave-3 description-truncation bug.
+_fm_parser = HugoParser()
+
+
+def _get_frontmatter_field(content: str, field_name: str) -> str | None:
+    """Return the full string value of a frontmatter field, or None."""
+    split = _fm_parser._split_frontmatter(content)
+    if split is None:
+        return None
+    data = _fm_parser._parse_yaml_content(split[0])
+    if not isinstance(data, dict):
+        return None
+    value = data.get(field_name)
+    return value if isinstance(value, str) else None
 
 # Gate 22: mojibake / encoding corruption patterns
 _MOJIBAKE_GATE_RE = re.compile(r"\u00e2\u20ac|\u00c3\u00a9|\u00c3\u00a8|\u00c3\u00bc|\u00c3\u00b6")
@@ -45,9 +65,6 @@ _STRAY_TABLE_BACKTICK_RE = re.compile(r"(?m)^\s*`(\s*\|)")
 _NON_LATIN_SCRIPT_LOCALES = frozenset({
     "ar", "bg", "el", "fa", "he", "hi", "ja", "ko", "ru", "th", "uk", "vi", "zh",
 })
-_FM_DESCRIPTION_RE = re.compile(
-    r'^description:\s*["\']?(.*?)["\']?\s*$', re.MULTILINE
-)
 
 # Gate 25: code block content truncated
 _CODE_BLOCK_CONTENT_RE = re.compile(
@@ -764,30 +781,47 @@ class WriteGateEvaluator:
         source_doc: object,
         result: WriteGateResult,
     ) -> str:
-        """Auto-fix odd backtick counts in frontmatter title/description/summary/linkTitle."""
-        parts = translated_content.split("---", 2)
-        if len(parts) < 3:
-            return translated_content
-        fm_text = parts[1]
-        cleaned_fm = fm_text
+        """Auto-fix odd backtick counts in frontmatter title/description/summary/linkTitle.
 
-        for field in ("title", "description", "summary", "linkTitle"):
-            m = re.search(r"^(" + re.escape(field) + r":\s*)(.+?)(\s*)$", cleaned_fm, re.MULTILINE)
-            if not m:
+        Parses the frontmatter into a CommentedMap and re-serializes via
+        YAMLFormatter instead of string-slicing around a literal '---' split
+        (TC-HT-001) — the old approach could not correctly handle multi-line/
+        folded scalar values and produced malformed YAML on edge cases.
+        """
+        split = _fm_parser._split_frontmatter(translated_content)
+        if split is None:
+            return translated_content
+        yaml_text, body = split
+        data = _fm_parser._parse_yaml_content(yaml_text)
+        if not isinstance(data, dict):
+            return translated_content
+
+        changed = False
+        for field_name in ("title", "description", "summary", "linkTitle"):
+            val = data.get(field_name)
+            if not isinstance(val, str):
                 continue
-            val = m.group(2).strip()
             if val.count("`") % 2 == 1:
-                # Odd backticks — try to fix by adding a closing backtick
                 fixed_val = val + "`"
-                cleaned_fm = cleaned_fm[:m.start(2)] + fixed_val + cleaned_fm[m.end(2):]
+                data[field_name] = fixed_val
+                changed = True
                 logger.info(
                     "GATE10 fixed odd backtick in %s.%s: %r → %r",
-                    output_path.name, field, val, fixed_val,
+                    output_path.name, field_name, val, fixed_val,
                 )
 
-        if cleaned_fm == fm_text:
+        if not changed:
             return translated_content
-        return parts[0] + "---" + cleaned_fm + "---" + parts[2]
+        try:
+            return YAMLFormatter.format_frontmatter(data) + body
+        except ValueError:
+            # Re-serialization produced invalid YAML — leave content untouched
+            # rather than risk writing a malformed file.
+            logger.warning(
+                "GATE10 re-serialization failed for %s; leaving content unmodified",
+                output_path.name,
+            )
+            return translated_content
 
     # ------------------------------------------------------------------
     # Gate 11: Frontmatter ID/class corruption (auto-clean)
@@ -1132,31 +1166,6 @@ class WriteGateEvaluator:
     # Gate 18: Description hallucination detection (BLOCKING)
     # ------------------------------------------------------------------
 
-    @staticmethod
-    def _extract_fm_field(content: str, field_name: str) -> str | None:
-        """Extract a named field value from YAML frontmatter.
-
-        Returns the raw string value (quotes stripped) or None if absent.
-        Only reads up to the closing '---' delimiter to avoid scanning body.
-        """
-        # Frontmatter is between the first and second '---' lines
-        parts = content.split("\n---", 2)
-        if len(parts) < 2:
-            return None
-        fm_block = parts[0]
-        m = re.search(
-            r"^" + re.escape(field_name) + r":\s*(.+)$",
-            fm_block,
-            re.MULTILINE,
-        )
-        if not m:
-            return None
-        value = m.group(1).strip()
-        # Strip surrounding single or double quotes
-        if len(value) >= 2 and value[0] in ('"', "'") and value[-1] == value[0]:
-            value = value[1:-1]
-        return value
-
     def _gate_description_hallucination(
         self,
         source_content: str,
@@ -1170,9 +1179,13 @@ class WriteGateEvaluator:
         additional explanatory text instead of translating the original concisely.
         Short source descriptions (< 30 chars) are excluded to avoid false positives
         on brief stubs like 'Gets the value.' that may have verbose translations.
+
+        Parses frontmatter via HugoParser rather than a first-line regex
+        (TC-HT-001), so multi-line folded/literal scalars are compared by
+        their full value instead of being truncated to the first line.
         """
-        src_desc = self._extract_fm_field(source_content, "description")
-        tgt_desc = self._extract_fm_field(translated_content, "description")
+        src_desc = _get_frontmatter_field(source_content, "description")
+        tgt_desc = _get_frontmatter_field(translated_content, "description")
         if not src_desc or not tgt_desc:
             return
         if len(src_desc) < 30:
@@ -1356,16 +1369,20 @@ class WriteGateEvaluator:
         a fully ASCII translated description means either (a) the model copied the EN
         value verbatim, or (b) a heal run wrote body only and left stale EN frontmatter.
         Both cases must be blocked so the shard retranslates properly.
+
+        Parses frontmatter via HugoParser rather than a first-line regex
+        (TC-HT-001), so multi-line folded/literal scalars are compared by
+        their full value instead of being truncated to the first line.
         """
         if target_lang not in _NON_LATIN_SCRIPT_LOCALES:
             return
-        m_src = _FM_DESCRIPTION_RE.search(source_content[:2000])
-        if not m_src or len(m_src.group(1).strip()) < 20:
+        src_desc = _get_frontmatter_field(source_content, "description")
+        if not src_desc or len(src_desc.strip()) < 20:
             return  # short source description — not enough signal
-        m_tgt = _FM_DESCRIPTION_RE.search(translated_content[:2000])
-        if not m_tgt:
+        tgt_desc = _get_frontmatter_field(translated_content, "description")
+        if not tgt_desc:
             return
-        tgt_desc = m_tgt.group(1).strip()
+        tgt_desc = tgt_desc.strip()
         if not tgt_desc:
             return
         if tgt_desc.isascii():

@@ -29,6 +29,8 @@ _SCRIPT_DIR = Path(__file__).resolve().parent
 _PROJ_ROOT = _SCRIPT_DIR.parent.parent
 if str(_PROJ_ROOT) not in sys.path:
     sys.path.insert(0, str(_PROJ_ROOT))
+if str(_SCRIPT_DIR) not in sys.path:
+    sys.path.insert(0, str(_SCRIPT_DIR))
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -56,18 +58,12 @@ PRIORITY: dict[str, int] = {
 # ---------------------------------------------------------------------------
 _FM_RE = re.compile(r"^---\n(.*?)\n---", re.S)
 _HEADING_RE = re.compile(r"^(#{1,6})\s+(.+)$", re.M)
-_FM_FIELD_RE = re.compile(r"^description:\s*(.+)$", re.M)
 _PURE_ASCII_RE = re.compile(r"^[\x00-\x7F]*$")
 _EN_PROSE_MIN_WORDS = 5
 
 # Matches lines that are almost certainly code/shortcode/table and should be
 # skipped when checking paragraph purity.
 _SKIP_LINE_RE = re.compile(r"^```|^\{\{[<%%]|^\|")
-
-
-def _get_frontmatter(content: str) -> str:
-    m = _FM_RE.match(content)
-    return m.group(1) if m else ""
 
 
 def _get_body(content: str) -> str:
@@ -193,7 +189,6 @@ def check_file(
 
     en_body = _get_body(en_content)
     tr_body = _get_body(tr_content)
-    tr_fm = _get_frontmatter(tr_content)
 
     # ---- body_identical_to_en ----
     en_body_stripped = en_body.strip()
@@ -237,9 +232,14 @@ def check_file(
             issues["table_desc_not_translated"].append(idx)
 
     # ---- description_yaml_reverted ----
-    fm_m = _FM_FIELD_RE.search(tr_fm)
-    if fm_m:
-        desc_val = fm_m.group(1).strip().strip("\"'")
+    # Parses frontmatter via HugoParser rather than a first-line regex
+    # (TC-HT-001), so multi-line folded/literal scalars compare by their
+    # full value instead of being truncated to the first physical line.
+    from frontmatter_utils import get_frontmatter_field
+
+    desc_val = get_frontmatter_field(tr_content, "description")
+    if desc_val:
+        desc_val = desc_val.strip()
         if _is_english_text(desc_val, locale) or (
             _PURE_ASCII_RE.match(desc_val) and len(desc_val.split()) >= 3
         ):

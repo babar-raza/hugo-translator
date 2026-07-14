@@ -37,6 +37,11 @@ from pathlib import Path
 
 sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
+# Ensure sibling modules (e.g. frontmatter_utils) import correctly regardless
+# of invocation mode (direct script run vs. pytest package import).
+if str(Path(__file__).resolve().parent) not in sys.path:
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+
 # ---------------------------------------------------------------------------
 # Configuration
 # ---------------------------------------------------------------------------
@@ -105,21 +110,6 @@ def _get_body(content: str) -> str:
     return content[end + 4:]
 
 
-def _extract_fm_field(content: str, field_name: str) -> str | None:
-    """Extract a frontmatter field value, stripping surrounding quotes."""
-    m = re.search(
-        r"^" + re.escape(field_name) + r":\s*(.+)$",
-        content[:2000],
-        re.MULTILINE,
-    )
-    if not m:
-        return None
-    value = m.group(1).strip()
-    if len(value) >= 2 and value[0] in ('"', "'") and value[-1] == value[0]:
-        value = value[1:-1]
-    return value or None
-
-
 def _strip_code_blocks(text: str) -> str:
     """Remove fenced code blocks."""
     return re.sub(r"```[\s\S]*?```", "", text)
@@ -151,9 +141,16 @@ def _detect_shortcode_leak(en_content: str, tr_content: str) -> bool:
 
 
 def _detect_description_hallucination(en_content: str, tr_content: str) -> bool:
-    """Description field length ratio > 3x or < 0.3x source."""
-    src = _extract_fm_field(en_content, "description")
-    tgt = _extract_fm_field(tr_content, "description")
+    """Description field length ratio > 3x or < 0.3x source.
+
+    Parses frontmatter via HugoParser rather than a first-line regex, so
+    multi-line folded/literal scalars are compared by their full value
+    instead of being truncated to the first physical line (TC-HT-001).
+    """
+    from frontmatter_utils import get_frontmatter_field
+
+    src = get_frontmatter_field(en_content, "description")
+    tgt = get_frontmatter_field(tr_content, "description")
     if not src or not tgt or len(src) < 20:
         return False
     ratio = len(tgt) / len(src)

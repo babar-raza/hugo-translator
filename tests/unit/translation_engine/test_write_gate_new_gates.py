@@ -618,6 +618,163 @@ class TestGate24DescriptionRevertedToEnglish:
         ev._gate_description_reverted_to_english(src, tgt, "ar", _OUT, r)
         assert r.passed  # too short to be reliable signal
 
+    def test_multiline_folded_description_not_false_blocked(self):
+        """TC-HT-001: a folded (>-) multi-line description with real Arabic
+        text must not be mistaken for a first-line-only ASCII fragment."""
+        from src.translation_engine.write_gate import WriteGateResult
+        ev = _make_evaluator_no_detector()
+        src = (
+            "---\ntitle: Test\ndescription: >-\n"
+            "  Gets the font size in points, used across the whole\n"
+            "  document rendering pipeline.\n---\ntext\n"
+        )
+        tgt = (
+            "---\ntitle: Test\ndescription: >-\n"
+            "  تحصل على حجم الخط بالنقاط، يستخدم في جميع أنحاء\n"
+            "  خط أنابيب عرض المستند.\n---\ntext\n"
+        )
+        r = WriteGateResult(passed=True)
+        ev._gate_description_reverted_to_english(src, tgt, "ar", _OUT, r)
+        assert r.passed
+
+    def test_force_accept_does_not_bypass(self):
+        """Gates 9+ are unconditional — force_accept=True must not skip Gate 24."""
+        from src.translation_engine.write_gate import WriteGateEvaluator, WriteGateResult
+        ev = WriteGateEvaluator(detector=None, similarity_tracker=None, config=None, force_accept=True)
+        src = self._make_desc_content("Gets the font size in points.")
+        tgt = self._make_desc_content("Gets the font size in points.")
+        r = WriteGateResult(passed=True)
+        ev._gate_description_reverted_to_english(src, tgt, "ar", _OUT, r)
+        assert not r.passed
+
+
+# ---------------------------------------------------------------------------
+# Gate 18: Description hallucination detection
+# ---------------------------------------------------------------------------
+
+
+class TestGate18DescriptionHallucination:
+    """Gate 18: translated description >3x source length → BLOCK."""
+
+    def _make_desc_content(self, description: str, body: str = "text") -> str:
+        return f"---\ntitle: Test\ndescription: {description}\n---\n{body}\n"
+
+    def test_blocks_hallucinated_description(self):
+        from src.translation_engine.write_gate import WriteGateResult
+        ev = _make_evaluator_no_detector()
+        src = self._make_desc_content("Gets the value of this property for testing.")
+        tgt = self._make_desc_content(
+            "This translation ballooned into a very long explanatory paragraph "
+            "with far more text than the source ever contained, several times over "
+            "the original length by any reasonable measure of things."
+        )
+        r = WriteGateResult(passed=True)
+        ev._gate_description_hallucination(src, tgt, _OUT, r)
+        assert not r.passed
+        assert "Gate 18" in r.error
+
+    def test_passes_proportional_translation(self):
+        from src.translation_engine.write_gate import WriteGateResult
+        ev = _make_evaluator_no_detector()
+        src = self._make_desc_content("Gets the value of this property for testing.")
+        tgt = self._make_desc_content("Obtiene el valor de esta propiedad para pruebas.")
+        r = WriteGateResult(passed=True)
+        ev._gate_description_hallucination(src, tgt, _OUT, r)
+        assert r.passed
+
+    def test_multiline_literal_description_compared_by_full_value(self):
+        """TC-HT-001: a literal (|) multi-line source description must be
+        compared by its full joined value, not just its first physical line."""
+        from src.translation_engine.write_gate import WriteGateResult
+        ev = _make_evaluator_no_detector()
+        src = (
+            "---\ntitle: Test\ndescription: |\n"
+            "  Gets the value of this property for testing purposes today.\n"
+            "  It also documents a second related concern in detail here.\n"
+            "---\ntext\n"
+        )
+        # Proportionally-sized translation of the FULL two-line source — a
+        # first-line-only comparison would see this as wildly disproportionate.
+        tgt = (
+            "---\ntitle: Test\ndescription: |\n"
+            "  Obtiene el valor de esta propiedad para fines de prueba hoy.\n"
+            "  Tambien documenta una segunda cuestion relacionada aqui.\n"
+            "---\ntext\n"
+        )
+        r = WriteGateResult(passed=True)
+        ev._gate_description_hallucination(src, tgt, _OUT, r)
+        assert r.passed
+
+    def test_skips_short_source_description(self):
+        from src.translation_engine.write_gate import WriteGateResult
+        ev = _make_evaluator_no_detector()
+        src = self._make_desc_content("Short.")
+        tgt = self._make_desc_content("Corto.")
+        r = WriteGateResult(passed=True)
+        ev._gate_description_hallucination(src, tgt, _OUT, r)
+        assert r.passed
+
+    def test_force_accept_does_not_bypass(self):
+        from src.translation_engine.write_gate import WriteGateEvaluator, WriteGateResult
+        ev = WriteGateEvaluator(detector=None, similarity_tracker=None, config=None, force_accept=True)
+        src = self._make_desc_content("Gets the value of this property for testing.")
+        tgt = self._make_desc_content(
+            "This translation ballooned into a very long explanatory paragraph "
+            "with far more text than the source ever contained, several times over "
+            "the original length by any reasonable measure of things."
+        )
+        r = WriteGateResult(passed=True)
+        ev._gate_description_hallucination(src, tgt, _OUT, r)
+        assert not r.passed
+
+
+# ---------------------------------------------------------------------------
+# Gate 10: Frontmatter broken backticks
+# ---------------------------------------------------------------------------
+
+
+class TestGate10FrontmatterBackticks:
+    """Gate 10: odd backtick count in frontmatter scalar fields → auto-clean."""
+
+    def test_fixes_odd_backtick_in_title(self):
+        from src.translation_engine.write_gate import WriteGateResult
+        ev = _make_evaluator_no_detector()
+        tgt = "---\ntitle: The `Camera class\ndescription: fine\n---\nbody\n"
+        r = WriteGateResult(passed=True)
+        cleaned = ev._gate_frontmatter_backticks(tgt, _OUT, None, r)
+        assert cleaned is not None
+        assert "The `Camera class`" in cleaned
+
+    def test_passthrough_when_balanced(self):
+        from src.translation_engine.write_gate import WriteGateResult
+        ev = _make_evaluator_no_detector()
+        tgt = "---\ntitle: The `Camera` class\ndescription: fine\n---\nbody\n"
+        r = WriteGateResult(passed=True)
+        result = ev._gate_frontmatter_backticks(tgt, _OUT, None, r)
+        assert result == tgt
+
+    def test_multiline_folded_description_backtick_fix_round_trips(self):
+        """TC-HT-001: fixing a sibling field's backticks must not corrupt an
+        unrelated multi-line folded description elsewhere in the same file —
+        re-serialization goes through YAMLFormatter, not string splicing."""
+        import yaml
+
+        from src.translation_engine.write_gate import WriteGateResult
+        ev = _make_evaluator_no_detector()
+        tgt = (
+            "---\ntitle: The `Camera class\n"
+            "description: >-\n"
+            "  Gets the value of this property across multiple\n"
+            "  physical lines of folded YAML text.\n"
+            "---\nbody\n"
+        )
+        r = WriteGateResult(passed=True)
+        cleaned = ev._gate_frontmatter_backticks(tgt, _OUT, None, r)
+        assert cleaned is not None
+        parsed = yaml.safe_load(cleaned.split("---")[1])
+        assert parsed["title"] == "The `Camera class`"
+        assert "physical lines of folded YAML text" in parsed["description"]
+
 
 # ---------------------------------------------------------------------------
 # Gate 25: Code block content truncated
