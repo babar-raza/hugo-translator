@@ -14,14 +14,19 @@ scope_of_this_closure: >
   zero fabricated evidence, zero net-new code regressions.
 
   This closure does NOT and cannot claim the parent 2026-07-12 wave-3
-  incident is fully closed end-to-end. Two items remain explicitly
-  operator-owned and outside this session's autonomous authority:
-    1. The push decision for 9 local mission commits (f29c7cc..3112844) to origin.
-    2. The separate, operator-supervised aspose.org pilot-to-production
-       session (TC-HT-011's deferred write-and-commit-gate proof step).
-  Per stage2-plan/stage2-anti-overclaim-rules.md rule 3, these must always
-  be reported as separate open items, never conflated with this repo's own
+  incident is fully closed end-to-end. One item remains explicitly
+  operator-owned and outside this session's autonomous authority: the
+  separate, operator-supervised aspose.org pilot-to-production session
+  (TC-HT-011's deferred write-and-commit-gate proof step). Per
+  stage2-plan/stage2-anti-overclaim-rules.md rule 3, this must always be
+  reported as a separate open item, never conflated with this repo's own
   closure.
+
+  The push decision (originally listed as a second operator-owned item) was
+  approved by the operator on 2026-07-14 and executed: all 9 mission
+  commits (f29c7cc..3112844) plus this closure commit (1518576) were pushed
+  to https://github.com/babar-raza/hugo-translator.git main, confirmed
+  fast-forward with no divergence.
 
   TC-HT-INFRA-001 (pytest full-suite non-determinism root-cause) is
   recorded as PROPOSED_DEFERRED for a future infrastructure session — not

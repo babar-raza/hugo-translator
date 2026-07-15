@@ -27,10 +27,13 @@ final_all_green_candidate:
     - id: TC-HT-003-limitation
       reason: "LLM-echo validation proven at mocked-provider level only; pre-accepted master-plan limitation, not reopened"
 
-  operator_owned_items_outstanding: 2
+  operator_owned_items_outstanding: 1
   operator_owned_items_detail:
-    - "Push decision for 9 local mission commits (f29c7cc..3112844) to origin"
     - "Separate, operator-supervised aspose.org pilot-to-production session (TC-HT-011's deferred write-and-commit-gate step)"
+  operator_owned_items_resolved:
+    - id: "push-to-origin"
+      resolved: 2026-07-14
+      detail: "Operator approved; pushed 9 mission commits (f29c7cc..3112844) + governance closure commit (1518576) to https://github.com/babar-raza/hugo-translator.git main. origin/main now at 1518576192fa961e5a9932ab28776dbb41cb3664, fast-forward, no divergence."
 
   candidate_status: ALL_GREEN_WITHIN_MISSION_SCOPE
   candidate_status_definition: >
