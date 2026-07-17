@@ -523,11 +523,18 @@ class SegmentTranslator:
                 )
 
             def _make_tm_req(seg):
+                # TC-HT-TMKEY-001: key on the pre-placeholder-protection text when
+                # available (frontmatter segments), not the model-input protected
+                # text. The protected text replaces identifying content (e.g. a
+                # class name in backticks) with a generic positional placeholder,
+                # so two unrelated documents sharing a short template (e.g.
+                # "`X` class with N methods") would otherwise hash to the same TM
+                # key and silently serve each other's cached translation.
                 return _TMLookupRequest(
                     site_id=site_id,
                     src_lang=source_lang,
                     tgt_lang=target_lang,
-                    text=seg.source_text,
+                    text=getattr(seg, "tm_key_text", None) or seg.source_text,
                     context=str(seg.context) if seg.context else None,
                 )
 
@@ -653,6 +660,152 @@ class SegmentTranslator:
                 for _ in segments:
                     progress.cache_miss()
 
+        # Step 1b (TC-HT-ROUTE-001): ContentTypeRouter — pre-translate LLM-routed
+        # frontmatter segments before the uniform per-file MT batch call below.
+        # Mirrors the AST path's "Step 2a" further down in this same module
+        # (_translate_body_ast) — without this, every frontmatter field
+        # (description, title, summary, ...) was translated exclusively via the
+        # per-file MT backend regardless of the content_type_routing config, so
+        # short decontextualized descriptions could hallucinate on MT instead of
+        # being routed to professionalize_llm as configured.
+        if segments_to_translate:
+            try:
+                from .content_type_router import ContentTypeRouter as _CTR_seg
+                from ..model_runtime.llm_backend import LLMModelBackend as _LLMBackend_seg
+
+                _te_cfg_ctr_seg = (
+                    engine.config.get_config().get("translation_engine", {})
+                    if hasattr(engine.config, "get_config")
+                    else {}
+                )
+                _ctr_config_seg = _te_cfg_ctr_seg.get("content_type_routing", {})
+                if _ctr_config_seg:
+                    _router_seg = _CTR_seg(_ctr_config_seg)
+                    _llm_segments: list = []
+                    _llm_hints_seg: list = []
+                    _llm_model_id_seg = None
+                    _remaining_segments: list = []
+                    for _seg in segments_to_translate:
+                        _field_name = (
+                            _seg.context.frontmatter_key
+                            if _seg.context and getattr(_seg.context, "frontmatter_key", None)
+                            else ""
+                        )
+                        if not _field_name:
+                            _remaining_segments.append(_seg)
+                            continue
+                        _decision_seg = _router_seg.route(_seg, field_name=_field_name)
+                        if _decision_seg.model_id:
+                            _llm_segments.append(_seg)
+                            _llm_hints_seg.append(_decision_seg.context_hint)
+                            if _llm_model_id_seg is None:
+                                _llm_model_id_seg = _decision_seg.model_id
+                        else:
+                            _remaining_segments.append(_seg)
+
+                    if _llm_segments and _llm_model_id_seg:
+                        logger.info(
+                            f"ContentTypeRouter: {len(_llm_segments)}/{len(segments_to_translate)} "
+                            f"frontmatter segments routed to LLM backend before MT batch"
+                        )
+                        segments_to_translate = _remaining_segments
+                        try:
+                            _llm_backend_seg = engine.model_loader.load_model(_llm_model_id_seg)
+                            _file_ctx_seg = (
+                                _LLMBackend_seg._derive_file_context(str(doc.output_path))
+                                if hasattr(doc, "output_path") and doc.output_path
+                                else {}
+                            )
+                        except Exception as _llm_load_err:
+                            logger.warning(
+                                f"ContentTypeRouter LLM backend load failed "
+                                f"({type(_llm_load_err).__name__}): {_llm_load_err}; "
+                                f"{len(_llm_segments)} frontmatter segments marked as "
+                                f"passthrough (NOT routed to MT)"
+                            )
+                            _llm_backend_seg = None
+                            _file_ctx_seg = {}
+
+                        for _seg, _hint in zip(_llm_segments, _llm_hints_seg):
+                            _seg_translation = None
+                            if _llm_backend_seg is not None:
+                                try:
+                                    _llm_result_seg = _llm_backend_seg.translate_with_context(
+                                        [_seg.source_text],
+                                        source_lang,
+                                        target_lang,
+                                        context_hint=_hint,
+                                        file_context=_file_ctx_seg,
+                                    )
+                                    if _llm_result_seg and _llm_result_seg[0]:
+                                        _seg_translation = _llm_result_seg[0]
+                                except Exception as _llm_err_seg:
+                                    logger.warning(
+                                        f"ContentTypeRouter LLM pre-translate failed for "
+                                        f"segment ({type(_llm_err_seg).__name__}): {_llm_err_seg}; "
+                                        f"segment marked as passthrough"
+                                    )
+
+                            if _seg_translation:
+                                _final_translation = self._restore_placeholders(
+                                    _seg_translation, _seg
+                                )
+                            else:
+                                # TC-LLM-AVAIL-001-style graceful degrade: keep the
+                                # original text rather than sending decontextualized
+                                # short strings to raw MT, which hallucinates worse.
+                                _final_translation = self._restore_placeholders(
+                                    _seg.source_text, _seg
+                                )
+                                if _seg.metadata is None:
+                                    _seg.metadata = {}
+                                _seg.metadata["llm_passthrough_reason"] = (
+                                    "professionalize_llm_unavailable"
+                                )
+
+                            translations[_seg.id] = _final_translation
+                            stats.translated_segments += 1
+                            stats.words_translated += len(_seg.source_text.split())
+
+                            _store_context_seg = {"target_lang": target_lang}
+                            if _seg.context:
+                                if getattr(_seg.context, "frontmatter_key", None):
+                                    _store_context_seg["frontmatter_key"] = (
+                                        _seg.context.frontmatter_key
+                                    )
+                                if hasattr(_seg.context, "context_type"):
+                                    _store_context_seg["context_type"] = str(
+                                        _seg.context.context_type
+                                    )
+
+                            if engine.cache_write_mode != "never":
+                                _force_update_seg = (
+                                    True if engine.cache_write_mode == "always" else force
+                                )
+                                _tm_entry_seg = dict(
+                                    site_id=site_id,
+                                    src_lang=source_lang,
+                                    tgt_lang=target_lang,
+                                    text=getattr(_seg, "tm_key_text", None) or _seg.source_text,
+                                    translation=_final_translation,
+                                    context=str(_seg.context) if _seg.context else None,
+                                    metadata={
+                                        "model": _llm_model_id_seg,
+                                        "source_file": str(doc.file_path)
+                                        if hasattr(doc, "file_path")
+                                        else None,
+                                    },
+                                    store_context=_store_context_seg,
+                                    force_update=_force_update_seg,
+                                )
+                                if tm_write_buffer is not None:
+                                    tm_write_buffer.append(_tm_entry_seg)
+                                else:
+                                    engine.tm.store(**_tm_entry_seg)
+                                stats.tm_entries_stored += 1
+            except Exception as _ctr_err_seg:
+                logger.debug(f"ContentTypeRouter (segments) init skipped: {_ctr_err_seg}")
+
         # Step 2: Translate new segments via model
         if segments_to_translate:
             logger.info(
@@ -762,7 +915,10 @@ class SegmentTranslator:
                             site_id=site_id,
                             src_lang=source_lang,
                             tgt_lang=target_lang,
-                            text=segment.source_text,
+                            # TC-HT-TMKEY-001: same rationale as _make_tm_req above —
+                            # key on pre-protection text so unrelated documents that
+                            # happen to share a short template cannot collide.
+                            text=getattr(segment, "tm_key_text", None) or segment.source_text,
                             translation=translation,
                             context=str(segment.context) if segment.context else None,
                             metadata={

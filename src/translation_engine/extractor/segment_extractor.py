@@ -45,6 +45,12 @@ class Segment:
     source_lang: str
     placeholder_map: dict[str, str] = field(default_factory=dict)
     metadata: dict[str, Any] = field(default_factory=dict)
+    # Pre-placeholder-protection source text, used for TM key derivation only.
+    # source_text has identifying content (e.g. class names) replaced by generic
+    # positional placeholders for model input; hashing that for the TM key lets
+    # unrelated documents that share a template collide on the same key. When
+    # unset, callers fall back to source_text (unscoped/legacy behavior).
+    tm_key_text: str | None = None
 
     # Terminology protection fields (TRM-05)
     protected_terms: list[Any] = field(default_factory=list)  # List[ProtectedSegment]
@@ -329,6 +335,7 @@ class SegmentExtractor:
             site_id=self.site_profile.site_id,
             source_lang=source_lang,
             placeholder_map=placeholder_map,
+            tm_key_text=value,
         )
 
         # Protect terminology (TRM-05)
