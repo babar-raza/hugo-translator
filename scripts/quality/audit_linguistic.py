@@ -36,7 +36,15 @@ if str(_SCRIPT_DIR) not in sys.path:
 # Constants
 # ---------------------------------------------------------------------------
 CONTENT_ROOT = Path(r"D:\onedrive\Documents\GitHub\aspose.org\content")
-SITES = ["reference.aspose.org", "docs.aspose.org", "kb.aspose.org"]
+# TC-AUD-007: expanded default from 3 to 5 real content sites (excludes
+# "templates" and websites.aspose.org/www.aspose.org, kept out of this pass).
+SITES = [
+    "reference.aspose.org",
+    "docs.aspose.org",
+    "kb.aspose.org",
+    "blog.aspose.org",
+    "products.aspose.org",
+]
 
 # Locales that use a non-Latin script — headings/descriptions in pure ASCII
 # are almost certainly untranslated English.

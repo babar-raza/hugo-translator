@@ -72,17 +72,34 @@ class Segment:
 class SegmentExtractor:
     """Extracts translatable segments from HugoDocument."""
 
-    def __init__(self, site_profile: SiteProfile, terminology_manager: Any | None = None):
+    def __init__(
+        self,
+        site_profile: SiteProfile,
+        terminology_manager: Any | None = None,
+        force_protected_fields: set[str] | None = None,
+    ):
         """
         Initialize segment extractor.
 
         Args:
             site_profile: Site-specific extraction rules
             terminology_manager: Optional TerminologyManager for protecting terms
+            force_protected_fields: Frontmatter keys to skip regardless of the
+                site profile's own mode (HT-QUALITY-GATES-001 RC1/RC3). This is
+                the SAME mechanism `TextUnitExtractor` already had — but this
+                class (used for the actual frontmatter-segments path via
+                `engine.py`'s `translate_file()` -> `extract_all()`, called
+                ONCE per file before any per-target-language translation)
+                never had it at all, so `is_family_platform_index()`-based
+                title protection had ZERO effect here regardless of fixes
+                made to `TextUnitExtractor`/`segment_translator.py`'s AST
+                path — confirmed directly: a canary retranslation after that
+                fix still produced wrong titles, traced to this exact gap.
         """
         self.site_profile = site_profile
         self.placeholder_manager = PlaceholderManager()
         self.terminology_manager = terminology_manager
+        self.force_protected_fields = force_protected_fields or set()
 
         # Compile preserve patterns from site profile
         self.preserve_patterns = site_profile.body.preserve_patterns or []
@@ -141,6 +158,9 @@ class SegmentExtractor:
 
         for key, rule in self.site_profile.frontmatter.items():
             if rule.mode == FrontmatterMode.IGNORE:
+                continue
+
+            if key in self.force_protected_fields:
                 continue
 
             if rule.mode == FrontmatterMode.TRANSLATE:
@@ -306,6 +326,31 @@ class SegmentExtractor:
             elif child.type == NodeType.INLINE_HTML:
                 # Keep inline HTML as-is
                 text_parts.append(child.raw or "")
+            elif child.type == NodeType.LINK:
+                # H3 fix (TC-HT-LEGACY-LINK-001): previously fell through to
+                # the generic "elif child.children" branch below, which
+                # recurses into the link's text children only -- silently
+                # DELETING the URL and [...](...iptax entirely, not merely
+                # risking corruption. Re-emit the full markdown link syntax
+                # as literal text so it survives translation the same way
+                # the AST/ASTRenderer path already handles links (by never
+                # routing the URL through the model, not by placeholder-
+                # protecting it -- InlineFormatProtector deliberately
+                # disabled link placeholder protection for the same reason:
+                # "MT models are trained on markdown and preserve
+                # [text](url) structure well").
+                url = child.attrs.get("url", "") if child.attrs else ""
+                inner = self._extract_text_from_children(child.children) if child.children else ""
+                text_parts.append(f"[{inner}]({url})")
+            elif child.type == NodeType.STRONG:
+                # Same bug class as LINK: the generic fallback below strips
+                # the ** markers, silently dropping bold formatting instead
+                # of just risking corruption.
+                inner = self._extract_text_from_children(child.children) if child.children else ""
+                text_parts.append(f"**{inner}**")
+            elif child.type == NodeType.EMPHASIS:
+                inner = self._extract_text_from_children(child.children) if child.children else ""
+                text_parts.append(f"*{inner}*")
             elif child.children:
                 # Recurse for nested structures
                 text_parts.append(self._extract_text_from_children(child.children))

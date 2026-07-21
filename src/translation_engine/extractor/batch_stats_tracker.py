@@ -69,6 +69,16 @@ class BatchStatsTracker:
         self.hardware_baseline = hardware_baseline
         self.stats_file = Path(config.get('stats_file', '.translation_progress/batch_stats.json'))
         self.languages: dict[str, dict[str, Any]] = {}
+        # Languages this process instance has actually modified since its last
+        # save. Multiple concurrent processes (one per heal/shard job) share
+        # this single JSON file, each with its own in-memory `languages` dict
+        # loaded once at startup. Without tracking dirty keys, save() would
+        # blindly overwrite the whole file with this process's snapshot --
+        # including STALE copies of languages other concurrent processes have
+        # since updated -- silently reverting their batch-size growth. Only
+        # the languages this process itself touched are safe to overwrite;
+        # everything else must come from a fresh on-disk read at save time.
+        self._dirty_languages: set[str] = set()
 
         # Adaptation parameters
         self.fallback_rate_threshold = config.get('fallback_rate_threshold', 0.05)
@@ -127,11 +137,42 @@ class BatchStatsTracker:
 
         Writes atomically to prevent corruption. Includes metadata
         like version and last update timestamp.
+
+        Multiple processes (one per concurrent heal/shard job) share this
+        file, each with its own in-memory `languages` snapshot loaded once
+        at startup. To avoid one process's stale copy of a language it
+        never touched silently reverting another process's concurrent
+        growth for that same language, this does a merge rather than a
+        blind overwrite: languages this instance has actually modified
+        (self._dirty_languages) come from memory; everything else is
+        re-read fresh from disk immediately before writing. Fixed
+        2026-07-16 alongside the baseline/max_size ceiling bug -- both
+        were needed together to get real batch-size growth in production
+        (confirmed live: languages processed by 2+ concurrent jobs, e.g.
+        'fi' via unified_shard_5 + review_latin_m2m, never grew past
+        baseline despite thousands of consecutive successes).
         """
+        on_disk_languages: dict[str, dict[str, Any]] = {}
+        if self.stats_file.exists():
+            try:
+                with open(self.stats_file, encoding='utf-8') as f:
+                    on_disk_languages = json.load(f).get('languages', {})
+            except (OSError, json.JSONDecodeError) as e:
+                logger.warning(
+                    f"save(): could not re-read {self.stats_file} for merge ({e}); "
+                    f"falling back to this process's own snapshot for all languages"
+                )
+                on_disk_languages = {}
+
+        merged = dict(on_disk_languages)
+        for lang in self._dirty_languages:
+            if lang in self.languages:
+                merged[lang] = self.languages[lang]
+
         data = {
             'version': '1.0',
             'last_updated': datetime.now().isoformat(),
-            'languages': self.languages
+            'languages': merged
         }
 
         try:
@@ -142,7 +183,15 @@ class BatchStatsTracker:
 
             temp_file.replace(self.stats_file)
 
-            logger.debug(f"Saved batch statistics: {len(self.languages)} languages")
+            # Keep this process's in-memory view consistent with what's now
+            # on disk (picks up other processes' concurrent progress for
+            # languages this instance doesn't own).
+            self.languages = merged
+
+            logger.debug(
+                f"Saved batch statistics: {len(merged)} languages "
+                f"({len(self._dirty_languages)} owned by this process)"
+            )
         except OSError as e:
             logger.error(f"Failed to save batch stats to {self.stats_file}: {e}")
 
@@ -205,6 +254,8 @@ class BatchStatsTracker:
         # Initialize language entry if needed
         if language not in self.languages:
             self.languages[language] = self._create_language_entry(language)
+
+        self._dirty_languages.add(language)
 
         # Update rolling statistics
         stats = self.languages[language]['rolling_stats']
@@ -296,13 +347,19 @@ class BatchStatsTracker:
 
         Adaptation Rules:
         - REDUCE: If EMA fallback rate > threshold, reduce by reduction_factor
-        - INCREASE: If 5+ consecutive successes and below baseline, increase by increase_factor
+        - INCREASE: If 5+ consecutive successes and below max_size (config ceiling),
+          increase by increase_factor. NOTE: previously capped at `baseline` (the
+          cold-start value) instead of `max_size` -- that bug pinned every language
+          at its cold-start batch size forever, since baseline is never revised
+          upward. Fixed 2026-07-16.
 
         Args:
             target_lang: Target language code
         """
         if target_lang not in self.languages:
             return
+
+        self._dirty_languages.add(target_lang)
 
         lang_data = self.languages[target_lang]
         stats = lang_data['rolling_stats']
@@ -341,20 +398,20 @@ class BatchStatsTracker:
                 lang_data['current_batch_size'] = new_size
                 return  # Don't check for increase in same update
 
-        # INCREASE: Sustained success (only if below baseline)
+        # INCREASE: Sustained success (only if below max_size)
         # FIX Concern #10: Use math.ceil + minimum +1 to ensure batch size actually increases
         # Previous bug: int(4 * 1.10) = int(4.4) = 4 (no increase!)
         # Fixed: max(current+1, ceil(current*factor)) ensures at least +1
         consecutive = lang_data.get('consecutive_successes', 0)
-        if consecutive >= self.min_batches_before_increase and current_size < baseline:
+        if consecutive >= self.min_batches_before_increase and current_size < max_size:
             # Use ceil to round up AND ensure at least +1 increase
             proportional_increase = math.ceil(current_size * self.increase_factor)
-            new_size = min(baseline, max(current_size + 1, proportional_increase))
+            new_size = min(max_size, max(current_size + 1, proportional_increase))
             if new_size != current_size:
                 # Prepare detailed reason
                 reason_detail = f"consecutive_successes {consecutive} >= {self.min_batches_before_increase}"
-                if new_size == baseline:
-                    reason_detail += ", capped at baseline"
+                if new_size == max_size:
+                    reason_detail += ", capped at max_size"
 
                 self._log_adaptation(
                     target_lang, 'INCREASE', current_size, new_size,

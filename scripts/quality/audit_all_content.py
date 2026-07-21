@@ -18,7 +18,17 @@ def safe(s):
     return s.encode("ascii", errors="replace").decode("ascii")
 
 CONTENT_ROOT = Path(r"D:\onedrive\Documents\GitHub\aspose.org\content")
-SITES = ["reference.aspose.org", "docs.aspose.org", "kb.aspose.org"]
+# TC-AUD-007: was a hardcoded 3-site list with no CLI override, silently
+# leaving blog/products/websites/www.aspose.org entirely unaudited by every
+# tier. Now overridable via --sites; default expanded to the 5 sites that
+# carry real translated content (excludes "templates", not a content site).
+SITES = [
+    "reference.aspose.org",
+    "docs.aspose.org",
+    "kb.aspose.org",
+    "blog.aspose.org",
+    "products.aspose.org",
+]
 
 # Detection patterns
 NLLB_ARTIFACTS = re.compile(
@@ -147,7 +157,7 @@ def check_code_fence_dropped(en_body, tr_body):
     return False, ""
 
 
-def scan(output_path=None, resume=False):
+def scan(output_path=None, resume=False, sites=None):
     results = defaultdict(lambda: defaultdict(int))   # site -> issue -> count
     examples = defaultdict(list)                       # issue -> list of (site, locale, rel, detail)
     locale_counts = defaultdict(lambda: defaultdict(int))  # locale -> issue -> count
@@ -177,7 +187,7 @@ def scan(output_path=None, resume=False):
 
     print(f"Starting audit at {datetime.now().strftime('%H:%M:%S')}", flush=True)
 
-    for site in SITES:
+    for site in (sites if sites is not None else SITES):
         site_root = CONTENT_ROOT / site
         en_root = site_root / "en"
         if not en_root.exists():
@@ -265,11 +275,16 @@ def scan(output_path=None, resume=False):
                         }) + "\n")
                     continue
 
-                # 2. Title mismatch (reference site: title should always match EN)
-                if site == "reference.aspose.org" and en_title and tr_title and tr_title != en_title:
+                # 2. Title mismatch. reference.aspose.org: title is passthrough
+                # site-wide, so check every file. Other sites translate title on
+                # leaf pages legitimately -- only family/platform index pages
+                # (lang/family/platform/_index.md) must stay byte-identical to EN.
+                _is_family_platform_index = len(rel.parts) == 3 and rel.parts[-1] == "_index.md"
+                _title_must_match_en = _is_family_platform_index or site == "reference.aspose.org"
+                if _title_must_match_en and en_title and tr_title and tr_title != en_title:
                     record("title_mismatch", f"EN={en_title!r} TR={tr_title!r}")
 
-                if site == "reference.aspose.org" and en_link_title and tr_link_title and tr_link_title != en_link_title:
+                if _title_must_match_en and en_link_title and tr_link_title and tr_link_title != en_link_title:
                     record("linktitle_mismatch", f"EN={en_link_title!r} TR={tr_link_title!r}")
 
                 # 3. NLLB/model artifact corruption anywhere in body
@@ -479,6 +494,8 @@ if __name__ == "__main__":
                         help="Skip files already present in the output JSONL")
     parser.add_argument("--no-jsonl", action="store_true",
                         help="Print only, no JSONL output")
+    parser.add_argument("--sites", nargs="+", default=SITES,
+                        help=f"Sites to scan (default: {SITES})")
     args = parser.parse_args()
     out = None if args.no_jsonl else args.output
-    scan(output_path=out, resume=args.resume)
+    scan(output_path=out, resume=args.resume, sites=args.sites)

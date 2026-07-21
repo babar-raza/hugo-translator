@@ -244,9 +244,35 @@ class EngineBuilder:
         from .validation.decision_engine import ValidationDecisionEngine
 
         engine.parser = HugoParser()
+        _validation_suite_was_default = p["validation_suite"] is None
         engine.validation_suite = p["validation_suite"] or (
             ValidationSuite() if p["enable_validation"] else None
         )
+
+        # TC-QG-004 (HT-QUALITY-GATES-001): opt SemanticSimilarityValidator into
+        # the default production suite when validation.yaml says enabled: true,
+        # or validation_mode == "strict" (config/validation.yaml's own
+        # documented, previously-unimplemented contract). Only applies to a
+        # suite we built ourselves here — an explicitly passed-in
+        # `validation_suite=` is respected as-is, not mutated. See
+        # ValidationSuite.load_semantic_similarity_validator()'s docstring for
+        # why this is narrowly scoped to just this one validator.
+        if engine.validation_suite is not None and _validation_suite_was_default:
+            _already_has_semantic = any(
+                type(v).__name__ == "SemanticSimilarityValidator"
+                for v in engine.validation_suite.validators
+            )
+            if not _already_has_semantic:
+                _semantic_validator = ValidationSuite.load_semantic_similarity_validator(
+                    force_enable=(p["validation_mode"] == "strict")
+                )
+                if _semantic_validator is not None:
+                    engine.validation_suite.validators.append(_semantic_validator)
+                    logger.info(
+                        "TC-QG-004: SemanticSimilarityValidator added to production "
+                        "ValidationSuite (validation_mode=%r)", p["validation_mode"],
+                    )
+
         engine.placeholder_manager = PlaceholderManager()
         engine.multiline_handler = MultilineHandler()
 

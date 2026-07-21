@@ -83,7 +83,10 @@ body:
   preserve_patterns:
   - ^\{\{<.*>\}\}
   # Aspose product names: Aspose.3D, Aspose.Words, Aspose.Cells.Python via .NET, etc.
+  # plus bare standalone "Aspose" (the dot-required version alone never
+  # matched this, consistent with the same gap found+fixed on kb.aspose.org).
   - \bAspose\.\S+
+  - \bAspose\b
   # Dotted API identifier: ClassName.METHOD, Enum.CONSTANT, Class.Class (constructor refs)
   - \b[A-Z][A-Za-z0-9_]*(?:\.[A-Z][A-Za-z0-9_]+)+\b
   # Interface names: ISerializable, IIndexedVertexElement (I + PascalCase, 2+ chars after I)

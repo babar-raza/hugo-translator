@@ -121,6 +121,45 @@ NON_TRANSLATABLE_FRONTMATTER_FIELDS = {
     "type",
 }
 
+
+def is_family_platform_index(
+    file_path: Any, source_lang: str = "en", include_family_root: bool = False
+) -> bool:
+    """True for {source_lang}/{family}/{platform}/_index.md paths.
+
+    These are product/platform index pages (e.g. docs.aspose.org's
+    slides/cpp/_index.md) whose title must stay identical to the English
+    source across every locale, unlike leaf content pages under the same
+    family/platform which legitimately translate their titles.
+
+    HT-QUALITY-GATES-001: `include_family_root=True` ALSO matches
+    {source_lang}/{family}/_index.md (2-level, no platform segment) — e.g.
+    products.aspose.org's `psd/_index.md`, one of the 15 root-only families
+    with no platform sub-pages at all. Confirmed by direct audit that these
+    family-root titles have the exact same byte-identical-to-EN requirement
+    (the audit's most severe single finding, a Serbian title corrupted to
+    "Смрт"/"Death", was on exactly this page shape). Defaults to False
+    (the original, narrower behavior) because this function is shared
+    across sites (docs.aspose.org, kb.aspose.org, ...) this session has not
+    audited — callers that have confirmed the broader requirement for their
+    site must opt in explicitly rather than this changing silently
+    everywhere.
+    """
+    if not file_path:
+        return False
+    parts = Path(file_path).parts
+    if source_lang not in parts:
+        return False
+    idx = len(parts) - 1 - parts[::-1].index(source_lang)
+    remainder = parts[idx + 1 :]
+    if remainder and remainder[-1] != "_index.md":
+        return False
+    if len(remainder) == 3:
+        return True
+    if len(remainder) == 2 and include_family_root:
+        return True
+    return False
+
 # API reference heading terms validated by Gate 9 in write_gate.py.
 # TC-HDG-TRANS-019: these must NEVER be blocked from translation;
 # they appear as section headings (## Methods) and must reach the model.
@@ -260,6 +299,7 @@ class TextUnitExtractor:
         similarity_tracker: Any | None = None,
         script_validation_thresholds: dict | None = None,
         batch_purity_skip_langs: list[str] | None = None,
+        force_protected_fields: frozenset[str] | set[str] = frozenset(),
     ):
         """
         Initialize extractor for native batch translation.
@@ -274,9 +314,14 @@ class TextUnitExtractor:
             fasttext_detector: FastTextDetector for language detection (optional, replaces langdetect)
             similarity_tracker: SimilarityTracker for adaptive similarity learning (optional)
             script_validation_thresholds: Script validation thresholds for fallback (optional)
+            force_protected_fields: Frontmatter field names to always treat as protected
+                (passthrough), overriding the site profile's per-field mode. Used for
+                path-dependent exceptions (e.g. family/platform index page titles) that
+                can't be expressed in the site-wide frontmatter config.
         """
         self.segmentation_strategy = segmentation_strategy
         self.site_profile = site_profile
+        self.force_protected_fields = frozenset(force_protected_fields)
 
         # Load extraction config from site profile (with fallback to defaults)
         extraction_config = self._load_extraction_config()
@@ -604,10 +649,10 @@ class TextUnitExtractor:
                     protected.add(field_name)
 
             if protected:  # Only use if non-empty
-                return protected
+                return protected | self.force_protected_fields
 
         # Fallback to defaults
-        return NON_TRANSLATABLE_FRONTMATTER_FIELDS
+        return NON_TRANSLATABLE_FRONTMATTER_FIELDS | self.force_protected_fields
 
     def _extract_frontmatter_units(self, frontmatter_dict):
         """
@@ -1993,7 +2038,14 @@ class TextUnitExtractor:
             return True
 
         # Version numbers: v1.2, 1.2.3, 2.0+
-        if re.match(r"^v?\d+\.?\d*[\.\+\-]?", text):
+        # Full-match required (trailing $): the old pattern had no end anchor,
+        # so re.match only required the STRING TO START WITH a digit -- any
+        # heading beginning with a number ("3D Model Inspection and
+        # Validation", "2D Visual Effects") satisfied it on the leading
+        # digit alone and was marked non-translatable, silently shipping the
+        # English heading in every locale on every site using AST body
+        # reconstruction (not something limited to one site's content).
+        if re.match(r"^v?\d+(?:\.\d+)*[\+\-]?$", text):
             return True
 
         return False

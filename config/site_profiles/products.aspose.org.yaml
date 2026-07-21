@@ -223,6 +223,10 @@ body:
   - (?s)```.*?```
   - '`[^`\n]+`'
   - \[[^\]]+\]\([^)]+\)
+  # Protect Aspose brand/product names (Aspose.Cells, Aspose.PDF, Aspose.Font,
+  # bare "Aspose", etc.) from being translated/corrupted -- was previously
+  # missing entirely on this site (unlike kb/reference/blog profiles).
+  - \bAspose(?:\.[A-Za-z0-9][A-Za-z0-9.]*)?\b
   placeholder_syntax:
   - \{\{<.*?>\}\}
   - \{\{%.*?%\}\}

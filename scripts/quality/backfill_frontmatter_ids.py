@@ -1,21 +1,29 @@
 """
 backfill_frontmatter_ids.py — Restore English title + linkTitle across translated files.
 
-Fixes 18,859 corrupted title fields and 11,503 corrupted linkTitle fields in
-reference.aspose.org translations, without touching the file body.
+Originally fixed 18,859 corrupted title fields and 11,503 corrupted linkTitle fields in
+reference.aspose.org translations, without touching the file body. Also used to backfill
+family/platform index-page titles on docs/kb/products.aspose.org (see --site and the
+family/platform depth filter below) — those sites legitimately translate titles on leaf
+content pages, so unlike reference.aspose.org this scan is restricted to
+{family}/{platform}/_index.md files only, to avoid reverting legitimate leaf-page title
+translations back to English.
 
 Algorithm:
-  1. Walk all non-en locale dirs under {content_root}/reference.aspose.org/
-  2. For each .md file, read first 25 lines (frontmatter region)
+  1. Walk all non-en locale dirs under {content_root}/{site}/
+  2. For each candidate .md file, read the full frontmatter block (between the
+     two `---` markers)
   3. Extract title: and linkTitle: values via regex (no YAML round-trip)
   4. Read English source's title/linkTitle the same way
   5. If either field differs from English → do in-place string replacement in frontmatter
   6. Write back full file with patched frontmatter, body bytes untouched
 
 Usage:
-  python scripts/quality/backfill_frontmatter_ids.py --dry-run   # default
+  python scripts/quality/backfill_frontmatter_ids.py --dry-run   # default, site=reference.aspose.org
   python scripts/quality/backfill_frontmatter_ids.py --apply
   python scripts/quality/backfill_frontmatter_ids.py --apply --locales ar,bg,ru
+  python scripts/quality/backfill_frontmatter_ids.py --site docs.aspose.org --dry-run
+  python scripts/quality/backfill_frontmatter_ids.py --site kb.aspose.org --apply
 """
 from __future__ import annotations
 
@@ -37,10 +45,15 @@ if str(Path(__file__).resolve().parent) not in sys.path:
 # Constants
 # ---------------------------------------------------------------------------
 
-SITE = "reference.aspose.org"
+DEFAULT_SITE = "reference.aspose.org"
 EN_LOCALE = "en"
-FRONTMATTER_LINES = 25  # Read only first 25 lines for comparison
 FRONTMATTER_END_RE = re.compile(r"^---\s*$")
+
+# Sites where title is legitimately translated on leaf content pages (only the
+# family/platform index page's title must stay pinned to EN). Scanning must be
+# restricted to {family}/{platform}/_index.md there, unlike reference.aspose.org
+# where title is passthrough site-wide and every .md file is in scope.
+SITES_SCOPED_TO_PLATFORM_INDEX = {"docs.aspose.org", "kb.aspose.org", "products.aspose.org"}
 
 # Match: title: SomeValue  OR  title: "Some Value"  OR  title: 'Some Value'
 _FM_RE = re.compile(
@@ -77,12 +90,18 @@ def _resolve_content_root() -> Path:
 
 
 def _extract_fm_values(text: str) -> dict[str, str]:
-    """Extract title and linkTitle from raw frontmatter text (first 25 lines)."""
+    """Extract title and linkTitle from raw frontmatter text.
+
+    Reads the full frontmatter block (delimited by the two `---` markers),
+    not a fixed line count -- reference.aspose.org's API pages carry long
+    evidence/provenance/grade blocks that routinely push title/linkTitle
+    past the first 25 lines, which previously caused real mismatches there
+    to be silently skipped.
+    """
     values: dict[str, str] = {}
     in_fm = False
     fm_end_count = 0
-    lines = text.splitlines()[:FRONTMATTER_LINES]
-    for line in lines:
+    for line in text.splitlines():
         if FRONTMATTER_END_RE.match(line):
             fm_end_count += 1
             if fm_end_count == 1:
@@ -201,13 +220,16 @@ def process_file(
 
 def run(
     content_root: Path,
+    site: str,
     only_locales: list[str] | None,
     apply: bool,
     verbose: bool,
 ) -> dict:
-    site_root = content_root / SITE
+    site_root = content_root / site
     if not site_root.exists():
         raise FileNotFoundError(f"Site root not found: {site_root}")
+
+    scope_to_platform_index = site in SITES_SCOPED_TO_PLATFORM_INDEX
 
     en_root = site_root / EN_LOCALE
     stats: dict = defaultdict(int)
@@ -223,11 +245,16 @@ def run(
     print(f"Content root: {site_root}")
     print(f"Locales: {locales}")
     print(f"Mode: {'APPLY' if apply else 'DRY-RUN'}")
+    if scope_to_platform_index:
+        print("Scope: {family}/{platform}/_index.md only (leaf-page titles are legitimately translated on this site)")
     print()
 
     for locale in locales:
         locale_root = site_root / locale
-        locale_files = list(locale_root.rglob("*.md"))
+        if scope_to_platform_index:
+            locale_files = list(locale_root.glob("*/*/_index.md"))
+        else:
+            locale_files = list(locale_root.rglob("*.md"))
         print(f"  {locale}: {len(locale_files)} files", end="", flush=True)
 
         for tr_path in locale_files:
@@ -253,6 +280,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Backfill English title/linkTitle into translated files")
     parser.add_argument("--dry-run", action="store_true", default=True, help="Report mismatches only (default)")
     parser.add_argument("--apply", action="store_true", help="Apply patches in place")
+    parser.add_argument("--site", type=str, default=DEFAULT_SITE, help=f"Site to scan (default: {DEFAULT_SITE})")
     parser.add_argument("--content-root", type=Path, help="Path to aspose.org/content directory")
     parser.add_argument("--locales", type=str, help="Comma-separated locales to restrict (default: all)")
     parser.add_argument("--verbose", action="store_true", help="Print per-file details")
@@ -263,7 +291,7 @@ def main() -> None:
     content_root = args.content_root or _resolve_content_root()
     only_locales = [l.strip() for l in args.locales.split(",")] if args.locales else None
 
-    stats = run(content_root, only_locales, apply=apply, verbose=args.verbose)
+    stats = run(content_root, args.site, only_locales, apply=apply, verbose=args.verbose)
 
     print()
     print("=" * 60)

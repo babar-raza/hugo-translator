@@ -1,9 +1,3 @@
----
-description: TR(Fixture to reproduce nested list concatenation bug)
-title: TR(Nested List Test Fixture)
-type: docs
----
-
 # TR(Nested List Preservation Test)
 
 TR(This fixture tests that nested list structures are preserved during translation.).

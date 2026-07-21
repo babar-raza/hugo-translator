@@ -59,7 +59,7 @@ class L1Cache:
         self._stats = CacheStats(max_size=max_size)
 
     def _make_key(
-        self, site_id: str, src_lang: str, tgt_lang: str, text: str
+        self, site_id: str, src_lang: str, tgt_lang: str, text: str, field_name: str = ""
     ) -> str:
         """
         Create cache key from lookup parameters.
@@ -69,17 +69,23 @@ class L1Cache:
             src_lang: Source language code
             tgt_lang: Target language code
             text: Source text
+            field_name: Optional field-scoping dimension (H2/TC-HDN-003) --
+                without this, an L1 hit for a field-scoped L2 miss would
+                still short-circuit lookup() before L2/field-scoping is ever
+                consulted, making L2-level scoping unreachable in practice.
 
         Returns:
             Cache key (hash of parameters)
         """
         # Create deterministic key
         key_data = f"{site_id}:{src_lang}:{tgt_lang}:{text}"
+        if field_name:
+            key_data = f"{site_id}:{field_name}:{src_lang}:{tgt_lang}:{text}"
         # Use MD5 for speed (not security-critical)
         return hashlib.md5(key_data.encode(), usedforsecurity=False).hexdigest()
 
     def get(
-        self, site_id: str, src_lang: str, tgt_lang: str, text: str
+        self, site_id: str, src_lang: str, tgt_lang: str, text: str, field_name: str = ""
     ) -> str | None:
         """
         Retrieve cached translation.
@@ -89,11 +95,12 @@ class L1Cache:
             src_lang: Source language code
             tgt_lang: Target language code
             text: Source text to translate
+            field_name: Optional field-scoping dimension (see _make_key)
 
         Returns:
             Cached translation if found, None otherwise
         """
-        key = self._make_key(site_id, src_lang, tgt_lang, text)
+        key = self._make_key(site_id, src_lang, tgt_lang, text, field_name)
 
         with self._lock:
             if key in self._cache:
@@ -112,6 +119,7 @@ class L1Cache:
         tgt_lang: str,
         text: str,
         translation: str,
+        field_name: str = "",
     ) -> None:
         """
         Store translation in cache.
@@ -122,8 +130,9 @@ class L1Cache:
             tgt_lang: Target language code
             text: Source text
             translation: Translated text
+            field_name: Optional field-scoping dimension (see _make_key)
         """
-        key = self._make_key(site_id, src_lang, tgt_lang, text)
+        key = self._make_key(site_id, src_lang, tgt_lang, text, field_name)
 
         with self._lock:
             # Update existing entry

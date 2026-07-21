@@ -86,7 +86,11 @@ body:
   - codespan
   preserve_patterns:
   - ^\{\{<.*>\}\}
-  - \bAspose\b  # Protect standalone Aspose brand name
+  # Protect Aspose brand/product names as one cohesive unit (Aspose.Cells,
+  # Aspose.3D, bare "Aspose", etc.) -- the previous bare-word-only pattern
+  # only protected "Aspose" itself, leaving ".Cells"/".3D" etc. adjacent
+  # and unprotected, which could still get mistranslated/detached.
+  - \bAspose(?:\.[A-Za-z0-9][A-Za-z0-9.]*)?\b
   placeholder_syntax:
   - \{\{<.*?>\}\}
   - \{\{%.*?%\}\}

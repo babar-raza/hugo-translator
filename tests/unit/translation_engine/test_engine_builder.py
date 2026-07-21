@@ -168,3 +168,47 @@ class TestValidationModeWiring:
         # The decision engine should have been created with strict config
         # We verify engine.decision_engine was set (not None)
         assert engine.decision_engine is not None
+
+    @patch("src.translation_engine.engine_builder.EngineBuilder._init_detection")
+    @patch("src.translation_engine.engine_builder.EngineBuilder._init_retry_handler")
+    def test_fast_mode_skips_retries_and_accepts_best_effort(self, mock_det, mock_retry):
+        """TC-HT-STALL-001: validation_mode='fast' must resolve to
+        max_retry_attempts=0 and accept_after_max_retries=True — MT backends
+        are deterministic (greedy decoding) and cannot retry with feedback,
+        so retrying only reproduces the same failure while burning GPU time.
+        This is what heal_english_headings.py / unified_translate.py now rely
+        on to stop wasting retries on deterministic MT failures."""
+        config = _make_config()
+        engine = MagicMock()
+        builder = EngineBuilder(
+            config_service=config,
+            tm=_make_tm(),
+            model_loader=_make_model_loader(),
+            validation_mode="fast",
+            enable_validation=True,
+        )
+        builder.build_into(engine)
+
+        assert engine.decision_engine is not None
+        assert engine.decision_engine.max_retry_attempts == 0
+        assert engine.decision_engine.accept_after_max_retries is True
+
+    @patch("src.translation_engine.engine_builder.EngineBuilder._init_detection")
+    @patch("src.translation_engine.engine_builder.EngineBuilder._init_retry_handler")
+    def test_fast_mode_not_overridden_by_explicit_max_retries(self, mock_det, mock_retry):
+        """validation_mode='fast' must force max_retry_attempts=0 even if a
+        caller also passes an explicit max_retries — fast mode's whole point
+        is that retries are pointless for deterministic MT, so it must win."""
+        config = _make_config()
+        engine = MagicMock()
+        builder = EngineBuilder(
+            config_service=config,
+            tm=_make_tm(),
+            model_loader=_make_model_loader(),
+            validation_mode="fast",
+            max_retries=2,
+            enable_validation=True,
+        )
+        builder.build_into(engine)
+
+        assert engine.decision_engine.max_retry_attempts == 0

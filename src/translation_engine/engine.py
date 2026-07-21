@@ -1081,7 +1081,20 @@ class TranslationEngine:
                 return result
 
             # Extract segments (TRM-05: pass terminology_manager for term protection)
-            extractor = SegmentExtractor(site_profile, terminology_manager=self.terminology_manager)
+            # HT-QUALITY-GATES-001 RC1/RC3: force_protected_fields must reach THIS
+            # extractor, not just the AST-body path's TextUnitExtractor — this is
+            # the one that actually decides whether `title` becomes a translatable
+            # segment for family/platform index pages (confirmed directly: a
+            # canary retranslation after fixing only the AST-path mechanism still
+            # produced wrong titles, traced to this exact extractor never having
+            # had any is_family_platform_index() awareness at all).
+            from .segment_translator import compute_force_protected_fields
+
+            extractor = SegmentExtractor(
+                site_profile,
+                terminology_manager=self.terminology_manager,
+                force_protected_fields=compute_force_protected_fields(doc, site_profile),
+            )
             segments = extractor.extract_all(doc, source_lang)
             result.stats.total_segments = len(segments)
 
@@ -1944,9 +1957,16 @@ class TranslationEngine:
         with open(file_path, encoding="utf-8") as f:
             content = f.read()
         doc = self.parser.parse_string(content)
+        doc.source_path = file_path  # HT-QUALITY-GATES-001: needed for is_family_platform_index()
 
         # Extract segments (TRM-05: with terminology protection)
-        extractor = SegmentExtractor(site_profile, terminology_manager=self.terminology_manager)
+        from .segment_translator import compute_force_protected_fields
+
+        extractor = SegmentExtractor(
+            site_profile,
+            terminology_manager=self.terminology_manager,
+            force_protected_fields=compute_force_protected_fields(doc, site_profile),
+        )
         source_lang = site_profile.default_source_lang
         segments = extractor.extract_all(doc, source_lang)
 

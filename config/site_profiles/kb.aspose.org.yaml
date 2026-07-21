@@ -118,7 +118,10 @@ body:
   - ^\{\{%.*?%\}\}
   - '`[^`]+`'
   # Protect Aspose product names (Aspose.Email, Aspose.3D, Aspose.Cells, etc.)
-  - \bAspose\.[A-Za-z][A-Za-z0-9.]*\b
+  # and bare standalone "Aspose" (e.g. "Aspose FOSS Knowledge Base" titles --
+  # the dot-required version above never matched these, so they still got
+  # translated/corrupted despite this preserve_pattern existing).
+  - \bAspose(?:\.[A-Za-z0-9][A-Za-z0-9.]*)?\b
   # Protect C++ scope resolution (mapi_message::from_stream, MapiMessage::FromStream)
   - \b\w+::\w+(?:\s*\([^)]*\))?\b
   # Protect email file format abbreviations (MSG, EML, PST, ICS, MIME, mbox)

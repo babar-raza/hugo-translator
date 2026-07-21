@@ -37,11 +37,15 @@ if str(_PROJECT_ROOT) not in sys.path:
 
 logger = logging.getLogger(__name__)
 
-_SITE_ENV_MAP = {
-    "reference.aspose.org": "ASPOSE_ORG_CONTENT",
-    "docs.aspose.org": "ASPOSE_NET_CONTENT",
-    "kb.aspose.org": "ASPOSE_NET_CONTENT",
-}
+# TC-AUD-008: was env-var indirection (_SITE_ENV_MAP) mapping docs/kb to
+# ASPOSE_NET_CONTENT -- wrong project entirely (aspose.net, not aspose.org),
+# and pointing at a directory that's empty on this machine; also silently
+# depended on the env var being set in-process, which it usually isn't
+# (.env exists but nothing here loads it). All 5 audited sites live under
+# the same aspose.org content root -- matches the direct, proven-working
+# CONTENT_ROOT constant already used by audit_all_content.py,
+# audit_linguistic.py, and audit_completeness.py.
+CONTENT_ROOT = Path(r"D:\onedrive\Documents\GitHub\aspose.org\content")
 
 _NON_LATIN_LOCALES = frozenset(
     "ar bg el fa he hi ja ko ru th uk zh".split()
@@ -56,12 +60,11 @@ _SCORE_RE = re.compile(r'"score"\s*:\s*(\d+(?:\.\d+)?)')
 
 
 def _get_content_root(site_id: str) -> Path | None:
-    env_key = _SITE_ENV_MAP.get(site_id)
-    if env_key:
-        val = os.environ.get(env_key)
-        if val:
-            return Path(val)
-    return None
+    """Return the SITE-level root (e.g. .../content/reference.aspose.org),
+    matching what _collect_candidates expects to append "en"/<locale> to --
+    not the top-level content root shared by all sites."""
+    site_root = CONTENT_ROOT / site_id
+    return site_root if site_root.exists() else None
 
 
 def _derive_class_name(file_path: Path) -> str:
@@ -170,22 +173,24 @@ def _build_score_prompt(
     return system, user
 
 
-def _call_llm(system: str, user: str, config) -> str | None:
+def _call_llm(system: str, user: str, model_loader) -> str | None:
     """Call professionalize_llm with the scoring prompt. Returns raw text response."""
     try:
-        from src.model_runtime.llm_backend import LLMModelBackend
-        backend = LLMModelBackend(config=config, model_name="professionalize_llm")
-        # Use the internal provider directly for a single chat call
+        # TC-AUD-009: was constructing LLMModelBackend(config=..., model_name=...)
+        # directly -- neither kwarg exists on its real __init__(model_info, device)
+        # signature (never caught because T4 had never actually been run end to
+        # end). ModelLoader is the proven, correct way to obtain a backend by
+        # model_id (matches heal_english_headings.py::_build_engine); it also
+        # caches the loaded backend, so repeated calls across many units are cheap.
+        backend = model_loader.load_model("professionalize_llm")
+        # TC-AUD-009 (cont'd): provider.chat(messages=..., system=..., ...)
+        # doesn't exist on the real provider classes (OpenAICompatibleProvider
+        # etc.) -- the actual public interface is generate(system_prompt,
+        # user_text) -> (text, input_tokens, output_tokens), per
+        # BaseLLMProvider.generate() in llm_providers.py.
         provider = backend._provider
-        resp = provider.chat(
-            messages=[
-                {"role": "user", "content": user},
-            ],
-            system=system,
-            temperature=0.0,
-            max_tokens=1000,
-        )
-        return resp
+        text, _input_tokens, _output_tokens = provider.generate(system, user)
+        return text
     except Exception as exc:
         logger.error("LLM call failed: %s", exc)
         return None
@@ -219,8 +224,17 @@ def run_audit(
     resume: bool,
     batch_size: int = 20,
 ) -> dict:
-    from src.config.config_service import ConfigService
-    config = ConfigService()
+    # TC-AUD-009: ConfigService(config) was constructed with zero args
+    # (its real signature requires config_root) and imported from a module
+    # that doesn't exist (src.config.config_service). config was also never
+    # actually needed here -- only a ModelLoader capable of resolving
+    # "professionalize_llm" is. device="cuda" is inert for this model
+    # (LLMModelBackend ignores it, always runs as "api"/HTTP).
+    from src.model_runtime.loader import ModelLoader
+    from src.model_runtime.registry import ModelRegistry
+
+    registry = ModelRegistry(str(_PROJECT_ROOT / "config" / "model_registry.yaml"))
+    model_loader = ModelLoader(registry=registry, device="cuda", max_memory_mb=7000)
 
     # Load done set
     done_files: set[str] = set()
@@ -273,7 +287,7 @@ def run_audit(
                     system, user = _build_score_prompt(batch, locale, class_name)
 
                     t0 = time.monotonic()
-                    response = _call_llm(system, user, config)
+                    response = _call_llm(system, user, model_loader)
                     elapsed = time.monotonic() - t0
                     stats["calls_made"] += 1
 

@@ -31,6 +31,53 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
+def compute_force_protected_fields(doc, site_profile) -> set[str]:
+    """Family/platform index pages (lang/family/platform/_index.md) must keep
+    their `title` identical to EN even on sites that otherwise translate
+    title on leaf content pages — see is_family_platform_index().
+
+    HT-QUALITY-GATES-001 RC1: extracted from inline logic in
+    `_translate_body_ast()` specifically so it's unit-testable against a real
+    `HugoDocument` without needing to exercise the rest of that (expensive,
+    model-loading) method. The original inline version read
+    `getattr(doc, "file_path", None)` — HugoDocument has no `file_path`
+    attribute (only `source_path`), so that always evaluated to `None` and
+    this protection never actually activated for any file, for as long as
+    this code existed. Existing tests only exercised
+    `is_family_platform_index()` and `TextUnitExtractor` in isolation with
+    the flag hand-set, never this glue — which is exactly why the bug went
+    uncaught.
+    """
+    from .extractor.text_unit_extractor import is_family_platform_index
+
+    source_path = doc.source_path if hasattr(doc, "source_path") and doc.source_path else None
+    # include_family_root scoped to sites directly confirmed to need it — not
+    # a blanket default, since it changes title-protection behavior. Initially
+    # products.aspose.org only (e.g. psd/_index.md, a root-only family with no
+    # platform sub-pages, whose title corrupted to the Serbian word for
+    # "Death"). kb.aspose.org and docs.aspose.org added (Part 22) after direct
+    # sampling of real live content found the identical defect already present
+    # at near-universal scale (kb: 7/9 hr, 9/9 fr family-root titles
+    # mismatched; docs: 6/9 hr, 9/9 fr) — e.g. kb hr/cells/_index.md's title
+    # corrupted to "Sljedeći članakFOSS" ("Next article" + "FOSS", a leaked
+    # UI string, not a translation). reference.aspose.org excluded: its
+    # `title` field is `mode: passthrough` (never sent to the model), so this
+    # vulnerability cannot occur there. blog.aspose.org excluded: it uses
+    # `per_language_folders: false` (locale is a file suffix, not a folder),
+    # a structurally different layout that `is_family_platform_index()`'s
+    # path-part matching doesn't apply to the same way — needs its own
+    # investigation before extending here, not a guess.
+    _FAMILY_ROOT_SITES = {"products.aspose.org", "kb.aspose.org", "docs.aspose.org"}
+    _include_family_root = getattr(site_profile, "site_id", "") in _FAMILY_ROOT_SITES
+    if is_family_platform_index(
+        source_path,
+        getattr(site_profile, "default_source_lang", "en"),
+        include_family_root=_include_family_root,
+    ):
+        return {"title"}
+    return set()
+
+
 class SegmentTranslator:
     """Owns TM lookup, model translation, batching, and reconstruction.
 
@@ -530,12 +577,24 @@ class SegmentTranslator:
                 # so two unrelated documents sharing a short template (e.g.
                 # "`X` class with N methods") would otherwise hash to the same TM
                 # key and silently serve each other's cached translation.
+                #
+                # H2/TC-HDN-003: also scope by field_name (e.g. "description" vs
+                # "title") -- narrower than tm_key_text's fix (which prevents
+                # cross-DOCUMENT collisions within the same field template) and
+                # complementary to it (prevents cross-FIELD-TYPE collisions when
+                # two different fields happen to contain identical text).
+                _field_name = (
+                    seg.context.frontmatter_key
+                    if seg.context and getattr(seg.context, "frontmatter_key", None)
+                    else ""
+                )
                 return _TMLookupRequest(
                     site_id=site_id,
                     src_lang=source_lang,
                     tgt_lang=target_lang,
                     text=getattr(seg, "tm_key_text", None) or seg.source_text,
                     context=str(seg.context) if seg.context else None,
+                    field_name=_field_name,
                 )
 
             _fm_idx = [i for i, s in enumerate(segments) if _is_fm_seg(s)]
@@ -643,7 +702,9 @@ class SegmentTranslator:
                     from .exceptions import ShutdownRequested
 
                     raise ShutdownRequested(
-                        file_path=str(doc.file_path) if hasattr(doc, "file_path") else "",
+                        file_path=str(doc.source_path)
+                        if hasattr(doc, "source_path") and doc.source_path
+                        else "",
                         segments_completed=idx,
                     )
 
@@ -711,9 +772,17 @@ class SegmentTranslator:
                         segments_to_translate = _remaining_segments
                         try:
                             _llm_backend_seg = engine.model_loader.load_model(_llm_model_id_seg)
+                            # HT-QUALITY-GATES-001: was `doc.output_path`, which doesn't
+                            # exist on HugoDocument (always fell back to {}). Compute the
+                            # real per-locale output path the same way file_pipeline.py does.
+                            _output_path_seg = (
+                                engine._get_output_path(doc.source_path, target_lang, site_profile)
+                                if hasattr(doc, "source_path") and doc.source_path
+                                else None
+                            )
                             _file_ctx_seg = (
-                                _LLMBackend_seg._derive_file_context(str(doc.output_path))
-                                if hasattr(doc, "output_path") and doc.output_path
+                                _LLMBackend_seg._derive_file_context(str(_output_path_seg))
+                                if _output_path_seg
                                 else {}
                             )
                         except Exception as _llm_load_err:
@@ -791,12 +860,13 @@ class SegmentTranslator:
                                     context=str(_seg.context) if _seg.context else None,
                                     metadata={
                                         "model": _llm_model_id_seg,
-                                        "source_file": str(doc.file_path)
-                                        if hasattr(doc, "file_path")
+                                        "source_file": str(doc.source_path)
+                                        if hasattr(doc, "source_path") and doc.source_path
                                         else None,
                                     },
                                     store_context=_store_context_seg,
                                     force_update=_force_update_seg,
+                                    field_name=_store_context_seg.get("frontmatter_key", ""),
                                 )
                                 if tm_write_buffer is not None:
                                     tm_write_buffer.append(_tm_entry_seg)
@@ -880,7 +950,9 @@ class SegmentTranslator:
                     from .exceptions import ShutdownRequested
 
                     raise ShutdownRequested(
-                        file_path=str(doc.file_path) if hasattr(doc, "file_path") else "",
+                        file_path=str(doc.source_path)
+                        if hasattr(doc, "source_path") and doc.source_path
+                        else "",
                         segments_completed=len(translations),
                     )
 
@@ -889,6 +961,16 @@ class SegmentTranslator:
                     zip(segments_to_translate, translated_texts, strict=False), 1
                 ):
                     translation = self._restore_placeholders(translation, segment)
+
+                    if segment.placeholder_map:
+                        missing = engine.placeholder_manager.find_missing_protected_values(
+                            translation, segment.placeholder_map
+                        )
+                        if missing:
+                            translation = self._retry_dropped_placeholders_via_llm(
+                                segment, translation, missing, source_lang, target_lang
+                            )
+
                     translations[segment.id] = translation
                     stats.translated_segments += 1
                     stats.words_translated += len(segment.source_text.split())
@@ -923,12 +1005,13 @@ class SegmentTranslator:
                             context=str(segment.context) if segment.context else None,
                             metadata={
                                 "model": model_id,
-                                "source_file": str(doc.file_path)
-                                if hasattr(doc, "file_path")
+                                "source_file": str(doc.source_path)
+                                if hasattr(doc, "source_path") and doc.source_path
                                 else None,
                             },
                             store_context=store_context,
                             force_update=force_update,
+                            field_name=store_context.get("frontmatter_key", ""),
                         )
                         if tm_write_buffer is not None:
                             tm_write_buffer.append(_tm_entry)
@@ -940,7 +1023,9 @@ class SegmentTranslator:
                         from .exceptions import ShutdownRequested
 
                         raise ShutdownRequested(
-                            file_path=str(doc.file_path) if hasattr(doc, "file_path") else "",
+                            file_path=str(doc.source_path)
+                            if hasattr(doc, "source_path") and doc.source_path
+                            else "",
                             segments_completed=len(translations),
                         )
 
@@ -1148,6 +1233,8 @@ class SegmentTranslator:
                 except Exception:
                     pass
 
+            force_protected_fields = compute_force_protected_fields(doc, site_profile)
+
             extractor = TextUnitExtractor(
                 segmentation_strategy=site_profile.body.ast_segmentation_strategy,
                 terminology_file=terminology_file if terminology_file.exists() else None,
@@ -1159,6 +1246,7 @@ class SegmentTranslator:
                 similarity_tracker=engine.similarity_tracker,
                 script_validation_thresholds=script_validation_thresholds,
                 batch_purity_skip_langs=_batch_purity_skip_langs,
+                force_protected_fields=force_protected_fields,
             )
 
             logger.info(
@@ -1281,9 +1369,17 @@ class SegmentTranslator:
                         )
                         try:
                             _llm_backend = engine.model_loader.load_model(_llm_model_id)
+                            # HT-QUALITY-GATES-001: was `doc.output_path` (doesn't exist on
+                            # HugoDocument, always fell back to {}) — compute the real
+                            # per-locale output path the same way file_pipeline.py does.
+                            _output_path = (
+                                engine._get_output_path(doc.source_path, target_lang, site_profile)
+                                if hasattr(doc, "source_path") and doc.source_path
+                                else None
+                            )
                             _file_ctx = (
-                                _LLMBackend._derive_file_context(str(doc.output_path))
-                                if hasattr(doc, "output_path") and doc.output_path
+                                _LLMBackend._derive_file_context(str(_output_path))
+                                if _output_path
                                 else {}
                             )
                             for _llm_unit, _hint in zip(_llm_units, _llm_hints):
@@ -1455,13 +1551,17 @@ class SegmentTranslator:
                                 severity="error",
                                 rule="BatchLanguagePurity",
                                 message=f"High batch purity failure rate: {purity_failure_rate:.1%} ({failed_outer_batches}/{total_outer_batches} outer batches)",
-                                location=str(doc.file_path) if hasattr(doc, "file_path") else None,
+                                location=str(doc.source_path)
+                                if hasattr(doc, "source_path") and doc.source_path
+                                else None,
                             )
                         ]
                         validation_result = ValidationResult(valid=False, issues=issues)
                         raise TranslationRetryableError(
                             message=f"Batch purity failure rate too high: {purity_failure_rate:.1%}",
-                            file_path=str(doc.file_path) if hasattr(doc, "file_path") else "",
+                            file_path=str(doc.source_path)
+                            if hasattr(doc, "source_path") and doc.source_path
+                            else "",
                             validation_result=validation_result,
                             retry_feedback=f"Batch language purity check failed for {purity_failure_rate:.1%} of outer batches. Ensure all translated units are in the target language {target_lang}.",
                         )
@@ -1493,13 +1593,17 @@ class SegmentTranslator:
                         severity="error",
                         rule="ASTTranslation",
                         message=f"{len(empty_units)} units with substantial source text returned empty translations",
-                        location=str(doc.file_path) if hasattr(doc, "file_path") else None,
+                        location=str(doc.source_path)
+                        if hasattr(doc, "source_path") and doc.source_path
+                        else None,
                     )
                 ]
                 validation_result = ValidationResult(valid=False, issues=issues)
                 raise TranslationRetryableError(
                     message="AST translation produced empty outputs for substantial text",
-                    file_path=str(doc.file_path) if hasattr(doc, "file_path") else "",
+                    file_path=str(doc.source_path)
+                    if hasattr(doc, "source_path") and doc.source_path
+                    else "",
                     validation_result=validation_result,
                     retry_feedback="All translated segments with substantial source text must return non-empty output.",
                 )
@@ -1583,6 +1687,72 @@ class SegmentTranslator:
                 raise
             logger.error(f"AST-based translation failed: {e}", exc_info=True)
             raise RuntimeError(f"AST-based translation failed: {e}")
+
+    def _retry_dropped_placeholders_via_llm(
+        self,
+        segment,
+        translation: str,
+        missing: list[str],
+        source_lang: str,
+        target_lang: str,
+    ) -> str:
+        """
+        HT-QUALITY-GATES-001 Part 20: one-shot fallback when the primary MT
+        model silently drops a protected span. Confirmed directly against the
+        real nllb_200_1.3b model: it doesn't just corrupt a placeholder's shape
+        (restore()'s fuzzy pass already recovers those) -- it can drop the
+        token entirely and hallucinate unrelated fluent prose in its place,
+        leaving no trace to restore from. No regex fix is possible for that
+        case; the only confirmed mitigation is re-translating via a stronger
+        backend. `professionalize_llm` (a real, already-configured company LLM
+        endpoint used elsewhere in this pipeline for CASE-4 escalation) was
+        tested directly against the exact real segment that dropped 3/12
+        placeholders under nllb_200_1.3b: it restored all 12 correctly.
+        """
+        engine = self._engine
+        try:
+            fallback_backend = engine.model_loader.load_model("professionalize_llm")
+        except Exception as e:
+            logger.warning(
+                f"Dropped-placeholder fallback: could not load professionalize_llm "
+                f"({type(e).__name__}): {e}; keeping original translation "
+                f"(missing: {missing})"
+            )
+            return translation
+
+        try:
+            fallback_raw = fallback_backend.translate(
+                [segment.source_text], source_lang, target_lang
+            )
+            fallback_raw = fallback_raw[0] if fallback_raw else ""
+        except Exception as e:
+            logger.warning(
+                f"Dropped-placeholder fallback: professionalize_llm call failed "
+                f"({type(e).__name__}): {e}; keeping original translation "
+                f"(missing: {missing})"
+            )
+            return translation
+
+        fallback_restored = engine.placeholder_manager.restore(
+            fallback_raw, segment.placeholder_map
+        )
+        fallback_missing = engine.placeholder_manager.find_missing_protected_values(
+            fallback_restored, segment.placeholder_map
+        )
+
+        if fallback_missing:
+            logger.warning(
+                f"Dropped-placeholder fallback via professionalize_llm still "
+                f"missing {len(fallback_missing)} value(s): {fallback_missing} "
+                f"-- keeping original MT translation (both incomplete)"
+            )
+            return translation
+
+        logger.info(
+            f"Dropped-placeholder fallback: professionalize_llm recovered "
+            f"{len(missing)} value(s) the primary model dropped: {missing}"
+        )
+        return fallback_restored
 
     def _restore_placeholders(self, text: str, segment) -> str:
         """Restore placeholder content (links, shortcodes, etc.) in translated text."""

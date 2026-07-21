@@ -26,7 +26,15 @@ _SCRIPT_DIR = Path(__file__).resolve().parent
 _PROJ_ROOT = _SCRIPT_DIR.parent.parent
 
 CONTENT_ROOT = Path(r"D:\onedrive\Documents\GitHub\aspose.org\content")
-SITES = ["reference.aspose.org", "docs.aspose.org", "kb.aspose.org"]
+# TC-AUD-007: expanded default from 3 to 5 real content sites (excludes
+# "templates" and websites.aspose.org/www.aspose.org, kept out of this pass).
+SITES = [
+    "reference.aspose.org",
+    "docs.aspose.org",
+    "kb.aspose.org",
+    "blog.aspose.org",
+    "products.aspose.org",
+]
 
 PRIORITY: dict[str, int] = {
     "empty_body": 1,

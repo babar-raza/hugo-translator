@@ -352,6 +352,12 @@ def _build_engine(model_id: str, root: Path):
         batch_size=20,
         force_accept=False,
         model_id=model_id,
+        # TC-HT-STALL-001: MT backends are deterministic (greedy decoding) and
+        # cannot retry-with-feedback, so the default max_retry_attempts=2 only
+        # ever reproduces the same failure — pure wasted GPU time that can blow
+        # the scheduler's stall window. "fast" mode skips retries and accepts
+        # best-effort for non-critical validator failures.
+        validation_mode="fast",
     )
     return engine
 

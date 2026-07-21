@@ -1,0 +1,79 @@
+name: Quality Gates Tests (HT-QUALITY-GATES-001)
+
+# CI half of HT-QUALITY-GATES-001 TC-QG-003's "both CI and local scheduler"
+# requirement: this workflow runs the repo's own unit/integration test suite
+# on a GitHub-hosted runner (no self-hosted runner, no GPU, no local content-
+# repo path access needed — those live in .local/scheduler.py instead, per
+# TC-QG-003's local-scheduler half). This is what makes the write-gate,
+# similarity-tracker, and semantic-validator-wiring regressions in this
+# mission actually enforced on every push/PR, not just runnable locally by
+# whoever remembers to — see HT-QUALITY-GATES-001 plan, structural weakness
+# "no feedback loop from audit finding to enforced gate."
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'src/translation_engine/write_gate.py'
+      - 'src/translation_engine/engine_builder.py'
+      - 'src/translation_engine/validation/**'
+      - 'src/translation_engine/language_detection/**'
+      - 'src/translation_engine/quality/**'
+      - 'src/translation_engine/extractor/text_unit_extractor.py'
+      - 'scripts/quality/audit_llm_artifacts.py'
+      - 'tests/unit/translation_engine/**'
+      - 'tests/unit/validation/**'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'src/translation_engine/write_gate.py'
+      - 'src/translation_engine/engine_builder.py'
+      - 'src/translation_engine/validation/**'
+      - 'src/translation_engine/language_detection/**'
+      - 'src/translation_engine/quality/**'
+      - 'src/translation_engine/extractor/text_unit_extractor.py'
+      - 'scripts/quality/audit_llm_artifacts.py'
+      - 'tests/unit/translation_engine/**'
+      - 'tests/unit/validation/**'
+  workflow_dispatch:
+    # Allow manual trigger
+
+jobs:
+  quality-gate-unit-tests:
+    name: Write-Gate / Validation / Similarity-Tracker Tests
+    runs-on: windows-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.13'
+          cache: 'pip'
+          cache-dependency-path: requirements/cpu.txt
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements/cpu.txt
+        shell: pwsh
+
+      - name: Run write_gate + similarity_tracker + validation suite tests
+        run: >
+          python -m pytest
+          tests/unit/translation_engine/test_write_gate.py
+          tests/unit/translation_engine/test_write_gate_new_gates.py
+          tests/unit/translation_engine/test_write_gate_28_29.py
+          tests/unit/translation_engine/language_detection/test_similarity_tracker.py
+          tests/unit/translation_engine/test_purity_threshold_override.py
+          tests/unit/translation_engine/test_engine_semantic_validator_wiring.py
+          tests/unit/validation/
+          -v
+        shell: pwsh
+
+      - name: Full translation_engine regression sweep
+        run: python -m pytest tests/unit/translation_engine/ -q
+        shell: pwsh

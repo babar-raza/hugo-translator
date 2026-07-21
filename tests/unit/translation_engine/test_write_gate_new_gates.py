@@ -538,6 +538,54 @@ class TestGate21InlineCodeIntegrity:
         assert r.passed
         assert r.cleaned_content is None  # no cleaning needed
 
+    def test_fenced_code_block_in_translation_only_does_not_false_positive(self):
+        """Regression (found 2026-07-20): a fenced ```code``` block present only in
+        the translation (not the EN source) has triple backticks that get mispaired
+        as inline-code delimiters by a naive single-backtick regex, manufacturing a
+        cross-fence "span" that swallows unrelated prose/table content and false-
+        positives against a real EN span. Confirmed live: 199 of 201 Gate 21 blocks
+        on reference.aspose.org were this false positive, not real corruption."""
+        from src.translation_engine.write_gate import WriteGateResult
+        ev = _make_evaluator_no_detector()
+        en = _make_content_simple(
+            "Use `AssetInfo`, `GetValue`, and `SetProperty` methods.\n"
+            "See `ensure_layout_slides_parsed` for details.\n"
+        )
+        # tgt: all EN code spans preserved verbatim, but translation also
+        # introduced a fenced block (not present in EN) further down the body.
+        tgt_body = (
+            "\u0418\u0441\u043f\u043e\u043b\u044c\u0437\u0443\u0439\u0442\u0435 `AssetInfo`, `GetValue` \u0438 `SetProperty`.\n"
+            "\u0421\u043c. `ensure_layout_slides_parsed` \u0434\u043b\u044f \u043f\u043e\u0434\u0440\u043e\u0431\u043d\u043e\u0441\u0442\u0435\u0439.\n"
+            "```cpp\n#include <Aspose/Slides/Foss/presentation.h>\n```\n"
+        )
+        tr = _make_content_simple(tgt_body)
+        r = WriteGateResult(passed=True)
+        ev._gate_inline_code_integrity(en, tr, _OUT, r)
+        assert r.passed, f"Fenced block must not corrupt inline-span comparison; error={r.error}"
+
+    def test_unpaired_backtick_does_not_swallow_rest_of_body(self):
+        """Regression: a single stray/unpaired backtick anywhere in the body must
+        not let a span cross a newline and swallow everything up to the next
+        backtick found later in the document (was the pre-fix _BACKTICK_SPAN_RE
+        behavior, since `[^`]+` has no newline exclusion)."""
+        from src.translation_engine.write_gate import WriteGateResult
+        ev = _make_evaluator_no_detector()
+        en = _make_content_simple(
+            "Use `AssetInfo`, `GetValue`, and `SetProperty` methods.\n"
+        )
+        # tgt: real spans preserved, plus one lone stray backtick followed much
+        # later by another backtick -- must not be read as one giant span.
+        tgt_body = (
+            "\u0418\u0441\u043f\u043e\u043b\u044c\u0437\u0443\u0439\u0442\u0435 `AssetInfo`, `GetValue` \u0438 `SetProperty`.\n"
+            "` \u0441\u043b\u0443\u0447\u0430\u0439\u043d\u044b\u0439 \u043e\u0434\u0438\u043d\u043e\u0447\u043d\u044b\u0439 \u0431\u044d\u043a\u0442\u0438\u043a\n"
+            "\u041c\u043d\u043e\u0433\u043e \u043d\u0435\u0441\u0432\u044f\u0437\u0430\u043d\u043d\u043e\u0433\u043e \u0442\u0435\u043a\u0441\u0442\u0430 \u0437\u0434\u0435\u0441\u044c.\n"
+            "\u0415\u0449\u0435 `\u0430\u0431\u0432\u0433\u0434` \u0437\u0434\u0435\u0441\u044c.\n"
+        )
+        tr = _make_content_simple(tgt_body)
+        r = WriteGateResult(passed=True)
+        ev._gate_inline_code_integrity(en, tr, _OUT, r)
+        assert r.passed, f"Lone backtick must not swallow the rest of the body; error={r.error}"
+
 
 class TestGateEmptyBody:
     """Gate 19b: empty body."""

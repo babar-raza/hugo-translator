@@ -576,8 +576,17 @@ class ASTRenderer:
             placeholder_map = unit.metadata.get('placeholder_map', {})
             if placeholder_map:
                 restored = self._restore_placeholders(final_text, placeholder_map)
-                # Detect unreplaced placeholder tokens — indicates partial restoration failure
-                remaining_placeholders = re.findall(r'\{PLACEHOLDER_\d+\}', restored)
+                # Detect unreplaced placeholder tokens — indicates partial restoration failure.
+                # HT-QUALITY-GATES-001 RC2: also catch the brace-stripped shape (confirmed
+                # directly against the real NLLB model — it can drop the `{`/`}` entirely,
+                # e.g. "{PLACEHOLDER_0}" -> bare "PLACEHOLDER_0"). restore() above now has a
+                # brace-agnostic fallback pass for keys it recognizes; this check is
+                # defense-in-depth for anything that still slips through (e.g. a
+                # hallucinated placeholder number with no matching map entry, so there was
+                # never anything to restore it to). "PLACEHOLDER_" is specific jargon, not
+                # real prose, so a brace-optional match here carries negligible
+                # false-positive risk on legitimate translated content.
+                remaining_placeholders = re.findall(r'\{?PLACEHOLDER_\d+\}?', restored)
                 if remaining_placeholders:
                     self._placeholder_leak_count += len(remaining_placeholders)
                     logger.error(

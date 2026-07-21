@@ -131,6 +131,77 @@ class ValidationSuite:
             # so they are only created via from_config() or explicitly passed in
         ]
 
+    @staticmethod
+    def _build_semantic_similarity_validator(ss_cfg: dict) -> "SemanticSimilarityValidator | None":
+        """Build a SemanticSimilarityValidator from an already-parsed
+        `validators.semantic_similarity` config section, or return None if
+        disabled. Pure/no I/O — see `load_semantic_similarity_validator()`
+        for the file-reading entry point.
+        """
+        if not ss_cfg.get("enabled", False):
+            return None
+        return SemanticSimilarityValidator(
+            warn_threshold=ss_cfg.get(
+                "warn_threshold", SemanticSimilarityValidator.WARN_THRESHOLD_DEFAULT
+            ),
+            error_threshold=ss_cfg.get(
+                "error_threshold", SemanticSimilarityValidator.ERROR_THRESHOLD_DEFAULT
+            ),
+            min_body_chars=ss_cfg.get(
+                "min_body_chars", SemanticSimilarityValidator.MIN_BODY_CHARS_DEFAULT
+            ),
+        )
+
+    @staticmethod
+    def load_semantic_similarity_validator(
+        config_path: Path | None = None, force_enable: bool = False
+    ) -> "SemanticSimilarityValidator | None":
+        """Read validation.yaml and build a SemanticSimilarityValidator if
+        `validators.semantic_similarity.enabled` is true, or if
+        `force_enable` is true (e.g. validation_mode == "strict" — see
+        config/validation.yaml's own comment: "enable via --validation-mode
+        strict or by setting enabled: true").
+
+        TC-QG-004 (HT-QUALITY-GATES-001): this is the entry point
+        engine_builder.py uses to opt this ONE validator into the default,
+        always-used production ValidationSuite — completing work that was
+        already half-done (the encoder dependency was already wired via
+        engine_builder.py's _init_tm_wiring / SemanticSimilarityValidator.
+        set_encoder(), but the validator itself was never instantiated into
+        a running suite; from_config() existed but nothing ever called it).
+
+        Deliberately narrow: from_config() builds a much larger alternate
+        validator set (YAMLValidator, PlaceholderValidator, StructureValidator,
+        LinkValidator, CompletenessValidator, LanguageConsistencyValidator,
+        ShortcodePreservationValidator, MetadataMarkdownContaminationValidator,
+        FrontmatterProtectionValidator, TerminologyPreservationValidator,
+        FilePlacementValidator, RepetitionDetectorValidator) that has ALSO
+        never run in production and has unknown false-positive/interaction
+        behavior with write_gate.py's 29 gates. Wiring that whole set in
+        wholesale is a separate, larger, not-yet-scoped decision — flagged,
+        not done here.
+        """
+        if config_path is None:
+            current_file = Path(__file__)
+            project_root = current_file.parent.parent.parent.parent
+            config_path = project_root / "config" / "validation.yaml"
+
+        try:
+            with open(config_path, encoding="utf-8") as f:
+                config = yaml.safe_load(f) or {}
+        except (OSError, yaml.YAMLError) as exc:
+            logger.warning(
+                "ValidationSuite: failed to load %s for semantic_similarity — "
+                "validator will NOT be added: %s", config_path, exc,
+            )
+            return None
+
+        ss_cfg = dict(config.get("validators", {}).get("semantic_similarity", {}))
+        if force_enable:
+            ss_cfg["enabled"] = True
+
+        return ValidationSuite._build_semantic_similarity_validator(ss_cfg)
+
     @classmethod
     def from_config(
         cls,
@@ -221,21 +292,11 @@ class ValidationSuite:
             }
             validators.append(RepetitionDetectorValidator(config=rep_cfg))
 
-        if validators_config.get("semantic_similarity", {}).get("enabled", False):
-            ss_cfg = validators_config.get("semantic_similarity", {})
-            validators.append(
-                SemanticSimilarityValidator(
-                    warn_threshold=ss_cfg.get(
-                        "warn_threshold", SemanticSimilarityValidator.WARN_THRESHOLD_DEFAULT
-                    ),
-                    error_threshold=ss_cfg.get(
-                        "error_threshold", SemanticSimilarityValidator.ERROR_THRESHOLD_DEFAULT
-                    ),
-                    min_body_chars=ss_cfg.get(
-                        "min_body_chars", SemanticSimilarityValidator.MIN_BODY_CHARS_DEFAULT
-                    ),
-                )
-            )
+        _semantic_validator = cls._build_semantic_similarity_validator(
+            validators_config.get("semantic_similarity", {})
+        )
+        if _semantic_validator is not None:
+            validators.append(_semantic_validator)
 
         return cls(
             validators=validators,

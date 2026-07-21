@@ -19,6 +19,7 @@ class LookupRequest:
     tgt_lang: str
     text: str
     context: str | None = None
+    field_name: str = ""
 
 
 @dataclass

@@ -65,6 +65,24 @@ class PlaceholderManager:
         for placeholder, original in placeholder_map.items():
             restored = restored.replace(placeholder, original)
 
+        # HT-QUALITY-GATES-001 RC2: brace-stripped fallback. The MT model can drop
+        # the `{`/`}` entirely around a placeholder while translating the
+        # surrounding text -- confirmed directly against the real NLLB model, not
+        # just theorized: protecting "with `.mtl`" as "with {PLACEHOLDER_0}" and
+        # translating to Finnish produced bare "PLACEHOLDER_0" with the braces
+        # gone and a Finnish case suffix glued on immediately after
+        # ("PLACEHOLDER_0:n"). None of the brace-anchored passes below can see
+        # this shape at all, so it was shipping into production untouched.
+        # Match the bare digit sequence directly (braces optional) and replace
+        # only that span, leaving any adjacent suffix/punctuation the model
+        # added in place -- imperfect grammar is an acceptable outcome, a raw
+        # leaked placeholder token is not.
+        def bare_replace(match: re.Match) -> str:
+            key = f"{{PLACEHOLDER_{match.group(1)}}}"
+            return placeholder_map.get(key, match.group(0))
+
+        restored = re.sub(r"PLACEHOLDER_(\d+)", bare_replace, restored)
+
         # Fuzzy replacement: handle translator-modified tokens like {Platch_1} or
         # { PLACHEHOLODER _1 } (NLLB adds spaces and misspells the keyword).
         # Pattern: any {…N…} where N is the digit sequence, with optional trailing
@@ -101,6 +119,23 @@ class PlaceholderManager:
 
         return restored
 
+    def find_missing_protected_values(
+        self, restored_text: str, placeholder_map: dict[str, str]
+    ) -> list[str]:
+        """
+        Return the original protected values that are absent from restored_text.
+
+        HT-QUALITY-GATES-001 Part 20: the MT model sometimes drops a placeholder
+        token entirely -- not corrupting its shape (which restore()'s fuzzy pass
+        already recovers), but hallucinating unrelated fluent prose in its place.
+        No regex can recover text that was never emitted; this only detects it,
+        by checking whether each originally-protected value survived restoration.
+        Confirmed directly against the real nllb_200_1.3b model: a 12-placeholder
+        real segment dropped 3 values (`DateTime`, `Cell.PutValue(value)`,
+        `Workbook.Worksheets`) with zero recognizable trace in the output.
+        """
+        return [value for value in placeholder_map.values() if value not in restored_text]
+
     def extract_placeholders(self, text: str) -> list[str]:
         """
         Extract all placeholder tokens from text.
@@ -110,5 +145,9 @@ class PlaceholderManager:
 
         Returns:
             List of placeholder tokens found
+
+        HT-QUALITY-GATES-001 RC2: brace-optional — the MT model can strip the
+        `{`/`}` entirely (confirmed directly), so a brace-only pattern misses
+        exactly the leaked tokens this method exists to catch.
         """
-        return re.findall(r"\{PLACEHOLDER_\d+\}", text)
+        return re.findall(r"\{?PLACEHOLDER_\d+\}?", text)

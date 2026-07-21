@@ -24,7 +24,18 @@ class PlaceholderValidator(Validator):
 
     def __init__(
         self,
-        placeholder_pattern: str = r"\{\{([A-Z_]+)_(\d+)\}\}",
+        # HT-QUALITY-GATES-001: was double-brace (`\{\{...\}\}`), but
+        # PlaceholderManager (src/translation_engine/extractor/placeholder_manager.py)
+        # only ever produces single-brace tokens (`{PLACEHOLDER_0}`) — this
+        # validator could never match a real placeholder, regardless of the
+        # separate brace-stripping issue fixed in PlaceholderManager.restore().
+        # Confirmed this validator runs on post-restore text in the real
+        # ValidationSuite wiring (file_pipeline.py), where a genuine leak
+        # would already have been caught by ast_renderer.py's own gate — so
+        # this fix restores correctness but adds no new detection coverage
+        # for that defect class; it's fixed anyway rather than left as
+        # permanently-dead, misleadingly-named validation logic.
+        placeholder_pattern: str = r"\{([A-Z_]+)_(\d+)\}",
         strict_order: bool = False,
         name: str | None = None,
     ):
@@ -109,7 +120,7 @@ class PlaceholderValidator(Validator):
             Set of placeholder strings
         """
         matches = re.findall(self.placeholder_pattern, text)
-        return {f"{{{{{prefix}_{num}}}}}" for prefix, num in matches}
+        return {f"{{{prefix}_{num}}}" for prefix, num in matches}
 
     def _check_order(
         self, source: str, translation: str, result: ValidationResult

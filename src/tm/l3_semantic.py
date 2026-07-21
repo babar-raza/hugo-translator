@@ -193,6 +193,14 @@ class L3SemanticTM:
                 logger.warning(f"Failed to move FAISS index to GPU: {e}. Using CPU.")
 
         self.metadata = []
+        # HT-QUALITY-GATES-001 TC-QG-L3-FIX: must reset alongside metadata --
+        # a fresh index means every prior position is gone, so stale entries
+        # here would point update_entry() at the wrong (or a since-reused)
+        # row. Previously not reset at all, so any call to rebuild_index()/
+        # batch_add() left this dict pointing at pre-rebuild positions --
+        # caught by test_l3_remove_entries.py's position-sync regression
+        # test, but predates and is broader than that one caller.
+        self._entry_id_to_positions = {}
 
     def add_entry(
         self,
@@ -726,7 +734,17 @@ class L3SemanticTM:
                     "context": entry.get("context"),
                     "metadata": entry.get("metadata", {}),
                 }
+                position = len(self.metadata)
                 self.metadata.append(entry_metadata)
+                # HT-QUALITY-GATES-001 TC-QG-L3-FIX: batch_add() previously
+                # never populated this (only add_entry() did), so
+                # update_entry() silently couldn't find anything added via
+                # batch_add()/rebuild_index() -- see _create_index()'s reset
+                # for the other half of this fix.
+                entry_id = entry["entry_id"]
+                if entry_id not in self._entry_id_to_positions:
+                    self._entry_id_to_positions[entry_id] = []
+                self._entry_id_to_positions[entry_id].append(position)
 
             # RES-04: Update counters for periodic saves
             self._additions_since_save += len(entries)
@@ -917,6 +935,50 @@ class L3SemanticTM:
 
             # Persist
             self.save_index()
+
+    def remove_entries(self, predicate) -> int:
+        """
+        Remove entries matching `predicate(metadata_dict) -> bool`, then
+        rebuild the index from the survivors.
+
+        HT-QUALITY-GATES-001 TC-QG-L3-FIX: `IndexFlatL2` (this class's index
+        type) has no ID-mapping wrapper — FAISS positions are the array
+        offset, and `self.metadata` is a plain Python list kept in lockstep
+        by position. Deleting via `index.remove_ids()` directly would shift
+        every subsequent position and require perfectly-synchronized manual
+        surgery on `self.metadata` and `self._entry_id_to_positions` — a
+        single off-by-one there silently desyncs search results for
+        unrelated entries corpus-wide. Filter-then-`rebuild_index()` instead:
+        it reuses the same, already-existing, position-safe path
+        `batch_add()` uses for every normal write, so metadata and vectors
+        can never drift apart. Cost: re-embeds every SURVIVING entry (not
+        just the removed ones) — acceptable for `all-MiniLM-L6-v2`-scale
+        corpora, not for indices where that's prohibitively expensive.
+
+        Only removes entries FROM THIS INDEX'S OWN current content — unlike
+        `L3IndexRebuilder`/`rebuild_l3_from_l2()` (src/tm/l3_rebuild.py),
+        this does NOT resync from L2, which can have materially different
+        population/content than L3.
+
+        Args:
+            predicate: called with each entry's metadata dict; return True to
+                REMOVE that entry.
+
+        Returns:
+            Number of entries removed.
+        """
+        with self._lock:
+            survivors = [m for m in self.metadata if not predicate(m)]
+            removed = len(self.metadata) - len(survivors)
+            if removed == 0:
+                return 0
+
+            logger.warning(
+                "L3 remove_entries: removing %d of %d entries, rebuilding index "
+                "(re-embeds %d survivors)", removed, len(self.metadata), len(survivors),
+            )
+            self.rebuild_index(survivors)
+            return removed
 
     def count(self) -> int:
         """

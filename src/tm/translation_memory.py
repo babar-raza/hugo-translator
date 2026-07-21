@@ -136,6 +136,7 @@ class TranslationMemory:
         use_semantic: bool = True,
         semantic_threshold: float = 0.80,
         lookup_context: dict[str, Any] | None = None,
+        field_name: str = "",
     ) -> LookupResult:
         """
         Unified lookup across all TM layers.
@@ -149,6 +150,12 @@ class TranslationMemory:
             use_semantic: Whether to use L3 semantic search
             semantic_threshold: Minimum similarity for L3 matches
             lookup_context: Optional context for override filtering (e.g., frontmatter_key)
+            field_name: Optional field-scoping dimension (H2/TC-HDN-003) --
+                e.g. "description" vs "title" -- prevents identical text in
+                two different frontmatter fields from cross-contaminating.
+                make_tm_key_scoped()/L2's field_name support already existed
+                one layer down; this threads it up to the only public entry
+                point callers actually use.
 
         Returns:
             LookupResult with translation and provenance
@@ -165,7 +172,7 @@ class TranslationMemory:
             )
 
         # Layer 1: Check cache
-        cached = self.l1.get(site_id, src_lang, tgt_lang, text)
+        cached = self.l1.get(site_id, src_lang, tgt_lang, text, field_name)
         if cached:
             self._total_hits += 1
             return LookupResult(
@@ -176,7 +183,7 @@ class TranslationMemory:
             )
 
         # Layer 2: Check persistent exact match
-        entry = self.l2.exact_lookup(site_id, src_lang, tgt_lang, text, context)
+        entry = self.l2.exact_lookup(site_id, src_lang, tgt_lang, text, context, field_name=field_name)
         if entry:
             # TC-12: Validate that the cached translation is actually in the target language.
             # Rejects poisoned L2 entries (e.g., Bulgarian stored under a Malay key).
@@ -185,7 +192,7 @@ class TranslationMemory:
                 pass
             else:
                 # Populate L1 cache
-                self.l1.put(site_id, src_lang, tgt_lang, text, entry.translation)
+                self.l1.put(site_id, src_lang, tgt_lang, text, entry.translation, field_name)
                 self._total_hits += 1
                 return LookupResult(
                     hit=True,
@@ -218,7 +225,7 @@ class TranslationMemory:
                 else:
                     # Populate L1 cache with best match
                     self.l1.put(
-                        site_id, src_lang, tgt_lang, text, best_match.translation
+                        site_id, src_lang, tgt_lang, text, best_match.translation, field_name
                     )
                     self._total_hits += 1
 
@@ -250,6 +257,7 @@ class TranslationMemory:
         store_context: dict[str, Any] | None = None,
         force_update: bool = False,
         skip_l3: bool = False,
+        field_name: str = "",
     ) -> bool:
         """
         Store translation in all applicable layers.
@@ -265,6 +273,8 @@ class TranslationMemory:
             store_context: Optional context for override filtering (e.g., frontmatter_key)
             force_update: If True, overwrite existing entries; if False, skip existing
             skip_l3: If True, skip L3 add_entry (caller already updated L3 in-place)
+            field_name: Optional field-scoping dimension (H2/TC-HDN-003) --
+                see lookup()'s docstring for rationale.
 
         Returns:
             True if stored, False if skipped (entry exists and not force_update)
@@ -275,7 +285,7 @@ class TranslationMemory:
         )
 
         # Store in L1 cache (always update L1 - it's just a cache)
-        self.l1.put(site_id, src_lang, tgt_lang, text, translation)
+        self.l1.put(site_id, src_lang, tgt_lang, text, translation, field_name)
 
         # Store in L2 persistent (respect overwrite setting)
         stored = self.l2.store(
@@ -287,6 +297,7 @@ class TranslationMemory:
             context=context,
             metadata=metadata,
             overwrite=should_update,
+            field_name=field_name,
         )
 
         # Store in L3 semantic (if available and L2 was stored)
@@ -363,17 +374,21 @@ class TranslationMemory:
                 continue
 
             # L1
-            cached = self.l1.get(req.site_id, req.src_lang, req.tgt_lang, req.text)
+            cached = self.l1.get(req.site_id, req.src_lang, req.tgt_lang, req.text, req.field_name)
             if cached:
                 self._total_hits += 1
                 results[i] = LookupResult(hit=True, translation=cached, source="l1_cache", confidence=1.0)
                 continue
 
             # L2
-            entry = self.l2.exact_lookup(req.site_id, req.src_lang, req.tgt_lang, req.text, req.context)
+            entry = self.l2.exact_lookup(
+                req.site_id, req.src_lang, req.tgt_lang, req.text, req.context, field_name=req.field_name
+            )
             if entry:
                 if self._validate_hit_language(entry.translation, req.tgt_lang):
-                    self.l1.put(req.site_id, req.src_lang, req.tgt_lang, req.text, entry.translation)
+                    self.l1.put(
+                        req.site_id, req.src_lang, req.tgt_lang, req.text, entry.translation, req.field_name
+                    )
                     self._total_hits += 1
                     results[i] = LookupResult(
                         hit=True, translation=entry.translation,

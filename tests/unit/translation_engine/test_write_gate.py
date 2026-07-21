@@ -194,6 +194,26 @@ class TestGateHeadingSurplus:
         r = gate.evaluate(tgt, src, "de", Path("test.md"))
         assert r.passed
 
+    def test_code_comments_inside_fence_not_counted_as_headings(self):
+        """Regression (found 2026-07-20): '# comment' is Python's comment marker
+        and C/C++'s preprocessor-directive marker, both common inside ```code```
+        fences. The un-fence-aware count previously miscounted every such line as
+        a heading, producing a false heading-surplus block on reference.aspose.org
+        files whose only real change was a translated code example."""
+        src = _md("## Real Heading\ntext\n```python\nx = 1\n```\n")
+        tgt = _md(
+            "## Real Heading\ntext\n"
+            "```python\n"
+            "# Create a new workbook\n"
+            "# Set a cell value\n"
+            "# Set a formula\n"
+            "x = 1\n"
+            "```\n"
+        )
+        gate = _make_evaluator()
+        r = gate.evaluate(tgt, src, "de", Path("test.md"))
+        assert r.passed, f"Code comments must not inflate heading count; error={r.error}"
+
     def test_fail_on_title_hallucination(self):
         src = _md("Normal content here")
         tgt = _md("TITLE: Some hallucinated title\nMore content")

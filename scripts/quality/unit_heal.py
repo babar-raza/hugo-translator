@@ -151,14 +151,26 @@ def process_queue(
                 en_path = entry.get("en_path", "")
                 locale = entry.get("locale", "")
                 site_id = entry.get("site_id", "")
-                entry_issues = [i["type"] for i in entry.get("issues", [])]
-
-                # Filter by site / locale / issue_type
+                # TC-HLN-006: entry["issues"][*]["type"] values come from
+                # merge_audit_queues.py's PRIORITY vocabulary (e.g.
+                # "encoding_corruption"), which is a DIFFERENT, incompatible
+                # vocabulary from UnitQualityScorer's own _detector-suffixed
+                # issue_type values (e.g. "mojibake_detector") produced
+                # below at line ~202. --issue-types is documented (see
+                # module docstring) and always used with the _detector
+                # vocabulary, so a queue-entry-level pre-filter comparing
+                # against the wrong vocabulary silently skipped every file
+                # whenever --issue-types was passed at all. The queue is
+                # authoritative only for "which files might have issues";
+                # which units are actually bad and what type they are is
+                # always freshly determined by scorer.score() below, and
+                # THAT result is correctly filtered by issue_types at
+                # (see `if issue_types:` after scoring). No file-level
+                # pre-filtering on issue type is done here anymore -- only
+                # site/locale, which use the same vocabulary on both sides.
                 if sites and site_id not in sites:
                     continue
                 if locales and locale not in locales:
-                    continue
-                if issue_types and not any(t in issue_types for t in entry_issues):
                     continue
 
                 # Resume check
@@ -423,8 +435,16 @@ def _run_write_gates(
 ) -> bool:
     """Run the standard write gate battery. Returns True if file can be written."""
     try:
-        from src.translation_engine.write_gate import WriteGate
-        gate = WriteGate()
+        # TC-HLN-006-c: real class is WriteGateEvaluator, not WriteGate --
+        # this import has been raising ImportError since unit_heal.py was
+        # written (commit d55b42c), meaning EVERY fix attempt in every prior
+        # run silently failed here and was counted as a gate rejection, not
+        # an internal error. detector=None runs structural + content gates
+        # (9-27) without language-mismatch/purity checks, matching
+        # WriteGateEvaluator.evaluate()'s own documented graceful-degrade
+        # path for a missing detector.
+        from src.translation_engine.write_gate import WriteGateEvaluator
+        gate = WriteGateEvaluator(detector=None, similarity_tracker=None, config=None)
         result = gate.evaluate(
             source_content=source_content,
             translated_content=translated_content,
@@ -469,6 +489,16 @@ def _build_parser() -> argparse.ArgumentParser:
 
 
 def main() -> None:
+    # TC-HLN-006-b: this script's whole purpose is printing/logging
+    # non-Latin translated text (dry-run previews, healed-unit summaries);
+    # a plain print() or logging call crashes with UnicodeEncodeError the
+    # first time it hits a Windows console's default cp1252 stdout encoding
+    # -- same bug class fixed in .local/scheduler.py earlier today. Fail
+    # soft instead of crashing the whole run over a display-only concern.
+    try:
+        sys.stdout.reconfigure(errors="backslashreplace")
+    except (AttributeError, ValueError):
+        pass
     args = _build_parser().parse_args()
     logging.basicConfig(
         level=logging.DEBUG if args.verbose else logging.INFO,

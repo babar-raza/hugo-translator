@@ -26,7 +26,18 @@ class SimilarityTracker:
     Features:
     - Conservative baseline similarity groups (Romance, Cyrillic, Arabic, etc.)
     - Rolling window statistics (configurable, default 50 samples)
-    - Automatic pair addition when failure rate > threshold (default 30%)
+    - High-failure-rate pairs are FLAGGED FOR HUMAN REVIEW (default 30% over 50
+      samples) via `adapt()` — they land in `pending_pairs`, not `learned_pairs`,
+      and do NOT affect `are_similar()` until explicitly approved via
+      `approve_pending()`. (TC-QG-006B, HT-QUALITY-GATES-001: a high FastText
+      disagreement rate between two languages is evidence of a translation- or
+      detection-quality problem at least as often as it is evidence the
+      languages are genuinely similar — see `.translation_progress/
+      language_similarities.json`'s pre-existing `learned_pairs`, several of
+      which are not linguistically related [e.g. hr-uz, en-hr] and read as
+      untranslated-English-residue or garbled output being silently
+      whitelisted rather than flagged. Auto-committing was removed; review is
+      now a required, explicit, logged step.)
     - JSON persistence for cross-session learning
     - Adaptation history logging
     """
@@ -65,7 +76,9 @@ class SimilarityTracker:
         self.baseline_groups = config.get("baseline_groups", self.DEFAULT_BASELINE_GROUPS)
 
         # Runtime state
-        self.learned_pairs: dict[str, dict[str, Any]] = {}  # Pairs added via adaptation
+        self.learned_pairs: dict[str, dict[str, Any]] = {}  # Approved pairs — affect are_similar()
+        self.pending_pairs: dict[str, dict[str, Any]] = {}  # Flagged by adapt(), awaiting human approval
+        self.revoked_pairs: dict[str, dict[str, Any]] = {}  # Previously-learned pairs a reviewer revoked
         self.rolling_stats: dict[str, deque] = {}  # Rolling window per pair
 
         # Ensure stats directory exists
@@ -86,8 +99,11 @@ class SimilarityTracker:
             with open(self.stats_file, encoding="utf-8") as f:
                 data = json.load(f)
 
-            # Load learned pairs
+            # Load learned pairs (approved — affect are_similar()) and pending pairs
+            # (flagged by adapt(), awaiting human approval — do NOT affect are_similar()).
             self.learned_pairs = data.get("learned_pairs", {})
+            self.pending_pairs = data.get("pending_pairs", {})
+            self.revoked_pairs = data.get("revoked_pairs", {})
 
             # Load rolling stats (reconstruct deques)
             raw_stats = data.get("rolling_stats", {})
@@ -96,6 +112,7 @@ class SimilarityTracker:
 
             logger.info(
                 f"Loaded similarity statistics: {len(self.learned_pairs)} learned pairs, "
+                f"{len(self.pending_pairs)} pending review, "
                 f"{len(self.rolling_stats)} tracked pairs"
             )
 
@@ -106,10 +123,12 @@ class SimilarityTracker:
     def save(self) -> None:
         """Save statistics and learned pairs to JSON file."""
         data = {
-            "version": "1.0",
+            "version": "1.1",
             "last_updated": datetime.now().isoformat(),
             "baseline_groups": self.baseline_groups,
             "learned_pairs": self.learned_pairs,
+            "pending_pairs": self.pending_pairs,
+            "revoked_pairs": self.revoked_pairs,
             "rolling_stats": {
                 # Convert deques to lists for JSON serialization
                 pair_key: list(samples)
@@ -207,20 +226,32 @@ class SimilarityTracker:
 
     def adapt(self) -> list[tuple[str, str, float, str]]:
         """
-        Analyze statistics and add new similarity pairs when needed.
+        Analyze statistics and FLAG high-failure-rate pairs for human review.
 
-        Checks all tracked pairs and adds to learned_pairs if:
+        Checks all tracked pairs and adds to `pending_pairs` (NOT `learned_pairs`)
+        if:
         - Sample count >= min_samples
         - Failure rate > failure_rate_threshold
 
+        IMPORTANT (TC-QG-006B): this method no longer auto-commits pairs into
+        `learned_pairs`. A high FastText disagreement rate between two
+        languages is not, by itself, proof the languages are similar — it can
+        equally mean a translation is repeatedly coming out untranslated or
+        garbled for that target language. Auto-promoting such pairs silently
+        disables the purity/TM-poison safety net for exactly the failure it
+        was supposed to catch. Flagged pairs require an explicit
+        `approve_pending()` call (with a recorded reason/approver) before they
+        affect `are_similar()`. Call `reject_pending()` to dismiss a
+        false-positive flag without silently losing the audit trail.
+
         Returns:
-            List of newly added pairs: [(lang1, lang2, failure_rate, reason), ...]
+            List of newly flagged pairs: [(lang1, lang2, failure_rate, reason), ...]
         """
-        newly_added = []
+        newly_flagged = []
 
         for pair_key, samples in self.rolling_stats.items():
-            # Skip if already learned
-            if pair_key in self.learned_pairs:
+            # Skip if already approved or already flagged
+            if pair_key in self.learned_pairs or pair_key in self.pending_pairs:
                 continue
 
             # Check if we have enough samples
@@ -233,25 +264,97 @@ class SimilarityTracker:
 
             # Check if failure rate exceeds threshold
             if failure_rate > self.failure_rate_threshold:
-                # Add to learned pairs
                 lang1, lang2 = pair_key.split("-")
+                reason = f"failure_rate {failure_rate:.1%} > threshold {self.failure_rate_threshold:.1%}"
 
-                self.learned_pairs[pair_key] = {
+                self.pending_pairs[pair_key] = {
                     "failure_rate": failure_rate,
                     "samples": len(samples),
-                    "added": datetime.now().isoformat(),
-                    "reason": f"failure_rate {failure_rate:.1%} > threshold {self.failure_rate_threshold:.1%}",
+                    "flagged": datetime.now().isoformat(),
+                    "reason": reason,
                 }
 
-                newly_added.append((lang1, lang2, failure_rate, self.learned_pairs[pair_key]["reason"]))
+                newly_flagged.append((lang1, lang2, failure_rate, reason))
 
                 if self.log_adaptations:
-                    logger.info(
-                        f"SIMILARITY LEARNED: {lang1}-{lang2} added to similar pairs "
-                        f"(failure_rate={failure_rate:.1%}, samples={len(samples)})"
+                    logger.warning(
+                        f"SIMILARITY PENDING REVIEW: {lang1}-{lang2} exceeded the failure-rate "
+                        f"threshold and needs human approval before being treated as similar "
+                        f"(failure_rate={failure_rate:.1%}, samples={len(samples)}). "
+                        f"Call approve_pending('{pair_key}', approved_by=...) to accept, or "
+                        f"reject_pending('{pair_key}', reason=...) to dismiss."
                     )
 
-        return newly_added
+        return newly_flagged
+
+    def approve_pending(self, pair_key: str, approved_by: str, note: str = "") -> bool:
+        """
+        Promote a pending pair to `learned_pairs`, making it affect `are_similar()`.
+
+        This is the explicit, auditable human-approval step required by
+        TC-QG-006B. Returns False (no-op) if `pair_key` isn't currently pending.
+        """
+        pending = self.pending_pairs.pop(pair_key, None)
+        if pending is None:
+            logger.warning(f"approve_pending: {pair_key!r} is not in pending_pairs — no-op")
+            return False
+
+        self.learned_pairs[pair_key] = {
+            **pending,
+            "added": datetime.now().isoformat(),
+            "approved_by": approved_by,
+            "approval_note": note,
+        }
+        logger.info(f"SIMILARITY APPROVED: {pair_key} added to similar pairs by {approved_by!r}")
+        return True
+
+    def reject_pending(self, pair_key: str, reason: str = "") -> bool:
+        """
+        Dismiss a pending pair without promoting it, keeping an audit trail.
+
+        Returns False (no-op) if `pair_key` isn't currently pending.
+        """
+        pending = self.pending_pairs.pop(pair_key, None)
+        if pending is None:
+            logger.warning(f"reject_pending: {pair_key!r} is not in pending_pairs — no-op")
+            return False
+
+        logger.info(f"SIMILARITY REJECTED: {pair_key} dismissed ({reason or 'no reason given'})")
+        return True
+
+    def revoke_learned(self, pair_key: str, revoked_by: str, reason: str = "") -> bool:
+        """
+        Remove a pair from `learned_pairs`, restoring the purity/TM-poison
+        safety net for it. Companion to `approve_pending()`/`reject_pending()`
+        for pairs that were already committed before TC-QG-006B's human-
+        approval gate existed (TC-QG-006A found 8 such pairs in the live
+        stats file, none with a defensible linguistic-similarity rationale —
+        see HT-QUALITY-GATES-001 plan Part 12).
+
+        The revocation itself, with its reason, is kept in `revoked_pairs`
+        (not silently deleted) so there's a durable record of what was
+        reviewed and why — mirrors this project's `.supervisor` anti-
+        overclaim convention of never discarding audit trail.
+
+        Returns False (no-op) if `pair_key` isn't currently in `learned_pairs`.
+        """
+        entry = self.learned_pairs.pop(pair_key, None)
+        if entry is None:
+            logger.warning(f"revoke_learned: {pair_key!r} is not in learned_pairs — no-op")
+            return False
+
+        self.revoked_pairs[pair_key] = {
+            **entry,
+            "revoked": datetime.now().isoformat(),
+            "revoked_by": revoked_by,
+            "revocation_reason": reason,
+        }
+
+        logger.warning(
+            f"SIMILARITY REVOKED: {pair_key} removed from learned_pairs by {revoked_by!r} "
+            f"({reason or 'no reason given'}) — purity/TM-poison checks now apply to this pair again."
+        )
+        return True
 
     def get_statistics(self) -> dict[str, Any]:
         """
@@ -274,6 +377,7 @@ class SimilarityTracker:
                 "failures": failures,
                 "failure_rate": failure_rate,
                 "is_learned": pair_key in self.learned_pairs,
+                "is_pending": pair_key in self.pending_pairs,
             }
 
         return stats
@@ -295,5 +399,6 @@ class SimilarityTracker:
         return (
             f"SimilarityTracker(baseline_groups={len(self.baseline_groups)}, "
             f"learned_pairs={len(self.learned_pairs)}, "
+            f"pending_pairs={len(self.pending_pairs)}, "
             f"tracked_pairs={len(self.rolling_stats)})"
         )

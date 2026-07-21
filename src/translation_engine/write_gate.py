@@ -22,7 +22,9 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
+from .extractor.text_unit_extractor import is_family_platform_index
 from .parser.hugo_parser import HugoParser
+from .quality.refusal_patterns import REFUSAL_RE
 from .reconstructor.yaml_formatter import YAMLFormatter
 
 if TYPE_CHECKING:
@@ -56,10 +58,20 @@ _MOJIBAKE_GATE_RE = re.compile(r"\u00e2\u20ac|\u00c3\u00a9|\u00c3\u00a8|\u00c3\u
 _SHORTCODE_GATE_RE = re.compile(r"\{\{[<%]")
 
 # Gate 17 (inline code integrity) helper
-_BACKTICK_SPAN_RE = re.compile(r"`([^`]+)`")
+# Excludes newlines: an inline code span never crosses a line in markdown, and
+# without this a single stray/unpaired backtick anywhere in the body would let
+# the span swallow everything up to the next backtick -- including whole
+# paragraphs or table rows -- producing garbage "spans" for pairing below.
+_BACKTICK_SPAN_RE = re.compile(r"`([^`\n]+)`")
 # m2m100 inserts a stray `` ` `` before table rows (e.g. "` | Чтение | …").
 # Matches only at line-start followed by optional space + pipe — unambiguous artifact.
 _STRAY_TABLE_BACKTICK_RE = re.compile(r"(?m)^\s*`(\s*\|)")
+# Fenced code blocks (```...```) must be excluded before extracting inline
+# (single-backtick) spans -- otherwise the three backticks of a fence get
+# paired up across the fence boundary as if they were inline code, corrupting
+# both the span count and content for every span that follows. Fenced blocks
+# have their own dedicated check (Gate 19/_gate_code_fence_count).
+_FENCED_CODE_BLOCK_RE = re.compile(r"```.*?```", re.DOTALL)
 
 # Gate 24: description reverted to English (non-Latin locales only)
 _NON_LATIN_SCRIPT_LOCALES = frozenset({
@@ -148,6 +160,16 @@ class WriteGateEvaluator:
         (25, "_gate_code_block_content_truncated", "structural", "block"),
         (26, "_gate_fence_parity",                 "structural", "block"),
         (27, "_gate_multiline_scalar_preservation", "content",   "block"),
+        # HT-QUALITY-GATES-001 TC-QG-001/005: Gate 28 promoted to "block" after
+        # the canary (Part 19) confirmed 100% title match with the RC1-RC4
+        # fixes live, and the dropped-placeholder fallback (Part 20/21) fixed
+        # the only other residual defect found. Gate 29 stays "warn" — no
+        # auto-fix path exists for refusal-artifact text, so blocking would
+        # just hard-stop a batch on first hit rather than fix anything (see
+        # _run_content_gates()'s dispatch loop: "warn" gates run against a
+        # disposable WriteGateResult so a bug there can't accidentally block).
+        (28, "_gate_title_identity",              "content",     "block"),
+        (29, "_gate_refusal_artifact",             "content",     "warn"),
     ]
 
     def __init__(
@@ -513,8 +535,13 @@ class WriteGateEvaluator:
             if translated_content.count("---") >= 2
             else translated_content
         )
-        _src_hd = len(re.findall(r"^#{1,6}\s", _src_body, re.MULTILINE))
-        _tgt_hd = len(re.findall(r"^#{1,6}\s", _tgt_body, re.MULTILINE))
+        # Strip fenced code blocks before counting -- a single `#` followed by
+        # space is also Python's comment marker and C/C++'s preprocessor
+        # directive marker, both common inside ```code``` fences. Without this,
+        # a `# comment` line inside a fence gets miscounted as a heading,
+        # inflating the surplus count against fence-free source bodies.
+        _src_hd = len(re.findall(r"^#{1,6}\s", _FENCED_CODE_BLOCK_RE.sub("", _src_body), re.MULTILINE))
+        _tgt_hd = len(re.findall(r"^#{1,6}\s", _FENCED_CODE_BLOCK_RE.sub("", _tgt_body), re.MULTILINE))
         if _tgt_hd >= _src_hd + 3:
             result.passed = False
             result.error = (
@@ -690,12 +717,16 @@ class WriteGateEvaluator:
                 lambda src, w, path, res: self._gate_fence_parity(src, w, path, res),
             "_gate_multiline_scalar_preservation":
                 lambda src, w, path, res: self._gate_multiline_scalar_preservation(src, w, target_lang, path, res),
+            "_gate_title_identity":
+                lambda src, w, path, res: self._gate_title_identity(w, path, target_lang, source_doc, res),
+            "_gate_refusal_artifact":
+                lambda src, w, path, res: self._gate_refusal_artifact(w, path, res),
         }
 
         working = translated_content
 
         for _, method_name, _, action in self.GATE_REGISTRY:
-            if action not in ("auto_clean", "block"):
+            if action not in ("auto_clean", "block", "warn"):
                 continue  # skip early_return / no_op entries (handled elsewhere)
 
             fn = _dispatch.get(method_name)
@@ -712,6 +743,13 @@ class WriteGateEvaluator:
                 new_working = fn(source_content, working, output_path, result)
                 if new_working is not None:
                     working = new_working
+            elif action == "warn":
+                # Log-only: run against a disposable result so a bug in a
+                # log-only gate can never flip the real result.passed and
+                # accidentally become blocking. See HT-QUALITY-GATES-001
+                # plan Part 8 — every new gate ships log-only first.
+                warn_result = WriteGateResult(passed=True)
+                fn(source_content, working, output_path, warn_result)
             else:  # "block"
                 if not result.passed:
                     continue  # short-circuit: stop on first blocking failure
@@ -1288,19 +1326,25 @@ class WriteGateEvaluator:
         src_body = self._get_body(source_content)
         tgt_body = self._get_body(translated_content)
 
-        en_spans = _BACKTICK_SPAN_RE.findall(src_body)
+        en_spans = _BACKTICK_SPAN_RE.findall(_FENCED_CODE_BLOCK_RE.sub("", src_body))
         if len(en_spans) < 3:
             return  # too few spans to fire (avoids noise on trivial files)
 
         # Strip stray leading backticks from table rows (m2m100 artifact: "` | Чтение |").
         # These cause _BACKTICK_SPAN_RE to manufacture a cross-row "span" containing
         # Cyrillic table content, triggering a false positive against ASCII en_spans.
+        # This is a real content fix, so it's applied to (and persisted from) the
+        # fenced body -- unlike the fence stripping below, which is comparison-only.
         tgt_body_clean = _STRAY_TABLE_BACKTICK_RE.sub(r"\1", tgt_body)
         if tgt_body_clean != tgt_body:
             result.cleaned_content = translated_content.replace(tgt_body, tgt_body_clean, 1)
             tgt_body = tgt_body_clean
 
-        tr_spans = _BACKTICK_SPAN_RE.findall(tgt_body)
+        # Fenced code blocks (```...```) are excluded here -- comparison-only,
+        # never persisted -- because their triple backticks otherwise get
+        # mispaired as inline-code delimiters, corrupting every span that
+        # follows (see _FENCED_CODE_BLOCK_RE).
+        tr_spans = _BACKTICK_SPAN_RE.findall(_FENCED_CODE_BLOCK_RE.sub("", tgt_body))
         for en_span, tr_span in zip(en_spans, tr_spans):
             if en_span.isascii() and not tr_span.isascii():
                 result.passed = False
@@ -1548,6 +1592,149 @@ class WriteGateEvaluator:
                 )
                 logger.error("GATE27 BLOCKED %s: %s", output_path.name, result.error)
                 return
+
+    # ------------------------------------------------------------------
+    # Gate 28: Title identity on family/platform index pages (warn-only)
+    # HT-QUALITY-GATES-001 TC-QG-005
+    # ------------------------------------------------------------------
+
+    def _gate_title_identity(
+        self,
+        translated_content: str,
+        output_path: Path,
+        target_lang: str,
+        source_doc: object,
+        result: WriteGateResult,
+    ) -> None:
+        """Warn if `title` drifted from the English source on a family/platform
+        index page ({locale}/{family}/{platform}/_index.md), where project
+        convention requires it to stay byte-identical across every locale.
+
+        Independent, write-time, defense-in-depth check. Does NOT replace the
+        extraction-time skip in text_unit_extractor's
+        force_protected_fields={"title"} (built via is_family_platform_index())
+        — it verifies that mechanism actually held, since the audit behind
+        HT-QUALITY-GATES-001 found title drift on the large majority of
+        translated family/platform pages despite that skip existing.
+        `linkTitle` is intentionally not checked here: confirmed (2026-07-20
+        casing precheck against real products.aspose.org content) that this
+        site's `family`/`plugin` layouts have no `linkTitle` field at all.
+
+        Promoted to "block" (Part 21) after the canary confirmed 100% title
+        match with RC1-RC4 live and the dropped-placeholder fallback fixed the
+        only other residual defect found — blocking is cheap insurance at
+        this point (RC1-RC4 already removed the root cause), not a premature
+        bet made before evidence existed.
+
+        `include_family_root` is scoped to sites directly confirmed to need
+        it. products.aspose.org: the audit's single most severe finding, a
+        title corrupted to the Serbian word for "Death", was on exactly this
+        page shape (family-root, no platform sub-pages). kb.aspose.org and
+        docs.aspose.org added (Part 22) after direct sampling of real live
+        content found the identical failure pattern already present at
+        near-universal scale — e.g. kb hr/cells/_index.md's title corrupted
+        to "Sljedeći članakFOSS" ("Next article" + "FOSS", a leaked UI
+        string), the same class of defect as products, not a different
+        content policy. reference.aspose.org excluded (title is
+        `mode: passthrough`, never sent to the model — not vulnerable).
+        blog.aspose.org excluded: `per_language_folders: false` means this
+        gate's path-part site-matching and `is_family_platform_index()`'s
+        locale-as-folder-segment detection don't apply the same way there —
+        needs its own investigation, not a guess.
+        """
+        if source_doc is None or not hasattr(source_doc, "frontmatter"):
+            return
+        _FAMILY_ROOT_SITES = ("products.aspose.org", "kb.aspose.org", "docs.aspose.org")
+        _include_family_root = any(site in output_path.parts for site in _FAMILY_ROOT_SITES)
+        if not is_family_platform_index(
+            output_path, source_lang=target_lang, include_family_root=_include_family_root
+        ):
+            return
+
+        fm = getattr(source_doc, "frontmatter", {}) or {}
+        en_title = fm.get("title")
+        if not en_title or not isinstance(en_title, str):
+            return
+        en_title = en_title.strip()
+
+        tr_title = _get_frontmatter_field(translated_content, "title")
+        if tr_title is None:
+            return
+        tr_title = tr_title.strip()
+
+        if tr_title == en_title:
+            return
+
+        result.passed = False
+        result.error = (
+            f"GATE28 TITLE DRIFT {output_path.name}: family/platform index title "
+            f"must stay byte-identical to English — expected {en_title!r}, got {tr_title!r}"
+        )
+        result.retranslate_queued = True
+        result.retranslate_paths.append((output_path, target_lang))
+        logger.error(
+            "GATE28 TITLE DRIFT (blocking, TC-QG-005) %s: family/platform index "
+            "title must stay byte-identical to English — expected %r, got %r",
+            output_path.name, en_title, tr_title,
+        )
+
+    # ------------------------------------------------------------------
+    # Gate 29: LLM refusal / meta-commentary artifact leak (warn-only)
+    # HT-QUALITY-GATES-001 TC-QG-001
+    # ------------------------------------------------------------------
+
+    def _gate_refusal_artifact(
+        self,
+        translated_content: str,
+        output_path: Path,
+        result: WriteGateResult,
+    ) -> None:
+        """Warn if raw LLM refusal/meta-commentary text ("Please provide the
+        English text you want translated.", "Ich habe keine Ahnung.", etc.)
+        appears to have been shipped as page content instead of an actual
+        translation.
+
+        Reuses the same curated, already-production-validated phrase list as
+        scripts/quality/audit_llm_artifacts.py (both now import from
+        src/translation_engine/quality/refusal_patterns.py — single source of
+        truth, HT-QUALITY-GATES-001 TC-QG-001) rather than a new/rewritten
+        detector.
+
+        Ships in "warn" (log-only) action, same rationale as Gate 28 — the
+        plan's own target for this defect class is eventually "block" (no
+        safe auto-fix exists for a refusal leak), but every new gate starts
+        in log-only mode until a clean-sample false-positive check has run.
+        """
+        split = _fm_parser._split_frontmatter(translated_content)
+        fm_text = split[0] if split else ""
+
+        hits: list[str] = []
+        for m in REFUSAL_RE.finditer(fm_text):
+            line_start = fm_text.rfind("\n", 0, m.start()) + 1
+            line_end = fm_text.find("\n", m.end())
+            line = fm_text[line_start: line_end if line_end != -1 else None].strip()
+            hits.append(line[:160])
+
+        body = split[1] if split else translated_content
+        in_code = False
+        for line in body.splitlines():
+            s = line.strip()
+            if s.startswith("```"):
+                in_code = not in_code
+                continue
+            if in_code or not s:
+                continue
+            if REFUSAL_RE.search(s):
+                hits.append(s[:160])
+
+        if not hits:
+            return
+
+        logger.warning(
+            "GATE29 REFUSAL ARTIFACT (warn-only, TC-QG-001) %s: %d probable "
+            "LLM refusal/meta-commentary line(s) found in shipped content: %s",
+            output_path.name, len(hits), hits[:5],
+        )
 
     # ------------------------------------------------------------------
     # OW-01 extension: check existing file when new translation failed
