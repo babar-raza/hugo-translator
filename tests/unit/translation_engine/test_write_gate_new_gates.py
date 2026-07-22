@@ -1108,3 +1108,57 @@ class TestGate27MultilineScalarPreservation:
         r = WriteGateResult(passed=True)
         ev._gate_multiline_scalar_preservation(src, tgt, "es", _OUT, r)
         assert not r.passed
+
+    def test_ko_legitimate_compact_translation_is_not_blocked(self):
+        """HT-QUALITY-GATES-001 Part 26: found via direct reproduction (not
+        assumed) while investigating residual title mismatches -- ko hit the
+        identical false-positive shape as zh. Real repro:
+        ko/barcode/_index.md's plugin_description at 52/107 chars (49%),
+        legitimate and complete, blocked before this fix."""
+        from src.translation_engine.write_gate import WriteGateResult
+        ev = _make_evaluator_no_detector()
+        src = (
+            "---\ntitle: Test\nplugin_description: >-\n"
+            "  Open-source library for generating standard-compliant barcodes\n"
+            "  in one and two dimensional formats with full output support.\n---\nbody\n"
+        )
+        tgt = (
+            "---\ntitle: Test\nplugin_description: "
+            "표준을 준수하는 1차원 및 2차원 바코드를 생성하는 오픈소스 라이브러리.\n---\nbody\n"
+        )
+        r = WriteGateResult(passed=True)
+        ev._gate_multiline_scalar_preservation(src, tgt, "ko", _OUT, r)
+        assert r.passed
+
+    def test_ja_legitimate_compact_translation_is_not_blocked(self):
+        """Real repro: ja/diagram/_index.md's plugin_description at 41/97
+        chars (42%), legitimate and complete, blocked before this fix."""
+        from src.translation_engine.write_gate import WriteGateResult
+        ev = _make_evaluator_no_detector()
+        src = (
+            "---\ntitle: Test\nplugin_description: >-\n"
+            "  Open-source library for generating and rendering diagrams\n"
+            "  and flowcharts with full layout and export support.\n---\nbody\n"
+        )
+        tgt = (
+            "---\ntitle: Test\nplugin_description: "
+            "ダイアグラムとフローチャートを生成しレンダリングするオープンソースライブラリ。\n---\nbody\n"
+        )
+        r = WriteGateResult(passed=True)
+        ev._gate_multiline_scalar_preservation(src, tgt, "ja", _OUT, r)
+        assert r.passed
+
+    def test_ja_ko_genuinely_truncated_still_blocks(self):
+        """The lowered ja/ko threshold must not become toothless."""
+        from src.translation_engine.write_gate import WriteGateResult
+        ev = _make_evaluator_no_detector()
+        src = (
+            "---\ntitle: Test\nplugin_description: >-\n"
+            "  Open-source library for generating standard-compliant barcodes\n"
+            "  in one and two dimensional formats with full output support.\n---\nbody\n"
+        )
+        for lang, short in [("ko", "라이브러리"), ("ja", "ライブラリ")]:
+            tgt = f"---\ntitle: Test\nplugin_description: {short}\n---\nbody\n"
+            r = WriteGateResult(passed=True)
+            ev._gate_multiline_scalar_preservation(src, tgt, lang, _OUT, r)
+            assert not r.passed, f"{lang} should still block genuine truncation"

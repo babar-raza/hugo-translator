@@ -687,6 +687,7 @@ class FileTranslationPipeline:
                         output_path=output_path,
                         source_doc=doc,
                         force_overwrite=ctx.force_overwrite,
+                        site_profile=site_profile,
                     )
                     if not _gate_result.passed:
                         validation_passed = False

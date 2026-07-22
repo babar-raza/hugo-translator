@@ -22,6 +22,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
+from ..utils.models import FrontmatterMode
 from .extractor.text_unit_extractor import is_family_platform_index
 from .parser.hugo_parser import HugoParser
 from .quality.refusal_patterns import REFUSAL_RE
@@ -50,6 +51,42 @@ def _get_frontmatter_field(content: str, field_name: str) -> str | None:
         return None
     value = data.get(field_name)
     return value if isinstance(value, str) else None
+
+
+def _build_language_detection_text(content: str, site_profile: Any = None) -> str:
+    """Text used for language-detection gates, with deliberately
+    passthrough (`mode: passthrough`) frontmatter field values removed.
+
+    HT-QUALITY-GATES-001 Part 26: confirmed real via direct reproduction --
+    `testimonialswrapper.tmessage` (a genuine customer quote, deliberately
+    left in its original language by site-profile design) is long enough to
+    bias FastText's whole-file language classification toward the source
+    language, even when every actually-translatable field is correctly
+    translated. This made CASE 1/CASE 4 overwrite-protection block
+    legitimate hr/sr retranslations indefinitely, leaving stale pre-mission
+    content (and its wrong title) in place. Detection-only: the text
+    actually written to disk is never touched by this function.
+    """
+    if site_profile is None or not getattr(site_profile, "frontmatter", None):
+        return content
+
+    split = _fm_parser._split_frontmatter(content)
+    if split is None:
+        return content
+    data = _fm_parser._parse_yaml_content(split[0])
+    if not isinstance(data, dict):
+        return content
+
+    detection_text = content
+    for key, rule in site_profile.frontmatter.items():
+        if getattr(rule, "mode", None) != FrontmatterMode.PASSTHROUGH:
+            continue
+        value = YAMLFormatter.get_nested_value(data, key)
+        # Only strip substantial values -- short passthrough fields (e.g. a
+        # URL, an enable flag rendered as text) aren't what biases detection.
+        if isinstance(value, str) and len(value) >= 30:
+            detection_text = detection_text.replace(value, "")
+    return detection_text
 
 # Gate 22: mojibake / encoding corruption patterns
 _MOJIBAKE_GATE_RE = re.compile(r"\u00e2\u20ac|\u00c3\u00a9|\u00c3\u00a8|\u00c3\u00bc|\u00c3\u00b6")
@@ -205,6 +242,7 @@ class WriteGateEvaluator:
         output_path: Path,
         source_doc: Any = None,
         force_overwrite: bool = False,
+        site_profile: Any = None,
     ) -> WriteGateResult:
         """Run gates 2-8 on translated content.
 
@@ -214,6 +252,9 @@ class WriteGateEvaluator:
             target_lang: Expected target language code.
             output_path: Where the file would be written.
             source_doc: Parsed HugoDocument (for frontmatter key check).
+            site_profile: Site profile (for passthrough-aware language
+                detection -- see _build_language_detection_text). Optional;
+                gates degrade to raw-content detection if omitted.
 
         Returns:
             WriteGateResult indicating pass/fail and any side-effect requests.
@@ -241,15 +282,23 @@ class WriteGateEvaluator:
                 result.cleaned_content = working
             return result
 
+        # HT-QUALITY-GATES-001 Part 26: strip deliberately-passthrough
+        # frontmatter values (e.g. an untranslated customer testimonial
+        # quote) before language detection -- see
+        # _build_language_detection_text's docstring for the confirmed real
+        # defect this fixes. Detection-only: `translated_content` itself
+        # (what actually gets written) is untouched.
+        _detection_text = _build_language_detection_text(translated_content, site_profile)
+
         # Gate 2: Language detection mismatch (B-7.1)
-        self._gate_language_mismatch(translated_content, target_lang, output_path, detector, result)
+        self._gate_language_mismatch(_detection_text, target_lang, output_path, detector, result)
         if not result.passed:
             return result
 
         # Gate 3: Overwrite protection (B-7.4, 4 CASEs)
         self._gate_overwrite_protection(
-            translated_content, target_lang, output_path, detector, result,
-            force_overwrite=force_overwrite,
+            _detection_text, target_lang, output_path, detector, result,
+            force_overwrite=force_overwrite, site_profile=site_profile,
         )
         if not result.passed:
             return result
@@ -347,6 +396,7 @@ class WriteGateEvaluator:
         detector: FastTextDetector,
         result: WriteGateResult,
         force_overwrite: bool = False,
+        site_profile: Any = None,
     ) -> None:
         if self._force_accept:
             return
@@ -360,7 +410,15 @@ class WriteGateEvaluator:
 
         try:
             existing_content = output_path.read_text(encoding="utf-8")
-            existing_lang, existing_conf = detector.detect(existing_content)
+            # HT-QUALITY-GATES-001 Part 26: strip the same passthrough
+            # content from the EXISTING file before detecting it, for the
+            # same reason as the new content (see
+            # _build_language_detection_text) -- an old file's untranslated
+            # testimonial quote shouldn't bias its detected language either.
+            existing_detection_text = _build_language_detection_text(
+                existing_content, site_profile
+            )
+            existing_lang, existing_conf = detector.detect(existing_detection_text)
         except OSError as e:
             logger.warning(f"Could not read existing file for comparison (allowing write): {e}")
             return
@@ -1587,9 +1645,9 @@ class WriteGateEvaluator:
         products.aspose.org retranslation pass, overwhelmingly 35-55%
         ratios, blocking the ENTIRE file write (not just the over-short
         field) and leaving stale pre-mission content in place indefinitely.
-        Scoped to `zh` only -- the one language directly confirmed to need
-        a lower bar; `ja`/`ko` are plausible but unverified, left at the
-        default rather than guessed.
+        `ja`/`ko` (also logographic/syllabic, denser than English) confirmed
+        to need the same lower bar via direct reproduction (Part 26) rather
+        than assumed at the same time as `zh`.
         """
         src_split = _fm_parser._split_frontmatter(source_content)
         tgt_split = _fm_parser._split_frontmatter(translated_content)
@@ -1608,7 +1666,13 @@ class WriteGateEvaluator:
                 continue
 
             tgt_val = tgt_data.get(field_name)
-            _min_ratio = 0.2 if target_lang == "zh" else 0.5
+            # HT-QUALITY-GATES-001 Part 26: ja/ko added after direct
+            # reproduction (not guessed) hit the identical false-positive
+            # shape as zh -- e.g. a real ko/barcode plugin_description at
+            # 52/107 chars (49%), ja/diagram at 41/97 (42%) -- both
+            # legitimate, complete translations blocked by the same
+            # English-centric character-count assumption.
+            _min_ratio = 0.2 if target_lang in ("zh", "ja", "ko") else 0.5
             reason = None
             if not isinstance(tgt_val, str):
                 reason = "target field missing or not a string"
