@@ -1050,3 +1050,61 @@ class TestGate27MultilineScalarPreservation:
         r = WriteGateResult(passed=True)
         ev._gate_multiline_scalar_preservation(src, tgt, "es", _OUT, r)
         assert not r.passed
+
+    def test_zh_legitimate_compact_translation_is_not_blocked(self):
+        """HT-QUALITY-GATES-001 Part 25: the 0.5-ratio threshold has no
+        language awareness. Real confirmed repro: a genuine, complete
+        zh `plugin_description` translation legitimately runs well under
+        half the English character count (Chinese is logographically far
+        more compact) -- 25 real blocks across a full retranslation pass
+        were false positives of this exact shape, blocking the entire file
+        write and leaving stale pre-mission content (including a wrong
+        title) in place. A zh-specific 0.2 floor still catches genuine
+        truncation but not legitimate compactness."""
+        from src.translation_engine.write_gate import WriteGateResult
+        ev = _make_evaluator_no_detector()
+        # 95-char English source folded scalar; 37-char zh target (39% ratio,
+        # the exact real repro ratio) -- legitimate, not truncated.
+        src = (
+            "---\ntitle: Test\nplugin_description: >-\n"
+            "  Open-source Python library for generating standard-compliant\n"
+            "  1D and 2D barcodes with full SVG and PNG output support.\n---\nbody\n"
+        )
+        tgt = (
+            "---\ntitle: Test\nplugin_description: "
+            "适用于生成标准兼容的一维和二维条形码的开源 Python 库。\n---\nbody\n"
+        )
+        r = WriteGateResult(passed=True)
+        ev._gate_multiline_scalar_preservation(src, tgt, "zh", _OUT, r)
+        assert r.passed
+
+    def test_zh_genuinely_truncated_still_blocks(self):
+        """The lowered zh threshold must not become toothless -- a target
+        that's a small fraction of the source (not just naturally compact)
+        still blocks."""
+        from src.translation_engine.write_gate import WriteGateResult
+        ev = _make_evaluator_no_detector()
+        src = (
+            "---\ntitle: Test\nplugin_description: >-\n"
+            "  Open-source Python library for generating standard-compliant\n"
+            "  1D and 2D barcodes with full SVG and PNG output support.\n---\nbody\n"
+        )
+        tgt = "---\ntitle: Test\nplugin_description: 库\n---\nbody\n"
+        r = WriteGateResult(passed=True)
+        ev._gate_multiline_scalar_preservation(src, tgt, "zh", _OUT, r)
+        assert not r.passed
+
+    def test_non_zh_language_still_uses_default_ratio(self):
+        """Regression guard: the zh-specific lower bar must not leak into
+        other languages -- the same short target still blocks for es."""
+        from src.translation_engine.write_gate import WriteGateResult
+        ev = _make_evaluator_no_detector()
+        src = (
+            "---\ntitle: Test\ndescription: >-\n"
+            "  This is a long folded description that\n"
+            "  continues across a second physical line here.\n---\nbody\n"
+        )
+        tgt = "---\ntitle: Test\ndescription: Corta.\n---\nbody\n"
+        r = WriteGateResult(passed=True)
+        ev._gate_multiline_scalar_preservation(src, tgt, "es", _OUT, r)
+        assert not r.passed

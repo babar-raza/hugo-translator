@@ -19,6 +19,27 @@ _RCD_LEADING_HASH_RE = re.compile(r"^#{1,6}\s+")
 # Trailing orphaned '#' or '#.': NOT preceded by C or c (preserves C#)
 _RCD_TRAILING_HASH_RE = re.compile(r"(?<![Cc])#\.?\s*$")
 
+# HT-QUALITY-GATES-001 Part 25: CP1252 C1 control-range bytes (0x80-0x9F)
+# that, when correctly interpreted, represent common punctuation (smart
+# quotes, dashes, ellipsis) rather than genuine control characters. Confirmed
+# real via direct reproduction: a `uk` retranslation produced literal U+0092
+# in MT output, crashing YAML serialization ("unacceptable character #x0092:
+# special characters are not allowed") -- the same known, pre-existing
+# transient-failure class documented elsewhere in this session (the fr/ca
+# retry failures during the original full retranslation). Mapping each byte
+# to its actual intended character is correct here, not a guess: this is the
+# standard, well-documented CP1252-vs-Latin1/control-range mismatch.
+_CP1252_C1_MAP = {
+    0x80: "€", 0x82: "‚", 0x83: "ƒ", 0x84: "„",
+    0x85: "…", 0x86: "†", 0x87: "‡", 0x88: "ˆ",
+    0x89: "‰", 0x8a: "Š", 0x8b: "‹", 0x8c: "Œ",
+    0x8e: "Ž", 0x91: "‘", 0x92: "’", 0x93: "“",
+    0x94: "”", 0x95: "•", 0x96: "–", 0x97: "—",
+    0x98: "˜", 0x99: "™", 0x9a: "š", 0x9b: "›",
+    0x9c: "œ", 0x9e: "ž", 0x9f: "Ÿ",
+}
+_CP1252_C1_RE = re.compile("[" + "".join(chr(c) for c in _CP1252_C1_MAP) + "]")
+
 import structlog
 import yaml
 from ruamel.yaml import YAML
@@ -72,6 +93,10 @@ class YAMLFormatter:
         # before serialization so MetadataMarkdownContaminationValidator never
         # needs to trigger a costly LLM retry for this systematic MT artifact.
         YAMLFormatter._strip_rcd_contamination(data)
+
+        # HT-QUALITY-GATES-001 Part 25: fix CP1252-remnant C1 control chars
+        # before they can crash YAML serialization (see _CP1252_C1_MAP above).
+        YAMLFormatter._sanitize_cp1252_c1_chars(data)
 
         try:
             # Use ruamel.yaml for round-trip formatting
@@ -142,6 +167,38 @@ class YAMLFormatter:
                     before=original[:80],
                     after=value[:80],
                 )
+
+    @staticmethod
+    def _sanitize_cp1252_c1_chars(data: dict[str, Any] | CommentedMap) -> None:
+        """Recursively replace CP1252-remnant C1 control chars in-place with
+        their actual intended punctuation (see _CP1252_C1_MAP), so a real
+        MT-output artifact never crashes YAML serialization with
+        "unacceptable character #xNNNN". Walks dicts, lists, and scalar
+        strings (including LiteralScalarString, preserving its block style).
+        """
+
+        def fix(value: str) -> str:
+            return _CP1252_C1_RE.sub(lambda m: _CP1252_C1_MAP[ord(m.group(0))], value)
+
+        def walk(obj: Any) -> Any:
+            if isinstance(obj, dict):
+                for key in list(obj.keys()):
+                    obj[key] = walk(obj[key])
+                return obj
+            if isinstance(obj, list):
+                for i in range(len(obj)):
+                    obj[i] = walk(obj[i])
+                return obj
+            if isinstance(obj, str):
+                fixed = fix(obj)
+                if fixed != obj:
+                    if isinstance(obj, LiteralScalarString):
+                        return LiteralScalarString(fixed)
+                    return fixed
+                return obj
+            return obj
+
+        walk(data)
 
     @staticmethod
     def apply_literal_style(value: str) -> LiteralScalarString:

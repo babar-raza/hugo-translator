@@ -143,6 +143,58 @@ class TestGateOverwriteProtection:
         assert r.retranslate_queued
         assert len(r.retranslate_paths) == 1
 
+    def test_case4_new_detected_as_similar_language_allows_healing_overwrite(self, tmp_path):
+        """HT-QUALITY-GATES-001 Part 25: CASE 1 already checked are_similar()
+        before treating a detected-language mismatch as real; CASE 4 never
+        did, despite the same reasoning applying. Real confirmed repro:
+        ms (Malay) retranslation output, genuinely correct, gets detected as
+        `id` (Indonesian) -- an already-configured similarity pair
+        (config/global.yaml's malay_indonesian group). Existing was stale
+        (also detected wrong). Without the fix this blocks forever, leaving
+        the old wrong content (and its wrong title) in place no matter how
+        many times you retranslate."""
+        out = tmp_path / "existing.md"
+        out.write_text("existing content", encoding="utf-8")
+
+        scripted = iter([
+            ("ms", 0.95),  # gate 2: matches target, passes
+            ("id", 0.90),  # gate 3: new content detected as Indonesian
+            ("id", 0.88),  # gate 3: existing content also detected as Indonesian
+        ])
+        det = MagicMock()
+        # Any calls beyond the scripted 3 (e.g. downstream purity gates, once
+        # CASE 4 no longer blocks) fall back to a plain target-language match.
+        det.detect.side_effect = lambda *a, **k: next(scripted, ("ms", 0.95))
+        tracker = MagicMock()
+        tracker.are_similar.side_effect = lambda a, b: {a, b} == {"ms", "id"}
+        gate = _make_evaluator(detector=det, similarity_tracker=tracker)
+
+        r = gate.evaluate(_md(), "", "ms", out)
+
+        assert r.passed, "similarity-adjusted CASE 4 must allow the healing overwrite"
+        assert not r.retranslate_queued
+
+    def test_case4_unrelated_languages_still_blocks_even_with_tracker(self, tmp_path):
+        """Regression guard: the similarity-tracker fix must not make CASE 4
+        toothless -- genuinely unrelated languages still block."""
+        out = tmp_path / "existing.md"
+        out.write_text("existing content", encoding="utf-8")
+
+        det = MagicMock()
+        det.detect.side_effect = [
+            ("de", 0.95),
+            ("fr", 0.90),
+            ("es", 0.88),
+        ]
+        tracker = MagicMock()
+        tracker.are_similar.return_value = False
+        gate = _make_evaluator(detector=det, similarity_tracker=tracker)
+
+        r = gate.evaluate(_md(), "", "de", out)
+
+        assert not r.passed
+        assert r.retranslate_queued
+
 
 # ---------------------------------------------------------------------------
 # Gate 6: Code block count

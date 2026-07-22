@@ -409,7 +409,28 @@ class WriteGateEvaluator:
             return
 
         # CASE 4: Both wrong → BLOCK + queue
+        # HT-QUALITY-GATES-001 Part 25: CASE 1 (above) already checks
+        # are_similar() before treating a language mismatch as real -- CASE 4
+        # never did, despite the identical reasoning applying. Confirmed real
+        # via direct reproduction: ms (Malay) retranslation output, genuinely
+        # correct, gets detected as `id` (Indonesian) by FastText (an
+        # already-configured similarity pair, config/global.yaml's
+        # malay_indonesian group) -- existing was also stale/wrong, so this
+        # unconditionally blocked forever, leaving the OLD wrong content (and
+        # its wrong title) in place no matter how many times you retranslate.
+        _case4_similar = False
+        if self._similarity_tracker:
+            _case4_similar = self._similarity_tracker.are_similar(target_lang, detected_lang)
         if existing_lang != target_lang and detected_lang != target_lang:
+            if _case4_similar:
+                logger.info(
+                    f"HEALING OVERWRITE (similarity-adjusted): new content detected as "
+                    f"{detected_lang}, treated as an acceptable {target_lang} equivalent "
+                    f"(learned/configured similarity) rather than genuinely wrong. "
+                    f"Existing was {existing_lang} ({existing_conf:.2%}). Allowing "
+                    f"overwrite for {output_path.name}."
+                )
+                return
             result.passed = False
             result.error = (
                 f"Blocked overwrite: both translations wrong "
@@ -1557,6 +1578,18 @@ class WriteGateEvaluator:
         be non-empty, retain at least half the source length, and (for
         non-English targets) not be byte-identical to the English source —
         the exact signature of the wave-3 description-truncation bug.
+
+        HT-QUALITY-GATES-001 Part 25: the 0.5 ratio has no language
+        awareness, and Chinese is logographically far more compact than
+        English -- a complete, accurate `zh` translation legitimately runs
+        well under half the English character count. Confirmed real via
+        direct reproduction (not assumed): 25 blocks across a full
+        products.aspose.org retranslation pass, overwhelmingly 35-55%
+        ratios, blocking the ENTIRE file write (not just the over-short
+        field) and leaving stale pre-mission content in place indefinitely.
+        Scoped to `zh` only -- the one language directly confirmed to need
+        a lower bar; `ja`/`ko` are plausible but unverified, left at the
+        default rather than guessed.
         """
         src_split = _fm_parser._split_frontmatter(source_content)
         tgt_split = _fm_parser._split_frontmatter(translated_content)
@@ -1575,12 +1608,13 @@ class WriteGateEvaluator:
                 continue
 
             tgt_val = tgt_data.get(field_name)
+            _min_ratio = 0.2 if target_lang == "zh" else 0.5
             reason = None
             if not isinstance(tgt_val, str):
                 reason = "target field missing or not a string"
             elif not tgt_val.strip():
                 reason = "target field is empty"
-            elif len(tgt_val) < 0.5 * len(src_val):
+            elif len(tgt_val) < _min_ratio * len(src_val):
                 reason = f"target retained only {len(tgt_val)}/{len(src_val)} chars"
             elif target_lang != "en" and tgt_val == src_val:
                 reason = "target is byte-identical to English source"
