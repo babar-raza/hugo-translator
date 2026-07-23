@@ -131,6 +131,39 @@ class TestGoldenList:
         assert result.value == "概要"
         assert log_calls == []
 
+    def test_multi_word_phrase_table_hit_translates(self, registry_dir, protected):
+        # Mining (TC-HT-I18N-002) found high-repetition MULTI-WORD phrase
+        # headings too (e.g. "Common Issues and Fixes") — these have no
+        # identifier ambiguity (real identifiers never contain spaces) and
+        # must resolve via the table exactly like single-word terms, ahead
+        # of any shape check.
+        registry_path = registry_dir / "_registry.yaml"
+        data = yaml.safe_load(registry_path.read_text(encoding="utf-8"))
+        data["entries"].append(
+            {
+                "id": "heading.common_issues_and_fixes",
+                "en": "Common Issues and Fixes",
+                "category": "section_heading",
+                "status": "approved",
+                "evidence_count": 42,
+            }
+        )
+        registry_path.write_text(yaml.safe_dump(data), encoding="utf-8")
+        ja_path = registry_dir / "ja.yaml"
+        ja_data = yaml.safe_load(ja_path.read_text(encoding="utf-8"))
+        ja_data["translations"]["heading.common_issues_and_fixes"] = {
+            "value": "よくある問題と解決策",
+            "reviewed_by": "agent:terminology-reviewer",
+        }
+        ja_path.write_text(yaml.safe_dump(ja_data, allow_unicode=True), encoding="utf-8")
+
+        registry = TemplateStringRegistry(registry_dir)
+        log_calls = []
+        result = _classify("Common Issues and Fixes", "ja", registry, protected, log_calls)
+        assert result.verdict == VERDICT_TABLE
+        assert result.value == "よくある問題と解決策"
+        assert log_calls == []
+
     def test_pending_entry_is_not_a_table_hit(self, registry, protected):
         # "Properties" is status: pending in the fixture registry — must NOT
         # be treated as translate_via_table even though it's a registry id.

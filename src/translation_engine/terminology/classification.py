@@ -247,34 +247,42 @@ def classify(
     Returns a :class:`ClassificationResult` with one of four verdicts:
 
     - ``translate_via_table``: an approved i18n template-string hit for this
-      locale — use ``result.value`` directly, skip MT and TM entirely.
+      locale — use ``result.value`` directly, skip MT and TM entirely. Checked
+      FIRST, ahead of any shape heuristic: a reviewed table entry is the most
+      specific signal available and isn't restricted to single-word text —
+      mining real corpus data (TC-HT-I18N-002) found many high-repetition
+      MULTI-WORD phrase headings too (e.g. "Common Issues and Fixes", "API
+      Reference Summary"), which are never identifier-shaped (no real class
+      name has spaces) but are exactly the same "closed, repeated template
+      string" problem this module exists to solve.
     - ``protect``: a confident multi-hump identifier, or a single-hump word
       found in the protected-terms config — never send to the model.
     - ``unresolved``: a single-hump capitalized word with no table entry and
       no protected-terms entry — a first-sighting; defaults to the same
       "do not translate" behavior as ``protect`` (the safer failure
       direction) and is appended to the discovery log for later curation.
-    - ``not_applicable``: ``text`` isn't single/multi-hump capitalized-word
-      shaped at all (contains spaces, punctuation, lowercase start, etc.) —
-      this classifier has nothing to say; the caller's existing logic
-      (terminology dict, signature detection, ordinary MT path, ...)
-      continues to apply unchanged. Not logged — logging every non-heading
-      text unit encountered across the whole corpus would drown the
-      discovery log in noise for a case this module was never meant to
+    - ``not_applicable``: ``text`` has no table entry and isn't
+      single/multi-hump capitalized-word shaped either (contains spaces,
+      punctuation, lowercase start, etc., AND no reviewed table entry exists
+      for it yet) — this classifier has nothing to say; the caller's
+      existing logic (terminology dict, signature detection, ordinary MT
+      path, ...) continues to apply unchanged. Not logged — logging every
+      non-heading text unit encountered across the whole corpus would drown
+      the discovery log in noise for a case this module was never meant to
       adjudicate.
     """
     text_stripped = text.strip()
+
+    reg = registry if registry is not None else TemplateStringRegistry()
+    table_value = reg.lookup(text_stripped, locale)
+    if table_value is not None:
+        return ClassificationResult(VERDICT_TABLE, value=table_value, reason="table_hit")
 
     if _MULTI_HUMP_RE.match(text_stripped):
         return ClassificationResult(VERDICT_PROTECT, reason="multi_hump_identifier_shape")
 
     if not _SINGLE_HUMP_RE.match(text_stripped):
         return ClassificationResult(VERDICT_NOT_APPLICABLE, reason="not_identifier_shaped")
-
-    reg = registry if registry is not None else TemplateStringRegistry()
-    table_value = reg.lookup(text_stripped, locale)
-    if table_value is not None:
-        return ClassificationResult(VERDICT_TABLE, value=table_value, reason="table_hit")
 
     prot = protected_terms if protected_terms is not None else ProtectedTerms()
     if text_stripped in prot:
