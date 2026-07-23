@@ -3,10 +3,20 @@
 # IMPORTANT: The system will ONLY translate source files (e.g., index.md, _index.md)
 #            and will automatically SKIP already-translated files (e.g., index.es.md)
 #            to prevent creating double-language files like index.es.da.md
+#
+# Confirmed on-disk structure (content root: ${ASPOSE_ORG_CONTENT}/blog.aspose.org):
+# there is NO top-level `en/` directory anywhere on this site -- unlike docs/kb/
+# products/reference.aspose.org, which use `en/{family}/{platform}/`. Content sits
+# directly under `{family}/{platform}/{slug}/index.md` (Hugo leaf bundles) with
+# `index.{lang}.md` siblings in the SAME directory, plus flat root utility pages
+# (`archive.md`/`archive.{lang}.md`, `search.md`/`search.{lang}.md`). Section
+# `{family}/{platform}/_index.md` pages currently have zero translated variants.
+# blog.aspose.net uses the identical convention (structurally the same site).
 
 site_id: blog.aspose.org
 display_name: blog posts
-# Multi-family: blog posts are organized by product family under en/{family}/
+# Multi-family: blog posts are organized by product family under {family}/{platform}/
+# (NOT en/{family}/ -- see the on-disk structure note above; this site has no en/ prefix).
 family_scope: multi
 content_roots:
 - ${ASPOSE_ORG_CONTENT}/blog.aspose.org
@@ -86,11 +96,27 @@ body:
   - codespan
   preserve_patterns:
   - ^\{\{<.*>\}\}
+  # HT-QUALITY-GATES-001 Part 22 (plan 5.3, closes 2.1.C's cited gap): this
+  # site had NO markdown-link preserve_pattern at all (exposure specifically
+  # in the legacy/non-AST reconstruction fallback path). Placed here, ahead
+  # of the brand-name pattern below, so it claims the WHOLE [text](url)
+  # span atomically before anything else can partially match content
+  # inside it (the exact ordering lesson from Part 1.1's brace-leak root
+  # cause -- a pattern matching inside an already-protected span creates a
+  # nested placeholder that restore()'s single sequential pass can't unwind).
+  - '\[([^\]]+)\]\(([^)]+)\)'
   # Protect Aspose brand/product names as one cohesive unit (Aspose.Cells,
   # Aspose.3D, bare "Aspose", etc.) -- the previous bare-word-only pattern
   # only protected "Aspose" itself, leaving ".Cells"/".3D" etc. adjacent
   # and unprotected, which could still get mistranslated/detached.
   - \bAspose(?:\.[A-Za-z0-9][A-Za-z0-9.]*)?\b
+  # HT-QUALITY-GATES-001 Part 22 (plan 5.3, incremental scope): protect
+  # hyphenated/slashed format & standard codes (UPC-E, EAN-13, PDF/A,
+  # ISO-8859-1, UTF-8, AES-256) embedded in prose -- confirmed real
+  # corruption: "UPC-E" became "U PC-E" mid-sentence because nothing
+  # protected it before MT. Requiring a hyphen/slash suffix (not just bare
+  # ALL-CAPS) keeps this from matching stylistic ALL-CAPS emphasis words.
+  - \b[A-Z]{2,}(?:[-/][A-Z0-9]+)+\b
   placeholder_syntax:
   - \{\{<.*?>\}\}
   - \{\{%.*?%\}\}

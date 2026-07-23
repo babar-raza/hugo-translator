@@ -57,53 +57,12 @@ logger = logging.getLogger(__name__)
 _SHORTCODE_RE = re.compile(r"(\{\{[<%].*?[%>]\}\})")
 
 # ---------------------------------------------------------------------------
-# Language codes — kept in sync with engine._ALL_LANGUAGE_CODES
+# Language codes — canonical source, not a hand-copy (durable-fix
+# consolidation: this was one of 6 independently drifting copies found
+# across the repo during that investigation).
 # ---------------------------------------------------------------------------
-_ALL_LANGUAGE_CODES = frozenset(
-    [
-        "af",
-        "ar",
-        "az",
-        "bg",
-        "ca",
-        "cs",
-        "da",
-        "de",
-        "el",
-        "es",
-        "et",
-        "fa",
-        "fi",
-        "fr",
-        "ga",
-        "he",
-        "hi",
-        "hr",
-        "hu",
-        "id",
-        "it",
-        "ja",
-        "ko",
-        "lt",
-        "lv",
-        "ms",
-        "nb",
-        "nl",
-        "no",
-        "pl",
-        "pt",
-        "ro",
-        "ru",
-        "sk",
-        "sl",
-        "sr",
-        "sv",
-        "th",
-        "tr",
-        "uk",
-        "vi",
-        "zh",
-    ]
+from src.utils.content_discovery import (  # noqa: E402
+    ALL_LANGUAGE_CODES as _ALL_LANGUAGE_CODES,
 )
 
 # Structural element regexes for fidelity scoring
@@ -142,6 +101,16 @@ class FileScores:
     structural_fidelity: float | None = None
     shortcode_preservation: float | None = None
     naturalness_llm: float | None = None
+    # HT-QUALITY-GATES-001 Part 22 (plan 5.4 item 4): MEANING fidelity, not
+    # fluency -- deliberately a separate field from naturalness_llm. This is
+    # the periodic/sampled-audit half of the tiered-coverage design; Gate 36
+    # in write_gate.py is the synchronous, high-risk-tier half. Kept out of
+    # `overall`'s weighted aggregate for the same reason naturalness_llm
+    # already is: an LLM judge score shouldn't silently dominate the
+    # mechanical aggregate before its agreement rate against human
+    # close-reading has been measured (Part 6 item 3).
+    fidelity_llm: float | None = None
+    fidelity_issues: list[str] = field(default_factory=list)
     overall: float | None = None
     flags: list[str] = field(default_factory=list)
     error: str | None = None
@@ -526,6 +495,40 @@ def score_naturalness_llm(
     return sum(scores) / len(scores) if scores else None
 
 
+def score_meaning_fidelity(
+    source_text: str,
+    translated_text: str,
+    lang: str,
+    model_id: str | None,
+) -> tuple[float | None, list[str]]:
+    """
+    HT-QUALITY-GATES-001 Part 22 (plan 5.4 item 4): the sampled/periodic-audit
+    half of tiered fidelity coverage. Uses the same LLM judge as write_gate.py's
+    Gate 36 (src.translation_engine.validation.fidelity_judge), but here it can
+    run against ANY sampled file, not just the synchronous high-risk tier --
+    this is what makes the plan's "otherwise sampling-based ongoing audit"
+    concrete rather than aspirational.
+
+    Returns (score_0_to_1, issues) -- (None, []) if disabled or the judge
+    fails open (network error, unparseable response, etc; see
+    fidelity_judge.judge_fidelity's docstring).
+    """
+    if model_id is None:
+        return None, []
+
+    from src.translation_engine.validation.fidelity_judge import judge_fidelity
+
+    body_src = _strip_frontmatter_and_code(source_text)
+    body_tgt = _strip_frontmatter_and_code(translated_text)
+    if len(body_tgt.strip()) < 50:
+        return None, []
+
+    verdict = judge_fidelity(body_src, body_tgt, "en", lang, model_id=model_id)
+    if verdict is None:
+        return None, []
+    return verdict.score, verdict.issues
+
+
 # ---------------------------------------------------------------------------
 # Weighted aggregate
 # ---------------------------------------------------------------------------
@@ -573,6 +576,7 @@ def score_pair(
     fasttext_detector,
     llm_provider,
     threshold: float,
+    fidelity_model_id: str | None = None,
 ) -> FileScores:
     result = FileScores(
         source_path=str(pair.source_path),
@@ -621,6 +625,14 @@ def score_pair(
             )
         except Exception as e:
             logger.debug("LLM naturalness scoring failed: %s", e)
+
+    if fidelity_model_id is not None:
+        try:
+            result.fidelity_llm, result.fidelity_issues = score_meaning_fidelity(
+                source_text, translated_text, pair.lang, fidelity_model_id
+            )
+        except Exception as e:
+            logger.debug("LLM fidelity scoring failed: %s", e)
 
     result.overall = compute_overall(result)
     result.flags = compute_flags(result, threshold)
@@ -785,7 +797,22 @@ def build_arg_parser() -> argparse.ArgumentParser:
     p.add_argument(
         "--use-llm",
         action="store_true",
-        help="Enable optional LLM naturalness scoring via professionalize_llm",
+        help="Enable optional LLM naturalness (fluency) scoring via professionalize_llm",
+    )
+    p.add_argument(
+        "--use-fidelity-judge",
+        action="store_true",
+        help=(
+            "Enable LLM MEANING-fidelity scoring (HT-QUALITY-GATES-001 Part 22 "
+            "plan 5.4 item 4) -- distinct from --use-llm's fluency check. This is "
+            "the sampled/periodic-audit tier; write_gate.py's Gate 36 is the "
+            "synchronous high-risk-tier check using the same judge."
+        ),
+    )
+    p.add_argument(
+        "--fidelity-model-id",
+        default="professionalize_llm",
+        help="Model registry ID to use for --use-fidelity-judge (default: professionalize_llm)",
     )
     p.add_argument("--verbose", action="store_true", help="Enable DEBUG logging")
     return p
@@ -896,6 +923,14 @@ def main() -> int:
             )
 
     # ---------------------------------------------------------------------------
+    # Fidelity judge model id (HT-QUALITY-GATES-001 Part 22, plan 5.4 item 4).
+    # judge_fidelity() constructs its own provider on demand (same pattern as
+    # correction.py), so there's no provider object to build ahead of time here
+    # -- just the model_id, or None to disable.
+    # ---------------------------------------------------------------------------
+    fidelity_model_id = args.fidelity_model_id if (args.use_fidelity_judge and args.mode != "ci") else None
+
+    # ---------------------------------------------------------------------------
     # Sample pairs
     # ---------------------------------------------------------------------------
     if args.mode == "ci":
@@ -942,6 +977,7 @@ def main() -> int:
             fasttext_detector=fasttext_detector,
             llm_provider=llm_provider,
             threshold=args.threshold,
+            fidelity_model_id=fidelity_model_id,
         )
         file_scores.append(scores)
 

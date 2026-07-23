@@ -33,7 +33,12 @@ body:
 # Output configuration
 output_layout:
   per_language_folders: false  # CI-2 fix: fixtures are at root, not in en/ subdir
-  pattern: "/{lang}/{relative_path}"
+  # Fixed alongside the durable-fix plan: this pattern previously read
+  # "/{lang}/{relative_path}" (a per_language_folders=true-shaped directory
+  # template), inconsistent with per_language_folders=false above -- stale
+  # drift from before the boolean was flipped. Corrected to the real
+  # file-suffix convention (matches blog.aspose.org/www.aspose.org etc.).
+  pattern: "{filename}.{lang}{ext}"
   preserve_structure: true
 
 # TM preferences (minimal for testing)

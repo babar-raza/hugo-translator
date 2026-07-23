@@ -7,10 +7,25 @@ Selects 5 random non-slides families and 2 files from each.
 
 import random
 import re
+import sys
 from pathlib import Path
 
-CONTENT_ROOT = Path(r"D:\onedrive\Documents\GitHub\aspose.net\content")
+_REPO_ROOT = Path(__file__).resolve().parents[2]
+if str(_REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(_REPO_ROOT))
+from src.utils.config_loader import ConfigService  # noqa: E402
+
+_CONFIG = ConfigService(_REPO_ROOT / "config")
 REPORTS_DIR = Path(r"c:\Users\prora\OneDrive\Documents\GitHub\hugo-translator\reports")
+
+
+def _site_content_root(site_id: str) -> Path:
+    """Registry-driven content root (TC-CD-017) -- was a single hardcoded
+    CONTENT_ROOT shared across subdomains, pointing at a confirmed-empty
+    stub directory (see TC-CD-015). Resolves each site's real root from
+    its own profile instead."""
+    profile = _CONFIG.get_site_profile(site_id)
+    return _CONFIG.resolve_content_root(profile.content_roots[0])
 
 # Reuse scoring logic from e2e_select_files.py
 NESTED_LIST_PATTERN = re.compile(r"^\s{2,}[-*+]\s", re.MULTILINE)
@@ -54,9 +69,9 @@ def discover_families() -> set[str]:
 
     # Check common subdomain roots
     subdomain_roots = [
-        CONTENT_ROOT / "docs.aspose.net",
-        CONTENT_ROOT / "kb.aspose.net",
-        CONTENT_ROOT / "reference.aspose.net",
+        _site_content_root("docs.aspose.net"),
+        _site_content_root("kb.aspose.net"),
+        _site_content_root("reference.aspose.net"),
     ]
 
     for root in subdomain_roots:
@@ -88,9 +103,9 @@ def find_files_for_family(family: str, count: int = 2) -> list[tuple[Path, int, 
         List of (file_path, score, breakdown) tuples
     """
     search_paths = [
-        CONTENT_ROOT / "docs.aspose.net" / family / "en",
-        CONTENT_ROOT / "kb.aspose.net" / family / "en",
-        CONTENT_ROOT / "reference.aspose.net" / family / "en",
+        _site_content_root("docs.aspose.net") / family / "en",
+        _site_content_root("kb.aspose.net") / family / "en",
+        _site_content_root("reference.aspose.net") / family / "en",
     ]
 
     all_files = []

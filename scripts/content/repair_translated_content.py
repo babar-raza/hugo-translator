@@ -40,6 +40,11 @@ except ImportError:
     print("ERROR: PyYAML not installed. Run: pip install pyyaml", file=sys.stderr)
     sys.exit(2)
 
+_PROJECT_ROOT = Path(__file__).resolve().parents[2]
+if str(_PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(_PROJECT_ROOT))
+from src.utils.content_discovery import ALL_LANGUAGE_CODES as LANG_CODES  # noqa: E402
+
 
 # ---------------------------------------------------------------------------
 # Data model
@@ -49,45 +54,12 @@ SEVERITY_ERROR = "error"
 SEVERITY_WARNING = "warning"
 SEVERITY_INFO = "info"
 
-# Language codes to detect translated files
-LANG_CODES = {
-    "ar",
-    "bg",
-    "ca",
-    "cs",
-    "da",
-    "de",
-    "el",
-    "es",
-    "fa",
-    "fi",
-    "fr",
-    "he",
-    "hi",
-    "hr",
-    "hu",
-    "id",
-    "it",
-    "ja",
-    "ko",
-    "lt",
-    "lv",
-    "ms",
-    "nl",
-    "no",
-    "pl",
-    "pt",
-    "ro",
-    "ru",
-    "sk",
-    "sr",
-    "sv",
-    "th",
-    "tr",
-    "uk",
-    "vi",
-    "zh",
-}
+# LANG_CODES (used to detect translated files by path shape below) is now
+# the canonical set from src/utils/content_discovery.py -- durable-fix
+# consolidation: this was one of 6 independently hand-copied language-code
+# lists found across the repo (this one happened to be correct already,
+# unlike build_unit_heal_queue.py's drifted copy, but kept as a separate
+# hardcoded list it would still eventually drift).
 
 # YAML keys that must never be translated
 CANONICAL_PASSTHROUGH_KEYS = {

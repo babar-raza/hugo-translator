@@ -23,9 +23,21 @@ from collections import defaultdict
 from datetime import datetime
 from pathlib import Path
 
-CONTENT_ROOT = Path(r"D:\onedrive\Documents\GitHub\aspose.org\content")
-SITES = ["reference.aspose.org", "docs.aspose.org", "kb.aspose.org", "blog.aspose.org", "products.aspose.org"]
-BLOG_SCHEME_SITES = {"blog.aspose.org"}
+_PROJECT_ROOT = Path(__file__).resolve().parents[2]
+if str(_PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(_PROJECT_ROOT))
+from src.utils.config_loader import ConfigService  # noqa: E402
+from src.utils.content_discovery import (  # noqa: E402
+    iter_locale_pairs,
+    resolve_source_root,
+)
+
+_CONFIG = ConfigService(_PROJECT_ROOT / "config")
+# Durable-fix consolidation: registry-driven site list (was a hardcoded
+# 5-site list) + registry-driven discovery (was a hand-rolled
+# BLOG_SCHEME_SITES special case + duplicate iter_pairs_directory_scheme/
+# iter_pairs_blog_scheme pair) via src/utils/content_discovery.py.
+SITES = _CONFIG.list_sites(autonomous_only=True)
 
 FM_RE = re.compile(r"^---\n(.*?)\n---\n?", re.S)
 BULLET_RE = re.compile(r"^(\s*)[-*]\s+(.+)$")
@@ -114,21 +126,22 @@ def find_mixed_blocks(body: str) -> list[dict]:
     return [{"items": b} for b in blocks]
 
 
-def iter_pairs_directory_scheme(site: str, locale: str = "sr"):
-    site_root = CONTENT_ROOT / site
-    locale_root = site_root / locale
-    if not locale_root.exists():
+def iter_locale_files(site: str, locale: str = "sr"):
+    """Yield (rel, tr_path) for existing translated files in one locale.
+    Registry-driven via content_discovery -- works identically for
+    directory-scheme and file-suffix-scheme sites, no per-site branching."""
+    try:
+        profile = _CONFIG.get_site_profile(site)
+    except Exception:
         return
-    for tr_path in sorted(locale_root.rglob("*.md")):
-        rel = tr_path.relative_to(locale_root)
-        yield str(rel), tr_path
-
-
-def iter_pairs_blog_scheme(site: str, locale: str = "sr"):
-    site_root = CONTENT_ROOT / site
-    for tr_path in sorted(site_root.rglob(f"index.{locale}.md")):
-        rel = tr_path.parent.relative_to(site_root)
-        yield str(rel), tr_path
+    content_root = _CONFIG.resolve_content_root(profile.content_roots[0])
+    if not content_root.exists():
+        return
+    source_root = resolve_source_root(profile, content_root)
+    for en_path, loc, tr_path in iter_locale_pairs(profile, content_root):
+        if loc != locale or not tr_path.exists():
+            continue
+        yield str(en_path.relative_to(source_root)), tr_path
 
 
 def scan(output_path: str | None, sites: list[str] | None, min_body_len: int):
@@ -141,8 +154,7 @@ def scan(output_path: str | None, sites: list[str] | None, min_body_len: int):
     print(f"Starting sr script-mixing audit at {datetime.now().strftime('%H:%M:%S')}", flush=True)
 
     for site in (sites if sites is not None else SITES):
-        is_blog = site in BLOG_SCHEME_SITES
-        iterator = iter_pairs_blog_scheme(site) if is_blog else iter_pairs_directory_scheme(site)
+        iterator = iter_locale_files(site)
         site_files = 0
         site_findings = 0
 

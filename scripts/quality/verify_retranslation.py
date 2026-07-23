@@ -18,12 +18,21 @@ verifier. Formalizes the ad-hoc script used earlier this session for the
 Usage:
     python scripts/quality/verify_retranslation.py --queue-file .local/heal_x.jsonl
     python scripts/quality/verify_retranslation.py --queue-file .local/heal_x.jsonl \
+        --site products.aspose.org \
         --title-match-threshold 0.90 --report-path reports/verify_x.json
 
 Exit code 0 = all thresholds met. Exit code 1 = regression (title-match rate
 below threshold, or any placeholder leak, or any file genuinely missing).
 This is meant to run unconditionally as the last step of every retranslation
 (canary or full), not as a one-off a human has to remember to invoke.
+
+Durable-fix consolidation (TC-CD-016): `en_path`/`tgt_path` were previously
+hardcoded to the `content_root/en/rel` + `content_root/locale/rel`
+per_language_folders shape unconditionally -- silently wrong if `--content-root`
+were ever pointed at a file-suffix-layout site. Now resolved via
+`src/utils/content_discovery.py`, reading the `--site`'s real
+`output_layout` from the registry, so this remains correct regardless of
+which site's queue is being verified.
 """
 from __future__ import annotations
 
@@ -33,7 +42,17 @@ import re
 import sys
 from pathlib import Path
 
-DEFAULT_CONTENT_ROOT = Path(r"D:\onedrive\Documents\GitHub\aspose.org\content\products.aspose.org")
+_PROJECT_ROOT = Path(__file__).resolve().parents[2]
+if str(_PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(_PROJECT_ROOT))
+from src.utils.config_loader import ConfigService  # noqa: E402
+from src.utils.content_discovery import (  # noqa: E402
+    resolve_source_root,
+    resolve_translated_path,
+)
+
+_CONFIG = ConfigService(_PROJECT_ROOT / "config")
+DEFAULT_SITE = "products.aspose.org"  # preserves this script's original default scope
 
 _PLACEHOLDER_RE = re.compile(r"\{?PLACEHOLDER_\d+\}?")
 
@@ -57,6 +76,7 @@ def page_to_rel(page: str) -> str:
 
 def verify(
     queue_entries: list[dict],
+    profile,
     content_root: Path,
 ) -> dict:
     results = {
@@ -74,12 +94,13 @@ def verify(
     }
 
     en_frontmatter_cache: dict[Path, dict | None] = {}
+    source_root = resolve_source_root(profile, content_root)
 
     for entry in queue_entries:
         locale = entry["locale"]
         rel = entry["rel"].replace("\\", "/")
-        en_path = content_root / "en" / rel
-        tgt_path = content_root / locale / rel
+        en_path = source_root / rel
+        tgt_path = resolve_translated_path(profile, en_path, locale)
 
         if en_path not in en_frontmatter_cache:
             if en_path.exists():
@@ -130,7 +151,12 @@ def verify(
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--queue-file", required=True, help="JSONL queue file (site/locale/rel per line)")
-    ap.add_argument("--content-root", default=str(DEFAULT_CONTENT_ROOT))
+    ap.add_argument("--site", default=DEFAULT_SITE, help="Registry site_id to resolve content root + layout from")
+    ap.add_argument(
+        "--content-root",
+        default=None,
+        help="Override the resolved content root (rare; normally derived from --site's registry entry)",
+    )
     ap.add_argument("--title-match-threshold", type=float, default=0.90)
     ap.add_argument("--allow-missing", type=int, default=0, help="Max files allowed missing")
     ap.add_argument("--report-path", default=None)
@@ -142,7 +168,13 @@ def main() -> int:
             if line.strip():
                 queue_entries.append(json.loads(line))
 
-    results = verify(queue_entries, Path(args.content_root))
+    profile = _CONFIG.get_site_profile(args.site)
+    content_root = (
+        Path(args.content_root) if args.content_root
+        else _CONFIG.resolve_content_root(profile.content_roots[0])
+    )
+
+    results = verify(queue_entries, profile, content_root)
 
     print(f"Total queued: {results['total']}")
     print(f"File exists: {results['file_exists']} / missing: {results['file_missing']}")

@@ -9,8 +9,13 @@ unambiguous without needing the EN source for comparison -- a Latin-script
 locale leaving "3D Model..." in English is not detectable this way, but
 non-Latin locales cover a large, clearly-identifiable slice of the damage).
 
-Handles both site directory schemes (dir-split sites + blog.aspose.org's
-page-bundle scheme).
+Durable-fix consolidation: site/locale/file discovery is now registry-driven
+via src/utils/content_discovery.py (reads each site's
+output_layout.per_language_folders), replacing the previous hand-rolled
+BLOG_SCHEME_SITES special case + duplicate iter_files_dirscheme/
+iter_files_blogscheme pair. SITES is derived from the site-profile registry
+(config/site_profiles/*.yaml via ConfigService.list_sites) instead of a
+hardcoded 5-site list, so this now covers all real production sites.
 """
 from __future__ import annotations
 
@@ -22,9 +27,17 @@ from collections import defaultdict
 from datetime import datetime
 from pathlib import Path
 
-CONTENT_ROOT = Path(r"D:\onedrive\Documents\GitHub\aspose.org\content")
-SITES = ["reference.aspose.org", "docs.aspose.org", "kb.aspose.org", "blog.aspose.org", "products.aspose.org"]
-BLOG_SCHEME_SITES = {"blog.aspose.org"}
+_PROJECT_ROOT = Path(__file__).resolve().parents[2]
+if str(_PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(_PROJECT_ROOT))
+from src.utils.config_loader import ConfigService  # noqa: E402
+from src.utils.content_discovery import (  # noqa: E402
+    iter_locale_pairs,
+    resolve_source_root,
+)
+
+_CONFIG = ConfigService(_PROJECT_ROOT / "config")
+SITES = _CONFIG.list_sites(autonomous_only=True)
 NON_LATIN = {"ar", "bg", "el", "fa", "he", "hi", "ja", "ko", "ru", "th", "uk", "zh"}
 
 HEADING_RE = re.compile(r"^(#{1,6})\s+(.+?)\s*$", re.M)
@@ -61,29 +74,23 @@ def check_file(tr_content: str) -> list[tuple[str, str]]:
     return findings
 
 
-def iter_files_dirscheme(site: str):
-    site_root = CONTENT_ROOT / site
-    if not site_root.exists():
+def iter_translated_files(site: str):
+    """Yield (locale, rel, tr_path) for existing non-Latin-locale translated
+    files. Registry-driven via content_discovery -- works identically for
+    directory-scheme and file-suffix-scheme sites, no per-site branching."""
+    try:
+        profile = _CONFIG.get_site_profile(site)
+    except Exception:
         return
-    locales = sorted(
-        d.name for d in site_root.iterdir()
-        if d.is_dir() and d.name in NON_LATIN
-    )
-    for locale in locales:
-        for tr_path in sorted((site_root / locale).rglob("*.md")):
-            rel = tr_path.relative_to(site_root / locale)
-            yield locale, str(rel), tr_path
-
-
-def iter_files_blogscheme(site: str):
-    site_root = CONTENT_ROOT / site
-    for tr_path in sorted(site_root.rglob("index.*.md")):
-        m = re.match(r"^index\.([a-z]{2,5})\.md$", tr_path.name)
-        if not m or m.group(1) not in NON_LATIN:
+    content_root = _CONFIG.resolve_content_root(profile.content_roots[0])
+    if not content_root.exists():
+        return
+    source_root = resolve_source_root(profile, content_root)
+    for en_path, locale, tr_path in iter_locale_pairs(profile, content_root):
+        if locale not in NON_LATIN or not tr_path.exists():
             continue
-        locale = m.group(1)
-        rel = str(tr_path.parent.relative_to(site_root))
-        yield locale, rel, tr_path
+        rel = en_path.relative_to(source_root)
+        yield locale, str(rel), tr_path
 
 
 def scan(output_path: str | None, sites: list[str] | None):
@@ -96,8 +103,7 @@ def scan(output_path: str | None, sites: list[str] | None):
     print(f"Starting digit-heading audit at {datetime.now().strftime('%H:%M:%S')}", flush=True)
 
     for site in (sites if sites is not None else SITES):
-        is_blog = site in BLOG_SCHEME_SITES
-        iterator = iter_files_blogscheme(site) if is_blog else iter_files_dirscheme(site)
+        iterator = iter_translated_files(site)
         site_files = 0
         site_findings = 0
 

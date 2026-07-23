@@ -7,61 +7,61 @@ Enumerates all source files and computes missing translations per site/language.
 import csv
 import json
 import os
+import sys
 from collections import defaultdict
 from datetime import datetime
 from pathlib import Path
 
-import yaml
+_REPO_ROOT = Path(__file__).resolve().parents[2]
+if str(_REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(_REPO_ROOT))
+from src.utils.config_loader import ConfigService  # noqa: E402
+from src.utils.content_discovery import (  # noqa: E402
+    discover_source_files as _discover_source_files,
+    resolve_translated_path,
+)
+
+_CONFIG = ConfigService(_REPO_ROOT / "config")
+
+# Durable-fix consolidation: discover_source_files/compute_expected_translation_path
+# previously hardcoded a content_root/{source_lang} folder-based assumption
+# unconditionally -- silently wrong for blog.aspose.net (already listed in
+# main_sites below), which uses output_layout.per_language_folders=false
+# (file-suffix layout). Now delegates to content_discovery, which reads
+# each site's actual output_layout.
 
 
-def load_site_profile(profile_path: str) -> dict:
-    """Load a site profile YAML file."""
-    with open(profile_path, encoding="utf-8") as f:
-        return yaml.safe_load(f)
-
-
-def discover_source_files(content_root: str, source_lang: str = "en") -> list[Path]:
-    """
-    Discover all source files in the content root.
-    For Hugo sites with per-language folders, source files are in the source language folder.
-    """
+def discover_source_files(content_root: str, source_lang: str = "en", profile=None) -> list[Path]:
+    """Discover all source files in the content root. Registry-driven via
+    content_discovery when a profile is supplied; skips `_index.md` for
+    parity with this script's original behavior."""
     content_path = Path(content_root)
-    source_lang_path = content_path / source_lang
-
-    if not source_lang_path.exists():
-        # Fallback: scan entire content root
-        source_lang_path = content_path
-
-    source_files = []
-    for md_file in source_lang_path.rglob("*.md"):
-        # Skip _index.md unless specifically needed
-        if md_file.name == "_index.md":
-            continue
-        source_files.append(md_file)
-
-    return sorted(source_files)
+    if profile is not None:
+        files = _discover_source_files(profile, content_path)
+    else:
+        source_lang_path = content_path / source_lang
+        if not source_lang_path.exists():
+            source_lang_path = content_path
+        files = sorted(source_lang_path.rglob("*.md"))
+    return sorted(f for f in files if f.name != "_index.md")
 
 
 def compute_expected_translation_path(
-    source_file: Path, source_lang: str, target_lang: str, content_root: str
+    source_file: Path, source_lang: str, target_lang: str, content_root: str, profile=None
 ) -> Path:
-    """
-    Compute the expected path for a translated file.
-    Pattern: {content_root}/{target_lang}/{relative_path_from_source_lang_folder}
-    """
+    """Compute the expected path for a translated file. Registry-driven via
+    content_discovery when a profile is supplied (handles both
+    per_language_folders and file-suffix layouts correctly)."""
+    if profile is not None:
+        return resolve_translated_path(profile, source_file, target_lang)
+
     content_path = Path(content_root)
     source_lang_path = content_path / source_lang
-
-    # Get relative path from source lang folder
     try:
         rel_path = source_file.relative_to(source_lang_path)
     except ValueError:
-        # If source file is not under source_lang_path, use relative to content_root
         rel_path = source_file.relative_to(content_path)
-
-    # Construct target path
-    target_path = content_path / target_lang / rel_path
-    return target_path
+    return content_path / target_lang / rel_path
 
 
 def check_translation_status(target_path: Path) -> str:
@@ -89,11 +89,10 @@ def discover_site(site_profile_path: str, run_dir: Path) -> dict:
     Discover all missing translations for a single site.
     Returns summary statistics and writes detailed manifest.
     """
-    profile = load_site_profile(site_profile_path)
-    site_id = profile["site_id"]
-    source_lang = profile.get("default_source_lang", "en")
-    target_langs = profile.get("target_langs", [])
-    content_roots = profile.get("content_roots", [])
+    site_id = Path(site_profile_path).stem
+    profile = _CONFIG.get_site_profile(site_id)
+    source_lang = profile.default_source_lang
+    target_langs = profile.target_langs
 
     print(f"\n{'=' * 80}")
     print(f"Site: {site_id}")
@@ -101,15 +100,16 @@ def discover_site(site_profile_path: str, run_dir: Path) -> dict:
     print(
         f"Target languages: {len(target_langs)} ({', '.join(target_langs[:5])}{'...' if len(target_langs) > 5 else ''})"
     )
-    print(f"Content roots: {len(content_roots)}")
+    print(f"Content roots: {len(profile.content_roots)}")
     print(f"{'=' * 80}\n")
 
     all_source_files = []
-    for content_root in content_roots:
+    for raw_content_root in profile.content_roots:
+        content_root = str(_CONFIG.resolve_content_root(raw_content_root))
         if not os.path.exists(content_root):
             print(f"WARNING: Content root does not exist: {content_root}")
             continue
-        source_files = discover_source_files(content_root, source_lang)
+        source_files = discover_source_files(content_root, source_lang, profile=profile)
         print(f"  Found {len(source_files)} source files in {content_root}")
         all_source_files.extend([(sf, content_root) for sf in source_files])
 
@@ -125,7 +125,7 @@ def discover_site(site_profile_path: str, run_dir: Path) -> dict:
     for source_file, content_root in all_source_files:
         for target_lang in target_langs:
             target_path = compute_expected_translation_path(
-                source_file, source_lang, target_lang, content_root
+                source_file, source_lang, target_lang, content_root, profile=profile
             )
             status = check_translation_status(target_path)
 
@@ -204,7 +204,11 @@ def discover_site(site_profile_path: str, run_dir: Path) -> dict:
 
 def main():
     # Setup
-    repo_root = Path(__file__).parent.parent
+    # (fixed in passing: this previously computed scripts/ instead of the
+    # repo root -- Path(__file__).parent.parent from scripts/content/ only
+    # goes up to scripts/, a pre-existing bug unrelated to the durable-fix
+    # consolidation but found while migrating this file's discovery logic)
+    repo_root = _REPO_ROOT
     run_dir = repo_root / "reports" / "translation_runs" / "20260212_131519_missing_full"
     run_dir.mkdir(parents=True, exist_ok=True)
 

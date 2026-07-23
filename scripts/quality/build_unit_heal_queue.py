@@ -25,7 +25,6 @@ from __future__ import annotations
 import argparse
 import json
 import logging
-import os
 import sys
 from pathlib import Path
 
@@ -33,6 +32,10 @@ _HERE = Path(__file__).resolve()
 _PROJECT_ROOT = _HERE.parents[2]
 if str(_PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(_PROJECT_ROOT))
+from src.utils.config_loader import ConfigService  # noqa: E402
+from src.utils.content_discovery import iter_locale_pairs  # noqa: E402
+
+_CONFIG = ConfigService(_PROJECT_ROOT / "config")
 
 logger = logging.getLogger(__name__)
 
@@ -50,47 +53,38 @@ PRIORITY = {
     "newline_ratio_detector": 3,
 }
 
-_SITE_ENV_MAP = {
-    "reference.aspose.org": "ASPOSE_ORG_CONTENT",
-    "docs.aspose.org": "ASPOSE_NET_CONTENT",
-    "kb.aspose.org": "ASPOSE_NET_CONTENT",
-}
-
-ALL_LOCALES = [
-    "ar", "bg", "ca", "cs", "da", "de", "el", "es", "fa", "fi",
-    "fr", "he", "hi", "hr", "hu", "id", "it", "ja", "ko", "lt",
-    "lv", "ms", "nl", "no", "pl", "pt", "ro", "ru", "sk", "sl",
-    "sr", "sv", "th", "tr", "uk", "vi", "zh",
-]
+# Durable-fix consolidation: replaced _SITE_ENV_MAP (only covered 3 sites,
+# and incorrectly mapped docs.aspose.org/kb.aspose.org to ASPOSE_NET_CONTENT
+# -- the wrong project; those two live under ASPOSE_ORG_CONTENT per their
+# own site profiles) + a hand-copied ALL_LOCALES list (had drifted: a stray
+# extra "sl" not present in any real site's target_langs) with the same
+# registry-driven ConfigService/content_discovery primitives used
+# throughout this consolidation.
 
 
-def _get_content_root(site_id: str) -> Path | None:
-    env_key = _SITE_ENV_MAP.get(site_id)
-    if env_key:
-        val = os.environ.get(env_key)
-        if val:
-            return Path(val)
-    return None
+def _get_site_profile_and_root(site_id: str):
+    """Return (profile, content_root) for site_id, or (None, None) if the
+    profile can't be loaded or its content root doesn't exist on disk."""
+    try:
+        profile = _CONFIG.get_site_profile(site_id)
+    except Exception:
+        return None, None
+    content_root = _CONFIG.resolve_content_root(profile.content_roots[0])
+    return (profile, content_root) if content_root.exists() else (None, None)
 
 
 def _find_en_tr_pairs(
+    profile,
     content_root: Path,
-    site_id: str,
     locales: list[str],
 ) -> list[tuple[Path, Path, str]]:
-    """Yield (en_path, tr_path, locale) tuples."""
+    """Return (en_path, tr_path, locale) tuples for existing translations.
+    Registry-driven via content_discovery -- works identically for
+    directory-scheme and file-suffix-scheme sites."""
     pairs = []
-    en_root = content_root / "en"
-    if not en_root.exists():
-        logger.warning("EN root not found: %s", en_root)
-        return pairs
-
-    for en_file in en_root.rglob("*.md"):
-        rel = en_file.relative_to(en_root)
-        for locale in locales:
-            tr_file = content_root / locale / rel
-            if tr_file.exists():
-                pairs.append((en_file, tr_file, locale))
+    for en_path, locale, tr_path in iter_locale_pairs(profile, content_root):
+        if locale in locales and tr_path.exists():
+            pairs.append((en_path, tr_path, locale))
     return pairs
 
 
@@ -127,13 +121,21 @@ def build_queue(
 
     with output_path.open(mode, encoding="utf-8") as out_fh:
         for site_id in sites:
-            content_root = _get_content_root(site_id)
-            if not content_root:
+            profile, content_root = _get_site_profile_and_root(site_id)
+            if not profile:
                 logger.error("Cannot resolve content root for site: %s", site_id)
                 continue
 
+            # "all" resolves to THIS site's configured target_langs, not a
+            # hand-copied global list -- avoids the ALL_LOCALES drift found
+            # during the durable-fix investigation (a stray "sl" not in any
+            # real site's target_langs).
+            site_locales = (
+                sorted(profile.target_langs) if "all" in locales else locales
+            )
+
             logger.info("Scanning %s at %s", site_id, content_root)
-            pairs = _find_en_tr_pairs(content_root, site_id, locales)
+            pairs = _find_en_tr_pairs(profile, content_root, site_locales)
             logger.info("Found %d EN/TR pairs for %s", len(pairs), site_id)
 
             for en_path, tr_path, locale in pairs:
@@ -229,13 +231,17 @@ def main() -> None:
         format="%(asctime)s %(levelname)s %(message)s",
     )
 
-    locales = ALL_LOCALES if "all" in args.locales else args.locales
+    # "all" is resolved per-site inside build_queue (each site's own
+    # target_langs), not to a single hand-copied global list -- see
+    # _find_en_tr_pairs's docstring / the durable-fix consolidation notes
+    # above _get_site_profile_and_root.
+    locales = args.locales
     output_path = Path(args.output)
 
     logger.info(
-        "build_unit_heal_queue: sites=%s locales=%d min_severity=%.2f",
+        "build_unit_heal_queue: sites=%s locales=%s min_severity=%.2f",
         args.sites,
-        len(locales),
+        "all (per-site target_langs)" if "all" in locales else locales,
         args.min_severity,
     )
 

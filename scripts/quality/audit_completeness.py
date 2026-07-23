@@ -15,6 +15,7 @@ from __future__ import annotations
 import argparse
 import json
 import re
+import sys
 from collections import defaultdict
 from datetime import datetime
 from pathlib import Path
@@ -24,17 +25,18 @@ from pathlib import Path
 # ---------------------------------------------------------------------------
 _SCRIPT_DIR = Path(__file__).resolve().parent
 _PROJ_ROOT = _SCRIPT_DIR.parent.parent
+if str(_PROJ_ROOT) not in sys.path:
+    sys.path.insert(0, str(_PROJ_ROOT))
+from src.utils.config_loader import ConfigService  # noqa: E402
+from src.utils.content_discovery import iter_locale_pairs  # noqa: E402
 
-CONTENT_ROOT = Path(r"D:\onedrive\Documents\GitHub\aspose.org\content")
-# TC-AUD-007: expanded default from 3 to 5 real content sites (excludes
-# "templates" and websites.aspose.org/www.aspose.org, kept out of this pass).
-SITES = [
-    "reference.aspose.org",
-    "docs.aspose.org",
-    "kb.aspose.org",
-    "blog.aspose.org",
-    "products.aspose.org",
-]
+_CONFIG = ConfigService(_PROJ_ROOT / "config")
+# Durable-fix consolidation: was a hardcoded 5-site list (TC-AUD-007) that
+# listed blog.aspose.org in SITES but had NO file-suffix-scheme branch at
+# all -- silently producing zero rows for it (same bug class as
+# audit_all_content.py, just never noticed here). Now registry-driven via
+# ConfigService.list_sites, covering every real production site profile.
+SITES = _CONFIG.list_sites(autonomous_only=True)
 
 PRIORITY: dict[str, int] = {
     "empty_body": 1,
@@ -131,23 +133,33 @@ def scan(
 
     with output_path.open(out_mode, encoding="utf-8") as out_fh:
         for site in sites:
-            site_root = CONTENT_ROOT / site
-            en_root = site_root / "en"
-            if not en_root.exists():
-                print(f"  Skipping {site} (no en/ dir)")
+            try:
+                profile = _CONFIG.get_site_profile(site)
+            except Exception as e:  # noqa: BLE001
+                print(f"  Skipping {site} (profile load failed: {e})")
                 continue
 
-            en_files = sorted(en_root.rglob("*.md"))
-            all_locales = sorted(
-                d.name
-                for d in site_root.iterdir()
-                if d.is_dir()
-                and d.name != "en"
-                and 2 <= len(d.name) <= 5
-                and d.name.replace("-", "").isalpha()
-            )
+            content_root = _CONFIG.resolve_content_root(profile.content_roots[0])
+            if not content_root.exists():
+                print(f"  Skipping {site} (content root not found: {content_root})")
+                continue
+
+            # Registry-driven discovery: works identically for
+            # per_language_folders=True and file-suffix (=False) sites.
+            all_locales = sorted(profile.target_langs)
             if locales_filter:
                 all_locales = [lc for lc in all_locales if lc in locales_filter]
+
+            en_files = []
+            seen_en = set()
+            pairs_by_en: dict[Path, list[tuple[str, Path]]] = defaultdict(list)
+            for en_path, locale, tr_path in iter_locale_pairs(profile, content_root):
+                if locale not in all_locales:
+                    continue
+                pairs_by_en[en_path].append((locale, tr_path))
+                if en_path not in seen_en:
+                    seen_en.add(en_path)
+                    en_files.append(en_path)
 
             print(
                 f"\n{site}: {len(en_files):,} EN files x {len(all_locales)} locales",
@@ -160,7 +172,6 @@ def scan(
                 if done % 2000 == 0:
                     print(f"  ... {done}/{len(en_files)} source files", flush=True)
 
-                rel = en_path.relative_to(en_root)
                 try:
                     en_content = en_path.read_text(encoding="utf-8", errors="replace")
                 except Exception:  # noqa: BLE001
@@ -168,8 +179,7 @@ def scan(
 
                 en_body = _get_body(en_content)
 
-                for locale in all_locales:
-                    tr_path = site_root / locale / rel
+                for locale, tr_path in pairs_by_en[en_path]:
                     total_files += 1
                     if not tr_path.exists():
                         continue

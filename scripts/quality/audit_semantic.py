@@ -37,15 +37,19 @@ if str(_PROJECT_ROOT) not in sys.path:
 
 logger = logging.getLogger(__name__)
 
-# TC-AUD-008: was env-var indirection (_SITE_ENV_MAP) mapping docs/kb to
-# ASPOSE_NET_CONTENT -- wrong project entirely (aspose.net, not aspose.org),
-# and pointing at a directory that's empty on this machine; also silently
-# depended on the env var being set in-process, which it usually isn't
-# (.env exists but nothing here loads it). All 5 audited sites live under
-# the same aspose.org content root -- matches the direct, proven-working
-# CONTENT_ROOT constant already used by audit_all_content.py,
-# audit_linguistic.py, and audit_completeness.py.
-CONTENT_ROOT = Path(r"D:\onedrive\Documents\GitHub\aspose.org\content")
+from src.utils.config_loader import ConfigService  # noqa: E402
+from src.utils.content_discovery import iter_locale_pairs  # noqa: E402
+
+# TC-AUD-008 (superseded by the durable-fix consolidation): was env-var
+# indirection (_SITE_ENV_MAP) mapping docs/kb to ASPOSE_NET_CONTENT -- wrong
+# project entirely, and depended on an env var never actually loaded
+# in-process. Then briefly a single hardcoded CONTENT_ROOT constant
+# (correct for the 5 aspose.org sites this script has been run against so
+# far, but wrong the moment anyone points it at an aspose.net site). Now
+# resolved per-site via ConfigService.resolve_content_root, same as every
+# other migrated audit script -- correct regardless of which real content
+# root a given --sites value lives under.
+_CONFIG = ConfigService(_PROJECT_ROOT / "config")
 
 _NON_LATIN_LOCALES = frozenset(
     "ar bg el fa he hi ja ko ru th uk zh".split()
@@ -59,12 +63,15 @@ _SHORT_API_RE = re.compile(
 _SCORE_RE = re.compile(r'"score"\s*:\s*(\d+(?:\.\d+)?)')
 
 
-def _get_content_root(site_id: str) -> Path | None:
-    """Return the SITE-level root (e.g. .../content/reference.aspose.org),
-    matching what _collect_candidates expects to append "en"/<locale> to --
-    not the top-level content root shared by all sites."""
-    site_root = CONTENT_ROOT / site_id
-    return site_root if site_root.exists() else None
+def _get_site_profile_and_root(site_id: str):
+    """Return (profile, content_root) for site_id, or (None, None) if the
+    profile can't be loaded or its content root doesn't exist on disk."""
+    try:
+        profile = _CONFIG.get_site_profile(site_id)
+    except Exception:
+        return None, None
+    content_root = _CONFIG.resolve_content_root(profile.content_roots[0])
+    return (profile, content_root) if content_root.exists() else (None, None)
 
 
 def _derive_class_name(file_path: Path) -> str:
@@ -74,6 +81,7 @@ def _derive_class_name(file_path: Path) -> str:
 
 
 def _collect_candidates(
+    profile,
     content_root: Path,
     site_id: str,
     locales: list[str],
@@ -81,6 +89,11 @@ def _collect_candidates(
     """
     Walk files and extract short API description units as scoring candidates.
     Returns list of dicts: {en_text, tr_text, locale, file_path, unit_idx, class_name}.
+
+    Registry-driven via content_discovery.iter_locale_pairs -- works
+    identically for per_language_folders=True and file-suffix sites, so this
+    script produces correct (rather than silently empty) candidates if ever
+    pointed at a file-suffix site via --sites.
     """
     from src.translation_engine.parser import HugoParser
     from src.translation_engine.extractor import TextUnitExtractor
@@ -90,62 +103,63 @@ def _collect_candidates(
     extractor = TextUnitExtractor(segmentation_strategy="sentence_only")
     candidates = []
 
-    en_root = content_root / "en"
-    if not en_root.exists():
-        return candidates
+    en_doc_cache: dict[Path, list] = {}
 
-    for en_file in en_root.rglob("*.md"):
-        rel = en_file.relative_to(en_root)
+    for en_file, locale, tr_file in iter_locale_pairs(profile, content_root):
+        if locale not in _NON_LATIN_LOCALES or locale not in locales:
+            continue
+        if not tr_file.exists():
+            continue
+
         class_name = _derive_class_name(en_file)
 
+        if en_file not in en_doc_cache:
+            try:
+                en_content = en_file.read_text(encoding="utf-8")
+                en_doc = parser.parse_string(en_content)
+                en_doc_cache[en_file] = extractor.extract_from_ast(
+                    en_doc.ast, en_doc.frontmatter
+                ).units
+            except Exception:
+                en_doc_cache[en_file] = None
+        en_units = en_doc_cache[en_file]
+        if en_units is None:
+            continue
+
         try:
-            en_content = en_file.read_text(encoding="utf-8")
-            en_doc = parser.parse_string(en_content)
-            en_units = extractor.extract_from_ast(en_doc.ast, en_doc.frontmatter).units
+            tr_content = tr_file.read_text(encoding="utf-8")
+            tr_doc = parser.parse_string(tr_content)
+            tr_units = extractor.extract_from_ast(tr_doc.ast, tr_doc.frontmatter).units
         except Exception:
             continue
 
-        for locale in locales:
-            if locale not in _NON_LATIN_LOCALES:
+        for unit_idx, en_unit in enumerate(en_units):
+            if en_unit.kind != TextUnitKind.TABLE_CELL_TEXT:
                 continue
-            tr_file = content_root / locale / rel
-            if not tr_file.exists():
+            en_text = (en_unit.source_text or "").strip()
+            if not en_text or len(en_text) > 60:
+                continue
+            if not _SHORT_API_RE.match(en_text):
+                continue
+            if unit_idx >= len(tr_units):
+                continue
+            tr_unit = tr_units[unit_idx]
+            tr_text = (tr_unit.source_text or "").strip()
+            if not tr_text:
                 continue
 
-            try:
-                tr_content = tr_file.read_text(encoding="utf-8")
-                tr_doc = parser.parse_string(tr_content)
-                tr_units = extractor.extract_from_ast(tr_doc.ast, tr_doc.frontmatter).units
-            except Exception:
-                continue
-
-            for unit_idx, en_unit in enumerate(en_units):
-                if en_unit.kind != TextUnitKind.TABLE_CELL_TEXT:
-                    continue
-                en_text = (en_unit.source_text or "").strip()
-                if not en_text or len(en_text) > 60:
-                    continue
-                if not _SHORT_API_RE.match(en_text):
-                    continue
-                if unit_idx >= len(tr_units):
-                    continue
-                tr_unit = tr_units[unit_idx]
-                tr_text = (tr_unit.source_text or "").strip()
-                if not tr_text:
-                    continue
-
-                candidates.append(
-                    {
-                        "en_text": en_text,
-                        "tr_text": tr_text,
-                        "locale": locale,
-                        "file_path": str(tr_file),
-                        "en_path": str(en_file),
-                        "unit_idx": unit_idx,
-                        "class_name": class_name,
-                        "site_id": site_id,
-                    }
-                )
+            candidates.append(
+                {
+                    "en_text": en_text,
+                    "tr_text": tr_text,
+                    "locale": locale,
+                    "file_path": str(tr_file),
+                    "en_path": str(en_file),
+                    "unit_idx": unit_idx,
+                    "class_name": class_name,
+                    "site_id": site_id,
+                }
+            )
 
     return candidates
 
@@ -253,13 +267,13 @@ def run_audit(
 
     with output_path.open(mode, encoding="utf-8") as out_fh:
         for site_id in sites:
-            content_root = _get_content_root(site_id)
-            if not content_root:
+            profile, content_root = _get_site_profile_and_root(site_id)
+            if not profile:
                 logger.error("Cannot resolve content root for site: %s", site_id)
                 continue
 
             logger.info("Collecting candidates from %s", site_id)
-            candidates = _collect_candidates(content_root, site_id, locales)
+            candidates = _collect_candidates(profile, content_root, site_id, locales)
             logger.info("Found %d short API description candidates", len(candidates))
 
             if dry_run:

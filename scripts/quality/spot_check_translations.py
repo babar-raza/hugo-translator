@@ -36,24 +36,19 @@ from pathlib import Path
 from typing import Optional
 
 ROOT = Path(__file__).resolve().parents[2]
-CONTENT = Path("C:/Users/prora/OneDrive/Documents/GitHub/aspose.org/content")
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+from src.utils.config_loader import ConfigService  # noqa: E402
+from src.utils.content_discovery import iter_locale_pairs  # noqa: E402
 
-SITES_DIRECTORY = {
-    "kb.aspose.org": CONTENT / "kb.aspose.org",
-    "docs.aspose.org": CONTENT / "docs.aspose.org",
-    "products.aspose.org": CONTENT / "products.aspose.org",
-    "reference.aspose.org": CONTENT / "reference.aspose.org",
-}
-
-SITES_SUFFIX = {
-    "blog.aspose.org": CONTENT / "blog.aspose.org",
-}
-
-LOCALES = [
-    "ar", "bg", "ca", "cs", "da", "de", "el", "es", "fa", "fi", "fr", "he",
-    "hi", "hr", "hu", "id", "it", "ja", "ko", "lt", "lv", "ms", "nl", "no",
-    "pl", "pt", "ro", "ru", "sk", "sr", "sv", "th", "tr", "uk", "vi", "zh",
-]
+_CONFIG = ConfigService(ROOT / "config")
+# Durable-fix consolidation: replaced two hardcoded site->path dicts
+# (SITES_DIRECTORY / SITES_SUFFIX) pointing at a hardcoded CONTENT root
+# (C:\Users\...\aspose.org\content -- confirmed to be an EMPTY STUB on this
+# machine; the real aspose.org content lives on D:) with registry-driven
+# resolution via ConfigService, covering every real production site profile
+# instead of a hand-maintained 5-site list.
+SITE_IDS = _CONFIG.list_sites(autonomous_only=True)
 
 # English words regex — used for untranslated prose detection
 _EN_WORD_RE = re.compile(r"\b[a-zA-Z]{3,}\b")
@@ -283,43 +278,35 @@ def check_file_pair(src_path: Path, tgt_path: Path, locale: str,
 # Scanner
 # ---------------------------------------------------------------------------
 
-def scan_site(site_id: str, root: Path, locale_filter: Optional[str],
+def scan_site(site_id: str, locale_filter: Optional[str],
               sample_n: Optional[int], min_english_words: int,
               newer_than: Optional[float] = None) -> list:
-    results = []
-    is_suffix = site_id in SITES_SUFFIX
-    locales = [locale_filter] if locale_filter else LOCALES
+    """Registry-driven scan via content_discovery.iter_locale_pairs -- works
+    identically for directory-scheme and file-suffix-scheme sites, no
+    per-site branching."""
+    try:
+        profile = _CONFIG.get_site_profile(site_id)
+    except Exception:
+        return []
+    content_root = _CONFIG.resolve_content_root(profile.content_roots[0])
+    if not content_root.exists():
+        return []
 
-    if is_suffix:
-        src_files = sorted(root.rglob("index.md"))
-        for locale in locales:
-            pairs = []
-            for idx in src_files:
-                tgt = idx.parent / f"index.{locale}.md"
-                if tgt.exists():
-                    if newer_than is None or tgt.stat().st_mtime > newer_than:
-                        pairs.append((idx, tgt))
-            if sample_n and len(pairs) > sample_n:
-                pairs = random.sample(pairs, sample_n)
-            for src, tgt in pairs:
-                results.append(check_file_pair(src, tgt, locale, min_english_words))
-    else:
-        en_root = root / "en"
-        if not en_root.exists():
-            return []
-        src_files = sorted(en_root.rglob("*.md"))
-        for locale in locales:
-            pairs = []
-            for src in src_files:
-                rel = src.relative_to(en_root)
-                tgt = root / locale / rel
-                if tgt.exists():
-                    if newer_than is None or tgt.stat().st_mtime > newer_than:
-                        pairs.append((src, tgt, rel))
-            if sample_n and len(pairs) > sample_n:
-                pairs = random.sample(pairs, sample_n)
-            for src, tgt, _ in pairs:
-                results.append(check_file_pair(src, tgt, locale, min_english_words))
+    locales = [locale_filter] if locale_filter else sorted(profile.target_langs)
+    results = []
+
+    for locale in locales:
+        pairs = []
+        for src, loc, tgt in iter_locale_pairs(profile, content_root):
+            if loc != locale or not tgt.exists():
+                continue
+            if newer_than is not None and tgt.stat().st_mtime <= newer_than:
+                continue
+            pairs.append((src, tgt))
+        if sample_n and len(pairs) > sample_n:
+            pairs = random.sample(pairs, sample_n)
+        for src, tgt in pairs:
+            results.append(check_file_pair(src, tgt, locale, min_english_words))
 
     return results
 
@@ -421,21 +408,17 @@ def main():
         return
 
     all_results = []
-    sites = {}
     if args.site:
-        if args.site in SITES_DIRECTORY:
-            sites = {args.site: SITES_DIRECTORY[args.site]}
-        elif args.site in SITES_SUFFIX:
-            sites = {args.site: SITES_SUFFIX[args.site]}
-        else:
+        if args.site not in SITE_IDS:
             print(f"ERROR: Unknown site '{args.site}'", file=sys.stderr)
             sys.exit(2)
+        sites = [args.site]
     else:
-        sites = {**SITES_DIRECTORY, **SITES_SUFFIX}
+        sites = SITE_IDS
 
-    for site_id, root in sites.items():
+    for site_id in sites:
         print(f"Scanning {site_id}...", flush=True)
-        results = scan_site(site_id, root, args.locale, args.sample, args.min_english_words,
+        results = scan_site(site_id, args.locale, args.sample, args.min_english_words,
                             newer_than=args.newer_than)
         print(f"  {len(results)} pairs checked", flush=True)
         for r in results:

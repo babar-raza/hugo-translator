@@ -26,12 +26,17 @@ Output:
 import argparse
 import json
 import logging
-import os
 import re
 import sys
 from pathlib import Path
 
-import yaml
+_PROJECT_ROOT = Path(__file__).resolve().parents[2]
+if str(_PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(_PROJECT_ROOT))
+from src.utils.config_loader import ConfigService  # noqa: E402
+from src.utils.content_discovery import iter_locale_pairs  # noqa: E402
+
+_CONFIG = ConfigService(_PROJECT_ROOT / "config")
 
 logging.basicConfig(level=logging.WARNING, format="%(levelname)s: %(message)s")
 logger = logging.getLogger(__name__)
@@ -56,10 +61,6 @@ SIMILAR_LANG_PAIRS: set[frozenset] = {
     frozenset({"nb", "no"}),
     frozenset({"no", "da"}),
 }
-
-
-def expand_env(value: str) -> str:
-    return os.path.expandvars(value.replace("${", "$").replace("}", ""))
 
 
 def load_fasttext_model(model_path: Path):
@@ -155,7 +156,27 @@ def is_similar_pair(lang_a: str, lang_b: str) -> bool:
     return frozenset({lang_a, lang_b}) in SIMILAR_LANG_PAIRS
 
 
-def load_site_profiles(profiles_dir: Path, site_filter: str | None = None) -> list[dict]:
+# Durable-fix consolidation: this script already correctly read
+# output_layout.per_language_folders (one of only 2 scripts found to do so
+# independently, alongside measure_completeness.py) -- it wasn't broken,
+# but it was a second, parallel implementation of logic that now lives
+# canonically in src/utils/content_discovery.py. Consolidated onto that
+# shared module so there is exactly one correct implementation.
+
+
+def load_site_profiles(profiles_dir: Path, site_filter: str | None = None) -> list:
+    """Load all production site profiles (*.aspose.net.yaml / *.aspose.org.yaml).
+
+    Preserves this script's original scope: only "top-level" production
+    profiles, not the `.words`-suffixed sub-profiles or test/disabled ones.
+    Builds its own ConfigService from profiles_dir's parent rather than
+    reusing the module-level _CONFIG singleton, so a custom --profiles-dir
+    override is respected.
+    """
+    config_service = (
+        _CONFIG if profiles_dir.resolve() == _CONFIG.site_profiles_dir.resolve()
+        else ConfigService(profiles_dir.parent)
+    )
     profiles = []
     for p in sorted(profiles_dir.glob("*.yaml")):
         name = p.stem
@@ -164,45 +185,30 @@ def load_site_profiles(profiles_dir: Path, site_filter: str | None = None) -> li
         if site_filter and name != site_filter:
             continue
         try:
-            with open(p, encoding="utf-8") as f:
-                data = yaml.safe_load(f)
-            if data and "site_id" in data and "content_roots" in data:
-                profiles.append(data)
+            profiles.append(config_service.get_site_profile(name))
         except Exception as e:
             logger.warning(f"Failed to load {p}: {e}")
     return profiles
 
 
 def get_output_files_for_lang(
-    profile: dict,
+    profile,
     target_lang: str,
 ) -> list[tuple[Path, str]]:
     """
-    Enumerate output files for a given site profile and target language.
+    Enumerate existing output files for a given site profile and target
+    language. Registry-driven via content_discovery.iter_locale_pairs --
+    works identically for per_language_folders=True and file-suffix sites.
     Returns list of (output_file_path, expected_lang).
     """
     output_files = []
-    source_lang = profile.get("default_source_lang", "en")
-    output_layout = profile.get("output_layout", {})
-    per_language_folders = output_layout.get("per_language_folders", False)
-    pattern = output_layout.get("pattern", "{filename}.{lang}{ext}")
-    content_roots_raw = profile.get("content_roots", [])
-
-    for root_raw in content_roots_raw:
-        root_path = Path(expand_env(str(root_raw)))
+    for root_raw in profile.content_roots:
+        root_path = _CONFIG.resolve_content_root(root_raw)
         if not root_path.exists():
             continue
-
-        if per_language_folders:
-            # Folder-based: output is in /{target_lang}/ subdirectory
-            lang_dir = root_path / target_lang
-            if lang_dir.exists():
-                for f in lang_dir.rglob("*.md"):
-                    output_files.append((f, target_lang))
-        else:
-            # File-based: outputs are *.{lang}.md files scattered in root
-            for f in root_path.rglob(f"*.{target_lang}.md"):
-                output_files.append((f, target_lang))
+        for _en_path, locale, tr_path in iter_locale_pairs(profile, root_path):
+            if locale == target_lang and tr_path.exists():
+                output_files.append((tr_path, target_lang))
 
     return output_files
 
@@ -217,7 +223,7 @@ def scan_site_lang(
     Scan all output files for a given site+lang.
     Returns list of flagged file dicts.
     """
-    site_id = profile.get("site_id", "unknown")
+    site_id = profile.site_id
     output_files = get_output_files_for_lang(profile, target_lang)
     if not output_files:
         logger.debug(f"[{site_id}/{target_lang}] No output files found")
@@ -352,7 +358,7 @@ def main() -> None:
     all_flagged: list[dict] = []
 
     for profile in profiles:
-        target_langs = profile.get("target_langs", [])
+        target_langs = list(profile.target_langs)
         if args.lang:
             target_langs = [l for l in target_langs if l == args.lang]
 

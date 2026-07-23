@@ -29,7 +29,24 @@ from collections import defaultdict
 from datetime import datetime
 from pathlib import Path
 
-CONTENT_ROOT = Path(r"D:\onedrive\Documents\GitHub\aspose.org\content")
+_PROJECT_ROOT = Path(__file__).resolve().parents[2]
+if str(_PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(_PROJECT_ROOT))
+from src.utils.config_loader import ConfigService  # noqa: E402
+from src.utils.content_discovery import (  # noqa: E402
+    iter_locale_pairs,
+    resolve_source_root,
+)
+
+_CONFIG = ConfigService(_PROJECT_ROOT / "config")
+# SITES intentionally excludes blog.aspose.org: this detector's logic
+# (backtick-quoted identifier matching the file's own title/linkTitle) only
+# applies to reference/docs/kb/products.aspose.org's API-reference-style
+# template pages -- blog posts have no such template, so this is a real
+# content-type scoping decision, not the file-suffix-layout coverage gap
+# fixed elsewhere in the durable-fix consolidation. Discovery itself
+# (iter_pairs below) is registry-driven so this remains correct if ever
+# pointed at a differently-laid-out site.
 SITES = ["reference.aspose.org", "docs.aspose.org", "kb.aspose.org", "products.aspose.org"]
 
 FM_RE = re.compile(r"^---\n(.*?)\n---", re.S)
@@ -84,20 +101,21 @@ def check_file(en_content: str, tr_content: str) -> list[tuple[str, str]]:
 
 
 def iter_pairs(site: str):
-    site_root = CONTENT_ROOT / site
-    en_root = site_root / "en"
-    if not en_root.exists():
+    """Yield (locale, rel, en_path, tr_path) for existing translation pairs.
+    Registry-driven via content_discovery."""
+    try:
+        profile = _CONFIG.get_site_profile(site)
+    except Exception:
         return
-    locales = sorted(
-        d.name for d in site_root.iterdir()
-        if d.is_dir() and d.name != "en" and 2 <= len(d.name) <= 5 and d.name.replace("-", "").isalpha()
-    )
-    for en_path in sorted(en_root.rglob("*.md")):
-        rel = en_path.relative_to(en_root)
-        for locale in locales:
-            tr_path = site_root / locale / rel
-            if tr_path.exists():
-                yield locale, str(rel), en_path, tr_path
+    content_root = _CONFIG.resolve_content_root(profile.content_roots[0])
+    if not content_root.exists():
+        return
+    source_root = resolve_source_root(profile, content_root)
+    for en_path, locale, tr_path in iter_locale_pairs(profile, content_root):
+        if not tr_path.exists():
+            continue
+        rel = en_path.relative_to(source_root)
+        yield locale, str(rel), en_path, tr_path
 
 
 def scan(output_path: str | None, sites: list[str] | None):

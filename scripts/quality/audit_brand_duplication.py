@@ -28,10 +28,12 @@ kb.aspose.org that carry a "Aspose.<Product> FOSS [for <Lang>]" title
 template. Not restricted to any fixed locale list (confirmed present well
 beyond the 9 locales the manual audit sampled, e.g. also "no").
 
-Two site directory schemes handled (see scripts/quality/audit_llm_artifacts.py
-for the reference iter_pairs_* implementations this reuses the shape of):
-  - reference/docs/kb/products.aspose.org: <site>/en/<rel> vs <site>/<locale>/<rel>
-  - blog.aspose.org: <site>/<rel>/index.md (EN) vs <site>/<rel>/index.<locale>.md
+Durable-fix consolidation: site/locale/pair discovery is now registry-driven
+via src/utils/content_discovery.py (reads each site's
+output_layout.per_language_folders), replacing the previous hand-rolled
+BLOG_SCHEME_SITES special case + duplicate iter_pairs_directory_scheme/
+iter_pairs_blog_scheme pair. SITES is derived from the site-profile registry
+instead of a hardcoded 5-site list.
 """
 from __future__ import annotations
 
@@ -43,15 +45,17 @@ from collections import defaultdict
 from datetime import datetime
 from pathlib import Path
 
-CONTENT_ROOT = Path(r"D:\onedrive\Documents\GitHub\aspose.org\content")
-SITES = [
-    "reference.aspose.org",
-    "docs.aspose.org",
-    "kb.aspose.org",
-    "blog.aspose.org",
-    "products.aspose.org",
-]
-BLOG_SCHEME_SITES = {"blog.aspose.org"}
+_PROJECT_ROOT = Path(__file__).resolve().parents[2]
+if str(_PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(_PROJECT_ROOT))
+from src.utils.config_loader import ConfigService  # noqa: E402
+from src.utils.content_discovery import (  # noqa: E402
+    iter_locale_pairs,
+    resolve_source_root,
+)
+
+_CONFIG = ConfigService(_PROJECT_ROOT / "config")
+SITES = _CONFIG.list_sites(autonomous_only=True)
 
 FM_RE = re.compile(r"^---\n(.*?)\n---", re.S)
 
@@ -138,31 +142,23 @@ def check_file(en_content: str, tr_content: str) -> list[tuple[str, str]]:
     return findings
 
 
-def iter_pairs_directory_scheme(site: str):
-    site_root = CONTENT_ROOT / site
-    en_root = site_root / "en"
-    if not en_root.exists():
+def iter_pairs(site: str):
+    """Yield (locale, rel, en_path, tr_path) for existing translation pairs.
+    Registry-driven via content_discovery -- works identically for
+    directory-scheme and file-suffix-scheme sites, no per-site branching."""
+    try:
+        profile = _CONFIG.get_site_profile(site)
+    except Exception:
         return
-    locales = sorted(
-        d.name for d in site_root.iterdir()
-        if d.is_dir() and d.name != "en" and 2 <= len(d.name) <= 5 and d.name.replace("-", "").isalpha()
-    )
-    for en_path in sorted(en_root.rglob("*.md")):
-        rel = en_path.relative_to(en_root)
-        for locale in locales:
-            tr_path = site_root / locale / rel
-            if tr_path.exists():
-                yield locale, str(rel), en_path, tr_path
-
-
-def iter_pairs_blog_scheme(site: str):
-    site_root = CONTENT_ROOT / site
-    for en_path in sorted(site_root.rglob("index.md")):
-        bundle_dir = en_path.parent
-        rel = bundle_dir.relative_to(site_root)
-        for tr_path in sorted(bundle_dir.glob("index.*.md")):
-            locale = tr_path.stem.split(".", 1)[1]
-            yield locale, str(rel), en_path, tr_path
+    content_root = _CONFIG.resolve_content_root(profile.content_roots[0])
+    if not content_root.exists():
+        return
+    source_root = resolve_source_root(profile, content_root)
+    for en_path, locale, tr_path in iter_locale_pairs(profile, content_root):
+        if not tr_path.exists():
+            continue
+        rel = en_path.relative_to(source_root)
+        yield locale, str(rel), en_path, tr_path
 
 
 def scan(output_path: str | None, sites: list[str] | None):
@@ -174,8 +170,7 @@ def scan(output_path: str | None, sites: list[str] | None):
     print(f"Starting brand-duplication audit at {datetime.now().strftime('%H:%M:%S')}", flush=True)
 
     for site in (sites if sites is not None else SITES):
-        is_blog = site in BLOG_SCHEME_SITES
-        pairs = iter_pairs_blog_scheme(site) if is_blog else iter_pairs_directory_scheme(site)
+        pairs = iter_pairs(site)
         site_pairs = 0
         site_findings = 0
         en_cache: dict[Path, str] = {}

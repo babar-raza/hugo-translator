@@ -11,24 +11,47 @@ from pathlib import Path
 from collections import defaultdict
 from datetime import datetime
 
+# HT-QUALITY-GATES-001 Part 22 (plan Part 6 item 5 / Phase 7): reuse the REAL
+# write_gate.py gate methods directly for the checks added this session,
+# rather than a third, independently-drifting reimplementation (this script
+# already had its own simplified re-derivations of several older checks --
+# not repeating that mistake for the new ones). These 5 gates don't read
+# self._detector/self._config, so a minimal, dependency-free evaluator
+# instance is sufficient and safe to share across the whole scan.
+_PROJECT_ROOT = Path(__file__).resolve().parents[2]
+if str(_PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(_PROJECT_ROOT))
+from src.translation_engine.write_gate import WriteGateEvaluator, WriteGateResult  # noqa: E402
+from src.utils.config_loader import ConfigService  # noqa: E402
+from src.utils.content_discovery import (  # noqa: E402
+    discover_source_files,
+    resolve_source_root,
+    resolve_translated_path,
+)
+
+_GATE_EVALUATOR = WriteGateEvaluator(
+    detector=None, similarity_tracker=None, config=None, force_accept=True,
+)
+
 def safe(s):
     """Return ASCII-safe version of string for display."""
     if isinstance(s, bytes):
         s = s.decode("utf-8", errors="replace")
     return s.encode("ascii", errors="replace").decode("ascii")
 
-CONTENT_ROOT = Path(r"D:\onedrive\Documents\GitHub\aspose.org\content")
-# TC-AUD-007: was a hardcoded 3-site list with no CLI override, silently
-# leaving blog/products/websites/www.aspose.org entirely unaudited by every
-# tier. Now overridable via --sites; default expanded to the 5 sites that
-# carry real translated content (excludes "templates", not a content site).
-SITES = [
-    "reference.aspose.org",
-    "docs.aspose.org",
-    "kb.aspose.org",
-    "blog.aspose.org",
-    "products.aspose.org",
-]
+_CONFIG = ConfigService(_PROJECT_ROOT / "config")
+
+# Durable-fix (see plan: "stop treating file-suffix-layout sites as
+# exceptions"): site list and content root are now DERIVED from the
+# registry (config/site_profiles/*.yaml via ConfigService), not hardcoded.
+# TC-AUD-007 fixed a hardcoded 3-site list by hand-expanding to 5; that
+# still silently excluded 13 real aspose.net/websites/www site profiles.
+# `autonomous_enabled` (already set correctly on every profile: false on
+# the 11 test/fixture profiles, true/default on the 18 real production
+# ones) is exactly the field that already exists to make this distinction
+# -- deriving from it means a future new site profile is automatically
+# covered without anyone needing to remember to edit this list.
+SITES = _CONFIG.list_sites(autonomous_only=True)
 
 # Detection patterns
 NLLB_ARTIFACTS = re.compile(
@@ -115,14 +138,34 @@ def check_english_headings_nonlatin(tr_body: str) -> list[str]:
 
 
 def check_purity(body, target_lang):
-    """Return (has_issue, ratio) for English content in non-Latin body."""
-    paras = [p.strip() for p in body.split("\n\n") if len(p.strip()) > 30]
+    """Return (has_issue, ratio) for English content in non-Latin body.
+
+    Fence-aware (TC-DCF-004): splits on fence boundaries first, then blank
+    lines within each non-fence chunk -- mirrors check_duplicate_content()'s
+    convention below. Splitting on blank lines first (the prior behavior)
+    let a fenced code block with an internal blank line leak into `paras` as
+    extra non-fence-looking chunks, which both inflated false positives (code
+    identifiers matching EN_WORD_LINE) and diluted the ratio's denominator
+    with code content, masking genuinely high English-prose files that carry
+    large code blocks. Fence-first splitting also avoids the opposite bug:
+    naively excluding any paragraph whose byte range merely overlaps a fence
+    span would swallow prose directly adjacent to a fence (no blank line
+    before it) into the fence and drop it from consideration entirely.
+    """
+    paras = []
+    for chunk in re.split(r"(```[\s\S]*?```)", body):
+        if chunk.startswith("```"):
+            continue
+        for seg in re.split(r"\n{2,}", chunk):
+            stripped = seg.strip()
+            if len(stripped) > 30:
+                paras.append(stripped)
     if not paras:
         return False, 0.0
     en_count = 0
     for p in paras:
-        # Skip code blocks, shortcodes
-        if p.startswith("```") or "{{<" in p or p.startswith("|"):
+        # Skip shortcodes, tables (fenced code already excluded above)
+        if "{{<" in p or p.startswith("|"):
             continue
         words = p.split()
         if len(words) >= 5 and EN_WORD_LINE.match(p):
@@ -273,17 +316,26 @@ def scan(output_path=None, resume=False, sites=None):
     print(f"Starting audit at {datetime.now().strftime('%H:%M:%S')}", flush=True)
 
     for site in (sites if sites is not None else SITES):
-        site_root = CONTENT_ROOT / site
-        en_root = site_root / "en"
-        if not en_root.exists():
-            print(f"  Skipping {site} (no /en/ dir)", flush=True)
+        try:
+            profile = _CONFIG.get_site_profile(site)
+        except Exception as e:
+            print(f"  Skipping {site} (profile load failed: {e})", flush=True)
             continue
 
-        en_files = sorted(en_root.rglob("*.md"))
-        locales = sorted(
-            d.name for d in site_root.iterdir()
-            if d.is_dir() and d.name != "en" and 2 <= len(d.name) <= 5 and d.name.replace("-", "").isalpha()
-        )
+        content_root = _CONFIG.resolve_content_root(profile.content_roots[0])
+        if not content_root.exists():
+            print(f"  Skipping {site} (content root not found: {content_root})", flush=True)
+            continue
+
+        # Registry-driven discovery (src/utils/content_discovery.py): works
+        # identically for per_language_folders=True sites (docs/kb/products/
+        # reference.aspose.org -- unchanged en_root.rglob walk under the
+        # hood) and per_language_folders=False, file-suffix sites (blog.
+        # aspose.org, blog.aspose.net, www.aspose.org, www.aspose.net --
+        # previously silently skipped here entirely). No per-site branching.
+        en_files = discover_source_files(profile, content_root)
+        source_root = resolve_source_root(profile, content_root)
+        locales = sorted(profile.target_langs)
         print(f"\n{site}: {len(en_files):,} EN files x {len(locales)} locales = {len(en_files)*len(locales):,} expected", flush=True)
         print(f"  Locales: {locales}", flush=True)
 
@@ -293,7 +345,7 @@ def scan(output_path=None, resume=False, sites=None):
             if done % 500 == 0:
                 print(f"  ... {done}/{len(en_files)} source files scanned", flush=True)
 
-            rel = en_path.relative_to(en_root)
+            rel = en_path.relative_to(source_root)
             try:
                 en_content = en_path.read_text(encoding="utf-8", errors="replace")
             except Exception:
@@ -308,7 +360,7 @@ def scan(output_path=None, resume=False, sites=None):
             en_paras = [p for p in en_body.split("\n\n") if len(p.strip()) > 20]
 
             for locale in locales:
-                tr_path = site_root / locale / rel
+                tr_path = resolve_translated_path(profile, en_path, locale)
                 total_files += 1
 
                 if not tr_path.exists():
@@ -362,15 +414,47 @@ def scan(output_path=None, resume=False, sites=None):
 
                 # 2. Title mismatch. reference.aspose.org: title is passthrough
                 # site-wide, so check every file. Other sites translate title on
-                # leaf pages legitimately -- only family/platform index pages
-                # (lang/family/platform/_index.md) must stay byte-identical to EN.
-                _is_family_platform_index = len(rel.parts) == 3 and rel.parts[-1] == "_index.md"
-                _title_must_match_en = _is_family_platform_index or site == "reference.aspose.org"
+                # leaf pages legitimately -- only index pages at family/platform
+                # depth (lang/family/platform/_index.md) or, on sites confirmed
+                # to have root-only families (docs/kb/products -- see
+                # is_family_platform_index()'s include_family_root in
+                # text_unit_extractor.py / segment_translator.py's
+                # _FAMILY_ROOT_SITES), family-root depth (lang/family/_index.md)
+                # must stay byte-identical to EN. blog.aspose.org not yet
+                # investigated for family-root -- family/platform depth only.
+                _FAMILY_ROOT_SITES = {"products.aspose.org", "kb.aspose.org", "docs.aspose.org"}
+                _is_index = rel.parts[-1] == "_index.md"
+                _is_family_platform_index = _is_index and len(rel.parts) == 3
+                _is_family_root_index = (
+                    _is_index and len(rel.parts) == 2 and site in _FAMILY_ROOT_SITES
+                )
+                _title_must_match_en = (
+                    _is_family_platform_index
+                    or _is_family_root_index
+                    or site == "reference.aspose.org"
+                )
                 if _title_must_match_en and en_title and tr_title and tr_title != en_title:
                     record("title_mismatch", f"EN={en_title!r} TR={tr_title!r}")
 
                 if _title_must_match_en and en_link_title and tr_link_title and tr_link_title != en_link_title:
                     record("linktitle_mismatch", f"EN={en_link_title!r} TR={tr_link_title!r}")
+
+                # 2b. Title untranslated (suspected). Ported from
+                # audit_blog_bundle.py (retired -- see durable-fix plan):
+                # opposite gate from title_mismatch above -- fires on pages
+                # where title SHOULD legitimately translate (leaf/post
+                # content), when it's byte-identical to EN and long/specific
+                # enough that a coincidental match is unlikely (short brand
+                # words like "Aspose.Cells" can legitimately match across
+                # languages; len>15 filters those out).
+                if (
+                    not _title_must_match_en
+                    and en_title
+                    and tr_title
+                    and tr_title == en_title
+                    and len(en_title) > 15
+                ):
+                    record("title_untranslated_suspected", en_title)
 
                 # 3. NLLB/model artifact corruption anywhere in body
                 art_m = NLLB_ARTIFACTS.search(tr_body)
@@ -472,6 +556,50 @@ def scan(output_path=None, resume=False, sites=None):
                     if tr_desc.isascii() and _EN_PROSE_RE.match(tr_desc):
                         record("description_yaml_reverted_to_english", f"desc={tr_desc[:60]!r}")
 
+                # 18-23. HT-QUALITY-GATES-001 Part 22 gates (30-35), reused
+                # directly from write_gate.py -- see _GATE_EVALUATOR comment
+                # above. Each gets its own disposable WriteGateResult so a
+                # hit in one never contaminates the next (mirrors the real
+                # pipeline's "warn" dispatch, which uses the same pattern).
+                # HT-QUALITY-GATES-001 Part 22 (Gate 29): omitted from the
+                # first Phase 7 sweep by oversight -- flagged by the user and
+                # fixed for this round. Cheap and structural (no LLM call),
+                # so there was no cost reason to have excluded it.
+                _wgr = WriteGateResult(passed=True)
+                _GATE_EVALUATOR._gate_refusal_artifact(tr_content, tr_path, _wgr, locale)
+                if not _wgr.passed:
+                    record("refusal_artifact_gate29", (_wgr.error or "")[:150])
+
+                _wgr = WriteGateResult(passed=True)
+                _GATE_EVALUATOR._gate_placeholder_leak(tr_content, tr_path, _wgr, locale)
+                if not _wgr.passed:
+                    record("placeholder_leak_gate30", (_wgr.error or "")[:150])
+
+                _wgr = WriteGateResult(passed=True)
+                _GATE_EVALUATOR._gate_partial_script_contamination(tr_content, tr_path, locale, _wgr)
+                if not _wgr.passed:
+                    record("partial_script_contamination_gate31", (_wgr.error or "")[:150])
+
+                _wgr = WriteGateResult(passed=True)
+                _GATE_EVALUATOR._gate_content_hash_staleness(en_content, tr_content, tr_path, _wgr)
+                if not _wgr.passed:
+                    record("content_hash_stale_gate32", (_wgr.error or "")[:150])
+
+                _wgr = WriteGateResult(passed=True)
+                _GATE_EVALUATOR._gate_brand_token_presence(en_content, tr_content, tr_path, _wgr)
+                if not _wgr.passed:
+                    record("brand_token_missing_gate33", (_wgr.error or "")[:150])
+
+                _wgr = WriteGateResult(passed=True)
+                _GATE_EVALUATOR._gate_heading_deficit(en_content, tr_content, tr_path, _wgr)
+                if not _wgr.passed:
+                    record("heading_deficit_gate34", (_wgr.error or "")[:150])
+
+                _wgr = WriteGateResult(passed=True)
+                _GATE_EVALUATOR._gate_dropped_trailing_link(en_content, tr_content, tr_path, _wgr)
+                if not _wgr.passed:
+                    record("dropped_trailing_link_gate35", (_wgr.error or "")[:150])
+
                 # Write JSONL record for this file if it has issues
                 if out_fh and file_issues:
                     en_path_str = str(en_path)
@@ -547,22 +675,45 @@ _PRIORITY = {
     "body_identical_to_en": 1,
     "empty_body": 1,
     "artifact_corruption": 1,
+    # HT-QUALITY-GATES-001 Part 22: a raw internal token is unambiguously,
+    # immediately visible as broken to any reader -- same severity class as
+    # the other priority-1 checks above (Part 1.1 root cause B).
+    "placeholder_leak_gate30": 1,
+    # Part 1.6: a raw LLM refusal/conversational response shipped as page
+    # content -- write_gate.py registers this "block", same severity tier.
+    "refusal_artifact_gate29": 1,
     "content_drift": 2,
     "english_headings_nonlatin": 2,
     "purity_issue": 2,
     "inline_code_translated": 2,
     "shortcode_leak": 2,
+    "partial_script_contamination_gate31": 2,
+    # Part 7's remediation-triage ordering: brand-name-mistranslated is
+    # explicitly "(2) directly reputational, cheap to fix" -- priority 2.
+    "brand_token_missing_gate33": 2,
     "link_path_corrupted": 3,
     "table_desc_not_translated": 3,
     "description_hallucination": 3,
     "description_yaml_reverted_to_english": 3,
     "table_row_corruption": 3,
     "code_fence_dropped": 3,
+    "content_hash_stale_gate32": 3,
+    # Ported from audit_blog_bundle.py during the durable-fix consolidation
+    # (script retired -- see plan): a leaf-page title that's byte-identical
+    # to EN on a page where title should legitimately translate suggests a
+    # skipped/failed field translation, distinct from title_mismatch (which
+    # only fires where title must stay IDENTICAL).
+    "title_untranslated_suspected": 3,
     "duplicate_content": 4,
     "double_period": 4,
     "newline_explosion": 4,
     "title_mismatch": 4,
     "linktitle_mismatch": 4,
+    # Part 7: "(4) systemic dropped trailing sections -- now confirmed as the
+    # single most prevalent defect corpus-wide" -- both gates target the same
+    # defect class (heading-count deficit / trailing-link-loss), priority 4.
+    "heading_deficit_gate34": 4,
+    "dropped_trailing_link_gate35": 4,
 }
 
 

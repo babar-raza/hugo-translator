@@ -30,9 +30,21 @@ from pathlib import Path
 
 import yaml
 
-CONTENT_ROOT = Path(r"D:\onedrive\Documents\GitHub\aspose.org\content")
-SITES = ["reference.aspose.org", "docs.aspose.org", "kb.aspose.org", "blog.aspose.org", "products.aspose.org"]
-BLOG_SCHEME_SITES = {"blog.aspose.org"}
+_PROJECT_ROOT = Path(__file__).resolve().parents[2]
+if str(_PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(_PROJECT_ROOT))
+from src.utils.config_loader import ConfigService  # noqa: E402
+from src.utils.content_discovery import (  # noqa: E402
+    iter_locale_pairs,
+    resolve_source_root,
+)
+
+_CONFIG = ConfigService(_PROJECT_ROOT / "config")
+# Durable-fix consolidation: registry-driven site list (was a hardcoded
+# 5-site list) + registry-driven discovery (was a hand-rolled
+# BLOG_SCHEME_SITES special case + duplicate iter_groups_dir_scheme/
+# iter_groups_blog_scheme pair) via src/utils/content_discovery.py.
+SITES = _CONFIG.list_sites(autonomous_only=True)
 
 FM_RE = re.compile(r"^---\n(.*?)\n---\n?", re.S)
 FIELDS_TO_CHECK = ["title", "description", "head_title", "subtitle", "head_description", "summary"]
@@ -48,7 +60,7 @@ def _load_translate_mode_fields(site: str) -> set[str]:
     "subtitle" rule -- these are never touched by the translation pipeline,
     so they're copied from EN untouched and are also expected to be
     identical, not a bug)."""
-    path = Path(f"config/site_profiles/{site}.yaml")
+    path = _CONFIG.site_profiles_dir / f"{site}.yaml"
     with open(path, encoding="utf-8") as fh:
         profile = yaml.safe_load(fh)
     fm_config = profile.get("frontmatter", {}) or {}
@@ -78,40 +90,29 @@ def extract_fields(content: str, allowed_fields: set[str]) -> dict[str, str]:
     return out
 
 
-def iter_groups_dir_scheme(site: str):
-    site_root = CONTENT_ROOT / site
-    en_root = site_root / "en"
-    if not en_root.exists():
+def iter_groups(site: str):
+    """Yield (rel, [(locale, tr_path), ...]) grouping every EXISTING
+    translated locale by its EN source file, for sources with 2+ existing
+    translations. Registry-driven via content_discovery -- works
+    identically for directory-scheme and file-suffix-scheme sites, no
+    per-site branching."""
+    try:
+        profile = _CONFIG.get_site_profile(site)
+    except Exception:
         return
-    locales = sorted(
-        d.name for d in site_root.iterdir()
-        if d.is_dir() and d.name != "en" and 2 <= len(d.name) <= 5 and d.name.replace("-", "").isalpha()
-    )
-    for en_path in sorted(en_root.rglob("*.md")):
-        rel = en_path.relative_to(en_root)
-        locale_files = []
-        for locale in locales:
-            tr_path = site_root / locale / rel
-            if tr_path.exists():
-                locale_files.append((locale, tr_path))
-        if len(locale_files) >= 2:
-            yield str(rel), locale_files
-
-
-def iter_groups_blog_scheme(site: str):
-    site_root = CONTENT_ROOT / site
-    if not site_root.exists():
+    content_root = _CONFIG.resolve_content_root(profile.content_roots[0])
+    if not content_root.exists():
         return
-    for en_index in sorted(site_root.rglob("index.md")):
-        bundle_dir = en_index.parent
-        rel = bundle_dir.relative_to(site_root)
-        locale_files = []
-        for f in bundle_dir.glob("index.*.md"):
-            parts = f.name.split(".")
-            if len(parts) == 3:
-                locale = parts[1]
-                locale_files.append((locale, f))
+
+    source_root = resolve_source_root(profile, content_root)
+    groups: dict[Path, list[tuple[str, Path]]] = defaultdict(list)
+    for en_path, locale, tr_path in iter_locale_pairs(profile, content_root):
+        if tr_path.exists():
+            groups[en_path].append((locale, tr_path))
+
+    for en_path, locale_files in groups.items():
         if len(locale_files) >= 2:
+            rel = en_path.relative_to(source_root)
             yield str(rel), locale_files
 
 
@@ -127,7 +128,7 @@ def scan(output_path: str, sites: list[str]):
         site_findings = 0
         site_groups = 0
         allowed_fields = _load_translate_mode_fields(site)
-        iterator = iter_groups_blog_scheme(site) if site in BLOG_SCHEME_SITES else iter_groups_dir_scheme(site)
+        iterator = iter_groups(site)
 
         for rel, locale_files in iterator:
             site_groups += 1

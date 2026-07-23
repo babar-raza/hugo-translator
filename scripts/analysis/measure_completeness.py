@@ -23,129 +23,62 @@ Completeness definition:
 import argparse
 import json
 import logging
-import os
 import sys
 from pathlib import Path
 
-import yaml
+_PROJECT_ROOT = Path(__file__).resolve().parents[2]
+if str(_PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(_PROJECT_ROOT))
+from src.utils.config_loader import ConfigService  # noqa: E402
+from src.utils.content_discovery import discover_source_files  # noqa: E402
+from src.utils.content_discovery import resolve_translated_path  # noqa: E402
 
 logging.basicConfig(level=logging.WARNING, format="%(levelname)s: %(message)s")
 logger = logging.getLogger(__name__)
 
-# Language codes that appear in filenames (file-based localization filter)
-_ALL_LANG_CODES = frozenset(
-    [
-        "af",
-        "ar",
-        "az",
-        "bg",
-        "ca",
-        "cs",
-        "da",
-        "de",
-        "el",
-        "en",
-        "es",
-        "et",
-        "fa",
-        "fi",
-        "fr",
-        "ga",
-        "he",
-        "hi",
-        "hr",
-        "hu",
-        "id",
-        "it",
-        "ja",
-        "ko",
-        "lt",
-        "lv",
-        "ms",
-        "nb",
-        "nl",
-        "no",
-        "pl",
-        "pt",
-        "ro",
-        "ru",
-        "sk",
-        "sl",
-        "sr",
-        "sv",
-        "th",
-        "tr",
-        "uk",
-        "vi",
-        "zh",
-    ]
-)
+_CONFIG = ConfigService(_PROJECT_ROOT / "config")
+
+# Durable-fix consolidation: this script already correctly read
+# output_layout.per_language_folders (one of only 2 scripts found to do so
+# independently, alongside scan_wrong_language_outputs.py) -- it wasn't
+# broken, but it was a second, parallel implementation of logic that now
+# lives canonically in src/utils/content_discovery.py. Consolidated onto
+# that shared module so there is exactly one correct implementation.
 
 
-def expand_env(value: str) -> str:
-    """Expand ${VAR} and $VAR style environment variables."""
-    return os.path.expandvars(value.replace("${", "$").replace("}", ""))
+def load_site_profiles(profiles_dir: Path, site_filter: str | None = None):
+    """Load all production site profiles (*.aspose.net.yaml / *.aspose.org.yaml).
 
+    Preserves this script's original scope: only "top-level" production
+    profiles, not the `.words`-suffixed sub-profiles or test/disabled ones
+    -- a deliberate choice, unlike the coverage-gap bugs found elsewhere in
+    the durable-fix investigation.
 
-def load_site_profiles(profiles_dir: Path, site_filter: str | None = None) -> list[dict]:
-    """Load all production site profiles (*.aspose.net.yaml)."""
+    Builds its own ConfigService from profiles_dir's parent rather than
+    reusing the module-level _CONFIG singleton, so a custom --profiles-dir
+    override is respected rather than silently falling back to the default
+    config/ directory.
+    """
+    config_service = (
+        _CONFIG if profiles_dir.resolve() == _CONFIG.site_profiles_dir.resolve()
+        else ConfigService(profiles_dir.parent)
+    )
     profiles = []
     for p in sorted(profiles_dir.glob("*.yaml")):
-        # Only load production aspose.net profiles; skip test/disabled profiles
         name = p.stem
         if not (name.endswith(".aspose.net") or name.endswith(".aspose.org")):
             continue
         if site_filter and name != site_filter:
             continue
         try:
-            with open(p, encoding="utf-8") as f:
-                data = yaml.safe_load(f)
-            if data and "site_id" in data and "content_roots" in data:
-                profiles.append(data)
+            profiles.append(config_service.get_site_profile(name))
         except Exception as e:
             logger.warning(f"Failed to load {p}: {e}")
     return profiles
 
 
-def is_source_file_file_based(path: Path) -> bool:
-    """
-    For file-based localization: return True if this file is a source (English) file.
-    Source files have no language code in the stem, e.g. index.md, post.md.
-    Translated files have a lang code: index.de.md, post.es.md — excluded.
-    """
-    stem = path.stem  # e.g. "index" or "index.de"
-    # Check if stem ends with a known language code
-    parts = stem.rsplit(".", 1)
-    if len(parts) == 2 and parts[1].lower() in _ALL_LANG_CODES:
-        return False  # Already translated file
-    return True
-
-
-def get_output_path_file_based(source_path: Path, target_lang: str, pattern: str) -> Path:
-    """Compute output path for file-based localization."""
-    stem = source_path.stem
-    ext = source_path.suffix
-    output_filename = pattern.format(
-        filename=stem, lang=target_lang, ext=ext, path=source_path.name
-    )
-    return source_path.parent / output_filename
-
-
-def get_output_path_folder_based(
-    source_path: Path, target_lang: str, source_lang: str
-) -> Path | None:
-    """Compute output path for folder-based localization (replace /en/ with /lang/)."""
-    source_str = str(source_path)
-    for sep in ["/", "\\"]:
-        source_folder = f"{sep}{source_lang}{sep}"
-        target_folder = f"{sep}{target_lang}{sep}"
-        if source_folder in source_str:
-            return Path(source_str.replace(source_folder, target_folder, 1))
-    return None
-
-
 def measure_site(
-    profile: dict,
+    profile,
     lang_filter: str | None = None,
 ) -> list[dict]:
     """
@@ -153,13 +86,8 @@ def measure_site(
 
     Returns list of dicts: {site_id, lang, source_files, translated, missing, coverage_pct}
     """
-    site_id = profile.get("site_id", "unknown")
-    source_lang = profile.get("default_source_lang", "en")
-    target_langs = profile.get("target_langs", [])
-    content_roots_raw = profile.get("content_roots", [])
-    output_layout = profile.get("output_layout", {})
-    per_language_folders = output_layout.get("per_language_folders", False)
-    pattern = output_layout.get("pattern", "{filename}.{lang}{ext}")
+    site_id = profile.site_id
+    target_langs = list(profile.target_langs)
 
     if lang_filter:
         target_langs = [l for l in target_langs if l == lang_filter]
@@ -168,33 +96,15 @@ def measure_site(
 
     results = []
 
-    for root_raw in content_roots_raw:
-        root_path = Path(expand_env(str(root_raw)))
+    for root_raw in profile.content_roots:
+        root_path = _CONFIG.resolve_content_root(root_raw)
         if not root_path.exists():
             logger.warning(f"[{site_id}] Content root not found: {root_path}")
             continue
 
-        # Collect source files
-        source_files = []
-        if per_language_folders:
-            # Folder-based: look for files under /<source_lang>/ subfolder
-            en_root = root_path / source_lang
-            if not en_root.exists():
-                # Try finding /en/ anywhere in the tree
-                en_dirs = list(root_path.rglob(source_lang))
-                if en_dirs:
-                    for en_dir in en_dirs:
-                        if en_dir.is_dir():
-                            source_files.extend(en_dir.rglob("*.md"))
-                else:
-                    logger.warning(f"[{site_id}] No /{source_lang}/ folder found in {root_path}")
-                    continue
-            else:
-                source_files = list(en_root.rglob("*.md"))
-        else:
-            # File-based: walk entire root, filter to source files only
-            all_md = list(root_path.rglob("*.md"))
-            source_files = [f for f in all_md if is_source_file_file_based(f)]
+        # Registry-driven discovery: works identically for
+        # per_language_folders=True and file-suffix (=False) sites.
+        source_files = discover_source_files(profile, root_path)
 
         if not source_files:
             logger.debug(f"[{site_id}] No source files found in {root_path}")
@@ -209,10 +119,7 @@ def measure_site(
 
         for src_file in source_files:
             for lang in target_langs:
-                if per_language_folders:
-                    output_path = get_output_path_folder_based(src_file, lang, source_lang)
-                else:
-                    output_path = get_output_path_file_based(src_file, lang, pattern)
+                output_path = resolve_translated_path(profile, src_file, lang)
 
                 if output_path and output_path.exists():
                     lang_stats[lang]["translated"] += 1
@@ -371,7 +278,7 @@ def main() -> None:
 
     all_rows: list[dict] = []
     for profile in profiles:
-        site_id = profile.get("site_id", "unknown")
+        site_id = profile.site_id
         rows = measure_site(profile, lang_filter=args.lang)
         if not rows:
             logger.debug(f"No results for {site_id}")

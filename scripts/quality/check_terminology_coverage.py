@@ -25,9 +25,13 @@ from collections import defaultdict
 from pathlib import Path
 
 _SCRIPT_DIR = Path(__file__).resolve().parent
-_PROJECT_ROOT = _SCRIPT_DIR.parent
+_PROJECT_ROOT = _SCRIPT_DIR.parent.parent
 if str(_PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(_PROJECT_ROOT))
+from src.utils.content_discovery import (  # noqa: E402
+    ALL_LANGUAGE_CODES as _ALL_LANGUAGE_CODES,
+)
+from src.utils.content_discovery import is_translated_filename  # noqa: E402
 
 logging.basicConfig(
     level=logging.INFO,
@@ -35,54 +39,14 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-_ALL_LANGUAGE_CODES = frozenset(
-    [
-        "af",
-        "ar",
-        "az",
-        "bg",
-        "ca",
-        "cs",
-        "da",
-        "de",
-        "el",
-        "es",
-        "et",
-        "fa",
-        "fi",
-        "fr",
-        "ga",
-        "he",
-        "hi",
-        "hr",
-        "hu",
-        "id",
-        "it",
-        "ja",
-        "ko",
-        "lt",
-        "lv",
-        "ms",
-        "nb",
-        "nl",
-        "no",
-        "pl",
-        "pt",
-        "ro",
-        "ru",
-        "sk",
-        "sl",
-        "sr",
-        "sv",
-        "th",
-        "tr",
-        "uk",
-        "vi",
-        "zh",
-    ]
-)
-
-
+# This tool takes an arbitrary --content-root directly (not a registered
+# site_id), so there's no SiteProfile/output_layout to consult -- it can't
+# use content_discovery.iter_locale_pairs/resolve_translated_path, which
+# require one. _find_translated_path's dual-scheme trial (folder-based,
+# then file-based) is a legitimate, different design for that reason; only
+# the hand-copied language-code list has been replaced with the canonical
+# one above (was one of 6 independently drifting copies found during the
+# durable-fix investigation).
 def _find_translated_path(source_path: Path, content_root: Path, lang: str) -> Path | None:
     # Folder-based: content_root/lang/rel_path.md
     try:
@@ -143,14 +107,11 @@ def run_coverage_check(
     """
     rng = random.Random(seed)
 
-    # Collect source files
-    source_files = []
-    for f in content_root.rglob("*.md"):
-        stem = f.stem
-        parts = stem.rsplit(".", 1)
-        if len(parts) == 2 and parts[1] in _ALL_LANGUAGE_CODES:
-            continue
-        source_files.append(f)
+    # Collect source files (exclude files that are themselves translations)
+    source_files = [
+        f for f in content_root.rglob("*.md")
+        if not is_translated_filename(f.name, langs)[0]
+    ]
 
     logger.info("Found %d source files", len(source_files))
 

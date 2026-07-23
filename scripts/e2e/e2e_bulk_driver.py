@@ -15,8 +15,13 @@ from datetime import datetime
 from pathlib import Path
 
 # Paths
-REPO_ROOT = Path(__file__).parent.parent
-CONTENT_ROOT = Path(r"D:\onedrive\Documents\GitHub\aspose.net\content")
+REPO_ROOT = Path(__file__).parent.parent.parent
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
+from src.utils.config_loader import ConfigService  # noqa: E402
+from src.utils.content_discovery import resolve_translated_path  # noqa: E402
+
+_CONFIG = ConfigService(REPO_ROOT / "config")
 REPORTS_DIR = REPO_ROOT / "reports"
 VENV_PYTHON = REPO_ROOT / ".venv" / "Scripts" / "python.exe"
 TRANSLATOR_CLI = REPO_ROOT / "src" / "cli.py"
@@ -59,6 +64,13 @@ def compute_target_path(source_path: Path, lang: str, site_profile: str) -> Path
     """
     Compute where the translated file will be written.
 
+    Durable-fix consolidation (TC-CD-017): previously hand-rolled both the
+    per_language_folders `/en/` -> `/{lang}/` swap AND a blog-specific
+    file-suffix special case, hardcoded to the `CONTENT_ROOT` constant.
+    Delegates to `content_discovery.resolve_translated_path`, which reads
+    each site's real `output_layout` from the registry instead -- no
+    per-site special-casing needed here anymore.
+
     Args:
         source_path: Source file path
         lang: Target language (fr/de)
@@ -67,33 +79,8 @@ def compute_target_path(source_path: Path, lang: str, site_profile: str) -> Path
     Returns:
         Expected target file path
     """
-    # Get relative path from content root
-    try:
-        rel_path = source_path.relative_to(CONTENT_ROOT)
-    except ValueError:
-        raise ValueError(f"Source file is not under content root: {source_path}")
-
-    # Split the path
-    parts = rel_path.parts
-
-    # For blog: index.md -> index.{lang}.md (file-localized)
-    if "blog.aspose.net" in str(source_path):
-        # Blog uses file-localized pattern: index.md -> index.de.md, index.fr.md
-        parent_dir = source_path.parent
-        target_file = parent_dir / f"index.{lang}.md"
-        return target_file
-
-    # For docs/kb/reference: /en/ -> /{lang}/
-    # Example: docs.aspose.net/slides/en/file.md -> docs.aspose.net/slides/de/file.md
-    new_parts = []
-    for part in parts:
-        if part == "en":
-            new_parts.append(lang)
-        else:
-            new_parts.append(part)
-
-    target_path = CONTENT_ROOT / Path(*new_parts)
-    return target_path
+    profile = _CONFIG.get_site_profile(site_profile)
+    return resolve_translated_path(profile, source_path, lang)
 
 
 def run_translation(source_path: Path, lang: str, site_profile: str) -> tuple[bool, str]:
@@ -253,7 +240,13 @@ def main():
     with open(filelist_path, encoding="utf-8") as f:
         lines = f.readlines()
 
-    files_to_process = [Path(line.strip()) for line in lines if line.strip().startswith("D:")]
+    # Was hardcoded to lines starting with "D:" -- broke the moment the
+    # producing e2e_select_*.py scripts' content root moved off that drive
+    # (see TC-CD-017). Any absolute path line is a real candidate now.
+    files_to_process = [
+        Path(line.strip()) for line in lines
+        if line.strip() and Path(line.strip()).is_absolute()
+    ]
 
     print(f"Files to process: {len(files_to_process)}")
     print(f"Target languages: {', '.join(args.langs)}")
