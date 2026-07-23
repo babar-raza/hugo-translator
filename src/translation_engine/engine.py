@@ -33,6 +33,9 @@ from ..utils.atomic_write import (
     atomic_write,
 )
 from ..utils.config_loader import ConfigService
+from ..utils.content_discovery import ALL_LANGUAGE_CODES as _ALL_LANGUAGE_CODES
+from ..utils.content_discovery import is_translated_filename as _is_translated_filename
+from ..utils.content_discovery import resolve_translated_path as _resolve_translated_path
 from ..utils.file_lock import FileLock
 from ..utils.metadata_tracker import MetadataTracker
 from ..utils.metrics import calc_stats
@@ -53,112 +56,11 @@ from .validation.decision_engine import ValidationDecisionEngine
 logger = logging.getLogger(__name__)
 
 
-# Module-level constant: All supported language codes for translation filtering
-_ALL_LANGUAGE_CODES = frozenset(
-    [
-        "af",
-        "ar",
-        "az",
-        "bg",
-        "ca",
-        "cs",
-        "da",
-        "de",
-        "el",
-        "es",
-        "et",
-        "fa",
-        "fi",
-        "fr",
-        "ga",
-        "he",
-        "hi",
-        "hr",
-        "hu",
-        "id",
-        "it",
-        "ja",
-        "ko",
-        "lt",
-        "lv",
-        "ms",
-        "nb",
-        "nl",
-        "no",
-        "pl",
-        "pt",
-        "ro",
-        "ru",
-        "sk",
-        "sl",
-        "sr",
-        "sv",
-        "th",
-        "tr",
-        "uk",
-        "vi",
-        "zh",
-    ]
-)
-
-
-def _is_translated_filename(
-    filename: str, target_langs: list[str], source_lang: str = "en"
-) -> tuple[bool, str | None]:
-    """
-    Check if filename appears to be a translated file based on language code pattern.
-
-    Detects filenames matching pattern: {name}.{lang}.(md|markdown)
-    Examples:
-        - index.es.md → (True, 'es')
-        - index.ES.MD → (True, 'es')  # case-insensitive
-        - tutorial.fr.markdown → (True, 'fr')
-        - index.md → (False, None)  # source file
-        - index.es.da.md → (True, 'da')  # matches last language code
-
-    Args:
-        filename: The filename to check (e.g., "index.es.md")
-        target_langs: List of target language codes configured for translation
-        source_lang: Source language code (default: 'en')
-
-    Returns:
-        Tuple of (is_translated, detected_language_code)
-        - is_translated: True if filename contains a language code pattern
-        - detected_language_code: The language code found, or None if not translated
-
-    Performance: O(n) with single regex compilation for n language codes.
-                 Uses sorted lang codes (longest first) for correct matching of region codes.
-    """
-    # Build combined set of all possible language codes
-    all_lang_codes = _ALL_LANGUAGE_CODES | set(target_langs)
-    # Exclude source language (allow files like index.en.md if en is source)
-    all_lang_codes = all_lang_codes - {source_lang}
-
-    # Sort by length descending to ensure consistent matching
-    sorted_langs = sorted(all_lang_codes, key=len, reverse=True)
-
-    # Build single optimized regex pattern with all language codes
-    # Pattern: \.(es|fr|de|...)\.(md|markdown)$
-    escaped_langs = [re.escape(lang) for lang in sorted_langs]
-    lang_pattern = "|".join(escaped_langs)
-    pattern = rf"\.({lang_pattern})\.(md|markdown)$"
-
-    # Compile and search once
-    compiled_pattern = re.compile(pattern, re.IGNORECASE)
-    match = compiled_pattern.search(filename)
-
-    if match:
-        detected_lang = match.group(1)
-        # Normalize case (pattern is case-insensitive, but we want consistent case)
-        # Find the original case from our language set
-        detected_lang_lower = detected_lang.lower()
-        for lang in sorted_langs:
-            if lang.lower() == detected_lang_lower:
-                return (True, lang)
-        # Fallback: return matched lang as-is
-        return (True, detected_lang)
-
-    return (False, None)
+# _ALL_LANGUAGE_CODES and _is_translated_filename are re-exported (see imports
+# above) from src.utils.content_discovery, the canonical, config-driven
+# implementation shared with standalone scripts. Kept as module attributes
+# here for backward compatibility with existing `from
+# src.translation_engine.engine import _is_translated_filename` call sites.
 
 
 def estimate_token_count(text: str) -> int:
@@ -1782,11 +1684,20 @@ class TranslationEngine:
             logger.info(f"Using CLI output override: {output_path} (relative: {relative_path})")
             return output_path
 
-        # Check if site profile uses Hugo sibling folder pattern
+        # Delegate the per_language_folders/pattern branch to the shared,
+        # config-driven implementation in src/utils/content_discovery.py --
+        # the same logic standalone scripts use, so there is exactly one
+        # place this substitution logic lives.
         output_layout = getattr(site_profile, "output_layout", None)
-        per_language_folders = False
-        pattern = None
         if output_layout:
+            output_path = _resolve_translated_path(site_profile, source_path, target_lang)
+            # _resolve_translated_path only falls through to its own
+            # last-resort (content_root-relative) fallback when neither
+            # per_language_folders nor a usable pattern applied -- detect
+            # that case so this method's own site-profile output_dir
+            # fallback below still runs instead (preserves prior behavior
+            # for profiles with output_layout set but no pattern and
+            # per_language_folders=False).
             per_language_folders = (
                 getattr(output_layout, "per_language_folders", False)
                 if hasattr(output_layout, "per_language_folders")
@@ -1797,45 +1708,11 @@ class TranslationEngine:
                 if hasattr(output_layout, "pattern")
                 else output_layout.get("pattern", None)
             )
-
-        source_lang = getattr(site_profile, "default_source_lang", "en")
-
-        if per_language_folders:
-            # Hugo sibling folder pattern: replace /en/ with /{target_lang}/
-            source_str = str(source_path)
-            # Try to find and replace the source language folder
-            # Handle both forward and back slashes
-            for sep in ["/", "\\"]:
-                source_folder = f"{sep}{source_lang}{sep}"
-                target_folder = f"{sep}{target_lang}{sep}"
-                if source_folder in source_str:
-                    output_path = Path(source_str.replace(source_folder, target_folder, 1))
-                    return output_path
-
-            # Also check if path ends with /en (folder name without trailing separator)
-            for sep in ["/", "\\"]:
-                if source_str.endswith(f"{sep}{source_lang}"):
-                    output_path = Path(source_str[: -len(source_lang)] + target_lang)
-                    return output_path
-        else:
-            # File-based localization: apply output_layout.pattern
-            if pattern:
-                # Extract filename components
-                filename_stem = source_path.stem  # e.g., "index"
-                filename_ext = source_path.suffix  # e.g., ".md"
-
-                # Apply pattern substitution
-                output_filename = pattern.format(
-                    filename=filename_stem,
-                    lang=target_lang,
-                    ext=filename_ext,
-                    path=str(source_path.name),  # Full filename as fallback
-                )
-
-                # Use source file's directory as base (not hardcoded output/)
-                output_path = source_path.parent / output_filename
-
-                logger.info(f"File-based localization: {source_path.name} -> {output_filename}")
+            if per_language_folders or pattern:
+                if pattern and not per_language_folders:
+                    logger.info(
+                        f"File-based localization: {source_path.name} -> {output_path.name}"
+                    )
                 return output_path
 
         # Fallback: use output directory from site profile

@@ -516,3 +516,99 @@ class TestSweepScheduler:
 
         finally:
             scheduler.stop()
+
+    # ==================== _get_target_path: per_language_folders=False ====================
+    # Previously untested: every OutputLayout fixture above uses
+    # per_language_folders=True. The False branch used to be a no-op
+    # (`else: pass`), silently falling through to a per-language-folder
+    # fallback that never matches a file-suffix site's real layout -- see
+    # the "durable fix" plan for blog.aspose.org / blog.aspose.net /
+    # www.aspose.org / www.aspose.net.
+
+    def test_get_target_path_file_suffix_layout(
+        self, mock_config_service, mock_enqueue_callback, temp_content_dir
+    ):
+        """per_language_folders=False sites resolve to a sibling {name}.{lang}.md file."""
+        file_suffix_profile = SiteProfile(
+            site_id="blog-scheme.test",
+            content_roots=[str(temp_content_dir)],
+            default_source_lang="en",
+            target_langs=["fr", "es"],
+            body=BodyRules(translate_markdown=True),
+            output_layout=OutputLayout(
+                per_language_folders=False, pattern="{filename}.{lang}{ext}"
+            ),
+        )
+        mock_config_service.get_site_profile.return_value = file_suffix_profile
+
+        scheduler = SweepScheduler(
+            config_service=mock_config_service,
+            job_enqueue_callback=mock_enqueue_callback,
+        )
+
+        source_path = temp_content_dir / "cells" / "net" / "slug" / "index.md"
+        target_path = scheduler._get_target_path(
+            source_path, "fr", file_suffix_profile
+        )
+
+        assert target_path == source_path.parent / "index.fr.md"
+
+    def test_get_target_path_file_suffix_layout_needs_translation(
+        self, mock_config_service, mock_enqueue_callback, temp_content_dir
+    ):
+        """A correctly-translated file-suffix sibling must be recognized as
+        complete -- before this fix, _needs_translation() always returned
+        True for these sites since the fallback path never existed on disk."""
+        file_suffix_profile = SiteProfile(
+            site_id="blog-scheme.test",
+            content_roots=[str(temp_content_dir)],
+            default_source_lang="en",
+            target_langs=["fr"],
+            body=BodyRules(translate_markdown=True),
+            output_layout=OutputLayout(
+                per_language_folders=False, pattern="{filename}.{lang}{ext}"
+            ),
+        )
+        mock_config_service.get_site_profile.return_value = file_suffix_profile
+
+        scheduler = SweepScheduler(
+            config_service=mock_config_service,
+            job_enqueue_callback=mock_enqueue_callback,
+        )
+
+        source_path = temp_content_dir / "index.md"
+        source_path.write_text("# Source")
+        time.sleep(0.05)
+        translated_path = temp_content_dir / "index.fr.md"
+        translated_path.write_text("# Traduit")
+
+        assert scheduler._needs_translation(source_path, file_suffix_profile) is False
+
+    def test_get_target_path_per_language_folders_nested_path(
+        self, mock_config_service, mock_enqueue_callback, temp_content_dir
+    ):
+        """Regression: real per_language_folders=True content lives at
+        content_root/en/family/platform/file.md (a literal /en/ path
+        segment). The prior content_roots-relative-path implementation
+        would have inserted an extra spurious "en" segment
+        (content_root/fr/en/family/platform/file.md) instead of
+        substituting /en/ -> /fr/ in place."""
+        profile = SiteProfile(
+            site_id="nested.test",
+            content_roots=[str(temp_content_dir)],
+            default_source_lang="en",
+            target_langs=["fr"],
+            body=BodyRules(translate_markdown=True),
+            output_layout=OutputLayout(per_language_folders=True, pattern="{lang}/{path}"),
+        )
+        mock_config_service.get_site_profile.return_value = profile
+
+        scheduler = SweepScheduler(
+            config_service=mock_config_service,
+            job_enqueue_callback=mock_enqueue_callback,
+        )
+
+        source_path = temp_content_dir / "en" / "cells" / "net" / "_index.md"
+        target_path = scheduler._get_target_path(source_path, "fr", profile)
+
+        assert target_path == temp_content_dir / "fr" / "cells" / "net" / "_index.md"

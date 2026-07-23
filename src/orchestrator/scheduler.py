@@ -13,6 +13,7 @@ from datetime import datetime
 from pathlib import Path
 
 from src.utils.config_loader import ConfigService
+from src.utils.content_discovery import resolve_translated_path
 from src.utils.models import SiteProfile
 
 from .models import JobMode, JobType, TranslationJob
@@ -296,28 +297,16 @@ class SweepScheduler:
         Returns:
             Expected translation path
         """
-        # Find which content root this file is under
-        for content_root in site_profile.content_roots:
-            content_dir = Path(content_root)
-            try:
-                rel_path = source_path.relative_to(content_dir)
-
-                # Construct target path using output layout pattern
-                if site_profile.output_layout and site_profile.output_layout.per_language_folders:
-                    # Per-language folder structure: content/de/path/to/file.md
-                    target_path = content_dir / target_lang / rel_path
-                    return target_path
-                else:
-                    # Alternative patterns could go here
-                    pass
-
-            except ValueError:
-                continue
-
-        # Fallback: assume per-language structure
-        content_root = Path(site_profile.content_roots[0])
-        rel_path = source_path.relative_to(content_root)
-        return content_root / target_lang / rel_path
+        # Delegate to the shared, config-driven implementation in
+        # src/utils/content_discovery.py -- the same logic
+        # TranslationEngine._get_output_path() and standalone quality-audit
+        # scripts use. Previously this method only ever handled
+        # per_language_folders=True (the `else` branch here was a no-op),
+        # so file-suffix-layout sites (per_language_folders=False, e.g.
+        # blog.aspose.org/blog.aspose.net/www.aspose.org/www.aspose.net)
+        # always fell through to the per-language-folder fallback below,
+        # which never matches their on-disk layout.
+        return resolve_translated_path(site_profile, source_path, target_lang)
 
     def _create_batch_jobs(
         self, site_id: str, site_profile: SiteProfile, files: list[Path]
