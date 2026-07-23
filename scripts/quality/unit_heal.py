@@ -32,6 +32,11 @@ if str(_PROJECT_ROOT) not in sys.path:
 
 logger = logging.getLogger(__name__)
 
+# HT-QUALITY-GATES-001 Phase 8 (F3): canonical gate-id <-> issue-name lookup,
+# shared with scripts/quality/audit_all_content.py's sweep (see
+# src/translation_engine/write_gate.py's GATE_ISSUE_NAMES docstring).
+from src.translation_engine.write_gate import gate_id_from_issue_name  # noqa: E402
+
 # ---------------------------------------------------------------------------
 # Unit-level translation validator
 # ---------------------------------------------------------------------------
@@ -194,6 +199,57 @@ def process_queue(
 
                 stats["processed"] += 1
                 t0 = time.monotonic()
+
+                # HT-QUALITY-GATES-001 Phase 8 (F3): entries whose issues
+                # include a gate-registry-derived type (e.g.
+                # "refusal_artifact_gate29", or the "gate{id}_..." fallback
+                # for any newer gate) are invisible to UnitQualityScorer's
+                # fixed 10-type vocabulary below -- scoring such a file
+                # always finds nothing and would mark it "skipped_clean"
+                # even when the gate issue is still genuinely present (root
+                # cause RC2: the queue and the healer's scorer speak two
+                # different, independently-drifted vocabularies). Re-run the
+                # ORIGINATING gate directly instead: WriteGateEvaluator.
+                # evaluate() already applies every auto_clean gate's own fix
+                # and re-validates every block gate, so "healing" a
+                # gate-derived finding is just re-running the real gate
+                # machinery -- not a second, independently-invented fix.
+                #
+                # Scoping note: a file with BOTH a gate-type issue and a
+                # UnitQualityScorer-vocabulary issue only gets the gate path
+                # run this pass; its unit-level issue is picked up on a
+                # later healer run once still-present in the next audit
+                # sweep. This pipeline is already iterative/multi-pass by
+                # design (queue -> heal -> re-sweep -> queue), so this is a
+                # deferred fix, not a dropped one.
+                gate_issue_types = {
+                    iss["type"] for iss in entry.get("issues", [])
+                    if gate_id_from_issue_name(iss["type"]) is not None
+                }
+                if gate_issue_types:
+                    outcome = _heal_via_gate_rerun(
+                        en_content=en_content,
+                        tr_content=tr_content,
+                        tr_file=tr_file,
+                        locale=locale,
+                        gate_issue_types=gate_issue_types,
+                        dry_run=dry_run,
+                        stats=stats,
+                    )
+                    # "needs_retranslation" is deliberately NOT marked done:
+                    # the file still has a real, current defect this
+                    # CPU-only healer can't fix mechanically (no auto_clean
+                    # path exists for it) -- leaving it off done_set means a
+                    # future run (e.g. once a model-based repair path exists
+                    # for this issue type) can still pick it up. "fixed" and
+                    # "clean" both mean there's genuinely nothing further to
+                    # do for this queue entry.
+                    if outcome in ("fixed", "clean") and not dry_run:
+                        done_set.add(file_path)
+                        if done_fh:
+                            done_fh.write(json.dumps({"file_path": file_path}) + "\n")
+                            done_fh.flush()
+                    continue
 
                 # Score the file
                 scorer = UnitQualityScorer(config={}, locale=locale)
@@ -424,6 +480,122 @@ def _restore_link_paths(en_text: str, tr_text: str) -> str:
             result = result[:m.start() + offset] + new + result[m.end() + offset:]
             offset += len(new) - len(old)
     return result
+
+
+def _heal_via_gate_rerun(
+    en_content: str,
+    tr_content: str,
+    tr_file: Path,
+    locale: str,
+    gate_issue_types: set[str],
+    dry_run: bool,
+    stats: dict,
+) -> str:
+    """HT-QUALITY-GATES-001 Phase 8 (F3): heal a queue entry whose issues
+    are gate-registry-derived (not UnitQualityScorer-vocabulary) by
+    re-running the real WriteGateEvaluator against the file's current
+    content. Returns "fixed", "clean", or "needs_retranslation".
+
+    Uses ``run_all_content_gates()``, NOT ``evaluate()`` -- this matters,
+    not just a style choice. ``evaluate()`` (via ``_run_content_gates()``)
+    routes every "warn"-action gate through a disposable, discarded result
+    (correct for the PRODUCTION write path: a bug in a brand-new gate must
+    never start blocking real writes). Checking ``evaluate()``'s returned
+    ``result.passed`` here would therefore ALWAYS read ``True`` for a
+    warn-tier gate regardless of whether it still fails -- silently
+    reproducing root cause RC2 ("gate finding never reaches an actual
+    fix") through a different mechanism. Confirmed via direct reproduction
+    during this session's independent verification pass; this is the fix.
+    ``run_all_content_gates()`` gives every gate a real, non-discarded
+    per-gate result, so the SPECIFIC gate ids this queue entry actually
+    named can be checked directly.
+
+    force_accept=True mirrors safe_io.py's existing evaluator construction
+    for offline/healing contexts (detector=None already skips gates 2-5,
+    which need a real language detector and aren't meaningful for a
+    same-locale re-check here).
+    """
+    from src.translation_engine.write_gate import WriteGateEvaluator, gate_id_from_issue_name
+
+    relevant_gate_ids = {
+        gid for gid in (gate_id_from_issue_name(name) for name in gate_issue_types)
+        if gid is not None
+    }
+    if not relevant_gate_ids:
+        # Caller (process_queue) only reaches this function when
+        # gate_id_from_issue_name matched at least one issue type, so this
+        # is a defensive fallback, not an expected path.
+        stats["skipped_clean"] = stats.get("skipped_clean", 0) + 1
+        return "clean"
+
+    evaluator = WriteGateEvaluator(
+        detector=None, similarity_tracker=None, config=None, force_accept=True,
+    )
+    gate_results, final_content = evaluator.run_all_content_gates(
+        source_content=en_content,
+        translated_content=tr_content,
+        target_lang=locale,
+        output_path=tr_file,
+    )
+
+    still_failing = {
+        gid: gate_results[gid]
+        for gid in relevant_gate_ids
+        if gid in gate_results and not gate_results[gid].passed
+    }
+
+    if final_content != tr_content:
+        # An auto_clean gate changed something -- write it. Applies
+        # regardless of which specific gate id triggered the clean: an
+        # auto_clean fix elsewhere in the file may incidentally resolve
+        # the queued issue as a side effect of cleaning the content.
+        if dry_run:
+            print(
+                f"  DRY-RUN [gate-fix] {tr_file.name}: auto_clean would change "
+                f"content ({', '.join(sorted(gate_issue_types))})"
+            )
+            return "fixed"
+        try:
+            from src.utils.atomic_write import atomic_write
+            atomic_write(tr_file, final_content)
+            stats["units_fixed"] = stats.get("units_fixed", 0) + 1
+            logger.info(
+                "[%s] Gate auto-clean fixed: %s", tr_file.name, ", ".join(sorted(gate_issue_types))
+            )
+            return "fixed"
+        except Exception as exc:
+            logger.error("Write error %s: %s", tr_file, exc)
+            stats["write_errors"] = stats.get("write_errors", 0) + 1
+            return "needs_retranslation"
+
+    if not still_failing:
+        # Every SPECIFIC gate this queue entry named now genuinely passes
+        # (checked against a REAL, non-discarded per-gate result) -- the
+        # queue entry was stale (already fixed by something else since the
+        # sweep that produced it ran, or a false positive that self-resolved).
+        stats["skipped_clean"] = stats.get("skipped_clean", 0) + 1
+        return "clean"
+
+    # Still genuinely failing (confirmed via a real, non-discarded result,
+    # not evaluate()'s warn-tier-discarding result.passed), and no
+    # auto_clean path could fix it mechanically -- this needs real
+    # re-translation (a model call), which this CPU-only healer doesn't
+    # perform for whole-file gate failures (they're file-level, not
+    # unit-indexed the way UnitQualityScorer's issues are). Correctly
+    # reported as "needs retranslation" rather than silently mis-reported
+    # as clean, which is what happened before this fix (root cause RC2).
+    stats["gate_needs_retranslation"] = stats.get("gate_needs_retranslation", 0) + 1
+    error_summary = "; ".join(r.error or "" for r in still_failing.values())
+    logger.info(
+        "[%s] Gate still failing, needs retranslation (not auto-fixable): %s -- %s",
+        tr_file.name, ", ".join(sorted(gate_issue_types)), error_summary,
+    )
+    if dry_run:
+        print(
+            f"  DRY-RUN [gate-needs-retranslation] {tr_file.name}: "
+            f"{', '.join(sorted(gate_issue_types))} -- {error_summary}"
+        )
+    return "needs_retranslation"
 
 
 def _run_write_gates(

@@ -1093,6 +1093,61 @@ class TestGate26FenceParity:
         ev._gate_fence_parity(src, tgt, _OUT, r)
         assert not r.passed
 
+    # HT-QUALITY-GATES-001 Phase 8 (Tier A #7): a reopened fence (a
+    # duplicate opening marker mid-snippet instead of a real close) is
+    # invisible to the count-based checks above -- the total can come out
+    # even, or even >= source's count, so neither prior condition fires.
+    def test_reopened_fence_is_blocked_even_though_count_is_even_and_not_lower(self):
+        from src.translation_engine.write_gate import WriteGateResult
+        ev = _make_evaluator_no_detector()
+        src = self._fenced_file(1)  # ```python\ncode_0\n``` -- 2 fence lines, well-formed
+        # LLM duplicated the opening marker mid-snippet instead of closing:
+        # ```python / code / ```python / more code / ``` -- 3 fence-marker
+        # LINES (odd -> would already be caught by the odd-count check), but
+        # a REAL reopen can also land on an even total if a genuine close
+        # follows the duplicate open, e.g. ```python / code / ```python /
+        # more / ``` / ``` -- 4 lines, even, and NOT less than src's 2.
+        tgt = (
+            "---\ntitle: Test\n---\n"
+            "```python\n"
+            "code_0\n"
+            "```python\n"
+            "more_code\n"
+            "```\n"
+            "```\n"
+        )
+        r = WriteGateResult(passed=True)
+        ev._gate_fence_parity(src, tgt, _OUT, r)
+        assert not r.passed
+        assert "reopened" in r.error
+
+    def test_well_formed_separate_blocks_are_not_flagged_as_reopened(self):
+        """Negative control: two genuinely separate, properly closed fenced
+        blocks (test_passes_target_gains_fences' shape) must never be
+        mistaken for a reopen."""
+        from src.translation_engine.write_gate import WriteGateResult
+        ev = _make_evaluator_no_detector()
+        src = self._fenced_file(1)
+        tgt = self._fenced_file(2)
+        r = WriteGateResult(passed=True)
+        ev._gate_fence_parity(src, tgt, _OUT, r)
+        assert r.passed
+
+    def test_reopen_already_present_in_source_is_not_flagged(self):
+        """If the source itself already contains this shape (unusual, but
+        possible in hand-authored docs demonstrating fence syntax), only a
+        NEW reopen introduced by translation should block."""
+        from src.translation_engine.write_gate import WriteGateResult
+        ev = _make_evaluator_no_detector()
+        src = (
+            "---\ntitle: Test\n---\n"
+            "```python\ncode\n```python\nmore\n```\n```\n"
+        )
+        tgt = src  # byte-identical -- same reopen count, nothing new
+        r = WriteGateResult(passed=True)
+        ev._gate_fence_parity(src, tgt, _OUT, r)
+        assert r.passed
+
 
 # ---------------------------------------------------------------------------
 # Gate 27: Multi-line frontmatter scalar preservation

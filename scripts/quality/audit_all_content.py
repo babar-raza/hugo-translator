@@ -15,13 +15,28 @@ from datetime import datetime
 # write_gate.py gate methods directly for the checks added this session,
 # rather than a third, independently-drifting reimplementation (this script
 # already had its own simplified re-derivations of several older checks --
-# not repeating that mistake for the new ones). These 5 gates don't read
+# not repeating that mistake for the new ones). These gates don't read
 # self._detector/self._config, so a minimal, dependency-free evaluator
 # instance is sufficient and safe to share across the whole scan.
+#
+# HT-QUALITY-GATES-001 Phase 8 (F1): gates 29+ (and any future gate added to
+# GATE_REGISTRY) are now picked up via WriteGateEvaluator.run_all_content_gates()
+# -- see _run_registry_gates() below -- instead of one hand-written
+# WriteGateResult(passed=True) block per gate id. That hand-written pattern
+# meant a new registry entry was live in production/healing but invisible to
+# this sweep until someone remembered a second, separate edit here (root
+# cause RC1 of the Phase 7 "no detector" reconnaissance -- see
+# C:/Users/prora/.claude/plans/no-detector-nothing-checks-pure-squid.md).
+# Gates 9-28 stay on this script's own hand-rolled checks below
+# (_HAND_IMPLEMENTED_GATE_IDS) for historical output continuity -- see
+# AUDIT_MANIFEST.md for the full disposition of every check in this file.
 _PROJECT_ROOT = Path(__file__).resolve().parents[2]
 if str(_PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(_PROJECT_ROOT))
-from src.translation_engine.write_gate import WriteGateEvaluator, WriteGateResult  # noqa: E402
+from src.translation_engine.write_gate import (  # noqa: E402
+    WriteGateEvaluator,
+    gate_issue_name as _gate_issue_name,
+)
 from src.utils.config_loader import ConfigService  # noqa: E402
 from src.utils.content_discovery import (  # noqa: E402
     discover_source_files,
@@ -29,9 +44,60 @@ from src.utils.content_discovery import (  # noqa: E402
     resolve_translated_path,
 )
 
+# HT-QUALITY-GATES-001 Phase 8 (Tier A #1): Gate 42 (whole-page language
+# mismatch) needs a real FastTextDetector to have any effect -- unlike
+# gates 9-37, which read neither self._detector nor self._config. Attempt
+# a real detector (same cache_dir convention as engine_builder.py's
+# production construction); fall back to None (Gate 42 self-guards and
+# no-ops) on any failure -- missing fasttext package, no cached/
+# downloadable model, no network -- so this sweep's dependency-free
+# default behavior for every OTHER gate is unaffected either way.
+try:
+    from src.translation_engine.language_detection.fasttext_detector import FastTextDetector
+    _DETECTOR = FastTextDetector(
+        cache_dir=_PROJECT_ROOT / "data" / "models" / "fasttext",
+        auto_download=False,  # sweep-time: use whatever's already cached, don't block on a download
+    )
+    if _DETECTOR._model is None and not _DETECTOR._langdetect_available:
+        _DETECTOR = None  # construction "succeeded" but nothing usable loaded
+except Exception:
+    _DETECTOR = None
+
 _GATE_EVALUATOR = WriteGateEvaluator(
-    detector=None, similarity_tracker=None, config=None, force_accept=True,
+    detector=_DETECTOR, similarity_tracker=None, config=None, force_accept=True,
 )
+
+# Gates 9-28 duplicate this script's own hand-rolled checks below (kept for
+# historical output continuity -- see AUDIT_MANIFEST.md); skip them here so
+# each concept is only reported once per file, not twice under two names.
+_HAND_IMPLEMENTED_GATE_IDS = set(range(9, 29))
+
+# _gate_issue_name (imported from write_gate.py above) is the canonical,
+# shared name mapping -- see that module's GATE_ISSUE_NAMES docstring.
+# Kept as a module-level alias here so downstream code in this file
+# (_GATE_ISSUE_NAMES) and existing tests can still reference it by the name
+# they already expect.
+from src.translation_engine.write_gate import GATE_ISSUE_NAMES as _GATE_ISSUE_NAMES  # noqa: E402
+
+_GATE_METHOD_NAMES = {gid: method for gid, method, _cat, _action in WriteGateEvaluator.GATE_REGISTRY}
+
+
+def _run_registry_gates(en_content, tr_content, locale, tr_path, record):
+    """Run every GATE_REGISTRY gate not already hand-implemented by this
+    script (see _HAND_IMPLEMENTED_GATE_IDS) and record a finding for each
+    failure, under a name matching today's established issue-type strings
+    for gates 29-35 (see _GATE_ISSUE_NAMES) or a predictable fallback name
+    for anything newer. This is the auto-propagation path (HT-QUALITY-
+    GATES-001 Phase 8, F1) -- a new gate added to write_gate.py's
+    GATE_REGISTRY is swept here with zero edits to this file.
+    """
+    gate_results, _final_content = _GATE_EVALUATOR.run_all_content_gates(en_content, tr_content, locale, tr_path)
+    for gate_id, gres in gate_results.items():
+        if gate_id in _HAND_IMPLEMENTED_GATE_IDS:
+            continue
+        if not gres.passed:
+            method_name = _GATE_METHOD_NAMES.get(gate_id, "unknown")
+            record(_gate_issue_name(gate_id, method_name), (gres.error or "")[:150])
 
 def safe(s):
     """Return ASCII-safe version of string for display."""
@@ -395,6 +461,18 @@ def scan(output_path=None, resume=False, sites=None):
                     site_locale_counts[f"{site}:{locale}"][issue] += 1
                     if len(examples[issue]) < 6:
                         examples[issue].append((site, locale, str(rel), safe(str(detail))))
+                    # HT-QUALITY-GATES-001 Phase 8 (F4): "unit_indices": []
+                    # here is an honest "not computed", not a placeholder bug
+                    # to work around -- every check in this file operates on
+                    # full-file text (regex/gate checks), with no per-unit
+                    # (TextUnit) granularity to report. Real per-unit indices
+                    # come from scripts/quality/build_unit_heal_queue.py's
+                    # UnitQualityScorer pass (a genuine AST/unit extraction),
+                    # merged in separately by merge_audit_queues.py. Gate-
+                    # derived issues (29+) don't need unit indices at all --
+                    # unit_heal.py's gate-rerun path (F3) re-verifies and
+                    # fixes them at the whole-file level, matching how they
+                    # were detected.
                     file_issues.append({"type": issue, "detail": safe(str(detail)), "unit_indices": []})
 
                 # 1. Empty body (skeleton file)
@@ -556,49 +634,14 @@ def scan(output_path=None, resume=False, sites=None):
                     if tr_desc.isascii() and _EN_PROSE_RE.match(tr_desc):
                         record("description_yaml_reverted_to_english", f"desc={tr_desc[:60]!r}")
 
-                # 18-23. HT-QUALITY-GATES-001 Part 22 gates (30-35), reused
-                # directly from write_gate.py -- see _GATE_EVALUATOR comment
-                # above. Each gets its own disposable WriteGateResult so a
-                # hit in one never contaminates the next (mirrors the real
-                # pipeline's "warn" dispatch, which uses the same pattern).
-                # HT-QUALITY-GATES-001 Part 22 (Gate 29): omitted from the
-                # first Phase 7 sweep by oversight -- flagged by the user and
-                # fixed for this round. Cheap and structural (no LLM call),
-                # so there was no cost reason to have excluded it.
-                _wgr = WriteGateResult(passed=True)
-                _GATE_EVALUATOR._gate_refusal_artifact(tr_content, tr_path, _wgr, locale)
-                if not _wgr.passed:
-                    record("refusal_artifact_gate29", (_wgr.error or "")[:150])
-
-                _wgr = WriteGateResult(passed=True)
-                _GATE_EVALUATOR._gate_placeholder_leak(tr_content, tr_path, _wgr, locale)
-                if not _wgr.passed:
-                    record("placeholder_leak_gate30", (_wgr.error or "")[:150])
-
-                _wgr = WriteGateResult(passed=True)
-                _GATE_EVALUATOR._gate_partial_script_contamination(tr_content, tr_path, locale, _wgr)
-                if not _wgr.passed:
-                    record("partial_script_contamination_gate31", (_wgr.error or "")[:150])
-
-                _wgr = WriteGateResult(passed=True)
-                _GATE_EVALUATOR._gate_content_hash_staleness(en_content, tr_content, tr_path, _wgr)
-                if not _wgr.passed:
-                    record("content_hash_stale_gate32", (_wgr.error or "")[:150])
-
-                _wgr = WriteGateResult(passed=True)
-                _GATE_EVALUATOR._gate_brand_token_presence(en_content, tr_content, tr_path, _wgr)
-                if not _wgr.passed:
-                    record("brand_token_missing_gate33", (_wgr.error or "")[:150])
-
-                _wgr = WriteGateResult(passed=True)
-                _GATE_EVALUATOR._gate_heading_deficit(en_content, tr_content, tr_path, _wgr)
-                if not _wgr.passed:
-                    record("heading_deficit_gate34", (_wgr.error or "")[:150])
-
-                _wgr = WriteGateResult(passed=True)
-                _GATE_EVALUATOR._gate_dropped_trailing_link(en_content, tr_content, tr_path, _wgr)
-                if not _wgr.passed:
-                    record("dropped_trailing_link_gate35", (_wgr.error or "")[:150])
+                # 18+. HT-QUALITY-GATES-001 Phase 8 (F1): every GATE_REGISTRY
+                # gate not hand-implemented above (gates 29-36, and any gate
+                # added after this comment was written) is now swept
+                # automatically -- see _run_registry_gates() and the
+                # _GATE_EVALUATOR comment near the top of this file. Adding a
+                # new gate to write_gate.py's GATE_REGISTRY requires zero
+                # further edits to this file to be picked up here.
+                _run_registry_gates(en_content, tr_content, locale, tr_path, record)
 
                 # Write JSONL record for this file if it has issues
                 if out_fh and file_issues:
@@ -714,6 +757,18 @@ _PRIORITY = {
     # defect class (heading-count deficit / trailing-link-loss), priority 4.
     "heading_deficit_gate34": 4,
     "dropped_trailing_link_gate35": 4,
+    # HT-QUALITY-GATES-001 Phase 8: gates 37-43 (Tier A/C additions).
+    # Independent-verification MINOR finding: these were originally
+    # omitted from this dict entirely (silently falling back to the
+    # generic default of 3) -- not incorrect, but inconsistent with every
+    # other gate having an explicit, deliberate priority assignment.
+    "gate37_tm_collision": 2,               # reputational: wrong content visible in metadata
+    "gate38_prose_before_code_dropped": 3,  # structural loss, same class as code_fence_dropped
+    "gate39_dash_range_collapsed": 3,       # content corruption changing a stated number
+    "gate40_seo_metadata_corruption": 3,
+    "gate41_homoglyph_in_code": 2,          # identifier corruption, same class as inline_code_translated
+    "gate42_whole_page_language_mismatch": 1,  # wholesale wrong-language page, same class as body_identical_to_en
+    "gate43_block_scalar_key_leak": 3,
 }
 
 

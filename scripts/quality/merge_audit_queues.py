@@ -16,6 +16,18 @@ from pathlib import Path
 _SCRIPT_DIR = Path(__file__).resolve().parent
 _PROJ_ROOT = _SCRIPT_DIR.parent.parent
 
+# Independent-verification MINOR finding (HT-QUALITY-GATES-001 Phase 8):
+# this dict has no entries for ANY gate-registry-derived issue type (gates
+# 29-43's names, e.g. "refusal_artifact_gate29", "gate37_tm_collision").
+# That's deliberate, not an oversight left unfixed: merge()'s own fallback
+# (`PRIORITY.get(issue["type"], issue.get("priority", 4))`, below) uses the
+# issue's OWN embedded priority -- already correctly assigned by whichever
+# tier script produced it (see audit_all_content.py's _PRIORITY dict, which
+# IS the authoritative source for every gate-derived name) -- whenever this
+# dict doesn't have its own entry. Duplicating that same mapping a third
+# time here would reintroduce exactly the kind of drift-prone duplication
+# this whole workstream exists to reduce (see AUDIT_MANIFEST.md's "Known
+# duplication" section).
 PRIORITY: dict[str, int] = {
     "encoding_corruption": 1,
     "body_identical_to_en": 1,
@@ -155,8 +167,30 @@ def main() -> None:
 
     if not tier_paths:
         # Auto-discover from data/audit/
+        #
+        # HT-QUALITY-GATES-001 Phase 8 (F4): unit_heal_queue.jsonl
+        # (scripts/quality/build_unit_heal_queue.py) is included here too --
+        # it was previously a second, disconnected queue pipeline that never
+        # fed this merge step (root cause RC2 of the Phase 7 "no detector"
+        # reconnaissance). Its issues carry REAL per-unit indices from an
+        # actual UnitQualityScorer extraction pass, unlike the other four
+        # tiers, whose full-file regex/gate checks have no unit-level
+        # granularity to report (their "unit_indices": [] is an honest
+        # "not computed here", not a bug -- see audit_all_content.py's
+        # comment on this). Note that unit_heal.py's own healing loop does
+        # NOT read unit_indices from the queue at all (it always re-derives
+        # fresh via a live scorer.score() call, per its TC-HLN-006 comment)
+        # -- merging this tier in is about giving one unified, honest queue
+        # to human operators and any future consumer, not about feeding
+        # today's healer a pointer it doesn't use.
         audit_dir = _PROJ_ROOT / "data" / "audit"
-        for name in ("audit_structural.jsonl", "audit_linguistic.jsonl", "audit_completeness.jsonl", "audit_semantic.jsonl"):
+        for name in (
+            "audit_structural.jsonl",
+            "audit_linguistic.jsonl",
+            "audit_completeness.jsonl",
+            "audit_semantic.jsonl",
+            "unit_heal_queue.jsonl",
+        ):
             p = audit_dir / name
             if p.exists():
                 print(f"  Auto-discovered: {p.name}")
