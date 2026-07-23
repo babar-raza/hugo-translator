@@ -339,12 +339,14 @@ def scan(output_path=None, resume=False, sites=None):
                 if DOUBLE_PERIOD.search(body_no_code):
                     record("double_period")
 
-                # 12. Duplicate content (paragraph repeated 3+ times)
-                tr_paras = [p.strip() for p in tr_body.split("\n\n") if len(p.strip()) > 50]
+                # 12. Duplicate content (paragraph repeated 3+ times, outside code fences --
+                # distinct code examples routinely share a short boilerplate opening line,
+                # which a fence-blind check would miscount as repeated content)
+                tr_body_no_code = re.sub(r"```[\s\S]*?```", "", tr_body)
+                tr_paras = [p.strip() for p in tr_body_no_code.split("\n\n") if len(p.strip()) > 50]
                 para_key_counts = {}
                 for p in tr_paras:
-                    k = p[:80]
-                    para_key_counts[k] = para_key_counts.get(k, 0) + 1
+                    para_key_counts[p] = para_key_counts.get(p, 0) + 1
                 if any(c >= 3 for c in para_key_counts.values()):
                     record("duplicate_content")
 

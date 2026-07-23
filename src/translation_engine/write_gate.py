@@ -1218,13 +1218,33 @@ class WriteGateEvaluator:
         output_path: Path,
         result: WriteGateResult,
     ) -> str:
-        """Remove paragraphs that appear 3+ times (model repetition artifact)."""
-        body = self._get_body(translated_content)
-        paragraphs = re.split(r"\n{2,}", body)
+        """Remove paragraphs that appear 3+ times (model repetition artifact).
 
-        # Normalize and count
+        Paragraphs that overlap a fenced code block are never eligible: distinct
+        code examples on the same page routinely share a short boilerplate
+        opening line (an import/#include right after the fence, separated from
+        the rest of the snippet by a blank line), and without this exclusion
+        those shared lines get miscounted as "the same paragraph repeated" and
+        stripped out of otherwise-correct, distinct examples.
+        """
+        body = self._get_body(translated_content)
+        fence_spans = [(m.start(), m.end()) for m in re.finditer(r"```[\s\S]*?```", body)]
+
+        def in_fence(start: int, end: int) -> bool:
+            return any(start < e and end > s for s, e in fence_spans)
+
+        paragraphs: list[tuple[str, int, int]] = []
+        pos = 0
+        for m in re.finditer(r"\n{2,}", body):
+            paragraphs.append((body[pos:m.start()], pos, m.start()))
+            pos = m.end()
+        paragraphs.append((body[pos:], pos, len(body)))
+
+        # Normalize and count -- only paragraphs outside code fences are eligible
         seen: dict[str, int] = {}
-        for para in paragraphs:
+        for para, start, end in paragraphs:
+            if in_fence(start, end):
+                continue
             key = re.sub(r"\s+", " ", para.strip())
             if len(key) > 30:  # Only meaningful paragraphs
                 seen[key] = seen.get(key, 0) + 1
@@ -1236,9 +1256,9 @@ class WriteGateEvaluator:
         # Keep only first occurrence of each duplicate
         kept: set[str] = set()
         cleaned_paragraphs = []
-        for para in paragraphs:
+        for para, start, end in paragraphs:
             key = re.sub(r"\s+", " ", para.strip())
-            if key in duplicates:
+            if not in_fence(start, end) and key in duplicates:
                 if key not in kept:
                     kept.add(key)
                     cleaned_paragraphs.append(para)

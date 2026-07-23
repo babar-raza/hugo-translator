@@ -311,6 +311,34 @@ class TestGateDuplicateContent:
             for line in ["First paragraph.", "Second paragraph.", "Third different paragraph."]:
                 assert r.cleaned_content.count(line) <= 1
 
+    def test_repeated_code_fence_boilerplate_not_stripped(self):
+        """Distinct code examples sharing a boilerplate opening line are not
+        code-fence-blind false positives: none of the 3 examples' shared
+        `#include` line should be removed, even though it repeats 3+ times.
+        """
+        body = (
+            "Intro paragraph unrelated to any duplication for this test.\n\n"
+            "```cpp\n#include <Aspose/Slides/Foss/presentation.h>\n\n"
+            "int main() { return 1; }\n```\n\n"
+            "A distinct prose paragraph placed between the first two examples.\n\n"
+            "```cpp\n#include <Aspose/Slides/Foss/presentation.h>\n\n"
+            "int main() { return 2; }\n```\n\n"
+            "Another distinct prose paragraph placed between the last two examples.\n\n"
+            "```cpp\n#include <Aspose/Slides/Foss/presentation.h>\n\n"
+            "int main() { return 3; }\n```\n"
+        )
+        tr = _md(body=body)
+        src = _src_md(body=body)
+        gate = _make_gate(force_accept=True)
+
+        r = gate.evaluate(tr, src, "ar", Path("test.md"))
+
+        result_body = r.cleaned_content if r.cleaned_content else tr
+        assert result_body.count("#include <Aspose/Slides/Foss/presentation.h>") == 3
+        assert result_body.count("int main() { return 1; }") == 1
+        assert result_body.count("int main() { return 2; }") == 1
+        assert result_body.count("int main() { return 3; }") == 1
+
 
 # ---------------------------------------------------------------------------
 # Gate 17: Newline Explosion (blocking)

@@ -1,0 +1,25 @@
+mission_id: duplicate-content-fence-fix-20260723
+audit_date: "2026-07-23"
+final_verdict: SPRINT_REQUIRES_EVIDENCE_REPAIR
+recommendation: >
+  No plan changes or re-execution of implementation work are required -- the
+  fix itself is correct and verified (see claim_classification_matrix in
+  issues.json, mostly ACCEPTED_VERIFIED at integration_validation or
+  end_to_end_proof level). What remains is evidence packaging: isolate this
+  sprint's hunks from co-mingled pre-existing unrelated changes in
+  write_gate.py and audit_all_content.py (verified feasible via
+  `git apply --cached --check`, both hunks apply cleanly), then commit
+  through prompt4-close-task.md. Per the successor rule for
+  SPRINT_REQUIRES_EVIDENCE_REPAIR ("recommend Prompt 3 only if evidence
+  repair can be executed safely from taskcards"), proceed directly to a short
+  Prompt 3 controlled-execution pass (2 taskcards: isolated commit, plus
+  confirming the background full-CLI verification) rather than Prompt 2 plan
+  hardening, since no plan-level change is needed -- only execution of
+  already-identified, already-scoped cleanup.
+next_stage: PROMPT3_CONTROLLED_EXECUTION
+skip_prompt2_plan_hardening: true
+skip_prompt2_reason: >
+  All actionable findings (AUD-L1-001, AUD-L1-002) are execution/evidence
+  gaps with a fully specified fix already verified safe (git apply --check),
+  not plan-design gaps. Prompt 2's own registry successor rule allows
+  routing SPRINT_REQUIRES_EVIDENCE_REPAIR directly to Prompt 3.

@@ -1,0 +1,64 @@
+mission_id: duplicate-content-fence-fix-20260723
+taskcards:
+  - taskcard_id: TC-DCF-001
+    title: Isolate and commit this sprint's hunks in write_gate.py and audit_all_content.py
+    source_issue_ids: [AUD-L1-001, AUD-L1-002, AUD-L2-001, AUD-L2-003]
+    status: DONE
+    lane_owner: Lane B (taskcard execution) + Lane E (governance/evidence/state)
+    required_implementation: >
+      Extract only the Gate-16 hunks (@@ -1218,13 +1393,33 @@ and
+      @@ -1236,9 +1431,9 @@) from write_gate.py's diff and only the
+      duplicate_content hunk (@@ -339,12 +370,14 @@) from audit_all_content.py's
+      diff into standalone patch files; stage clean files
+      (surgical_retranslate.py, both test files) whole; stage the mission
+      state directory; commit with all other pre-existing unrelated
+      modified/untracked files explicitly excluded.
+    required_verification: "git apply --cached --check on both isolated patches (dry-run, no side effects) before applying for real; git diff --cached reviewed post-stage to confirm scope exactly matches intent"
+    required_evidence: "commit hash + files_changed list, recorded in close_task_result.yaml"
+    forbidden_paths:
+      - "any file not in {write_gate.py, surgical_retranslate.py, audit_all_content.py, test_write_gate_new_gates.py, test_surgical_retranslate_duplicate_content.py, .supervisor/state/duplicate-content-fence-fix-20260723/**}"
+    machine_state: COMPLETED
+    quality_scores:
+      requirement_correctness: 5
+      implementation_correctness: 5
+      integration_completeness: 5
+      pipeline_compatibility: 5
+      governance_compliance: 5
+      evidence_completeness: 5
+      test_coverage: 4
+      validator_coverage: 4
+      repeatability: 5
+      idempotency: 5
+      downstream_consumer_readiness: 5
+      agentic_consumption_quality: 5
+      rollback_safety_quality: 5
+      documentation_skill_agent_sync_quality: 4
+      production_readiness: 5
+    score_notes: >
+      test_coverage/validator_coverage held at 4/5 rather than 5/5: two of
+      the three patched implementations (write_gate.py, surgical_retranslate.py)
+      have committed regression tests; the third (audit_all_content.py) does
+      not, by deliberate scope decision (AUD-L1-004, ACCEPTED_KNOWN_LIMITATION)
+      rather than oversight, to avoid unapproved scope expansion. All
+      dimensions clear the >=4/5 acceptance floor -- no reroute required.
+    reroute_required: false
+
+  - taskcard_id: TC-DCF-002
+    title: Real, unscoped, full-CLI confirmation run (surgical_retranslate.py --dry-run --sites all)
+    source_issue_ids: []
+    status: IN_PROGRESS_BACKGROUND_NON_BLOCKING
+    lane_owner: Lane D (verification/QA)
+    required_implementation: "Launch scripts/quality/surgical_retranslate.py --dry-run --issue-type duplicate_content --sites all --verbose as a background process (read-only, no writes)"
+    required_verification: "Compare reported flagged-file count against the 13-true-positive figure established via targeted re-scan"
+    machine_state: RUNNING_AT_CLOSURE_TIME
+    note: >
+      This was not a blocking requirement of the approved plan or of
+      SPRINT_REQUIRES_EVIDENCE_REPAIR's actionable findings -- it is
+      additional, voluntary end-to-end confirmation launched to strengthen
+      proof level beyond what was already achieved (integration_validation
+      via real-code execution against the full previously-flagged set).
+      Because the underlying fix is already verified correct through
+      multiple independent real-code proofs, this run's completion is
+      tracked as a non-blocking follow-up, not a closure gate. If its result
+      contradicts prior findings, that reopens this mission per the
+      idempotent-reopening rule.

@@ -1,0 +1,77 @@
+# Convergence Binding Record
+# Generated: 2026-07-23
+# Protocol: POST-PLAN AUTONOMOUS CONVERGENCE AND GOVERNED CLOSURE
+# Mission: duplicate_content audit false-positive root-cause fix (code-fence-blind paragraph splitter)
+
+convergence_binding:
+  mission_id: duplicate-content-fence-fix-20260723
+  plan_id: duplicate-content-repeated-paragraph-robust-stroustrup
+  plan_path: "C:/Users/prora/.claude/plans/duplicate-content-repeated-paragraph-robust-stroustrup.md"
+  plan_revision: "1 (approved and executed 2026-07-23, same session)"
+  plan_hash: 52270f13d939350f1c0f3259e3ce5dc1cb46655e8e440c8b5e36edc421d76f45
+
+  post_sprint_audit:
+    expected: .supervisor/prompts/prompt1-post-sprint-audit.md
+    path: .supervisor/prompts/prompt1-post-sprint-audit.md
+    hash: 263dab3dadad6845f5dd2874fe22cd860403151156cadb2dffedef5258103099
+    role_verified: TRUE  # content: "POST-SPRINT STRICT EVIDENCE AUDIT" -- matches registry PSL-PROMPT-1
+
+  plan_hardening:
+    expected: .supervisor/prompts/prompt2-plan-hardening.md
+    path: .supervisor/prompts/prompt2-plan-hardening.md
+    hash: 4fe227b68c0e58e08381f89f5381bb8d29eebd89cba328ea3fb33c957c5d3d00
+    role_verified: TRUE  # content: "PLAN MODE: HARDEN CURRENT PLAN FROM LATEST SPRINT AUDIT" -- matches registry PSL-PROMPT-2
+
+  controlled_execution:
+    expected: .supervisor/prompts/prompt3-controlled-execution.md
+    path: .supervisor/prompts/prompt3-controlled-execution.md
+    hash: 5246d218a39a8464cdc32c542d5411d2f29ad034f3e867651c0f731e1269edd9
+    role_verified: TRUE  # content: "EXECUTION MODE: CONTROLLED TASKCARD EXECUTION" -- matches registry PSL-PROMPT-3
+
+  close_task:
+    expected: .supervisor/prompts/prompt4-close-task.md
+    resolved: .supervisor/prompts/prompt4-close-task.md
+    hash: 3196a5bd52bd6e037b84d602dbde8d32a8dbac31798c0947bac03784ff6ef81b
+    role_verified: TRUE  # content: "Close this task cleanly" -- commit + plan-update + closure-status contract
+
+  prompt_registry:
+    path: .supervisor/prompts/prompt-registry.yaml
+    status: FOUND_AND_READ
+
+  status: BOUND_ALL_FOUR_PROMPTS_VERIFIED
+
+  binding_decision: >
+    Plan identity was AMBIGUOUS at first ask: this session's just-executed plan
+    (duplicate-content false-positive fix) was run via the standalone Plan Mode
+    workflow, not as a pre-existing .supervisor mission -- it has no prior
+    taskcards/queue/ledger. Per the operator's own binding rule ("reject
+    execution when authoritative plan identity is ambiguous"), the user was
+    asked directly (AskUserQuestion) rather than guessing among five candidate
+    .supervisor/state/ mission directories plus a sixth, older, already-closed
+    mission recorded at the top-level TERMINAL_CLOSED.yaml
+    (aspose-org-multisite-speed-language-mixing-20260702, closed 2026-07-03,
+    unrelated). User confirmed: bind to the duplicate-content fix just executed
+    in this session, run with full autonomy, no manual checkpoints. This
+    mission directory is created fresh to retroactively bind that plan into
+    this governance framework, following the same condensed artifact
+    convention used by prior missions (lmdb-consolidation-20260711,
+    quality-remediation-20260713) since .supervisor/schemas/ does not exist in
+    this repository (verified: no schema files present) -- structural
+    conformance to the prompts' documented field lists is the achievable bar,
+    consistent with all prior missions.
+
+  known_governance_limitation: >
+    .supervisor/schemas/*.schema.json referenced by all four prompts'
+    "Output contract" headers do not exist anywhere in the repository
+    (confirmed by directory listing). No stage output, in this mission or any
+    prior one, has been mechanically schema-validated. Disclosed rather than
+    claimed as validated.
+
+  evidence_root: ".supervisor/state/duplicate-content-fence-fix-20260723/"
+  originating_plan_evidence:
+    - "Standalone-verified surgical_retranslate.py::_detect_duplicate_content / _fix_duplicate_content against real production file + 2 synthetic controls (real module import, not reimplementation)"
+    - "pytest: tests/unit/translation_engine/test_write_gate_new_gates.py (73/73 pass, including new TestGateDuplicateContent::test_repeated_code_fence_boilerplate_not_stripped, exercising the real WriteGateEvaluator class)"
+    - "Literal extraction+exec of the real audit_all_content.py duplicate_content code block from disk (not reimplementation) against real production file + 2 synthetic controls"
+    - "Full re-scan of all 3,622 originally-flagged files (matches user-reported count exactly) using the patched logic: 13 true positives remain (99.6% were false positives)"
+    - "Manual inspection of all 13 remaining true positives: confirmed all trace to one EN source page (reference.aspose.org/en/3d/typescript/transform.md) and are legitimate per-method API-reference \"Returns\" boilerplate, not corruption -- zero genuine defects in the entire flagged set"
+    - "data/audit/duplicate_content_true_positives.jsonl (gitignored via data/*, retained on disk as evidence)"

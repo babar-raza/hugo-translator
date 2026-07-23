@@ -249,9 +249,25 @@ def _repair_inline_code_line(en_line: str, tr_line: str) -> str:
 
 
 def _detect_duplicate_content(tr_content: str) -> list[tuple[int, str, str, str]]:
-    """Detect paragraphs appearing 3+ times in body."""
+    """Detect paragraphs appearing 3+ times in body.
+
+    Code-fence content is excluded: distinct code examples on the same page
+    routinely share a short boilerplate opening line (an import/#include
+    right after the fence, separated from the rest of the snippet by a blank
+    line), which would otherwise be miscounted as "the same paragraph
+    repeated" even though every example is genuinely different.
+    """
     body = _get_body(tr_content)
-    paragraphs = [p.strip() for p in re.split(r"\n{2,}", body) if len(p.strip()) > 30]
+    non_fence_chunks = [
+        part for part in re.split(r"(```[\s\S]*?```)", body)
+        if not part.startswith("```")
+    ]
+    paragraphs = [
+        p.strip()
+        for chunk in non_fence_chunks
+        for p in re.split(r"\n{2,}", chunk)
+        if len(p.strip()) > 30
+    ]
 
     counts: dict[str, int] = {}
     for p in paragraphs:
@@ -264,7 +280,7 @@ def _detect_duplicate_content(tr_content: str) -> list[tuple[int, str, str, str]
 
 
 def _fix_duplicate_content(tr_content: str) -> str:
-    """Remove duplicate paragraphs (keep first occurrence)."""
+    """Remove duplicate paragraphs (keep first occurrence); code-fence content is left untouched."""
     # Split into frontmatter and body
     if tr_content.startswith("---"):
         end = tr_content.find("\n---", 4)
@@ -278,18 +294,27 @@ def _fix_duplicate_content(tr_content: str) -> str:
         fm = ""
         body = tr_content
 
-    paragraphs = re.split(r"(\n{2,})", body)
     seen: set[str] = set()
-    result = []
-    for segment in paragraphs:
-        stripped = segment.strip()
-        if len(stripped) > 30:
-            if stripped in seen:
-                continue  # skip duplicate
-            seen.add(stripped)
-        result.append(segment)
 
-    return fm + "".join(result)
+    def _dedupe_chunk(chunk: str) -> str:
+        segments = re.split(r"(\n{2,})", chunk)
+        result = []
+        for segment in segments:
+            stripped = segment.strip()
+            if len(stripped) > 30:
+                if stripped in seen:
+                    continue  # skip duplicate
+                seen.add(stripped)
+            result.append(segment)
+        return "".join(result)
+
+    fence_parts = re.split(r"(```[\s\S]*?```)", body)
+    fixed_parts = [
+        part if part.startswith("```") else _dedupe_chunk(part)
+        for part in fence_parts
+    ]
+
+    return fm + "".join(fixed_parts)
 
 
 def _detect_double_periods(
