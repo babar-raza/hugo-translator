@@ -248,6 +248,55 @@ def _repair_inline_code_line(en_line: str, tr_line: str) -> str:
     return repaired
 
 
+def _paragraphs_with_positions(body: str) -> list[tuple[str, int]]:
+    """Split body on blank-line boundaries, returning (stripped_text, start_offset)."""
+    paragraphs = []
+    pos = 0
+    for m in re.finditer(r"\n{2,}", body):
+        paragraphs.append((body[pos:m.start()].strip(), pos))
+        pos = m.end()
+    paragraphs.append((body[pos:].strip(), pos))
+    return paragraphs
+
+
+def _structurally_separated_duplicates(body: str) -> set[str]:
+    """Paragraph texts that repeat 3+ times outside code fences where a
+    heading or a code fence separates every consecutive pair of occurrences.
+
+    That structural separation is the signature of legitimate repetition --
+    e.g. a "Returns: same X instance for chaining" note, or a "Key
+    Properties" label, repeated once per distinct method/property/class
+    section on a reference.aspose.org API-reference page -- rather than a
+    genuine MT decoding-loop artifact, which has no such intervening
+    structure between repeats.
+    """
+    fence_spans = [(m.start(), m.end()) for m in re.finditer(r"```[\s\S]*?```", body)]
+    heading_spans = [(m.start(), m.end()) for m in re.finditer(r"^#{1,6}[ \t].*$", body, re.M)]
+
+    def in_fence(start: int, end: int) -> bool:
+        return any(start < e and end > s for s, e in fence_spans)
+
+    def has_boundary_between(a: int, b: int) -> bool:
+        return any(a <= s < b for s, _ in heading_spans) or any(a <= s < b for s, _ in fence_spans)
+
+    occurrence_starts: dict[str, list[int]] = {}
+    for stripped, start in _paragraphs_with_positions(body):
+        if len(stripped) <= 30:
+            continue
+        if in_fence(start, start + len(stripped)):
+            continue
+        occurrence_starts.setdefault(stripped, []).append(start)
+
+    protected = set()
+    for key, starts in occurrence_starts.items():
+        if len(starts) < 3:
+            continue
+        starts = sorted(starts)
+        if all(has_boundary_between(starts[i], starts[i + 1]) for i in range(len(starts) - 1)):
+            protected.add(key)
+    return protected
+
+
 def _detect_duplicate_content(tr_content: str) -> list[tuple[int, str, str, str]]:
     """Detect paragraphs appearing 3+ times in body.
 
@@ -255,9 +304,12 @@ def _detect_duplicate_content(tr_content: str) -> list[tuple[int, str, str, str]
     routinely share a short boilerplate opening line (an import/#include
     right after the fence, separated from the rest of the snippet by a blank
     line), which would otherwise be miscounted as "the same paragraph
-    repeated" even though every example is genuinely different.
+    repeated" even though every example is genuinely different. Legitimate
+    structurally-repeating prose (see `_structurally_separated_duplicates`)
+    is excluded too.
     """
     body = _get_body(tr_content)
+    protected = _structurally_separated_duplicates(body)
     non_fence_chunks = [
         part for part in re.split(r"(```[\s\S]*?```)", body)
         if not part.startswith("```")
@@ -273,14 +325,16 @@ def _detect_duplicate_content(tr_content: str) -> list[tuple[int, str, str, str]
     for p in paragraphs:
         counts[p] = counts.get(p, 0) + 1
 
-    duplicates = [p for p, c in counts.items() if c >= 3]
+    duplicates = [p for p, c in counts.items() if c >= 3 and p not in protected]
     if duplicates:
         return [(0, "", tr_content, "duplicate_content")]
     return []
 
 
 def _fix_duplicate_content(tr_content: str) -> str:
-    """Remove duplicate paragraphs (keep first occurrence); code-fence content is left untouched."""
+    """Remove duplicate paragraphs (keep first occurrence); code-fence
+    content and structurally-separated legitimate repeats (see
+    `_structurally_separated_duplicates`) are left untouched."""
     # Split into frontmatter and body
     if tr_content.startswith("---"):
         end = tr_content.find("\n---", 4)
@@ -294,6 +348,7 @@ def _fix_duplicate_content(tr_content: str) -> str:
         fm = ""
         body = tr_content
 
+    protected = _structurally_separated_duplicates(body)
     seen: set[str] = set()
 
     def _dedupe_chunk(chunk: str) -> str:
@@ -301,7 +356,7 @@ def _fix_duplicate_content(tr_content: str) -> str:
         result = []
         for segment in segments:
             stripped = segment.strip()
-            if len(stripped) > 30:
+            if len(stripped) > 30 and stripped not in protected:
                 if stripped in seen:
                     continue  # skip duplicate
                 seen.add(stripped)

@@ -157,6 +157,50 @@ def check_code_fence_dropped(en_body, tr_body):
     return False, ""
 
 
+def check_duplicate_content(tr_body: str) -> bool:
+    """Return True if a paragraph repeats 3+ times outside code fences,
+    excluding legitimate structurally-separated repeats.
+
+    Code-fence content is excluded: distinct code examples on the same page
+    routinely share a short boilerplate opening line (an import/#include
+    right after the fence), which would otherwise be miscounted as "the same
+    paragraph repeated" even though every example is genuinely different.
+
+    A duplicate is also excluded if a heading or a code fence separates
+    every consecutive pair of its occurrences -- the signature of
+    legitimate repetition (e.g. a "Returns: same X instance for chaining"
+    note, or a "Key Properties" label, repeated once per distinct
+    method/property/class section on a reference.aspose.org API-reference
+    page) rather than a genuine MT decoding-loop artifact, which has no
+    such intervening structure between repeats.
+    """
+    fence_spans = [(m.start(), m.end()) for m in re.finditer(r"```[\s\S]*?```", tr_body)]
+    heading_spans = [(m.start(), m.end()) for m in re.finditer(r"^#{1,6}[ \t].*$", tr_body, re.M)]
+
+    def in_fence(start, end):
+        return any(start < e and end > s for s, e in fence_spans)
+
+    def has_boundary_between(a, b):
+        return any(a <= s < b for s, _ in heading_spans) or any(a <= s < b for s, _ in fence_spans)
+
+    occurrence_starts: dict[str, list[int]] = {}
+    pos = 0
+    for seg in re.split(r"(\n{2,})", tr_body):
+        stripped = seg.strip()
+        if len(stripped) > 50 and not in_fence(pos, pos + len(seg)):
+            occurrence_starts.setdefault(stripped, []).append(pos)
+        pos += len(seg)
+
+    for key, starts in occurrence_starts.items():
+        if len(starts) < 3:
+            continue
+        starts = sorted(starts)
+        if all(has_boundary_between(starts[i], starts[i + 1]) for i in range(len(starts) - 1)):
+            continue  # structurally-separated legitimate repeat
+        return True
+    return False
+
+
 def scan(output_path=None, resume=False, sites=None):
     results = defaultdict(lambda: defaultdict(int))   # site -> issue -> count
     examples = defaultdict(list)                       # issue -> list of (site, locale, rel, detail)
@@ -339,15 +383,9 @@ def scan(output_path=None, resume=False, sites=None):
                 if DOUBLE_PERIOD.search(body_no_code):
                     record("double_period")
 
-                # 12. Duplicate content (paragraph repeated 3+ times, outside code fences --
-                # distinct code examples routinely share a short boilerplate opening line,
-                # which a fence-blind check would miscount as repeated content)
-                tr_body_no_code = re.sub(r"```[\s\S]*?```", "", tr_body)
-                tr_paras = [p.strip() for p in tr_body_no_code.split("\n\n") if len(p.strip()) > 50]
-                para_key_counts = {}
-                for p in tr_paras:
-                    para_key_counts[p] = para_key_counts.get(p, 0) + 1
-                if any(c >= 3 for c in para_key_counts.values()):
+                # 12. Duplicate content (paragraph repeated 3+ times, outside code
+                # fences and excluding structurally-separated legitimate repeats)
+                if check_duplicate_content(tr_body):
                     record("duplicate_content")
 
                 # 13. Body identical to English (completely untranslated)

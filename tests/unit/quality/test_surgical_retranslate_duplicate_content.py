@@ -109,3 +109,57 @@ def test_real_flagged_production_sample_no_longer_flagged():
         "int main() { return 5; }\n```\n"
     )
     assert _detect_duplicate_content(body) == []
+
+
+# ---------------------------------------------------------------------------
+# TC-DCF-003: structurally-separated prose boilerplate (mission
+# duplicate-content-fence-fix-20260723's pilot finding AUD-L3-002).
+# Reproduces the real reference.aspose.org pattern: a short "Returns" note
+# repeated once per distinct method/property section (heading between every
+# occurrence) is legitimate documentation, not an MT decoding-loop artifact.
+# ---------------------------------------------------------------------------
+
+_STRUCTURALLY_SEPARATED_BOILERPLATE = (
+    "---\ntitle: Test\n---\n\n"
+    "### setTranslation(tx, ty, tz)\n\n"
+    "Sets the local translation.\n\n"
+    "Returns: the same Transform instance, for method chaining.\n\n"
+    "### setScale(sx, sy, sz)\n\n"
+    "Sets the local scale.\n\n"
+    "Returns: the same Transform instance, for method chaining.\n\n"
+    "### setRotation(rw, rx, ry, rz)\n\n"
+    "Sets the local rotation.\n\n"
+    "Returns: the same Transform instance, for method chaining.\n"
+)
+
+_SAME_NOTE_WITHOUT_STRUCTURAL_SEPARATION = (
+    "---\ntitle: Test\n---\n\n"
+    "Returns: the same Transform instance, for method chaining.\n\n"
+    "Unrelated filler paragraph with no heading in sight here at all.\n\n"
+    "Returns: the same Transform instance, for method chaining.\n\n"
+    "Another unrelated filler paragraph, still no headings anywhere near it.\n\n"
+    "Returns: the same Transform instance, for method chaining.\n"
+)
+
+
+def test_structurally_separated_prose_boilerplate_not_flagged():
+    assert _detect_duplicate_content(_STRUCTURALLY_SEPARATED_BOILERPLATE) == []
+
+
+def test_structurally_separated_prose_boilerplate_not_stripped():
+    working = _STRUCTURALLY_SEPARATED_BOILERPLATE
+    if _detect_duplicate_content(working):
+        working = _fix_duplicate_content(working)
+    assert working == _STRUCTURALLY_SEPARATED_BOILERPLATE
+    assert working.count("Returns: the same Transform instance, for method chaining.") == 3
+
+
+def test_repeated_prose_without_structural_separation_still_flagged_and_fixed():
+    """Contrast case: the exclusion must not blind detection to a genuine
+    decoding-loop shape (same note repeated with no heading/fence between
+    occurrences)."""
+    assert _detect_duplicate_content(_SAME_NOTE_WITHOUT_STRUCTURAL_SEPARATION) != []
+    working = _SAME_NOTE_WITHOUT_STRUCTURAL_SEPARATION
+    if _detect_duplicate_content(working):
+        working = _fix_duplicate_content(working)
+    assert working.count("Returns: the same Transform instance, for method chaining.") == 1

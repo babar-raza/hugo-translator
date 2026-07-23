@@ -1220,18 +1220,33 @@ class WriteGateEvaluator:
     ) -> str:
         """Remove paragraphs that appear 3+ times (model repetition artifact).
 
-        Paragraphs that overlap a fenced code block are never eligible: distinct
-        code examples on the same page routinely share a short boilerplate
-        opening line (an import/#include right after the fence, separated from
-        the rest of the snippet by a blank line), and without this exclusion
-        those shared lines get miscounted as "the same paragraph repeated" and
-        stripped out of otherwise-correct, distinct examples.
+        Two exclusions keep this from stripping legitimate content:
+
+        - Paragraphs that overlap a fenced code block are never eligible:
+          distinct code examples on the same page routinely share a short
+          boilerplate opening line (an import/#include right after the
+          fence, separated from the rest of the snippet by a blank line),
+          and without this exclusion those shared lines get miscounted as
+          "the same paragraph repeated" and stripped out of otherwise-
+          correct, distinct examples.
+        - A duplicate is also excluded if a heading or a code fence appears
+          between every consecutive pair of its occurrences: this is the
+          signature of legitimate structural repetition (e.g. a "Returns:
+          same X instance for chaining" note, or a "Key Properties" label,
+          repeated once per distinct method/property/class section on a
+          reference.aspose.org API-reference page) -- a genuine MT
+          decoding-loop artifact has no such intervening structure between
+          repeats.
         """
         body = self._get_body(translated_content)
         fence_spans = [(m.start(), m.end()) for m in re.finditer(r"```[\s\S]*?```", body)]
+        heading_spans = [(m.start(), m.end()) for m in re.finditer(r"^#{1,6}[ \t].*$", body, re.M)]
 
         def in_fence(start: int, end: int) -> bool:
             return any(start < e and end > s for s, e in fence_spans)
+
+        def has_structural_boundary_between(a: int, b: int) -> bool:
+            return any(a <= s < b for s, _ in heading_spans) or any(a <= s < b for s, _ in fence_spans)
 
         paragraphs: list[tuple[str, int, int]] = []
         pos = 0
@@ -1240,16 +1255,28 @@ class WriteGateEvaluator:
             pos = m.end()
         paragraphs.append((body[pos:], pos, len(body)))
 
-        # Normalize and count -- only paragraphs outside code fences are eligible
+        # Normalize, count, and track occurrence positions -- only paragraphs
+        # outside code fences are eligible.
         seen: dict[str, int] = {}
+        occurrence_starts: dict[str, list[int]] = {}
         for para, start, end in paragraphs:
             if in_fence(start, end):
                 continue
             key = re.sub(r"\s+", " ", para.strip())
             if len(key) > 30:  # Only meaningful paragraphs
                 seen[key] = seen.get(key, 0) + 1
+                occurrence_starts.setdefault(key, []).append(start)
 
-        duplicates = {k for k, v in seen.items() if v >= 3}
+        def structurally_separated(key: str) -> bool:
+            starts = sorted(occurrence_starts.get(key, []))
+            if len(starts) < 2:
+                return False
+            return all(
+                has_structural_boundary_between(starts[i], starts[i + 1])
+                for i in range(len(starts) - 1)
+            )
+
+        duplicates = {k for k, v in seen.items() if v >= 3 and not structurally_separated(k)}
         if not duplicates:
             return translated_content
 

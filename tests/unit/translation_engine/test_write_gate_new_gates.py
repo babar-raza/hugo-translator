@@ -339,6 +339,60 @@ class TestGateDuplicateContent:
         assert result_body.count("int main() { return 2; }") == 1
         assert result_body.count("int main() { return 3; }") == 1
 
+    def test_structurally_separated_prose_boilerplate_not_stripped(self):
+        """A short 'Returns' note repeated once per distinct method section
+        (heading between every occurrence) is legitimate reference-doc
+        boilerplate, not an MT decoding-loop artifact -- reproduces the
+        real reference.aspose.org pattern found in mission
+        duplicate-content-fence-fix-20260723's pilot (transform.md,
+        _index.md, exceptions.md, page-break.md): none of the 3 occurrences
+        should be stripped.
+        """
+        body = (
+            "### setTranslation(tx, ty, tz)\n\n"
+            "Sets the local translation.\n\n"
+            "Returns: the same Transform instance, for method chaining.\n\n"
+            "### setScale(sx, sy, sz)\n\n"
+            "Sets the local scale.\n\n"
+            "Returns: the same Transform instance, for method chaining.\n\n"
+            "### setRotation(rw, rx, ry, rz)\n\n"
+            "Sets the local rotation.\n\n"
+            "Returns: the same Transform instance, for method chaining.\n"
+        )
+        tr = _md(body=body)
+        src = _src_md(body=body)
+        gate = _make_gate(force_accept=True)
+
+        r = gate.evaluate(tr, src, "ar", Path("test.md"))
+
+        result_body = r.cleaned_content if r.cleaned_content else tr
+        assert result_body.count("Returns: the same Transform instance, for method chaining.") == 3
+        for heading in ["### setTranslation(tx, ty, tz)", "### setScale(sx, sy, sz)", "### setRotation(rw, rx, ry, rz)"]:
+            assert heading in result_body
+
+    def test_repeated_prose_without_structural_separation_still_cleaned(self):
+        """Contrast case: the same short note repeated 3x with NO heading or
+        code fence between occurrences (a genuine decoding-loop shape) must
+        still be detected and deduplicated -- the structural-separation
+        exclusion must not blind the gate to real corruption.
+        """
+        note = "Returns: the same Transform instance, for method chaining."
+        body = (
+            f"{note}\n\n"
+            "Unrelated filler paragraph with no heading in sight here at all.\n\n"
+            f"{note}\n\n"
+            "Another unrelated filler paragraph, still no headings anywhere near it.\n\n"
+            f"{note}\n"
+        )
+        tr = _md(body=body)
+        src = _src_md(body=body)
+        gate = _make_gate(force_accept=True)
+
+        r = gate.evaluate(tr, src, "ar", Path("test.md"))
+
+        result_body = r.cleaned_content if r.cleaned_content else tr
+        assert result_body.count(note) == 1
+
 
 # ---------------------------------------------------------------------------
 # Gate 17: Newline Explosion (blocking)
