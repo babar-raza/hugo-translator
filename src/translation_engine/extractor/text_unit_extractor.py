@@ -15,6 +15,12 @@ from typing import Any
 from src.utils.log_sanitizer import sanitize_for_log
 
 from ..parser.ast_nodes import ASTNode, NodeType
+from ..terminology.classification import (
+    VERDICT_TABLE,
+    ProtectedTerms,
+    TemplateStringRegistry,
+    classify,
+)
 from .text_unit import BodyTranslationPlan, TextUnit, TextUnitKind
 
 logger = logging.getLogger(__name__)
@@ -300,6 +306,7 @@ class TextUnitExtractor:
         script_validation_thresholds: dict | None = None,
         batch_purity_skip_langs: list[str] | None = None,
         force_protected_fields: frozenset[str] | set[str] = frozenset(),
+        target_lang: str | None = None,
     ):
         """
         Initialize extractor for native batch translation.
@@ -318,10 +325,22 @@ class TextUnitExtractor:
                 (passthrough), overriding the site profile's per-field mode. Used for
                 path-dependent exceptions (e.g. family/platform index page titles) that
                 can't be expressed in the site-wide frontmatter config.
+            target_lang: Target locale code (e.g. "ja"). Used to resolve headings/table
+                cells against the i18n template-string table (mission
+                heading-i18n-governance-20260723, TC-HT-I18N-004) before falling back to
+                MT — None disables the table lookup entirely (e.g. legacy callers that
+                don't pass it), preserving prior behavior.
         """
         self.segmentation_strategy = segmentation_strategy
         self.site_profile = site_profile
         self.force_protected_fields = frozenset(force_protected_fields)
+        self.target_lang = target_lang
+        # Loaded once per extractor instance (one instance per file-translation
+        # call, per segment_translator.py's _translate_body_ast) rather than
+        # once per text unit, since re-parsing the 14 template-string YAML
+        # files on every heading/table-cell would be wasteful.
+        self._template_registry = TemplateStringRegistry()
+        self._protected_terms = ProtectedTerms()
 
         # Load extraction config from site profile (with fallback to defaults)
         extraction_config = self._load_extraction_config()
@@ -1565,8 +1584,16 @@ class TextUnitExtractor:
             do_not_translate=do_not_translate,
             metadata={"placeholder_map": placeholder_map} if placeholder_map else {},
         )
+        # i18n table short-circuit (TC-HT-I18N-004): pre-setting translated_text
+        # here makes segment_translator.py's existing "already translated" skip
+        # (the same one used for LLM-prefilled units) apply automatically — no
+        # MT call, no TM read/write, for this unit.
+        table_value = self._i18n_table_value(protected_text, node_addr=node.node_addr)
+        if table_value is not None:
+            unit.do_not_translate = True
+            unit.translated_text = table_value
         logger.debug(
-            f"[DEBUG] Created TextUnit: do_not_translate={do_not_translate}",
+            f"[DEBUG] Created TextUnit: do_not_translate={unit.do_not_translate}",
             extra={"source_text": sanitize_for_log(protected_text, 200)},
         )
         units.append(unit)
@@ -1743,8 +1770,18 @@ class TextUnitExtractor:
             do_not_translate=do_not_translate,
             metadata=_unit_metadata,
         )
+        # i18n table short-circuit (TC-HT-I18N-004): this is the primary path
+        # for headings (kind=HEADING_TEXT) and table headers/enum cells
+        # (kind=TABLE_CELL_TEXT) — the ~83% of the english_headings_nonlatin
+        # backlog this mission's i18n table covers. See _extract_text_node's
+        # matching comment for why pre-setting translated_text is sufficient.
+        if kind in (TextUnitKind.HEADING_TEXT, TextUnitKind.TABLE_CELL_TEXT):
+            table_value = self._i18n_table_value(protected_text, node_addr=node.node_addr)
+            if table_value is not None:
+                unit.do_not_translate = True
+                unit.translated_text = table_value
         logger.debug(
-            f"[DEBUG] Created full sentence TextUnit: do_not_translate={do_not_translate}",
+            f"[DEBUG] Created full sentence TextUnit: do_not_translate={unit.do_not_translate}",
             extra={"source_text": sanitize_for_log(protected_text, 200)},
         )
         units.append(unit)
@@ -1881,6 +1918,37 @@ class TextUnitExtractor:
                 return True
 
         return False
+
+    def _i18n_table_value(self, text: str, *, node_addr: str = "") -> str | None:
+        """Resolve ``text`` against the i18n template-string table for
+        ``self.target_lang`` (mission heading-i18n-governance-20260723,
+        TC-HT-I18N-004). Returns the approved translation on a table hit, or
+        None otherwise (including when ``target_lang`` was never set, e.g.
+        a caller that predates this parameter). Never raises: a classifier
+        error must not block ordinary extraction.
+
+        A miss also drives the continuous discovery log (TC-HT-I18N-005) for
+        single-hump words with neither a table nor protected-terms entry —
+        this is what turns "found by a rare full-corpus audit" into
+        "surfaced continuously, as it happens."
+        """
+        if not self.target_lang:
+            return None
+        try:
+            result = classify(
+                text,
+                self.target_lang,
+                registry=self._template_registry,
+                protected_terms=self._protected_terms,
+                # File path isn't plumbed into the extractor today (extract_from_ast
+                # only receives the AST + frontmatter); node_addr is still useful
+                # discovery-log context and doesn't require widening that signature.
+                context=node_addr or None,
+            )
+        except Exception:
+            logger.debug("i18n table classification failed for %r", text[:80], exc_info=True)
+            return None
+        return result.value if result.verdict == VERDICT_TABLE else None
 
     def _has_block_content(self, node: ASTNode) -> bool:
         """Check if node has block-level children that cannot be represented as

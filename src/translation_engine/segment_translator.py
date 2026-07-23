@@ -607,8 +607,20 @@ class SegmentTranslator:
                 for _bi, _br in zip(_fm_idx, _fm_res):
                     _tm_batch_results[_bi] = _br
             if _body_idx:
+                # HT-QUALITY-GATES-001 Part 22 (plan 5.1 item 5): site profiles
+                # declare tm_prefs.min_similarity_score but nothing read it --
+                # batch_lookup()'s semantic_threshold silently kept its
+                # hardcoded 0.80 default for every site regardless of this
+                # config. Wired here so the declared per-site value actually
+                # takes effect for the one call site (body segments) that
+                # uses L3 semantic search at all (frontmatter above passes
+                # use_semantic=False, so threshold is moot there).
+                _tm_prefs = getattr(site_profile, "tm_prefs", None)
+                _semantic_threshold = getattr(_tm_prefs, "min_similarity_score", 0.80)
                 _body_res = engine.tm.batch_lookup(
-                    [_make_tm_req(segments[i]) for i in _body_idx], use_semantic=True
+                    [_make_tm_req(segments[i]) for i in _body_idx],
+                    use_semantic=True,
+                    semantic_threshold=_semantic_threshold,
                 )
                 for _bi, _br in zip(_body_idx, _body_res):
                     _tm_batch_results[_bi] = _br
@@ -819,6 +831,11 @@ class SegmentTranslator:
                                 _final_translation = self._restore_placeholders(
                                     _seg_translation, _seg
                                 )
+                                # HT-QUALITY-GATES-001 Part 22 (plan 5.4 item 4):
+                                # record the per-unit "actually LLM-translated"
+                                # fact (segment-path equivalent of the AST-path
+                                # instrumentation above).
+                                stats.llm_units_translated += 1
                             else:
                                 # TC-LLM-AVAIL-001-style graceful degrade: keep the
                                 # original text rather than sending decontextualized
@@ -907,6 +924,31 @@ class SegmentTranslator:
                     )
 
             # INT-02: Retry temperature variation — increase sampling diversity on retries
+            #
+            # HT-QUALITY-GATES-001 Part 22 (root cause B, retry-temperature
+            # leak): `_provider._config.temperature` is shared, mutable state
+            # on a cross-thread singleton backend instance (ModelLoader caches
+            # one backend per model, reused by every concurrent worker
+            # thread). The ORIGINAL bug: this write only happened inside the
+            # `retry_count > 0` branch, so once ANY file anywhere retried and
+            # raised the temperature, it stayed elevated forever afterward --
+            # every subsequent call on that backend, retry or not, ran hotter
+            # than intended, for the rest of the process. Fixed here by
+            # writing the correct value on EVERY call, retry or not, so the
+            # shared state can never be left stale from a previous call by
+            # omission. This does not add per-call thread-isolation (that
+            # would need `generate()` to accept temperature as an explicit
+            # argument across every provider implementation, plumbed through
+            # every `backend.translate()`/`translate_with_token_counts()`
+            # call site in this file -- real surgery on a cost-incurring hot
+            # path, not a surgical fix); a narrow residual risk remains where
+            # two concurrent calls on the SAME backend could each observe the
+            # other's transient write in the instant before their own
+            # generate() call reads it. That residual is materially smaller
+            # than the fixed bug (a multi-file-forever drift, now reduced to
+            # a same-two-calls microsecond window) and is the honest
+            # boundary of what this pass fixes -- see Part 7's stress-test
+            # mitigation for verifying this under real concurrent load.
             base_temperature = 0.7
             if retry_count > 0:
                 temperature_increment = 0.1
@@ -914,19 +956,19 @@ class SegmentTranslator:
                 temperature = min(
                     base_temperature + (retry_count * temperature_increment), max_temperature
                 )
-                # TC-BUGFIX-A: Apply temperature to LLM backend for retry diversity
-                _provider = getattr(getattr(backend, "_provider", None), "_config", None)
-                if _provider is not None and hasattr(_provider, "temperature"):
-                    _provider.temperature = temperature
-                    logger.debug(
-                        f"Retry {retry_count}: applied temperature={temperature} to LLM backend"
-                    )
-                else:
-                    logger.debug(
-                        f"Retry {retry_count}: temperature={temperature} (backend does not support temperature)"
-                    )
             else:
                 temperature = base_temperature
+
+            _provider = getattr(getattr(backend, "_provider", None), "_config", None)
+            if _provider is not None and hasattr(_provider, "temperature"):
+                _provider.temperature = temperature
+                logger.debug(
+                    f"Retry {retry_count}: applied temperature={temperature} to LLM backend"
+                )
+            else:
+                logger.debug(
+                    f"Retry {retry_count}: temperature={temperature} (backend does not support temperature)"
+                )
             try:
                 progress = get_progress_tracker()
                 batch_start_time = time.time()
@@ -1247,6 +1289,7 @@ class SegmentTranslator:
                 script_validation_thresholds=script_validation_thresholds,
                 batch_purity_skip_langs=_batch_purity_skip_langs,
                 force_protected_fields=force_protected_fields,
+                target_lang=target_lang,
             )
 
             logger.info(
@@ -1401,6 +1444,13 @@ class SegmentTranslator:
                                         _llm_unit.metadata[
                                             "llm_passthrough_reason"
                                         ] = "llm_echo_reject"
+                                    else:
+                                        # HT-QUALITY-GATES-001 Part 22 (plan
+                                        # 5.4 item 4): record the per-unit
+                                        # "actually LLM-translated" fact so
+                                        # write-gate tiering can use it
+                                        # directly instead of a locale proxy.
+                                        stats.llm_units_translated += 1
                         except Exception as _llm_err:
                             logger.warning(
                                 f"ContentTypeRouter LLM pre-translate failed "
