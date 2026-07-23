@@ -1,0 +1,285 @@
+# Canonical registry of closed-vocabulary "template strings" (API-doc section
+# headings, table column headers, table enum values) that get a deterministic
+# i18n lookup instead of a per-occurrence MT call.
+#
+# Mission: heading-i18n-governance-20260723 (successor to HT-QUALITY-GATES-001).
+# See C:\Users\prora\.claude\plans\glittery-waddling-moth.md §1/§5/§7 for the
+# root-cause analysis and taskcard (TC-HT-I18N-001..003) that produced this file.
+#
+# Schema:
+#   id                  stable identifier, never the raw English text (text can
+#                       be re-cased/renamed without breaking locale-file keys)
+#   en                  the exact English source string this entry matches
+#   category            section_heading | table_header | enum_value
+#   status              approved   -> live in the classifier, must have full
+#                                     locale coverage (see completeness lint)
+#                        pending    -> seeded here, translations not yet
+#                                     agentically reviewed (TC-HT-I18N-003)
+#                        deprecated -> no longer matched, kept for history
+#   first_seen_incident traceability back to the investigation that surfaced it
+#   evidence_count      occurrence count from the audit_phase7_recon.jsonl /
+#                       live-corpus scan that justified adding this entry;
+#                       0 means "known term from the pre-existing
+#                       _API_HEADING_TERMS/_SECTION_HEADING_TERMS/
+#                       _TABLE_ACCESS_VALUES lists, not independently
+#                       recounted in this pass"
+schema_version: 1
+entries:
+  - id: heading.overview
+    en: "Overview"
+    category: section_heading
+    status: pending
+    first_seen_incident: HT-QUALITY-GATES-001
+    evidence_count: 13622
+  - id: heading.properties
+    en: "Properties"
+    category: table_header
+    status: pending
+    first_seen_incident: HT-QUALITY-GATES-001
+    evidence_count: 6500
+  - id: heading.value
+    en: "Value"
+    category: table_header
+    status: pending
+    first_seen_incident: HT-QUALITY-GATES-001
+    evidence_count: 3536
+  - id: heading.values
+    en: "Values"
+    category: table_header
+    status: pending
+    first_seen_incident: HT-QUALITY-GATES-001
+    evidence_count: 3808
+  - id: heading.methods
+    en: "Methods"
+    category: table_header
+    status: pending
+    first_seen_incident: HT-QUALITY-GATES-001
+    evidence_count: 3448
+  - id: heading.description
+    en: "Description"
+    category: table_header
+    status: pending
+    first_seen_incident: HT-QUALITY-GATES-001
+    evidence_count: 2572
+  - id: heading.see_also
+    en: "See Also"
+    category: table_header
+    status: pending
+    first_seen_incident: HT-QUALITY-GATES-001
+    evidence_count: 1790
+  - id: heading.options
+    en: "Options"
+    category: section_heading
+    status: pending
+    first_seen_incident: HT-QUALITY-GATES-001
+    evidence_count: 310
+  - id: heading.enumerations
+    en: "Enumerations"
+    category: section_heading
+    status: pending
+    first_seen_incident: HT-QUALITY-GATES-001
+    evidence_count: 119
+  - id: heading.example
+    en: "Example"
+    category: section_heading
+    status: pending
+    first_seen_incident: HT-QUALITY-GATES-001
+    evidence_count: 118
+  - id: heading.installation
+    en: "Installation"
+    category: section_heading
+    status: pending
+    first_seen_incident: HT-QUALITY-GATES-001
+    evidence_count: 58
+  - id: heading.examples
+    en: "Examples"
+    category: table_header
+    status: pending
+    first_seen_incident: HT-QUALITY-GATES-001
+    evidence_count: 35
+  - id: heading.inheritance
+    en: "Inheritance"
+    category: table_header
+    status: pending
+    first_seen_incident: HT-QUALITY-GATES-001
+    evidence_count: 34
+  - id: heading.type
+    en: "Type"
+    category: table_header
+    status: pending
+    first_seen_incident: HT-QUALITY-GATES-001
+    evidence_count: 33
+  - id: heading.input
+    en: "Input"
+    category: section_heading
+    status: pending
+    first_seen_incident: HT-QUALITY-GATES-001
+    evidence_count: 33
+  - id: heading.constructors
+    en: "Constructors"
+    category: table_header
+    status: pending
+    first_seen_incident: HT-QUALITY-GATES-001
+    evidence_count: 31
+  - id: heading.features
+    en: "Features"
+    category: section_heading
+    status: pending
+    first_seen_incident: HT-QUALITY-GATES-001
+    evidence_count: 12
+  - id: heading.notes
+    en: "Notes"
+    category: section_heading
+    status: pending
+    first_seen_incident: HT-QUALITY-GATES-001
+    evidence_count: 7
+  - id: heading.usage
+    en: "Usage"
+    category: section_heading
+    status: pending
+    first_seen_incident: HT-QUALITY-GATES-001
+    evidence_count: 5
+  - id: heading.summary
+    en: "Summary"
+    category: section_heading
+    status: pending
+    first_seen_incident: HT-QUALITY-GATES-001
+    evidence_count: 4
+  # Known terms from the pre-existing _API_HEADING_TERMS/_SECTION_HEADING_TERMS
+  # allow-lists (text_unit_extractor.py, write_gate.py, tm_surgical_cleanup.py)
+  # not independently re-measured in this investigation's frequency pass —
+  # seeded here so the same closed vocabulary is covered by one canonical
+  # source instead of remaining scattered across those five files.
+  - id: heading.name
+    en: "Name"
+    category: table_header
+    status: pending
+    first_seen_incident: HT-QUALITY-GATES-001
+    evidence_count: 0
+  - id: heading.returns
+    en: "Returns"
+    category: table_header
+    status: pending
+    first_seen_incident: HT-QUALITY-GATES-001
+    evidence_count: 0
+  - id: heading.parameters
+    en: "Parameters"
+    category: table_header
+    status: pending
+    first_seen_incident: HT-QUALITY-GATES-001
+    evidence_count: 0
+  - id: heading.fields
+    en: "Fields"
+    category: table_header
+    status: pending
+    first_seen_incident: HT-QUALITY-GATES-001
+    evidence_count: 0
+  - id: heading.events
+    en: "Events"
+    category: table_header
+    status: pending
+    first_seen_incident: HT-QUALITY-GATES-001
+    evidence_count: 0
+  - id: heading.exceptions
+    en: "Exceptions"
+    category: table_header
+    status: pending
+    first_seen_incident: HT-QUALITY-GATES-001
+    evidence_count: 0
+  - id: heading.remarks
+    en: "Remarks"
+    category: table_header
+    status: pending
+    first_seen_incident: HT-QUALITY-GATES-001
+    evidence_count: 0
+  - id: heading.implements
+    en: "Implements"
+    category: table_header
+    status: pending
+    first_seen_incident: HT-QUALITY-GATES-001
+    evidence_count: 0
+  - id: heading.namespace
+    en: "Namespace"
+    category: table_header
+    status: pending
+    first_seen_incident: HT-QUALITY-GATES-001
+    evidence_count: 0
+  - id: heading.assembly
+    en: "Assembly"
+    category: table_header
+    status: pending
+    first_seen_incident: HT-QUALITY-GATES-001
+    evidence_count: 0
+  - id: heading.syntax
+    en: "Syntax"
+    category: table_header
+    status: pending
+    first_seen_incident: HT-QUALITY-GATES-001
+    evidence_count: 0
+  - id: heading.deprecated
+    en: "Deprecated"
+    category: section_heading
+    status: pending
+    first_seen_incident: HT-QUALITY-GATES-001
+    evidence_count: 0
+  - id: heading.requirements
+    en: "Requirements"
+    category: section_heading
+    status: pending
+    first_seen_incident: HT-QUALITY-GATES-001
+    evidence_count: 0
+  - id: heading.introduction
+    en: "Introduction"
+    category: section_heading
+    status: pending
+    first_seen_incident: HT-QUALITY-GATES-001
+    evidence_count: 0
+  - id: heading.output
+    en: "Output"
+    category: section_heading
+    status: pending
+    first_seen_incident: HT-QUALITY-GATES-001
+    evidence_count: 0
+  - id: heading.result
+    en: "Result"
+    category: section_heading
+    status: pending
+    first_seen_incident: HT-QUALITY-GATES-001
+    evidence_count: 0
+  - id: heading.results
+    en: "Results"
+    category: section_heading
+    status: pending
+    first_seen_incident: HT-QUALITY-GATES-001
+    evidence_count: 0
+  - id: heading.details
+    en: "Details"
+    category: section_heading
+    status: pending
+    first_seen_incident: HT-QUALITY-GATES-001
+    evidence_count: 0
+  - id: heading.configuration
+    en: "Configuration"
+    category: section_heading
+    status: pending
+    first_seen_incident: HT-QUALITY-GATES-001
+    evidence_count: 0
+  - id: heading.limitations
+    en: "Limitations"
+    category: section_heading
+    status: pending
+    first_seen_incident: HT-QUALITY-GATES-001
+    evidence_count: 0
+  # Table enum cell values (heal_english_headings.py's _TABLE_ACCESS_VALUES)
+  - id: table.access.read
+    en: "Read"
+    category: enum_value
+    status: pending
+    first_seen_incident: HT-QUALITY-GATES-001
+    evidence_count: 0
+  - id: table.access.write
+    en: "Write"
+    category: enum_value
+    status: pending
+    first_seen_incident: HT-QUALITY-GATES-001
+    evidence_count: 0

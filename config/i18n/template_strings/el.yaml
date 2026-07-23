@@ -1,0 +1,7 @@
+# Per-locale translations for config/i18n/template_strings/_registry.yaml.
+# Populated by the agentic adjudication workflow (TC-HT-I18N-003), sourced
+# from scripts/quality/mine_heading_glossary.py's candidate queues. Every
+# key here must be an id from _registry.yaml with status: approved.
+schema_version: 1
+locale: el
+translations: {}
