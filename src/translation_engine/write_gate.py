@@ -1229,38 +1229,55 @@ class WriteGateEvaluator:
           and without this exclusion those shared lines get miscounted as
           "the same paragraph repeated" and stripped out of otherwise-
           correct, distinct examples.
-        - A duplicate is also excluded if a heading or a code fence appears
-          between every consecutive pair of its occurrences: this is the
-          signature of legitimate structural repetition (e.g. a "Returns:
-          same X instance for chaining" note, or a "Key Properties" label,
+        - A duplicate is also excluded if a heading appears between every
+          consecutive pair of its occurrences: this is the signature of
+          legitimate structural repetition (e.g. a "Returns: same X
+          instance for chaining" note, or a "Key Properties" label,
           repeated once per distinct method/property/class section on a
           reference.aspose.org API-reference page) -- a genuine MT
           decoding-loop artifact has no such intervening structure between
-          repeats.
+          repeats. A code fence between occurrences is deliberately NOT
+          treated as sufficient separation on its own: a decoding-loop
+          repeat could plausibly interleave with unrelated code blocks, so
+          only an actual section-heading change counts as evidence of
+          distinct structural context (verified: all 20 known real
+          legitimate cases from mission duplicate-content-fence-fix-20260723
+          are heading-separated, not merely fence-separated).
         """
         body = self._get_body(translated_content)
-        fence_spans = [(m.start(), m.end()) for m in re.finditer(r"```[\s\S]*?```", body)]
         heading_spans = [(m.start(), m.end()) for m in re.finditer(r"^#{1,6}[ \t].*$", body, re.M)]
 
-        def in_fence(start: int, end: int) -> bool:
-            return any(start < e and end > s for s, e in fence_spans)
-
         def has_structural_boundary_between(a: int, b: int) -> bool:
-            return any(a <= s < b for s, _ in heading_spans) or any(a <= s < b for s, _ in fence_spans)
+            return any(a <= s < b for s, _ in heading_spans)
 
-        paragraphs: list[tuple[str, int, int]] = []
-        pos = 0
-        for m in re.finditer(r"\n{2,}", body):
-            paragraphs.append((body[pos:m.start()], pos, m.start()))
-            pos = m.end()
-        paragraphs.append((body[pos:], pos, len(body)))
+        # Split on fence boundaries first, then blank lines within each
+        # non-fence chunk. Splitting on blank lines first and only
+        # afterward checking fence overlap (the earlier approach) would
+        # silently merge a paragraph that directly abuts a fence with no
+        # blank line into the fence itself, losing it from detection
+        # entirely -- either missing genuine 3x corruption that happens to
+        # sit right after a fence, or (when protection is involved) failing
+        # to recognize a legitimate fence-adjacent occurrence as one of the
+        # structurally-separated repeats.
+        paragraphs: list[tuple[str, int, int, bool]] = []  # (text, start, end, is_fence)
+        offset = 0
+        for chunk in re.split(r"(```[\s\S]*?```)", body):
+            if chunk.startswith("```"):
+                paragraphs.append((chunk, offset, offset + len(chunk), True))
+            else:
+                pos = 0
+                for m in re.finditer(r"\n{2,}", chunk):
+                    paragraphs.append((chunk[pos:m.start()], offset + pos, offset + m.start(), False))
+                    pos = m.end()
+                paragraphs.append((chunk[pos:], offset + pos, offset + len(chunk), False))
+            offset += len(chunk)
 
         # Normalize, count, and track occurrence positions -- only paragraphs
         # outside code fences are eligible.
         seen: dict[str, int] = {}
         occurrence_starts: dict[str, list[int]] = {}
-        for para, start, end in paragraphs:
-            if in_fence(start, end):
+        for para, start, end, is_fence in paragraphs:
+            if is_fence:
                 continue
             key = re.sub(r"\s+", " ", para.strip())
             if len(key) > 30:  # Only meaningful paragraphs
@@ -1283,9 +1300,12 @@ class WriteGateEvaluator:
         # Keep only first occurrence of each duplicate
         kept: set[str] = set()
         cleaned_paragraphs = []
-        for para, start, end in paragraphs:
+        for para, start, end, is_fence in paragraphs:
+            if is_fence:
+                cleaned_paragraphs.append(para)
+                continue
             key = re.sub(r"\s+", " ", para.strip())
-            if not in_fence(start, end) and key in duplicates:
+            if key in duplicates:
                 if key not in kept:
                     kept.add(key)
                     cleaned_paragraphs.append(para)

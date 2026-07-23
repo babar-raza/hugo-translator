@@ -249,41 +249,55 @@ def _repair_inline_code_line(en_line: str, tr_line: str) -> str:
 
 
 def _paragraphs_with_positions(body: str) -> list[tuple[str, int]]:
-    """Split body on blank-line boundaries, returning (stripped_text, start_offset)."""
+    """Split body into paragraphs, returning (stripped_text, start_offset).
+
+    Splits on fence boundaries first, then blank lines within each
+    non-fence chunk (fence content itself is never returned as a
+    paragraph). Splitting on blank lines first and only afterward checking
+    fence overlap would silently merge a paragraph that directly abuts a
+    fence with no blank line into the fence itself, losing it from
+    consideration entirely.
+    """
     paragraphs = []
-    pos = 0
-    for m in re.finditer(r"\n{2,}", body):
-        paragraphs.append((body[pos:m.start()].strip(), pos))
-        pos = m.end()
-    paragraphs.append((body[pos:].strip(), pos))
+    offset = 0
+    for chunk in re.split(r"(```[\s\S]*?```)", body):
+        if chunk.startswith("```"):
+            offset += len(chunk)
+            continue
+        pos = 0
+        for m in re.finditer(r"\n{2,}", chunk):
+            paragraphs.append((chunk[pos:m.start()].strip(), offset + pos))
+            pos = m.end()
+        paragraphs.append((chunk[pos:].strip(), offset + pos))
+        offset += len(chunk)
     return paragraphs
 
 
 def _structurally_separated_duplicates(body: str) -> set[str]:
     """Paragraph texts that repeat 3+ times outside code fences where a
-    heading or a code fence separates every consecutive pair of occurrences.
+    heading separates every consecutive pair of occurrences.
 
     That structural separation is the signature of legitimate repetition --
     e.g. a "Returns: same X instance for chaining" note, or a "Key
     Properties" label, repeated once per distinct method/property/class
     section on a reference.aspose.org API-reference page -- rather than a
     genuine MT decoding-loop artifact, which has no such intervening
-    structure between repeats.
+    structure between repeats. A code fence between occurrences is
+    deliberately NOT treated as sufficient separation on its own: a
+    decoding-loop repeat could plausibly interleave with unrelated code
+    blocks, so only an actual section-heading change counts as evidence of
+    distinct structural context (verified: all 20 known real legitimate
+    cases from this mission are heading-separated, not merely
+    fence-separated).
     """
-    fence_spans = [(m.start(), m.end()) for m in re.finditer(r"```[\s\S]*?```", body)]
     heading_spans = [(m.start(), m.end()) for m in re.finditer(r"^#{1,6}[ \t].*$", body, re.M)]
 
-    def in_fence(start: int, end: int) -> bool:
-        return any(start < e and end > s for s, e in fence_spans)
-
     def has_boundary_between(a: int, b: int) -> bool:
-        return any(a <= s < b for s, _ in heading_spans) or any(a <= s < b for s, _ in fence_spans)
+        return any(a <= s < b for s, _ in heading_spans)
 
     occurrence_starts: dict[str, list[int]] = {}
     for stripped, start in _paragraphs_with_positions(body):
         if len(stripped) <= 30:
-            continue
-        if in_fence(start, start + len(stripped)):
             continue
         occurrence_starts.setdefault(stripped, []).append(start)
 

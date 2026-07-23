@@ -166,30 +166,44 @@ def check_duplicate_content(tr_body: str) -> bool:
     right after the fence), which would otherwise be miscounted as "the same
     paragraph repeated" even though every example is genuinely different.
 
-    A duplicate is also excluded if a heading or a code fence separates
-    every consecutive pair of its occurrences -- the signature of
-    legitimate repetition (e.g. a "Returns: same X instance for chaining"
-    note, or a "Key Properties" label, repeated once per distinct
-    method/property/class section on a reference.aspose.org API-reference
-    page) rather than a genuine MT decoding-loop artifact, which has no
-    such intervening structure between repeats.
+    A duplicate is also excluded if a heading separates every consecutive
+    pair of its occurrences -- the signature of legitimate repetition (e.g.
+    a "Returns: same X instance for chaining" note, or a "Key Properties"
+    label, repeated once per distinct method/property/class section on a
+    reference.aspose.org API-reference page) rather than a genuine MT
+    decoding-loop artifact, which has no such intervening structure between
+    repeats. A code fence between occurrences is deliberately NOT treated
+    as sufficient separation on its own: a decoding-loop repeat could
+    plausibly interleave with unrelated code blocks, so only an actual
+    section-heading change counts as evidence of distinct structural
+    context (verified: all 20 known real legitimate cases from mission
+    duplicate-content-fence-fix-20260723 are heading-separated, not merely
+    fence-separated).
     """
-    fence_spans = [(m.start(), m.end()) for m in re.finditer(r"```[\s\S]*?```", tr_body)]
     heading_spans = [(m.start(), m.end()) for m in re.finditer(r"^#{1,6}[ \t].*$", tr_body, re.M)]
 
-    def in_fence(start, end):
-        return any(start < e and end > s for s, e in fence_spans)
-
     def has_boundary_between(a, b):
-        return any(a <= s < b for s, _ in heading_spans) or any(a <= s < b for s, _ in fence_spans)
+        return any(a <= s < b for s, _ in heading_spans)
 
+    # Split on fence boundaries first, then blank lines within each
+    # non-fence chunk. Splitting on blank lines first and only afterward
+    # checking fence overlap would silently merge a paragraph that directly
+    # abuts a fence with no blank line into the fence itself, losing it
+    # from consideration entirely -- missing genuine 3x corruption that
+    # happens to sit right after a fence.
     occurrence_starts: dict[str, list[int]] = {}
-    pos = 0
-    for seg in re.split(r"(\n{2,})", tr_body):
-        stripped = seg.strip()
-        if len(stripped) > 50 and not in_fence(pos, pos + len(seg)):
-            occurrence_starts.setdefault(stripped, []).append(pos)
-        pos += len(seg)
+    offset = 0
+    for chunk in re.split(r"(```[\s\S]*?```)", tr_body):
+        if chunk.startswith("```"):
+            offset += len(chunk)
+            continue
+        pos = 0
+        for seg in re.split(r"(\n{2,})", chunk):
+            stripped = seg.strip()
+            if len(stripped) > 50:
+                occurrence_starts.setdefault(stripped, []).append(offset + pos)
+            pos += len(seg)
+        offset += len(chunk)
 
     for key, starts in occurrence_starts.items():
         if len(starts) < 3:

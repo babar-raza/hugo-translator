@@ -85,3 +85,47 @@ def test_structurally_separated_boilerplate_not_flagged():
 
 def test_prose_repetition_without_structural_separation_still_flagged():
     assert check_duplicate_content(_SAME_NOTE_WITHOUT_STRUCTURAL_SEPARATION) is True
+
+
+# ---------------------------------------------------------------------------
+# Regression tests found by independent verification of TC-DCF-003: this
+# function's rewrite (extracted from an inline block) split the whole body
+# on blank lines before checking fence overlap, silently merging a
+# paragraph with no blank line before it into an adjacent fence -- a
+# genuine decoding-loop repeat directly after a fence was silently missed
+# entirely (never reached the >=3 count).
+# ---------------------------------------------------------------------------
+
+_GENUINE_CORRUPTION_FENCE_ADJACENT = (
+    "Intro paragraph unrelated to anything duplicated in this test case that "
+    "is long enough to count as a real paragraph in this check.\n\n"
+    "```python\nx = 1\n```\n"
+    "This is a genuinely duplicated warning paragraph that repeats verbatim "
+    "in prose here, well past the fifty character minimum length.\n\n"
+    "```python\ny = 2\n```\n"
+    "This is a genuinely duplicated warning paragraph that repeats verbatim "
+    "in prose here, well past the fifty character minimum length.\n\n"
+    "```python\nz = 3\n```\n"
+    "This is a genuinely duplicated warning paragraph that repeats verbatim "
+    "in prose here, well past the fifty character minimum length.\n"
+)
+
+_LEGITIMATE_BOILERPLATE_FENCE_ADJACENT = (
+    "### setTranslation(tx, ty, tz)\n\nSets the local translation for this node.\n\n"
+    "```typescript\nsetTranslation(tx: number): Transform\n```\n"
+    "Returns: the same Transform instance, for method chaining purposes here.\n\n"
+    "### setScale(sx, sy, sz)\n\nSets the local scale factor for this node.\n\n"
+    "```typescript\nsetScale(sx: number): Transform\n```\n"
+    "Returns: the same Transform instance, for method chaining purposes here.\n\n"
+    "### setRotation(rw, rx, ry, rz)\n\nSets the local rotation for this node.\n\n"
+    "```typescript\nsetRotation(rw: number): Transform\n```\n"
+    "Returns: the same Transform instance, for method chaining purposes here.\n"
+)
+
+
+def test_genuine_corruption_directly_adjacent_to_fence_still_flagged():
+    assert check_duplicate_content(_GENUINE_CORRUPTION_FENCE_ADJACENT) is True
+
+
+def test_legitimate_boilerplate_directly_adjacent_to_fence_still_protected():
+    assert check_duplicate_content(_LEGITIMATE_BOILERPLATE_FENCE_ADJACENT) is False

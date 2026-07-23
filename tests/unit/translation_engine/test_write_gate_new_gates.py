@@ -393,6 +393,77 @@ class TestGateDuplicateContent:
         result_body = r.cleaned_content if r.cleaned_content else tr
         assert result_body.count(note) == 1
 
+    def test_genuine_corruption_directly_adjacent_to_fence_still_caught(self):
+        """Regression test (found by independent verification of TC-DCF-003):
+        splitting on blank lines before checking fence overlap silently
+        merged a paragraph with no blank line before it into an adjacent
+        fence, losing it from detection entirely. A genuinely duplicated
+        paragraph that directly follows a code fence (no blank line) must
+        still be caught and deduplicated.
+        """
+        note = "This is a genuinely duplicated warning paragraph that repeats verbatim in prose here."
+        body = (
+            "Intro paragraph unrelated to anything duplicated in this test case.\n\n"
+            f"```python\nx = 1\n```\n{note}\n\n"
+            f"```python\ny = 2\n```\n{note}\n\n"
+            f"```python\nz = 3\n```\n{note}\n"
+        )
+        tr = _md(body=body)
+        src = _src_md(body=body)
+        gate = _make_gate(force_accept=True)
+
+        r = gate.evaluate(tr, src, "ar", Path("test.md"))
+
+        result_body = r.cleaned_content if r.cleaned_content else tr
+        assert result_body.count(note) == 1
+
+    def test_legitimate_boilerplate_directly_adjacent_to_fence_still_protected(self):
+        """Companion regression test: a legitimate heading-separated repeat
+        that directly follows a fence with no blank line must still be
+        recognized as protected, not silently dropped from the
+        structural-separation check and stripped anyway.
+        """
+        note = "Returns: the same Transform instance, for method chaining."
+        body = (
+            f"### setTranslation(tx, ty, tz)\n\nSets the local translation.\n\n"
+            f"```typescript\nsetTranslation(tx: number): Transform\n```\n{note}\n\n"
+            f"### setScale(sx, sy, sz)\n\nSets the local scale.\n\n"
+            f"```typescript\nsetScale(sx: number): Transform\n```\n{note}\n\n"
+            f"### setRotation(rw, rx, ry, rz)\n\nSets the local rotation.\n\n"
+            f"```typescript\nsetRotation(rw: number): Transform\n```\n{note}\n"
+        )
+        tr = _md(body=body)
+        src = _src_md(body=body)
+        gate = _make_gate(force_accept=True)
+
+        r = gate.evaluate(tr, src, "ar", Path("test.md"))
+
+        result_body = r.cleaned_content if r.cleaned_content else tr
+        assert result_body.count(note) == 3
+
+    def test_code_fence_alone_between_occurrences_is_not_sufficient_separation(self):
+        """A code fence between occurrences, with no heading change, must
+        NOT be treated as legitimate structural separation on its own -- a
+        genuine decoding-loop repeat could plausibly interleave with
+        unrelated code blocks. Only an actual heading counts as evidence of
+        distinct structural context.
+        """
+        note = "This is a genuinely duplicated warning paragraph that repeats verbatim in prose here."
+        body = (
+            "Intro paragraph unrelated to anything duplicated in this test case.\n\n"
+            f"{note}\n\n```python\nx = 1\n```\n\n"
+            f"{note}\n\n```python\ny = 2\n```\n\n"
+            f"{note}\n"
+        )
+        tr = _md(body=body)
+        src = _src_md(body=body)
+        gate = _make_gate(force_accept=True)
+
+        r = gate.evaluate(tr, src, "ar", Path("test.md"))
+
+        result_body = r.cleaned_content if r.cleaned_content else tr
+        assert result_body.count(note) == 1
+
 
 # ---------------------------------------------------------------------------
 # Gate 17: Newline Explosion (blocking)

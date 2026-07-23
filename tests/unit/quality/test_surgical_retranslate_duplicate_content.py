@@ -163,3 +163,76 @@ def test_repeated_prose_without_structural_separation_still_flagged_and_fixed():
     if _detect_duplicate_content(working):
         working = _fix_duplicate_content(working)
     assert working.count("Returns: the same Transform instance, for method chaining.") == 1
+
+
+# ---------------------------------------------------------------------------
+# Regression tests found by independent verification of TC-DCF-003: the
+# structural-separation helper split the whole body on blank lines before
+# checking fence overlap, silently merging a paragraph with no blank line
+# before it into an adjacent fence -- losing it from consideration
+# entirely. That caused a false positive (legitimate fence-adjacent content
+# wrongly stripped) here in surgical_retranslate.py, and a false negative
+# (genuine fence-adjacent corruption silently missed) in audit_all_content.py.
+# ---------------------------------------------------------------------------
+
+_GENUINE_CORRUPTION_FENCE_ADJACENT = (
+    "---\ntitle: Test\n---\n\n"
+    "Intro paragraph unrelated to anything duplicated in this test case.\n\n"
+    "```python\nx = 1\n```\n"
+    "This is a genuinely duplicated warning paragraph that repeats verbatim in prose here.\n\n"
+    "```python\ny = 2\n```\n"
+    "This is a genuinely duplicated warning paragraph that repeats verbatim in prose here.\n\n"
+    "```python\nz = 3\n```\n"
+    "This is a genuinely duplicated warning paragraph that repeats verbatim in prose here.\n"
+)
+
+_LEGITIMATE_BOILERPLATE_FENCE_ADJACENT = (
+    "---\ntitle: Test\n---\n\n"
+    "### setTranslation(tx, ty, tz)\n\nSets the local translation.\n\n"
+    "```typescript\nsetTranslation(tx: number): Transform\n```\n"
+    "Returns: the same Transform instance, for method chaining.\n\n"
+    "### setScale(sx, sy, sz)\n\nSets the local scale.\n\n"
+    "```typescript\nsetScale(sx: number): Transform\n```\n"
+    "Returns: the same Transform instance, for method chaining.\n\n"
+    "### setRotation(rw, rx, ry, rz)\n\nSets the local rotation.\n\n"
+    "```typescript\nsetRotation(rw: number): Transform\n```\n"
+    "Returns: the same Transform instance, for method chaining.\n"
+)
+
+_ONLY_FENCE_SEPARATED_NO_HEADING = (
+    "---\ntitle: Test\n---\n\n"
+    "Intro paragraph unrelated to anything duplicated in this test case.\n\n"
+    "This is a genuinely duplicated warning paragraph that repeats verbatim in prose here.\n\n"
+    "```python\nx = 1\n```\n\n"
+    "This is a genuinely duplicated warning paragraph that repeats verbatim in prose here.\n\n"
+    "```python\ny = 2\n```\n\n"
+    "This is a genuinely duplicated warning paragraph that repeats verbatim in prose here.\n"
+)
+
+
+def _real_pipeline_fix(content):
+    working = content
+    if _detect_duplicate_content(working):
+        working = _fix_duplicate_content(working)
+    return working
+
+
+def test_genuine_corruption_directly_adjacent_to_fence_still_caught():
+    fixed = _real_pipeline_fix(_GENUINE_CORRUPTION_FENCE_ADJACENT)
+    assert fixed.count("This is a genuinely duplicated warning paragraph") == 1
+
+
+def test_legitimate_boilerplate_directly_adjacent_to_fence_still_protected():
+    fixed = _real_pipeline_fix(_LEGITIMATE_BOILERPLATE_FENCE_ADJACENT)
+    assert fixed == _LEGITIMATE_BOILERPLATE_FENCE_ADJACENT
+    assert fixed.count("Returns: the same Transform instance, for method chaining.") == 3
+
+
+def test_code_fence_alone_between_occurrences_is_not_sufficient_separation():
+    """A code fence between occurrences, with no heading change, must NOT
+    be treated as legitimate structural separation on its own -- a genuine
+    decoding-loop repeat could plausibly interleave with unrelated code
+    blocks. Only an actual heading counts as evidence of distinct
+    structural context."""
+    fixed = _real_pipeline_fix(_ONLY_FENCE_SEPARATED_NO_HEADING)
+    assert fixed.count("This is a genuinely duplicated warning paragraph") == 1
