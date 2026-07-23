@@ -236,3 +236,28 @@ def test_code_fence_alone_between_occurrences_is_not_sufficient_separation():
     structural context."""
     fixed = _real_pipeline_fix(_ONLY_FENCE_SEPARATED_NO_HEADING)
     assert fixed.count("This is a genuinely duplicated warning paragraph") == 1
+
+
+# ---------------------------------------------------------------------------
+# TC-DCF-008: _fix_duplicate_content must only strip paragraphs that
+# actually meet the 3x threshold, not any 2nd+ occurrence of any paragraph
+# >30 chars. An unrelated, incidental 2x repeat in the same file as a
+# genuine 3x+ duplicate must be left untouched.
+# ---------------------------------------------------------------------------
+
+_MIXED_3X_AND_2X_DUPLICATES = (
+    "---\ntitle: Test\n---\n\n"
+    "This is a genuinely duplicated warning paragraph that repeats three times verbatim in prose right here.\n\n"
+    "Unrelated filler paragraph one that has nothing at all to do with anything else in this document.\n\n"
+    "This is a genuinely duplicated warning paragraph that repeats three times verbatim in prose right here.\n\n"
+    "This is an unrelated paragraph that just happens to repeat exactly twice in this test document overall.\n\n"
+    "Unrelated filler paragraph two that has nothing at all to do with anything else in this document.\n\n"
+    "This is a genuinely duplicated warning paragraph that repeats three times verbatim in prose right here.\n\n"
+    "This is an unrelated paragraph that just happens to repeat exactly twice in this test document overall.\n"
+)
+
+
+def test_2x_repeat_untouched_when_file_also_has_genuine_3x_duplicate():
+    fixed = _real_pipeline_fix(_MIXED_3X_AND_2X_DUPLICATES)
+    assert fixed.count("This is a genuinely duplicated warning paragraph") == 1
+    assert fixed.count("This is an unrelated paragraph that just happens to repeat exactly twice") == 2

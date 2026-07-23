@@ -87,6 +87,33 @@ def count_table_rows(text):
     return count
 
 
+def check_english_headings_nonlatin(tr_body: str) -> list[str]:
+    """Return up to all English-looking headings found outside code fences.
+
+    Fence-aware (TC-DCF-007): a Python/YAML/bash comment line inside a code
+    fence (e.g. "# Read full text") matches the same #-prefixed pattern
+    `HEADING_RE` uses for real markdown headings. Without excluding fenced
+    content, these get misreported as untranslated English document
+    headings in non-Latin locales -- confirmed on real files (e.g.
+    kb.aspose.org/ar/words/python/how-to-build-ldm-builder-python.md, where
+    Python comments "# Read full text" / "# Iterate sections" inside code
+    blocks were the only "headings" ever flagged).
+    """
+    fence_spans = [(m.start(), m.end()) for m in re.finditer(r"```[\s\S]*?```", tr_body)]
+
+    def in_fence(pos):
+        return any(s <= pos < e for s, e in fence_spans)
+
+    en_heads = []
+    for m in HEADING_RE.finditer(tr_body):
+        if in_fence(m.start()):
+            continue
+        heading_text = m.group(2)
+        if re.match(r"^[A-Za-z][A-Za-z0-9 ]{1,30}$", heading_text.strip()):
+            en_heads.append(heading_text)
+    return en_heads
+
+
 def check_purity(body, target_lang):
     """Return (has_issue, ratio) for English content in non-Latin body."""
     paras = [p.strip() for p in body.split("\n\n") if len(p.strip()) > 30]
@@ -361,8 +388,7 @@ def scan(output_path=None, resume=False, sites=None):
 
                 # 6. English API headings in non-Latin-script locales
                 if locale in NON_LATIN:
-                    headings = HEADING_RE.findall(tr_body)
-                    en_heads = [h for _, h in headings if re.match(r"^[A-Za-z][A-Za-z0-9 ]{1,30}$", h.strip())]
+                    en_heads = check_english_headings_nonlatin(tr_body)
                     if en_heads:
                         record("english_headings_nonlatin", str(en_heads[:2]))
 

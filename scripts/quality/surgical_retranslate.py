@@ -348,7 +348,16 @@ def _detect_duplicate_content(tr_content: str) -> list[tuple[int, str, str, str]
 def _fix_duplicate_content(tr_content: str) -> str:
     """Remove duplicate paragraphs (keep first occurrence); code-fence
     content and structurally-separated legitimate repeats (see
-    `_structurally_separated_duplicates`) are left untouched."""
+    `_structurally_separated_duplicates`) are left untouched.
+
+    Only paragraphs that actually meet `_detect_duplicate_content`'s 3+
+    occurrence threshold are eligible for stripping -- a paragraph that
+    happens to repeat only twice is left alone even if the same file also
+    contains an unrelated, genuine 3+ duplicate elsewhere. (Fixed:
+    TC-DCF-008 -- the single-pass "seen" tracking previously stripped any
+    2nd+ occurrence of any paragraph >30 chars, regardless of whether it
+    met the 3x threshold that gates whether this function is even called.)
+    """
     # Split into frontmatter and body
     if tr_content.startswith("---"):
         end = tr_content.find("\n---", 4)
@@ -363,6 +372,12 @@ def _fix_duplicate_content(tr_content: str) -> str:
         body = tr_content
 
     protected = _structurally_separated_duplicates(body)
+    counts: dict[str, int] = {}
+    for stripped, _ in _paragraphs_with_positions(body):
+        if len(stripped) > 30:
+            counts[stripped] = counts.get(stripped, 0) + 1
+    eligible = {p for p, c in counts.items() if c >= 3 and p not in protected}
+
     seen: set[str] = set()
 
     def _dedupe_chunk(chunk: str) -> str:
@@ -370,7 +385,7 @@ def _fix_duplicate_content(tr_content: str) -> str:
         result = []
         for segment in segments:
             stripped = segment.strip()
-            if len(stripped) > 30 and stripped not in protected:
+            if stripped in eligible:
                 if stripped in seen:
                     continue  # skip duplicate
                 seen.add(stripped)
