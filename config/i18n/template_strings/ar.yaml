@@ -1,7 +1,33 @@
-# Per-locale translations for config/i18n/template_strings/_registry.yaml.
-# Populated by the agentic adjudication workflow (TC-HT-I18N-003), sourced
-# from scripts/quality/mine_heading_glossary.py's candidate queues. Every
-# key here must be an id from _registry.yaml with status: approved.
 schema_version: 1
 locale: ar
-translations: {}
+translations:
+  heading.overview:
+    value: نظرة عامة
+    reviewed_by: agent:terminology-reviewer+cross-check
+    reviewed_at: '2026-07-23T21:00:00+05:00'
+    evidence_count: 715
+  heading.properties:
+    value: خصائص
+    reviewed_by: agent:terminology-reviewer
+    reviewed_at: '2026-07-23T21:00:00+05:00'
+    evidence_count: 2308
+  heading.values:
+    value: القيم
+    reviewed_by: agent:terminology-reviewer
+    reviewed_at: '2026-07-23T21:00:00+05:00'
+    evidence_count: 610
+  heading.methods:
+    value: الطرق
+    reviewed_by: agent:terminology-reviewer
+    reviewed_at: '2026-07-23T21:00:00+05:00'
+    evidence_count: 2798
+  heading.description:
+    value: وصف
+    reviewed_by: agent:terminology-reviewer
+    reviewed_at: '2026-07-23T21:00:00+05:00'
+    evidence_count: 252
+  heading.see_also:
+    value: انظر أيضاً
+    reviewed_by: agent:terminology-reviewer
+    reviewed_at: '2026-07-23T21:00:00+05:00'
+    evidence_count: 2544

@@ -1,7 +1,28 @@
-# Per-locale translations for config/i18n/template_strings/_registry.yaml.
-# Populated by the agentic adjudication workflow (TC-HT-I18N-003), sourced
-# from scripts/quality/mine_heading_glossary.py's candidate queues. Every
-# key here must be an id from _registry.yaml with status: approved.
 schema_version: 1
 locale: th
-translations: {}
+translations:
+  heading.overview:
+    value: ภาพรวม
+    reviewed_by: agent:terminology-reviewer
+    reviewed_at: '2026-07-23T21:00:00+05:00'
+    evidence_count: 3726
+  heading.properties:
+    value: คุณสมบัติ
+    reviewed_by: agent:terminology-reviewer
+    reviewed_at: '2026-07-23T21:00:00+05:00'
+    evidence_count: 2393
+  heading.methods:
+    value: วิธีการ
+    reviewed_by: agent:terminology-reviewer
+    reviewed_at: '2026-07-23T21:00:00+05:00'
+    evidence_count: 2306
+  heading.description:
+    value: คําอธิบาย
+    reviewed_by: agent:terminology-reviewer
+    reviewed_at: '2026-07-23T21:00:00+05:00'
+    evidence_count: 513
+  heading.see_also:
+    value: ดูเช่นกัน
+    reviewed_by: agent:terminology-reviewer
+    reviewed_at: '2026-07-23T21:00:00+05:00'
+    evidence_count: 3122

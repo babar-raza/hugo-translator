@@ -1,7 +1,28 @@
-# Per-locale translations for config/i18n/template_strings/_registry.yaml.
-# Populated by the agentic adjudication workflow (TC-HT-I18N-003), sourced
-# from scripts/quality/mine_heading_glossary.py's candidate queues. Every
-# key here must be an id from _registry.yaml with status: approved.
 schema_version: 1
 locale: zh
-translations: {}
+translations:
+  heading.overview:
+    value: 概述
+    reviewed_by: agent:terminology-reviewer
+    reviewed_at: '2026-07-23T21:00:00+05:00'
+    evidence_count: 1583
+  heading.properties:
+    value: 属性
+    reviewed_by: agent:terminology-reviewer
+    reviewed_at: '2026-07-23T21:00:00+05:00'
+    evidence_count: 917
+  heading.methods:
+    value: 方法
+    reviewed_by: agent:terminology-reviewer
+    reviewed_at: '2026-07-23T21:00:00+05:00'
+    evidence_count: 1008
+  heading.description:
+    value: 描述
+    reviewed_by: agent:terminology-reviewer
+    reviewed_at: '2026-07-23T21:00:00+05:00'
+    evidence_count: 16
+  heading.see_also:
+    value: 另请参阅
+    reviewed_by: agent:terminology-reviewer
+    reviewed_at: '2026-07-23T21:00:00+05:00'
+    evidence_count: 190
