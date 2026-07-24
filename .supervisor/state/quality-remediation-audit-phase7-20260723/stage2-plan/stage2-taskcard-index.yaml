@@ -1,0 +1,95 @@
+# Stage 2 taskcard index — mirrors plan Deliverable 4's table exactly
+# (that table already satisfies prompt2's field list; this file is the
+# machine-tracked status view, updated live as execution proceeds).
+mission_id: quality-remediation-audit-phase7-20260723
+plan_hash: 62b2e5fd46d4ce55d97c44606cb1b6208fcaf6b0288d2a652068b39caed746a7
+
+taskcards:
+  - id: TC-P7-00
+    title: Preflight & mission bootstrap
+    lane: COORD
+    status: CLOSED
+    quality_note: uncovered 2 material findings not in original plan (content-repo's own live pipeline, hugo-translator pre-existing dirty state), both resolved via operator confirmation and isolation
+  - id: TC-P7-01
+    title: Blog-scheme audit governance fix
+    lane: FIX
+    status: CLOSED_OBSOLETE
+    quality_note: already solved via src/utils/content_discovery.py (commit 242bafb); re-verified not rebuilt
+  - id: TC-P7-02
+    title: Grouped findings report
+    lane: FIX
+    status: CLOSED
+    quality_note: rebaselined on audit_18site_dryrun.jsonl; spot-checked
+  - id: TC-P7-03
+    title: Title/linkTitle identity fixer
+    lane: FIX
+    status: CLOSED
+    quality_note: all 4 in-scope sites complete, spot-verified byte-identical to EN
+  - id: TC-P7-04
+    title: Double-period fixer
+    lane: FIX
+    status: CLOSED
+    quality_note: 292 fixed, 210 idempotent no-op, 0 confirmed defects after verify_fix.py bugfix
+  - id: TC-P7-05
+    title: Link-path fixer + classifier
+    lane: FIX
+    status: IN_PROGRESS
+    quality_note: batch 1 (1000 files) complete -- 71/78 initial verify failures were a real bug found and fixed in verify_fix.py's Hugo-URL-segment resolution; 7/78 are pre-existing EN-side broken links (out of scope, fix correctly matches EN, not rolled back). Batch 2 (remaining ~674) running.
+  - id: TC-P7-06
+    title: Newline-explosion classifier + fixer
+    lane: FIX
+    status: NOT_STARTED
+    dependency: TC-P7-05 CLOSED (file overlap: 22 files)
+  - id: TC-P7-07
+    title: Dropped-code-fence fixer
+    lane: FIX
+    status: NOT_STARTED
+    dependency: TC-P7-05 CLOSED (file overlap: 27 files)
+  - id: TC-P7-08
+    title: Table-cell classifier + TM fill
+    lane: FIX
+    status: NOT_STARTED
+    dependency: TC-P7-05 CLOSED (file overlap: 23 files), TC-P7-06 CLOSED (file overlap: 62 files)
+  - id: TC-P7-09
+    title: Gate 31 term classification
+    lane: FIX
+    status: CLOSED
+    quality_note: traced a real, previously-unknown defect class (identifier-splitting corruption) via direct file inspection, not assumption
+  - id: TC-P7-10
+    title: Shortcode-leak backlog routing
+    lane: FIX
+    status: CLOSED
+  - id: TC-P7-11
+    title: Empty-body backlog registration
+    lane: FIX
+    status: CLOSED
+  - id: TC-P7-12
+    title: verify_fix.py
+    lane: QA
+    status: CLOSED
+    quality_note: found and fixed 2 real bugs during use (pre-existing-completeness false positive; Hugo leaf-page URL-segment resolution false positive) -- both with regression tests added
+  - id: TC-P7-13
+    title: TM purge + fix-forward
+    lane: TM
+    status: SCRIPT_READY_WRITE_PENDING
+    quality_note: unit tested + real dry-run against production L2 (698185 scanned, 10780 corrupted candidates). --write blocked on TC-P7-03..08 all CLOSED per dependency.
+  - id: TC-P7-14
+    title: Backlog enqueue + drain monitor
+    lane: QA
+    status: SCRIPT_READY_NOT_RUN
+    quality_note: enqueue_backlog.py built, reuses src/tm/retranslate_queue.py's add_to_queue() directly
+  - id: TC-P7-15
+    title: Worker-stop / TM-safety orchestration
+    lane: COORD
+    status: PARTIAL
+    quality_note: hugo-translator's own content_worker/tm_worker confirmed already stopped (heartbeats stale/status=stopped) at TC-P7-00; per operator's explicit go-ahead to proceed concurrently with the content repo's OWN separate pipeline, this mission does not additionally stop that pipeline -- documented risk, not a silent gap
+  - id: TC-P7-16
+    title: Full re-audit + regression gate
+    lane: QA
+    status: NOT_STARTED
+    dependency: all FIX and TM taskcards CLOSED
+  - id: TC-P7-17
+    title: Content-repo commit + evidence bundle + closeout
+    lane: GOV
+    status: NOT_STARTED
+    dependency: TC-P7-16 CLOSED

@@ -1,0 +1,72 @@
+convergence_binding:
+  mission_id: quality-remediation-audit-phase7-20260723
+  plan_id: link-path-corrupted-1-638-memoized-hinton
+  plan_path: C:\Users\prora\.claude\plans\link-path-corrupted-1-638-memoized-hinton.md
+  plan_revision: "hardened-2026-07-24-live-system-reassessment"
+  plan_hash: 62b2e5fd46d4ce55d97c44606cb1b6208fcaf6b0288d2a652068b39caed746a7
+  # not a rerun/rediscovery: this is the same session and plan that has been
+  # continuously executing since plan approval -- binding formalizes state
+  # for an already-in-flight mission, not a fresh selection.
+  bound_at: "2026-07-24 (session-continuous, exact clock time not available to this environment)"
+
+  post_sprint_audit:
+    expected: .supervisor/prompts/prompt1-post-sprint-audit.md
+    path: .supervisor/prompts/prompt1-post-sprint-audit.md
+    hash_sha256_prefix16: 263dab3dadad6845
+    role_verified: true
+    role_verification_evidence: >
+      Read in full. Header "POST-SPRINT STRICT EVIDENCE AUDIT", output
+      contract .supervisor/schemas/stage1-issue-model.schema.json, produces
+      stage1-*.{md,yaml,csv,json} classifying achievements/proof-levels/
+      L1-L3 issues/claim-classification/next-stage recommendation. Matches
+      expected role by content, not filename alone.
+
+  plan_hardening:
+    expected: .supervisor/prompts/prompt2-plan-hardening.md
+    path: .supervisor/prompts/prompt2-plan-hardening.md
+    hash_sha256_prefix16: 4fe227b68c0e58e0
+    role_verified: true
+    role_verification_evidence: >
+      Read in full (prior turn, before mission execution began). Header
+      "PLAN MODE: HARDEN CURRENT PLAN FROM LATEST SPRINT AUDIT", output
+      contract stage2-taskcard-contract.schema.json, requires taskcard
+      fields (taskcard_id, lane_owner, allowed_paths, validation_commands,
+      etc.) -- this plan's Deliverable 4 taskcard table was built directly
+      against this contract (see plan Deliverable 2 for the field mapping).
+
+  controlled_execution:
+    expected: .supervisor/prompts/prompt3-controlled-execution.md
+    path: .supervisor/prompts/prompt3-controlled-execution.md
+    hash_sha256_prefix16: 5246d218a39a8464
+    role_verified: true
+    role_verification_evidence: >
+      Read in full (prior turn). Header "EXECUTION MODE: CONTROLLED
+      TASKCARD EXECUTION", output contract
+      stage3-quality-scoring-rubric.schema.json, defines Phase 0-7 (preflight
+      -> readiness gate -> healing -> multi-lane execution -> verification
+      -> 15-dim quality scoring -> commit -> self-review),
+      declaration-review-package-<run_id>.zip. This mission's actual
+      execution (TC-P7-00 through TC-P7-17) follows this phase structure.
+
+  close_task:
+    expected: .supervisor/prompts/prompt4-close-task.md
+    resolved: .supervisor/prompts/prompt4-close-task.md
+    hash_sha256_prefix16: 3196a5bd52bd6e03
+    role_verified: true
+    role_verification_evidence: >
+      Read in full. Simple 5-step checklist (review changes, commit,
+      update master plan in place, mark closed only if implementation +
+      verification + commit + plan update all complete, report files
+      changed/commit hash/plan sections/CLOSED-or-NOT-CLOSED). Not a
+      schema-heavy stage4 artifact producer like stages 1-3 -- confirmed by
+      content, this is the correct and only close-task prompt in the
+      registry (no separate stage4 schema exists).
+
+  status: BOUND
+
+  # Disclosed, not hidden (carried over from plan Deliverable 2): no
+  # .supervisor/schemas/*.schema.json file exists anywhere in this repo, in
+  # this mission or any prior one. All "schema-conformant" language below
+  # means structural conformance to each prompt's own prose field list,
+  # never actual JSON-Schema validation -- this has been true for every
+  # mission in .supervisor/state/ to date, not unique to this one.
