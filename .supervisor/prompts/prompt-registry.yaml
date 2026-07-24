@@ -93,6 +93,31 @@ prompts:
       - "must include evidence_bundle_path"
       - "rerouted items cannot be accepted without rescoring"
 
+  - id: PSL-PROMPT-4
+    name: prompt4-close-task
+    file: .supervisor/prompts/prompt4-close-task.md
+    description: "Final task closure: review changes, commit, update master plan in place, report closure status"
+    stage: 4
+    mode: closure
+    inputs:
+      - stage3-quality-scoring-rubric.json
+      - stage3-final-sprint-summary.yaml
+      - current repository diff (uncommitted changes from the sprint)
+      - active master plan
+    outputs:
+      - close_task_result (files changed, commit hash(es), master plan sections updated, closure status)
+    output_schema: null
+    successor_rules:
+      - condition: "closure status == CLOSED"
+        next: null
+      - condition: "closure status == NOT CLOSED"
+        next: PSL-PROMPT-3
+    validation_rules:
+      - "must not claim closure without verifying the final repo state"
+      - "must not leave uncommitted relevant changes behind"
+      - "must not create ad hoc summary files unless required by governance"
+    added_by: "heading-i18n-governance-20260723 formal convergence cycle, 2026-07-24 -- backfills a real, pre-existing registry gap found during Stage 1 audit (issue L2-001): prompt4-close-task.md existed and was already used by name (e.g. the 2026-07-17 mission's own binding) with no corresponding registry entry."
+
   - id: PSL-LOOP-CTRL
     name: prompt-loop-controller
     file: .supervisor/prompts/prompt-loop-controller.md
