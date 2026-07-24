@@ -9,10 +9,11 @@ Three layers:
    actually bypasses translation for a table hit (the strongest possible
    guarantee: not "output looks right" but "this code path cannot vary").
 3. A single-source-of-truth lint: fails if a second copy of the identifier
-   regex/allow-list appears outside classification.py. Two known,
-   deliberately-deferred duplicates (write_gate.py x2, tm_surgical_cleanup.py)
-   are explicitly xfailed with a reason rather than silently skipped --
-   see TC-HT-I18N-004's evidence.md for why that unification was deferred.
+   regex/allow-list appears outside classification.py. As of TC-HT-I18N-004's
+   completion pass, write_gate.py, tm_surgical_cleanup.py,
+   heal_english_headings.py, and surgical_retranslate.py are all unified --
+   only text_unit_extractor.py remains, a deliberately-deferred exception
+   with a named, evidence-backed reason (see _KNOWN_DEFERRED_DUPLICATES).
 """
 
 from __future__ import annotations
@@ -183,31 +184,42 @@ class TestExtractorDiscoveryLogging:
 # ---------------------------------------------------------------------------
 
 _IDENTIFIER_REGEX_SHAPES = [
-    re.compile(r"\^\[A-Z\]\[a-zA-Z0-9_\.\]\+\$"),  # write_gate.py / tm_surgical_cleanup.py shape
-    re.compile(r"_API_HEADING_TERMS\s*[:=]\s*frozenset"),
+    re.compile(r"\^\[A-Z\]\[a-zA-Z0-9_\.\]\+\$"),  # the retired write_gate.py / tm_surgical_cleanup.py shape
+    # Fingerprint of the actual hardcoded 20-term list itself (three
+    # consecutive literal entries, tolerant of the newline/indentation
+    # variants the four original copies used) -- NOT a name-based check
+    # like `_API_HEADING_TERMS = frozenset(...)`, because every one of
+    # those four files now legitimately assigns a registry-derived set to a
+    # variable of that same name (TC-HT-I18N-004 completion); a name-based
+    # regex would false-positive on the fix itself. This only fires if
+    # someone re-pastes the literal list somewhere new.
+    re.compile(r'"Description",\s*"Returns",\s*"Parameters"'),
 ]
 
 _CANONICAL_MODULE = REPO_ROOT / "src" / "translation_engine" / "terminology" / "classification.py"
 
-# Known, deliberately-deferred duplicates as of TC-HT-I18N-004/006 (see
-# TC-HT-I18N-004's evidence.md: write_gate.py carries +1520 uncommitted
-# lines of unrelated active work; unifying its two _IDENTIFIER_RE sites was
-# judged higher risk than value for that pass and pushed to a follow-up
-# taskcard). This lint run also surfaced two MORE pre-existing copies this
-# investigation hadn't enumerated before writing this test
-# (heal_english_headings.py, surgical_retranslate.py) -- recorded here
-# rather than silently ignored, since discovering the true extent of the
-# duplication is exactly this test's job.
+# As of TC-HT-I18N-004's completion pass, all four previously-duplicated
+# OFFLINE copies (write_gate.py's two _IDENTIFIER_RE sites,
+# tm_surgical_cleanup.py's Rule 1 + Rule 3, heal_english_headings.py's and
+# surgical_retranslate.py's _API_HEADING_TERMS) were unified to read from
+# the canonical TemplateStringRegistry instead of a locally-hardcoded
+# literal.
+#
+# text_unit_extractor.py deliberately remains: its own _API_HEADING_TERMS
+# (39 terms) and _ALWAYS_TRANSLATE_WORDS (6 terms: Read, Write, Execute,
+# Create, Delete, Update) gate `_is_non_translatable` on the hottest live
+# code path in the system (evaluated per text unit on every translation
+# call). _API_HEADING_TERMS alone is a safe registry subset, but
+# _ALWAYS_TRANSLATE_WORDS is NOT: "Execute"/"Create"/"Delete"/"Update" have
+# no registry entry at all today, so a same-pass swap would silently drop
+# them back through the over-broad PascalCase heuristic -- reintroducing
+# this exact mission's root-cause bug for those four words. Fixing this
+# safely means first backfilling those 4 terms into the registry (a
+# TC-HT-I18N-003-style data-completeness step), which is out of scope for
+# this mechanical dedup pass and deliberately deferred rather than risked
+# un-scoped on the live hot path.
 _KNOWN_DEFERRED_DUPLICATES = {
-    REPO_ROOT / "src" / "translation_engine" / "write_gate.py",
-    REPO_ROOT / "scripts" / "quality" / "tm_surgical_cleanup.py",
-    REPO_ROOT / "scripts" / "quality" / "heal_english_headings.py",
-    REPO_ROOT / "scripts" / "quality" / "surgical_retranslate.py",
-    REPO_ROOT
-    / "src"
-    / "translation_engine"
-    / "extractor"
-    / "text_unit_extractor.py",  # still has _is_technical_identifier (multi-hump path, not the identifier-shape duplicate)
+    REPO_ROOT / "src" / "translation_engine" / "extractor" / "text_unit_extractor.py",
 }
 
 
@@ -230,10 +242,11 @@ class TestSingleSourceOfTruthLint:
     def test_no_unexpected_new_duplicate_identifier_regex(self):
         """This is the mechanical guardrail against 'fixed in one place, still
         broken in the other four' (plan §1's structural-weakness finding).
-        It does NOT require zero duplicates today -- write_gate.py's
-        unification is a deliberately deferred follow-up, tracked explicitly
-        below -- but it DOES fail if a *new, unexpected* duplicate appears
-        anywhere else, which is the regression this guards against."""
+        It does NOT require zero duplicates today -- text_unit_extractor.py's
+        holdout is a deliberately deferred, explicitly justified exception
+        (see _KNOWN_DEFERRED_DUPLICATES's comment) -- but it DOES fail if a
+        *new, unexpected* duplicate appears anywhere else, which is the
+        regression this guards against."""
         hits = _files_with_duplicate_shape()
         unexpected = hits - _KNOWN_DEFERRED_DUPLICATES
         assert unexpected == set(), (
@@ -243,17 +256,25 @@ class TestSingleSourceOfTruthLint:
             f"_KNOWN_DEFERRED_DUPLICATES with a reason if this is intentional."
         )
 
-    @pytest.mark.xfail(
-        reason=(
-            "write_gate.py's two _IDENTIFIER_RE sites and tm_surgical_cleanup.py's "
-            "copy are known, tracked duplicates -- unification deferred to a "
-            "follow-up taskcard per TC-HT-I18N-004's evidence.md (write_gate.py "
-            "carries +1520 uncommitted lines of unrelated active work). This "
-            "test documents the aspiration; flip to a hard assertion once that "
-            "follow-up lands."
-        ),
-        strict=True,
-    )
-    def test_zero_duplicates_once_followup_lands(self):
+    def test_offline_tool_duplicates_are_fully_eliminated(self):
+        """TC-HT-I18N-004 completion (was previously xfail(strict=True) --
+        now a real, hard assertion): write_gate.py (both sites),
+        tm_surgical_cleanup.py (Rule 1 and Rule 3), heal_english_headings.py,
+        and surgical_retranslate.py no longer carry a hardcoded duplicate of
+        the identifier-shape regex or the heading-term list -- all four now
+        read from the canonical TemplateStringRegistry. text_unit_extractor.py
+        is the one remaining, deliberately-deferred holdout (see
+        _KNOWN_DEFERRED_DUPLICATES's comment on why it's higher-risk than a
+        same-pass mechanical dedup). Asserting equality (not emptiness)
+        against that named set means a future fix there -- or a fresh,
+        unrelated duplicate appearing -- both require deliberately touching
+        this test, rather than either silently passing or silently going
+        unnoticed."""
         hits = _files_with_duplicate_shape()
-        assert hits == set()
+        assert hits == _KNOWN_DEFERRED_DUPLICATES, (
+            f"Expected exactly the known-deferred holdout "
+            f"{sorted(str(p) for p in _KNOWN_DEFERRED_DUPLICATES)}, got "
+            f"{sorted(str(p) for p in hits)}. If text_unit_extractor.py has "
+            f"just been fixed, update _KNOWN_DEFERRED_DUPLICATES too. If this "
+            f"is a new duplicate, remove it instead."
+        )

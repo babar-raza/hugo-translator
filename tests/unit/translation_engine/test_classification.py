@@ -21,6 +21,7 @@ from src.translation_engine.terminology.classification import (
     VERDICT_TABLE,
     VERDICT_UNRESOLVED,
     classify,
+    should_protect_as_identifier,
     validate_locale_file,
     validate_registry_file,
 )
@@ -303,3 +304,47 @@ class TestCompletenessLint:
     def test_pending_entries_are_not_flagged(self, registry):
         gaps = registry.completeness_gaps(["ja", "zh"])
         assert not any(g[0] == "heading.properties" for g in gaps)
+
+
+class TestShouldProtectAsIdentifier:
+    """TC-HT-I18N-004 completion: the boolean wrapper unifying write_gate.py's
+    frontmatter-id gate and tm_surgical_cleanup.py's Rule 1 behind this
+    module. Golden cases re-verified here (not just in the plan doc)."""
+
+    def test_table_hit_is_not_protected(self, registry, protected):
+        assert (
+            should_protect_as_identifier(
+                "Overview", "ja", registry=registry, protected_terms=protected
+            )
+            is False
+        )
+
+    def test_known_protected_term_is_protected(self, registry, protected):
+        assert (
+            should_protect_as_identifier("Body", "ja", registry=registry, protected_terms=protected)
+            is True
+        )
+
+    def test_multi_hump_identifier_is_protected(self, registry, protected):
+        assert (
+            should_protect_as_identifier(
+                "ImageRenderOptions", "ja", registry=registry, protected_terms=protected
+            )
+            is True
+        )
+
+    def test_unseen_single_hump_word_defaults_to_protected(self, registry, protected):
+        # "Mesh" is in neither the fixture table nor the fixture protected-terms
+        # list -- unresolved, and unresolved means "protect" for this wrapper.
+        assert (
+            should_protect_as_identifier("Mesh", "ja", registry=registry, protected_terms=protected)
+            is True
+        )
+
+    def test_ordinary_prose_is_not_protected(self, registry, protected):
+        assert (
+            should_protect_as_identifier(
+                "this is ordinary prose.", "ja", registry=registry, protected_terms=protected
+            )
+            is False
+        )

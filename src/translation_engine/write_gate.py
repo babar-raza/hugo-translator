@@ -28,6 +28,7 @@ from .fence_spans import count_fence_open_reopens, get_fence_char_spans, strip_f
 from .parser.hugo_parser import HugoParser
 from .quality.refusal_patterns import CONVERSATIONAL_SHAPE_RE, REFUSAL_RE
 from .reconstructor.yaml_formatter import YAMLFormatter
+from .terminology.classification import TemplateStringRegistry, should_protect_as_identifier
 
 if TYPE_CHECKING:
     from ..utils.config_loader import ConfigService
@@ -510,6 +511,11 @@ class WriteGateEvaluator:
         self._similarity_tracker = similarity_tracker
         self._config = config
         self._force_accept = force_accept
+        # Mission heading-i18n-governance-20260723 (TC-HT-I18N-004
+        # completion): loaded once per evaluator instance, not per gate
+        # call -- shared by Gate 9 (heading-term coverage) and Gate 11
+        # (frontmatter-id-corruption) below.
+        self._template_registry = TemplateStringRegistry()
         self._verify_gate_registry()
 
     def _verify_gate_registry(self) -> None:
@@ -984,14 +990,6 @@ class WriteGateEvaluator:
     # Gates 9-17: Content quality gates (unconditional — no force_accept)
     # ==================================================================
 
-    # API heading terms that must never be translated
-    _API_HEADING_TERMS: frozenset[str] = frozenset({
-        "Name", "Type", "Description", "Returns", "Parameters",
-        "Properties", "Methods", "Fields", "Constructors", "Events",
-        "Exceptions", "Remarks", "Examples", "See Also", "Inheritance",
-        "Implements", "Namespace", "Assembly", "Syntax", "Value",
-    })
-
     # Latin-script target languages: gate 14 (mixed lang) skips these
     _LATIN_SCRIPT_LANGS: frozenset[str] = frozenset({
         "af", "az", "bs", "ca", "cs", "cy", "da", "de", "en", "es", "et",
@@ -1000,8 +998,12 @@ class WriteGateEvaluator:
         "sv", "sw", "tr", "vi",
     })
 
-    # PascalCase / dotted identifier — must not be translated in frontmatter
-    _IDENTIFIER_RE: re.Pattern[str] = re.compile(r"^[A-Z][a-zA-Z0-9_.]+$")
+    # Mission heading-i18n-governance-20260723 (TC-HT-I18N-004 completion):
+    # the old shape-only single-capitalized-word-of-4+-letters _IDENTIFIER_RE
+    # (matched any such word, not just real multi-hump identifiers) has been
+    # retired -- Gate 11 (_gate_frontmatter_id_corruption) now calls the
+    # canonical should_protect_as_identifier() from terminology.classification
+    # instead.
 
     # EU/GDPR hallucination patterns
     _EU_HALLUCINATION_PATTERNS: list[re.Pattern[str]] = [
@@ -1068,11 +1070,11 @@ class WriteGateEvaluator:
         """
         return {
             "_gate_heading_integrity":
-                lambda src, w, path, res: self._gate_heading_integrity(src, w, path, source_doc, res),
+                lambda src, w, path, res: self._gate_heading_integrity(src, w, path, source_doc, res, target_lang),
             "_gate_frontmatter_backticks":
                 lambda src, w, path, res: self._gate_frontmatter_backticks(w, path, source_doc, res),
             "_gate_frontmatter_id_corruption":
-                lambda src, w, path, res: self._gate_frontmatter_id_corruption(w, path, source_doc, res),
+                lambda src, w, path, res: self._gate_frontmatter_id_corruption(w, path, source_doc, res, target_lang),
             "_gate_double_periods":
                 lambda src, w, path, res: self._gate_double_periods(src, w, path, res),
             "_gate_eu_hallucination":
@@ -1283,8 +1285,39 @@ class WriteGateEvaluator:
         output_path: Path,
         source_doc: object,
         result: WriteGateResult,
+        target_lang: str,
     ) -> str:
-        """Auto-clean corrupted headings that are in _API_HEADING_TERMS."""
+        """Auto-clean corrupted headings; flag untranslated known heading terms.
+
+        Mission heading-i18n-governance-20260723 (TC-HT-I18N-004 completion):
+        the known-term set is every id in the canonical i18n template-string
+        registry (config/i18n/template_strings/) — replacing this gate's
+        former locally-hardcoded 20-term frozenset, which never covered the
+        "section heading" terms (Overview, Enumerations, Options, ...) at
+        all, so this gate silently had zero visibility into corruption/
+        untranslated-status for those terms. The registry is a strict
+        coverage expansion over that old list (verified superset), and any
+        future review-cycle addition to the registry is picked up here
+        automatically, with no code change needed.
+
+        Also fixes the plan's §1 root-cause finding: an untranslated known
+        heading term used to be accepted completely silently (debug-only
+        log, no metric, no follow-up). Now logged at `warning` (visible)
+        and queued via the same `result.retranslate_paths` mechanism every
+        other auto-clean gate in this file already uses to request another
+        translation pass -- this file's own established idiom for "flag
+        for retry," not a new mechanism. Still deliberately non-blocking
+        (`result.passed` is untouched): one bad heading should not fail an
+        entire file's translation, per the plan's own tradeoff reasoning.
+
+        Note: this cannot literally re-invoke the MT model here -- Gate 9
+        runs on already-produced, static content with no model handle.
+        A same-request retry would need to live upstream in
+        segment_translator.py's translation loop; requeueing via
+        `retranslate_paths` is the closest equivalent this gate can offer
+        and is consistent with how every other gate in this file signals
+        "this needs another pass."
+        """
         src_body = self._get_body(source_content)
         tgt_body = self._get_body(translated_content)
 
@@ -1295,19 +1328,21 @@ class WriteGateEvaluator:
             # Count mismatch already handled by gate 7; skip positional check
             return translated_content
 
+        known_heading_terms = self._template_registry.by_en_text.keys()
+
         working = translated_content
         cleaned_count = 0
-        untranslated_count = 0
+        untranslated_terms: list[str] = []
         for (s_level, s_text), (t_level, t_text) in zip(src_headings, tgt_headings):
             s_stripped = s_text.strip()
             t_stripped = t_text.strip()
-            if s_stripped in self._API_HEADING_TERMS:
+            if s_stripped in known_heading_terms:
                 if t_stripped == s_stripped:
                     # Model returned heading unchanged (failed to translate).
-                    # Content is already English — no modification needed, but log for monitoring.
-                    # TC-HDG-TRANS-019: these terms are now sent to model; model failure is expected
-                    # occasionally. Gate 9 accepts English fallback (same as pre-fix behavior).
-                    untranslated_count += 1
+                    # Content is already English -- no modification needed,
+                    # but this is now visible and queued for retry (see
+                    # docstring), not silently swallowed at debug level.
+                    untranslated_terms.append(s_stripped)
                 elif self._contains_corruption(t_stripped, s_stripped):
                     old_line = f"{t_level} {t_text}"
                     new_line = f"{s_level} {s_text.strip()}"
@@ -1320,13 +1355,17 @@ class WriteGateEvaluator:
                 cleaned_count,
                 output_path.name,
             )
-        if untranslated_count:
-            logger.debug(
-                "GATE9 %d API heading(s) untranslated (model returned source) in %s — "
-                "English retained",
-                untranslated_count,
+        if untranslated_terms:
+            logger.warning(
+                "GATE9 %d known heading term(s) untranslated (model returned "
+                "source) in %s for target_lang=%s — English retained, queued "
+                "for retranslation: %s",
+                len(untranslated_terms),
                 output_path.name,
+                target_lang,
+                untranslated_terms,
             )
+            result.retranslate_paths.append((output_path, target_lang))
         return working
 
     # ------------------------------------------------------------------
@@ -1392,8 +1431,22 @@ class WriteGateEvaluator:
         output_path: Path,
         source_doc: object,
         result: WriteGateResult,
+        target_lang: str,
     ) -> str:
-        """Restore English API identifier in title/linkTitle if translation corrupted it."""
+        """Restore English API identifier in title/linkTitle if translation corrupted it.
+
+        Mission heading-i18n-governance-20260723 (TC-HT-I18N-004 completion):
+        the shape-only `_IDENTIFIER_RE` check (matches any single capitalized
+        word of 4+ letters, not just real multi-hump identifiers) is replaced
+        by `should_protect_as_identifier()`, the canonical classifier used
+        everywhere else this decision is made. This is strictly more
+        accurate, not just a rename: `_IDENTIFIER_RE` alone could never
+        distinguish "Camera" (protect) from "Overview" (a reviewed, approved
+        translation) -- both match the same regex shape. The canonical
+        classifier checks the i18n table first, so a frontmatter value that
+        happens to equal an approved template-string term is no longer
+        force-treated as an untouchable identifier.
+        """
         if source_doc is None or not hasattr(source_doc, "frontmatter"):
             return translated_content
 
@@ -1410,8 +1463,10 @@ class WriteGateEvaluator:
             if not en_val or not isinstance(en_val, str):
                 continue
             en_str = str(en_val).strip()
-            if not self._IDENTIFIER_RE.match(en_str):
-                continue  # Not a pure API identifier — don't force-restore
+            if not should_protect_as_identifier(
+                en_str, target_lang, registry=self._template_registry
+            ):
+                continue  # Not a protected identifier — don't force-restore
 
             # Find translated value
             m = re.search(

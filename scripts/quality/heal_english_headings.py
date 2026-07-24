@@ -41,6 +41,15 @@ sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 if str(Path(__file__).resolve().parent) not in sys.path:
     sys.path.insert(0, str(Path(__file__).resolve().parent))
 
+_REPO_ROOT = Path(__file__).resolve().parent.parent.parent
+for _p in (str(_REPO_ROOT / "src"), str(_REPO_ROOT)):
+    if _p not in sys.path:
+        sys.path.insert(0, _p)
+
+from src.translation_engine.terminology.classification import (  # noqa: E402
+    TemplateStringRegistry,
+)
+
 # ---------------------------------------------------------------------------
 # Constants
 # ---------------------------------------------------------------------------
@@ -48,23 +57,24 @@ if str(Path(__file__).resolve().parent) not in sys.path:
 ALL_SITES = ["reference.aspose.org", "docs.aspose.org", "kb.aspose.org"]
 EN_LOCALE = "en"
 
-_API_HEADING_TERMS: frozenset[str] = frozenset({
-    "Name", "Type", "Description", "Returns", "Parameters",
-    "Properties", "Methods", "Fields", "Constructors", "Events",
-    "Exceptions", "Remarks", "Examples", "See Also", "Inheritance",
-    "Implements", "Namespace", "Assembly", "Syntax", "Value",
-})
 
-_SECTION_HEADING_TERMS: frozenset[str] = frozenset({
-    "Overview", "Example", "Notes", "Enumerations", "Deprecated",
-    "Requirements", "Installation", "Usage", "Introduction",
-    "Output", "Input", "Result", "Results", "Summary", "Details",
-    "Options", "Configuration", "Features", "Limitations",
-})
+def _registry_terms_by_category(category: str) -> frozenset[str]:
+    """Known closed-vocabulary terms of one category, pulled from the
+    canonical i18n registry (config/i18n/template_strings/_registry.yaml)
+    instead of a locally-duplicated frozenset. Any status is included --
+    this scan is descriptive (candidate discovery for --build-queue/
+    --retranslate), not a translate-vs-protect decision, so a `pending`
+    term is still a term worth flagging for healing.
+    """
+    registry = TemplateStringRegistry()
+    return frozenset(
+        entry["en"] for entry in registry.entries.values() if entry.get("category") == category
+    )
 
-_ALL_HEALING_TERMS: frozenset[str] = _API_HEADING_TERMS | _SECTION_HEADING_TERMS
 
-_TABLE_ACCESS_VALUES: frozenset[str] = frozenset({"Read", "Write"})
+_API_HEADING_TERMS: frozenset[str] = _registry_terms_by_category("table_header")
+_SECTION_HEADING_TERMS: frozenset[str] = _registry_terms_by_category("section_heading")
+_TABLE_ACCESS_VALUES: frozenset[str] = _registry_terms_by_category("enum_value")
 
 # Non-Latin locales: these cannot "accidentally" look like English
 _NON_LATIN_LOCALES: frozenset[str] = frozenset({

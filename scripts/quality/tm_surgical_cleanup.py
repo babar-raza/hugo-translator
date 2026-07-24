@@ -32,6 +32,7 @@ sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
 from src.translation_engine.terminology.classification import (  # noqa: E402
     TemplateStringRegistry,
+    should_protect_as_identifier,
 )
 from tm.l2_persistent import L2PersistentTM, TranslationEntry  # noqa: E402
 
@@ -42,33 +43,12 @@ from tm.l2_persistent import L2PersistentTM, TranslationEntry  # noqa: E402
 DEFAULT_SITE = "reference.aspose.org"
 DEFAULT_TM_PATH = Path("data/tm/l2.lmdb")
 
-_API_HEADING_TERMS: frozenset[str] = frozenset(
-    {
-        "Name",
-        "Type",
-        "Description",
-        "Returns",
-        "Parameters",
-        "Properties",
-        "Methods",
-        "Fields",
-        "Constructors",
-        "Events",
-        "Exceptions",
-        "Remarks",
-        "Examples",
-        "See Also",
-        "Inheritance",
-        "Implements",
-        "Namespace",
-        "Assembly",
-        "Syntax",
-        "Value",
-    }
-)
-
-# Matches any PascalCase / dotted identifier that should never be translated
-_IDENTIFIER_RE = re.compile(r"^[A-Z][a-zA-Z0-9_.]+$")
+# All known closed-vocabulary template-string terms (headings, table
+# headers, enum values), pulled from the canonical i18n registry instead of
+# a locally-duplicated literal -- a strict superset of the original 20-term
+# hardcoded list (verified), so Rule 3 below gains coverage rather than
+# losing it.
+_API_HEADING_TERMS: frozenset[str] = frozenset(TemplateStringRegistry().by_en_text.keys())
 
 # Known artifact fragments produced by NLLB / m2m100 / template corruption
 _ARTIFACT_FRAGMENTS = [
@@ -132,9 +112,15 @@ def is_corrupt_entry(
         if approved_value is not None and tgt == approved_value:
             return False, "", ""
 
-    # Rule 1: PascalCase / dotted identifier should never be translated.
+    # Rule 1: an identifier (per the canonical classifier -- shape-unambiguous
+    # multi-hump PascalCase, or a curated protected term, or a single-hump
+    # word the i18n table doesn't claim) should never be translated.
     # Require len >= 4 to avoid false-positives on short common words.
-    if len(src) >= 4 and _IDENTIFIER_RE.match(src) and tgt != src:
+    if (
+        len(src) >= 4
+        and tgt != src
+        and should_protect_as_identifier(src, entry.tgt_lang, registry=registry)
+    ):
         return True, "identifier_translated", "overwrite"
 
     # Rule 2: Known artifact fragments in translation

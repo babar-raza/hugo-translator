@@ -70,18 +70,25 @@ except ImportError:
     _TM_AVAILABLE = False
     L2PersistentTM = None  # type: ignore
 
+from src.translation_engine.terminology.classification import (  # noqa: E402
+    TemplateStringRegistry,
+)
+
 LATIN_SCRIPT_LANGS = frozenset({
     "af", "az", "ca", "cs", "da", "de", "en", "es", "et", "fi",
     "fr", "ga", "hr", "hu", "id", "it", "lt", "lv", "ms", "nl",
     "no", "pl", "pt", "ro", "sk", "sl", "sr", "sv", "tr", "vi",
 })
 
-_API_HEADING_TERMS = frozenset({
-    "Name", "Type", "Description", "Returns", "Parameters",
-    "Properties", "Methods", "Fields", "Constructors", "Events",
-    "Exceptions", "Remarks", "Examples", "See Also", "Inheritance",
-    "Implements", "Namespace", "Assembly", "Syntax", "Value",
-})
+# Known table-header/API terms, pulled from the canonical i18n registry
+# (config/i18n/template_strings/_registry.yaml) instead of a locally-
+# duplicated frozenset -- same source _cell_is_non_translatable's callers
+# already trust in heal_english_headings.py and write_gate.py.
+_API_HEADING_TERMS = frozenset(
+    entry["en"]
+    for entry in TemplateStringRegistry().entries.values()
+    if entry.get("category") == "table_header"
+)
 
 _EU_HALLUCINATION_PATTERNS = [
     re.compile(r"(?:cookie|GDPR|General Data Protection|privacy policy|data protection)", re.IGNORECASE),

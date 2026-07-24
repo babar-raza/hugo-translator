@@ -290,3 +290,34 @@ def classify(
 
     log_unresolved_fn(text_stripped, locale, file=file, context=context, log_path=log_path)
     return ClassificationResult(VERDICT_UNRESOLVED, reason="unresolved_single_hump_default_protect")
+
+
+def should_protect_as_identifier(
+    text: str,
+    locale: str,
+    *,
+    registry: TemplateStringRegistry | None = None,
+    protected_terms: ProtectedTerms | None = None,
+) -> bool:
+    """Thin boolean wrapper around :func:`classify` for callers that only
+    need a yes/no "is this an identifier that must not be translated"
+    answer — e.g. write_gate.py's frontmatter-id-corruption gate and
+    tm_surgical_cleanup.py's Rule 1 (mission heading-i18n-governance-20260723,
+    TC-HT-I18N-004 completion).
+
+    Both ``protect`` (confident multi-hump shape, or a single-hump word
+    explicitly listed in ``config/terminology.yaml``) and ``unresolved``
+    (a first-sighting single-hump word, safer-default-protect direction)
+    map to ``True`` here — from these callers' point of view both mean
+    "treat as an identifier, restore/preserve the English source." Only a
+    ``translate_via_table`` hit (a reviewed, approved translation) or
+    ``not_applicable`` (not identifier-shaped at all) map to ``False``.
+
+    Verified against this module's own golden cases before use elsewhere:
+    ``should_protect_as_identifier("Camera", "ar")`` is ``True`` (unresolved
+    single-hump default-protect — "Camera" isn't in terminology.yaml today,
+    but the safer direction still holds); ``should_protect_as_identifier(
+    "Overview", "ar")`` is ``False`` (a reviewed table hit).
+    """
+    result = classify(text, locale, registry=registry, protected_terms=protected_terms)
+    return result.verdict in (VERDICT_PROTECT, VERDICT_UNRESOLVED)
