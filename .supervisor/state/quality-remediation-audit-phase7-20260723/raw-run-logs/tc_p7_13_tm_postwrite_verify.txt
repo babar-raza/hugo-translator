@@ -1,0 +1,5 @@
+Scope: 144 (site_id, locale) pairs from reports/audit/findings_detail.csv, issue_types=['double_period', 'link_path_corrupted']
+
+Total scanned: 687405, total corrupted candidates: 0
+Dry-run only -- no deletions. Re-run with --write after operator sanity-checks these counts
+and scripts/tm/backup_tm.py has completed (see plan TC-P7-13 sequencing).

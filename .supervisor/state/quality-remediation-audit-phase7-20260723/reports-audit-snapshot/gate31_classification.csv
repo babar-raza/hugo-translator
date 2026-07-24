@@ -1,0 +1,57 @@
+site_id,locale,file_path,terms,verdict
+docs.aspose.org,el,D:\onedrive\Documents\GitHub\aspose.org\content\docs.aspose.org\el\pdf\java\developer-guide\asn1.md,DER byte,legitimate_passthrough
+docs.aspose.org,th,D:\onedrive\Documents\GitHub\aspose.org\content\docs.aspose.org\th\words\python\developer-guide\docx-reader.md,,genuine_leak_or_unclassified
+docs.aspose.org,uk,D:\onedrive\Documents\GitHub\aspose.org\content\docs.aspose.org\uk\words\python\developer-guide\docx-reader.md,,genuine_leak_or_unclassified
+docs.aspose.org,th,D:\onedrive\Documents\GitHub\aspose.org\content\docs.aspose.org\th\words\python\developer-guide\ldm-builder.md,,genuine_leak_or_unclassified
+docs.aspose.org,uk,D:\onedrive\Documents\GitHub\aspose.org\content\docs.aspose.org\uk\words\python\developer-guide\ldm-builder.md,,genuine_leak_or_unclassified
+kb.aspose.org,fa,D:\onedrive\Documents\GitHub\aspose.org\content\kb.aspose.org\fa\email\cpp\how-to-get-started-email-cpp.md,,genuine_leak_or_unclassified
+kb.aspose.org,ja,D:\onedrive\Documents\GitHub\aspose.org\content\kb.aspose.org\ja\email\cpp\how-to-get-started-email-cpp.md,,genuine_leak_or_unclassified
+kb.aspose.org,fa,D:\onedrive\Documents\GitHub\aspose.org\content\kb.aspose.org\fa\note\python\how-to-get-started-note-python.md,,genuine_leak_or_unclassified
+kb.aspose.org,ja,D:\onedrive\Documents\GitHub\aspose.org\content\kb.aspose.org\ja\note\python\how-to-get-started-note-python.md,,genuine_leak_or_unclassified
+kb.aspose.org,fa,D:\onedrive\Documents\GitHub\aspose.org\content\kb.aspose.org\fa\slides\cpp\how-to-get-started-slides-cpp.md,,genuine_leak_or_unclassified
+kb.aspose.org,ja,D:\onedrive\Documents\GitHub\aspose.org\content\kb.aspose.org\ja\slides\cpp\how-to-get-started-slides-cpp.md,,genuine_leak_or_unclassified
+kb.aspose.org,ja,D:\onedrive\Documents\GitHub\aspose.org\content\kb.aspose.org\ja\slides\net\how-to-get-started-slides-dotnet.md,,genuine_leak_or_unclassified
+kb.aspose.org,zh,D:\onedrive\Documents\GitHub\aspose.org\content\kb.aspose.org\zh\slides\net\how-to-get-started-slides-dotnet.md,,genuine_leak_or_unclassified
+kb.aspose.org,ru,D:\onedrive\Documents\GitHub\aspose.org\content\kb.aspose.org\ru\words\python\how-to-extract-parsers-python.md,,genuine_leak_or_unclassified
+kb.aspose.org,fa,D:\onedrive\Documents\GitHub\aspose.org\content\kb.aspose.org\fa\words\python\how-to-load-docx-reader-python.md,,genuine_leak_or_unclassified
+kb.aspose.org,he,D:\onedrive\Documents\GitHub\aspose.org\content\kb.aspose.org\he\words\python\how-to-load-docx-reader-python.md,,genuine_leak_or_unclassified
+kb.aspose.org,ru,D:\onedrive\Documents\GitHub\aspose.org\content\kb.aspose.org\ru\words\python\troubleshooting.md,,genuine_leak_or_unclassified
+kb.aspose.org,zh,D:\onedrive\Documents\GitHub\aspose.org\content\kb.aspose.org\zh\words\python\troubleshooting.md,,genuine_leak_or_unclassified
+kb.aspose.org,fa,D:\onedrive\Documents\GitHub\aspose.org\content\kb.aspose.org\fa\words\python\use-cases.md,,genuine_leak_or_unclassified
+kb.aspose.org,he,D:\onedrive\Documents\GitHub\aspose.org\content\kb.aspose.org\he\words\python\use-cases.md,,genuine_leak_or_unclassified
+kb.aspose.org,ja,D:\onedrive\Documents\GitHub\aspose.org\content\kb.aspose.org\ja\words\python\use-cases.md,,genuine_leak_or_unclassified
+reference.aspose.org,ar,D:\onedrive\Documents\GitHub\aspose.org\content\reference.aspose.org\ar\pdf\go\_index.md,LE entry,legitimate_passthrough
+reference.aspose.org,th,D:\onedrive\Documents\GitHub\aspose.org\content\reference.aspose.org\th\pdf\go\_index.md,LE entry,legitimate_passthrough
+reference.aspose.org,ar,D:\onedrive\Documents\GitHub\aspose.org\content\reference.aspose.org\ar\pdf\go\LineEndingStyle.md,LE entry,legitimate_passthrough
+reference.aspose.org,th,D:\onedrive\Documents\GitHub\aspose.org\content\reference.aspose.org\th\pdf\go\LineEndingStyle.md,LE entry,legitimate_passthrough
+reference.aspose.org,th,D:\onedrive\Documents\GitHub\aspose.org\content\reference.aspose.org\th\pdf\java\DocumentPageImporter.md,,genuine_leak_or_unclassified
+reference.aspose.org,uk,D:\onedrive\Documents\GitHub\aspose.org\content\reference.aspose.org\uk\pdf\java\Page.md,LA CHE HOLE,genuine_leak_or_unclassified
+reference.aspose.org,el,D:\onedrive\Documents\GitHub\aspose.org\content\reference.aspose.org\el\pdf\java\PKCS7SignedData.md,DER bytes,legitimate_passthrough
+reference.aspose.org,he,D:\onedrive\Documents\GitHub\aspose.org\content\reference.aspose.org\he\pdf\java\PKCS7SignedData.md,,genuine_leak_or_unclassified
+reference.aspose.org,zh,D:\onedrive\Documents\GitHub\aspose.org\content\reference.aspose.org\zh\pdf\java\PKCS7SignedData.md,DER bytes,legitimate_passthrough
+reference.aspose.org,th,D:\onedrive\Documents\GitHub\aspose.org\content\reference.aspose.org\th\pdf\java\SignerInfo.md,issuer der,legitimate_passthrough
+reference.aspose.org,bg,D:\onedrive\Documents\GitHub\aspose.org\content\reference.aspose.org\bg\pdf\net\_index.md,LE entry elements,legitimate_passthrough
+reference.aspose.org,el,D:\onedrive\Documents\GitHub\aspose.org\content\reference.aspose.org\el\pdf\net\_index.md,LE entry elements,legitimate_passthrough
+reference.aspose.org,fa,D:\onedrive\Documents\GitHub\aspose.org\content\reference.aspose.org\fa\pdf\net\_index.md,LE entry elements,legitimate_passthrough
+reference.aspose.org,he,D:\onedrive\Documents\GitHub\aspose.org\content\reference.aspose.org\he\pdf\net\_index.md,LE entry elements,legitimate_passthrough
+reference.aspose.org,hi,D:\onedrive\Documents\GitHub\aspose.org\content\reference.aspose.org\hi\pdf\net\_index.md,LE entry elements,legitimate_passthrough
+reference.aspose.org,ru,D:\onedrive\Documents\GitHub\aspose.org\content\reference.aspose.org\ru\pdf\net\_index.md,LE entry elements,legitimate_passthrough
+reference.aspose.org,th,D:\onedrive\Documents\GitHub\aspose.org\content\reference.aspose.org\th\pdf\net\_index.md,LE entry elements,legitimate_passthrough
+reference.aspose.org,uk,D:\onedrive\Documents\GitHub\aspose.org\content\reference.aspose.org\uk\pdf\net\_index.md,LE entry elements,legitimate_passthrough
+reference.aspose.org,zh,D:\onedrive\Documents\GitHub\aspose.org\content\reference.aspose.org\zh\pdf\net\_index.md,LE entry elements,legitimate_passthrough
+reference.aspose.org,ru,D:\onedrive\Documents\GitHub\aspose.org\content\reference.aspose.org\ru\pdf\net\AnnotationState.md,,genuine_leak_or_unclassified
+reference.aspose.org,he,D:\onedrive\Documents\GitHub\aspose.org\content\reference.aspose.org\he\pdf\net\ColumnInfo.md,,genuine_leak_or_unclassified
+reference.aspose.org,fa,D:\onedrive\Documents\GitHub\aspose.org\content\reference.aspose.org\fa\pdf\net\LineEnding.md,,genuine_leak_or_unclassified
+reference.aspose.org,he,D:\onedrive\Documents\GitHub\aspose.org\content\reference.aspose.org\he\pdf\net\LineEnding.md,,genuine_leak_or_unclassified
+reference.aspose.org,el,D:\onedrive\Documents\GitHub\aspose.org\content\reference.aspose.org\el\pdf\net\PdfExtractor.md,LE bytes,legitimate_passthrough
+reference.aspose.org,th,D:\onedrive\Documents\GitHub\aspose.org\content\reference.aspose.org\th\pdf\net\PdfExtractor.md,,genuine_leak_or_unclassified
+reference.aspose.org,el,D:\onedrive\Documents\GitHub\aspose.org\content\reference.aspose.org\el\pdf\net\PdfFileSignature.md,bytes DER,legitimate_passthrough
+reference.aspose.org,el,D:\onedrive\Documents\GitHub\aspose.org\content\reference.aspose.org\el\pdf\net\SignatureField.md,DER byte,legitimate_passthrough
+reference.aspose.org,fa,D:\onedrive\Documents\GitHub\aspose.org\content\reference.aspose.org\fa\slides\cpp\Elements.md,end para,genuine_leak_or_unclassified
+reference.aspose.org,hi,D:\onedrive\Documents\GitHub\aspose.org\content\reference.aspose.org\hi\slides\cpp\Elements.md,end para,genuine_leak_or_unclassified
+reference.aspose.org,th,D:\onedrive\Documents\GitHub\aspose.org\content\reference.aspose.org\th\slides\cpp\Elements.md,end para,genuine_leak_or_unclassified
+reference.aspose.org,uk,D:\onedrive\Documents\GitHub\aspose.org\content\reference.aspose.org\uk\slides\cpp\Elements.md,end para,genuine_leak_or_unclassified
+reference.aspose.org,hi,D:\onedrive\Documents\GitHub\aspose.org\content\reference.aspose.org\hi\words\python\StyleData.md,para props,genuine_leak_or_unclassified
+reference.aspose.org,th,D:\onedrive\Documents\GitHub\aspose.org\content\reference.aspose.org\th\words\python\StyleData.md,para props,genuine_leak_or_unclassified
+reference.aspose.org,uk,D:\onedrive\Documents\GitHub\aspose.org\content\reference.aspose.org\uk\words\python\StyleData.md,para props,genuine_leak_or_unclassified
+reference.aspose.org,zh,D:\onedrive\Documents\GitHub\aspose.org\content\reference.aspose.org\zh\words\python\StyleData.md,para props,genuine_leak_or_unclassified

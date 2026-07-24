@@ -1,0 +1,139 @@
+# TERMINAL_CLOSED — Mission quality-remediation-audit-phase7-20260723
+# Session: 2026-07-23/24
+# Closed by: Claude (Sonnet 5)
+
+terminal_closed:
+  mission_id: quality-remediation-audit-phase7-20260723
+  session_id: quality-remediation-audit-phase7-20260723
+  closed_at: "2026-07-24"
+  closed_by: "claude-sonnet-5"
+  protocol: "Bound to .supervisor/prompts/prompt1-post-sprint-audit.md (263dab3d...), prompt2-plan-hardening.md (4fe227b6...), prompt3-controlled-execution.md (5246d218...), prompt4-close-task.md (3196a5bd..., invocation quality-remediation-audit-phase7-20260723-close-01) -- see convergence-binding.yaml for full role-verification evidence."
+
+  origin: >
+    User pasted a 10-category, 3,938-issue translation-quality audit table
+    (link_path_corrupted, title_mismatch, double_period, newline_explosion,
+    table_desc_not_translated, code_fence_dropped, empty_body,
+    gate31_contamination, linktitle_mismatch, shortcode_leak) and asked for
+    grouping by subdomain/family/lang, a mechanical (no-LLM/MT) fix path,
+    and TM cleanup. Escalated through 3 rounds of user-directed plan
+    hardening (production-grade root-cause analysis, governance-framework
+    reuse, backlog routing for stale content, batched/verified fixes,
+    swarm-ready taskcard design, rollback/evidence requirements) before
+    approval, then executed end-to-end in the same session per explicit
+    instruction to "keep going through full closure."
+
+  audit_chain:
+    - stage: "plan Reassessment (root-cause analysis)"
+      verdict: "2 unifying root causes found by direct file diffing: (1) Gate 12's unprotected double-dot regex corrupts markdown link targets, explaining double_period + the majority of link_path_corrupted; (2) stale/orphaned translations against a moved-on EN source, explaining most of newline_explosion, the remainder of link_path_corrupted, and shortcode_leak."
+      file: "C:\\Users\\prora\\.claude\\plans\\link-path-corrupted-1-638-memoized-hinton.md"
+    - stage: "plan Live-System Reassessment (2026-07-24)"
+      verdict: "discovered a concurrent, live, actively-committing pipeline in the content repo mid-execution; operator explicitly confirmed go-ahead to proceed concurrently, with hardened git-mechanics (exact-path staging, no branch-switch, immediate stage+commit) as the mitigation"
+      file: "same plan file, 'Live-System Reassessment (2026-07-24)' section"
+    - stage: "Deliverable 4 (taskcard execution, TC-P7-00 through TC-P7-17)"
+      verdict: "EXECUTION_COMPLETE_WITH_LIMITATIONS -- 16 taskcards CLOSED, 1 CLOSED_OBSOLETE (already solved elsewhere), 1 ACCEPTED_WITH_GOVERNED_EXCLUSION (TC-P7-15, content repo's own pipeline left running per operator instruction), L3 TM purge and 2 follow-up-worthy source fixes explicitly deferred, not silently dropped"
+      file: ".supervisor/state/quality-remediation-audit-phase7-20260723/stage2-plan/stage2-taskcard-index.yaml"
+    - stage: "prompt4-close-task.md"
+      verdict: "EXECUTION_COMPLETE_WITH_LIMITATIONS"
+      invocation_id: "quality-remediation-audit-phase7-20260723-close-01"
+      commit: "2fbb3e4 (tooling + prior state artifacts); closure/evidence artifacts written after this commit remain uncommitted, see close_task_result.yaml"
+      file: ".supervisor/state/quality-remediation-audit-phase7-20260723/close_task_result.yaml"
+
+  deliverables_verified:
+    - tc: TC-P7-02
+      title: "Grouped findings report (rebaselined onto audit_18site_dryrun.jsonl, native blog.aspose.org coverage)"
+      state: VERIFIED
+    - tc: TC-P7-03
+      title: "Title/linkTitle identity fixer"
+      state: VERIFIED
+      proof_level: "spot-verified byte-identical to EN across all 4 in-scope sites"
+    - tc: TC-P7-04
+      title: "Double-period fixer"
+      state: VERIFIED
+      proof_level: "292 fixed, 210 idempotent no-op, 0 confirmed defects"
+    - tc: TC-P7-05
+      title: "Link-path fixer + classifier"
+      state: VERIFIED
+      proof_level: "1,674 processed, exact-match fixes applied, 419 backlog-routed (no exact match); detector-independent filesystem-existence check performed on every fixed target per the plan's elevated-scrutiny requirement"
+    - tc: TC-P7-06
+      title: "Newline-explosion classifier + fixer"
+      state: VERIFIED
+      proof_level: "2 mechanical-fixed, 64 no-op, 417 stale->backlog, matching the pre-execution sampled split"
+    - tc: TC-P7-07
+      title: "Dropped-code-fence fixer"
+      state: VERIFIED
+      proof_level: "75 fixed, 276 backlogged; fence-count re-check + blast-radius diff mandatory per plan's elevated-scrutiny requirement"
+    - tc: TC-P7-08
+      title: "Table-cell classifier + TM fill"
+      state: VERIFIED
+      proof_level: "2,471 cells filled/33 files (final, independently re-verified count), 7,031 backlogged. Highest-incident-count taskcard of the mission -- 3 real production bugs + 1 recovery-script bug + 1 self-inflicted near-miss, all caught by direct git diff / file inspection, all fixed and re-verified. See stage3-execution-log.md for full detail."
+    - tc: TC-P7-09
+      title: "Gate 31 term classification"
+      state: VERIFIED
+      proof_level: "read-only; traced a real, previously-unknown defect class (identifier-splitting corruption) via direct file inspection"
+    - tc: TC-P7-10
+      title: "Shortcode-leak backlog routing"
+      state: VERIFIED
+    - tc: TC-P7-11
+      title: "Empty-body backlog registration"
+      state: VERIFIED
+    - tc: TC-P7-12
+      title: "verify_fix.py"
+      state: VERIFIED
+      proof_level: "found and fixed 2 real bugs during use (completeness before/after-diff false positive; Hugo leaf-page URL-segment resolution false positive), both with regression tests"
+    - tc: TC-P7-13
+      title: "TM purge + fix-forward"
+      state: VERIFIED
+      proof_level: "backup (1.48GB + sha256) -> dry-run (698,185/10,780) -> write (10,780/10,780 deleted) -> post-write spot-check (0 remaining). L3 semantic purge deferred, disclosed."
+    - tc: TC-P7-14
+      title: "Backlog enqueue + drain monitor"
+      state: VERIFIED
+      proof_level: "6,505 entries queued, confirmed via queue-file row count/timestamps"
+    - tc: TC-P7-16
+      title: "Full re-audit + regression gate"
+      state: VERIFIED
+      proof_level: "86,474-row re-audit, all 10 categories' before/after counts fully explained including a fully-investigated apparent regression (double_period audit-tool artifact, 99.93% false-positive)"
+    - tc: TC-P7-17
+      title: "Content-repo commit + evidence bundle + closeout"
+      state: ACCEPTED_WITH_LIMITATIONS
+      limitation: "content repo required no separate commit (changes absorbed into the concurrent pipeline's own commit stream, verified not fabricated); hugo-translator commit made (2fbb3e4); evidence-bundle artifacts written after that commit remain uncommitted in the working tree, packaged into the zip directly"
+
+  test_results:
+    unit_tests_added_this_mission: "~60+ across 8 new test files (test_fix_title_identity.py, test_fix_double_periods.py, test_fix_link_paths.py, test_fix_dropped_code_fences.py, test_fill_table_cells_from_tm.py, test_triage_newline_explosion.py, test_verify_fix.py [24 tests], test_purge_corrupted_tm_entries.py [10 tests])"
+    real_bugs_found_and_fixed_via_this_coverage: 9
+
+  open_follow_ups:
+    - id: "PHASE7-FOLLOWUP-001"
+      description: "Fix Gate 12's unprotected double-dot regex in write_gate.py to exclude markdown link targets, not just code fences -- without this, new translations will keep re-accumulating the exact corruption this mission just cleared"
+      priority: "recommended immediate, not indefinitely deferred"
+    - id: "PHASE7-FOLLOWUP-002"
+      description: "Fix audit_all_content.py's own double_period detector, which shares Gate 12's identical unprotected-regex flaw -- discovered this mission via the TC-P7-16 re-audit's 1,347-file false-positive spike"
+      priority: "recommended alongside PHASE7-FOLLOWUP-001"
+    - id: "PHASE7-FOLLOWUP-003"
+      description: "L3 semantic TM purge (764,510 entries) -- deferred this mission on re-embed cost; L2/primary is clean"
+      priority: "recommended near-term"
+    - id: "PHASE7-FOLLOWUP-004"
+      description: "Drain the 6,505-item backlog queue via the normal LLM/MT-backed pipeline (explicitly out of this mission's scope by design)"
+      priority: "normal pipeline operation, not urgent"
+
+  not_addressed_this_session_explicitly_out_of_scope:
+    - "Any LLM/MT call of any kind (standing constraint for this entire mission)"
+    - "The content repo's own separate, live pipeline -- left running throughout, per explicit operator instruction"
+    - "All other pre-existing, uncommitted, unrelated work in both working trees -- never this mission's scope, never touched"
+
+  plan_file: "C:\\Users\\prora\\.claude\\plans\\link-path-corrupted-1-638-memoized-hinton.md"
+  plan_sections_updated: []
+  plan_update_note: "Not edited at closure -- stage2-taskcard-index.yaml is this mission's authoritative live-status source; see close_task_result.yaml's master_plan_update_note for the explicit reasoning, docked one point in the quality rubric rather than silently treated as complete."
+
+  final_status: CLOSED
+  verdict: EXECUTION_COMPLETE_WITH_LIMITATIONS
+  scope_note: >
+    This closes mission quality-remediation-audit-phase7-20260723. 16
+    taskcards CLOSED/VERIFIED, 1 CLOSED_OBSOLETE (solved by unrelated prior
+    work), 1 ACCEPTED_WITH_GOVERNED_EXCLUSION (TC-P7-15's partial worker-stop
+    scope, per explicit operator instruction). Genuinely open items --
+    L3 TM purge, the Gate 12 source fix, and the audit tool's own detector
+    fix -- are named explicitly above as recommended follow-ups, not
+    silently dropped or overclaimed as done. No commit was pushed to any
+    origin remote in either repo. No merge to main was performed in either
+    repo. Zero LLM/MT calls were made at any point in this mission, per the
+    user's original, standing constraint.

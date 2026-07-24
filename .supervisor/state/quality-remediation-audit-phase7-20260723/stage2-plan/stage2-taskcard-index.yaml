@@ -33,23 +33,23 @@ taskcards:
   - id: TC-P7-05
     title: Link-path fixer + classifier
     lane: FIX
-    status: IN_PROGRESS
-    quality_note: batch 1 (1000 files) complete -- 71/78 initial verify failures were a real bug found and fixed in verify_fix.py's Hugo-URL-segment resolution; 7/78 are pre-existing EN-side broken links (out of scope, fix correctly matches EN, not rolled back). Batch 2 (remaining ~674) running.
+    status: CLOSED
+    quality_note: 1,674 files processed across 2 batches; exact-match fixes applied, 419 routed to backlog (no exact EN-target match). Real bug found+fixed in verify_fix.py's Hugo-URL-segment resolution (71/78 apparent failures); remaining ~50 traced to pre-existing EN-side broken links or not-yet-translated locale pages, out of scope, not rolled back.
   - id: TC-P7-06
     title: Newline-explosion classifier + fixer
     lane: FIX
-    status: NOT_STARTED
-    dependency: TC-P7-05 CLOSED (file overlap: 22 files)
+    status: CLOSED
+    quality_note: 2 mechanical-fixed, 64 no-op, 417 stale->backlog. Matched predicted ~14%/86% mechanical/stale split from pre-execution sampling.
   - id: TC-P7-07
     title: Dropped-code-fence fixer
     lane: FIX
-    status: NOT_STARTED
-    dependency: TC-P7-05 CLOSED (file overlap: 27 files)
+    status: CLOSED
+    quality_note: 75 fixed, 276 backlogged (genuinely ambiguous heading structure). Two real bugs found+fixed during execution: heading-TEXT vs heading-LEVEL alignment, and EN-heading-overwrite on rebuild -- both regression-tested.
   - id: TC-P7-08
     title: Table-cell classifier + TM fill
     lane: FIX
-    status: NOT_STARTED
-    dependency: TC-P7-05 CLOSED (file overlap: 23 files), TC-P7-06 CLOSED (file overlap: 62 files)
+    status: CLOSED
+    quality_note: 2,471 cells filled across 33 files (final, verified count); 7,031 cells backlogged. Most significant incident of the mission -- 3 real production-code bugs (line-index alignment causing real data corruption; naive duplicate-key resolution; recovery script sharing the same collision bug) plus 1 self-inflicted near-miss (re-running a destructive script twice), all caught via direct git diff / file inspection, all fixed and independently re-verified. Full detail: this file's TC-P7-03..08 table above.
   - id: TC-P7-09
     title: Gate 31 term classification
     lane: FIX
@@ -71,25 +71,25 @@ taskcards:
   - id: TC-P7-13
     title: TM purge + fix-forward
     lane: TM
-    status: SCRIPT_READY_WRITE_PENDING
-    quality_note: unit tested + real dry-run against production L2 (698185 scanned, 10780 corrupted candidates). --write blocked on TC-P7-03..08 all CLOSED per dependency.
+    status: CLOSED
+    quality_note: backup created (backups/tm_pre_purge_quality_remediation_phase7_20260724.tar.gz, 1.48GB + sha256), --write executed (10780/10780 deleted across 144 site/locale pairs), post-write spot-check confirmed 0 remaining. L3 semantic purge (764,510 entries) deliberately deferred -- re-embed cost prohibitive for remaining session time, L2/primary is clean. Full detail: stage3-execution/tm-purge-log.md.
   - id: TC-P7-14
     title: Backlog enqueue + drain monitor
     lane: QA
-    status: SCRIPT_READY_NOT_RUN
-    quality_note: enqueue_backlog.py built, reuses src/tm/retranslate_queue.py's add_to_queue() directly
+    status: CLOSED
+    quality_note: 6,505 entries queued via retranslate_queue.py's add_to_queue(), confirmed via data/retranslate_queue.jsonl row count/timestamps. Drain itself explicitly out of this mission's scope (no LLM/MT calls) -- monitor script built and ready for the normal pipeline to use going forward.
   - id: TC-P7-15
     title: Worker-stop / TM-safety orchestration
     lane: COORD
     status: PARTIAL
-    quality_note: hugo-translator's own content_worker/tm_worker confirmed already stopped (heartbeats stale/status=stopped) at TC-P7-00; per operator's explicit go-ahead to proceed concurrently with the content repo's OWN separate pipeline, this mission does not additionally stop that pipeline -- documented risk, not a silent gap
+    quality_note: hugo-translator's own content_worker/tm_worker confirmed already stopped (heartbeats stale/status=stopped) at TC-P7-00; per operator's explicit go-ahead to proceed concurrently with the content repo's OWN separate pipeline, this mission does not additionally stop that pipeline -- documented risk, not a silent gap. Stays PARTIAL by design, not an oversight.
   - id: TC-P7-16
     title: Full re-audit + regression gate
     lane: QA
-    status: NOT_STARTED
-    dependency: all FIX and TM taskcards CLOSED
+    status: CLOSED
+    quality_note: 86,474-row re-audit across docs/kb/products/reference.aspose.org. All 10 categories' before/after counts fully explained, zero unexplained regressions (one apparent regression -- double_period audit-artifact spike -- investigated and confirmed 99.93% false-positive, 0.07% pre-existing/out-of-scope). Full detail: stage3-execution/before-after-audit-diff.md.
   - id: TC-P7-17
     title: Content-repo commit + evidence bundle + closeout
     lane: GOV
-    status: NOT_STARTED
-    dependency: TC-P7-16 CLOSED
+    status: CLOSED
+    quality_note: content repo required no commit action (all mission changes already absorbed into the concurrent pipeline's own commit stream, verified via git status showing zero mission-owned dirty files); hugo-translator repo committed on branch remediation/audit-phase7-20260723, commit 2fbb3e4 (24 files, 3791 insertions). Evidence bundle assembled. Final verdict: EXECUTION_COMPLETE_WITH_LIMITATIONS (L3 TM purge deferred; Gate 12 source fix and audit-tool double_period detector fix recommended as follow-up missions) -- see closure-report.md.
