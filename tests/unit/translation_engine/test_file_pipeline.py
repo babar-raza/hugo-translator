@@ -14,12 +14,34 @@ from src.translation_engine.file_pipeline import (
     FileTranslationPipeline,
     LanguageResult,
     LanguageTranslationContext,
+    verification_error_metadata,
 )
 
 
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
+
+def test_verification_error_metadata_excludes_candidate_text():
+    issue = MagicMock(
+        severity="error",
+        check_name="language_detection",
+        location="frontmatter.title",
+        message="SECRET REJECTED CANDIDATE",
+        translated_text="SECRET REJECTED CANDIDATE",
+    )
+    result = MagicMock(issues=[issue])
+
+    metadata = verification_error_metadata(result)
+
+    assert metadata == [
+        {
+            "check": "language_detection",
+            "location": "frontmatter.title",
+        }
+    ]
+    assert "SECRET" not in repr(metadata)
 
 
 def _make_engine(
