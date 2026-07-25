@@ -136,6 +136,41 @@ def test_campaign_failure_metadata_uses_validator_names_without_messages():
     assert "SECRET" not in reason
 
 
+def test_failure_metadata_records_payload_free_repetition_fingerprint():
+    issue = SimpleNamespace(
+        validator="RepetitionDetectorValidator",
+        severity=SimpleNamespace(value="warning"),
+        message="SECRET REJECTED CANDIDATE",
+        location="segment_SECRET",
+        details={
+            "word": "SECRET",
+            "frequency": 0.235294,
+            "count": 4,
+            "threshold": 0.20,
+            "source_word_freq_ceiling": 0.08,
+            "suggestion": "SECRET",
+        },
+    )
+    result = SimpleNamespace(
+        errors=[],
+        retry_attempts=0,
+        validation_result=SimpleNamespace(issues=[issue]),
+        error="",
+    )
+
+    gate, reason = CampaignRunner._failure_metadata(result)
+
+    assert gate == "RepetitionDetectorValidator"
+    assert (
+        "RepetitionDetectorValidator:warning:word_frequency:"
+        in reason
+    )
+    assert "count=4" in reason
+    assert "threshold=0.2" in reason
+    assert "frequency=0.235294" in reason
+    assert "SECRET" not in reason
+
+
 def test_shards_are_locale_scoped_and_bounded(tmp_path):
     path = tmp_path / "manifest.yaml"
     path.write_text(yaml.safe_dump(_manifest(tmp_path)), encoding="utf-8")

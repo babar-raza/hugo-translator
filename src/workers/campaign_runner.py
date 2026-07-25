@@ -466,6 +466,60 @@ class CampaignRunner:
             raw_error,
             re.IGNORECASE,
         )
+        issue_fingerprints: list[str] = []
+        for issue in getattr(validation_result, "issues", []) or []:
+            severity = str(
+                getattr(
+                    getattr(issue, "severity", None),
+                    "value",
+                    getattr(issue, "severity", ""),
+                )
+            )
+            if severity not in {"error", "warning"}:
+                continue
+            validator = re.sub(
+                r"[^A-Za-z0-9_-]",
+                "",
+                str(getattr(issue, "validator", "unknown")),
+            ) or "unknown"
+            details = getattr(issue, "details", None) or {}
+            if "ngram" in details:
+                issue_kind = "ngram"
+            elif "frequency" in details and "word" in details:
+                issue_kind = "word_frequency"
+            elif "sentence" in details:
+                issue_kind = "sentence_duplication"
+            elif "heading" in details:
+                issue_kind = "heading_repetition"
+            else:
+                issue_kind = "generic"
+            location_hash = hashlib.sha256(
+                str(getattr(issue, "location", "")).encode("utf-8")
+            ).hexdigest()[:16]
+            numeric_parts: list[str] = []
+            for key in (
+                "count",
+                "threshold",
+                "source_ngram_ceiling",
+                "frequency",
+                "source_word_freq_ceiling",
+            ):
+                value = details.get(key)
+                if isinstance(value, bool) or not isinstance(value, (int, float)):
+                    continue
+                rendered = f"{value:.6g}" if isinstance(value, float) else str(value)
+                numeric_parts.append(f"{key}={rendered}")
+            issue_fingerprints.append(
+                ":".join(
+                    [
+                        validator,
+                        severity,
+                        issue_kind,
+                        location_hash,
+                        *(numeric_parts or ["numeric=none"]),
+                    ]
+                )
+            )
         gate = validators[0] if validators else (safe_codes[0] if safe_codes else "pipeline")
         validator_text = ",".join(validators) if validators else "unknown"
         reason = (
@@ -476,6 +530,8 @@ class CampaignRunner:
             f"score={score_match.group(1) if score_match else 'unknown'}; "
             f"unit_fingerprints="
             f"{unit_fingerprints.group(1) if unit_fingerprints else 'none'}; "
+            f"issue_fingerprints="
+            f"{','.join(sorted(issue_fingerprints)) if issue_fingerprints else 'none'}; "
             f"error_sha256={hashlib.sha256(raw_error.encode('utf-8')).hexdigest()}"
         )
         return gate, reason
