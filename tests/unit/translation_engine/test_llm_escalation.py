@@ -178,3 +178,18 @@ def test_blocked_write_escalation_retries_before_success_bookkeeping():
     escalation_end = source.index("if not _escalated:")
     success_bookkeeping = source.index("# File successfully written", escalation_end)
     assert "continue" in source[escalation_end:success_bookkeeping]
+
+
+def test_zero_defect_campaign_disables_pipeline_internal_escalation():
+    """The campaign runner alone owns the manifest's exact attempt schedule."""
+    import inspect
+
+    from src.translation_engine.file_pipeline import FileTranslationPipeline
+
+    source = inspect.getsource(FileTranslationPipeline.translate_language)
+    gate_escalation = source.index("# TC-HDN-007b: Gate-failure escalation.")
+    escalation_decision = source.index("if (", gate_escalation)
+    escalation_block = source[
+        escalation_decision : source.index("except Exception", gate_escalation)
+    ]
+    assert 'validation_policy", "standard") != "zero-defect"' in escalation_block

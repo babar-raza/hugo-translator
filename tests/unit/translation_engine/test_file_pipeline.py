@@ -5,6 +5,7 @@ correction pass, and TM buffer lifecycle.
 """
 
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -218,6 +219,68 @@ class TestBasicPipelineFlow:
 
 
 class TestRetryAndFeedbackGuard:
+    def test_each_retry_receives_a_fresh_copy_of_the_source_document(self):
+        """Candidate construction may mutate its copy but never the source or next retry."""
+        from src.translation_engine.validation.post_translation_validator import (
+            ValidationDecision as PostValidationDecision,
+        )
+
+        engine = _make_engine(validation_enabled=True)
+        seen_titles = []
+
+        def mutate_attempt(*args, **kwargs):
+            attempt_doc = kwargs["doc"]
+            seen_titles.append(attempt_doc.frontmatter["title"])
+            attempt_doc.frontmatter["title"] = "MUTATED CANDIDATE"
+            return "---\ntitle: Translated\n---\nTranslated body"
+
+        engine._translate_to_language.side_effect = mutate_attempt
+
+        decision_retry = MagicMock(
+            decision=PostValidationDecision.RETRY,
+            retry_feedback="Try again",
+            decision_reason="First candidate rejected",
+        )
+        decision_accept = MagicMock(decision=PostValidationDecision.ACCEPT)
+        engine.decision_engine.make_decision.side_effect = [decision_retry, decision_accept]
+
+        issue = MagicMock(validator="semantic", severity=MagicMock(value="error"))
+        first_validation = MagicMock(
+            issues=[issue],
+            error_count=1,
+            warning_count=0,
+        )
+        second_validation = MagicMock(
+            issues=[],
+            error_count=0,
+            warning_count=0,
+        )
+        engine.validation_suite.validate_aggregated.side_effect = [
+            first_validation,
+            second_validation,
+        ]
+
+        source_doc = SimpleNamespace(
+            ast=[],
+            frontmatter={"title": "SOURCE TITLE"},
+            body="Source body",
+            source_path=Path("/tmp/test.md"),
+            file_path=Path("/tmp/test.md"),
+        )
+        ctx = _make_ctx(
+            doc=source_doc,
+            should_validate=True,
+            max_retry_attempts=2,
+        )
+        result = _make_result()
+        result.stats.model_used = "llm_gpt4"
+
+        lang_result = FileTranslationPipeline(engine).translate_language(ctx, result)
+
+        assert lang_result.success
+        assert seen_titles == ["SOURCE TITLE", "SOURCE TITLE"]
+        assert source_doc.frontmatter == {"title": "SOURCE TITLE"}
+
     def test_retry_on_validation_retry_decision(self):
         """RETRY decision → retry with feedback → second attempt succeeds."""
         from src.translation_engine.validation.post_translation_validator import (

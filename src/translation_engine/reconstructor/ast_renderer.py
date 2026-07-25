@@ -465,6 +465,24 @@ class ASTRenderer:
 
             # Sanitize language markers from frontmatter translations (FIX-BT-02)
             sanitized_translation = self._sanitize_language_markers(unit.translated_text)
+            placeholder_map = unit.metadata.get('placeholder_map', {})
+            if placeholder_map:
+                sanitized_translation = self._restore_placeholders(
+                    sanitized_translation, placeholder_map
+                )
+
+            # Frontmatter does not pass through the body-node restoration path
+            # below, so enforce the same fail-closed placeholder invariant here.
+            remaining_placeholders = re.findall(
+                r'\{?\s*PLACEHOLDER_\d+\s*\}?', sanitized_translation, re.IGNORECASE
+            )
+            if remaining_placeholders:
+                self._placeholder_leak_count += len(remaining_placeholders)
+                logger.error(
+                    "Unrestored placeholder token(s) in frontmatter field '%s': count=%d",
+                    unit.metadata.get('field_name'),
+                    len(remaining_placeholders),
+                )
 
             field_name = unit.metadata.get('field_name')
             field_type = unit.metadata.get('field_type')

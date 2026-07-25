@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import logging
 import time
+from copy import deepcopy
 from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
@@ -159,12 +160,19 @@ class FileTranslationPipeline:
                 # a failed previous attempt that triggered RETRY).
                 _tm_write_buffer.clear()
 
+                # SegmentTranslator's AST renderer intentionally mutates its
+                # document while constructing a candidate. Every retry must
+                # start from the immutable parsed source, and all downstream
+                # source-side validators must continue to see that source.
+                attempt_doc = deepcopy(doc)
+                attempt_segments = deepcopy(segments)
+
                 # Translate (returns content, doesn't write yet)
                 translated_content = engine._translate_to_language(
                     site_id=site_id,
                     site_profile=site_profile,
-                    doc=doc,
-                    segments=segments,
+                    doc=attempt_doc,
+                    segments=attempt_segments,
                     source_lang=source_lang,
                     target_lang=target_lang,
                     force=force,
@@ -905,7 +913,11 @@ class FileTranslationPipeline:
                     # Uses existing _llm_model_override wiring (already passed to
                     # _translate_to_language() at line 161 as model_id_override).
                     _escalated = False
-                    if _llm_model_override is None and retry_count < max_retry_attempts:
+                    if (
+                        getattr(engine, "validation_policy", "standard") != "zero-defect"
+                        and _llm_model_override is None
+                        and retry_count < max_retry_attempts
+                    ):
                         try:
                             _te_cfg_esc = (
                                 engine.config.get_config().get("translation_engine", {})
