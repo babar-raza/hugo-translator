@@ -35,6 +35,16 @@ def test_unapplied_frontmatter_field_is_reported_without_candidate_text():
     ]
 
 
+def test_frontmatter_application_check_precedes_governed_scalar_cleanup():
+    frontmatter = {"summary": "translated summary#"}
+    expected = {"summary": ["translated summary#"]}
+    formatter = YAMLFormatter()
+
+    assert _unapplied_frontmatter_keys(expected, frontmatter, formatter) == []
+    formatter.format_frontmatter(frontmatter)
+    assert _unapplied_frontmatter_keys(expected, frontmatter, formatter) == ["summary"]
+
+
 def test_campaign_log_filter_replaces_message_and_traceback_payloads():
     record = logging.LogRecord(
         "translator.candidate",

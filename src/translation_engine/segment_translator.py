@@ -1234,9 +1234,11 @@ class SegmentTranslator:
                 from .reconstructor import YAMLFormatter
 
                 yaml_formatter = YAMLFormatter()
-                frontmatter_yaml = yaml_formatter.format_frontmatter(translated_frontmatter)
 
-                # Structural invariant: verify every frontmatter field was applied.
+                # Structural invariant: verify every frontmatter field was applied
+                # before YAMLFormatter performs governed scalar auto-cleaning.
+                # The all-gate fixed-point rerun validates the serialized, cleaned
+                # bytes; this check is only about reconstruction placement.
                 # A field can legitimately have more than one extracted Segment
                 # (the segment and AST unit paths overlap for some profiles).  The
                 # reconstructed value therefore needs to match *one* authoritative
@@ -1265,6 +1267,8 @@ class SegmentTranslator:
                     if getattr(engine, "validation_policy", "standard") == "zero-defect":
                         raise ValueError(_fm_error)
                     logger.warning(_fm_error)
+
+                frontmatter_yaml = yaml_formatter.format_frontmatter(translated_frontmatter)
 
                 # RC-3 FIX: Verify frontmatter keys were not translated
                 _source_keys = set(doc.frontmatter.keys())
