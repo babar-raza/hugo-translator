@@ -116,6 +116,25 @@ def test_failure_ledger_contains_metadata_only(tmp_path):
     assert "content" not in row
 
 
+def test_campaign_failure_metadata_uses_validator_names_without_messages():
+    issue = SimpleNamespace(
+        validator="SemanticSimilarityValidator",
+        severity=SimpleNamespace(value="error"),
+        message="SECRET REJECTED CANDIDATE",
+    )
+    result = SimpleNamespace(
+        errors=["rejected"],
+        retry_attempts=0,
+        validation_result=SimpleNamespace(issues=[issue]),
+    )
+
+    gate, reason = CampaignRunner._failure_metadata(result)
+
+    assert gate == "SemanticSimilarityValidator"
+    assert "validators=SemanticSimilarityValidator" in reason
+    assert "SECRET" not in reason
+
+
 def test_shards_are_locale_scoped_and_bounded(tmp_path):
     path = tmp_path / "manifest.yaml"
     path.write_text(yaml.safe_dump(_manifest(tmp_path)), encoding="utf-8")

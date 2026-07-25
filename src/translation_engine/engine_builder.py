@@ -119,9 +119,7 @@ class EngineBuilder:
         engine.validation_mode = p["validation_mode"]
         engine.validation_policy = p.get("validation_policy", "standard")
         if engine.validation_policy not in {"standard", "zero-defect"}:
-            raise ValueError(
-                f"Unknown validation_policy: {engine.validation_policy!r}"
-            )
+            raise ValueError(f"Unknown validation_policy: {engine.validation_policy!r}")
         engine.enable_terminology = p["enable_terminology"]
         engine.terminology_mode = p["terminology_mode"]
         engine.max_retries_override = p["max_retries"]
@@ -193,8 +191,8 @@ class EngineBuilder:
                     if hasattr(engine.config, "get_config")
                     else {}
                 )
-                engine._review_cache_config_fingerprint = (
-                    ReviewCache.compute_config_fingerprint(_te_cfg)
+                engine._review_cache_config_fingerprint = ReviewCache.compute_config_fingerprint(
+                    _te_cfg
                 )
                 logger.info(
                     "Review cache enabled (%d entries loaded, config_fingerprint=%s)",
@@ -285,7 +283,8 @@ class EngineBuilder:
                     engine.validation_suite.validators.append(_semantic_validator)
                     logger.info(
                         "TC-QG-004: SemanticSimilarityValidator added to production "
-                        "ValidationSuite (validation_mode=%r)", p["validation_mode"],
+                        "ValidationSuite (validation_mode=%r)",
+                        p["validation_mode"],
                     )
 
         engine.placeholder_manager = PlaceholderManager()
@@ -579,8 +578,15 @@ class EngineBuilder:
                 SemanticSimilarityValidator,
             )
 
-            _l3_enc = getattr(getattr(engine.tm, "l3", None), "encoder", None)
-            if _l3_enc is not None:
+            _configured_model = (
+                engine.config.get_config()
+                .get("tm_defaults", {})
+                .get("l3_embedding_model", "all-MiniLM-L6-v2")
+            )
+            _l3 = getattr(engine.tm, "l3", None)
+            _l3_enc = getattr(_l3, "encoder", None)
+            _l3_model = getattr(_l3, "embedding_model_name", None)
+            if _l3_enc is not None and _l3_model == _configured_model:
                 SemanticSimilarityValidator.set_encoder(_l3_enc)
             else:
                 # HT-QUALITY-GATES-001 Part 22 (plan 5.4 item 1): L3 lookups
@@ -595,16 +601,13 @@ class EngineBuilder:
                 # see load_standalone_sentence_encoder()'s docstring.
                 from src.tm.l3_semantic import load_standalone_sentence_encoder
 
-                _model_name = (
-                    engine.config.get_config()
-                    .get("tm_defaults", {})
-                    .get("l3_embedding_model", "all-MiniLM-L6-v2")
-                )
-                _standalone_enc = load_standalone_sentence_encoder(_model_name, use_gpu=False)
+                _standalone_enc = load_standalone_sentence_encoder(_configured_model, use_gpu=False)
                 SemanticSimilarityValidator.set_encoder(_standalone_enc)
                 logger.info(
                     "SemanticSimilarityValidator: loaded standalone CPU encoder "
-                    "(%s) since L3 is not active (skip_l3=True)", _model_name,
+                    "(%s) because the active L3 encoder is absent or uses a "
+                    "different, non-governed model",
+                    _configured_model,
                 )
         except Exception as _sem_wire_err:
             logger.debug(

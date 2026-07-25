@@ -237,6 +237,7 @@ class FileTranslationPipeline:
                                 "file_path": str(file_path),
                             },
                         )
+                        result.validation_result = validation_result
 
                         # Check frontmatter language
                         _fm_issues = engine._check_frontmatter_language(
@@ -356,6 +357,7 @@ class FileTranslationPipeline:
                                                 },
                                             )
                                         )
+                                        result.validation_result = validation_result
                                         _fm_issues = engine._check_frontmatter_language(
                                             translated_content, target_lang
                                         )

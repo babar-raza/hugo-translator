@@ -374,11 +374,30 @@ class CampaignRunner:
         )
 
     @staticmethod
-    def _failure_reason(result: Any) -> str:
+    def _failure_metadata(result: Any) -> tuple[str, str]:
         """Return rejection metadata without persisting candidate-derived text."""
         error_count = len(getattr(result, "errors", None) or [])
         retry_count = int(getattr(result, "retry_attempts", 0) or 0)
-        return f"translation_rejected; error_count={error_count}; internal_retries={retry_count}"
+        validation_result = getattr(result, "validation_result", None)
+        validators = sorted(
+            {
+                str(getattr(issue, "validator", "unknown"))
+                for issue in getattr(validation_result, "issues", []) or []
+                if str(
+                    getattr(
+                        getattr(issue, "severity", None), "value", getattr(issue, "severity", "")
+                    )
+                )
+                in {"error", "warning"}
+            }
+        )
+        gate = validators[0] if validators else "pipeline"
+        validator_text = ",".join(validators) if validators else "unknown"
+        reason = (
+            f"translation_rejected; error_count={error_count}; "
+            f"internal_retries={retry_count}; validators={validator_text}"
+        )
+        return gate, reason
 
     def verify(self, *, resume: bool = False) -> dict[str, Any]:
         receipts = self._validated_resume_receipts() if resume else {}
@@ -480,14 +499,16 @@ class CampaignRunner:
                                 "rejected attempt produced an unreceipted "
                                 f"output: {expected_output}"
                             )
+                        failure_gate, failure_reason = self._failure_metadata(result)
                         self.ledger.append_failure(
                             source_path=source.source_path,
                             output_path=expected_output,
                             target_lang=locale,
-                            error=self._failure_reason(result),
+                            error=failure_reason,
                             attempt=attempt_number,
                             job_id=(f"{shard['shard_id']}::{source.source_path}::{locale}"),
                             source_sha256=source.source_sha256,
+                            gate=failure_gate,
                         )
                 finally:
                     llm_paths.discard(resolved_output)
