@@ -366,7 +366,12 @@ def test_campaign_uses_three_primary_then_llm_and_logs_metadata_only(tmp_path, m
             assert file_path == source
             assert target_langs == ["es"]
             escalated = str(output.resolve()) in self._rtq_llm_output_paths
-            self.calls.append((escalated, self.decision_engine.max_retry_attempts))
+            feedback = self._campaign_retry_feedback_by_output.pop(
+                str(output.resolve()), None
+            )
+            self.calls.append(
+                (escalated, self.decision_engine.max_retry_attempts, feedback)
+            )
             if len(self.calls) < 3:
                 return SimpleNamespace(
                     success=False,
@@ -413,7 +418,11 @@ def test_campaign_uses_three_primary_then_llm_and_logs_metadata_only(tmp_path, m
     summary = runner.run()
 
     assert summary["status"] == "COMPLETE"
-    assert engine.calls == [(False, 2), (True, 0), (True, 0)]
+    assert engine.calls[0] == (False, 2, None)
+    assert engine.calls[1][0:2] == (True, 0)
+    assert "Regenerate the complete translation" in engine.calls[1][2]
+    assert engine.calls[2][0:2] == (True, 0)
+    assert "Regenerate the complete translation" in engine.calls[2][2]
     assert engine.decision_engine.max_retry_attempts == 99
     failure_log = runner.ledger.failures_path.read_text(encoding="utf-8")
     assert failure_log.count("\n") == 2

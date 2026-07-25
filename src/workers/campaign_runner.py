@@ -573,6 +573,54 @@ class CampaignRunner:
         )
         return gate, reason
 
+    @staticmethod
+    def _retry_feedback(result: Any, target_lang: str) -> str:
+        """Build candidate-free instructions for the next governed attempt."""
+        validation_result = getattr(result, "validation_result", None)
+        issues = getattr(validation_result, "issues", []) or []
+        validators = {
+            str(getattr(issue, "validator", ""))
+            for issue in issues
+        }
+        instructions: list[str] = []
+        if "FrontmatterLanguageCheck" in validators:
+            fields = sorted(
+                {
+                    str((getattr(issue, "details", None) or {}).get("field", ""))
+                    for issue in issues
+                    if str(getattr(issue, "validator", ""))
+                    == "FrontmatterLanguageCheck"
+                    and str((getattr(issue, "details", None) or {}).get("field", ""))
+                    in {"title", "description", "seoTitle", "summary"}
+                }
+            )
+            field_text = ", ".join(fields) if fields else "translatable frontmatter"
+            instructions.append(
+                f"Translate {field_text} fully into target locale {target_lang}; "
+                "preserve only product names, API identifiers, code, and file formats. "
+                "Do not leave English prose."
+            )
+        if "RepetitionDetectorValidator" in validators:
+            instructions.append(
+                "Avoid adding repeated phrases or duplicate sentences beyond the source structure."
+            )
+        raw_error = str(getattr(result, "error", "") or "")
+        if "GATE36" in raw_error:
+            instructions.append(
+                "Preserve every source claim and section with no omission, reversal, or invented fact."
+            )
+        if "TC-SAS-01" in raw_error:
+            instructions.append(
+                "Translate every translatable source unit; identical output is allowed only for "
+                "product names, API identifiers, and reviewed locale cognates."
+            )
+        if not instructions:
+            instructions.append(
+                f"Regenerate the complete translation in target locale {target_lang} and correct "
+                "all prior validation failures without changing structure, code, links, or shortcodes."
+            )
+        return " ".join(instructions)
+
     def verify(self, *, resume: bool = False) -> dict[str, Any]:
         receipts = self._validated_resume_receipts() if resume else {}
         self.manifest.verify_environment(
@@ -647,12 +695,21 @@ class CampaignRunner:
                     (False, primary_attempts - 1, primary_attempts),
                     *[(True, 0, primary_attempts + index) for index in range(1, llm_attempts + 1)],
                 ]
+                feedback_by_output = getattr(
+                    self.engine, "_campaign_retry_feedback_by_output", None
+                )
+                if feedback_by_output is None:
+                    feedback_by_output = {}
+                    self.engine._campaign_retry_feedback_by_output = feedback_by_output
+                next_feedback: str | None = None
                 try:
                     for use_llm, retry_budget, attempt_number in phases:
                         if decision_engine is not None:
                             decision_engine.max_retry_attempts = retry_budget
                         if use_llm:
                             llm_paths.add(resolved_output)
+                        if next_feedback:
+                            feedback_by_output[resolved_output] = next_feedback
                         result = self.engine.translate_file(
                             source.site_id,
                             source_path,
@@ -674,6 +731,7 @@ class CampaignRunner:
                                 f"output: {expected_output}"
                             )
                         failure_gate, failure_reason = self._failure_metadata(result)
+                        next_feedback = self._retry_feedback(result, locale)
                         self.ledger.append_failure(
                             source_path=source.source_path,
                             output_path=expected_output,
@@ -686,6 +744,7 @@ class CampaignRunner:
                         )
                 finally:
                     llm_paths.discard(resolved_output)
+                    feedback_by_output.pop(resolved_output, None)
                     if decision_engine is not None:
                         decision_engine.max_retry_attempts = original_retry_budget
                 if receipt is None or not expected.is_file():

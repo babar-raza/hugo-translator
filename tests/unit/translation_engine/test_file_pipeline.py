@@ -180,6 +180,25 @@ class TestBasicPipelineFlow:
         engine._translate_to_language.assert_called_once()
         engine._write_output.assert_called_once()
 
+    def test_campaign_feedback_is_consumed_by_next_attempt(self):
+        engine = _make_engine()
+        output = Path("/tmp/test_de.md")
+        engine._campaign_retry_feedback_by_output = {
+            str(output.resolve()): "Translate description fully into de."
+        }
+        pipeline = FileTranslationPipeline(engine)
+
+        language = pipeline.translate_language(
+            _make_ctx(output_path=output), _make_result()
+        )
+
+        assert language.success
+        assert (
+            engine._translate_to_language.call_args.kwargs["retry_feedback"]
+            == "Translate description fully into de."
+        )
+        assert engine._campaign_retry_feedback_by_output == {}
+
     def test_write_gate_failure_blocks_write(self):
         """Write gate returns passed=False → no file written, failure result."""
         from src.translation_engine.write_gate import WriteGateResult

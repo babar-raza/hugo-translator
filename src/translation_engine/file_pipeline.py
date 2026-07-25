@@ -150,6 +150,12 @@ class FileTranslationPipeline:
         max_retry_attempts = ctx.max_retry_attempts
         output_paths_cache = ctx.output_paths_cache
         _llm_model_override = ctx.llm_model_override
+        campaign_feedback = getattr(
+            engine, "_campaign_retry_feedback_by_output", {}
+        )
+        retry_feedback = campaign_feedback.pop(
+            str(output_path.resolve()), retry_feedback
+        )
 
         lang_result = LanguageResult(success=False, retry_count=0)
 
