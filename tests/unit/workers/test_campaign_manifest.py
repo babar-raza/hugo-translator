@@ -249,7 +249,16 @@ def test_campaign_uses_three_primary_then_llm_and_logs_metadata_only(tmp_path, m
         def _get_output_path(self, *_args):
             return output
 
-        def translate_file(self, *_args, **_kwargs):
+        def translate_file(
+            self,
+            site_id,
+            file_path,
+            target_langs,
+            **_kwargs,
+        ):
+            assert site_id == "docs.aspose.org"
+            assert file_path == source
+            assert target_langs == ["es"]
             escalated = str(output.resolve()) in self._rtq_llm_output_paths
             self.calls.append(escalated)
             if len(self.calls) < 4:

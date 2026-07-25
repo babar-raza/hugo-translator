@@ -449,8 +449,8 @@ class CampaignRunner:
                     if attempt > primary_attempts:
                         llm_paths.add(resolved_output)
                     result = self.engine.translate_file(
+                        source.site_id,
                         source_path,
-                        site_id=source.site_id,
                         target_langs=[locale],
                         validate=True,
                         force=False,
