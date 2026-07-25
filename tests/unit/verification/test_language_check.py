@@ -210,6 +210,41 @@ class TestLanguageDetectionCheck:
         # Technical content should be skipped
         assert len(issues) == 0
 
+    def test_protected_evidence_and_grade_metadata_are_skipped(self, check):
+        translated = {
+            "frontmatter": {
+                "title": "Das ist ein ausreichend langer deutscher Titel",
+                "evidence": {
+                    "model_sha": "This is immutable English provenance metadata",
+                    "sections": [
+                        {
+                            "heading": "English source section heading",
+                            "apis": ["Document save option identifier"],
+                        }
+                    ],
+                },
+                "grade_reasons": ["English grading rationale retained for auditability"],
+            }
+        }
+
+        issues = check.run({}, translated, "de")
+
+        assert issues == []
+
+    def test_translatable_frontmatter_remains_checked_with_evidence(self, check):
+        translated = {
+            "frontmatter": {
+                "description": ("This English description must still fail language detection"),
+                "evidence": {
+                    "heading": "Protected English evidence metadata",
+                },
+            }
+        }
+
+        issues = check.run({}, translated, "de")
+
+        assert [issue.location for issue in issues] == ["frontmatter.description"]
+
     def test_issue_metadata(self, check, english_text):
         """Test that issues include useful metadata."""
         translated = {

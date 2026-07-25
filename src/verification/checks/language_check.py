@@ -94,6 +94,10 @@ class LanguageDetectionCheck(VerificationCheck):
         "https://",
         "www.",
     ]
+    PROTECTED_FRONTMATTER_TREES = {
+        "evidence",
+        "grade_reasons",
+    }
 
     def __init__(
         self,
@@ -185,6 +189,8 @@ class LanguageDetectionCheck(VerificationCheck):
 
         for key, value in data.items():
             current_path = f"{path}.{key}"
+            if path == "frontmatter" and key in self.PROTECTED_FRONTMATTER_TREES:
+                continue
 
             if isinstance(value, str):
                 if len(value) >= self.min_text_length:
