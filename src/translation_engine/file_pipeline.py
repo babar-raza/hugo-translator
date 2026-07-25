@@ -1100,6 +1100,10 @@ class FileTranslationPipeline:
                 if retry_count > max_retry_attempts:
                     # Per-locale rejection: max retries exceeded. Handle in-place;
                     # do NOT raise.
+                    result.validation_result = e.validation_result
+                    result.error = (
+                        f"TranslationRetryableError: {e.retry_feedback or str(e)}"
+                    )
                     result.errors.append(
                         f"Translation to {target_lang} rejected after {retry_count} retries"
                     )

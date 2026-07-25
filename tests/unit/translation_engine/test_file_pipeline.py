@@ -10,7 +10,10 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from src.translation_engine.exceptions import TranslationRejectedError
+from src.translation_engine.exceptions import (
+    TranslationRejectedError,
+    TranslationRetryableError,
+)
 from src.translation_engine.file_pipeline import (
     FileTranslationPipeline,
     LanguageResult,
@@ -237,6 +240,34 @@ class TestBasicPipelineFlow:
         assert not language.success
         assert result.validation_result is validation_result
         assert "RepetitionDetectorValidator" in result.error
+
+    def test_exhausted_retry_preserves_structured_diagnostic_in_memory(self):
+        engine = _make_engine()
+        issue = SimpleNamespace(
+            validator="LanguageConsistencyValidator",
+            severity=SimpleNamespace(value="warning"),
+            message="SECRET REJECTED CANDIDATE",
+            details={},
+            location="segment_0",
+        )
+        validation_result = SimpleNamespace(issues=[issue])
+        engine._translate_to_language.side_effect = TranslationRetryableError(
+            message="Retry",
+            file_path="/tmp/test.md",
+            validation_result=validation_result,
+            retry_feedback=(
+                "LanguageConsistencyValidator SECRET REJECTED CANDIDATE"
+            ),
+        )
+        result = _make_result()
+
+        language = FileTranslationPipeline(engine).translate_language(
+            _make_ctx(max_retry_attempts=0), result
+        )
+
+        assert not language.success
+        assert result.validation_result is validation_result
+        assert "LanguageConsistencyValidator" in result.error
 
 
 # ---------------------------------------------------------------------------
