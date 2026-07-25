@@ -235,6 +235,9 @@ class FileTranslationPipeline:
                                 "source_lang": source_lang,
                                 "target_lang": target_lang,
                                 "file_path": str(file_path),
+                                "validation_policy": getattr(
+                                    engine, "validation_policy", "standard"
+                                ),
                             },
                         )
                         result.validation_result = validation_result
@@ -354,6 +357,11 @@ class FileTranslationPipeline:
                                                     "source_lang": source_lang,
                                                     "target_lang": target_lang,
                                                     "file_path": str(file_path),
+                                                    "validation_policy": getattr(
+                                                        engine,
+                                                        "validation_policy",
+                                                        "standard",
+                                                    ),
                                                 },
                                             )
                                         )
