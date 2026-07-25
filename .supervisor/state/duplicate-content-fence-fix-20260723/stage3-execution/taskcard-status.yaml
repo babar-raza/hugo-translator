@@ -106,6 +106,20 @@ taskcards:
     evidence: "successor mission"
     recovery: "Keep distinct tool definitions explicit; do not force threshold uniformity."
     closure_conditions: ["explicitly excluded by the governing plan's Phase 4"]
+  - taskcard_id: TC-DCF-017
+    title: Post-closure end-to-end audit pilot and historical comparison
+    status: COMPLETED
+    lane_owner: this-session
+    objective: Run the actual audit scan on isolated copies of real affected and clean-control pairs, then compare committed mission code with its immediate pre-fix predecessor.
+    allowed_paths: [.supervisor/state/duplicate-content-fence-fix-20260723/**, "%TEMP%/hugo-translator-dcf-pilot-*"]
+    forbidden_paths: ["production content checkout", "TM stores", "unrelated working-tree changes"]
+    dependencies: [TC-DCF-014]
+    expected_outputs: ["previous and committed JSONL/log outputs", "hash proof of no pilot-content mutation", "pilot comparison"]
+    acceptance_checks: ["broken-fence defect changes from missed to reported", "clean control does not gain target-check findings", "remaining audit/report gaps are disclosed"]
+    verification: ["actual scan() pipeline runs under production profiles", "JSONL issue comparison", "SHA256 source/target equality check"]
+    evidence: stage3-execution/evidence/20260725-code-fence-durable-fix/pilot/pilot-results.md
+    recovery: "If output differs for unrelated working-tree code, compare the committed revision rather than attribute it to this mission."
+    closure_conditions: ["committed-vs-predecessor comparison inspected", "no pilot content mutated", "remaining Gate-26 report-parity gap routed to AUD-AUDIT-REPRO-001"]
   - taskcard_id: TC-DCF-001
     title: Isolate and commit this sprint's hunks in write_gate.py and audit_all_content.py
     source_issue_ids: [AUD-L1-001, AUD-L1-002, AUD-L2-001, AUD-L2-003]

@@ -17,3 +17,7 @@ resume_rule: "No eligible task remains in this mission; execute only an explicit
 closure_verdict: "MISSION_COMPLETE — NO_ELIGIBLE_WORK_REMAINS"
 independent_review: ACCEPTED
 implementation_commit: 12615212ec5cf083e4924903ee0732bf055749e0
+post_closure_pilot:
+  task: TC-DCF-017
+  verdict: "core migration confirmed; audit-report parity remains incomplete"
+  evidence: stage3-execution/evidence/20260725-code-fence-durable-fix/pilot/pilot-results.md
