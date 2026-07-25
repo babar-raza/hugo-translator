@@ -130,7 +130,7 @@ class SegmentTranslator:
             if not is_code:
                 continue
             if match.start() > pos:
-                parts.append(("text", text[pos:match.start()]))
+                parts.append(("text", text[pos : match.start()]))
             parts.append(("code", token))
             pos = match.end()
         if pos < len(text):
@@ -154,7 +154,7 @@ class SegmentTranslator:
             if not is_code:
                 continue
             if match.start() > pos:
-                parts.append(("text", text[pos:match.start()]))
+                parts.append(("text", text[pos : match.start()]))
             parts.append(("code", token))
             pos = match.end()
         if pos < len(text):
@@ -270,7 +270,9 @@ class SegmentTranslator:
         for (rendered_idx, sentence, spacing), translation in zip(
             sentence_items, translations, strict=False
         ):
-            rendered[rendered_idx] = f"{translation.strip() if translation.strip() else sentence.strip()}{spacing}"
+            rendered[rendered_idx] = (
+                f"{translation.strip() if translation.strip() else sentence.strip()}{spacing}"
+            )
 
         candidate = "".join(rendered)
         if not candidate.strip() or self._is_effectively_untranslated(source_text, candidate):
@@ -383,7 +385,9 @@ class SegmentTranslator:
         for (rendered_idx, sentence, spacing), translation in zip(
             sentence_items, translations, strict=False
         ):
-            rendered[rendered_idx] = f"{translation.strip() if translation.strip() else sentence.strip()}{spacing}"
+            rendered[rendered_idx] = (
+                f"{translation.strip() if translation.strip() else sentence.strip()}{spacing}"
+            )
 
         candidate = "".join(rendered)
         if not candidate.strip():
@@ -428,7 +432,7 @@ class SegmentTranslator:
             trailing_match = re.search(r"\s*$", prose)
             leading = leading_match.group(0) if leading_match else ""
             trailing = trailing_match.group(0) if trailing_match else ""
-            core = prose[len(leading): len(prose) - len(trailing) if trailing else len(prose)]
+            core = prose[len(leading) : len(prose) - len(trailing) if trailing else len(prose)]
             if not core:
                 rendered[rendered_idx] = prose
                 continue
@@ -439,7 +443,9 @@ class SegmentTranslator:
                 target_lang,
                 stats,
             )
-            rendered[rendered_idx] = f"{leading}{candidate if candidate.strip() else core}{trailing}"
+            rendered[rendered_idx] = (
+                f"{leading}{candidate if candidate.strip() else core}{trailing}"
+            )
 
         return "".join(rendered)
 
@@ -456,8 +462,12 @@ class SegmentTranslator:
         normalized = normalized.replace("header-and-source", "header and source")
         normalized = normalized.replace("control formula visibility", "hide formulas")
         normalized = normalized.replace("Control formula visibility", "Hide formulas")
-        normalized = normalized.replace("Lock individual cells", "Protect cells by locking individual cells")
-        normalized = normalized.replace("lock individual cells", "protect cells by locking individual cells")
+        normalized = normalized.replace(
+            "Lock individual cells", "Protect cells by locking individual cells"
+        )
+        normalized = normalized.replace(
+            "lock individual cells", "protect cells by locking individual cells"
+        )
         normalized = normalized.replace("export styled workbooks", "export formatted workbooks")
         normalized = normalized.replace(
             "Library for Word Document Conversion",
@@ -473,7 +483,11 @@ class SegmentTranslator:
             variants.append(re.sub(r"^\s*Set\b", "Configure", normalized, count=1))
         if re.match(r"^\s*set\b", normalized):
             variants.append(re.sub(r"^\s*set\b", "configure", normalized, count=1))
-        return [variant for idx, variant in enumerate(variants) if variant and variant not in variants[:idx]]
+        return [
+            variant
+            for idx, variant in enumerate(variants)
+            if variant and variant not in variants[:idx]
+        ]
 
     def _translate_core_with_residue_variants(
         self,
@@ -507,8 +521,8 @@ class SegmentTranslator:
                 f"(target={target_lang})"
             )
             if hasattr(backend, "translate_with_token_counts"):
-                retry_translations, input_tokens, output_tokens = backend.translate_with_token_counts(
-                    [variant], source_lang, target_lang
+                retry_translations, input_tokens, output_tokens = (
+                    backend.translate_with_token_counts([variant], source_lang, target_lang)
                 )
                 stats.tokens_input += input_tokens
                 stats.tokens_output += output_tokens
@@ -517,7 +531,10 @@ class SegmentTranslator:
                 stats.tokens_input += estimate_token_count(variant)
                 stats.tokens_output += sum(estimate_token_count(t) for t in retry_translations)
             retry_candidate = retry_translations[0] if retry_translations else ""
-            if retry_candidate and self._english_source_residue_count(variant, retry_candidate) == 0:
+            if (
+                retry_candidate
+                and self._english_source_residue_count(variant, retry_candidate) == 0
+            ):
                 return retry_candidate
         return candidate
 
@@ -589,7 +606,9 @@ class SegmentTranslator:
                 stats.i18n_hits += 1
 
         _tm_segments = (
-            [s for s in segments if s.id not in i18n_resolved_ids] if i18n_resolved_ids else segments
+            [s for s in segments if s.id not in i18n_resolved_ids]
+            if i18n_resolved_ids
+            else segments
         )
 
         # Create extractor instance for inline formatting restoration
@@ -797,8 +816,8 @@ class SegmentTranslator:
         # being routed to professionalize_llm as configured.
         if segments_to_translate:
             try:
-                from .content_type_router import ContentTypeRouter as _CTR_seg
                 from ..model_runtime.llm_backend import LLMModelBackend as _LLMBackend_seg
+                from .content_type_router import ContentTypeRouter as _CTR_seg
 
                 _te_cfg_ctr_seg = (
                     engine.config.get_config().get("translation_engine", {})
@@ -1107,9 +1126,9 @@ class SegmentTranslator:
                             context=str(segment.context) if segment.context else None,
                             metadata={
                                 "model": model_id,
-                                "campaign_id": (
-                                    getattr(engine, "campaign_context", {}) or {}
-                                ).get("campaign_id"),
+                                "campaign_id": (getattr(engine, "campaign_context", {}) or {}).get(
+                                    "campaign_id"
+                                ),
                                 "config_fingerprint": (
                                     getattr(engine, "campaign_context", {}) or {}
                                 ).get("config_fingerprint"),
@@ -1182,6 +1201,7 @@ class SegmentTranslator:
                     stats,
                     segments=segments,
                     translations=translations,
+                    model_id_override=model_id_override,
                 )
                 ast_body_rendered = True
 
@@ -1318,6 +1338,7 @@ class SegmentTranslator:
         stats: TranslationStats,
         segments: list | None = None,
         translations: dict[str, str] | None = None,
+        model_id_override: str | None = None,
     ) -> str:
         """Translate document body using AST-based node-addressed translation."""
         engine = self._engine
@@ -1326,7 +1347,11 @@ class SegmentTranslator:
         from .reconstructor import ASTRenderer
 
         try:
-            model_id = engine._get_model_id(site_profile, tgt_lang=target_lang)
+            # The AST pass is the authoritative body reconstruction path. It
+            # must use the same governed backend selected for the surrounding
+            # attempt; otherwise LLM output is silently overwritten by the
+            # profile's default MT backend during reconstruction.
+            model_id = model_id_override or engine._get_model_id(site_profile, tgt_lang=target_lang)
             with engine._model_lock:
                 mt_model = engine.model_loader.load_model(model_id)
 
@@ -1462,8 +1487,8 @@ class SegmentTranslator:
             # Step 2a: ContentTypeRouter — pre-translate LLM-routed units
             # before the MT batch so batch_translate_units() skips them.
             try:
-                from .content_type_router import ContentTypeRouter as _CTR
                 from ..model_runtime.llm_backend import LLMModelBackend as _LLMBackend
+                from .content_type_router import ContentTypeRouter as _CTR
 
                 _te_cfg_ctr = (
                     engine.config.get_config().get("translation_engine", {})
@@ -1481,7 +1506,9 @@ class SegmentTranslator:
                             continue
                         _decision = _router.route(
                             _u,
-                            field_name=_u.metadata.get("frontmatter_key", "") if _u.metadata else "",
+                            field_name=_u.metadata.get("frontmatter_key", "")
+                            if _u.metadata
+                            else "",
                         )
                         if _decision.model_id:
                             _llm_units.append(_u)
@@ -1525,9 +1552,9 @@ class SegmentTranslator:
                                     if 0 in getattr(_llm_backend, "last_reject_reasons", {}):
                                         if _llm_unit.metadata is None:
                                             _llm_unit.metadata = {}
-                                        _llm_unit.metadata[
-                                            "llm_passthrough_reason"
-                                        ] = "llm_echo_reject"
+                                        _llm_unit.metadata["llm_passthrough_reason"] = (
+                                            "llm_echo_reject"
+                                        )
                                     else:
                                         # HT-QUALITY-GATES-001 Part 22 (plan
                                         # 5.4 item 4): record the per-unit
@@ -1548,9 +1575,9 @@ class SegmentTranslator:
                                     _u.translated_text = _u.source_text
                                     if _u.metadata is None:
                                         _u.metadata = {}
-                                    _u.metadata[
-                                        "llm_passthrough_reason"
-                                    ] = "professionalize_llm_unavailable"
+                                    _u.metadata["llm_passthrough_reason"] = (
+                                        "professionalize_llm_unavailable"
+                                    )
             except Exception as _ctr_err:
                 logger.debug(f"ContentTypeRouter init skipped: {_ctr_err}")
 
@@ -1601,7 +1628,8 @@ class SegmentTranslator:
             _sas_tolerance = float(_te_cfg_sas.get("same_as_source_tolerance", 0.0))
             _translatable_count = sum(1 for u in translated_units if not u.do_not_translate)
             _sas_units = [
-                u for u in translated_units
+                u
+                for u in translated_units
                 if not u.do_not_translate
                 and u.source_text
                 and u.translated_text is not None
@@ -1615,7 +1643,9 @@ class SegmentTranslator:
                 and u.kind != TextUnitKind.TABLE_CELL_TEXT
             ]
             if _sas_units:
-                _sas_ratio = len(_sas_units) / _translatable_count if _translatable_count > 0 else 0.0
+                _sas_ratio = (
+                    len(_sas_units) / _translatable_count if _translatable_count > 0 else 0.0
+                )
                 logger.warning(
                     f"TC-SAS-01: {len(_sas_units)}/{_translatable_count} translatable units returned "
                     f"same-as-source (ratio={_sas_ratio:.1%}, tolerance={_sas_tolerance:.1%}) "
@@ -1652,6 +1682,7 @@ class SegmentTranslator:
                         )
                     else:
                         from .exceptions import TranslationIncomplete
+
                         raise TranslationIncomplete(
                             f"TC-SAS-01: same-as-source ratio {_sas_ratio:.1%} exceeds tolerance "
                             f"{_sas_tolerance:.1%} ({len(_sas_units)}/{_translatable_count} units unchanged)",
@@ -1663,9 +1694,11 @@ class SegmentTranslator:
 
             # AGENT B-7.3: Check batch-level purity failures
             batch_stats = extractor.batch_stats
-            if batch_stats.get("language_purity_failures", 0) > 0 and target_lang not in (
-                _batch_purity_skip_langs or []
-            ) and not getattr(engine, '_force_accept', False):
+            if (
+                batch_stats.get("language_purity_failures", 0) > 0
+                and target_lang not in (_batch_purity_skip_langs or [])
+                and not getattr(engine, "_force_accept", False)
+            ):
                 # Use outer-batch counters so reactive sub-batch splitting doesn't
                 # artificially inflate the failure rate.
                 total_outer_batches = batch_stats.get("total_outer_batches", 0)
@@ -2171,12 +2204,9 @@ class SegmentTranslator:
                     )
 
                 translated_text = "\n".join(translated_lines)
-                if (
-                    self._has_fenced_code_or_placeholder(
-                        segment.source_text, getattr(segment, "placeholder_map", None)
-                    )
-                    and self._is_effectively_untranslated(segment.source_text, translated_text)
-                ):
+                if self._has_fenced_code_or_placeholder(
+                    segment.source_text, getattr(segment, "placeholder_map", None)
+                ) and self._is_effectively_untranslated(segment.source_text, translated_text):
                     logger.info(
                         "MSP-02: Retrying fenced-code multiline segment as prose/code chunks"
                     )

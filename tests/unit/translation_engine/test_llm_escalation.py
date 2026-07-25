@@ -166,3 +166,15 @@ class TestGlobalYamlEscalationConfig:
         te_cfg = raw.get("translation_engine", {})
         model = te_cfg.get("llm_escalation_model", "professionalize_llm")
         assert model, "llm_escalation_model must be a non-empty string"
+
+
+def test_blocked_write_escalation_retries_before_success_bookkeeping():
+    """Blocked, unwritten attempts cannot fall through to success bookkeeping."""
+    import inspect
+
+    from src.translation_engine.file_pipeline import FileTranslationPipeline
+
+    source = inspect.getsource(FileTranslationPipeline.translate_language)
+    escalation_end = source.index("if not _escalated:")
+    success_bookkeeping = source.index("# File successfully written", escalation_end)
+    assert "continue" in source[escalation_end:success_bookkeeping]

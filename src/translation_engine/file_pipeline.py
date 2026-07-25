@@ -929,6 +929,9 @@ class FileTranslationPipeline:
                             logger.debug(f"Gate-failure escalation check failed: {_esc_err}")
                     if not _escalated:
                         break  # Validation failure is deterministic (no escalation available)
+                    # Retry with the newly selected backend. Falling through
+                    # would mark a blocked, unwritten candidate as successful.
+                    continue
 
                 # File successfully written
                 result.outputs[target_lang] = output_path

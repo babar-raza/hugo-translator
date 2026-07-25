@@ -33,6 +33,7 @@ def _make_engine():
     # segment_translator now calls batch_lookup() instead of per-segment lookup().
     def _batch_lookup_side_effect(requests, use_semantic=True, **kwargs):
         return [engine.tm.lookup.return_value for _ in requests]
+
     engine.tm.batch_lookup.side_effect = _batch_lookup_side_effect
 
     # Model loader
@@ -69,6 +70,34 @@ def _make_stats():
 
 
 class TestTMLookupAndTranslation:
+    def test_model_override_is_forwarded_to_authoritative_ast_pass(self):
+        """An escalation backend must translate the body that is finally rendered."""
+        engine = _make_engine()
+        tm_result = MagicMock()
+        tm_result.hit = False
+        tm_result.source = None
+        engine.tm.lookup.return_value = tm_result
+
+        translator = SegmentTranslator(engine)
+        stats = _make_stats()
+        seg = _make_segment()
+
+        with patch.object(translator, "_translate_body_ast") as mock_ast:
+            mock_ast.return_value = "Translated body"
+            translator.translate_to_language(
+                site_id="test",
+                site_profile=MagicMock(),
+                doc=MagicMock(ast=None, frontmatter={"title": "Test"}),
+                segments=[seg],
+                source_lang="en",
+                target_lang="de",
+                force=False,
+                stats=stats,
+                model_id_override="professionalize_llm",
+            )
+
+        assert mock_ast.call_args.kwargs["model_id_override"] == "professionalize_llm"
+
     def test_tm_hit_skips_model_call(self):
         """When TM has a hit, the segment is not sent to the model."""
         engine = _make_engine()
@@ -454,6 +483,7 @@ class TestContentTypeRouterLLMPassthrough:
         mt_backend.translate_batch.return_value = []
 
         if llm_raises:
+
             def _load(model_id):
                 if "professionalize_llm" in str(model_id):
                     raise ConnectionError("LLM service unavailable")
@@ -496,9 +526,10 @@ class TestContentTypeRouterLLMPassthrough:
         site_profile = MagicMock()
         site_profile.default_source_lang = "en"
 
-        with patch("src.translation_engine.extractor.TextUnitExtractor") as MockExt, patch(
-            "src.translation_engine.reconstructor.ASTRenderer"
-        ) as MockRenderer:
+        with (
+            patch("src.translation_engine.extractor.TextUnitExtractor") as MockExt,
+            patch("src.translation_engine.reconstructor.ASTRenderer") as MockRenderer,
+        ):
             mock_ext = MagicMock()
             mock_ext.extract_from_ast.return_value = plan
             mock_ext.batch_translate_units.return_value = plan.units
@@ -589,7 +620,8 @@ class TestMinSimilarityScoreWiring:
             )
 
         body_calls = [
-            call for call in engine.tm.batch_lookup.call_args_list
+            call
+            for call in engine.tm.batch_lookup.call_args_list
             if call.kwargs.get("use_semantic") is True
         ]
         assert body_calls, "Expected at least one use_semantic=True batch_lookup call"
@@ -628,9 +660,54 @@ class TestMinSimilarityScoreWiring:
             )
 
         body_calls = [
-            call for call in engine.tm.batch_lookup.call_args_list
+            call
+            for call in engine.tm.batch_lookup.call_args_list
             if call.kwargs.get("use_semantic") is True
         ]
         assert body_calls
         for call in body_calls:
             assert call.kwargs.get("semantic_threshold") == 0.80
+
+
+class TestAstModelOverride:
+    """The authoritative AST batch must load the governed attempt backend."""
+
+    def test_ast_batch_loads_override_instead_of_profile_default(self):
+        from src.translation_engine.extractor.text_unit import BodyTranslationPlan
+
+        engine = _make_engine()
+        translator = SegmentTranslator(engine)
+        doc = MagicMock(ast=[], frontmatter={})
+        plan = BodyTranslationPlan(ast=[], units=[], ast_fingerprint="test-fp")
+        profile = MagicMock()
+        profile.default_source_lang = "en"
+        profile.body.ast_segmentation_strategy = "full_sentence"
+        profile.body.ast_batch_size = 16
+        profile.body.preserve_patterns = []
+
+        with (
+            patch("src.translation_engine.extractor.TextUnitExtractor") as mock_cls,
+            patch("src.translation_engine.reconstructor.ASTRenderer") as mock_renderer_cls,
+        ):
+            extractor = mock_cls.return_value
+            extractor.extract_from_ast.return_value = plan
+            extractor.batch_translate_units.return_value = []
+            extractor.batch_stats = {}
+            extractor._batch_calls = 0
+            extractor._individual_fallbacks = 0
+
+            renderer = mock_renderer_cls.return_value
+            renderer.placeholder_leak_count = 0
+            renderer._missing_node_count = 0
+            renderer.applied_units = []
+            renderer.render_to_markdown.return_value = "body\n"
+
+            translator._translate_body_ast(
+                doc=doc,
+                target_lang="ar",
+                site_profile=profile,
+                stats=_make_stats(),
+                model_id_override="professionalize_llm",
+            )
+
+        engine.model_loader.load_model.assert_called_once_with("professionalize_llm")
