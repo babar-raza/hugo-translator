@@ -64,7 +64,13 @@ _LOCALE_FILE_RE = re.compile(r"\.[a-z]{2}\.md$")
 
 def _config_fingerprint(translator_repo: Path) -> str:
     digest = hashlib.sha256()
-    paths = [translator_repo / "config/global.yaml"]
+    paths = [
+        translator_repo / "config/global.yaml",
+        translator_repo / "config/validation.yaml",
+        translator_repo / "config/terminology.yaml",
+        translator_repo / "config/terminology/technical_terms.yaml",
+        translator_repo / "config/site_profiles/default.yaml",
+    ]
     paths.extend(
         translator_repo / "config/site_profiles" / f"{site}.yaml" for site, _ in FOLDER_SURFACES
     )
