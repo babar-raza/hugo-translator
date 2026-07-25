@@ -333,6 +333,12 @@ class RepetitionDetectorValidator(PostTranslationValidator):
         )
         effective_warn_threshold = max(
             self.ngram_warning_threshold,
+            # Keep the warning band calibrated to the configured ERROR
+            # threshold.  Production profiles raise ngram_threshold to avoid
+            # ordinary document-level phrase reuse, and zero-defect promotes
+            # every warning to blocking.  Leaving the legacy warning default
+            # at 2 would therefore negate the configured threshold entirely.
+            max(1, self.ngram_threshold - 1),
             int(source_ngram_ceiling * 1.2) + 1 if source_ngram_ceiling else 0,
         )
 

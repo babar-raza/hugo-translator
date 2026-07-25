@@ -510,6 +510,34 @@ class TestSourceRelativeBaseline:
         assert not result.success
         assert result.error_count > 0
 
+    def test_warning_band_tracks_configured_error_threshold(self):
+        """A raised error threshold must not retain the legacy 2x warning band."""
+        validator = RepetitionDetectorValidator(
+            config={
+                "ngram_threshold": 5,
+                "ngram_warning_threshold": 2,
+            }
+        )
+        repeated_three = " ".join(
+            ["reutilizar esta frase ahora"] * 3 + ["contenido final distinto"]
+        )
+        repeated_four = " ".join(
+            ["reutilizar esta frase ahora"] * 4 + ["contenido final distinto"]
+        )
+        repeated_five = " ".join(
+            ["reutilizar esta frase ahora"] * 5 + ["contenido final distinto"]
+        )
+
+        three = validator.validate(source="", translation=repeated_three)
+        four = validator.validate(source="", translation=repeated_four)
+        five = validator.validate(source="", translation=repeated_five)
+
+        assert three.warning_count == 0
+        assert three.error_count == 0
+        assert four.warning_count > 0
+        assert four.error_count == 0
+        assert five.error_count > 0
+
     def test_no_source_uses_fixed_threshold(self):
         """When no source is provided, fixed threshold applies unchanged."""
         validator = RepetitionDetectorValidator(config={"ngram_threshold": 5})
