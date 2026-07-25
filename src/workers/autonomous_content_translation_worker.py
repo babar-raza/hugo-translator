@@ -10,6 +10,7 @@ Runs scheduled translation tasks on Hugo content directories with:
 """
 
 import argparse
+import hashlib
 import json
 import logging
 import os
@@ -37,6 +38,32 @@ from src.workers.window_scheduler import ScheduleConfig, WindowScheduler
 from src.workers.worker_state import record_worker_state
 
 logger = logging.getLogger(__name__)
+
+
+class _CampaignMetadataOnlyLogFilter(logging.Filter):
+    """Prevent source or rejected-candidate payloads from reaching campaign logs."""
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        try:
+            rendered = record.getMessage()
+        except Exception:
+            rendered = f"<unrenderable:{type(record.msg).__name__}>"
+        digest = hashlib.sha256(rendered.encode("utf-8", errors="replace")).hexdigest()
+        exception_name = ""
+        if record.exc_info and record.exc_info[0]:
+            exception_name = record.exc_info[0].__name__
+        record.msg = (
+            "campaign_event "
+            f"logger={record.name} function={record.funcName} "
+            f"event_sha256={digest}"
+            + (f" exception={exception_name}" if exception_name else "")
+        )
+        record.args = ()
+        # Tracebacks can embed model responses or candidate fragments.
+        record.exc_info = None
+        record.exc_text = None
+        record.stack_info = None
+        return True
 
 
 def _emit_run_signal_safe(
@@ -2442,19 +2469,26 @@ def main():
     _backup_count = int(_log_cfg.get("max_log_backups", 3))
     from logging.handlers import RotatingFileHandler as _RFH
 
+    _stream_handler = logging.StreamHandler()
+    _file_handler = _RFH(
+        log_path,
+        maxBytes=_max_bytes,
+        backupCount=_backup_count,
+        delay=True,
+        encoding="utf-8",
+    )
+    if args.campaign_manifest:
+        _metadata_filter = _CampaignMetadataOnlyLogFilter()
+        _stream_handler.addFilter(_metadata_filter)
+        _file_handler.addFilter(_metadata_filter)
+
     logging.basicConfig(
         level=getattr(logging, args.log_level),
         format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
         datefmt="%Y-%m-%d %H:%M:%S",
         handlers=[
-            logging.StreamHandler(),
-            _RFH(
-                log_path,
-                maxBytes=_max_bytes,
-                backupCount=_backup_count,
-                delay=True,
-                encoding="utf-8",
-            ),
+            _stream_handler,
+            _file_handler,
         ],
         force=True,
     )

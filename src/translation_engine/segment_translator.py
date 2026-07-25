@@ -31,6 +31,27 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
+def _effective_same_as_source_tolerance(
+    configured_tolerance: float, validation_policy: str
+) -> float:
+    """Campaign acceptance has no ratio-based untranslated-unit allowance."""
+    return 0.0 if validation_policy == "zero-defect" else configured_tolerance
+
+
+def _unapplied_frontmatter_keys(
+    expected_by_key: dict[str, list[str]],
+    translated_frontmatter: dict,
+    yaml_formatter,
+) -> list[str]:
+    """Return fields whose rendered value matches no extracted translation."""
+    return sorted(
+        key
+        for key, expected_values in expected_by_key.items()
+        if yaml_formatter.get_nested_value(translated_frontmatter, key)
+        not in expected_values
+    )
+
+
 def compute_force_protected_fields(doc, site_profile) -> set[str]:
     """Family/platform index pages (lang/family/platform/_index.md) must keep
     their `title` identical to EN even on sites that otherwise translate
@@ -1215,8 +1236,12 @@ class SegmentTranslator:
                 yaml_formatter = YAMLFormatter()
                 frontmatter_yaml = yaml_formatter.format_frontmatter(translated_frontmatter)
 
-                # Structural invariant: verify every frontmatter segment was applied
-                _fm_not_applied = []
+                # Structural invariant: verify every frontmatter field was applied.
+                # A field can legitimately have more than one extracted Segment
+                # (the segment and AST unit paths overlap for some profiles).  The
+                # reconstructed value therefore needs to match *one* authoritative
+                # translation for the key, not every duplicate segment in turn.
+                _fm_expected_by_key: dict[str, list[str]] = {}
                 for _seg in segments:
                     if (
                         _seg.context
@@ -1226,14 +1251,20 @@ class SegmentTranslator:
                     ):
                         _fm_key = _seg.context.frontmatter_key
                         _expected = translations[_seg.id]
-                        _actual = yaml_formatter.get_nested_value(translated_frontmatter, _fm_key)
-                        if _actual != _expected:
-                            _fm_not_applied.append((_fm_key, _expected[:40], str(_actual)[:40]))
+                        _fm_expected_by_key.setdefault(_fm_key, []).append(_expected)
+                _fm_not_applied = _unapplied_frontmatter_keys(
+                    _fm_expected_by_key,
+                    translated_frontmatter,
+                    yaml_formatter,
+                )
                 if _fm_not_applied:
-                    logger.warning(
-                        "frontmatter_segment_not_applied: keys=%s",
-                        [k for k, _, _ in _fm_not_applied],
+                    _fm_error = (
+                        "frontmatter_segment_not_applied: "
+                        f"keys={sorted(_fm_not_applied)}"
                     )
+                    if getattr(engine, "validation_policy", "standard") == "zero-defect":
+                        raise ValueError(_fm_error)
+                    logger.warning(_fm_error)
 
                 # RC-3 FIX: Verify frontmatter keys were not translated
                 _source_keys = set(doc.frontmatter.keys())
@@ -1625,7 +1656,14 @@ class SegmentTranslator:
             _te_cfg_sas_site = getattr(site_profile, "translation_engine", None) or {}
             _te_cfg_sas = {**_te_cfg_sas_global, **_te_cfg_sas_site}
             _sas_min_len = int(_te_cfg_sas.get("same_as_source_min_length", 10))
-            _sas_tolerance = float(_te_cfg_sas.get("same_as_source_tolerance", 0.0))
+            _validation_policy_sas = getattr(
+                engine, "validation_policy", "standard"
+            )
+            _zero_defect_sas = _validation_policy_sas == "zero-defect"
+            _sas_tolerance = _effective_same_as_source_tolerance(
+                float(_te_cfg_sas.get("same_as_source_tolerance", 0.0)),
+                _validation_policy_sas,
+            )
             _translatable_count = sum(1 for u in translated_units if not u.do_not_translate)
             _sas_units = [
                 u
@@ -1645,11 +1683,6 @@ class SegmentTranslator:
             if _sas_units:
                 _sas_ratio = (
                     len(_sas_units) / _translatable_count if _translatable_count > 0 else 0.0
-                )
-                logger.warning(
-                    f"TC-SAS-01: {len(_sas_units)}/{_translatable_count} translatable units returned "
-                    f"same-as-source (ratio={_sas_ratio:.1%}, tolerance={_sas_tolerance:.1%}) "
-                    f"-- source text will appear in output."
                 )
                 if _sas_ratio > _sas_tolerance:
                     # TC-TBL-012 / Layer 2: Suppress legacy fallback for table-containing
@@ -1672,7 +1705,7 @@ class SegmentTranslator:
                         _ast_nodes = doc.ast if isinstance(doc.ast, list) else [doc.ast]
                         _ast_has_tables = _check_ast_tables(_ast_nodes)
 
-                    if _ast_has_tables:
+                    if _ast_has_tables and not _zero_defect_sas:
                         logger.warning(
                             f"TC-SAS-01: ratio {_sas_ratio:.1%} > {_sas_tolerance:.1%} but "
                             f"document contains tables — suppressing legacy fallback to preserve "
@@ -1691,6 +1724,15 @@ class SegmentTranslator:
                             ratio=_sas_ratio,
                             tolerance=_sas_tolerance,
                         )
+                else:
+                    logger.info(
+                        "TC-SAS-01 accepted within configured standard-policy tolerance: "
+                        "%d/%d units (ratio=%.1f%%, tolerance=%.1f%%)",
+                        len(_sas_units),
+                        _translatable_count,
+                        _sas_ratio * 100,
+                        _sas_tolerance * 100,
+                    )
 
             # AGENT B-7.3: Check batch-level purity failures
             batch_stats = extractor.batch_stats
