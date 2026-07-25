@@ -94,6 +94,35 @@ class ValidationSuite:
             )
         return defaults
 
+    @staticmethod
+    def _load_repetition_config() -> dict:
+        """Load the versioned production repetition-detector settings."""
+        defaults = {
+            "ngram_threshold": 5,
+            "sentence_dup_threshold": 3,
+            "word_freq_threshold": 0.35,
+        }
+        try:
+            cfg_path = Path("config/validation.yaml")
+            if not cfg_path.exists():
+                return defaults
+            with cfg_path.open(encoding="utf-8") as fh:
+                cfg = yaml.safe_load(fh) or {}
+            configured = cfg.get("validators", {}).get("repetition_detector", {})
+            defaults.update(
+                {
+                    key: value
+                    for key, value in configured.items()
+                    if key not in {"enabled", "description"}
+                }
+            )
+        except Exception as exc:
+            logger.warning(
+                "validation_suite: failed to load repetition config — using defaults: %s",
+                exc,
+            )
+        return defaults
+
     def _create_default_validators(self) -> list[Validator]:
         """
         Create default set of validators (all enabled).
@@ -106,6 +135,7 @@ class ValidationSuite:
             List of validator instances
         """
         lc_cfg = self._load_lang_consistency_config()
+        repetition_cfg = self._load_repetition_config()
         return [
             # Legacy validators
             PlaceholderValidator(),
@@ -119,13 +149,7 @@ class ValidationSuite:
             ),
             ShortcodePreservationValidator(),
             MetadataMarkdownContaminationValidator(),
-            RepetitionDetectorValidator(
-                config={
-                    "ngram_threshold": 5,  # Require 5+ occurrences (default 3) — reduces false positives on structured docs
-                    "sentence_dup_threshold": 3,  # Require 3 duplicates (default 2) — tolerates paired FAQ/step patterns
-                    "word_freq_threshold": 0.35,  # Slightly relaxed (default 0.30) — product names repeat legitimately
-                }
-            ),
+            RepetitionDetectorValidator(config=repetition_cfg),
             # Note: FrontmatterProtectionValidator, TerminologyPreservationValidator,
             # and FilePlacementValidator require constructor arguments,
             # so they are only created via from_config() or explicitly passed in
