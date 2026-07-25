@@ -333,3 +333,23 @@ def test_campaign_uses_three_primary_then_llm_and_logs_metadata_only(tmp_path, m
     assert failure_log.count("\n") == 2
     assert "SECRET REJECTED CANDIDATE TEXT" not in failure_log
     assert "translation_rejected" in failure_log
+
+
+def test_failure_metadata_extracts_safe_gate_score_without_candidate_text():
+    result = SimpleNamespace(
+        errors=[],
+        retry_attempts=0,
+        validation_result=None,
+        error=(
+            "GATE36 FIDELITY JUDGE output.de.md: fail score=0.40; "
+            "SECRET REJECTED CANDIDATE TEXT"
+        ),
+    )
+
+    gate, reason = CampaignRunner._failure_metadata(result)
+
+    assert gate == "GATE36"
+    assert "codes=GATE36" in reason
+    assert "verdict=fail" in reason
+    assert "score=0.40" in reason
+    assert "SECRET" not in reason

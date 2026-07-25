@@ -12,7 +12,9 @@ from unittest.mock import MagicMock, patch
 
 from src.translation_engine.validation.fidelity_judge import (
     FidelityVerdict,
+    _aligned_fidelity_chunks,
     _parse_response,
+    _replace_fenced_code,
     judge_fidelity,
 )
 
@@ -70,6 +72,63 @@ class TestParseResponse:
 
 
 class TestJudgeFidelity:
+    def test_short_complete_document_is_not_asymmetrically_truncated(self):
+        source = "SOURCE-START\n" + ("source sentence. " * 400) + "\nSOURCE-TAIL"
+        target = "TARGET-START\n" + ("translated sentence. " * 400) + "\nTARGET-TAIL"
+
+        chunks = _aligned_fidelity_chunks(source, target)
+
+        assert chunks == [(source, target)]
+        assert "SOURCE-TAIL" in chunks[0][0]
+        assert "TARGET-TAIL" in chunks[0][1]
+
+    def test_fenced_code_payload_is_replaced_with_aligned_markers(self):
+        text = "Before\n```rust\nlet candidate = secret();\n```\nAfter"
+
+        prepared = _replace_fenced_code(text)
+
+        assert prepared == "Before\n<PRESERVED_CODE_BLOCK_1>\nAfter"
+        assert "candidate" not in prepared
+
+    @patch("src.model_runtime.llm_backend.LLMModelBackend")
+    @patch("src.model_runtime.registry.ModelRegistry")
+    def test_long_document_is_fully_judged_in_aligned_chunks(
+        self, mock_registry_cls, mock_backend_cls
+    ):
+        mock_registry = MagicMock()
+        mock_registry.get_model.return_value = MagicMock()
+        mock_registry_cls.return_value = mock_registry
+        mock_backend = MagicMock()
+        mock_backend._provider = MagicMock()
+        mock_backend._provider.generate.side_effect = [
+            ('{"score": 9, "issues": []}', 100, 20),
+            ('{"score": 4, "issues": ["late semantic reversal"]}', 100, 20),
+        ]
+        mock_backend_cls.return_value = mock_backend
+        source = "\n".join(
+            [
+                "# One\n" + ("source one. " * 800),
+                "# Two\n" + ("source two. " * 800),
+                "# Three\n" + ("source three. " * 800),
+            ]
+        )
+        target = "\n".join(
+            [
+                "# Eins\n" + ("target one. " * 800),
+                "# Zwei\n" + ("target two. " * 800),
+                "# Drei\n" + ("target three. " * 800),
+            ]
+        )
+
+        verdict = judge_fidelity(source, target, "en", "de")
+
+        assert verdict.score == 0.4
+        assert verdict.verdict == "fail"
+        assert mock_backend._provider.generate.call_count == 2
+        second_prompt = mock_backend._provider.generate.call_args_list[1].args[1]
+        assert "# Three" in second_prompt
+        assert "# Drei" in second_prompt
+
     @patch("src.model_runtime.llm_backend.LLMModelBackend")
     @patch("src.model_runtime.registry.ModelRegistry")
     def test_high_fidelity_verdict(self, mock_registry_cls, mock_backend_cls):

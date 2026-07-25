@@ -22,6 +22,7 @@ SemanticSimilarityValidator's and attempt_correction()'s existing conventions.
 """
 from __future__ import annotations
 
+import hashlib
 import json
 import logging
 import re
@@ -39,6 +40,8 @@ _JUDGE_SYSTEM_PROMPT = (
     "described as setting or sending); omitted content; and content clearly "
     "about a different subject than the source. Do NOT flag differences in "
     "phrasing, word order, or style -- only flag actual meaning divergence. "
+    "A token such as <PRESERVED_CODE_BLOCK_1> represents an identical governed "
+    "code block on both sides and is not an omission. "
     "Respond with ONLY a single-line JSON object, no other text: "
     '{"score": <integer 0-10, 10=perfectly faithful, 0=completely wrong '
     'meaning>, "issues": [<short strings, empty list if none>]}'
@@ -50,10 +53,11 @@ _JUDGE_PROMPT_TEMPLATE = (
     "Respond with the JSON verdict now."
 )
 
-_MAX_CHARS = 3000  # cap per side to keep latency/cost bounded
+_MAX_CHARS = 24000
 
 _JSON_OBJECT_RE = re.compile(r"\{.*\}", re.DOTALL)
 _LEADING_INT_RE = re.compile(r"\d+")
+_HEADING_RE = re.compile(r"(?m)^#{1,6}\s+")
 
 
 @dataclass
@@ -107,6 +111,90 @@ def _parse_response(text: str) -> tuple[float | None, list[str], bool]:
     return None, [], False
 
 
+def _replace_fenced_code(text: str) -> str:
+    """Replace fenced-code payloads with aligned structural markers."""
+    output: list[str] = []
+    fence_char = ""
+    block_index = 0
+    for line in text.splitlines():
+        stripped = line.lstrip()
+        marker = ""
+        if stripped.startswith("```"):
+            marker = "```"
+        elif stripped.startswith("~~~"):
+            marker = "~~~"
+        if marker:
+            if not fence_char:
+                fence_char = marker
+                block_index += 1
+                output.append(f"<PRESERVED_CODE_BLOCK_{block_index}>")
+            elif marker == fence_char:
+                fence_char = ""
+            continue
+        if not fence_char:
+            output.append(line)
+    return "\n".join(output)
+
+
+def _sections(text: str) -> list[str]:
+    starts = [match.start() for match in _HEADING_RE.finditer(text)]
+    if not starts:
+        return [text] if text.strip() else []
+    boundaries = [0, *starts, len(text)]
+    sections = [
+        text[boundaries[index] : boundaries[index + 1]].strip()
+        for index in range(len(boundaries) - 1)
+    ]
+    return [section for section in sections if section]
+
+
+def _aligned_fidelity_chunks(
+    source_text: str,
+    translated_text: str,
+    max_chars: int = _MAX_CHARS,
+) -> list[tuple[str, str]] | None:
+    """Create complete, heading-aligned judge chunks without asymmetric truncation."""
+    source = _replace_fenced_code(source_text)
+    target = _replace_fenced_code(translated_text)
+    if len(source) <= max_chars and len(target) <= max_chars:
+        return [(source, target)]
+
+    source_sections = _sections(source)
+    target_sections = _sections(target)
+    if len(source_sections) != len(target_sections):
+        return None
+
+    chunks: list[tuple[str, str]] = []
+    current_source: list[str] = []
+    current_target: list[str] = []
+    source_length = 0
+    target_length = 0
+    for source_section, target_section in zip(
+        source_sections, target_sections, strict=True
+    ):
+        if len(source_section) > max_chars or len(target_section) > max_chars:
+            return None
+        separator = 2 if current_source else 0
+        would_overflow = (
+            source_length + separator + len(source_section) > max_chars
+            or target_length + separator + len(target_section) > max_chars
+        )
+        if would_overflow:
+            chunks.append(("\n\n".join(current_source), "\n\n".join(current_target)))
+            current_source = []
+            current_target = []
+            source_length = 0
+            target_length = 0
+            separator = 0
+        current_source.append(source_section)
+        current_target.append(target_section)
+        source_length += separator + len(source_section)
+        target_length += separator + len(target_section)
+    if current_source:
+        chunks.append(("\n\n".join(current_source), "\n\n".join(current_target)))
+    return chunks or None
+
+
 def judge_fidelity(
     source_text: str,
     translated_text: str,
@@ -140,28 +228,57 @@ def judge_fidelity(
             logger.warning("FidelityJudge: provider not initialized for %s", model_id)
             return None
 
-        prompt = _JUDGE_PROMPT_TEMPLATE.format(
-            src_lang=src_lang,
-            tgt_lang=tgt_lang,
-            source=source_text[:_MAX_CHARS],
-            translation=translated_text[:_MAX_CHARS],
-        )
-        response, _in_tok, _out_tok = backend._provider.generate(_JUDGE_SYSTEM_PROMPT, prompt)
+        chunks = _aligned_fidelity_chunks(source_text, translated_text)
+        if chunks is None:
+            logger.warning(
+                "FidelityJudge: content could not be aligned into bounded chunks "
+                "(source_length=%d target_length=%d)",
+                len(source_text),
+                len(translated_text),
+            )
+            return None
+
+        chunk_scores: list[float] = []
+        all_issues: list[str] = []
+        response_hashes: list[str] = []
+        all_parsed = True
+        for index, (source_chunk, target_chunk) in enumerate(chunks, start=1):
+            prompt = _JUDGE_PROMPT_TEMPLATE.format(
+                src_lang=src_lang,
+                tgt_lang=tgt_lang,
+                source=source_chunk,
+                translation=target_chunk,
+            )
+            response, _in_tok, _out_tok = backend._provider.generate(
+                _JUDGE_SYSTEM_PROMPT, prompt
+            )
+            score, issues, parsed_ok = _parse_response(response)
+            if score is None:
+                logger.warning(
+                    "FidelityJudge: could not parse response "
+                    "(chunk=%d response_length=%d response_sha256=%s)",
+                    index,
+                    len(response or ""),
+                    hashlib.sha256((response or "").encode("utf-8")).hexdigest(),
+                )
+                return None
+            chunk_scores.append(score)
+            all_issues.extend(f"chunk {index}: {issue}" for issue in issues)
+            response_hashes.append(
+                hashlib.sha256((response or "").encode("utf-8")).hexdigest()
+            )
+            all_parsed = all_parsed and parsed_ok
 
     except Exception as exc:
         logger.warning("FidelityJudge: LLM call failed (%s): %s", model_id, exc)
         return None
 
-    score, issues, parsed_ok = _parse_response(response)
-    if score is None:
-        logger.warning("FidelityJudge: could not parse response: %r", (response or "")[:200])
-        return None
-
+    score = min(chunk_scores)
     return FidelityVerdict(
         score=score,
         verdict=_classify(score, warn_threshold, fail_threshold),
-        issues=issues,
+        issues=all_issues[:20],
         model=model_id,
-        raw_response=(response or "")[:500],
-        parsed=parsed_ok,
+        raw_response="sha256:" + ",".join(response_hashes),
+        parsed=all_parsed,
     )

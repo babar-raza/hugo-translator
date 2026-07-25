@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import re
@@ -391,11 +392,27 @@ class CampaignRunner:
                 in {"error", "warning"}
             }
         )
-        gate = validators[0] if validators else "pipeline"
+        raw_error = str(getattr(result, "error", "") or "")
+        safe_codes = sorted(
+            set(
+                re.findall(
+                    r"\b(?:GATE\d+|TC-[A-Z0-9-]+|"
+                    r"[A-Za-z][A-Za-z0-9_]*(?:Validator|Check))\b",
+                    raw_error,
+                )
+            )
+        )
+        score_match = re.search(r"\bscore=(\d+(?:\.\d+)?)\b", raw_error)
+        verdict_match = re.search(r"\b(fail|warn|pass)\b", raw_error, re.IGNORECASE)
+        gate = validators[0] if validators else (safe_codes[0] if safe_codes else "pipeline")
         validator_text = ",".join(validators) if validators else "unknown"
         reason = (
             f"translation_rejected; error_count={error_count}; "
-            f"internal_retries={retry_count}; validators={validator_text}"
+            f"internal_retries={retry_count}; validators={validator_text}; "
+            f"codes={','.join(safe_codes) if safe_codes else 'unknown'}; "
+            f"verdict={verdict_match.group(1).lower() if verdict_match else 'unknown'}; "
+            f"score={score_match.group(1) if score_match else 'unknown'}; "
+            f"error_sha256={hashlib.sha256(raw_error.encode('utf-8')).hexdigest()}"
         )
         return gate, reason
 
