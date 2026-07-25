@@ -499,6 +499,8 @@ class CampaignRunner:
                 issue_kind = "sentence_duplication"
             elif "heading" in details:
                 issue_kind = "heading_repetition"
+            elif validator == "FrontmatterLanguageCheck":
+                issue_kind = "frontmatter_language"
             else:
                 issue_kind = "generic"
             location_hash = hashlib.sha256(
@@ -511,12 +513,21 @@ class CampaignRunner:
                 "source_ngram_ceiling",
                 "frequency",
                 "source_word_freq_ceiling",
+                "confidence",
             ):
                 value = details.get(key)
                 if isinstance(value, bool) or not isinstance(value, (int, float)):
                     continue
                 rendered = f"{value:.6g}" if isinstance(value, float) else str(value)
                 numeric_parts.append(f"{key}={rendered}")
+            categorical_parts: list[str] = []
+            field = str(details.get("field", ""))
+            if field in {"title", "description", "seoTitle", "summary"}:
+                categorical_parts.append(f"field={field}")
+            for key in ("detected_lang", "expected_lang"):
+                value = str(details.get(key, "")).lower()
+                if re.fullmatch(r"[a-z]{2,3}(?:-[a-z]{2})?", value):
+                    categorical_parts.append(f"{key}={value}")
             payload_value = None
             for key in ("ngram", "word", "sentence", "heading"):
                 value = details.get(key)
@@ -536,6 +547,7 @@ class CampaignRunner:
                         issue_kind,
                         location_hash,
                         f"payload_sha256={payload_hash}",
+                        *categorical_parts,
                         *(numeric_parts or ["numeric=none"]),
                     ]
                 )

@@ -172,6 +172,38 @@ def test_failure_metadata_records_payload_free_repetition_fingerprint():
     assert "SECRET" not in reason
 
 
+def test_failure_metadata_records_payload_free_frontmatter_language_fingerprint():
+    issue = SimpleNamespace(
+        validator="FrontmatterLanguageCheck",
+        severity=SimpleNamespace(value="error"),
+        message="SECRET REJECTED CANDIDATE",
+        location="frontmatter.description",
+        details={
+            "field": "description",
+            "detected_lang": "en",
+            "expected_lang": "hi",
+            "confidence": 0.999,
+            "preview": "SECRET",
+        },
+    )
+    result = SimpleNamespace(
+        errors=["rejected"],
+        retry_attempts=0,
+        validation_result=SimpleNamespace(issues=[issue]),
+        error="TranslationRejectedError: SECRET",
+    )
+
+    gate, reason = CampaignRunner._failure_metadata(result)
+
+    assert gate == "FrontmatterLanguageCheck"
+    assert "frontmatter_language" in reason
+    assert "field=description" in reason
+    assert "detected_lang=en" in reason
+    assert "expected_lang=hi" in reason
+    assert "confidence=0.999" in reason
+    assert "SECRET" not in reason
+
+
 def test_shards_are_locale_scoped_and_bounded(tmp_path):
     path = tmp_path / "manifest.yaml"
     path.write_text(yaml.safe_dump(_manifest(tmp_path)), encoding="utf-8")
