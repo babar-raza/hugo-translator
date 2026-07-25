@@ -1,5 +1,111 @@
 mission_id: duplicate-content-fence-fix-20260723
+authoritative_task_graph: true
+continuation_state: .supervisor/state/duplicate-content-fence-fix-20260723/continuation-state.yaml
+plan_path: C:/Users/prora/.claude/plans/this-surfaced-something-more-witty-bear.md
+plan_status: ACTIVE_CONTINUATION_2026-07-25
 taskcards:
+  - taskcard_id: TC-DCF-010
+    title: Reopen the existing mission and capture an isolated preflight baseline
+    status: COMPLETED
+    lane_owner: this-session
+    objective: Bind the supplied durable-fix plan to the existing DCF mission without creating a competing mission or overwriting unrelated work.
+    allowed_paths: [.supervisor/state/duplicate-content-fence-fix-20260723/**]
+    forbidden_paths: ["all unrelated working-tree changes"]
+    dependencies: []
+    expected_outputs: [continuation-state.yaml, preflight evidence]
+    acceptance_checks: ["repository identity and dirty state captured", "existing DCF mission selected as the sole continuation"]
+    verification: ["git status --short", "git branch --show-current", "git rev-parse HEAD"]
+    evidence: stage3-execution/evidence/20260725-code-fence-durable-fix/preflight.md
+    recovery: "If the selected mission conflicts with raw repository evidence, amend this same ledger and plan before continuing."
+    closure_conditions: ["preflight recorded", "unrelated changes left untouched"]
+  - taskcard_id: TC-DCF-011
+    title: Correct the canonical code-region primitive and prove its edge cases
+    status: COMPLETED
+    lane_owner: this-session
+    objective: Mark both CommonMark fenced and indented code blocks in the shared line mask, with regression coverage for tilde, long-backtick, unterminated, indented, and CRLF input.
+    allowed_paths: [src/translation_engine/fence_spans.py, tests/unit/quality/test_fence_spans.py, tests/unit/quality/fence_span_cases.py]
+    forbidden_paths: ["unrelated HT-QUALITY-GATES-001 work", "content checkout"]
+    dependencies: [TC-DCF-010]
+    expected_outputs: ["corrected fenced_line_mask", "shared edge-case fixtures", "consumer-agreement test"]
+    acceptance_checks: ["all five masks match expected physical lines", "canonical and scripts/quality re-export agree"]
+    verification: [".venv/Scripts/python.exe -m pytest tests/unit/quality/test_fence_spans.py tests/unit/translation_engine/test_fence_spans.py -v"]
+    evidence: stage3-execution/evidence/20260725-code-fence-durable-fix/verification-results.md
+    recovery: "Inspect markdown-it token maps and correct the shared primitive; do not add per-consumer regex fallbacks."
+    closure_conditions: ["focused tests pass", "both token types are covered"]
+    completion_evidence: "13 focused tests passed using .venv/Scripts/python.exe -m pytest tests/unit/quality/test_fence_spans.py tests/unit/translation_engine/test_fence_spans.py -v"
+  - taskcard_id: TC-DCF-012
+    title: Migrate the three current audit consumers to the canonical primitive
+    status: COMPLETED
+    lane_owner: this-session
+    objective: Replace ad-hoc fence regex logic in purity, duplicate-content, and English-heading checks while preserving adjacent-prose behavior.
+    allowed_paths: [scripts/quality/audit_all_content.py, tests/unit/quality/test_audit_all_content_check_purity.py, tests/unit/quality/test_audit_all_content_duplicate_content.py, tests/unit/quality/test_audit_all_content_english_headings.py]
+    forbidden_paths: ["the unrelated inline-code changes already present in audit_all_content.py", "content checkout"]
+    dependencies: [TC-DCF-011]
+    expected_outputs: ["three canonical-utility consumers", "focused regressions"]
+    acceptance_checks: ["tilde, long-backtick, unterminated, and indented code cannot create audit findings", "real prose findings remain detectable"]
+    verification: [".venv/Scripts/python.exe -m pytest tests/unit/quality/test_audit_all_content_check_purity.py tests/unit/quality/test_audit_all_content_duplicate_content.py tests/unit/quality/test_audit_all_content_english_headings.py -v"]
+    evidence: stage3-execution/evidence/20260725-code-fence-durable-fix/verification-results.md
+    recovery: "Re-read audit_all_content.py before patching; if concurrent changes overlap, isolate only mission hunks."
+    closure_conditions: ["focused regressions pass", "no local regex fence detector remains in the three consumers"]
+    completion_evidence: "21 focused tests passed using .venv/Scripts/python.exe -m pytest tests/unit/quality/test_audit_all_content_check_purity.py tests/unit/quality/test_audit_all_content_duplicate_content.py tests/unit/quality/test_audit_all_content_english_headings.py -v"
+  - taskcard_id: TC-DCF-013
+    title: Verify migration against live content and record successor scope
+    status: COMPLETED
+    lane_owner: this-session
+    objective: Compare old/new checker outcomes on the live corpus where available, inspect new purity candidates, and explicitly track the deferred five-check sweep.
+    allowed_paths: [.supervisor/state/duplicate-content-fence-fix-20260723/**]
+    forbidden_paths: ["translated content files", "TM stores", "configuration"]
+    dependencies: [TC-DCF-012]
+    expected_outputs: ["comparison report", "manual disposition evidence", "AUD-FENCE-SWEEP-001 successor"]
+    acceptance_checks: ["comparison uses identical file reads", "all deltas reconciled or documented", "no candidate content is changed"]
+    verification: ["read-only corpus comparison script", "manual samples with paths and reasoning"]
+    evidence: stage3-execution/evidence/20260725-code-fence-durable-fix/corpus-comparison.md
+    recovery: "If content root is unavailable, retain local synthetic evidence and record the exact external resume condition."
+    closure_conditions: ["read-only comparison inspected", "deferred scope is explicit"]
+    completion_evidence: "136,689-file same-read comparison completed in 524.9s; 7 new purity candidates manually inspected and recorded as genuine dropped/misplaced-fence defects."
+  - taskcard_id: TC-DCF-014
+    title: Assemble evidence, independently review, and close the continuation
+    status: COMPLETED
+    lane_owner: independent-review then this-session
+    objective: Challenge the completed change, rerun critical checks, reconcile state, and create the final evidence bundle.
+    allowed_paths: [.supervisor/state/duplicate-content-fence-fix-20260723/**, "C:/Users/prora/.claude/plans/this-surfaced-something-more-witty-bear.md"]
+    forbidden_paths: ["unrelated working-tree changes"]
+    dependencies: [TC-DCF-013]
+    expected_outputs: ["independent review", "final evidence manifest", "updated plan and continuation closure"]
+    acceptance_checks: ["independent reviewer accepts or all findings repaired", "exact-path staged diff reviewed", "no eligible plan task remains"]
+    verification: ["focused test rerun", "git diff --check", "git status --short"]
+    evidence: stage3-execution/evidence/20260725-code-fence-durable-fix/
+    recovery: "Repair review findings in this same mission, repeat independent review, and do not close on a prose claim alone."
+    closure_conditions: ["evidence complete", "independent review accepted", "continuation state terminal"]
+    completion_evidence: "Independent reviewer accepted the exact cached diff and independently reran the 36-test focused suite."
+  - taskcard_id: AUD-FENCE-SWEEP-001
+    title: Migrate the remaining five confirmed-vulnerable audit checks
+    status: DEFERRED_SUCCESSOR_NOT_ELIGIBLE_IN_THIS_MISSION
+    lane_owner: future dedicated mission
+    objective: Move artifact_corruption, shortcode_leak, eu_hallucination, inline_code_translated, and link_path_corrupted to the canonical code-region primitive with an individual real-corpus old-vs-new proof for each.
+    allowed_paths: ["to be scoped by successor"]
+    forbidden_paths: ["current continuation's implementation scope"]
+    dependencies: [TC-DCF-014]
+    expected_outputs: ["five verified migrations", "per-check reconciliation"]
+    acceptance_checks: ["each check has a separate comparison and regression coverage"]
+    verification: ["successor-defined"]
+    evidence: "successor mission"
+    recovery: "Do not bundle this sweep into detector-hardening closeout."
+    closure_conditions: ["explicitly excluded by the governing plan's Phase 3"]
+  - taskcard_id: AUD-AUDIT-REPRO-001
+    title: Align audit observability with live gates and add reproducibility fingerprints
+    status: DEFERRED_SUCCESSOR_NOT_ELIGIBLE_IN_THIS_MISSION
+    lane_owner: future dedicated mission
+    objective: Align purity/fence audit reporting with live configuration, emit config and repository fingerprints, and record the FastText model hash.
+    allowed_paths: ["to be scoped by successor"]
+    forbidden_paths: ["current continuation's implementation scope"]
+    dependencies: [TC-DCF-014]
+    expected_outputs: ["observable threshold/config divergence", "reproducible audit header"]
+    acceptance_checks: ["live gate thresholds are visible in audit output"]
+    verification: ["successor-defined"]
+    evidence: "successor mission"
+    recovery: "Keep distinct tool definitions explicit; do not force threshold uniformity."
+    closure_conditions: ["explicitly excluded by the governing plan's Phase 4"]
   - taskcard_id: TC-DCF-001
     title: Isolate and commit this sprint's hunks in write_gate.py and audit_all_content.py
     source_issue_ids: [AUD-L1-001, AUD-L1-002, AUD-L2-001, AUD-L2-003]

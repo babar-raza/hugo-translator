@@ -1,0 +1,18 @@
+mission_id: duplicate-content-fence-fix-20260723
+state: TERMINAL_CLOSED
+active_plan: C:/Users/prora/.claude/plans/this-surfaced-something-more-witty-bear.md
+authoritative_controller: .supervisor/prompts/prompt3-controlled-execution.md
+authoritative_task_graph: stage3-execution/taskcard-status.yaml
+evidence_root: stage3-execution/evidence/20260725-code-fence-durable-fix
+reopened_at: "2026-07-25"
+reason: >
+  The supplied plan proves that the earlier duplicate-content-only closure
+  left a live shared-primitve gap: CommonMark indented code is not masked and
+  three audit checks still implement fence exclusion independently. This
+  continuation supersedes only the prior terminal status; historical closure
+  artifacts remain preserved as evidence.
+closed_at: "2026-07-25"
+next_task: none
+resume_rule: "No eligible task remains in this mission; execute only an explicitly approved successor mission."
+closure_verdict: "MISSION_COMPLETE — NO_ELIGIBLE_WORK_REMAINS"
+independent_review: ACCEPTED

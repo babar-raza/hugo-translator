@@ -37,6 +37,11 @@ from src.translation_engine.write_gate import (  # noqa: E402
     WriteGateEvaluator,
     gate_issue_name as _gate_issue_name,
 )
+from src.translation_engine.fence_spans import (  # noqa: E402
+    get_fence_char_spans,
+    is_in_fence,
+    split_fenced_segments,
+)
 from src.utils.config_loader import ConfigService  # noqa: E402
 from src.utils.content_discovery import (  # noqa: E402
     discover_source_files,
@@ -188,14 +193,11 @@ def check_english_headings_nonlatin(tr_body: str) -> list[str]:
     Python comments "# Read full text" / "# Iterate sections" inside code
     blocks were the only "headings" ever flagged).
     """
-    fence_spans = [(m.start(), m.end()) for m in re.finditer(r"```[\s\S]*?```", tr_body)]
-
-    def in_fence(pos):
-        return any(s <= pos < e for s, e in fence_spans)
+    code_spans = get_fence_char_spans(tr_body)
 
     en_heads = []
     for m in HEADING_RE.finditer(tr_body):
-        if in_fence(m.start()):
+        if is_in_fence(m.start(), code_spans):
             continue
         heading_text = m.group(2)
         if re.match(r"^[A-Za-z][A-Za-z0-9 ]{1,30}$", heading_text.strip()):
@@ -219,10 +221,10 @@ def check_purity(body, target_lang):
     before it) into the fence and drop it from consideration entirely.
     """
     paras = []
-    for chunk in re.split(r"(```[\s\S]*?```)", body):
-        if chunk.startswith("```"):
+    for is_code, lines in split_fenced_segments(body):
+        if is_code:
             continue
-        for seg in re.split(r"\n{2,}", chunk):
+        for seg in re.split(r"(?:\r?\n){2,}", "".join(lines)):
             stripped = seg.strip()
             if len(stripped) > 30:
                 paras.append(stripped)
@@ -329,12 +331,13 @@ def check_duplicate_content(tr_body: str) -> bool:
     # happens to sit right after a fence.
     occurrence_starts: dict[str, list[int]] = {}
     offset = 0
-    for chunk in re.split(r"(```[\s\S]*?```)", tr_body):
-        if chunk.startswith("```"):
+    for is_code, lines in split_fenced_segments(tr_body):
+        chunk = "".join(lines)
+        if is_code:
             offset += len(chunk)
             continue
         pos = 0
-        for seg in re.split(r"(\n{2,})", chunk):
+        for seg in re.split(r"((?:\r?\n){2,})", chunk):
             stripped = seg.strip()
             if len(stripped) > 50:
                 occurrence_starts.setdefault(stripped, []).append(offset + pos)

@@ -1,0 +1,3636 @@
+{
+  "method": "single-read old-vs-new checker comparison; old functions extracted from git HEAD and current functions imported from working tree",
+  "repository": {
+    "root": "C:\\Users\\prora\\OneDrive\\Documents\\GitHub\\hugo-translator",
+    "branch": "remediation/audit-phase7-20260723",
+    "head": "26381afa64bb61b2ad876e2060a5560be289e955"
+  },
+  "resolved_config_sha256": "05e97236319b884ab096bdd28339accd20cd69402b17dd8d199da99c7b341d63",
+  "content_roots": {
+    "C:\\Users\\prora\\OneDrive\\Documents\\GitHub\\aspose.net\\content\\about.aspose.net": {
+      "sha": "009c20c42e830aa9055e5aaddace92704b64b659",
+      "dirty": "not_collected: bounded out after two status-walk attempts"
+    },
+    "C:\\Users\\prora\\OneDrive\\Documents\\GitHub\\aspose.net\\content\\blog.aspose.net": {
+      "sha": "009c20c42e830aa9055e5aaddace92704b64b659",
+      "dirty": "not_collected: bounded out after two status-walk attempts"
+    },
+    "D:\\onedrive\\Documents\\GitHub\\aspose.org\\content\\blog.aspose.org": {
+      "sha": "f503f48c45124f9f20a3337f74141bdcdd1d1a6d",
+      "dirty": "not_collected: bounded out after two status-walk attempts"
+    },
+    "C:\\Users\\prora\\OneDrive\\Documents\\GitHub\\aspose.net\\content\\docs.aspose.net": {
+      "sha": "009c20c42e830aa9055e5aaddace92704b64b659",
+      "dirty": "not_collected: bounded out after two status-walk attempts"
+    },
+    "C:\\Users\\prora\\OneDrive\\Documents\\GitHub\\aspose.net\\content\\docs.aspose.net\\words": {
+      "sha": "009c20c42e830aa9055e5aaddace92704b64b659",
+      "dirty": "not_collected: bounded out after two status-walk attempts"
+    },
+    "D:\\onedrive\\Documents\\GitHub\\aspose.org\\content\\docs.aspose.org": {
+      "sha": "f503f48c45124f9f20a3337f74141bdcdd1d1a6d",
+      "dirty": "not_collected: bounded out after two status-walk attempts"
+    },
+    "C:\\Users\\prora\\OneDrive\\Documents\\GitHub\\aspose.net\\content\\kb.aspose.net": {
+      "sha": "009c20c42e830aa9055e5aaddace92704b64b659",
+      "dirty": "not_collected: bounded out after two status-walk attempts"
+    },
+    "C:\\Users\\prora\\OneDrive\\Documents\\GitHub\\aspose.net\\content\\kb.aspose.net\\words": {
+      "sha": "009c20c42e830aa9055e5aaddace92704b64b659",
+      "dirty": "not_collected: bounded out after two status-walk attempts"
+    },
+    "D:\\onedrive\\Documents\\GitHub\\aspose.org\\content\\kb.aspose.org": {
+      "sha": "f503f48c45124f9f20a3337f74141bdcdd1d1a6d",
+      "dirty": "not_collected: bounded out after two status-walk attempts"
+    },
+    "C:\\Users\\prora\\OneDrive\\Documents\\GitHub\\aspose.net\\content\\products.aspose.net": {
+      "sha": "009c20c42e830aa9055e5aaddace92704b64b659",
+      "dirty": "not_collected: bounded out after two status-walk attempts"
+    },
+    "C:\\Users\\prora\\OneDrive\\Documents\\GitHub\\aspose.net\\content\\products.aspose.net\\words": {
+      "sha": "009c20c42e830aa9055e5aaddace92704b64b659",
+      "dirty": "not_collected: bounded out after two status-walk attempts"
+    },
+    "D:\\onedrive\\Documents\\GitHub\\aspose.org\\content\\products.aspose.org": {
+      "sha": "f503f48c45124f9f20a3337f74141bdcdd1d1a6d",
+      "dirty": "not_collected: bounded out after two status-walk attempts"
+    },
+    "C:\\Users\\prora\\OneDrive\\Documents\\GitHub\\aspose.net\\content\\reference.aspose.net\\words": {
+      "sha": "009c20c42e830aa9055e5aaddace92704b64b659",
+      "dirty": "not_collected: bounded out after two status-walk attempts"
+    },
+    "D:\\onedrive\\Documents\\GitHub\\aspose.org\\content\\reference.aspose.org": {
+      "sha": "f503f48c45124f9f20a3337f74141bdcdd1d1a6d",
+      "dirty": "not_collected: bounded out after two status-walk attempts"
+    },
+    "C:\\Users\\prora\\OneDrive\\Documents\\GitHub\\aspose.net\\content\\websites.aspose.net": {
+      "sha": "009c20c42e830aa9055e5aaddace92704b64b659",
+      "dirty": "not_collected: bounded out after two status-walk attempts"
+    },
+    "D:\\onedrive\\Documents\\GitHub\\aspose.org\\content\\websites.aspose.org": {
+      "sha": "f503f48c45124f9f20a3337f74141bdcdd1d1a6d",
+      "dirty": "not_collected: bounded out after two status-walk attempts"
+    },
+    "C:\\Users\\prora\\OneDrive\\Documents\\GitHub\\aspose.net\\content\\www.aspose.net": {
+      "sha": "009c20c42e830aa9055e5aaddace92704b64b659",
+      "dirty": "not_collected: bounded out after two status-walk attempts"
+    },
+    "D:\\onedrive\\Documents\\GitHub\\aspose.org\\content\\www.aspose.org": {
+      "sha": "f503f48c45124f9f20a3337f74141bdcdd1d1a6d",
+      "dirty": "not_collected: bounded out after two status-walk attempts"
+    }
+  },
+  "totals": {
+    "files": 136689,
+    "duplicate_old": 62,
+    "duplicate_new": 52,
+    "purity_old": 3313,
+    "purity_new": 3284
+  },
+  "delta_counts": {
+    "duplicate_old_only": 10,
+    "duplicate_new_only": 0,
+    "purity_old_only": 36,
+    "purity_new_only": 7
+  },
+  "deltas": {
+    "duplicate_old_only": [
+      {
+        "site": "docs.aspose.org",
+        "locale": "sv",
+        "path": "sv\\cells\\net\\developer-guide\\features.md"
+      },
+      {
+        "site": "docs.aspose.org",
+        "locale": "tr",
+        "path": "tr\\cells\\net\\developer-guide\\features.md"
+      },
+      {
+        "site": "docs.aspose.org",
+        "locale": "vi",
+        "path": "vi\\cells\\net\\developer-guide\\features.md"
+      },
+      {
+        "site": "docs.aspose.org",
+        "locale": "sv",
+        "path": "sv\\cells\\net\\developer-guide\\working-with-spreadsheet-management.md"
+      },
+      {
+        "site": "docs.aspose.org",
+        "locale": "tr",
+        "path": "tr\\cells\\net\\developer-guide\\working-with-spreadsheet-management.md"
+      },
+      {
+        "site": "docs.aspose.org",
+        "locale": "vi",
+        "path": "vi\\cells\\net\\developer-guide\\working-with-spreadsheet-management.md"
+      },
+      {
+        "site": "kb.aspose.org",
+        "locale": "hu",
+        "path": "hu\\cells\\net\\how-to-work-with-cell-validation-dotnet.md"
+      },
+      {
+        "site": "kb.aspose.org",
+        "locale": "id",
+        "path": "id\\cells\\net\\how-to-work-with-cell-validation-dotnet.md"
+      },
+      {
+        "site": "kb.aspose.org",
+        "locale": "tr",
+        "path": "tr\\cells\\net\\how-to-work-with-cell-validation-dotnet.md"
+      },
+      {
+        "site": "kb.aspose.org",
+        "locale": "vi",
+        "path": "vi\\cells\\net\\how-to-work-with-cell-validation-dotnet.md"
+      }
+    ],
+    "duplicate_new_only": [],
+    "purity_old_only": [
+      {
+        "site": "blog.aspose.org",
+        "locale": "vi",
+        "path": "3d\\net\\3d-utilities-net\\index.vi.md",
+        "old_ratio": 0.10526315789473684,
+        "new_ratio": 0.0
+      },
+      {
+        "site": "blog.aspose.org",
+        "locale": "vi",
+        "path": "font\\python\\python-font-ttf-woff-library\\index.vi.md",
+        "old_ratio": 0.14285714285714285,
+        "new_ratio": 0.0
+      },
+      {
+        "site": "docs.aspose.org",
+        "locale": "vi",
+        "path": "vi\\font\\python\\developer-guide\\core-management.md",
+        "old_ratio": 0.2,
+        "new_ratio": 0.0
+      },
+      {
+        "site": "docs.aspose.org",
+        "locale": "fa",
+        "path": "fa\\page\\python\\developer-guide\\ps.md",
+        "old_ratio": 0.10526315789473684,
+        "new_ratio": 0.0
+      },
+      {
+        "site": "docs.aspose.org",
+        "locale": "ru",
+        "path": "ru\\page\\python\\developer-guide\\ps.md",
+        "old_ratio": 0.1111111111111111,
+        "new_ratio": 0.0
+      },
+      {
+        "site": "docs.aspose.org",
+        "locale": "vi",
+        "path": "vi\\page\\python\\developer-guide\\ps.md",
+        "old_ratio": 0.10526315789473684,
+        "new_ratio": 0.0
+      },
+      {
+        "site": "docs.aspose.org",
+        "locale": "th",
+        "path": "th\\words\\python\\developer-guide\\ldm-builder.md",
+        "old_ratio": 0.1935483870967742,
+        "new_ratio": 0.07692307692307693
+      },
+      {
+        "site": "docs.aspose.org",
+        "locale": "uk",
+        "path": "uk\\words\\python\\developer-guide\\ldm-builder.md",
+        "old_ratio": 0.1875,
+        "new_ratio": 0.07142857142857142
+      },
+      {
+        "site": "docs.aspose.org",
+        "locale": "vi",
+        "path": "vi\\words\\python\\developer-guide\\ldm-builder.md",
+        "old_ratio": 0.1935483870967742,
+        "new_ratio": 0.07692307692307693
+      },
+      {
+        "site": "kb.aspose.org",
+        "locale": "vi",
+        "path": "vi\\barcode\\python\\use-cases.md",
+        "old_ratio": 0.20833333333333334,
+        "new_ratio": 0.08333333333333333
+      },
+      {
+        "site": "kb.aspose.org",
+        "locale": "vi",
+        "path": "vi\\cells\\python\\use-cases.md",
+        "old_ratio": 0.25,
+        "new_ratio": 0.09523809523809523
+      },
+      {
+        "site": "kb.aspose.org",
+        "locale": "fa",
+        "path": "fa\\font\\python\\how-to-work-with-woff-python.md",
+        "old_ratio": 0.14705882352941177,
+        "new_ratio": 0.058823529411764705
+      },
+      {
+        "site": "kb.aspose.org",
+        "locale": "hi",
+        "path": "hi\\font\\python\\how-to-work-with-woff-python.md",
+        "old_ratio": 0.14705882352941177,
+        "new_ratio": 0.058823529411764705
+      },
+      {
+        "site": "kb.aspose.org",
+        "locale": "ru",
+        "path": "ru\\font\\python\\how-to-work-with-woff-python.md",
+        "old_ratio": 0.14285714285714285,
+        "new_ratio": 0.05555555555555555
+      },
+      {
+        "site": "kb.aspose.org",
+        "locale": "th",
+        "path": "th\\font\\python\\how-to-work-with-woff-python.md",
+        "old_ratio": 0.1388888888888889,
+        "new_ratio": 0.05555555555555555
+      },
+      {
+        "site": "kb.aspose.org",
+        "locale": "uk",
+        "path": "uk\\font\\python\\how-to-work-with-woff-python.md",
+        "old_ratio": 0.1388888888888889,
+        "new_ratio": 0.05405405405405406
+      },
+      {
+        "site": "reference.aspose.org",
+        "locale": "fa",
+        "path": "fa\\3d\\typescript\\mesh.md",
+        "old_ratio": 0.17391304347826086,
+        "new_ratio": 0.0
+      },
+      {
+        "site": "reference.aspose.org",
+        "locale": "he",
+        "path": "he\\3d\\typescript\\mesh.md",
+        "old_ratio": 0.17391304347826086,
+        "new_ratio": 0.0
+      },
+      {
+        "site": "reference.aspose.org",
+        "locale": "hi",
+        "path": "hi\\3d\\typescript\\mesh.md",
+        "old_ratio": 0.17391304347826086,
+        "new_ratio": 0.0
+      },
+      {
+        "site": "reference.aspose.org",
+        "locale": "ko",
+        "path": "ko\\3d\\typescript\\mesh.md",
+        "old_ratio": 0.18181818181818182,
+        "new_ratio": 0.0
+      },
+      {
+        "site": "reference.aspose.org",
+        "locale": "ru",
+        "path": "ru\\3d\\typescript\\mesh.md",
+        "old_ratio": 0.17391304347826086,
+        "new_ratio": 0.0
+      },
+      {
+        "site": "reference.aspose.org",
+        "locale": "th",
+        "path": "th\\3d\\typescript\\mesh.md",
+        "old_ratio": 0.17391304347826086,
+        "new_ratio": 0.0
+      },
+      {
+        "site": "reference.aspose.org",
+        "locale": "uk",
+        "path": "uk\\3d\\typescript\\mesh.md",
+        "old_ratio": 0.17391304347826086,
+        "new_ratio": 0.0
+      },
+      {
+        "site": "reference.aspose.org",
+        "locale": "vi",
+        "path": "vi\\3d\\typescript\\mesh.md",
+        "old_ratio": 0.17391304347826086,
+        "new_ratio": 0.0
+      },
+      {
+        "site": "reference.aspose.org",
+        "locale": "zh",
+        "path": "zh\\3d\\typescript\\mesh.md",
+        "old_ratio": 0.2,
+        "new_ratio": 0.0
+      },
+      {
+        "site": "reference.aspose.org",
+        "locale": "vi",
+        "path": "vi\\3d\\typescript\\quaternion.md",
+        "old_ratio": 0.10714285714285714,
+        "new_ratio": 0.0
+      },
+      {
+        "site": "reference.aspose.org",
+        "locale": "ko",
+        "path": "ko\\3d\\typescript\\scene.md",
+        "old_ratio": 0.10526315789473684,
+        "new_ratio": 0.0
+      },
+      {
+        "site": "reference.aspose.org",
+        "locale": "zh",
+        "path": "zh\\3d\\typescript\\scene.md",
+        "old_ratio": 0.125,
+        "new_ratio": 0.0
+      },
+      {
+        "site": "reference.aspose.org",
+        "locale": "ar",
+        "path": "ar\\words\\python\\_index.md",
+        "old_ratio": 0.2,
+        "new_ratio": 0.0
+      },
+      {
+        "site": "reference.aspose.org",
+        "locale": "el",
+        "path": "el\\words\\python\\_index.md",
+        "old_ratio": 0.3,
+        "new_ratio": 0.0
+      },
+      {
+        "site": "reference.aspose.org",
+        "locale": "ja",
+        "path": "ja\\words\\python\\_index.md",
+        "old_ratio": 0.4,
+        "new_ratio": 0.0
+      },
+      {
+        "site": "reference.aspose.org",
+        "locale": "ko",
+        "path": "ko\\words\\python\\_index.md",
+        "old_ratio": 0.3,
+        "new_ratio": 0.0
+      },
+      {
+        "site": "reference.aspose.org",
+        "locale": "th",
+        "path": "th\\words\\python\\_index.md",
+        "old_ratio": 0.3,
+        "new_ratio": 0.0
+      },
+      {
+        "site": "reference.aspose.org",
+        "locale": "uk",
+        "path": "uk\\words\\python\\_index.md",
+        "old_ratio": 0.3,
+        "new_ratio": 0.0
+      },
+      {
+        "site": "reference.aspose.org",
+        "locale": "vi",
+        "path": "vi\\words\\python\\_index.md",
+        "old_ratio": 0.3,
+        "new_ratio": 0.0
+      },
+      {
+        "site": "reference.aspose.org",
+        "locale": "zh",
+        "path": "zh\\words\\python\\_index.md",
+        "old_ratio": 0.3,
+        "new_ratio": 0.0
+      }
+    ],
+    "purity_new_only": [
+      {
+        "site": "docs.aspose.org",
+        "locale": "vi",
+        "path": "vi\\cells\\typescript\\getting-started\\quickstart.md",
+        "old_ratio": 0.0,
+        "new_ratio": 0.14285714285714285
+      },
+      {
+        "site": "reference.aspose.org",
+        "locale": "he",
+        "path": "he\\3d\\java\\mesh.md",
+        "old_ratio": 0.1,
+        "new_ratio": 0.2
+      },
+      {
+        "site": "reference.aspose.org",
+        "locale": "hi",
+        "path": "hi\\3d\\java\\mesh.md",
+        "old_ratio": 0.09523809523809523,
+        "new_ratio": 0.1875
+      },
+      {
+        "site": "reference.aspose.org",
+        "locale": "ru",
+        "path": "ru\\3d\\java\\mesh.md",
+        "old_ratio": 0.09090909090909091,
+        "new_ratio": 0.17647058823529413
+      },
+      {
+        "site": "reference.aspose.org",
+        "locale": "th",
+        "path": "th\\3d\\java\\mesh.md",
+        "old_ratio": 0.09523809523809523,
+        "new_ratio": 0.1875
+      },
+      {
+        "site": "reference.aspose.org",
+        "locale": "uk",
+        "path": "uk\\3d\\java\\mesh.md",
+        "old_ratio": 0.09523809523809523,
+        "new_ratio": 0.17647058823529413
+      },
+      {
+        "site": "reference.aspose.org",
+        "locale": "vi",
+        "path": "vi\\3d\\java\\mesh.md",
+        "old_ratio": 0.09523809523809523,
+        "new_ratio": 0.1875
+      }
+    ]
+  },
+  "per_site_locale": {
+    "about.aspose.net:ar": {
+      "files": 23,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "about.aspose.net:bg": {
+      "files": 23,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 1,
+      "purity_new": 1
+    },
+    "about.aspose.net:ca": {
+      "files": 23,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "about.aspose.net:cs": {
+      "files": 23,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "about.aspose.net:da": {
+      "files": 23,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "about.aspose.net:de": {
+      "files": 23,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "about.aspose.net:el": {
+      "files": 23,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "about.aspose.net:es": {
+      "files": 23,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "about.aspose.net:fa": {
+      "files": 23,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 1,
+      "purity_new": 1
+    },
+    "about.aspose.net:fi": {
+      "files": 23,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "about.aspose.net:fr": {
+      "files": 23,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "about.aspose.net:he": {
+      "files": 23,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 1,
+      "purity_new": 1
+    },
+    "about.aspose.net:hi": {
+      "files": 23,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 1,
+      "purity_new": 1
+    },
+    "about.aspose.net:hr": {
+      "files": 23,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "about.aspose.net:hu": {
+      "files": 23,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "about.aspose.net:id": {
+      "files": 23,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "about.aspose.net:it": {
+      "files": 23,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "about.aspose.net:ja": {
+      "files": 23,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 1,
+      "purity_new": 1
+    },
+    "about.aspose.net:ko": {
+      "files": 23,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 1,
+      "purity_new": 1
+    },
+    "about.aspose.net:lt": {
+      "files": 23,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "about.aspose.net:lv": {
+      "files": 23,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "about.aspose.net:ms": {
+      "files": 23,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "about.aspose.net:nl": {
+      "files": 23,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "about.aspose.net:no": {
+      "files": 23,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "about.aspose.net:pl": {
+      "files": 23,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "about.aspose.net:pt": {
+      "files": 23,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "about.aspose.net:ro": {
+      "files": 23,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "about.aspose.net:ru": {
+      "files": 23,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 1,
+      "purity_new": 1
+    },
+    "about.aspose.net:sk": {
+      "files": 23,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "about.aspose.net:sr": {
+      "files": 23,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "about.aspose.net:sv": {
+      "files": 23,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "about.aspose.net:th": {
+      "files": 23,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 1,
+      "purity_new": 1
+    },
+    "about.aspose.net:tr": {
+      "files": 23,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "about.aspose.net:uk": {
+      "files": 23,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 1,
+      "purity_new": 1
+    },
+    "about.aspose.net:vi": {
+      "files": 23,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 1,
+      "purity_new": 1
+    },
+    "about.aspose.net:zh": {
+      "files": 23,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 1,
+      "purity_new": 1
+    },
+    "blog.aspose.net:ar": {
+      "files": 443,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 6,
+      "purity_new": 6
+    },
+    "blog.aspose.net:bg": {
+      "files": 439,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 1,
+      "purity_new": 1
+    },
+    "blog.aspose.net:ca": {
+      "files": 439,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "blog.aspose.net:cs": {
+      "files": 439,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "blog.aspose.net:da": {
+      "files": 438,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "blog.aspose.net:de": {
+      "files": 435,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "blog.aspose.net:el": {
+      "files": 436,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 4,
+      "purity_new": 4
+    },
+    "blog.aspose.net:es": {
+      "files": 440,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "blog.aspose.net:fa": {
+      "files": 434,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 4,
+      "purity_new": 4
+    },
+    "blog.aspose.net:fi": {
+      "files": 404,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "blog.aspose.net:fr": {
+      "files": 436,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "blog.aspose.net:he": {
+      "files": 435,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 4,
+      "purity_new": 4
+    },
+    "blog.aspose.net:hi": {
+      "files": 380,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 2,
+      "purity_new": 2
+    },
+    "blog.aspose.net:hr": {
+      "files": 435,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "blog.aspose.net:hu": {
+      "files": 435,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "blog.aspose.net:id": {
+      "files": 434,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "blog.aspose.net:it": {
+      "files": 437,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "blog.aspose.net:ja": {
+      "files": 435,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 5,
+      "purity_new": 5
+    },
+    "blog.aspose.net:ko": {
+      "files": 435,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 5,
+      "purity_new": 5
+    },
+    "blog.aspose.net:lt": {
+      "files": 380,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "blog.aspose.net:lv": {
+      "files": 381,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "blog.aspose.net:ms": {
+      "files": 380,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "blog.aspose.net:nl": {
+      "files": 434,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "blog.aspose.net:no": {
+      "files": 380,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "blog.aspose.net:pl": {
+      "files": 434,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "blog.aspose.net:pt": {
+      "files": 434,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "blog.aspose.net:ro": {
+      "files": 434,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "blog.aspose.net:ru": {
+      "files": 433,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 2,
+      "purity_new": 2
+    },
+    "blog.aspose.net:sk": {
+      "files": 435,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "blog.aspose.net:sr": {
+      "files": 435,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "blog.aspose.net:sv": {
+      "files": 435,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "blog.aspose.net:th": {
+      "files": 435,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 6,
+      "purity_new": 6
+    },
+    "blog.aspose.net:tr": {
+      "files": 435,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "blog.aspose.net:uk": {
+      "files": 434,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "blog.aspose.net:vi": {
+      "files": 435,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 2,
+      "purity_new": 2
+    },
+    "blog.aspose.net:zh": {
+      "files": 435,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 5,
+      "purity_new": 5
+    },
+    "blog.aspose.org:ar": {
+      "files": 127,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 8,
+      "purity_new": 8
+    },
+    "blog.aspose.org:cs": {
+      "files": 98,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "blog.aspose.org:de": {
+      "files": 98,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "blog.aspose.org:el": {
+      "files": 127,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 4,
+      "purity_new": 4
+    },
+    "blog.aspose.org:es": {
+      "files": 128,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "blog.aspose.org:fa": {
+      "files": 101,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 3,
+      "purity_new": 3
+    },
+    "blog.aspose.org:fr": {
+      "files": 128,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "blog.aspose.org:he": {
+      "files": 128,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 3,
+      "purity_new": 3
+    },
+    "blog.aspose.org:hi": {
+      "files": 92,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 1,
+      "purity_new": 1
+    },
+    "blog.aspose.org:hu": {
+      "files": 115,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "blog.aspose.org:id": {
+      "files": 106,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "blog.aspose.org:it": {
+      "files": 81,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "blog.aspose.org:ja": {
+      "files": 81,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 1,
+      "purity_new": 1
+    },
+    "blog.aspose.org:ko": {
+      "files": 81,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 2,
+      "purity_new": 2
+    },
+    "blog.aspose.org:nl": {
+      "files": 80,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "blog.aspose.org:pl": {
+      "files": 80,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "blog.aspose.org:pt": {
+      "files": 127,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "blog.aspose.org:ro": {
+      "files": 128,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "blog.aspose.org:ru": {
+      "files": 109,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 2,
+      "purity_new": 2
+    },
+    "blog.aspose.org:sv": {
+      "files": 84,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "blog.aspose.org:th": {
+      "files": 116,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 2,
+      "purity_new": 2
+    },
+    "blog.aspose.org:tr": {
+      "files": 120,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "blog.aspose.org:uk": {
+      "files": 115,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 2,
+      "purity_new": 2
+    },
+    "blog.aspose.org:vi": {
+      "files": 118,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 6,
+      "purity_new": 4
+    },
+    "blog.aspose.org:zh": {
+      "files": 83,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 3,
+      "purity_new": 3
+    },
+    "docs.aspose.net.words:ar": {
+      "files": 12,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "docs.aspose.net.words:bg": {
+      "files": 12,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "docs.aspose.net.words:ca": {
+      "files": 12,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "docs.aspose.net.words:cs": {
+      "files": 12,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "docs.aspose.net.words:da": {
+      "files": 11,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "docs.aspose.net.words:de": {
+      "files": 12,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "docs.aspose.net.words:el": {
+      "files": 12,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "docs.aspose.net.words:es": {
+      "files": 12,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "docs.aspose.net.words:fa": {
+      "files": 12,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "docs.aspose.net.words:fi": {
+      "files": 12,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "docs.aspose.net.words:fr": {
+      "files": 12,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "docs.aspose.net.words:he": {
+      "files": 12,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "docs.aspose.net.words:hi": {
+      "files": 11,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "docs.aspose.net.words:hr": {
+      "files": 12,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "docs.aspose.net.words:hu": {
+      "files": 12,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "docs.aspose.net.words:id": {
+      "files": 12,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "docs.aspose.net.words:it": {
+      "files": 12,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "docs.aspose.net.words:ja": {
+      "files": 12,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "docs.aspose.net.words:ko": {
+      "files": 12,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "docs.aspose.net.words:lt": {
+      "files": 12,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "docs.aspose.net.words:lv": {
+      "files": 12,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "docs.aspose.net.words:ms": {
+      "files": 12,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "docs.aspose.net.words:nl": {
+      "files": 12,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "docs.aspose.net.words:no": {
+      "files": 11,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "docs.aspose.net.words:pl": {
+      "files": 12,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "docs.aspose.net.words:pt": {
+      "files": 12,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "docs.aspose.net.words:ro": {
+      "files": 12,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "docs.aspose.net.words:ru": {
+      "files": 12,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "docs.aspose.net.words:sk": {
+      "files": 12,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "docs.aspose.net.words:sr": {
+      "files": 12,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "docs.aspose.net.words:sv": {
+      "files": 12,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "docs.aspose.net.words:th": {
+      "files": 12,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "docs.aspose.net.words:tr": {
+      "files": 12,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "docs.aspose.net.words:uk": {
+      "files": 12,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "docs.aspose.net.words:vi": {
+      "files": 12,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "docs.aspose.net.words:zh": {
+      "files": 12,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "docs.aspose.org:ar": {
+      "files": 360,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 58,
+      "purity_new": 58
+    },
+    "docs.aspose.org:cs": {
+      "files": 255,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "docs.aspose.org:de": {
+      "files": 192,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "docs.aspose.org:el": {
+      "files": 359,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 59,
+      "purity_new": 59
+    },
+    "docs.aspose.org:es": {
+      "files": 360,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "docs.aspose.org:fa": {
+      "files": 328,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 52,
+      "purity_new": 51
+    },
+    "docs.aspose.org:fr": {
+      "files": 360,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "docs.aspose.org:he": {
+      "files": 359,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 50,
+      "purity_new": 50
+    },
+    "docs.aspose.org:hi": {
+      "files": 292,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 21,
+      "purity_new": 21
+    },
+    "docs.aspose.org:hu": {
+      "files": 357,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "docs.aspose.org:id": {
+      "files": 278,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "docs.aspose.org:it": {
+      "files": 189,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "docs.aspose.org:ja": {
+      "files": 165,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 5,
+      "purity_new": 5
+    },
+    "docs.aspose.org:ko": {
+      "files": 275,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 54,
+      "purity_new": 54
+    },
+    "docs.aspose.org:nl": {
+      "files": 163,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "docs.aspose.org:pl": {
+      "files": 244,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "docs.aspose.org:pt": {
+      "files": 360,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "docs.aspose.org:ro": {
+      "files": 360,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "docs.aspose.org:ru": {
+      "files": 286,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 13,
+      "purity_new": 12
+    },
+    "docs.aspose.org:sv": {
+      "files": 365,
+      "duplicate_old": 2,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "docs.aspose.org:th": {
+      "files": 356,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 39,
+      "purity_new": 38
+    },
+    "docs.aspose.org:tr": {
+      "files": 366,
+      "duplicate_old": 2,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "docs.aspose.org:uk": {
+      "files": 354,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 53,
+      "purity_new": 52
+    },
+    "docs.aspose.org:vi": {
+      "files": 364,
+      "duplicate_old": 2,
+      "duplicate_new": 0,
+      "purity_old": 56,
+      "purity_new": 54
+    },
+    "docs.aspose.org:zh": {
+      "files": 315,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 52,
+      "purity_new": 52
+    },
+    "kb.aspose.net.words:ar": {
+      "files": 40,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 4,
+      "purity_new": 4
+    },
+    "kb.aspose.net.words:bg": {
+      "files": 40,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 2,
+      "purity_new": 2
+    },
+    "kb.aspose.net.words:ca": {
+      "files": 40,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "kb.aspose.net.words:cs": {
+      "files": 40,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "kb.aspose.net.words:da": {
+      "files": 40,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "kb.aspose.net.words:de": {
+      "files": 40,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "kb.aspose.net.words:el": {
+      "files": 40,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 5,
+      "purity_new": 5
+    },
+    "kb.aspose.net.words:es": {
+      "files": 40,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "kb.aspose.net.words:fa": {
+      "files": 40,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 5,
+      "purity_new": 5
+    },
+    "kb.aspose.net.words:fi": {
+      "files": 40,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "kb.aspose.net.words:fr": {
+      "files": 40,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "kb.aspose.net.words:he": {
+      "files": 40,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 5,
+      "purity_new": 5
+    },
+    "kb.aspose.net.words:hi": {
+      "files": 40,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 6,
+      "purity_new": 6
+    },
+    "kb.aspose.net.words:hr": {
+      "files": 40,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "kb.aspose.net.words:hu": {
+      "files": 40,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "kb.aspose.net.words:id": {
+      "files": 40,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "kb.aspose.net.words:it": {
+      "files": 40,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "kb.aspose.net.words:ja": {
+      "files": 40,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 6,
+      "purity_new": 6
+    },
+    "kb.aspose.net.words:ko": {
+      "files": 40,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 7,
+      "purity_new": 7
+    },
+    "kb.aspose.net.words:lt": {
+      "files": 40,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "kb.aspose.net.words:lv": {
+      "files": 40,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "kb.aspose.net.words:ms": {
+      "files": 40,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "kb.aspose.net.words:nl": {
+      "files": 40,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "kb.aspose.net.words:no": {
+      "files": 40,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "kb.aspose.net.words:pl": {
+      "files": 40,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "kb.aspose.net.words:pt": {
+      "files": 40,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "kb.aspose.net.words:ro": {
+      "files": 40,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "kb.aspose.net.words:ru": {
+      "files": 40,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 5,
+      "purity_new": 5
+    },
+    "kb.aspose.net.words:sk": {
+      "files": 40,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "kb.aspose.net.words:sr": {
+      "files": 40,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "kb.aspose.net.words:sv": {
+      "files": 40,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "kb.aspose.net.words:th": {
+      "files": 40,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 7,
+      "purity_new": 7
+    },
+    "kb.aspose.net.words:tr": {
+      "files": 40,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "kb.aspose.net.words:uk": {
+      "files": 40,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 6,
+      "purity_new": 6
+    },
+    "kb.aspose.net.words:vi": {
+      "files": 40,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 6,
+      "purity_new": 6
+    },
+    "kb.aspose.net.words:zh": {
+      "files": 40,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 7,
+      "purity_new": 7
+    },
+    "kb.aspose.org:ar": {
+      "files": 272,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 24,
+      "purity_new": 24
+    },
+    "kb.aspose.org:cs": {
+      "files": 200,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "kb.aspose.org:de": {
+      "files": 168,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "kb.aspose.org:el": {
+      "files": 272,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 23,
+      "purity_new": 23
+    },
+    "kb.aspose.org:es": {
+      "files": 272,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "kb.aspose.org:fa": {
+      "files": 256,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 14,
+      "purity_new": 13
+    },
+    "kb.aspose.org:fr": {
+      "files": 273,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "kb.aspose.org:he": {
+      "files": 272,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 16,
+      "purity_new": 16
+    },
+    "kb.aspose.org:hi": {
+      "files": 243,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 14,
+      "purity_new": 13
+    },
+    "kb.aspose.org:hu": {
+      "files": 274,
+      "duplicate_old": 1,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "kb.aspose.org:id": {
+      "files": 223,
+      "duplicate_old": 1,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "kb.aspose.org:it": {
+      "files": 166,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "kb.aspose.org:ja": {
+      "files": 161,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 3,
+      "purity_new": 3
+    },
+    "kb.aspose.org:ko": {
+      "files": 212,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 21,
+      "purity_new": 21
+    },
+    "kb.aspose.org:nl": {
+      "files": 163,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "kb.aspose.org:pl": {
+      "files": 166,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "kb.aspose.org:pt": {
+      "files": 273,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "kb.aspose.org:ro": {
+      "files": 273,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "kb.aspose.org:ru": {
+      "files": 246,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 10,
+      "purity_new": 9
+    },
+    "kb.aspose.org:sv": {
+      "files": 232,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "kb.aspose.org:th": {
+      "files": 271,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 11,
+      "purity_new": 10
+    },
+    "kb.aspose.org:tr": {
+      "files": 274,
+      "duplicate_old": 1,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "kb.aspose.org:uk": {
+      "files": 271,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 17,
+      "purity_new": 16
+    },
+    "kb.aspose.org:vi": {
+      "files": 272,
+      "duplicate_old": 1,
+      "duplicate_new": 0,
+      "purity_old": 19,
+      "purity_new": 17
+    },
+    "kb.aspose.org:zh": {
+      "files": 229,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 17,
+      "purity_new": 17
+    },
+    "products.aspose.net.words:ar": {
+      "files": 15,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "products.aspose.net.words:bg": {
+      "files": 15,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "products.aspose.net.words:ca": {
+      "files": 15,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "products.aspose.net.words:cs": {
+      "files": 15,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "products.aspose.net.words:da": {
+      "files": 15,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "products.aspose.net.words:de": {
+      "files": 15,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "products.aspose.net.words:el": {
+      "files": 15,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "products.aspose.net.words:es": {
+      "files": 15,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "products.aspose.net.words:fa": {
+      "files": 15,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "products.aspose.net.words:fi": {
+      "files": 15,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "products.aspose.net.words:fr": {
+      "files": 15,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "products.aspose.net.words:he": {
+      "files": 15,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "products.aspose.net.words:hi": {
+      "files": 15,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "products.aspose.net.words:hr": {
+      "files": 15,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "products.aspose.net.words:hu": {
+      "files": 15,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "products.aspose.net.words:id": {
+      "files": 15,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "products.aspose.net.words:it": {
+      "files": 14,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "products.aspose.net.words:ja": {
+      "files": 15,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "products.aspose.net.words:ko": {
+      "files": 14,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "products.aspose.net.words:lt": {
+      "files": 15,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "products.aspose.net.words:lv": {
+      "files": 15,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "products.aspose.net.words:ms": {
+      "files": 15,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "products.aspose.net.words:nl": {
+      "files": 15,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "products.aspose.net.words:no": {
+      "files": 15,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "products.aspose.net.words:pl": {
+      "files": 15,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "products.aspose.net.words:pt": {
+      "files": 15,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "products.aspose.net.words:ro": {
+      "files": 15,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "products.aspose.net.words:ru": {
+      "files": 15,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "products.aspose.net.words:sk": {
+      "files": 15,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "products.aspose.net.words:sr": {
+      "files": 15,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "products.aspose.net.words:sv": {
+      "files": 15,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "products.aspose.net.words:th": {
+      "files": 15,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "products.aspose.net.words:tr": {
+      "files": 15,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "products.aspose.net.words:uk": {
+      "files": 15,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "products.aspose.net.words:vi": {
+      "files": 15,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "products.aspose.net.words:zh": {
+      "files": 15,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "products.aspose.org:ar": {
+      "files": 52,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "products.aspose.org:cs": {
+      "files": 52,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "products.aspose.org:de": {
+      "files": 52,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "products.aspose.org:el": {
+      "files": 52,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "products.aspose.org:es": {
+      "files": 52,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "products.aspose.org:fa": {
+      "files": 52,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "products.aspose.org:fr": {
+      "files": 52,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "products.aspose.org:he": {
+      "files": 52,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "products.aspose.org:hi": {
+      "files": 52,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "products.aspose.org:hu": {
+      "files": 52,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "products.aspose.org:id": {
+      "files": 52,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "products.aspose.org:it": {
+      "files": 52,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "products.aspose.org:ja": {
+      "files": 52,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "products.aspose.org:ko": {
+      "files": 52,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "products.aspose.org:nl": {
+      "files": 52,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "products.aspose.org:pl": {
+      "files": 52,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "products.aspose.org:pt": {
+      "files": 52,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "products.aspose.org:ro": {
+      "files": 52,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "products.aspose.org:ru": {
+      "files": 52,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "products.aspose.org:sv": {
+      "files": 52,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "products.aspose.org:th": {
+      "files": 52,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "products.aspose.org:tr": {
+      "files": 52,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "products.aspose.org:uk": {
+      "files": 52,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "products.aspose.org:vi": {
+      "files": 52,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "products.aspose.org:zh": {
+      "files": 52,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "reference.aspose.net.words:ar": {
+      "files": 160,
+      "duplicate_old": 1,
+      "duplicate_new": 1,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "reference.aspose.net.words:bg": {
+      "files": 159,
+      "duplicate_old": 2,
+      "duplicate_new": 2,
+      "purity_old": 1,
+      "purity_new": 1
+    },
+    "reference.aspose.net.words:ca": {
+      "files": 160,
+      "duplicate_old": 2,
+      "duplicate_new": 2,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "reference.aspose.net.words:cs": {
+      "files": 160,
+      "duplicate_old": 2,
+      "duplicate_new": 2,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "reference.aspose.net.words:da": {
+      "files": 159,
+      "duplicate_old": 2,
+      "duplicate_new": 2,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "reference.aspose.net.words:de": {
+      "files": 159,
+      "duplicate_old": 2,
+      "duplicate_new": 2,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "reference.aspose.net.words:el": {
+      "files": 159,
+      "duplicate_old": 2,
+      "duplicate_new": 2,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "reference.aspose.net.words:es": {
+      "files": 159,
+      "duplicate_old": 2,
+      "duplicate_new": 2,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "reference.aspose.net.words:fa": {
+      "files": 159,
+      "duplicate_old": 2,
+      "duplicate_new": 2,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "reference.aspose.net.words:fi": {
+      "files": 159,
+      "duplicate_old": 2,
+      "duplicate_new": 2,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "reference.aspose.net.words:fr": {
+      "files": 159,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "reference.aspose.net.words:he": {
+      "files": 159,
+      "duplicate_old": 1,
+      "duplicate_new": 1,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "reference.aspose.net.words:hr": {
+      "files": 159,
+      "duplicate_old": 2,
+      "duplicate_new": 2,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "reference.aspose.net.words:hu": {
+      "files": 159,
+      "duplicate_old": 2,
+      "duplicate_new": 2,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "reference.aspose.net.words:id": {
+      "files": 159,
+      "duplicate_old": 2,
+      "duplicate_new": 2,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "reference.aspose.net.words:it": {
+      "files": 159,
+      "duplicate_old": 2,
+      "duplicate_new": 2,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "reference.aspose.net.words:ja": {
+      "files": 159,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "reference.aspose.net.words:ko": {
+      "files": 159,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "reference.aspose.net.words:lt": {
+      "files": 1,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "reference.aspose.net.words:nl": {
+      "files": 159,
+      "duplicate_old": 2,
+      "duplicate_new": 2,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "reference.aspose.net.words:pl": {
+      "files": 159,
+      "duplicate_old": 2,
+      "duplicate_new": 2,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "reference.aspose.net.words:pt": {
+      "files": 159,
+      "duplicate_old": 2,
+      "duplicate_new": 2,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "reference.aspose.net.words:ro": {
+      "files": 159,
+      "duplicate_old": 2,
+      "duplicate_new": 2,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "reference.aspose.net.words:ru": {
+      "files": 159,
+      "duplicate_old": 2,
+      "duplicate_new": 2,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "reference.aspose.net.words:sk": {
+      "files": 159,
+      "duplicate_old": 2,
+      "duplicate_new": 2,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "reference.aspose.net.words:sr": {
+      "files": 159,
+      "duplicate_old": 2,
+      "duplicate_new": 2,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "reference.aspose.net.words:sv": {
+      "files": 159,
+      "duplicate_old": 2,
+      "duplicate_new": 2,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "reference.aspose.net.words:th": {
+      "files": 159,
+      "duplicate_old": 2,
+      "duplicate_new": 2,
+      "purity_old": 1,
+      "purity_new": 1
+    },
+    "reference.aspose.net.words:tr": {
+      "files": 159,
+      "duplicate_old": 2,
+      "duplicate_new": 2,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "reference.aspose.net.words:uk": {
+      "files": 159,
+      "duplicate_old": 2,
+      "duplicate_new": 2,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "reference.aspose.net.words:vi": {
+      "files": 159,
+      "duplicate_old": 2,
+      "duplicate_new": 2,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "reference.aspose.net.words:zh": {
+      "files": 159,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "reference.aspose.org:ar": {
+      "files": 4865,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 422,
+      "purity_new": 421
+    },
+    "reference.aspose.org:cs": {
+      "files": 3546,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "reference.aspose.org:de": {
+      "files": 2770,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "reference.aspose.org:el": {
+      "files": 4879,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 410,
+      "purity_new": 409
+    },
+    "reference.aspose.org:es": {
+      "files": 4857,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "reference.aspose.org:fa": {
+      "files": 4578,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 203,
+      "purity_new": 202
+    },
+    "reference.aspose.org:fr": {
+      "files": 4878,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "reference.aspose.org:he": {
+      "files": 4879,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 240,
+      "purity_new": 240
+    },
+    "reference.aspose.org:hi": {
+      "files": 4476,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 204,
+      "purity_new": 204
+    },
+    "reference.aspose.org:hu": {
+      "files": 4829,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "reference.aspose.org:id": {
+      "files": 4012,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "reference.aspose.org:it": {
+      "files": 643,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "reference.aspose.org:ja": {
+      "files": 594,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 20,
+      "purity_new": 19
+    },
+    "reference.aspose.org:ko": {
+      "files": 1822,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 31,
+      "purity_new": 28
+    },
+    "reference.aspose.org:nl": {
+      "files": 642,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "reference.aspose.org:pl": {
+      "files": 466,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "reference.aspose.org:pt": {
+      "files": 4878,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "reference.aspose.org:ro": {
+      "files": 4874,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "reference.aspose.org:ru": {
+      "files": 4494,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 254,
+      "purity_new": 254
+    },
+    "reference.aspose.org:sv": {
+      "files": 4340,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "reference.aspose.org:th": {
+      "files": 4843,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 52,
+      "purity_new": 51
+    },
+    "reference.aspose.org:tr": {
+      "files": 5038,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "reference.aspose.org:uk": {
+      "files": 4837,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 192,
+      "purity_new": 191
+    },
+    "reference.aspose.org:vi": {
+      "files": 5031,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 237,
+      "purity_new": 235
+    },
+    "reference.aspose.org:zh": {
+      "files": 3590,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 180,
+      "purity_new": 177
+    },
+    "websites.aspose.net:ar": {
+      "files": 14,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "websites.aspose.net:bg": {
+      "files": 14,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "websites.aspose.net:ca": {
+      "files": 14,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "websites.aspose.net:cs": {
+      "files": 14,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "websites.aspose.net:da": {
+      "files": 14,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "websites.aspose.net:de": {
+      "files": 14,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "websites.aspose.net:el": {
+      "files": 14,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "websites.aspose.net:es": {
+      "files": 14,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "websites.aspose.net:fa": {
+      "files": 14,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "websites.aspose.net:fi": {
+      "files": 14,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "websites.aspose.net:fr": {
+      "files": 14,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "websites.aspose.net:he": {
+      "files": 14,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "websites.aspose.net:hi": {
+      "files": 14,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "websites.aspose.net:hr": {
+      "files": 14,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "websites.aspose.net:hu": {
+      "files": 14,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "websites.aspose.net:id": {
+      "files": 14,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "websites.aspose.net:it": {
+      "files": 14,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "websites.aspose.net:ja": {
+      "files": 14,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "websites.aspose.net:ko": {
+      "files": 14,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "websites.aspose.net:lt": {
+      "files": 14,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "websites.aspose.net:lv": {
+      "files": 14,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "websites.aspose.net:ms": {
+      "files": 14,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "websites.aspose.net:nl": {
+      "files": 14,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "websites.aspose.net:no": {
+      "files": 14,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "websites.aspose.net:pl": {
+      "files": 14,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "websites.aspose.net:pt": {
+      "files": 14,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "websites.aspose.net:ro": {
+      "files": 14,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "websites.aspose.net:ru": {
+      "files": 14,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "websites.aspose.net:sk": {
+      "files": 14,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "websites.aspose.net:sr": {
+      "files": 14,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "websites.aspose.net:sv": {
+      "files": 14,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "websites.aspose.net:th": {
+      "files": 14,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "websites.aspose.net:tr": {
+      "files": 14,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "websites.aspose.net:uk": {
+      "files": 14,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "websites.aspose.net:vi": {
+      "files": 14,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "websites.aspose.net:zh": {
+      "files": 14,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "websites.aspose.org:ar": {
+      "files": 15,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "websites.aspose.org:cs": {
+      "files": 15,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "websites.aspose.org:de": {
+      "files": 15,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "websites.aspose.org:el": {
+      "files": 15,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "websites.aspose.org:es": {
+      "files": 15,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "websites.aspose.org:fa": {
+      "files": 15,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "websites.aspose.org:fr": {
+      "files": 15,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "websites.aspose.org:he": {
+      "files": 15,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "websites.aspose.org:hi": {
+      "files": 15,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "websites.aspose.org:hu": {
+      "files": 15,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "websites.aspose.org:id": {
+      "files": 15,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "websites.aspose.org:it": {
+      "files": 15,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "websites.aspose.org:ja": {
+      "files": 15,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "websites.aspose.org:ko": {
+      "files": 15,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "websites.aspose.org:nl": {
+      "files": 15,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "websites.aspose.org:pl": {
+      "files": 15,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "websites.aspose.org:pt": {
+      "files": 15,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "websites.aspose.org:ro": {
+      "files": 15,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "websites.aspose.org:ru": {
+      "files": 15,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "websites.aspose.org:sv": {
+      "files": 15,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "websites.aspose.org:th": {
+      "files": 15,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "websites.aspose.org:tr": {
+      "files": 15,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "websites.aspose.org:uk": {
+      "files": 15,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "websites.aspose.org:vi": {
+      "files": 15,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "websites.aspose.org:zh": {
+      "files": 15,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "www.aspose.net:ar": {
+      "files": 1,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "www.aspose.net:bg": {
+      "files": 1,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "www.aspose.net:ca": {
+      "files": 1,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "www.aspose.net:cs": {
+      "files": 1,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "www.aspose.net:da": {
+      "files": 1,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "www.aspose.net:de": {
+      "files": 1,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "www.aspose.net:el": {
+      "files": 1,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "www.aspose.net:es": {
+      "files": 1,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "www.aspose.net:fa": {
+      "files": 1,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "www.aspose.net:fi": {
+      "files": 1,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "www.aspose.net:fr": {
+      "files": 1,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "www.aspose.net:he": {
+      "files": 1,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "www.aspose.net:hr": {
+      "files": 1,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "www.aspose.net:hu": {
+      "files": 1,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "www.aspose.net:id": {
+      "files": 1,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "www.aspose.net:it": {
+      "files": 1,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "www.aspose.net:ja": {
+      "files": 1,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "www.aspose.net:ko": {
+      "files": 1,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "www.aspose.net:nl": {
+      "files": 1,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "www.aspose.net:pl": {
+      "files": 1,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "www.aspose.net:pt": {
+      "files": 1,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "www.aspose.net:ro": {
+      "files": 1,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "www.aspose.net:ru": {
+      "files": 1,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "www.aspose.net:sk": {
+      "files": 1,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "www.aspose.net:sr": {
+      "files": 1,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "www.aspose.net:sv": {
+      "files": 1,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "www.aspose.net:th": {
+      "files": 1,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "www.aspose.net:tr": {
+      "files": 1,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "www.aspose.net:uk": {
+      "files": 1,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "www.aspose.net:vi": {
+      "files": 1,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "www.aspose.net:zh": {
+      "files": 1,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "www.aspose.org:ar": {
+      "files": 1,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "www.aspose.org:cs": {
+      "files": 1,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "www.aspose.org:de": {
+      "files": 1,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "www.aspose.org:el": {
+      "files": 1,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "www.aspose.org:es": {
+      "files": 1,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "www.aspose.org:fa": {
+      "files": 1,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "www.aspose.org:fr": {
+      "files": 1,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "www.aspose.org:he": {
+      "files": 1,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "www.aspose.org:hi": {
+      "files": 1,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "www.aspose.org:hu": {
+      "files": 1,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "www.aspose.org:id": {
+      "files": 1,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "www.aspose.org:it": {
+      "files": 1,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "www.aspose.org:ja": {
+      "files": 1,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "www.aspose.org:ko": {
+      "files": 1,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "www.aspose.org:nl": {
+      "files": 1,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "www.aspose.org:pl": {
+      "files": 1,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "www.aspose.org:pt": {
+      "files": 1,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "www.aspose.org:ro": {
+      "files": 1,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "www.aspose.org:ru": {
+      "files": 1,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "www.aspose.org:sv": {
+      "files": 1,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "www.aspose.org:th": {
+      "files": 1,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "www.aspose.org:tr": {
+      "files": 1,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "www.aspose.org:uk": {
+      "files": 1,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "www.aspose.org:vi": {
+      "files": 1,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    },
+    "www.aspose.org:zh": {
+      "files": 1,
+      "duplicate_old": 0,
+      "duplicate_new": 0,
+      "purity_old": 0,
+      "purity_new": 0
+    }
+  }
+}

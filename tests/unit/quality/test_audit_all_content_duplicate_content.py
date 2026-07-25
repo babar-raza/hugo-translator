@@ -17,6 +17,8 @@ an MT decoding-loop artifact, and must not be flagged.
 
 from __future__ import annotations
 
+import pytest
+
 from scripts.quality.audit_all_content import check_duplicate_content
 
 _FENCE_FALSE_POSITIVE = (
@@ -129,3 +131,26 @@ def test_genuine_corruption_directly_adjacent_to_fence_still_flagged():
 
 def test_legitimate_boilerplate_directly_adjacent_to_fence_still_protected():
     assert check_duplicate_content(_LEGITIMATE_BOILERPLATE_FENCE_ADJACENT) is False
+
+
+@pytest.mark.parametrize(
+    "wrap",
+    [
+        lambda text: f"~~~python\n{text}\n~~~",
+        lambda text: f"````python\n{text}\n```\nstill code\n````",
+        lambda text: "    " + text,
+    ],
+    ids=["tilde", "long-backtick", "indented"],
+)
+def test_all_commonmark_code_styles_exclude_repeated_code_boilerplate(wrap):
+    repeated = "This is repeated code boilerplate that must never be counted as prose duplication."
+    body = "\n\nUnique prose one that is safely longer than fifty characters for this detector.\n\n".join(
+        [wrap(repeated), wrap(repeated), wrap(repeated)]
+    )
+    assert check_duplicate_content(body) is False
+
+
+def test_unterminated_fence_excludes_repeated_code_boilerplate():
+    repeated = "This is repeated code boilerplate that must never be counted as prose duplication."
+    body = "```python\n" + "\n\n".join([repeated, repeated, repeated])
+    assert check_duplicate_content(body) is False
