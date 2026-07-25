@@ -47,7 +47,14 @@ def _allow_legacy_ast_fallback(validation_policy: str) -> bool:
 _REVIEWED_IDENTICAL_TRANSLATIONS: dict[str, frozenset[str]] = {
     # "Introduction" is spelled identically in English and French.  This is
     # an exact reviewed equivalence, not an untranslated-unit tolerance.
-    "fr": frozenset({"introduction"}),
+    "fr": frozenset(
+        {
+            "introduction",
+            # AST text unit following the protected FilterOperatorType name;
+            # French uses the same noun and punctuation.
+            "conditions.",
+        }
+    ),
 }
 
 

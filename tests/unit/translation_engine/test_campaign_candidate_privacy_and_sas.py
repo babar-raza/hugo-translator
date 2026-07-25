@@ -27,7 +27,9 @@ def test_zero_defect_prohibits_legacy_ast_fallback():
 def test_reviewed_identical_translation_is_locale_scoped():
     assert _is_reviewed_identical_translation("Introduction", "fr")
     assert _is_reviewed_identical_translation(" INTRODUCTION ", "fr")
+    assert _is_reviewed_identical_translation("conditions.", "fr")
     assert not _is_reviewed_identical_translation("Introduction", "es")
+    assert not _is_reviewed_identical_translation("conditions.", "de")
     assert not _is_reviewed_identical_translation("Getting Started", "fr")
 
 
