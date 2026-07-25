@@ -244,6 +244,7 @@ def test_campaign_uses_three_primary_then_llm_and_logs_metadata_only(tmp_path, m
         def __init__(self):
             self.campaign_context = {}
             self.calls = []
+            self.decision_engine = SimpleNamespace(max_retry_attempts=99)
             self.config = SimpleNamespace(get_site_profile=lambda _site: SimpleNamespace())
 
         def _get_output_path(self, *_args):
@@ -260,8 +261,8 @@ def test_campaign_uses_three_primary_then_llm_and_logs_metadata_only(tmp_path, m
             assert file_path == source
             assert target_langs == ["es"]
             escalated = str(output.resolve()) in self._rtq_llm_output_paths
-            self.calls.append(escalated)
-            if len(self.calls) < 4:
+            self.calls.append((escalated, self.decision_engine.max_retry_attempts))
+            if len(self.calls) < 3:
                 return SimpleNamespace(
                     success=False,
                     acceptance_receipts={},
@@ -307,8 +308,9 @@ def test_campaign_uses_three_primary_then_llm_and_logs_metadata_only(tmp_path, m
     summary = runner.run()
 
     assert summary["status"] == "COMPLETE"
-    assert engine.calls == [False, False, False, True]
+    assert engine.calls == [(False, 2), (True, 0), (True, 0)]
+    assert engine.decision_engine.max_retry_attempts == 99
     failure_log = runner.ledger.failures_path.read_text(encoding="utf-8")
-    assert failure_log.count("\n") == 3
+    assert failure_log.count("\n") == 2
     assert "SECRET REJECTED CANDIDATE TEXT" not in failure_log
     assert "translation_rejected" in failure_log

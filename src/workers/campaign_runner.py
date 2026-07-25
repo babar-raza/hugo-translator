@@ -445,38 +445,54 @@ class CampaignRunner:
                     llm_paths = set()
                     self.engine._rtq_llm_output_paths = llm_paths
                 resolved_output = str(expected.resolve())
-                for attempt in range(1, primary_attempts + llm_attempts + 1):
-                    if attempt > primary_attempts:
-                        llm_paths.add(resolved_output)
-                    result = self.engine.translate_file(
-                        source.site_id,
-                        source_path,
-                        target_langs=[locale],
-                        validate=True,
-                        force=False,
-                        force_overwrite=False,
-                        trigger_type="campaign",
-                    )
-                    receipt = result.acceptance_receipts.get(locale)
-                    if receipt is None:
-                        receipt = self.ledger.receipts().get(expected_output)
-                    if receipt is not None and expected.is_file():
-                        break
-                    if expected.exists():
-                        expected.unlink(missing_ok=True)
-                        raise CampaignManifestError(
-                            f"rejected attempt produced an unreceipted output: {expected_output}"
+                decision_engine = getattr(self.engine, "decision_engine", None)
+                original_retry_budget = getattr(decision_engine, "max_retry_attempts", None)
+                # The primary invocation owns the initial translation plus two
+                # feedback-guided retries. Each LLM invocation is one attempt,
+                # for exactly five attempts total.
+                phases = [
+                    (False, primary_attempts - 1, primary_attempts),
+                    *[(True, 0, primary_attempts + index) for index in range(1, llm_attempts + 1)],
+                ]
+                try:
+                    for use_llm, retry_budget, attempt_number in phases:
+                        if decision_engine is not None:
+                            decision_engine.max_retry_attempts = retry_budget
+                        if use_llm:
+                            llm_paths.add(resolved_output)
+                        result = self.engine.translate_file(
+                            source.site_id,
+                            source_path,
+                            target_langs=[locale],
+                            validate=True,
+                            force=False,
+                            force_overwrite=False,
+                            trigger_type="campaign",
                         )
-                    self.ledger.append_failure(
-                        source_path=source.source_path,
-                        output_path=expected_output,
-                        target_lang=locale,
-                        error=self._failure_reason(result),
-                        attempt=attempt,
-                        job_id=(f"{shard['shard_id']}::{source.source_path}::{locale}"),
-                        source_sha256=source.source_sha256,
-                    )
-                llm_paths.discard(resolved_output)
+                        receipt = result.acceptance_receipts.get(locale)
+                        if receipt is None:
+                            receipt = self.ledger.receipts().get(expected_output)
+                        if receipt is not None and expected.is_file():
+                            break
+                        if expected.exists():
+                            expected.unlink(missing_ok=True)
+                            raise CampaignManifestError(
+                                "rejected attempt produced an unreceipted "
+                                f"output: {expected_output}"
+                            )
+                        self.ledger.append_failure(
+                            source_path=source.source_path,
+                            output_path=expected_output,
+                            target_lang=locale,
+                            error=self._failure_reason(result),
+                            attempt=attempt_number,
+                            job_id=(f"{shard['shard_id']}::{source.source_path}::{locale}"),
+                            source_sha256=source.source_sha256,
+                        )
+                finally:
+                    llm_paths.discard(resolved_output)
+                    if decision_engine is not None:
+                        decision_engine.max_retry_attempts = original_retry_budget
                 if receipt is None or not expected.is_file():
                     failed += 1
                     shard_failed += 1
