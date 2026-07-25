@@ -35,6 +35,7 @@ class EngineBuilder:
         validation_suite=None,
         decision_engine=None,
         validation_mode: str | None = None,
+        validation_policy: str = "standard",
         enable_terminology: bool | None = None,
         terminology_mode: str | None = None,
         max_retries: int | None = None,
@@ -63,6 +64,7 @@ class EngineBuilder:
             validation_suite=validation_suite,
             decision_engine=decision_engine,
             validation_mode=validation_mode,
+            validation_policy=validation_policy,
             enable_terminology=enable_terminology,
             terminology_mode=terminology_mode,
             max_retries=max_retries,
@@ -115,6 +117,11 @@ class EngineBuilder:
         engine.redis_client = p["redis_client"]
 
         engine.validation_mode = p["validation_mode"]
+        engine.validation_policy = p.get("validation_policy", "standard")
+        if engine.validation_policy not in {"standard", "zero-defect"}:
+            raise ValueError(
+                f"Unknown validation_policy: {engine.validation_policy!r}"
+            )
         engine.enable_terminology = p["enable_terminology"]
         engine.terminology_mode = p["terminology_mode"]
         engine.max_retries_override = p["max_retries"]
@@ -124,6 +131,7 @@ class EngineBuilder:
         engine.output_dir_override = p["output_dir_override"]
         engine.input_root = p["input_root"]
         engine.sort_segments_by_length = p["sort_segments_by_length"]
+        engine.campaign_context = dict(p.get("campaign_context") or {})
 
         if p["output_dir_override"] is not None and not isinstance(p["output_dir_override"], Path):
             raise ValueError(
@@ -143,6 +151,13 @@ class EngineBuilder:
             )
 
         engine._force_accept = p.get("force_accept", False)
+        if engine.validation_policy == "zero-defect":
+            if engine._force_accept:
+                raise ValueError("zero-defect policy prohibits force_accept")
+            if not engine.enable_validation:
+                raise ValueError("zero-defect policy requires validation")
+            if not engine.enable_verification:
+                raise ValueError("zero-defect policy requires verification")
         engine.force_retranslate = p.get("force_retranslate", False)
         engine.cache_write_mode = p.get("cache_write_mode", "auto")
         engine.changed_since_sha = p.get("changed_since_sha", None)
@@ -560,13 +575,37 @@ class EngineBuilder:
                 logger.debug(f"TM detector wiring failed (non-fatal): {_tm_wire_err}")
 
         try:
+            from src.translation_engine.validation.semantic_similarity_validator import (
+                SemanticSimilarityValidator,
+            )
+
             _l3_enc = getattr(getattr(engine.tm, "l3", None), "encoder", None)
             if _l3_enc is not None:
-                from src.translation_engine.validation.semantic_similarity_validator import (
-                    SemanticSimilarityValidator,
-                )
-
                 SemanticSimilarityValidator.set_encoder(_l3_enc)
+            else:
+                # HT-QUALITY-GATES-001 Part 22 (plan 5.4 item 1): L3 lookups
+                # and semantic-similarity VALIDATION are unrelated
+                # capabilities that happened to share one model artifact --
+                # engine.tm.l3 being None (skip_l3=True, the documented
+                # production default for multi-shard GPU runs) used to mean
+                # the validator's encoder was NEVER set, silently, on every
+                # run. Load a standalone encoder instead of leaving it
+                # unset. Defaults to CPU specifically to avoid reintroducing
+                # the GPU memory pressure skip_l3=True exists to prevent --
+                # see load_standalone_sentence_encoder()'s docstring.
+                from src.tm.l3_semantic import load_standalone_sentence_encoder
+
+                _model_name = (
+                    engine.config.get_config()
+                    .get("tm_defaults", {})
+                    .get("l3_embedding_model", "all-MiniLM-L6-v2")
+                )
+                _standalone_enc = load_standalone_sentence_encoder(_model_name, use_gpu=False)
+                SemanticSimilarityValidator.set_encoder(_standalone_enc)
+                logger.info(
+                    "SemanticSimilarityValidator: loaded standalone CPU encoder "
+                    "(%s) since L3 is not active (skip_l3=True)", _model_name,
+                )
         except Exception as _sem_wire_err:
             logger.debug(
                 "SemanticSimilarityValidator encoder wiring failed (non-fatal): %s", _sem_wire_err
@@ -589,6 +628,7 @@ class EngineBuilder:
             similarity_tracker=engine.similarity_tracker,
             config=engine.config,
             force_accept=engine._force_accept,
+            validation_policy=engine.validation_policy,
         )
 
         engine._file_pipeline = FileTranslationPipeline(engine)

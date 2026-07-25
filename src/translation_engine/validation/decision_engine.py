@@ -124,6 +124,17 @@ class ValidationDecisionEngine:
         "LinkValidator",
         "StructureValidator",
         "ShortcodePreservationValidator",  # defense-in-depth: class default accept_after_max_retries=True creates gap when instantiated directly
+        # HT-QUALITY-GATES-001 Part 22 (plan 5.4 item 2): without this, a
+        # validator specifically built to catch meaning-level divergence
+        # was structurally excluded from ever blocking anything on MT
+        # backends (~34/36 locales) via the accept-best-effort bypass just
+        # below (BUG-022-FIX/TC-RETRY-FIX-018) -- confirmed in root cause F.
+        # Only fires on ERROR-severity issues (cosine similarity < 0.40,
+        # the validator's own "meaning diverges significantly" threshold,
+        # not the softer 0.55 warn band), and only once item 1's encoder
+        # decoupling actually gives it something to compute against on
+        # every run, not just when L3 happens to be active.
+        "SemanticSimilarityValidator",
     }
 
     def __init__(

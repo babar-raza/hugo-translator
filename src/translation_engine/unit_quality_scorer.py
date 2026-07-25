@@ -13,6 +13,7 @@ from difflib import SequenceMatcher
 from typing import Any
 
 from .extractor.text_unit import TextUnit, TextUnitKind
+from .quality.inline_code_repair import has_translated_inline_code as _has_translated_inline_code_shared
 
 # ---------------------------------------------------------------------------
 # Patterns
@@ -237,21 +238,18 @@ class UnitQualityScorer:
 
     @staticmethod
     def _has_translated_inline_code(en_text: str, tr_text: str) -> bool:
-        """Return True if any backtick span was ASCII in EN but non-ASCII in TR."""
-        en_spans = _INLINE_CODE_RE.findall(en_text)
-        tr_spans = _INLINE_CODE_RE.findall(tr_text)
-        if not en_spans:
-            return False
-        # Only trigger when EN has ≥3 spans (avoid noise on trivial files)
-        if len(en_spans) < 3:
-            return False
-        for en_span in en_spans:
-            if en_span.isascii():
-                # Find matching span in TR (order-based)
-                idx = en_spans.index(en_span)
-                if idx < len(tr_spans) and not tr_spans[idx].isascii():
-                    return True
-        return False
+        """Return True if any backtick span was ASCII in EN but non-ASCII in TR.
+
+        HT-INLINE-CODE-001 TC-ICR-004: delegated to the shared
+        src/translation_engine/quality/inline_code_repair.py primitive
+        instead of this class's own index-based pairing (which had no
+        fenced-code-block exclusion, no newline exclusion, and used
+        `en_spans.index(en_span)` -- silently wrong on a repeated span
+        value -- to look up the "matching" TR span by position). The
+        shared primitive also declines to fire on an EN/TR span-count
+        mismatch rather than guessing a positional pairing.
+        """
+        return _has_translated_inline_code_shared(en_text, tr_text)
 
     @staticmethod
     def _is_ascii_prose(text: str) -> bool:

@@ -455,3 +455,89 @@ class TestNormalizeTableCells:
         lines = normalized.splitlines()
         assert len(lines) == 1
         assert lines[0].endswith("|"), f"Expected trailing |, got: {lines[0]!r}"
+
+
+class TestParseTableCellFenceHandling:
+    """HT-QUALITY-GATES-001 Part 22 (plan 5.1 item 4): _parse_table_cell was
+    missing the fence/code_block branch that _parse_list_item ("Bug 1") and
+    _parse_blockquote already have -- a fence/code_block token reaching this
+    method fell through the generic `else: i += 1`, silently dropping the
+    code content before translation even starts.
+
+    Honesty note on reachability: real markdown-it tokenization of standard
+    GFM pipe-table syntax (confirmed by direct tokenizer inspection) never
+    actually emits a "fence" token between td_open/td_close -- a table row
+    is single-line, so triple backticks there tokenize as inline code, not
+    a fence, and raw `<table>` HTML is parsed as html_block/fence pairs
+    OUTSIDE table_open/td_open entirely, never reaching this method. This
+    fix could not be demonstrated firing via any real markdown input found;
+    it closes a structural inconsistency against the two sibling parsers
+    (defensive/symmetry fix, zero behavior change for any currently-
+    reachable input) rather than a confirmed-live defect. These tests
+    exercise the method directly with a hand-built token list, which is the
+    most honest test achievable given that reachability finding.
+    """
+
+    def _fence_token(self, content: str, info: str = "python"):
+        from markdown_it.token import Token
+
+        return Token(type="fence", tag="code", nesting=0, content=content, info=info)
+
+    def _cell_open_close(self, is_header: bool = False):
+        from markdown_it.token import Token
+
+        open_type = "th_open" if is_header else "td_open"
+        close_type = "th_close" if is_header else "td_close"
+        return (
+            Token(type=open_type, tag="th" if is_header else "td", nesting=1),
+            Token(type=close_type, tag="th" if is_header else "td", nesting=-1),
+        )
+
+    def test_fence_token_becomes_code_block_child_not_dropped(self):
+        from src.translation_engine.parser import HugoParser
+        from src.translation_engine.parser.ast_nodes import NodeType
+
+        parser = HugoParser()
+        open_tok, close_tok = self._cell_open_close()
+        tokens = [open_tok, self._fence_token("x = 1\n", "python"), close_tok]
+
+        node, end_idx = parser._parse_table_cell(tokens, 0, is_header=False)
+
+        assert node.type == NodeType.TABLE_CELL
+        assert len(node.children) == 1
+        assert node.children[0].type == NodeType.CODE_BLOCK
+        assert node.children[0].raw == "x = 1\n"
+        assert end_idx == 3
+
+    def test_code_block_token_type_also_handled(self):
+        """The alternate token type (indented code blocks use "code_block",
+        fenced use "fence") -- both must be handled, matching the sibling
+        parsers' `token.type in ("fence", "code_block")` check."""
+        from markdown_it.token import Token
+
+        from src.translation_engine.parser import HugoParser
+        from src.translation_engine.parser.ast_nodes import NodeType
+
+        parser = HugoParser()
+        open_tok, close_tok = self._cell_open_close()
+        code_tok = Token(type="code_block", tag="code", nesting=0, content="y = 2\n")
+        tokens = [open_tok, code_tok, close_tok]
+
+        node, _ = parser._parse_table_cell(tokens, 0, is_header=False)
+
+        assert len(node.children) == 1
+        assert node.children[0].type == NodeType.CODE_BLOCK
+        assert node.children[0].raw == "y = 2\n"
+
+    def test_header_cell_with_fence_also_handled(self):
+        from src.translation_engine.parser import HugoParser
+        from src.translation_engine.parser.ast_nodes import NodeType
+
+        parser = HugoParser()
+        open_tok, close_tok = self._cell_open_close(is_header=True)
+        tokens = [open_tok, self._fence_token("z = 3\n"), close_tok]
+
+        node, _ = parser._parse_table_cell(tokens, 0, is_header=True)
+
+        assert node.attrs["is_header"] is True
+        assert node.children[0].type == NodeType.CODE_BLOCK

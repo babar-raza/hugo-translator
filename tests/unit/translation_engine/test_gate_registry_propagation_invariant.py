@@ -76,14 +76,14 @@ class TestSweepAutoPropagation:
             f"this gate's findings (RC1 regression)."
         )
 
-    def test_hand_implemented_ids_are_still_a_subset_of_9_to_28(self):
+    def test_hand_implemented_ids_exclude_registry_swept_gate26(self):
         """Documents the current boundary explicitly -- if this ever needs
         to change (e.g. gate 9-28 concepts get consolidated into the
         registry-driven path), it should be a deliberate edit, not a
         silent drift."""
         import audit_all_content as aac
 
-        assert aac._HAND_IMPLEMENTED_GATE_IDS == set(range(9, 29))
+        assert aac._HAND_IMPLEMENTED_GATE_IDS == set(range(9, 26)) | {27, 28}
 
 
 class TestHealerGateRoutingRoundTrip:

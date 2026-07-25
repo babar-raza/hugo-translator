@@ -179,6 +179,66 @@ class TestExtractorDiscoveryLogging:
         assert record["context"] == "heading[0]"
 
 
+class TestBatchTranslateDoesNotClobberI18nValues:
+    """P0 regression (mission reference-i18n-hardening-20260725): the
+    fill-if-empty guard in batch_translate_units' non-translatable loop.
+
+    Before the fix, `unit.translated_text = unit.source_text` ran
+    unconditionally for every do_not_translate unit — including i18n-table
+    hits, whose translated_text already held the approved locale value —
+    so every table-resolved heading was clobbered back to English before
+    rendering. The older test above only proves the unit is excluded from
+    get_translatable_units(); THIS test runs the real batch_translate_units
+    and proves the value survives it."""
+
+    def test_i18n_value_survives_and_mt_never_sees_dnt_units(self):
+        extractor = TextUnitExtractor(segmentation_strategy="leaf_only", target_lang="ja")
+        units: list = []
+        extractor._extract_full_sentence(_heading_node("Overview"), units)
+        assert units[0].translated_text == "概要"  # precondition (table hit)
+
+        from src.translation_engine.extractor.text_unit import TextUnit
+
+        prose = TextUnit(
+            unit_id="u_prose",
+            source_text="This class renders scenes for export.",
+            kind="paragraph",
+            node_addr="paragraph[0]",
+            do_not_translate=False,
+        )
+        protected = TextUnit(
+            unit_id="u_ident",
+            source_text="ImageRenderOptions",
+            kind="heading",
+            node_addr="heading[1]",
+            do_not_translate=True,  # shape-protected, NO prefilled value
+        )
+        all_units = units + [prose, protected]
+
+        seen_texts: list[str] = []
+
+        class StubModel:
+            def translate(self, texts, src_lang, tgt_lang, **kwargs):
+                seen_texts.extend(texts)
+                return ["このクラスはシーンをレンダリングします。"] * len(texts)
+
+        # Deterministic: purity verdict is not what this test is about.
+        extractor._verify_translation_language_purity = lambda batch, tgt: True
+
+        result = extractor.batch_translate_units(all_units, StubModel(), "en", "ja", batch_size=10)
+
+        assert result is all_units or len(result) == len(all_units)
+        # THE P0 assertion: the table value was not clobbered back to English.
+        assert units[0].translated_text == "概要"
+        # Legacy DNT behavior preserved: empty DNT units still get source copied.
+        assert protected.translated_text == "ImageRenderOptions"
+        # The ordinary unit was translated by the stub.
+        assert prose.translated_text == "このクラスはシーンをレンダリングします。"
+        # MT never received either DNT unit's text.
+        assert all("Overview" not in t for t in seen_texts)
+        assert all("ImageRenderOptions" not in t for t in seen_texts)
+
+
 # ---------------------------------------------------------------------------
 # 3. Single-source-of-truth lint
 # ---------------------------------------------------------------------------
@@ -205,22 +265,15 @@ _CANONICAL_MODULE = REPO_ROOT / "src" / "translation_engine" / "terminology" / "
 # the canonical TemplateStringRegistry instead of a locally-hardcoded
 # literal.
 #
-# text_unit_extractor.py deliberately remains: its own _API_HEADING_TERMS
-# (39 terms) and _ALWAYS_TRANSLATE_WORDS (6 terms: Read, Write, Execute,
-# Create, Delete, Update) gate `_is_non_translatable` on the hottest live
-# code path in the system (evaluated per text unit on every translation
-# call). _API_HEADING_TERMS alone is a safe registry subset, but
-# _ALWAYS_TRANSLATE_WORDS is NOT: "Execute"/"Create"/"Delete"/"Update" have
-# no registry entry at all today, so a same-pass swap would silently drop
-# them back through the over-broad PascalCase heuristic -- reintroducing
-# this exact mission's root-cause bug for those four words. Fixing this
-# safely means first backfilling those 4 terms into the registry (a
-# TC-HT-I18N-003-style data-completeness step), which is out of scope for
-# this mechanical dedup pass and deliberately deferred rather than risked
-# un-scoped on the live hot path.
-_KNOWN_DEFERRED_DUPLICATES = {
-    REPO_ROOT / "src" / "translation_engine" / "extractor" / "text_unit_extractor.py",
-}
+# reference-i18n-hardening-20260725 closed the last holdout:
+# text_unit_extractor.py's _API_HEADING_TERMS/_ALWAYS_TRANSLATE_WORDS were
+# retired in favor of classification.is_translate_eligible() with
+# kind-scoped categories, after backfilling table.access.execute/create/
+# delete/update into the registry (the data-completeness precondition the
+# previous version of this comment named). The set below is now empty and
+# MUST stay empty — see TestFrozensetRetirementParity for the guarantee
+# that no historical term silently fell back into the PascalCase heuristic.
+_KNOWN_DEFERRED_DUPLICATES: set[Path] = set()
 
 
 def _files_with_duplicate_shape() -> set[Path]:
@@ -257,24 +310,94 @@ class TestSingleSourceOfTruthLint:
         )
 
     def test_offline_tool_duplicates_are_fully_eliminated(self):
-        """TC-HT-I18N-004 completion (was previously xfail(strict=True) --
-        now a real, hard assertion): write_gate.py (both sites),
-        tm_surgical_cleanup.py (Rule 1 and Rule 3), heal_english_headings.py,
-        and surgical_retranslate.py no longer carry a hardcoded duplicate of
-        the identifier-shape regex or the heading-term list -- all four now
-        read from the canonical TemplateStringRegistry. text_unit_extractor.py
-        is the one remaining, deliberately-deferred holdout (see
-        _KNOWN_DEFERRED_DUPLICATES's comment on why it's higher-risk than a
-        same-pass mechanical dedup). Asserting equality (not emptiness)
-        against that named set means a future fix there -- or a fresh,
-        unrelated duplicate appearing -- both require deliberately touching
-        this test, rather than either silently passing or silently going
-        unnoticed."""
+        """All five historical duplicate sites are now unified behind the
+        canonical module: write_gate.py (both sites), tm_surgical_cleanup.py
+        (Rule 1 and Rule 3), heal_english_headings.py,
+        surgical_retranslate.py (TC-HT-I18N-004), and — as of mission
+        reference-i18n-hardening-20260725 — text_unit_extractor.py's
+        hot-path frozensets. Zero duplicates, asserted as equality against
+        the (now empty) named set so a fresh duplicate must deliberately
+        touch this test to land."""
         hits = _files_with_duplicate_shape()
         assert hits == _KNOWN_DEFERRED_DUPLICATES, (
-            f"Expected exactly the known-deferred holdout "
-            f"{sorted(str(p) for p in _KNOWN_DEFERRED_DUPLICATES)}, got "
-            f"{sorted(str(p) for p in hits)}. If text_unit_extractor.py has "
-            f"just been fixed, update _KNOWN_DEFERRED_DUPLICATES too. If this "
-            f"is a new duplicate, remove it instead."
+            f"Expected zero duplicate sites, got "
+            f"{sorted(str(p) for p in hits)}. Import from classification.py "
+            f"instead of re-pasting the identifier regex / heading-term list."
+        )
+
+
+# The exact contents of the two retired frozensets, preserved HERE (tests/
+# is outside the SSOT lint's scan roots) as the parity fixture: retirement
+# must not silently drop any historical term back into the over-broad
+# PascalCase heuristic.
+_RETIRED_API_HEADING_TERMS = frozenset({
+    "Name", "Type", "Description", "Returns", "Parameters",
+    "Properties", "Methods", "Fields", "Constructors", "Events",
+    "Exceptions", "Remarks", "Examples", "See Also", "Inheritance",
+    "Implements", "Namespace", "Assembly", "Syntax", "Value",
+    "Overview", "Example", "Notes", "Enumerations", "Deprecated",
+    "Requirements", "Installation", "Usage", "Introduction",
+    "Output", "Input", "Result", "Results", "Summary", "Details",
+    "Options", "Configuration", "Features", "Limitations",
+})
+_RETIRED_ALWAYS_TRANSLATE_WORDS = frozenset({
+    "Read", "Write", "Execute", "Create", "Delete", "Update",
+})
+
+
+class TestFrozensetRetirementParity:
+    """reference-i18n-hardening-20260725: every term the retired hardcoded
+    sets used to force-translate must be translate-eligible via the registry
+    under its historical kind — the registry-driven override is a superset,
+    not a lossy swap."""
+
+    def test_all_39_heading_terms_eligible_under_heading_kind(self):
+        from src.translation_engine.terminology.classification import (
+            CATEGORIES_FOR_KIND,
+            get_default_registry,
+            is_translate_eligible,
+        )
+
+        reg = get_default_registry()
+        missing = [
+            term
+            for term in sorted(_RETIRED_API_HEADING_TERMS)
+            if not is_translate_eligible(
+                term, CATEGORIES_FOR_KIND["heading_text"], registry=reg
+            )
+        ]
+        assert missing == [], (
+            f"Heading terms lost by the frozenset retirement (would fall "
+            f"into the PascalCase protect heuristic): {missing}"
+        )
+
+    def test_all_6_access_words_eligible_under_table_cell_kind_only(self):
+        from src.translation_engine.terminology.classification import (
+            CATEGORIES_FOR_KIND,
+            get_default_registry,
+            is_translate_eligible,
+        )
+
+        reg = get_default_registry()
+        cell_cats = CATEGORIES_FOR_KIND["table_cell_text"]
+        heading_cats = CATEGORIES_FOR_KIND["heading_text"]
+        not_eligible_as_cell = [
+            w
+            for w in sorted(_RETIRED_ALWAYS_TRANSLATE_WORDS)
+            if not is_translate_eligible(w, cell_cats, registry=reg)
+        ]
+        assert not_eligible_as_cell == [], (
+            f"Access-column words lost by the retirement: {not_eligible_as_cell}"
+        )
+        # The deliberate behavior CHANGE (hazard fix): as HEADINGS these are
+        # method names and must NOT be force-translated anymore. "Read" and
+        # "Write" are heading-ineligible only via their enum_value category.
+        wrongly_eligible_as_heading = [
+            w
+            for w in sorted(_RETIRED_ALWAYS_TRANSLATE_WORDS)
+            if is_translate_eligible(w, heading_cats, registry=reg)
+        ]
+        assert wrongly_eligible_as_heading == [], (
+            f"Access-column enum values must never be translate-eligible as "
+            f"headings (they collide with method names): {wrongly_eligible_as_heading}"
         )

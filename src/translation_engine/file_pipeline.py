@@ -142,6 +142,7 @@ class FileTranslationPipeline:
 
         while retry_count <= max_retry_attempts:
             try:
+                _gate_result = None
                 # Clear buffer at each attempt start (discard any entries from
                 # a failed previous attempt that triggered RETRY).
                 _tm_write_buffer.clear()
@@ -680,16 +681,52 @@ class FileTranslationPipeline:
 
                 # TC-DECOMP-02: Write gate evaluation (gates 2-8)
                 if validation_passed:
-                    _gate_result = engine._write_gate.evaluate(
-                        translated_content=translated_content,
-                        source_content=content,
-                        target_lang=target_lang,
-                        output_path=output_path,
-                        source_doc=doc,
-                        force_overwrite=ctx.force_overwrite,
-                        site_profile=site_profile,
-                    )
-                    if not _gate_result.passed:
+                    _zero_defect = getattr(engine, "validation_policy", "standard") == "zero-defect"
+                    if _zero_defect:
+                        if not should_validate or not engine.validation_suite or not engine.decision_engine:
+                            validation_passed = False
+                            validation_error = (
+                                "Zero-defect policy requires the validation suite and decision engine"
+                            )
+                        elif not should_verify or final_verification_result is None:
+                            validation_passed = False
+                            validation_error = (
+                                "Zero-defect policy requires completed post-translation verification"
+                            )
+                        elif getattr(final_validation_result, "error_count", 0) > 0 or getattr(
+                            final_validation_result, "warning_count", 0
+                        ) > 0:
+                            validation_passed = False
+                            validation_error = (
+                                "Zero-defect validation requires zero errors and zero warnings"
+                            )
+                        elif getattr(final_verification_result, "error_count", 0) > 0 or getattr(
+                            final_verification_result, "warning_count", 0
+                        ) > 0:
+                            validation_passed = False
+                            validation_error = (
+                                "Zero-defect verification requires zero errors and zero warnings"
+                            )
+
+                    if validation_passed:
+                        evaluate = (
+                            engine._write_gate.evaluate_zero_defect
+                            if _zero_defect
+                            else engine._write_gate.evaluate
+                        )
+                        _gate_result = evaluate(
+                            translated_content=translated_content,
+                            source_content=content,
+                            target_lang=target_lang,
+                            output_path=output_path,
+                            source_doc=doc,
+                            force_overwrite=ctx.force_overwrite,
+                            site_profile=site_profile,
+                            translation_stats=result.stats,
+                        )
+                    else:
+                        _gate_result = None
+                    if _gate_result is not None and not _gate_result.passed:
                         validation_passed = False
                         validation_error = _gate_result.error
                         if _gate_result.overwrite_blocked:
@@ -702,7 +739,7 @@ class FileTranslationPipeline:
                                 _rtq_add(_rtq_path, _rtq_lang)
                             except Exception:
                                 pass
-                        if _gate_result.quarantine_content:
+                        if _gate_result.quarantine_content and not _zero_defect:
                             try:
                                 from pathlib import Path as _QPath
 
@@ -727,7 +764,7 @@ class FileTranslationPipeline:
                                 logger.info("Quarantined invalid candidate to %s", _qfile)
                             except Exception as _qe:
                                 logger.warning("Quarantine write failed: %s", _qe)
-                    else:
+                    elif _gate_result is not None:
                         # Soft contamination queuing (does NOT block write)
                         for _rtq_path, _rtq_lang in _gate_result.retranslate_paths:
                             try:
@@ -736,26 +773,77 @@ class FileTranslationPipeline:
                                 logger.debug(f"soft contamination queue failed: {_rtq_err}")
 
                 # Apply auto-cleaned content from gates 9-12/16 (if any gate cleaned it)
-                if validation_passed and "_gate_result" in locals() and _gate_result.cleaned_content is not None:
+                if validation_passed and _gate_result is not None and _gate_result.cleaned_content is not None:
                     translated_content = _gate_result.cleaned_content
+
+                if validation_passed and getattr(engine, "validation_policy", "standard") == "zero-defect":
+                    pre_write_passed, pre_write_errors = engine._pre_write_validation(
+                        content=translated_content,
+                        output_path=output_path,
+                        source_path=source_path,
+                        target_lang=target_lang,
+                        site_id=site_id,
+                        site_profile=site_profile,
+                    )
+                    if not pre_write_passed:
+                        validation_passed = False
+                        validation_error = "; ".join(pre_write_errors)
 
                 # PHASE 2: WRITE (only if ALL validation passed)
                 if validation_passed:
                     try:
-                        engine._write_output(
-                            translated_content, output_path, source_path, result.stats
-                        )
+                        if getattr(engine, "validation_policy", "standard") == "zero-defect":
+                            from .models import AcceptedTranslation
+
+                            gate_receipt = {
+                                1: {
+                                    "passed": True,
+                                    "action": "verification",
+                                    "error": None,
+                                },
+                                **(_gate_result.gate_results if _gate_result else {}),
+                            }
+                            campaign_context = getattr(engine, "campaign_context", {})
+                            accepted = AcceptedTranslation.from_text(
+                                content=translated_content,
+                                source_content=content,
+                                source_path=source_path,
+                                output_path=output_path,
+                                target_lang=target_lang,
+                                gate_results=gate_receipt,
+                                config_fingerprint=campaign_context.get(
+                                    "config_fingerprint", ""
+                                ),
+                                model_fingerprint=str(
+                                    _llm_model_override
+                                    or getattr(engine, "model_id_override", "")
+                                    or getattr(site_profile, "default_model", "")
+                                    or ""
+                                ),
+                                campaign_id=campaign_context.get("campaign_id", ""),
+                            )
+                            engine._write_accepted_output(accepted, result.stats)
+                            result.acceptance_receipts[target_lang] = accepted.receipt()
+                        else:
+                            engine._write_output(
+                                translated_content, output_path, source_path, result.stats
+                            )
                         logger.info(
                             f"Successfully wrote {output_path.name} after passing all validation checks"
                         )
-                        # TC-11: Flush deferred TM entries now
-                        for _entry in _tm_write_buffer:
-                            try:
-                                engine.tm.store(**_entry)
-                            except Exception as _tm_err:
-                                logger.warning(
-                                    f"TM deferred store failed for {output_path.name}: {_tm_err}"
-                                )
+                        # TC-11: a zero-defect campaign flush is authorized by
+                        # the immutable acceptance object, never by raw text or
+                        # a boolean validation flag.
+                        if getattr(engine, "validation_policy", "standard") == "zero-defect":
+                            engine._flush_accepted_tm(accepted, _tm_write_buffer)
+                        else:
+                            for _entry in _tm_write_buffer:
+                                try:
+                                    engine.tm.store(**_entry)
+                                except Exception as _tm_err:
+                                    logger.warning(
+                                        f"TM deferred store failed for {output_path.name}: {_tm_err}"
+                                    )
                         _tm_write_buffer.clear()
                     except Exception as write_error:
                         logger.error(
@@ -839,13 +927,15 @@ class FileTranslationPipeline:
                         logger.warning(f"Failed to update content hash metadata: {e}")
 
                 # INT-05: Post-write validation
-                post_write_passed = engine._post_write_validation(
-                    output_path=output_path,
-                    source_path=source_path,
-                    target_lang=target_lang,
-                    site_id=site_id,
-                    site_profile=site_profile,
-                )
+                post_write_passed = True
+                if getattr(engine, "validation_policy", "standard") != "zero-defect":
+                    post_write_passed = engine._post_write_validation(
+                        output_path=output_path,
+                        source_path=source_path,
+                        target_lang=target_lang,
+                        site_id=site_id,
+                        site_profile=site_profile,
+                    )
 
                 if not post_write_passed:
                     logger.warning(

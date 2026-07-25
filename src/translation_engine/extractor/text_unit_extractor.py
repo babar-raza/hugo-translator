@@ -19,7 +19,11 @@ from ..terminology.classification import (
     VERDICT_TABLE,
     ProtectedTerms,
     TemplateStringRegistry,
+    categories_for_kind,
     classify,
+    get_default_protected_terms,
+    get_default_registry,
+    is_translate_eligible,
 )
 from .text_unit import BodyTranslationPlan, TextUnit, TextUnitKind
 
@@ -166,29 +170,13 @@ def is_family_platform_index(
         return True
     return False
 
-# API reference heading terms validated by Gate 9 in write_gate.py.
-# TC-HDG-TRANS-019: these must NEVER be blocked from translation;
-# they appear as section headings (## Methods) and must reach the model.
-_API_HEADING_TERMS: frozenset[str] = frozenset({
-    "Name", "Type", "Description", "Returns", "Parameters",
-    "Properties", "Methods", "Fields", "Constructors", "Events",
-    "Exceptions", "Remarks", "Examples", "See Also", "Inheritance",
-    "Implements", "Namespace", "Assembly", "Syntax", "Value",
-    # RC-A additions (TC-AUDIT-001): common section heading words also
-    # caught by the PascalCase heuristic in _is_technical_identifier.
-    "Overview", "Example", "Notes", "Enumerations", "Deprecated",
-    "Requirements", "Installation", "Usage", "Introduction",
-    "Output", "Input", "Result", "Results", "Summary", "Details",
-    "Options", "Configuration", "Features", "Limitations",
-})
-
-# Words that must always be translated regardless of PascalCase appearance.
-# These are NOT headings (Gate 9 does not apply), but they match the
-# PascalCase heuristic and would otherwise be left in English.
-# RC-A additions (TC-AUDIT-001): table Access column values.
-_ALWAYS_TRANSLATE_WORDS: frozenset[str] = frozenset({
-    "Read", "Write", "Execute", "Create", "Delete", "Update",
-})
+# reference-i18n-hardening-20260725: the hardcoded _API_HEADING_TERMS /
+# _ALWAYS_TRANSLATE_WORDS frozensets that lived here were retired — the
+# always-translate override in _is_non_translatable now reads the i18n
+# template-string registry via classification.is_translate_eligible(), with
+# kind-scoped categories so table Access-column values (Read/Write/Execute/
+# Create/Delete/Update — all real method names too) are only eligible in
+# table-cell context, never as headings.
 
 # Validate constants at module load time (VLD-04, PH-01)
 # Use ValueError instead of assert to ensure validation works with -O flag
@@ -335,12 +323,11 @@ class TextUnitExtractor:
         self.site_profile = site_profile
         self.force_protected_fields = frozenset(force_protected_fields)
         self.target_lang = target_lang
-        # Loaded once per extractor instance (one instance per file-translation
-        # call, per segment_translator.py's _translate_body_ast) rather than
-        # once per text unit, since re-parsing the 14 template-string YAML
-        # files on every heading/table-cell would be wasteful.
-        self._template_registry = TemplateStringRegistry()
-        self._protected_terms = ProtectedTerms()
+        # Process-cached (reference-i18n-hardening-20260725): one extractor is
+        # built per file-translation call, so per-instance loading still
+        # re-parsed all template-string YAML files once per file per language.
+        self._template_registry = get_default_registry()
+        self._protected_terms = get_default_protected_terms()
 
         # Load extraction config from site profile (with fallback to defaults)
         extraction_config = self._load_extraction_config()
@@ -1588,7 +1575,9 @@ class TextUnitExtractor:
         # here makes segment_translator.py's existing "already translated" skip
         # (the same one used for LLM-prefilled units) apply automatically — no
         # MT call, no TM read/write, for this unit.
-        table_value = self._i18n_table_value(protected_text, node_addr=node.node_addr)
+        table_value = self._i18n_table_value(
+            protected_text, node_addr=node.node_addr, kind=TextUnitKind.TEXT
+        )
         if table_value is not None:
             unit.do_not_translate = True
             unit.translated_text = table_value
@@ -1713,8 +1702,17 @@ class TextUnitExtractor:
             if suffix_match:
                 suffix_ws = suffix_match.group(1)
 
+        # TC-EXT-001 column context, hoisted above the DNT check so the
+        # kind-scoped registry override (and the i18n resolver below) can
+        # gate Access-column enum values on it.
+        _col_header = ""
+        if kind is TextUnitKind.TABLE_CELL_TEXT and node.node_id:
+            _col_header = getattr(self, "_cell_column_header", {}).get(node.node_id, "")
+
         # Check if non-translatable FIRST (before applying placeholders)
-        do_not_translate = self._is_non_translatable(stripped_text)
+        do_not_translate = self._is_non_translatable(
+            stripped_text, kind=kind, column_header=_col_header or None
+        )
 
         # Apply preserve_patterns protection (if configured and not already protected)
         placeholder_map = {}
@@ -1744,10 +1742,8 @@ class TextUnitExtractor:
         _unit_metadata: dict = {"placeholder_map": placeholder_map} if placeholder_map else {}
 
         # TC-EXT-001: add column_header for table cells so LLM has column context
-        if kind is TextUnitKind.TABLE_CELL_TEXT and node.node_id:
-            _col_header = getattr(self, "_cell_column_header", {}).get(node.node_id, "")
-            if _col_header:
-                _unit_metadata["column_header"] = _col_header
+        if _col_header:
+            _unit_metadata["column_header"] = _col_header
         if (
             kind is TextUnitKind.TABLE_CELL_TEXT
             and not do_not_translate
@@ -1775,8 +1771,15 @@ class TextUnitExtractor:
         # (kind=TABLE_CELL_TEXT) — the ~83% of the english_headings_nonlatin
         # backlog this mission's i18n table covers. See _extract_text_node's
         # matching comment for why pre-setting translated_text is sufficient.
+        # reference-i18n-hardening-20260725: kind + column context scope the
+        # lookup (enum values only serve under their required column header).
         if kind in (TextUnitKind.HEADING_TEXT, TextUnitKind.TABLE_CELL_TEXT):
-            table_value = self._i18n_table_value(protected_text, node_addr=node.node_addr)
+            table_value = self._i18n_table_value(
+                protected_text,
+                node_addr=node.node_addr,
+                kind=kind,
+                column_header=_col_header or None,
+            )
             if table_value is not None:
                 unit.do_not_translate = True
                 unit.translated_text = table_value
@@ -1919,13 +1922,25 @@ class TextUnitExtractor:
 
         return False
 
-    def _i18n_table_value(self, text: str, *, node_addr: str = "") -> str | None:
+    def _i18n_table_value(
+        self,
+        text: str,
+        *,
+        node_addr: str = "",
+        kind: TextUnitKind | str | None = None,
+        column_header: str | None = None,
+    ) -> str | None:
         """Resolve ``text`` against the i18n template-string table for
         ``self.target_lang`` (mission heading-i18n-governance-20260723,
         TC-HT-I18N-004). Returns the approved translation on a table hit, or
         None otherwise (including when ``target_lang`` was never set, e.g.
         a caller that predates this parameter). Never raises: a classifier
         error must not block ordinary extraction.
+
+        reference-i18n-hardening-20260725: ``kind`` scopes the lookup to the
+        unit's grammatical role (normalized, category-filtered matching via
+        classification.resolve()); ``column_header`` satisfies context-gated
+        enum_value entries (Read/Write under an Access column).
 
         A miss also drives the continuous discovery log (TC-HT-I18N-005) for
         single-hump words with neither a table nor protected-terms entry —
@@ -1944,6 +1959,8 @@ class TextUnitExtractor:
                 # only receives the AST + frontmatter); node_addr is still useful
                 # discovery-log context and doesn't require widening that signature.
                 context=node_addr or None,
+                categories=categories_for_kind(kind) if kind is not None else None,
+                unit_context={"column_header": column_header} if column_header else None,
             )
         except Exception:
             logger.debug("i18n table classification failed for %r", text[:80], exc_info=True)
@@ -1983,7 +2000,12 @@ class TextUnitExtractor:
 
         return False
 
-    def _is_non_translatable(self, text: str) -> bool:
+    def _is_non_translatable(
+        self,
+        text: str,
+        kind: TextUnitKind | str | None = None,
+        column_header: str | None = None,
+    ) -> bool:
         """
         Detect non-translatable content using multiple strategies.
 
@@ -1994,6 +2016,13 @@ class TextUnitExtractor:
         1. NER-based detection (requires spaCy)
         2. Heuristic-based detection (CamelCase, snake_case, etc.)
         3. Terminology dictionary
+
+        ``kind`` scopes the registry always-translate override to the unit's
+        grammatical role (heading vs table cell vs bare text); callers that
+        don't pass it get the bare-text scope (labels yes, enum values no).
+        ``column_header`` is accepted for parity with the i18n resolver but
+        eligibility here is category-level; value serving stays context-gated
+        in classification.resolve().
         """
         text_stripped = text.strip()
         if not text_stripped:
@@ -2007,12 +2036,6 @@ class TextUnitExtractor:
                 extra={"source_text": sanitize_for_log(text_stripped, 200)},
             )
             return True
-
-        # Strategy 0.4 DISABLED (TC-HDG-TRANS-019): API heading terms should be translated.
-        # Gate 9 (write_gate.py) validates translated headings and restores English on corruption.
-        # Keeping _API_HEADING_TERMS frozenset: still used by write_gate.py Gate 9.
-        # if text_stripped in _API_HEADING_TERMS:
-        #     return True
 
         # Strategy 0.5: Punctuation-only or separator-only strings - NEVER translate
         # These cause corruption like ",et," when the model tries to "translate" commas
@@ -2054,11 +2077,18 @@ class TextUnitExtractor:
             # spaCy not available, skip NER detection
             pass
 
-        # TC-AUDIT-001: Always-translate override for heading terms and table values
-        # that the PascalCase heuristic (Strategy 2) would incorrectly block.
-        # _API_HEADING_TERMS: section headings (## Overview, ## Methods, ## Example …)
-        # _ALWAYS_TRANSLATE_WORDS: table cell values (Read, Write …)
-        if text_stripped in _API_HEADING_TERMS or text_stripped in _ALWAYS_TRANSLATE_WORDS:
+        # TC-AUDIT-001 / reference-i18n-hardening-20260725: registry-driven
+        # always-translate override for template strings the PascalCase
+        # heuristic (Strategy 2) would incorrectly block. Kind-scoped: a
+        # section-heading term is eligible as a heading or bare text; an
+        # Access-column enum value (Read/Write/Execute/…) only as a table
+        # cell — as a heading those words are method names and correctly
+        # fall through to Strategy 2 / classify()'s default-protect.
+        if is_translate_eligible(
+            text_stripped,
+            categories_for_kind(kind if kind is not None else "text"),
+            registry=self._template_registry,
+        ):
             return False
 
         # Strategy 2: Heuristic-based detection
@@ -2488,9 +2518,14 @@ class TextUnitExtractor:
         if sort_by_length and translatable:
             translatable = sorted(translatable, key=lambda u: self._estimate_token_count(u.source_text))
 
-        # Non-translatable: copy source to translated (NEVER sent to MT)
+        # Non-translatable: copy source to translated (NEVER sent to MT).
+        # Fill-if-empty only: i18n-table-resolved units arrive here with
+        # do_not_translate=True AND translated_text already holding the
+        # approved locale value — overwriting unconditionally clobbered
+        # that value back to English (P0, reference-i18n-hardening-20260725).
         for unit in non_translatable:
-            unit.translated_text = unit.source_text
+            if not unit.translated_text:
+                unit.translated_text = unit.source_text
 
         # E2E FIX: Log reused translations
         if already_translated:
