@@ -17,8 +17,6 @@ from src.utils.log_sanitizer import sanitize_for_log
 from ..parser.ast_nodes import ASTNode, NodeType
 from ..terminology.classification import (
     VERDICT_TABLE,
-    ProtectedTerms,
-    TemplateStringRegistry,
     categories_for_kind,
     classify,
     get_default_protected_terms,
@@ -402,6 +400,12 @@ class TextUnitExtractor:
                 "Python",
             }
         )
+        # Canonical exact protected terms live in config/terminology.yaml.
+        # Keep AST do_not_translate classification aligned with the governed
+        # terminology validator; otherwise a correctly preserved multi-word
+        # phrase (for example "API Reference") is mislabeled as same-as-source
+        # leakage by TC-SAS-01 in zero-defect campaigns.
+        self.terminology_dict.update(self._protected_terms.terms)
 
         # Initialize NLP model for NER (optional, lazy loaded)
         self._nlp = None
