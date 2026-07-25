@@ -538,6 +538,46 @@ class TestSourceRelativeBaseline:
         assert four.error_count == 0
         assert five.error_count > 0
 
+    def test_locale_scoped_canonical_phrase_expansion_is_exempt(self):
+        validator = RepetitionDetectorValidator(
+            config={
+                "ngram_threshold": 5,
+                "localized_phrase_whitelist": {
+                    "es": ["gestión de hojas de cálculo"],
+                },
+            }
+        )
+        text = " ".join(
+            [
+                f"sección {index} gestión de hojas de cálculo detalle {index}"
+                for index in range(8)
+            ]
+        )
+
+        spanish = validator._check_ngram_repetition(
+            text,
+            "0",
+            source_ngram_ceiling=2,
+            target_lang="es",
+        )
+        french = validator._check_ngram_repetition(
+            text,
+            "0",
+            source_ngram_ceiling=2,
+            target_lang="fr",
+        )
+
+        spanish_payloads = {
+            issue.details.get("ngram") for issue in spanish
+        }
+        french_payloads = {
+            issue.details.get("ngram") for issue in french
+        }
+        assert "gestión de hojas" not in spanish_payloads
+        assert "de hojas de" not in spanish_payloads
+        assert "hojas de cálculo" not in spanish_payloads
+        assert "hojas de cálculo" in french_payloads
+
     def test_no_source_uses_fixed_threshold(self):
         """When no source is provided, fixed threshold applies unchanged."""
         validator = RepetitionDetectorValidator(config={"ngram_threshold": 5})

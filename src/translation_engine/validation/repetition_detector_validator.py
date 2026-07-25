@@ -107,6 +107,22 @@ class RepetitionDetectorValidator(PostTranslationValidator):
         # Sentence duplication config
         self.sentence_dup_threshold = config.get("sentence_dup_threshold", 2)
 
+        # Locale-scoped canonical translated phrases.  A single English term
+        # can legitimately expand to a multi-word target-language phrase
+        # ("spreadsheet" -> "hoja de cálculo").  Count-only cross-lingual
+        # n-gram ceilings cannot model that expansion, so profiles may exempt
+        # only n-grams wholly contained in reviewed canonical phrases.
+        localized = config.get("localized_phrase_whitelist", {}) or {}
+        self.localized_phrase_whitelist = {
+            str(locale).lower(): tuple(
+                str(phrase).strip().lower()
+                for phrase in phrases
+                if str(phrase).strip()
+            )
+            for locale, phrases in localized.items()
+            if isinstance(phrases, list)
+        }
+
         # Load technical terms whitelist
         self.whitelist_terms = self._load_whitelist(config)
 
@@ -256,7 +272,10 @@ class RepetitionDetectorValidator(PostTranslationValidator):
 
             # Check 1: N-gram repetition (source-ceiling-scaled)
             ngram_issues = self._check_ngram_repetition(
-                segment_text, str(segment_id), src_ngram_ceil
+                segment_text,
+                str(segment_id),
+                src_ngram_ceil,
+                target_lang=str(context.get("target_lang", "")).lower(),
             )
             issues.extend(ngram_issues)
 
@@ -288,7 +307,11 @@ class RepetitionDetectorValidator(PostTranslationValidator):
         )
 
     def _check_ngram_repetition(
-        self, text: str, segment_id: str, source_ngram_ceiling: int = 0
+        self,
+        text: str,
+        segment_id: str,
+        source_ngram_ceiling: int = 0,
+        target_lang: str = "",
     ) -> list[ValidationIssue]:
         """Check for n-gram repetition in text.
 
@@ -314,10 +337,20 @@ class RepetitionDetectorValidator(PostTranslationValidator):
 
         # Generate n-grams
         ngrams = []
+        localized_whitelist_ngrams: set[tuple[str, ...]] = set()
+        for phrase in self.localized_phrase_whitelist.get(target_lang, ()):
+            phrase_words = self._tokenize(phrase)
+            localized_whitelist_ngrams.update(
+                tuple(phrase_words[index:index + self.ngram_size])
+                for index in range(len(phrase_words) - self.ngram_size + 1)
+            )
         for i in range(len(words) - self.ngram_size + 1):
             ngram = tuple(words[i:i + self.ngram_size])
             # Skip n-grams containing whitelisted terms
-            if not any(word in self.whitelist_terms for word in ngram):
+            if (
+                ngram not in localized_whitelist_ngrams
+                and not any(word in self.whitelist_terms for word in ngram)
+            ):
                 ngrams.append(ngram)
 
         # Count n-gram occurrences
