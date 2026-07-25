@@ -23,11 +23,32 @@ from src.workers.campaign_manifest import (
     sha256_file,
 )
 
-
 TARGET_LOCALES = (
-    "ar", "cs", "de", "el", "es", "fa", "fr", "he", "hi", "hu",
-    "id", "it", "ja", "ko", "nl", "pl", "pt", "ro", "ru", "sv",
-    "th", "tr", "uk", "vi", "zh",
+    "ar",
+    "cs",
+    "de",
+    "el",
+    "es",
+    "fa",
+    "fr",
+    "he",
+    "hi",
+    "hu",
+    "id",
+    "it",
+    "ja",
+    "ko",
+    "nl",
+    "pl",
+    "pt",
+    "ro",
+    "ru",
+    "sv",
+    "th",
+    "tr",
+    "uk",
+    "vi",
+    "zh",
 )
 PRODUCTS = (("words", "net"), ("html", "python"), ("cells", "rust"))
 FOLDER_SURFACES = (
@@ -45,12 +66,9 @@ def _config_fingerprint(translator_repo: Path) -> str:
     digest = hashlib.sha256()
     paths = [translator_repo / "config/global.yaml"]
     paths.extend(
-        translator_repo / "config/site_profiles" / f"{site}.yaml"
-        for site, _ in FOLDER_SURFACES
+        translator_repo / "config/site_profiles" / f"{site}.yaml" for site, _ in FOLDER_SURFACES
     )
-    paths.append(
-        translator_repo / "config/site_profiles/blog.aspose.org.yaml"
-    )
+    paths.append(translator_repo / "config/site_profiles/blog.aspose.org.yaml")
     for path in paths:
         digest.update(path.relative_to(translator_repo).as_posix().encode("utf-8"))
         digest.update(b"\0")
@@ -70,37 +88,28 @@ def _knowledge_fingerprints(content_repo: Path) -> dict[str, str]:
                 merged / "api_surface.json",
             ]
         )
-    paths.append(
-        Path("knowledge/html/python/scout/enriched_claims.json")
+    paths.append(Path("knowledge/html/python/scout/enriched_claims.json"))
+    paths.extend(
+        [
+            Path("reports/generation/words-net.yaml"),
+            Path("reports/generation/html-python.yaml"),
+            Path("reports/generation/cells-rust.yaml"),
+            Path("reports/grade_manifest.json"),
+        ]
     )
-    return {
-        path.as_posix(): sha256_file(content_repo / path)
-        for path in paths
-    }
+    return {path.as_posix(): sha256_file(content_repo / path) for path in paths}
 
 
 def _folder_sources(content_repo: Path):
     for site_id, default_wave in FOLDER_SURFACES:
         for family, platform in PRODUCTS:
-            root = (
-                content_repo
-                / "content"
-                / site_id
-                / "en"
-                / family
-                / platform
-            )
+            root = content_repo / "content" / site_id / "en" / family / platform
             for source in sorted(root.rglob("*.md")):
                 relative_tail = source.relative_to(root)
                 source_rel = source.relative_to(content_repo).as_posix()
                 outputs = {
                     locale: (
-                        Path("content")
-                        / site_id
-                        / locale
-                        / family
-                        / platform
-                        / relative_tail
+                        Path("content") / site_id / locale / family / platform / relative_tail
                     ).as_posix()
                     for locale in TARGET_LOCALES
                 }
@@ -128,9 +137,9 @@ def _blog_sources(content_repo: Path):
                 continue
             source_rel = source.relative_to(content_repo).as_posix()
             outputs = {
-                locale: source.with_name(
-                    f"{source.stem}.{locale}{source.suffix}"
-                ).relative_to(content_repo).as_posix()
+                locale: source.with_name(f"{source.stem}.{locale}{source.suffix}")
+                .relative_to(content_repo)
+                .as_posix()
                 for locale in TARGET_LOCALES
             }
             yield {
@@ -176,14 +185,12 @@ def build_manifest(
         "translator_repo_sha": git_sha(translator_repo),
         "config_fingerprint": _config_fingerprint(translator_repo),
         "model_fingerprints": {
-            "model_registry": sha256_file(
-                translator_repo / "config/model_registry.yaml"
-            ),
+            "model_registry": sha256_file(translator_repo / "config/model_registry.yaml"),
         },
         "tm_fingerprint": fingerprint_files(
             translator_repo,
             [
-                "data/tm/l2_lmdb/data.mdb",
+                "data/tm/l2.lmdb/data.mdb",
                 "data/tm/l3_faiss/index.faiss",
                 "data/tm/l3_faiss/metadata.pkl",
                 "data/tm/l3_faiss/config.json",

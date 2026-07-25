@@ -1,11 +1,18 @@
 import json
+import hashlib
+import subprocess
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 import yaml
 
-from src.workers.campaign_manifest import CampaignManifest, CampaignManifestError
-from src.workers.campaign_runner import CampaignLedger
+from src.workers.campaign_manifest import (
+    CampaignManifest,
+    CampaignManifestError,
+    sha256_file,
+)
+from src.workers.campaign_runner import CampaignLedger, CampaignRunner
 
 
 def _manifest(tmp_path: Path) -> dict:
@@ -23,6 +30,16 @@ def _manifest(tmp_path: Path) -> dict:
         "target_locales": ["es", "fr"],
         "expected_source_count": 1,
         "expected_output_count": 2,
+        "retry_policy": {
+            "primary_attempts": 3,
+            "llm_escalation_attempts": 2,
+            "llm_model": "professionalize_llm",
+        },
+        "commit_policy": {
+            "branch": "pilot",
+            "max_outputs_per_commit": 250,
+            "push": False,
+        },
         "sources": [
             {
                 "site_id": "docs.aspose.org",
@@ -70,10 +87,18 @@ def test_manifest_rejects_locale_drift(tmp_path):
 def test_ledger_never_accepts_candidate_text(tmp_path):
     ledger = CampaignLedger(tmp_path, "pilot")
     with pytest.raises(ValueError, match="candidate text"):
-        ledger.append_receipt(
-            {"output_path": "page.md", "content": "rejected translation"}
-        )
+        ledger.append_receipt({"output_path": "page.md", "content": "rejected translation"})
     assert not ledger.receipts_path.exists()
+
+
+def test_ledger_deduplicates_identical_receipt_and_rejects_conflict(tmp_path):
+    ledger = CampaignLedger(tmp_path, "pilot")
+    receipt = {"output_path": "page.md", "output_sha256": "a" * 64}
+    ledger.append_receipt(receipt)
+    ledger.append_receipt(receipt)
+    assert len(ledger.receipts_path.read_text(encoding="utf-8").splitlines()) == 1
+    with pytest.raises(ValueError, match="conflicting"):
+        ledger.append_receipt({"output_path": "page.md", "output_sha256": "b" * 64})
 
 
 def test_failure_ledger_contains_metadata_only(tmp_path):
@@ -102,3 +127,179 @@ def test_shards_are_locale_scoped_and_bounded(tmp_path):
     assert all(len(shard["jobs"]) == 1 for shard in shards)
     assert {shard["locale"] for shard in shards} == {"es", "fr"}
     assert all(shard["site_id"] == "docs.aspose.org" for shard in shards)
+
+
+def test_commit_contains_only_receipted_output(tmp_path):
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    subprocess.run(["git", "init", "-b", "pilot"], cwd=repo, check=True)
+    subprocess.run(
+        ["git", "config", "user.email", "campaign@example.invalid"],
+        cwd=repo,
+        check=True,
+    )
+    subprocess.run(
+        ["git", "config", "user.name", "Campaign Test"],
+        cwd=repo,
+        check=True,
+    )
+    marker = repo / "baseline.txt"
+    marker.write_text("baseline", encoding="utf-8")
+    subprocess.run(["git", "add", "baseline.txt"], cwd=repo, check=True)
+    subprocess.run(["git", "commit", "-m", "baseline"], cwd=repo, check=True)
+
+    payload = _manifest(repo)
+    manifest_path = tmp_path / "manifest.yaml"
+    manifest_path.write_text(yaml.safe_dump(payload), encoding="utf-8")
+    manifest = CampaignManifest.load(manifest_path)
+    ledger_root = tmp_path / "ledger"
+    runner = CampaignRunner(
+        manifest=manifest,
+        translation_engine=object(),
+        translator_repo=repo,
+        ledger_root=ledger_root,
+    )
+    relative = "content/docs.aspose.org/es/words/net/page.md"
+    output = repo / relative
+    output.parent.mkdir(parents=True)
+    output.write_text("accepted", encoding="utf-8")
+    runner.ledger.append_receipt(
+        {
+            "output_path": relative,
+            "output_sha256": hashlib.sha256(output.read_bytes()).hexdigest(),
+        }
+    )
+
+    commit_sha = runner._commit_verified_outputs("fixture")
+
+    assert commit_sha
+    changed = subprocess.run(
+        ["git", "show", "--pretty=", "--name-only", "HEAD"],
+        cwd=repo,
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.splitlines()
+    assert changed == [relative]
+
+
+def test_resume_rejects_tampered_receipt_fingerprint(tmp_path):
+    source = tmp_path / "content/docs.aspose.org/en/words/net/page.md"
+    source.parent.mkdir(parents=True)
+    source.write_text("source", encoding="utf-8")
+    payload = _manifest(tmp_path)
+    payload["sources"][0]["source_sha256"] = sha256_file(source)
+    manifest_path = tmp_path / "manifest.yaml"
+    manifest_path.write_text(yaml.safe_dump(payload), encoding="utf-8")
+    manifest = CampaignManifest.load(manifest_path)
+    runner = CampaignRunner(
+        manifest=manifest,
+        translation_engine=object(),
+        translator_repo=tmp_path,
+        ledger_root=tmp_path / "ledger",
+    )
+    output_relative = payload["sources"][0]["outputs"]["es"]
+    output = tmp_path / output_relative
+    output.parent.mkdir(parents=True)
+    output.write_text("accepted", encoding="utf-8")
+    runner.ledger.append_receipt(
+        {
+            "campaign_id": "pilot",
+            "source_path": payload["sources"][0]["source_path"],
+            "output_path": output_relative,
+            "source_sha256": sha256_file(source),
+            "output_sha256": sha256_file(output),
+            "target_lang": "es",
+            "validation_policy": "zero-defect",
+            "config_fingerprint": payload["config_fingerprint"],
+            "model_fingerprint": "fixture",
+            "gate_results": {str(index): {"passed": True} for index in range(1, 45)},
+        }
+    )
+    rows = runner.ledger.receipts_path.read_text(encoding="utf-8").splitlines()
+    tampered = json.loads(rows[0])
+    tampered["model_fingerprint"] = "tampered"
+    runner.ledger.receipts_path.write_text(json.dumps(tampered) + "\n", encoding="utf-8")
+
+    with pytest.raises(CampaignManifestError, match="fingerprint mismatch"):
+        runner._validated_resume_receipts()
+
+
+def test_campaign_uses_three_primary_then_llm_and_logs_metadata_only(tmp_path, monkeypatch):
+    source = tmp_path / "content/docs.aspose.org/en/words/net/page.md"
+    source.parent.mkdir(parents=True)
+    source.write_text("source", encoding="utf-8")
+    payload = _manifest(tmp_path)
+    payload["target_locales"] = ["es"]
+    payload["expected_output_count"] = 1
+    payload["sources"][0]["outputs"] = {"es": payload["sources"][0]["outputs"]["es"]}
+    payload["sources"][0]["source_sha256"] = sha256_file(source)
+    manifest_path = tmp_path / "manifest.yaml"
+    manifest_path.write_text(yaml.safe_dump(payload), encoding="utf-8")
+    manifest = CampaignManifest.load(manifest_path)
+    output_relative = payload["sources"][0]["outputs"]["es"]
+    output = tmp_path / output_relative
+
+    class Engine:
+        def __init__(self):
+            self.campaign_context = {}
+            self.calls = []
+            self.config = SimpleNamespace(get_site_profile=lambda _site: SimpleNamespace())
+
+        def _get_output_path(self, *_args):
+            return output
+
+        def translate_file(self, *_args, **_kwargs):
+            escalated = str(output.resolve()) in self._rtq_llm_output_paths
+            self.calls.append(escalated)
+            if len(self.calls) < 4:
+                return SimpleNamespace(
+                    success=False,
+                    acceptance_receipts={},
+                    errors=["SECRET REJECTED CANDIDATE TEXT"],
+                    retry_attempts=0,
+                )
+            output.parent.mkdir(parents=True, exist_ok=True)
+            output.write_text("accepted", encoding="utf-8")
+            receipt = {
+                "campaign_id": "pilot",
+                "source_path": str(source.resolve()),
+                "output_path": str(output.resolve()),
+                "source_sha256": sha256_file(source),
+                "output_sha256": sha256_file(output),
+                "target_lang": "es",
+                "validation_policy": "zero-defect",
+                "config_fingerprint": payload["config_fingerprint"],
+                "model_fingerprint": "professionalize_llm",
+                "gate_results": {index: {"passed": True} for index in range(1, 45)},
+            }
+            self.campaign_context["receipt_sink"](receipt)
+            return SimpleNamespace(
+                success=True,
+                acceptance_receipts={"es": receipt},
+                errors=[],
+                retry_attempts=0,
+            )
+
+    engine = Engine()
+    runner = CampaignRunner(
+        manifest=manifest,
+        translation_engine=engine,
+        translator_repo=tmp_path,
+        ledger_root=tmp_path / "ledger",
+    )
+    monkeypatch.setattr(
+        runner,
+        "verify",
+        lambda **_kwargs: {**manifest.to_summary(), "accepted": 0, "remaining": 1},
+    )
+    monkeypatch.setattr(runner, "_commit_verified_outputs", lambda _shard: None)
+
+    summary = runner.run()
+
+    assert summary["status"] == "COMPLETE"
+    assert engine.calls == [False, False, False, True]
+    failure_log = runner.ledger.failures_path.read_text(encoding="utf-8")
+    assert failure_log.count("\n") == 3
+    assert "SECRET REJECTED CANDIDATE TEXT" not in failure_log
+    assert "translation_rejected" in failure_log
