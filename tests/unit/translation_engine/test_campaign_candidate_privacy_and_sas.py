@@ -4,6 +4,7 @@ from src.translation_engine.reconstructor.yaml_formatter import YAMLFormatter
 from src.translation_engine.segment_translator import (
     _allow_legacy_ast_fallback,
     _effective_same_as_source_tolerance,
+    _is_reviewed_identical_translation,
     _same_as_source_fingerprints,
     _unapplied_frontmatter_keys,
 )
@@ -21,6 +22,13 @@ def test_zero_defect_same_as_source_tolerance_is_always_zero():
 def test_zero_defect_prohibits_legacy_ast_fallback():
     assert _allow_legacy_ast_fallback("zero-defect") is False
     assert _allow_legacy_ast_fallback("standard") is True
+
+
+def test_reviewed_identical_translation_is_locale_scoped():
+    assert _is_reviewed_identical_translation("Introduction", "fr")
+    assert _is_reviewed_identical_translation(" INTRODUCTION ", "fr")
+    assert not _is_reviewed_identical_translation("Introduction", "es")
+    assert not _is_reviewed_identical_translation("Getting Started", "fr")
 
 
 def test_same_as_source_diagnostics_are_hashes_not_payloads():

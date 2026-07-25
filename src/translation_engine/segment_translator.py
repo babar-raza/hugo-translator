@@ -44,6 +44,21 @@ def _allow_legacy_ast_fallback(validation_policy: str) -> bool:
     return validation_policy != "zero-defect"
 
 
+_REVIEWED_IDENTICAL_TRANSLATIONS: dict[str, frozenset[str]] = {
+    # "Introduction" is spelled identically in English and French.  This is
+    # an exact reviewed equivalence, not an untranslated-unit tolerance.
+    "fr": frozenset({"introduction"}),
+}
+
+
+def _is_reviewed_identical_translation(source_text: str, target_lang: str) -> bool:
+    """Return whether an exact same-as-source value is valid for this locale."""
+    normalized = re.sub(r"\s+", " ", source_text).strip().casefold()
+    return normalized in _REVIEWED_IDENTICAL_TRANSLATIONS.get(
+        target_lang.lower(), frozenset()
+    )
+
+
 def _same_as_source_fingerprints(units: list) -> str:
     """Return candidate-free source-unit metadata for autonomous diagnosis."""
     return ",".join(
@@ -1704,6 +1719,9 @@ class SegmentTranslator:
                 and u.translated_text is not None
                 and u.translated_text.strip() == u.source_text.strip()
                 and len(u.source_text.strip()) > _sas_min_len
+                and not _is_reviewed_identical_translation(
+                    u.source_text, target_lang
+                )
                 # TC-TBL-012 / Layer 2: Exclude table cells from SAS ratio.
                 # A table cell the model fails to translate stays as English text —
                 # bad for quality but handled by Gate 15 / purity check. Counting
