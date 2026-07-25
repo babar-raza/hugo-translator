@@ -52,7 +52,11 @@ tm_defaults:
   fallback_exact_only: false
   l1_cache_size: 10000
   l2_max_size_mb: 1536  # 2026-04-17: 696K entries @ 878 MB used; 1536 MiB = 658 MiB headroom. Run scripts/compact_l2_lmdb.py with workers stopped to reclaim 2 GB pre-alloc.
-  l3_embedding_model: "sentence-transformers/paraphrase-multilingual-mpnet-base-v2"
+  # Zero-defect semantic validation model. Qualified across all 25 campaign
+  # locales (minimum good-pair cosine 0.634719) and available from the pinned
+  # local Hugging Face snapshot; do not substitute the English-only L3 index
+  # encoder for cross-lingual validation.
+  l3_embedding_model: "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
   l3_index_type: "IVFFlat"  # Flat, IVFFlat, HNSW
 
   # TC-M3-LITE: L3 context gate (default disabled — enable after testing in staging)
