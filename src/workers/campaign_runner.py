@@ -509,6 +509,17 @@ class CampaignRunner:
                     continue
                 rendered = f"{value:.6g}" if isinstance(value, float) else str(value)
                 numeric_parts.append(f"{key}={rendered}")
+            payload_value = None
+            for key in ("ngram", "word", "sentence", "heading"):
+                value = details.get(key)
+                if isinstance(value, str) and value:
+                    payload_value = value
+                    break
+            payload_hash = (
+                hashlib.sha256(payload_value.encode("utf-8")).hexdigest()[:16]
+                if payload_value is not None
+                else "none"
+            )
             issue_fingerprints.append(
                 ":".join(
                     [
@@ -516,6 +527,7 @@ class CampaignRunner:
                         severity,
                         issue_kind,
                         location_hash,
+                        f"payload_sha256={payload_hash}",
                         *(numeric_parts or ["numeric=none"]),
                     ]
                 )

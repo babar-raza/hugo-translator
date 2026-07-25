@@ -168,6 +168,7 @@ def test_failure_metadata_records_payload_free_repetition_fingerprint():
     assert "count=4" in reason
     assert "threshold=0.2" in reason
     assert "frequency=0.235294" in reason
+    assert "payload_sha256=" in reason
     assert "SECRET" not in reason
 
 
