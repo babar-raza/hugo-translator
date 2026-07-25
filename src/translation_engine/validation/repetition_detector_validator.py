@@ -27,6 +27,7 @@ Example:
 """
 
 import re
+import unicodedata
 from collections import Counter
 from pathlib import Path
 from typing import Any
@@ -571,10 +572,19 @@ class RepetitionDetectorValidator(PostTranslationValidator):
         Returns:
             List of normalized words (lowercase)
         """
-        # Remove punctuation and split on whitespace
-        # Keep only alphanumeric and basic punctuation
-        words = re.findall(r'\b[\w]+\b', text.lower())
-        return words
+        # Python's ``\w`` excludes Unicode combining marks.  That fragments
+        # Indic words (for example, Devanagari vowel signs and viramas) into
+        # tiny pseudo-words and creates false repeated n-grams.  Keep Unicode
+        # letters, marks, and numbers in the same token; punctuation and
+        # symbols remain separators as before.
+        normalized: list[str] = []
+        for character in text.casefold():
+            category = unicodedata.category(character)
+            if character == "_" or category[0] in {"L", "M", "N"}:
+                normalized.append(character)
+            else:
+                normalized.append(" ")
+        return "".join(normalized).split()
 
     def _split_sentences(self, text: str) -> list[str]:
         """Split text into sentences.

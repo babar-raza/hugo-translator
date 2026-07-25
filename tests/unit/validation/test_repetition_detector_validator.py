@@ -451,6 +451,35 @@ class TestRepetitionDetectorValidator:
         assert result.success
         assert result.error_count == 0
 
+    def test_unicode_combining_marks_remain_inside_indic_words(self):
+        validator = RepetitionDetectorValidator()
+
+        assert validator._tokenize(
+            "स्प्रेडशीट प्रबंधन में"
+        ) == ["स्प्रेडशीट", "प्रबंधन", "में"]
+        assert validator._tokenize(
+            "करने के लिए"
+        ) == ["करने", "के", "लिए"]
+
+    def test_real_hindi_phrase_repetition_is_still_detected(self):
+        validator = RepetitionDetectorValidator(
+            config={
+                "ngram_threshold": 5,
+                "ngram_warning_threshold": 4,
+            }
+        )
+        translation = " ".join(
+            ["स्प्रेडशीट प्रबंधन के लिए"] * 8
+        )
+
+        result = validator.validate(source="", translation=translation)
+
+        assert result.error_count > 0
+        assert any(
+            issue.details.get("ngram") == "स्प्रेडशीट प्रबंधन के"
+            for issue in result.issues
+        )
+
 
 class TestSourceRelativeBaseline:
     """Tests for source-relative repetition thresholds (TC-01 regression suite).
