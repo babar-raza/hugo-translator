@@ -2,7 +2,9 @@ import logging
 
 from src.translation_engine.reconstructor.yaml_formatter import YAMLFormatter
 from src.translation_engine.segment_translator import (
+    _allow_legacy_ast_fallback,
     _effective_same_as_source_tolerance,
+    _same_as_source_fingerprints,
     _unapplied_frontmatter_keys,
 )
 from src.workers.autonomous_content_translation_worker import (
@@ -14,6 +16,25 @@ def test_zero_defect_same_as_source_tolerance_is_always_zero():
     assert _effective_same_as_source_tolerance(0.10, "zero-defect") == 0.0
     assert _effective_same_as_source_tolerance(0.03, "zero-defect") == 0.0
     assert _effective_same_as_source_tolerance(0.10, "standard") == 0.10
+
+
+def test_zero_defect_prohibits_legacy_ast_fallback():
+    assert _allow_legacy_ast_fallback("zero-defect") is False
+    assert _allow_legacy_ast_fallback("standard") is True
+
+
+def test_same_as_source_diagnostics_are_hashes_not_payloads():
+    unit = type(
+        "Unit",
+        (),
+        {"kind": "link_text", "source_text": "SECRET SOURCE UNIT"},
+    )()
+
+    metadata = _same_as_source_fingerprints([unit])
+
+    assert metadata.startswith("link_text:")
+    assert metadata.endswith(":18")
+    assert "SECRET" not in metadata
 
 
 def test_duplicate_frontmatter_segments_accept_the_rendered_authoritative_value():

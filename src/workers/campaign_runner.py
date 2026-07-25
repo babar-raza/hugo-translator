@@ -461,6 +461,11 @@ class CampaignRunner:
         )
         score_match = re.search(r"\bscore=(\d+(?:\.\d+)?)\b", raw_error)
         verdict_match = re.search(r"\b(fail|warn|pass)\b", raw_error, re.IGNORECASE)
+        unit_fingerprints = re.search(
+            r"\bunit_fingerprints=([a-z0-9_:,-]+)\b",
+            raw_error,
+            re.IGNORECASE,
+        )
         gate = validators[0] if validators else (safe_codes[0] if safe_codes else "pipeline")
         validator_text = ",".join(validators) if validators else "unknown"
         reason = (
@@ -469,6 +474,8 @@ class CampaignRunner:
             f"codes={','.join(safe_codes) if safe_codes else 'unknown'}; "
             f"verdict={verdict_match.group(1).lower() if verdict_match else 'unknown'}; "
             f"score={score_match.group(1) if score_match else 'unknown'}; "
+            f"unit_fingerprints="
+            f"{unit_fingerprints.group(1) if unit_fingerprints else 'none'}; "
             f"error_sha256={hashlib.sha256(raw_error.encode('utf-8')).hexdigest()}"
         )
         return gate, reason

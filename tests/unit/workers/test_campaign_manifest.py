@@ -365,3 +365,20 @@ def test_failure_metadata_extracts_safe_gate_score_without_candidate_text():
     assert "verdict=fail" in reason
     assert "score=0.40" in reason
     assert "SECRET" not in reason
+
+
+def test_failure_metadata_preserves_only_safe_sas_unit_fingerprints():
+    result = SimpleNamespace(
+        errors=[],
+        retry_attempts=0,
+        validation_result=None,
+        error=(
+            "TC-SAS-01: same-as-source; "
+            "unit_fingerprints=link_text:0123456789abcdef:13"
+        ),
+    )
+
+    gate, reason = CampaignRunner._failure_metadata(result)
+
+    assert gate == "TC-SAS-01"
+    assert "unit_fingerprints=link_text:0123456789abcdef:13" in reason

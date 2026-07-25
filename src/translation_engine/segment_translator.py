@@ -11,6 +11,7 @@ The translator receives an engine reference for accessing shared state
 
 from __future__ import annotations
 
+import hashlib
 import logging
 import math
 import re
@@ -36,6 +37,23 @@ def _effective_same_as_source_tolerance(
 ) -> float:
     """Campaign acceptance has no ratio-based untranslated-unit allowance."""
     return 0.0 if validation_policy == "zero-defect" else configured_tolerance
+
+
+def _allow_legacy_ast_fallback(validation_policy: str) -> bool:
+    """Managed zero-defect campaigns never leave the authoritative AST path."""
+    return validation_policy != "zero-defect"
+
+
+def _same_as_source_fingerprints(units: list) -> str:
+    """Return candidate-free source-unit metadata for autonomous diagnosis."""
+    return ",".join(
+        (
+            f"{getattr(getattr(unit, 'kind', ''), 'value', getattr(unit, 'kind', ''))}:"
+            f"{hashlib.sha256((unit.source_text or '').encode('utf-8')).hexdigest()[:16]}:"
+            f"{len(unit.source_text or '')}"
+        )
+        for unit in units
+    )
 
 
 def _unapplied_frontmatter_keys(
@@ -1287,6 +1305,15 @@ class SegmentTranslator:
             except TranslationRetryableError:
                 raise
             except Exception as e:
+                if not _allow_legacy_ast_fallback(
+                    getattr(engine, "validation_policy", "standard")
+                ):
+                    logger.error(
+                        "AST reconstruction failed under zero-defect policy; "
+                        "legacy fallback is prohibited",
+                        exc_info=True,
+                    )
+                    raise
                 if ast_body_rendered:
                     logger.error(
                         "AST reconstruction failed after body rendering; refusing legacy fallback "
@@ -1722,7 +1749,8 @@ class SegmentTranslator:
 
                         raise TranslationIncomplete(
                             f"TC-SAS-01: same-as-source ratio {_sas_ratio:.1%} exceeds tolerance "
-                            f"{_sas_tolerance:.1%} ({len(_sas_units)}/{_translatable_count} units unchanged)",
+                            f"{_sas_tolerance:.1%} ({len(_sas_units)}/{_translatable_count} units unchanged); "
+                            f"unit_fingerprints={_same_as_source_fingerprints(_sas_units)}",
                             missing_count=len(_sas_units),
                             total_count=_translatable_count,
                             ratio=_sas_ratio,
