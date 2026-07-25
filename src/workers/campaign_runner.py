@@ -514,6 +514,9 @@ class CampaignRunner:
                 "frequency",
                 "source_word_freq_ceiling",
                 "confidence",
+                "letter_count",
+                "latin_letter_ratio",
+                "target_script_ratio",
             ):
                 value = details.get(key)
                 if isinstance(value, bool) or not isinstance(value, (int, float)):

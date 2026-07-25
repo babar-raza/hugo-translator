@@ -15,6 +15,7 @@ import hashlib
 import os
 import re
 import time
+import unicodedata
 from pathlib import Path
 from typing import Any, Optional
 
@@ -57,6 +58,52 @@ from .validation.base import ValidationSeverity as _ValSeverity
 from .validation.decision_engine import ValidationDecisionEngine
 
 logger = logging.getLogger(__name__)
+
+
+_TARGET_SCRIPT_RANGES: dict[str, tuple[tuple[int, int], ...]] = {
+    "ar": ((0x0600, 0x06FF),),
+    "fa": ((0x0600, 0x06FF),),
+    "el": ((0x0370, 0x03FF),),
+    "he": ((0x0590, 0x05FF),),
+    "hi": ((0x0900, 0x097F),),
+    "ja": ((0x3040, 0x30FF), (0x3400, 0x9FFF)),
+    "ko": ((0x1100, 0x11FF), (0xAC00, 0xD7AF)),
+    "ru": ((0x0400, 0x052F),),
+    "th": ((0x0E00, 0x0E7F),),
+    "uk": ((0x0400, 0x052F),),
+    "zh": ((0x3400, 0x9FFF),),
+}
+
+
+def _frontmatter_script_metrics(text: str, target_lang: str) -> dict[str, int | float]:
+    """Return payload-free script ratios for frontmatter diagnostics."""
+    letters = [character for character in text if character.isalpha()]
+    letter_count = len(letters)
+    if not letter_count:
+        return {
+            "letter_count": 0,
+            "latin_letter_ratio": 0.0,
+            "target_script_ratio": 0.0,
+        }
+    latin_count = sum(
+        1
+        for character in letters
+        if "LATIN" in unicodedata.name(character, "")
+    )
+    ranges = _TARGET_SCRIPT_RANGES.get(target_lang, ())
+    if ranges:
+        target_count = sum(
+            1
+            for character in letters
+            if any(start <= ord(character) <= end for start, end in ranges)
+        )
+    else:
+        target_count = latin_count
+    return {
+        "letter_count": letter_count,
+        "latin_letter_ratio": latin_count / letter_count,
+        "target_script_ratio": target_count / letter_count,
+    }
 
 
 # _ALL_LANGUAGE_CODES and _is_translated_filename are re-exported (see imports
@@ -1759,6 +1806,9 @@ class TranslationEngine:
                                     "detected_lang": top.lang,
                                     "confidence": top.prob,
                                     "expected_lang": target_lang,
+                                    **_frontmatter_script_metrics(
+                                        v_stripped, target_lang
+                                    ),
                                 },
                             )
                         )

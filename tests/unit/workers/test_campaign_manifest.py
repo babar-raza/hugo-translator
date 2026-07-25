@@ -183,6 +183,9 @@ def test_failure_metadata_records_payload_free_frontmatter_language_fingerprint(
             "detected_lang": "en",
             "expected_lang": "hi",
             "confidence": 0.999,
+            "letter_count": 100,
+            "latin_letter_ratio": 0.82,
+            "target_script_ratio": 0.18,
             "preview": "SECRET",
         },
     )
@@ -201,6 +204,9 @@ def test_failure_metadata_records_payload_free_frontmatter_language_fingerprint(
     assert "detected_lang=en" in reason
     assert "expected_lang=hi" in reason
     assert "confidence=0.999" in reason
+    assert "letter_count=100" in reason
+    assert "latin_letter_ratio=0.82" in reason
+    assert "target_script_ratio=0.18" in reason
     assert "SECRET" not in reason
 
 
