@@ -20,7 +20,7 @@ Usage:
   python scripts/quality/heal_english_headings.py --scan --locales zh,ru,uk,hi --sites all
   python scripts/quality/heal_english_headings.py --build-queue --locales zh,ru,uk --sites all
   python scripts/quality/heal_english_headings.py --retranslate --model nllb_200_1.3b \\
-      --locales ar,bg,el,ja,ko,th,uk,zh --sites all
+      --locales ar,el,ja,ko,th,uk,zh --sites all
   python scripts/quality/heal_english_headings.py --retranslate --model m2m100_418m \\
       --locales fa,he,hi,ru --sites all
 """
@@ -49,6 +49,12 @@ for _p in (str(_REPO_ROOT / "src"), str(_REPO_ROOT)):
 from src.translation_engine.terminology.classification import (  # noqa: E402
     TemplateStringRegistry,
 )
+from src.utils.config_loader import ConfigService  # noqa: E402
+from src.utils.locale_policy import (  # noqa: E402
+    LocalePolicyViolation,
+    filter_to_allowed_locales,
+    validate_requested_locales,
+)
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -56,6 +62,24 @@ from src.translation_engine.terminology.classification import (  # noqa: E402
 
 ALL_SITES = ["reference.aspose.org", "docs.aspose.org", "kb.aspose.org"]
 EN_LOCALE = "en"
+
+_config_service: ConfigService | None = None
+
+
+def _get_site_profile(site_id: str):
+    """Fetch the live SiteProfile for site_id (None if not loadable).
+
+    Locale-allowlist enforcement (filter_to_allowed_locales /
+    validate_requested_locales) is driven entirely by whatever this
+    profile declares -- no site-specific logic lives in this script.
+    """
+    global _config_service
+    if _config_service is None:
+        _config_service = ConfigService(str(_REPO_ROOT / "config"))
+    try:
+        return _config_service.get_site_profile(site_id)
+    except Exception:
+        return None
 
 
 def _registry_terms_by_category(category: str) -> frozenset[str]:
@@ -238,8 +262,9 @@ def run_scan(sites: list[str], locales: list[str], categories: set[str], max_fil
         print(f"\nSite: {site}")
         counts: dict[str, dict[str, int]] = defaultdict(lambda: defaultdict(int))
 
-        site_locales = locales if locales else sorted(
-            d.name for d in site_root.iterdir() if d.is_dir() and d.name != EN_LOCALE
+        site_locales = locales if locales else filter_to_allowed_locales(
+            _get_site_profile(site),
+            sorted(d.name for d in site_root.iterdir() if d.is_dir() and d.name != EN_LOCALE),
         )
 
         for locale in site_locales:
@@ -295,8 +320,9 @@ def run_build_queue(sites: list[str], locales: list[str], categories: set[str],
                 continue
             en_root = site_root / EN_LOCALE
 
-            site_locales = locales if locales else sorted(
-                d.name for d in site_root.iterdir() if d.is_dir() and d.name != EN_LOCALE
+            site_locales = locales if locales else filter_to_allowed_locales(
+                _get_site_profile(site),
+                sorted(d.name for d in site_root.iterdir() if d.is_dir() and d.name != EN_LOCALE),
             )
 
             print(f"\nSite: {site}")
@@ -518,6 +544,14 @@ def main() -> None:
     locales = [loc.strip() for loc in args.locales.split(",") if loc.strip()] if args.locales else []
     categories = {c.strip() for c in args.categories.split(",") if c.strip()}
     queue_path = Path(args.queue_file)
+
+    if locales:
+        for site in sites:
+            try:
+                validate_requested_locales(_get_site_profile(site), locales)
+            except LocalePolicyViolation as e:
+                print(f"ERROR: {e}", file=sys.stderr)
+                sys.exit(1)
 
     print(f"Sites: {sites}")
     print(f"Locales: {locales or '(all)'}")

@@ -23,7 +23,7 @@ Usage:
   python scripts/quality/delete_for_retranslate.py --apply --sites all
   python scripts/quality/delete_for_retranslate.py --apply --sites docs.aspose.org
   python scripts/quality/delete_for_retranslate.py --apply --issue-type shortcode_leak
-  python scripts/quality/delete_for_retranslate.py --apply --locales ar,bg,ru
+  python scripts/quality/delete_for_retranslate.py --apply --locales ar,ru
   python scripts/quality/delete_for_retranslate.py --apply --max-files 1000
 """
 from __future__ import annotations
@@ -41,6 +41,31 @@ sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 # of invocation mode (direct script run vs. pytest package import).
 if str(Path(__file__).resolve().parent) not in sys.path:
     sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+_REPO_ROOT = Path(__file__).resolve().parent.parent.parent
+for _p in (str(_REPO_ROOT / "src"), str(_REPO_ROOT)):
+    if _p not in sys.path:
+        sys.path.insert(0, _p)
+
+from src.utils.config_loader import ConfigService  # noqa: E402
+from src.utils.locale_policy import (  # noqa: E402
+    LocalePolicyViolation,
+    filter_to_allowed_locales,
+    validate_requested_locales,
+)
+
+_config_service: ConfigService | None = None
+
+
+def _get_site_profile(site_id: str):
+    """Fetch the live SiteProfile for site_id (None if not loadable)."""
+    global _config_service
+    if _config_service is None:
+        _config_service = ConfigService(str(_REPO_ROOT / "config"))
+    try:
+        return _config_service.get_site_profile(site_id)
+    except Exception:
+        return None
 
 # ---------------------------------------------------------------------------
 # Configuration
@@ -380,6 +405,11 @@ def run(
             if d.is_dir() and d.name != EN_LOCALE
             and (not only_locales or d.name in only_locales)
         )
+        if not only_locales:
+            # Auto-discovery must never pick up a locale retired from this
+            # site's active profile, even if its directory still exists on
+            # disk (existing translated content is preserved, not deleted).
+            locales = filter_to_allowed_locales(_get_site_profile(site_id), locales)
 
         print(f"Site: {site_id}  ({len(locales)} locales)")
 
@@ -477,6 +507,18 @@ def main() -> None:
         sites = ALL_SITES
     else:
         sites = [s.strip() for s in args.sites.split(",")]
+
+    if only_locales:
+        # For strict_locale_allowlist sites, deleting content in a locale
+        # outside target_langs is never permitted, even if explicitly
+        # requested — must fail loudly, not silently no-op. No-op for
+        # non-strict sites.
+        for site_id in sites:
+            try:
+                validate_requested_locales(_get_site_profile(site_id), only_locales)
+            except LocalePolicyViolation as e:
+                print(f"ERROR: {e}", file=sys.stderr)
+                sys.exit(1)
 
     stats = run(
         content_root=content_root,

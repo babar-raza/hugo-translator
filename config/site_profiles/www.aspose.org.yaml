@@ -9,41 +9,31 @@ content_roots:
 default_source_lang: en
 target_langs:
 - ar
-- bg
-- ca
 - cs
-- da
 - de
 - el
 - es
 - fa
-- fi
 - fr
 - he
 - hi
-- hr
 - hu
 - id
 - it
 - ja
 - ko
-- lt
-- lv
-- ms
 - nl
-- "no"
 - pl
 - pt
 - ro
 - ru
-- sk
-- sr
 - sv
 - th
 - tr
 - uk
 - vi
 - zh
+strict_locale_allowlist: true
 
 frontmatter:
   title:

@@ -7,41 +7,31 @@ content_roots:
 default_source_lang: en
 target_langs:
   - ar
-  - bg
-  - ca
   - cs
-  - da
   - de
   - el
   - es
   - fa
-  - fi
   - fr
   - he
   - hi
-  - hr
   - hu
   - id
   - it
   - ja
   - ko
-  - lt
-  - lv
-  - ms
   - nl
-  - "no"
   - pl
   - pt
   - ro
   - ru
-  - sk
-  - sr
   - sv
   - th
   - tr
   - uk
   - vi
   - zh
+strict_locale_allowlist: true
 
 frontmatter:
   title:
@@ -82,6 +72,27 @@ body:
   - link
   preserve_patterns:
   - ^\{\{<.*>\}\}
+  # HT-QUALITY-GATES-001 Part 22 (plan 5.3, closes 2.1.C's cited gap): this
+  # site had NO markdown-link preserve_pattern at all (exposure specifically
+  # in the legacy/non-AST reconstruction fallback path). Placed early,
+  # ahead of the identifier patterns below, so it claims the WHOLE
+  # [text](url) span atomically -- this is the exact ordering lesson from
+  # Part 1.1's brace-leak root cause: if a later-running identifier pattern
+  # (e.g. bare PascalCase) partially matches a class name embedded inside
+  # the URL portion BEFORE this pattern runs, the result is a placeholder
+  # nested inside another placeholder's stored value, which restore()'s
+  # single sequential pass cannot unwind correctly -- placed first, that
+  # nesting can never occur.
+  - '\[([^\]]+)\]\(([^)]+)\)'
+  # HT-QUALITY-GATES-001 Part 22 (plan 5.3, incremental scope): protect
+  # hyphenated/slashed format & standard codes (UPC-E, EAN-13, PDF/A,
+  # ISO-8859-1, UTF-8, AES-256) embedded in prose -- confirmed real
+  # corruption: "UPC-E" became "U PC-E" mid-sentence because nothing
+  # protected it before MT. Requiring a hyphen/slash suffix (not just bare
+  # ALL-CAPS) keeps this from matching stylistic ALL-CAPS emphasis words.
+  # Placed early for the same nesting-avoidance reason as the link pattern
+  # above.
+  - \b[A-Z]{2,}(?:[-/][A-Z0-9]+)+\b
   # Aspose product names: Aspose.3D, Aspose.Words, Aspose.Cells.Python via .NET, etc.
   # plus bare standalone "Aspose" (the dot-required version alone never
   # matched this, consistent with the same gap found+fixed on kb.aspose.org).

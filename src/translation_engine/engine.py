@@ -37,6 +37,7 @@ from ..utils.content_discovery import ALL_LANGUAGE_CODES as _ALL_LANGUAGE_CODES
 from ..utils.content_discovery import is_translated_filename as _is_translated_filename
 from ..utils.content_discovery import resolve_translated_path as _resolve_translated_path
 from ..utils.file_lock import FileLock
+from ..utils.locale_policy import LocalePolicyViolation, validate_requested_locales
 from ..utils.metadata_tracker import MetadataTracker
 from ..utils.metrics import calc_stats
 from .exceptions import TranslationRejectedError
@@ -884,6 +885,16 @@ class TranslationEngine:
             site_profile = self.config.get_site_profile(site_id)
             if not site_profile:
                 result.errors.append(f"Site profile not found: {site_id}")
+                return result
+
+            # Locale allowlist policy: for sites with strict_locale_allowlist
+            # set, reject any target locale outside target_langs, regardless
+            # of caller (CLI, quality scripts, orchestrator jobs) — this is
+            # the last-line safety net. No-op for non-strict sites.
+            try:
+                validate_requested_locales(site_profile, target_langs)
+            except LocalePolicyViolation as e:
+                result.errors.append(str(e))
                 return result
 
             source_lang = site_profile.default_source_lang

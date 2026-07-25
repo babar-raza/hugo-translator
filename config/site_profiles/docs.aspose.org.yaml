@@ -7,41 +7,31 @@ content_roots:
 default_source_lang: en
 target_langs:
   - ar
-  - bg
-  - ca
   - cs
-  - da
   - de
   - el
   - es
   - fa
-  - fi
   - fr
   - he
   - hi
-  - hr
   - hu
   - id
   - it
   - ja
   - ko
-  - lt
-  - lv
-  - ms
   - nl
-  - "no"
   - pl
   - pt
   - ro
   - ru
-  - sk
-  - sr
   - sv
   - th
   - tr
   - uk
   - vi
   - zh
+strict_locale_allowlist: true
 
 frontmatter:
   title:
@@ -85,6 +75,13 @@ body:
   # bare "Aspose", etc.) from being translated/corrupted -- was previously
   # missing entirely on this site (unlike kb/reference/blog profiles).
   - \bAspose(?:\.[A-Za-z0-9][A-Za-z0-9.]*)?\b
+  # HT-QUALITY-GATES-001 Part 22 (plan 5.3, incremental scope): protect
+  # hyphenated/slashed format & standard codes (UPC-E, EAN-13, PDF/A,
+  # ISO-8859-1, UTF-8, AES-256) embedded in prose -- confirmed real
+  # corruption: "UPC-E" became "U PC-E" mid-sentence because nothing
+  # protected it before MT. Requiring a hyphen/slash suffix (not just bare
+  # ALL-CAPS) keeps this from matching stylistic ALL-CAPS emphasis words.
+  - \b[A-Z]{2,}(?:[-/][A-Z0-9]+)+\b
   placeholder_syntax:
   - \{\{<.*?>\}\}
   - \{\{%.*?%\}\}

@@ -17,14 +17,30 @@ ROOT = Path(__file__).resolve().parents[2]
 GOVERNED_RUNNER = ROOT / "scripts" / "quality" / "aspose_org_governed_retranslate.py"
 DEFAULT_CONTENT = Path(r"C:\Users\prora\OneDrive\Documents\GitHub\aspose.org\content")
 SITES = ["kb.aspose.org", "blog.aspose.org", "docs.aspose.org", "reference.aspose.org"]
-LOCALE_SHARDS = [
-    ("latin-a", "ar,bg,ca,cs,da,de"),
-    ("latin-b", "el,es,fa,fi,fr,he"),
-    ("latin-c", "hi,hr,hu,id,it,ja"),
-    ("latin-d", "ko,lt,lv,ms,nl,no"),
-    ("latin-e", "pl,pt,ro,ru,sk,sr"),
-    ("latin-f", "sv,th,tr,uk,vi,zh"),
-]
+_N_LOCALE_SHARDS = 6
+
+
+def compute_locale_shards(site_id: str, n_shards: int = _N_LOCALE_SHARDS) -> list[tuple[str, str]]:
+    """Partition site_id's live target_langs into n_shards work-distribution
+    groups, computed fresh from its site profile every call. Shard names
+    stay stable ("latin-a".."latin-f") since checkpoint files are keyed by
+    shard_id, but membership auto-adapts whenever target_langs changes --
+    no code edit required for a locale-set change to take effect here.
+    """
+    from src.utils.config_loader import ConfigService
+
+    config_service = ConfigService(str(ROOT / "config"))
+    profile = config_service.get_site_profile(site_id)
+    locales = sorted(profile.target_langs)
+    shard_names = [f"latin-{chr(ord('a') + i)}" for i in range(n_shards)]
+    shards = [locales[i::n_shards] for i in range(n_shards)]
+    return [
+        (name, ",".join(group))
+        for name, group in zip(shard_names, shards)
+        if group
+    ]
+
+
 HUGO_CONFIGS = {
     "kb.aspose.org": "configs/kb.aspose.org.toml",
     "blog.aspose.org": "configs/blog.aspose.org.yml",
@@ -425,15 +441,16 @@ def main() -> int:
         else:
             stagnant = 0
             last_counts = (summary.get("accepted_pairs"), summary.get("failed_pairs"))
+            locale_shards = compute_locale_shards(site)
             shard_model_batches = {
-                shard_id: selected_model_batch_size for shard_id, _locales in LOCALE_SHARDS
+                shard_id: selected_model_batch_size for shard_id, _locales in locale_shards
             }
             for cycle in range(1, args.max_cycles + 1):
                 cycle_started = time.monotonic()
                 before_summary = site_summary(args.run_id, site)
                 if args.shard_locales:
                     cycle_results = []
-                    for shard_id, locales in LOCALE_SHARDS:
+                    for shard_id, locales in locale_shards:
                         shard_batch = shard_model_batches.get(shard_id, selected_model_batch_size)
                         shard_summary_path = (
                             ROOT / ".local" / "evidences" / site / args.run_id / "final" / f"summary.{shard_id}.json"
@@ -589,7 +606,7 @@ def main() -> int:
 
         if args.shard_locales:
             reverify_results = []
-            for shard_id, locales in LOCALE_SHARDS:
+            for shard_id, locales in compute_locale_shards(site):
                 reverify_cmd = base + [
                     "--resume",
                     "--reverify-accepted",

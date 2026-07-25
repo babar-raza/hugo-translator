@@ -7,41 +7,31 @@ content_roots:
 default_source_lang: en
 target_langs:
   - ar
-  - bg
-  - ca
   - cs
-  - da
   - de
   - el
   - es
   - fa
-  - fi
   - fr
   - he
   - hi
-  - hr
   - hu
   - id
   - it
   - ja
   - ko
-  - lt
-  - lv
-  - ms
   - nl
-  - "no"
   - pl
   - pt
   - ro
   - ru
-  - sk
-  - sr
   - sv
   - th
   - tr
   - uk
   - vi
   - zh
+strict_locale_allowlist: true
 
 
 frontmatter:
@@ -116,7 +106,23 @@ body:
   preserve_patterns:
   - ^\{\{<.*?>\}\}
   - ^\{\{%.*?%\}\}
-  - '`[^`]+`'
+  # HT-QUALITY-GATES-001 Part 22 (plan 5.3, closes 2.1.C's cited gap): this
+  # site had NO markdown-link preserve_pattern at all (exposure specifically
+  # in the legacy/non-AST reconstruction fallback path). Placed here, ahead
+  # of every other content pattern below (backtick spans, brand names,
+  # acronyms), so it claims the WHOLE [text](url) span atomically -- the
+  # exact ordering lesson from Part 1.1's brace-leak root cause: if a
+  # later-running pattern partially matches content INSIDE the link's text
+  # or URL before this one runs, the result is a placeholder nested inside
+  # another placeholder's stored value, which restore()'s single sequential
+  # pass cannot unwind correctly. Placed first, that nesting can never occur.
+  - '\[([^\]]+)\]\(([^)]+)\)'
+  # HT-INLINE-CODE-001 TC-ICR-003: the inline-code backtick pattern
+  # previously staged here only is retired in favor of the shared
+  # config/global.yaml body.preserve_patterns baseline (TC-ICR-002),
+  # tightened there to exclude newlines -- see that file's comment for why
+  # a per-site-only copy of this exact pattern was the root cause of 4 of
+  # 5 sites missing it entirely.
   # Protect Aspose product names (Aspose.Email, Aspose.3D, Aspose.Cells, etc.)
   # and bare standalone "Aspose" (e.g. "Aspose FOSS Knowledge Base" titles --
   # the dot-required version above never matched these, so they still got
@@ -126,6 +132,13 @@ body:
   - \b\w+::\w+(?:\s*\([^)]*\))?\b
   # Protect email file format abbreviations (MSG, EML, PST, ICS, MIME, mbox)
   - \b(?:MSG|EML|PST|ICS|mbox|MIME|MAPI|SMTP|IMAP|POP3|RFC)\b
+  # HT-QUALITY-GATES-001 Part 22 (plan 5.3, incremental scope): protect
+  # hyphenated/slashed format & standard codes (UPC-E, EAN-13, PDF/A,
+  # ISO-8859-1, UTF-8, AES-256) embedded in prose -- confirmed real
+  # corruption: "UPC-E" became "U PC-E" mid-sentence because nothing
+  # protected it before MT. Requiring a hyphen/slash suffix (not just bare
+  # ALL-CAPS) keeps this from matching stylistic ALL-CAPS emphasis words.
+  - \b[A-Z]{2,}(?:[-/][A-Z0-9]+)+\b
   placeholder_syntax:
   - \{\{<.*?>\}\}
   - \{\{%.*?%\}\}
