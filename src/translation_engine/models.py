@@ -153,6 +153,9 @@ class TranslationResult:
     stats: TranslationStats = field(default_factory=TranslationStats)
     errors: list[str] = field(default_factory=list)
     warnings: list[str] = field(default_factory=list)
+    # In-memory diagnostic only. Campaign ledgers hash/sanitize this field and
+    # never persist candidate-derived rejection text.
+    error: str | None = None
     validation_result: Optional["ValidationResult"] = None  # Validation result if validation enabled
 
     # Decision state (INF-03: Validation decision tracking)

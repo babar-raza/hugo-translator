@@ -212,6 +212,32 @@ class TestBasicPipelineFlow:
         # TM store called for the buffer entry
         engine.tm.store.assert_called()
 
+    def test_rejection_preserves_structured_diagnostic_in_memory(self):
+        engine = _make_engine()
+        issue = SimpleNamespace(
+            validator="RepetitionDetectorValidator",
+            severity=SimpleNamespace(value="error"),
+            message="SECRET REJECTED CANDIDATE",
+            details={"count": 6, "threshold": 5},
+            location="segment_0",
+        )
+        validation_result = SimpleNamespace(issues=[issue])
+        engine._translate_to_language.side_effect = TranslationRejectedError(
+            message="Rejected",
+            file_path="/tmp/test.md",
+            validation_result=validation_result,
+            rejection_reason="RepetitionDetectorValidator SECRET REJECTED CANDIDATE",
+        )
+        result = _make_result()
+
+        language = FileTranslationPipeline(engine).translate_language(
+            _make_ctx(), result
+        )
+
+        assert not language.success
+        assert result.validation_result is validation_result
+        assert "RepetitionDetectorValidator" in result.error
+
 
 # ---------------------------------------------------------------------------
 # Retry and feedback guard

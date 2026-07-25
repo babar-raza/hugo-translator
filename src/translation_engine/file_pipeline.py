@@ -1059,6 +1059,14 @@ class FileTranslationPipeline:
             except TranslationRejectedError as _rej_err:
                 # Per-locale rejection: record failure, queue for retry, continue
                 # to next locale. Do NOT re-raise.
+                # Preserve the structured validator result and rejection cause
+                # in memory so the campaign runner can emit payload-free gate
+                # fingerprints.  Previously this exception boundary discarded
+                # both, leaving autonomous hardening with only "pipeline".
+                result.validation_result = _rej_err.validation_result
+                result.error = (
+                    f"TranslationRejectedError: {_rej_err.rejection_reason or str(_rej_err)}"
+                )
                 result.errors.append(
                     f"Translation to {target_lang} rejected after {retry_count} attempts"
                 )
