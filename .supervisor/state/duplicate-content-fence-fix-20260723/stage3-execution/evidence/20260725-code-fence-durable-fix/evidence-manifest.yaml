@@ -10,13 +10,15 @@ baseline:
   state: preflight.md
   focused_tests: "17 passed, 3 warnings"
 implementation:
-  - src/translation_engine/fence_spans.py
-  - scripts/quality/audit_all_content.py
-  - tests/unit/quality/fence_span_cases.py
-  - tests/unit/quality/test_fence_spans.py
-  - tests/unit/quality/test_audit_all_content_check_purity.py
-  - tests/unit/quality/test_audit_all_content_duplicate_content.py
-  - tests/unit/quality/test_audit_all_content_english_headings.py
+  primary_commit: 12615212ec5cf083e4924903ee0732bf055749e0
+  changed_paths:
+    - src/translation_engine/fence_spans.py
+    - scripts/quality/audit_all_content.py
+    - tests/unit/quality/fence_span_cases.py
+    - tests/unit/quality/test_fence_spans.py
+    - tests/unit/quality/test_audit_all_content_check_purity.py
+    - tests/unit/quality/test_audit_all_content_duplicate_content.py
+    - tests/unit/quality/test_audit_all_content_english_headings.py
 verification:
   primitive_and_consumer_tests: "36 passed, 3 warnings"
   compilation: "src/translation_engine/fence_spans.py and scripts/quality/audit_all_content.py compiled"
