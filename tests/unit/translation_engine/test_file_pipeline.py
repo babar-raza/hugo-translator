@@ -60,6 +60,7 @@ def _make_engine(
     engine.enable_verification = False
     engine.enable_verification_fix = False
     engine._check_shutdown.return_value = False
+    engine._is_oom_error.return_value = False
     engine.dry_run = False
     engine.enable_content_hash = False
     engine.metadata_tracker = None
@@ -268,6 +269,20 @@ class TestBasicPipelineFlow:
         assert not language.success
         assert result.validation_result is validation_result
         assert "LanguageConsistencyValidator" in result.error
+
+    def test_unexpected_exception_preserves_class_and_cause_in_memory(self):
+        engine = _make_engine()
+        engine._translate_to_language.side_effect = ValueError(
+            "SECRET REJECTED CANDIDATE"
+        )
+        result = _make_result()
+
+        language = FileTranslationPipeline(engine).translate_language(
+            _make_ctx(), result
+        )
+
+        assert not language.success
+        assert result.error == "ValueError: SECRET REJECTED CANDIDATE"
 
 
 # ---------------------------------------------------------------------------

@@ -403,6 +403,21 @@ def test_failure_metadata_extracts_safe_gate_score_without_candidate_text():
     assert "SECRET" not in reason
 
 
+def test_failure_metadata_extracts_exception_class_without_candidate_text():
+    result = SimpleNamespace(
+        errors=["rejected"],
+        retry_attempts=0,
+        validation_result=None,
+        error="TranslationIncomplete: SECRET REJECTED CANDIDATE",
+    )
+
+    gate, reason = CampaignRunner._failure_metadata(result)
+
+    assert gate == "pipeline"
+    assert "exceptions=TranslationIncomplete" in reason
+    assert "SECRET" not in reason
+
+
 def test_failure_metadata_preserves_only_safe_sas_unit_fingerprints():
     result = SimpleNamespace(
         errors=[],

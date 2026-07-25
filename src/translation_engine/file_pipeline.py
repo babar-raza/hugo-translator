@@ -1153,6 +1153,8 @@ class FileTranslationPipeline:
                         break
 
                 # Unexpected error - don't retry
+                result.validation_result = getattr(e, "validation_result", None)
+                result.error = f"{type(e).__name__}: {e}"
                 logger.error(f"Error translating {file_path} to {target_lang}: {e}")
                 result.errors.append(f"Translation to {target_lang} failed: {e}")
                 break

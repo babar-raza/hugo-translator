@@ -459,6 +459,14 @@ class CampaignRunner:
                 )
             )
         )
+        exception_classes = sorted(
+            set(
+                re.findall(
+                    r"\b([A-Za-z][A-Za-z0-9_]*(?:Error|Exception|Incomplete)):",
+                    raw_error,
+                )
+            )
+        )
         score_match = re.search(r"\bscore=(\d+(?:\.\d+)?)\b", raw_error)
         verdict_match = re.search(r"\b(fail|warn|pass)\b", raw_error, re.IGNORECASE)
         unit_fingerprints = re.search(
@@ -538,6 +546,8 @@ class CampaignRunner:
             f"translation_rejected; error_count={error_count}; "
             f"internal_retries={retry_count}; validators={validator_text}; "
             f"codes={','.join(safe_codes) if safe_codes else 'unknown'}; "
+            f"exceptions="
+            f"{','.join(exception_classes) if exception_classes else 'unknown'}; "
             f"verdict={verdict_match.group(1).lower() if verdict_match else 'unknown'}; "
             f"score={score_match.group(1) if score_match else 'unknown'}; "
             f"unit_fingerprints="
