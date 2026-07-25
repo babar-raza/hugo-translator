@@ -326,9 +326,7 @@ class AutonomousContentTranslationWorker:
             if self.config.mode != "oneshot":
                 raise ValueError("campaign manifests are supported only in oneshot mode")
             if self.config.validation_policy != "zero-defect":
-                raise ValueError(
-                    "campaign execution requires --validation-policy zero-defect"
-                )
+                raise ValueError("campaign execution requires --validation-policy zero-defect")
             from src.workers.campaign_manifest import CampaignManifest
 
             self.campaign = CampaignManifest.load(self.config.campaign_manifest)
@@ -473,20 +471,12 @@ class AutonomousContentTranslationWorker:
                 enable_content_hash_tracking=content_hash_enabled,
                 enable_validation=True,
                 validation_mode=(
-                    "strict"
-                    if self.config.validation_policy == "zero-defect"
-                    else None
+                    "strict" if self.config.validation_policy == "zero-defect" else None
                 ),
                 validation_policy=self.config.validation_policy,
-                enable_verification=(
-                    self.config.validation_policy == "zero-defect"
-                ),
-                enable_verification_fix=(
-                    self.config.validation_policy == "zero-defect"
-                ),
-                max_retries=(
-                    4 if self.config.validation_policy == "zero-defect" else None
-                ),
+                enable_verification=(self.config.validation_policy == "zero-defect"),
+                enable_verification_fix=(self.config.validation_policy == "zero-defect"),
+                max_retries=(4 if self.config.validation_policy == "zero-defect" else None),
                 save_rejected=False,
                 campaign_context=(
                     {
@@ -786,7 +776,7 @@ class AutonomousContentTranslationWorker:
         )
 
         try:
-            if self.campaign is not None:
+            if getattr(self, "campaign", None) is not None:
                 from src.workers.campaign_runner import CampaignRunner
 
                 runner = CampaignRunner(
@@ -798,9 +788,7 @@ class AutonomousContentTranslationWorker:
                     resume=self.config.resume,
                     verify_only=self.config.verify_only,
                 )
-                self._run_new_files = {
-                    "campaign": int(summary.get("accepted", 0))
-                }
+                self._run_new_files = {"campaign": int(summary.get("accepted", 0))}
                 self._run_rejected_files = int(summary.get("failed", 0))
                 self._run_attempted_files = (
                     self._run_new_files["campaign"] + self._run_rejected_files
@@ -1823,7 +1811,9 @@ class AutonomousContentTranslationWorker:
             logger.debug("TC-14: content_root %s not found — skipping post-run scan", content_root)
             return
 
-        script = Path(__file__).parents[2] / "scripts" / "scan_language_contamination.py"
+        script = (
+            Path(__file__).parents[2] / "scripts" / "content" / "scan_language_contamination.py"
+        )
         if not script.exists():
             logger.warning(
                 "TC-14: scan_language_contamination.py not found — skipping post-run scan"
@@ -1889,8 +1879,13 @@ class AutonomousContentTranslationWorker:
                         if self.config_service is not None
                         else None
                     )
+                    configured_langs = (
+                        getattr(site_profile, "target_langs", None) if site_profile else None
+                    )
                     allowed_langs = (
-                        set(site_profile.target_langs) if site_profile else None
+                        set(configured_langs)
+                        if isinstance(configured_langs, (list, tuple, set))
+                        else None
                     )
 
                     for entry in contaminated_files:

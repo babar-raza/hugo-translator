@@ -685,11 +685,12 @@ class TestContextFiltering:
         # Assert - returns None (context mismatch)
         assert result is None
 
-    def test_no_context_filter_returns_any_entry(self, l2_tm):
+    def test_no_context_lookup_does_not_cross_context_namespace(self, l2_tm):
         """
-        INV: IF no context specified in lookup, return entry regardless of context.
+        INV: IF no context is specified, do not return a context-scoped entry.
 
-        Evidence: src/tm/l2_persistent.py lines 166-168 (context check only if specified)
+        Context is part of the persistent key so campaign/source contexts cannot
+        silently reuse each other's translations.
         """
         # Arrange - store entry with context
         l2_tm.store(
@@ -704,15 +705,14 @@ class TestContextFiltering:
         # Act - lookup without context filter
         result = l2_tm.exact_lookup("site.com", "en", "de", "Hello")
 
-        # Assert - entry found (no context filter applied)
-        assert result is not None
-        assert result.translation == "Hallo"
+        # Assert - the context-scoped entry is not visible without its namespace
+        assert result is None
 
-    def test_same_text_different_contexts_uses_same_key(self, l2_tm):
+    def test_same_text_different_contexts_are_isolated(self, l2_tm):
         """
-        INV: Context is NOT part of the key - same text overwrites regardless of context.
+        INV: Context is part of the key; identical text can coexist safely.
 
-        Evidence: src/tm/l2_persistent.py - make_tm_key only uses site_id, src_lang, tgt_lang, text
+        Evidence: src/tm/l2_persistent.py uses make_tm_key_scoped().
         """
         # Arrange - store same text with different contexts
         l2_tm.store(
@@ -732,14 +732,18 @@ class TestContextFiltering:
             context="context2",
         )
 
-        # Act - lookup without context
-        result = l2_tm.exact_lookup("site.com", "en", "de", "Hello")
+        # Act - look up each explicit namespace
+        first = l2_tm.exact_lookup("site.com", "en", "de", "Hello", context="context1")
+        second = l2_tm.exact_lookup("site.com", "en", "de", "Hello", context="context2")
 
-        # Assert - only one entry exists (second overwrote first)
-        assert result is not None
-        assert result.translation == "Hallo v2"
-        assert result.context == "context2"
-        assert l2_tm.count() == 1
+        # Assert - neither campaign/source context overwrote the other
+        assert first is not None
+        assert first.translation == "Hallo v1"
+        assert first.context == "context1"
+        assert second is not None
+        assert second.translation == "Hallo v2"
+        assert second.context == "context2"
+        assert l2_tm.count() == 2
 
 
 # ==============================================================================

@@ -4,6 +4,7 @@ Language Detection Check for verification.
 Detects when translated content is not in the expected target language,
 which indicates untranslated or mixed-language content.
 """
+
 import logging
 from typing import Any
 
@@ -61,13 +62,37 @@ class LanguageDetectionCheck(VerificationCheck):
     # Patterns that indicate technical content to skip
     SKIP_PATTERNS = [
         # Code patterns
-        "{{", "}}", "<%", "%>", "```",
+        "{{",
+        "}}",
+        "<%",
+        "%>",
+        "```",
         # URL patterns
-        "http://", "https://", "www.",
+        "http://",
+        "https://",
+        "www.",
         # File paths
-        ".exe", ".dll", ".pdf", ".docx",
+        ".exe",
+        ".dll",
+        ".pdf",
+        ".docx",
         # API references (likely to stay in English)
-        "API", "SDK", "HTTP", "REST", "JSON", "XML",
+        "API",
+        "SDK",
+        "HTTP",
+        "REST",
+        "JSON",
+        "XML",
+    ]
+    ALWAYS_SKIP_PATTERNS = [
+        "{{",
+        "}}",
+        "<%",
+        "%>",
+        "```",
+        "http://",
+        "https://",
+        "www.",
     ]
 
     def __init__(
@@ -171,20 +196,14 @@ class LanguageDetectionCheck(VerificationCheck):
                     item_path = f"{current_path}[{idx}]"
                     if isinstance(item, str):
                         if len(item) >= self.min_text_length:
-                            item_issues = self._check_text(
-                                item, target_lang, item_path
-                            )
+                            item_issues = self._check_text(item, target_lang, item_path)
                             issues.extend(item_issues)
                     elif isinstance(item, dict):
-                        dict_issues = self._check_dict_fields(
-                            item, target_lang, item_path
-                        )
+                        dict_issues = self._check_dict_fields(item, target_lang, item_path)
                         issues.extend(dict_issues)
 
             elif isinstance(value, dict):
-                nested_issues = self._check_dict_fields(
-                    value, target_lang, current_path
-                )
+                nested_issues = self._check_dict_fields(value, target_lang, current_path)
                 issues.extend(nested_issues)
 
         return issues
@@ -277,6 +296,8 @@ class LanguageDetectionCheck(VerificationCheck):
         """
         # Check for skip patterns
         text_upper = text.upper()
+        if any(pattern.upper() in text_upper for pattern in self.ALWAYS_SKIP_PATTERNS):
+            return True
         for pattern in self.SKIP_PATTERNS:
             if pattern.upper() in text_upper:
                 # Allow if pattern is small part of text
