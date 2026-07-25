@@ -10,6 +10,7 @@ import yaml
 from src.workers.campaign_manifest import (
     CampaignManifest,
     CampaignManifestError,
+    receipt_fingerprint,
     sha256_file,
 )
 from src.workers.campaign_runner import CampaignLedger, CampaignRunner
@@ -242,6 +243,17 @@ def test_resume_rejects_tampered_receipt_fingerprint(tmp_path):
 
     with pytest.raises(CampaignManifestError, match="fingerprint mismatch"):
         runner._validated_resume_receipts()
+
+
+def test_receipt_fingerprint_survives_json_roundtrip_with_integer_gate_keys():
+    receipt = {
+        "output_path": "content/page.de.md",
+        "gate_results": {index: {"passed": True} for index in range(1, 45)},
+    }
+
+    persisted = json.loads(json.dumps(receipt))
+
+    assert receipt_fingerprint(receipt) == receipt_fingerprint(persisted)
 
 
 def test_campaign_uses_three_primary_then_llm_and_logs_metadata_only(tmp_path, monkeypatch):

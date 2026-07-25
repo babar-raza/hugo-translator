@@ -20,6 +20,7 @@ from .campaign_manifest import (
     CampaignManifest,
     CampaignManifestError,
     git_dirty_paths,
+    legacy_integer_gate_receipt_fingerprint,
     receipt_fingerprint,
     sha256_file,
 )
@@ -109,6 +110,24 @@ class CampaignLedger:
             },
         )
 
+    def replace_receipts(self, receipts: list[dict[str, Any]]) -> None:
+        """Atomically replace metadata-only receipts after verified migration."""
+        encoded = "".join(
+            json.dumps(row, ensure_ascii=False, sort_keys=True) + "\n"
+            for row in receipts
+        )
+        with self._lock:
+            atomic_write(
+                path=self.receipts_path,
+                content=encoded,
+                encoding="utf-8",
+                fsync=True,
+                create_parents=True,
+            )
+            self._receipt_index = {
+                str(row["output_path"]): row for row in receipts
+            }
+
     def _append(self, path: Path, row: dict[str, Any]) -> None:
         with self._lock:
             self._append_unlocked(path, row)
@@ -152,6 +171,7 @@ class CampaignRunner:
     def _validated_resume_receipts(self) -> dict[str, dict[str, Any]]:
         receipts = self.ledger.receipts()
         valid: dict[str, dict[str, Any]] = {}
+        legacy_migrations: dict[str, dict[str, Any]] = {}
         expected_outputs = {
             output: (source, locale)
             for source in self.manifest.sources
@@ -164,7 +184,18 @@ class CampaignRunner:
             claimed_fingerprint = receipt.get("receipt_sha256")
             unsigned = {key: value for key, value in receipt.items() if key != "receipt_sha256"}
             if not claimed_fingerprint or receipt_fingerprint(unsigned) != claimed_fingerprint:
-                raise CampaignManifestError(f"acceptance receipt fingerprint mismatch: {output}")
+                if (
+                    claimed_fingerprint
+                    and legacy_integer_gate_receipt_fingerprint(unsigned)
+                    == claimed_fingerprint
+                ):
+                    migrated = dict(unsigned)
+                    migrated["receipt_sha256"] = receipt_fingerprint(unsigned)
+                    legacy_migrations[output] = migrated
+                else:
+                    raise CampaignManifestError(
+                        f"acceptance receipt fingerprint mismatch: {output}"
+                    )
             expected_context = {
                 "campaign_id": self.manifest.campaign_id,
                 "source_path": source.source_path,
@@ -185,7 +216,11 @@ class CampaignRunner:
             gates = receipt.get("gate_results") or {}
             if len(gates) != 44 or any(not item.get("passed", False) for item in gates.values()):
                 raise CampaignManifestError(f"receipt is not all-pass: {output}")
-            valid[output] = receipt
+            valid[output] = legacy_migrations.get(output, receipt)
+        if legacy_migrations:
+            self.ledger.replace_receipts(
+                [legacy_migrations.get(output, receipt) for output, receipt in receipts.items()]
+            )
         return valid
 
     def _append_campaign_receipt(self, receipt: dict[str, Any]) -> None:

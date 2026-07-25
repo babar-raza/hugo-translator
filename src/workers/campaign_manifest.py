@@ -399,5 +399,25 @@ class CampaignManifest:
 
 
 def receipt_fingerprint(receipt: dict[str, Any]) -> str:
-    encoded = json.dumps(receipt, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    # JSON object keys are strings on disk. Canonicalize in memory first so
+    # gate_results={1: ..., 2: ...} and the reloaded {"1": ..., "2": ...}
+    # produce the same ordering and fingerprint across campaign restarts.
+    canonical = json.loads(json.dumps(receipt, ensure_ascii=False))
+    encoded = json.dumps(
+        canonical,
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+    ).encode("utf-8")
+    return hashlib.sha256(encoded).hexdigest()
+
+
+def legacy_integer_gate_receipt_fingerprint(receipt: dict[str, Any]) -> str:
+    """Reproduce the pre-canonicalization signature for narrow migration."""
+    legacy = json.loads(json.dumps(receipt, ensure_ascii=False))
+    gates = legacy.get("gate_results")
+    if not isinstance(gates, dict) or not all(str(key).isdigit() for key in gates):
+        return ""
+    legacy["gate_results"] = {int(key): value for key, value in gates.items()}
+    encoded = json.dumps(legacy, sort_keys=True, separators=(",", ":")).encode("utf-8")
     return hashlib.sha256(encoded).hexdigest()
