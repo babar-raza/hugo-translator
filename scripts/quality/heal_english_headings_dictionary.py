@@ -19,9 +19,35 @@ file list against `git status --short` in the content repo and reports
 any file that already has unrelated uncommitted changes, so those diffs
 never get silently folded into this healer's commit.
 
+Modes (reference-i18n-hardening-20260725, plan item C1):
+  --mode normalize (default, original TC-HT-I18N-007 behavior): replace ANY
+    heading matching a registry EN term with the current approved locale
+    value, regardless of what the existing translated text is. This
+    normalizes every acceptable-but-inconsistent variant too (e.g. a ja
+    "See Also" file using "参照" gets rewritten to the approved "関連情報"
+    even though "参照" is itself a fine translation) — high consistency,
+    higher churn/risk. Kept available, not the default going forward.
+  --mode targeted (recommended, plan-approved default posture): replace a
+    heading ONLY when it is a PROVEN defect: (i) English leakage (the
+    current text literally equals the EN term), (ii) an adjudicated
+    `rejected_variants` entry for that (term, locale) — i.e. a corpus form
+    a reviewer explicitly confirmed wrong — or (iii) an identifier-heading
+    restoration (the EN counterpart heading is protected/multi-hump-shaped
+    and the locale heading differs from it — e.g. `## ImageRenderOptions`
+    mistranslated in ja/lt — restored to the EN text verbatim). Acceptable
+    variant forms are left untouched; they converge over time via the
+    i18n-first live pipeline (TC-HT-I18N-004 / reference-i18n-hardening-
+    20260725's Step-0 pre-TM pass) on next regeneration, per the
+    plan's healing-scope decision (D1).
+    Identifier restoration requires reading the EN counterpart file for
+    positional alignment (equal-count zip only, same as the miner's fast
+    path); files whose EN/locale heading counts differ are skipped for
+    that specific check (counted, not silently ignored) but still get the
+    leakage/rejected-variant checks applied.
+
 Usage:
   python scripts/quality/heal_english_headings_dictionary.py --dry-run --sites all
-  python scripts/quality/heal_english_headings_dictionary.py --apply --sites reference.aspose.org --locales ja --max-files 20
+  python scripts/quality/heal_english_headings_dictionary.py --mode targeted --apply --sites reference.aspose.org --locales ja --max-files 20
   python scripts/quality/heal_english_headings_dictionary.py --apply --sites all
 """
 
@@ -41,12 +67,14 @@ sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 import safe_io  # noqa: E402
 
 from src.translation_engine.terminology.classification import (  # noqa: E402
+    _MULTI_HUMP_RE,
     TemplateStringRegistry,
 )
 
 ALL_SITES = ["reference.aspose.org", "docs.aspose.org", "kb.aspose.org"]
 EN_LOCALE = "en"
 NON_LATIN_LOCALES = ["ar", "bg", "el", "fa", "he", "hi", "ja", "ko", "ru", "th", "uk", "vi", "zh"]
+VALID_MODES = ("normalize", "targeted")
 
 _HEADING_RE = re.compile(r"^(#{1,6})(\s+)(.+)$", re.MULTILINE)
 
@@ -96,21 +124,90 @@ def _dirty_files_in_content_repo(content_root: Path) -> set[str]:
     return dirty
 
 
-def _patch_headings(body: str, locale: str, registry: TemplateStringRegistry) -> tuple[str, int]:
-    """Return (new_body, n_replaced)."""
+def _patch_headings(
+    body: str,
+    locale: str,
+    registry: TemplateStringRegistry,
+    *,
+    mode: str = "normalize",
+    en_body: str | None = None,
+) -> tuple[str, int, dict[str, int]]:
+    """Return (new_body, n_replaced, reasons). ``reasons`` counts by fix
+    type: normalize | leakage | rejected_variant | identifier_restore."""
+    reasons = {"normalize": 0, "leakage": 0, "rejected_variant": 0, "identifier_restore": 0}
+
+    if mode == "normalize":
+        n_replaced = 0
+
+        def _sub_normalize(m: re.Match) -> str:
+            nonlocal n_replaced
+            hashes, ws, text = m.group(1), m.group(2), m.group(3)
+            stripped = text.strip()
+            value = registry.lookup(stripped, locale)
+            if value is None or value == stripped:
+                return m.group(0)
+            n_replaced += 1
+            reasons["normalize"] += 1
+            return f"{hashes}{ws}{value}"
+
+        new_body = _HEADING_RE.sub(_sub_normalize, body)
+        return new_body, n_replaced, reasons
+
+    # mode == "targeted"
+    locale_matches = list(_HEADING_RE.finditer(body))
+    en_headings: list[str] | None = None
+    if en_body is not None:
+        en_matches = [m.group(3).strip() for m in _HEADING_RE.finditer(en_body)]
+        if len(en_matches) == len(locale_matches):
+            en_headings = en_matches  # equal-count: positional alignment is safe
+
     n_replaced = 0
+    idx = -1
 
-    def _sub(m: re.Match) -> str:
-        nonlocal n_replaced
+    def _sub_targeted(m: re.Match) -> str:
+        nonlocal n_replaced, idx
         hashes, ws, text = m.group(1), m.group(2), m.group(3)
-        value = registry.lookup(text.strip(), locale)
-        if value is None:
-            return m.group(0)
-        n_replaced += 1
-        return f"{hashes}{ws}{value}"
+        idx += 1
+        stripped = text.strip()
 
-    new_body = _HEADING_RE.sub(_sub, body)
-    return new_body, n_replaced
+        # (i) English leakage: current text literally IS the EN registry term.
+        value = registry.lookup(stripped, locale)
+        if value is not None and value != stripped:
+            n_replaced += 1
+            reasons["leakage"] += 1
+            return f"{hashes}{ws}{value}"
+
+        if en_headings is not None:
+            en_text = en_headings[idx]
+
+            # (ii) adjudicated rejected_variants for the EN heading THIS
+            # locale heading is translating (requires knowing which entry
+            # via positional alignment -- the wrong form itself carries no
+            # EN text to look up by).
+            rejected = registry.rejected_variants_for_text(en_text, locale)
+            if stripped in rejected:
+                approved = registry.lookup(en_text, locale)
+                if approved is not None:
+                    n_replaced += 1
+                    reasons["rejected_variant"] += 1
+                    return f"{hashes}{ws}{approved}"
+
+            # (iii) identifier-heading restoration: the EN heading is a
+            # protected multi-hump identifier (e.g. ImageRenderOptions) and
+            # the locale heading was mistranslated away from it -- restore
+            # EN verbatim. Single-hump words are deliberately NOT covered
+            # here (shape alone can't tell heading-word from class-name;
+            # that ambiguity is exactly why classification.py never decides
+            # single-hump words by shape either).
+            if _MULTI_HUMP_RE.match(en_text) and stripped != en_text:
+                n_replaced += 1
+                reasons["identifier_restore"] += 1
+                return f"{hashes}{ws}{en_text}"
+
+        return m.group(0)
+
+    new_body = _HEADING_RE.sub(_sub_targeted, body)
+    return new_body, n_replaced, reasons
 
 
 def run(
@@ -120,12 +217,16 @@ def run(
     max_files: int,
     registry_dir: Path | None,
     manifest_path: Path | None = None,
+    mode: str = "normalize",
+    families: list[str] | None = None,
 ) -> list[str]:
     """Returns the list of content-repo-relative paths this run actually
     wrote (empty in --dry-run mode). Callers MUST commit using exactly this
     list (e.g. `git commit -- <paths>`), never a broad `git add`, since
     other sessions may have unrelated changes already staged in the same
     working tree/index (confirmed to happen live during this mission)."""
+    if mode not in VALID_MODES:
+        raise ValueError(f"mode must be one of {VALID_MODES}, got {mode!r}")
     content_root = _resolve_content_root()
     registry = TemplateStringRegistry(registry_dir) if registry_dir else TemplateStringRegistry()
 
@@ -137,6 +238,8 @@ def run(
     total_quarantined = 0
     overlap_flagged: list[str] = []
     written_paths: list[str] = []
+    reasons_total = {"normalize": 0, "leakage": 0, "rejected_variant": 0, "identifier_restore": 0}
+    misaligned_files = 0  # targeted mode: EN/locale heading count differs -> no identifier-restore/rejected-variant check for that file
 
     for site in sites:
         site_root = content_root / site
@@ -148,7 +251,17 @@ def run(
             continue
 
         en_files = list(en_root.rglob("*.md"))
-        print(f"Site: {site} ({len(en_files)} EN files)")
+        if families:
+            en_files = [
+                p
+                for p in en_files
+                if (parts := p.relative_to(en_root).parts) and parts[0] in families
+            ]
+        print(
+            f"Site: {site} ({len(en_files)} EN files"
+            + (f", families={families}" if families else "")
+            + ")"
+        )
 
         for locale in locales:
             locale_root = site_root / locale
@@ -173,7 +286,25 @@ def run(
                 except OSError:
                     continue
 
-                new_body, n_replaced = _patch_headings(body, locale, registry)
+                en_body_for_alignment = None
+                if mode == "targeted":
+                    try:
+                        _, en_body_for_alignment, _ = safe_io.load(en_path)
+                    except OSError:
+                        en_body_for_alignment = None
+
+                new_body, n_replaced, reasons = _patch_headings(
+                    body, locale, registry, mode=mode, en_body=en_body_for_alignment
+                )
+                for k, v in reasons.items():
+                    reasons_total[k] += v
+                if (
+                    mode == "targeted"
+                    and en_body_for_alignment is not None
+                    and len(list(_HEADING_RE.finditer(body)))
+                    != len(list(_HEADING_RE.finditer(en_body_for_alignment)))
+                ):
+                    misaligned_files += 1
                 if n_replaced == 0:
                     continue
 
@@ -222,6 +353,17 @@ def run(
         f"TOTAL: {total_files_scanned} files scanned, {total_files_with_hits} files with "
         f"a heading hit, {total_headings_replaced} headings replaced"
     )
+    if mode == "targeted":
+        print(
+            f"  by reason: leakage={reasons_total['leakage']} "
+            f"rejected_variant={reasons_total['rejected_variant']} "
+            f"identifier_restore={reasons_total['identifier_restore']}"
+        )
+        print(
+            f"  files with EN/locale heading-count mismatch (rejected_variant/"
+            f"identifier_restore skipped for those files, leakage still applied): "
+            f"{misaligned_files}"
+        )
     if apply:
         print(f"Quarantined (write-gate rejected): {total_quarantined}")
     if overlap_flagged:
@@ -248,6 +390,20 @@ def run(
     return written_paths
 
 
+def _target_langs_for_site(site: str) -> list[str]:
+    """Read target_langs from config/site_profiles/<site>.yaml (mirrors
+    mine_heading_glossary.py's identical helper) -- used by --locales all."""
+    import yaml
+
+    repo_root = Path(__file__).resolve().parent.parent.parent
+    profile_path = repo_root / "config" / "site_profiles" / f"{site}.yaml"
+    if not profile_path.exists():
+        return list(NON_LATIN_LOCALES)
+    data = yaml.safe_load(profile_path.read_text(encoding="utf-8")) or {}
+    langs = data.get("target_langs") or []
+    return [str(lang) for lang in langs]
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(
         description="Patch existing English headings using the reviewed i18n table "
@@ -255,6 +411,24 @@ def main() -> None:
     )
     parser.add_argument("--sites", type=str, default="reference.aspose.org")
     parser.add_argument("--locales", type=str, default="")
+    parser.add_argument(
+        "--families",
+        type=str,
+        default="",
+        help="Comma list of product-family top-level dirs to restrict scanning to "
+        "(e.g. 'note' for a small pilot slice); default: all families under the site.",
+    )
+    parser.add_argument(
+        "--mode",
+        type=str,
+        default="normalize",
+        choices=list(VALID_MODES),
+        help="normalize (original behavior: force every matched heading to the "
+        "current approved value) or targeted (recommended: only fix proven "
+        "defects -- English leakage, adjudicated rejected_variants, identifier "
+        "restoration; leave acceptable variant forms untouched). See module "
+        "docstring for the full rationale.",
+    )
     parser.add_argument("--apply", action="store_true", help="Write changes (default: dry-run)")
     parser.add_argument(
         "--dry-run", action="store_true", help="Explicit dry-run (default behavior)"
@@ -282,21 +456,33 @@ def main() -> None:
         if args.sites.strip().lower() == "all"
         else [s.strip() for s in args.sites.split(",") if s.strip()]
     )
-    locales = (
-        [loc.strip() for loc in args.locales.split(",") if loc.strip()]
-        if args.locales
-        else NON_LATIN_LOCALES
-    )
+    if args.locales.strip().lower() == "all":
+        locales = sorted({lang for site in sites for lang in _target_langs_for_site(site)})
+    elif args.locales:
+        locales = [loc.strip() for loc in args.locales.split(",") if loc.strip()]
+    else:
+        locales = list(NON_LATIN_LOCALES)
+    families = [f.strip() for f in args.families.split(",") if f.strip()] or None
     apply = args.apply and not args.dry_run
     registry_dir = Path(args.registry_dir) if args.registry_dir else None
     manifest_path = Path(args.manifest_out) if args.manifest_out else None
 
     print(f"Sites: {sites}")
     print(f"Locales: {locales}")
-    print(f"Mode: {'APPLY' if apply else 'DRY-RUN'}")
+    print(f"Families: {families or 'all'}")
+    print(f"Mode: {args.mode} ({'APPLY' if apply else 'DRY-RUN'})")
     print()
 
-    run(sites, locales, apply, args.max_files, registry_dir, manifest_path)
+    run(
+        sites,
+        locales,
+        apply,
+        args.max_files,
+        registry_dir,
+        manifest_path,
+        mode=args.mode,
+        families=families,
+    )
 
 
 if __name__ == "__main__":

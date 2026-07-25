@@ -91,10 +91,18 @@ class TestFrontmatterSegmentRetainsOriginalTextForTmKey:
         assert seg_a.source_text == seg_b.source_text  # still collides pre-fix
         assert seg_a.tm_key_text != seg_b.tm_key_text  # fixed: distinct TM keys
 
-    def test_body_segments_are_unaffected(self):
-        """Only frontmatter segments get tm_key_text; body segments keep the
-        existing (pre-fix) behavior -- this fix is deliberately scoped to the
-        confirmed frontmatter collision pattern, not a blanket TM-keying change."""
+    def test_body_segments_now_also_get_tm_key_text(self):
+        """HT-QUALITY-GATES-001 Part 22 (root cause A): the original TC-HT-TMKEY-001
+        fix was deliberately scoped to frontmatter only. Further root-cause
+        investigation this session confirmed body segments have the exact
+        same collision precondition (placeholder protection collapsing
+        distinguishing content, e.g. two different Aspose product names both
+        protecting to the same brand-token placeholder) and is the confirmed
+        explanation for the kb.aspose.org cross-family body-content
+        contamination pattern (e.g. identical boilerplate paragraphs shared
+        across unrelated product families). The scope was widened to match --
+        see test_segment_extractor_body_tm_key_scoping.py for the full
+        collision-reproduction test using this exact mechanism."""
         from src.translation_engine.parser.ast_nodes import ASTNode, NodeType
 
         extractor = SegmentExtractor(_make_site_profile())
@@ -107,7 +115,7 @@ class TestFrontmatterSegmentRetainsOriginalTextForTmKey:
             depth=0,
             parent_type=None,
         )
-        assert seg.tm_key_text is None
+        assert seg.tm_key_text == "Some prose text."
 
 
 class TestSegmentTmKeyTextDefaultsNone:

@@ -4,6 +4,13 @@
 **Last Updated:** 2025-12-28
 **Total Languages:** 36
 
+> **Note:** This is the global model/benchmark language catalog — what
+> Hugo Translator is *capable* of. Individual sites may use a narrower
+> subset. Aspose.org sites are restricted to a 25-target-locale subset of
+> this list (26 with the `en` source) — see
+> [`ASPOSE_ORG_LOCALE_POLICY.md`](ASPOSE_ORG_LOCALE_POLICY.md) for the
+> exact contract and why it differs from this catalog.
+
 ## Overview
 
 The Hugo Translation System supports translation from English to 36 target languages, carefully selected to cover Aspose.net's global user base with emphasis on:

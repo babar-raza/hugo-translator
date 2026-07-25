@@ -319,6 +319,23 @@ class JobProcessor:
             # Get site profile
             site_profile = self.config_service.get_site_profile(site_id)
 
+            # Re-validate the job's (potentially stale) target_langs snapshot
+            # against the live site profile before executing. A job created
+            # before a locale was retired from a site's profile must not
+            # resurrect it just because it was already queued.
+            if site_profile:
+                stale_langs = [
+                    lang for lang in target_langs if lang not in site_profile.target_langs
+                ]
+                if stale_langs:
+                    logger.warning(
+                        f"Job {job.job_id}: dropping locale(s) {stale_langs} — no "
+                        f"longer present in the live '{site_id}' site profile"
+                    )
+                target_langs = [
+                    lang for lang in target_langs if lang in site_profile.target_langs
+                ]
+
             # Process all input files
             files_processed = 0
             files_failed = 0

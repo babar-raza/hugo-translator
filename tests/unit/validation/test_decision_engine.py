@@ -1392,3 +1392,82 @@ class TestShortcodePreservationValidatorCritical:
             "ShortcodePreservationValidator must be in CRITICAL_VALIDATORS to prevent "
             "accept_after_max_retries=True from writing shortcode-broken files."
         )
+
+
+class TestSemanticSimilarityValidatorCritical:
+    """HT-QUALITY-GATES-001 Part 22 (plan 5.4 item 2) regression tests:
+    SemanticSimilarityValidator in CRITICAL_VALIDATORS.
+
+    Before this fix, SemanticSimilarityValidator ERRORs (cosine similarity
+    < 0.40, "meaning diverges significantly from source") were structurally
+    excluded from ever blocking a write on MT backends (~34/36 locales) via
+    file_pipeline.py's accept-best-effort bypass (BUG-022-FIX/
+    TC-RETRY-FIX-018), which only escalates to a hard reject for validators
+    in CRITICAL_VALIDATORS. Confirmed in root cause F: this was true even
+    on the rare occasions the validator's encoder happened to be wired up,
+    since membership in this set -- not just "did the validator fire" -- is
+    what the accept-best-effort bypass actually checks.
+    """
+
+    def _make_config(self, accept_after_max_retries: bool, max_retries: int = 2) -> dict:
+        return {
+            "decision_rules": {
+                "reject_on_error_count": 99,  # high threshold — must not trigger
+                "reject_on_placeholder_error": False,
+                "reject_on_code_block_error": False,
+                "reject_on_link_error": False,
+                "max_retry_attempts": max_retries,
+                "retry_on_structure_error": True,
+                "retry_on_terminology_warning": False,
+                "accept_warnings": True,
+                "accept_after_max_retries": accept_after_max_retries,
+            }
+        }
+
+    def _make_semantic_divergence_result(self) -> "ValidationResult":
+        return ValidationResult(
+            success=False,
+            issues=[
+                ValidationIssue(
+                    severity=ValidationSeverity.ERROR,
+                    validator="SemanticSimilarityValidator",
+                    message="Semantic similarity 0.310 < 0.4 — translation meaning "
+                            "diverges significantly from source",
+                    location="document",
+                    details={"similarity": 0.31, "threshold": 0.4},
+                )
+            ],
+        )
+
+    def test_semantic_divergence_rejects_when_retries_exhausted(self):
+        """The exact condition MT-backend translations hit most often:
+        retries exhausted, accept_after_max_retries=True. Before this fix,
+        a severely-diverged translation would ship anyway at this point."""
+        config = self._make_config(accept_after_max_retries=True, max_retries=2)
+        engine = ValidationDecisionEngine(config)
+        result = self._make_semantic_divergence_result()
+
+        decision = engine.make_decision(result, retry_count=2, source="test source")
+
+        assert decision.decision == ValidationDecision.REJECT, (
+            f"Expected REJECT via CRITICAL_VALIDATORS gate but got {decision.decision}. "
+            f"Reason: {decision.decision_reason}"
+        )
+        assert "SemanticSimilarityValidator" in decision.decision_reason
+
+    def test_semantic_divergence_also_rejects_at_first_attempt(self):
+        config = self._make_config(accept_after_max_retries=True)
+        engine = ValidationDecisionEngine(config)
+        result = self._make_semantic_divergence_result()
+
+        decision = engine.make_decision(result, retry_count=0, source="test source")
+
+        assert decision.decision == ValidationDecision.REJECT
+        assert "SemanticSimilarityValidator" in decision.decision_reason
+
+    def test_semantic_similarity_validator_is_in_critical_validators_set(self):
+        assert "SemanticSimilarityValidator" in ValidationDecisionEngine.CRITICAL_VALIDATORS, (
+            "SemanticSimilarityValidator must be in CRITICAL_VALIDATORS or its ERROR "
+            "issues are silently accepted as best-effort on MT backends, exactly like "
+            "the ShortcodePreservationValidator gap this same fix pattern already closed."
+        )

@@ -637,30 +637,41 @@ class TestFix3PromptPacking:
         assert "[N]" not in prompt
 
     def test_max_segments_per_prompt_splits(self):
-        """Texts exceeding MAX_SEGMENTS_PER_PROMPT are split into sub-batches."""
+        """Texts exceeding MAX_SEGMENTS_PER_PROMPT are split into sub-batches.
+
+        HT-QUALITY-GATES-001 Part 22: the effective max-segments value moved
+        from a plain instance attribute (racy across concurrent threads
+        sharing one backend instance) to a module-level contextvars.ContextVar
+        -- override it the same way translate_with_context() does internally,
+        via .set()/.reset(), not by assigning to the instance.
+        """
+        from src.model_runtime.llm_backend import _max_segments_per_prompt_var
+
         backend = self._make_backend()
-        backend.MAX_SEGMENTS_PER_PROMPT = 3  # Override for test
+        token = _max_segments_per_prompt_var.set(3)  # Override for test
+        try:
+            provider = MagicMock()
+            call_count = [0]
 
-        provider = MagicMock()
-        call_count = [0]
+            def mock_generate(system_prompt, user_text):
+                call_count[0] += 1
+                # Count <<<SEG_N>>> tags to determine segment count (LWF-01 delimiter)
+                tags = re.findall(r"<<<SEG_(\d+)>>>", user_text)
+                n = len(tags)
+                if n > 1:
+                    lines = [f"<<<SEG_{i}>>> Translated-{i}" for i in range(1, n + 1)]
+                    return ("\n".join(lines), 20, 15)
+                else:
+                    return ("Single-translated", 10, 5)
 
-        def mock_generate(system_prompt, user_text):
-            call_count[0] += 1
-            # Count <<<SEG_N>>> tags to determine segment count (LWF-01 delimiter)
-            tags = re.findall(r"<<<SEG_(\d+)>>>", user_text)
-            n = len(tags)
-            if n > 1:
-                lines = [f"<<<SEG_{i}>>> Translated-{i}" for i in range(1, n + 1)]
-                return ("\n".join(lines), 20, 15)
-            else:
-                return ("Single-translated", 10, 5)
+            provider.generate.side_effect = mock_generate
+            backend._provider = provider
 
-        provider.generate.side_effect = mock_generate
-        backend._provider = provider
+            texts = ["A", "B", "C", "D", "E"]  # 5 texts, max 3 per prompt
+            result, inp, out = backend.translate_with_token_counts(texts, "en", "fr")
 
-        texts = ["A", "B", "C", "D", "E"]  # 5 texts, max 3 per prompt
-        result, inp, out = backend.translate_with_token_counts(texts, "en", "fr")
-
-        # Should be 2 packed calls: [A,B,C] and [D,E]
-        assert provider.generate.call_count == 2
-        assert len(result) == 5
+            # Should be 2 packed calls: [A,B,C] and [D,E]
+            assert provider.generate.call_count == 2
+            assert len(result) == 5
+        finally:
+            _max_segments_per_prompt_var.reset(token)

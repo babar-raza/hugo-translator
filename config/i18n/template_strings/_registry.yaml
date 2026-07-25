@@ -8,37 +8,37 @@ entries:
   evidence_count: 13622
 - id: heading.properties
   en: Properties
-  category: table_header
+  category: section_heading
   status: approved
   first_seen_incident: HT-QUALITY-GATES-001
   evidence_count: 6500
 - id: heading.value
   en: Value
   category: table_header
-  status: pending
+  status: approved
   first_seen_incident: HT-QUALITY-GATES-001
-  evidence_count: 0
+  evidence_count: 13014
 - id: heading.values
   en: Values
-  category: table_header
+  category: section_heading
   status: approved
   first_seen_incident: HT-QUALITY-GATES-001
   evidence_count: 3808
 - id: heading.methods
   en: Methods
-  category: table_header
+  category: section_heading
   status: approved
   first_seen_incident: HT-QUALITY-GATES-001
   evidence_count: 3448
 - id: heading.description
   en: Description
-  category: table_header
+  category: section_heading
   status: approved
   first_seen_incident: HT-QUALITY-GATES-001
   evidence_count: 2572
 - id: heading.see_also
   en: See Also
-  category: table_header
+  category: section_heading
   status: approved
   first_seen_incident: HT-QUALITY-GATES-001
   evidence_count: 1790
@@ -51,7 +51,7 @@ entries:
 - id: heading.enumerations
   en: Enumerations
   category: section_heading
-  status: pending
+  status: approved
   first_seen_incident: HT-QUALITY-GATES-001
   evidence_count: 119
 - id: heading.example
@@ -68,22 +68,22 @@ entries:
   evidence_count: 58
 - id: heading.examples
   en: Examples
-  category: table_header
-  status: pending
+  category: section_heading
+  status: approved
   first_seen_incident: HT-QUALITY-GATES-001
   evidence_count: 35
 - id: heading.inheritance
   en: Inheritance
-  category: table_header
-  status: pending
+  category: section_heading
+  status: approved
   first_seen_incident: HT-QUALITY-GATES-001
   evidence_count: 34
 - id: heading.type
   en: Type
   category: table_header
-  status: pending
-  first_seen_incident: HT-QUALITY-GATES-001
-  evidence_count: 33
+  status: approved
+  first_seen_incident: reference-i18n-hardening-20260725
+  evidence_count: 52228
 - id: heading.input
   en: Input
   category: section_heading
@@ -92,8 +92,8 @@ entries:
   evidence_count: 33
 - id: heading.constructors
   en: Constructors
-  category: table_header
-  status: pending
+  category: section_heading
+  status: approved
   first_seen_incident: HT-QUALITY-GATES-001
   evidence_count: 31
 - id: heading.features
@@ -123,15 +123,15 @@ entries:
 - id: heading.name
   en: Name
   category: table_header
-  status: pending
-  first_seen_incident: HT-QUALITY-GATES-001
-  evidence_count: 0
+  status: approved
+  first_seen_incident: reference-i18n-hardening-20260725
+  evidence_count: 52195
 - id: heading.returns
   en: Returns
   category: table_header
-  status: pending
-  first_seen_incident: HT-QUALITY-GATES-001
-  evidence_count: 0
+  status: approved
+  first_seen_incident: reference-i18n-hardening-20260725
+  evidence_count: 1363
 - id: heading.parameters
   en: Parameters
   category: table_header
@@ -243,12 +243,211 @@ entries:
 - id: table.access.read
   en: Read
   category: enum_value
-  status: pending
+  status: approved
   first_seen_incident: HT-QUALITY-GATES-001
   evidence_count: 0
+  context:
+    column_header: Access
 - id: table.access.write
   en: Write
   category: enum_value
-  status: pending
+  status: approved
   first_seen_incident: HT-QUALITY-GATES-001
   evidence_count: 0
+  context:
+    column_header: Access
+- id: table.access.execute
+  en: Execute
+  category: enum_value
+  status: approved
+  first_seen_incident: reference-i18n-hardening-20260725
+  evidence_count: 0
+  context:
+    column_header: Access
+- id: table.access.create
+  en: Create
+  category: enum_value
+  status: approved
+  first_seen_incident: reference-i18n-hardening-20260725
+  evidence_count: 0
+  context:
+    column_header: Access
+- id: table.access.delete
+  en: Delete
+  category: enum_value
+  status: approved
+  first_seen_incident: reference-i18n-hardening-20260725
+  evidence_count: 0
+  context:
+    column_header: Access
+- id: table.access.update
+  en: Update
+  category: enum_value
+  status: approved
+  first_seen_incident: reference-i18n-hardening-20260725
+  evidence_count: 0
+  context:
+    column_header: Access
+- id: table.access.read_write
+  en: Read/Write
+  category: enum_value
+  status: approved
+  first_seen_incident: reference-i18n-hardening-20260725
+  evidence_count: 0
+  context:
+    column_header: Access
+- id: table.header.description
+  en: Description
+  category: table_header
+  status: approved
+  first_seen_incident: reference-i18n-hardening-20260725
+  evidence_count: 122171
+- id: table.header.signature
+  en: Signature
+  category: table_header
+  status: approved
+  first_seen_incident: reference-i18n-hardening-20260725
+  evidence_count: 31997
+- id: table.header.access
+  en: Access
+  category: table_header
+  status: approved
+  first_seen_incident: reference-i18n-hardening-20260725
+  evidence_count: 34671
+- id: table.header.property
+  en: Property
+  category: table_header
+  status: approved
+  first_seen_incident: reference-i18n-hardening-20260725
+  evidence_count: 1958
+- id: table.header.method
+  en: Method
+  category: table_header
+  status: approved
+  first_seen_incident: reference-i18n-hardening-20260725
+  evidence_count: 1266
+- id: table.header.class
+  en: Class
+  category: table_header
+  status: approved
+  first_seen_incident: reference-i18n-hardening-20260725
+  evidence_count: 715
+- id: table.header.enumeration
+  en: Enumeration
+  category: table_header
+  status: approved
+  first_seen_incident: reference-i18n-hardening-20260725
+  evidence_count: 525
+- id: table.header.return_type
+  en: Return type
+  category: table_header
+  status: approved
+  first_seen_incident: reference-i18n-hardening-20260725
+  evidence_count: 273
+- id: heading.interfaces
+  en: Interfaces
+  category: section_heading
+  status: approved
+  first_seen_incident: reference-i18n-hardening-20260725
+  evidence_count: 150
+- id: heading.structs
+  en: Structs
+  category: section_heading
+  status: approved
+  first_seen_incident: reference-i18n-hardening-20260725
+  evidence_count: 143
+- id: heading.classes
+  en: Classes
+  category: section_heading
+  status: approved
+  first_seen_incident: reference-i18n-hardening-20260725
+  evidence_count: 103
+- id: heading.accessor_methods
+  en: Accessor Methods
+  category: section_heading
+  status: approved
+  first_seen_incident: reference-i18n-hardening-20260725
+  evidence_count: 791
+- id: heading.core_api
+  en: Core API
+  category: section_heading
+  status: approved
+  first_seen_incident: reference-i18n-hardening-20260725
+  evidence_count: 290
+- id: phrase.inherits_from
+  en: 'Inherits from: {api}.'
+  category: param_phrase
+  status: approved
+  first_seen_incident: reference-i18n-hardening-20260725
+  evidence_count: 3750
+  placeholders:
+  - api
+- id: phrase.is_a_class_in
+  en: '{api} is a class in Aspose.{family} FOSS for {platform}.'
+  category: param_phrase
+  status: approved
+  first_seen_incident: reference-i18n-hardening-20260725
+  evidence_count: 61489
+  placeholders:
+  - api
+  - family
+  - platform
+- id: phrase.is_an_enum_in
+  en: '{api} is a enum in Aspose.{family} FOSS for {platform}.'
+  category: param_phrase
+  status: approved
+  first_seen_incident: reference-i18n-hardening-20260725
+  evidence_count: 13205
+  placeholders:
+  - api
+  - family
+  - platform
+- id: phrase.is_an_interface_in
+  en: '{api} is a interface in Aspose.{family} FOSS for {platform}.'
+  category: param_phrase
+  status: approved
+  first_seen_incident: reference-i18n-hardening-20260725
+  evidence_count: 5427
+  placeholders:
+  - api
+  - family
+  - platform
+- id: phrase.is_a_struct_in
+  en: '{api} is a struct in Aspose.{family} FOSS for {platform}.'
+  category: param_phrase
+  status: approved
+  first_seen_incident: reference-i18n-hardening-20260725
+  evidence_count: 873
+  placeholders:
+  - api
+  - family
+  - platform
+- id: phrase.class_provides_methods
+  en: This class provides {n} methods for working with {api} objects in {platform}
+    programs.
+  category: param_phrase
+  status: approved
+  first_seen_incident: reference-i18n-hardening-20260725
+  evidence_count: 23690
+  placeholders:
+  - n
+  - api
+  - platform
+- id: phrase.enum_defines_values
+  en: 'This enumeration defines {n} values:'
+  category: param_phrase
+  status: approved
+  first_seen_incident: reference-i18n-hardening-20260725
+  evidence_count: 9578
+  placeholders:
+  - n
+- id: phrase.members_accessible_after_install
+  en: All public members are accessible to any {platform} application after installing
+    the Aspose.{family} FOSS for {platform} package.
+  category: param_phrase
+  status: approved
+  first_seen_incident: reference-i18n-hardening-20260725
+  evidence_count: 3690
+  placeholders:
+  - platform
+  - family
