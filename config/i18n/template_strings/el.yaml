@@ -3,31 +3,282 @@ locale: el
 translations:
   heading.overview:
     value: Επισκόπηση
-    reviewed_by: agent:terminology-reviewer+cross-check
-    reviewed_at: '2026-07-23T21:00:00+05:00'
-    evidence_count: 621
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 13622
+    corpus_agreement: override
+    rejected_variants:
+    - ΕΚΤΙΜΗΣΗ
+    - Γενική Επισκόπηση
   heading.properties:
     value: Ιδιότητες
-    reviewed_by: agent:terminology-reviewer
-    reviewed_at: '2026-07-23T21:00:00+05:00'
-    evidence_count: 561
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 6500
+    corpus_agreement: override
+    rejected_variants:
+    - Ιδιοκτησία
   heading.values:
     value: Τιμές
-    reviewed_by: agent:terminology-reviewer
-    reviewed_at: '2026-07-23T21:00:00+05:00'
-    evidence_count: 160
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 3808
+    corpus_agreement: override
+    rejected_variants:
+    - Αξίες
   heading.methods:
     value: Μέθοδοι
-    reviewed_by: agent:terminology-reviewer
-    reviewed_at: '2026-07-23T21:00:00+05:00'
-    evidence_count: 2950
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 3448
+    corpus_agreement: agree
   heading.description:
     value: Περιγραφή
-    reviewed_by: agent:terminology-reviewer
-    reviewed_at: '2026-07-23T21:00:00+05:00'
-    evidence_count: 572
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 2572
+    corpus_agreement: agree
   heading.see_also:
     value: Δείτε επίσης
-    reviewed_by: agent:terminology-reviewer
-    reviewed_at: '2026-07-23T21:00:00+05:00'
-    evidence_count: 4464
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 1790
+    corpus_agreement: agree
+  heading.enumerations:
+    value: Απαριθμήσεις
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 119
+    corpus_agreement: override
+    rejected_variants:
+    - ΕΝΟΜΗΜΑΤΑ
+    - Καταγραφές
+  heading.accessor_methods:
+    value: Μέθοδοι πρόσβασης
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 791
+    corpus_agreement: agree
+  heading.constructors:
+    value: Κατασκευαστές
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 31
+    corpus_agreement: agree
+  heading.interfaces:
+    value: Διεπαφές
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 150
+    corpus_agreement: override
+    rejected_variants:
+    - ΕΡΧΕΣΕΙΑ
+    - Σχήματα
+  heading.inheritance:
+    value: Κληρονομικότητα
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 34
+    corpus_agreement: override
+    rejected_variants:
+    - Κληρονομιά
+  heading.structs:
+    value: Δομές
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 143
+    corpus_agreement: override
+    rejected_variants:
+    - Στρατιώτες
+  heading.examples:
+    value: Παραδείγματα
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 35
+    corpus_agreement: agree
+  heading.classes:
+    value: Τάξεις
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 103
+    corpus_agreement: agree
+  heading.type:
+    value: Τύπος
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 52228
+    corpus_agreement: agree
+  heading.returns:
+    value: Επιστροφή
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 1363
+    corpus_agreement: agree
+    rejected_variants:
+    - Επιστρέφει
+    - Επιστροφές
+  heading.value:
+    value: Τιμή
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 13014
+    corpus_agreement: override
+    rejected_variants:
+    - Αξία
+  table.header.description:
+    value: Περιγραφή
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 122171
+    corpus_agreement: agree
+  table.header.signature:
+    value: Υπογραφή
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 31997
+    corpus_agreement: agree
+    rejected_variants:
+    - υπογραφή
+  table.header.access:
+    value: Πρόσβαση
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 34671
+    corpus_agreement: agree
+  table.header.property:
+    value: Ιδιότητα
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 1958
+    corpus_agreement: override
+    rejected_variants:
+    - Ιδιοκτησία
+  table.header.method:
+    value: Μέθοδος
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 1266
+    corpus_agreement: agree
+  table.header.class:
+    value: Κλάση
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 715
+    corpus_agreement: agree
+    rejected_variants:
+    - Τάξη
+  table.header.enumeration:
+    value: Απαρίθμηση
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 525
+    corpus_agreement: override
+    rejected_variants:
+    - Αριθμός
+    - Καταγραφή
+  table.header.return_type:
+    value: Τύπος επιστροφής
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 273
+    corpus_agreement: agree
+  table.access.read:
+    value: Ανάγνωση
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 0
+    corpus_agreement: no_corpus_evidence
+  table.access.write:
+    value: Εγγραφή
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 0
+    corpus_agreement: no_corpus_evidence
+  table.access.read_write:
+    value: Ανάγνωση/Εγγραφή
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 0
+    corpus_agreement: no_corpus_evidence
+  table.access.execute:
+    value: Εκτέλεση
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 0
+    corpus_agreement: no_corpus_evidence
+  table.access.create:
+    value: Δημιουργία
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 0
+    corpus_agreement: no_corpus_evidence
+  table.access.delete:
+    value: Διαγραφή
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 0
+    corpus_agreement: no_corpus_evidence
+  table.access.update:
+    value: Ενημέρωση
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 0
+    corpus_agreement: no_corpus_evidence
+  phrase.inherits_from:
+    value: 'Κληρονομεί από: {api}.'
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 3750
+    corpus_agreement: agree
+  phrase.is_a_class_in:
+    value: '{api} είναι μια κλάση στο Aspose.{family} FOSS για {platform}.'
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 61489
+    corpus_agreement: override
+    rejected_variants:
+    - '{api} Είναι μια τάξη στο Aspose.{family} FOSS για {platform}.'
+  phrase.is_an_enum_in:
+    value: '{api} είναι μια απαρίθμηση στο Aspose.{family} FOSS για {platform}.'
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 13205
+    corpus_agreement: override
+    rejected_variants:
+    - '{api} Είναι ένα enum στο Aspose.{family} FOSS για {platform}.'
+  phrase.is_an_interface_in:
+    value: '{api} είναι μια διεπαφή στο Aspose.{family} FOSS για {platform}.'
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 5427
+    corpus_agreement: agree
+  phrase.is_a_struct_in:
+    value: '{api} είναι μια δομή στο Aspose.{family} FOSS για {platform}.'
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 873
+    corpus_agreement: override
+    rejected_variants:
+    - '{api} Είναι ένα δοχείο στο Aspose.{family} FOSS για {platform}.'
+  phrase.class_provides_methods:
+    value: Αυτή η κλάση παρέχει {n} μεθόδους για εργασία με αντικείμενα {api} σε προγράμματα
+      {platform}.
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 23690
+    corpus_agreement: agree
+  phrase.enum_defines_values:
+    value: 'Αυτή η απαρίθμηση ορίζει {n} τιμές:'
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 9578
+    corpus_agreement: override
+    rejected_variants:
+    - 'Η λίστα αυτή καθορίζει {n} τιμές:'
+  phrase.members_accessible_after_install:
+    value: Όλα τα δημόσια μέλη είναι προσβάσιμα σε οποιαδήποτε εφαρμογή {platform}
+      μετά την εγκατάσταση του πακέτου Aspose.{family} FOSS for {platform}.
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 3690
+    corpus_agreement: agree

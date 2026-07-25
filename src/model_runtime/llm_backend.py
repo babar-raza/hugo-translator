@@ -9,6 +9,7 @@ Supports all providers in llm_providers.py: Ollama, OpenAI,
 Anthropic, and any OpenAI-compatible endpoint.
 """
 
+import contextvars
 import logging
 import re
 import time
@@ -21,6 +22,33 @@ from .loader import repair_mojibake
 from .registry import ModelInfo
 
 logger = logging.getLogger(__name__)
+
+# HT-QUALITY-GATES-001 Part 22 (root cause B, LLM prompt-context race):
+# ModelLoader caches ONE LLMModelBackend instance per model, shared across
+# every concurrent worker thread (max_parallel_files: 2+ per site config).
+# translate_with_context() used to stash context_hint/file_context as plain
+# instance attributes (`self._ctx_hint`/`self._ctx_file`) on that shared
+# instance, read back later inside prompt-building -- two threads
+# translating different files concurrently could interleave, so file A's
+# prompt got built with file B's class context. Confirmed as the same shape
+# as the reference.aspose.org CfbDocument/StampInfo description
+# cross-contamination found this session. contextvars.ContextVar gives each
+# thread (and each asyncio task, if this code is ever awaited concurrently)
+# its own independent view by default -- no shared mutable state, no lock
+# needed, and no call-chain signature changes required in the many
+# `translate()`/`translate_with_token_counts()` call sites elsewhere in this
+# file that don't care about context at all.
+_ctx_hint_var: contextvars.ContextVar[str | None] = contextvars.ContextVar(
+    "llm_backend_ctx_hint", default=None
+)
+_ctx_file_var: contextvars.ContextVar[dict[str, str] | None] = contextvars.ContextVar(
+    "llm_backend_ctx_file", default=None
+)
+# Same race, same fix: this used to be a temporary instance-attribute
+# override (`self.MAX_SEGMENTS_PER_PROMPT = 30`) on the shared backend.
+_max_segments_per_prompt_var: contextvars.ContextVar[int] = contextvars.ContextVar(
+    "llm_backend_max_segments_per_prompt", default=8
+)
 
 # ISO 639-1 → full language name for translation prompts
 LANGUAGE_NAMES = {
@@ -248,23 +276,28 @@ class LLMModelBackend:
         if not texts:
             return []
 
-        # Stash context for sub-methods; cleared in finally block
-        self._ctx_hint: str | None = context_hint
-        self._ctx_file: dict[str, str] | None = file_context
+        # HT-QUALITY-GATES-001 Part 22: context lives in thread/task-local
+        # ContextVars, not shared instance attributes -- see the module-level
+        # comment above for why. reset(token) restores the PREVIOUS value in
+        # this same context (normally the default), not just blanking it,
+        # which matters if translate_with_context() calls are ever nested.
+        hint_token = _ctx_hint_var.set(context_hint)
+        file_token = _ctx_file_var.set(file_context)
         try:
             # Use larger batch for short API descriptions (avg ~8 tokens each)
-            _saved_max = self.MAX_SEGMENTS_PER_PROMPT
-            if context_hint == "api_property_description":
-                self.MAX_SEGMENTS_PER_PROMPT = 30
+            max_token = _max_segments_per_prompt_var.set(
+                30 if context_hint == "api_property_description"
+                else _max_segments_per_prompt_var.get()
+            )
             try:
                 translations, _, _ = self.translate_with_token_counts(
                     texts, src_lang, tgt_lang
                 )
             finally:
-                self.MAX_SEGMENTS_PER_PROMPT = _saved_max
+                _max_segments_per_prompt_var.reset(max_token)
         finally:
-            self._ctx_hint = None
-            self._ctx_file = None
+            _ctx_hint_var.reset(hint_token)
+            _ctx_file_var.reset(file_token)
         return translations
 
     @staticmethod
@@ -302,6 +335,9 @@ class LLMModelBackend:
     # LLM-WASTE-FIX-3: max segments packed into a single LLM prompt.
     # Each segment gets a numbered tag; the LLM returns numbered translations.
     # If parsing fails, we fall back to per-segment calls for that sub-batch.
+    # HT-QUALITY-GATES-001 Part 22: the effective, possibly-overridden value
+    # now lives in _max_segments_per_prompt_var (module-level ContextVar);
+    # this class attribute is kept only as the documented default baseline.
     MAX_SEGMENTS_PER_PROMPT = 8
 
     def translate_with_token_counts(
@@ -347,8 +383,9 @@ class LLMModelBackend:
                 translations[i] = t  # preserve whitespace-only as-is
 
         # Process non-empty texts in packed sub-batches
-        for sub_start in range(0, len(non_empty_indices), self.MAX_SEGMENTS_PER_PROMPT):
-            sub_indices = non_empty_indices[sub_start : sub_start + self.MAX_SEGMENTS_PER_PROMPT]
+        _max_segments = _max_segments_per_prompt_var.get()
+        for sub_start in range(0, len(non_empty_indices), _max_segments):
+            sub_indices = non_empty_indices[sub_start : sub_start + _max_segments]
 
             if len(sub_indices) == 1:
                 # Single segment — use direct prompt (no packing overhead)
@@ -398,6 +435,29 @@ class LLMModelBackend:
         if not stripped:
             return "refusal"
         if _REFUSAL_RE.match(stripped):
+            return "refusal"
+
+        # HT-QUALITY-GATES-001 Part 22 (1.6): _REFUSAL_RE above only matches
+        # at the START of the response. A fluent, mid-string, or
+        # non-start-anchored conversational reply -- a clarifying question,
+        # an apology not beginning with "I'm sorry", "let me know if..." --
+        # passed every check here untouched and shipped as translated
+        # content in production (confirmed real examples: a `keywords` list
+        # entry that reads "Could you please provide the English text you'd
+        # like translated into Ukrainian?"; body prose reading "I'm sorry,
+        # but I can't access or read any attached files..."). Reuses the
+        # same curated patterns as write_gate.py's Gate 29/30 (single source
+        # of truth, src/translation_engine/quality/refusal_patterns.py) so
+        # generation-time and write-time detection can't drift apart.
+        # Lazy import: translation_engine's package __init__ imports
+        # TranslationEngine, which imports this package (ModelLoader) at
+        # module load time -- a top-level import here would be circular.
+        from src.translation_engine.quality.refusal_patterns import (
+            CONVERSATIONAL_SHAPE_RE,
+            REFUSAL_RE,
+        )
+
+        if REFUSAL_RE.search(stripped) or CONVERSATIONAL_SHAPE_RE.search(stripped):
             return "refusal"
 
         lines = stripped.splitlines()
@@ -696,8 +756,8 @@ class LLMModelBackend:
         """
         src_name = LANGUAGE_NAMES.get(src_lang, src_lang.upper())
         tgt_name = LANGUAGE_NAMES.get(tgt_lang, tgt_lang.upper())
-        hint: str | None = getattr(self, "_ctx_hint", None)
-        file_ctx: dict[str, str] = getattr(self, "_ctx_file", None) or {}
+        hint: str | None = _ctx_hint_var.get()
+        file_ctx: dict[str, str] = _ctx_file_var.get() or {}
 
         if hint == "api_property_description":
             class_name = file_ctx.get("class_name", "")
@@ -771,8 +831,8 @@ class LLMModelBackend:
         """
         src_name = LANGUAGE_NAMES.get(src_lang, src_lang.upper())
         tgt_name = LANGUAGE_NAMES.get(tgt_lang, tgt_lang.upper())
-        hint: str | None = getattr(self, "_ctx_hint", None)
-        file_ctx: dict[str, str] = getattr(self, "_ctx_file", None) or {}
+        hint: str | None = _ctx_hint_var.get()
+        file_ctx: dict[str, str] = _ctx_file_var.get() or {}
 
         if hint == "api_property_description":
             class_name = file_ctx.get("class_name", "")

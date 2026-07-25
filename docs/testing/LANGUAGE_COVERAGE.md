@@ -14,6 +14,11 @@ This document describes the comprehensive language coverage testing strategy for
 **Coverage:** 36/36 languages (100%)
 **Test File:** `tests/integration/test_language_coverage.py`
 
+> **Note:** "36/36" here means model-registry coverage (every language in
+> the global catalog has a working model), not that every site ships all
+> 36. Aspose.org site profiles are restricted to a 25-target-locale subset
+> — see `docs/languages/ASPOSE_ORG_LOCALE_POLICY.md`.
+
 ---
 
 ## Test Methodology

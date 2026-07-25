@@ -53,11 +53,11 @@ def test_gate30_placeholder_leak_is_reported_under_its_established_name():
     assert "placeholder_leak_gate30" in issue_types
 
 
-def test_hand_implemented_gate_ids_9_to_28_are_never_double_reported():
+def test_hand_implemented_gate_ids_exclude_registry_swept_gate26():
     # These ids are this script's own hand-rolled checks elsewhere in scan();
     # _run_registry_gates must skip them so a hit isn't reported twice under
     # two different names for the same underlying defect.
-    assert aac._HAND_IMPLEMENTED_GATE_IDS == set(range(9, 29))
+    assert aac._HAND_IMPLEMENTED_GATE_IDS == set(range(9, 26)) | {27, 28}
     en = "---\ntitle: Test\n---\nHello world, a normal sentence with enough words."
     tr = "---\ntitle: Test\n---\nHola mundo, una oracion normal con suficientes palabras."
     findings = _collect(en, tr)

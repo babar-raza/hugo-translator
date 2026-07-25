@@ -3,31 +3,282 @@ locale: ko
 translations:
   heading.overview:
     value: 개요
-    reviewed_by: agent:terminology-reviewer
-    reviewed_at: '2026-07-23T21:00:00+05:00'
-    evidence_count: 1545
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 13622
+    corpus_agreement: agree
   heading.properties:
     value: 속성
-    reviewed_by: agent:terminology-reviewer+cross-check
-    reviewed_at: '2026-07-23T21:00:00+05:00'
-    evidence_count: 66
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 6500
+    corpus_agreement: override
+    rejected_variants:
+    - 성질
   heading.values:
     value: 값
-    reviewed_by: agent:terminology-reviewer
-    reviewed_at: '2026-07-23T21:00:00+05:00'
-    evidence_count: 58
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 3808
+    corpus_agreement: agree
   heading.methods:
-    value: 방법들
-    reviewed_by: agent:terminology-reviewer
-    reviewed_at: '2026-07-23T21:00:00+05:00'
-    evidence_count: 455
+    value: 메서드
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 3448
+    corpus_agreement: override
+    rejected_variants:
+    - 방법들
+    - 방법
   heading.description:
     value: 설명
-    reviewed_by: agent:terminology-reviewer
-    reviewed_at: '2026-07-23T21:00:00+05:00'
-    evidence_count: 221
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 2572
+    corpus_agreement: agree
   heading.see_also:
     value: 참조
-    reviewed_by: agent:terminology-reviewer+cross-check
-    reviewed_at: '2026-07-23T21:00:00+05:00'
-    evidence_count: 68
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 1790
+    corpus_agreement: override
+    rejected_variants:
+    - 이 부분도 참조하십시오.
+    - 또 보기
+  heading.enumerations:
+    value: 열거형
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 119
+    corpus_agreement: override
+    rejected_variants:
+    - 목록
+  heading.accessor_methods:
+    value: 접근자 메서드
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 791
+    corpus_agreement: override
+    rejected_variants:
+    - 부합기법
+  heading.constructors:
+    value: 생성자
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 31
+    corpus_agreement: override
+    rejected_variants:
+    - 제조업체들
+  heading.core_api:
+    value: 코어 API
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 290
+    corpus_agreement: agree
+  heading.interfaces:
+    value: 인터페이스
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 150
+    corpus_agreement: no_corpus_evidence
+  heading.inheritance:
+    value: 상속
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 34
+    corpus_agreement: no_corpus_evidence
+  heading.structs:
+    value: 구조체
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 143
+    corpus_agreement: no_corpus_evidence
+  heading.examples:
+    value: 예제
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 35
+    corpus_agreement: no_corpus_evidence
+  heading.classes:
+    value: 클래스
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 103
+    corpus_agreement: no_corpus_evidence
+  heading.type:
+    value: 유형
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 52228
+    corpus_agreement: agree
+  heading.name:
+    value: 이름
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 52195
+    corpus_agreement: agree
+  heading.returns:
+    value: 반환값
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 1363
+    corpus_agreement: override
+    rejected_variants:
+    - 수익률
+  heading.value:
+    value: 값
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 13014
+    corpus_agreement: override
+    rejected_variants:
+    - 가치
+    - 가치가 있는
+  table.header.description:
+    value: 설명
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 122171
+    corpus_agreement: agree
+  table.header.signature:
+    value: 시그니처
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 31997
+    corpus_agreement: agree
+  table.header.access:
+    value: 액세스
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 34671
+    corpus_agreement: agree
+    rejected_variants:
+    - 접근
+  table.header.property:
+    value: 속성
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 1958
+    corpus_agreement: override
+    rejected_variants:
+    - ImageRenderOptions
+  table.header.method:
+    value: 메서드
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 1266
+    corpus_agreement: override
+    rejected_variants:
+    - Methods
+  table.header.class:
+    value: 클래스
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 715
+    corpus_agreement: no_corpus_evidence
+  table.header.enumeration:
+    value: 열거형
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 525
+    corpus_agreement: no_corpus_evidence
+  table.header.return_type:
+    value: 반환 타입
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 273
+    corpus_agreement: agree
+    rejected_variants:
+    - 반환 형식
+  table.access.read:
+    value: 읽기
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 0
+    corpus_agreement: no_corpus_evidence
+  table.access.write:
+    value: 쓰기
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 0
+    corpus_agreement: no_corpus_evidence
+  table.access.read_write:
+    value: 읽기/쓰기
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 0
+    corpus_agreement: no_corpus_evidence
+  table.access.execute:
+    value: 실행
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 0
+    corpus_agreement: no_corpus_evidence
+  table.access.create:
+    value: 생성
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 0
+    corpus_agreement: no_corpus_evidence
+  table.access.delete:
+    value: 삭제
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 0
+    corpus_agreement: no_corpus_evidence
+  table.access.update:
+    value: 업데이트
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 0
+    corpus_agreement: no_corpus_evidence
+    rejected_variants:
+    - 수정
+    - 갱신
+  phrase.inherits_from:
+    value: '상속 대상: {api}.'
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 3750
+    corpus_agreement: agree
+  phrase.is_an_enum_in:
+    value: '{api} {platform}의 Aspose.{family} FOSS에서 enum입니다.'
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 13205
+    corpus_agreement: agree
+  phrase.is_an_interface_in:
+    value: '{api} {platform}를 위한 Aspose.{family} FOSS의 인터페이스입니다.'
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 5427
+    corpus_agreement: agree
+  phrase.is_a_struct_in:
+    value: '{api} {platform}의 Aspose.{family} FOSS에 있는 구조체입니다.'
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 873
+    corpus_agreement: override
+    rejected_variants:
+    - '{api} {platform}의 Aspose.{family} FOSS에서 있는 구조입니다.'
+  phrase.class_provides_methods:
+    value: 이 클래스는 {platform} 프로그램에서 {api} 객체를 작업하기 위한 {n}개의 메서드를 제공합니다.
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 23690
+    corpus_agreement: agree
+  phrase.enum_defines_values:
+    value: '이 열거형은 {n}개의 값을 정의합니다:'
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 9578
+    corpus_agreement: override
+    rejected_variants:
+    - '이 수열은 {n}개의 값을 정의합니다.:'
+  phrase.members_accessible_after_install:
+    value: Aspose.{family} FOSS for {platform} 패키지를 설치한 후 모든 {platform} 애플리케이션에서 모든
+      public 멤버에 접근할 수 있습니다.
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 3690
+    corpus_agreement: agree

@@ -9,6 +9,12 @@
 
 This specification defines the complete model coverage strategy for translating English content to all 36 target languages supported by the Hugo Translation System. It ensures every language has at least one functional translation model and provides guidance for optimal model selection per language.
 
+> **Scope note:** this is a model/registry-level requirement — every
+> language in the catalog must have a working model. It does not mean
+> every site translates to all 36 languages. Aspose.org site profiles are
+> restricted to a 25-target-locale subset (26 with the `en` source); see
+> `docs/languages/ASPOSE_ORG_LOCALE_POLICY.md` for that per-site contract.
+
 ## Table of Contents
 
 1. [Language Requirements](#language-requirements)

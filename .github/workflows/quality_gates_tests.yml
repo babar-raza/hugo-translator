@@ -20,9 +20,13 @@ on:
       - 'src/translation_engine/language_detection/**'
       - 'src/translation_engine/quality/**'
       - 'src/translation_engine/extractor/text_unit_extractor.py'
+      - 'src/translation_engine/terminology/**'
+      - 'config/i18n/**'
       - 'scripts/quality/audit_llm_artifacts.py'
+      - 'scripts/quality/mine_heading_glossary.py'
       - 'tests/unit/translation_engine/**'
       - 'tests/unit/validation/**'
+      - 'tests/unit/scripts/test_mine_heading_glossary.py'
   pull_request:
     branches: [main]
     paths:
@@ -32,9 +36,13 @@ on:
       - 'src/translation_engine/language_detection/**'
       - 'src/translation_engine/quality/**'
       - 'src/translation_engine/extractor/text_unit_extractor.py'
+      - 'src/translation_engine/terminology/**'
+      - 'config/i18n/**'
       - 'scripts/quality/audit_llm_artifacts.py'
+      - 'scripts/quality/mine_heading_glossary.py'
       - 'tests/unit/translation_engine/**'
       - 'tests/unit/validation/**'
+      - 'tests/unit/scripts/test_mine_heading_glossary.py'
   workflow_dispatch:
     # Allow manual trigger
 
@@ -76,4 +84,8 @@ jobs:
 
       - name: Full translation_engine regression sweep
         run: python -m pytest tests/unit/translation_engine/ -q
+        shell: pwsh
+
+      - name: i18n miner unit tests
+        run: python -m pytest tests/unit/scripts/test_mine_heading_glossary.py -q
         shell: pwsh

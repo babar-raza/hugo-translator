@@ -3,10 +3,11 @@ Unit tests for L3 Semantic Translation Memory.
 """
 
 from pathlib import Path
+from unittest.mock import patch
 
 import pytest
 
-from src.tm.l3_semantic import L3SemanticTM, SemanticMatch
+from src.tm.l3_semantic import L3SemanticTM, SemanticMatch, load_standalone_sentence_encoder
 
 
 @pytest.fixture
@@ -583,3 +584,32 @@ class TestSemanticMatch:
         assert match_dict["source_text"] == "Hello"
         assert match_dict["translation"] == "Bonjour"
         assert match_dict["context"] == "frontmatter.title"
+
+
+class TestLoadStandaloneSentenceEncoder:
+    """HT-QUALITY-GATES-001 Part 22 (plan 5.4 item 1): standalone encoder
+    loading, decoupled from full L3SemanticTM construction (no FAISS index,
+    no on-disk metadata, no periodic-save machinery)."""
+
+    def test_defaults_to_cpu(self):
+        """Deliberately defaults to CPU -- the configured embedding model
+        (~1.1GB multilingual mpnet) is exactly the GPU-memory cost
+        skip_l3=True exists to avoid on multi-shard runs; see the
+        function's own docstring for the full reasoning."""
+        with patch("src.tm.l3_semantic.SentenceTransformer") as mock_st:
+            load_standalone_sentence_encoder("some-model-name")
+
+        mock_st.assert_called_once_with("some-model-name", device="cpu")
+
+    def test_use_gpu_true_requests_cuda(self):
+        with patch("src.tm.l3_semantic.SentenceTransformer") as mock_st:
+            load_standalone_sentence_encoder("some-model-name", use_gpu=True)
+
+        mock_st.assert_called_once_with("some-model-name", device="cuda")
+
+    def test_returns_the_loaded_encoder(self):
+        with patch("src.tm.l3_semantic.SentenceTransformer") as mock_st:
+            mock_st.return_value = "encoder-instance"
+            result = load_standalone_sentence_encoder("some-model-name")
+
+        assert result == "encoder-instance"

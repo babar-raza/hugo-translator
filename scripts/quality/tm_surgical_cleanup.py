@@ -34,6 +34,9 @@ from src.translation_engine.terminology.classification import (  # noqa: E402
     TemplateStringRegistry,
     should_protect_as_identifier,
 )
+from src.translation_engine.quality.inline_code_repair import (  # noqa: E402
+    restore_inline_code_spans,
+)
 from tm.l2_persistent import L2PersistentTM, TranslationEntry  # noqa: E402
 
 # ---------------------------------------------------------------------------
@@ -145,6 +148,19 @@ def is_corrupt_entry(
         if approved_value is not None and approved_value != src:
             return True, "heading_untranslated_passthrough", "correct"
 
+    # Rule 5 (HT-INLINE-CODE-001 TC-ICR-011): an embedded inline-code span
+    # (an API identifier inside backticks within a larger cached segment)
+    # was translated instead of preserved verbatim -- the TM-side instance
+    # of the same corruption class TC-ICR-004/008 fix on the content side.
+    # Uses the same shared, count-guarded primitive: only patches the
+    # specific corrupted span(s), never a full identity overwrite of the
+    # whole cached segment, so correctly-translated surrounding prose in
+    # the same entry is never touched. A span-count mismatch (ambiguous
+    # pairing) returns None from the primitive and is correctly NOT
+    # flagged here either.
+    if restore_inline_code_spans(entry.source_text, entry.translation) is not None:
+        return True, "inline_code_span_translated", "patch"
+
     return False, "", ""
 
 
@@ -168,6 +184,7 @@ def run(
     to_overwrite: list[TranslationEntry] = []
     to_delete: list[TranslationEntry] = []
     to_correct: list[tuple[TranslationEntry, str]] = []
+    to_patch: list[tuple[TranslationEntry, str]] = []
 
     print(f"Scanning L2 TM (site={site or 'ALL'}, locales={only_locales or 'ALL'})...")
 
@@ -197,21 +214,26 @@ def run(
         elif action == "correct":
             corrected_value = registry.lookup(entry.source_text.strip(), entry.tgt_lang)
             to_correct.append((entry, corrected_value))
+        elif action == "patch":
+            patched_value = restore_inline_code_spans(entry.source_text, entry.translation)
+            to_patch.append((entry, patched_value))
         else:
             to_delete.append(entry)
 
-        if len(to_overwrite) + len(to_delete) + len(to_correct) >= max_changes:
+        if len(to_overwrite) + len(to_delete) + len(to_correct) + len(to_patch) >= max_changes:
             print(f"  WARNING: max_changes={max_changes} reached — stopping scan early.")
             break
 
     stats["to_overwrite"] = len(to_overwrite)
     stats["to_delete"] = len(to_delete)
     stats["to_correct"] = len(to_correct)
+    stats["to_patch"] = len(to_patch)
 
     if apply:
         print(
             f"\nApplying {len(to_overwrite)} overwrites, {len(to_delete)} deletes, "
-            f"and {len(to_correct)} i18n-table corrections..."
+            f"{len(to_correct)} i18n-table corrections, and {len(to_patch)} "
+            f"inline-code-span patches..."
         )
 
         for entry in to_overwrite:
@@ -244,6 +266,29 @@ def run(
                 print(f"  ERROR correcting {entry.source_text[:30]!r}: {e}", file=sys.stderr)
                 stats["correct_errors"] += 1
 
+        for entry, patched_value in to_patch:
+            try:
+                tm.store(
+                    site_id=entry.site_id,
+                    src_lang=entry.src_lang,
+                    tgt_lang=entry.tgt_lang,
+                    text=entry.source_text,
+                    translation=patched_value,
+                    overwrite=True,
+                    # HT-INLINE-CODE-001 TC-ICR-011: provenance marker in the
+                    # existing metadata dict (no schema change) -- makes a
+                    # future "what already got remediated" query possible
+                    # instead of needing another forensic script.
+                    metadata={
+                        **(entry.metadata or {}),
+                        "remediation": "inline_code_repair_v1",
+                    },
+                )
+                stats["patched"] += 1
+            except Exception as e:
+                print(f"  ERROR patching {entry.source_text[:30]!r}: {e}", file=sys.stderr)
+                stats["patch_errors"] += 1
+
         for entry in to_delete:
             try:
                 tm.delete(
@@ -259,6 +304,7 @@ def run(
     else:
         stats["overwritten"] = 0
         stats["deleted"] = 0
+        stats["patched"] = 0
 
     return dict(stats)
 
@@ -358,16 +404,23 @@ def main() -> None:
         f"  heading_untranslated_passthrough:"
         f"{stats.get('reason_heading_untranslated_passthrough', 0):>4,}"
     )
+    print(
+        f"  inline_code_span_translated:"
+        f"{stats.get('reason_inline_code_span_translated', 0):>8,}"
+    )
     print(f"Planned overwrites:     {stats.get('to_overwrite', 0):>8,}")
     print(f"Planned deletes:        {stats.get('to_delete', 0):>8,}")
     print(f"Planned i18n corrections:{stats.get('to_correct', 0):>7,}")
+    print(f"Planned inline-code patches:{stats.get('to_patch', 0):>4,}")
     if apply:
         print(f"Overwrites applied:     {stats.get('overwritten', 0):>8,}")
         print(f"Deletes applied:        {stats.get('deleted', 0):>8,}")
         print(f"i18n corrections applied:{stats.get('corrected', 0):>7,}")
+        print(f"Inline-code patches applied:{stats.get('patched', 0):>4,}")
         print(f"Overwrite errors:       {stats.get('overwrite_errors', 0):>8,}")
         print(f"Delete errors:          {stats.get('delete_errors', 0):>8,}")
         print(f"Correction errors:      {stats.get('correct_errors', 0):>8,}")
+        print(f"Patch errors:           {stats.get('patch_errors', 0):>8,}")
 
     if not apply:
         print()
