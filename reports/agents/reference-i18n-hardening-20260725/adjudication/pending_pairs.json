@@ -1,0 +1,190 @@
+[
+  {
+    "locale": "ar",
+    "id": "heading.core_api"
+  },
+  {
+    "locale": "bg",
+    "id": "phrase.class_provides_methods"
+  },
+  {
+    "locale": "ca",
+    "id": "phrase.is_a_class_in"
+  },
+  {
+    "locale": "ca",
+    "id": "phrase.is_an_interface_in"
+  },
+  {
+    "locale": "el",
+    "id": "heading.core_api"
+  },
+  {
+    "locale": "el",
+    "id": "heading.name"
+  },
+  {
+    "locale": "es",
+    "id": "phrase.class_provides_methods"
+  },
+  {
+    "locale": "fa",
+    "id": "heading.see_also"
+  },
+  {
+    "locale": "fa",
+    "id": "heading.methods"
+  },
+  {
+    "locale": "fa",
+    "id": "heading.description"
+  },
+  {
+    "locale": "fa",
+    "id": "heading.enumerations"
+  },
+  {
+    "locale": "fa",
+    "id": "heading.interfaces"
+  },
+  {
+    "locale": "fa",
+    "id": "heading.structs"
+  },
+  {
+    "locale": "fa",
+    "id": "heading.classes"
+  },
+  {
+    "locale": "fa",
+    "id": "table.header.description"
+  },
+  {
+    "locale": "fi",
+    "id": "heading.enumerations"
+  },
+  {
+    "locale": "fi",
+    "id": "table.header.enumeration"
+  },
+  {
+    "locale": "he",
+    "id": "heading.core_api"
+  },
+  {
+    "locale": "hu",
+    "id": "heading.accessor_methods"
+  },
+  {
+    "locale": "hu",
+    "id": "phrase.is_a_class_in"
+  },
+  {
+    "locale": "hu",
+    "id": "phrase.is_an_enum_in"
+  },
+  {
+    "locale": "hu",
+    "id": "phrase.is_an_interface_in"
+  },
+  {
+    "locale": "id",
+    "id": "table.header.signature"
+  },
+  {
+    "locale": "ja",
+    "id": "heading.see_also"
+  },
+  {
+    "locale": "ja",
+    "id": "phrase.enum_defines_values"
+  },
+  {
+    "locale": "ko",
+    "id": "phrase.is_a_class_in"
+  },
+  {
+    "locale": "lt",
+    "id": "heading.name"
+  },
+  {
+    "locale": "lt",
+    "id": "phrase.is_a_class_in"
+  },
+  {
+    "locale": "lt",
+    "id": "phrase.is_an_enum_in"
+  },
+  {
+    "locale": "lt",
+    "id": "phrase.is_an_interface_in"
+  },
+  {
+    "locale": "lv",
+    "id": "phrase.is_a_class_in"
+  },
+  {
+    "locale": "lv",
+    "id": "phrase.is_an_enum_in"
+  },
+  {
+    "locale": "nl",
+    "id": "table.header.signature"
+  },
+  {
+    "locale": "no",
+    "id": "heading.enumerations"
+  },
+  {
+    "locale": "no",
+    "id": "table.header.enumeration"
+  },
+  {
+    "locale": "ru",
+    "id": "table.header.signature"
+  },
+  {
+    "locale": "sr",
+    "id": "heading.returns"
+  },
+  {
+    "locale": "sv",
+    "id": "phrase.class_provides_methods"
+  },
+  {
+    "locale": "th",
+    "id": "heading.enumerations"
+  },
+  {
+    "locale": "th",
+    "id": "table.header.enumeration"
+  },
+  {
+    "locale": "tr",
+    "id": "phrase.enum_defines_values"
+  },
+  {
+    "locale": "uk",
+    "id": "phrase.inherits_from"
+  },
+  {
+    "locale": "uk",
+    "id": "phrase.class_provides_methods"
+  },
+  {
+    "locale": "uk",
+    "id": "phrase.enum_defines_values"
+  },
+  {
+    "locale": "vi",
+    "id": "heading.enumerations"
+  },
+  {
+    "locale": "vi",
+    "id": "table.header.enumeration"
+  },
+  {
+    "locale": "vi",
+    "id": "phrase.enum_defines_values"
+  }
+]
