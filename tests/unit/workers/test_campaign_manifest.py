@@ -19,6 +19,7 @@ def _manifest(tmp_path: Path) -> dict:
         "config_fingerprint": "c" * 64,
         "model_fingerprints": {"model_registry": "e" * 64},
         "tm_fingerprint": "f" * 64,
+        "knowledge_fingerprints": {},
         "target_locales": ["es", "fr"],
         "expected_source_count": 1,
         "expected_output_count": 2,

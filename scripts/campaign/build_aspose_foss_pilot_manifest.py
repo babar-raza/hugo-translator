@@ -59,6 +59,26 @@ def _config_fingerprint(translator_repo: Path) -> str:
     return digest.hexdigest()
 
 
+def _knowledge_fingerprints(content_repo: Path) -> dict[str, str]:
+    paths: list[Path] = []
+    for family, platform in PRODUCTS:
+        merged = Path("knowledge") / family / platform / "merged"
+        paths.extend(
+            [
+                merged / "model.yaml",
+                merged / "claims.json",
+                merged / "api_surface.json",
+            ]
+        )
+    paths.append(
+        Path("knowledge/html/python/scout/enriched_claims.json")
+    )
+    return {
+        path.as_posix(): sha256_file(content_repo / path)
+        for path in paths
+    }
+
+
 def _folder_sources(content_repo: Path):
     for site_id, default_wave in FOLDER_SURFACES:
         for family, platform in PRODUCTS:
@@ -169,6 +189,7 @@ def build_manifest(
                 "data/tm/l3_faiss/config.json",
             ],
         ),
+        "knowledge_fingerprints": _knowledge_fingerprints(content_repo),
         "target_locales": list(TARGET_LOCALES),
         "expected_source_count": EXPECTED_SOURCE_COUNT,
         "expected_output_count": EXPECTED_OUTPUT_COUNT,

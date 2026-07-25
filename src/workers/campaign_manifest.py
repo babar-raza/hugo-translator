@@ -107,6 +107,7 @@ class CampaignManifest:
     config_fingerprint: str
     model_fingerprints: dict[str, str]
     tm_fingerprint: str
+    knowledge_fingerprints: dict[str, str]
     target_locales: tuple[str, ...]
     sources: tuple[CampaignSource, ...]
     expected_source_count: int
@@ -135,6 +136,10 @@ class CampaignManifest:
                     for k, v in raw["model_fingerprints"].items()
                 },
                 tm_fingerprint=str(raw["tm_fingerprint"]),
+                knowledge_fingerprints={
+                    str(k): str(v)
+                    for k, v in raw["knowledge_fingerprints"].items()
+                },
                 target_locales=tuple(str(item) for item in raw["target_locales"]),
                 sources=tuple(
                     CampaignSource.from_dict(item) for item in raw["sources"]
@@ -254,6 +259,12 @@ class CampaignManifest:
                 errors.append(str(exc))
 
         accepted = allow_existing_accepted or set()
+        for relative, expected_hash in self.knowledge_fingerprints.items():
+            knowledge_path = content_repo / relative
+            if not knowledge_path.is_file():
+                errors.append(f"knowledge artifact missing: {relative}")
+            elif sha256_file(knowledge_path) != expected_hash:
+                errors.append(f"knowledge fingerprint drift: {relative}")
         for source in self.sources:
             source_path = content_repo / source.source_path
             if not source_path.is_file():
