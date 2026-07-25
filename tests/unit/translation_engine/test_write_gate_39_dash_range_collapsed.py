@@ -81,3 +81,26 @@ class TestGateDashRangeCollapsed:
         gate._gate_dash_range_collapsed(en, tr, Path("test.md"), result)
 
         assert result.passed is True
+
+    def test_intact_range_plus_unrelated_coincidental_digit_run_is_silent(self):
+        """Independent-verification MINOR finding, false-positive vector:
+        the range "18-22" is preserved intact (dash and all) elsewhere in
+        the document, but an unrelated, coincidental digit run "1822"
+        (e.g. a product code) also appears -- the gate must not treat that
+        coincidence as evidence the range collapsed, since the correctly
+        preserved range is right there too."""
+        en = (
+            "---\ntitle: Sample\n---\n"
+            "Supported in versions 18-22 of the product. See product code 1822 "
+            "for ordering.\n"
+        )
+        tr = (
+            "---\ntitle: Sample\n---\n"
+            "Soportado en las versiones 18-22 del producto. Vea el codigo de "
+            "producto 1822 para realizar el pedido.\n"
+        )
+        gate = _make_gate()
+        result = WriteGateResult(passed=True)
+        gate._gate_dash_range_collapsed(en, tr, Path("test.md"), result)
+
+        assert result.passed is True

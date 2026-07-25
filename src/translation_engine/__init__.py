@@ -10,6 +10,7 @@ from .exceptions import (
 )
 from .extractor import SegmentExtractor
 from .models import (
+    AcceptedTranslation,
     DirectoryResult,
     TranslationResult,
     TranslationStats,
@@ -22,6 +23,7 @@ from .reconstructor import MarkdownReconstructor
 
 __all__ = [
     "TranslationEngine",
+    "AcceptedTranslation",
     "TranslationError",
     "TranslationRejectedError",
     "TranslationRetryableError",

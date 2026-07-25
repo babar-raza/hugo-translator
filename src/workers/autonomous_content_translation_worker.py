@@ -206,6 +206,10 @@ class AutonomousWorkerConfig:
         max_gpu_memory_percent: int | None = 60,
         device: str = "auto",
         file_timeout_seconds: int = 600,
+        campaign_manifest: str | None = None,
+        resume: bool = False,
+        verify_only: bool = False,
+        validation_policy: str = "standard",
     ):
         """Initialize worker configuration."""
         self.config_root = config_root
@@ -221,6 +225,10 @@ class AutonomousWorkerConfig:
         self.max_gpu_memory_percent = max_gpu_memory_percent
         self.device = device
         self.file_timeout_seconds = file_timeout_seconds
+        self.campaign_manifest = campaign_manifest
+        self.resume = resume
+        self.verify_only = verify_only
+        self.validation_policy = validation_policy
 
     @classmethod
     def from_args(cls, args: argparse.Namespace) -> "AutonomousWorkerConfig":
@@ -238,6 +246,10 @@ class AutonomousWorkerConfig:
             max_gpu_memory_percent=args.max_gpu_memory_percent,
             device=args.device,
             file_timeout_seconds=args.file_timeout_seconds,
+            campaign_manifest=getattr(args, "campaign_manifest", None),
+            resume=getattr(args, "resume", False),
+            verify_only=getattr(args, "verify_only", False),
+            validation_policy=getattr(args, "validation_policy", "standard"),
         )
 
 
@@ -282,6 +294,7 @@ class AutonomousContentTranslationWorker:
         self.scheduler = None
         self._site_profile_cache = {}
         self._site_profile_errors = {}
+        self.campaign = None
 
         # Generate stable run ID for this invocation (used across all sites in this run)
         self.invocation_id = str(uuid.uuid4())
@@ -308,6 +321,19 @@ class AutonomousContentTranslationWorker:
         except Exception as e:
             logger.error(f"Failed to load configuration: {e}")
             raise
+
+        if self.config.campaign_manifest:
+            if self.config.mode != "oneshot":
+                raise ValueError("campaign manifests are supported only in oneshot mode")
+            if self.config.validation_policy != "zero-defect":
+                raise ValueError(
+                    "campaign execution requires --validation-policy zero-defect"
+                )
+            from src.workers.campaign_manifest import CampaignManifest
+
+            self.campaign = CampaignManifest.load(self.config.campaign_manifest)
+            if self.campaign.validation_policy != self.config.validation_policy:
+                raise ValueError("worker and campaign validation policies differ")
 
         # Apply VRAM enforcement if using CUDA
         if self.config.device.startswith("cuda"):
@@ -445,6 +471,31 @@ class AutonomousContentTranslationWorker:
                     "fallback_model", "m2m100_1.2b"
                 ),
                 enable_content_hash_tracking=content_hash_enabled,
+                enable_validation=True,
+                validation_mode=(
+                    "strict"
+                    if self.config.validation_policy == "zero-defect"
+                    else None
+                ),
+                validation_policy=self.config.validation_policy,
+                enable_verification=(
+                    self.config.validation_policy == "zero-defect"
+                ),
+                enable_verification_fix=(
+                    self.config.validation_policy == "zero-defect"
+                ),
+                max_retries=(
+                    4 if self.config.validation_policy == "zero-defect" else None
+                ),
+                save_rejected=False,
+                campaign_context=(
+                    {
+                        "campaign_id": self.campaign.campaign_id,
+                        "config_fingerprint": self.campaign.config_fingerprint,
+                    }
+                    if self.campaign
+                    else {}
+                ),
             )
             logger.info("Initialized TranslationEngine")
         except Exception as e:
@@ -735,9 +786,29 @@ class AutonomousContentTranslationWorker:
         )
 
         try:
-            self._commit_orphaned_translations()
-            self._execute_translation_run()
-            self._recover_pending_commits()
+            if self.campaign is not None:
+                from src.workers.campaign_runner import CampaignRunner
+
+                runner = CampaignRunner(
+                    manifest=self.campaign,
+                    translation_engine=self.translation_engine,
+                    translator_repo=Path.cwd(),
+                )
+                summary = runner.run(
+                    resume=self.config.resume,
+                    verify_only=self.config.verify_only,
+                )
+                self._run_new_files = {
+                    "campaign": int(summary.get("accepted", 0))
+                }
+                self._run_rejected_files = int(summary.get("failed", 0))
+                self._run_attempted_files = (
+                    self._run_new_files["campaign"] + self._run_rejected_files
+                )
+            else:
+                self._commit_orphaned_translations()
+                self._execute_translation_run()
+                self._recover_pending_commits()
             self._record_run_history()
             _run_total_new = sum(getattr(self, "_run_new_files", {}).values())
             _run_lock_errors = getattr(self, "_run_lock_errors", 0)
@@ -1804,22 +1875,44 @@ class AutonomousContentTranslationWorker:
                     data = _json.loads(json_path.read_text(encoding="utf-8"))
                     contaminated_files = data.get("files", [])
                     queued = 0
+                    skipped_out_of_policy = 0
                     from src.tm.retranslate_queue import add_to_queue
+
+                    # The scanner runs with --all-languages and discovers
+                    # locales purely from disk, independent of this site's
+                    # active target_langs. Gate queuing against the live
+                    # profile so a retired locale's contaminated files
+                    # (still on disk, no longer maintained) never re-enter
+                    # the retranslate queue.
+                    site_profile = (
+                        self.config_service.get_site_profile(site_id)
+                        if self.config_service is not None
+                        else None
+                    )
+                    allowed_langs = (
+                        set(site_profile.target_langs) if site_profile else None
+                    )
 
                     for entry in contaminated_files:
                         file_path = entry.get("file_path")
                         target_lang = entry.get("target_lang")
-                        if file_path and target_lang:
-                            try:
-                                add_to_queue(Path(file_path), target_lang)
-                                queued += 1
-                            except Exception as _qe:
-                                logger.debug("TC-14: failed to queue %s: %s", file_path, _qe)
+                        if not (file_path and target_lang):
+                            continue
+                        if allowed_langs is not None and target_lang not in allowed_langs:
+                            skipped_out_of_policy += 1
+                            continue
+                        try:
+                            add_to_queue(Path(file_path), target_lang)
+                            queued += 1
+                        except Exception as _qe:
+                            logger.debug("TC-14: failed to queue %s: %s", file_path, _qe)
                     contaminated_count = data.get("contaminated_count", 0)
                     logger.info(
-                        "TC-14: Post-run contamination scan complete — %d contaminated, %d queued for retranslation",
+                        "TC-14: Post-run contamination scan complete — %d contaminated, "
+                        "%d queued for retranslation, %d skipped (locale not in active site profile)",
                         contaminated_count,
                         queued,
+                        skipped_out_of_policy,
                     )
                 else:
                     logger.info(
@@ -2196,6 +2289,32 @@ Examples:
         type=str,
         default=None,
         help="Site ID to process (if omitted, process all sites)",
+    )
+
+    parser.add_argument(
+        "--campaign-manifest",
+        type=str,
+        default=None,
+        help="Versioned campaign manifest; requires zero-defect policy and oneshot mode",
+    )
+
+    parser.add_argument(
+        "--resume",
+        action="store_true",
+        help="Resume a campaign from checksum-verified acceptance receipts",
+    )
+
+    parser.add_argument(
+        "--verify-only",
+        action="store_true",
+        help="Verify the pinned campaign environment without translating",
+    )
+
+    parser.add_argument(
+        "--validation-policy",
+        choices=["standard", "zero-defect"],
+        default="standard",
+        help="Persistence policy (campaigns require zero-defect)",
     )
 
     parser.add_argument(

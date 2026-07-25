@@ -245,6 +245,32 @@ terminology:
   config_file: "config/terminology.yaml"  # Path to terminology configuration
   preserve_mode: "BOTH"  # Default preservation mode: PROTECT, VALIDATE, BOTH, NONE (can be overridden per term)
 
+# HT-INLINE-CODE-001 TC-ICR-002: shared baseline for body.preserve_patterns,
+# unioned with every site profile's own preserve_patterns list (see
+# SegmentExtractor.__init__ / get_global_config()). Unlike terminology's
+# inherit_global (opt-in, default false), this baseline is always merged in
+# -- there is no known legitimate case for a site to reject a globally
+# protected syntactic pattern, and the alternative (silent per-site
+# duplication/omission) is exactly the drift that motivated this baseline
+# in the first place (an inline-code pattern staged for one site profile
+# only, missing from the other four -- see TC-ICR-003).
+body:
+  preserve_patterns:
+  # HT-INLINE-CODE-001 TC-ICR-003: protect single-backtick inline code
+  # spans (API identifiers, method names) from being sent through MT/LLM
+  # translation as plain text -- root cause of the 21,904-hit
+  # "inline_code_translated" audit finding (segment_extractor.py flattens
+  # CODE_SPAN AST nodes back into literal `code` text with no placeholder
+  # protection). Newline-excluded ([^`\n]) deliberately, unlike the
+  # pattern this replaces (previously staged on kb.aspose.org.yaml only,
+  # `[^`]+`, no newline exclusion) -- an inline code span never
+  # legitimately crosses a markdown line; without the exclusion, a single
+  # stray/unpaired backtick anywhere in a segment lets the pattern swallow
+  # everything up to the next backtick, confirmed directly against real
+  # production audit data as the majority cause of false positives in the
+  # equivalent detector logic (audit_all_content.py, write_gate.py Gate 22).
+  - '`[^`\n]+`'
+
 # Security settings
 security:
   enable_input_validation: true
@@ -697,6 +723,26 @@ translation_engine:
   llm_escalation_after_retries: 2  # Escalate after this many MT failures (see retranslate_queue.py)
   llm_escalation_model: "professionalize_llm"  # Model ID to use for escalated files
 
+  # HT-QUALITY-GATES-001 Part 22 (plan 5.4 items 3+5): Gate 36 LLM meaning-
+  # fidelity judge. Catches homonym mistranslation, inverted getter/method
+  # semantics, factual reversals, and hallucinated content -- failure classes
+  # that read as fluent, on-topic text to SemanticSimilarityValidator's
+  # embedding cosine similarity and pass it undetected. Only runs the actual
+  # LLM call for high-risk-tier files (see WriteGateEvaluator._gate36_is_high_risk):
+  # kb.aspose.org family-root pages, reference.aspose.org leaf pages, or any
+  # file where at least one unit was actually LLM-translated this run.
+  # `enforce: false` is deliberate and matches Part 6 item 3's rollout
+  # discipline: the verdict is always computed and written into the
+  # `translation_fidelity` frontmatter field for high-risk files, but must
+  # not block a write until its agreement rate against human close-reading
+  # has been measured (shadow mode) -- flip to true only after that canary.
+  fidelity_judge:
+    enabled: true
+    enforce: false  # shadow mode -- logs/writes verdict, never blocks. See Part 6 item 3.
+    model_id: "professionalize_llm"
+    warn_threshold: 0.7   # score below this (0-1) -> verdict "warn"
+    block_threshold: 0.5  # score below this (0-1) -> verdict "fail" (blocks only if enforce: true)
+
   # TC-HDN-005: Content-type routing — assigns specific translation backends to unit types.
   # Rules are evaluated in order; first matching rule wins.  null model = use shard default.
   # Generic: no site-specific logic here; works for all 3 sites.
@@ -805,7 +851,7 @@ metrics:
 # Endpoint URL and auth token come from environment variables only (never in config).
 # dry_run=true by default: payloads are logged but NOT posted.
 agent_metrics:
-  enabled: false                    # Master switch; default off — enable explicitly per run
+  enabled: true                     # Pilot evidence enabled; dry_run prevents external posting
   dry_run: true                     # Log payload but don't POST; default on
   endpoint_env: "AGENT_METRICS_ENDPOINT"
   token_env: "AGENT_METRICS_TOKEN"

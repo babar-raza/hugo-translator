@@ -180,7 +180,7 @@ class ASTRenderer:
 
         M2M100 and similar MT models sometimes produce asymmetric asterisk sequences
         for bold markers, e.g. "* Texto*" instead of "**Texto**". This method
-        normalizes the five common corruption patterns.
+        normalizes the six common corruption patterns.
 
         Patterns (applied in order):
         P4a: ***text*  → **text**  (triple opening, single closing)
@@ -188,6 +188,9 @@ class ASTRenderer:
         P2:  * text**  → **text**  (single + space opening, double closing)
         P3:  **text *  → **text**  (double opening, single + space closing)
         P1:  * Uppercase text* → **Uppercase text** (heading-style corruption)
+        P5:  ** text:** → **text:**  (space after opening markers, before
+             content -- confirmed real: kb.aspose.org German "** Daten-Export:**",
+             products.aspose.org French "** Étiquetage du produit:**")
 
         Args:
             text: Translated text potentially containing corrupted bold markers
@@ -225,6 +228,12 @@ class ASTRenderer:
             lambda m: f'**{m.group(1).rstrip()}**',
             text
         )
+
+        # P5: stray space after opening markers, before content: ** text:** \u2192 **text:**
+        # Well-formed **text** already has no space here and is untouched
+        # ([ \t]+ requires actual whitespace to match at all). Does not match
+        # ***text*** (the third `*` immediately follows, no whitespace).
+        text = re.sub(r'\*\*[ \t]+([^\n*]+?)\*\*', r'**\1**', text)
 
         return text
 

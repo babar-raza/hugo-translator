@@ -13,6 +13,20 @@ from ..parser import ASTNode, HugoDocument, NodeType
 from .placeholder_manager import PlaceholderManager
 
 
+def _get_global_body_preserve_patterns() -> list[str]:
+    """Return the shared body.preserve_patterns baseline from
+    config/global.yaml (HT-INLINE-CODE-001 TC-ICR-002). Uses the
+    standalone get_global_config() helper (raw dict access, no
+    ConfigService threading required) rather than a full config-service
+    dependency injection -- deliberately the lighter-weight of the two
+    merge approaches this repo has (see terminology's
+    ConfigService.get_merged_terminology_config for the heavier,
+    Pydantic-modeled alternative), scoped to this one list field."""
+    from ...utils.config_loader import get_global_config
+
+    return list(get_global_config().get("body", {}).get("preserve_patterns", []))
+
+
 class SegmentContextType(str, Enum):
     """Type of segment context."""
 
@@ -101,8 +115,16 @@ class SegmentExtractor:
         self.terminology_manager = terminology_manager
         self.force_protected_fields = force_protected_fields or set()
 
-        # Compile preserve patterns from site profile
-        self.preserve_patterns = site_profile.body.preserve_patterns or []
+        # Compile preserve patterns: shared global baseline (HT-INLINE-CODE-001
+        # TC-ICR-002) unioned with the site profile's own list. Unlike a naive
+        # per-site-only list, this closes the class of bug where a protection
+        # pattern (e.g. inline-code backtick spans, TC-ICR-003) gets added to
+        # one site profile and silently forgotten on the other four -- always
+        # merged in, no opt-out, since there's no legitimate case for a site to
+        # reject a globally-protected syntactic pattern.
+        self.preserve_patterns = _get_global_body_preserve_patterns() + (
+            site_profile.body.preserve_patterns or []
+        )
         self.preserve_blocks = site_profile.body.preserve_blocks or []
 
         # Hugo shortcode patterns
@@ -422,6 +444,20 @@ class SegmentExtractor:
             site_id=self.site_profile.site_id,
             source_lang=source_lang,
             placeholder_map=placeholder_map,
+            # HT-QUALITY-GATES-001 Part 22 (root cause A): mirrors the
+            # frontmatter segment's fix (_create_frontmatter_segment above).
+            # Without this, body segments fall back to hashing
+            # `protected_text` for the TM key -- placeholder protection
+            # collapses distinguishing content (e.g. "Aspose.Cells" and
+            # "Aspose.Words" both protect to the same `{PLACEHOLDER_0}`
+            # shape), so two genuinely different source paragraphs from
+            # different product families can hash to the identical TM key
+            # and silently share a cached translation. Using the
+            # pre-protection text as the hash input keeps genuinely-shared
+            # boilerplate (byte-identical unprotected text) correctly
+            # cache-shared while fixing the confirmed collision case, without
+            # the coverage-rate cost of a heavier per-page-unique key.
+            tm_key_text=text,
         )
 
         # Protect terminology (TRM-05)

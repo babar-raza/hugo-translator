@@ -119,7 +119,9 @@ output_layout:
   per_language_folders: false
   pattern: '{filename}.{lang}{ext}'
 model:
-  default: m2m100_1.2b
+  # The governed Aspose batch skill pins the 418M model for blog runs.
+  # The 1.2B model has reproduced Windows OOM/native crashes on this host.
+  default: m2m100_418m
 tm_prefs:
   use_semantic_tm: true
   fallback_exact_only: false

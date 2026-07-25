@@ -727,6 +727,20 @@ class HugoParser:
                 inline_children = self._parse_inline_content(token)
                 children.extend(inline_children)
                 i += 1
+
+            # HT-QUALITY-GATES-001 Part 22 (plan 5.1 item 4): fenced/indented
+            # code block inside a table cell -- same gap as Bug 1 already
+            # fixed in _parse_list_item/_parse_blockquote above, just never
+            # ported to this method. Without this branch the fence token was
+            # silently skipped by the `else: i += 1` fallthrough, dropping the
+            # code content entirely before translation even starts (a parse-
+            # time loss no downstream gate can detect, since the content
+            # never reaches any segment).
+            elif token.type in ("fence", "code_block"):
+                lang = token.info if hasattr(token, "info") else None
+                children.append(code_block_node(token.content, lang, self._generate_node_id()))
+                i += 1
+
             else:
                 i += 1
 

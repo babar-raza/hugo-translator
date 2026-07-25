@@ -202,3 +202,48 @@ class TestBoldMarkerNormalization:
         normalized = renderer._normalize_bold_markers(corrupted)
 
         assert "**Últimos artigos**" in normalized
+
+    # === PATTERN 5: stray space after opening markers ===
+    # HT-QUALITY-GATES-001 Part 22 (plan 5.1 item 6)
+
+    def test_normalize_stray_space_after_opening_markers_german(self, renderer):
+        """Real confirmed instance: kb.aspose.org German cells/net file."""
+        corrupted = "** Daten-Export:** Details here."
+        normalized = renderer._normalize_bold_markers(corrupted)
+
+        assert normalized == "**Daten-Export:** Details here."
+
+    def test_normalize_stray_space_after_opening_markers_french(self, renderer):
+        """Real confirmed instance: products.aspose.org French barcode/python file."""
+        corrupted = "** Étiquetage du produit:** Description."
+        normalized = renderer._normalize_bold_markers(corrupted)
+
+        assert normalized == "**Étiquetage du produit:** Description."
+
+    def test_well_formed_bold_unaffected_by_p5(self, renderer):
+        """P5 must not touch already-correct **text** (no space to strip)."""
+        text = "**Correctly formatted** bold text."
+        normalized = renderer._normalize_bold_markers(text)
+
+        assert normalized == "**Correctly formatted** bold text."
+
+    def test_bold_italic_triple_star_unaffected_by_p5(self, renderer):
+        """P5 must not misfire on valid ***bold-italic*** (no whitespace
+        immediately follows the opening **, so [ \\t]+ cannot match)."""
+        text = "***bold and italic*** together"
+        normalized = renderer._normalize_bold_markers(text)
+
+        assert "***bold and italic***" in normalized
+
+    def test_p5_fires_on_multiple_labels_in_bulleted_list(self, renderer):
+        """The confirmed real shape: a list of ** Label:** bullets, as seen
+        in the actual affected files (Aspose.Cells feature bullet lists)."""
+        text = (
+            "- ** Zell-Styling:** Details.\n"
+            "- ** Bedingte Formatierung:** More details.\n"
+        )
+        normalized = renderer._normalize_bold_markers(text)
+
+        assert "**Zell-Styling:**" in normalized
+        assert "**Bedingte Formatierung:**" in normalized
+        assert "- ** " not in normalized, "opening marker should no longer have a stray space"
