@@ -172,6 +172,16 @@ def _model_selector_recommend_safe(
         return None
 
 
+def bind_campaign_content_environment(campaign) -> Path:
+    """Bind profile interpolation to the manifest's immutable content checkout."""
+    content_repo = Path(campaign.content_repo).resolve()
+    content_root = content_repo / "content"
+    if not content_root.is_dir():
+        raise ValueError(f"campaign content directory is missing: {content_root}")
+    os.environ["ASPOSE_ORG_CONTENT"] = str(content_root)
+    return content_root
+
+
 class AutonomousWorkerConfig:
     """
     Configuration for autonomous content translation worker.
@@ -332,6 +342,15 @@ class AutonomousContentTranslationWorker:
             self.campaign = CampaignManifest.load(self.config.campaign_manifest)
             if self.campaign.validation_policy != self.config.validation_policy:
                 raise ValueError("worker and campaign validation policies differ")
+            campaign_content_root = bind_campaign_content_environment(self.campaign)
+            # ConfigService loads profiles lazily. Clear any defensive cache
+            # entries so ${ASPOSE_ORG_CONTENT} is expanded only after the
+            # manifest-controlled value above has been installed.
+            self.config_service._profile_cache.clear()
+            logger.info(
+                "Campaign profile root bound to pinned checkout: %s",
+                campaign_content_root,
+            )
 
         # Apply VRAM enforcement if using CUDA
         if self.config.device.startswith("cuda"):

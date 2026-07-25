@@ -769,6 +769,16 @@ translation_engine:
       - condition: {}
         preferred_model: professionalize_llm
         context_hint: frontmatter_description
+    frontmatter_seoTitle:
+      # SEO titles are short and brand-heavy; M2M can return them unchanged,
+      # which is a blocking wrong-language result in zero-defect campaigns.
+      - condition: {}
+        preferred_model: professionalize_llm
+        context_hint: frontmatter_seo_title
+    frontmatter_seo_title:
+      - condition: {}
+        preferred_model: professionalize_llm
+        context_hint: frontmatter_seo_title
     default:
       # All other units: use MT; escalate to LLM after 2 gate failures
       - condition: {}
