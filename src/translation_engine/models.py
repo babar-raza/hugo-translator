@@ -1,8 +1,8 @@
 """
 Data models for translation engine results and statistics.
 """
-from dataclasses import dataclass, field
 import hashlib
+from dataclasses import dataclass, field
 from enum import IntEnum
 from pathlib import Path
 from typing import Any, Optional
@@ -209,6 +209,7 @@ class AcceptedTranslation:
         *,
         content: str,
         source_content: str,
+        source_bytes: bytes | None = None,
         source_path: Path,
         output_path: Path,
         target_lang: str,
@@ -218,11 +219,17 @@ class AcceptedTranslation:
         campaign_id: str = "",
     ) -> "AcceptedTranslation":
         encoded = content.encode("utf-8")
+        if source_bytes is None:
+            source_bytes = (
+                source_path.read_bytes()
+                if source_path.is_file()
+                else source_content.encode("utf-8")
+            )
         return cls(
             content=encoded,
             source_path=source_path,
             output_path=output_path,
-            source_sha256=hashlib.sha256(source_content.encode("utf-8")).hexdigest(),
+            source_sha256=hashlib.sha256(source_bytes).hexdigest(),
             output_sha256=hashlib.sha256(encoded).hexdigest(),
             target_lang=target_lang,
             validation_policy="zero-defect",

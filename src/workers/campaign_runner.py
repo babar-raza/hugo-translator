@@ -171,7 +171,7 @@ class CampaignRunner:
     def _validated_resume_receipts(self) -> dict[str, dict[str, Any]]:
         receipts = self.ledger.receipts()
         valid: dict[str, dict[str, Any]] = {}
-        legacy_migrations: dict[str, dict[str, Any]] = {}
+        receipt_migrations: dict[str, dict[str, Any]] = {}
         expected_outputs = {
             output: (source, locale)
             for source in self.manifest.sources
@@ -191,7 +191,7 @@ class CampaignRunner:
                 ):
                     migrated = dict(unsigned)
                     migrated["receipt_sha256"] = receipt_fingerprint(unsigned)
-                    legacy_migrations[output] = migrated
+                    receipt_migrations[output] = migrated
                 else:
                     raise CampaignManifestError(
                         f"acceptance receipt fingerprint mismatch: {output}"
@@ -206,7 +206,26 @@ class CampaignRunner:
                 "config_fingerprint": self.manifest.config_fingerprint,
             }
             for field_name, expected_value in expected_context.items():
-                if receipt.get(field_name) != expected_value:
+                current_receipt = receipt_migrations.get(output, receipt)
+                if current_receipt.get(field_name) != expected_value:
+                    source_path = self.content_repo / source.source_path
+                    legacy_normalized_source_sha = hashlib.sha256(
+                        source_path.read_text(encoding="utf-8").encode("utf-8")
+                    ).hexdigest()
+                    if (
+                        field_name == "source_sha256"
+                        and current_receipt.get(field_name)
+                        == legacy_normalized_source_sha
+                    ):
+                        migrated = {
+                            key: value
+                            for key, value in current_receipt.items()
+                            if key != "receipt_sha256"
+                        }
+                        migrated[field_name] = expected_value
+                        migrated["receipt_sha256"] = receipt_fingerprint(migrated)
+                        receipt_migrations[output] = migrated
+                        continue
                     raise CampaignManifestError(f"receipt {field_name} mismatch for {output}")
             output_path = self.content_repo / output
             if not output_path.is_file():
@@ -216,10 +235,13 @@ class CampaignRunner:
             gates = receipt.get("gate_results") or {}
             if len(gates) != 44 or any(not item.get("passed", False) for item in gates.values()):
                 raise CampaignManifestError(f"receipt is not all-pass: {output}")
-            valid[output] = legacy_migrations.get(output, receipt)
-        if legacy_migrations:
+            valid[output] = receipt_migrations.get(output, receipt)
+        if receipt_migrations:
             self.ledger.replace_receipts(
-                [legacy_migrations.get(output, receipt) for output, receipt in receipts.items()]
+                [
+                    receipt_migrations.get(output, receipt)
+                    for output, receipt in receipts.items()
+                ]
             )
         return valid
 

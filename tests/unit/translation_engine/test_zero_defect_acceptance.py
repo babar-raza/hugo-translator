@@ -34,6 +34,29 @@ def test_accepted_translation_is_immutable_and_hashed(tmp_path):
         accepted.target_lang = "fr"
 
 
+def test_accepted_translation_hashes_raw_source_bytes(tmp_path):
+    source_path = tmp_path / "en" / "page.md"
+    source_path.parent.mkdir(parents=True)
+    source_bytes = b"---\r\ntitle: Hello\r\n---\r\nContent.\r\n"
+    source_path.write_bytes(source_bytes)
+
+    accepted = AcceptedTranslation.from_text(
+        content="translated",
+        source_content=source_path.read_text(encoding="utf-8"),
+        source_path=source_path,
+        output_path=tmp_path / "es" / "page.md",
+        target_lang="es",
+        gate_results={
+            gate_id: {"passed": True, "action": "test", "error": None}
+            for gate_id in range(1, 45)
+        },
+    )
+
+    import hashlib
+
+    assert accepted.source_sha256 == hashlib.sha256(source_bytes).hexdigest()
+
+
 def test_zero_defect_writer_rejects_unaccepted_payload(tmp_path):
     engine = TranslationEngine.__new__(TranslationEngine)
     with pytest.raises(TypeError):

@@ -859,6 +859,7 @@ class FileTranslationPipeline:
                             accepted = AcceptedTranslation.from_text(
                                 content=translated_content,
                                 source_content=content,
+                                source_bytes=source_path.read_bytes(),
                                 source_path=source_path,
                                 output_path=output_path,
                                 target_lang=target_lang,
