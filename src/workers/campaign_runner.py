@@ -39,7 +39,8 @@ class CampaignLedger:
         self.receipts_path = self.root / "acceptance_receipts.jsonl"
         self.failures_path = self.root / "failure_metadata.jsonl"
         self.summary_path = self.root / "summary.json"
-        self._lock = threading.Lock()
+        self._process_lock_path = self.root / "ledger-process.lock"
+        self._lock = threading.RLock()
         self._receipt_index = self.receipts()
 
     @staticmethod
@@ -66,7 +67,10 @@ class CampaignLedger:
         output = str(row.get("output_path") or "")
         if not output:
             raise ValueError("campaign receipt requires output_path")
-        with self._lock:
+        with self._lock, FileLock(self._process_lock_path, timeout=30):
+            # Refresh under the inter-process lock: every shard worker has an
+            # independent in-memory ledger index.
+            self._receipt_index = self.receipts()
             previous = self._receipt_index.get(output)
             if previous is not None:
                 comparable_previous = {
@@ -133,7 +137,7 @@ class CampaignLedger:
         encoded = "".join(
             json.dumps(row, ensure_ascii=False, sort_keys=True) + "\n" for row in receipts
         )
-        with self._lock:
+        with self._lock, FileLock(self._process_lock_path, timeout=30):
             atomic_write(
                 path=self.receipts_path,
                 content=encoded,
@@ -144,7 +148,7 @@ class CampaignLedger:
             self._receipt_index = {str(row["output_path"]): row for row in receipts}
 
     def _append(self, path: Path, row: dict[str, Any]) -> None:
-        with self._lock:
+        with self._lock, FileLock(self._process_lock_path, timeout=30):
             self._append_unlocked(path, row)
 
     @staticmethod
@@ -157,13 +161,14 @@ class CampaignLedger:
             os.fsync(handle.fileno())
 
     def write_summary(self, payload: dict[str, Any]) -> None:
-        atomic_write(
-            path=self.summary_path,
-            content=json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True),
-            encoding="utf-8",
-            fsync=True,
-            create_parents=True,
-        )
+        with self._lock, FileLock(self._process_lock_path, timeout=30):
+            atomic_write(
+                path=self.summary_path,
+                content=json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True),
+                encoding="utf-8",
+                fsync=True,
+                create_parents=True,
+            )
 
 
 class CampaignRunner:
@@ -1071,9 +1076,31 @@ class CampaignRunner:
             "remaining": self.manifest.expected_output_count - len(receipts),
         }
 
-    def run(self, *, resume: bool = False, verify_only: bool = False) -> dict[str, Any]:
-        with FileLock(self.ledger.root / "campaign.lock", timeout=0):
-            return self._run_locked(resume=resume, verify_only=verify_only)
+    def run(
+        self,
+        *,
+        resume: bool = False,
+        verify_only: bool = False,
+        shard_ids: set[str] | None = None,
+    ) -> dict[str, Any]:
+        """Run all campaign jobs or one explicitly pinned shard set.
+
+        Shard workers may run in separate processes because their outputs are
+        disjoint and the ledger is inter-process locked.  The default still
+        holds a campaign-wide exclusion lock for compatibility and safety.
+        """
+        normalized = frozenset(shard_ids or ())
+        lock_name = "campaign.lock"
+        if normalized:
+            lock_name = "shard-" + hashlib.sha256(
+                "\n".join(sorted(normalized)).encode("utf-8")
+            ).hexdigest()[:16] + ".lock"
+        with FileLock(self.ledger.root / lock_name, timeout=0):
+            return self._run_locked(
+                resume=resume,
+                verify_only=verify_only,
+                shard_ids=normalized or None,
+            )
 
     def _run_campaign_job(
         self,
@@ -1216,6 +1243,7 @@ class CampaignRunner:
         *,
         resume: bool = False,
         verify_only: bool = False,
+        shard_ids: frozenset[str] | None = None,
     ) -> dict[str, Any]:
         summary = self.verify(resume=resume)
         if verify_only:
@@ -1235,10 +1263,17 @@ class CampaignRunner:
         failed = 0
         max_outputs = int(self.manifest.commit_policy.get("max_outputs_per_commit", 250))
         max_parallel_jobs = int(self.manifest.execution_policy.get("max_parallel_jobs", 1))
-        for shard in self.manifest.shards(
+        all_shards = list(self.manifest.shards(
             resume_receipts=set(receipts),
             max_outputs=max_outputs,
-        ):
+        ))
+        available_shards = {str(shard["shard_id"]) for shard in all_shards}
+        if shard_ids and not shard_ids.issubset(available_shards):
+            unknown = sorted(shard_ids - available_shards)
+            raise CampaignManifestError(f"campaign shard is unknown or already complete: {unknown}")
+        for shard in all_shards:
+            if shard_ids and shard["shard_id"] not in shard_ids:
+                continue
             shard_accepted = 0
             shard_failed = 0
             with ThreadPoolExecutor(max_workers=min(max_parallel_jobs, len(shard["jobs"]))) as executor:
@@ -1290,19 +1325,24 @@ class CampaignRunner:
                     }
                 )
 
+        partial = bool(shard_ids)
         final = {
             **self.manifest.to_summary(),
             "accepted": accepted,
             "failed": failed,
             "remaining": self.manifest.expected_output_count - accepted,
             "status": (
-                "COMPLETE"
+                "SHARD_SET_COMPLETE"
+                if partial and failed == 0
+                else (
+                    "COMPLETE"
                 if accepted == self.manifest.expected_output_count and failed == 0
                 else "INCOMPLETE"
+                )
             ),
         }
         self.ledger.write_summary(final)
-        if final["status"] != "COMPLETE":
+        if final["status"] not in {"COMPLETE", "SHARD_SET_COMPLETE"}:
             raise CampaignManifestError(
                 f"campaign incomplete: accepted={accepted}, failed={failed}, "
                 f"remaining={final['remaining']}"

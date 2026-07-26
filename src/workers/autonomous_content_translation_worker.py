@@ -244,6 +244,7 @@ class AutonomousWorkerConfig:
         device: str = "auto",
         file_timeout_seconds: int = 600,
         campaign_manifest: str | None = None,
+        campaign_shard: str | None = None,
         resume: bool = False,
         verify_only: bool = False,
         validation_policy: str = "standard",
@@ -263,6 +264,7 @@ class AutonomousWorkerConfig:
         self.device = device
         self.file_timeout_seconds = file_timeout_seconds
         self.campaign_manifest = campaign_manifest
+        self.campaign_shard = campaign_shard
         self.resume = resume
         self.verify_only = verify_only
         self.validation_policy = validation_policy
@@ -284,6 +286,7 @@ class AutonomousWorkerConfig:
             device=args.device,
             file_timeout_seconds=args.file_timeout_seconds,
             campaign_manifest=getattr(args, "campaign_manifest", None),
+            campaign_shard=getattr(args, "campaign_shard", None),
             resume=getattr(args, "resume", False),
             verify_only=getattr(args, "verify_only", False),
             validation_policy=getattr(args, "validation_policy", "standard"),
@@ -332,6 +335,12 @@ class AutonomousContentTranslationWorker:
         self._site_profile_cache = {}
         self._site_profile_errors = {}
         self.campaign = None
+        if config.campaign_shard:
+            shard_digest = hashlib.sha256(
+                config.campaign_shard.encode("utf-8")
+            ).hexdigest()[:12]
+            self._worker_id = f"content_worker_campaign_{shard_digest}"
+            self._worker_log_path = f"data/logs/{self._worker_id}.log"
 
         # Generate stable run ID for this invocation (used across all sites in this run)
         self.invocation_id = str(uuid.uuid4())
@@ -833,6 +842,11 @@ class AutonomousContentTranslationWorker:
                 summary = runner.run(
                     resume=self.config.resume,
                     verify_only=self.config.verify_only,
+                    shard_ids=(
+                        {self.config.campaign_shard}
+                        if self.config.campaign_shard
+                        else None
+                    ),
                 )
                 self._run_new_files = {"campaign": int(summary.get("accepted", 0))}
                 self._run_rejected_files = int(summary.get("failed", 0))
@@ -2337,6 +2351,13 @@ Examples:
         type=str,
         default=None,
         help="Versioned campaign manifest; requires zero-defect policy and oneshot mode",
+    )
+
+    parser.add_argument(
+        "--campaign-shard",
+        type=str,
+        default=None,
+        help="Run only one exact shard ID from --campaign-manifest; enables isolated parallel shard workers",
     )
 
     parser.add_argument(
