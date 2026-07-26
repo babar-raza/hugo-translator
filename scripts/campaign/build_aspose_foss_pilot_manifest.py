@@ -18,7 +18,9 @@ import yaml
 from src.utils.atomic_write import atomic_write
 from src.workers.campaign_manifest import (
     fingerprint_files,
+    git_changed_paths,
     git_dirty_paths,
+    git_is_ancestor,
     git_sha,
     sha256_file,
 )
@@ -164,6 +166,7 @@ def build_manifest(
     content_repo: Path,
     translator_repo: Path,
     campaign_id: str,
+    content_baseline_sha: str | None = None,
 ) -> dict:
     content_dirty = git_dirty_paths(content_repo)
     translator_dirty = git_dirty_paths(translator_repo)
@@ -182,12 +185,32 @@ def build_manifest(
             f"outputs={output_count}/{EXPECTED_OUTPUT_COUNT}"
         )
 
+    current_content_sha = git_sha(content_repo)
+    pinned_content_sha = content_baseline_sha or current_content_sha
+    if not git_is_ancestor(content_repo, pinned_content_sha, current_content_sha):
+        raise RuntimeError("content baseline is not an ancestor of current HEAD")
+    if pinned_content_sha != current_content_sha:
+        allowed_outputs = {
+            output
+            for source in sources
+            for output in source["outputs"].values()
+        }
+        changed = set(
+            git_changed_paths(content_repo, pinned_content_sha, current_content_sha)
+        )
+        unexpected = sorted(changed - allowed_outputs)
+        if unexpected:
+            raise RuntimeError(
+                "content baseline descendants contain non-campaign paths: "
+                f"{unexpected[:10]}"
+            )
+
     return {
         "schema_version": 1,
         "campaign_id": campaign_id,
         "validation_policy": "zero-defect",
         "content_repo": str(content_repo.resolve()),
-        "content_repo_sha": git_sha(content_repo),
+        "content_repo_sha": pinned_content_sha,
         "translator_repo_sha": git_sha(translator_repo),
         "config_fingerprint": _config_fingerprint(translator_repo),
         "model_fingerprints": {
@@ -237,6 +260,14 @@ def main(argv: list[str] | None = None) -> int:
         "--campaign-id",
         default="aspose-foss-25-locales-v1",
     )
+    parser.add_argument(
+        "--content-baseline-sha",
+        default=None,
+        help=(
+            "Immutable pre-output content SHA to preserve while repinning a "
+            "campaign whose descendants contain only enumerated outputs"
+        ),
+    )
     args = parser.parse_args(argv)
 
     try:
@@ -244,6 +275,7 @@ def main(argv: list[str] | None = None) -> int:
             content_repo=args.content_repo.resolve(),
             translator_repo=args.translator_repo.resolve(),
             campaign_id=args.campaign_id,
+            content_baseline_sha=args.content_baseline_sha,
         )
     except Exception as exc:
         print(f"MANIFEST BUILD BLOCKED: {exc}", file=sys.stderr)
