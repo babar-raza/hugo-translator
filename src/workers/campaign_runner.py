@@ -115,17 +115,36 @@ class CampaignLedger:
 
     def latest_failure(self, *, output_path: str, target_lang: str) -> dict[str, Any] | None:
         """Return the latest metadata-only failure for a resumable job."""
+        failures = self.recent_failures(
+            output_path=output_path,
+            target_lang=target_lang,
+            limit=1,
+        )
+        return failures[-1] if failures else None
+
+    def recent_failures(
+        self,
+        *,
+        output_path: str,
+        target_lang: str,
+        limit: int = 20,
+    ) -> list[dict[str, Any]]:
+        """Return recent metadata-only failures for cumulative retry guidance."""
+        if limit < 1:
+            raise ValueError("failure history limit must be positive")
         if not self.failures_path.is_file():
-            return None
-        latest = None
+            return []
+        matches: list[dict[str, Any]] = []
         with self.failures_path.open("r", encoding="utf-8") as handle:
             for line in handle:
                 if not line.strip():
                     continue
                 row = json.loads(line)
                 if row.get("output_path") == output_path and row.get("target_lang") == target_lang:
-                    latest = row
-        return latest
+                    matches.append(row)
+                    if len(matches) > limit:
+                        matches.pop(0)
+        return matches
 
     def replace_receipts(self, receipts: list[dict[str, Any]]) -> None:
         """Atomically replace metadata-only receipts after verified migration."""
@@ -1184,6 +1203,7 @@ class CampaignRunner:
         target_lang: str,
         *,
         source_path: Path | None = None,
+        prior_feedback: str | None = None,
     ) -> str | None:
         """Rehydrate safe retry guidance from metadata when resuming."""
         if not failure:
@@ -1239,8 +1259,28 @@ class CampaignRunner:
                 error=reason,
             ),
             target_lang,
+            prior_feedback,
             source_path=source_path,
         )
+
+    @classmethod
+    def _retry_feedback_from_failures(
+        cls,
+        failures: list[dict[str, Any]],
+        target_lang: str,
+        *,
+        source_path: Path | None = None,
+    ) -> str | None:
+        """Fold distinct recent failure metadata into one safe instruction."""
+        feedback: str | None = None
+        for failure in failures:
+            feedback = cls._retry_feedback_from_failure(
+                failure,
+                target_lang,
+                source_path=source_path,
+                prior_feedback=feedback,
+            )
+        return feedback
 
     def verify(self, *, resume: bool = False) -> dict[str, Any]:
         receipts = self._validated_resume_receipts() if resume else {}
@@ -1322,8 +1362,11 @@ class CampaignRunner:
                 if feedback_by_output is None:
                     feedback_by_output = {}
                     self.engine._campaign_retry_feedback_by_output = feedback_by_output
-                next_feedback = self._retry_feedback_from_failure(
-                    self.ledger.latest_failure(output_path=expected_output, target_lang=locale),
+                next_feedback = self._retry_feedback_from_failures(
+                    self.ledger.recent_failures(
+                        output_path=expected_output,
+                        target_lang=locale,
+                    ),
                     locale,
                     source_path=source_path,
                 )

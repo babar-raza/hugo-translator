@@ -895,6 +895,51 @@ def test_czech_language_retry_uses_unambiguous_czech_title(tmp_path):
     assert "Czech (cs)" in feedback
 
 
+def test_resume_feedback_accumulates_distinct_recent_failures(tmp_path):
+    link_label = "Aspose.Cells Enterprise Blog"
+    source = tmp_path / "index.md"
+    source.write_text(
+        "---\n"
+        "title: Spreadsheet Management in Rust with Aspose.Cells FOSS\n"
+        "summary: Manage spreadsheets with Rust.\n"
+        "---\n"
+        f"[{link_label}](https://blog.aspose.com/)\n",
+        encoding="utf-8",
+    )
+    link_fingerprint = hashlib.sha256(link_label.encode("utf-8")).hexdigest()[:16]
+    failures = [
+        {
+            "gate": "GATE36",
+            "reason": "translation_rejected; codes=GATE36; verdict=fail; score=0.2",
+        },
+        {
+            "gate": "FrontmatterLanguageCheck",
+            "reason": (
+                "translation_rejected; validators=FrontmatterLanguageCheck; "
+                "field=summary"
+            ),
+        },
+        {
+            "gate": "TC-SAS-01",
+            "reason": (
+                "translation_rejected; codes=TC-SAS-01; "
+                f"unit_fingerprints=link_text:{link_fingerprint}:{len(link_label)}"
+            ),
+        },
+    ]
+
+    feedback = CampaignRunner._retry_feedback_from_failures(
+        failures,
+        "cs",
+        source_path=source,
+    )
+
+    assert "Preserve every source claim and section" in feedback
+    assert "fields detected as failing were: summary" in feedback
+    assert "affected source link label" in feedback
+    assert "Translate all ordinary label words into Czech (cs)" in feedback
+
+
 def test_failure_metadata_extracts_exception_class_without_candidate_text():
     result = SimpleNamespace(
         errors=["rejected"],
