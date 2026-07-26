@@ -828,6 +828,41 @@ def test_product_link_terminology_covers_every_campaign_locale():
     assert all("Aspose.Words" in value and ".NET" in value for value in translations.values())
 
 
+def test_german_github_repository_retry_uses_governed_label(tmp_path):
+    source = tmp_path / "index.md"
+    label = "GitHub Repository"
+    source.write_text(
+        f"[{label}](https://github.com/aspose-words/)\n",
+        encoding="utf-8",
+    )
+    fingerprint = hashlib.sha256(label.encode("utf-8")).hexdigest()[:16]
+    failure = {
+        "gate": "TC-SAS-01",
+        "reason": (
+            "translation_rejected; codes=TC-SAS-01; "
+            f"unit_fingerprints=link_text:{fingerprint}:{len(label)}; "
+            "error_sha256=abc"
+        ),
+    }
+
+    feedback = CampaignRunner._retry_feedback_from_failure(
+        failure,
+        "de",
+        source_path=source,
+    )
+
+    assert "GitHub-Repository" in feedback
+    assert "governed target label exactly" in feedback
+
+
+def test_github_repository_terminology_covers_every_campaign_locale():
+    translations = CampaignRunner._GITHUB_REPOSITORY_LABEL_TRANSLATIONS
+
+    assert set(translations) == set(CampaignRunner._LOCALE_NAMES)
+    assert all(value != "GitHub Repository" for value in translations.values())
+    assert all("GitHub" in value for value in translations.values())
+
+
 def test_failure_metadata_extracts_safe_gate_score_without_candidate_text():
     result = SimpleNamespace(
         errors=[],

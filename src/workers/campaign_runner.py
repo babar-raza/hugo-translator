@@ -259,6 +259,33 @@ class CampaignRunner:
         "vi": "Aspose.Words dành cho .NET",
         "zh": "Aspose.Words（适用于 .NET）",
     }
+    _GITHUB_REPOSITORY_LABEL_TRANSLATIONS = {
+        "ar": "مستودع GitHub",
+        "cs": "Repozitář GitHub",
+        "de": "GitHub-Repository",
+        "el": "Αποθετήριο GitHub",
+        "es": "Repositorio de GitHub",
+        "fa": "مخزن GitHub",
+        "fr": "Dépôt GitHub",
+        "he": "מאגר GitHub",
+        "hi": "GitHub रिपॉज़िटरी",
+        "hu": "GitHub-adattár",
+        "id": "Repositori GitHub",
+        "it": "Repository su GitHub",
+        "ja": "GitHub リポジトリ",
+        "ko": "GitHub 저장소",
+        "nl": "GitHub-opslagplaats",
+        "pl": "Repozytorium GitHub",
+        "pt": "Repositório do GitHub",
+        "ro": "Depozit GitHub",
+        "ru": "Репозиторий GitHub",
+        "sv": "GitHub-arkiv",
+        "th": "ที่เก็บ GitHub",
+        "tr": "GitHub deposu",
+        "uk": "Репозиторій GitHub",
+        "vi": "Kho lưu trữ GitHub",
+        "zh": "GitHub 代码仓库",
+    }
     _LOCALE_RETRY_HINTS = {
         "cs": (
             "If the source title is 'Spreadsheet Management in Rust with "
@@ -1125,6 +1152,14 @@ class CampaignRunner:
             if exact:
                 guidance += (
                     " For the exact source label 'Aspose.Words for .NET', use "
+                    f"the governed target label exactly as '{exact}'."
+                )
+        if "GitHub Repository" in matched:
+            locale = target_lang.lower().split("-")[0]
+            exact = CampaignRunner._GITHUB_REPOSITORY_LABEL_TRANSLATIONS.get(locale)
+            if exact:
+                guidance += (
+                    " For the exact source label 'GitHub Repository', use "
                     f"the governed target label exactly as '{exact}'."
                 )
         return guidance
