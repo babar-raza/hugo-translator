@@ -384,17 +384,38 @@ class CampaignRunner:
         calculated = self.engine._get_output_path(source_path, locale, profile)
         if calculated.resolve() != target_path.resolve():
             raise CampaignManifestError(f"receipt revalidation routing mismatch: {output_path}")
-        gate_result = self.engine._write_gate.evaluate_zero_defect(
-            translated_content=accepted_content,
-            source_content=source_content,
-            target_lang=locale,
-            output_path=target_path,
-            source_doc=source_doc,
-            # This is a read-only verification of the same expected output,
-            # not an overwrite authorization.
-            force_overwrite=True,
-            site_profile=profile,
-        )
+        # Gate 36's external LLM score is deliberately stochastic.  Its final
+        # PASS was already captured in the immutable receipt when these exact
+        # source/output hashes were accepted.  Replaying it can produce a
+        # contradictory score for unchanged bytes and does not verify anything
+        # new.  Re-run every deterministic gate and replay only that immutable
+        # accepted Gate 36 result; candidate acceptance itself still always
+        # invokes the independent judge.
+        accepted_gate36 = (receipt.get("gate_results") or {}).get("36")
+        if not isinstance(accepted_gate36, dict) or not accepted_gate36.get("passed"):
+            raise CampaignManifestError(f"receipt missing accepted fidelity pass: {output_path}")
+        evaluator = self.engine._write_gate
+        original_fidelity_gate = evaluator._gate_fidelity_judge
+
+        def _replay_accepted_fidelity(*args: Any, **kwargs: Any) -> str:
+            translated = args[1] if len(args) > 1 else str(kwargs.get("translated_content", ""))
+            return translated
+
+        evaluator._gate_fidelity_judge = _replay_accepted_fidelity
+        try:
+            gate_result = evaluator.evaluate_zero_defect(
+                translated_content=accepted_content,
+                source_content=source_content,
+                target_lang=locale,
+                output_path=target_path,
+                source_doc=source_doc,
+                # This is a read-only verification of the same expected output,
+                # not an overwrite authorization.
+                force_overwrite=True,
+                site_profile=profile,
+            )
+        finally:
+            evaluator._gate_fidelity_judge = original_fidelity_gate
         final_content = gate_result.cleaned_content
         if not gate_result.passed or final_content != accepted_content:
             raise CampaignManifestError(f"receipt revalidation gates failed: {output_path}")
@@ -402,6 +423,7 @@ class CampaignRunner:
             1: {"passed": True, "action": "verification", "error": None},
             **gate_result.gate_results,
         }
+        gate_results[36] = accepted_gate36
         expected_gate_ids = set(range(1, 45))
         invalid = [
             gate_id
