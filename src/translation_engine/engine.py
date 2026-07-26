@@ -1757,7 +1757,27 @@ class TranslationEngine:
             or getattr(verification, "error_count", 0) > 0
             or getattr(verification, "warning_count", 0) > 0
         ):
-            raise ValueError("candidate rejected by independent verification")
+            checks = sorted(
+                {
+                    str(getattr(issue, "check_name", "unknown"))
+                    for issue in getattr(verification, "issues", [])
+                }
+            )
+            locations = sorted(
+                {
+                    hashlib.sha256(
+                        str(getattr(issue, "location", "unknown")).encode("utf-8")
+                    ).hexdigest()[:16]
+                    for issue in getattr(verification, "issues", [])
+                }
+            )
+            raise ValueError(
+                "candidate rejected by independent verification "
+                f"errors={getattr(verification, 'error_count', 0)} "
+                f"warnings={getattr(verification, 'warning_count', 0)} "
+                f"checks={','.join(checks) or 'unknown'} "
+                f"location_hashes={','.join(locations) or 'none'}"
+            )
 
         gate_result = self._write_gate.evaluate_zero_defect(
             translated_content=translated_content,
