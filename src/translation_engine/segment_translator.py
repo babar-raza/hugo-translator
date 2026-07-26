@@ -152,11 +152,9 @@ def _restore_required_seo_separator(
     product = re.search(r"\bAspose(?:\.[A-Za-z0-9.]+)?\b", translated_value)
     if product is None or not translated_value[: product.start()].strip():
         return translated_value
-    return (
-        translated_value[: product.start()].rstrip()
-        + f" {source_separator.group()} "
-        + translated_value[product.start() :]
-    )
+    separator = source_separator.group()
+    rendered_separator = separator if separator == " - " else f" {separator} "
+    return translated_value[: product.start()].rstrip() + rendered_separator + translated_value[product.start() :]
 
 
 _REVIEWED_IDENTICAL_TRANSLATIONS: dict[str, frozenset[str]] = {
