@@ -655,7 +655,7 @@ translation_engine:
   # replaces the campaign-pinned M2M primary on a first attempt.
   zero_defect_frontmatter_retry_models:
     blog.aspose.org:
-      title: m2m100_418m
+      title: nllb_200_1.3b
       seoTitle: nllb_200_1.3b
       description: m2m100_418m
       summary: m2m100_418m
@@ -735,6 +735,7 @@ translation_engine:
     lv: "professionalize_llm"   # Latvian: M2M100 produces Hungarian (83.1% purity failures). LLM verified 3/3 lv-detected.
     ko: "nllb_200_1.3b"         # Korean: canary fidelity rejected all M2M/LLM attempts; route the full candidate through qualified NLLB.
     de: "nllb_200_1.3b"         # German: M2M/LLM ladder left a required link-text unit untranslated.
+    fr: "nllb_200_1.3b"         # French: this canary source failed independent fidelity after the M2M/LLM ladder.
     th: "nllb_200_1.3b"         # Thai: canary fidelity rejected all M2M/LLM attempts; route the full candidate through qualified NLLB.
     tr: "nllb_200_1.3b"         # Turkish: M2M/LLM ladder left a required link-text unit untranslated.
     vi: "nllb_200_1.3b"         # Vietnamese: canary fidelity rejected all M2M/LLM attempts; route the full candidate through qualified NLLB.
