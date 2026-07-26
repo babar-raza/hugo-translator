@@ -62,6 +62,32 @@ class TestChineseTechnicalFrontmatter:
         assert issues[0].details["expected_lang"] == "zh"
 
 
+class TestLatinTechnicalFrontmatter:
+    """Governed technical tokens must not outvote translated Latin prose."""
+
+    def test_accepts_strong_italian_ordinary_prose_signal(self):
+        content = (
+            "---\n"
+            "title: 'Approfondimento: il CSSOM in Python'\n"
+            "---\n"
+        )
+
+        assert _make_engine()._check_frontmatter_language(content, "it") == []
+
+    def test_keeps_untranslated_english_ordinary_prose_blocking(self):
+        content = (
+            "---\n"
+            "title: 'Deep Dive: The CSSOM in Python'\n"
+            "---\n"
+        )
+
+        issues = _make_engine()._check_frontmatter_language(content, "it")
+
+        assert len(issues) == 1
+        assert issues[0].validator == "FrontmatterLanguageCheck"
+        assert issues[0].details["detected_lang"] == "en"
+
+
 class TestDetectorNoneBlocksWrite:
     """When _get_language_detector() returns None, writes must be blocked."""
 

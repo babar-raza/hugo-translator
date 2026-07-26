@@ -136,6 +136,12 @@ def _frontmatter_has_strong_script_evidence(text: str, target_lang: str) -> bool
     return target_count >= 6 and target_count / len(letters) >= 0.70
 
 
+def _frontmatter_language_signal_text(text: str) -> str:
+    """Return ordinary prose without governed technical classifier noise."""
+    stripped = _FRONTMATTER_TECHNICAL_SIGNAL_RE.sub(" ", text)
+    return re.sub(r"\s+", " ", stripped).strip()
+
+
 # _ALL_LANGUAGE_CODES and _is_translated_filename are re-exported (see imports
 # above) from src.utils.content_discovery, the canonical, config-driven
 # implementation shared with standalone scripts. Kept as module attributes
@@ -1779,6 +1785,22 @@ class TranslationEngine:
             "Event ",
             "Constructor ",
         )
+        _SIMILAR_LANG_MAP = {
+            "sr": {"hr", "bs"},  # South Slavic Latin-script
+            "hr": {"sr", "bs"},
+            "bs": {"sr", "hr"},
+            "ms": {"id"},  # Malay ↔ Indonesian
+            "id": {"ms"},
+            "uk": {"ru", "bg"},  # East Slavic Cyrillic
+            "bg": {"ru", "uk"},
+            "sk": {"cs"},  # West Slavic
+            "cs": {"sk"},
+            "zh": {"ja", "zh-cn", "zh-tw"},  # CJK — shared characters
+            "ja": {"zh", "zh-cn", "zh-tw"},
+            "no": {"da", "nb"},  # North Germanic
+            "nb": {"no", "da"},
+            "da": {"no", "nb"},
+        }
 
         for field in CHECKED_FIELDS:
             value = fm_data.get(field)
@@ -1797,27 +1819,27 @@ class TranslationEngine:
             if _frontmatter_has_strong_script_evidence(v_stripped, target_lang):
                 continue
             try:
+                # Required product/API/platform identifiers can dominate a
+                # short, otherwise-correct Latin-script title. Accept only a
+                # strong positive target-language verdict from ordinary prose
+                # with governed technical tokens removed. If that positive
+                # attestation is absent, retain the stricter raw-text check.
+                signal_text = _frontmatter_language_signal_text(v_stripped)
+                if sum(character.isalpha() for character in signal_text) >= 6:
+                    signal_langs = _ld.detect_langs(signal_text)
+                    if signal_langs:
+                        signal_top = signal_langs[0]
+                        signal_accepted = _SIMILAR_LANG_MAP.get(target_lang, set())
+                        if (
+                            signal_top.lang == target_lang
+                            or signal_top.lang in signal_accepted
+                        ) and signal_top.prob > CONFIDENCE_THRESHOLD:
+                            continue
                 detected_langs = _ld.detect_langs(v_stripped)
                 if detected_langs:
                     top = detected_langs[0]
                     # Accept linguistically near-identical languages that share script/vocabulary space.
                     # langdetect frequently confuses these pairs on short technical text.
-                    _SIMILAR_LANG_MAP = {
-                        "sr": {"hr", "bs"},  # South Slavic Latin-script
-                        "hr": {"sr", "bs"},
-                        "bs": {"sr", "hr"},
-                        "ms": {"id"},  # Malay ↔ Indonesian
-                        "id": {"ms"},
-                        "uk": {"ru", "bg"},  # East Slavic Cyrillic
-                        "bg": {"ru", "uk"},
-                        "sk": {"cs"},  # West Slavic
-                        "cs": {"sk"},
-                        "zh": {"ja", "zh-cn", "zh-tw"},  # CJK — shared characters
-                        "ja": {"zh", "zh-cn", "zh-tw"},
-                        "no": {"da", "nb"},  # North Germanic
-                        "nb": {"no", "da"},
-                        "da": {"no", "nb"},
-                    }
                     _similar_accepted = _SIMILAR_LANG_MAP.get(target_lang, set())
                     if (
                         top.lang != target_lang
