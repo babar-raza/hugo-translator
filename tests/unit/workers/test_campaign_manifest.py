@@ -456,7 +456,9 @@ def test_campaign_uses_three_primary_then_llm_and_logs_metadata_only(tmp_path, m
             assert target_langs == ["es"]
             escalated = str(output.resolve()) in self._rtq_llm_output_paths
             feedback = self._campaign_retry_feedback_by_output.pop(str(output.resolve()), None)
-            self.calls.append((escalated, self.decision_engine.max_retry_attempts, feedback))
+            self.calls.append(
+                (escalated, _kwargs.get("retry_budget_override"), feedback)
+            )
             if len(self.calls) < 3:
                 return SimpleNamespace(
                     success=False,

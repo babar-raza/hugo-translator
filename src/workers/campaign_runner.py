@@ -1078,8 +1078,6 @@ class CampaignRunner:
                     llm_paths = set()
                     self.engine._rtq_llm_output_paths = llm_paths
                 resolved_output = str(expected.resolve())
-                decision_engine = getattr(self.engine, "decision_engine", None)
-                original_retry_budget = getattr(decision_engine, "max_retry_attempts", None)
                 # The primary invocation owns the initial translation plus two
                 # feedback-guided retries. Each LLM invocation is one attempt,
                 # for exactly five attempts total.
@@ -1100,8 +1098,6 @@ class CampaignRunner:
                 )
                 try:
                     for use_llm, retry_budget, attempt_number in phases:
-                        if decision_engine is not None:
-                            decision_engine.max_retry_attempts = retry_budget
                         if use_llm:
                             llm_paths.add(resolved_output)
                         if next_feedback:
@@ -1114,6 +1110,7 @@ class CampaignRunner:
                             force=False,
                             force_overwrite=False,
                             trigger_type="campaign",
+                            retry_budget_override=retry_budget,
                         )
                         receipt = result.acceptance_receipts.get(locale)
                         if receipt is None:
@@ -1146,8 +1143,6 @@ class CampaignRunner:
                 finally:
                     llm_paths.discard(resolved_output)
                     feedback_by_output.pop(resolved_output, None)
-                    if decision_engine is not None:
-                        decision_engine.max_retry_attempts = original_retry_budget
                 if receipt is None or not expected.is_file():
                     failed += 1
                     shard_failed += 1

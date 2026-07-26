@@ -916,6 +916,7 @@ class TranslationEngine:
         force_overwrite: bool = False,
         validate: bool | None = None,
         trigger_type: str = "cli",
+        retry_budget_override: int | None = None,
     ) -> TranslationResult:
         """
         Translate a single Hugo markdown file.
@@ -1109,8 +1110,12 @@ class TranslationEngine:
             should_verify = self.enable_verification
             should_fix = self.enable_verification_fix and should_verify
             max_retry_attempts = (
-                self.decision_engine.max_retry_attempts if self.decision_engine else 2
+                retry_budget_override
+                if retry_budget_override is not None
+                else (self.decision_engine.max_retry_attempts if self.decision_engine else 2)
             )
+            if max_retry_attempts < 0:
+                raise ValueError("retry_budget_override must be non-negative")
 
             # CRITICAL FIX: Cache output paths to prevent path mismatch between skip check and write
             # Bug: If path calculated differently at write time, skip check tests wrong path

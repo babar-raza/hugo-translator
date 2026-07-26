@@ -171,6 +171,14 @@ regression and qualification tests, and resume. No candidate text from a
 rejected attempt may be logged, quarantined, materialized in a temp file, or
 stored in TM.
 
+The GPU execution topology is one shared CUDA-loaded `m2m100_418m` model,
+four isolated candidate pipelines, and adaptive segment microbatches starting
+at eight and qualifying toward sixteen. It must not create duplicate model
+replicas merely to increase file concurrency. `professionalize_llm` escalation
+and independent fidelity calls are bounded separately so their network latency
+overlaps GPU work. `nllb_200_600m` is benchmark-only until its CC-BY-NC-4.0
+license is explicitly approved for this production campaign.
+
 ## Requirement and task register
 
 | ID | Requirement / finding | Owner | Proof target | State |
