@@ -21,7 +21,7 @@ from src.translation_engine.segment_translator import (
 
 def test_retry_feedback_model_instructs_every_ast_translation_call():
     backend = MagicMock()
-    backend.translate.return_value = ["अनुवाद"]
+    backend.translate_with_retry_feedback.return_value = ["अनुवाद"]
     model = _RetryFeedbackModel(backend, "Translate every link label fully into hi.")
 
     result = model.translate(
@@ -32,11 +32,26 @@ def test_retry_feedback_model_instructs_every_ast_translation_call():
     )
 
     assert result == ["अनुवाद"]
-    assert backend.translate.call_args.args[0] == [
-        "Translate every link label fully into hi.\n\n"
-        "SOURCE TEXT:\nAspose.Cells — Enterprise Blog"
+    assert backend.translate_with_retry_feedback.call_args.args[0] == [
+        "Aspose.Cells — Enterprise Blog"
     ]
-    assert backend.translate.call_args.kwargs == {"generation_params": {"temperature": 0.2}}
+    assert backend.translate_with_retry_feedback.call_args.kwargs == {
+        "retry_feedback": "Translate every link label fully into hi.",
+        "generation_params": {"temperature": 0.2},
+    }
+
+    backend.translate_with_token_counts_and_retry_feedback.return_value = (
+        ["अनुवाद"],
+        5,
+        2,
+    )
+    counted = model.translate_with_token_counts(["Source"], "en", "hi", max_new_tokens=20)
+    assert counted == (["अनुवाद"], 5, 2)
+    assert backend.translate_with_token_counts_and_retry_feedback.call_args.args[0] == ["Source"]
+    assert (
+        backend.translate_with_token_counts_and_retry_feedback.call_args.kwargs["retry_feedback"]
+        == "Translate every link label fully into hi."
+    )
 
 
 def _make_engine():

@@ -44,6 +44,9 @@ _ctx_hint_var: contextvars.ContextVar[str | None] = contextvars.ContextVar(
 _ctx_file_var: contextvars.ContextVar[dict[str, str] | None] = contextvars.ContextVar(
     "llm_backend_ctx_file", default=None
 )
+_retry_feedback_var: contextvars.ContextVar[str | None] = contextvars.ContextVar(
+    "llm_backend_retry_feedback", default=None
+)
 # Same race, same fix: this used to be a temporary instance-attribute
 # override (`self.MAX_SEGMENTS_PER_PROMPT = 30`) on the shared backend.
 _max_segments_per_prompt_var: contextvars.ContextVar[int] = contextvars.ContextVar(
@@ -254,6 +257,7 @@ class LLMModelBackend:
         tgt_lang: str,
         context_hint: str | None = None,
         file_context: dict[str, str] | None = None,
+        retry_feedback: str | None = None,
     ) -> list[str]:
         """Translate with optional content-type context for enriched prompting.
 
@@ -283,22 +287,64 @@ class LLMModelBackend:
         # which matters if translate_with_context() calls are ever nested.
         hint_token = _ctx_hint_var.set(context_hint)
         file_token = _ctx_file_var.set(file_context)
+        feedback_token = _retry_feedback_var.set(retry_feedback)
         try:
             # Use larger batch for short API descriptions (avg ~8 tokens each)
             max_token = _max_segments_per_prompt_var.set(
-                30 if context_hint == "api_property_description"
+                30
+                if context_hint == "api_property_description"
                 else _max_segments_per_prompt_var.get()
             )
             try:
-                translations, _, _ = self.translate_with_token_counts(
-                    texts, src_lang, tgt_lang
-                )
+                translations, _, _ = self.translate_with_token_counts(texts, src_lang, tgt_lang)
             finally:
                 _max_segments_per_prompt_var.reset(max_token)
         finally:
+            _retry_feedback_var.reset(feedback_token)
             _ctx_hint_var.reset(hint_token)
             _ctx_file_var.reset(file_token)
         return translations
+
+    def translate_with_retry_feedback(
+        self,
+        texts: list[str],
+        src_lang: str,
+        tgt_lang: str,
+        retry_feedback: str,
+        **kwargs,
+    ) -> list[str]:
+        """Translate with candidate-free correction instructions in the system prompt."""
+        feedback_token = _retry_feedback_var.set(retry_feedback)
+        try:
+            return self.translate(texts, src_lang, tgt_lang, **kwargs)
+        finally:
+            _retry_feedback_var.reset(feedback_token)
+
+    def translate_with_token_counts_and_retry_feedback(
+        self,
+        texts: list[str],
+        src_lang: str,
+        tgt_lang: str,
+        retry_feedback: str,
+        **kwargs,
+    ) -> tuple[list[str], int, int]:
+        """Translate with token counts and governed system-prompt feedback."""
+        feedback_token = _retry_feedback_var.set(retry_feedback)
+        try:
+            return self.translate_with_token_counts(texts, src_lang, tgt_lang, **kwargs)
+        finally:
+            _retry_feedback_var.reset(feedback_token)
+
+    @staticmethod
+    def _apply_retry_feedback(system_prompt: str) -> str:
+        feedback = _retry_feedback_var.get()
+        if not feedback:
+            return system_prompt
+        return (
+            f"{system_prompt}\n\nGoverned retry requirements:\n"
+            f"- {feedback}\n"
+            "- Apply these requirements silently; do not repeat or discuss them."
+        )
 
     @staticmethod
     def _derive_file_context(output_path: str | None) -> dict[str, str]:
@@ -319,11 +365,9 @@ class LLMModelBackend:
         parts = p.parts
         try:
             # Find locale segment index (2-letter language code)
-            content_idx = next(
-                i for i, part in enumerate(parts) if part == "content"
-            )
+            content_idx = next(i for i, part in enumerate(parts) if part == "content")
             # locale is content_idx + 1; product parts follow, class name is last
-            after_locale = parts[content_idx + 2:]  # skip content/<locale>/
+            after_locale = parts[content_idx + 2 :]  # skip content/<locale>/
             if len(after_locale) >= 2:
                 class_name = p.stem  # filename without extension
                 product = "/".join(after_locale[:-1])
@@ -471,8 +515,7 @@ class LLMModelBackend:
                 continue
             following = lines[i + 1 : i + 4]
             marker_count = sum(
-                1 for ln in following
-                if _LIST_MARKER_RE.match(ln) or _NUMBERED_MARKER_RE.match(ln)
+                1 for ln in following if _LIST_MARKER_RE.match(ln) or _NUMBERED_MARKER_RE.match(ln)
             )
             if marker_count >= 2:
                 return "rule_header_leak"
@@ -481,9 +524,7 @@ class LLMModelBackend:
         # source has none at all.
         response_list_lines = sum(1 for ln in lines if _LIST_MARKER_RE.match(ln))
         if response_list_lines >= 2:
-            source_has_list = any(
-                _LIST_MARKER_RE.match(ln) for ln in source_text.splitlines()
-            )
+            source_has_list = any(_LIST_MARKER_RE.match(ln) for ln in source_text.splitlines())
             if not source_has_list:
                 return "list_marker_leak"
 
@@ -495,6 +536,7 @@ class LLMModelBackend:
             if ln.strip().startswith("- ")
         ]
         if rule_lines:
+
             def _words(s: str) -> set[str]:
                 return set(re.findall(r"[a-z0-9]+", s.lower()))
 
@@ -526,7 +568,7 @@ class LLMModelBackend:
 
         Returns (input_tokens, output_tokens).
         """
-        system_prompt = self._build_system_prompt(src_lang, tgt_lang)
+        system_prompt = self._apply_retry_feedback(self._build_system_prompt(src_lang, tgt_lang))
         try:
             protected = tm.protect(text) if tm else None
             input_text = protected.protected_text if protected else text
@@ -544,7 +586,9 @@ class LLMModelBackend:
             if reject_reason is not None:
                 logger.error(
                     "LLM response rejected (%s) for segment %d/%d: prompt-echo/refusal guard fired",
-                    reject_reason, idx + 1, total,
+                    reject_reason,
+                    idx + 1,
+                    total,
                 )
                 self.last_reject_reasons[idx] = reject_reason
                 translations[idx] = text
@@ -558,7 +602,7 @@ class LLMModelBackend:
                 tgt_lang, self._max_hallucination_ratio
             )
             if input_len > 0 and output_len > _max_ratio * input_len:
-                excess_text = result[int(input_len * _max_ratio):]
+                excess_text = result[int(input_len * _max_ratio) :]
                 if re.search(r"^\s*[-*]\s", excess_text, re.MULTILINE):
                     # TC-HT-003: the overflow itself looks like leaked
                     # rule/list text rather than a verbose-but-legitimate
@@ -567,7 +611,11 @@ class LLMModelBackend:
                     logger.error(
                         "LLM hallucination with list-marker overflow rejected for segment %d/%d "
                         "(%d→%d chars, %.1fx input)",
-                        idx + 1, total, input_len, output_len, output_len / input_len,
+                        idx + 1,
+                        total,
+                        input_len,
+                        output_len,
+                        output_len / input_len,
                     )
                     self.last_reject_reasons[idx] = "hallucination_list_marker_reject"
                     translations[idx] = text
@@ -630,7 +678,9 @@ class LLMModelBackend:
         Falls back to per-segment calls if output parsing fails.
         Returns (total_input_tokens, total_output_tokens).
         """
-        system_prompt = self._build_batch_system_prompt(src_lang, tgt_lang, len(indices))
+        system_prompt = self._apply_retry_feedback(
+            self._build_batch_system_prompt(src_lang, tgt_lang, len(indices))
+        )
 
         # Protect terms and build packed input
         protected_map = {}  # idx -> ProtectedResult
@@ -664,14 +714,13 @@ class LLMModelBackend:
 
                     # TC-HT-003: reject prompt-echo/refusal per-item before
                     # term restore, same guard as the single-segment path.
-                    reject_reason = self._validate_llm_response(
-                        trans, texts[idx], system_prompt
-                    )
+                    reject_reason = self._validate_llm_response(trans, texts[idx], system_prompt)
                     if reject_reason is not None:
                         logger.error(
                             "LLM response rejected (%s) for packed segment idx=%d: "
                             "prompt-echo/refusal guard fired",
-                            reject_reason, idx,
+                            reject_reason,
+                            idx,
                         )
                         self.last_reject_reasons[idx] = reject_reason
                         translations[idx] = texts[idx]

@@ -40,8 +40,22 @@ class _RetryFeedbackModel:
         self._feedback = feedback
 
     def translate(self, texts, src_lang: str, tgt_lang: str, **kwargs):
-        instructed = [f"{self._feedback}\n\nSOURCE TEXT:\n{text}" for text in texts]
-        return self._backend.translate(instructed, src_lang, tgt_lang, **kwargs)
+        return self._backend.translate_with_retry_feedback(
+            texts,
+            src_lang,
+            tgt_lang,
+            retry_feedback=self._feedback,
+            **kwargs,
+        )
+
+    def translate_with_token_counts(self, texts, src_lang: str, tgt_lang: str, **kwargs):
+        return self._backend.translate_with_token_counts_and_retry_feedback(
+            texts,
+            src_lang,
+            tgt_lang,
+            retry_feedback=self._feedback,
+            **kwargs,
+        )
 
     def __getattr__(self, name):
         return getattr(self._backend, name)
@@ -959,18 +973,13 @@ class SegmentTranslator:
                             _seg_translation = None
                             if _llm_backend_seg is not None:
                                 try:
-                                    _effective_hint = _hint
-                                    if retry_feedback:
-                                        _effective_hint = (
-                                            f"{_hint}\n\nGOVERNED RETRY INSTRUCTIONS:\n"
-                                            f"{retry_feedback}"
-                                        )
                                     _llm_result_seg = _llm_backend_seg.translate_with_context(
                                         [_seg.source_text],
                                         source_lang,
                                         target_lang,
-                                        context_hint=_effective_hint,
+                                        context_hint=_hint,
                                         file_context=_file_ctx_seg,
+                                        retry_feedback=retry_feedback,
                                     )
                                     if _llm_result_seg and _llm_result_seg[0]:
                                         _seg_translation = _llm_result_seg[0]
@@ -1074,10 +1083,7 @@ class SegmentTranslator:
                 from ..model_runtime.llm_backend import LLMModelBackend
 
                 if isinstance(backend, LLMModelBackend):
-                    texts_with_feedback = [
-                        f"{retry_feedback}\n\nSOURCE TEXT:\n{text}" for text in texts
-                    ]
-                    texts = texts_with_feedback
+                    backend = _RetryFeedbackModel(backend, retry_feedback)
                     logger.debug(f"Applied retry feedback to {len(texts)} segments")
                 else:
                     logger.debug(

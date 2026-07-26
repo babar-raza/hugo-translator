@@ -203,9 +203,9 @@ class TestFrontmatterDescriptionReachesLlmBackend:
                 retry_feedback="Translate description fully into hi.",
             )
 
-        hint = llm_backend.translate_with_context.call_args.kwargs["context_hint"]
-        assert "frontmatter_description" in hint
-        assert "Translate description fully into hi." in hint
+        kwargs = llm_backend.translate_with_context.call_args.kwargs
+        assert kwargs["context_hint"] == "frontmatter_description"
+        assert kwargs["retry_feedback"] == "Translate description fully into hi."
 
     def test_llm_failure_falls_back_to_passthrough_not_mt(self):
         """TC-LLM-AVAIL-001-style graceful degrade: on LLM failure, keep the
