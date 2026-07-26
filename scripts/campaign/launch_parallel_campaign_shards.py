@@ -31,6 +31,27 @@ def select_pending_shards(
     ][:max_workers]
 
 
+def incomplete_shards(
+    manifest: CampaignManifest,
+    ledger_root: Path,
+    shard_ids: list[str],
+) -> list[str]:
+    """Return launched shards that lack one or more final acceptance receipts."""
+    receipt_paths = set(CampaignLedger(ledger_root, manifest.campaign_id).receipts())
+    expected_by_id = {
+        str(shard["shard_id"]): {output for _source, _locale, output in shard["jobs"]}
+        for shard in manifest.shards(
+            resume_receipts=set(),
+            max_outputs=int(manifest.commit_policy.get("max_outputs_per_commit", 250)),
+        )
+    }
+    return [
+        shard_id
+        for shard_id in shard_ids
+        if not expected_by_id.get(shard_id, set()).issubset(receipt_paths)
+    ]
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--campaign-manifest", required=True, type=Path)
@@ -91,6 +112,13 @@ def main(argv: list[str] | None = None) -> int:
     if args.wait:
         exit_codes = [child.wait() for child in children]
         if any(code != 0 for code in exit_codes):
+            return 1
+        # Child process status is necessary but insufficient: a legacy worker
+        # could exit cleanly after a fail-closed preflight abort.  A supervised
+        # batch is successful only when every exact shard output has a receipt.
+        incomplete = incomplete_shards(manifest, args.ledger_root, shard_ids)
+        if incomplete:
+            print(f"Incomplete campaign shards: {', '.join(incomplete)}", file=sys.stderr)
             return 1
     return 0
 

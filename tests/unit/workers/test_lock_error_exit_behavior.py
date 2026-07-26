@@ -85,6 +85,20 @@ def test_oneshot_exits_1_when_all_content_roots_locked(monkeypatch):
     assert exc_info.value.code == 1
 
 
+def test_oneshot_exits_1_when_preflight_rejects(monkeypatch):
+    """A fail-closed preflight must propagate nonzero status to a launcher."""
+    w = _make_worker()
+    monkeypatch.setattr(
+        type(w), "_preflight_check", lambda self: False
+    )
+    monkeypatch.setattr(type(w), "_record_state", lambda self, *a, **kw: None)
+
+    with pytest.raises(SystemExit) as exc_info:
+        w._run_oneshot()
+
+    assert exc_info.value.code == 1
+
+
 # ---------------------------------------------------------------------------
 # Test 2 — Some translations succeeded despite lock errors → normal return (no exit 1)
 # ---------------------------------------------------------------------------

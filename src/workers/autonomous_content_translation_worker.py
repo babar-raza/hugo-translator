@@ -829,7 +829,10 @@ class AutonomousContentTranslationWorker:
                 "preflight_failed",
                 error=getattr(self, "_last_preflight_error", "") or "Preflight checks failed",
             )
-            return  # Graceful exit, not sys.exit(1)
+            # A campaign parent must never mistake a preflight abort for an
+            # accepted shard.  This is intentionally nonzero: no candidate
+            # was written and the caller must surface the blocked shard.
+            sys.exit(1)
 
         _run_id = str(uuid.uuid4())
         _cont_active = _continuation_start_safe(
