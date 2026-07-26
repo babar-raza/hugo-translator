@@ -20,6 +20,16 @@ from typing import Any
 logger = logging.getLogger(__name__)
 
 
+def _process_create_time(pid: int) -> float | None:
+    """Return a stable process birth time for PID-reuse detection."""
+    try:
+        import psutil
+
+        return float(psutil.Process(pid).create_time())
+    except Exception:
+        return None
+
+
 def _is_process_alive(pid: int) -> bool:
     """Platform-safe check for process liveness."""
     if platform.system() == "Windows":
@@ -49,8 +59,44 @@ def acquire_pid_file(worker_id: str, log_dir: Path | None = None) -> bool:
     ``FileExistsError`` and re-checks the holder's liveness before giving up.
     """
     pid_path = (log_dir or Path("data/logs")) / f"{worker_id}.pid"
+    identity_path = pid_path.with_suffix(pid_path.suffix + ".identity.json")
     pid_path.parent.mkdir(parents=True, exist_ok=True)
     my_pid = str(os.getpid()).encode()
+    my_create_time = _process_create_time(os.getpid())
+
+    def _write_identity() -> None:
+        identity = {
+            "worker_id": worker_id,
+            "pid": os.getpid(),
+            "create_time": my_create_time,
+        }
+        tmp_path = identity_path.with_suffix(identity_path.suffix + ".tmp")
+        tmp_path.write_text(
+            json.dumps(identity, sort_keys=True),
+            encoding="utf-8",
+        )
+        tmp_path.replace(identity_path)
+
+    def _holder_matches_identity(existing_pid: int) -> bool:
+        """Distinguish the original worker from an unrelated reused PID."""
+        if not _is_process_alive(existing_pid):
+            return False
+        try:
+            identity = json.loads(identity_path.read_text(encoding="utf-8"))
+        except (OSError, ValueError, TypeError):
+            # Legacy PID files have no identity sidecar. Preserve the existing
+            # fail-closed behavior until one governed acquisition replaces it.
+            return True
+        if (
+            str(identity.get("worker_id")) != worker_id
+            or int(identity.get("pid", -1)) != existing_pid
+        ):
+            return True
+        expected_create_time = identity.get("create_time")
+        current_create_time = _process_create_time(existing_pid)
+        if expected_create_time is None or current_create_time is None:
+            return True
+        return abs(float(expected_create_time) - current_create_time) < 0.01
 
     def _try_atomic_create() -> bool:
         """Attempt O_CREAT|O_EXCL open. Returns True on success, False if file exists."""
@@ -60,6 +106,7 @@ def acquire_pid_file(worker_id: str, log_dir: Path | None = None) -> bool:
                 os.write(fd, my_pid)
             finally:
                 os.close(fd)
+            _write_identity()
             return True
         except FileExistsError:
             return False
@@ -71,15 +118,15 @@ def acquire_pid_file(worker_id: str, log_dir: Path | None = None) -> bool:
     # File already exists — check who holds it
     try:
         existing_pid = int(pid_path.read_text(encoding="utf-8").strip())
-        if _is_process_alive(existing_pid):
+        if _holder_matches_identity(existing_pid):
             logger.warning(
                 "PID file %s held by live process %d — refusing to overwrite",
                 pid_path, existing_pid,
             )
             return False
-        # Dead PID — clean up the stale file and retry
+        # Dead or PID-reused holder — clean up the stale file and retry.
         logger.info(
-            "PID file %s held dead PID %d — removing stale file",
+            "PID file %s held dead/reused PID %d — removing stale file",
             pid_path, existing_pid,
         )
     except (ValueError, OSError):
@@ -87,6 +134,7 @@ def acquire_pid_file(worker_id: str, log_dir: Path | None = None) -> bool:
 
     try:
         pid_path.unlink(missing_ok=True)
+        identity_path.unlink(missing_ok=True)
     except OSError:
         pass
 
@@ -97,7 +145,7 @@ def acquire_pid_file(worker_id: str, log_dir: Path | None = None) -> bool:
 
     try:
         existing_pid = int(pid_path.read_text(encoding="utf-8").strip())
-        if _is_process_alive(existing_pid):
+        if _holder_matches_identity(existing_pid):
             logger.warning(
                 "PID file %s claimed by PID %d during stale-cleanup retry — exiting",
                 pid_path, existing_pid,
@@ -108,6 +156,7 @@ def acquire_pid_file(worker_id: str, log_dir: Path | None = None) -> bool:
 
     # Fallback: file exists but is unreadable/empty — overwrite it
     pid_path.write_text(str(os.getpid()), encoding="utf-8")
+    _write_identity()
     return True
 
 
