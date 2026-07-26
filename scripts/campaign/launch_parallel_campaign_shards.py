@@ -12,6 +12,7 @@ import subprocess
 import sys
 from pathlib import Path
 
+from src.utils.file_lock import FileLock, LockError
 from src.workers.campaign_manifest import CampaignManifest
 from src.workers.campaign_runner import CampaignLedger
 
@@ -68,25 +69,35 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     if not 1 <= args.max_workers <= 4:
         raise SystemExit("--max-workers must be 1..4")
+    if not args.wait:
+        raise SystemExit("--wait is required for governed campaign launches")
 
     manifest = CampaignManifest.load(args.campaign_manifest)
     translator_repo = Path(__file__).resolve().parents[2]
     config_root = translator_repo / "config"
-    shard_ids = select_pending_shards(manifest, args.ledger_root, args.max_workers)
-    if not shard_ids:
-        print("No pending campaign shards")
-        return 0
-    children: list[subprocess.Popen] = []
-    for shard_id in shard_ids:
-        print(shard_id)
-    if args.dry_run:
-        return 0
+    lock_path = args.ledger_root / manifest.campaign_id / "parallel-launcher.lock"
+    try:
+        launcher_lock = FileLock(lock_path, timeout=1)
+        launcher_lock.acquire()
+    except LockError:
+        print("A governed campaign launcher is already active", file=sys.stderr)
+        return 1
+    try:
+        shard_ids = select_pending_shards(manifest, args.ledger_root, args.max_workers)
+        if not shard_ids:
+            print("No pending campaign shards")
+            return 0
+        children: list[subprocess.Popen] = []
+        for shard_id in shard_ids:
+            print(shard_id)
+        if args.dry_run:
+            return 0
 
-    flags = 0
-    if sys.platform == "win32":
-        flags = subprocess.CREATE_NO_WINDOW
-    for shard_id in shard_ids:
-        command = [
+        flags = 0
+        if sys.platform == "win32":
+            flags = subprocess.CREATE_NO_WINDOW
+        for shard_id in shard_ids:
+            command = [
             sys.executable,
             "-m",
             "src.workers.autonomous_content_translation_worker",
@@ -107,9 +118,8 @@ def main(argv: list[str] | None = None) -> int:
             str(args.max_gpu_memory_percent),
             "--log-level",
             "INFO",
-        ]
-        children.append(subprocess.Popen(command, cwd=translator_repo, creationflags=flags))
-    if args.wait:
+            ]
+            children.append(subprocess.Popen(command, cwd=translator_repo, creationflags=flags))
         exit_codes = [child.wait() for child in children]
         if any(code != 0 for code in exit_codes):
             return 1
@@ -120,7 +130,9 @@ def main(argv: list[str] | None = None) -> int:
         if incomplete:
             print(f"Incomplete campaign shards: {', '.join(incomplete)}", file=sys.stderr)
             return 1
-    return 0
+        return 0
+    finally:
+        launcher_lock.release()
 
 
 if __name__ == "__main__":
