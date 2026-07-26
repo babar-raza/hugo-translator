@@ -36,7 +36,10 @@ def test_strict_retry_uses_only_the_pinned_profile_field_override():
             get_config=lambda: {
                 "translation_engine": {
                     "zero_defect_frontmatter_retry_models": {
-                        "blog.aspose.org": {"seoTitle": "nllb_200_1.3b"}
+                        "blog.aspose.org": {
+                            "title": "m2m100_418m",
+                            "seoTitle": "nllb_200_1.3b",
+                        }
                     }
                 }
             }
@@ -51,6 +54,12 @@ def test_strict_retry_uses_only_the_pinned_profile_field_override():
     assert (
         _strict_frontmatter_retry_model_id(
             engine, "blog.aspose.org", "title", "m2m100_418m", "retry"
+        )
+        == "m2m100_418m"
+    )
+    assert (
+        _strict_frontmatter_retry_model_id(
+            engine, "blog.aspose.org", "title", "professionalize_llm", "retry"
         )
         == "m2m100_418m"
     )
