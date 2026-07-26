@@ -364,3 +364,33 @@ def test_candidate_byte_acceptance_rejects_cleaned_byte_drift(tmp_path):
             target_lang="es",
             site_id="docs.aspose.org",
         )
+
+
+def test_candidate_byte_acceptance_reports_gate_id_without_reason_payload(tmp_path):
+    engine = _candidate_acceptance_engine()
+    failed = WriteGateResult(
+        passed=False,
+        error="SECRET CANDIDATE-DERIVED REASON",
+        gate_results={
+            31: {
+                "passed": False,
+                "action": "warn",
+                "error": "SECRET CANDIDATE-DERIVED REASON",
+            }
+        },
+    )
+    engine._write_gate.evaluate_zero_defect.return_value = failed
+
+    with pytest.raises(ValueError) as caught:
+        engine.accept_candidate_bytes(
+            source_bytes=b"source",
+            candidate_bytes=b"---\ntitle: Destino\n---\nCuerpo.\n",
+            source_path=tmp_path / "en" / "page.md",
+            output_path=tmp_path / "es" / "page.md",
+            target_lang="es",
+            site_id="docs.aspose.org",
+        )
+
+    assert "failed_gates=31" in str(caught.value)
+    assert "reason_sha256=" in str(caught.value)
+    assert "SECRET" not in str(caught.value)

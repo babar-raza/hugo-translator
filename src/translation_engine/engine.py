@@ -1793,7 +1793,19 @@ class TranslationEngine:
             translation_stats=TranslationStats(),
         )
         if not gate_result.passed:
-            raise ValueError("candidate rejected by write gate")
+            failed_gates = sorted(
+                gate_id
+                for gate_id, item in gate_result.gate_results.items()
+                if not item.get("passed", False)
+            )
+            reason_hash = hashlib.sha256(
+                str(gate_result.error or "unknown").encode("utf-8")
+            ).hexdigest()[:16]
+            raise ValueError(
+                "candidate rejected by write gate "
+                f"failed_gates={','.join(map(str, failed_gates)) or 'unknown'} "
+                f"reason_sha256={reason_hash}"
+            )
         expected_gate_ids = set(range(2, 45))
         if set(gate_result.gate_results) != expected_gate_ids or any(
             not item.get("passed", False)
