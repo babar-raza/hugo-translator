@@ -122,6 +122,16 @@ def test_dirty_snapshot_excludes_receipted_output_and_detects_user_change(tmp_pa
     assert dirty_snapshot_fingerprint(baseline) == fingerprint
 
 
+def test_direct_dirty_campaign_allows_empty_receipt_ledger(tmp_path):
+    """A fresh direct campaign has no accepted outputs to exclude yet."""
+    receipt_path = tmp_path / "empty-receipts.jsonl"
+    receipt_path.write_text("", encoding="utf-8")
+
+    from scripts.campaign.build_aspose_foss_pilot_manifest import _accepted_output_hashes
+
+    assert _accepted_output_hashes(receipt_path) == {}
+
+
 def test_verify_environment_preserves_frozen_dirty_destination(tmp_path):
     content_repo = tmp_path / "content"
     translator_repo = tmp_path / "translator"

@@ -211,9 +211,6 @@ def build_manifest(
             "Immutable manifest requires clean repositories: "
             f"content_dirty={len(content_dirty)}, translator_dirty={len(translator_dirty)}"
         )
-    if allow_dirty_content and not accepted_output_hashes:
-        raise RuntimeError("dirty content destination requires an accepted receipt ledger")
-
     sources = [*_folder_sources(content_repo), *_blog_sources(content_repo)]
     output_count = sum(len(item["outputs"]) for item in sources)
     if len(sources) != EXPECTED_SOURCE_COUNT or output_count != EXPECTED_OUTPUT_COUNT:
