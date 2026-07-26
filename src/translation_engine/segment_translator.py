@@ -84,6 +84,25 @@ def _allow_legacy_ast_fallback(validation_policy: str) -> bool:
     return validation_policy != "zero-defect"
 
 
+def _retry_original_frontmatter_value(
+    model_id_override: str | None,
+    retry_feedback: str | None,
+    validation_policy: str,
+) -> bool:
+    """Whether an AST retry must bypass placeholder-wrapped frontmatter text.
+
+    Placeholder protection is normally desirable, but short titles containing a
+    product entity are a documented M2M100 failure mode: the model can copy the
+    entire placeholder-bearing value unchanged.  A governed retry has already
+    failed its gates, so send the immutable original value to the selected
+    backend and let terminology/structure/language/fidelity gates validate its
+    returned bytes.  The LLM escalation path always uses this behavior.
+    """
+    return model_id_override == "professionalize_llm" or (
+        validation_policy == "zero-defect" and bool(retry_feedback)
+    )
+
+
 _REVIEWED_IDENTICAL_TRANSLATIONS: dict[str, frozenset[str]] = {
     # "Introduction" is spelled identically in English and French.  This is
     # an exact reviewed equivalence, not an untranslated-unit tolerance.
@@ -1750,12 +1769,17 @@ class SegmentTranslator:
                 logger.debug(f"ContentTypeRouter init skipped: {_ctr_err}")
 
             # A placeholder is normally the right representation for MT, but
-            # some LLMs conservatively copy an entire short title containing
-            # one.  On the *controlled* escalation attempt only, ask the LLM
-            # to translate the immutable original frontmatter value.  The
-            # terminology, placeholder, structure, language, and fidelity
-            # gates still validate the returned bytes before acceptance.
-            if model_id_override == "professionalize_llm":
+            # short titles containing one are also copied unchanged by M2M100.
+            # On an already-failed zero-defect retry (and always during the
+            # controlled LLM escalation), translate the immutable original
+            # frontmatter value.  The terminology, placeholder, structure,
+            # language, and fidelity gates still validate the returned bytes
+            # before acceptance.
+            if _retry_original_frontmatter_value(
+                model_id_override,
+                retry_feedback,
+                getattr(engine, "validation_policy", "standard"),
+            ):
                 try:
                     for _unit in plan.units:
                         _meta = _unit.metadata or {}
@@ -1768,13 +1792,20 @@ class SegmentTranslator:
                             or not str(_unit.node_addr).startswith("frontmatter.")
                         ):
                             continue
-                        _result = mt_model.translate_with_context(
-                            [str(_original)],
-                            site_profile.default_source_lang,
-                            target_lang,
-                            context_hint=f"frontmatter_{_field}",
-                            file_context={},
-                        )
+                        if hasattr(mt_model, "translate_with_context"):
+                            _result = mt_model.translate_with_context(
+                                [str(_original)],
+                                site_profile.default_source_lang,
+                                target_lang,
+                                context_hint=f"frontmatter_{_field}",
+                                file_context={},
+                            )
+                        else:
+                            _result = mt_model.translate(
+                                [str(_original)],
+                                site_profile.default_source_lang,
+                                target_lang,
+                            )
                         if _result and _result[0]:
                             _unit.translated_text = _result[0]
                             stats.llm_units_translated += 1
