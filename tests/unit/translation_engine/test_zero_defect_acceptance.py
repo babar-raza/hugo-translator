@@ -80,6 +80,25 @@ def test_zero_defect_writer_checksums_and_calls_receipt_sink(tmp_path):
     sink.assert_called_once()
 
 
+def test_zero_defect_writer_rejects_warn_receipt_before_any_disk_write(tmp_path):
+    engine = TranslationEngine.__new__(TranslationEngine)
+    accepted = _accepted(tmp_path)
+    gates = dict(accepted.gate_results)
+    gates[31] = {"passed": True, "action": "warn", "error": None}
+    warned = AcceptedTranslation.from_text(
+        content=accepted.text,
+        source_content="source",
+        source_path=accepted.source_path,
+        output_path=accepted.output_path,
+        target_lang="es",
+        gate_results=gates,
+    )
+
+    with pytest.raises(ValueError, match="non-final gate receipt"):
+        engine._write_accepted_output(warned, MagicMock())
+    assert not warned.output_path.exists()
+
+
 def test_receipt_failure_removes_output(tmp_path):
     engine = TranslationEngine.__new__(TranslationEngine)
     accepted = _accepted(tmp_path)
@@ -143,6 +162,7 @@ def test_warn_gate_is_blocking_under_zero_defect():
     )
     assert result.passed is False
     assert result.gate_results[31]["passed"] is False
+    assert result.gate_results[31]["action"] == "block"
 
 
 def test_zero_defect_requires_language_detector():

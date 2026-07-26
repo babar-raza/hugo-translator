@@ -1657,8 +1657,18 @@ class TranslationEngine:
             raise TypeError("zero-defect writer requires AcceptedTranslation")
         if accepted.validation_policy != "zero-defect":
             raise ValueError("accepted translation has the wrong validation policy")
-        if any(not item.get("passed", False) for item in accepted.gate_results.values()):
-            raise ValueError("accepted translation contains a non-passing gate receipt")
+        expected_gate_ids = set(range(1, 45))
+        invalid_gates = [
+            gate_id
+            for gate_id, item in accepted.gate_results.items()
+            if not isinstance(item, dict)
+            or not item.get("passed", False)
+            or str(item.get("action", "")).lower()
+            in {"warn", "warning", "skip", "skipped", "unavailable", "exception"}
+            or item.get("error") is not None
+        ]
+        if set(accepted.gate_results) != expected_gate_ids or invalid_gates:
+            raise ValueError("accepted translation contains a non-final gate receipt")
 
         file_existed = accepted.output_path.exists()
         atomic_write_binary(
@@ -1696,9 +1706,17 @@ class TranslationEngine:
 
         if not isinstance(accepted, AcceptedTranslation):
             raise TypeError("TM flush requires AcceptedTranslation")
-        if len(accepted.gate_results) != 44 or any(
-            not item.get("passed", False) for item in accepted.gate_results.values()
-        ):
+        expected_gate_ids = set(range(1, 45))
+        invalid_gates = [
+            gate_id
+            for gate_id, item in accepted.gate_results.items()
+            if not isinstance(item, dict)
+            or not item.get("passed", False)
+            or str(item.get("action", "")).lower()
+            in {"warn", "warning", "skip", "skipped", "unavailable", "exception"}
+            or item.get("error") is not None
+        ]
+        if set(accepted.gate_results) != expected_gate_ids or invalid_gates:
             raise ValueError("TM flush requires an all-44-gates acceptance receipt")
         for entry in buffered_entries:
             self.tm.store(**entry)

@@ -1314,9 +1314,14 @@ class WriteGateEvaluator:
                 fn(source_content, working, output_path, gate_result)
 
             if self._zero_defect:
+                # A rollout-tier warn gate is still evaluated independently,
+                # but campaign policy promotes it to a blocking acceptance
+                # gate.  Record the promoted action as well: a final receipt
+                # must never describe any gate as a warning.
+                receipt_action = "block" if action == "warn" else action
                 result.gate_results[gate_id] = {
                     "passed": gate_result.passed,
-                    "action": action,
+                    "action": receipt_action,
                     "error": gate_result.error,
                 }
                 if not gate_result.passed:
