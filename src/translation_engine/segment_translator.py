@@ -57,6 +57,17 @@ class _RetryFeedbackModel:
             **kwargs,
         )
 
+    def translate_with_context(self, texts, src_lang: str, tgt_lang: str, **kwargs):
+        # Keep campaign retry guidance attached to the field-aware LLM path
+        # used for frontmatter escalation as well as to ordinary batches.
+        return self._backend.translate_with_context(
+            texts,
+            src_lang,
+            tgt_lang,
+            retry_feedback=self._feedback,
+            **kwargs,
+        )
+
     def __getattr__(self, name):
         return getattr(self._backend, name)
 
@@ -1730,6 +1741,43 @@ class SegmentTranslator:
                                     )
             except Exception as _ctr_err:
                 logger.debug(f"ContentTypeRouter init skipped: {_ctr_err}")
+
+            # A placeholder is normally the right representation for MT, but
+            # some LLMs conservatively copy an entire short title containing
+            # one.  On the *controlled* escalation attempt only, ask the LLM
+            # to translate the immutable original frontmatter value.  The
+            # terminology, placeholder, structure, language, and fidelity
+            # gates still validate the returned bytes before acceptance.
+            if model_id_override == "professionalize_llm":
+                try:
+                    for _unit in plan.units:
+                        _meta = _unit.metadata or {}
+                        _original = _meta.get("original_text")
+                        _field = _meta.get("field_name")
+                        if (
+                            _unit.do_not_translate
+                            or not _original
+                            or not _field
+                            or not str(_unit.node_addr).startswith("frontmatter.")
+                        ):
+                            continue
+                        _result = mt_model.translate_with_context(
+                            [str(_original)],
+                            site_profile.default_source_lang,
+                            target_lang,
+                            context_hint=f"frontmatter_{_field}",
+                            file_context={},
+                        )
+                        if _result and _result[0]:
+                            _unit.translated_text = _result[0]
+                            stats.llm_units_translated += 1
+                except Exception as _frontmatter_llm_error:
+                    # Do not substitute source text: the subsequent gates
+                    # must reject a failed escalation candidate naturally.
+                    logger.warning(
+                        "LLM frontmatter escalation unavailable (%s)",
+                        type(_frontmatter_llm_error).__name__,
+                    )
 
             # Step 2b: Translate remaining units (MT) with batching + fallback.
             # Units that were pre-translated by the LLM step already have
