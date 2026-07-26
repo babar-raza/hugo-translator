@@ -1,6 +1,7 @@
 """
 Data models for translation engine results and statistics.
 """
+
 import hashlib
 from dataclasses import dataclass, field
 from enum import IntEnum
@@ -17,6 +18,7 @@ class ValidationDecision(IntEnum):
     - RETRY (1): Translation has issues but may improve with retry
     - REJECT (2): Translation has critical errors, should not be used
     """
+
     ACCEPT = 0
     RETRY = 1
     REJECT = 2
@@ -91,7 +93,9 @@ class TranslationStats:
     ast_units_protected: int = 0  # TextUnits marked as do_not_translate
     ast_batch_calls: int = 0  # Number of batch translation calls
     ast_individual_fallbacks: int = 0  # Number of fallbacks to individual translation
-    ast_missing_nodes: int = 0  # TC-MLD-01: AST nodes with no matching TextUnit (source-text leakage risk)
+    ast_missing_nodes: int = (
+        0  # TC-MLD-01: AST nodes with no matching TextUnit (source-text leakage risk)
+    )
 
     # HT-QUALITY-GATES-001 Part 22 (plan 5.4 item 4): units actually translated
     # by an LLM backend (ContentTypeRouter escalation), as opposed to routed-to
@@ -156,7 +160,9 @@ class TranslationResult:
     # In-memory diagnostic only. Campaign ledgers hash/sanitize this field and
     # never persist candidate-derived rejection text.
     error: str | None = None
-    validation_result: Optional["ValidationResult"] = None  # Validation result if validation enabled
+    validation_result: Optional["ValidationResult"] = (
+        None  # Validation result if validation enabled
+    )
 
     # Decision state (INF-03: Validation decision tracking)
     validation_decision: ValidationDecision | None = None  # Final validation decision
@@ -168,15 +174,24 @@ class TranslationResult:
     verification_result: Any | None = None  # VerificationResult from verification agent
 
     # RES-05: Skip tracking for existing outputs
-    skipped_langs: list[str] = field(default_factory=list)  # Languages skipped due to existing output
-    skip_reasons: dict[str, str] = field(default_factory=dict)  # {lang: reason} for skipped languages
+    skipped_langs: list[str] = field(
+        default_factory=list
+    )  # Languages skipped due to existing output
+    skip_reasons: dict[str, str] = field(
+        default_factory=dict
+    )  # {lang: reason} for skipped languages
 
     # TC-GIT-01: Telemetry context for git commit association
     telemetry_context: Any | None = None  # RunContext from telemetry tracking
 
     # OW-01: Overwrite-protection tracking
-    overwrite_blocked: bool = False  # True when write was blocked to protect an existing translation
+    overwrite_blocked: bool = (
+        False  # True when write was blocked to protect an existing translation
+    )
     acceptance_receipts: dict[str, dict[str, Any]] = field(default_factory=dict)
+    # Metadata-only gate outcomes for rejected candidates. Error strings are
+    # intentionally excluded because they may contain candidate fragments.
+    rejection_gate_results: dict[int, dict[str, Any]] = field(default_factory=dict)
 
     def __str__(self) -> str:
         """Human-readable summary."""
@@ -384,6 +399,7 @@ class LanguageProgress:
 
     T304: Multi-language progress tracking (federated-splashing-panda).
     """
+
     language_code: str
     total_texts: int = 0
     completed_texts: int = 0
@@ -405,6 +421,7 @@ class MultiLanguageProgress:
 
     T304: Multi-language progress tracking (federated-splashing-panda).
     """
+
     languages: dict[str, LanguageProgress] = field(default_factory=dict)
     mode: str = "serial"  # serial, parallel, roundrobin
     current_round: int = 0
@@ -417,7 +434,9 @@ class MultiLanguageProgress:
     @property
     def completed_languages(self) -> int:
         """Number of completed languages."""
-        return sum(1 for lang in self.languages.values() if lang.completed_texts >= lang.total_texts)
+        return sum(
+            1 for lang in self.languages.values() if lang.completed_texts >= lang.total_texts
+        )
 
     @property
     def overall_progress_percentage(self) -> float:
