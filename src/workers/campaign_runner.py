@@ -730,9 +730,7 @@ class CampaignRunner:
         """Resolve hashed same-as-source link units to source-only lexical guidance."""
         if source_path is None or not source_path.is_file():
             return ""
-        fingerprint_match = re.search(
-            r"\bunit_fingerprints=([a-z0-9_:,-]+)\b", raw_error
-        )
+        fingerprint_match = re.search(r"\bunit_fingerprints=([a-z0-9_:,-]+)\b", raw_error)
         if not fingerprint_match:
             return ""
         requested = {

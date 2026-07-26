@@ -515,8 +515,7 @@ def test_sas_link_feedback_resolves_source_hash_to_lexical_boundary(tmp_path):
     result = SimpleNamespace(
         validation_result=SimpleNamespace(issues=[]),
         error=(
-            "TC-SAS-01: same-as-source; "
-            f"unit_fingerprints=link_text:{fingerprint}:{len(label)}"
+            "TC-SAS-01: same-as-source; " f"unit_fingerprints=link_text:{fingerprint}:{len(label)}"
         ),
     )
 
