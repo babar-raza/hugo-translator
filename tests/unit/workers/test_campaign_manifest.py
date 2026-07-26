@@ -765,6 +765,34 @@ def test_sas_link_feedback_rehydrates_from_metadata_only_failure(tmp_path):
     assert "Enterprise, Blog" in feedback
 
 
+def test_arabic_sas_retry_uses_translated_product_link_label(tmp_path):
+    source = tmp_path / "index.md"
+    label = "Aspose.Words for .NET"
+    source.write_text(
+        f"[{label}](https://products.aspose.org/words/net/)\n",
+        encoding="utf-8",
+    )
+    fingerprint = hashlib.sha256(label.encode("utf-8")).hexdigest()[:16]
+    failure = {
+        "gate": "TC-SAS-01",
+        "reason": (
+            "translation_rejected; codes=TC-SAS-01; "
+            f"unit_fingerprints=link_text:{fingerprint}:{len(label)}; "
+            "error_sha256=abc"
+        ),
+    }
+
+    feedback = CampaignRunner._retry_feedback_from_failure(
+        failure,
+        "ar",
+        source_path=source,
+    )
+
+    assert "Aspose.Words لـ .NET" in feedback
+    assert "render the ordinary word 'for' in Arabic" in feedback
+    assert "Translate all ordinary label words into Arabic (ar)" in feedback
+
+
 def test_failure_metadata_extracts_safe_gate_score_without_candidate_text():
     result = SimpleNamespace(
         errors=[],

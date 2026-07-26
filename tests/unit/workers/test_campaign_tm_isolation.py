@@ -38,3 +38,10 @@ def test_campaign_l3_path_rejects_traversal(tmp_path, monkeypatch):
         AutonomousContentTranslationWorker._l3_index_path(
             Path("data/tm"), SimpleNamespace(campaign_id="../../outside")
         )
+
+
+def test_campaign_l3_flushes_each_accepted_addition():
+    campaign = SimpleNamespace(campaign_id="pilot-v1")
+
+    assert AutonomousContentTranslationWorker._l3_save_interval(campaign) == 1
+    assert AutonomousContentTranslationWorker._l3_save_interval(None) == 100

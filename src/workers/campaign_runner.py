@@ -233,6 +233,11 @@ class CampaignRunner:
         "zh": "Chinese Han characters",
     }
     _LOCALE_RETRY_HINTS = {
+        "ar": (
+            "If the source link label is 'Aspose.Words for .NET', translate "
+            "that link label exactly as 'Aspose.Words لـ .NET'. Preserve the "
+            "product tokens and render the ordinary word 'for' in Arabic."
+        ),
         "cs": (
             "If the source title is 'Spreadsheet Management in Rust with "
             "Aspose.Cells FOSS', translate that title exactly as "
@@ -1154,6 +1159,8 @@ class CampaignRunner:
             )
             if source_guidance:
                 instructions.append(source_guidance)
+            if locale_retry_hint:
+                instructions.append(locale_retry_hint)
         verification_result = getattr(result, "verification_result", None)
         failed_checks = sorted(
             {

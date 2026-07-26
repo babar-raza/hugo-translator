@@ -335,6 +335,11 @@ class AutonomousContentTranslationWorker:
             raise ValueError("campaign L3 path escapes the governed campaign root")
         return candidate
 
+    @staticmethod
+    def _l3_save_interval(campaign) -> int:
+        """Fsync every accepted campaign addition instead of batching durability."""
+        return 1 if campaign is not None else 100
+
     def __init__(self, config: AutonomousWorkerConfig):
         """
         Initialize autonomous worker.
@@ -467,6 +472,7 @@ class AutonomousContentTranslationWorker:
                     l3_semantic = L3SemanticTM(
                         index_path=l3_index_path,
                         use_gpu=self.config.device.startswith("cuda"),
+                        save_interval=self._l3_save_interval(self.campaign),
                     )
                     if self.campaign is not None:
                         logger.info(
