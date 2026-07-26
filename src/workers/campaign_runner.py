@@ -301,6 +301,13 @@ class CampaignRunner:
             "Bibliothek für Word-Dokumente'. This wording is idiomatic German "
             "and supplies unambiguous German language signals."
         ),
+        "es": (
+            "If the source title is 'Introducing Aspose.Words FOSS for .NET', "
+            "translate that title exactly as 'Lanzamiento de Aspose.Words FOSS "
+            "para .NET'. This wording is idiomatic Spanish and supplies an "
+            "unambiguous Spanish language signal while preserving the product "
+            "and platform tokens."
+        ),
         "nl": (
             "For a short Dutch technical title, translate the source phrase "
             "'Deep Dive' idiomatically as 'Een grondige analyse van'. "
@@ -1172,6 +1179,91 @@ class CampaignRunner:
         return guidance
 
     @staticmethod
+    def _sas_text_source_guidance(
+        source_path: Path | None, raw_error: str, target_lang: str
+    ) -> str:
+        """Rehydrate hashed AST text units into candidate-free retry guidance.
+
+        Failure metadata deliberately retains only source-unit fingerprints.  A
+        resumed campaign can safely resolve those fingerprints against the
+        still-pinned English source and give the next model attempt precise
+        source-only instructions without persisting rejected candidate text.
+        """
+        if source_path is None or not source_path.is_file():
+            return ""
+        fingerprint_match = re.search(r"\bunit_fingerprints=([a-z0-9_:,-]+)\b", raw_error)
+        if not fingerprint_match:
+            return ""
+        requested = {
+            (kind, digest, int(length))
+            for kind, digest, length in re.findall(
+                r"(?:^|,)(text):([a-f0-9]{16}):(\d+)",
+                fingerprint_match.group(1),
+            )
+        }
+        if not requested:
+            return ""
+
+        try:
+            from src.translation_engine.extractor import TextUnitExtractor
+            from src.translation_engine.parser import HugoParser
+            from src.utils.config_loader import ConfigService
+
+            parts = list(source_path.parts)
+            content_index = next(
+                index for index, part in enumerate(parts) if part.casefold() == "content"
+            )
+            site_id = parts[content_index + 1]
+            profile = ConfigService(Path("config")).get_site_profile(site_id)
+            terminology_file = Path("config/terminology/aspose_terms.txt")
+            document = HugoParser().parse_file(source_path)
+            extractor = TextUnitExtractor(
+                segmentation_strategy=profile.body.ast_segmentation_strategy,
+                terminology_file=terminology_file if terminology_file.is_file() else None,
+                preserve_patterns=profile.body.preserve_patterns,
+                site_profile=profile,
+                target_lang=target_lang,
+            )
+            plan = extractor.extract_from_ast(document.ast, frontmatter=document.frontmatter)
+        except (OSError, UnicodeError, ValueError, StopIteration, IndexError):
+            return ""
+        except Exception:
+            # Retry guidance is supplemental.  The candidate must still fail
+            # closed if source rehydration is unavailable for any reason.
+            return ""
+
+        matched: list[str] = []
+        for unit in plan.units:
+            source_text = str(getattr(unit, "source_text", "") or "")
+            kind = str(
+                getattr(
+                    getattr(unit, "kind", ""),
+                    "value",
+                    getattr(unit, "kind", ""),
+                )
+            )
+            fingerprint = (
+                kind,
+                hashlib.sha256(source_text.encode("utf-8")).hexdigest()[:16],
+                len(source_text),
+            )
+            if fingerprint in requested and source_text not in matched:
+                matched.append(source_text)
+        if not matched:
+            return ""
+
+        locale_label = CampaignRunner._target_locale_label(target_lang)
+        numbered = " ".join(
+            f"[{index}] {source_text}" for index, source_text in enumerate(matched, start=1)
+        )
+        return (
+            "The affected exact English source units are listed below. Translate every "
+            f"ordinary word in each complete unit into {locale_label}; preserve "
+            "{PLACEHOLDER_n} tokens, product/API identifiers, code, versions, and file "
+            f"formats exactly. Return no unit unchanged. Source units: {numbered}"
+        )
+
+    @staticmethod
     def _retry_feedback(
         result: Any,
         target_lang: str,
@@ -1232,6 +1324,11 @@ class CampaignRunner:
             )
             if source_guidance:
                 instructions.append(source_guidance)
+            text_source_guidance = CampaignRunner._sas_text_source_guidance(
+                source_path, raw_error, target_lang
+            )
+            if text_source_guidance:
+                instructions.append(text_source_guidance)
             if locale_retry_hint:
                 instructions.append(locale_retry_hint)
         verification_result = getattr(result, "verification_result", None)

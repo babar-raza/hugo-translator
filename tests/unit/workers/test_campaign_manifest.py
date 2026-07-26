@@ -765,6 +765,57 @@ def test_sas_link_feedback_rehydrates_from_metadata_only_failure(tmp_path):
     assert "Enterprise, Blog" in feedback
 
 
+def test_sas_text_feedback_rehydrates_only_pinned_source_units(tmp_path, monkeypatch):
+    source = tmp_path / "content" / "blog.aspose.org" / "product" / "index.md"
+    source.parent.mkdir(parents=True)
+    source_unit = "Build documents from scratch with"
+    source.write_text(f"## Guide\n\n{source_unit} `DocumentBuilder`.\n", encoding="utf-8")
+    fingerprint = hashlib.sha256(source_unit.encode("utf-8")).hexdigest()[:16]
+
+    parsed = SimpleNamespace(ast=[], frontmatter={})
+    monkeypatch.setattr(
+        "src.translation_engine.parser.HugoParser.parse_file",
+        lambda _self, _path: parsed,
+    )
+    monkeypatch.setattr(
+        "src.translation_engine.extractor.TextUnitExtractor.extract_from_ast",
+        lambda _self, _ast, frontmatter=None: SimpleNamespace(
+            units=[
+                SimpleNamespace(kind=SimpleNamespace(value="text"), source_text=source_unit),
+                SimpleNamespace(kind=SimpleNamespace(value="text"), source_text="Other prose"),
+            ]
+        ),
+    )
+    monkeypatch.setattr(
+        "src.utils.config_loader.ConfigService.get_site_profile",
+        lambda _self, _site_id: SimpleNamespace(
+            body=SimpleNamespace(
+                ast_segmentation_strategy="adaptive",
+                preserve_patterns=[],
+            )
+        ),
+    )
+    result = SimpleNamespace(
+        validation_result=SimpleNamespace(issues=[]),
+        error=(
+            "TC-SAS-01: same-as-source; "
+            f"unit_fingerprints=text:{fingerprint}:{len(source_unit)}"
+        ),
+    )
+
+    feedback = CampaignRunner._retry_feedback(
+        result,
+        "es",
+        source_path=source,
+    )
+
+    assert "affected exact English source units" in feedback
+    assert source_unit in feedback
+    assert "Other prose" not in feedback
+    assert "Spanish (es)" in feedback
+    assert "Return no unit unchanged" in feedback
+
+
 def test_arabic_sas_retry_uses_translated_product_link_label(tmp_path):
     source = tmp_path / "index.md"
     label = "Aspose.Words for .NET"
@@ -991,6 +1042,34 @@ def test_czech_language_retry_uses_unambiguous_czech_title(tmp_path):
     assert "Řízení tabulek v jazyce Rust s Aspose.Cells FOSS" in feedback
     assert "Czech/Slovak-neutral" in feedback
     assert "Czech (cs)" in feedback
+
+
+def test_spanish_language_retry_uses_unambiguous_spanish_title(tmp_path):
+    source = tmp_path / "index.md"
+    source.write_text(
+        "---\n"
+        "title: Introducing Aspose.Words FOSS for .NET\n"
+        "---\n",
+        encoding="utf-8",
+    )
+    failure = {
+        "gate": "verification:language_detection",
+        "reason": (
+            "translation_rejected; verification_checks=language_detection; "
+            "verification_fingerprints=language_detection:error:abc:"
+            "field=title:confidence=0.999993"
+        ),
+    }
+
+    feedback = CampaignRunner._retry_feedback_from_failure(
+        failure,
+        "es",
+        source_path=source,
+    )
+
+    assert "Lanzamiento de Aspose.Words FOSS para .NET" in feedback
+    assert "unambiguous Spanish language signal" in feedback
+    assert "Spanish (es)" in feedback
 
 
 def test_romanian_frontmatter_retry_uses_unambiguous_seo_title(tmp_path):
