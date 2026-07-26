@@ -168,6 +168,47 @@ class CampaignLedger:
 class CampaignRunner:
     """Execute only jobs enumerated by a pinned CampaignManifest."""
 
+    _LOCALE_NAMES = {
+        "ar": "Arabic",
+        "cs": "Czech",
+        "de": "German",
+        "el": "Greek",
+        "es": "Spanish",
+        "fa": "Persian",
+        "fr": "French",
+        "he": "Hebrew",
+        "hi": "Hindi",
+        "hu": "Hungarian",
+        "id": "Indonesian",
+        "it": "Italian",
+        "ja": "Japanese",
+        "ko": "Korean",
+        "nl": "Dutch",
+        "pl": "Polish",
+        "pt": "Portuguese",
+        "ro": "Romanian",
+        "ru": "Russian",
+        "sv": "Swedish",
+        "th": "Thai",
+        "tr": "Turkish",
+        "uk": "Ukrainian",
+        "vi": "Vietnamese",
+        "zh": "Chinese",
+    }
+    _LOCALE_SCRIPT_HINTS = {
+        "ar": "Arabic script",
+        "el": "Greek script",
+        "fa": "Persian script",
+        "he": "Hebrew script",
+        "hi": "Devanagari script",
+        "ja": "Japanese script",
+        "ko": "Hangul",
+        "ru": "Cyrillic script",
+        "th": "Thai script",
+        "uk": "Cyrillic script",
+        "zh": "Chinese Han characters",
+    }
+
     def __init__(
         self,
         *,
@@ -717,10 +758,21 @@ class CampaignRunner:
         field_text = ", ".join(selected)
         protected_text = ", ".join(protected) if protected else "none"
         substantive_text = ", ".join(substantive) if substantive else "all ordinary words"
+        locale_label = CampaignRunner._target_locale_label(target_lang)
         return (
             f"For source field(s) {field_text}, preserve exactly only these source tokens: "
-            f"{protected_text}. Translate every other English source token into {target_lang}, "
+            f"{protected_text}. Translate every other English source token into {locale_label}, "
             f"including these ordinary technical terms: {substantive_text}."
+        )
+
+    @classmethod
+    def _target_locale_label(cls, target_lang: str) -> str:
+        """Return an explicit, governed language/script label for model feedback."""
+        locale = target_lang.lower().split("-")[0]
+        name = cls._LOCALE_NAMES.get(locale, target_lang)
+        script = cls._LOCALE_SCRIPT_HINTS.get(locale)
+        return f"{name} ({target_lang})" + (
+            f", using {script} for all ordinary prose" if script else ""
         )
 
     @staticmethod
@@ -782,10 +834,11 @@ class CampaignRunner:
                 target.append(token)
         if not ordinary:
             return ""
+        locale_label = CampaignRunner._target_locale_label(target_lang)
         return (
             "For the affected source link label(s), preserve exactly only these "
             f"identifier/product tokens: {', '.join(protected) if protected else 'none'}. "
-            f"Translate all ordinary label words into {target_lang}, including: "
+            f"Translate all ordinary label words into {locale_label}, including: "
             f"{', '.join(ordinary)}. Do not preserve the complete English label as a title."
         )
 
@@ -802,6 +855,7 @@ class CampaignRunner:
         issues = getattr(validation_result, "issues", []) or []
         validators = {str(getattr(issue, "validator", "")) for issue in issues}
         instructions: list[str] = []
+        locale_label = CampaignRunner._target_locale_label(target_lang)
         if "FrontmatterLanguageCheck" in validators:
             fields = sorted(
                 {
@@ -815,7 +869,7 @@ class CampaignRunner:
             field_text = ", ".join(fields) if fields else "unspecified"
             instructions.append(
                 "Translate every translatable frontmatter field (title, description, "
-                f"seoTitle, summary) fully into target locale {target_lang}; "
+                f"seoTitle, summary) fully into target locale {locale_label}; "
                 f"the fields detected as failing were: {field_text}. "
                 "preserve only product names, API identifiers, code, and file formats. "
                 "Do not leave English prose."
@@ -856,7 +910,7 @@ class CampaignRunner:
             instructions.append(
                 "Correct every post-translation verification issue from these checks: "
                 f"{', '.join(failed_checks)}. Preserve source meaning and structure, "
-                f"and render all ordinary prose in target locale {target_lang}."
+                f"and render all ordinary prose in target locale {locale_label}."
             )
             verification_fields = sorted(
                 {
@@ -875,7 +929,7 @@ class CampaignRunner:
                 instructions.append(
                     "Translate every ordinary-language word in the affected "
                     f"frontmatter field(s) {', '.join(verification_fields)} into "
-                    f"target locale {target_lang}."
+                    f"target locale {locale_label}."
                 )
                 source_guidance = CampaignRunner._frontmatter_source_guidance(
                     source_path, verification_fields, target_lang
@@ -884,7 +938,7 @@ class CampaignRunner:
                     instructions.append(source_guidance)
         if not instructions and not prior_feedback:
             instructions.append(
-                f"Regenerate the complete translation in target locale {target_lang} and correct "
+                f"Regenerate the complete translation in target locale {locale_label} and correct "
                 "all prior validation failures without changing structure, code, links, or shortcodes."
             )
         additions = " ".join(instructions)

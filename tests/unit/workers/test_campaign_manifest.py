@@ -472,6 +472,37 @@ def test_campaign_resume_rehydrates_feedback_from_metadata(tmp_path):
     assert "summary" in feedback
 
 
+def test_greek_frontmatter_retry_names_language_and_requires_script(tmp_path):
+    source = tmp_path / "index.md"
+    source.write_text(
+        "---\n"
+        "seoTitle: Aspose.HTML FOSS for Python — CSSOM, Cascade, and Computed Styles\n"
+        "---\n",
+        encoding="utf-8",
+    )
+    failure = {
+        "gate": "FrontmatterLanguageCheck",
+        "reason": (
+            "translation_rejected; validators=FrontmatterLanguageCheck; "
+            "field=seoTitle; detected_lang=en; expected_lang=el"
+        ),
+    }
+
+    feedback = CampaignRunner._retry_feedback_from_failure(
+        failure,
+        "el",
+        source_path=source,
+    )
+
+    assert "Greek (el), using Greek script for all ordinary prose" in feedback
+    assert "preserve exactly only these source tokens" in feedback
+    assert "Aspose.HTML" in feedback
+    assert "CSSOM" in feedback
+    assert "Cascade" in feedback
+    assert "Computed" in feedback
+    assert "Styles" in feedback
+
+
 def test_frontmatter_feedback_has_source_derived_protection_boundary(tmp_path):
     source = tmp_path / "index.md"
     source.write_text(
@@ -528,7 +559,7 @@ def test_sas_link_feedback_resolves_source_hash_to_lexical_boundary(tmp_path):
     assert "affected source link label" in feedback
     assert "Aspose.Cells" in feedback
     assert "Enterprise, Blog" in feedback
-    assert "Translate all ordinary label words into nl" in feedback
+    assert "Translate all ordinary label words into Dutch (nl)" in feedback
 
 
 def test_sas_link_feedback_rehydrates_from_metadata_only_failure(tmp_path):
