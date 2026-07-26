@@ -661,6 +661,8 @@ translation_engine:
       summary: m2m100_418m
       de:
         title: nllb_200_1.3b
+      cs:
+        title: nllb_200_1.3b
       id:
         title: nllb_200_1.3b
       pl:
