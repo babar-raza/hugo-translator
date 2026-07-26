@@ -11,6 +11,7 @@ import sys
 import threading
 from datetime import datetime, timezone
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Any
 
 from src.utils.atomic_write import atomic_write
@@ -109,6 +110,20 @@ class CampaignLedger:
                 "failed_at": datetime.now(timezone.utc).isoformat(),
             },
         )
+
+    def latest_failure(self, *, output_path: str, target_lang: str) -> dict[str, Any] | None:
+        """Return the latest metadata-only failure for a resumable job."""
+        if not self.failures_path.is_file():
+            return None
+        latest = None
+        with self.failures_path.open("r", encoding="utf-8") as handle:
+            for line in handle:
+                if not line.strip():
+                    continue
+                row = json.loads(line)
+                if row.get("output_path") == output_path and row.get("target_lang") == target_lang:
+                    latest = row
+        return latest
 
     def replace_receipts(self, receipts: list[dict[str, Any]]) -> None:
         """Atomically replace metadata-only receipts after verified migration."""
@@ -618,6 +633,36 @@ class CampaignRunner:
             return prior_feedback
         return f"{prior_feedback} {additions}"
 
+    @classmethod
+    def _retry_feedback_from_failure(
+        cls, failure: dict[str, Any] | None, target_lang: str
+    ) -> str | None:
+        """Rehydrate safe retry guidance from metadata when resuming."""
+        if not failure:
+            return None
+        reason = str(failure.get("reason") or "")
+        gate = str(failure.get("gate") or "")
+        validators: list[str] = []
+        if gate == "FrontmatterLanguageCheck" or "FrontmatterLanguageCheck" in reason:
+            validators.append("FrontmatterLanguageCheck")
+        if "RepetitionDetectorValidator" in reason:
+            validators.append("RepetitionDetectorValidator")
+        fields = re.findall(r"\bfield=(title|description|seoTitle|summary)\b", reason)
+        issues = [
+            SimpleNamespace(
+                validator=validator,
+                details={"field": fields[0]} if fields else {},
+            )
+            for validator in validators
+        ]
+        return cls._retry_feedback(
+            SimpleNamespace(
+                validation_result=SimpleNamespace(issues=issues),
+                error=reason,
+            ),
+            target_lang,
+        )
+
     def verify(self, *, resume: bool = False) -> dict[str, Any]:
         receipts = self._validated_resume_receipts() if resume else {}
         self.manifest.verify_environment(
@@ -698,7 +743,10 @@ class CampaignRunner:
                 if feedback_by_output is None:
                     feedback_by_output = {}
                     self.engine._campaign_retry_feedback_by_output = feedback_by_output
-                next_feedback: str | None = None
+                next_feedback = self._retry_feedback_from_failure(
+                    self.ledger.latest_failure(output_path=expected_output, target_lang=locale),
+                    locale,
+                )
                 try:
                     for use_llm, retry_budget, attempt_number in phases:
                         if decision_engine is not None:

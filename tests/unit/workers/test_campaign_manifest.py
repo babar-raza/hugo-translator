@@ -452,6 +452,26 @@ def test_campaign_retry_feedback_accumulates_distinct_gate_instructions():
     assert "Translate every translatable source unit" in combined
 
 
+def test_campaign_resume_rehydrates_feedback_from_metadata(tmp_path):
+    ledger = CampaignLedger(tmp_path, "campaign")
+    ledger.append_failure(
+        source_path="content/source.md",
+        output_path="content/source.hi.md",
+        target_lang="hi",
+        error=(
+            "translation_rejected; validators=FrontmatterLanguageCheck; "
+            "field=summary; error_sha256=abc"
+        ),
+        gate="FrontmatterLanguageCheck",
+    )
+
+    latest = ledger.latest_failure(output_path="content/source.hi.md", target_lang="hi")
+    feedback = CampaignRunner._retry_feedback_from_failure(latest, "hi")
+
+    assert "Translate every translatable frontmatter field" in feedback
+    assert "summary" in feedback
+
+
 def test_failure_metadata_extracts_safe_gate_score_without_candidate_text():
     result = SimpleNamespace(
         errors=[],
