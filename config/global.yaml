@@ -663,6 +663,8 @@ translation_engine:
         title: nllb_200_1.3b
       id:
         title: nllb_200_1.3b
+      pl:
+        seoTitle: nllb_200_1.3b
 
   max_batch_purity_failure_rate: 0.10  # Block write if >10% of batches fail language purity checks
 
@@ -727,6 +729,7 @@ translation_engine:
   # accepted via SCRIPT_SIMILAR_LANGUAGES sr→{hr,bs} (Serbian Latin ≈ Croatian at text level).
   language_routing_overrides:
     lv: "professionalize_llm"   # Latvian: M2M100 produces Hungarian (83.1% purity failures). LLM verified 3/3 lv-detected.
+    ko: "nllb_200_1.3b"         # Korean: canary fidelity rejected all M2M/LLM attempts; route the full candidate through qualified NLLB.
   #   sr: "professionalize_llm"   # Serbian: M2M100 produces mixed-language (67.7% failures). LLM produces Latin Serbian (hr-detected → accepted via script_similar_languages). TEMPORARILY DISABLED for heal run (NLLB used instead).
   #   fa: "professionalize_llm"   # Persian: RTL + systematic M2M100 failures (not yet verified)
   #   he: "professionalize_llm"   # Hebrew: RTL + systematic M2M100 failures (not yet verified)
