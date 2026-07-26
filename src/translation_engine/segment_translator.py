@@ -103,6 +103,32 @@ def _retry_original_frontmatter_value(
     )
 
 
+def _strict_frontmatter_retry_model_id(
+    engine: Any,
+    site_id: str,
+    field_name: str,
+    default_model_id: str,
+    retry_feedback: str | None,
+) -> str:
+    """Resolve a pinned, field-scoped strict retry backend.
+
+    The override exists for short SEO fields where the campaign's primary MT
+    backend has already failed language validation.  It is deliberately
+    profile-and-field scoped, config-pinned, and only reachable after a
+    zero-defect retry signal; every returned byte still traverses all gates.
+    """
+    if not retry_feedback or getattr(engine, "validation_policy", "standard") != "zero-defect":
+        return default_model_id
+    try:
+        config = engine.config.get_config().get("translation_engine", {})
+        overrides = config.get("zero_defect_frontmatter_retry_models", {})
+        site_overrides = overrides.get(site_id, {})
+        configured = site_overrides.get(field_name)
+        return str(configured) if configured else default_model_id
+    except Exception:
+        return default_model_id
+
+
 _REVIEWED_IDENTICAL_TRANSLATIONS: dict[str, frozenset[str]] = {
     # "Introduction" is spelled identically in English and French.  This is
     # an exact reviewed equivalence, not an untranslated-unit tolerance.
@@ -1796,8 +1822,19 @@ class SegmentTranslator:
                             or not str(_unit.node_addr).startswith("frontmatter.")
                         ):
                             continue
-                        if hasattr(mt_model, "translate_with_context"):
-                            _result = mt_model.translate_with_context(
+                        _field_model_id = _strict_frontmatter_retry_model_id(
+                            engine,
+                            str(getattr(site_profile, "site_id", "")),
+                            str(_field),
+                            model_id,
+                            retry_feedback,
+                        )
+                        _field_model = mt_model
+                        if _field_model_id != model_id:
+                            with engine._model_lock:
+                                _field_model = engine.model_loader.load_model(_field_model_id)
+                        if hasattr(_field_model, "translate_with_context"):
+                            _result = _field_model.translate_with_context(
                                 [str(_original)],
                                 site_profile.default_source_lang,
                                 target_lang,
@@ -1805,7 +1842,7 @@ class SegmentTranslator:
                                 file_context={},
                             )
                         else:
-                            _result = mt_model.translate(
+                            _result = _field_model.translate(
                                 [str(_original)],
                                 site_profile.default_source_lang,
                                 target_lang,

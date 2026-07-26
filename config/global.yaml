@@ -650,6 +650,13 @@ translation_engine:
 
   require_language_detector: true  # Fail translation if language detector unavailable (prevents blind translation)
 
+  # Zero-defect retries may use a separately qualified local backend for a
+  # known short-field detector failure. This is profile/field scoped and never
+  # replaces the campaign-pinned M2M primary on a first attempt.
+  zero_defect_frontmatter_retry_models:
+    blog.aspose.org:
+      seoTitle: nllb_200_1.3b
+
   max_batch_purity_failure_rate: 0.10  # Block write if >10% of batches fail language purity checks
 
   # Languages where batch-level purity checks are skipped (document-level check still enforced).
