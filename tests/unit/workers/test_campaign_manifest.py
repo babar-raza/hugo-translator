@@ -545,8 +545,37 @@ def test_failure_metadata_preserves_safe_verification_check_only():
 
     assert gate == "verification:language_detection"
     assert "verification_checks=language_detection" in reason
+    assert "field=title" in reason
     assert "confidence=0.91" in reason
     assert "SECRET REJECTED CANDIDATE TEXT" not in reason
+
+
+def test_verification_language_feedback_uses_frontmatter_source_lexicon(tmp_path):
+    source = tmp_path / "index.md"
+    source.write_text(
+        "---\n" "title: Spreadsheet Management in Rust with Aspose.Cells FOSS\n" "---\n",
+        encoding="utf-8",
+    )
+    failure = {
+        "gate": "verification:language_detection",
+        "reason": (
+            "translation_rejected; verification_checks=language_detection; "
+            "verification_fingerprints=language_detection:error:abc:"
+            "field=title:confidence=0.714284"
+        ),
+    }
+
+    feedback = CampaignRunner._retry_feedback_from_failure(
+        failure,
+        "ko",
+        source_path=source,
+    )
+
+    assert "frontmatter field(s) title" in feedback
+    assert "preserve exactly only these source tokens" in feedback
+    assert "Spreadsheet" in feedback
+    assert "Management" in feedback
+    assert "Aspose.Cells" in feedback
 
 
 def test_failure_metadata_extracts_exception_class_without_candidate_text():

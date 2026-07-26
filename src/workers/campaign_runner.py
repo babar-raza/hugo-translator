@@ -603,6 +603,10 @@ class CampaignRunner:
             location_hash = hashlib.sha256(
                 str(getattr(issue, "location", "")).encode("utf-8")
             ).hexdigest()[:16]
+            location = str(getattr(issue, "location", ""))
+            field_match = re.fullmatch(
+                r"frontmatter\.(title|description|seoTitle|summary)", location
+            )
             metadata = getattr(issue, "metadata", None) or {}
             numeric_parts: list[str] = []
             for key, value in sorted(metadata.items()):
@@ -617,6 +621,7 @@ class CampaignRunner:
                         check_name,
                         severity,
                         location_hash,
+                        *([f"field={field_match.group(1)}"] if field_match else []),
                         *(numeric_parts or ["numeric=none"]),
                     ]
                 )
@@ -782,6 +787,30 @@ class CampaignRunner:
                 f"{', '.join(failed_checks)}. Preserve source meaning and structure, "
                 f"and render all ordinary prose in target locale {target_lang}."
             )
+            verification_fields = sorted(
+                {
+                    match.group(1)
+                    for issue in getattr(verification_result, "issues", []) or []
+                    if str(getattr(issue, "check_name", "")) == "language_detection"
+                    and (
+                        match := re.fullmatch(
+                            r"frontmatter\.(title|description|seoTitle|summary)",
+                            str(getattr(issue, "location", "")),
+                        )
+                    )
+                }
+            )
+            if verification_fields:
+                instructions.append(
+                    "Translate every ordinary-language word in the affected "
+                    f"frontmatter field(s) {', '.join(verification_fields)} into "
+                    f"target locale {target_lang}."
+                )
+                source_guidance = CampaignRunner._frontmatter_source_guidance(
+                    source_path, verification_fields, target_lang
+                )
+                if source_guidance:
+                    instructions.append(source_guidance)
         if not instructions and not prior_feedback:
             instructions.append(
                 f"Regenerate the complete translation in target locale {target_lang} and correct "
@@ -825,7 +854,22 @@ class CampaignRunner:
             SimpleNamespace(
                 check_name=check,
                 severity="warning",
-                location="",
+                location=(
+                    f"frontmatter.{fields[0]}"
+                    if check == "language_detection" and fields
+                    else next(
+                        (
+                            f"frontmatter.{field}"
+                            for field in ("title", "description", "seoTitle", "summary")
+                            if re.search(
+                                rf"{re.escape(check)}:(?:error|warning):"
+                                rf"{hashlib.sha256(f'frontmatter.{field}'.encode('utf-8')).hexdigest()[:16]}",
+                                reason,
+                            )
+                        ),
+                        "",
+                    )
+                ),
                 metadata={},
             )
             for check in (
