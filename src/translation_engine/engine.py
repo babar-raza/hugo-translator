@@ -1635,6 +1635,182 @@ class TranslationEngine:
 
         return not errors, errors
 
+    def accept_candidate_bytes(
+        self,
+        *,
+        source_bytes: bytes,
+        candidate_bytes: bytes,
+        source_path: Path,
+        output_path: Path,
+        target_lang: str,
+        site_id: str,
+        model_fingerprint: str = "",
+    ):
+        """Revalidate immutable bytes and return an acceptance capability.
+
+        This is the non-writing counterpart of the production validation path.
+        It exists for fail-closed receipt recovery and verification: callers
+        receive an ``AcceptedTranslation`` only when the exact supplied bytes
+        pass the full validation suite, independent verification, all 44 write
+        gates (including the fidelity judge), placement checks, and the
+        fixed-point auto-clean rerun.  It never writes output or flushes TM.
+        """
+        from .models import AcceptedTranslation
+        from .reconstructor import ASTRenderer
+        from .validation.post_translation_validator import (
+            ValidationDecision as PostValidationDecision,
+        )
+
+        if self.validation_policy != "zero-defect":
+            raise RuntimeError("candidate-byte acceptance requires zero-defect policy")
+        if not isinstance(source_bytes, bytes) or not isinstance(candidate_bytes, bytes):
+            raise TypeError("candidate-byte acceptance requires immutable bytes")
+        if not self.validation_suite or not self.decision_engine:
+            raise RuntimeError("candidate-byte acceptance requires all validators")
+
+        try:
+            source_content = source_bytes.decode("utf-8", errors="strict")
+            translated_content = candidate_bytes.decode("utf-8", errors="strict")
+        except UnicodeDecodeError as exc:
+            raise ValueError("candidate-byte acceptance requires valid UTF-8") from exc
+        if translated_content.encode("utf-8") != candidate_bytes:
+            raise ValueError("candidate bytes are not a stable UTF-8 round trip")
+
+        site_profile = self.config.get_site_profile(site_id)
+        if site_profile is None:
+            raise RuntimeError(f"site profile unavailable: {site_id}")
+        source_doc = self.parser.parse_string(source_content)
+        source_doc.source_path = source_path
+        translated_doc = self.parser.parse_string(translated_content)
+
+        source_body = (
+            ASTRenderer().render_to_markdown(source_doc.ast)
+            if getattr(source_doc, "ast", None)
+            else ""
+        )
+        translated_body = str(getattr(translated_doc, "body", ""))
+        validation_result = self.validation_suite.validate_aggregated(
+            source_body,
+            translated_body,
+            context={
+                "source_lang": getattr(site_profile, "default_source_lang", "en"),
+                "target_lang": target_lang,
+                "file_path": str(source_path),
+                "validation_policy": "zero-defect",
+            },
+        )
+        validation_result.issues.extend(
+            self._check_frontmatter_language(translated_content, target_lang)
+        )
+        if (
+            getattr(validation_result, "error_count", 0) > 0
+            or getattr(validation_result, "warning_count", 0) > 0
+        ):
+            raise ValueError("candidate rejected by validation suite")
+        decision = self.decision_engine.make_decision(
+            validation_result=validation_result,
+            retry_count=0,
+            source=source_body,
+            site_id=site_id,
+            target_lang=target_lang,
+        )
+        if decision.decision != PostValidationDecision.ACCEPT:
+            raise ValueError("candidate rejected by validation decision")
+
+        verification = self._get_verification_agent().verify(
+            source_doc={
+                "frontmatter": getattr(source_doc, "frontmatter", {}),
+                "body": str(getattr(source_doc, "body", "")),
+            },
+            translated_doc={
+                "frontmatter": getattr(translated_doc, "frontmatter", {}),
+                "body": str(getattr(translated_doc, "body", "")),
+            },
+            target_lang=target_lang,
+            context={
+                "source_lang": getattr(site_profile, "default_source_lang", "en"),
+                "file_path": str(source_path),
+                "site_id": site_id,
+                "validation_policy": "zero-defect",
+            },
+        )
+        if (
+            not verification.passed
+            or getattr(verification, "error_count", 0) > 0
+            or getattr(verification, "warning_count", 0) > 0
+        ):
+            raise ValueError("candidate rejected by independent verification")
+
+        gate_result = self._write_gate.evaluate_zero_defect(
+            translated_content=translated_content,
+            source_content=source_content,
+            target_lang=target_lang,
+            output_path=output_path,
+            source_doc=source_doc,
+            # Receipt recovery validates a byte-identical existing blob.  This
+            # bypasses only Gate 3's "path already exists" condition; it does
+            # not bypass or weaken any translation-quality gate.
+            force_overwrite=True,
+            site_profile=site_profile,
+            translation_stats=TranslationStats(),
+        )
+        if not gate_result.passed:
+            raise ValueError("candidate rejected by write gate")
+        expected_gate_ids = set(range(2, 45))
+        if set(gate_result.gate_results) != expected_gate_ids or any(
+            not item.get("passed", False)
+            for item in gate_result.gate_results.values()
+        ):
+            raise ValueError("candidate lacks an all-pass 43-gate write receipt")
+        final_content = (
+            gate_result.cleaned_content
+            if gate_result.cleaned_content is not None
+            else translated_content
+        )
+        if final_content.encode("utf-8") != candidate_bytes:
+            raise ValueError("candidate bytes differ from fixed-point gate output")
+        fidelity = getattr(gate_result, "_fidelity_result", None)
+        if not isinstance(fidelity, dict) or fidelity.get("verdict") != "pass":
+            raise ValueError("candidate lacks an independent fidelity PASS")
+
+        pre_write_passed, pre_write_errors = self._pre_write_validation(
+            content=translated_content,
+            output_path=output_path,
+            source_path=source_path,
+            target_lang=target_lang,
+            site_id=site_id,
+            site_profile=site_profile,
+        )
+        if not pre_write_passed:
+            raise ValueError(
+                f"candidate rejected by pre-write validation ({len(pre_write_errors)} finding(s))"
+            )
+
+        gate_receipt = {
+            1: {"passed": True, "action": "verification", "error": None},
+            **gate_result.gate_results,
+        }
+        campaign_context = getattr(self, "campaign_context", {}) or {}
+        fidelity_model = str(fidelity.get("model") or "")
+        receipt_model = model_fingerprint or (
+            f"receipt-recovery:fidelity={fidelity_model}"
+            if fidelity_model
+            else "receipt-recovery:fidelity=unknown"
+        )
+        return AcceptedTranslation(
+            content=candidate_bytes,
+            source_path=source_path,
+            output_path=output_path,
+            source_sha256=hashlib.sha256(source_bytes).hexdigest(),
+            output_sha256=hashlib.sha256(candidate_bytes).hexdigest(),
+            target_lang=target_lang,
+            validation_policy="zero-defect",
+            gate_results=gate_receipt,
+            config_fingerprint=str(campaign_context.get("config_fingerprint") or ""),
+            model_fingerprint=receipt_model,
+            campaign_id=str(campaign_context.get("campaign_id") or ""),
+        )
+
     def _tm_site_namespace(self, site_id: str, source_path: Path | str | None) -> str:
         """Bind campaign TM entries to campaign, config, and source context."""
         context = getattr(self, "campaign_context", {}) or {}

@@ -246,6 +246,7 @@ class AutonomousWorkerConfig:
         campaign_manifest: str | None = None,
         resume: bool = False,
         verify_only: bool = False,
+        recover_committed_receipts: bool = False,
         validation_policy: str = "standard",
     ):
         """Initialize worker configuration."""
@@ -265,6 +266,7 @@ class AutonomousWorkerConfig:
         self.campaign_manifest = campaign_manifest
         self.resume = resume
         self.verify_only = verify_only
+        self.recover_committed_receipts = recover_committed_receipts
         self.validation_policy = validation_policy
 
     @classmethod
@@ -286,6 +288,7 @@ class AutonomousWorkerConfig:
             campaign_manifest=getattr(args, "campaign_manifest", None),
             resume=getattr(args, "resume", False),
             verify_only=getattr(args, "verify_only", False),
+            recover_committed_receipts=getattr(args, "recover_committed_receipts", False),
             validation_policy=getattr(args, "validation_policy", "standard"),
         )
 
@@ -377,6 +380,10 @@ class AutonomousContentTranslationWorker:
             logger.info(
                 "Campaign profile root bound to pinned checkout: %s",
                 campaign_content_root,
+            )
+        elif self.config.recover_committed_receipts:
+            raise ValueError(
+                "--recover-committed-receipts requires --campaign-manifest"
             )
 
         # Apply VRAM enforcement if using CUDA
@@ -830,8 +837,10 @@ class AutonomousContentTranslationWorker:
                     translation_engine=self.translation_engine,
                     translator_repo=Path.cwd(),
                 )
+                if self.config.recover_committed_receipts:
+                    runner.recover_committed_receipts()
                 summary = runner.run(
-                    resume=self.config.resume,
+                    resume=(self.config.resume or self.config.recover_committed_receipts),
                     verify_only=self.config.verify_only,
                 )
                 self._run_new_files = {"campaign": int(summary.get("accepted", 0))}
@@ -2349,6 +2358,16 @@ Examples:
         "--verify-only",
         action="store_true",
         help="Verify the pinned campaign environment without translating",
+    )
+
+    parser.add_argument(
+        "--recover-committed-receipts",
+        action="store_true",
+        help=(
+            "Fail-closed recovery for an empty lost ledger: revalidate exact "
+            "one-file governed commit bytes through every zero-defect gate, "
+            "then resume"
+        ),
     )
 
     parser.add_argument(

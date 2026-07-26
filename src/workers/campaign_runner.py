@@ -129,6 +129,11 @@ class CampaignLedger:
 
     def replace_receipts(self, receipts: list[dict[str, Any]]) -> None:
         """Atomically replace metadata-only receipts after verified migration."""
+        if any(
+            "content" in row or "translated_content" in row
+            for row in receipts
+        ):
+            raise ValueError("campaign receipts must never contain candidate text")
         encoded = "".join(
             json.dumps(row, ensure_ascii=False, sort_keys=True) + "\n" for row in receipts
         )
@@ -313,6 +318,203 @@ class CampaignRunner:
                     f"receipt {field_name} is outside content repo: {absolute}"
                 ) from exc
         self.ledger.append_receipt(normalized)
+
+    def _receipt_recovery_candidates(
+        self,
+    ) -> list[tuple[Any, str, str, str]]:
+        """Return manifest outputs backed by immutable governed add commits.
+
+        Each candidate must be the sole path added by its latest path commit,
+        that commit must be after the pinned content baseline and reachable
+        from the current branch, and the current bytes must equal the commit
+        blob.  This deliberately excludes arbitrary pre-existing files.
+        """
+        candidates: list[tuple[Any, str, str, str]] = []
+        for source in self.manifest.sources:
+            for locale, relative in source.outputs.items():
+                output_path = self.content_repo / relative
+                if not output_path.exists():
+                    continue
+                if not output_path.is_file():
+                    raise CampaignManifestError(
+                        f"receipt recovery output is not a file: {relative}"
+                    )
+                log = subprocess.run(
+                    ["git", "log", "-1", "--format=%H%x00%s", "--", relative],
+                    cwd=self.content_repo,
+                    check=True,
+                    capture_output=True,
+                ).stdout.decode("utf-8", errors="strict").strip()
+                if "\0" not in log:
+                    raise CampaignManifestError(
+                        f"receipt recovery path has no commit provenance: {relative}"
+                    )
+                commit_sha, subject = log.split("\0", 1)
+                shard_prefix = (
+                    f"w{source.wave}:{source.site_id}:{source.family}:"
+                    f"{source.platform}:{locale}:"
+                )
+                expected_subject = re.compile(
+                    rf"^content\(locale\): zero-defect shard "
+                    rf"{re.escape(shard_prefix)}[1-9][0-9]*$"
+                )
+                if not expected_subject.fullmatch(subject):
+                    raise CampaignManifestError(
+                        f"receipt recovery commit is not governed: {relative}"
+                    )
+                if not subprocess.run(
+                    [
+                        "git",
+                        "merge-base",
+                        "--is-ancestor",
+                        self.manifest.content_repo_sha,
+                        commit_sha,
+                    ],
+                    cwd=self.content_repo,
+                    capture_output=True,
+                ).returncode == 0:
+                    raise CampaignManifestError(
+                        f"receipt recovery commit predates pinned baseline: {relative}"
+                    )
+                if not subprocess.run(
+                    ["git", "merge-base", "--is-ancestor", commit_sha, "HEAD"],
+                    cwd=self.content_repo,
+                    capture_output=True,
+                ).returncode == 0:
+                    raise CampaignManifestError(
+                        f"receipt recovery commit is not reachable: {relative}"
+                    )
+                changed = subprocess.run(
+                    [
+                        "git",
+                        "diff-tree",
+                        "--no-commit-id",
+                        "--name-status",
+                        "-r",
+                        commit_sha,
+                    ],
+                    cwd=self.content_repo,
+                    check=True,
+                    capture_output=True,
+                    text=True,
+                ).stdout.splitlines()
+                if changed != [f"A\t{relative}"]:
+                    raise CampaignManifestError(
+                        f"receipt recovery requires a one-file add commit: {relative}"
+                    )
+                committed_bytes = subprocess.run(
+                    ["git", "show", f"{commit_sha}:{relative}"],
+                    cwd=self.content_repo,
+                    check=True,
+                    capture_output=True,
+                ).stdout
+                if hashlib.sha256(committed_bytes).hexdigest() != sha256_file(output_path):
+                    raise CampaignManifestError(
+                        f"receipt recovery blob drift: {relative}"
+                    )
+                candidates.append((source, locale, relative, commit_sha))
+        return sorted(candidates, key=lambda item: item[2])
+
+    def recover_committed_receipts(self) -> dict[str, Any]:
+        """Recreate a lost empty ledger by revalidating governed committed bytes.
+
+        This is not an acceptance shortcut: all candidate bytes are kept in
+        memory and independently rerun through validation, verification,
+        fidelity, all 44 gates, and placement.  The metadata-only ledger is
+        replaced atomically only after the entire recovery set passes.
+        """
+        with FileLock(self.ledger.root / "campaign.lock", timeout=0):
+            if self.ledger.receipts():
+                raise CampaignManifestError(
+                    "receipt recovery requires an empty acceptance ledger"
+                )
+            candidates = self._receipt_recovery_candidates()
+            if not candidates:
+                raise CampaignManifestError(
+                    "receipt recovery found no governed committed outputs"
+                )
+            existing_expected = {
+                output
+                for source in self.manifest.sources
+                for output in source.outputs.values()
+                if (self.content_repo / output).exists()
+            }
+            recovered_outputs = {item[2] for item in candidates}
+            if recovered_outputs != existing_expected:
+                raise CampaignManifestError(
+                    "receipt recovery provenance does not cover every existing output"
+                )
+
+            self.manifest.verify_environment(
+                translator_repo=self.translator_repo,
+                require_clean=True,
+                allow_existing_accepted=recovered_outputs,
+            )
+            self.engine.campaign_context.update(
+                {
+                    "campaign_id": self.manifest.campaign_id,
+                    "config_fingerprint": self.manifest.config_fingerprint,
+                }
+            )
+
+            accepted_rows: list[dict[str, Any]] = []
+            accepted_at = datetime.now(timezone.utc).isoformat()
+            for source, locale, relative, commit_sha in candidates:
+                source_path = self.content_repo / source.source_path
+                output_path = self.content_repo / relative
+                accepted = self.engine.accept_candidate_bytes(
+                    source_bytes=source_path.read_bytes(),
+                    candidate_bytes=output_path.read_bytes(),
+                    source_path=source_path,
+                    output_path=output_path,
+                    target_lang=locale,
+                    site_id=source.site_id,
+                )
+                receipt = accepted.receipt()
+                normalized = dict(receipt)
+                for field_name in ("source_path", "output_path"):
+                    normalized[field_name] = (
+                        Path(normalized[field_name])
+                        .resolve()
+                        .relative_to(self.content_repo)
+                        .as_posix()
+                    )
+                expected_context = {
+                    "campaign_id": self.manifest.campaign_id,
+                    "source_path": source.source_path,
+                    "output_path": relative,
+                    "source_sha256": source.source_sha256,
+                    "target_lang": locale,
+                    "validation_policy": "zero-defect",
+                    "config_fingerprint": self.manifest.config_fingerprint,
+                }
+                if any(
+                    normalized.get(field) != expected
+                    for field, expected in expected_context.items()
+                ):
+                    raise CampaignManifestError(
+                        f"revalidated receipt context mismatch: {relative}"
+                    )
+                normalized["receipt_recovery"] = {
+                    "mode": "all-gates-byte-revalidation-v1",
+                    "commit_sha": commit_sha,
+                }
+                normalized["accepted_at"] = accepted_at
+                normalized["receipt_sha256"] = receipt_fingerprint(normalized)
+                accepted_rows.append(normalized)
+
+            self.ledger.replace_receipts(accepted_rows)
+            verified = self._validated_resume_receipts()
+            if set(verified) != recovered_outputs:
+                raise CampaignManifestError("recovered receipt reconciliation failed")
+            summary = {
+                **self.manifest.to_summary(),
+                "status": "RECEIPTS_RECOVERED",
+                "accepted": len(verified),
+                "remaining": self.manifest.expected_output_count - len(verified),
+            }
+            self.ledger.write_summary(summary)
+            return summary
 
     def _commit_verified_outputs(self, shard_id: str) -> str | None:
         """Commit only checksum-verified, receipted campaign outputs."""

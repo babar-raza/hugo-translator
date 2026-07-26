@@ -14,6 +14,7 @@ from src.workers.campaign_manifest import (
     sha256_file,
 )
 from src.workers.campaign_runner import CampaignLedger, CampaignRunner
+from src.translation_engine.models import AcceptedTranslation
 
 
 def _manifest(tmp_path: Path) -> dict:
@@ -100,6 +101,15 @@ def test_ledger_deduplicates_identical_receipt_and_rejects_conflict(tmp_path):
     assert len(ledger.receipts_path.read_text(encoding="utf-8").splitlines()) == 1
     with pytest.raises(ValueError, match="conflicting"):
         ledger.append_receipt({"output_path": "page.md", "output_sha256": "b" * 64})
+
+
+def test_ledger_atomic_replacement_rejects_candidate_text(tmp_path):
+    ledger = CampaignLedger(tmp_path, "pilot")
+    with pytest.raises(ValueError, match="candidate text"):
+        ledger.replace_receipts(
+            [{"output_path": "page.md", "translated_content": "SECRET"}]
+        )
+    assert not ledger.receipts_path.exists()
 
 
 def test_failure_ledger_contains_metadata_only(tmp_path):
@@ -325,6 +335,167 @@ def test_receipt_fingerprint_survives_json_roundtrip_with_integer_gate_keys():
     persisted = json.loads(json.dumps(receipt))
 
     assert receipt_fingerprint(receipt) == receipt_fingerprint(persisted)
+
+
+def _init_recovery_repo(tmp_path: Path, *, extra_commit_path: str | None = None):
+    repo = tmp_path / "content-repo"
+    repo.mkdir()
+    subprocess.run(["git", "init", "-b", "pilot"], cwd=repo, check=True)
+    subprocess.run(
+        ["git", "config", "user.email", "campaign@example.invalid"],
+        cwd=repo,
+        check=True,
+    )
+    subprocess.run(
+        ["git", "config", "user.name", "Campaign Test"],
+        cwd=repo,
+        check=True,
+    )
+    source_relative = "content/docs.aspose.org/en/words/net/page.md"
+    source = repo / source_relative
+    source.parent.mkdir(parents=True)
+    source.write_text("source", encoding="utf-8")
+    marker = repo / "baseline.txt"
+    marker.write_text("baseline", encoding="utf-8")
+    subprocess.run(["git", "add", "."], cwd=repo, check=True)
+    subprocess.run(["git", "commit", "-m", "baseline"], cwd=repo, check=True)
+    baseline = subprocess.run(
+        ["git", "rev-parse", "HEAD"],
+        cwd=repo,
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
+
+    payload = _manifest(repo)
+    payload["target_locales"] = ["es"]
+    payload["expected_output_count"] = 1
+    payload["content_repo_sha"] = baseline
+    payload["sources"][0]["outputs"] = {
+        "es": payload["sources"][0]["outputs"]["es"]
+    }
+    payload["sources"][0]["source_sha256"] = sha256_file(source)
+    manifest_path = tmp_path / "manifest.yaml"
+    manifest_path.write_text(yaml.safe_dump(payload), encoding="utf-8")
+    manifest = CampaignManifest.load(manifest_path)
+
+    output_relative = payload["sources"][0]["outputs"]["es"]
+    output = repo / output_relative
+    output.parent.mkdir(parents=True)
+    output.write_text("accepted", encoding="utf-8")
+    subprocess.run(["git", "add", output_relative], cwd=repo, check=True)
+    if extra_commit_path:
+        extra = repo / extra_commit_path
+        extra.parent.mkdir(parents=True, exist_ok=True)
+        extra.write_text("extra", encoding="utf-8")
+        subprocess.run(["git", "add", extra_commit_path], cwd=repo, check=True)
+    subprocess.run(
+        [
+            "git",
+            "commit",
+            "-m",
+            "content(locale): zero-defect shard "
+            "w2:docs.aspose.org:words:net:es:1",
+        ],
+        cwd=repo,
+        check=True,
+    )
+    return repo, manifest, source, output
+
+
+def test_recover_receipts_revalidates_governed_commit_before_atomic_ledger(
+    tmp_path, monkeypatch
+):
+    repo, manifest, source, output = _init_recovery_repo(tmp_path)
+
+    class Engine:
+        def __init__(self):
+            self.campaign_context = {}
+            self.calls = []
+
+        def accept_candidate_bytes(self, **kwargs):
+            self.calls.append(kwargs)
+            return AcceptedTranslation(
+                content=kwargs["candidate_bytes"],
+                source_path=kwargs["source_path"],
+                output_path=kwargs["output_path"],
+                source_sha256=sha256_file(source),
+                output_sha256=sha256_file(output),
+                target_lang="es",
+                validation_policy="zero-defect",
+                gate_results={
+                    gate_id: {"passed": True, "action": "test", "error": None}
+                    for gate_id in range(1, 45)
+                },
+                config_fingerprint=manifest.config_fingerprint,
+                model_fingerprint="receipt-recovery:fidelity=test",
+                campaign_id=manifest.campaign_id,
+            )
+
+    engine = Engine()
+    runner = CampaignRunner(
+        manifest=manifest,
+        translation_engine=engine,
+        translator_repo=repo,
+        ledger_root=tmp_path / "ledger",
+    )
+    monkeypatch.setattr(
+        CampaignManifest, "verify_environment", lambda self, **_kwargs: None
+    )
+
+    summary = runner.recover_committed_receipts()
+
+    assert summary["accepted"] == 1
+    assert len(engine.calls) == 1
+    receipt = next(iter(runner.ledger.receipts().values()))
+    assert len(receipt["gate_results"]) == 44
+    assert receipt["receipt_recovery"]["commit_sha"]
+    assert "content" not in receipt
+    assert output.read_text(encoding="utf-8") == "accepted"
+
+
+def test_recover_receipts_rejects_multifile_governed_commit_without_ledger(
+    tmp_path
+):
+    repo, manifest, _source, _output = _init_recovery_repo(
+        tmp_path, extra_commit_path="unrelated.txt"
+    )
+    runner = CampaignRunner(
+        manifest=manifest,
+        translation_engine=SimpleNamespace(campaign_context={}),
+        translator_repo=repo,
+        ledger_root=tmp_path / "ledger",
+    )
+
+    with pytest.raises(CampaignManifestError, match="one-file add commit"):
+        runner.recover_committed_receipts()
+    assert not runner.ledger.receipts_path.exists()
+
+
+def test_recover_receipts_persists_nothing_when_revalidation_fails(
+    tmp_path, monkeypatch
+):
+    repo, manifest, _source, output = _init_recovery_repo(tmp_path)
+    engine = SimpleNamespace(
+        campaign_context={},
+        accept_candidate_bytes=lambda **_kwargs: (_ for _ in ()).throw(
+            ValueError("candidate rejected by fidelity")
+        ),
+    )
+    runner = CampaignRunner(
+        manifest=manifest,
+        translation_engine=engine,
+        translator_repo=repo,
+        ledger_root=tmp_path / "ledger",
+    )
+    monkeypatch.setattr(
+        CampaignManifest, "verify_environment", lambda self, **_kwargs: None
+    )
+
+    with pytest.raises(ValueError, match="fidelity"):
+        runner.recover_committed_receipts()
+    assert not runner.ledger.receipts_path.exists()
+    assert output.read_text(encoding="utf-8") == "accepted"
 
 
 def test_campaign_uses_three_primary_then_llm_and_logs_metadata_only(tmp_path, monkeypatch):

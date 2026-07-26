@@ -1,5 +1,6 @@
 from dataclasses import FrozenInstanceError
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -8,6 +9,9 @@ from src.translation_engine.engine import TranslationEngine
 from src.translation_engine.engine_builder import EngineBuilder
 from src.translation_engine.models import AcceptedTranslation
 from src.translation_engine.write_gate import WriteGateEvaluator, WriteGateResult
+from src.translation_engine.validation.post_translation_validator import (
+    ValidationDecision,
+)
 
 
 def _accepted(tmp_path: Path) -> AcceptedTranslation:
@@ -208,3 +212,121 @@ def test_tm_flush_requires_accepted_translation():
         engine._flush_accepted_tm("raw translation", [{"text": "source"}])
 
     engine.tm.store.assert_not_called()
+
+
+def _candidate_acceptance_engine(*, validation_warnings: int = 0):
+    engine = object.__new__(TranslationEngine)
+    engine.validation_policy = "zero-defect"
+    validation = SimpleNamespace(
+        issues=[],
+        error_count=0,
+        warning_count=validation_warnings,
+    )
+    engine.validation_suite = SimpleNamespace(
+        validate_aggregated=MagicMock(return_value=validation)
+    )
+    engine.decision_engine = SimpleNamespace(
+        make_decision=MagicMock(
+            return_value=SimpleNamespace(decision=ValidationDecision.ACCEPT)
+        )
+    )
+    engine.config = SimpleNamespace(
+        get_site_profile=lambda _site: SimpleNamespace(default_source_lang="en")
+    )
+    docs = [
+        SimpleNamespace(ast=None, body="Source body", frontmatter={"title": "Source"}),
+        SimpleNamespace(ast=None, body="Cuerpo", frontmatter={"title": "Destino"}),
+    ]
+    engine.parser = SimpleNamespace(parse_string=MagicMock(side_effect=docs))
+    engine._check_frontmatter_language = MagicMock(return_value=[])
+    verification = SimpleNamespace(
+        passed=True,
+        error_count=0,
+        warning_count=0,
+        issues=[],
+    )
+    engine._get_verification_agent = MagicMock(
+        return_value=SimpleNamespace(verify=MagicMock(return_value=verification))
+    )
+    gates = WriteGateResult(
+        passed=True,
+        cleaned_content="---\ntitle: Destino\n---\nCuerpo.\n",
+        gate_results={
+            gate_id: {"passed": True, "action": "test", "error": None}
+            for gate_id in range(2, 45)
+        },
+    )
+    gates._fidelity_result = {
+        "verdict": "pass",
+        "score": 1.0,
+        "model": "professionalize_llm",
+        "issues": [],
+    }
+    engine._write_gate = SimpleNamespace(
+        evaluate_zero_defect=MagicMock(return_value=gates)
+    )
+    engine._pre_write_validation = MagicMock(return_value=(True, []))
+    engine.campaign_context = {
+        "campaign_id": "pilot",
+        "config_fingerprint": "c" * 64,
+    }
+    return engine
+
+
+def test_candidate_byte_acceptance_reruns_all_gates_without_writing(tmp_path):
+    engine = _candidate_acceptance_engine()
+    source_path = tmp_path / "en" / "page.md"
+    output_path = tmp_path / "es" / "page.md"
+    candidate = b"---\ntitle: Destino\n---\nCuerpo.\n"
+
+    accepted = engine.accept_candidate_bytes(
+        source_bytes=b"---\ntitle: Source\n---\nSource body.\n",
+        candidate_bytes=candidate,
+        source_path=source_path,
+        output_path=output_path,
+        target_lang="es",
+        site_id="docs.aspose.org",
+    )
+
+    assert accepted.content == candidate
+    assert len(accepted.gate_results) == 44
+    assert all(item["passed"] for item in accepted.gate_results.values())
+    assert accepted.model_fingerprint == (
+        "receipt-recovery:fidelity=professionalize_llm"
+    )
+    assert not output_path.exists()
+
+
+def test_candidate_byte_acceptance_blocks_warning_without_receipt_or_write(tmp_path):
+    engine = _candidate_acceptance_engine(validation_warnings=1)
+    output_path = tmp_path / "es" / "page.md"
+
+    with pytest.raises(ValueError, match="validation suite"):
+        engine.accept_candidate_bytes(
+            source_bytes=b"source",
+            candidate_bytes=b"---\ntitle: Destino\n---\nCuerpo.\n",
+            source_path=tmp_path / "en" / "page.md",
+            output_path=output_path,
+            target_lang="es",
+            site_id="docs.aspose.org",
+        )
+
+    engine._write_gate.evaluate_zero_defect.assert_not_called()
+    assert not output_path.exists()
+
+
+def test_candidate_byte_acceptance_rejects_cleaned_byte_drift(tmp_path):
+    engine = _candidate_acceptance_engine()
+    engine._write_gate.evaluate_zero_defect.return_value.cleaned_content = (
+        "---\ntitle: Corregido\n---\nCuerpo.\n"
+    )
+
+    with pytest.raises(ValueError, match="fixed-point"):
+        engine.accept_candidate_bytes(
+            source_bytes=b"source",
+            candidate_bytes=b"---\ntitle: Destino\n---\nCuerpo.\n",
+            source_path=tmp_path / "en" / "page.md",
+            output_path=tmp_path / "es" / "page.md",
+            target_lang="es",
+            site_id="docs.aspose.org",
+        )
