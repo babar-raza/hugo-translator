@@ -39,6 +39,11 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--max-gpu-memory-percent", type=int, default=90)
     parser.add_argument("--ledger-root", type=Path, default=Path("data/campaigns"))
     parser.add_argument("--dry-run", action="store_true")
+    parser.add_argument(
+        "--wait",
+        action="store_true",
+        help="Wait for every isolated child and return nonzero if any shard fails",
+    )
     args = parser.parse_args(argv)
     if not 1 <= args.max_workers <= 4:
         raise SystemExit("--max-workers must be 1..4")
@@ -50,6 +55,7 @@ def main(argv: list[str] | None = None) -> int:
     if not shard_ids:
         print("No pending campaign shards")
         return 0
+    children: list[subprocess.Popen] = []
     for shard_id in shard_ids:
         print(shard_id)
     if args.dry_run:
@@ -81,7 +87,11 @@ def main(argv: list[str] | None = None) -> int:
             "--log-level",
             "INFO",
         ]
-        subprocess.Popen(command, cwd=translator_repo, creationflags=flags)
+        children.append(subprocess.Popen(command, cwd=translator_repo, creationflags=flags))
+    if args.wait:
+        exit_codes = [child.wait() for child in children]
+        if any(code != 0 for code in exit_codes):
+            return 1
     return 0
 
 
