@@ -279,6 +279,7 @@ def build_manifest(
         "expected_source_count": EXPECTED_SOURCE_COUNT,
         "expected_output_count": EXPECTED_OUTPUT_COUNT,
         "retry_policy": {
+            "primary_model": "m2m100_418m",
             "primary_attempts": 3,
             "llm_escalation_attempts": 2,
             "llm_model": "professionalize_llm",

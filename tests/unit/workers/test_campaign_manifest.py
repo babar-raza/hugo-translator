@@ -36,6 +36,7 @@ def _manifest(tmp_path: Path) -> dict:
         "expected_source_count": 1,
         "expected_output_count": 2,
         "retry_policy": {
+            "primary_model": "m2m100_418m",
             "primary_attempts": 3,
             "llm_escalation_attempts": 2,
             "llm_model": "professionalize_llm",
@@ -509,7 +510,12 @@ def test_campaign_uses_three_primary_then_llm_and_logs_metadata_only(tmp_path, m
             escalated = str(output.resolve()) in self._rtq_llm_output_paths
             feedback = self._campaign_retry_feedback_by_output.pop(str(output.resolve()), None)
             self.calls.append(
-                (escalated, _kwargs.get("retry_budget_override"), feedback)
+                (
+                    escalated,
+                    _kwargs.get("retry_budget_override"),
+                    feedback,
+                    self.model_id_override,
+                )
             )
             if len(self.calls) < 3:
                 return SimpleNamespace(
@@ -557,11 +563,14 @@ def test_campaign_uses_three_primary_then_llm_and_logs_metadata_only(tmp_path, m
     summary = runner.run()
 
     assert summary["status"] == "COMPLETE"
-    assert engine.calls[0] == (False, 2, None)
+    assert engine.calls[0] == (False, 2, None, "m2m100_418m")
     assert engine.calls[1][0:2] == (True, 0)
     assert "Regenerate the complete translation" in engine.calls[1][2]
+    assert engine.calls[1][3] == "professionalize_llm"
     assert engine.calls[2][0:2] == (True, 0)
     assert "Regenerate the complete translation" in engine.calls[2][2]
+    assert engine.calls[2][3] == "professionalize_llm"
+    assert engine.model_id_override is None
     assert engine.decision_engine.max_retry_attempts == 99
     failure_log = runner.ledger.failures_path.read_text(encoding="utf-8")
     assert failure_log.count("\n") == 2

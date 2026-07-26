@@ -1128,10 +1128,13 @@ class CampaignRunner:
 
         primary_attempts = int(self.manifest.retry_policy["primary_attempts"])
         llm_attempts = int(self.manifest.retry_policy["llm_escalation_attempts"])
+        primary_model = str(self.manifest.retry_policy["primary_model"])
+        llm_model = str(self.manifest.retry_policy["llm_model"])
         receipt = None
         result = None
         resolved_output = str(expected.resolve())
         with self._engine_campaign_state_lock:
+            prior_model_override = getattr(self.engine, "model_id_override", None)
             llm_paths = getattr(self.engine, "_rtq_llm_output_paths", None)
             if llm_paths is None:
                 llm_paths = set()
@@ -1157,6 +1160,13 @@ class CampaignRunner:
         try:
             for use_llm, retry_budget, attempt_number in phases:
                 with self._engine_campaign_state_lock:
+                    # A manifest model pin takes precedence over the adaptive
+                    # selector.  The selector can otherwise silently replace
+                    # the governed M2M100 primary with another backend before
+                    # the controlled professionalize_llm escalation phase.
+                    self.engine.model_id_override = (
+                        llm_model if use_llm else primary_model
+                    )
                     if use_llm:
                         llm_paths.add(resolved_output)
                     if next_feedback:
@@ -1228,6 +1238,9 @@ class CampaignRunner:
             with self._engine_campaign_state_lock:
                 llm_paths.discard(resolved_output)
                 feedback_by_output.pop(resolved_output, None)
+                # Do not leak this campaign's model pin into later workers or
+                # ordinary translation calls sharing this engine instance.
+                self.engine.model_id_override = prior_model_override
 
         if receipt is None or not expected.is_file():
             return False, expected_output

@@ -221,6 +221,8 @@ class CampaignManifest:
             errors.append("campaign validation_policy must be zero-defect")
         if len(set(self.target_locales)) != len(self.target_locales):
             errors.append("target_locales contains duplicates")
+        if self.retry_policy.get("primary_model") != "m2m100_418m":
+            errors.append("zero-defect campaign primary model must be m2m100_418m")
         if self.retry_policy.get("primary_attempts") != 3:
             errors.append("zero-defect campaign requires exactly 3 primary attempts")
         if self.retry_policy.get("llm_escalation_attempts") != 2:
