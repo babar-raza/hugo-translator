@@ -245,6 +245,14 @@ class CampaignRunner:
             "'Deep Dive' idiomatically as 'Een grondige analyse van'. "
             "Do not use an English or Afrikaans-like literal calque."
         ),
+        "ro": (
+            "If the source seoTitle is 'Aspose.HTML FOSS for Python — CSSOM, "
+            "Cascade, and Computed Styles', translate that seoTitle exactly as "
+            "'Aspose.HTML FOSS pentru Python — CSSOM, cascada și stilurile "
+            "calculate'. This wording is idiomatic Romanian and supplies "
+            "unambiguous Romanian language signals while preserving the "
+            "product and API tokens."
+        ),
     }
 
     def __init__(
@@ -1125,6 +1133,8 @@ class CampaignRunner:
             )
             if source_guidance:
                 instructions.append(source_guidance)
+            if locale_retry_hint:
+                instructions.append(locale_retry_hint)
         if "RepetitionDetectorValidator" in validators:
             instructions.append(
                 "Avoid adding repeated phrases or duplicate sentences beyond the source structure."

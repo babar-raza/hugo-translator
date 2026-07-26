@@ -895,6 +895,36 @@ def test_czech_language_retry_uses_unambiguous_czech_title(tmp_path):
     assert "Czech (cs)" in feedback
 
 
+def test_romanian_frontmatter_retry_uses_unambiguous_seo_title(tmp_path):
+    source = tmp_path / "index.md"
+    source.write_text(
+        "---\n"
+        "seoTitle: Aspose.HTML FOSS for Python — CSSOM, Cascade, and Computed Styles\n"
+        "---\n",
+        encoding="utf-8",
+    )
+    failure = {
+        "gate": "FrontmatterLanguageCheck",
+        "reason": (
+            "translation_rejected; validators=FrontmatterLanguageCheck; "
+            "field=seoTitle; detected_lang=en; expected_lang=ro"
+        ),
+    }
+
+    feedback = CampaignRunner._retry_feedback_from_failure(
+        failure,
+        "ro",
+        source_path=source,
+    )
+
+    assert (
+        "Aspose.HTML FOSS pentru Python — CSSOM, cascada și stilurile calculate"
+        in feedback
+    )
+    assert "unambiguous Romanian language signals" in feedback
+    assert "Romanian (ro)" in feedback
+
+
 def test_resume_feedback_accumulates_distinct_recent_failures(tmp_path):
     link_label = "Aspose.Cells Enterprise Blog"
     source = tmp_path / "index.md"
