@@ -1,0 +1,24 @@
+mission_binding:
+  mission_id: aspose-foss-25-locales-zero-defect-pilot
+  plan_path: docs/runbooks/aspose-foss-zero-defect-campaign.md
+  plan_version: 2.0.0
+  plan_hash: 27a48fb8a5603c7e75df175e6125eac2c2a06beb0c09c30c622ddae64a95bfdc
+  source_of_authority:
+    - user-approved Aspose FOSS 25-Locale Zero-Defect Pilot
+    - plan-then-execute attachment mounted 2026-07-26
+  translator_repository: C:/Users/prora/OneDrive/Documents/GitHub/hugo-translator-pilot-zero-defect
+  translator_head_at_binding: 551724deb3dd0b59d522927e09c439d51f7dc104
+  authoritative_content_repository: D:/onedrive/Documents/GitHub/aspose.org
+  content_head_at_binding: 512a6e8dcdf220f0d7a81ab7882245f95b6d4ef9
+  legacy_evidence_repository: D:/onedrive/Documents/GitHub/aspose.org-pilot-zero-defect-v2
+  direct_reconciled_receipts: 36
+  binding_outcome: BOUND_PROMOTED_ADDENDUM
+  mandatory_outcomes:
+    - 1213 pinned English sources
+    - 30325 receipt-backed locale outputs
+    - all-44-gates and independent-fidelity PASS per output
+    - zero rejected candidate text persisted
+    - no out-of-scope or frozen-baseline changes
+  non_goals:
+    - push, publish, deploy, merge, or external posting
+    - staging or committing unrelated user changes

@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import json
 import os
 import re
 import sys
@@ -17,6 +18,8 @@ import yaml
 
 from src.utils.atomic_write import atomic_write
 from src.workers.campaign_manifest import (
+    dirty_path_fingerprints,
+    dirty_snapshot_fingerprint,
     fingerprint_files,
     git_dirty_paths,
     git_sha,
@@ -106,6 +109,39 @@ def _knowledge_fingerprints(content_repo: Path) -> dict[str, str]:
     return {path.as_posix(): sha256_file(content_repo / path) for path in paths}
 
 
+def _accepted_output_hashes(receipts_path: Path | None) -> dict[str, str]:
+    """Load only validated metadata from an existing acceptance ledger."""
+    if receipts_path is None:
+        return {}
+    if not receipts_path.is_file():
+        raise RuntimeError(f"accepted receipt ledger missing: {receipts_path}")
+    accepted: dict[str, str] = {}
+    for line_number, line in enumerate(receipts_path.read_text(encoding="utf-8").splitlines(), 1):
+        if not line.strip():
+            continue
+        try:
+            receipt = json.loads(line)
+            output = Path(str(receipt["output_path"])).as_posix()
+            output_hash = str(receipt["output_sha256"])
+            gates = receipt["gate_results"]
+        except (KeyError, TypeError, ValueError, json.JSONDecodeError) as exc:
+            raise RuntimeError(f"invalid acceptance receipt at line {line_number}: {exc}") from exc
+        if (
+            Path(output).is_absolute()
+            or ".." in Path(output).parts
+            or len(output_hash) != 64
+            or len(gates) != 44
+            or any(not isinstance(value, dict) or value.get("passed") is not True for value in gates.values())
+            or "content" in receipt
+            or "translated_content" in receipt
+        ):
+            raise RuntimeError(f"invalid zero-defect receipt at line {line_number}")
+        previous = accepted.setdefault(output, output_hash)
+        if previous != output_hash:
+            raise RuntimeError(f"conflicting accepted output receipt: {output}")
+    return accepted
+
+
 def _folder_sources(content_repo: Path):
     for site_id, default_wave in FOLDER_SURFACES:
         for family, platform in PRODUCTS:
@@ -164,14 +200,19 @@ def build_manifest(
     content_repo: Path,
     translator_repo: Path,
     campaign_id: str,
+    allow_dirty_content: bool = False,
+    accepted_output_hashes: dict[str, str] | None = None,
 ) -> dict:
     content_dirty = git_dirty_paths(content_repo)
     translator_dirty = git_dirty_paths(translator_repo)
-    if content_dirty or translator_dirty:
+    accepted_output_hashes = accepted_output_hashes or {}
+    if translator_dirty or (content_dirty and not allow_dirty_content):
         raise RuntimeError(
             "Immutable manifest requires clean repositories: "
             f"content_dirty={len(content_dirty)}, translator_dirty={len(translator_dirty)}"
         )
+    if allow_dirty_content and not accepted_output_hashes:
+        raise RuntimeError("dirty content destination requires an accepted receipt ledger")
 
     sources = [*_folder_sources(content_repo), *_blog_sources(content_repo)]
     output_count = sum(len(item["outputs"]) for item in sources)
@@ -181,6 +222,40 @@ def build_manifest(
             f"sources={len(sources)}/{EXPECTED_SOURCE_COUNT}, "
             f"outputs={output_count}/{EXPECTED_OUTPUT_COUNT}"
         )
+
+    allowed_outputs = {
+        output for source in sources for output in source["outputs"].values()
+    }
+    unexpected_receipts = sorted(set(accepted_output_hashes) - allowed_outputs)
+    if unexpected_receipts:
+        raise RuntimeError(
+            f"accepted receipt outside campaign matrix: {unexpected_receipts[0]}"
+        )
+    for output, output_hash in accepted_output_hashes.items():
+        output_path = content_repo / output
+        if not output_path.is_file():
+            raise RuntimeError(f"accepted receipt output missing from destination: {output}")
+        if sha256_file(output_path) != output_hash:
+            raise RuntimeError(f"accepted receipt output hash mismatch: {output}")
+    existing_without_receipt = [
+        output for output in allowed_outputs
+        if (content_repo / output).exists() and output not in accepted_output_hashes
+    ]
+    if existing_without_receipt:
+        raise RuntimeError(
+            f"destination contains unreceipted campaign output: {existing_without_receipt[0]}"
+        )
+    destination_baseline = {}
+    if allow_dirty_content:
+        paths = dirty_path_fingerprints(
+            content_repo,
+            exclude_paths=set(accepted_output_hashes),
+        )
+        destination_baseline = {
+            "repo_head": git_sha(content_repo),
+            "paths": paths,
+            "fingerprint": dirty_snapshot_fingerprint(paths),
+        }
 
     return {
         "schema_version": 1,
@@ -215,7 +290,9 @@ def build_manifest(
             "branch": "pilot/foss-localization-zero-defect",
             "max_outputs_per_commit": 250,
             "push": False,
+            "enabled": not allow_dirty_content,
         },
+        "destination_baseline": destination_baseline,
         "sources": sources,
     }
 
@@ -237,6 +314,16 @@ def main(argv: list[str] | None = None) -> int:
         "--campaign-id",
         default="aspose-foss-25-locales-v1",
     )
+    parser.add_argument(
+        "--accepted-receipts",
+        type=Path,
+        help="metadata-only ledger for already accepted direct-destination outputs",
+    )
+    parser.add_argument(
+        "--allow-dirty-content",
+        action="store_true",
+        help="freeze unrelated destination changes instead of requiring a clean content repository",
+    )
     args = parser.parse_args(argv)
 
     try:
@@ -244,6 +331,8 @@ def main(argv: list[str] | None = None) -> int:
             content_repo=args.content_repo.resolve(),
             translator_repo=args.translator_repo.resolve(),
             campaign_id=args.campaign_id,
+            allow_dirty_content=args.allow_dirty_content,
+            accepted_output_hashes=_accepted_output_hashes(args.accepted_receipts),
         )
     except Exception as exc:
         print(f"MANIFEST BUILD BLOCKED: {exc}", file=sys.stderr)

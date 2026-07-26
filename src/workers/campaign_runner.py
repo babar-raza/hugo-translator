@@ -1174,7 +1174,9 @@ class CampaignRunner:
                 raise CampaignManifestError(
                     f"shard blocked: {shard['shard_id']} failures={shard_failed}"
                 )
-            commit_sha = self._commit_verified_outputs(shard["shard_id"])
+            commit_sha = None
+            if self.manifest.commit_policy.get("enabled", True):
+                commit_sha = self._commit_verified_outputs(shard["shard_id"])
             if commit_sha:
                 self.ledger.write_summary(
                     {

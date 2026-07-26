@@ -10,6 +10,8 @@ import yaml
 from src.workers.campaign_manifest import (
     CampaignManifest,
     CampaignManifestError,
+    dirty_path_fingerprints,
+    dirty_snapshot_fingerprint,
     receipt_fingerprint,
     sha256_file,
 )
@@ -83,6 +85,96 @@ def test_manifest_rejects_locale_drift(tmp_path):
     path.write_text(yaml.safe_dump(payload), encoding="utf-8")
     with pytest.raises(CampaignManifestError, match="output locales"):
         CampaignManifest.load(path)
+
+
+def test_manifest_rejects_tampered_frozen_dirty_baseline(tmp_path):
+    payload = _manifest(tmp_path)
+    paths = {"unrelated.md": "a" * 64}
+    payload["destination_baseline"] = {
+        "paths": paths,
+        "fingerprint": "b" * 64,
+    }
+    path = tmp_path / "manifest.yaml"
+    path.write_text(yaml.safe_dump(payload), encoding="utf-8")
+
+    with pytest.raises(CampaignManifestError, match="baseline fingerprint"):
+        CampaignManifest.load(path)
+
+
+def test_dirty_snapshot_excludes_receipted_output_and_detects_user_change(tmp_path):
+    subprocess.run(["git", "init", "-b", "pilot"], cwd=tmp_path, check=True)
+    unrelated = tmp_path / "unrelated.md"
+    output = tmp_path / "content/page.es.md"
+    unrelated.write_text("original", encoding="utf-8")
+    output.parent.mkdir(parents=True)
+    output.write_text("accepted", encoding="utf-8")
+
+    baseline = dirty_path_fingerprints(tmp_path, exclude_paths={"content/page.es.md"})
+    assert baseline == {"unrelated.md": sha256_file(unrelated)}
+    fingerprint = dirty_snapshot_fingerprint(baseline)
+
+    unrelated.write_text("changed", encoding="utf-8")
+    assert dirty_path_fingerprints(
+        tmp_path, exclude_paths={"content/page.es.md"}
+    ) != baseline
+    assert dirty_snapshot_fingerprint(baseline) == fingerprint
+
+
+def test_verify_environment_preserves_frozen_dirty_destination(tmp_path):
+    content_repo = tmp_path / "content"
+    translator_repo = tmp_path / "translator"
+    for repo in (content_repo, translator_repo):
+        repo.mkdir()
+        subprocess.run(["git", "init", "-b", "pilot"], cwd=repo, check=True)
+        subprocess.run(["git", "config", "user.email", "test@example.invalid"], cwd=repo, check=True)
+        subprocess.run(["git", "config", "user.name", "Test"], cwd=repo, check=True)
+
+    source = content_repo / "content/docs.aspose.org/en/words/net/page.md"
+    source.parent.mkdir(parents=True)
+    source.write_text("source", encoding="utf-8")
+    subprocess.run(["git", "add", "."], cwd=content_repo, check=True)
+    subprocess.run(["git", "commit", "-m", "baseline"], cwd=content_repo, check=True)
+
+    registry = translator_repo / "config/model_registry.yaml"
+    registry.parent.mkdir(parents=True)
+    registry.write_text("models: []\n", encoding="utf-8")
+    subprocess.run(["git", "add", "."], cwd=translator_repo, check=True)
+    subprocess.run(["git", "commit", "-m", "baseline"], cwd=translator_repo, check=True)
+
+    unrelated = content_repo / "user-work.md"
+    unrelated.write_text("keep", encoding="utf-8")
+    output_relative = "content/docs.aspose.org/es/words/net/page.md"
+    output = content_repo / output_relative
+    output.parent.mkdir(parents=True)
+    output.write_text("accepted", encoding="utf-8")
+    payload = _manifest(content_repo)
+    payload["content_repo_sha"] = subprocess.run(
+        ["git", "rev-parse", "HEAD"], cwd=content_repo, check=True, capture_output=True, text=True
+    ).stdout.strip()
+    payload["translator_repo_sha"] = subprocess.run(
+        ["git", "rev-parse", "HEAD"], cwd=translator_repo, check=True, capture_output=True, text=True
+    ).stdout.strip()
+    payload["model_fingerprints"] = {"model_registry": sha256_file(registry)}
+    payload["sources"][0]["source_sha256"] = sha256_file(source)
+    paths = dirty_path_fingerprints(content_repo, exclude_paths={output_relative})
+    payload["destination_baseline"] = {
+        "paths": paths,
+        "fingerprint": dirty_snapshot_fingerprint(paths),
+    }
+    manifest_path = tmp_path / "manifest.yaml"
+    manifest_path.write_text(yaml.safe_dump(payload), encoding="utf-8")
+    manifest = CampaignManifest.load(manifest_path)
+
+    manifest.verify_environment(
+        translator_repo=translator_repo,
+        allow_existing_accepted={output_relative},
+    )
+    unrelated.write_text("changed", encoding="utf-8")
+    with pytest.raises(CampaignManifestError, match="frozen dirty baseline drift"):
+        manifest.verify_environment(
+            translator_repo=translator_repo,
+            allow_existing_accepted={output_relative},
+        )
 
 
 def test_ledger_never_accepts_candidate_text(tmp_path):

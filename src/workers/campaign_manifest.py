@@ -106,6 +106,34 @@ def git_dirty_paths(repo: Path) -> list[str]:
     return paths
 
 
+def dirty_path_fingerprints(
+    repo: Path,
+    *,
+    exclude_paths: set[str] | None = None,
+) -> dict[str, str | None]:
+    """Return a deterministic, content-addressed snapshot of dirty paths.
+
+    A direct-destination campaign may coexist with unrelated user changes.  It
+    must preserve those changes exactly rather than treating a dirty worktree as
+    permission to modify arbitrary paths.  ``None`` denotes a tracked deletion.
+    """
+    excluded = {Path(item).as_posix() for item in (exclude_paths or set())}
+    snapshot: dict[str, str | None] = {}
+    for relative in git_dirty_paths(repo):
+        normalized = Path(relative).as_posix()
+        if normalized in excluded:
+            continue
+        path = repo / normalized
+        snapshot[normalized] = sha256_file(path) if path.is_file() else None
+    return dict(sorted(snapshot.items()))
+
+
+def dirty_snapshot_fingerprint(paths: dict[str, str | None]) -> str:
+    """Fingerprint a frozen dirty baseline without storing candidate bytes."""
+    encoded = json.dumps(paths, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    return hashlib.sha256(encoded).hexdigest()
+
+
 @dataclass(frozen=True)
 class CampaignSource:
     site_id: str
@@ -147,6 +175,7 @@ class CampaignManifest:
     expected_output_count: int
     retry_policy: dict[str, Any] = field(default_factory=dict)
     commit_policy: dict[str, Any] = field(default_factory=dict)
+    destination_baseline: dict[str, Any] = field(default_factory=dict)
 
     @classmethod
     def load(cls, path: str | Path) -> CampaignManifest:
@@ -175,6 +204,7 @@ class CampaignManifest:
                 expected_output_count=int(raw["expected_output_count"]),
                 retry_policy=dict(raw.get("retry_policy") or {}),
                 commit_policy=dict(raw.get("commit_policy") or {}),
+                destination_baseline=dict(raw.get("destination_baseline") or {}),
             )
         except (KeyError, TypeError, ValueError) as exc:
             raise CampaignManifestError(f"Invalid campaign manifest: {exc}") from exc
@@ -197,11 +227,24 @@ class CampaignManifest:
             errors.append("zero-defect campaign LLM escalation must use professionalize_llm")
         if self.commit_policy.get("push") is not False:
             errors.append("zero-defect campaign commit policy must prohibit push")
+        if not isinstance(self.commit_policy.get("enabled", True), bool):
+            errors.append("campaign commit policy enabled must be boolean")
         max_outputs = self.commit_policy.get("max_outputs_per_commit")
         if not isinstance(max_outputs, int) or not 1 <= max_outputs <= 250:
             errors.append("campaign commit partitions must contain 1..250 outputs")
         if len(self.sources) != self.expected_source_count:
             errors.append(f"source count {len(self.sources)} != {self.expected_source_count}")
+
+        if self.destination_baseline:
+            paths = self.destination_baseline.get("paths")
+            fingerprint = self.destination_baseline.get("fingerprint")
+            if not isinstance(paths, dict) or not all(
+                isinstance(key, str) and (value is None or isinstance(value, str))
+                for key, value in paths.items()
+            ):
+                errors.append("destination baseline paths must be a path/hash map")
+            elif fingerprint != dirty_snapshot_fingerprint(paths):
+                errors.append("destination baseline fingerprint mismatch")
 
         output_paths: set[str] = set()
         job_count = 0
@@ -266,13 +309,28 @@ class CampaignManifest:
                 allowed_dirty = {
                     Path(item).as_posix() for item in (allow_existing_accepted or set())
                 }
-                unexpected_dirty = [
-                    item for item in dirty if Path(item).as_posix() not in allowed_dirty
-                ]
-                if unexpected_dirty:
-                    errors.append(
-                        f"content repository is dirty ({len(unexpected_dirty)} unexpected paths)"
+                if self.destination_baseline:
+                    expected_dirty = {
+                        Path(key).as_posix(): value
+                        for key, value in self.destination_baseline["paths"].items()
+                    }
+                    actual_dirty = dirty_path_fingerprints(
+                        content_repo,
+                        exclude_paths=allowed_dirty,
                     )
+                    if actual_dirty != expected_dirty:
+                        errors.append(
+                            "content repository frozen dirty baseline drift "
+                            f"(expected={len(expected_dirty)}, actual={len(actual_dirty)})"
+                        )
+                else:
+                    unexpected_dirty = [
+                        item for item in dirty if Path(item).as_posix() not in allowed_dirty
+                    ]
+                    if unexpected_dirty:
+                        errors.append(
+                            f"content repository is dirty ({len(unexpected_dirty)} unexpected paths)"
+                        )
 
         translator_repo = translator_repo.resolve()
         if git_sha(translator_repo) != self.translator_repo_sha:
