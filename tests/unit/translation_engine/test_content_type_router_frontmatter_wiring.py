@@ -58,8 +58,10 @@ def _make_mt_backend(translation_text):
     """MT backend mock using the method _translate_with_multiline_support
     actually calls (translate_with_token_counts), not translate_batch."""
     backend = MagicMock()
-    backend.translate_with_token_counts.side_effect = (
-        lambda texts, src, tgt: ([translation_text] * len(texts), 0, 0)
+    backend.translate_with_token_counts.side_effect = lambda texts, src, tgt: (
+        [translation_text] * len(texts),
+        0,
+        0,
     )
     return backend
 
@@ -174,6 +176,36 @@ class TestFrontmatterDescriptionReachesLlmBackend:
         # both fixes compose correctly for a routed segment.
         engine.tm.store.assert_called_once()
         assert engine.tm.store.call_args.kwargs["text"] == _ALIGNMENT_DESC
+
+    def test_routed_description_receives_governed_retry_feedback(self):
+        engine = _make_engine(content_type_routing=_ROUTING_CONFIG)
+        llm_backend = MagicMock()
+        llm_backend.translate_with_context.return_value = ["हिंदी विवरण"]
+        engine.model_loader.load_model.return_value = llm_backend
+        translator = SegmentTranslator(engine)
+        seg = _make_segment(_ALIGNMENT_DESC, "description")
+        doc = MagicMock(
+            ast=None,
+            frontmatter={"description": _ALIGNMENT_DESC},
+            output_path=None,
+        )
+
+        with patch.object(translator, "_translate_body_ast", return_value=""):
+            translator.translate_to_language(
+                site_id="blog.aspose.org",
+                site_profile=_make_site_profile(),
+                doc=doc,
+                segments=[seg],
+                source_lang="en",
+                target_lang="hi",
+                force=False,
+                stats=_make_stats(),
+                retry_feedback="Translate description fully into hi.",
+            )
+
+        hint = llm_backend.translate_with_context.call_args.kwargs["context_hint"]
+        assert "frontmatter_description" in hint
+        assert "Translate description fully into hi." in hint
 
     def test_llm_failure_falls_back_to_passthrough_not_mt(self):
         """TC-LLM-AVAIL-001-style graceful degrade: on LLM failure, keep the

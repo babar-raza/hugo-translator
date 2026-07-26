@@ -113,8 +113,7 @@ class CampaignLedger:
     def replace_receipts(self, receipts: list[dict[str, Any]]) -> None:
         """Atomically replace metadata-only receipts after verified migration."""
         encoded = "".join(
-            json.dumps(row, ensure_ascii=False, sort_keys=True) + "\n"
-            for row in receipts
+            json.dumps(row, ensure_ascii=False, sort_keys=True) + "\n" for row in receipts
         )
         with self._lock:
             atomic_write(
@@ -124,9 +123,7 @@ class CampaignLedger:
                 fsync=True,
                 create_parents=True,
             )
-            self._receipt_index = {
-                str(row["output_path"]): row for row in receipts
-            }
+            self._receipt_index = {str(row["output_path"]): row for row in receipts}
 
     def _append(self, path: Path, row: dict[str, Any]) -> None:
         with self._lock:
@@ -186,8 +183,7 @@ class CampaignRunner:
             if not claimed_fingerprint or receipt_fingerprint(unsigned) != claimed_fingerprint:
                 if (
                     claimed_fingerprint
-                    and legacy_integer_gate_receipt_fingerprint(unsigned)
-                    == claimed_fingerprint
+                    and legacy_integer_gate_receipt_fingerprint(unsigned) == claimed_fingerprint
                 ):
                     migrated = dict(unsigned)
                     migrated["receipt_sha256"] = receipt_fingerprint(unsigned)
@@ -214,8 +210,7 @@ class CampaignRunner:
                     ).hexdigest()
                     if (
                         field_name == "source_sha256"
-                        and current_receipt.get(field_name)
-                        == legacy_normalized_source_sha
+                        and current_receipt.get(field_name) == legacy_normalized_source_sha
                     ):
                         migrated = {
                             key: value
@@ -238,10 +233,7 @@ class CampaignRunner:
             valid[output] = receipt_migrations.get(output, receipt)
         if receipt_migrations:
             self.ledger.replace_receipts(
-                [
-                    receipt_migrations.get(output, receipt)
-                    for output, receipt in receipts.items()
-                ]
+                [receipt_migrations.get(output, receipt) for output, receipt in receipts.items()]
             )
         return valid
 
@@ -453,8 +445,7 @@ class CampaignRunner:
         safe_codes = sorted(
             set(
                 re.findall(
-                    r"\b(?:GATE\d+|TC-[A-Z0-9-]+|"
-                    r"[A-Za-z][A-Za-z0-9_]*(?:Validator|Check))\b",
+                    r"\b(?:GATE\d+|TC-[A-Z0-9-]+|" r"[A-Za-z][A-Za-z0-9_]*(?:Validator|Check))\b",
                     raw_error,
                 )
             )
@@ -485,11 +476,14 @@ class CampaignRunner:
             )
             if severity not in {"error", "warning"}:
                 continue
-            validator = re.sub(
-                r"[^A-Za-z0-9_-]",
-                "",
-                str(getattr(issue, "validator", "unknown")),
-            ) or "unknown"
+            validator = (
+                re.sub(
+                    r"[^A-Za-z0-9_-]",
+                    "",
+                    str(getattr(issue, "validator", "unknown")),
+                )
+                or "unknown"
+            )
             details = getattr(issue, "details", None) or {}
             if "ngram" in details:
                 issue_kind = "ngram"
@@ -574,22 +568,18 @@ class CampaignRunner:
         return gate, reason
 
     @staticmethod
-    def _retry_feedback(result: Any, target_lang: str) -> str:
+    def _retry_feedback(result: Any, target_lang: str, prior_feedback: str | None = None) -> str:
         """Build candidate-free instructions for the next governed attempt."""
         validation_result = getattr(result, "validation_result", None)
         issues = getattr(validation_result, "issues", []) or []
-        validators = {
-            str(getattr(issue, "validator", ""))
-            for issue in issues
-        }
+        validators = {str(getattr(issue, "validator", "")) for issue in issues}
         instructions: list[str] = []
         if "FrontmatterLanguageCheck" in validators:
             fields = sorted(
                 {
                     str((getattr(issue, "details", None) or {}).get("field", ""))
                     for issue in issues
-                    if str(getattr(issue, "validator", ""))
-                    == "FrontmatterLanguageCheck"
+                    if str(getattr(issue, "validator", "")) == "FrontmatterLanguageCheck"
                     and str((getattr(issue, "details", None) or {}).get("field", ""))
                     in {"title", "description", "seoTitle", "summary"}
                 }
@@ -614,12 +604,17 @@ class CampaignRunner:
                 "Translate every translatable source unit; identical output is allowed only for "
                 "product names, API identifiers, and reviewed locale cognates."
             )
-        if not instructions:
+        if not instructions and not prior_feedback:
             instructions.append(
                 f"Regenerate the complete translation in target locale {target_lang} and correct "
                 "all prior validation failures without changing structure, code, links, or shortcodes."
             )
-        return " ".join(instructions)
+        additions = " ".join(instructions)
+        if not prior_feedback:
+            return additions
+        if not additions or additions in prior_feedback:
+            return prior_feedback
+        return f"{prior_feedback} {additions}"
 
     def verify(self, *, resume: bool = False) -> dict[str, Any]:
         receipts = self._validated_resume_receipts() if resume else {}
@@ -731,7 +726,7 @@ class CampaignRunner:
                                 f"output: {expected_output}"
                             )
                         failure_gate, failure_reason = self._failure_metadata(result)
-                        next_feedback = self._retry_feedback(result, locale)
+                        next_feedback = self._retry_feedback(result, locale, next_feedback)
                         self.ledger.append_failure(
                             source_path=source.source_path,
                             output_path=expected_output,

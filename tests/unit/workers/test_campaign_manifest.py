@@ -161,10 +161,7 @@ def test_failure_metadata_records_payload_free_repetition_fingerprint():
     gate, reason = CampaignRunner._failure_metadata(result)
 
     assert gate == "RepetitionDetectorValidator"
-    assert (
-        "RepetitionDetectorValidator:warning:word_frequency:"
-        in reason
-    )
+    assert "RepetitionDetectorValidator:warning:word_frequency:" in reason
     assert "count=4" in reason
     assert "threshold=0.2" in reason
     assert "frequency=0.235294" in reason
@@ -366,12 +363,8 @@ def test_campaign_uses_three_primary_then_llm_and_logs_metadata_only(tmp_path, m
             assert file_path == source
             assert target_langs == ["es"]
             escalated = str(output.resolve()) in self._rtq_llm_output_paths
-            feedback = self._campaign_retry_feedback_by_output.pop(
-                str(output.resolve()), None
-            )
-            self.calls.append(
-                (escalated, self.decision_engine.max_retry_attempts, feedback)
-            )
+            feedback = self._campaign_retry_feedback_by_output.pop(str(output.resolve()), None)
+            self.calls.append((escalated, self.decision_engine.max_retry_attempts, feedback))
             if len(self.calls) < 3:
                 return SimpleNamespace(
                     success=False,
@@ -430,14 +423,41 @@ def test_campaign_uses_three_primary_then_llm_and_logs_metadata_only(tmp_path, m
     assert "translation_rejected" in failure_log
 
 
+def test_campaign_retry_feedback_accumulates_distinct_gate_instructions():
+    first = CampaignRunner._retry_feedback(
+        SimpleNamespace(
+            validation_result=SimpleNamespace(
+                issues=[
+                    SimpleNamespace(
+                        validator="FrontmatterLanguageCheck",
+                        details={"field": "description"},
+                    )
+                ]
+            ),
+            error="",
+        ),
+        "hi",
+    )
+    combined = CampaignRunner._retry_feedback(
+        SimpleNamespace(
+            validation_result=SimpleNamespace(issues=[]),
+            error="TC-SAS-01: link_text fingerprint",
+        ),
+        "hi",
+        first,
+    )
+
+    assert "Translate description fully" in combined
+    assert "Translate every translatable source unit" in combined
+
+
 def test_failure_metadata_extracts_safe_gate_score_without_candidate_text():
     result = SimpleNamespace(
         errors=[],
         retry_attempts=0,
         validation_result=None,
         error=(
-            "GATE36 FIDELITY JUDGE output.de.md: fail score=0.40; "
-            "SECRET REJECTED CANDIDATE TEXT"
+            "GATE36 FIDELITY JUDGE output.de.md: fail score=0.40; " "SECRET REJECTED CANDIDATE TEXT"
         ),
     )
 
@@ -470,10 +490,7 @@ def test_failure_metadata_preserves_only_safe_sas_unit_fingerprints():
         errors=[],
         retry_attempts=0,
         validation_result=None,
-        error=(
-            "TC-SAS-01: same-as-source; "
-            "unit_fingerprints=link_text:0123456789abcdef:13"
-        ),
+        error=("TC-SAS-01: same-as-source; " "unit_fingerprints=link_text:0123456789abcdef:13"),
     )
 
     gate, reason = CampaignRunner._failure_metadata(result)

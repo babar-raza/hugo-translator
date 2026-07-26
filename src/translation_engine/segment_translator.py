@@ -32,6 +32,21 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
+class _RetryFeedbackModel:
+    """Inject governed retry instructions into every LLM translation call."""
+
+    def __init__(self, backend, feedback: str) -> None:
+        self._backend = backend
+        self._feedback = feedback
+
+    def translate(self, texts, src_lang: str, tgt_lang: str, **kwargs):
+        instructed = [f"{self._feedback}\n\nSOURCE TEXT:\n{text}" for text in texts]
+        return self._backend.translate(instructed, src_lang, tgt_lang, **kwargs)
+
+    def __getattr__(self, name):
+        return getattr(self._backend, name)
+
+
 def _effective_same_as_source_tolerance(
     configured_tolerance: float, validation_policy: str
 ) -> float:
@@ -61,9 +76,7 @@ _REVIEWED_IDENTICAL_TRANSLATIONS: dict[str, frozenset[str]] = {
 def _is_reviewed_identical_translation(source_text: str, target_lang: str) -> bool:
     """Return whether an exact same-as-source value is valid for this locale."""
     normalized = re.sub(r"\s+", " ", source_text).strip().casefold()
-    return normalized in _REVIEWED_IDENTICAL_TRANSLATIONS.get(
-        target_lang.lower(), frozenset()
-    )
+    return normalized in _REVIEWED_IDENTICAL_TRANSLATIONS.get(target_lang.lower(), frozenset())
 
 
 def _same_as_source_fingerprints(units: list) -> str:
@@ -87,8 +100,7 @@ def _unapplied_frontmatter_keys(
     return sorted(
         key
         for key, expected_values in expected_by_key.items()
-        if yaml_formatter.get_nested_value(translated_frontmatter, key)
-        not in expected_values
+        if yaml_formatter.get_nested_value(translated_frontmatter, key) not in expected_values
     )
 
 
@@ -845,9 +857,11 @@ class SegmentTranslator:
                     from .exceptions import ShutdownRequested
 
                     raise ShutdownRequested(
-                        file_path=str(doc.source_path)
-                        if hasattr(doc, "source_path") and doc.source_path
-                        else "",
+                        file_path=(
+                            str(doc.source_path)
+                            if hasattr(doc, "source_path") and doc.source_path
+                            else ""
+                        ),
                         segments_completed=idx,
                     )
 
@@ -945,11 +959,17 @@ class SegmentTranslator:
                             _seg_translation = None
                             if _llm_backend_seg is not None:
                                 try:
+                                    _effective_hint = _hint
+                                    if retry_feedback:
+                                        _effective_hint = (
+                                            f"{_hint}\n\nGOVERNED RETRY INSTRUCTIONS:\n"
+                                            f"{retry_feedback}"
+                                        )
                                     _llm_result_seg = _llm_backend_seg.translate_with_context(
                                         [_seg.source_text],
                                         source_lang,
                                         target_lang,
-                                        context_hint=_hint,
+                                        context_hint=_effective_hint,
                                         file_context=_file_ctx_seg,
                                     )
                                     if _llm_result_seg and _llm_result_seg[0]:
@@ -1017,9 +1037,11 @@ class SegmentTranslator:
                                         "config_fingerprint": (
                                             getattr(engine, "campaign_context", {}) or {}
                                         ).get("config_fingerprint"),
-                                        "source_file": str(doc.source_path)
-                                        if hasattr(doc, "source_path") and doc.source_path
-                                        else None,
+                                        "source_file": (
+                                            str(doc.source_path)
+                                            if hasattr(doc, "source_path") and doc.source_path
+                                            else None
+                                        ),
                                     },
                                     store_context=_store_context_seg,
                                     force_update=_force_update_seg,
@@ -1132,9 +1154,11 @@ class SegmentTranslator:
                     from .exceptions import ShutdownRequested
 
                     raise ShutdownRequested(
-                        file_path=str(doc.source_path)
-                        if hasattr(doc, "source_path") and doc.source_path
-                        else "",
+                        file_path=(
+                            str(doc.source_path)
+                            if hasattr(doc, "source_path") and doc.source_path
+                            else ""
+                        ),
                         segments_completed=len(translations),
                     )
 
@@ -1193,9 +1217,11 @@ class SegmentTranslator:
                                 "config_fingerprint": (
                                     getattr(engine, "campaign_context", {}) or {}
                                 ).get("config_fingerprint"),
-                                "source_file": str(doc.source_path)
-                                if hasattr(doc, "source_path") and doc.source_path
-                                else None,
+                                "source_file": (
+                                    str(doc.source_path)
+                                    if hasattr(doc, "source_path") and doc.source_path
+                                    else None
+                                ),
                             },
                             store_context=store_context,
                             force_update=force_update,
@@ -1211,9 +1237,11 @@ class SegmentTranslator:
                         from .exceptions import ShutdownRequested
 
                         raise ShutdownRequested(
-                            file_path=str(doc.source_path)
-                            if hasattr(doc, "source_path") and doc.source_path
-                            else "",
+                            file_path=(
+                                str(doc.source_path)
+                                if hasattr(doc, "source_path") and doc.source_path
+                                else ""
+                            ),
                             segments_completed=len(translations),
                         )
 
@@ -1263,6 +1291,7 @@ class SegmentTranslator:
                     segments=segments,
                     translations=translations,
                     model_id_override=model_id_override,
+                    retry_feedback=retry_feedback,
                 )
                 ast_body_rendered = True
 
@@ -1301,8 +1330,7 @@ class SegmentTranslator:
                 )
                 if _fm_not_applied:
                     _fm_error = (
-                        "frontmatter_segment_not_applied: "
-                        f"keys={sorted(_fm_not_applied)}"
+                        "frontmatter_segment_not_applied: " f"keys={sorted(_fm_not_applied)}"
                     )
                     if getattr(engine, "validation_policy", "standard") == "zero-defect":
                         raise ValueError(_fm_error)
@@ -1327,9 +1355,7 @@ class SegmentTranslator:
             except TranslationRetryableError:
                 raise
             except Exception as e:
-                if not _allow_legacy_ast_fallback(
-                    getattr(engine, "validation_policy", "standard")
-                ):
+                if not _allow_legacy_ast_fallback(getattr(engine, "validation_policy", "standard")):
                     logger.error(
                         "AST reconstruction failed under zero-defect policy; "
                         "legacy fallback is prohibited",
@@ -1423,6 +1449,7 @@ class SegmentTranslator:
         segments: list | None = None,
         translations: dict[str, str] | None = None,
         model_id_override: str | None = None,
+        retry_feedback: str | None = None,
     ) -> str:
         """Translate document body using AST-based node-addressed translation."""
         engine = self._engine
@@ -1438,6 +1465,11 @@ class SegmentTranslator:
             model_id = model_id_override or engine._get_model_id(site_profile, tgt_lang=target_lang)
             with engine._model_lock:
                 mt_model = engine.model_loader.load_model(model_id)
+            if retry_feedback:
+                from ..model_runtime.llm_backend import LLMModelBackend
+
+                if isinstance(mt_model, LLMModelBackend):
+                    mt_model = _RetryFeedbackModel(mt_model, retry_feedback)
 
             terminology_file = Path("config/terminology/aspose_terms.txt")
 
@@ -1590,9 +1622,9 @@ class SegmentTranslator:
                             continue
                         _decision = _router.route(
                             _u,
-                            field_name=_u.metadata.get("frontmatter_key", "")
-                            if _u.metadata
-                            else "",
+                            field_name=(
+                                _u.metadata.get("frontmatter_key", "") if _u.metadata else ""
+                            ),
                         )
                         if _decision.model_id:
                             _llm_units.append(_u)
@@ -1709,9 +1741,7 @@ class SegmentTranslator:
             _te_cfg_sas_site = getattr(site_profile, "translation_engine", None) or {}
             _te_cfg_sas = {**_te_cfg_sas_global, **_te_cfg_sas_site}
             _sas_min_len = int(_te_cfg_sas.get("same_as_source_min_length", 10))
-            _validation_policy_sas = getattr(
-                engine, "validation_policy", "standard"
-            )
+            _validation_policy_sas = getattr(engine, "validation_policy", "standard")
             _zero_defect_sas = _validation_policy_sas == "zero-defect"
             _sas_tolerance = _effective_same_as_source_tolerance(
                 float(_te_cfg_sas.get("same_as_source_tolerance", 0.0)),
@@ -1726,9 +1756,7 @@ class SegmentTranslator:
                 and u.translated_text is not None
                 and u.translated_text.strip() == u.source_text.strip()
                 and len(u.source_text.strip()) > _sas_min_len
-                and not _is_reviewed_identical_translation(
-                    u.source_text, target_lang
-                )
+                and not _is_reviewed_identical_translation(u.source_text, target_lang)
                 # TC-TBL-012 / Layer 2: Exclude table cells from SAS ratio.
                 # A table cell the model fails to translate stays as English text —
                 # bad for quality but handled by Gate 15 / purity check. Counting
@@ -1817,17 +1845,21 @@ class SegmentTranslator:
                                 severity="error",
                                 rule="BatchLanguagePurity",
                                 message=f"High batch purity failure rate: {purity_failure_rate:.1%} ({failed_outer_batches}/{total_outer_batches} outer batches)",
-                                location=str(doc.source_path)
-                                if hasattr(doc, "source_path") and doc.source_path
-                                else None,
+                                location=(
+                                    str(doc.source_path)
+                                    if hasattr(doc, "source_path") and doc.source_path
+                                    else None
+                                ),
                             )
                         ]
                         validation_result = ValidationResult(valid=False, issues=issues)
                         raise TranslationRetryableError(
                             message=f"Batch purity failure rate too high: {purity_failure_rate:.1%}",
-                            file_path=str(doc.source_path)
-                            if hasattr(doc, "source_path") and doc.source_path
-                            else "",
+                            file_path=(
+                                str(doc.source_path)
+                                if hasattr(doc, "source_path") and doc.source_path
+                                else ""
+                            ),
                             validation_result=validation_result,
                             retry_feedback=f"Batch language purity check failed for {purity_failure_rate:.1%} of outer batches. Ensure all translated units are in the target language {target_lang}.",
                         )
@@ -1859,17 +1891,21 @@ class SegmentTranslator:
                         severity="error",
                         rule="ASTTranslation",
                         message=f"{len(empty_units)} units with substantial source text returned empty translations",
-                        location=str(doc.source_path)
-                        if hasattr(doc, "source_path") and doc.source_path
-                        else None,
+                        location=(
+                            str(doc.source_path)
+                            if hasattr(doc, "source_path") and doc.source_path
+                            else None
+                        ),
                     )
                 ]
                 validation_result = ValidationResult(valid=False, issues=issues)
                 raise TranslationRetryableError(
                     message="AST translation produced empty outputs for substantial text",
-                    file_path=str(doc.source_path)
-                    if hasattr(doc, "source_path") and doc.source_path
-                    else "",
+                    file_path=(
+                        str(doc.source_path)
+                        if hasattr(doc, "source_path") and doc.source_path
+                        else ""
+                    ),
                     validation_result=validation_result,
                     retry_feedback="All translated segments with substantial source text must return non-empty output.",
                 )

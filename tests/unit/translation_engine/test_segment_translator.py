@@ -8,12 +8,35 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from src.translation_engine.segment_translator import SegmentTranslator
+from src.translation_engine.segment_translator import (
+    SegmentTranslator,
+    _RetryFeedbackModel,
+)
 
 
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
+
+def test_retry_feedback_model_instructs_every_ast_translation_call():
+    backend = MagicMock()
+    backend.translate.return_value = ["अनुवाद"]
+    model = _RetryFeedbackModel(backend, "Translate every link label fully into hi.")
+
+    result = model.translate(
+        ["Aspose.Cells — Enterprise Blog"],
+        "en",
+        "hi",
+        generation_params={"temperature": 0.2},
+    )
+
+    assert result == ["अनुवाद"]
+    assert backend.translate.call_args.args[0] == [
+        "Translate every link label fully into hi.\n\n"
+        "SOURCE TEXT:\nAspose.Cells — Enterprise Blog"
+    ]
+    assert backend.translate.call_args.kwargs == {"generation_params": {"temperature": 0.2}}
 
 
 def _make_engine():
@@ -488,6 +511,7 @@ class TestContentTypeRouterLLMPassthrough:
                 if "professionalize_llm" in str(model_id):
                     raise ConnectionError("LLM service unavailable")
                 return mt_backend
+
         else:
             llm_backend = MagicMock()
             llm_backend.translate_with_context.return_value = [llm_translation]
@@ -559,9 +583,9 @@ class TestContentTypeRouterLLMPassthrough:
 
         self._run_translate(engine, doc, plan)
 
-        assert unit.translated_text == "Gets the width.", (
-            "English passthrough expected when LLM is unavailable"
-        )
+        assert (
+            unit.translated_text == "Gets the width."
+        ), "English passthrough expected when LLM is unavailable"
         assert unit.metadata is not None
         assert unit.metadata.get("llm_passthrough_reason") == "professionalize_llm_unavailable"
 
@@ -572,12 +596,12 @@ class TestContentTypeRouterLLMPassthrough:
 
         self._run_translate(engine, doc, plan)
 
-        assert unit.translated_text == "Отримує ширину.", (
-            "Translated content expected when LLM is available"
-        )
-        assert not (unit.metadata or {}).get("llm_passthrough_reason"), (
-            "No passthrough metadata expected when LLM succeeds"
-        )
+        assert (
+            unit.translated_text == "Отримує ширину."
+        ), "Translated content expected when LLM is available"
+        assert not (unit.metadata or {}).get(
+            "llm_passthrough_reason"
+        ), "No passthrough metadata expected when LLM succeeds"
 
 
 # ---------------------------------------------------------------------------
