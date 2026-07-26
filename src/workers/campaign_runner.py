@@ -294,6 +294,13 @@ class CampaignRunner:
             "is idiomatic Czech and supplies an unambiguous Czech language "
             "signal; do not use a Czech/Slovak-neutral paraphrase."
         ),
+        "de": (
+            "If the source seoTitle is 'Aspose.Words FOSS for .NET — "
+            "Open-Source Word Document Library', translate that seoTitle "
+            "exactly as 'Aspose.Words FOSS für .NET — eine quelloffene "
+            "Bibliothek für Word-Dokumente'. This wording is idiomatic German "
+            "and supplies unambiguous German language signals."
+        ),
         "nl": (
             "For a short Dutch technical title, translate the source phrase "
             "'Deep Dive' idiomatically as 'Een grondige analyse van'. "

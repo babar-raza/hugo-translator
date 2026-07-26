@@ -1023,6 +1023,36 @@ def test_romanian_frontmatter_retry_uses_unambiguous_seo_title(tmp_path):
     assert "Romanian (ro)" in feedback
 
 
+def test_german_frontmatter_retry_uses_unambiguous_seo_title(tmp_path):
+    source = tmp_path / "index.md"
+    source.write_text(
+        "---\n"
+        "seoTitle: Aspose.Words FOSS for .NET — Open-Source Word Document Library\n"
+        "---\n",
+        encoding="utf-8",
+    )
+    failure = {
+        "gate": "FrontmatterLanguageCheck",
+        "reason": (
+            "translation_rejected; validators=FrontmatterLanguageCheck; "
+            "field=seoTitle; detected_lang=en; expected_lang=de"
+        ),
+    }
+
+    feedback = CampaignRunner._retry_feedback_from_failure(
+        failure,
+        "de",
+        source_path=source,
+    )
+
+    assert (
+        "Aspose.Words FOSS für .NET — eine quelloffene Bibliothek "
+        "für Word-Dokumente"
+    ) in feedback
+    assert "unambiguous German language signals" in feedback
+    assert "German (de)" in feedback
+
+
 def test_resume_feedback_accumulates_distinct_recent_failures(tmp_path):
     link_label = "Aspose.Cells Enterprise Blog"
     source = tmp_path / "index.md"
