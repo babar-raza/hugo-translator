@@ -308,6 +308,35 @@ class TestLanguageDetectionCheck:
             # Low confidence should not trigger issue
             assert len(issues) == 0
 
+    def test_korean_technical_title_uses_strong_hangul_attestation(self, check):
+        """Mixed product tokens must not make a translated Korean title fail."""
+        translated = {
+            "frontmatter": {
+                "title": (
+                    "Aspose.Cells FOSS\ub97c \uc0ac\uc6a9\ud55c Rust\uc758 "
+                    "\uc2a4\ud504\ub808\ub4dc\uc2dc\ud2b8 \uad00\ub9ac"
+                ),
+            }
+        }
+
+        with patch.object(check, "_detect_language", return_value=("en", 0.99999)):
+            issues = check.run({}, translated, "ko")
+
+        assert issues == []
+
+    def test_korean_token_fragment_cannot_attest_english_title(self, check):
+        """A few Hangul characters cannot mask otherwise untranslated prose."""
+        translated = {
+            "frontmatter": {
+                "title": "Spreadsheet Management in Rust with Aspose.Cells FOSS \uad00\ub9ac",
+            }
+        }
+
+        with patch.object(check, "_detect_language", return_value=("en", 0.99999)):
+            issues = check.run({}, translated, "ko")
+
+        assert [issue.location for issue in issues] == ["frontmatter.title"]
+
     def test_detection_failure_handled_gracefully(self, check):
         """Test that detection failures are handled gracefully."""
         with patch.object(check, "_detect_language") as mock_detect:
@@ -323,6 +352,55 @@ class TestLanguageDetectionCheck:
 
             # Should not crash, just skip
             assert len(issues) == 0
+
+    def test_detection_failure_blocks_zero_defect(self, check):
+        """A missing detector verdict is never a zero-defect skip."""
+        with patch.object(check, "_detect_language") as mock_detect:
+            mock_detect.return_value = (None, 0.0)
+            translated = {
+                "frontmatter": {
+                    "text": "Some text that fails detection",
+                }
+            }
+
+            issues = check.run(
+                {},
+                translated,
+                "de",
+                context={"validation_policy": "zero-defect"},
+            )
+
+        assert len(issues) == 1
+        assert issues[0].severity == "error"
+        assert issues[0].metadata["validator_unavailable"] is True
+
+    def test_protected_technical_tokens_do_not_override_korean_signal(self):
+        """Required ASCII identifiers cannot dominate otherwise Korean prose."""
+        check = LanguageDetectionCheck(min_text_length=20)
+        translated = {
+            "frontmatter": {
+                "title": (
+                    "Rust\ub97c \uc0ac\uc6a9\ud55c Aspose.Cells FOSS "
+                    "\uc2a4\ud504\ub808\ub4dc\uc2dc\ud2b8 \uad00\ub9ac"
+                ),
+            }
+        }
+
+        assert check.run({}, translated, "ko") == []
+
+    def test_technical_normalization_does_not_hide_english_prose(self):
+        """Ordinary untranslated title words remain visible to the detector."""
+        check = LanguageDetectionCheck(min_text_length=20)
+        translated = {
+            "frontmatter": {
+                "title": "Spreadsheet Management in Rust with Aspose.Cells FOSS",
+            }
+        }
+
+        issues = check.run({}, translated, "ko")
+
+        assert len(issues) == 1
+        assert issues[0].metadata["detected_lang"] == "en"
 
 
 class TestLanguageDetectionCheckIntegration:

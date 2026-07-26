@@ -628,6 +628,7 @@ class FileTranslationPipeline:
                             "source_lang": source_lang,
                             "file_path": str(file_path),
                             "site_id": site_id,
+                            "validation_policy": getattr(engine, "validation_policy", "standard"),
                         },
                     )
 
