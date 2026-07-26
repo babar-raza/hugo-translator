@@ -584,9 +584,11 @@ class CampaignRunner:
                     in {"title", "description", "seoTitle", "summary"}
                 }
             )
-            field_text = ", ".join(fields) if fields else "translatable frontmatter"
+            field_text = ", ".join(fields) if fields else "unspecified"
             instructions.append(
-                f"Translate {field_text} fully into target locale {target_lang}; "
+                "Translate every translatable frontmatter field (title, description, "
+                f"seoTitle, summary) fully into target locale {target_lang}; "
+                f"the fields detected as failing were: {field_text}. "
                 "preserve only product names, API identifiers, code, and file formats. "
                 "Do not leave English prose."
             )

@@ -447,7 +447,8 @@ def test_campaign_retry_feedback_accumulates_distinct_gate_instructions():
         first,
     )
 
-    assert "Translate description fully" in combined
+    assert "Translate every translatable frontmatter field" in combined
+    assert "description" in combined
     assert "Translate every translatable source unit" in combined
 
 
