@@ -1335,10 +1335,12 @@ class SegmentTranslator:
                 )
                 ast_body_rendered = True
 
-                _fm_reconstructor = MarkdownReconstructor(site_profile)
-                translated_frontmatter = _fm_reconstructor.reconstruct_frontmatter(
-                    doc.frontmatter, translations, target_lang
-                )
+                # `_translate_body_ast()` is authoritative for both the body
+                # and frontmatter.  ASTRenderer has already applied its
+                # candidate units directly to `doc.frontmatter`; applying the
+                # legacy segment map again here can overwrite an escalated LLM
+                # frontmatter value with an earlier unchanged MT result.
+                translated_frontmatter = doc.frontmatter
 
                 from .reconstructor import YAMLFormatter
 
@@ -1353,16 +1355,21 @@ class SegmentTranslator:
                 # reconstructed value therefore needs to match *one* authoritative
                 # translation for the key, not every duplicate segment in turn.
                 _fm_expected_by_key: dict[str, list[str]] = {}
-                for _seg in segments:
-                    if (
-                        _seg.context
-                        and hasattr(_seg.context, "context_type")
-                        and str(_seg.context.context_type) == "SegmentContextType.FRONTMATTER"
-                        and _seg.id in translations
-                    ):
-                        _fm_key = _seg.context.frontmatter_key
-                        _expected = translations[_seg.id]
-                        _fm_expected_by_key.setdefault(_fm_key, []).append(_expected)
+                # Legacy segment results remain a useful placement invariant
+                # for normal MT.  On LLM escalation they are explicitly
+                # superseded by AST frontmatter units, so comparing against
+                # the stale map would manufacture a false placement error.
+                if model_id_override != "professionalize_llm":
+                    for _seg in segments:
+                        if (
+                            _seg.context
+                            and hasattr(_seg.context, "context_type")
+                            and str(_seg.context.context_type) == "SegmentContextType.FRONTMATTER"
+                            and _seg.id in translations
+                        ):
+                            _fm_key = _seg.context.frontmatter_key
+                            _expected = translations[_seg.id]
+                            _fm_expected_by_key.setdefault(_fm_key, []).append(_expected)
                 _fm_not_applied = _unapplied_frontmatter_keys(
                     _fm_expected_by_key,
                     translated_frontmatter,
