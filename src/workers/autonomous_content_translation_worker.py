@@ -321,6 +321,20 @@ class AutonomousContentTranslationWorker:
     _worker_id = "content_worker"
     _worker_log_path = "data/logs/content_worker.log"
 
+    @staticmethod
+    def _l3_index_path(tm_data_dir: Path, campaign) -> Path:
+        """Keep governed campaign semantic records isolated from legacy L3."""
+        if campaign is None:
+            return tm_data_dir / "l3_faiss"
+
+        campaign_root = (Path("data") / "campaigns").resolve()
+        candidate = (
+            campaign_root / str(campaign.campaign_id) / "tm" / "l3_faiss"
+        ).resolve()
+        if not candidate.is_relative_to(campaign_root):
+            raise ValueError("campaign L3 path escapes the governed campaign root")
+        return candidate
+
     def __init__(self, config: AutonomousWorkerConfig):
         """
         Initialize autonomous worker.
@@ -449,10 +463,16 @@ class AutonomousContentTranslationWorker:
             l3_semantic = None
             if L3SemanticTM is not None:
                 try:
+                    l3_index_path = self._l3_index_path(tm_data_dir, self.campaign)
                     l3_semantic = L3SemanticTM(
-                        index_path=tm_data_dir / "l3_faiss",
-                        use_gpu=True,  # TC-L3-002: ~80MB encoder, safe on RTX 4090; CPU fallback built-in
+                        index_path=l3_index_path,
+                        use_gpu=self.config.device.startswith("cuda"),
                     )
+                    if self.campaign is not None:
+                        logger.info(
+                            "Campaign L3 isolated at governed namespace: %s",
+                            l3_index_path,
+                        )
                 except Exception as e:
                     logger.warning(f"L3 semantic TM not available: {e}")
 
