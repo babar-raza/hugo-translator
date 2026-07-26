@@ -492,7 +492,7 @@ def test_recover_receipts_persists_nothing_when_revalidation_fails(
         CampaignManifest, "verify_environment", lambda self, **_kwargs: None
     )
 
-    with pytest.raises(ValueError, match="fidelity"):
+    with pytest.raises(CampaignManifestError, match="fidelity"):
         runner.recover_committed_receipts()
     assert not runner.ledger.receipts_path.exists()
     assert output.read_text(encoding="utf-8") == "accepted"

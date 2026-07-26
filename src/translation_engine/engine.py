@@ -1688,7 +1688,14 @@ class TranslationEngine:
             if getattr(source_doc, "ast", None)
             else ""
         )
-        translated_body = str(getattr(translated_doc, "body", ""))
+        # Match the production file pipeline exactly: validation operates on
+        # the serialized body bytes with only the frontmatter delimiters
+        # removed, not on a parser-normalized reconstruction.
+        translated_body = translated_content
+        if translated_body.startswith("---"):
+            frontmatter_end = translated_body.find("---", 3)
+            if frontmatter_end != -1:
+                translated_body = translated_body[frontmatter_end + 3 :].lstrip("\n")
         validation_result = self.validation_suite.validate_aggregated(
             source_body,
             translated_body,
@@ -1706,7 +1713,18 @@ class TranslationEngine:
             getattr(validation_result, "error_count", 0) > 0
             or getattr(validation_result, "warning_count", 0) > 0
         ):
-            raise ValueError("candidate rejected by validation suite")
+            validators = sorted(
+                {
+                    str(getattr(issue, "validator", "unknown"))
+                    for issue in getattr(validation_result, "issues", [])
+                }
+            )
+            raise ValueError(
+                "candidate rejected by validation suite "
+                f"errors={getattr(validation_result, 'error_count', 0)} "
+                f"warnings={getattr(validation_result, 'warning_count', 0)} "
+                f"validators={','.join(validators) or 'unknown'}"
+            )
         decision = self.decision_engine.make_decision(
             validation_result=validation_result,
             retry_count=0,

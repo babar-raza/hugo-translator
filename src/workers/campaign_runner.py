@@ -462,14 +462,19 @@ class CampaignRunner:
             for source, locale, relative, commit_sha in candidates:
                 source_path = self.content_repo / source.source_path
                 output_path = self.content_repo / relative
-                accepted = self.engine.accept_candidate_bytes(
-                    source_bytes=source_path.read_bytes(),
-                    candidate_bytes=output_path.read_bytes(),
-                    source_path=source_path,
-                    output_path=output_path,
-                    target_lang=locale,
-                    site_id=source.site_id,
-                )
+                try:
+                    accepted = self.engine.accept_candidate_bytes(
+                        source_bytes=source_path.read_bytes(),
+                        candidate_bytes=output_path.read_bytes(),
+                        source_path=source_path,
+                        output_path=output_path,
+                        target_lang=locale,
+                        site_id=source.site_id,
+                    )
+                except Exception as exc:
+                    raise CampaignManifestError(
+                        f"receipt recovery validation failed for {relative}: {exc}"
+                    ) from exc
                 receipt = accepted.receipt()
                 normalized = dict(receipt)
                 for field_name in ("source_path", "output_path"):
