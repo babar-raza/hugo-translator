@@ -14,6 +14,8 @@ from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
 
+import yaml
+
 from src.utils.atomic_write import atomic_write
 from src.utils.file_lock import FileLock
 
@@ -583,7 +585,80 @@ class CampaignRunner:
         return gate, reason
 
     @staticmethod
-    def _retry_feedback(result: Any, target_lang: str, prior_feedback: str | None = None) -> str:
+    def _frontmatter_source_guidance(
+        source_path: Path | None, fields: list[str], target_lang: str
+    ) -> str:
+        """Build source-derived, candidate-free lexical retry boundaries."""
+        if source_path is None or not source_path.is_file():
+            return ""
+        try:
+            text = source_path.read_text(encoding="utf-8")
+            if not text.startswith("---"):
+                return ""
+            end = text.find("---", 3)
+            if end < 0:
+                return ""
+            frontmatter = yaml.safe_load(text[3:end]) or {}
+        except (OSError, UnicodeError, yaml.YAMLError):
+            return ""
+        selected = fields or ["title", "description", "seoTitle", "summary"]
+        source_text = " ".join(str(frontmatter.get(field) or "") for field in selected)
+        tokens = re.findall(r"[A-Za-z][A-Za-z0-9_.+#-]*", source_text)
+        if not tokens:
+            return ""
+        known_protected = {
+            "FOSS",
+            "Rust",
+            "Python",
+            "Java",
+            "Microsoft",
+            "Office",
+        }
+        protected: list[str] = []
+        ordinary: list[str] = []
+        stopwords = {
+            "a",
+            "an",
+            "and",
+            "all",
+            "for",
+            "in",
+            "of",
+            "the",
+            "to",
+            "with",
+            "without",
+        }
+        for token in tokens:
+            is_identifier = (
+                "." in token
+                or token.isupper()
+                or bool(re.search(r"[a-z][A-Z]", token))
+                or token in known_protected
+            )
+            target = protected if is_identifier else ordinary
+            if token not in target:
+                target.append(token)
+        substantive = [
+            token for token in ordinary if token.casefold() not in stopwords and len(token) >= 4
+        ][:40]
+        field_text = ", ".join(selected)
+        protected_text = ", ".join(protected) if protected else "none"
+        substantive_text = ", ".join(substantive) if substantive else "all ordinary words"
+        return (
+            f"For source field(s) {field_text}, preserve exactly only these source tokens: "
+            f"{protected_text}. Translate every other English source token into {target_lang}, "
+            f"including these ordinary technical terms: {substantive_text}."
+        )
+
+    @staticmethod
+    def _retry_feedback(
+        result: Any,
+        target_lang: str,
+        prior_feedback: str | None = None,
+        *,
+        source_path: Path | None = None,
+    ) -> str:
         """Build candidate-free instructions for the next governed attempt."""
         validation_result = getattr(result, "validation_result", None)
         issues = getattr(validation_result, "issues", []) or []
@@ -607,6 +682,11 @@ class CampaignRunner:
                 "preserve only product names, API identifiers, code, and file formats. "
                 "Do not leave English prose."
             )
+            source_guidance = CampaignRunner._frontmatter_source_guidance(
+                source_path, fields, target_lang
+            )
+            if source_guidance:
+                instructions.append(source_guidance)
         if "RepetitionDetectorValidator" in validators:
             instructions.append(
                 "Avoid adding repeated phrases or duplicate sentences beyond the source structure."
@@ -635,7 +715,11 @@ class CampaignRunner:
 
     @classmethod
     def _retry_feedback_from_failure(
-        cls, failure: dict[str, Any] | None, target_lang: str
+        cls,
+        failure: dict[str, Any] | None,
+        target_lang: str,
+        *,
+        source_path: Path | None = None,
     ) -> str | None:
         """Rehydrate safe retry guidance from metadata when resuming."""
         if not failure:
@@ -661,6 +745,7 @@ class CampaignRunner:
                 error=reason,
             ),
             target_lang,
+            source_path=source_path,
         )
 
     def verify(self, *, resume: bool = False) -> dict[str, Any]:
@@ -746,6 +831,7 @@ class CampaignRunner:
                 next_feedback = self._retry_feedback_from_failure(
                     self.ledger.latest_failure(output_path=expected_output, target_lang=locale),
                     locale,
+                    source_path=source_path,
                 )
                 try:
                     for use_llm, retry_budget, attempt_number in phases:
@@ -776,7 +862,12 @@ class CampaignRunner:
                                 f"output: {expected_output}"
                             )
                         failure_gate, failure_reason = self._failure_metadata(result)
-                        next_feedback = self._retry_feedback(result, locale, next_feedback)
+                        next_feedback = self._retry_feedback(
+                            result,
+                            locale,
+                            next_feedback,
+                            source_path=source_path,
+                        )
                         self.ledger.append_failure(
                             source_path=source.source_path,
                             output_path=expected_output,

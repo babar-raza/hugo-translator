@@ -472,6 +472,38 @@ def test_campaign_resume_rehydrates_feedback_from_metadata(tmp_path):
     assert "summary" in feedback
 
 
+def test_frontmatter_feedback_has_source_derived_protection_boundary(tmp_path):
+    source = tmp_path / "index.md"
+    source.write_text(
+        "---\n"
+        "description: A tour of spreadsheet management in Aspose.Cells FOSS "
+        "for Rust with worksheets, CellStyle, formulas, and XLSX files.\n"
+        "---\n",
+        encoding="utf-8",
+    )
+    result = SimpleNamespace(
+        validation_result=SimpleNamespace(
+            issues=[
+                SimpleNamespace(
+                    validator="FrontmatterLanguageCheck",
+                    details={"field": "description"},
+                )
+            ]
+        ),
+        error="",
+    )
+
+    feedback = CampaignRunner._retry_feedback(result, "hi", source_path=source)
+
+    assert "preserve exactly only these source tokens" in feedback
+    assert "Aspose.Cells" in feedback
+    assert "CellStyle" in feedback
+    assert "XLSX" in feedback
+    assert "spreadsheet" in feedback
+    assert "worksheets" in feedback
+    assert "formulas" in feedback
+
+
 def test_failure_metadata_extracts_safe_gate_score_without_candidate_text():
     result = SimpleNamespace(
         errors=[],
