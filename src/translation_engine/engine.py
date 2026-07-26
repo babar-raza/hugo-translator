@@ -10,8 +10,8 @@ Orchestrates the complete translation workflow:
 6. Write output files
 """
 
-import logging
 import hashlib
+import logging
 import os
 import re
 import time
@@ -36,7 +36,7 @@ from ..utils.atomic_write import (
     atomic_write_binary,
 )
 from ..utils.config_loader import ConfigService
-from ..utils.content_discovery import ALL_LANGUAGE_CODES as _ALL_LANGUAGE_CODES
+from ..utils.content_discovery import ALL_LANGUAGE_CODES as _ALL_LANGUAGE_CODES  # noqa: F401
 from ..utils.content_discovery import is_translated_filename as _is_translated_filename
 from ..utils.content_discovery import resolve_translated_path as _resolve_translated_path
 from ..utils.file_lock import FileLock
@@ -74,6 +74,18 @@ _TARGET_SCRIPT_RANGES: dict[str, tuple[tuple[int, int], ...]] = {
     "zh": ((0x3400, 0x9FFF),),
 }
 
+_FRONTMATTER_TECHNICAL_SIGNAL_RE = re.compile(
+    r"(?<![A-Za-z0-9_])(?:"
+    r"Aspose(?:\.[A-Za-z][A-Za-z0-9]*)+|"
+    r"\.NET|C\+\+|C#|"
+    r"FOSS|SDK|API|HTTP|REST|JSON|XML|XLSX|PDF|DOCX|"
+    r"Rust|Python|Java|JavaScript|Microsoft|Office|"
+    r"[A-Za-z][A-Za-z0-9_+#-]*(?:\.[A-Za-z0-9_+#-]+)+|"
+    r"[A-Z][A-Z0-9_+#-]{1,}|"
+    r"[A-Z][a-z0-9]+(?:[A-Z][A-Za-z0-9]*)+"
+    r")(?![A-Za-z0-9_.])"
+)
+
 
 def _frontmatter_script_metrics(text: str, target_lang: str) -> dict[str, int | float]:
     """Return payload-free script ratios for frontmatter diagnostics."""
@@ -85,11 +97,7 @@ def _frontmatter_script_metrics(text: str, target_lang: str) -> dict[str, int | 
             "latin_letter_ratio": 0.0,
             "target_script_ratio": 0.0,
         }
-    latin_count = sum(
-        1
-        for character in letters
-        if "LATIN" in unicodedata.name(character, "")
-    )
+    latin_count = sum(1 for character in letters if "LATIN" in unicodedata.name(character, ""))
     ranges = _TARGET_SCRIPT_RANGES.get(target_lang, ())
     if ranges:
         target_count = sum(
@@ -104,6 +112,28 @@ def _frontmatter_script_metrics(text: str, target_lang: str) -> dict[str, int | 
         "latin_letter_ratio": latin_count / letter_count,
         "target_script_ratio": target_count / letter_count,
     }
+
+
+def _frontmatter_has_strong_script_evidence(text: str, target_lang: str) -> bool:
+    """Attest Chinese prose after removing governed technical tokens.
+
+    Required product, platform, API, and file-format identifiers must not
+    outvote translated prose. The remaining signal still needs enough Han
+    characters and a high script ratio, so a token Chinese word added to
+    untranslated English prose cannot pass.
+    """
+    target_base = target_lang.lower().split("-")[0]
+    if target_base != "zh":
+        return False
+    signal = _FRONTMATTER_TECHNICAL_SIGNAL_RE.sub(" ", text)
+    letters = [character for character in signal if character.isalpha()]
+    if not letters:
+        return False
+    ranges = _TARGET_SCRIPT_RANGES[target_base]
+    target_count = sum(
+        any(start <= ord(character) <= end for start, end in ranges) for character in letters
+    )
+    return target_count >= 6 and target_count / len(letters) >= 0.70
 
 
 # _ALL_LANGUAGE_CODES and _is_translated_filename are re-exported (see imports
@@ -1607,9 +1637,7 @@ class TranslationEngine:
         if not campaign_id:
             return site_id
         source_context = str(Path(source_path).resolve()) if source_path else ""
-        source_fingerprint = hashlib.sha256(
-            source_context.encode("utf-8")
-        ).hexdigest()[:16]
+        source_fingerprint = hashlib.sha256(source_context.encode("utf-8")).hexdigest()[:16]
         return (
             f"{site_id}::campaign={campaign_id}"
             f"::config={config_fingerprint[:16]}"
@@ -1664,8 +1692,7 @@ class TranslationEngine:
         if not isinstance(accepted, AcceptedTranslation):
             raise TypeError("TM flush requires AcceptedTranslation")
         if len(accepted.gate_results) != 44 or any(
-            not item.get("passed", False)
-            for item in accepted.gate_results.values()
+            not item.get("passed", False) for item in accepted.gate_results.values()
         ):
             raise ValueError("TM flush requires an all-44-gates acceptance receipt")
         for entry in buffered_entries:
@@ -1715,7 +1742,7 @@ class TranslationEngine:
         CONFIDENCE_THRESHOLD = 0.80
         # Regex: C++ scope resolution (mapi_message::from_file) or multiple underscored
         # identifiers — these inflate apparent English ratio in langdetect.
-        _API_IDENTIFIER_RE = _re.compile(r'[A-Za-z_]\w*::[A-Za-z_]\w*|(?:\b[a-z]+_[a-z_]+\b.*){2}')
+        _API_IDENTIFIER_RE = _re.compile(r"[A-Za-z_]\w*::[A-Za-z_]\w*|(?:\b[a-z]+_[a-z_]+\b.*){2}")
 
         issues = []
         # Extract frontmatter block
@@ -1767,6 +1794,8 @@ class TranslationEngine:
                 or _API_IDENTIFIER_RE.search(v_stripped)
             ):
                 continue
+            if _frontmatter_has_strong_script_evidence(v_stripped, target_lang):
+                continue
             try:
                 detected_langs = _ld.detect_langs(v_stripped)
                 if detected_langs:
@@ -1774,23 +1803,27 @@ class TranslationEngine:
                     # Accept linguistically near-identical languages that share script/vocabulary space.
                     # langdetect frequently confuses these pairs on short technical text.
                     _SIMILAR_LANG_MAP = {
-                        'sr': {'hr', 'bs'},        # South Slavic Latin-script
-                        'hr': {'sr', 'bs'},
-                        'bs': {'sr', 'hr'},
-                        'ms': {'id'},              # Malay ↔ Indonesian
-                        'id': {'ms'},
-                        'uk': {'ru', 'bg'},        # East Slavic Cyrillic
-                        'bg': {'ru', 'uk'},
-                        'sk': {'cs'},              # West Slavic
-                        'cs': {'sk'},
-                        'zh': {'ja', 'zh-cn', 'zh-tw'},  # CJK — shared characters
-                        'ja': {'zh', 'zh-cn', 'zh-tw'},
-                        'no': {'da', 'nb'},        # North Germanic
-                        'nb': {'no', 'da'},
-                        'da': {'no', 'nb'},
+                        "sr": {"hr", "bs"},  # South Slavic Latin-script
+                        "hr": {"sr", "bs"},
+                        "bs": {"sr", "hr"},
+                        "ms": {"id"},  # Malay ↔ Indonesian
+                        "id": {"ms"},
+                        "uk": {"ru", "bg"},  # East Slavic Cyrillic
+                        "bg": {"ru", "uk"},
+                        "sk": {"cs"},  # West Slavic
+                        "cs": {"sk"},
+                        "zh": {"ja", "zh-cn", "zh-tw"},  # CJK — shared characters
+                        "ja": {"zh", "zh-cn", "zh-tw"},
+                        "no": {"da", "nb"},  # North Germanic
+                        "nb": {"no", "da"},
+                        "da": {"no", "nb"},
                     }
                     _similar_accepted = _SIMILAR_LANG_MAP.get(target_lang, set())
-                    if top.lang != target_lang and top.lang not in _similar_accepted and top.prob > CONFIDENCE_THRESHOLD:
+                    if (
+                        top.lang != target_lang
+                        and top.lang not in _similar_accepted
+                        and top.prob > CONFIDENCE_THRESHOLD
+                    ):
                         issues.append(
                             _ValIssue(
                                 severity=_ValSeverity.ERROR,
@@ -1806,9 +1839,7 @@ class TranslationEngine:
                                     "detected_lang": top.lang,
                                     "confidence": top.prob,
                                     "expected_lang": target_lang,
-                                    **_frontmatter_script_metrics(
-                                        v_stripped, target_lang
-                                    ),
+                                    **_frontmatter_script_metrics(v_stripped, target_lang),
                                 },
                             )
                         )
@@ -2314,12 +2345,12 @@ class TranslationEngine:
                 retry_count=retry_count,
                 success=success,
                 # Additional context
-                validation_passed=stats.validation_passed
-                if hasattr(stats, "validation_passed")
-                else None,
-                validation_errors=stats.validation_errors
-                if hasattr(stats, "validation_errors")
-                else 0,
+                validation_passed=(
+                    stats.validation_passed if hasattr(stats, "validation_passed") else None
+                ),
+                validation_errors=(
+                    stats.validation_errors if hasattr(stats, "validation_errors") else 0
+                ),
             )
 
             logger.debug(

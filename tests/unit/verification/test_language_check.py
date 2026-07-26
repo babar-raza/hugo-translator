@@ -337,6 +337,35 @@ class TestLanguageDetectionCheck:
 
         assert [issue.location for issue in issues] == ["frontmatter.title"]
 
+    def test_chinese_technical_title_uses_strong_han_attestation(self, check):
+        """Required Latin identifiers must not outvote substantial Chinese prose."""
+        translated = {
+            "frontmatter": {
+                "title": (
+                    "\u4f7f\u7528 Aspose.Cells FOSS \u5728 Rust "
+                    "\u4e2d\u7ba1\u7406\u7535\u5b50\u8868\u683c"
+                ),
+            }
+        }
+
+        with patch.object(check, "_detect_language", return_value=("no", 0.99999)):
+            issues = check.run({}, translated, "zh")
+
+        assert issues == []
+
+    def test_chinese_token_fragment_cannot_attest_english_title(self, check):
+        """A few Han characters cannot mask otherwise untranslated English prose."""
+        translated = {
+            "frontmatter": {
+                "title": ("Spreadsheet Management in Rust with Aspose.Cells FOSS " "\u7ba1\u7406"),
+            }
+        }
+
+        with patch.object(check, "_detect_language", return_value=("en", 0.99999)):
+            issues = check.run({}, translated, "zh")
+
+        assert [issue.location for issue in issues] == ["frontmatter.title"]
+
     def test_detection_failure_handled_gracefully(self, check):
         """Test that detection failures are handled gracefully."""
         with patch.object(check, "_detect_language") as mock_detect:

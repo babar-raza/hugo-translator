@@ -130,6 +130,10 @@ class LanguageDetectionCheck(VerificationCheck):
             (0x3130, 0x318F),  # Hangul Compatibility Jamo
             (0xAC00, 0xD7AF),  # Hangul syllables
         ),
+        "zh": (
+            (0x3400, 0x4DBF),  # CJK Unified Ideographs Extension A
+            (0x4E00, 0x9FFF),  # CJK Unified Ideographs
+        ),
     }
     MIN_TARGET_SCRIPT_CHARS = 6
     MIN_TARGET_SCRIPT_RATIO = 0.30

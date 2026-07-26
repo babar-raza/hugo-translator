@@ -10,7 +10,10 @@ is unavailable or fails, rather than allowing unvalidated content through.
 
 from unittest.mock import Mock
 
-from src.translation_engine.engine import TranslationEngine
+from src.translation_engine.engine import (
+    TranslationEngine,
+    _frontmatter_has_strong_script_evidence,
+)
 
 
 class _DummyConfigService:
@@ -30,6 +33,33 @@ def _make_engine() -> TranslationEngine:
         enable_validation=False,
         enable_telemetry=False,
     )
+
+
+class TestChineseTechnicalFrontmatter:
+    """Technical ASCII tokens must not outvote Chinese ordinary prose."""
+
+    def test_accepts_substantial_chinese_after_governed_tokens_removed(self):
+        assert _frontmatter_has_strong_script_evidence(
+            "使用 Aspose.Cells FOSS 在 Rust 中管理电子表格和工作表",
+            "zh",
+        )
+
+    def test_rejects_token_chinese_added_to_english_prose(self):
+        assert not _frontmatter_has_strong_script_evidence(
+            "Spreadsheet Management with Aspose.Cells FOSS in Rust 中文",
+            "zh",
+        )
+
+    def test_frontmatter_gate_keeps_english_ordinary_prose_blocking(self):
+        content = (
+            "---\n" "title: Spreadsheet Management with Aspose.Cells FOSS in Rust 中文\n" "---\n"
+        )
+
+        issues = _make_engine()._check_frontmatter_language(content, "zh")
+
+        assert len(issues) == 1
+        assert issues[0].validator == "FrontmatterLanguageCheck"
+        assert issues[0].details["expected_lang"] == "zh"
 
 
 class TestDetectorNoneBlocksWrite:
