@@ -153,6 +153,11 @@ validators:
         # "spreadsheet management" product phrase.  All other Spanish
         # n-grams retain the strict repetition thresholds.
         - "gestión de hojas de cálculo"
+      fr:
+        # Canonical French spreadsheet-management terminology. This narrowly
+        # exempts its reviewed n-grams; all other repetition checks stay strict.
+        - "gestion des feuilles de calcul"
+        - "gestion de feuilles de calcul"
 
   # TC-17/TC-18: Semantic similarity validator.
   # Detects major semantic drift using cross-lingual sentence embeddings.

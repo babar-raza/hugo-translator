@@ -573,6 +573,7 @@ class TestSourceRelativeBaseline:
                 "ngram_threshold": 5,
                 "localized_phrase_whitelist": {
                     "es": ["gestión de hojas de cálculo"],
+                    "fr": ["gestion des feuilles de calcul"],
                 },
             }
         )
@@ -606,6 +607,27 @@ class TestSourceRelativeBaseline:
         assert "de hojas de" not in spanish_payloads
         assert "hojas de cálculo" not in spanish_payloads
         assert "hojas de cálculo" in french_payloads
+
+        french_text = " ".join(
+            [
+                f"section {index} gestion des feuilles de calcul detail {index}"
+                for index in range(8)
+            ]
+        )
+        exempt_french = validator._check_ngram_repetition(
+            french_text, "1", source_ngram_ceiling=2, target_lang="fr"
+        )
+        unrelated_french = validator._check_ngram_repetition(
+            french_text, "1", source_ngram_ceiling=2, target_lang="es"
+        )
+        assert not any(
+            issue.details.get("ngram") == "gestion des feuilles"
+            for issue in exempt_french
+        )
+        assert any(
+            issue.details.get("ngram") == "gestion des feuilles"
+            for issue in unrelated_french
+        )
 
     def test_no_source_uses_fixed_threshold(self):
         """When no source is provided, fixed threshold applies unchanged."""
