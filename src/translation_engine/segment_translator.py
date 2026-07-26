@@ -1378,7 +1378,11 @@ class SegmentTranslator:
                 # for normal MT.  On LLM escalation they are explicitly
                 # superseded by AST frontmatter units, so comparing against
                 # the stale map would manufacture a false placement error.
-                if model_id_override != "professionalize_llm":
+                if not _retry_original_frontmatter_value(
+                    model_id_override,
+                    retry_feedback,
+                    getattr(engine, "validation_policy", "standard"),
+                ):
                     for _seg in segments:
                         if (
                             _seg.context

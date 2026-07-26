@@ -15,3 +15,9 @@ def test_initial_primary_attempt_keeps_placeholder_protection():
 
 def test_llm_escalation_always_uses_original_frontmatter_value():
     assert _retry_original_frontmatter_value("professionalize_llm", None, "zero-defect")
+
+
+def test_legacy_placement_invariant_is_not_authoritative_on_strict_retry():
+    assert _retry_original_frontmatter_value(
+        "m2m100_418m", "frontmatter language failure", "zero-defect"
+    )
