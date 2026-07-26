@@ -71,3 +71,11 @@ def test_seo_separator_repair_does_not_invent_a_missing_product_token():
         "Manage spreadsheets - Aspose.Cells for Rust",
         "Správa tabulek pro Rust",
     ) == "Správa tabulek pro Rust"
+
+
+def test_seo_separator_repair_preserves_an_en_dash_separator():
+    assert _restore_required_seo_separator(
+        "seoTitle",
+        "Manage spreadsheets – Aspose.Cells for Rust",
+        "Správa tabulek Aspose.Cells pro Rust",
+    ) == "Správa tabulek – Aspose.Cells pro Rust"

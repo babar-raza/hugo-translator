@@ -139,17 +139,24 @@ def _restore_required_seo_separator(
     before an Aspose product token which is already present in the model
     output, so it cannot add prose, a product, or an untranslated suffix.
     """
-    if field_name not in {"seoTitle", "head_title"} or " - " not in source_value:
+    separator_pattern = re.compile(r"[|\u2013\u2014\uff5c\uff0d]| - ")
+    source_separator = separator_pattern.search(source_value)
+    if field_name not in {"seoTitle", "head_title"} or source_separator is None:
         return translated_value
-    if re.search(r"[|\u2013\u2014\uff5c\uff0d]| - ", translated_value):
+    if separator_pattern.search(translated_value):
         return translated_value
-    source_left, source_right = source_value.split(" - ", 1)
+    source_left = source_value[: source_separator.start()]
+    source_right = source_value[source_separator.end() :]
     if not source_left.strip() or not re.search(r"\bAspose(?:\.[A-Za-z0-9.]+)?\b", source_right):
         return translated_value
     product = re.search(r"\bAspose(?:\.[A-Za-z0-9.]+)?\b", translated_value)
     if product is None or not translated_value[: product.start()].strip():
         return translated_value
-    return translated_value[: product.start()].rstrip() + " - " + translated_value[product.start() :]
+    return (
+        translated_value[: product.start()].rstrip()
+        + f" {source_separator.group()} "
+        + translated_value[product.start() :]
+    )
 
 
 _REVIEWED_IDENTICAL_TRANSLATIONS: dict[str, frozenset[str]] = {
