@@ -44,6 +44,8 @@ def main(argv: list[str] | None = None) -> int:
         raise SystemExit("--max-workers must be 1..4")
 
     manifest = CampaignManifest.load(args.campaign_manifest)
+    translator_repo = Path(__file__).resolve().parents[2]
+    config_root = translator_repo / "config"
     shard_ids = select_pending_shards(manifest, args.ledger_root, args.max_workers)
     if not shard_ids:
         print("No pending campaign shards")
@@ -61,6 +63,8 @@ def main(argv: list[str] | None = None) -> int:
             sys.executable,
             "-m",
             "src.workers.autonomous_content_translation_worker",
+            "--config-root",
+            str(config_root),
             "--mode",
             "oneshot",
             "--campaign-manifest",
@@ -77,7 +81,7 @@ def main(argv: list[str] | None = None) -> int:
             "--log-level",
             "INFO",
         ]
-        subprocess.Popen(command, cwd=Path.cwd(), creationflags=flags)
+        subprocess.Popen(command, cwd=translator_repo, creationflags=flags)
     return 0
 
 
