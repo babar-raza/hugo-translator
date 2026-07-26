@@ -2073,9 +2073,20 @@ class TextUnitExtractor:
             if self._nlp:
                 doc = self._nlp(text_stripped)
                 for ent in doc.ents:
-                    if ent.label_ in ["PRODUCT", "ORG"]:
-                        # Detected product name or organization
-                        logger.debug(f"NER detected {ent.label_}: {text_stripped}")
+                    if ent.label_ not in ["PRODUCT", "ORG"]:
+                        continue
+                    # An entity *within* a prose unit is not a reason to
+                    # preserve the entire unit.  In particular, a title such
+                    # as "Spreadsheet Management in Rust with Aspose.Cells
+                    # FOSS" contains the Aspose organization entity, but its
+                    # surrounding grammatical content must be translated.
+                    # Treat only a value consisting solely of the entity as a
+                    # protected identifier.  The terminology/placeholder
+                    # layers preserve the embedded product token itself.
+                    entity_text = re.sub(r"\s+", " ", str(ent.text).strip())
+                    normalized_text = re.sub(r"\s+", " ", text_stripped)
+                    if entity_text == normalized_text:
+                        logger.debug(f"NER detected standalone {ent.label_}: {text_stripped}")
                         return True
         except ImportError:
             # spaCy not available, skip NER detection
