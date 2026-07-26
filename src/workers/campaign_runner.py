@@ -9,6 +9,7 @@ import re
 import subprocess
 import sys
 import threading
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone
 from pathlib import Path
 from types import SimpleNamespace
@@ -222,6 +223,10 @@ class CampaignRunner:
         self.translator_repo = translator_repo.resolve()
         self.content_repo = Path(manifest.content_repo).resolve()
         self.ledger = CampaignLedger(ledger_root, manifest.campaign_id)
+        # The engine owns one model instance.  Candidate jobs have distinct
+        # source/output paths, while these two maps provide only narrowly
+        # scoped retry routing for the currently running job.
+        self._engine_campaign_state_lock = threading.RLock()
 
     def _validated_resume_receipts(self) -> dict[str, dict[str, Any]]:
         receipts = self.ledger.receipts()
@@ -1036,6 +1041,135 @@ class CampaignRunner:
         with FileLock(self.ledger.root / "campaign.lock", timeout=0):
             return self._run_locked(resume=resume, verify_only=verify_only)
 
+    def _run_campaign_job(
+        self,
+        *,
+        shard: dict[str, Any],
+        source,
+        locale: str,
+        expected_output: str,
+    ) -> tuple[bool, str]:
+        """Run one immutable candidate job and return (accepted, output).
+
+        This method is deliberately independent of shard accounting so a
+        bounded executor can overlap parsing, validation and remote fidelity
+        calls.  It never returns candidate text; failures are persisted only
+        through the metadata-only ledger.
+        """
+        source_path = self.content_repo / source.source_path
+        profile = self.engine.config.get_site_profile(source.site_id)
+        calculated = self.engine._get_output_path(source_path, locale, profile)
+        expected = self.content_repo / expected_output
+        if calculated.resolve() != expected.resolve():
+            raise CampaignManifestError(
+                f"output routing mismatch: calculated={calculated}, expected={expected}"
+            )
+
+        primary_attempts = int(self.manifest.retry_policy["primary_attempts"])
+        llm_attempts = int(self.manifest.retry_policy["llm_escalation_attempts"])
+        receipt = None
+        result = None
+        resolved_output = str(expected.resolve())
+        with self._engine_campaign_state_lock:
+            llm_paths = getattr(self.engine, "_rtq_llm_output_paths", None)
+            if llm_paths is None:
+                llm_paths = set()
+                self.engine._rtq_llm_output_paths = llm_paths
+            feedback_by_output = getattr(
+                self.engine, "_campaign_retry_feedback_by_output", None
+            )
+            if feedback_by_output is None:
+                feedback_by_output = {}
+                self.engine._campaign_retry_feedback_by_output = feedback_by_output
+
+        # The primary invocation owns initial output plus its two guided
+        # retries.  LLM escalation has exactly two one-attempt invocations.
+        phases = [
+            (False, primary_attempts - 1, primary_attempts),
+            *[(True, 0, primary_attempts + index) for index in range(1, llm_attempts + 1)],
+        ]
+        next_feedback = self._retry_feedback_from_failure(
+            self.ledger.latest_failure(output_path=expected_output, target_lang=locale),
+            locale,
+            source_path=source_path,
+        )
+        try:
+            for use_llm, retry_budget, attempt_number in phases:
+                with self._engine_campaign_state_lock:
+                    if use_llm:
+                        llm_paths.add(resolved_output)
+                    if next_feedback:
+                        feedback_by_output[resolved_output] = next_feedback
+                result = self.engine.translate_file(
+                    source.site_id,
+                    source_path,
+                    target_langs=[locale],
+                    validate=True,
+                    force=False,
+                    force_overwrite=False,
+                    trigger_type="campaign",
+                    retry_budget_override=retry_budget,
+                )
+                receipt = result.acceptance_receipts.get(locale)
+                if receipt is None:
+                    receipt = self.ledger.receipts().get(expected_output)
+                if receipt is not None and expected.is_file():
+                    break
+                if expected.exists():
+                    expected.unlink(missing_ok=True)
+                    raise CampaignManifestError(
+                        "rejected attempt produced an unreceipted "
+                        f"output: {expected_output}"
+                    )
+                failure_gate, failure_reason = self._failure_metadata(result)
+                next_feedback = self._retry_feedback(
+                    result,
+                    locale,
+                    next_feedback,
+                    source_path=source_path,
+                )
+                self.ledger.append_failure(
+                    source_path=source.source_path,
+                    output_path=expected_output,
+                    target_lang=locale,
+                    error=failure_reason,
+                    attempt=attempt_number,
+                    job_id=(f"{shard['shard_id']}::{source.source_path}::{locale}"),
+                    source_sha256=source.source_sha256,
+                    gate=failure_gate,
+                )
+        except Exception as exc:
+            # An engine crash must not leave an unreceipted bytes-on-disk
+            # candidate behind.  Expected output is manifest-scoped.
+            if expected.exists() and receipt is None:
+                expected.unlink(missing_ok=True)
+            if isinstance(exc, CampaignManifestError):
+                raise
+            self.ledger.append_failure(
+                source_path=source.source_path,
+                output_path=expected_output,
+                target_lang=locale,
+                error=f"campaign_job_exception={type(exc).__name__}",
+                attempt=0,
+                job_id=(f"{shard['shard_id']}::{source.source_path}::{locale}"),
+                source_sha256=source.source_sha256,
+                gate="campaign_job_exception",
+            )
+            return False, expected_output
+        finally:
+            with self._engine_campaign_state_lock:
+                llm_paths.discard(resolved_output)
+                feedback_by_output.pop(resolved_output, None)
+
+        if receipt is None or not expected.is_file():
+            return False, expected_output
+        if Path(receipt["output_path"]).resolve() != expected.resolve():
+            expected.unlink(missing_ok=True)
+            raise CampaignManifestError(
+                f"accepted receipt path mismatch for {expected_output}"
+            )
+        return True, expected_output
+
     def _run_locked(
         self,
         *,
@@ -1059,107 +1193,32 @@ class CampaignRunner:
         accepted = len(receipts)
         failed = 0
         max_outputs = int(self.manifest.commit_policy.get("max_outputs_per_commit", 250))
+        max_parallel_jobs = int(self.manifest.execution_policy.get("max_parallel_jobs", 1))
         for shard in self.manifest.shards(
             resume_receipts=set(receipts),
             max_outputs=max_outputs,
         ):
             shard_accepted = 0
             shard_failed = 0
-            for source, locale, expected_output in shard["jobs"]:
-                source_path = self.content_repo / source.source_path
-                profile = self.engine.config.get_site_profile(source.site_id)
-                calculated = self.engine._get_output_path(source_path, locale, profile)
-                expected = self.content_repo / expected_output
-                if calculated.resolve() != expected.resolve():
-                    raise CampaignManifestError(
-                        f"output routing mismatch: calculated={calculated}, expected={expected}"
+            with ThreadPoolExecutor(max_workers=min(max_parallel_jobs, len(shard["jobs"]))) as executor:
+                futures = [
+                    executor.submit(
+                        self._run_campaign_job,
+                        shard=shard,
+                        source=source,
+                        locale=locale,
+                        expected_output=expected_output,
                     )
-
-                primary_attempts = int(self.manifest.retry_policy["primary_attempts"])
-                llm_attempts = int(self.manifest.retry_policy["llm_escalation_attempts"])
-                receipt = None
-                result = None
-                llm_paths = getattr(self.engine, "_rtq_llm_output_paths", None)
-                if llm_paths is None:
-                    llm_paths = set()
-                    self.engine._rtq_llm_output_paths = llm_paths
-                resolved_output = str(expected.resolve())
-                # The primary invocation owns the initial translation plus two
-                # feedback-guided retries. Each LLM invocation is one attempt,
-                # for exactly five attempts total.
-                phases = [
-                    (False, primary_attempts - 1, primary_attempts),
-                    *[(True, 0, primary_attempts + index) for index in range(1, llm_attempts + 1)],
+                    for source, locale, expected_output in shard["jobs"]
                 ]
-                feedback_by_output = getattr(
-                    self.engine, "_campaign_retry_feedback_by_output", None
-                )
-                if feedback_by_output is None:
-                    feedback_by_output = {}
-                    self.engine._campaign_retry_feedback_by_output = feedback_by_output
-                next_feedback = self._retry_feedback_from_failure(
-                    self.ledger.latest_failure(output_path=expected_output, target_lang=locale),
-                    locale,
-                    source_path=source_path,
-                )
-                try:
-                    for use_llm, retry_budget, attempt_number in phases:
-                        if use_llm:
-                            llm_paths.add(resolved_output)
-                        if next_feedback:
-                            feedback_by_output[resolved_output] = next_feedback
-                        result = self.engine.translate_file(
-                            source.site_id,
-                            source_path,
-                            target_langs=[locale],
-                            validate=True,
-                            force=False,
-                            force_overwrite=False,
-                            trigger_type="campaign",
-                            retry_budget_override=retry_budget,
-                        )
-                        receipt = result.acceptance_receipts.get(locale)
-                        if receipt is None:
-                            receipt = self.ledger.receipts().get(expected_output)
-                        if receipt is not None and expected.is_file():
-                            break
-                        if expected.exists():
-                            expected.unlink(missing_ok=True)
-                            raise CampaignManifestError(
-                                "rejected attempt produced an unreceipted "
-                                f"output: {expected_output}"
-                            )
-                        failure_gate, failure_reason = self._failure_metadata(result)
-                        next_feedback = self._retry_feedback(
-                            result,
-                            locale,
-                            next_feedback,
-                            source_path=source_path,
-                        )
-                        self.ledger.append_failure(
-                            source_path=source.source_path,
-                            output_path=expected_output,
-                            target_lang=locale,
-                            error=failure_reason,
-                            attempt=attempt_number,
-                            job_id=(f"{shard['shard_id']}::{source.source_path}::{locale}"),
-                            source_sha256=source.source_sha256,
-                            gate=failure_gate,
-                        )
-                finally:
-                    llm_paths.discard(resolved_output)
-                    feedback_by_output.pop(resolved_output, None)
-                if receipt is None or not expected.is_file():
-                    failed += 1
-                    shard_failed += 1
-                    continue
-                if Path(receipt["output_path"]).resolve() != expected.resolve():
-                    expected.unlink(missing_ok=True)
-                    raise CampaignManifestError(
-                        f"accepted receipt path mismatch for {expected_output}"
-                    )
-                accepted += 1
-                shard_accepted += 1
+                for future in as_completed(futures):
+                    job_accepted, _output = future.result()
+                    if job_accepted:
+                        accepted += 1
+                        shard_accepted += 1
+                    else:
+                        failed += 1
+                        shard_failed += 1
             self.ledger.write_summary(
                 {
                     **self.manifest.to_summary(),

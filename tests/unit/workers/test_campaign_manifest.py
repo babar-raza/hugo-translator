@@ -1,6 +1,8 @@
 import json
 import hashlib
 import subprocess
+import threading
+import time
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -515,6 +517,100 @@ def test_campaign_uses_three_primary_then_llm_and_logs_metadata_only(tmp_path, m
     assert failure_log.count("\n") == 2
     assert "SECRET REJECTED CANDIDATE TEXT" not in failure_log
     assert "translation_rejected" in failure_log
+
+
+def test_campaign_parallel_jobs_share_engine_without_cross_job_state(tmp_path, monkeypatch):
+    """A bounded campaign shard overlaps jobs while receipts stay per-output."""
+    source = tmp_path / "content/docs.aspose.org/en/words/net/page.md"
+    source.parent.mkdir(parents=True)
+    source.write_text("source", encoding="utf-8")
+    payload = _manifest(tmp_path)
+    payload["target_locales"] = ["es"]
+    payload["expected_source_count"] = 2
+    payload["expected_output_count"] = 2
+    payload["sources"][0]["outputs"] = {
+        "es": payload["sources"][0]["outputs"]["es"],
+    }
+    payload["sources"][0]["source_sha256"] = sha256_file(source)
+    second_source = tmp_path / "content/docs.aspose.org/en/words/net/second.md"
+    second_source.write_text("second source", encoding="utf-8")
+    payload["sources"].append(
+        {
+            **payload["sources"][0],
+            "source_path": "content/docs.aspose.org/en/words/net/second.md",
+            "source_sha256": sha256_file(second_source),
+            "outputs": {"es": "content/docs.aspose.org/es/words/net/second.md"},
+        }
+    )
+    payload["execution_policy"] = {
+        "max_parallel_jobs": 2,
+        "model_sharing": "single_shared_instance",
+    }
+    manifest_path = tmp_path / "manifest.yaml"
+    manifest_path.write_text(yaml.safe_dump(payload), encoding="utf-8")
+    manifest = CampaignManifest.load(manifest_path)
+    outputs = {
+        str(tmp_path / item["source_path"]): tmp_path / item["outputs"]["es"]
+        for item in payload["sources"]
+    }
+
+    class Engine:
+        def __init__(self):
+            self.campaign_context = {}
+            self.config = SimpleNamespace(get_site_profile=lambda _site: SimpleNamespace())
+            self.active = 0
+            self.peak = 0
+            self.lock = threading.Lock()
+
+        def _get_output_path(self, source_path, _locale, _profile):
+            return outputs[str(source_path)]
+
+        def translate_file(self, _site, _source, target_langs, **_kwargs):
+            locale = target_langs[0]
+            with self.lock:
+                self.active += 1
+                self.peak = max(self.peak, self.active)
+            time.sleep(0.08)
+            output = outputs[str(_source)]
+            output.parent.mkdir(parents=True, exist_ok=True)
+            output.write_text(f"accepted-{locale}", encoding="utf-8")
+            receipt = {
+                "campaign_id": "pilot",
+                "source_path": str(_source.resolve()),
+                "output_path": str(output.resolve()),
+                "source_sha256": sha256_file(_source),
+                "output_sha256": sha256_file(output),
+                "target_lang": locale,
+                "validation_policy": "zero-defect",
+                "config_fingerprint": payload["config_fingerprint"],
+                "model_fingerprint": "fixture",
+                "gate_results": {index: {"passed": True} for index in range(1, 45)},
+            }
+            self.campaign_context["receipt_sink"](receipt)
+            with self.lock:
+                self.active -= 1
+            return SimpleNamespace(success=True, acceptance_receipts={locale: receipt}, errors=[])
+
+    engine = Engine()
+    runner = CampaignRunner(
+        manifest=manifest,
+        translation_engine=engine,
+        translator_repo=tmp_path,
+        ledger_root=tmp_path / "ledger",
+    )
+    monkeypatch.setattr(
+        runner,
+        "verify",
+        lambda **_kwargs: {**manifest.to_summary(), "accepted": 0, "remaining": 2},
+    )
+    monkeypatch.setattr(runner, "_commit_verified_outputs", lambda _shard: None)
+
+    summary = runner.run()
+
+    assert summary["status"] == "COMPLETE"
+    assert engine.peak == 2
+    receipts = runner.ledger.receipts()
+    assert set(receipts) == {item["outputs"]["es"] for item in payload["sources"]}
 
 
 def test_campaign_retry_feedback_accumulates_distinct_gate_instructions():

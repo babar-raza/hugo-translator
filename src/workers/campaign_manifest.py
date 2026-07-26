@@ -175,6 +175,7 @@ class CampaignManifest:
     expected_output_count: int
     retry_policy: dict[str, Any] = field(default_factory=dict)
     commit_policy: dict[str, Any] = field(default_factory=dict)
+    execution_policy: dict[str, Any] = field(default_factory=dict)
     destination_baseline: dict[str, Any] = field(default_factory=dict)
 
     @classmethod
@@ -204,6 +205,7 @@ class CampaignManifest:
                 expected_output_count=int(raw["expected_output_count"]),
                 retry_policy=dict(raw.get("retry_policy") or {}),
                 commit_policy=dict(raw.get("commit_policy") or {}),
+                execution_policy=dict(raw.get("execution_policy") or {}),
                 destination_baseline=dict(raw.get("destination_baseline") or {}),
             )
         except (KeyError, TypeError, ValueError) as exc:
@@ -232,6 +234,13 @@ class CampaignManifest:
         max_outputs = self.commit_policy.get("max_outputs_per_commit")
         if not isinstance(max_outputs, int) or not 1 <= max_outputs <= 250:
             errors.append("campaign commit partitions must contain 1..250 outputs")
+        max_parallel_jobs = self.execution_policy.get("max_parallel_jobs", 1)
+        if not isinstance(max_parallel_jobs, int) or not 1 <= max_parallel_jobs <= 4:
+            errors.append("campaign execution max_parallel_jobs must be 1..4")
+        if max_parallel_jobs > 1 and self.execution_policy.get("model_sharing") != "single_shared_instance":
+            errors.append(
+                "parallel campaign execution requires model_sharing=single_shared_instance"
+            )
         if len(self.sources) != self.expected_source_count:
             errors.append(f"source count {len(self.sources)} != {self.expected_source_count}")
 

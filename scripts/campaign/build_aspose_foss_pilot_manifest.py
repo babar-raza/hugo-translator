@@ -292,6 +292,13 @@ def build_manifest(
             "push": False,
             "enabled": not allow_dirty_content,
         },
+        # Four candidate pipelines share one CUDA-resident model.  This is
+        # deliberately capped: parallelism is for CPU parsing/validation and
+        # remote judgement overlap, never duplicate MT model residency.
+        "execution_policy": {
+            "max_parallel_jobs": 4,
+            "model_sharing": "single_shared_instance",
+        },
         "destination_baseline": destination_baseline,
         "sources": sources,
     }
