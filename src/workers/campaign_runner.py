@@ -863,7 +863,7 @@ class CampaignRunner:
                             for field in ("title", "description", "seoTitle", "summary")
                             if re.search(
                                 rf"{re.escape(check)}:(?:error|warning):"
-                                rf"{hashlib.sha256(f'frontmatter.{field}'.encode('utf-8')).hexdigest()[:16]}",
+                                rf"{hashlib.sha256(f'frontmatter.{field}'.encode()).hexdigest()[:16]}",
                                 reason,
                             )
                         ),
