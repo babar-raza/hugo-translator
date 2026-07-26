@@ -691,6 +691,7 @@ class AutonomousContentTranslationWorker:
         import shutil
 
         checks_passed = True
+        failure_codes: list[str] = []
 
         # 1. GPU available (if device=cuda) - Fall back to CPU if unavailable
         original_device = self.config.device
@@ -714,6 +715,7 @@ class AutonomousContentTranslationWorker:
         if not config_root.exists():
             logger.warning(f"PREFLIGHT FAIL: Config root missing: {config_root}")
             checks_passed = False
+            failure_codes.append("config_root_missing")
 
         # 3. Disk space > 5% (check output drive, not CWD)
         try:
@@ -735,6 +737,7 @@ class AutonomousContentTranslationWorker:
                     f"PREFLIGHT FAIL: Disk space critical ({free / total * 100:.1f}% free on {disk_check_path})"
                 )
                 checks_passed = False
+                failure_codes.append("disk_space_critical")
         except Exception as e:
             logger.warning(f"PREFLIGHT WARNING: Could not check disk space: {e}")
 
@@ -759,6 +762,9 @@ class AutonomousContentTranslationWorker:
         if original_device != self.config.device:
             logger.info(f"Device fallback applied: {original_device} → {self.config.device}")
 
+        self._last_preflight_error = (
+            "preflight:" + ",".join(failure_codes) if failure_codes else ""
+        )
         return checks_passed
 
     def run(self) -> None:
@@ -819,7 +825,10 @@ class AutonomousContentTranslationWorker:
 
         if not self._preflight_check():
             logger.warning("Preflight check failed, aborting oneshot run")
-            self._record_state("preflight_failed", error="Preflight checks failed")
+            self._record_state(
+                "preflight_failed",
+                error=getattr(self, "_last_preflight_error", "") or "Preflight checks failed",
+            )
             return  # Graceful exit, not sys.exit(1)
 
         _run_id = str(uuid.uuid4())
