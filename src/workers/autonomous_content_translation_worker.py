@@ -743,7 +743,9 @@ class AutonomousContentTranslationWorker:
         try:
             # Check the content root drive (where translations are written)
             disk_check_path = "."
-            if self.config_service and self.config.site:
+            if self.campaign is not None:
+                disk_check_path = str(Path(self.campaign.content_repo).resolve())
+            elif self.config_service and self.config.site:
                 try:
                     profile = self.config_service.get_site_profile(self.config.site)
                     if profile and profile.content_roots:
