@@ -874,6 +874,12 @@ class CampaignRunner:
                 "preserve only product names, API identifiers, code, and file formats. "
                 "Do not leave English prose."
             )
+            if target_lang == "ar":
+                instructions.append(
+                    f"For each failing field ({field_text}), write ordinary prose in Arabic "
+                    "script; Latin text is permitted only for protected product names, API "
+                    "identifiers, code, and file formats."
+                )
             source_guidance = CampaignRunner._frontmatter_source_guidance(
                 source_path, fields, target_lang
             )

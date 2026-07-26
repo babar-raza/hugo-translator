@@ -546,6 +546,26 @@ def test_campaign_retry_feedback_accumulates_distinct_gate_instructions():
     assert "Translate every translatable source unit" in combined
 
 
+def test_arabic_frontmatter_feedback_requires_arabic_script():
+    feedback = CampaignRunner._retry_feedback(
+        SimpleNamespace(
+            validation_result=SimpleNamespace(
+                issues=[
+                    SimpleNamespace(
+                        validator="FrontmatterLanguageCheck",
+                        details={"field": "seoTitle"},
+                    )
+                ]
+            ),
+            error="",
+        ),
+        "ar",
+    )
+
+    assert "Arabic script" in feedback
+    assert "seoTitle" in feedback
+
+
 def test_campaign_resume_rehydrates_feedback_from_metadata(tmp_path):
     ledger = CampaignLedger(tmp_path, "campaign")
     ledger.append_failure(
