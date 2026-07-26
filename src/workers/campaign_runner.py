@@ -458,6 +458,19 @@ class CampaignRunner:
                 in {"error", "warning"}
             }
         )
+        verification_result = getattr(result, "verification_result", None)
+        verification_checks = sorted(
+            {
+                re.sub(
+                    r"[^A-Za-z0-9_-]",
+                    "",
+                    str(getattr(issue, "check_name", "unknown")),
+                )
+                or "unknown"
+                for issue in getattr(verification_result, "issues", []) or []
+                if str(getattr(issue, "severity", "")) in {"error", "warning"}
+            }
+        )
         raw_error = str(getattr(result, "error", "") or "")
         safe_codes = sorted(
             set(
@@ -467,6 +480,14 @@ class CampaignRunner:
                 )
             )
         )
+        failed_gate_ids = sorted(
+            int(gate_id)
+            for gate_id, gate_result in (
+                getattr(result, "rejection_gate_results", None) or {}
+            ).items()
+            if not bool(gate_result.get("passed", False))
+        )
+        safe_codes = sorted({*safe_codes, *(f"GATE{gate_id}" for gate_id in failed_gate_ids)})
         exception_classes = sorted(
             set(
                 re.findall(
@@ -566,7 +587,49 @@ class CampaignRunner:
                     ]
                 )
             )
-        gate = validators[0] if validators else (safe_codes[0] if safe_codes else "pipeline")
+        verification_fingerprints: list[str] = []
+        for issue in getattr(verification_result, "issues", []) or []:
+            severity = str(getattr(issue, "severity", ""))
+            if severity not in {"error", "warning"}:
+                continue
+            check_name = (
+                re.sub(
+                    r"[^A-Za-z0-9_-]",
+                    "",
+                    str(getattr(issue, "check_name", "unknown")),
+                )
+                or "unknown"
+            )
+            location_hash = hashlib.sha256(
+                str(getattr(issue, "location", "")).encode("utf-8")
+            ).hexdigest()[:16]
+            metadata = getattr(issue, "metadata", None) or {}
+            numeric_parts: list[str] = []
+            for key, value in sorted(metadata.items()):
+                if isinstance(value, bool) or not isinstance(value, (int, float)):
+                    continue
+                safe_key = re.sub(r"[^A-Za-z0-9_-]", "", str(key)) or "metric"
+                rendered = f"{value:.6g}" if isinstance(value, float) else str(value)
+                numeric_parts.append(f"{safe_key}={rendered}")
+            verification_fingerprints.append(
+                ":".join(
+                    [
+                        check_name,
+                        severity,
+                        location_hash,
+                        *(numeric_parts or ["numeric=none"]),
+                    ]
+                )
+            )
+        gate = (
+            validators[0]
+            if validators
+            else (
+                f"verification:{verification_checks[0]}"
+                if verification_checks
+                else (safe_codes[0] if safe_codes else "pipeline")
+            )
+        )
         validator_text = ",".join(validators) if validators else "unknown"
         reason = (
             f"translation_rejected; error_count={error_count}; "
@@ -580,6 +643,10 @@ class CampaignRunner:
             f"{unit_fingerprints.group(1) if unit_fingerprints else 'none'}; "
             f"issue_fingerprints="
             f"{','.join(sorted(issue_fingerprints)) if issue_fingerprints else 'none'}; "
+            f"verification_checks="
+            f"{','.join(verification_checks) if verification_checks else 'none'}; "
+            f"verification_fingerprints="
+            f"{','.join(sorted(verification_fingerprints)) if verification_fingerprints else 'none'}; "
             f"error_sha256={hashlib.sha256(raw_error.encode('utf-8')).hexdigest()}"
         )
         return gate, reason
@@ -701,6 +768,20 @@ class CampaignRunner:
                 "Translate every translatable source unit; identical output is allowed only for "
                 "product names, API identifiers, and reviewed locale cognates."
             )
+        verification_result = getattr(result, "verification_result", None)
+        failed_checks = sorted(
+            {
+                str(getattr(issue, "check_name", "unknown"))
+                for issue in getattr(verification_result, "issues", []) or []
+                if str(getattr(issue, "severity", "")) in {"error", "warning"}
+            }
+        )
+        if failed_checks:
+            instructions.append(
+                "Correct every post-translation verification issue from these checks: "
+                f"{', '.join(failed_checks)}. Preserve source meaning and structure, "
+                f"and render all ordinary prose in target locale {target_lang}."
+            )
         if not instructions and not prior_feedback:
             instructions.append(
                 f"Regenerate the complete translation in target locale {target_lang} and correct "
@@ -739,9 +820,24 @@ class CampaignRunner:
             )
             for validator in validators
         ]
+        verification_checks_match = re.search(r"\bverification_checks=([A-Za-z0-9_,-]+)\b", reason)
+        verification_issues = [
+            SimpleNamespace(
+                check_name=check,
+                severity="warning",
+                location="",
+                metadata={},
+            )
+            for check in (
+                verification_checks_match.group(1).split(",")
+                if verification_checks_match and verification_checks_match.group(1) != "none"
+                else []
+            )
+        ]
         return cls._retry_feedback(
             SimpleNamespace(
                 validation_result=SimpleNamespace(issues=issues),
+                verification_result=SimpleNamespace(issues=verification_issues),
                 error=reason,
             ),
             target_lang,

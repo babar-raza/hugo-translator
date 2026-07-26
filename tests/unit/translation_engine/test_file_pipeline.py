@@ -48,6 +48,56 @@ def test_verification_error_metadata_excludes_candidate_text():
     assert "SECRET" not in repr(metadata)
 
 
+def test_zero_defect_warning_block_preserves_verification_result_in_memory():
+    from src.translation_engine.validation.post_translation_validator import (
+        ValidationDecision as PostValidationDecision,
+    )
+
+    engine = _make_engine(validation_enabled=True)
+    engine.validation_policy = "zero-defect"
+    validation_result = SimpleNamespace(
+        issues=[],
+        error_count=0,
+        warning_count=0,
+        info_count=0,
+    )
+    engine.validation_suite.validate_aggregated.return_value = validation_result
+    engine.decision_engine.make_decision.return_value = SimpleNamespace(
+        decision=PostValidationDecision.ACCEPT,
+        decision_reason="accepted",
+    )
+    warning = SimpleNamespace(
+        severity="warning",
+        check_name="language_detection",
+        location="frontmatter.title",
+        message="SECRET REJECTED CANDIDATE",
+        metadata={"confidence": 0.91},
+    )
+    verification_result = SimpleNamespace(
+        passed=True,
+        issues=[warning],
+        error_count=0,
+        warning_count=1,
+        info_count=0,
+    )
+    engine._get_verification_agent.return_value.verify.return_value = verification_result
+    engine.parser.parse_string.return_value = SimpleNamespace(
+        frontmatter={"title": "Translated"},
+        body="Translated body",
+    )
+    result = _make_result()
+
+    language = FileTranslationPipeline(engine).translate_language(
+        _make_ctx(should_validate=True, should_verify=True),
+        result,
+    )
+
+    assert not language.success
+    assert result.verification_result is verification_result
+    assert result.error == ("Zero-defect verification requires zero errors and zero warnings")
+    engine._write_accepted_output.assert_not_called()
+
+
 def _make_engine(
     validation_enabled=False,
     review_cache=None,
@@ -188,9 +238,7 @@ class TestBasicPipelineFlow:
         }
         pipeline = FileTranslationPipeline(engine)
 
-        language = pipeline.translate_language(
-            _make_ctx(output_path=output), _make_result()
-        )
+        language = pipeline.translate_language(_make_ctx(output_path=output), _make_result())
 
         assert language.success
         assert (
@@ -205,7 +253,16 @@ class TestBasicPipelineFlow:
 
         engine = _make_engine()
         engine._write_gate.evaluate.return_value = WriteGateResult(
-            passed=False, error="Language mismatch"
+            passed=False,
+            error="SECRET REJECTED CANDIDATE",
+            gate_results={
+                2: {"passed": True, "action": "block", "error": None},
+                18: {
+                    "passed": False,
+                    "action": "block",
+                    "error": "SECRET REJECTED CANDIDATE",
+                },
+            },
         )
         pipeline = FileTranslationPipeline(engine)
         ctx = _make_ctx()
@@ -214,6 +271,11 @@ class TestBasicPipelineFlow:
         lang_result = pipeline.translate_language(ctx, result)
         assert not lang_result.success
         engine._write_output.assert_not_called()
+        assert result.rejection_gate_results == {
+            2: {"passed": True, "action": "block"},
+            18: {"passed": False, "action": "block"},
+        }
+        assert "SECRET" not in repr(result.rejection_gate_results)
 
     def test_tm_buffer_flushed_on_success(self):
         """TM write buffer entries are stored to TM after successful write."""
@@ -253,9 +315,7 @@ class TestBasicPipelineFlow:
         )
         result = _make_result()
 
-        language = FileTranslationPipeline(engine).translate_language(
-            _make_ctx(), result
-        )
+        language = FileTranslationPipeline(engine).translate_language(_make_ctx(), result)
 
         assert not language.success
         assert result.validation_result is validation_result
@@ -275,9 +335,7 @@ class TestBasicPipelineFlow:
             message="Retry",
             file_path="/tmp/test.md",
             validation_result=validation_result,
-            retry_feedback=(
-                "LanguageConsistencyValidator SECRET REJECTED CANDIDATE"
-            ),
+            retry_feedback=("LanguageConsistencyValidator SECRET REJECTED CANDIDATE"),
         )
         result = _make_result()
 
@@ -291,14 +349,10 @@ class TestBasicPipelineFlow:
 
     def test_unexpected_exception_preserves_class_and_cause_in_memory(self):
         engine = _make_engine()
-        engine._translate_to_language.side_effect = ValueError(
-            "SECRET REJECTED CANDIDATE"
-        )
+        engine._translate_to_language.side_effect = ValueError("SECRET REJECTED CANDIDATE")
         result = _make_result()
 
-        language = FileTranslationPipeline(engine).translate_language(
-            _make_ctx(), result
-        )
+        language = FileTranslationPipeline(engine).translate_language(_make_ctx(), result)
 
         assert not language.success
         assert result.error == "ValueError: SECRET REJECTED CANDIDATE"

@@ -150,12 +150,8 @@ class FileTranslationPipeline:
         max_retry_attempts = ctx.max_retry_attempts
         output_paths_cache = ctx.output_paths_cache
         _llm_model_override = ctx.llm_model_override
-        campaign_feedback = getattr(
-            engine, "_campaign_retry_feedback_by_output", {}
-        )
-        retry_feedback = campaign_feedback.pop(
-            str(output_path.resolve()), retry_feedback
-        )
+        campaign_feedback = getattr(engine, "_campaign_retry_feedback_by_output", {})
+        retry_feedback = campaign_feedback.pop(str(output_path.resolve()), retry_feedback)
 
         lang_result = LanguageResult(success=False, retry_count=0)
 
@@ -611,12 +607,16 @@ class FileTranslationPipeline:
                     }
                     translated_doc_parsed = engine.parser.parse_string(translated_content)
                     translated_doc_dict = {
-                        "frontmatter": translated_doc_parsed.frontmatter
-                        if hasattr(translated_doc_parsed, "frontmatter")
-                        else {},
-                        "body": str(translated_doc_parsed.body)
-                        if hasattr(translated_doc_parsed, "body")
-                        else "",
+                        "frontmatter": (
+                            translated_doc_parsed.frontmatter
+                            if hasattr(translated_doc_parsed, "frontmatter")
+                            else {}
+                        ),
+                        "body": (
+                            str(translated_doc_parsed.body)
+                            if hasattr(translated_doc_parsed, "body")
+                            else ""
+                        ),
                     }
 
                     verification_agent = engine._get_verification_agent()
@@ -632,6 +632,10 @@ class FileTranslationPipeline:
                     )
 
                     final_verification_result = verification_result
+                    # Preserve structured, candidate-free verification state
+                    # even when zero-defect warning promotion blocks before
+                    # the normal success bookkeeping below.
+                    result.verification_result = verification_result
 
                     if not verification_result.passed:
                         logger.warning(
@@ -780,6 +784,13 @@ class FileTranslationPipeline:
                     if _gate_result is not None and not _gate_result.passed:
                         validation_passed = False
                         validation_error = _gate_result.error
+                        result.rejection_gate_results = {
+                            int(gate_id): {
+                                "passed": bool(gate_result.get("passed", False)),
+                                "action": str(gate_result.get("action", "")),
+                            }
+                            for gate_id, gate_result in _gate_result.gate_results.items()
+                        }
                         if _gate_result.overwrite_blocked:
                             result.overwrite_blocked = True
                             lang_result.overwrite_blocked = True
@@ -1107,9 +1118,7 @@ class FileTranslationPipeline:
                     # Per-locale rejection: max retries exceeded. Handle in-place;
                     # do NOT raise.
                     result.validation_result = e.validation_result
-                    result.error = (
-                        f"TranslationRetryableError: {e.retry_feedback or str(e)}"
-                    )
+                    result.error = f"TranslationRetryableError: {e.retry_feedback or str(e)}"
                     result.errors.append(
                         f"Translation to {target_lang} rejected after {retry_count} retries"
                     )

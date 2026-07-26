@@ -523,6 +523,32 @@ def test_failure_metadata_extracts_safe_gate_score_without_candidate_text():
     assert "SECRET" not in reason
 
 
+def test_failure_metadata_preserves_safe_verification_check_only():
+    issue = SimpleNamespace(
+        severity="warning",
+        check_name="language_detection",
+        location="frontmatter.title",
+        message="SECRET REJECTED CANDIDATE TEXT",
+        source_text="SECRET REJECTED CANDIDATE TEXT",
+        translated_text="SECRET REJECTED CANDIDATE TEXT",
+        metadata={"confidence": 0.91},
+    )
+    result = SimpleNamespace(
+        errors=[],
+        retry_attempts=0,
+        validation_result=None,
+        verification_result=SimpleNamespace(issues=[issue]),
+        error="Zero-defect verification requires zero errors and zero warnings",
+    )
+
+    gate, reason = CampaignRunner._failure_metadata(result)
+
+    assert gate == "verification:language_detection"
+    assert "verification_checks=language_detection" in reason
+    assert "confidence=0.91" in reason
+    assert "SECRET REJECTED CANDIDATE TEXT" not in reason
+
+
 def test_failure_metadata_extracts_exception_class_without_candidate_text():
     result = SimpleNamespace(
         errors=["rejected"],
@@ -535,6 +561,25 @@ def test_failure_metadata_extracts_exception_class_without_candidate_text():
 
     assert gate == "pipeline"
     assert "exceptions=TranslationIncomplete" in reason
+    assert "SECRET" not in reason
+
+
+def test_failure_metadata_promotes_rejected_write_gate_without_error_text():
+    result = SimpleNamespace(
+        errors=[],
+        retry_attempts=0,
+        validation_result=None,
+        error="SECRET REJECTED CANDIDATE",
+        rejection_gate_results={
+            2: {"passed": True, "action": "block"},
+            18: {"passed": False, "action": "block"},
+        },
+    )
+
+    gate, reason = CampaignRunner._failure_metadata(result)
+
+    assert gate == "GATE18"
+    assert "codes=GATE18" in reason
     assert "SECRET" not in reason
 
 
