@@ -663,6 +663,34 @@ def test_verification_language_feedback_uses_frontmatter_source_lexicon(tmp_path
     assert "Aspose.Cells" in feedback
 
 
+def test_dutch_language_retry_uses_unambiguous_idiomatic_title(tmp_path):
+    source = tmp_path / "index.md"
+    source.write_text(
+        "---\n"
+        "title: 'Deep Dive: The CSSOM in Python'\n"
+        "---\n",
+        encoding="utf-8",
+    )
+    failure = {
+        "gate": "verification:language_detection",
+        "reason": (
+            "translation_rejected; verification_checks=language_detection; "
+            "verification_fingerprints=language_detection:error:abc:"
+            "field=title:confidence=0.999996"
+        ),
+    }
+
+    feedback = CampaignRunner._retry_feedback_from_failure(
+        failure,
+        "nl",
+        source_path=source,
+    )
+
+    assert "Een grondige analyse van" in feedback
+    assert "Afrikaans-like literal calque" in feedback
+    assert "Dutch (nl)" in feedback
+
+
 def test_failure_metadata_extracts_exception_class_without_candidate_text():
     result = SimpleNamespace(
         errors=["rejected"],

@@ -208,6 +208,13 @@ class CampaignRunner:
         "uk": "Cyrillic script",
         "zh": "Chinese Han characters",
     }
+    _LOCALE_RETRY_HINTS = {
+        "nl": (
+            "For a short Dutch technical title, translate the source phrase "
+            "'Deep Dive' idiomatically as 'Een grondige analyse van'. "
+            "Do not use an English or Afrikaans-like literal calque."
+        ),
+    }
 
     def __init__(
         self,
@@ -856,6 +863,9 @@ class CampaignRunner:
         validators = {str(getattr(issue, "validator", "")) for issue in issues}
         instructions: list[str] = []
         locale_label = CampaignRunner._target_locale_label(target_lang)
+        locale_retry_hint = CampaignRunner._LOCALE_RETRY_HINTS.get(
+            target_lang.lower().split("-")[0]
+        )
         if "FrontmatterLanguageCheck" in validators:
             fields = sorted(
                 {
@@ -936,6 +946,8 @@ class CampaignRunner:
                 )
                 if source_guidance:
                     instructions.append(source_guidance)
+            if locale_retry_hint and "language_detection" in failed_checks:
+                instructions.append(locale_retry_hint)
         if not instructions and not prior_feedback:
             instructions.append(
                 f"Regenerate the complete translation in target locale {locale_label} and correct "
