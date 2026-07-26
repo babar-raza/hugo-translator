@@ -21,13 +21,13 @@ def test_llm_escalation_does_not_reuse_unchanged_frontmatter():
     )
 
 
-def test_llm_escalation_keeps_legitimate_changed_frontmatter_and_body_reuse():
+def test_llm_escalation_keeps_changed_values_but_retranslates_unchanged_body():
     frontmatter = _segment("Spreadsheet Management in Rust with Aspose.Cells FOSS")
     body = _segment("Spreadsheet Management", SegmentContextType.BODY_TEXT)
 
     assert SegmentTranslator._can_reuse_ast_translation(
         frontmatter, "Správa tabulek v Rustu s Aspose.Cells FOSS", "professionalize_llm"
     )
-    assert SegmentTranslator._can_reuse_ast_translation(
+    assert not SegmentTranslator._can_reuse_ast_translation(
         body, body.source_text, "professionalize_llm"
     )

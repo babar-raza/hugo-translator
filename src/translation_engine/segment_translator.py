@@ -264,18 +264,14 @@ class SegmentTranslator:
     ) -> bool:
         """Return whether a legacy segment result may seed the AST pass.
 
-        An unchanged *frontmatter* result is a failed translation signal, not
-        a usable translation.  During controlled LLM escalation it must reach
-        the AST translator again; otherwise the reuse map copies English into
-        the AST plan and prevents the escalation backend from ever seeing the
-        field that the language gate rejected.
+        An unchanged translatable result is a failed translation signal, not a
+        usable translation. During controlled LLM escalation it must reach the
+        AST translator again; otherwise the reuse map copies English into the
+        AST plan and prevents the escalation backend from seeing the unit that
+        the same-as-source or language gate rejected. Explicitly protected
+        code and shortcode units are excluded before this reuse decision.
         """
         if model_id_override != "professionalize_llm":
-            return True
-        context = getattr(segment, "context", None)
-        if not context or "FRONTMATTER" not in str(
-            getattr(context, "context_type", "")
-        ):
             return True
         source = re.sub(r"\s+", " ", str(getattr(segment, "source_text", "")).strip())
         candidate = re.sub(r"\s+", " ", str(translation).strip())
