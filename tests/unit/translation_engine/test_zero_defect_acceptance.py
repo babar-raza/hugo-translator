@@ -149,6 +149,40 @@ def test_warn_gate_is_blocking_under_zero_defect():
     assert result.gate_results[31]["passed"] is False
 
 
+def test_fidelity_pass_evidence_survives_disposable_gate_result():
+    config = MagicMock()
+    config.get_config.return_value = {"translation_engine": {}}
+    gate = WriteGateEvaluator(
+        detector=MagicMock(),
+        similarity_tracker=None,
+        config=config,
+        validation_policy="zero-defect",
+    )
+    gate.GATE_REGISTRY = [(36, "_gate_fidelity_judge", "content", "auto_clean")]
+
+    def pass_fidelity(_source, translated, _path, result):
+        result._fidelity_result = {
+            "verdict": "pass",
+            "score": 0.99,
+            "model": "independent-judge",
+            "issues": [],
+        }
+        return translated
+
+    gate._build_content_gate_dispatch = MagicMock(
+        return_value={"_gate_fidelity_judge": pass_fidelity}
+    )
+    result = WriteGateResult(passed=True)
+
+    gate._run_content_gates(
+        "source", "translation", "es", Path("page.md"), None, result
+    )
+
+    assert result.gate_results[36]["passed"] is True
+    assert result._fidelity_result["verdict"] == "pass"
+    assert result._fidelity_result["model"] == "independent-judge"
+
+
 def test_zero_defect_requires_language_detector():
     config = MagicMock()
     config.get_config.return_value = {"translation_engine": {}}

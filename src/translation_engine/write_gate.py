@@ -1319,6 +1319,15 @@ class WriteGateEvaluator:
                     "action": action,
                     "error": gate_result.error,
                 }
+                if gate_id == 36 and hasattr(gate_result, "_fidelity_result"):
+                    # Preserve the independent judge evidence on the aggregate
+                    # fixed-point result.  The per-gate result is otherwise
+                    # disposable, which previously retained only its boolean
+                    # and made a model-bound fidelity PASS impossible to prove
+                    # in an acceptance receipt or receipt recovery.
+                    result._fidelity_result = dict(  # type: ignore[attr-defined]
+                        gate_result._fidelity_result  # type: ignore[attr-defined]
+                    )
                 if not gate_result.passed:
                     result.passed = False
                     result.error = gate_result.error or f"Gate {gate_id} failed"
