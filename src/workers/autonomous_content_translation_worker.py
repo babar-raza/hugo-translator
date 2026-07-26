@@ -717,11 +717,16 @@ class AutonomousContentTranslationWorker:
             checks_passed = False
             failure_codes.append("config_root_missing")
 
-        # 3. Disk space > 5% (check output drive, not CWD)
+        # 3. Disk space > 5% (check the actual output drive, not CWD).
+        # Campaign shards intentionally omit --site because their manifest
+        # contains multiple sites.  In that mode the pinned campaign checkout
+        # is the sole authoritative write location.
         try:
-            # Check the content root drive (where translations are written)
             disk_check_path = "."
-            if self.config_service and self.config.site:
+            campaign = getattr(self, "campaign", None)
+            if campaign is not None:
+                disk_check_path = str(Path(campaign.content_repo) / "content")
+            elif self.config_service and self.config.site:
                 try:
                     profile = self.config_service.get_site_profile(self.config.site)
                     if profile and profile.content_roots:
