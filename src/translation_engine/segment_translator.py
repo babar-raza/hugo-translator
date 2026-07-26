@@ -175,6 +175,29 @@ class SegmentTranslator:
         self._engine = engine
 
     @staticmethod
+    def _can_reuse_ast_translation(
+        segment: Any, translation: str, model_id_override: str | None
+    ) -> bool:
+        """Return whether a legacy segment result may seed the AST pass.
+
+        An unchanged *frontmatter* result is a failed translation signal, not
+        a usable translation.  During controlled LLM escalation it must reach
+        the AST translator again; otherwise the reuse map copies English into
+        the AST plan and prevents the escalation backend from ever seeing the
+        field that the language gate rejected.
+        """
+        if model_id_override != "professionalize_llm":
+            return True
+        context = getattr(segment, "context", None)
+        if not context or "FRONTMATTER" not in str(
+            getattr(context, "context_type", "")
+        ):
+            return True
+        source = re.sub(r"\s+", " ", str(getattr(segment, "source_text", "")).strip())
+        candidate = re.sub(r"\s+", " ", str(translation).strip())
+        return not source or source != candidate
+
+    @staticmethod
     def _should_preserve_multiline_line(text: str) -> bool:
         placeholders = re.findall(r"\{PLACEHOLDER_\d+\}", text)
         if len(placeholders) >= 3:
@@ -1566,6 +1589,10 @@ class SegmentTranslator:
                 source_to_translation = {}
                 for segment in segments:
                     if segment.id in translations and translations[segment.id]:
+                        if not self._can_reuse_ast_translation(
+                            segment, translations[segment.id], model_id_override
+                        ):
+                            continue
                         normalized_source = strip_markdown(segment.source_text)
                         protected_source, _ = pm.protect(normalized_source, preserve_patterns)
                         source_to_translation[protected_source] = translations[segment.id]
