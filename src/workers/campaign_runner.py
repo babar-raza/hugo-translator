@@ -940,11 +940,15 @@ class CampaignRunner:
             if source_guidance:
                 instructions.append(source_guidance)
         verification_result = getattr(result, "verification_result", None)
+        def _verification_severity(issue: Any) -> str:
+            severity = getattr(issue, "severity", "")
+            return str(getattr(severity, "value", severity)).lower()
+
         failed_checks = sorted(
             {
                 str(getattr(issue, "check_name", "unknown"))
                 for issue in getattr(verification_result, "issues", []) or []
-                if str(getattr(issue, "severity", "")) in {"error", "warning"}
+                if _verification_severity(issue) in {"error", "warning"}
             }
         )
         if failed_checks:

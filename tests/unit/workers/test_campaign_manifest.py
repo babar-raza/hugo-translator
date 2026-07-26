@@ -923,6 +923,33 @@ def test_verification_language_feedback_uses_frontmatter_source_lexicon(tmp_path
     assert "Aspose.Cells" in feedback
 
 
+def test_live_verification_enum_severity_generates_language_feedback(tmp_path):
+    source = tmp_path / "index.md"
+    source.write_text(
+        "---\n" "title: Spreadsheet Management in Rust with Aspose.Cells FOSS\n" "---\n",
+        encoding="utf-8",
+    )
+    result = SimpleNamespace(
+        validation_result=SimpleNamespace(issues=[]),
+        verification_result=SimpleNamespace(
+            issues=[
+                SimpleNamespace(
+                    severity=SimpleNamespace(value="error"),
+                    check_name="language_detection",
+                    location="frontmatter.title",
+                )
+            ]
+        ),
+        error="",
+    )
+
+    feedback = CampaignRunner._retry_feedback(result, "cs", source_path=source)
+
+    assert "language_detection" in feedback
+    assert "frontmatter field(s) title" in feedback
+    assert "Czech (cs)" in feedback
+
+
 def test_failure_metadata_extracts_exception_class_without_candidate_text():
     result = SimpleNamespace(
         errors=["rejected"],
