@@ -120,6 +120,11 @@ def _strict_frontmatter_retry_model_id(
     """
     if not retry_feedback or getattr(engine, "validation_policy", "standard") != "zero-defect":
         return default_model_id
+    # Field routing qualifies a local MT retry.  It must not replace the
+    # separately governed professional escalation, which is the final
+    # independent recovery path for a persistent local-model failure.
+    if default_model_id == "professionalize_llm":
+        return default_model_id
     try:
         config = engine.config.get_config().get("translation_engine", {})
         overrides = config.get("zero_defect_frontmatter_retry_models", {})

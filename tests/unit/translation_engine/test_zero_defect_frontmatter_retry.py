@@ -61,7 +61,7 @@ def test_strict_retry_uses_only_the_pinned_profile_field_override():
         _strict_frontmatter_retry_model_id(
             engine, "blog.aspose.org", "cs", "title", "professionalize_llm", "retry"
         )
-        == "m2m100_418m"
+        == "professionalize_llm"
     )
     engine.config.get_config = lambda: {
         "translation_engine": {
