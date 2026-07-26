@@ -291,7 +291,23 @@ class CampaignRunner:
             if sha256_file(output_path) != receipt.get("output_sha256"):
                 raise CampaignManifestError(f"receipt/output hash mismatch: {output}")
             gates = receipt.get("gate_results") or {}
-            if len(gates) != 44 or any(not item.get("passed", False) for item in gates.values()):
+            expected_gate_ids = {str(index) for index in range(1, 45)}
+            invalid_gates = [
+                gate_id
+                for gate_id, item in gates.items()
+                if not isinstance(item, dict)
+                or not item.get("passed", False)
+                or str(item.get("action", "")).lower() in {
+                    "warn",
+                    "warning",
+                    "skip",
+                    "skipped",
+                    "unavailable",
+                    "exception",
+                }
+                or item.get("error") is not None
+            ]
+            if set(gates) != expected_gate_ids or invalid_gates:
                 raise CampaignManifestError(f"receipt is not all-pass: {output}")
             valid[output] = receipt_migrations.get(output, receipt)
         if receipt_migrations:

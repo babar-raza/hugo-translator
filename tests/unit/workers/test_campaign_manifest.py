@@ -410,6 +410,46 @@ def test_resume_rejects_tampered_receipt_fingerprint(tmp_path):
         runner._validated_resume_receipts()
 
 
+def test_resume_rejects_warn_only_gate_receipt_under_zero_defect(tmp_path):
+    source = tmp_path / "content/docs.aspose.org/en/words/net/page.md"
+    source.parent.mkdir(parents=True)
+    source.write_text("source", encoding="utf-8")
+    payload = _manifest(tmp_path)
+    payload["sources"][0]["source_sha256"] = sha256_file(source)
+    manifest_path = tmp_path / "manifest.yaml"
+    manifest_path.write_text(yaml.safe_dump(payload), encoding="utf-8")
+    manifest = CampaignManifest.load(manifest_path)
+    output_relative = payload["sources"][0]["outputs"]["es"]
+    output = tmp_path / output_relative
+    output.parent.mkdir(parents=True)
+    output.write_text("accepted", encoding="utf-8")
+    runner = CampaignRunner(
+        manifest=manifest,
+        translation_engine=object(),
+        translator_repo=tmp_path,
+        ledger_root=tmp_path / "ledger",
+    )
+    gate_results = {str(index): {"passed": True, "action": "block", "error": None} for index in range(1, 45)}
+    gate_results["31"]["action"] = "warn"
+    runner.ledger.append_receipt(
+        {
+            "campaign_id": "pilot",
+            "source_path": payload["sources"][0]["source_path"],
+            "output_path": output_relative,
+            "source_sha256": sha256_file(source),
+            "output_sha256": sha256_file(output),
+            "target_lang": "es",
+            "validation_policy": "zero-defect",
+            "config_fingerprint": payload["config_fingerprint"],
+            "model_fingerprint": "fixture",
+            "gate_results": gate_results,
+        }
+    )
+
+    with pytest.raises(CampaignManifestError, match="all-pass"):
+        runner._validated_resume_receipts()
+
+
 def test_receipt_fingerprint_survives_json_roundtrip_with_integer_gate_keys():
     receipt = {
         "output_path": "content/page.de.md",
