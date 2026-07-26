@@ -789,8 +789,43 @@ def test_arabic_sas_retry_uses_translated_product_link_label(tmp_path):
     )
 
     assert "Aspose.Words لـ .NET" in feedback
-    assert "render the ordinary word 'for' in Arabic" in feedback
+    assert "governed target label exactly" in feedback
     assert "Translate all ordinary label words into Arabic (ar)" in feedback
+
+
+def test_czech_sas_retry_uses_translated_product_link_label(tmp_path):
+    source = tmp_path / "index.md"
+    label = "Aspose.Words for .NET"
+    source.write_text(
+        f"[{label}](https://products.aspose.org/words/net/)\n",
+        encoding="utf-8",
+    )
+    fingerprint = hashlib.sha256(label.encode("utf-8")).hexdigest()[:16]
+    failure = {
+        "gate": "TC-SAS-01",
+        "reason": (
+            "translation_rejected; codes=TC-SAS-01; "
+            f"unit_fingerprints=link_text:{fingerprint}:{len(label)}; "
+            "error_sha256=abc"
+        ),
+    }
+
+    feedback = CampaignRunner._retry_feedback_from_failure(
+        failure,
+        "cs",
+        source_path=source,
+    )
+
+    assert "Aspose.Words pro .NET" in feedback
+    assert "governed target label exactly" in feedback
+
+
+def test_product_link_terminology_covers_every_campaign_locale():
+    translations = CampaignRunner._PRODUCT_LINK_LABEL_TRANSLATIONS
+
+    assert set(translations) == set(CampaignRunner._LOCALE_NAMES)
+    assert all(value != "Aspose.Words for .NET" for value in translations.values())
+    assert all("Aspose.Words" in value and ".NET" in value for value in translations.values())
 
 
 def test_failure_metadata_extracts_safe_gate_score_without_candidate_text():

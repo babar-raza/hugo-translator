@@ -232,12 +232,34 @@ class CampaignRunner:
         "uk": "Cyrillic script",
         "zh": "Chinese Han characters",
     }
+    _PRODUCT_LINK_LABEL_TRANSLATIONS = {
+        "ar": "Aspose.Words لـ .NET",
+        "cs": "Aspose.Words pro .NET",
+        "de": "Aspose.Words für .NET",
+        "el": "Aspose.Words για .NET",
+        "es": "Aspose.Words para .NET",
+        "fa": "Aspose.Words برای .NET",
+        "fr": "Aspose.Words pour .NET",
+        "he": "Aspose.Words עבור .NET",
+        "hi": ".NET के लिए Aspose.Words",
+        "hu": "Aspose.Words .NET-hez",
+        "id": "Aspose.Words untuk .NET",
+        "it": "Aspose.Words per .NET",
+        "ja": ".NET 向け Aspose.Words",
+        "ko": ".NET용 Aspose.Words",
+        "nl": "Aspose.Words voor .NET",
+        "pl": "Aspose.Words dla .NET",
+        "pt": "Aspose.Words para .NET",
+        "ro": "Aspose.Words pentru .NET",
+        "ru": "Aspose.Words для .NET",
+        "sv": "Aspose.Words för .NET",
+        "th": "Aspose.Words สำหรับ .NET",
+        "tr": ".NET için Aspose.Words",
+        "uk": "Aspose.Words для .NET",
+        "vi": "Aspose.Words dành cho .NET",
+        "zh": "Aspose.Words（适用于 .NET）",
+    }
     _LOCALE_RETRY_HINTS = {
-        "ar": (
-            "If the source link label is 'Aspose.Words for .NET', translate "
-            "that link label exactly as 'Aspose.Words لـ .NET'. Preserve the "
-            "product tokens and render the ordinary word 'for' in Arabic."
-        ),
         "cs": (
             "If the source title is 'Spreadsheet Management in Rust with "
             "Aspose.Cells FOSS', translate that title exactly as "
@@ -1091,12 +1113,21 @@ class CampaignRunner:
         if not ordinary:
             return ""
         locale_label = CampaignRunner._target_locale_label(target_lang)
-        return (
+        guidance = (
             "For the affected source link label(s), preserve exactly only these "
             f"identifier/product tokens: {', '.join(protected) if protected else 'none'}. "
             f"Translate all ordinary label words into {locale_label}, including: "
             f"{', '.join(ordinary)}. Do not preserve the complete English label as a title."
         )
+        if "Aspose.Words for .NET" in matched:
+            locale = target_lang.lower().split("-")[0]
+            exact = CampaignRunner._PRODUCT_LINK_LABEL_TRANSLATIONS.get(locale)
+            if exact:
+                guidance += (
+                    " For the exact source label 'Aspose.Words for .NET', use "
+                    f"the governed target label exactly as '{exact}'."
+                )
+        return guidance
 
     @staticmethod
     def _retry_feedback(
