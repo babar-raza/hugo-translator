@@ -4,6 +4,7 @@ from types import SimpleNamespace
 
 from src.translation_engine.segment_translator import (
     _retry_original_frontmatter_value,
+    _restore_required_seo_separator,
     _strict_frontmatter_retry_model_id,
 )
 
@@ -53,3 +54,20 @@ def test_strict_retry_uses_only_the_pinned_profile_field_override():
         )
         == "m2m100_418m"
     )
+
+
+def test_seo_separator_repair_inserts_only_before_existing_product_token():
+    repaired = _restore_required_seo_separator(
+        "seoTitle",
+        "Manage spreadsheets - Aspose.Cells for Rust",
+        "Správa tabulek Aspose.Cells pro Rust",
+    )
+    assert repaired == "Správa tabulek - Aspose.Cells pro Rust"
+
+
+def test_seo_separator_repair_does_not_invent_a_missing_product_token():
+    assert _restore_required_seo_separator(
+        "seoTitle",
+        "Manage spreadsheets - Aspose.Cells for Rust",
+        "Správa tabulek pro Rust",
+    ) == "Správa tabulek pro Rust"

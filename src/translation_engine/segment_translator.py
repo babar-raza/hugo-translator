@@ -129,6 +129,29 @@ def _strict_frontmatter_retry_model_id(
         return default_model_id
 
 
+def _restore_required_seo_separator(
+    field_name: str, source_value: str, translated_value: str
+) -> str:
+    """Restore only a dropped page/product separator in an SEO scalar.
+
+    Gate 40 requires the delimiter when the English SEO field uses one.  This
+    repair is deliberately lossless: it only inserts `` - `` immediately
+    before an Aspose product token which is already present in the model
+    output, so it cannot add prose, a product, or an untranslated suffix.
+    """
+    if field_name not in {"seoTitle", "head_title"} or " - " not in source_value:
+        return translated_value
+    if re.search(r"[|\u2013\u2014\uff5c\uff0d]| - ", translated_value):
+        return translated_value
+    source_left, source_right = source_value.split(" - ", 1)
+    if not source_left.strip() or not re.search(r"\bAspose(?:\.[A-Za-z0-9.]+)?\b", source_right):
+        return translated_value
+    product = re.search(r"\bAspose(?:\.[A-Za-z0-9.]+)?\b", translated_value)
+    if product is None or not translated_value[: product.start()].strip():
+        return translated_value
+    return translated_value[: product.start()].rstrip() + " - " + translated_value[product.start() :]
+
+
 _REVIEWED_IDENTICAL_TRANSLATIONS: dict[str, frozenset[str]] = {
     # "Introduction" is spelled identically in English and French.  This is
     # an exact reviewed equivalence, not an untranslated-unit tolerance.
@@ -1848,7 +1871,9 @@ class SegmentTranslator:
                                 target_lang,
                             )
                         if _result and _result[0]:
-                            _unit.translated_text = _result[0]
+                            _unit.translated_text = _restore_required_seo_separator(
+                                str(_field), str(_original), _result[0]
+                            )
                             stats.llm_units_translated += 1
                 except Exception as _frontmatter_llm_error:
                     # Do not substitute source text: the subsequent gates
