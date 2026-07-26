@@ -416,18 +416,16 @@ class CampaignRunner:
         return sorted(candidates, key=lambda item: item[2])
 
     def recover_committed_receipts(self) -> dict[str, Any]:
-        """Recreate a lost empty ledger by revalidating governed committed bytes.
+        """Recover lost receipts by revalidating governed committed bytes.
 
         This is not an acceptance shortcut: all candidate bytes are kept in
         memory and independently rerun through validation, verification,
-        fidelity, all 44 gates, and placement.  The metadata-only ledger is
-        replaced atomically only after the entire recovery set passes.
+        fidelity, all 44 gates, and placement.  Each all-pass metadata-only
+        receipt is fsynced independently so an outage or later bad candidate
+        cannot erase completed revalidation work; a resumed recovery validates
+        existing receipt hashes before skipping them.
         """
         with FileLock(self.ledger.root / "campaign.lock", timeout=0):
-            if self.ledger.receipts():
-                raise CampaignManifestError(
-                    "receipt recovery requires an empty acceptance ledger"
-                )
             candidates = self._receipt_recovery_candidates()
             if not candidates:
                 raise CampaignManifestError(
@@ -444,6 +442,13 @@ class CampaignRunner:
                 raise CampaignManifestError(
                     "receipt recovery provenance does not cover every existing output"
                 )
+            existing_receipts = self._validated_resume_receipts()
+            unexpected_receipts = set(existing_receipts) - recovered_outputs
+            if unexpected_receipts:
+                raise CampaignManifestError(
+                    "receipt recovery ledger contains outputs without current "
+                    "governed commit provenance"
+                )
 
             self.manifest.verify_environment(
                 translator_repo=self.translator_repo,
@@ -457,9 +462,9 @@ class CampaignRunner:
                 }
             )
 
-            accepted_rows: list[dict[str, Any]] = []
-            accepted_at = datetime.now(timezone.utc).isoformat()
             for source, locale, relative, commit_sha in candidates:
+                if relative in existing_receipts:
+                    continue
                 source_path = self.content_repo / source.source_path
                 output_path = self.content_repo / relative
                 try:
@@ -504,11 +509,9 @@ class CampaignRunner:
                     "mode": "all-gates-byte-revalidation-v1",
                     "commit_sha": commit_sha,
                 }
-                normalized["accepted_at"] = accepted_at
-                normalized["receipt_sha256"] = receipt_fingerprint(normalized)
-                accepted_rows.append(normalized)
+                self.ledger.append_receipt(normalized)
+                existing_receipts[relative] = self.ledger.receipts()[relative]
 
-            self.ledger.replace_receipts(accepted_rows)
             verified = self._validated_resume_receipts()
             if set(verified) != recovered_outputs:
                 raise CampaignManifestError("recovered receipt reconciliation failed")

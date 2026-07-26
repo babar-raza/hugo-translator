@@ -453,6 +453,11 @@ def test_recover_receipts_revalidates_governed_commit_before_atomic_ledger(
     assert "content" not in receipt
     assert output.read_text(encoding="utf-8") == "accepted"
 
+    resumed = runner.recover_committed_receipts()
+
+    assert resumed["accepted"] == 1
+    assert len(engine.calls) == 1
+
 
 def test_recover_receipts_rejects_multifile_governed_commit_without_ledger(
     tmp_path

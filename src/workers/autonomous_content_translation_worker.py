@@ -2364,7 +2364,7 @@ Examples:
         "--recover-committed-receipts",
         action="store_true",
         help=(
-            "Fail-closed recovery for an empty lost ledger: revalidate exact "
+            "Fail-closed recovery for a lost/partial ledger: revalidate exact "
             "one-file governed commit bytes through every zero-defect gate, "
             "then resume"
         ),
