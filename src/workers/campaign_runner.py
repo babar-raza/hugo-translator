@@ -286,6 +286,20 @@ class CampaignRunner:
             for field_name, expected_value in expected_context.items():
                 current_receipt = receipt_migrations.get(output, receipt)
                 if current_receipt.get(field_name) != expected_value:
+                    if field_name == "config_fingerprint":
+                        # A manifest fingerprint may legitimately advance while
+                        # hardening the canary.  Never waive the mismatch: rerun
+                        # all final write gates over the already accepted bytes,
+                        # require an unchanged fixed point, then atomically
+                        # replace receipt metadata with the new fingerprint.
+                        migrated = self._revalidate_accepted_receipt(
+                            current_receipt,
+                            source=source,
+                            locale=locale,
+                            output_path=output,
+                        )
+                        receipt_migrations[output] = migrated
+                        continue
                     source_path = self.content_repo / source.source_path
                     legacy_normalized_source_sha = hashlib.sha256(
                         source_path.read_text(encoding="utf-8").encode("utf-8")
@@ -334,6 +348,84 @@ class CampaignRunner:
                 [receipt_migrations.get(output, receipt) for output, receipt in receipts.items()]
             )
         return valid
+
+    def _revalidate_accepted_receipt(
+        self,
+        receipt: dict[str, Any],
+        *,
+        source: Any,
+        locale: str,
+        output_path: str,
+    ) -> dict[str, Any]:
+        """Reissue metadata only after a byte-identical final-gate rerun.
+
+        This is the only receipt migration allowed for an evolving canary.
+        It never invokes translation, never writes the content file, and fails
+        if any gate changes or auto-cleaning would alter the accepted bytes.
+        """
+        source_path = self.content_repo / source.source_path
+        target_path = self.content_repo / output_path
+        if not source_path.is_file() or not target_path.is_file():
+            raise CampaignManifestError(f"receipt revalidation input missing: {output_path}")
+        if sha256_file(source_path) != source.source_sha256:
+            raise CampaignManifestError(f"receipt revalidation source drift: {output_path}")
+        if sha256_file(target_path) != receipt.get("output_sha256"):
+            raise CampaignManifestError(f"receipt revalidation output drift: {output_path}")
+        try:
+            source_content = source_path.read_text(encoding="utf-8")
+            accepted_content = target_path.read_text(encoding="utf-8")
+            source_doc = self.engine.parser.parse_string(source_content)
+            source_doc.source_path = source_path
+        except (OSError, UnicodeError, ValueError) as exc:
+            raise CampaignManifestError(
+                f"receipt revalidation parse failure: {type(exc).__name__}"
+            ) from exc
+        profile = self.engine.config.get_site_profile(source.site_id)
+        calculated = self.engine._get_output_path(source_path, locale, profile)
+        if calculated.resolve() != target_path.resolve():
+            raise CampaignManifestError(f"receipt revalidation routing mismatch: {output_path}")
+        gate_result = self.engine._write_gate.evaluate_zero_defect(
+            translated_content=accepted_content,
+            source_content=source_content,
+            target_lang=locale,
+            output_path=target_path,
+            source_doc=source_doc,
+            # This is a read-only verification of the same expected output,
+            # not an overwrite authorization.
+            force_overwrite=True,
+            site_profile=profile,
+        )
+        final_content = gate_result.cleaned_content
+        if not gate_result.passed or final_content != accepted_content:
+            raise CampaignManifestError(f"receipt revalidation gates failed: {output_path}")
+        gate_results = {
+            1: {"passed": True, "action": "verification", "error": None},
+            **gate_result.gate_results,
+        }
+        expected_gate_ids = set(range(1, 45))
+        invalid = [
+            gate_id
+            for gate_id, item in gate_results.items()
+            if not isinstance(item, dict)
+            or not item.get("passed", False)
+            or str(item.get("action", "")).lower()
+            in {"warn", "warning", "skip", "skipped", "unavailable", "exception"}
+            or item.get("error") is not None
+        ]
+        if set(gate_results) != expected_gate_ids or invalid:
+            raise CampaignManifestError(f"receipt revalidation not all-pass: {output_path}")
+        migrated = {
+            key: value
+            for key, value in receipt.items()
+            if key not in {"receipt_sha256", "accepted_at"}
+        }
+        migrated["config_fingerprint"] = self.manifest.config_fingerprint
+        migrated["gate_results"] = {str(key): value for key, value in gate_results.items()}
+        # Preserve the original acceptance time: only provenance metadata is
+        # refreshed, content bytes and their original acceptance remain intact.
+        migrated["accepted_at"] = receipt.get("accepted_at")
+        migrated["receipt_sha256"] = receipt_fingerprint(migrated)
+        return migrated
 
     def _append_campaign_receipt(self, receipt: dict[str, Any]) -> None:
         normalized = dict(receipt)
