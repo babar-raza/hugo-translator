@@ -1665,6 +1665,7 @@ class SegmentTranslator:
                                     target_lang,
                                     context_hint=_hint,
                                     file_context=_file_ctx,
+                                    retry_feedback=retry_feedback,
                                 )
                                 if _llm_result and _llm_result[0]:
                                     _llm_unit.translated_text = _llm_result[0]

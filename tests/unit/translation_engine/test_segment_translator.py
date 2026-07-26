@@ -530,6 +530,7 @@ class TestContentTypeRouterLLMPassthrough:
         else:
             llm_backend = MagicMock()
             llm_backend.translate_with_context.return_value = [llm_translation]
+            engine._test_llm_backend = llm_backend
 
             def _load(model_id):
                 if "professionalize_llm" in str(model_id):
@@ -560,7 +561,7 @@ class TestContentTypeRouterLLMPassthrough:
         doc.output_path = None
         return doc, plan, unit
 
-    def _run_translate(self, engine, doc, plan):
+    def _run_translate(self, engine, doc, plan, retry_feedback=None):
         translator = SegmentTranslator(engine)
         site_profile = MagicMock()
         site_profile.default_source_lang = "en"
@@ -589,6 +590,7 @@ class TestContentTypeRouterLLMPassthrough:
                 target_lang="uk",
                 site_profile=site_profile,
                 stats=MagicMock(),
+                retry_feedback=retry_feedback,
             )
 
     def test_llm_down_sets_english_passthrough(self):
@@ -617,6 +619,21 @@ class TestContentTypeRouterLLMPassthrough:
         assert not (unit.metadata or {}).get(
             "llm_passthrough_reason"
         ), "No passthrough metadata expected when LLM succeeds"
+
+    def test_ast_routed_unit_receives_retry_feedback(self):
+        engine = self._make_engine(llm_raises=False, llm_translation="हिंदी विवरण")
+        doc, plan, _unit = self._make_doc_and_unit("Gets the width.")
+
+        self._run_translate(
+            engine,
+            doc,
+            plan,
+            retry_feedback="Translate every ordinary word into hi.",
+        )
+
+        kwargs = engine._test_llm_backend.translate_with_context.call_args.kwargs
+        assert kwargs["context_hint"] == "api_property_description"
+        assert kwargs["retry_feedback"] == "Translate every ordinary word into hi."
 
 
 # ---------------------------------------------------------------------------
