@@ -214,6 +214,13 @@ class CampaignRunner:
         "zh": "Chinese Han characters",
     }
     _LOCALE_RETRY_HINTS = {
+        "cs": (
+            "If the source title is 'Spreadsheet Management in Rust with "
+            "Aspose.Cells FOSS', translate that title exactly as "
+            "'Řízení tabulek v jazyce Rust s Aspose.Cells FOSS'. This wording "
+            "is idiomatic Czech and supplies an unambiguous Czech language "
+            "signal; do not use a Czech/Slovak-neutral paraphrase."
+        ),
         "nl": (
             "For a short Dutch technical title, translate the source phrase "
             "'Deep Dive' idiomatically as 'Een grondige analyse van'. "

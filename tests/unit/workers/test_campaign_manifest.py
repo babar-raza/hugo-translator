@@ -867,6 +867,34 @@ def test_dutch_language_retry_uses_unambiguous_idiomatic_title(tmp_path):
     assert "Dutch (nl)" in feedback
 
 
+def test_czech_language_retry_uses_unambiguous_czech_title(tmp_path):
+    source = tmp_path / "index.md"
+    source.write_text(
+        "---\n"
+        "title: Spreadsheet Management in Rust with Aspose.Cells FOSS\n"
+        "---\n",
+        encoding="utf-8",
+    )
+    failure = {
+        "gate": "verification:language_detection",
+        "reason": (
+            "translation_rejected; verification_checks=language_detection; "
+            "verification_fingerprints=language_detection:error:abc:"
+            "field=title:confidence=0.999995"
+        ),
+    }
+
+    feedback = CampaignRunner._retry_feedback_from_failure(
+        failure,
+        "cs",
+        source_path=source,
+    )
+
+    assert "Řízení tabulek v jazyce Rust s Aspose.Cells FOSS" in feedback
+    assert "Czech/Slovak-neutral" in feedback
+    assert "Czech (cs)" in feedback
+
+
 def test_failure_metadata_extracts_exception_class_without_candidate_text():
     result = SimpleNamespace(
         errors=["rejected"],
