@@ -504,6 +504,61 @@ def test_frontmatter_feedback_has_source_derived_protection_boundary(tmp_path):
     assert "formulas" in feedback
 
 
+def test_sas_link_feedback_resolves_source_hash_to_lexical_boundary(tmp_path):
+    source = tmp_path / "index.md"
+    label = "Aspose.Cells — Enterprise Blog"
+    source.write_text(
+        f"Read [{label}](https://blog.aspose.com/) for more.\n",
+        encoding="utf-8",
+    )
+    fingerprint = hashlib.sha256(label.encode("utf-8")).hexdigest()[:16]
+    result = SimpleNamespace(
+        validation_result=SimpleNamespace(issues=[]),
+        error=(
+            "TC-SAS-01: same-as-source; "
+            f"unit_fingerprints=link_text:{fingerprint}:{len(label)}"
+        ),
+    )
+
+    feedback = CampaignRunner._retry_feedback(
+        result,
+        "nl",
+        source_path=source,
+    )
+
+    assert "affected source link label" in feedback
+    assert "Aspose.Cells" in feedback
+    assert "Enterprise, Blog" in feedback
+    assert "Translate all ordinary label words into nl" in feedback
+
+
+def test_sas_link_feedback_rehydrates_from_metadata_only_failure(tmp_path):
+    source = tmp_path / "index.md"
+    label = "Aspose.Cells — Enterprise Blog"
+    source.write_text(
+        f"[{label}](https://blog.aspose.com/)\n",
+        encoding="utf-8",
+    )
+    fingerprint = hashlib.sha256(label.encode("utf-8")).hexdigest()[:16]
+    failure = {
+        "gate": "TC-SAS-01",
+        "reason": (
+            "translation_rejected; codes=TC-SAS-01; "
+            f"unit_fingerprints=link_text:{fingerprint}:{len(label)}; "
+            "error_sha256=abc"
+        ),
+    }
+
+    feedback = CampaignRunner._retry_feedback_from_failure(
+        failure,
+        "nl",
+        source_path=source,
+    )
+
+    assert "Aspose.Cells" in feedback
+    assert "Enterprise, Blog" in feedback
+
+
 def test_failure_metadata_extracts_safe_gate_score_without_candidate_text():
     result = SimpleNamespace(
         errors=[],

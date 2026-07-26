@@ -724,6 +724,74 @@ class CampaignRunner:
         )
 
     @staticmethod
+    def _sas_link_source_guidance(
+        source_path: Path | None, raw_error: str, target_lang: str
+    ) -> str:
+        """Resolve hashed same-as-source link units to source-only lexical guidance."""
+        if source_path is None or not source_path.is_file():
+            return ""
+        fingerprint_match = re.search(
+            r"\bunit_fingerprints=([a-z0-9_:,-]+)\b", raw_error
+        )
+        if not fingerprint_match:
+            return ""
+        requested = {
+            (digest, int(length))
+            for digest, length in re.findall(
+                r"(?:^|,)link_text:([a-f0-9]{16}):(\d+)",
+                fingerprint_match.group(1),
+            )
+        }
+        if not requested:
+            return ""
+        try:
+            source_text = source_path.read_text(encoding="utf-8")
+        except (OSError, UnicodeError):
+            return ""
+
+        labels = re.findall(r"\[([^\]\r\n]+)\]\([^)]+\)", source_text)
+        matched = [
+            label
+            for label in labels
+            if (
+                hashlib.sha256(label.encode("utf-8")).hexdigest()[:16],
+                len(label),
+            )
+            in requested
+        ]
+        if not matched:
+            return ""
+
+        known_protected = {
+            "FOSS",
+            "Rust",
+            "Python",
+            "Java",
+            "Microsoft",
+            "Office",
+        }
+        protected: list[str] = []
+        ordinary: list[str] = []
+        for token in re.findall(r"[A-Za-z][A-Za-z0-9_.+#-]*", " ".join(matched)):
+            is_identifier = (
+                "." in token
+                or token.isupper()
+                or bool(re.search(r"[a-z][A-Z]", token))
+                or token in known_protected
+            )
+            target = protected if is_identifier else ordinary
+            if token not in target:
+                target.append(token)
+        if not ordinary:
+            return ""
+        return (
+            "For the affected source link label(s), preserve exactly only these "
+            f"identifier/product tokens: {', '.join(protected) if protected else 'none'}. "
+            f"Translate all ordinary label words into {target_lang}, including: "
+            f"{', '.join(ordinary)}. Do not preserve the complete English label as a title."
+        )
+
+    @staticmethod
     def _retry_feedback(
         result: Any,
         target_lang: str,
@@ -773,6 +841,11 @@ class CampaignRunner:
                 "Translate every translatable source unit; identical output is allowed only for "
                 "product names, API identifiers, and reviewed locale cognates."
             )
+            source_guidance = CampaignRunner._sas_link_source_guidance(
+                source_path, raw_error, target_lang
+            )
+            if source_guidance:
+                instructions.append(source_guidance)
         verification_result = getattr(result, "verification_result", None)
         failed_checks = sorted(
             {
