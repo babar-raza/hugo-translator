@@ -286,6 +286,62 @@ class TestL2PersistentTM:
             # Verify gone
             assert tm.exact_lookup("site1", "en", "es", "Hello") is None
 
+    def test_delete_namespace_removes_scoped_entries_only(self, temp_db: Path) -> None:
+        with L2PersistentTM(temp_db, max_size_mb=20) as tm:
+            tm.store(
+                "campaign-source-a",
+                "en",
+                "es",
+                "First",
+                "Primero",
+                context="frontmatter.title",
+                field_name="title",
+            )
+            tm.store(
+                "campaign-source-a",
+                "en",
+                "es",
+                "Second",
+                "Segundo",
+                context="body.0",
+            )
+            tm.store(
+                "campaign-source-a",
+                "en",
+                "fr",
+                "First",
+                "Premier",
+                context="frontmatter.title",
+                field_name="title",
+            )
+            tm.store("other-source", "en", "es", "First", "Primero")
+
+            removed = tm.delete_namespace(
+                site_id="campaign-source-a",
+                src_lang="en",
+                tgt_lang="es",
+            )
+
+            assert removed == 2
+            assert tm.exact_lookup(
+                "campaign-source-a",
+                "en",
+                "es",
+                "First",
+                field_name="title",
+                context="frontmatter.title",
+            ) is None
+            assert tm.exact_lookup(
+                "campaign-source-a", "en", "fr", "First",
+                field_name="title", context="frontmatter.title",
+            ) is not None
+            assert tm.exact_lookup("other-source", "en", "es", "First") is not None
+
+    def test_delete_namespace_requires_exact_nonempty_namespace(self, temp_db: Path) -> None:
+        with L2PersistentTM(temp_db, max_size_mb=20) as tm:
+            with pytest.raises(ValueError, match="exact site_id"):
+                tm.delete_namespace(site_id="", tgt_lang="es")
+
     def test_count(self, temp_db: Path) -> None:
         """Test entry counting."""
         with L2PersistentTM(temp_db, max_size_mb=20) as tm:

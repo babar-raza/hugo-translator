@@ -4,6 +4,7 @@ L2 Persistent Translation Memory using LMDB.
 Durable key-value store for exact translation matches across sessions.
 """
 
+import hashlib
 import json
 import logging
 import threading
@@ -571,6 +572,55 @@ class L2PersistentTM:
         with self._lock:
             with self.env.begin(write=True) as txn:
                 return txn.delete(key.encode("utf-8"))
+
+    def delete_namespace(
+        self,
+        *,
+        site_id: str,
+        src_lang: str | None = None,
+        tgt_lang: str | None = None,
+    ) -> int:
+        """Atomically remove every entry in an exact governed namespace.
+
+        Matching uses only entry metadata; translation payloads are never
+        returned or logged.  This is intended for invalidating a campaign
+        source/locale namespace after its previously accepted output loses
+        acceptance under a hardened policy.
+        """
+        if not site_id:
+            raise ValueError("delete_namespace requires an exact site_id")
+        keys: list[bytes] = []
+        with self._lock:
+            with self.env.begin() as txn:
+                cursor = txn.cursor()
+                for key, value in cursor:
+                    try:
+                        entry = json.loads(value.decode("utf-8"))
+                    except Exception as exc:
+                        raise RuntimeError(
+                            "refusing namespace deletion with an unreadable TM entry"
+                        ) from exc
+                    if entry.get("site_id") != site_id:
+                        continue
+                    if src_lang is not None and entry.get("src_lang") != src_lang:
+                        continue
+                    if tgt_lang is not None and entry.get("tgt_lang") != tgt_lang:
+                        continue
+                    keys.append(bytes(key))
+            if not keys:
+                return 0
+            with self.env.begin(write=True) as txn:
+                removed = sum(1 for key in keys if txn.delete(key))
+                if removed != len(keys):
+                    raise RuntimeError(
+                        "TM namespace deletion count changed during atomic removal"
+                    )
+        logger.warning(
+            "Deleted %d L2 entries from exact namespace hash=%s",
+            len(keys),
+            hashlib.sha256(site_id.encode("utf-8")).hexdigest()[:16],
+        )
+        return len(keys)
 
     def count(self) -> int:
         """
