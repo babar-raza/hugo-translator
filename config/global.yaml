@@ -661,6 +661,8 @@ translation_engine:
       summary: m2m100_418m
       de:
         title: nllb_200_1.3b
+      id:
+        title: nllb_200_1.3b
 
   max_batch_purity_failure_rate: 0.10  # Block write if >10% of batches fail language purity checks
 

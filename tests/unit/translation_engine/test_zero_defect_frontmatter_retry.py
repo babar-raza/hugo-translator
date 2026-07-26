@@ -69,6 +69,7 @@ def test_strict_retry_uses_only_the_pinned_profile_field_override():
                 "blog.aspose.org": {
                     "title": "m2m100_418m",
                     "de": {"title": "nllb_200_1.3b"},
+                    "id": {"title": "nllb_200_1.3b"},
                 }
             }
         }
@@ -76,6 +77,12 @@ def test_strict_retry_uses_only_the_pinned_profile_field_override():
     assert (
         _strict_frontmatter_retry_model_id(
             engine, "blog.aspose.org", "de", "title", "m2m100_418m", "retry"
+        )
+        == "nllb_200_1.3b"
+    )
+    assert (
+        _strict_frontmatter_retry_model_id(
+            engine, "blog.aspose.org", "id", "title", "m2m100_418m", "retry"
         )
         == "nllb_200_1.3b"
     )
