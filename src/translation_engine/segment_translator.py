@@ -106,6 +106,7 @@ def _retry_original_frontmatter_value(
 def _strict_frontmatter_retry_model_id(
     engine: Any,
     site_id: str,
+    target_lang: str,
     field_name: str,
     default_model_id: str,
     retry_feedback: str | None,
@@ -123,7 +124,8 @@ def _strict_frontmatter_retry_model_id(
         config = engine.config.get_config().get("translation_engine", {})
         overrides = config.get("zero_defect_frontmatter_retry_models", {})
         site_overrides = overrides.get(site_id, {})
-        configured = site_overrides.get(field_name)
+        locale_overrides = site_overrides.get(target_lang, {})
+        configured = locale_overrides.get(field_name) or site_overrides.get(field_name)
         return str(configured) if configured else default_model_id
     except Exception:
         return default_model_id
@@ -1849,6 +1851,7 @@ class SegmentTranslator:
                         _field_model_id = _strict_frontmatter_retry_model_id(
                             engine,
                             str(getattr(site_profile, "site_id", "")),
+                            target_lang,
                             str(_field),
                             model_id,
                             retry_feedback,
