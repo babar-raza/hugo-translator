@@ -148,33 +148,49 @@ def _git_fingerprint(path: Path) -> dict[str, object]:
             ["git", "rev-parse", "HEAD"], cwd=path, capture_output=True,
             text=True, timeout=5, check=True,
         ).stdout.strip()
+    except Exception as exc:
+        return {"sha": None, "dirty": None, "error": type(exc).__name__}
+    try:
         dirty = bool(subprocess.run(
             ["git", "status", "--porcelain"], cwd=path, capture_output=True,
             text=True, timeout=5, check=True,
         ).stdout.strip())
         return {"sha": sha, "dirty": dirty}
     except Exception as exc:
-        return {"sha": None, "dirty": None, "error": type(exc).__name__}
+        # A large live content checkout can make status exceed the bounded
+        # collection time. Its immutable revision remains useful evidence;
+        # report only dirty-state uncertainty instead of discarding it.
+        return {"sha": sha, "dirty": None, "status_error": type(exc).__name__}
 
 
 def audit_run_metadata(sites: list[str] | None = None) -> dict[str, object]:
     """Metadata companion to JSONL: exact inputs without changing its schema."""
+    resolved_sites = sorted(sites if sites is not None else SITES)
     config_files = sorted((_PROJECT_ROOT / "config").rglob("*.yaml"))
     config_digest = hashlib.sha256()
     for path in config_files:
         config_digest.update(str(path.relative_to(_PROJECT_ROOT)).encode("utf-8"))
         config_digest.update(path.read_bytes())
     model_path = _PROJECT_ROOT / "data" / "models" / "fasttext" / "lid.176.bin"
+    content_roots: dict[str, object] = {}
+    for site in resolved_sites:
+        try:
+            profile = _CONFIG.get_site_profile(site)
+            root = _CONFIG.resolve_content_root(profile.content_roots[0])
+            content_roots[site] = {"path": str(root), "repository": _git_fingerprint(root)}
+        except Exception as exc:
+            content_roots[site] = {"path": None, "repository": {"error": type(exc).__name__}}
     return {
         "schema": "audit_all_content_run_metadata/v1",
         "generated_at": datetime.now().isoformat(timespec="seconds"),
-        "sites": sorted(sites if sites is not None else SITES),
+        "sites": resolved_sites,
         "purity_thresholds": {
             lang: get_purity_threshold(lang)
             for lang in sorted(NON_LATIN)
         },
         "config_sha256": config_digest.hexdigest(),
         "audit_repository": _git_fingerprint(_PROJECT_ROOT),
+        "content_repositories": content_roots,
         "fasttext_model": {
             "path": str(model_path),
             "sha256": _sha256_file(model_path),

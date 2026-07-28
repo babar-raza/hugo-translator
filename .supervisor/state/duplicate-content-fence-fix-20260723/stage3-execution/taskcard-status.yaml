@@ -4,6 +4,85 @@ continuation_state: .supervisor/state/duplicate-content-fence-fix-20260723/conti
 plan_path: C:/Users/prora/.claude/plans/this-surfaced-something-more-witty-bear.md
 plan_status: ACTIVE_CONTINUATION_2026-07-25
 taskcards:
+  - taskcard_id: TC-DCF-018
+    title: Reopen the bound mission and reconcile the post-pilot contradiction
+    status: COMPLETED
+    lane_owner: this-session
+    objective: Amend the authoritative plan and ledger in place after pilot evidence disproved terminal closure.
+    allowed_paths: ["C:/Users/prora/.claude/plans/this-surfaced-something-more-witty-bear.md", .supervisor/state/duplicate-content-fence-fix-20260723/**]
+    dependencies: [TC-DCF-017]
+    acceptance_checks: ["previous plan hash recorded", "no competing mission created", "all v2 gaps have task ownership"]
+    verification: ["Get-FileHash authoritative plan", "ledger review"]
+    evidence: stage3-execution/evidence/20260725-code-fence-durable-fix/reopen-v2.md
+  - taskcard_id: TC-DCF-019
+    title: Align audit code-fence reporting with live Gate 26
+    status: COMPLETED
+    lane_owner: this-session
+    objective: Remove stale audit tolerance and report strict Gate 26 decisions as code_fence_dropped.
+    allowed_paths: [scripts/quality/audit_all_content.py, tests/unit/quality/test_audit_all_content_registry_gates.py, tests/unit/quality/test_audit_all_content_gate26.py, .supervisor/state/duplicate-content-fence-fix-20260723/**]
+    dependencies: [TC-DCF-018]
+    acceptance_checks: ["two-fence loss reported", "odd and reopen shapes agree with Gate 26", "no duplicate Gate 26 record"]
+    verification: ["focused pytest", "isolated scan pilot"]
+    evidence: stage3-execution/evidence/20260725-code-fence-durable-fix/v2-gate26/
+    completion_evidence: "Gate 26 registry-sweep tests and actual docs pilot record src=8/tgt=6 as one code_fence_dropped JSONL issue."
+  - taskcard_id: TC-DCF-020
+    title: Migrate remaining fence-vulnerable audit consumers
+    status: COMPLETED
+    lane_owner: this-session
+    objective: Exclude canonical code regions in artifact, shortcode, EU, and link-path detectors; verify concurrent inline-code primitive behavior without overwriting it.
+    allowed_paths: [scripts/quality/audit_all_content.py, tests/unit/quality/test_audit_all_content_code_regions.py, tests/unit/quality/test_audit_all_content_inline_code.py, .supervisor/state/duplicate-content-fence-fix-20260723/**]
+    dependencies: [TC-DCF-019]
+    acceptance_checks: ["each detector has code-only negative and prose-positive coverage", "inline-code ownership remains intact"]
+    verification: ["focused pytest", "per-detector same-input comparison"]
+    evidence: stage3-execution/evidence/20260725-code-fence-durable-fix/v2-consumer-sweep/
+    completion_evidence: "Focused code-only versus prose tests passed for artifact, shortcode, EU, and link-path checks; inline-code shared primitive was preserved."
+  - taskcard_id: TC-DCF-021
+    title: Align purity configuration and audit reproducibility fingerprint
+    status: COMPLETED
+    lane_owner: this-session
+    objective: Use live purity thresholds and emit resolved config/repository/model fingerprints without mutating production data.
+    allowed_paths: [scripts/quality/audit_all_content.py, tests/unit/quality/test_audit_all_content_reproducibility.py, .supervisor/state/duplicate-content-fence-fix-20260723/**]
+    dependencies: [TC-DCF-020]
+    acceptance_checks: ["default and override thresholds match live gate", "fingerprint reflects actual config and model", "JSONL remains consumable"]
+    verification: ["focused pytest", "CLI metadata inspection"]
+    evidence: stage3-execution/evidence/20260725-code-fence-durable-fix/v2-reproducibility/
+    completion_evidence: "Purity threshold and BOM-free metadata tests passed; sidecar records config, audit repo, content-root identity-or-error, and FastText hash."
+  - taskcard_id: TC-DCF-022
+    title: Complete comparison, adversarial review, and closure decision
+    status: COMPLETED_VERIFIED
+    lane_owner: this-session (resumed 2026-07-27)
+    objective: Re-run pilots and a same-read corpus comparison; classify all deltas and challenge the completed scope.
+    allowed_paths: [.supervisor/state/duplicate-content-fence-fix-20260723/**]
+    dependencies: [TC-DCF-021]
+    acceptance_checks: ["logs, JSONL, hashes, errors, skips, and retries compared", "new-only findings inspected", "review verdict recorded"]
+    verification: ["read-only corpus comparison", "focused suite", "independent review"]
+    evidence: stage3-execution/evidence/20260725-code-fence-durable-fix/v2-final/TC-DCF-022-closure-20260727.md
+    resolved_blocking_condition: >
+      2026-07-25's blocking condition ("non-selective same-read full-corpus
+      comparator exceeded the platform's fixed ten-minute foreground command
+      cap twice") was resolved 2026-07-27 by launching the comparator as a
+      detached background process (nohup + disown) and polling for
+      completion out-of-band, rather than blocking a single foreground call
+      on it. Two runs were needed: the first surfaced a real bug in the
+      comparator itself (see completion_evidence) that had to be fixed
+      before its result could be trusted.
+    independent_review: ACCEPTED_V2_SCOPE
+    completion_evidence: >
+      136,690-pair non-selective full-corpus comparison completed in 984.6s
+      (second, corrected run). All six checks: three zero-delta
+      (artifact_corruption, eu_hallucination, link_path_corrupted), one clean
+      monotonic improvement (shortcode_leak: 108 new-only/0 old-only), two
+      with deltas fully reconciled (code_fence_dropped: 4,174 new-only/0
+      old-only; purity_issue: 463 new-only/3 old-only, the 3 explained by
+      the existing bg=0.15 purity_threshold_override). A real defect was
+      found and fixed in the comparator script itself during disposition
+      (compare_v2_detectors_full_corpus.py's code_fence_dropped branch was
+      double-stripping frontmatter before calling _gate_fence_parity,
+      producing a false 85-file old_only regression signal on the first
+      run) -- confirmed via two independent real-code checks that the
+      production detection code was never affected, only this verification
+      script. See TC-DCF-022-closure-20260727.md for full detail, spot-check
+      evidence, and the corrected vs. buggy JSON artifacts.
   - taskcard_id: TC-DCF-010
     title: Reopen the existing mission and capture an isolated preflight baseline
     status: COMPLETED
@@ -79,33 +158,57 @@ taskcards:
     closure_conditions: ["evidence complete", "independent review accepted", "continuation state terminal"]
     completion_evidence: "Independent reviewer accepted the exact cached diff and independently reran the 36-test focused suite."
   - taskcard_id: AUD-FENCE-SWEEP-001
-    title: Migrate the remaining five confirmed-vulnerable audit checks
-    status: DEFERRED_SUCCESSOR_NOT_ELIGIBLE_IN_THIS_MISSION
-    lane_owner: future dedicated mission
-    objective: Move artifact_corruption, shortcode_leak, eu_hallucination, inline_code_translated, and link_path_corrupted to the canonical code-region primitive with an individual real-corpus old-vs-new proof for each.
+    title: Migrate the one remaining confirmed-vulnerable audit check (inline_code_translated)
+    status: NARROWED_2026-07-27_FOUR_OF_FIVE_COMPLETED_IN_TC-DCF-020
+    lane_owner: future dedicated mission (only if the owning concurrent effort has not already covered it)
+    objective: >
+      Originally scoped to five checks (artifact_corruption, shortcode_leak,
+      eu_hallucination, inline_code_translated, link_path_corrupted). Verified
+      2026-07-27: TC-DCF-020 migrated four of the five
+      (artifact_corruption/shortcode_leak/eu_hallucination/link_path_corrupted)
+      onto the canonical code-region primitive, with committed regression
+      coverage in tests/unit/quality/test_audit_all_content_code_regions.py
+      (independently rerun 2026-07-27: passes). Only inline_code_translated
+      remains un-migrated here, by deliberate scope decision -- it is owned by
+      a separate, concurrent shared-primitive effort
+      (tests/unit/quality/test_audit_all_content_inline_code.py verifies this
+      mission did not regress it, not that it was migrated here). A successor
+      should first confirm whether that concurrent effort already covers it
+      before doing new work.
     allowed_paths: ["to be scoped by successor"]
     forbidden_paths: ["current continuation's implementation scope"]
-    dependencies: [TC-DCF-014]
-    expected_outputs: ["five verified migrations", "per-check reconciliation"]
-    acceptance_checks: ["each check has a separate comparison and regression coverage"]
+    dependencies: [TC-DCF-014, TC-DCF-020]
+    expected_outputs: ["one verified migration (inline_code_translated) or a written disposition that it is already covered elsewhere"]
+    acceptance_checks: ["inline_code_translated has a real-corpus old-vs-new comparison and regression coverage, or a documented reason it is out of scope"]
     verification: ["successor-defined"]
-    evidence: "successor mission"
+    evidence: "successor mission; four-of-five completion evidence backfilled at stage3-execution/evidence/20260725-code-fence-durable-fix/v2-consumer-sweep/evidence-backfill-20260727.md"
     recovery: "Do not bundle this sweep into detector-hardening closeout."
-    closure_conditions: ["explicitly excluded by the governing plan's Phase 3"]
+    closure_conditions: ["four of five explicitly completed in TC-DCF-020; only inline_code_translated remains, scoped to a successor only if not already covered"]
   - taskcard_id: AUD-AUDIT-REPRO-001
     title: Align audit observability with live gates and add reproducibility fingerprints
-    status: DEFERRED_SUCCESSOR_NOT_ELIGIBLE_IN_THIS_MISSION
-    lane_owner: future dedicated mission
-    objective: Align purity/fence audit reporting with live configuration, emit config and repository fingerprints, and record the FastText model hash.
-    allowed_paths: ["to be scoped by successor"]
-    forbidden_paths: ["current continuation's implementation scope"]
+    status: SUPERSEDED_COMPLETED_BY_TC-DCF-019_AND_TC-DCF-021
+    lane_owner: n/a -- delivered in this mission's v2 continuation
+    objective: >
+      Fully delivered 2026-07-27 verification, not deferred: TC-DCF-019
+      aligned audit code_fence_dropped reporting with live Gate 26 (strict,
+      zero-tolerance parity, replacing the stale Gate-19-era tolerance);
+      TC-DCF-021 made check_purity use live threshold semantics (6% default
+      plus per-language overrides matching the write gate) and added an
+      audit_run_metadata() sidecar recording resolved config SHA-256, this
+      repo's and each content root's git fingerprint, and the cached FastText
+      model's SHA-256. Independently reverified 2026-07-27: both are present
+      in the working tree and their regression tests
+      (test_audit_all_content_gate26.py, test_audit_all_content_registry_gates.py,
+      test_audit_all_content_reproducibility.py) pass.
+    allowed_paths: ["n/a -- closed"]
+    forbidden_paths: []
     dependencies: [TC-DCF-014]
     expected_outputs: ["observable threshold/config divergence", "reproducible audit header"]
     acceptance_checks: ["live gate thresholds are visible in audit output"]
-    verification: ["successor-defined"]
-    evidence: "successor mission"
+    verification: ["tests/unit/quality/test_audit_all_content_gate26.py", "tests/unit/quality/test_audit_all_content_registry_gates.py", "tests/unit/quality/test_audit_all_content_reproducibility.py"]
+    evidence: "stage3-execution/evidence/20260725-code-fence-durable-fix/v2-gate26/; stage3-execution/evidence/20260725-code-fence-durable-fix/v2-reproducibility/evidence-backfill-20260727.md"
     recovery: "Keep distinct tool definitions explicit; do not force threshold uniformity."
-    closure_conditions: ["explicitly excluded by the governing plan's Phase 4"]
+    closure_conditions: ["delivered by TC-DCF-019 and TC-DCF-021; no successor mission required"]
   - taskcard_id: TC-DCF-017
     title: Post-closure end-to-end audit pilot and historical comparison
     status: COMPLETED

@@ -1,0 +1,31 @@
+{
+  "audit_repository": {
+    "dirty": true,
+    "sha": "3599a45aae8ff881e276422de358bb40af6100ae"
+  },
+  "config_sha256": "1f1dabbc85308fd690d5e82240a9cd4167b5bca180a20cb6a81e1e239573d701",
+  "fasttext_model": {
+    "path": "C:\\Users\\prora\\OneDrive\\Documents\\GitHub\\hugo-translator\\data\\models\\fasttext\\lid.176.bin",
+    "sha256": "7e69ec5451bc261cc7844e49e4792a85d7f09c06789ec800fc4a44aec362764e"
+  },
+  "generated_at": "2026-07-25T21:57:11",
+  "purity_thresholds": {
+    "ar": 0.06,
+    "bg": 0.15,
+    "el": 0.06,
+    "fa": 0.06,
+    "he": 0.06,
+    "hi": 0.06,
+    "ja": 0.06,
+    "ko": 0.06,
+    "ru": 0.06,
+    "th": 0.06,
+    "uk": 0.06,
+    "vi": 0.06,
+    "zh": 0.06
+  },
+  "schema": "audit_all_content_run_metadata/v1",
+  "sites": [
+    "docs.aspose.org"
+  ]
+}

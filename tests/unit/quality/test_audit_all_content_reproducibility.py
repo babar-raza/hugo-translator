@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import subprocess
 
 from scripts.quality import audit_all_content as aac
 from src.translation_engine.write_gate import WriteGateEvaluator
@@ -22,6 +23,12 @@ def test_metadata_contains_resolved_inputs_and_model_hash_field(tmp_path):
     assert metadata["sites"] == ["docs.aspose.org"]
     assert len(metadata["config_sha256"]) == 64
     assert metadata["audit_repository"]["sha"]
+    content_repo = metadata["content_repositories"]["docs.aspose.org"]["repository"]
+    # A configured content root can be an isolated pilot directory or a
+    # non-Git mounted checkout. The metadata must expose that limitation
+    # explicitly rather than inventing a revision.
+    assert "sha" in content_repo
+    assert "dirty" in content_repo
     assert "sha256" in metadata["fasttext_model"]
 
 
@@ -32,3 +39,15 @@ def test_default_threshold_surfaces_a_ten_percent_purity_issue_but_lt_override_d
     )
     assert aac.check_purity(translated, "ar")[0] is True
     assert aac.check_purity(translated, "lt")[0] is False
+
+
+def test_content_sha_survives_a_bounded_dirty_status_timeout(monkeypatch, tmp_path):
+    def fake_run(args, **_kwargs):
+        if args[1] == "rev-parse":
+            return subprocess.CompletedProcess(args, 0, stdout="known-sha\n", stderr="")
+        raise subprocess.TimeoutExpired(args, 5)
+
+    monkeypatch.setattr(aac.subprocess, "run", fake_run)
+    assert aac._git_fingerprint(tmp_path) == {
+        "sha": "known-sha", "dirty": None, "status_error": "TimeoutExpired"
+    }

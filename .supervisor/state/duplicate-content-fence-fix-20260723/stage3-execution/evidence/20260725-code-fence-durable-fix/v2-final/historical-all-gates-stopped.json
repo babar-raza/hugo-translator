@@ -1,0 +1,5 @@
+﻿{
+    "pid":  67324,
+    "reason":  "All-gate historical scan did not complete within the bounded comparison window; replaced by a same-read full-corpus comparator for every v2-changed detector.",
+    "stopped_at":  "2026-07-25T22:20:23.1687071+05:00"
+}
