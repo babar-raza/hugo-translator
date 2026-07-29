@@ -22,6 +22,7 @@ def _mock_worker_infra():
     with (
         patch("src.tm.l2_persistent.L2PersistentTM") as mock_l2,
         patch("src.workers.worker_state.acquire_pid_file", return_value=True),
+        patch("shutil.disk_usage", return_value=(100, 50, 50)),
     ):
         mock_l2.return_value.get_stats.return_value = {
             "used_mb": 0.0,

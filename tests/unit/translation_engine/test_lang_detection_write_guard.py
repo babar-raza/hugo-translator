@@ -51,15 +51,31 @@ class TestChineseTechnicalFrontmatter:
         )
 
     def test_frontmatter_gate_keeps_english_ordinary_prose_blocking(self):
-        content = (
-            "---\n" "title: Spreadsheet Management with Aspose.Cells FOSS in Rust 中文\n" "---\n"
-        )
+        content = "---\ntitle: Spreadsheet Management with Aspose.Cells FOSS in Rust 中文\n---\n"
 
         issues = _make_engine()._check_frontmatter_language(content, "zh")
 
         assert len(issues) == 1
         assert issues[0].validator == "FrontmatterLanguageCheck"
         assert issues[0].details["expected_lang"] == "zh"
+
+
+class TestLatinTechnicalFrontmatter:
+    """Governed technical tokens must not outvote translated Latin prose."""
+
+    def test_accepts_strong_italian_ordinary_prose_signal(self):
+        content = "---\ntitle: 'Approfondimento: il CSSOM in Python'\n---\n"
+
+        assert _make_engine()._check_frontmatter_language(content, "it") == []
+
+    def test_keeps_untranslated_english_ordinary_prose_blocking(self):
+        content = "---\ntitle: 'Deep Dive: The CSSOM in Python'\n---\n"
+
+        issues = _make_engine()._check_frontmatter_language(content, "it")
+
+        assert len(issues) == 1
+        assert issues[0].validator == "FrontmatterLanguageCheck"
+        assert issues[0].details["detected_lang"] == "en"
 
 
 class TestDetectorNoneBlocksWrite:

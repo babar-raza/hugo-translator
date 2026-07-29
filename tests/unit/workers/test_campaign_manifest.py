@@ -18,6 +18,7 @@ from src.workers.campaign_manifest import (
     sha256_file,
 )
 from src.workers.campaign_runner import CampaignLedger, CampaignRunner
+from src.translation_engine.models import AcceptedTranslation
 
 
 def _manifest(tmp_path: Path) -> dict:
@@ -117,9 +118,7 @@ def test_dirty_snapshot_excludes_receipted_output_and_detects_user_change(tmp_pa
     fingerprint = dirty_snapshot_fingerprint(baseline)
 
     unrelated.write_text("changed", encoding="utf-8")
-    assert dirty_path_fingerprints(
-        tmp_path, exclude_paths={"content/page.es.md"}
-    ) != baseline
+    assert dirty_path_fingerprints(tmp_path, exclude_paths={"content/page.es.md"}) != baseline
     assert dirty_snapshot_fingerprint(baseline) == fingerprint
 
 
@@ -139,7 +138,9 @@ def test_verify_environment_preserves_frozen_dirty_destination(tmp_path):
     for repo in (content_repo, translator_repo):
         repo.mkdir()
         subprocess.run(["git", "init", "-b", "pilot"], cwd=repo, check=True)
-        subprocess.run(["git", "config", "user.email", "test@example.invalid"], cwd=repo, check=True)
+        subprocess.run(
+            ["git", "config", "user.email", "test@example.invalid"], cwd=repo, check=True
+        )
         subprocess.run(["git", "config", "user.name", "Test"], cwd=repo, check=True)
 
     source = content_repo / "content/docs.aspose.org/en/words/net/page.md"
@@ -165,7 +166,11 @@ def test_verify_environment_preserves_frozen_dirty_destination(tmp_path):
         ["git", "rev-parse", "HEAD"], cwd=content_repo, check=True, capture_output=True, text=True
     ).stdout.strip()
     payload["translator_repo_sha"] = subprocess.run(
-        ["git", "rev-parse", "HEAD"], cwd=translator_repo, check=True, capture_output=True, text=True
+        ["git", "rev-parse", "HEAD"],
+        cwd=translator_repo,
+        check=True,
+        capture_output=True,
+        text=True,
     ).stdout.strip()
     payload["model_fingerprints"] = {"model_registry": sha256_file(registry)}
     payload["sources"][0]["source_sha256"] = sha256_file(source)
@@ -205,6 +210,13 @@ def test_ledger_deduplicates_identical_receipt_and_rejects_conflict(tmp_path):
     assert len(ledger.receipts_path.read_text(encoding="utf-8").splitlines()) == 1
     with pytest.raises(ValueError, match="conflicting"):
         ledger.append_receipt({"output_path": "page.md", "output_sha256": "b" * 64})
+
+
+def test_ledger_atomic_replacement_rejects_candidate_text(tmp_path):
+    ledger = CampaignLedger(tmp_path, "pilot")
+    with pytest.raises(ValueError, match="candidate text"):
+        ledger.replace_receipts([{"output_path": "page.md", "translated_content": "SECRET"}])
+    assert not ledger.receipts_path.exists()
 
 
 def test_failure_ledger_contains_metadata_only(tmp_path):
@@ -440,7 +452,9 @@ def test_resume_rejects_warn_only_gate_receipt_under_zero_defect(tmp_path):
         translator_repo=tmp_path,
         ledger_root=tmp_path / "ledger",
     )
-    gate_results = {str(index): {"passed": True, "action": "block", "error": None} for index in range(1, 45)}
+    gate_results = {
+        str(index): {"passed": True, "action": "block", "error": None} for index in range(1, 45)
+    }
     gate_results["31"]["action"] = "warn"
     runner.ledger.append_receipt(
         {
@@ -470,6 +484,159 @@ def test_receipt_fingerprint_survives_json_roundtrip_with_integer_gate_keys():
     persisted = json.loads(json.dumps(receipt))
 
     assert receipt_fingerprint(receipt) == receipt_fingerprint(persisted)
+
+
+def _init_recovery_repo(tmp_path: Path, *, extra_commit_path: str | None = None):
+    repo = tmp_path / "content-repo"
+    repo.mkdir()
+    subprocess.run(["git", "init", "-b", "pilot"], cwd=repo, check=True)
+    subprocess.run(
+        ["git", "config", "user.email", "campaign@example.invalid"],
+        cwd=repo,
+        check=True,
+    )
+    subprocess.run(
+        ["git", "config", "user.name", "Campaign Test"],
+        cwd=repo,
+        check=True,
+    )
+    source_relative = "content/docs.aspose.org/en/words/net/page.md"
+    source = repo / source_relative
+    source.parent.mkdir(parents=True)
+    source.write_text("source", encoding="utf-8")
+    marker = repo / "baseline.txt"
+    marker.write_text("baseline", encoding="utf-8")
+    subprocess.run(["git", "add", "."], cwd=repo, check=True)
+    subprocess.run(["git", "commit", "-m", "baseline"], cwd=repo, check=True)
+    baseline = subprocess.run(
+        ["git", "rev-parse", "HEAD"],
+        cwd=repo,
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
+
+    payload = _manifest(repo)
+    payload["target_locales"] = ["es"]
+    payload["expected_output_count"] = 1
+    payload["content_repo_sha"] = baseline
+    payload["sources"][0]["outputs"] = {"es": payload["sources"][0]["outputs"]["es"]}
+    payload["sources"][0]["source_sha256"] = sha256_file(source)
+    manifest_path = tmp_path / "manifest.yaml"
+    manifest_path.write_text(yaml.safe_dump(payload), encoding="utf-8")
+    manifest = CampaignManifest.load(manifest_path)
+
+    output_relative = payload["sources"][0]["outputs"]["es"]
+    output = repo / output_relative
+    output.parent.mkdir(parents=True)
+    output.write_text("accepted", encoding="utf-8")
+    subprocess.run(["git", "add", output_relative], cwd=repo, check=True)
+    if extra_commit_path:
+        extra = repo / extra_commit_path
+        extra.parent.mkdir(parents=True, exist_ok=True)
+        extra.write_text("extra", encoding="utf-8")
+        subprocess.run(["git", "add", extra_commit_path], cwd=repo, check=True)
+    subprocess.run(
+        [
+            "git",
+            "commit",
+            "-m",
+            "content(locale): zero-defect shard w2:docs.aspose.org:words:net:es:1",
+        ],
+        cwd=repo,
+        check=True,
+    )
+    return repo, manifest, source, output
+
+
+def test_recover_receipts_revalidates_governed_commit_before_atomic_ledger(tmp_path, monkeypatch):
+    repo, manifest, source, output = _init_recovery_repo(tmp_path)
+
+    class Engine:
+        def __init__(self):
+            self.campaign_context = {}
+            self.calls = []
+
+        def accept_candidate_bytes(self, **kwargs):
+            self.calls.append(kwargs)
+            return AcceptedTranslation(
+                content=kwargs["candidate_bytes"],
+                source_path=kwargs["source_path"],
+                output_path=kwargs["output_path"],
+                source_sha256=sha256_file(source),
+                output_sha256=sha256_file(output),
+                target_lang="es",
+                validation_policy="zero-defect",
+                gate_results={
+                    gate_id: {"passed": True, "action": "test", "error": None}
+                    for gate_id in range(1, 45)
+                },
+                config_fingerprint=manifest.config_fingerprint,
+                model_fingerprint="receipt-recovery:fidelity=test",
+                campaign_id=manifest.campaign_id,
+            )
+
+    engine = Engine()
+    runner = CampaignRunner(
+        manifest=manifest,
+        translation_engine=engine,
+        translator_repo=repo,
+        ledger_root=tmp_path / "ledger",
+    )
+    monkeypatch.setattr(CampaignManifest, "verify_environment", lambda self, **_kwargs: None)
+
+    summary = runner.recover_committed_receipts()
+
+    assert summary["accepted"] == 1
+    assert len(engine.calls) == 1
+    receipt = next(iter(runner.ledger.receipts().values()))
+    assert len(receipt["gate_results"]) == 44
+    assert receipt["receipt_recovery"]["commit_sha"]
+    assert "content" not in receipt
+    assert output.read_text(encoding="utf-8") == "accepted"
+
+    resumed = runner.recover_committed_receipts()
+
+    assert resumed["accepted"] == 1
+    assert len(engine.calls) == 1
+
+
+def test_recover_receipts_rejects_multifile_governed_commit_without_ledger(tmp_path):
+    repo, manifest, _source, _output = _init_recovery_repo(
+        tmp_path, extra_commit_path="unrelated.txt"
+    )
+    runner = CampaignRunner(
+        manifest=manifest,
+        translation_engine=SimpleNamespace(campaign_context={}),
+        translator_repo=repo,
+        ledger_root=tmp_path / "ledger",
+    )
+
+    with pytest.raises(CampaignManifestError, match="one-file add commit"):
+        runner.recover_committed_receipts()
+    assert not runner.ledger.receipts_path.exists()
+
+
+def test_recover_receipts_persists_nothing_when_revalidation_fails(tmp_path, monkeypatch):
+    repo, manifest, _source, output = _init_recovery_repo(tmp_path)
+    engine = SimpleNamespace(
+        campaign_context={},
+        accept_candidate_bytes=lambda **_kwargs: (_ for _ in ()).throw(
+            ValueError("candidate rejected by fidelity")
+        ),
+    )
+    runner = CampaignRunner(
+        manifest=manifest,
+        translation_engine=engine,
+        translator_repo=repo,
+        ledger_root=tmp_path / "ledger",
+    )
+    monkeypatch.setattr(CampaignManifest, "verify_environment", lambda self, **_kwargs: None)
+
+    with pytest.raises(CampaignManifestError, match="fidelity"):
+        runner.recover_committed_receipts()
+    assert not runner.ledger.receipts_path.exists()
+    assert output.read_text(encoding="utf-8") == "accepted"
 
 
 def test_campaign_uses_three_primary_then_llm_and_logs_metadata_only(tmp_path, monkeypatch):
@@ -744,9 +911,7 @@ def test_campaign_resume_rehydrates_feedback_from_metadata(tmp_path):
 def test_greek_frontmatter_retry_names_language_and_requires_script(tmp_path):
     source = tmp_path / "index.md"
     source.write_text(
-        "---\n"
-        "seoTitle: Aspose.HTML FOSS for Python — CSSOM, Cascade, and Computed Styles\n"
-        "---\n",
+        "---\nseoTitle: Aspose.HTML FOSS for Python — CSSOM, Cascade, and Computed Styles\n---\n",
         encoding="utf-8",
     )
     failure = {
@@ -815,7 +980,7 @@ def test_sas_link_feedback_resolves_source_hash_to_lexical_boundary(tmp_path):
     result = SimpleNamespace(
         validation_result=SimpleNamespace(issues=[]),
         error=(
-            "TC-SAS-01: same-as-source; " f"unit_fingerprints=link_text:{fingerprint}:{len(label)}"
+            f"TC-SAS-01: same-as-source; unit_fingerprints=link_text:{fingerprint}:{len(label)}"
         ),
     )
 
@@ -858,13 +1023,161 @@ def test_sas_link_feedback_rehydrates_from_metadata_only_failure(tmp_path):
     assert "Enterprise, Blog" in feedback
 
 
+def test_sas_text_feedback_rehydrates_only_pinned_source_units(tmp_path, monkeypatch):
+    source = tmp_path / "content" / "blog.aspose.org" / "product" / "index.md"
+    source.parent.mkdir(parents=True)
+    source_unit = "Build documents from scratch with"
+    source.write_text(f"## Guide\n\n{source_unit} `DocumentBuilder`.\n", encoding="utf-8")
+    fingerprint = hashlib.sha256(source_unit.encode("utf-8")).hexdigest()[:16]
+
+    parsed = SimpleNamespace(ast=[], frontmatter={})
+    monkeypatch.setattr(
+        "src.translation_engine.parser.HugoParser.parse_file",
+        lambda _self, _path: parsed,
+    )
+    monkeypatch.setattr(
+        "src.translation_engine.extractor.TextUnitExtractor.extract_from_ast",
+        lambda _self, _ast, frontmatter=None: SimpleNamespace(
+            units=[
+                SimpleNamespace(kind=SimpleNamespace(value="text"), source_text=source_unit),
+                SimpleNamespace(kind=SimpleNamespace(value="text"), source_text="Other prose"),
+            ]
+        ),
+    )
+    monkeypatch.setattr(
+        "src.utils.config_loader.ConfigService.get_site_profile",
+        lambda _self, _site_id: SimpleNamespace(
+            body=SimpleNamespace(
+                ast_segmentation_strategy="adaptive",
+                preserve_patterns=[],
+            )
+        ),
+    )
+    result = SimpleNamespace(
+        validation_result=SimpleNamespace(issues=[]),
+        error=(
+            f"TC-SAS-01: same-as-source; unit_fingerprints=text:{fingerprint}:{len(source_unit)}"
+        ),
+    )
+
+    feedback = CampaignRunner._retry_feedback(
+        result,
+        "es",
+        source_path=source,
+    )
+
+    assert "affected exact English source units" in feedback
+    assert source_unit in feedback
+    assert "Other prose" not in feedback
+    assert "Spanish (es)" in feedback
+    assert "Return no unit unchanged" in feedback
+
+
+def test_arabic_sas_retry_uses_translated_product_link_label(tmp_path):
+    source = tmp_path / "index.md"
+    label = "Aspose.Words for .NET"
+    source.write_text(
+        f"[{label}](https://products.aspose.org/words/net/)\n",
+        encoding="utf-8",
+    )
+    fingerprint = hashlib.sha256(label.encode("utf-8")).hexdigest()[:16]
+    failure = {
+        "gate": "TC-SAS-01",
+        "reason": (
+            "translation_rejected; codes=TC-SAS-01; "
+            f"unit_fingerprints=link_text:{fingerprint}:{len(label)}; "
+            "error_sha256=abc"
+        ),
+    }
+
+    feedback = CampaignRunner._retry_feedback_from_failure(
+        failure,
+        "ar",
+        source_path=source,
+    )
+
+    assert "Aspose.Words لـ .NET" in feedback
+    assert "governed target label exactly" in feedback
+    assert "Translate all ordinary label words into Arabic (ar)" in feedback
+
+
+def test_czech_sas_retry_uses_translated_product_link_label(tmp_path):
+    source = tmp_path / "index.md"
+    label = "Aspose.Words for .NET"
+    source.write_text(
+        f"[{label}](https://products.aspose.org/words/net/)\n",
+        encoding="utf-8",
+    )
+    fingerprint = hashlib.sha256(label.encode("utf-8")).hexdigest()[:16]
+    failure = {
+        "gate": "TC-SAS-01",
+        "reason": (
+            "translation_rejected; codes=TC-SAS-01; "
+            f"unit_fingerprints=link_text:{fingerprint}:{len(label)}; "
+            "error_sha256=abc"
+        ),
+    }
+
+    feedback = CampaignRunner._retry_feedback_from_failure(
+        failure,
+        "cs",
+        source_path=source,
+    )
+
+    assert "Aspose.Words pro .NET" in feedback
+    assert "governed target label exactly" in feedback
+
+
+def test_product_link_terminology_covers_every_campaign_locale():
+    translations = CampaignRunner._PRODUCT_LINK_LABEL_TRANSLATIONS
+
+    assert set(translations) == set(CampaignRunner._LOCALE_NAMES)
+    assert all(value != "Aspose.Words for .NET" for value in translations.values())
+    assert all("Aspose.Words" in value and ".NET" in value for value in translations.values())
+
+
+def test_german_github_repository_retry_uses_governed_label(tmp_path):
+    source = tmp_path / "index.md"
+    label = "GitHub Repository"
+    source.write_text(
+        f"[{label}](https://github.com/aspose-words/)\n",
+        encoding="utf-8",
+    )
+    fingerprint = hashlib.sha256(label.encode("utf-8")).hexdigest()[:16]
+    failure = {
+        "gate": "TC-SAS-01",
+        "reason": (
+            "translation_rejected; codes=TC-SAS-01; "
+            f"unit_fingerprints=link_text:{fingerprint}:{len(label)}; "
+            "error_sha256=abc"
+        ),
+    }
+
+    feedback = CampaignRunner._retry_feedback_from_failure(
+        failure,
+        "de",
+        source_path=source,
+    )
+
+    assert "GitHub-Repository" in feedback
+    assert "governed target label exactly" in feedback
+
+
+def test_github_repository_terminology_covers_every_campaign_locale():
+    translations = CampaignRunner._GITHUB_REPOSITORY_LABEL_TRANSLATIONS
+
+    assert set(translations) == set(CampaignRunner._LOCALE_NAMES)
+    assert all(value != "GitHub Repository" for value in translations.values())
+    assert all("GitHub" in value for value in translations.values())
+
+
 def test_failure_metadata_extracts_safe_gate_score_without_candidate_text():
     result = SimpleNamespace(
         errors=[],
         retry_attempts=0,
         validation_result=None,
         error=(
-            "GATE36 FIDELITY JUDGE output.de.md: fail score=0.40; " "SECRET REJECTED CANDIDATE TEXT"
+            "GATE36 FIDELITY JUDGE output.de.md: fail score=0.40; SECRET REJECTED CANDIDATE TEXT"
         ),
     )
 
@@ -907,7 +1220,7 @@ def test_failure_metadata_preserves_safe_verification_check_only():
 def test_verification_language_feedback_uses_frontmatter_source_lexicon(tmp_path):
     source = tmp_path / "index.md"
     source.write_text(
-        "---\n" "title: Spreadsheet Management in Rust with Aspose.Cells FOSS\n" "---\n",
+        "---\ntitle: Spreadsheet Management in Rust with Aspose.Cells FOSS\n---\n",
         encoding="utf-8",
     )
     failure = {
@@ -935,7 +1248,7 @@ def test_verification_language_feedback_uses_frontmatter_source_lexicon(tmp_path
 def test_live_verification_enum_severity_generates_language_feedback(tmp_path):
     source = tmp_path / "index.md"
     source.write_text(
-        "---\n" "title: Spreadsheet Management in Rust with Aspose.Cells FOSS\n" "---\n",
+        "---\ntitle: Spreadsheet Management in Rust with Aspose.Cells FOSS\n---\n",
         encoding="utf-8",
     )
     result = SimpleNamespace(
@@ -957,6 +1270,178 @@ def test_live_verification_enum_severity_generates_language_feedback(tmp_path):
     assert "language_detection" in feedback
     assert "frontmatter field(s) title" in feedback
     assert "Czech (cs)" in feedback
+
+
+def test_dutch_language_retry_uses_unambiguous_idiomatic_title(tmp_path):
+    source = tmp_path / "index.md"
+    source.write_text(
+        "---\ntitle: 'Deep Dive: The CSSOM in Python'\n---\n",
+        encoding="utf-8",
+    )
+    failure = {
+        "gate": "verification:language_detection",
+        "reason": (
+            "translation_rejected; verification_checks=language_detection; "
+            "verification_fingerprints=language_detection:error:abc:"
+            "field=title:confidence=0.999996"
+        ),
+    }
+
+    feedback = CampaignRunner._retry_feedback_from_failure(
+        failure,
+        "nl",
+        source_path=source,
+    )
+
+    assert "Een grondige analyse van" in feedback
+    assert "Afrikaans-like literal calque" in feedback
+    assert "Dutch (nl)" in feedback
+
+
+def test_czech_language_retry_uses_unambiguous_czech_title(tmp_path):
+    source = tmp_path / "index.md"
+    source.write_text(
+        "---\ntitle: Spreadsheet Management in Rust with Aspose.Cells FOSS\n---\n",
+        encoding="utf-8",
+    )
+    failure = {
+        "gate": "verification:language_detection",
+        "reason": (
+            "translation_rejected; verification_checks=language_detection; "
+            "verification_fingerprints=language_detection:error:abc:"
+            "field=title:confidence=0.999995"
+        ),
+    }
+
+    feedback = CampaignRunner._retry_feedback_from_failure(
+        failure,
+        "cs",
+        source_path=source,
+    )
+
+    assert "Řízení tabulek v jazyce Rust s Aspose.Cells FOSS" in feedback
+    assert "Czech/Slovak-neutral" in feedback
+    assert "Czech (cs)" in feedback
+
+
+def test_spanish_language_retry_uses_unambiguous_spanish_title(tmp_path):
+    source = tmp_path / "index.md"
+    source.write_text(
+        "---\ntitle: Introducing Aspose.Words FOSS for .NET\n---\n",
+        encoding="utf-8",
+    )
+    failure = {
+        "gate": "verification:language_detection",
+        "reason": (
+            "translation_rejected; verification_checks=language_detection; "
+            "verification_fingerprints=language_detection:error:abc:"
+            "field=title:confidence=0.999993"
+        ),
+    }
+
+    feedback = CampaignRunner._retry_feedback_from_failure(
+        failure,
+        "es",
+        source_path=source,
+    )
+
+    assert "Lanzamiento de Aspose.Words FOSS para .NET" in feedback
+    assert "unambiguous Spanish language signal" in feedback
+    assert "Spanish (es)" in feedback
+
+
+def test_romanian_frontmatter_retry_uses_unambiguous_seo_title(tmp_path):
+    source = tmp_path / "index.md"
+    source.write_text(
+        "---\nseoTitle: Aspose.HTML FOSS for Python — CSSOM, Cascade, and Computed Styles\n---\n",
+        encoding="utf-8",
+    )
+    failure = {
+        "gate": "FrontmatterLanguageCheck",
+        "reason": (
+            "translation_rejected; validators=FrontmatterLanguageCheck; "
+            "field=seoTitle; detected_lang=en; expected_lang=ro"
+        ),
+    }
+
+    feedback = CampaignRunner._retry_feedback_from_failure(
+        failure,
+        "ro",
+        source_path=source,
+    )
+
+    assert "Aspose.HTML FOSS pentru Python — CSSOM, cascada și stilurile calculate" in feedback
+    assert "unambiguous Romanian language signals" in feedback
+    assert "Romanian (ro)" in feedback
+
+
+def test_german_frontmatter_retry_uses_unambiguous_seo_title(tmp_path):
+    source = tmp_path / "index.md"
+    source.write_text(
+        "---\nseoTitle: Aspose.Words FOSS for .NET — Open-Source Word Document Library\n---\n",
+        encoding="utf-8",
+    )
+    failure = {
+        "gate": "FrontmatterLanguageCheck",
+        "reason": (
+            "translation_rejected; validators=FrontmatterLanguageCheck; "
+            "field=seoTitle; detected_lang=en; expected_lang=de"
+        ),
+    }
+
+    feedback = CampaignRunner._retry_feedback_from_failure(
+        failure,
+        "de",
+        source_path=source,
+    )
+
+    assert (
+        "Aspose.Words FOSS für .NET — eine quelloffene Bibliothek für Word-Dokumente"
+    ) in feedback
+    assert "unambiguous German language signals" in feedback
+    assert "German (de)" in feedback
+
+
+def test_resume_feedback_accumulates_distinct_recent_failures(tmp_path):
+    link_label = "Aspose.Cells Enterprise Blog"
+    source = tmp_path / "index.md"
+    source.write_text(
+        "---\n"
+        "title: Spreadsheet Management in Rust with Aspose.Cells FOSS\n"
+        "summary: Manage spreadsheets with Rust.\n"
+        "---\n"
+        f"[{link_label}](https://blog.aspose.com/)\n",
+        encoding="utf-8",
+    )
+    link_fingerprint = hashlib.sha256(link_label.encode("utf-8")).hexdigest()[:16]
+    failures = [
+        {
+            "gate": "GATE36",
+            "reason": "translation_rejected; codes=GATE36; verdict=fail; score=0.2",
+        },
+        {
+            "gate": "FrontmatterLanguageCheck",
+            "reason": ("translation_rejected; validators=FrontmatterLanguageCheck; field=summary"),
+        },
+        {
+            "gate": "TC-SAS-01",
+            "reason": (
+                "translation_rejected; codes=TC-SAS-01; "
+                f"unit_fingerprints=link_text:{link_fingerprint}:{len(link_label)}"
+            ),
+        },
+    ]
+
+    feedback = CampaignRunner._retry_feedback_from_failures(
+        failures,
+        "cs",
+        source_path=source,
+    )
+
+    assert "Preserve every source claim and section" in feedback
+    assert "fields detected as failing were: summary" in feedback
+    assert "affected source link label" in feedback
+    assert "Translate all ordinary label words into Czech (cs)" in feedback
 
 
 def test_failure_metadata_extracts_exception_class_without_candidate_text():
@@ -998,7 +1483,7 @@ def test_failure_metadata_preserves_only_safe_sas_unit_fingerprints():
         errors=[],
         retry_attempts=0,
         validation_result=None,
-        error=("TC-SAS-01: same-as-source; " "unit_fingerprints=link_text:0123456789abcdef:13"),
+        error=("TC-SAS-01: same-as-source; unit_fingerprints=link_text:0123456789abcdef:13"),
     )
 
     gate, reason = CampaignRunner._failure_metadata(result)

@@ -11,11 +11,13 @@ this 25-target-locale set with strict enforcement turned on.
 `bg` is the explicit negative control: a real, previously-active
 Aspose.org locale, now retired.
 """
+
 from __future__ import annotations
 
 import pytest
 
 from src.utils.config_loader import ConfigService
+from src.utils.models import FrontmatterMode
 
 ASPOSE_ORG_SITE_IDS = [
     "docs.aspose.org",
@@ -28,9 +30,31 @@ ASPOSE_ORG_SITE_IDS = [
 ]
 
 EXPECTED_TARGET_LANGS = {
-    "ar", "cs", "de", "el", "es", "fa", "fr", "he", "hi", "hu",
-    "id", "it", "ja", "ko", "nl", "pl", "pt", "ro", "ru", "sv",
-    "th", "tr", "uk", "vi", "zh",
+    "ar",
+    "cs",
+    "de",
+    "el",
+    "es",
+    "fa",
+    "fr",
+    "he",
+    "hi",
+    "hu",
+    "id",
+    "it",
+    "ja",
+    "ko",
+    "nl",
+    "pl",
+    "pt",
+    "ro",
+    "ru",
+    "sv",
+    "th",
+    "tr",
+    "uk",
+    "vi",
+    "zh",
 }
 
 NEGATIVE_CONTROL_LOCALE = "bg"
@@ -63,3 +87,10 @@ def test_profile_resolves_to_exactly_26_locales(config_service, site_id):
     profile = config_service.get_site_profile(site_id)
     resolved = {profile.default_source_lang, *profile.target_langs}
     assert len(resolved) == 26
+
+
+def test_blog_profile_excludes_hugo_routing_fields_from_locale_outputs(config_service):
+    profile = config_service.get_site_profile("blog.aspose.org")
+
+    assert profile.frontmatter["url"].mode == FrontmatterMode.IGNORE.value
+    assert profile.frontmatter["aliases"].mode == FrontmatterMode.IGNORE.value

@@ -120,20 +120,41 @@ class CampaignLedger:
 
     def latest_failure(self, *, output_path: str, target_lang: str) -> dict[str, Any] | None:
         """Return the latest metadata-only failure for a resumable job."""
+        failures = self.recent_failures(
+            output_path=output_path,
+            target_lang=target_lang,
+            limit=1,
+        )
+        return failures[-1] if failures else None
+
+    def recent_failures(
+        self,
+        *,
+        output_path: str,
+        target_lang: str,
+        limit: int = 20,
+    ) -> list[dict[str, Any]]:
+        """Return recent metadata-only failures for cumulative retry guidance."""
+        if limit < 1:
+            raise ValueError("failure history limit must be positive")
         if not self.failures_path.is_file():
-            return None
-        latest = None
+            return []
+        matches: list[dict[str, Any]] = []
         with self.failures_path.open("r", encoding="utf-8") as handle:
             for line in handle:
                 if not line.strip():
                     continue
                 row = json.loads(line)
                 if row.get("output_path") == output_path and row.get("target_lang") == target_lang:
-                    latest = row
-        return latest
+                    matches.append(row)
+                    if len(matches) > limit:
+                        matches.pop(0)
+        return matches
 
     def replace_receipts(self, receipts: list[dict[str, Any]]) -> None:
         """Atomically replace metadata-only receipts after verified migration."""
+        if any("content" in row or "translated_content" in row for row in receipts):
+            raise ValueError("campaign receipts must never contain candidate text")
         encoded = "".join(
             json.dumps(row, ensure_ascii=False, sort_keys=True) + "\n" for row in receipts
         )
@@ -213,6 +234,96 @@ class CampaignRunner:
         "th": "Thai script",
         "uk": "Cyrillic script",
         "zh": "Chinese Han characters",
+    }
+    _PRODUCT_LINK_LABEL_TRANSLATIONS = {
+        "ar": "Aspose.Words لـ .NET",
+        "cs": "Aspose.Words pro .NET",
+        "de": "Aspose.Words für .NET",
+        "el": "Aspose.Words για .NET",
+        "es": "Aspose.Words para .NET",
+        "fa": "Aspose.Words برای .NET",
+        "fr": "Aspose.Words pour .NET",
+        "he": "Aspose.Words עבור .NET",
+        "hi": ".NET के लिए Aspose.Words",
+        "hu": "Aspose.Words .NET-hez",
+        "id": "Aspose.Words untuk .NET",
+        "it": "Aspose.Words per .NET",
+        "ja": ".NET 向け Aspose.Words",
+        "ko": ".NET용 Aspose.Words",
+        "nl": "Aspose.Words voor .NET",
+        "pl": "Aspose.Words dla .NET",
+        "pt": "Aspose.Words para .NET",
+        "ro": "Aspose.Words pentru .NET",
+        "ru": "Aspose.Words для .NET",
+        "sv": "Aspose.Words för .NET",
+        "th": "Aspose.Words สำหรับ .NET",
+        "tr": ".NET için Aspose.Words",
+        "uk": "Aspose.Words для .NET",
+        "vi": "Aspose.Words dành cho .NET",
+        "zh": "Aspose.Words（适用于 .NET）",
+    }
+    _GITHUB_REPOSITORY_LABEL_TRANSLATIONS = {
+        "ar": "مستودع GitHub",
+        "cs": "Repozitář GitHub",
+        "de": "GitHub-Repository",
+        "el": "Αποθετήριο GitHub",
+        "es": "Repositorio de GitHub",
+        "fa": "مخزن GitHub",
+        "fr": "Dépôt GitHub",
+        "he": "מאגר GitHub",
+        "hi": "GitHub रिपॉज़िटरी",
+        "hu": "GitHub-adattár",
+        "id": "Repositori GitHub",
+        "it": "Repository su GitHub",
+        "ja": "GitHub リポジトリ",
+        "ko": "GitHub 저장소",
+        "nl": "GitHub-opslagplaats",
+        "pl": "Repozytorium GitHub",
+        "pt": "Repositório do GitHub",
+        "ro": "Depozit GitHub",
+        "ru": "Репозиторий GitHub",
+        "sv": "GitHub-arkiv",
+        "th": "ที่เก็บ GitHub",
+        "tr": "GitHub deposu",
+        "uk": "Репозиторій GitHub",
+        "vi": "Kho lưu trữ GitHub",
+        "zh": "GitHub 代码仓库",
+    }
+    _LOCALE_RETRY_HINTS = {
+        "cs": (
+            "If the source title is 'Spreadsheet Management in Rust with "
+            "Aspose.Cells FOSS', translate that title exactly as "
+            "'Řízení tabulek v jazyce Rust s Aspose.Cells FOSS'. This wording "
+            "is idiomatic Czech and supplies an unambiguous Czech language "
+            "signal; do not use a Czech/Slovak-neutral paraphrase."
+        ),
+        "de": (
+            "If the source seoTitle is 'Aspose.Words FOSS for .NET — "
+            "Open-Source Word Document Library', translate that seoTitle "
+            "exactly as 'Aspose.Words FOSS für .NET — eine quelloffene "
+            "Bibliothek für Word-Dokumente'. This wording is idiomatic German "
+            "and supplies unambiguous German language signals."
+        ),
+        "es": (
+            "If the source title is 'Introducing Aspose.Words FOSS for .NET', "
+            "translate that title exactly as 'Lanzamiento de Aspose.Words FOSS "
+            "para .NET'. This wording is idiomatic Spanish and supplies an "
+            "unambiguous Spanish language signal while preserving the product "
+            "and platform tokens."
+        ),
+        "nl": (
+            "For a short Dutch technical title, translate the source phrase "
+            "'Deep Dive' idiomatically as 'Een grondige analyse van'. "
+            "Do not use an English or Afrikaans-like literal calque."
+        ),
+        "ro": (
+            "If the source seoTitle is 'Aspose.HTML FOSS for Python — CSSOM, "
+            "Cascade, and Computed Styles', translate that seoTitle exactly as "
+            "'Aspose.HTML FOSS pentru Python — CSSOM, cascada și stilurile "
+            "calculate'. This wording is idiomatic Romanian and supplies "
+            "unambiguous Romanian language signals while preserving the "
+            "product and API tokens."
+        ),
     }
 
     def __init__(
@@ -330,7 +441,8 @@ class CampaignRunner:
                 for gate_id, item in gates.items()
                 if not isinstance(item, dict)
                 or not item.get("passed", False)
-                or str(item.get("action", "")).lower() in {
+                or str(item.get("action", "")).lower()
+                in {
                     "warn",
                     "warning",
                     "skip",
@@ -460,6 +572,214 @@ class CampaignRunner:
                     f"receipt {field_name} is outside content repo: {absolute}"
                 ) from exc
         self.ledger.append_receipt(normalized)
+
+    def _receipt_recovery_candidates(
+        self,
+    ) -> list[tuple[Any, str, str, str]]:
+        """Return manifest outputs backed by immutable governed add commits.
+
+        Each candidate must be the sole path added by its latest path commit,
+        that commit must be after the pinned content baseline and reachable
+        from the current branch, and the current bytes must equal the commit
+        blob.  This deliberately excludes arbitrary pre-existing files.
+        """
+        candidates: list[tuple[Any, str, str, str]] = []
+        for source in self.manifest.sources:
+            for locale, relative in source.outputs.items():
+                output_path = self.content_repo / relative
+                if not output_path.exists():
+                    continue
+                if not output_path.is_file():
+                    raise CampaignManifestError(
+                        f"receipt recovery output is not a file: {relative}"
+                    )
+                log = (
+                    subprocess.run(
+                        ["git", "log", "-1", "--format=%H%x00%s", "--", relative],
+                        cwd=self.content_repo,
+                        check=True,
+                        capture_output=True,
+                    )
+                    .stdout.decode("utf-8", errors="strict")
+                    .strip()
+                )
+                if "\0" not in log:
+                    raise CampaignManifestError(
+                        f"receipt recovery path has no commit provenance: {relative}"
+                    )
+                commit_sha, subject = log.split("\0", 1)
+                shard_prefix = (
+                    f"w{source.wave}:{source.site_id}:{source.family}:{source.platform}:{locale}:"
+                )
+                expected_subject = re.compile(
+                    rf"^content\(locale\): zero-defect shard "
+                    rf"{re.escape(shard_prefix)}[1-9][0-9]*$"
+                )
+                if not expected_subject.fullmatch(subject):
+                    raise CampaignManifestError(
+                        f"receipt recovery commit is not governed: {relative}"
+                    )
+                if (
+                    not subprocess.run(
+                        [
+                            "git",
+                            "merge-base",
+                            "--is-ancestor",
+                            self.manifest.content_repo_sha,
+                            commit_sha,
+                        ],
+                        cwd=self.content_repo,
+                        capture_output=True,
+                    ).returncode
+                    == 0
+                ):
+                    raise CampaignManifestError(
+                        f"receipt recovery commit predates pinned baseline: {relative}"
+                    )
+                if (
+                    not subprocess.run(
+                        ["git", "merge-base", "--is-ancestor", commit_sha, "HEAD"],
+                        cwd=self.content_repo,
+                        capture_output=True,
+                    ).returncode
+                    == 0
+                ):
+                    raise CampaignManifestError(
+                        f"receipt recovery commit is not reachable: {relative}"
+                    )
+                changed = subprocess.run(
+                    [
+                        "git",
+                        "diff-tree",
+                        "--no-commit-id",
+                        "--name-status",
+                        "-r",
+                        commit_sha,
+                    ],
+                    cwd=self.content_repo,
+                    check=True,
+                    capture_output=True,
+                    text=True,
+                ).stdout.splitlines()
+                if changed != [f"A\t{relative}"]:
+                    raise CampaignManifestError(
+                        f"receipt recovery requires a one-file add commit: {relative}"
+                    )
+                committed_bytes = subprocess.run(
+                    ["git", "show", f"{commit_sha}:{relative}"],
+                    cwd=self.content_repo,
+                    check=True,
+                    capture_output=True,
+                ).stdout
+                if hashlib.sha256(committed_bytes).hexdigest() != sha256_file(output_path):
+                    raise CampaignManifestError(f"receipt recovery blob drift: {relative}")
+                candidates.append((source, locale, relative, commit_sha))
+        return sorted(candidates, key=lambda item: item[2])
+
+    def recover_committed_receipts(self) -> dict[str, Any]:
+        """Recover lost receipts by revalidating governed committed bytes.
+
+        This is not an acceptance shortcut: all candidate bytes are kept in
+        memory and independently rerun through validation, verification,
+        fidelity, all 44 gates, and placement.  Each all-pass metadata-only
+        receipt is fsynced independently so an outage or later bad candidate
+        cannot erase completed revalidation work; a resumed recovery validates
+        existing receipt hashes before skipping them.
+        """
+        with FileLock(self.ledger.root / "campaign.lock", timeout=0):
+            candidates = self._receipt_recovery_candidates()
+            if not candidates:
+                raise CampaignManifestError("receipt recovery found no governed committed outputs")
+            existing_expected = {
+                output
+                for source in self.manifest.sources
+                for output in source.outputs.values()
+                if (self.content_repo / output).exists()
+            }
+            recovered_outputs = {item[2] for item in candidates}
+            if recovered_outputs != existing_expected:
+                raise CampaignManifestError(
+                    "receipt recovery provenance does not cover every existing output"
+                )
+            existing_receipts = self._validated_resume_receipts()
+            unexpected_receipts = set(existing_receipts) - recovered_outputs
+            if unexpected_receipts:
+                raise CampaignManifestError(
+                    "receipt recovery ledger contains outputs without current "
+                    "governed commit provenance"
+                )
+
+            self.manifest.verify_environment(
+                translator_repo=self.translator_repo,
+                require_clean=True,
+                allow_existing_accepted=recovered_outputs,
+            )
+            self.engine.campaign_context.update(
+                {
+                    "campaign_id": self.manifest.campaign_id,
+                    "config_fingerprint": self.manifest.config_fingerprint,
+                }
+            )
+
+            for source, locale, relative, commit_sha in candidates:
+                if relative in existing_receipts:
+                    continue
+                source_path = self.content_repo / source.source_path
+                output_path = self.content_repo / relative
+                try:
+                    accepted = self.engine.accept_candidate_bytes(
+                        source_bytes=source_path.read_bytes(),
+                        candidate_bytes=output_path.read_bytes(),
+                        source_path=source_path,
+                        output_path=output_path,
+                        target_lang=locale,
+                        site_id=source.site_id,
+                    )
+                except Exception as exc:
+                    raise CampaignManifestError(
+                        f"receipt recovery validation failed for {relative}: {exc}"
+                    ) from exc
+                receipt = accepted.receipt()
+                normalized = dict(receipt)
+                for field_name in ("source_path", "output_path"):
+                    normalized[field_name] = (
+                        Path(normalized[field_name])
+                        .resolve()
+                        .relative_to(self.content_repo)
+                        .as_posix()
+                    )
+                expected_context = {
+                    "campaign_id": self.manifest.campaign_id,
+                    "source_path": source.source_path,
+                    "output_path": relative,
+                    "source_sha256": source.source_sha256,
+                    "target_lang": locale,
+                    "validation_policy": "zero-defect",
+                    "config_fingerprint": self.manifest.config_fingerprint,
+                }
+                if any(
+                    normalized.get(field) != expected
+                    for field, expected in expected_context.items()
+                ):
+                    raise CampaignManifestError(f"revalidated receipt context mismatch: {relative}")
+                normalized["receipt_recovery"] = {
+                    "mode": "all-gates-byte-revalidation-v1",
+                    "commit_sha": commit_sha,
+                }
+                self.ledger.append_receipt(normalized)
+                existing_receipts[relative] = self.ledger.receipts()[relative]
+
+            verified = self._validated_resume_receipts()
+            if set(verified) != recovered_outputs:
+                raise CampaignManifestError("recovered receipt reconciliation failed")
+            summary = {
+                **self.manifest.to_summary(),
+                "status": "RECEIPTS_RECOVERED",
+                "accepted": len(verified),
+                "remaining": self.manifest.expected_output_count - len(verified),
+            }
+            self.ledger.write_summary(summary)
+            return summary
 
     def _commit_verified_outputs(self, shard_id: str) -> str | None:
         """Commit only checksum-verified, receipted campaign outputs."""
@@ -746,7 +1066,7 @@ class CampaignRunner:
                 "target_script_ratio",
             ):
                 value = details.get(key)
-                if isinstance(value, bool) or not isinstance(value, (int, float)):
+                if isinstance(value, bool) or not isinstance(value, int | float):
                     continue
                 rendered = f"{value:.6g}" if isinstance(value, float) else str(value)
                 numeric_parts.append(f"{key}={rendered}")
@@ -805,7 +1125,7 @@ class CampaignRunner:
             metadata = getattr(issue, "metadata", None) or {}
             numeric_parts: list[str] = []
             for key, value in sorted(metadata.items()):
-                if isinstance(value, bool) or not isinstance(value, (int, float)):
+                if isinstance(value, bool) or not isinstance(value, int | float):
                     continue
                 safe_key = re.sub(r"[^A-Za-z0-9_-]", "", str(key)) or "metric"
                 rendered = f"{value:.6g}" if isinstance(value, float) else str(value)
@@ -989,11 +1309,113 @@ class CampaignRunner:
         if not ordinary:
             return ""
         locale_label = CampaignRunner._target_locale_label(target_lang)
-        return (
+        guidance = (
             "For the affected source link label(s), preserve exactly only these "
             f"identifier/product tokens: {', '.join(protected) if protected else 'none'}. "
             f"Translate all ordinary label words into {locale_label}, including: "
             f"{', '.join(ordinary)}. Do not preserve the complete English label as a title."
+        )
+        if "Aspose.Words for .NET" in matched:
+            locale = target_lang.lower().split("-")[0]
+            exact = CampaignRunner._PRODUCT_LINK_LABEL_TRANSLATIONS.get(locale)
+            if exact:
+                guidance += (
+                    " For the exact source label 'Aspose.Words for .NET', use "
+                    f"the governed target label exactly as '{exact}'."
+                )
+        if "GitHub Repository" in matched:
+            locale = target_lang.lower().split("-")[0]
+            exact = CampaignRunner._GITHUB_REPOSITORY_LABEL_TRANSLATIONS.get(locale)
+            if exact:
+                guidance += (
+                    " For the exact source label 'GitHub Repository', use "
+                    f"the governed target label exactly as '{exact}'."
+                )
+        return guidance
+
+    @staticmethod
+    def _sas_text_source_guidance(
+        source_path: Path | None, raw_error: str, target_lang: str
+    ) -> str:
+        """Rehydrate hashed AST text units into candidate-free retry guidance.
+
+        Failure metadata deliberately retains only source-unit fingerprints.  A
+        resumed campaign can safely resolve those fingerprints against the
+        still-pinned English source and give the next model attempt precise
+        source-only instructions without persisting rejected candidate text.
+        """
+        if source_path is None or not source_path.is_file():
+            return ""
+        fingerprint_match = re.search(r"\bunit_fingerprints=([a-z0-9_:,-]+)\b", raw_error)
+        if not fingerprint_match:
+            return ""
+        requested = {
+            (kind, digest, int(length))
+            for kind, digest, length in re.findall(
+                r"(?:^|,)(text):([a-f0-9]{16}):(\d+)",
+                fingerprint_match.group(1),
+            )
+        }
+        if not requested:
+            return ""
+
+        try:
+            from src.translation_engine.extractor import TextUnitExtractor
+            from src.translation_engine.parser import HugoParser
+            from src.utils.config_loader import ConfigService
+
+            parts = list(source_path.parts)
+            content_index = next(
+                index for index, part in enumerate(parts) if part.casefold() == "content"
+            )
+            site_id = parts[content_index + 1]
+            profile = ConfigService(Path("config")).get_site_profile(site_id)
+            terminology_file = Path("config/terminology/aspose_terms.txt")
+            document = HugoParser().parse_file(source_path)
+            extractor = TextUnitExtractor(
+                segmentation_strategy=profile.body.ast_segmentation_strategy,
+                terminology_file=terminology_file if terminology_file.is_file() else None,
+                preserve_patterns=profile.body.preserve_patterns,
+                site_profile=profile,
+                target_lang=target_lang,
+            )
+            plan = extractor.extract_from_ast(document.ast, frontmatter=document.frontmatter)
+        except (OSError, UnicodeError, ValueError, StopIteration, IndexError):
+            return ""
+        except Exception:
+            # Retry guidance is supplemental.  The candidate must still fail
+            # closed if source rehydration is unavailable for any reason.
+            return ""
+
+        matched: list[str] = []
+        for unit in plan.units:
+            source_text = str(getattr(unit, "source_text", "") or "")
+            kind = str(
+                getattr(
+                    getattr(unit, "kind", ""),
+                    "value",
+                    getattr(unit, "kind", ""),
+                )
+            )
+            fingerprint = (
+                kind,
+                hashlib.sha256(source_text.encode("utf-8")).hexdigest()[:16],
+                len(source_text),
+            )
+            if fingerprint in requested and source_text not in matched:
+                matched.append(source_text)
+        if not matched:
+            return ""
+
+        locale_label = CampaignRunner._target_locale_label(target_lang)
+        numbered = " ".join(
+            f"[{index}] {source_text}" for index, source_text in enumerate(matched, start=1)
+        )
+        return (
+            "The affected exact English source units are listed below. Translate every "
+            f"ordinary word in each complete unit into {locale_label}; preserve "
+            "{PLACEHOLDER_n} tokens, product/API identifiers, code, versions, and file "
+            f"formats exactly. Return no unit unchanged. Source units: {numbered}"
         )
 
     @staticmethod
@@ -1010,6 +1432,9 @@ class CampaignRunner:
         validators = {str(getattr(issue, "validator", "")) for issue in issues}
         instructions: list[str] = []
         locale_label = CampaignRunner._target_locale_label(target_lang)
+        locale_retry_hint = CampaignRunner._LOCALE_RETRY_HINTS.get(
+            target_lang.lower().split("-")[0]
+        )
         if "FrontmatterLanguageCheck" in validators:
             fields = sorted(
                 {
@@ -1039,6 +1464,8 @@ class CampaignRunner:
             )
             if source_guidance:
                 instructions.append(source_guidance)
+            if locale_retry_hint:
+                instructions.append(locale_retry_hint)
         if "RepetitionDetectorValidator" in validators:
             instructions.append(
                 "Avoid adding repeated phrases or duplicate sentences beyond the source structure."
@@ -1058,7 +1485,15 @@ class CampaignRunner:
             )
             if source_guidance:
                 instructions.append(source_guidance)
+            text_source_guidance = CampaignRunner._sas_text_source_guidance(
+                source_path, raw_error, target_lang
+            )
+            if text_source_guidance:
+                instructions.append(text_source_guidance)
+            if locale_retry_hint:
+                instructions.append(locale_retry_hint)
         verification_result = getattr(result, "verification_result", None)
+
         def _verification_severity(issue: Any) -> str:
             severity = getattr(issue, "severity", "")
             return str(getattr(severity, "value", severity)).lower()
@@ -1100,6 +1535,8 @@ class CampaignRunner:
                 )
                 if source_guidance:
                     instructions.append(source_guidance)
+            if locale_retry_hint and "language_detection" in failed_checks:
+                instructions.append(locale_retry_hint)
         if not instructions and not prior_feedback:
             instructions.append(
                 f"Regenerate the complete translation in target locale {locale_label} and correct "
@@ -1119,6 +1556,7 @@ class CampaignRunner:
         target_lang: str,
         *,
         source_path: Path | None = None,
+        prior_feedback: str | None = None,
     ) -> str | None:
         """Rehydrate safe retry guidance from metadata when resuming."""
         if not failure:
@@ -1174,8 +1612,28 @@ class CampaignRunner:
                 error=reason,
             ),
             target_lang,
+            prior_feedback,
             source_path=source_path,
         )
+
+    @classmethod
+    def _retry_feedback_from_failures(
+        cls,
+        failures: list[dict[str, Any]],
+        target_lang: str,
+        *,
+        source_path: Path | None = None,
+    ) -> str | None:
+        """Fold distinct recent failure metadata into one safe instruction."""
+        feedback: str | None = None
+        for failure in failures:
+            feedback = cls._retry_feedback_from_failure(
+                failure,
+                target_lang,
+                source_path=source_path,
+                prior_feedback=feedback,
+            )
+        return feedback
 
     def verify(self, *, resume: bool = False) -> dict[str, Any]:
         receipts = self._validated_resume_receipts() if resume else {}
@@ -1206,9 +1664,11 @@ class CampaignRunner:
         normalized = frozenset(shard_ids or ())
         lock_name = "campaign.lock"
         if normalized:
-            lock_name = "shard-" + hashlib.sha256(
-                "\n".join(sorted(normalized)).encode("utf-8")
-            ).hexdigest()[:16] + ".lock"
+            lock_name = (
+                "shard-"
+                + hashlib.sha256("\n".join(sorted(normalized)).encode("utf-8")).hexdigest()[:16]
+                + ".lock"
+            )
         with FileLock(self.ledger.root / lock_name, timeout=0):
             return self._run_locked(
                 resume=resume,
@@ -1253,9 +1713,7 @@ class CampaignRunner:
             if llm_paths is None:
                 llm_paths = set()
                 self.engine._rtq_llm_output_paths = llm_paths
-            feedback_by_output = getattr(
-                self.engine, "_campaign_retry_feedback_by_output", None
-            )
+            feedback_by_output = getattr(self.engine, "_campaign_retry_feedback_by_output", None)
             if feedback_by_output is None:
                 feedback_by_output = {}
                 self.engine._campaign_retry_feedback_by_output = feedback_by_output
@@ -1266,8 +1724,11 @@ class CampaignRunner:
             (False, primary_attempts - 1, primary_attempts),
             *[(True, 0, primary_attempts + index) for index in range(1, llm_attempts + 1)],
         ]
-        next_feedback = self._retry_feedback_from_failure(
-            self.ledger.latest_failure(output_path=expected_output, target_lang=locale),
+        next_feedback = self._retry_feedback_from_failures(
+            self.ledger.recent_failures(
+                output_path=expected_output,
+                target_lang=locale,
+            ),
             locale,
             source_path=source_path,
         )
@@ -1278,9 +1739,7 @@ class CampaignRunner:
                     # selector.  The selector can otherwise silently replace
                     # the governed M2M100 primary with another backend before
                     # the controlled professionalize_llm escalation phase.
-                    self.engine.model_id_override = (
-                        llm_model if use_llm else primary_model
-                    )
+                    self.engine.model_id_override = llm_model if use_llm else primary_model
                     if use_llm:
                         llm_paths.add(resolved_output)
                     if next_feedback:
@@ -1310,8 +1769,7 @@ class CampaignRunner:
                 if expected.exists():
                     expected.unlink(missing_ok=True)
                     raise CampaignManifestError(
-                        "rejected attempt produced an unreceipted "
-                        f"output: {expected_output}"
+                        f"rejected attempt produced an unreceipted output: {expected_output}"
                     )
                 failure_gate, failure_reason = self._failure_metadata(result)
                 next_feedback = self._retry_feedback(
@@ -1360,9 +1818,7 @@ class CampaignRunner:
             return False, expected_output
         if Path(receipt["output_path"]).resolve() != expected.resolve():
             expected.unlink(missing_ok=True)
-            raise CampaignManifestError(
-                f"accepted receipt path mismatch for {expected_output}"
-            )
+            raise CampaignManifestError(f"accepted receipt path mismatch for {expected_output}")
         return True, expected_output
 
     def _run_locked(
@@ -1390,10 +1846,12 @@ class CampaignRunner:
         failed = 0
         max_outputs = int(self.manifest.commit_policy.get("max_outputs_per_commit", 250))
         max_parallel_jobs = int(self.manifest.execution_policy.get("max_parallel_jobs", 1))
-        all_shards = list(self.manifest.shards(
-            resume_receipts=set(receipts),
-            max_outputs=max_outputs,
-        ))
+        all_shards = list(
+            self.manifest.shards(
+                resume_receipts=set(receipts),
+                max_outputs=max_outputs,
+            )
+        )
         available_shards = {str(shard["shard_id"]) for shard in all_shards}
         if shard_ids and not shard_ids.issubset(available_shards):
             unknown = sorted(shard_ids - available_shards)
@@ -1403,7 +1861,9 @@ class CampaignRunner:
                 continue
             shard_accepted = 0
             shard_failed = 0
-            with ThreadPoolExecutor(max_workers=min(max_parallel_jobs, len(shard["jobs"]))) as executor:
+            with ThreadPoolExecutor(
+                max_workers=min(max_parallel_jobs, len(shard["jobs"]))
+            ) as executor:
                 futures = [
                     executor.submit(
                         self._run_campaign_job,
@@ -1463,8 +1923,8 @@ class CampaignRunner:
                 if partial and failed == 0
                 else (
                     "COMPLETE"
-                if accepted == self.manifest.expected_output_count and failed == 0
-                else "INCOMPLETE"
+                    if accepted == self.manifest.expected_output_count and failed == 0
+                    else "INCOMPLETE"
                 )
             ),
         }

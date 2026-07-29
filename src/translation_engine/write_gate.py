@@ -124,6 +124,7 @@ def _build_language_detection_text(content: str, site_profile: Any = None) -> st
             detection_text = detection_text.replace(value, "")
     return detection_text
 
+
 # Gate 22: mojibake / encoding corruption patterns
 _MOJIBAKE_GATE_RE = re.compile(r"\u00e2\u20ac|\u00c3\u00a9|\u00c3\u00a8|\u00c3\u00bc|\u00c3\u00b6")
 
@@ -153,9 +154,23 @@ _FENCED_CODE_BLOCK_RE = re.compile(r"```.*?```", re.DOTALL)
 _PLACEHOLDER_LEAK_RE = re.compile(r"\{?PLACEHOLDER_\d+\}?")
 
 # Gate 24: description reverted to English (non-Latin locales only)
-_NON_LATIN_SCRIPT_LOCALES = frozenset({
-    "ar", "bg", "el", "fa", "he", "hi", "ja", "ko", "ru", "th", "uk", "vi", "zh",
-})
+_NON_LATIN_SCRIPT_LOCALES = frozenset(
+    {
+        "ar",
+        "bg",
+        "el",
+        "fa",
+        "he",
+        "hi",
+        "ja",
+        "ko",
+        "ru",
+        "th",
+        "uk",
+        "vi",
+        "zh",
+    }
+)
 
 # Gate 31: partial foreign-script contamination. Gate 24 above only catches
 # TOTAL reversion (the whole description field is ASCII-only); this catches
@@ -188,15 +203,52 @@ _NON_LATIN_SCRIPT_LOCALES = frozenset({
 # would now be missed, an acceptable precision/recall tradeoff given the
 # 39/40 false-positive rate the naive version had). Brand/technical phrases
 # never contain these particles, so they no longer match.
-_GATE31_NON_LATIN_LOCALES = frozenset({
-    "ar", "bg", "el", "fa", "he", "hi", "ja", "ko", "ru", "th", "uk", "zh",
-})
+_GATE31_NON_LATIN_LOCALES = frozenset(
+    {
+        "ar",
+        "bg",
+        "el",
+        "fa",
+        "he",
+        "hi",
+        "ja",
+        "ko",
+        "ru",
+        "th",
+        "uk",
+        "zh",
+    }
+)
 _LATIN_WORD_RUN_RE = re.compile(r"\b[A-Za-z]{2,}(?:[ \t]+[A-Za-z]{2,}){1,}\b")
-_ROMANCE_GERMANIC_FUNCTION_WORDS = frozenset({
-    "de", "la", "las", "el", "los", "con", "para", "que", "una", "uno",
-    "des", "le", "les", "un", "dans", "avec", "pour", "sur", "und", "der",
-    "die", "das", "dem", "den", "für",
-})
+_ROMANCE_GERMANIC_FUNCTION_WORDS = frozenset(
+    {
+        "de",
+        "la",
+        "las",
+        "el",
+        "los",
+        "con",
+        "para",
+        "que",
+        "una",
+        "uno",
+        "des",
+        "le",
+        "les",
+        "un",
+        "dans",
+        "avec",
+        "pour",
+        "sur",
+        "und",
+        "der",
+        "die",
+        "das",
+        "dem",
+        "den",
+        "für",
+    }
+)
 # Markdown link syntax: strip the (url) part but keep the [visible text] --
 # the anchor text is real page content and must still be scanned.
 _MARKDOWN_LINK_URL_RE = re.compile(r"\]\([^)]*\)")
@@ -221,8 +273,7 @@ _TOP_HEADING_RE = re.compile(r"^##\s+.+$", re.MULTILINE)
 # gate-id-to-name mapping -- exactly the kind of drift that let Gates
 # 29-35's findings reach a queue under names UnitQualityScorer's fixed
 # vocabulary could never match (root cause RC2 of the Phase 7 "no
-# detector" reconnaissance; see
-# C:/Users/prora/.claude/plans/no-detector-nothing-checks-pure-squid.md).
+# detector" reconnaissance documented in the Phase 7 plan).
 GATE_ISSUE_NAMES: dict[int, str] = {
     26: "code_fence_dropped",
     29: "refusal_artifact_gate29",
@@ -261,10 +312,9 @@ def gate_id_from_issue_name(issue_name: str) -> int | None:
             return int(digits)
     return None
 
+
 # Gate 25: code block content truncated
-_CODE_BLOCK_CONTENT_RE = re.compile(
-    r"```[^\n]*\n(.*?)```", re.DOTALL
-)
+_CODE_BLOCK_CONTENT_RE = re.compile(r"```[^\n]*\n(.*?)```", re.DOTALL)
 
 # Gate 37: TM-collision cross-context metadata contamination -- see
 # scripts/quality/audit_tm_collision.py, whose BACKTICK_ID_RE this mirrors.
@@ -283,14 +333,47 @@ _DIGIT_RUN_RE = re.compile(r"\d+")
 # returned zero matches).
 _HOMOGLYPH_TO_ASCII: dict[str, str] = {
     # Cyrillic lowercase
-    "а": "a", "е": "e", "о": "o", "р": "p", "с": "c", "у": "y", "х": "x",
-    "ѕ": "s", "і": "i", "ј": "j", "ԁ": "d", "ԛ": "q", "ѡ": "w",
+    "а": "a",
+    "е": "e",
+    "о": "o",
+    "р": "p",
+    "с": "c",
+    "у": "y",
+    "х": "x",
+    "ѕ": "s",
+    "і": "i",
+    "ј": "j",
+    "ԁ": "d",
+    "ԛ": "q",
+    "ѡ": "w",
     # Cyrillic uppercase
-    "А": "A", "В": "B", "Е": "E", "К": "K", "М": "M", "Н": "H", "О": "O",
-    "Р": "P", "С": "C", "Т": "T", "У": "Y", "Х": "X",
+    "А": "A",
+    "В": "B",
+    "Е": "E",
+    "К": "K",
+    "М": "M",
+    "Н": "H",
+    "О": "O",
+    "Р": "P",
+    "С": "C",
+    "Т": "T",
+    "У": "Y",
+    "Х": "X",
     # Greek uppercase
-    "Α": "A", "Β": "B", "Ε": "E", "Ζ": "Z", "Η": "H", "Ι": "I", "Κ": "K",
-    "Μ": "M", "Ν": "N", "Ο": "O", "Ρ": "P", "Τ": "T", "Υ": "Y", "Χ": "X",
+    "Α": "A",
+    "Β": "B",
+    "Ε": "E",
+    "Ζ": "Z",
+    "Η": "H",
+    "Ι": "I",
+    "Κ": "K",
+    "Μ": "M",
+    "Ν": "N",
+    "Ο": "O",
+    "Ρ": "P",
+    "Τ": "T",
+    "Υ": "Y",
+    "Χ": "X",
     # Greek lowercase
     "ο": "o",
 }
@@ -367,26 +450,26 @@ class WriteGateEvaluator:
     # is sufficient to wire it in.
     GATE_REGISTRY: list[tuple[int, str, str, str]] = [
         # id   method                             category       action
-        (2,  "_gate_language_mismatch",           "structural",  "early_return"),
-        (3,  "_gate_overwrite_protection",        "safety",      "early_return"),
-        (4,  "_gate_file_purity",                 "content",     "early_return"),
-        (5,  "_gate_soft_contamination",          "content",     "no_op"),
-        (6,  "_gate_code_block",                  "structural",  "early_return"),
-        (7,  "_gate_heading_surplus",             "structural",  "early_return"),
-        (8,  "_gate_yaml_frontmatter",            "structural",  "early_return"),
-        (9,  "_gate_heading_integrity",           "content",     "auto_clean"),
-        (10, "_gate_frontmatter_backticks",       "content",     "auto_clean"),
-        (11, "_gate_frontmatter_id_corruption",   "content",     "auto_clean"),
-        (12, "_gate_double_periods",              "cosmetic",    "auto_clean"),
-        (13, "_gate_eu_hallucination",            "content",     "block"),
-        (14, "_gate_mixed_language",              "content",     "block"),
-        (15, "_gate_table_row_integrity",         "structural",  "block"),
-        (16, "_gate_duplicate_content",           "content",     "auto_clean"),
-        (17, "_gate_newline_explosion",           "structural",  "block"),
-        (18, "_gate_description_hallucination",   "content",     "block"),
-        (19, "_gate_code_fence_count",            "structural",  "block"),
-        (20, "_gate_empty_body",                  "content",     "block"),
-        (21, "_gate_shortcode_body_leak",         "structural",  "block"),
+        (2, "_gate_language_mismatch", "structural", "early_return"),
+        (3, "_gate_overwrite_protection", "safety", "early_return"),
+        (4, "_gate_file_purity", "content", "early_return"),
+        (5, "_gate_soft_contamination", "content", "no_op"),
+        (6, "_gate_code_block", "structural", "early_return"),
+        (7, "_gate_heading_surplus", "structural", "early_return"),
+        (8, "_gate_yaml_frontmatter", "structural", "early_return"),
+        (9, "_gate_heading_integrity", "content", "auto_clean"),
+        (10, "_gate_frontmatter_backticks", "content", "auto_clean"),
+        (11, "_gate_frontmatter_id_corruption", "content", "auto_clean"),
+        (12, "_gate_double_periods", "cosmetic", "auto_clean"),
+        (13, "_gate_eu_hallucination", "content", "block"),
+        (14, "_gate_mixed_language", "content", "block"),
+        (15, "_gate_table_row_integrity", "structural", "block"),
+        (16, "_gate_duplicate_content", "content", "auto_clean"),
+        (17, "_gate_newline_explosion", "structural", "block"),
+        (18, "_gate_description_hallucination", "content", "block"),
+        (19, "_gate_code_fence_count", "structural", "block"),
+        (20, "_gate_empty_body", "content", "block"),
+        (21, "_gate_shortcode_body_leak", "structural", "block"),
         # HT-INLINE-CODE-001 TC-ICR-005: was registered "auto_clean" despite
         # its implementation being a hard block (result.passed = False) --
         # _verify_gate_registry() only checked the method existed, never
@@ -395,17 +478,17 @@ class WriteGateEvaluator:
         # what actually differs (short-circuit skip once an earlier block
         # gate has already failed -- previously this gate ran regardless
         # and could silently overwrite an earlier gate's result.error).
-        (22, "_gate_inline_code_integrity",       "content",     "block"),
-        (23, "_gate_encoding_clean",              "structural",  "block"),
+        (22, "_gate_inline_code_integrity", "content", "block"),
+        (23, "_gate_encoding_clean", "structural", "block"),
         (24, "_gate_description_reverted_to_english", "content", "block"),
         (25, "_gate_code_block_content_truncated", "structural", "block"),
-        (26, "_gate_fence_parity",                 "structural", "block"),
-        (27, "_gate_multiline_scalar_preservation", "content",   "block"),
+        (26, "_gate_fence_parity", "structural", "block"),
+        (27, "_gate_multiline_scalar_preservation", "content", "block"),
         # HT-QUALITY-GATES-001 TC-QG-001/005: Gate 28 promoted to "block" after
         # the canary (Part 19) confirmed 100% title match with the RC1-RC4
         # fixes live, and the dropped-placeholder fallback (Part 20/21) fixed
         # the only other residual defect found.
-        (28, "_gate_title_identity",              "content",     "block"),
+        (28, "_gate_title_identity", "content", "block"),
         # HT-QUALITY-GATES-001 Part 22 (1.6): Gate 29 promoted from "warn" to
         # "block". The clean-sample false-positive check this promotion was
         # waiting on: a follow-up investigation searched production content
@@ -419,7 +502,7 @@ class WriteGateEvaluator:
         # for a refusal leak (nothing to auto-clean it into), so a hit routes
         # into the same retranslate-queue mechanism as Gate 28 (see
         # _gate_refusal_artifact below) rather than an auto_clean action.
-        (29, "_gate_refusal_artifact",             "content",     "block"),
+        (29, "_gate_refusal_artifact", "content", "block"),
         # HT-QUALITY-GATES-001 Part 22 (1.1 root cause B): universal
         # placeholder-leak gate. A literal "PLACEHOLDER_N" token (braced or
         # bare) reaching this point means restore() was never called on this
@@ -432,7 +515,7 @@ class WriteGateEvaluator:
         # process-agnostic -- it blocks the shape regardless of which writer
         # produced it, closing this codebase's own exposure even though it
         # can't compel an external writer to route through it (Part 7).
-        (30, "_gate_placeholder_leak",             "content",     "block"),
+        (30, "_gate_placeholder_leak", "content", "block"),
         # HT-QUALITY-GATES-001 Part 22 addendum (user-flagged, live-verified
         # 2026-07-22): partial foreign-script contamination -- a Hebrew
         # translation with Spanish phrases mixed into otherwise-correct
@@ -445,15 +528,15 @@ class WriteGateEvaluator:
         # legitimately-preserved multi-word technical phrase (".NET
         # Framework"), so this needs a clean-sample false-positive check
         # before it's trusted to block.
-        (31, "_gate_partial_script_contamination",  "content",     "warn"),
+        (31, "_gate_partial_script_contamination", "content", "warn"),
         # HT-QUALITY-GATES-001 Part 22 (plan 5.1 items 8-9). Both ship "warn"
         # per this registry's established rollout convention -- neither has
         # had a canary/clean-sample pass yet. Staleness in particular is
         # diagnostic rather than a guarantee the current content is wrong
         # (EN can change without invalidating an existing translation), so
         # it's intentionally not framed as a hard block even after a canary.
-        (32, "_gate_content_hash_staleness",        "content",     "warn"),
-        (33, "_gate_brand_token_presence",          "content",     "warn"),
+        (32, "_gate_content_hash_staleness", "content", "warn"),
+        (33, "_gate_brand_token_presence", "content", "warn"),
         # HT-QUALITY-GATES-001 Part 22 (plan 5.2 items 1-2): detection
         # symmetry for the single most prevalent defect found this session
         # -- a systemically dropped trailing section (almost always "See
@@ -463,8 +546,8 @@ class WriteGateEvaluator:
         # registry ever fired on a deficit, so this exact bug class was
         # permanently undetectable even after any upstream fix landed. Both
         # ship "warn" (new gates, established convention) pending a canary.
-        (34, "_gate_heading_deficit",               "structural",  "warn"),
-        (35, "_gate_dropped_trailing_link",          "structural",  "warn"),
+        (34, "_gate_heading_deficit", "structural", "warn"),
+        (35, "_gate_dropped_trailing_link", "structural", "warn"),
         # HT-QUALITY-GATES-001 Part 22 (plan 5.4 items 3+5): the highest-
         # priority workstream in the whole plan -- a real LLM meaning-fidelity
         # judge, not embedding cosine similarity (SemanticSimilarityValidator
@@ -480,7 +563,7 @@ class WriteGateEvaluator:
         # _gate36_is_high_risk) -- this is the synchronous half of Part 5.4
         # item 4's tiered coverage; everything else is the periodic/sampled
         # audit tier (scripts/audit_translation_quality.py).
-        (36, "_gate_fidelity_judge",                 "content",     "auto_clean"),
+        (36, "_gate_fidelity_judge", "content", "auto_clean"),
         # HT-QUALITY-GATES-001 Phase 8 (Tier C #12): real-time port of the
         # already-proven scripts/quality/audit_tm_collision.py detector.
         # Ships "warn" per this registry's rollout convention (see the
@@ -489,31 +572,31 @@ class WriteGateEvaluator:
         # write-gate context specifically, even though the underlying
         # logic is already validated against the historical corpus by the
         # standalone script.
-        (37, "_gate_tm_collision",                   "content",     "warn"),
+        (37, "_gate_tm_collision", "content", "warn"),
         # HT-QUALITY-GATES-001 Phase 8 (Tier A #14): new detector, ships
         # "warn" pending a clean-sample false-positive check (see the
         # class docstring's "Rollout / promotion convention" section).
-        (38, "_gate_prose_before_code_dropped",      "structural",  "warn"),
+        (38, "_gate_prose_before_code_dropped", "structural", "warn"),
         # HT-QUALITY-GATES-001 Phase 8 (Tier A #8): new detector, ships
         # "warn" pending a clean-sample false-positive check.
-        (39, "_gate_dash_range_collapsed",           "content",     "warn"),
+        (39, "_gate_dash_range_collapsed", "content", "warn"),
         # HT-QUALITY-GATES-001 Phase 8 (Tier A #10): new detector, ships
         # "warn" pending a clean-sample false-positive check.
-        (40, "_gate_seo_metadata_corruption",        "content",     "warn"),
+        (40, "_gate_seo_metadata_corruption", "content", "warn"),
         # HT-QUALITY-GATES-001 Phase 8 (Tier A #4): new detector, ships
         # "warn" pending a clean-sample false-positive check.
-        (41, "_gate_homoglyph_in_code",              "content",     "warn"),
+        (41, "_gate_homoglyph_in_code", "content", "warn"),
         # HT-QUALITY-GATES-001 Phase 8 (Tier A #1): new detector, ships
         # "warn" pending a clean-sample false-positive check. Requires a
         # real detector to have any effect -- see the method's docstring.
-        (42, "_gate_whole_page_language_mismatch",   "content",     "warn"),
+        (42, "_gate_whole_page_language_mismatch", "content", "warn"),
         # HT-QUALITY-GATES-001 Phase 8 (Tier A #5): new detector, ships
         # "warn" pending a clean-sample false-positive check.
-        (43, "_gate_block_scalar_key_leak",          "content",     "warn"),
+        (43, "_gate_block_scalar_key_leak", "content", "warn"),
         # Independent-verification finding (HT-QUALITY-GATES-001 Phase 8):
         # no SEO field anywhere had length/SERP-convention awareness. Ships
         # "warn" pending a clean-sample false-positive check.
-        (44, "_gate_seo_length_sanity",              "content",     "warn"),
+        (44, "_gate_seo_length_sanity", "content", "warn"),
     ]
 
     def __init__(
@@ -608,7 +691,12 @@ class WriteGateEvaluator:
                     translated_content, output_path, target_lang, source_doc, result
                 )
             working = self._run_content_gates(
-                source_content, translated_content, target_lang, output_path, source_doc, result,
+                source_content,
+                translated_content,
+                target_lang,
+                output_path,
+                source_doc,
+                result,
                 translation_stats=translation_stats,
             )
             if working != translated_content:
@@ -630,8 +718,13 @@ class WriteGateEvaluator:
 
         # Gate 3: Overwrite protection (B-7.4, 4 CASEs)
         self._gate_overwrite_protection(
-            _detection_text, target_lang, output_path, detector, result,
-            force_overwrite=force_overwrite, site_profile=site_profile,
+            _detection_text,
+            target_lang,
+            output_path,
+            detector,
+            result,
+            force_overwrite=force_overwrite,
+            site_profile=site_profile,
         )
         if not result.passed:
             return result
@@ -667,7 +760,12 @@ class WriteGateEvaluator:
         # "auto_clean" or "block". See _run_content_gates() for dispatch logic.
         # ------------------------------------------------------------------
         working = self._run_content_gates(
-            source_content, translated_content, target_lang, output_path, source_doc, result,
+            source_content,
+            translated_content,
+            target_lang,
+            output_path,
+            source_doc,
+            result,
             translation_stats=translation_stats,
         )
         if working != translated_content:
@@ -816,9 +914,7 @@ class WriteGateEvaluator:
             # same reason as the new content (see
             # _build_language_detection_text) -- an old file's untranslated
             # testimonial quote shouldn't bias its detected language either.
-            existing_detection_text = _build_language_detection_text(
-                existing_content, site_profile
-            )
+            existing_detection_text = _build_language_detection_text(existing_content, site_profile)
             existing_lang, existing_conf = detector.detect(existing_detection_text)
         except OSError as e:
             if self._zero_defect:
@@ -1033,8 +1129,12 @@ class WriteGateEvaluator:
         # directive marker, both common inside ```code``` fences. Without this,
         # a `# comment` line inside a fence gets miscounted as a heading,
         # inflating the surplus count against fence-free source bodies.
-        _src_hd = len(re.findall(r"^#{1,6}\s", _FENCED_CODE_BLOCK_RE.sub("", _src_body), re.MULTILINE))
-        _tgt_hd = len(re.findall(r"^#{1,6}\s", _FENCED_CODE_BLOCK_RE.sub("", _tgt_body), re.MULTILINE))
+        _src_hd = len(
+            re.findall(r"^#{1,6}\s", _FENCED_CODE_BLOCK_RE.sub("", _src_body), re.MULTILINE)
+        )
+        _tgt_hd = len(
+            re.findall(r"^#{1,6}\s", _FENCED_CODE_BLOCK_RE.sub("", _tgt_body), re.MULTILINE)
+        )
         if _tgt_hd >= _src_hd + 3:
             result.passed = False
             result.error = (
@@ -1101,12 +1201,47 @@ class WriteGateEvaluator:
     # ==================================================================
 
     # Latin-script target languages: gate 14 (mixed lang) skips these
-    _LATIN_SCRIPT_LANGS: frozenset[str] = frozenset({
-        "af", "az", "bs", "ca", "cs", "cy", "da", "de", "en", "es", "et",
-        "eu", "fi", "fr", "ga", "hr", "hu", "id", "it", "lt", "lv", "ms",
-        "mt", "nl", "no", "nb", "pl", "pt", "ro", "sk", "sl", "sq", "sr",
-        "sv", "sw", "tr", "vi",
-    })
+    _LATIN_SCRIPT_LANGS: frozenset[str] = frozenset(
+        {
+            "af",
+            "az",
+            "bs",
+            "ca",
+            "cs",
+            "cy",
+            "da",
+            "de",
+            "en",
+            "es",
+            "et",
+            "eu",
+            "fi",
+            "fr",
+            "ga",
+            "hr",
+            "hu",
+            "id",
+            "it",
+            "lt",
+            "lv",
+            "ms",
+            "mt",
+            "nl",
+            "no",
+            "nb",
+            "pl",
+            "pt",
+            "ro",
+            "sk",
+            "sl",
+            "sq",
+            "sr",
+            "sv",
+            "sw",
+            "tr",
+            "vi",
+        }
+    )
 
     # Mission heading-i18n-governance-20260723 (TC-HT-I18N-004 completion):
     # the old shape-only single-capitalized-word-of-4+-letters _IDENTIFIER_RE
@@ -1117,7 +1252,9 @@ class WriteGateEvaluator:
 
     # EU/GDPR hallucination patterns
     _EU_HALLUCINATION_PATTERNS: list[re.Pattern[str]] = [
-        re.compile(r"(?:cookie|GDPR|General Data Protection|privacy policy|data protection)", re.IGNORECASE),
+        re.compile(
+            r"(?:cookie|GDPR|General Data Protection|privacy policy|data protection)", re.IGNORECASE
+        ),
         re.compile(r"(?:European Union|EU regulation|DSGVO|Datenschutz)", re.IGNORECASE),
     ]
 
@@ -1179,80 +1316,126 @@ class WriteGateEvaluator:
         None.
         """
         return {
-            "_gate_heading_integrity":
-                lambda src, w, path, res: self._gate_heading_integrity(src, w, path, source_doc, res, target_lang),
-            "_gate_frontmatter_backticks":
-                lambda src, w, path, res: self._gate_frontmatter_backticks(w, path, source_doc, res),
-            "_gate_frontmatter_id_corruption":
-                lambda src, w, path, res: self._gate_frontmatter_id_corruption(w, path, source_doc, res, target_lang),
-            "_gate_double_periods":
-                lambda src, w, path, res: self._gate_double_periods(src, w, path, res),
-            "_gate_eu_hallucination":
-                lambda src, w, path, res: self._gate_eu_hallucination(src, w, path, res),
-            "_gate_mixed_language":
-                lambda src, w, path, res: self._gate_mixed_language(w, target_lang, path, res),
-            "_gate_table_row_integrity":
-                lambda src, w, path, res: self._gate_table_row_integrity(src, w, path, res),
-            "_gate_duplicate_content":
-                lambda src, w, path, res: self._gate_duplicate_content(w, path, res),
-            "_gate_newline_explosion":
-                lambda src, w, path, res: self._gate_newline_explosion(src, w, path, res),
-            "_gate_description_hallucination":
-                lambda src, w, path, res: self._gate_description_hallucination(src, w, path, res),
-            "_gate_code_fence_count":
-                lambda src, w, path, res: self._gate_code_fence_count(src, w, path, res),
-            "_gate_empty_body":
-                lambda src, w, path, res: self._gate_empty_body(src, w, path, res),
-            "_gate_shortcode_body_leak":
-                lambda src, w, path, res: self._gate_shortcode_body_leak(src, w, path, res),
-            "_gate_inline_code_integrity":
-                lambda src, w, path, res: self._gate_inline_code_integrity(src, w, path, res),
-            "_gate_encoding_clean":
-                lambda src, w, path, res: self._gate_encoding_clean(src, w, path, res),
-            "_gate_description_reverted_to_english":
-                lambda src, w, path, res: self._gate_description_reverted_to_english(src, w, target_lang, path, res),
-            "_gate_code_block_content_truncated":
-                lambda src, w, path, res: self._gate_code_block_content_truncated(src, w, path, res),
-            "_gate_fence_parity":
-                lambda src, w, path, res: self._gate_fence_parity(src, w, path, res),
-            "_gate_multiline_scalar_preservation":
-                lambda src, w, path, res: self._gate_multiline_scalar_preservation(src, w, target_lang, path, res),
-            "_gate_title_identity":
-                lambda src, w, path, res: self._gate_title_identity(w, path, target_lang, source_doc, res),
-            "_gate_refusal_artifact":
-                lambda src, w, path, res: self._gate_refusal_artifact(w, path, res, target_lang),
-            "_gate_placeholder_leak":
-                lambda src, w, path, res: self._gate_placeholder_leak(w, path, res, target_lang),
-            "_gate_partial_script_contamination":
-                lambda src, w, path, res: self._gate_partial_script_contamination(w, path, target_lang, res),
-            "_gate_content_hash_staleness":
-                lambda src, w, path, res: self._gate_content_hash_staleness(src, w, path, res),
-            "_gate_brand_token_presence":
-                lambda src, w, path, res: self._gate_brand_token_presence(src, w, path, res),
-            "_gate_heading_deficit":
-                lambda src, w, path, res: self._gate_heading_deficit(src, w, path, res),
-            "_gate_dropped_trailing_link":
-                lambda src, w, path, res: self._gate_dropped_trailing_link(src, w, path, res),
-            "_gate_fidelity_judge":
-                lambda src, w, path, res: self._gate_fidelity_judge(
-                    src, w, target_lang, path, res, translation_stats
-                ),
-            "_gate_tm_collision":
-                lambda src, w, path, res: self._gate_tm_collision(src, w, path, res),
-            "_gate_prose_before_code_dropped":
-                lambda src, w, path, res: self._gate_prose_before_code_dropped(src, w, path, res),
-            "_gate_dash_range_collapsed":
-                lambda src, w, path, res: self._gate_dash_range_collapsed(src, w, path, res),
-            "_gate_seo_metadata_corruption":
-                lambda src, w, path, res: self._gate_seo_metadata_corruption(src, w, path, res),
-            "_gate_seo_length_sanity":
-                lambda src, w, path, res: self._gate_seo_length_sanity(src, w, path, res),
-            "_gate_homoglyph_in_code":
-                lambda src, w, path, res: self._gate_homoglyph_in_code(src, w, path, res),
-            "_gate_whole_page_language_mismatch":
-                lambda src, w, path, res: self._gate_whole_page_language_mismatch(w, target_lang, path, res),
-            "_gate_block_scalar_key_leak":
-                lambda src, w, path, res: self._gate_block_scalar_key_leak(src, w, path, res),
+            "_gate_heading_integrity": lambda src, w, path, res: self._gate_heading_integrity(
+                src, w, path, source_doc, res, target_lang
+            ),
+            "_gate_frontmatter_backticks": lambda src,
+            w,
+            path,
+            res: self._gate_frontmatter_backticks(w, path, source_doc, res),
+            "_gate_frontmatter_id_corruption": lambda src,
+            w,
+            path,
+            res: self._gate_frontmatter_id_corruption(w, path, source_doc, res, target_lang),
+            "_gate_double_periods": lambda src, w, path, res: self._gate_double_periods(
+                src, w, path, res
+            ),
+            "_gate_eu_hallucination": lambda src, w, path, res: self._gate_eu_hallucination(
+                src, w, path, res
+            ),
+            "_gate_mixed_language": lambda src, w, path, res: self._gate_mixed_language(
+                w, target_lang, path, res
+            ),
+            "_gate_table_row_integrity": lambda src, w, path, res: self._gate_table_row_integrity(
+                src, w, path, res
+            ),
+            "_gate_duplicate_content": lambda src, w, path, res: self._gate_duplicate_content(
+                w, path, res
+            ),
+            "_gate_newline_explosion": lambda src, w, path, res: self._gate_newline_explosion(
+                src, w, path, res
+            ),
+            "_gate_description_hallucination": lambda src,
+            w,
+            path,
+            res: self._gate_description_hallucination(src, w, path, res),
+            "_gate_code_fence_count": lambda src, w, path, res: self._gate_code_fence_count(
+                src, w, path, res
+            ),
+            "_gate_empty_body": lambda src, w, path, res: self._gate_empty_body(src, w, path, res),
+            "_gate_shortcode_body_leak": lambda src, w, path, res: self._gate_shortcode_body_leak(
+                src, w, path, res
+            ),
+            "_gate_inline_code_integrity": lambda src,
+            w,
+            path,
+            res: self._gate_inline_code_integrity(src, w, path, res),
+            "_gate_encoding_clean": lambda src, w, path, res: self._gate_encoding_clean(
+                src, w, path, res
+            ),
+            "_gate_description_reverted_to_english": lambda src,
+            w,
+            path,
+            res: self._gate_description_reverted_to_english(src, w, target_lang, path, res),
+            "_gate_code_block_content_truncated": lambda src,
+            w,
+            path,
+            res: self._gate_code_block_content_truncated(src, w, path, res),
+            "_gate_fence_parity": lambda src, w, path, res: self._gate_fence_parity(
+                src, w, path, res
+            ),
+            "_gate_multiline_scalar_preservation": lambda src,
+            w,
+            path,
+            res: self._gate_multiline_scalar_preservation(src, w, target_lang, path, res),
+            "_gate_title_identity": lambda src, w, path, res: self._gate_title_identity(
+                w, path, target_lang, source_doc, res
+            ),
+            "_gate_refusal_artifact": lambda src, w, path, res: self._gate_refusal_artifact(
+                w, path, res, target_lang
+            ),
+            "_gate_placeholder_leak": lambda src, w, path, res: self._gate_placeholder_leak(
+                w, path, res, target_lang
+            ),
+            "_gate_partial_script_contamination": lambda src,
+            w,
+            path,
+            res: self._gate_partial_script_contamination(w, path, target_lang, res),
+            "_gate_content_hash_staleness": lambda src,
+            w,
+            path,
+            res: self._gate_content_hash_staleness(src, w, path, res),
+            "_gate_brand_token_presence": lambda src, w, path, res: self._gate_brand_token_presence(
+                src, w, path, res
+            ),
+            "_gate_heading_deficit": lambda src, w, path, res: self._gate_heading_deficit(
+                src, w, path, res
+            ),
+            "_gate_dropped_trailing_link": lambda src,
+            w,
+            path,
+            res: self._gate_dropped_trailing_link(src, w, path, res),
+            "_gate_fidelity_judge": lambda src, w, path, res: self._gate_fidelity_judge(
+                src, w, target_lang, path, res, translation_stats
+            ),
+            "_gate_tm_collision": lambda src, w, path, res: self._gate_tm_collision(
+                src, w, path, res
+            ),
+            "_gate_prose_before_code_dropped": lambda src,
+            w,
+            path,
+            res: self._gate_prose_before_code_dropped(src, w, path, res),
+            "_gate_dash_range_collapsed": lambda src, w, path, res: self._gate_dash_range_collapsed(
+                src, w, path, res
+            ),
+            "_gate_seo_metadata_corruption": lambda src,
+            w,
+            path,
+            res: self._gate_seo_metadata_corruption(src, w, path, res),
+            "_gate_seo_length_sanity": lambda src, w, path, res: self._gate_seo_length_sanity(
+                src, w, path, res
+            ),
+            "_gate_homoglyph_in_code": lambda src, w, path, res: self._gate_homoglyph_in_code(
+                src, w, path, res
+            ),
+            "_gate_whole_page_language_mismatch": lambda src,
+            w,
+            path,
+            res: self._gate_whole_page_language_mismatch(w, target_lang, path, res),
+            "_gate_block_scalar_key_leak": lambda src,
+            w,
+            path,
+            res: self._gate_block_scalar_key_leak(src, w, path, res),
         }
 
     def _run_content_gates(
@@ -1324,12 +1507,19 @@ class WriteGateEvaluator:
                     "action": receipt_action,
                     "error": gate_result.error,
                 }
+                if gate_id == 36 and hasattr(gate_result, "_fidelity_result"):
+                    # Preserve the independent judge evidence on the aggregate
+                    # fixed-point result.  The per-gate result is otherwise
+                    # disposable, which previously retained only its boolean
+                    # and made a model-bound fidelity PASS impossible to prove
+                    # in an acceptance receipt or receipt recovery.
+                    result._fidelity_result = dict(  # type: ignore[attr-defined]
+                        gate_result._fidelity_result  # type: ignore[attr-defined]
+                    )
                 if not gate_result.passed:
                     result.passed = False
                     result.error = gate_result.error or f"Gate {gate_id} failed"
-                    result.clear_tm_buffer = (
-                        result.clear_tm_buffer or gate_result.clear_tm_buffer
-                    )
+                    result.clear_tm_buffer = result.clear_tm_buffer or gate_result.clear_tm_buffer
                     result.retranslate_paths.extend(gate_result.retranslate_paths)
 
         return working
@@ -1539,7 +1729,10 @@ class WriteGateEvaluator:
                 changed = True
                 logger.info(
                     "GATE10 fixed odd backtick in %s.%s: %r → %r",
-                    output_path.name, field_name, val, fixed_val,
+                    output_path.name,
+                    field_name,
+                    val,
+                    fixed_val,
                 )
 
         if not changed:
@@ -1592,8 +1785,8 @@ class WriteGateEvaluator:
         fm_text = parts[1]
         cleaned_fm = fm_text
 
-        for field in ("title", "linkTitle"):
-            en_val = fm.get(field, "")
+        for field_name in ("title", "linkTitle"):
+            en_val = fm.get(field_name, "")
             if not en_val or not isinstance(en_val, str):
                 continue
             en_str = str(en_val).strip()
@@ -1604,7 +1797,7 @@ class WriteGateEvaluator:
 
             # Find translated value
             m = re.search(
-                r"^(" + re.escape(field) + r":\s*[\"']?)(.+?)([\"']?\s*)$",
+                r"^(" + re.escape(field_name) + r":\s*[\"']?)(.+?)([\"']?\s*)$",
                 cleaned_fm,
                 re.MULTILINE,
             )
@@ -1616,11 +1809,14 @@ class WriteGateEvaluator:
 
             # Corrupted: replace with English value
             old_line = m.group(0)
-            new_line = f"{field}: {en_str}"
+            new_line = f"{field_name}: {en_str}"
             cleaned_fm = cleaned_fm.replace(old_line, new_line, 1)
             logger.info(
                 "GATE11 restored %s in %s: %r → %r",
-                field, output_path.name, tr_val, en_str,
+                field_name,
+                output_path.name,
+                tr_val,
+                en_str,
             )
 
         if cleaned_fm == fm_text:
@@ -1813,16 +2009,15 @@ class WriteGateEvaluator:
             result.passed = False
             result.error = (
                 f"Gate 15 table integrity: source={src_rows} rows, "
-                f"translation={tgt_rows} rows (ratio={tgt_rows/max(src_rows,1):.2f})"
+                f"translation={tgt_rows} rows (ratio={tgt_rows / max(src_rows, 1):.2f})"
             )
             logger.error("GATE15 BLOCKED %s: %s", output_path.name, result.error)
             if src_rows >= 4:
                 # Dump full translated content to temp file for diagnosis
-                import tempfile, os as _os
-                _dump_path = _os.path.join(
-                    tempfile.gettempdir(),
-                    f"gate15_dump_{output_path.name}"
-                )
+                import os as _os
+                import tempfile
+
+                _dump_path = _os.path.join(tempfile.gettempdir(), f"gate15_dump_{output_path.name}")
                 try:
                     with open(_dump_path, "w", encoding="utf-8") as _f:
                         _f.write(f"=== tgt_rows={tgt_rows} src_rows={src_rows} ===\n")
@@ -1892,7 +2087,9 @@ class WriteGateEvaluator:
             else:
                 pos = 0
                 for m in re.finditer(r"\n{2,}", chunk):
-                    paragraphs.append((chunk[pos:m.start()], offset + pos, offset + m.start(), False))
+                    paragraphs.append(
+                        (chunk[pos : m.start()], offset + pos, offset + m.start(), False)
+                    )
                     pos = m.end()
                 paragraphs.append((chunk[pos:], offset + pos, offset + len(chunk), False))
             offset += len(chunk)
@@ -2075,7 +2272,9 @@ class WriteGateEvaluator:
         if _SHORTCODE_GATE_RE.search(src_body):
             return  # shortcode exists in EN source — correctly preserved, not a leak
         result.passed = False
-        result.error = "Gate 20 shortcode body leak: {{< or {{% in translated body but not in EN source"
+        result.error = (
+            "Gate 20 shortcode body leak: {{< or {{% in translated body but not in EN source"
+        )
         logger.error("GATE20 BLOCKED %s: %s", output_path.name, result.error)
 
     # ------------------------------------------------------------------
@@ -2476,7 +2675,8 @@ class WriteGateEvaluator:
                 )
                 logger.warning(
                     "GATE43 BLOCK-SCALAR KEY LEAK (warn-only, Phase 8 Tier A) %s: %s",
-                    output_path.name, result.error,
+                    output_path.name,
+                    result.error,
                 )
                 return
 
@@ -2562,7 +2762,9 @@ class WriteGateEvaluator:
         logger.error(
             "GATE28 TITLE DRIFT (blocking, TC-QG-005) %s: family/platform index "
             "title must stay byte-identical to English — expected %r, got %r",
-            output_path.name, en_title, tr_title,
+            output_path.name,
+            en_title,
+            tr_title,
         )
 
     # ------------------------------------------------------------------
@@ -2604,7 +2806,7 @@ class WriteGateEvaluator:
             for m in pattern.finditer(fm_text):
                 line_start = fm_text.rfind("\n", 0, m.start()) + 1
                 line_end = fm_text.find("\n", m.end())
-                line = fm_text[line_start: line_end if line_end != -1 else None].strip()
+                line = fm_text[line_start : line_end if line_end != -1 else None].strip()
                 if line not in hits:
                     hits.append(line[:160])
 
@@ -2633,7 +2835,9 @@ class WriteGateEvaluator:
         logger.error(
             "GATE29 REFUSAL ARTIFACT (blocking, TC-QG-001/Part 22) %s: %d probable "
             "LLM refusal/meta-commentary line(s) found in shipped content: %s",
-            output_path.name, len(hits), hits[:5],
+            output_path.name,
+            len(hits),
+            hits[:5],
         )
 
     # ------------------------------------------------------------------
@@ -2693,7 +2897,9 @@ class WriteGateEvaluator:
         logger.error(
             "GATE30 PLACEHOLDER LEAK (blocking, Part 22) %s: %d literal "
             "placeholder token(s) survived into shipped content: %s",
-            output_path.name, len(hits), hits[:5],
+            output_path.name,
+            len(hits),
+            hits[:5],
         )
 
     # ------------------------------------------------------------------
@@ -2787,7 +2993,10 @@ class WriteGateEvaluator:
         logger.warning(
             "GATE31 PARTIAL SCRIPT CONTAMINATION (warn-only, Part 22) %s: "
             "%d multi-word Latin-script run(s) found in %s content: %s",
-            output_path.name, len(hits), target_lang, hits[:5],
+            output_path.name,
+            len(hits),
+            target_lang,
+            hits[:5],
         )
 
     # ------------------------------------------------------------------
@@ -2839,9 +3048,10 @@ class WriteGateEvaluator:
             f"stale API surface"
         )
         logger.warning(
-            "GATE32 CONTENT HASH STALE (warn-only, Part 22) %s: tgt_hash=%s "
-            "en_hash=%s",
-            output_path.name, tgt_hash[:12], en_hash[:12],
+            "GATE32 CONTENT HASH STALE (warn-only, Part 22) %s: tgt_hash=%s en_hash=%s",
+            output_path.name,
+            tgt_hash[:12],
+            en_hash[:12],
         )
 
     # ------------------------------------------------------------------
@@ -2886,9 +3096,11 @@ class WriteGateEvaluator:
                 f"{'is empty' if not tgt_value else f'does not: {tgt_value[:60]!r}'}"
             )
             logger.warning(
-                "GATE33 BRAND TOKEN MISSING (warn-only, Part 22) %s: field=%s "
-                "en=%r tgt=%r",
-                output_path.name, field_name, en_value[:60], (tgt_value or "")[:60],
+                "GATE33 BRAND TOKEN MISSING (warn-only, Part 22) %s: field=%s en=%r tgt=%r",
+                output_path.name,
+                field_name,
+                en_value[:60],
+                (tgt_value or "")[:60],
             )
             return  # one hit is enough to warn; don't spam multiple fields
 
@@ -2935,7 +3147,9 @@ class WriteGateEvaluator:
         )
         logger.warning(
             "GATE34 HEADING DEFICIT (warn-only, Part 22) %s: src=%d tgt=%d",
-            output_path.name, src_hd, tgt_hd,
+            output_path.name,
+            src_hd,
+            tgt_hd,
         )
 
     # ------------------------------------------------------------------
@@ -2991,9 +3205,9 @@ class WriteGateEvaluator:
             f"anywhere in the translated body"
         )
         logger.warning(
-            "GATE35 DROPPED TRAILING LINK (warn-only, Part 22) %s: missing "
-            "URL(s) %s",
-            output_path.name, section_urls[:2],
+            "GATE35 DROPPED TRAILING LINK (warn-only, Part 22) %s: missing URL(s) %s",
+            output_path.name,
+            section_urls[:2],
         )
 
     # ------------------------------------------------------------------
@@ -3027,7 +3241,10 @@ class WriteGateEvaluator:
         is_reference_leaf = "reference.aspose.org" in parts and output_path.stem != "_index"
         if is_kb_root or is_reference_leaf:
             return True
-        if translation_stats is not None and getattr(translation_stats, "llm_units_translated", 0) > 0:
+        if (
+            translation_stats is not None
+            and getattr(translation_stats, "llm_units_translated", 0) > 0
+        ):
             return True
         return False
 
@@ -3087,9 +3304,7 @@ class WriteGateEvaluator:
         # cause of the block.
         if not result.passed:
             return translated_content
-        if not self._zero_defect and not self._gate36_is_high_risk(
-            output_path, translation_stats
-        ):
+        if not self._zero_defect and not self._gate36_is_high_risk(output_path, translation_stats):
             return translated_content
 
         src_body = self._get_body(source_content)
@@ -3111,9 +3326,7 @@ class WriteGateEvaluator:
         if verdict is None:
             if self._zero_defect:
                 result.passed = False
-                result.error = (
-                    f"GATE36 fidelity judge unavailable for {output_path.name}"
-                )
+                result.error = f"GATE36 fidelity judge unavailable for {output_path.name}"
                 return translated_content
             logger.info(
                 "GATE36 fidelity judge unavailable/failed for %s — skipped",
@@ -3157,7 +3370,9 @@ class WriteGateEvaluator:
         if verdict.verdict == "fail":
             logger.warning(
                 "GATE36 fidelity judge FAIL (score=%.2f) for %s: %s",
-                verdict.score, output_path.name, "; ".join(verdict.issues) or "(no details)",
+                verdict.score,
+                output_path.name,
+                "; ".join(verdict.issues) or "(no details)",
             )
             if _cfg.get("enforce", False):
                 result.passed = False
@@ -3172,7 +3387,9 @@ class WriteGateEvaluator:
         elif verdict.verdict == "warn":
             logger.info(
                 "GATE36 fidelity judge WARN (score=%.2f) for %s: %s",
-                verdict.score, output_path.name, "; ".join(verdict.issues) or "(no details)",
+                verdict.score,
+                output_path.name,
+                "; ".join(verdict.issues) or "(no details)",
             )
 
         try:
@@ -3245,7 +3462,10 @@ class WriteGateEvaluator:
             logger.warning(
                 "GATE37 TM COLLISION (warn-only, Phase 8 Tier C) %s: field=%s "
                 "expected=`%s` found=`%s`",
-                output_path.name, field_name, en_title, other,
+                output_path.name,
+                field_name,
+                en_title,
+                other,
             )
             return  # one hit is enough; don't spam multiple fields
 
@@ -3296,7 +3516,9 @@ class WriteGateEvaluator:
         if not src_fence_idxs or len(src_fence_idxs) != len(tgt_fence_idxs):
             return
 
-        for block_num, (src_idx, tgt_idx) in enumerate(zip(src_fence_idxs, tgt_fence_idxs), start=1):
+        for block_num, (src_idx, tgt_idx) in enumerate(
+            zip(src_fence_idxs, tgt_fence_idxs), start=1
+        ):
             if src_idx == 0 or tgt_idx == 0:
                 continue  # fence is the very first segment -- no lead-in possible
             src_lead_in = "".join(src_segments[src_idx - 1][1]).strip()
@@ -3311,7 +3533,9 @@ class WriteGateEvaluator:
                 logger.warning(
                     "GATE38 PROSE-BEFORE-CODE DROPPED (warn-only, Phase 8 Tier A) %s: "
                     "block #%d src_lead_in=%r",
-                    output_path.name, block_num, src_lead_in[:60],
+                    output_path.name,
+                    block_num,
+                    src_lead_in[:60],
                 )
                 return
 
@@ -3370,13 +3594,15 @@ class WriteGateEvaluator:
                 result.passed = False
                 result.error = (
                     f"GATE39 DASH RANGE COLLAPSED {output_path.name}: "
-                    f"source range \"{num1}-{num2}\" appears to have collapsed "
-                    f"to \"{collapsed}\" in the translation"
+                    f'source range "{num1}-{num2}" appears to have collapsed '
+                    f'to "{collapsed}" in the translation'
                 )
                 logger.warning(
-                    "GATE39 DASH RANGE COLLAPSED (warn-only, Phase 8 Tier A) %s: "
-                    "%s-%s -> %s",
-                    output_path.name, num1, num2, collapsed,
+                    "GATE39 DASH RANGE COLLAPSED (warn-only, Phase 8 Tier A) %s: %s-%s -> %s",
+                    output_path.name,
+                    num1,
+                    num2,
+                    collapsed,
                 )
                 return
 
@@ -3427,15 +3653,20 @@ class WriteGateEvaluator:
             logger.warning(
                 "GATE40 SEO METADATA separator dropped (warn-only, Phase 8 Tier A) "
                 "%s: field=%s en=%r tgt=%r",
-                output_path.name, field_name, en_value[:60], tgt_value[:60],
+                output_path.name,
+                field_name,
+                en_value[:60],
+                tgt_value[:60],
             )
             return
 
         en_keywords = _get_frontmatter_list_field(source_content, "keywords")
         if en_keywords:
             tgt_keywords = _get_frontmatter_list_field(translated_content, "keywords")
-            if tgt_keywords and len(tgt_keywords) >= len(en_keywords) + 2 and (
-                len(tgt_keywords) >= len(en_keywords) * 1.5
+            if (
+                tgt_keywords
+                and len(tgt_keywords) >= len(en_keywords) + 2
+                and (len(tgt_keywords) >= len(en_keywords) * 1.5)
             ):
                 result.passed = False
                 result.error = (
@@ -3446,7 +3677,9 @@ class WriteGateEvaluator:
                 logger.warning(
                     "GATE40 SEO METADATA keywords ballooned (warn-only, Phase 8 "
                     "Tier A) %s: en=%d tgt=%d",
-                    output_path.name, len(en_keywords), len(tgt_keywords),
+                    output_path.name,
+                    len(en_keywords),
+                    len(tgt_keywords),
                 )
 
     # ------------------------------------------------------------------
@@ -3481,9 +3714,7 @@ class WriteGateEvaluator:
             tgt_value = _get_frontmatter_field(translated_content, field_name)
             if not tgt_value:
                 continue  # empty/missing field is a different gate's concern
-            if len(tgt_value) >= len(en_value) + 15 and (
-                len(tgt_value) >= len(en_value) * 1.5
-            ):
+            if len(tgt_value) >= len(en_value) + 15 and (len(tgt_value) >= len(en_value) * 1.5):
                 result.passed = False
                 result.error = (
                     f"GATE44 SEO LENGTH {output_path.name}: {field_name} grew "
@@ -3493,7 +3724,10 @@ class WriteGateEvaluator:
                 logger.warning(
                     "GATE44 SEO LENGTH ballooned (warn-only, Phase 8) %s: "
                     "field=%s en_len=%d tgt_len=%d",
-                    output_path.name, field_name, len(en_value), len(tgt_value),
+                    output_path.name,
+                    field_name,
+                    len(en_value),
+                    len(tgt_value),
                 )
                 return
 
@@ -3554,7 +3788,8 @@ class WriteGateEvaluator:
         )
         logger.warning(
             "GATE41 HOMOGLYPH IN CODE (warn-only, Phase 8 Tier A) %s: %s",
-            output_path.name, result.error,
+            output_path.name,
+            result.error,
         )
 
     # ------------------------------------------------------------------
@@ -3605,7 +3840,9 @@ class WriteGateEvaluator:
             return
         if detected_lang == target_lang or confidence < 0.85:
             return
-        if self._similarity_tracker and self._similarity_tracker.are_similar(target_lang, detected_lang):
+        if self._similarity_tracker and self._similarity_tracker.are_similar(
+            target_lang, detected_lang
+        ):
             return
 
         result.passed = False
@@ -3616,7 +3853,8 @@ class WriteGateEvaluator:
         )
         logger.warning(
             "GATE42 WHOLE-PAGE LANGUAGE MISMATCH (warn-only, Phase 8 Tier A) %s: %s",
-            output_path.name, result.error,
+            output_path.name,
+            result.error,
         )
 
     # ------------------------------------------------------------------
@@ -3782,7 +4020,8 @@ class WriteGateEvaluator:
             for token in api_identifiers:
                 remaining = remaining.replace(token, " ")
             prose_words = [
-                word for word in re.findall(r"[A-Za-z]{4,}", remaining)
+                word
+                for word in re.findall(r"[A-Za-z]{4,}", remaining)
                 if word.lower() not in {"class", "method", "property", "properties"}
             ]
             if len(prose_words) < 4:
@@ -3800,9 +4039,7 @@ class WriteGateEvaluator:
                 return True
         if re.search(r"Aspose\.\w+", line):
             remaining = re.sub(r"Aspose\.\w+", "", line)
-            prose_words = [
-                word for word in remaining.split() if word.isalpha() and len(word) > 3
-            ]
+            prose_words = [word for word in remaining.split() if word.isalpha() and len(word) > 3]
             if len(prose_words) < 3:
                 return True
         return False

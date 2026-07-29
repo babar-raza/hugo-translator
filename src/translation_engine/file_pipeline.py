@@ -847,50 +847,38 @@ class FileTranslationPipeline:
                     validation_passed
                     and getattr(engine, "validation_policy", "standard") == "zero-defect"
                 ):
-                    pre_write_passed, pre_write_errors = engine._pre_write_validation(
-                        content=translated_content,
-                        output_path=output_path,
-                        source_path=source_path,
-                        target_lang=target_lang,
-                        site_id=site_id,
-                        site_profile=site_profile,
-                    )
-                    if not pre_write_passed:
+                    try:
+                        # Final-byte acceptance reruns validation,
+                        # verification, all 44 gates (including independent
+                        # fidelity), fixed-point cleaning, and placement on
+                        # the exact serialized payload.  This closes the old
+                        # gap where an auto-cleaned result could be written
+                        # without re-verifying the bytes that reached disk.
+                        _accepted_candidate = engine.accept_candidate_bytes(
+                            source_bytes=source_path.read_bytes(),
+                            candidate_bytes=translated_content.encode("utf-8"),
+                            source_path=source_path,
+                            output_path=output_path,
+                            target_lang=target_lang,
+                            site_id=site_id,
+                            model_fingerprint=str(
+                                _llm_model_override
+                                or getattr(engine, "model_id_override", "")
+                                or getattr(site_profile, "default_model", "")
+                                or ""
+                            ),
+                        )
+                    except Exception as acceptance_error:
                         validation_passed = False
-                        validation_error = "; ".join(pre_write_errors)
+                        validation_error = str(acceptance_error)
+                else:
+                    _accepted_candidate = None
 
                 # PHASE 2: WRITE (only if ALL validation passed)
                 if validation_passed:
                     try:
                         if getattr(engine, "validation_policy", "standard") == "zero-defect":
-                            from .models import AcceptedTranslation
-
-                            gate_receipt = {
-                                1: {
-                                    "passed": True,
-                                    "action": "verification",
-                                    "error": None,
-                                },
-                                **(_gate_result.gate_results if _gate_result else {}),
-                            }
-                            campaign_context = getattr(engine, "campaign_context", {})
-                            accepted = AcceptedTranslation.from_text(
-                                content=translated_content,
-                                source_content=content,
-                                source_bytes=source_path.read_bytes(),
-                                source_path=source_path,
-                                output_path=output_path,
-                                target_lang=target_lang,
-                                gate_results=gate_receipt,
-                                config_fingerprint=campaign_context.get("config_fingerprint", ""),
-                                model_fingerprint=str(
-                                    _llm_model_override
-                                    or getattr(engine, "model_id_override", "")
-                                    or getattr(site_profile, "default_model", "")
-                                    or ""
-                                ),
-                                campaign_id=campaign_context.get("campaign_id", ""),
-                            )
+                            accepted = _accepted_candidate
                             engine._write_accepted_output(accepted, result.stats)
                             result.acceptance_receipts[target_lang] = accepted.receipt()
                         else:

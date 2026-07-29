@@ -21,7 +21,9 @@ from src.workers.campaign_manifest import (
     dirty_path_fingerprints,
     dirty_snapshot_fingerprint,
     fingerprint_files,
+    git_changed_paths,
     git_dirty_paths,
+    git_is_ancestor,
     git_sha,
     sha256_file,
 )
@@ -131,7 +133,10 @@ def _accepted_output_hashes(receipts_path: Path | None) -> dict[str, str]:
             or ".." in Path(output).parts
             or len(output_hash) != 64
             or len(gates) != 44
-            or any(not isinstance(value, dict) or value.get("passed") is not True for value in gates.values())
+            or any(
+                not isinstance(value, dict) or value.get("passed") is not True
+                for value in gates.values()
+            )
             or "content" in receipt
             or "translated_content" in receipt
         ):
@@ -202,6 +207,7 @@ def build_manifest(
     campaign_id: str,
     allow_dirty_content: bool = False,
     accepted_output_hashes: dict[str, str] | None = None,
+    content_baseline_sha: str | None = None,
 ) -> dict:
     content_dirty = git_dirty_paths(content_repo)
     translator_dirty = git_dirty_paths(translator_repo)
@@ -220,14 +226,10 @@ def build_manifest(
             f"outputs={output_count}/{EXPECTED_OUTPUT_COUNT}"
         )
 
-    allowed_outputs = {
-        output for source in sources for output in source["outputs"].values()
-    }
+    allowed_outputs = {output for source in sources for output in source["outputs"].values()}
     unexpected_receipts = sorted(set(accepted_output_hashes) - allowed_outputs)
     if unexpected_receipts:
-        raise RuntimeError(
-            f"accepted receipt outside campaign matrix: {unexpected_receipts[0]}"
-        )
+        raise RuntimeError(f"accepted receipt outside campaign matrix: {unexpected_receipts[0]}")
     for output, output_hash in accepted_output_hashes.items():
         output_path = content_repo / output
         if not output_path.is_file():
@@ -235,13 +237,25 @@ def build_manifest(
         if sha256_file(output_path) != output_hash:
             raise RuntimeError(f"accepted receipt output hash mismatch: {output}")
     existing_without_receipt = [
-        output for output in allowed_outputs
+        output
+        for output in allowed_outputs
         if (content_repo / output).exists() and output not in accepted_output_hashes
     ]
     if existing_without_receipt:
         raise RuntimeError(
             f"destination contains unreceipted campaign output: {existing_without_receipt[0]}"
         )
+    current_content_sha = git_sha(content_repo)
+    pinned_content_sha = content_baseline_sha or current_content_sha
+    if not git_is_ancestor(content_repo, pinned_content_sha, current_content_sha):
+        raise RuntimeError("content baseline is not an ancestor of current HEAD")
+    if pinned_content_sha != current_content_sha:
+        changed = set(git_changed_paths(content_repo, pinned_content_sha, current_content_sha))
+        unexpected = sorted(changed - allowed_outputs)
+        if unexpected:
+            raise RuntimeError(
+                f"content baseline descendants contain non-campaign paths: {unexpected[:10]}"
+            )
     destination_baseline = {}
     if allow_dirty_content:
         paths = dirty_path_fingerprints(
@@ -259,7 +273,7 @@ def build_manifest(
         "campaign_id": campaign_id,
         "validation_policy": "zero-defect",
         "content_repo": str(content_repo.resolve()),
-        "content_repo_sha": git_sha(content_repo),
+        "content_repo_sha": pinned_content_sha,
         "translator_repo_sha": git_sha(translator_repo),
         "config_fingerprint": _config_fingerprint(translator_repo),
         "model_fingerprints": {
@@ -329,6 +343,14 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="freeze unrelated destination changes instead of requiring a clean content repository",
     )
+    parser.add_argument(
+        "--content-baseline-sha",
+        default=None,
+        help=(
+            "Immutable pre-output content SHA to preserve while repinning a "
+            "campaign whose descendants contain only enumerated outputs"
+        ),
+    )
     args = parser.parse_args(argv)
 
     try:
@@ -338,6 +360,7 @@ def main(argv: list[str] | None = None) -> int:
             campaign_id=args.campaign_id,
             allow_dirty_content=args.allow_dirty_content,
             accepted_output_hashes=_accepted_output_hashes(args.accepted_receipts),
+            content_baseline_sha=args.content_baseline_sha,
         )
     except Exception as exc:
         print(f"MANIFEST BUILD BLOCKED: {exc}", file=sys.stderr)

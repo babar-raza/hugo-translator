@@ -55,8 +55,7 @@ class _CampaignMetadataOnlyLogFilter(logging.Filter):
         record.msg = (
             "campaign_event "
             f"logger={record.name} function={record.funcName} "
-            f"event_sha256={digest}"
-            + (f" exception={exception_name}" if exception_name else "")
+            f"event_sha256={digest}" + (f" exception={exception_name}" if exception_name else "")
         )
         record.args = ()
         # Tracebacks can embed model responses or candidate fragments.
@@ -247,6 +246,7 @@ class AutonomousWorkerConfig:
         campaign_shard: str | None = None,
         resume: bool = False,
         verify_only: bool = False,
+        recover_committed_receipts: bool = False,
         validation_policy: str = "standard",
     ):
         """Initialize worker configuration."""
@@ -267,6 +267,7 @@ class AutonomousWorkerConfig:
         self.campaign_shard = campaign_shard
         self.resume = resume
         self.verify_only = verify_only
+        self.recover_committed_receipts = recover_committed_receipts
         self.validation_policy = validation_policy
 
     @classmethod
@@ -289,6 +290,7 @@ class AutonomousWorkerConfig:
             campaign_shard=getattr(args, "campaign_shard", None),
             resume=getattr(args, "resume", False),
             verify_only=getattr(args, "verify_only", False),
+            recover_committed_receipts=getattr(args, "recover_committed_receipts", False),
             validation_policy=getattr(args, "validation_policy", "standard"),
         )
 
@@ -321,6 +323,23 @@ class AutonomousContentTranslationWorker:
     _worker_id = "content_worker"
     _worker_log_path = "data/logs/content_worker.log"
 
+    @staticmethod
+    def _l3_index_path(tm_data_dir: Path, campaign) -> Path:
+        """Keep governed campaign semantic records isolated from legacy L3."""
+        if campaign is None:
+            return tm_data_dir / "l3_faiss"
+
+        campaign_root = (Path("data") / "campaigns").resolve()
+        candidate = (campaign_root / str(campaign.campaign_id) / "tm" / "l3_faiss").resolve()
+        if not candidate.is_relative_to(campaign_root):
+            raise ValueError("campaign L3 path escapes the governed campaign root")
+        return candidate
+
+    @staticmethod
+    def _l3_save_interval(campaign) -> int:
+        """Fsync every accepted campaign addition instead of batching durability."""
+        return 1 if campaign is not None else 100
+
     def __init__(self, config: AutonomousWorkerConfig):
         """
         Initialize autonomous worker.
@@ -336,9 +355,7 @@ class AutonomousContentTranslationWorker:
         self._site_profile_errors = {}
         self.campaign = None
         if config.campaign_shard:
-            shard_digest = hashlib.sha256(
-                config.campaign_shard.encode("utf-8")
-            ).hexdigest()[:12]
+            shard_digest = hashlib.sha256(config.campaign_shard.encode("utf-8")).hexdigest()[:12]
             self._worker_id = f"content_worker_campaign_{shard_digest}"
             self._worker_log_path = f"data/logs/{self._worker_id}.log"
 
@@ -387,6 +404,8 @@ class AutonomousContentTranslationWorker:
                 "Campaign profile root bound to pinned checkout: %s",
                 campaign_content_root,
             )
+        elif self.config.recover_committed_receipts:
+            raise ValueError("--recover-committed-receipts requires --campaign-manifest")
 
         # Apply VRAM enforcement if using CUDA
         if self.config.device.startswith("cuda"):
@@ -451,10 +470,17 @@ class AutonomousContentTranslationWorker:
             l3_semantic = None
             if L3SemanticTM is not None:
                 try:
+                    l3_index_path = self._l3_index_path(tm_data_dir, self.campaign)
                     l3_semantic = L3SemanticTM(
-                        index_path=tm_data_dir / "l3_faiss",
-                        use_gpu=True,  # TC-L3-002: ~80MB encoder, safe on RTX 4090; CPU fallback built-in
+                        index_path=l3_index_path,
+                        use_gpu=self.config.device.startswith("cuda"),
+                        save_interval=self._l3_save_interval(self.campaign),
                     )
+                    if self.campaign is not None:
+                        logger.info(
+                            "Campaign L3 isolated at governed namespace: %s",
+                            l3_index_path,
+                        )
                 except Exception as e:
                     logger.warning(f"L3 semantic TM not available: {e}")
 
@@ -725,7 +751,7 @@ class AutonomousContentTranslationWorker:
             disk_check_path = "."
             campaign = getattr(self, "campaign", None)
             if campaign is not None:
-                disk_check_path = str(Path(campaign.content_repo) / "content")
+                disk_check_path = str(Path(campaign.content_repo).resolve())
             elif self.config_service and self.config.site:
                 try:
                     profile = self.config_service.get_site_profile(self.config.site)
@@ -767,9 +793,7 @@ class AutonomousContentTranslationWorker:
         if original_device != self.config.device:
             logger.info(f"Device fallback applied: {original_device} → {self.config.device}")
 
-        self._last_preflight_error = (
-            "preflight:" + ",".join(failure_codes) if failure_codes else ""
-        )
+        self._last_preflight_error = "preflight:" + ",".join(failure_codes) if failure_codes else ""
         return checks_passed
 
     def run(self) -> None:
@@ -856,13 +880,13 @@ class AutonomousContentTranslationWorker:
                     translation_engine=self.translation_engine,
                     translator_repo=Path.cwd(),
                 )
+                if self.config.recover_committed_receipts:
+                    runner.recover_committed_receipts()
                 summary = runner.run(
-                    resume=self.config.resume,
+                    resume=(self.config.resume or self.config.recover_committed_receipts),
                     verify_only=self.config.verify_only,
                     shard_ids=(
-                        {self.config.campaign_shard}
-                        if self.config.campaign_shard
-                        else None
+                        {self.config.campaign_shard} if self.config.campaign_shard else None
                     ),
                 )
                 self._run_new_files = {"campaign": int(summary.get("accepted", 0))}
@@ -1961,7 +1985,7 @@ class AutonomousContentTranslationWorker:
                     )
                     allowed_langs = (
                         set(configured_langs)
-                        if isinstance(configured_langs, (list, tuple, set))
+                        if isinstance(configured_langs, list | tuple | set)
                         else None
                     )
 
@@ -2387,6 +2411,16 @@ Examples:
         "--verify-only",
         action="store_true",
         help="Verify the pinned campaign environment without translating",
+    )
+
+    parser.add_argument(
+        "--recover-committed-receipts",
+        action="store_true",
+        help=(
+            "Fail-closed recovery for a lost/partial ledger: revalidate exact "
+            "one-file governed commit bytes through every zero-defect gate, "
+            "then resume"
+        ),
     )
 
     parser.add_argument(
