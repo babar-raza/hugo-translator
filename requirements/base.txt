@@ -20,7 +20,7 @@ sentencepiece>=0.1.99
 # Orchestration
 watchdog>=3.0.0
 mcp>=0.9.0
-redis>=5.0.0
+redis>=7.0.1
 
 # Observability
 structlog>=23.2.0
