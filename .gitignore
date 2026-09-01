@@ -357,3 +357,4 @@ scripts/inspect_cache.py
 /docs/plans
 /.local
 /.supervisor/state
+/.kilo
