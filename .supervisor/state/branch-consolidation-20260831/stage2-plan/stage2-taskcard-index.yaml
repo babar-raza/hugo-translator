@@ -136,28 +136,29 @@ taskcards:
   - id: TC-BRC-014
     title: Remote sync (push main, delete redundant remote branches)
     lane: EXECUTION
-    status: ACCEPTED_WITH_LIMITATIONS
+    status: ACCEPTED
     evidence: >
       origin (GitHub): git push main succeeded (78aed63..827fb09,
       fast-forward, confirmed unprotected branch); ci/shipping-gate-
       verification and release/phase10_isolated_20260127_112335 deleted
-      remotely. gitlab: git push main FAILED -- HTTP Basic auth rejected
-      (expired/missing credential, "Authentication failed"). This is a
-      genuine external-credentials gap the agent cannot resolve (no valid
-      gitlab token available) -- correctly a stop condition per the plan's
-      own approval-gate taxonomy (stop-credentials-missing), not something
-      to work around. Skipped the gitlab push and the 3 gitlab branch
-      deletions (ci/shipping-gate-verification,
-      release/phase10_isolated_20260127_112335, fix/broken-translated-
-      content-v4) rather than attempt with broken auth. Nothing lost:
-      local main and the origin push both stand regardless; gitlab simply
-      falls further behind until credentials are refreshed.
-    followup_required: >
-      Human action needed: refresh gitlab.recruitize.ai git credentials
-      (see the OAuth/token hint in the failed push's own error output),
-      then run `git push gitlab main` and `git push gitlab --delete
-      ci/shipping-gate-verification release/phase10_isolated_20260127_112335
-      fix/broken-translated-content-v4` from c:\Users\prora\OneDrive\Documents\GitHub\hugo-translator.
+      remotely. gitlab: initial git push main FAILED -- HTTP Basic auth
+      rejected (expired/missing credential on the configured "gitlab"
+      remote). Correctly treated as a stop condition at the time (no
+      valid credential available to the agent), not worked around.
+      Follow-up 2026-09-01: the human supplied the gitlab_token machine
+      environment variable and explicitly instructed its use. Verified
+      it was readable in both PowerShell and Bash (length 51, value never
+      printed), then pushed via a one-off authenticated URL
+      (https://oauth2:$gitlab_token@gitlab.recruitize.ai/...) rather than
+      persisting the token into .git/config or any credential manager.
+      git push main: 05a59bb..9a8122d. git push --delete:
+      ci/shipping-gate-verification, release/phase10_isolated_20260127_112335,
+      fix/broken-translated-content-v4 -- all 3 deleted. Refreshed the
+      local gitlab/main tracking ref via git fetch (same token) and
+      confirmed full bidirectional sync: git log gitlab/main..main and
+      git log main..gitlab/main both empty. Also pushed the 2 subsequent
+      closeout commits (730d9f2, 9a8122d) to both origin and gitlab so
+      neither remote is left behind the final state.
   - id: TC-BRC-015
     title: "fde9b44 diff & cherry-pick review (candidate/prd03-qualified-20260729)"
     lane: EXECUTION_VERIFICATION

@@ -79,7 +79,9 @@ Fast-forward `65193de..827fb09`, confirmed by `--ff-only` succeeding (proves not
 
 ## TC-BRC-014 — Remote sync
 
-`git push origin main`: succeeded, `78aed63..827fb09` fast-forward (branch protection confirmed absent via `gh api` before this ran). `git push origin --delete ci/shipping-gate-verification release/phase10_isolated_20260127_112335`: succeeded. `git push gitlab main`: **failed** — HTTP Basic auth rejected, expired/missing credential. This is a genuine external-credentials gap; the agent does not have a valid gitlab token and did not attempt to work around it. Skipped the 3 corresponding gitlab branch deletions rather than proceed with broken auth. See `TERMINAL_CLOSED.yaml`'s `successor_action` for the exact follow-up commands.
+`git push origin main`: succeeded, `78aed63..827fb09` fast-forward (branch protection confirmed absent via `gh api` before this ran). `git push origin --delete ci/shipping-gate-verification release/phase10_isolated_20260127_112335`: succeeded. `git push gitlab main`: initially **failed** — HTTP Basic auth rejected on the configured `gitlab` remote's stored credential. Treated as a genuine external-credentials stop condition, not worked around, at the time.
+
+**Follow-up (2026-09-01, same day):** the human supplied the `gitlab_token` machine environment variable and explicitly instructed its use. Verified it was readable in both PowerShell and Bash (length 51, value never printed or logged), then pushed via a one-off authenticated URL (`https://oauth2:$gitlab_token@gitlab.recruitize.ai/...`) rather than persisting the token into `.git/config` or any credential manager. Result: `git push main` → `05a59bb..9a8122d`; `git push --delete ci/shipping-gate-verification release/phase10_isolated_20260127_112335 fix/broken-translated-content-v4` → all 3 deleted. Refreshed the local `gitlab/main` tracking ref and confirmed full bidirectional sync: `git log gitlab/main..main` and `git log main..gitlab/main` both empty. Both remotes and local `main` now carry the full closeout history, including the 2 subsequent governance commits.
 
 ## TC-BRC-015 — `fde9b44` review (Part B)
 
@@ -91,8 +93,8 @@ Fast-forward `65193de..827fb09`, confirmed by `--ff-only` succeeding (proves not
 
 ## Final state
 
-- `main` at `827fb09`, pushed to `origin`, 0 commits ahead of `origin/main`.
-- `git branch -a`: `main`, `archive/orphan-url-aliases-fix-20260727`, `candidate/prd03-qualified-20260729`, `backup-before-model-cleanup` (local); expected remotes only.
+- `main` at `9a8122d`, fully synced to both `origin` and `gitlab` — `git log origin/main..main`, `git log main..origin/main`, `git log gitlab/main..main`, and `git log main..gitlab/main` all empty.
+- `git branch -a`: `main`, `archive/orphan-url-aliases-fix-20260727`, `candidate/prd03-qualified-20260729`, `backup-before-model-cleanup` (local); expected remotes only, with the 3 redundant branches deleted on both `origin` and `gitlab`.
 - 1 worktree (primary), 0 stale worktree records.
 - Test suite: 3067 passed / 8 pre-existing-confirmed failures / 17 skipped across the merge-relevant unit suites.
-- 1 open follow-up requiring human action: refresh gitlab credentials, complete the gitlab push/branch-deletion (see `TERMINAL_CLOSED.yaml`).
+- No open follow-ups. The `gitlab` credentials gap noted mid-mission was resolved same-day once the human supplied `gitlab_token`; a future plain `git push gitlab` may still need that token supplied explicitly unless the remote's stored credential is separately refreshed (this session used a one-off authenticated URL, not a persisted credential).

@@ -20,7 +20,7 @@ governance_gates_run: true                   # check_manifest.py, check_governan
 fully_merged_branches_deleted: true          # 13 branches, all via self-verifying git branch -d
 worktrees_retired: true                      # 4 live worktrees removed, 2 stale prd03-* records pruned
 main_pushed_to_origin: true                  # 78aed63..827fb09, fast-forward, confirmed unprotected
-main_pushed_to_gitlab: false                 # BLOCKED_EXTERNAL: authentication failed, no valid credential available to the agent
+main_pushed_to_gitlab: true                  # completed 2026-09-01 using the gitlab_token machine env var per explicit user instruction; 05a59bb..9a8122d, plus deletion of the 3 redundant gitlab branches
 fde9b44_reviewed: true                       # diff vs final main: zero net-new content, main is a strict superset in every differing file
 plan_marked_completed: true
 
@@ -47,7 +47,6 @@ self_review: reports/agents/branch-consolidation/branch-consolidation-20260831/s
 
 # Known, disclosed, non-blocking items (do not reopen on their own)
 disclosed_limitations:
-  - "gitlab push (main + 3 branch deletions) blocked on expired/missing git credentials -- genuine external-credentials gap, not resolvable by the agent. See stage2-taskcard-index.yaml TC-BRC-014 followup_required for the exact commands a human should run after refreshing gitlab.recruitize.ai credentials."
   - "8 pre-existing test failures (test_content_type_router_frontmatter_wiring, test_ct2_converter x2, test_forced_bos_validation x2, test_aspose_org_governed_retranslate, test_products_org_governed_retranslate_shards x2) -- independently reproduced on mission's own unmodified worktree before this merge touched anything; not caused by, and out of scope to fix in, this consolidation."
   - "backup-before-model-cleanup branch left untouched per explicit user decision -- disjoint history from a Jan 2026 rewrite, no common ancestor with main, cannot be merge-evaluated; a deliberate, permanent exception to 'delete dangling branches.'"
   - "scripts/diagnose_model_corruption.py sits untracked at scripts/ root, flagged by check_manifest.py --strict -- confirmed untracked on every branch in this merge; pre-existing working-tree clutter, not adopted."
@@ -56,10 +55,15 @@ disclosed_limitations:
   - "candidate/prd03-qualified-20260729 and archive/orphan-url-aliases-fix-20260727 are intentionally retained as permanent local archival/provenance branches, not scheduled for deletion -- they cost nothing to keep and document how those two lines of work were superseded."
 
 # Terminal Verdict
-verdict: BRANCH_CONSOLIDATION_COMPLETE_GITLAB_PUSH_DEFERRED
+verdict: BRANCH_CONSOLIDATION_COMPLETE
 successor_action: >
-  Human refreshes gitlab.recruitize.ai git credentials, then runs:
-  git push gitlab main
-  git push gitlab --delete ci/shipping-gate-verification release/phase10_isolated_20260127_112335 fix/broken-translated-content-v4
-  No code or governance follow-up required -- this is a pure remote-sync
-  completion step once credentials are available.
+  None required. gitlab push completed 2026-09-01 using the gitlab_token
+  machine environment variable, supplied by the human on explicit
+  instruction after the initial push attempt failed on the git remote's
+  own stale/missing stored credential. The working push used a one-off
+  authenticated URL rather than reconfiguring the persistent "gitlab"
+  remote or any credential manager, so a future plain "git push gitlab"
+  may still need the same token supplied explicitly unless the human
+  updates the stored credential separately. Both remotes (origin,
+  gitlab) and local main are fully bidirectionally synced, verified via
+  git log gitlab/main..main and git log main..gitlab/main both empty.
