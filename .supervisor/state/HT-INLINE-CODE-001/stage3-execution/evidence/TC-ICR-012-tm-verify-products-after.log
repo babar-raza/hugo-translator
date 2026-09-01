@@ -1,0 +1,26 @@
+C:\Users\prora\OneDrive\Documents\GitHub\hugo-translator\scripts\quality\tm_surgical_cleanup.py:382: UserWarning: L2PersistentTM: sibling LMDB directory found alongside canonical 'l2.lmdb': l2_lmdb. This indicates split writes. Run scripts/tm/migrate_l2_lmdb.py to consolidate.
+  tm = L2PersistentTM(db_path=tm_path)
+TC-TM-02: sibling L2 LMDB dir(s) detected: l2_lmdb (canonical: data\tm\l2.lmdb). Run scripts/tm/migrate_l2_lmdb.py --apply to consolidate.
+TM path: data\tm\l2.lmdb
+Mode: DRY-RUN
+Max changes: 25000
+
+Scanning L2 TM (site=products.aspose.org, locales=ALL)...
+
+============================================================
+SUMMARY
+============================================================
+Entries scanned:          49,786
+Clean entries:            49,786
+Corrupt entries found:         0
+  identifier_translated:       0
+  artifact_in_translation:     0
+  heading_term_corrupted:      0
+  heading_untranslated_passthrough:   0
+  inline_code_span_translated:       0
+Planned overwrites:            0
+Planned deletes:               0
+Planned i18n corrections:      0
+Planned inline-code patches:   0
+
+DRY-RUN complete. Run with --apply to fix entries.

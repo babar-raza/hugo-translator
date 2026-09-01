@@ -1,0 +1,50 @@
+mission_id: duplicate-content-fence-fix-20260723
+state: TERMINAL_CLOSED
+active_plan: C:/Users/prora/.claude/plans/this-surfaced-something-more-witty-bear.md
+authoritative_controller: .supervisor/prompts/prompt3-controlled-execution.md
+authoritative_task_graph: stage3-execution/taskcard-status.yaml
+evidence_root: stage3-execution/evidence/20260725-code-fence-durable-fix
+reopened_at: "2026-07-25"
+reason: >
+  The supplied plan proves that the earlier duplicate-content-only closure
+  left a live shared-primitve gap: CommonMark indented code is not masked and
+  three audit checks still implement fence exclusion independently. This
+  continuation supersedes only the prior terminal status; historical closure
+  artifacts remain preserved as evidence.
+closed_at: "2026-07-27"
+next_task: null
+resume_rule: "None -- all v2 tasks (TC-DCF-018..022) are COMPLETED_VERIFIED. A future successor mission would need its own reopening, not a resume of this one."
+closure_verdict: >
+  ALL_GREEN. TC-DCF-018 through TC-DCF-022 all COMPLETED_VERIFIED. TC-DCF-022
+  (the only gate blocked at last close) was resumed 2026-07-27: the 10-minute
+  foreground execution ceiling was escaped by running the comparator as a
+  detached background process; the resulting non-selective 136,690-pair
+  full-corpus comparison found zero unexplained regressions across all six
+  v2-touched checks. A real defect discovered and fixed in the comparator
+  script itself during disposition (double-frontmatter-stripping in its
+  code_fence_dropped branch, causing a false 85-file regression signal on
+  the first run) was confirmed NOT to affect any shipped detection code --
+  see stage3-execution/evidence/20260725-code-fence-durable-fix/v2-final/TC-DCF-022-closure-20260727.md.
+  Two prior stale successor-taskcard entries (AUD-FENCE-SWEEP-001,
+  AUD-AUDIT-REPRO-001) were corrected 2026-07-27 to reflect that TC-DCF-020/021
+  actually delivered 4 of 5 and all of the originally-successor-scoped work
+  respectively; only inline_code_translated's eventual migration (owned by a
+  separate concurrent effort) remains open under AUD-FENCE-SWEEP-001, narrowed
+  accordingly. The uncommitted v2 diff (scripts/quality/audit_all_content.py,
+  tests/unit/quality/test_audit_all_content_reproducibility.py, plus this
+  session's comparator-script fix and governance-file corrections) has not
+  been committed -- that decision is left to the operator per this mission's
+  own "no commit or push is implied" convention for this phase.
+independent_review: ACCEPTED_V2_SCOPE
+implementation_commit: 12615212ec5cf083e4924903ee0732bf055749e0
+post_closure_pilot:
+  task: TC-DCF-017
+  verdict: "core migration confirmed; audit-report parity remains incomplete"
+  evidence: stage3-execution/evidence/20260725-code-fence-durable-fix/pilot/pilot-results.md
+plan_version: v2
+superseded_plan_sha256: C2EE3358EF493672213A943884E6127B747584123919284B18121826A7143136
+plan_sha256: 3D8F423E0F1EECD5410480C0CEE2EE884DCB83BAA3437E9C2B09311CE459F2F0
+reopen_reason: >
+  TC-DCF-017 proved live Gate 26 detects a two-fence loss that audit JSONL
+  suppresses. Amendment v2 activates the explicitly named Phase 3 and 4 gaps
+  in this same mission.

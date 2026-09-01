@@ -1,0 +1,285 @@
+schema_version: 1
+locale: cs
+translations:
+  heading.overview:
+    value: Přehled
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 13622
+    corpus_agreement: agree
+  heading.see_also:
+    value: 'Viz také:'
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 1790
+    corpus_agreement: agree
+    rejected_variants:
+    - Viz také
+  heading.properties:
+    value: Vlastnosti
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 6500
+    corpus_agreement: agree
+  heading.methods:
+    value: Metody
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 3448
+    corpus_agreement: agree
+  heading.description:
+    value: Popis
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 2572
+    corpus_agreement: override
+    rejected_variants:
+    - Vlastnosti
+    - Metody
+    - Hodnoty
+  heading.values:
+    value: Hodnoty
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 3808
+    corpus_agreement: agree
+  heading.enumerations:
+    value: Výčty
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 119
+    corpus_agreement: override
+    rejected_variants:
+    - Číslování
+  heading.accessor_methods:
+    value: Přístupové metody
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 791
+    corpus_agreement: override
+    rejected_variants:
+    - Metody přípojky
+  heading.constructors:
+    value: Konstruktory
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 31
+    corpus_agreement: override
+    rejected_variants:
+    - Výrobci
+  heading.core_api:
+    value: Základní API
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 290
+    corpus_agreement: override
+    rejected_variants:
+    - Graf hlavní scény
+  heading.interfaces:
+    value: Rozhraní
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 150
+    corpus_agreement: override
+    rejected_variants:
+    - Tvary
+  heading.inheritance:
+    value: Dědičnost
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 34
+    corpus_agreement: override
+    rejected_variants:
+    - Dědictví
+  heading.structs:
+    value: Struktury
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 143
+    corpus_agreement: no_corpus_evidence
+  heading.examples:
+    value: 'Příklady:'
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 35
+    corpus_agreement: agree
+  heading.classes:
+    value: Třídy
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 103
+    corpus_agreement: agree
+  heading.type:
+    value: 'Typ:'
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 52228
+    corpus_agreement: agree
+  heading.name:
+    value: 'Název:'
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 52195
+    corpus_agreement: agree
+  heading.returns:
+    value: Návratová hodnota
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 1363
+    corpus_agreement: override
+    rejected_variants:
+    - Zpětné výnosy
+  heading.value:
+    value: Hodnota
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 13014
+    corpus_agreement: agree
+  table.header.description:
+    value: 'Popis:'
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 122171
+    corpus_agreement: agree
+  table.header.signature:
+    value: 'Podpis:'
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 31997
+    corpus_agreement: agree
+  table.header.access:
+    value: Přístup
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 34671
+    corpus_agreement: agree
+  table.header.property:
+    value: Vlastnost
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 1958
+    corpus_agreement: override
+    rejected_variants:
+    - Vlastnictví
+  table.header.method:
+    value: Metoda
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 1266
+    corpus_agreement: override
+    rejected_variants:
+    - Metodika
+  table.header.class:
+    value: Třída
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 715
+    corpus_agreement: agree
+  table.header.enumeration:
+    value: Výčet
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 525
+    corpus_agreement: override
+    rejected_variants:
+    - Číslo a počet
+  table.header.return_type:
+    value: Typ vrácení
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 273
+    corpus_agreement: agree
+  table.access.read:
+    value: Čtení
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 0
+    corpus_agreement: no_corpus_evidence
+  table.access.write:
+    value: Zápis
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 0
+    corpus_agreement: no_corpus_evidence
+  table.access.read_write:
+    value: Čtení/zápis
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 0
+    corpus_agreement: no_corpus_evidence
+  table.access.execute:
+    value: Spuštění
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 0
+    corpus_agreement: no_corpus_evidence
+  table.access.create:
+    value: Vytvoření
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 0
+    corpus_agreement: no_corpus_evidence
+  table.access.delete:
+    value: Odstranění
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 0
+    corpus_agreement: no_corpus_evidence
+  table.access.update:
+    value: Aktualizace
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 0
+    corpus_agreement: no_corpus_evidence
+  phrase.inherits_from:
+    value: 'Dědí z: {api}.'
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 3750
+    corpus_agreement: agree
+  phrase.is_a_class_in:
+    value: '{api} je třída v Aspose.{family} FOSS pro {platform}.'
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 61489
+    corpus_agreement: agree
+  phrase.is_an_enum_in:
+    value: '{api} je enum v Aspose.{family} FOSS pro {platform}.'
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 13205
+    corpus_agreement: agree
+  phrase.is_an_interface_in:
+    value: '{api} je rozhraní v Aspose.{family} FOSS pro {platform}.'
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 5427
+    corpus_agreement: agree
+  phrase.is_a_struct_in:
+    value: '{api} je struktura v Aspose.{family} FOSS pro {platform}.'
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 873
+    corpus_agreement: agree
+  phrase.class_provides_methods:
+    value: Tato třída poskytuje {n} metod pro práci s objekty {api} v programech {platform}.
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 23690
+    corpus_agreement: agree
+  phrase.enum_defines_values:
+    value: 'Tento výčet definuje {n} hodnot:'
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 9578
+    corpus_agreement: agree
+  phrase.members_accessible_after_install:
+    value: Všechny veřejné členy jsou přístupné jakékoli aplikaci {platform} po instalaci
+      balíčku Aspose.{family} FOSS pro {platform}.
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 3690
+    corpus_agreement: override
+    rejected_variants:
+    - Všechny veřejné členy jsou přístupné jakékoli aplikaci {platform} po instalaci
+      balíčku Aspose.{family} FOSS for {platform}.

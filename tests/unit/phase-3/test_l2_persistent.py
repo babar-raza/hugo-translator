@@ -168,6 +168,47 @@ class TestL2PersistentTM:
             entry = tm.exact_lookup("site1", "en", "es", "Title", context="body.heading")
             assert entry is None
 
+    def test_context_and_field_name_combined_disambiguation(self, temp_db: Path) -> None:
+        """HT-QUALITY-GATES-001 Part 22 (root cause A follow-up): context was
+        previously accepted end-to-end (TranslationMemory -> L2PersistentTM)
+        but never affected the LMDB key at all, so two unrelated occurrences
+        of identical text under different contexts silently collided --
+        confirmed live via test_context_filtering failing against HEAD before
+        this fix. This exercises the combined field_name+context case, the
+        most specific tier of the new fallback chain, which no existing test
+        covered."""
+        with L2PersistentTM(temp_db, max_size_mb=20) as tm:
+            tm.store(
+                "site1", "en", "uk", "Name", "Заголовок",
+                context="frontmatter.title", field_name="title",
+            )
+            tm.store(
+                "site1", "en", "uk", "Name", "Опис",
+                context="frontmatter.description", field_name="description",
+            )
+
+            title_entry = tm.exact_lookup(
+                "site1", "en", "uk", "Name",
+                context="frontmatter.title", field_name="title",
+            )
+            desc_entry = tm.exact_lookup(
+                "site1", "en", "uk", "Name",
+                context="frontmatter.description", field_name="description",
+            )
+            assert title_entry.translation == "Заголовок"
+            assert desc_entry.translation == "Опис"
+
+            # Same field_name, different context -- must not collide even
+            # though field_name alone would previously have been enough to
+            # match (this is the same-field-different-node case: two
+            # different frontmatter.title occurrences across two pages
+            # sharing templated text).
+            miss = tm.exact_lookup(
+                "site1", "en", "uk", "Name",
+                context="body.heading", field_name="title",
+            )
+            assert miss is None
+
     def test_batch_store(self, temp_db: Path) -> None:
         """Test batch storage."""
         with L2PersistentTM(temp_db, max_size_mb=20) as tm:
@@ -184,6 +225,51 @@ class TestL2PersistentTM:
             assert tm.exact_lookup("site1", "en", "es", "One").translation == "Uno"
             assert tm.exact_lookup("site1", "en", "es", "Two").translation == "Dos"
             assert tm.exact_lookup("site1", "en", "es", "Three").translation == "Tres"
+
+    def test_batch_store_respects_field_name_scoping(self, temp_db: Path) -> None:
+        """HT-QUALITY-GATES-001 Part 22 (root cause A): batch_store() used to
+        always call make_tm_key() (unscoped) directly, bypassing field_name
+        scoping entirely even for entries that specified one -- the same
+        source text under two different field scopes would collide on one
+        shared key. Two entries with identical source_text but different
+        field_name must be stored and retrievable independently."""
+        with L2PersistentTM(temp_db, max_size_mb=20) as tm:
+            entries = [
+                TranslationEntry(
+                    "Aspose.Cells FOSS is a free library.", "Title translation",
+                    "site1", "en", "es", field_name="title",
+                ),
+                TranslationEntry(
+                    "Aspose.Cells FOSS is a free library.", "Description translation",
+                    "site1", "en", "es", field_name="description",
+                ),
+            ]
+
+            count = tm.batch_store(entries)
+            assert count == 2
+
+            title_entry = tm.exact_lookup(
+                "site1", "en", "es", "Aspose.Cells FOSS is a free library.",
+                field_name="title",
+            )
+            description_entry = tm.exact_lookup(
+                "site1", "en", "es", "Aspose.Cells FOSS is a free library.",
+                field_name="description",
+            )
+            assert title_entry.translation == "Title translation"
+            assert description_entry.translation == "Description translation"
+
+    def test_batch_store_default_field_name_is_legacy_unscoped(self, temp_db: Path) -> None:
+        """An entry with no field_name specified must still round-trip via
+        the legacy unscoped key -- backward compatible with existing
+        pre-Part-22 callers/entries."""
+        with L2PersistentTM(temp_db, max_size_mb=20) as tm:
+            entries = [TranslationEntry("Plain text", "Texto simple", "site1", "en", "es")]
+            tm.batch_store(entries)
+
+            entry = tm.exact_lookup("site1", "en", "es", "Plain text")
+            assert entry is not None
+            assert entry.translation == "Texto simple"
 
     def test_delete(self, temp_db: Path) -> None:
         """Test deletion of entries."""

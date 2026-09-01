@@ -295,8 +295,8 @@ class TestTemperatureOnRetry:
         # Temperature should be 0.7 + (2 * 0.1) = 0.9
         assert provider_config.temperature == pytest.approx(0.9)
 
-    def test_temperature_not_applied_on_first_attempt(self):
-        """On retry_count=0, temperature should remain at base (0.7)."""
+    def test_temperature_set_to_base_on_first_attempt(self):
+        """On retry_count=0, temperature should be (re-)written to base (0.7)."""
         engine = _make_engine()
         tm_result = MagicMock()
         tm_result.hit = False
@@ -329,10 +329,60 @@ class TestTemperatureOnRetry:
                 retry_count=0,
             )
 
-        # Temperature should NOT have been changed from the mock's initial value
-        # (No assignment to provider_config.temperature on retry_count=0)
-        # The base temperature block doesn't write to the provider
         assert provider_config.temperature == 0.7
+
+    def test_non_retry_call_resets_temperature_left_elevated_by_prior_retry(self):
+        """HT-QUALITY-GATES-001 Part 22 (root cause B, retry-temperature
+        leak): the confirmed real bug. `_provider._config.temperature` is
+        shared, mutable state on a cross-thread singleton backend instance
+        (one ModelLoader-cached backend reused by every concurrent worker).
+        Before the fix, temperature was only ever written inside the
+        `retry_count > 0` branch -- so once ANY file anywhere retried and
+        raised it, it stayed elevated forever afterward, including for
+        unrelated non-retry calls on the same shared backend. This test
+        starts the shared provider_config already elevated (as if a
+        DIFFERENT file's retry left it at 0.9) and confirms a fresh,
+        non-retry call on the SAME backend instance correctly resets it to
+        base, rather than silently inheriting the stale elevated value."""
+        engine = _make_engine()
+        tm_result = MagicMock()
+        tm_result.hit = False
+        engine.tm.lookup.return_value = tm_result
+
+        provider_config = MagicMock()
+        # Simulates state left behind by an earlier, unrelated retry on this
+        # same shared backend instance -- the exact confirmed defect shape.
+        provider_config.temperature = 0.9
+        provider = MagicMock()
+        provider._config = provider_config
+        backend = MagicMock()
+        backend._provider = provider
+        backend.translate_batch.return_value = ["Hallo Welt"]
+        engine.model_loader.load_model.return_value = backend
+
+        translator = SegmentTranslator(engine)
+        stats = _make_stats()
+        seg = _make_segment()
+
+        with patch.object(translator, "_translate_body_ast") as mock_ast:
+            mock_ast.return_value = "---\ntitle: Test\n---\nHallo Welt"
+            translator.translate_to_language(
+                site_id="test",
+                site_profile=MagicMock(),
+                doc=MagicMock(ast=None, frontmatter={"title": "Test"}),
+                segments=[seg],
+                source_lang="en",
+                target_lang="de",
+                force=False,
+                stats=stats,
+                retry_count=0,  # this call itself never retried
+            )
+
+        assert provider_config.temperature == pytest.approx(0.7), (
+            "A non-retry call must reset temperature to base, not inherit a "
+            "stale elevated value left by a prior, unrelated retry on the "
+            "same shared backend instance."
+        )
 
     def test_temperature_capped_at_max(self):
         """Temperature should not exceed 1.0 even with high retry count."""
@@ -497,3 +547,90 @@ class TestContentTypeRouterLLMPassthrough:
         assert not (unit.metadata or {}).get("llm_passthrough_reason"), (
             "No passthrough metadata expected when LLM succeeds"
         )
+
+
+# ---------------------------------------------------------------------------
+# HT-QUALITY-GATES-001 Part 22 (plan 5.1 item 5): min_similarity_score wiring
+# ---------------------------------------------------------------------------
+
+
+class TestMinSimilarityScoreWiring:
+    def test_site_profile_min_similarity_score_reaches_batch_lookup(self):
+        """Site profiles declare tm_prefs.min_similarity_score, but the
+        actual L3 semantic-search call site (batch_lookup's semantic_threshold
+        kwarg, default 0.80) never read it -- every site silently got the
+        same hardcoded default regardless of its own declared config. This
+        test uses a distinctive, non-default value (0.93) so a regression
+        back to the hardcoded default would fail loudly rather than
+        coincidentally matching."""
+        engine = _make_engine()
+        tm_result = MagicMock()
+        tm_result.hit = False
+        engine.tm.lookup.return_value = tm_result
+
+        site_profile = MagicMock()
+        site_profile.tm_prefs.min_similarity_score = 0.93
+
+        translator = SegmentTranslator(engine)
+        stats = _make_stats()
+        seg = _make_segment()  # context=None -> body segment, not frontmatter
+
+        with patch.object(translator, "_translate_body_ast") as mock_ast:
+            mock_ast.return_value = "---\ntitle: Test\n---\nHallo Welt"
+            translator.translate_to_language(
+                site_id="test",
+                site_profile=site_profile,
+                doc=MagicMock(ast=None, frontmatter={"title": "Test"}),
+                segments=[seg],
+                source_lang="en",
+                target_lang="de",
+                force=False,
+                stats=stats,
+            )
+
+        body_calls = [
+            call for call in engine.tm.batch_lookup.call_args_list
+            if call.kwargs.get("use_semantic") is True
+        ]
+        assert body_calls, "Expected at least one use_semantic=True batch_lookup call"
+        for call in body_calls:
+            assert call.kwargs.get("semantic_threshold") == 0.93, (
+                f"Expected site profile's min_similarity_score (0.93) to reach "
+                f"batch_lookup, got {call.kwargs.get('semantic_threshold')!r}"
+            )
+
+    def test_missing_tm_prefs_falls_back_to_default(self):
+        """A site_profile with no tm_prefs at all must not crash -- falls
+        back to the same 0.80 default batch_lookup already had."""
+        engine = _make_engine()
+        tm_result = MagicMock()
+        tm_result.hit = False
+        engine.tm.lookup.return_value = tm_result
+
+        site_profile = MagicMock()
+        site_profile.tm_prefs = None
+
+        translator = SegmentTranslator(engine)
+        stats = _make_stats()
+        seg = _make_segment()
+
+        with patch.object(translator, "_translate_body_ast") as mock_ast:
+            mock_ast.return_value = "---\ntitle: Test\n---\nHallo Welt"
+            translator.translate_to_language(
+                site_id="test",
+                site_profile=site_profile,
+                doc=MagicMock(ast=None, frontmatter={"title": "Test"}),
+                segments=[seg],
+                source_lang="en",
+                target_lang="de",
+                force=False,
+                stats=stats,
+            )
+
+        body_calls = [
+            call for call in engine.tm.batch_lookup.call_args_list
+            if call.kwargs.get("use_semantic") is True
+        ]
+        assert body_calls
+        for call in body_calls:
+            assert call.kwargs.get("semantic_threshold") == 0.80

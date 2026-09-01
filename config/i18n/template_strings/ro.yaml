@@ -1,0 +1,321 @@
+schema_version: 1
+locale: ro
+translations:
+  heading.overview:
+    value: Prezentare generală
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 13622
+    corpus_agreement: override
+    rejected_variants:
+    - Opinie generală
+    - Methods
+  heading.see_also:
+    value: 'Vezi și:'
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 1790
+    corpus_agreement: agree
+    rejected_variants:
+    - Vezi și
+    - Methods
+  heading.properties:
+    value: Proprietăți
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 6500
+    corpus_agreement: agree
+    rejected_variants:
+    - Metode de evaluare
+  heading.methods:
+    value: Metode
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 3448
+    corpus_agreement: override
+    rejected_variants:
+    - Metode de evaluare
+    - Vezi și
+  heading.values:
+    value: Valori
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 3808
+    corpus_agreement: override
+    rejected_variants:
+    - Valori de referință
+  heading.enumerations:
+    value: Enumerări
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 119
+    corpus_agreement: override
+    rejected_variants:
+    - Numărarea
+    - ImageRenderOptions
+  heading.accessor_methods:
+    value: Metode de accesor
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 791
+    corpus_agreement: agree
+  heading.constructors:
+    value: Constructori
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 31
+    corpus_agreement: agree
+  heading.core_api:
+    value: API de bază
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 290
+    corpus_agreement: override
+    rejected_variants:
+    - API-ul de bază
+    - Grafică de scenă de bază
+  heading.interfaces:
+    value: Interfețe
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 150
+    corpus_agreement: agree
+    rejected_variants:
+    - Geometrie și Mesh
+    - Forme
+  heading.inheritance:
+    value: Moștenire
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 34
+    corpus_agreement: agree
+  heading.structs:
+    value: Structuri
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 143
+    corpus_agreement: override
+    rejected_variants:
+    - Primitive încorporate
+    - ImageRenderOptions
+  heading.examples:
+    value: Exemple
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 35
+    corpus_agreement: override
+    rejected_variants:
+    - Exemple de astfel de măsuri
+  heading.classes:
+    value: Clase
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 103
+    corpus_agreement: override
+    rejected_variants:
+    - Clasificări
+  heading.type:
+    value: Tip
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 52228
+    corpus_agreement: override
+    rejected_variants:
+    - Tipul de vehicul
+    - Tip
+  heading.name:
+    value: Nume
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 52195
+    corpus_agreement: override
+    rejected_variants:
+    - Numele de proprietate
+    - Nume
+  heading.returns:
+    value: Valoare returnată
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 1363
+    corpus_agreement: override
+    rejected_variants:
+    - Retoururi
+    - Returnează
+  heading.value:
+    value: Valoare
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 13014
+    corpus_agreement: override
+    rejected_variants:
+    - Valori de referință
+    - Valoare
+  table.header.description:
+    value: 'Descriere:'
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 122171
+    corpus_agreement: agree
+    rejected_variants:
+    - Descriere
+    - ImageRenderOptions
+  table.header.signature:
+    value: Semnătură
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 31997
+    corpus_agreement: override
+    rejected_variants:
+    - Semnătura
+  table.header.access:
+    value: Acces
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 34671
+    corpus_agreement: override
+    rejected_variants:
+    - Accesul
+  table.header.property:
+    value: Proprietate
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 1958
+    corpus_agreement: agree
+    rejected_variants:
+    - ImageRenderOptions
+  table.header.method:
+    value: Metodă
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 1266
+    corpus_agreement: override
+    rejected_variants:
+    - Metoda de evaluare
+  table.header.class:
+    value: Clasă
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 715
+    corpus_agreement: override
+    rejected_variants:
+    - Clasa de învăţământ
+  table.header.enumeration:
+    value: Enumerare
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 525
+    corpus_agreement: override
+    rejected_variants:
+    - Numărarea
+  table.header.return_type:
+    value: Tip de returnare
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 273
+    corpus_agreement: agree
+  table.access.read:
+    value: Citire
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 0
+    corpus_agreement: no_corpus_evidence
+  table.access.write:
+    value: Scriere
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 0
+    corpus_agreement: no_corpus_evidence
+  table.access.read_write:
+    value: Citire/Scriere
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 0
+    corpus_agreement: no_corpus_evidence
+  table.access.execute:
+    value: Executare
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 0
+    corpus_agreement: no_corpus_evidence
+  table.access.create:
+    value: Creare
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 0
+    corpus_agreement: no_corpus_evidence
+  table.access.delete:
+    value: Ștergere
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 0
+    corpus_agreement: no_corpus_evidence
+  table.access.update:
+    value: Actualizare
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 0
+    corpus_agreement: no_corpus_evidence
+  phrase.inherits_from:
+    value: 'Moștenește de la: {api}.'
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 3750
+    corpus_agreement: agree
+  phrase.is_a_class_in:
+    value: '{api} este o clasă în Aspose.{family} FOSS pentru {platform}.'
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 61489
+    corpus_agreement: agree
+    rejected_variants:
+    - '{api} este o clasă în Aspose.{family} pentru {platform}.'
+  phrase.is_an_enum_in:
+    value: '{api} este un enum în Aspose.{family} FOSS pentru {platform}.'
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 13205
+    corpus_agreement: agree
+    rejected_variants:
+    - '{api} este un enum în Aspose.{family} pentru {platform}.'
+  phrase.is_an_interface_in:
+    value: '{api} este o interfață în Aspose.{family} FOSS pentru {platform}.'
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 5427
+    corpus_agreement: agree
+  phrase.is_a_struct_in:
+    value: '{api} este o structură în Aspose.{family} FOSS pentru {platform}.'
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 873
+    corpus_agreement: agree
+  phrase.class_provides_methods:
+    value: Această clasă oferă {n} metode pentru a lucra cu obiecte {api} în programele
+      {platform}.
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 23690
+    corpus_agreement: override
+  phrase.enum_defines_values:
+    value: 'Această enumerare definește {n} valori:'
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 9578
+    corpus_agreement: agree
+    rejected_variants:
+    - 'Această enumerare definește {n} de valori:'
+  phrase.members_accessible_after_install:
+    value: Toți membrii publici sunt accesibili oricărei aplicații {platform} după
+      instalarea pachetului Aspose.{family} FOSS pentru {platform}.
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 3690
+    corpus_agreement: no_corpus_evidence
+  heading.description:
+    value: Descriere
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow+arbiter
+    reviewed_at: '2026-07-25'
+    evidence_count: 2572
+    corpus_agreement: override
+    rejected_variants:
+    - 'Descriere:'

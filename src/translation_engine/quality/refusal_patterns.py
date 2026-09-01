@@ -60,3 +60,38 @@ REFUSAL_PHRASES: list[str] = [
 REFUSAL_RE = re.compile("|".join(re.escape(p) for p in REFUSAL_PHRASES), re.IGNORECASE)
 LEADING_DASH_RE = re.compile(r"^[-–—]\s*\S")
 ASPOSE_TOKEN_RE = re.compile(r"aspos[a-z]*", re.IGNORECASE)
+
+# HT-QUALITY-GATES-001 Part 22 (1.6): shape-based conversational-response
+# detection, added alongside promoting Gate 29 from "warn" to "block".
+# REFUSAL_PHRASES above is a curated exact-substring list built from confirmed
+# instances -- effective (it already independently caught 5 of 6 new leaked
+# examples found this session, purely blocked by the gate's "warn"-only
+# action, not a phrase-coverage gap) but necessarily incomplete: a fluent,
+# non-templated conversational reply that doesn't happen to contain one of
+# the curated phrases passes it untouched. One confirmed real miss:
+# "I'm sorry, but I can't access or read any attached files. If you paste
+# the text you'd like translated directly into the chat, I'll be happy to
+# translate it for you." -- zero overlap with REFUSAL_PHRASES, published
+# verbatim as page body content (docs.aspose.org/no/email/net/developer-guide
+# /features.md). These patterns are deliberately generic first/second-person
+# conversational-register markers that essentially never occur in this
+# corpus's third-person technical-documentation prose, rather than more
+# exact phrases -- broader net, same "never legitimately appears in Aspose
+# API/product documentation" justification as REFUSAL_PHRASES itself.
+CONVERSATIONAL_SHAPE_PATTERNS: list[str] = [
+    r"\bi'?m sorry\b",
+    r"\bi can'?t access\b",
+    r"\bif you paste\b",
+    r"\bi'?ll be happy to\b",
+    r"\byou'?d like (it )?translated\b",
+    r"\blet me know if\b",
+    r"\bcould you (please )?(provide|give|share|clarify)\b",
+    r"\bcan you (please )?(provide|give|share|clarify)\b",
+    r"\bwould you (like|mind)\b",
+    r"\bplease (provide|share|clarify|specify) (the|more)\b",
+    r"\bi need (more|the) (context|information|text)\b",
+    r"\bwhat (would you like|do you (want|mean))\b",
+]
+CONVERSATIONAL_SHAPE_RE = re.compile(
+    "|".join(CONVERSATIONAL_SHAPE_PATTERNS), re.IGNORECASE
+)

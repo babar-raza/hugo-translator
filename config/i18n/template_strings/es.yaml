@@ -1,0 +1,282 @@
+schema_version: 1
+locale: es
+translations:
+  heading.overview:
+    value: Visión general
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 13622
+    corpus_agreement: override
+    rejected_variants:
+    - Revisión
+  heading.see_also:
+    value: Ver también
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 1790
+    corpus_agreement: agree
+  heading.properties:
+    value: Propiedades
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 6500
+    corpus_agreement: agree
+  heading.methods:
+    value: Métodos
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 3448
+    corpus_agreement: override
+    rejected_variants:
+    - Metodología
+  heading.description:
+    value: Descripción
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 2572
+    corpus_agreement: agree
+  heading.values:
+    value: Valores
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 3808
+    corpus_agreement: agree
+  heading.enumerations:
+    value: Enumeraciones
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 119
+    corpus_agreement: agree
+  heading.accessor_methods:
+    value: Métodos de acceso
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 791
+    corpus_agreement: override
+    rejected_variants:
+    - Métodos de accesorios
+  heading.constructors:
+    value: Constructores
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 31
+    corpus_agreement: agree
+  heading.core_api:
+    value: API principal
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 290
+    corpus_agreement: override
+    rejected_variants:
+    - El fuego core
+  heading.interfaces:
+    value: Interfaces
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 150
+    corpus_agreement: no_corpus_evidence
+  heading.inheritance:
+    value: Herencia
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 34
+    corpus_agreement: agree
+  heading.structs:
+    value: Estructuras
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 143
+    corpus_agreement: no_corpus_evidence
+  heading.examples:
+    value: Ejemplos
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 35
+    corpus_agreement: override
+    rejected_variants:
+    - Exemplos
+  heading.classes:
+    value: Clases
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 103
+    corpus_agreement: no_corpus_evidence
+  heading.type:
+    value: Tipo
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 52228
+    corpus_agreement: agree
+  heading.name:
+    value: Nombre
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 52195
+    corpus_agreement: agree
+  heading.returns:
+    value: Devoluciones
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 1363
+    corpus_agreement: override
+    rejected_variants:
+    - regreso
+    - Devuelve
+  heading.value:
+    value: Valor
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 13014
+    corpus_agreement: agree
+  table.header.description:
+    value: Descripción
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 122171
+    corpus_agreement: agree
+  table.header.signature:
+    value: Firma
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 31997
+    corpus_agreement: override
+    rejected_variants:
+    - firma
+  table.header.access:
+    value: Acceso
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 34671
+    corpus_agreement: agree
+  table.header.property:
+    value: Propiedad
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 1958
+    corpus_agreement: agree
+  table.header.method:
+    value: Método
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 1266
+    corpus_agreement: override
+    rejected_variants:
+    - Metodología
+  table.header.class:
+    value: Clase
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 715
+    corpus_agreement: override
+    rejected_variants:
+    - clase
+  table.header.enumeration:
+    value: Enumeración
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 525
+    corpus_agreement: agree
+  table.header.return_type:
+    value: Tipo de retorno
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 273
+    corpus_agreement: override
+    rejected_variants:
+    - Tipo de regreso
+  table.access.read:
+    value: Lectura
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 0
+    corpus_agreement: no_corpus_evidence
+  table.access.write:
+    value: Escritura
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 0
+    corpus_agreement: no_corpus_evidence
+  table.access.read_write:
+    value: Lectura/Escritura
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 0
+    corpus_agreement: no_corpus_evidence
+  table.access.execute:
+    value: Ejecución
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 0
+    corpus_agreement: no_corpus_evidence
+  table.access.create:
+    value: Creación
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 0
+    corpus_agreement: no_corpus_evidence
+  table.access.delete:
+    value: Eliminación
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 0
+    corpus_agreement: no_corpus_evidence
+  table.access.update:
+    value: Actualización
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 0
+    corpus_agreement: no_corpus_evidence
+  phrase.inherits_from:
+    value: 'Hereda de: {api}.'
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 3750
+    corpus_agreement: agree
+  phrase.is_a_class_in:
+    value: '{api} es una clase en Aspose.{family} FOSS para {platform}.'
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 61489
+    corpus_agreement: override
+    rejected_variants:
+    - '{api} Es una clase en Aspose.{family} FOSS para {platform}.'
+  phrase.is_an_enum_in:
+    value: '{api} es un enum en Aspose.{family} FOSS para {platform}.'
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 13205
+    corpus_agreement: override
+    rejected_variants:
+    - '{api} Es un enum en Aspose.{family} FOSS para {platform}.'
+  phrase.is_an_interface_in:
+    value: '{api} es una interfaz en Aspose.{family} FOSS para {platform}.'
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 5427
+    corpus_agreement: agree
+  phrase.is_a_struct_in:
+    value: '{api} es una estructura en Aspose.{family} FOSS para {platform}.'
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 873
+    corpus_agreement: override
+    rejected_variants:
+    - '{api} Es una estructura en Aspose.{family} FOSS para {platform}.'
+  phrase.enum_defines_values:
+    value: 'Esta enumeración define {n} valores:'
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 9578
+    corpus_agreement: override
+    rejected_variants:
+    - 'Esta lista define {n} valores:'
+  phrase.members_accessible_after_install:
+    value: Todos los miembros públicos son accesibles para cualquier aplicación {platform}
+      después de instalar el paquete Aspose.{family} FOSS para {platform}.
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 3690
+    corpus_agreement: override
+    rejected_variants:
+    - Todos los miembros públicos son accesibles para cualquier aplicación {platform}
+      después de instalar el paquete Aspose.{family} FOSS for {platform}.

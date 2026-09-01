@@ -1,0 +1,323 @@
+schema_version: 1
+locale: pt
+translations:
+  heading.overview:
+    value: Visão geral
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 13622
+    corpus_agreement: override
+    rejected_variants:
+    - Resumo geral
+    - Methods
+  heading.see_also:
+    value: Ver também
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 1790
+    corpus_agreement: agree
+    rejected_variants:
+    - 'Ver também:'
+    - Veja Também
+  heading.properties:
+    value: Propriedades
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 6500
+    corpus_agreement: agree
+  heading.methods:
+    value: Métodos
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 3448
+    corpus_agreement: override
+    rejected_variants:
+    - Métodos de avaliação
+  heading.description:
+    value: Descrição
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 2572
+    corpus_agreement: override
+    rejected_variants:
+    - Propriedades
+    - 'Descrição:'
+    - Métodos de avaliação
+  heading.values:
+    value: Valores
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 3808
+    corpus_agreement: override
+    rejected_variants:
+    - Valores de referência
+  heading.enumerations:
+    value: Enumerações
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 119
+    corpus_agreement: override
+    rejected_variants:
+    - Listagem de produtos
+  heading.accessor_methods:
+    value: Métodos de acesso
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 791
+    corpus_agreement: override
+    rejected_variants:
+    - Métodos de acessório
+  heading.constructors:
+    value: Construtores
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 31
+    corpus_agreement: agree
+  heading.core_api:
+    value: API de núcleo
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 290
+    corpus_agreement: agree
+  heading.interfaces:
+    value: Interfaces
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 150
+    corpus_agreement: override
+    rejected_variants:
+    - Interfaces de dados
+  heading.inheritance:
+    value: Herança
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 34
+    corpus_agreement: override
+    rejected_variants:
+    - A herança
+  heading.structs:
+    value: Estruturas
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 143
+    corpus_agreement: agree
+  heading.examples:
+    value: Exemplos
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 35
+    corpus_agreement: override
+    rejected_variants:
+    - Exemplos de
+  heading.classes:
+    value: Classes
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 103
+    corpus_agreement: override
+    rejected_variants:
+    - 'Classe de trabalho:'
+  heading.type:
+    value: Tipo
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 52228
+    corpus_agreement: override
+    rejected_variants:
+    - 'Tipo de veículo:'
+  heading.name:
+    value: Nome
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 52195
+    corpus_agreement: agree
+    rejected_variants:
+    - 'Nome:'
+  heading.returns:
+    value: Retorno
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 1363
+    corpus_agreement: override
+    rejected_variants:
+    - Retorno de lucros
+    - Retorna
+  heading.value:
+    value: Valor
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 13014
+    corpus_agreement: override
+    rejected_variants:
+    - Valor de um produto
+  table.header.description:
+    value: Descrição
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 122171
+    corpus_agreement: agree
+    rejected_variants:
+    - 'Descrição:'
+  table.header.signature:
+    value: Assinatura
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 31997
+    corpus_agreement: agree
+  table.header.access:
+    value: Acesso
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 34671
+    corpus_agreement: override
+    rejected_variants:
+    - Acessos
+  table.header.property:
+    value: Propriedade
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 1958
+    corpus_agreement: agree
+  table.header.method:
+    value: Método
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 1266
+    corpus_agreement: override
+    rejected_variants:
+    - Método de avaliação
+  table.header.class:
+    value: Classe
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 715
+    corpus_agreement: agree
+    rejected_variants:
+    - 'Classe:'
+  table.header.enumeration:
+    value: Enumeração
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 525
+    corpus_agreement: override
+    rejected_variants:
+    - Listagem
+  table.header.return_type:
+    value: Tipo de retorno
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 273
+    corpus_agreement: override
+    rejected_variants:
+    - Tipo de devolução
+  table.access.read:
+    value: Leitura
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 0
+    corpus_agreement: no_corpus_evidence
+    rejected_variants:
+    - Ler
+  table.access.write:
+    value: Escrita
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 0
+    corpus_agreement: no_corpus_evidence
+    rejected_variants:
+    - Gravação
+    - Escrever
+  table.access.read_write:
+    value: Leitura/Escrita
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 0
+    corpus_agreement: no_corpus_evidence
+  table.access.execute:
+    value: Execução
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 0
+    corpus_agreement: no_corpus_evidence
+    rejected_variants:
+    - Executar
+  table.access.create:
+    value: Criação
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 0
+    corpus_agreement: no_corpus_evidence
+    rejected_variants:
+    - Criar
+  table.access.delete:
+    value: Exclusão
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 0
+    corpus_agreement: no_corpus_evidence
+    rejected_variants:
+    - Eliminação
+    - Excluir
+  table.access.update:
+    value: Atualização
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 0
+    corpus_agreement: no_corpus_evidence
+    rejected_variants:
+    - Actualização
+    - Atualizar
+  phrase.inherits_from:
+    value: 'Herda de: {api}.'
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 3750
+    corpus_agreement: agree
+  phrase.is_a_class_in:
+    value: '{api} é uma classe em Aspose.{family} FOSS para {platform}.'
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 61489
+    corpus_agreement: agree
+    rejected_variants:
+    - '{api} é uma classe em Aspose.{family} para {platform}.'
+  phrase.is_an_enum_in:
+    value: '{api} é um enum em Aspose.{family} FOSS para {platform}.'
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 13205
+    corpus_agreement: agree
+    rejected_variants:
+    - '{api} é um enum em Aspose.{family} para {platform}.'
+  phrase.is_an_interface_in:
+    value: '{api} é uma interface em Aspose.{family} FOSS para {platform}.'
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 5427
+    corpus_agreement: agree
+  phrase.is_a_struct_in:
+    value: '{api} é uma estrutura em Aspose.{family} FOSS para {platform}.'
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 873
+    corpus_agreement: agree
+  phrase.class_provides_methods:
+    value: Esta classe fornece {n} métodos para trabalhar com objetos {api} em programas
+      {platform}.
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 23690
+    corpus_agreement: override
+  phrase.enum_defines_values:
+    value: 'Esta enumeração define {n} valores:'
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 9578
+    corpus_agreement: agree
+  phrase.members_accessible_after_install:
+    value: Todos os membros públicos são acessíveis a qualquer aplicação {platform}
+      após instalar o pacote Aspose.{family} FOSS para {platform}.
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 3690
+    corpus_agreement: override

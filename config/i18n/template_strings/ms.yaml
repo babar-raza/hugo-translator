@@ -1,0 +1,302 @@
+schema_version: 1
+locale: ms
+translations:
+  heading.overview:
+    value: Gambaran Keseluruhan
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 13622
+    corpus_agreement: override
+    rejected_variants:
+    - Methods
+    - Gambaran keseluruhan
+  heading.see_also:
+    value: Lihat Juga
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 1790
+    corpus_agreement: agree
+  heading.properties:
+    value: Sifat
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 6500
+    corpus_agreement: override
+    rejected_variants:
+    - Methods
+    - harta benda
+  heading.methods:
+    value: Kaedah
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 3448
+    corpus_agreement: agree
+  heading.description:
+    value: Penerangan
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 2572
+    corpus_agreement: agree
+  heading.values:
+    value: Nilai
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 3808
+    corpus_agreement: agree
+  heading.enumerations:
+    value: Enumerasi
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 119
+    corpus_agreement: override
+    rejected_variants:
+    - Senarai
+  heading.accessor_methods:
+    value: Kaedah Pengakses
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 791
+    corpus_agreement: no_corpus_evidence
+    rejected_variants:
+    - Kaedah Capaian
+  heading.constructors:
+    value: Konstruktor
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 31
+    corpus_agreement: no_corpus_evidence
+    rejected_variants:
+    - Pembina
+  heading.core_api:
+    value: API Teras
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 290
+    corpus_agreement: override
+    rejected_variants:
+    - Graf Adegan Teras
+    - api utama
+  heading.interfaces:
+    value: Antara Muka
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 150
+    corpus_agreement: override
+    rejected_variants:
+    - Geometri dan Mesh
+    - Bentuk
+  heading.inheritance:
+    value: Pewarisan
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 34
+    corpus_agreement: no_corpus_evidence
+  heading.structs:
+    value: Struktur
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 143
+    corpus_agreement: override
+    rejected_variants:
+    - Primitif Terbina Dalam
+    - ColladaSaveOptions
+  heading.examples:
+    value: Contoh
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 35
+    corpus_agreement: no_corpus_evidence
+  heading.classes:
+    value: Kelas
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 103
+    corpus_agreement: override
+    rejected_variants:
+    - AnimationClip/Example/ImageRenderOptions
+  heading.type:
+    value: Jenis
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 52228
+    corpus_agreement: agree
+  heading.name:
+    value: Nama
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 52195
+    corpus_agreement: agree
+  heading.returns:
+    value: Pulangan
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 1363
+    corpus_agreement: override
+    rejected_variants:
+    - Methods
+    - Mengembalikan
+    - Kembali
+  heading.value:
+    value: Nilai
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 13014
+    corpus_agreement: agree
+  table.header.description:
+    value: Penerangan
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 122171
+    corpus_agreement: agree
+    rejected_variants:
+    - Keterangan
+  table.header.signature:
+    value: Tandatangan
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 31997
+    corpus_agreement: agree
+  table.header.access:
+    value: Akses
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 34671
+    corpus_agreement: agree
+  table.header.property:
+    value: Sifat
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 1958
+    corpus_agreement: override
+    rejected_variants:
+    - ImageRenderOptions
+  table.header.method:
+    value: Kaedah
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 1266
+    corpus_agreement: override
+    rejected_variants:
+    - Methods
+  table.header.class:
+    value: Kelas
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 715
+    corpus_agreement: override
+    rejected_variants:
+    - Enumerations
+    - ImageRenderOptions
+  table.header.enumeration:
+    value: Enumerasi
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 525
+    corpus_agreement: override
+    rejected_variants:
+    - ReferenceMode
+    - ImageRenderOptions
+  table.header.return_type:
+    value: Jenis Pulangan
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 273
+    corpus_agreement: agree
+  table.access.read:
+    value: Baca
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 0
+    corpus_agreement: no_corpus_evidence
+  table.access.write:
+    value: Tulis
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 0
+    corpus_agreement: no_corpus_evidence
+  table.access.read_write:
+    value: Baca/Tulis
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 0
+    corpus_agreement: no_corpus_evidence
+  table.access.execute:
+    value: Laksana
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 0
+    corpus_agreement: no_corpus_evidence
+    rejected_variants:
+    - Jalankan
+  table.access.create:
+    value: Cipta
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 0
+    corpus_agreement: no_corpus_evidence
+  table.access.delete:
+    value: Padam
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 0
+    corpus_agreement: no_corpus_evidence
+  table.access.update:
+    value: Kemas Kini
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 0
+    corpus_agreement: no_corpus_evidence
+  phrase.inherits_from:
+    value: 'Mewarisi daripada: {api}.'
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 3750
+    corpus_agreement: override
+    rejected_variants:
+    - 'Mewarisi dari: {api}.'
+  phrase.is_a_class_in:
+    value: '{api} adalah kelas dalam Aspose.{family} FOSS untuk {platform}.'
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 61489
+    corpus_agreement: agree
+  phrase.is_an_enum_in:
+    value: '{api} ialah enum dalam Aspose.{family} FOSS untuk {platform}.'
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 13205
+    corpus_agreement: agree
+  phrase.is_an_interface_in:
+    value: '{api} adalah antara muka dalam Aspose.{family} FOSS untuk {platform}.'
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 5427
+    corpus_agreement: agree
+  phrase.is_a_struct_in:
+    value: '{api} merupakan struktur dalam Aspose.{family} FOSS untuk {platform}.'
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 873
+    corpus_agreement: agree
+  phrase.class_provides_methods:
+    value: Kelas ini menyediakan {n} kaedah untuk bekerja dengan objek {api} dalam
+      program {platform}.
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 23690
+    corpus_agreement: agree
+  phrase.enum_defines_values:
+    value: 'Enumerasi ini mendefinisikan {n} nilai:'
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 9578
+    corpus_agreement: agree
+    rejected_variants:
+    - 'Senarai ini menentukan {n} nilai:'
+  phrase.members_accessible_after_install:
+    value: Semua ahli awam boleh diakses oleh mana-mana aplikasi {platform} selepas
+      memasang pakej Aspose.{family} FOSS untuk {platform}.
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 3690
+    corpus_agreement: agree

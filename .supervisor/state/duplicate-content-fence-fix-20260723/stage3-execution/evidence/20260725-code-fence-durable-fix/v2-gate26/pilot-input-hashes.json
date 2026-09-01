@@ -1,0 +1,43 @@
+{
+    "after":  [
+                  {
+                      "Path":  "C:\\Users\\prora\\AppData\\Local\\Temp\\hugo-translator-dcf-pilot-c10847a4fe5440908dd17b21636795a5\\docs.aspose.org\\en\\cells\\typescript\\getting-started\\quickstart.md",
+                      "Hash":  "4409303DF3185DB3BDACB855AB49B07C14733E7C5C2DE9659AE84B9D7BC3896F"
+                  },
+                  {
+                      "Path":  "C:\\Users\\prora\\AppData\\Local\\Temp\\hugo-translator-dcf-pilot-c10847a4fe5440908dd17b21636795a5\\docs.aspose.org\\vi\\cells\\typescript\\getting-started\\quickstart.md",
+                      "Hash":  "26344F2D1DE4C0269470D371EE987A7E308A2BCC48FD66095AD0B7DF560F161A"
+                  },
+                  {
+                      "Path":  "C:\\Users\\prora\\AppData\\Local\\Temp\\hugo-translator-dcf-pilot-c10847a4fe5440908dd17b21636795a5\\kb.aspose.org\\ar\\words\\python\\how-to-build-ldm-builder-python.md",
+                      "Hash":  "81F8AC422262FDF36EC928CAF3A6B1D08E04FB99658D1B5B80AB468F69CA09A2"
+                  },
+                  {
+                      "Path":  "C:\\Users\\prora\\AppData\\Local\\Temp\\hugo-translator-dcf-pilot-c10847a4fe5440908dd17b21636795a5\\kb.aspose.org\\en\\words\\python\\how-to-build-ldm-builder-python.md",
+                      "Hash":  "DF44418751976CBEB9828E37E75A60E069C29156F549082FCDD84AB54384DF1F"
+                  }
+              ],
+    "before":  [
+                   {
+                       "Path":  "C:\\Users\\prora\\AppData\\Local\\Temp\\hugo-translator-dcf-pilot-c10847a4fe5440908dd17b21636795a5\\docs.aspose.org\\en\\cells\\typescript\\getting-started\\quickstart.md",
+                       "Hash":  "4409303DF3185DB3BDACB855AB49B07C14733E7C5C2DE9659AE84B9D7BC3896F"
+                   },
+                   {
+                       "Path":  "C:\\Users\\prora\\AppData\\Local\\Temp\\hugo-translator-dcf-pilot-c10847a4fe5440908dd17b21636795a5\\docs.aspose.org\\vi\\cells\\typescript\\getting-started\\quickstart.md",
+                       "Hash":  "26344F2D1DE4C0269470D371EE987A7E308A2BCC48FD66095AD0B7DF560F161A"
+                   },
+                   {
+                       "Path":  "C:\\Users\\prora\\AppData\\Local\\Temp\\hugo-translator-dcf-pilot-c10847a4fe5440908dd17b21636795a5\\kb.aspose.org\\ar\\words\\python\\how-to-build-ldm-builder-python.md",
+                       "Hash":  "81F8AC422262FDF36EC928CAF3A6B1D08E04FB99658D1B5B80AB468F69CA09A2"
+                   },
+                   {
+                       "Path":  "C:\\Users\\prora\\AppData\\Local\\Temp\\hugo-translator-dcf-pilot-c10847a4fe5440908dd17b21636795a5\\kb.aspose.org\\en\\words\\python\\how-to-build-ldm-builder-python.md",
+                       "Hash":  "DF44418751976CBEB9828E37E75A60E069C29156F549082FCDD84AB54384DF1F"
+                   }
+               ],
+    "content_unchanged":  [
+                              "[{\"Path\":\"C:\\\\Users\\\\prora\\\\AppData\\\\Local\\\\Temp\\\\hugo-translator-dcf-pilot-c10847a4fe5440908dd17b21636795a5\\\\docs.aspose.org\\\\en\\\\cells\\\\typescript\\\\getting-started\\\\quickstart.md\",\"Hash\":\"4409303DF3185DB3BDACB855AB49B07C14733E7C5C2DE9659AE84B9D7BC3896F\"},{\"Path\":\"C:\\\\Users\\\\prora\\\\AppData\\\\Local\\\\Temp\\\\hugo-translator-dcf-pilot-c10847a4fe5440908dd17b21636795a5\\\\docs.aspose.org\\\\vi\\\\cells\\\\typescript\\\\getting-started\\\\quickstart.md\",\"Hash\":\"26344F2D1DE4C0269470D371EE987A7E308A2BCC48FD66095AD0B7DF560F161A\"},{\"Path\":\"C:\\\\Users\\\\prora\\\\AppData\\\\Local\\\\Temp\\\\hugo-translator-dcf-pilot-c10847a4fe5440908dd17b21636795a5\\\\kb.aspose.org\\\\ar\\\\words\\\\python\\\\how-to-build-ldm-builder-python.md\",\"Hash\":\"81F8AC422262FDF36EC928CAF3A6B1D08E04FB99658D1B5B80AB468F69CA09A2\"},{\"Path\":\"C:\\\\Users\\\\prora\\\\AppData\\\\Local\\\\Temp\\\\hugo-translator-dcf-pilot-c10847a4fe5440908dd17b21636795a5\\\\kb.aspose.org\\\\en\\\\words\\\\python\\\\how-to-build-ldm-builder-python.md\",\"Hash\":\"DF44418751976CBEB9828E37E75A60E069C29156F549082FCDD84AB54384DF1F\"}]"
+                          ],
+    "docs_exit":  0,
+    "kb_exit":  0
+}

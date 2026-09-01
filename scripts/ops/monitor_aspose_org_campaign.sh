@@ -39,8 +39,9 @@ while true; do
     # Check completion: count EN vs translated files
     pct=$($VENV_PY -c "
 import glob
+from src.utils.config_loader import ConfigService
 content = 'D:/onedrive/Documents/GitHub/aspose.org/content'
-langs = 'ar bg ca cs da de el es fa fi fr he hi hr hu id it ja ko lt lv ms nl no pl pt ro ru sk sr sv th tr uk vi zh'.split()
+langs = ConfigService('config').get_site_profile('$site').target_langs
 en = len(glob.glob(f'{content}/$site/en/**/*.md', recursive=True))
 if en == 0:
     print(0)

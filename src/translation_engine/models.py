@@ -2,6 +2,7 @@
 Data models for translation engine results and statistics.
 """
 from dataclasses import dataclass, field
+import hashlib
 from enum import IntEnum
 from pathlib import Path
 from typing import Any, Optional
@@ -33,6 +34,11 @@ class TranslationStats:
     total_segments: int = 0
     total_lookups: int = 0  # TM lookups attempted (segments × languages)
     tm_hits: int = 0  # Segments found in TM
+    # reference-i18n-hardening-20260725: segments resolved by the i18n-first
+    # pre-TM pass (heading/table-header/enum-value template strings) —
+    # these never reach TM lookup or MT, so they are not counted in
+    # total_lookups/tm_hits/translated_segments.
+    i18n_hits: int = 0
     l1_hits: int = 0  # L1 cache hits
     l2_hits: int = 0  # L2 persistent hits
     l3_hits: int = 0  # L3 semantic hits
@@ -86,6 +92,14 @@ class TranslationStats:
     ast_batch_calls: int = 0  # Number of batch translation calls
     ast_individual_fallbacks: int = 0  # Number of fallbacks to individual translation
     ast_missing_nodes: int = 0  # TC-MLD-01: AST nodes with no matching TextUnit (source-text leakage risk)
+
+    # HT-QUALITY-GATES-001 Part 22 (plan 5.4 item 4): units actually translated
+    # by an LLM backend (ContentTypeRouter escalation), as opposed to routed-to
+    # but passed-through-as-source (see llm_passthrough_reason metadata). This
+    # is the per-unit "was this LLM-escalated" fact the plan's tiered-coverage
+    # design calls for -- previously there was no recorded fact of this at all,
+    # only a transient RoutingDecision discarded immediately after use.
+    llm_units_translated: int = 0
 
     # TC-H5: Operator-visible quality signal per translated file.
     # PASS: purity ok, 0 errors, 0 missing nodes
@@ -159,12 +173,84 @@ class TranslationResult:
 
     # OW-01: Overwrite-protection tracking
     overwrite_blocked: bool = False  # True when write was blocked to protect an existing translation
+    acceptance_receipts: dict[str, dict[str, Any]] = field(default_factory=dict)
 
     def __str__(self) -> str:
         """Human-readable summary."""
         status = "SUCCESS" if self.success else "FAILED"
         error_info = f", {len(self.errors)} errors" if self.errors else ""
         return f"{status}: {self.file_path}{error_info} - {self.stats}"
+
+
+@dataclass(frozen=True)
+class AcceptedTranslation:
+    """Immutable, fully validated translation authorized for persistence.
+
+    Zero-defect runs are only allowed to reach the disk writer through this
+    type.  The hashes bind the accepted bytes to their source and destination,
+    while ``gate_results`` is the machine-readable acceptance receipt.
+    """
+
+    content: bytes
+    source_path: Path
+    output_path: Path
+    source_sha256: str
+    output_sha256: str
+    target_lang: str
+    validation_policy: str
+    gate_results: dict[int, dict[str, Any]]
+    config_fingerprint: str = ""
+    model_fingerprint: str = ""
+    campaign_id: str = ""
+
+    @classmethod
+    def from_text(
+        cls,
+        *,
+        content: str,
+        source_content: str,
+        source_path: Path,
+        output_path: Path,
+        target_lang: str,
+        gate_results: dict[int, dict[str, Any]],
+        config_fingerprint: str = "",
+        model_fingerprint: str = "",
+        campaign_id: str = "",
+    ) -> "AcceptedTranslation":
+        encoded = content.encode("utf-8")
+        return cls(
+            content=encoded,
+            source_path=source_path,
+            output_path=output_path,
+            source_sha256=hashlib.sha256(source_content.encode("utf-8")).hexdigest(),
+            output_sha256=hashlib.sha256(encoded).hexdigest(),
+            target_lang=target_lang,
+            validation_policy="zero-defect",
+            gate_results=dict(gate_results),
+            config_fingerprint=config_fingerprint,
+            model_fingerprint=model_fingerprint,
+            campaign_id=campaign_id,
+        )
+
+    @property
+    def text(self) -> str:
+        """Return the accepted UTF-8 payload as text."""
+        return self.content.decode("utf-8")
+
+    def receipt(self) -> dict[str, Any]:
+        """Return a JSON-serializable acceptance receipt without content."""
+        return {
+            "campaign_id": self.campaign_id,
+            "source_path": str(self.source_path),
+            "output_path": str(self.output_path),
+            "source_sha256": self.source_sha256,
+            "output_sha256": self.output_sha256,
+            "target_lang": self.target_lang,
+            "validation_policy": self.validation_policy,
+            "config_fingerprint": self.config_fingerprint,
+            "model_fingerprint": self.model_fingerprint,
+            "gate_results": self.gate_results,
+        }
 
 
 @dataclass
@@ -222,6 +308,7 @@ class DirectoryResult:
             agg.ast_batch_calls += result.stats.ast_batch_calls
             agg.ast_individual_fallbacks += result.stats.ast_individual_fallbacks
             agg.ast_missing_nodes += result.stats.ast_missing_nodes
+            agg.llm_units_translated += result.stats.llm_units_translated
 
         agg.duration_seconds = self.duration_seconds
         return agg

@@ -1,0 +1,115 @@
+close_task_result:
+  prompt_path: .supervisor/prompts/prompt4-close-task.md
+  prompt_hash_prefix16: 3196a5bd52bd6e03
+  invocation_id: quality-remediation-audit-phase7-20260723-close-01
+  mission_id: quality-remediation-audit-phase7-20260723
+  plan_id: link-path-corrupted-1-638-memoized-hinton
+  plan_revision: "hardened-2026-07-24-live-system-reassessment"
+  plan_hash: 62b2e5fd46d4ce55d97c44606cb1b6208fcaf6b0288d2a652068b39caed746a7
+
+  taskcards_closed:
+    - TC-P7-00
+    - TC-P7-02
+    - TC-P7-03
+    - TC-P7-04
+    - TC-P7-05
+    - TC-P7-06
+    - TC-P7-07
+    - TC-P7-08
+    - TC-P7-09
+    - TC-P7-10
+    - TC-P7-11
+    - TC-P7-12
+    - TC-P7-13
+    - TC-P7-14
+    - TC-P7-16
+    - TC-P7-17
+
+  taskcards_closed_obsolete:
+    - {id: TC-P7-01, reason: "already solved differently, already committed via src/utils/content_discovery.py (commit 242bafb), prior to this mission's execution -- re-verified working, not rebuilt"}
+
+  taskcards_accepted_with_governed_exclusion:
+    - id: TC-P7-15
+      excluded_requirement: "stopping the content repo's own separate, live .supervisor/-governed pipeline"
+      authority: "explicit operator go-ahead to proceed concurrently (plan's Live-System Reassessment §D, 'RESOLVED 2026-07-24 14:53')"
+      code_deliverable_status: PARTIAL_BY_DESIGN
+      note: "hugo-translator's own content_worker/tm_worker were confirmed stopped; the content repo's separate pipeline was, by explicit operator instruction, left running throughout"
+
+  taskcards_not_closed:
+    - {id: "L3 semantic TM purge", state: DEFERRED, reason: "764,510 entries; re-embed cost after remove_entries() rebuild assessed as prohibitive for remaining session time -- L2/primary (the layer hit on every exact-match lookup) is clean and verified. Recommended as a near-term follow-up, not indefinitely deferred."}
+    - {id: "Gate 12 source fix", state: NOT_STARTED, reason: "live-pipeline change (write_gate.py), explicitly out of this mission's scope by design -- recommended as an immediate follow-up mission so today's fixes don't start re-accumulating corruption on new translations"}
+    - {id: "audit_all_content.py double_period detector fix", state: NOT_STARTED, reason: "newly discovered this mission (TC-P7-16 investigation) -- the audit tool's own double_period check shares Gate 12's unprotected-regex flaw, causing a 1,347-file false-positive spike in the re-audit. Not fixed (would touch the audit tool's live detection logic, no test coverage built for it this mission) -- recommended as a follow-up alongside the Gate 12 fix."
+
+  requirements_reconciled: true
+  queue_empty_and_valid: true
+  continuation_disabled: true
+
+  files_changed_this_close_task_invocation:
+    - .supervisor/state/quality-remediation-audit-phase7-20260723/stage3-execution/before-after-audit-diff.md
+    - .supervisor/state/quality-remediation-audit-phase7-20260723/stage3-execution/tm-purge-log.md
+    - .supervisor/state/quality-remediation-audit-phase7-20260723/stage3-execution/quality-scoring-rubric.md
+    - .supervisor/state/quality-remediation-audit-phase7-20260723/stage3-execution/git-evidence.md
+    - .supervisor/state/quality-remediation-audit-phase7-20260723/stage3-execution/stage3-execution-log.md (appended)
+    - .supervisor/state/quality-remediation-audit-phase7-20260723/stage2-plan/stage2-taskcard-index.yaml (updated to final states)
+    - .supervisor/state/quality-remediation-audit-phase7-20260723/close_task_result.yaml (this file)
+    - .supervisor/state/quality-remediation-audit-phase7-20260723/TERMINAL_CLOSED.yaml
+
+  commits_this_invocation:
+    - hash: 2fbb3e4
+      message: "feat(quality): add phase-7 audit remediation tooling (link-path/double-period/title/table-cell fixers, TM purge, verify_fix)"
+      note: "evidence-bundle files listed above were written after this commit and are NOT included in it -- see remaining_uncommitted_evidence below"
+
+  commits_this_mission_full_list:
+    - {hash: 2fbb3e4, taskcard: "TC-P7-17 (all 20 tooling/test files + prior .supervisor/state/ artifacts, one bundled commit per Deliverable 6's git-mechanics revision -- concurrency with the content repo's own pipeline made per-category commits on a separate branch the higher-risk choice; see plan's Live-System Reassessment §D)"}
+
+  content_repo_commits: "None made by this mission -- see stage3-execution/git-evidence.md for the full explanation (this mission's content fixes were absorbed into the concurrent pipeline's own commit stream, not committed separately by this mission; verified via re-audit diff and spot-checked file content, not via commit attribution)."
+
+  master_plan_sections_updated: []
+  master_plan_update_note: >
+    The plan document itself (link-path-corrupted-1-638-memoized-hinton.md)
+    was not edited during closure -- per this mission's own established
+    practice (see stage2-taskcard-index.yaml, "live-tracked status view"),
+    stage2-taskcard-index.yaml is the authoritative current-status source,
+    not the plan file. Docked in quality-scoring-rubric.md dimension 14
+    (documentation_skill_agent_sync_quality) accordingly, not silently
+    treated as complete.
+
+  pushed_to_origin: false
+  push_is_operator_owned: true
+
+  verification_performed:
+    - "TC-P7-16 full re-audit: 86,474 rows across docs/kb/products/reference.aspose.org, all 10 target categories' before/after deltas computed directly from the two JSONL files and fully explained -- see stage3-execution/before-after-audit-diff.md"
+    - "docs.aspose.org double_period spike (121->1,348) investigated by reading all 1,348 flagged files directly and testing for stray '..' outside markdown link targets: 1,347/1,348 false-positive (audit-tool artifact), 1/1,348 pre-existing/out-of-scope"
+    - "TM purge: dry-run before write (698,185 scanned / 10,780 candidates), write (10,780/10,780 deleted), post-write spot-check (0 remaining) -- see stage3-execution/tm-purge-log.md"
+    - "git status on both repos re-verified at closure time: hugo-translator's own commit contains exactly the 24 intended files (verified via git show --stat); content repo's dirty set re-confirmed to contain zero mission-owned files"
+    - "backlog queue (data/retranslate_queue.jsonl) row count (6,505) and timestamp cross-checked against the taskcards that feed it (TC-P7-06/08/09/10/11, all CLOSED before the queue file's last-modified time)"
+
+  remaining_uncommitted_evidence: >
+    This close_task_result.yaml, TERMINAL_CLOSED.yaml, and the stage3-execution/
+    evidence files listed under files_changed_this_close_task_invocation were
+    written to the working tree but NOT included in commit 2fbb3e4 (which
+    predates them). They remain uncommitted in the hugo-translator working
+    tree on branch remediation/audit-phase7-20260723 at the end of this
+    mission -- the evidence bundle zip (see evidence_bundle_path below)
+    packages them directly from the working tree, not from a commit. A
+    follow-up commit of these closure artifacts is recommended but not
+    performed automatically here, consistent with this session's practice of
+    keeping git actions explicit and reviewable rather than silently
+    finalizing further commits after the user's original single-go
+    authorization was already exercised once.
+
+  evidence_bundle_path: ".supervisor/state/quality-remediation-audit-phase7-20260723/declaration-review-package-quality-remediation-audit-phase7-20260723.zip"
+
+  remaining_follow_ups_or_non_blockers:
+    - "Gate 12 source fix (write_gate.py) -- recommended as an immediate follow-up mission, not indefinitely deferred (see plan's Durability section)"
+    - "audit_all_content.py double_period detector fix -- same unprotected-regex flaw, newly discovered this mission, recommended alongside the Gate 12 fix"
+    - "L3 semantic TM purge (764,510 entries) -- deferred, recommended as a near-term follow-up"
+    - "Backlog drain (6,505 queued items) -- explicitly out of this mission's scope (no LLM/MT calls); ready for the normal pipeline to consume"
+    - "Follow-up commit of the closure/evidence artifacts themselves (see remaining_uncommitted_evidence above)"
+
+  closure_record_path: ".supervisor/state/quality-remediation-audit-phase7-20260723/TERMINAL_CLOSED.yaml"
+  closure_record_valid: true
+  terminal_state_written: true
+  contradictions: []
+
+  verdict: EXECUTION_COMPLETE_WITH_LIMITATIONS

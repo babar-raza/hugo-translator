@@ -1,0 +1,45 @@
+state: TERMINAL_CLOSED
+mission_id: duplicate-content-fence-fix-20260723
+plan_id: duplicate-content-repeated-paragraph-robust-stroustrup
+closed_at: "2026-07-23"
+closed_by: claude-sonnet-5
+
+# Closure Conditions (all TRUE)
+commit_created: true                         # 78aed63 on main
+all_bugs_fixed: true                         # code-fence-blind duplicate_content check, 3 implementations
+enforcement_deployed: true                   # Gate 16 auto_clean fence-aware, live
+regression_tests_added: true                 # 2/3 implementations, 78/78 pass at closure time
+hunk_isolation_verified: true                # git apply --cached --check before, git status spot-check after
+full_flagged_set_rescanned: true             # 3,622/3,622 files re-checked
+zero_content_defects_confirmed: true         # all 13 remaining candidates manually verified as legitimate
+zero_tm_cleanup_needed: true                 # no corrupted cache entries -- nothing was ever actually corrupted
+plan_marked_completed: true                  # duplicate-content-repeated-paragraph-robust-stroustrup.md STATUS: COMPLETED header added
+audit_all_green: true                        # SPRINT_REQUIRES_EVIDENCE_REPAIR resolved by isolated commit; no plan-level defects found
+
+# Final Counts
+originally_flagged_files: 3622
+false_positives_resolved: 3609
+true_positive_candidates: 13
+genuine_defects_found: 0
+files_requiring_content_edit: 0
+tm_entries_requiring_cleanup: 0
+
+# Governance Chain
+convergence_binding: .supervisor/state/duplicate-content-fence-fix-20260723/convergence-binding.yaml
+stage1_audit: .supervisor/state/duplicate-content-fence-fix-20260723/stage1-audit/
+stage3_execution: .supervisor/state/duplicate-content-fence-fix-20260723/stage3-execution/
+close_task_result: .supervisor/state/duplicate-content-fence-fix-20260723/close_task_result.yaml
+
+# Known, disclosed, non-blocking items (do not reopen on their own)
+disclosed_limitations:
+  - "audit_all_content.py's duplicate_content check has no committed regression test (AUD-L1-004, ACCEPTED_KNOWN_LIMITATION) -- mitigated via literal extract+exec verification instead"
+  - ".supervisor/schemas/*.schema.json referenced by all four prompts do not exist in this repo -- no stage output has ever been mechanically schema-validated, in this mission or any prior one"
+  - "Background full-CLI confirmation run (surgical_retranslate.py --dry-run --sites all) was still in progress at closure time -- non-blocking, see close_task_result.yaml; reopens this mission only if its result contradicts prior findings"
+
+# Terminal Verdict
+verdict: DUPLICATE_CONTENT_AUDIT_FALSE_POSITIVE_ROOT_CAUSE_FIXED
+successor_action: >
+  AUD-L3-001 (VALID_DEFERRED): a focused audit of audit_all_content.py's
+  remaining ~22 checks for the same code-fence-blindness pattern, scoped as
+  its own small mission if a future reported metric from this audit looks
+  suspiciously high relative to spot-checked real content.

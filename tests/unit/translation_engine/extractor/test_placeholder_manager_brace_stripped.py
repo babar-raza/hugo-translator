@@ -16,6 +16,94 @@ This is the exact case pinned below, not a synthetic approximation.
 from src.translation_engine.extractor.placeholder_manager import PlaceholderManager
 
 
+class TestBareBraceWrappedCorrectValue:
+    """Found 2026-07-22 in real reference.aspose.org output (es/pdf/net/
+    ColumnInfo.md, he/pdf/net/ColumnInfo.md) from the cross_locale_dup
+    remediation campaign: description/summary shipped as
+    "`{ColumnInfo}` clase con 3 propiedades" instead of "`ColumnInfo`
+    clase con 3 propiedades". Root cause: reference.aspose.org's frontmatter
+    preserve_patterns have no backtick-specific rule (backticks are only
+    protected via the AST-level `codespan` preserve_block, which doesn't
+    apply to frontmatter strings) -- only the bare PascalCase pattern
+    matches "ColumnInfo" without the surrounding backticks, so the
+    placeholder ends up sitting directly between literal backtick and brace
+    characters: "`{PLACEHOLDER_0}` class...". The model correctly guessed
+    the identifier but kept the literal `{`/`}` around it instead of the
+    exact "PLACEHOLDER_0" token, and none of the existing digit-anchored
+    passes match (no digit remains), while the close-match fallback's naive
+    substring check treated "ColumnInfo" as already present (true, but
+    still brace-wrapped) and skipped it."""
+
+    def test_real_confirmed_repro_columninfo(self):
+        pm = PlaceholderManager()
+        placeholder_map = {"{PLACEHOLDER_0}": "ColumnInfo"}
+        raw_model_output = "`{ColumnInfo}` clase con 3 propiedades"
+
+        restored = pm.restore(raw_model_output, placeholder_map)
+
+        assert restored == "`ColumnInfo` clase con 3 propiedades"
+
+    def test_whitespace_inside_braces_still_stripped(self):
+        pm = PlaceholderManager()
+        placeholder_map = {"{PLACEHOLDER_0}": "ColumnInfo"}
+        raw = "`{ ColumnInfo }` clase con 3 propiedades"
+
+        restored = pm.restore(raw, placeholder_map)
+
+        assert restored == "`ColumnInfo` clase con 3 propiedades"
+
+    def test_does_not_touch_unrelated_braced_text(self):
+        """A brace pair NOT matching any placeholder's original value must
+        be left alone -- this pass is a targeted, exact-value match, not a
+        blanket brace-stripper."""
+        pm = PlaceholderManager()
+        placeholder_map = {"{PLACEHOLDER_0}": "ColumnInfo"}
+        raw = "See {SomeOtherClass} for details. `ColumnInfo` clase con 3 propiedades"
+
+        restored = pm.restore(raw, placeholder_map)
+
+        assert "{SomeOtherClass}" in restored
+        assert restored.count("ColumnInfo") == 1
+
+
+class TestFuzzyVariantBraceStripOrderingGap:
+    """HT-QUALITY-GATES-001 Part 21: the exact-value brace-strip pass and the
+    fuzzy-variant substitution pass ran in an order that left a gap -- if the
+    model's guess is a close VARIANT rather than an exact match (e.g.
+    "{ColumnInfos}" instead of "{ColumnInfo}"), the exact-match brace-strip
+    pass (which ran first) can't see it (not an exact value match), and the
+    fuzzy-variant pass (which ran after) only swaps the inner word via
+    substring replace, leaving the surrounding braces untouched:
+    "{ColumnInfos}" -> "{ColumnInfo}", braces intact, still a leaked-looking
+    token. Fixed by re-running the brace-strip pass a final time after the
+    fuzzy-variant substitution."""
+
+    def test_close_variant_inside_braces_loses_both_typo_and_braces(self):
+        pm = PlaceholderManager()
+        placeholder_map = {"{PLACEHOLDER_0}": "ColumnInfo"}
+        raw = "`{ColumnInfos}` clase con 3 propiedades"
+
+        restored = pm.restore(raw, placeholder_map)
+
+        assert restored == "`ColumnInfo` clase con 3 propiedades"
+        assert "{" not in restored and "}" not in restored
+
+    def test_close_variant_without_surrounding_backticks(self):
+        """OutlineElement/OutlineElements (ratio ~0.97) is a genuine close-typo
+        variant, unlike PropertyCollection/PropertiesCollection (ratio ~0.89,
+        below the intentional 0.92 cutoff -- see the comment on that cutoff
+        just above in the source) which the pipeline deliberately does NOT
+        auto-correct since singular/plural could be a real, non-typo
+        difference."""
+        pm = PlaceholderManager()
+        placeholder_map = {"{PLACEHOLDER_0}": "OutlineElement"}
+        raw = "See {OutlineElements} for details."
+
+        restored = pm.restore(raw, placeholder_map)
+
+        assert restored == "See OutlineElement for details."
+
+
 class TestBraceStrippedRestore:
     def test_real_confirmed_repro_fi_3d_java(self):
         """The literal input/output pair confirmed by running the real

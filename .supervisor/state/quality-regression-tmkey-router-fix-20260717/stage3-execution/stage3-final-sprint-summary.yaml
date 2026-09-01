@@ -1,0 +1,67 @@
+final_sprint_summary:
+  mission_id: quality-regression-tmkey-router-fix-20260717
+  plan_id: sharded-wibbling-sifakis
+  plan_path: C:\Users\prora\.claude\plans\sharded-wibbling-sifakis.md
+
+  taskcards_executed_and_accepted:
+    - TC-HT-TMKEY-001  # Option A0, all 15 dims >= 4
+    - TC-HT-ROUTE-001  # Option A, all 15 dims >= 4
+    - infra-fix-scheduler-outage-recovery  # all 15 dims >= 4
+    - infra-fix-stall-detector-crash-loop  # rerouted, repaired, rescored, all 15 dims >= 4
+
+  taskcards_deferred_to_successor_scope:
+    - TC-OPS-SCHED-MONITOR-001
+    - TC-TEST-ISOLATION-001
+    - TC-HT-TMKEY-002
+    - TC-TM-LMDB-CONSOLIDATE-001
+    - TC-HT-GATE-001
+
+  updated_existing_taskcards:
+    - TC-HDN-003  # scope note amended, not closed
+
+  evidence_bundle:
+    - "tests/unit/tm/test_tm_key_collision.py (7 tests, all pass)"
+    - "tests/unit/translation_engine/test_content_type_router_frontmatter_wiring.py (3 tests, all pass)"
+    - "tests/unit/ops/test_scheduler_stall_detection.py (4 tests, all pass)"
+    - "Full pytest tests/ run (64 min, 775/6299/173/21 fail/pass/skip/xfail, rigorously triaged)"
+    - "Real production data/tm/l2.lmdb read confirming the exact reported collision"
+    - "Live scheduler.log + per-job .log/.err monitoring across 2 relaunches and 5+ post-fix cycles"
+
+  test_results:
+    new_tests_this_mission: 14
+    new_tests_passing: 14
+    full_regression_command: "pytest tests/ --continue-on-collection-errors -q"
+    full_regression_result: "775 failed, 6299 passed, 173 skipped, 21 xfailed, 35 errors (all pre-existing, 0 attributable to this mission's changes -- see stage1 L1-003)"
+    neighborhood_regression_command: "pytest tests/unit/translation_engine/ tests/unit/tm/ tests/unit/model_runtime/ -q"
+    neighborhood_regression_result: "1202 passed, 4 failed (pre-existing, unrelated: torch API version, ctranslate2)"
+
+  self_review:
+    what_was_achieved: >
+      Fixed the confirmed root cause of the reported quality regression
+      (cross-file TM key collision + missing router wiring on frontmatter
+      content) with layered proof up to real-production-data validation.
+      Found and fixed two independent, unrelated infrastructure defects
+      (multi-hour undetected campaign outage; a stall-detector crash-loop)
+      discovered only because the deploy was actively, live-monitored rather
+      than treated as fire-and-forget. One of those two fixes was itself
+      caught under-tested by this convergence cycle's own quality gate and
+      repaired within the same cycle.
+    what_this_proves: >
+      The core content-fix claim reaches end_to_end_proof for the specific
+      reported defect instance (real production LMDB) and integration
+      proof for the general mechanism (real function return value, not
+      mocked reconstruction). It does not yet reach pilot_proof for the
+      original 3 flagged files specifically (deferred, VRAM-gated,
+      TC-HT-TMKEY-002).
+    effect_on_final_outcome: >
+      Directly reduces risk for the master plan's largest identified
+      quality-regression pattern. Does not advance Phase 0/1/2 of the
+      master plan (comprehensive audit, remaining hardening, unit-level
+      healing infra) -- those remain entirely out of this mission's scope
+      and are unaffected by this closure.
+    l1_execution_issues: "see stage1-l1-execution-issues.yaml -- 2 resolved this session (L1-001, L1-002), 2 consumed as new taskcards (L1-003, L1-004)"
+    l2_integration_issues: "see stage1-l2-integration-issues.yaml -- all 3 consumed (1 plan-item update, 2 new taskcards)"
+    l3_system_weakness_issues: "see stage1-l3-system-weaknesses.yaml -- 1 recorded as observation only (outside mission authority), 1 consumed as a new taskcard"
+    evidence_quality_verdict: STRONG for all accepted taskcards; see stage1-claim-classification-matrix.csv for the full per-claim breakdown including honestly-unresolved items.
+
+  overall_verdict: EXECUTION_COMPLETE_VERIFIED

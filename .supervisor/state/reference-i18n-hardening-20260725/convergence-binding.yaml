@@ -1,0 +1,80 @@
+convergence_binding:
+  mission_id: reference-i18n-hardening-20260725
+  plan_id: reference-i18n-recon-shiny-platypus
+  plan_path: C:\Users\prora\.claude\plans\reference-i18n-recon-shiny-platypus.md
+  plan_revision: "final-2026-07-25-user-approved"
+  plan_hash: 9d027cee1fe11978f6a2a64a7fe3eb3a983a54acc2ed4e88e5ffe7c42aa08518
+  bound_at: "2026-07-25 (bound at execution start, same session as plan approval)"
+
+  # Mission scope: make i18n the authoritative first lookup for short,
+  # repeated, context-stable labels on reference.aspose.org. Continues the
+  # closed mission heading-i18n-governance-20260723 (registry/resolver/
+  # short-circuit/miner/healer shipped there; this mission fixes the P0
+  # value-clobber bug, extends coverage to all 36 locales and new candidate
+  # tracks, adjudicates at full scope, and applies targeted content healing).
+
+  post_sprint_audit:
+    expected: .supervisor/prompts/prompt1-post-sprint-audit.md
+    path: .supervisor/prompts/prompt1-post-sprint-audit.md
+    hash_sha256_prefix16: 263dab3dadad6845
+    role_verified: true
+    role_verification_evidence: >
+      Same file, same hash prefix as verified in
+      quality-remediation-audit-phase7-20260723's binding (263dab3dadad6845).
+      Stage-1-equivalent audit for THIS mission is the corpus/pipeline/log
+      recon completed pre-plan (three exploration reports transcribed to
+      reports/agents/reference-i18n-hardening-20260725/recon/), plus the
+      directly verified P0 clobber finding recorded in the plan.
+
+  plan_hardening:
+    expected: .supervisor/prompts/prompt2-plan-hardening.md
+    path: .supervisor/prompts/prompt2-plan-hardening.md
+    hash_sha256_prefix16: 4fe227b68c0e58e0
+    role_verified: true
+    role_verification_evidence: >
+      Same file/hash as prior mission binding. Stage-2 equivalent: the
+      approved plan's Workstreams A/B/C with per-item allowed files,
+      constraints, verification commands, and four recorded user decisions
+      (healing=targeted, dirty-files=surgical, adjudication=full,
+      TM-cleanup=wait-for-central-file + NO NEW TOOLS sprint-wide).
+
+  controlled_execution:
+    expected: .supervisor/prompts/prompt3-controlled-execution.md
+    path: .supervisor/prompts/prompt3-controlled-execution.md
+    hash_sha256_prefix16: 5246d218a39a8464
+    role_verified: true
+    role_verification_evidence: >
+      Same file/hash as prior mission binding. Execution follows the plan's
+      12-step order; evidence lands under
+      reports/agents/reference-i18n-hardening-20260725/.
+
+  close_task:
+    expected: .supervisor/prompts/prompt4-close-task.md
+    resolved: .supervisor/prompts/prompt4-close-task.md
+    hash_sha256_prefix16: 3196a5bd52bd6e03
+    role_verified: true
+    role_verification_evidence: >
+      Same file/hash as prior mission binding (registered in
+      prompt-registry.yaml as PSL-PROMPT-4, commit 65193de).
+
+  status: BOUND
+
+  non_collision_declaration:
+    open_mission: HT-INLINE-CODE-001
+    frozen_files_not_touched_by_this_mission:
+      - src/translation_engine/write_gate.py
+      - scripts/quality/audit_all_content.py
+      - scripts/quality/unit_heal.py
+      - src/translation_engine/extractor/segment_extractor.py
+    frozen_file_touched_only_after_open_mission_lands:
+      - scripts/quality/tm_surgical_cleanup.py   # C2 Rule 4b, else DEFERRED
+    dirty_files_touched_minimally_last:
+      - src/translation_engine/segment_translator.py   # A4: one block
+      - src/translation_engine/models.py               # A4: one field
+    other_constraints:
+      - "L3/FAISS: no operations (re-embed of 1,150,560 entries in progress on GPU)"
+      - "content repo D:/onedrive/Documents/GitHub/aspose.org: safe_io healer writes only; commits operator-owned per locale-family manifest; no deletions; no push"
+
+  # Disclosed, not hidden (established precedent): no
+  # .supervisor/schemas/*.schema.json exists in this repo; schema-conformant
+  # language means structural conformance to each prompt's prose field list.

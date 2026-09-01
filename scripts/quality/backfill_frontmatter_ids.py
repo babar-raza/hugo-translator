@@ -21,7 +21,7 @@ Algorithm:
 Usage:
   python scripts/quality/backfill_frontmatter_ids.py --dry-run   # default, site=reference.aspose.org
   python scripts/quality/backfill_frontmatter_ids.py --apply
-  python scripts/quality/backfill_frontmatter_ids.py --apply --locales ar,bg,ru
+  python scripts/quality/backfill_frontmatter_ids.py --apply --locales ar,ru
   python scripts/quality/backfill_frontmatter_ids.py --site docs.aspose.org --dry-run
   python scripts/quality/backfill_frontmatter_ids.py --site kb.aspose.org --apply
 """
@@ -40,6 +40,31 @@ sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 # invocation mode (direct script run vs. pytest package import).
 if str(Path(__file__).resolve().parent) not in sys.path:
     sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+_REPO_ROOT = Path(__file__).resolve().parent.parent.parent
+for _p in (str(_REPO_ROOT / "src"), str(_REPO_ROOT)):
+    if _p not in sys.path:
+        sys.path.insert(0, _p)
+
+from src.utils.config_loader import ConfigService  # noqa: E402
+from src.utils.locale_policy import (  # noqa: E402
+    LocalePolicyViolation,
+    filter_to_allowed_locales,
+    validate_requested_locales,
+)
+
+_config_service: ConfigService | None = None
+
+
+def _get_site_profile(site_id: str):
+    """Fetch the live SiteProfile for site_id (None if not loadable)."""
+    global _config_service
+    if _config_service is None:
+        _config_service = ConfigService(str(_REPO_ROOT / "config"))
+    try:
+        return _config_service.get_site_profile(site_id)
+    except Exception:
+        return None
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -241,6 +266,8 @@ def run(
         for d in site_root.iterdir()
         if d.is_dir() and d.name != EN_LOCALE and (not only_locales or d.name in only_locales)
     )
+    if not only_locales:
+        locales = filter_to_allowed_locales(_get_site_profile(site), locales)
 
     print(f"Content root: {site_root}")
     print(f"Locales: {locales}")
@@ -290,6 +317,13 @@ def main() -> None:
 
     content_root = args.content_root or _resolve_content_root()
     only_locales = [l.strip() for l in args.locales.split(",")] if args.locales else None
+
+    if only_locales:
+        try:
+            validate_requested_locales(_get_site_profile(args.site), only_locales)
+        except LocalePolicyViolation as e:
+            print(f"ERROR: {e}", file=sys.stderr)
+            sys.exit(1)
 
     stats = run(content_root, args.site, only_locales, apply=apply, verbose=args.verbose)
 

@@ -1,0 +1,287 @@
+schema_version: 1
+locale: sr
+translations:
+  heading.overview:
+    value: Pregled
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 13622
+    corpus_agreement: agree
+  heading.see_also:
+    value: Vidi takođe
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 1790
+    corpus_agreement: agree
+  heading.properties:
+    value: Svojstva
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 6500
+    corpus_agreement: agree
+  heading.methods:
+    value: Metode
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 3448
+    corpus_agreement: agree
+  heading.description:
+    value: Opis
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 2572
+    corpus_agreement: agree
+  heading.values:
+    value: Vrednosti
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 3808
+    corpus_agreement: agree
+  heading.enumerations:
+    value: Enumeracije
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 119
+    corpus_agreement: override
+    rejected_variants:
+    - Побројеви
+    - Tekst
+  heading.accessor_methods:
+    value: Pristupne metode
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 791
+    corpus_agreement: override
+    rejected_variants:
+    - Аксесоар методе
+  heading.constructors:
+    value: Konstruktori
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 31
+    corpus_agreement: agree
+  heading.core_api:
+    value: Osnovni API
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 290
+    corpus_agreement: override
+    rejected_variants:
+    - Osnovni graf scene
+    - Основни АПИ
+  heading.interfaces:
+    value: Interfejsi
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 150
+    corpus_agreement: override
+    rejected_variants:
+    - Oblici
+  heading.inheritance:
+    value: Nasleđivanje
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 34
+    corpus_agreement: no_corpus_evidence
+  heading.structs:
+    value: Strukture
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 143
+    corpus_agreement: override
+    rejected_variants:
+    - Ugrađeni primitivci
+  heading.examples:
+    value: Primeri
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 35
+    corpus_agreement: no_corpus_evidence
+  heading.classes:
+    value: Klase
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 103
+    corpus_agreement: override
+    rejected_variants:
+    - AnimationClip
+  heading.type:
+    value: Tip
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 52228
+    corpus_agreement: override
+    rejected_variants:
+    - Тип
+  heading.name:
+    value: Naziv
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 52195
+    corpus_agreement: override
+    rejected_variants:
+    - Име
+    - Ime
+  heading.value:
+    value: Vrednost
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 13014
+    corpus_agreement: override
+    rejected_variants:
+    - Вредност
+  table.header.description:
+    value: Opis
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 122171
+    corpus_agreement: override
+    rejected_variants:
+    - Опис
+  table.header.signature:
+    value: Potpis
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 31997
+    corpus_agreement: agree
+  table.header.access:
+    value: Pristup
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 34671
+    corpus_agreement: agree
+  table.header.property:
+    value: Svojstvo
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 1958
+    corpus_agreement: agree
+  table.header.method:
+    value: Metoda
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 1266
+    corpus_agreement: override
+    rejected_variants:
+    - Metod
+  table.header.class:
+    value: Klasa
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 715
+    corpus_agreement: override
+    rejected_variants:
+    - Example
+  table.header.enumeration:
+    value: Enumeracija
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 525
+    corpus_agreement: override
+    rejected_variants:
+    - ReferenceMode
+  table.header.return_type:
+    value: Povratni tip
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 273
+    corpus_agreement: override
+    rejected_variants:
+    - Vrati tip
+  table.access.read:
+    value: Čitanje
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 0
+    corpus_agreement: no_corpus_evidence
+  table.access.write:
+    value: Pisanje
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 0
+    corpus_agreement: no_corpus_evidence
+  table.access.read_write:
+    value: Čitanje/pisanje
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 0
+    corpus_agreement: no_corpus_evidence
+  table.access.execute:
+    value: Izvršavanje
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 0
+    corpus_agreement: no_corpus_evidence
+  table.access.create:
+    value: Kreiranje
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 0
+    corpus_agreement: no_corpus_evidence
+  table.access.delete:
+    value: Brisanje
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 0
+    corpus_agreement: no_corpus_evidence
+  table.access.update:
+    value: Ažuriranje
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 0
+    corpus_agreement: no_corpus_evidence
+  phrase.inherits_from:
+    value: 'Nasleđuje od: {api}.'
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 3750
+    corpus_agreement: agree
+  phrase.is_a_class_in:
+    value: '{api} je klasa u Aspose.{family} FOSS za {platform}.'
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 61489
+    corpus_agreement: override
+    rejected_variants:
+    - '{api} је класа у Aspose.{family} FOSS за {platform}.'
+  phrase.is_an_enum_in:
+    value: '{api} je enum u Aspose.{family} FOSS za {platform}.'
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 13205
+    corpus_agreement: agree
+  phrase.is_an_interface_in:
+    value: '{api} je interfejs u Aspose.{family} FOSS za {platform}.'
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 5427
+    corpus_agreement: override
+    rejected_variants:
+    - '{api} је интерфејс у Aspose.{family} FOSS за {platform}.'
+  phrase.is_a_struct_in:
+    value: '{api} je struktura u Aspose.{family} FOSS za {platform}.'
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 873
+    corpus_agreement: agree
+  phrase.class_provides_methods:
+    value: Ova klasa pruža {n} metoda za rad sa objektima {api} u {platform} programima.
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 23690
+    corpus_agreement: override
+    rejected_variants:
+    - contaminated multi-sentence corpus variants
+  phrase.enum_defines_values:
+    value: 'Ova enumeracija definiše {n} vrednosti:'
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 9578
+    corpus_agreement: agree
+  phrase.members_accessible_after_install:
+    value: Svi javni članovi su dostupni za bilo koju {platform} aplikaciju nakon
+      instalacije Aspose.{family} FOSS za {platform} paketa.
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 3690
+    corpus_agreement: no_corpus_evidence

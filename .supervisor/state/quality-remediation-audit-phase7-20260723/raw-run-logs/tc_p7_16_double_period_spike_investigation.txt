@@ -1,0 +1,5 @@
+total flagged files: 1348
+false_positive (link-target-only, correctly restored ../): 1347
+true_positive (genuine stray .. outside links): 1
+read errors: 0
+TP SAMPLE: D:\onedrive\Documents\GitHub\aspose.org\content\docs.aspose.org\ro\cells\cpp\getting-started\license.md

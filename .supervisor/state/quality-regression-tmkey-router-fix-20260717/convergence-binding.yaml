@@ -1,0 +1,81 @@
+# Convergence Binding Record
+# Generated: 2026-07-17
+# Protocol: POST-PLAN AUTONOMOUS CONVERGENCE AND GOVERNED CLOSURE
+
+convergence_binding:
+  mission_id: quality-regression-tmkey-router-fix-20260717
+  plan_id: sharded-wibbling-sifakis
+  plan_path: C:\Users\prora\.claude\plans\sharded-wibbling-sifakis.md
+  plan_revision: "session-2026-07-17"
+  plan_hash: 05ebf998f532eaf1edac15c920d7864730510026cb846479895278377ec6148a
+
+  reopen_basis: >
+    The plan file's prior mission (quality-protection-repair-20260712, session
+    quality-remediation-20260713) was formally TERMINAL_CLOSED on 2026-07-14,
+    scoped to TC-WGT-GATE22-FIX and TC-LLM-AVAIL-001. That closure is not
+    contradicted -- its scope is unchanged and remains VERIFIED. Since then, in
+    later sessions on the SAME plan file, DELIVERABLE 52 (2026-07-16, throughput
+    fix) and DELIVERABLE 53 (2026-07-16/17, quality-regression root-cause fix)
+    were added and, this session, DELIVERABLE 53 was executed. This is later
+    in-scope work invalidating the completeness of the prior closure for the
+    plan as a whole, not a plan-identity change -- per governance section 11
+    ("reopen automatically if later in-scope work invalidates closure"). Same
+    plan_id, same plan_path, new mission_id scoped to the new work actually
+    executed this session.
+
+  do_not_select_by_recency_check: >
+    Explicitly verified this is not "recency bias": read .supervisor/state/
+    TERMINAL_CLOSED.yaml (mission aspose-org-multisite-speed-language-mixing-
+    20260702, unrelated, different plan under docs/quality/) and both existing
+    mission subdirectories (translator-producer-fix-20260714, closed
+    2026-07-15, different plan at C:\Users\prora\.claude\plans\translator-
+    producer-fix.md; quality-remediation-20260713, closed 2026-07-14, SAME
+    plan as this binding). Neither prior directory is currently open. This
+    binding targets the plan actually executed in this conversation
+    (sharded-wibbling-sifakis.md, DELIVERABLE 53), confirmed by direct
+    conversation history, not by filesystem mtime alone.
+
+  post_sprint_audit:
+    expected: .supervisor/prompts/prompt1-post-sprint-audit.md
+    path: .supervisor/prompts/prompt1-post-sprint-audit.md
+    hash: 263dab3dadad6845f5dd2874fe22cd860403151156cadb2dffedef5258103099
+    role_verified: TRUE  # "POST-SPRINT STRICT EVIDENCE AUDIT" confirmed; identical hash to 07-13 binding (file unchanged)
+
+  plan_hardening:
+    expected: .supervisor/prompts/prompt2-plan-hardening.md
+    path: .supervisor/prompts/prompt2-plan-hardening.md
+    hash: 4fe227b68c0e58e08381f89f5381bb8d29eebd89cba328ea3fb33c957c5d3d00
+    role_verified: TRUE  # "PLAN MODE: HARDEN CURRENT PLAN FROM LATEST SPRINT AUDIT" confirmed; identical hash to 07-13 binding
+
+  controlled_execution:
+    expected: .supervisor/prompts/prompt3-controlled-execution.md
+    path: .supervisor/prompts/prompt3-controlled-execution.md
+    hash: 5246d218a39a8464cdc32c542d5411d2f29ad034f3e867651c0f731e1269edd9
+    role_verified: TRUE  # "EXECUTION MODE: CONTROLLED TASKCARD EXECUTION" confirmed; identical hash to 07-13 binding
+
+  close_task:
+    expected: .supervisor/prompts/prompt4-close-task.md
+    resolved: .supervisor/prompts/prompt4-close-task.md
+    hash: 3196a5bd52bd6e037b84d602dbde8d32a8dbac31798c0947bac03784ff6ef81b
+    role_verified: TRUE  # "Close this task cleanly" -- session-closure role confirmed; identical hash to 07-13 binding
+
+  schemas_note: >
+    .supervisor/schemas/ does not exist on disk (referenced by all 3 prompts'
+    "Required Outputs" sections but never materialized in this repo, including
+    at the time of the 07-13 binding). Outputs below are structured to match
+    each prompt's documented required fields (issue_id/issue_level/root_cause/
+    evidence/severity/etc.) in lieu of a literal JSON Schema to validate
+    against -- same accommodation the prior binding made implicitly.
+
+  prompt_registry:
+    path: .supervisor/prompts/prompt-registry.yaml
+    status: FOUND_AND_READ
+
+  status: BOUND_ALL_FOUR_PROMPTS_VERIFIED
+  binding_decision: >
+    All four prompts found at expected .supervisor/prompts/ paths (registry's
+    docs/governance/prompts/ mirror referenced in the 2026-07-02 binding does
+    not exist in this repo layout; .supervisor/prompts/ is authoritative here,
+    matching the 07-13 binding's own resolution). Roles verified from contents
+    and hash-matched against the last verified binding for this same plan.
+    Plan identity unambiguous. Proceeding with convergence lifecycle.

@@ -1,0 +1,162 @@
+mission_id: duplicate-content-fence-fix-20260723
+prompt: prompt4-close-task
+executed_at: "2026-07-23"
+
+# ── Commit ──────────────────────────────────────────────────────────────────
+commit_hash: 78aed63
+branch: main
+files_changed: 10
+insertions: 563
+deletions: 23
+commit_message_summary: "fix(quality): make duplicate_content check code-fence-aware (HT-DCF-001)"
+
+staged_files:
+  modified:
+    - scripts/quality/audit_all_content.py       # isolated hunk only, see note below
+    - scripts/quality/surgical_retranslate.py     # whole file, no pre-existing changes
+    - src/translation_engine/write_gate.py        # isolated hunks only, see note below
+    - tests/unit/translation_engine/test_write_gate_new_gates.py
+  new:
+    - tests/unit/quality/test_surgical_retranslate_duplicate_content.py
+    - .supervisor/state/duplicate-content-fence-fix-20260723/convergence-binding.yaml
+    - .supervisor/state/duplicate-content-fence-fix-20260723/stage1-audit/audit-summary.md
+    - .supervisor/state/duplicate-content-fence-fix-20260723/stage1-audit/issues.json
+    - .supervisor/state/duplicate-content-fence-fix-20260723/stage1-audit/next-stage-recommendation.yaml
+    - .supervisor/state/duplicate-content-fence-fix-20260723/stage3-execution/taskcard-status.yaml
+
+hunk_isolation_note: >
+  write_gate.py and audit_all_content.py each had substantial pre-existing
+  uncommitted changes from other in-flight work (present before this mission
+  started). Only this mission's specific hunks were staged, via
+  `git apply --cached` on hand-extracted patches, verified clean beforehand
+  with `git apply --cached --check` (both applied without error). Confirmed
+  post-commit that the unrelated pre-existing modifications in both files
+  remain present and untouched in the working tree (git status still shows
+  them modified) -- they were not committed, reverted, or altered by this
+  mission.
+
+excluded_from_commit:
+  - "~24 pre-existing modified files + ~9 untracked files/dirs (HT-QUALITY-GATES-001 and other in-flight work): config/global.yaml, config/site_profiles/*.yaml, data/benchmark_corpus/* (deletions), src/tm/*.py, src/translation_engine/segment_translator.py, src/translation_engine/quality/refusal_patterns.py, src/translation_engine/reconstructor/ast_renderer.py, src/translation_engine/validation/*.py, scripts/audit_translation_quality.py, src/model_runtime/llm_backend.py, various test files, scripts/quality/audit_bare_brace_placeholder_leak.py (new), scripts/quality/audit_blog_bundle.py (new), src/translation_engine/validation/fidelity_judge.py (new), scripts/ops/* (new), .kilo/ (new) -- none touched by this mission"
+
+# ── Plan Update ──────────────────────────────────────────────────────────────
+plan_file: "C:/Users/prora/.claude/plans/duplicate-content-repeated-paragraph-robust-stroustrup.md"
+plan_updated: true
+plan_status_added: "## STATUS: COMPLETED 2026-07-23 — commit 78aed63"
+
+# ── Final Verification ───────────────────────────────────────────────────────
+all_green_validation: PASSED
+regression_tests: "78/78 pass (73 write_gate_new_gates.py + 5 surgical_retranslate_duplicate_content.py), re-run at closure time"
+real_code_proof:
+  write_gate_gate16: "real WriteGateEvaluator.evaluate() via pytest"
+  surgical_retranslate: "real module import, real production file + synthetic controls"
+  audit_all_content: "literal extraction+exec of real on-disk code block + real production file + synthetic controls"
+full_corpus_rescan: "3,622/3,622 originally-flagged files re-checked with fixed logic -- 3,609 false positives resolved, 13 true-positive candidates manually confirmed as legitimate boilerplate (zero real defects)"
+content_changes_required: 0
+tm_cleanup_required: 0
+
+# ── Non-blocking follow-up (NOT a closure gate) ──────────────────────────────
+background_verification:
+  command: "scripts/quality/surgical_retranslate.py --dry-run --issue-type duplicate_content --sites all --verbose"
+  status: COMPLETE
+  rationale: >
+    This CLI-level, unscoped, full-directory-walk run was launched as
+    additional confirmation beyond what closure required -- production_shaped_
+    repeatable_proof (proof level 5) via the real official tool, not a
+    reimplementation or a sample.
+  evidence_path: "scratchpad/surgical_dryrun_duplicate_content.log (session-local, not committed)"
+  final_result:
+    files_scanned: 143369
+    files_clean: 140864
+    files_with_duplicate_content: 16
+    en_source_missing: 2489
+    read_errors: 0
+  reconciliation_with_stage1_finding: >
+    Stage 1's exhaustive re-scan (using the specific audit_phase7_recon.jsonl
+    / audit_phase7_recon_v2.jsonl snapshot as the 3,622-file candidate
+    universe) found 13 true positives, all reference.aspose.org/*/3d/typescript/
+    transform.md across 13 locales. This live, unscoped, full-corpus run
+    (143,369 real files, no snapshot/candidate-list dependency) found 16:
+    the same transform.md pattern across 14 locales (the 13 already found,
+    plus "he" -- not in the stale snapshot used for Stage 1, most likely
+    because that snapshot predates a small change or was itself
+    slightly incomplete), plus a second, previously-unexamined page,
+    reference.aspose.org/*/cells/python/_index.md, across 2 locales (el, hu).
+    Both "el" and "hu" instances were inspected directly: the duplicated text
+    is "**Key Properties**" (localized) repeating 3x as a section-marker
+    heading before 3 different property tables for the same class -- the
+    exact same reference.aspose.org API-index-page boilerplate pattern as
+    transform.md's "Returns: same X instance for chaining" line (confirmed:
+    applying the mechanical fixer would delete 2 of 3 property tables'
+    headers, making the page worse). The additional "he" transform.md
+    instance was also inspected and matches the same pattern exactly (4
+    occurrences of the Hebrew "same Transform instance" line).
+    Conclusion unchanged: 16/143,369 real files match the fence-aware check,
+    all belonging to 2 known EN source pages' legitimate, structurally-repeating
+    API-reference documentation, zero genuine MT-corruption defects anywhere
+    in the corpus. This reinforces rather than contradicts the mission's
+    finding and does not reopen it -- it simply completes the count from
+    "13 within one historical snapshot" to "16 across the live, authoritative,
+    full corpus," with no new failure mode discovered.
+
+# ── Closure Decision ─────────────────────────────────────────────────────────
+result: CLOSE_TASK_SUCCESS
+all_primary_work_committed: true
+all_bugs_fixed: true                    # code-fence-blind duplicate_content check, 3 implementations
+enforcement_deployed: true              # Gate 16 auto_clean now fence-aware, live for all future translations
+regression_tests_added: true            # 2/3 implementations have committed pytest coverage
+third_implementation_test_gap: true     # audit_all_content.py: accepted limitation, see AUD-L1-004
+plan_marked_completed: true
+content_or_tm_remediation_needed: false # verified: zero genuine defects in the flagged set
+
+# ── Post-closure pilot validation (2026-07-23, same day) ────────────────────
+# User requested a rigorous pilot rerun + before/after comparison after closure.
+# Ran a controlled, single-pass, full-143,369-file OLD-vs-NEW comparison
+# (both code versions applied to the identical file read, eliminating the
+# snapshot-staleness confound from the original 13-vs-16 discrepancy) plus a
+# write-gate-level pilot calling the real bound _gate_duplicate_content on a
+# real WriteGateEvaluator instance (both code versions) against known-affected
+# files, a 401-file systematic control sample, and a synthetic true-positive.
+pilot_validation:
+  full_corpus_old_vs_new:
+    files_scanned: 143369
+    old_flagged: 3850
+    new_flagged: 20
+    resolved_false_positives: 3830
+    new_regressions: 0
+    reduction_pct: 99.48
+  write_gate_pilot:
+    known_affected_16_files: "OLD would auto-clean all 16 (confirms the live bug was real); NEW still auto-cleans the same 16 but strips substantially fewer chars in every case (removed only the fence-caught portion, not the whole match) -- see finding below"
+    control_sample_401_files: "OLD would auto-clean 9/401 (~3,215 extrapolated corpus-wide, consistent with 3,850 full-corpus figure); NEW auto-cleans 0/401 -- 9/9 eliminated, 0 new"
+    synthetic_true_positive: "both OLD and NEW correctly detect and correctly dedupe genuine repeated-paragraph corruption -- no false-negative regression"
+  finding_residual_pattern_not_covered_by_this_fix: >
+    The 20 files still flagged post-fix (all reference.aspose.org: 14x
+    3d/typescript/transform.md, 2x cells/python/_index.md, 3x
+    note/python/exceptions.md, 1x cells/python/page-break.md) are NOT
+    code-fence false positives -- they are a DIFFERENT pattern this mission's
+    fix does not address: a short, legitimate, structurally-repeating prose
+    boilerplate label/description (e.g. "Returns: same X instance for
+    chaining", "Key Properties") that correctly repeats across multiple
+    distinct sibling sections (methods/properties/exception classes) on
+    reference.aspose.org's generated API-reference pages, sitting in plain
+    prose (not inside a code fence), so fence-awareness does not protect it.
+    Gate 16 (auto_clean, no human review) STILL fires on these today and
+    would strip 2+ of the legitimate repeats from any FUTURE rewrite of these
+    or similarly-structured pages -- this is a real, live, currently-unfixed
+    risk, small in current scope (20/143,369 = 0.014% of corpus, confined to
+    reference.aspose.org) but not zero. This does NOT reopen this mission
+    (its bound scope -- the code-fence-blindness root cause of the reported
+    3,622/3,850 metric -- was fully fixed and is verified with zero
+    regressions) but supersedes/sharpens AUD-L3-001 with a concrete,
+    quantified, characterized follow-up target.
+  successor_finding_id: AUD-L3-002
+  successor_recommendation: >
+    A follow-up mission should teach Gate 16 / surgical_retranslate.py /
+    audit_all_content.py to also exclude short (e.g. <15-word), heading-like,
+    or table/list-item-adjacent prose duplicates from the auto_clean action --
+    or, more conservatively, downgrade auto_clean to a review-only flag for
+    any duplicate that is NOT inside a code fence, until a positive signal
+    (e.g. genuine MT decoding-loop shape: same sentence 3+ times back-to-back
+    with no intervening distinct content) can be distinguished from
+    legitimate structural repetition. Scope: reference.aspose.org API-index
+    pages specifically (this pattern was not observed on docs.aspose.org or
+    kb.aspose.org in the 143,369-file corpus scan).

@@ -1,0 +1,48 @@
+mission_id: duplicate-content-fence-fix-20260723
+run_id: 20260725-code-fence-durable-fix
+governing_plan: C:/Users/prora/.claude/plans/this-surfaced-something-more-witty-bear.md
+controller: .supervisor/prompts/prompt3-controlled-execution.md
+task_graph: ../../taskcard-status.yaml
+baseline:
+  repository: C:/Users/prora/OneDrive/Documents/GitHub/hugo-translator
+  branch: remediation/audit-phase7-20260723
+  head: e6ada1417d8a3638ce4ad6b208acdfed7cd51698
+  state: preflight.md
+  focused_tests: "17 passed, 3 warnings"
+implementation:
+  primary_commit: 12615212ec5cf083e4924903ee0732bf055749e0
+  changed_paths:
+    - src/translation_engine/fence_spans.py
+    - scripts/quality/audit_all_content.py
+    - tests/unit/quality/fence_span_cases.py
+    - tests/unit/quality/test_fence_spans.py
+    - tests/unit/quality/test_audit_all_content_check_purity.py
+    - tests/unit/quality/test_audit_all_content_duplicate_content.py
+    - tests/unit/quality/test_audit_all_content_english_headings.py
+verification:
+  primitive_and_consumer_tests: "36 passed, 3 warnings"
+  compilation: "src/translation_engine/fence_spans.py and scripts/quality/audit_all_content.py compiled"
+  full_corpus: corpus-comparison.md
+  raw_full_corpus_data: corpus-comparison.json
+  manual_dispositions: manual-purity-dispositions.md
+  lint:
+    scoped_new_and_changed_files: passed
+    audit_module_full_file: "known pre-existing failures also present in git HEAD; see verification-results.md"
+failure_and_recovery:
+  - "The first ten-minute corpus run timed out before completing because it ran full Git dirty-status scans for every content root."
+  - "The second run showed that even a deduplicated full dirty-status scan is too slow for the live checkout."
+  - "The completed recovery records config and content-root Git SHAs and explicitly labels dirty status uncollected; it retains the required same-read checker comparison."
+independent_review:
+  verdict: ACCEPTED
+  method: "Separate agent inspected the plan, task graph, evidence, staged diff, and reran the focused suite."
+  findings_repaired:
+    - "Taskcard evidence references now resolve to verification-results.md."
+    - "Unterminated-fence cases cover duplicate-content and English-heading consumers."
+    - "Only mission audit hunks are staged; unrelated inline-code and priority-map work remains unstaged."
+continuation_proof:
+  next_task_after_close: none_in_current_mission
+  deferred_successors: [AUD-FENCE-SWEEP-001, AUD-AUDIT-REPRO-001, AUD-DCF-010]
+  idempotency: "The primitive is pure and the controlled comparison is read-only; rerunning tests or the comparison produces no content/TM changes."
+known_limitations:
+  - "Content-checkout dirty status was not collected after two bounded attempts; SHA and config hash are retained."
+  - "Phase 3 and Phase 4 are intentionally deferred by the governing plan and are represented as non-eligible successor tasks."

@@ -1,0 +1,41 @@
+issue_type                      before     after     delta
+code_fence_dropped                 103        35       -68
+double_period                      494      1465       971
+empty_body                          88        88         0
+gate31_contamination                 0         0         0
+link_path_corrupted               1638       383     -1255
+linktitle_mismatch                  30         0       -30
+newline_explosion                  481       481         0
+shortcode_leak                      15        15         0
+table_desc_not_translated          434       396       -38
+title_mismatch                     799         0      -799
+
+--- by site (before -> after) ---
+
+docs.aspose.org:
+  code_fence_dropped              59 -> 27       (delta -32)
+  double_period                  121 -> 1348     (delta +1227)
+  empty_body                      88 -> 88       (delta +0)
+  link_path_corrupted           1325 -> 92       (delta -1233)
+  table_desc_not_translated        5 -> 5        (delta +0)
+  title_mismatch                 204 -> 0        (delta -204)
+
+kb.aspose.org:
+  code_fence_dropped              44 -> 8        (delta -36)
+  double_period                  165 -> 114      (delta -51)
+  link_path_corrupted            132 -> 110      (delta -22)
+  shortcode_leak                   1 -> 1        (delta +0)
+  table_desc_not_translated        1 -> 1        (delta +0)
+  title_mismatch                 242 -> 0        (delta -242)
+
+products.aspose.org:
+  title_mismatch                 128 -> 0        (delta -128)
+
+reference.aspose.org:
+  double_period                  208 -> 3        (delta -205)
+  link_path_corrupted            181 -> 181      (delta +0)
+  linktitle_mismatch              30 -> 0        (delta -30)
+  newline_explosion              481 -> 481      (delta +0)
+  shortcode_leak                  14 -> 14       (delta +0)
+  table_desc_not_translated      428 -> 390      (delta -38)
+  title_mismatch                 225 -> 0        (delta -225)

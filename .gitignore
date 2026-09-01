@@ -356,3 +356,5 @@ scripts/inspect_l3.bat
 scripts/inspect_cache.py
 /docs/plans
 /.local
+/.supervisor/state
+/.kilo

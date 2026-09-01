@@ -23,41 +23,31 @@ content_roots:
 default_source_lang: en
 target_langs:
 - ar
-- bg
-- ca
 - cs
-- da
 - de
 - el
 - es
 - fa
-- fi
 - fr
 - he
 - hi
-- hr
 - hu
 - id
 - it
 - ja
 - ko
-- lt
-- lv
-- ms
 - nl
-- "no"
 - pl
 - pt
 - ro
 - ru
-- sk
-- sr
 - sv
 - th
 - tr
 - uk
 - vi
 - zh
+strict_locale_allowlist: true
 frontmatter:
   title:
     mode: translate
@@ -84,7 +74,10 @@ frontmatter:
     mode: passthrough
     strategy: null
   url:
-    mode: passthrough
+    mode: ignore
+    strategy: null
+  aliases:
+    mode: ignore
     strategy: null
   slug:
     mode: passthrough
@@ -129,7 +122,9 @@ output_layout:
   per_language_folders: false
   pattern: '{filename}.{lang}{ext}'
 model:
-  default: m2m100_1.2b
+  # The governed Aspose batch skill pins the 418M model for blog runs.
+  # The 1.2B model has reproduced Windows OOM/native crashes on this host.
+  default: m2m100_418m
 tm_prefs:
   use_semantic_tm: true
   fallback_exact_only: false

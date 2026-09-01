@@ -212,3 +212,77 @@ class TestValidationModeWiring:
         builder.build_into(engine)
 
         assert engine.decision_engine.max_retry_attempts == 0
+
+
+# ---------------------------------------------------------------------------
+# HT-QUALITY-GATES-001 Part 22 (plan 5.4 item 1): semantic-encoder wiring
+# decoupled from skip_l3
+# ---------------------------------------------------------------------------
+
+
+class TestSemanticEncoderWiring:
+    """Before this fix, SemanticSimilarityValidator's encoder was only ever
+    set when `engine.tm.l3` was a real, initialized L3SemanticTM instance --
+    which is None whenever skip_l3=True, the documented production default
+    for multi-shard GPU runs. These tests confirm the encoder now gets set
+    either way, via a standalone CPU-loaded fallback when L3 isn't active.
+    """
+
+    def test_uses_l3_encoder_when_l3_is_active(self):
+        """When L3 IS active, reuse its encoder -- must not load a second,
+        redundant standalone encoder."""
+        from src.translation_engine.engine_builder import EngineBuilder
+        from src.translation_engine.validation.semantic_similarity_validator import (
+            SemanticSimilarityValidator,
+        )
+
+        engine = MagicMock()
+        engine.tm.l3.encoder = "the-real-l3-encoder"
+        engine.config.get_config.return_value = {}
+
+        with patch(
+            "src.tm.l3_semantic.load_standalone_sentence_encoder"
+        ) as mock_standalone:
+            EngineBuilder._init_tm_wiring(engine, {})
+
+        mock_standalone.assert_not_called()
+        assert SemanticSimilarityValidator._shared_encoder == "the-real-l3-encoder"
+
+    def test_falls_back_to_standalone_cpu_encoder_when_l3_is_none(self):
+        """The actual fix: engine.tm.l3 is None (skip_l3=True case) -- the
+        encoder must still get set, via a standalone, CPU-loaded encoder."""
+        from src.translation_engine.engine_builder import EngineBuilder
+        from src.translation_engine.validation.semantic_similarity_validator import (
+            SemanticSimilarityValidator,
+        )
+
+        engine = MagicMock()
+        engine.tm.l3 = None
+        engine.config.get_config.return_value = {
+            "tm_defaults": {"l3_embedding_model": "test-model-name"}
+        }
+
+        with patch(
+            "src.tm.l3_semantic.load_standalone_sentence_encoder"
+        ) as mock_standalone:
+            mock_standalone.return_value = "the-standalone-encoder"
+            EngineBuilder._init_tm_wiring(engine, {})
+
+        mock_standalone.assert_called_once_with("test-model-name", use_gpu=False)
+        assert SemanticSimilarityValidator._shared_encoder == "the-standalone-encoder"
+
+    def test_standalone_load_failure_is_non_fatal(self):
+        """A failure loading the standalone encoder (e.g. dependency
+        missing, model download failure) must not break engine
+        construction -- matches the existing non-fatal wiring pattern."""
+        from src.translation_engine.engine_builder import EngineBuilder
+
+        engine = MagicMock()
+        engine.tm.l3 = None
+        engine.config.get_config.return_value = {"tm_defaults": {}}
+
+        with patch(
+            "src.tm.l3_semantic.load_standalone_sentence_encoder",
+            side_effect=RuntimeError("model download failed"),
+        ):
+            EngineBuilder._init_tm_wiring(engine, {})  # must not raise

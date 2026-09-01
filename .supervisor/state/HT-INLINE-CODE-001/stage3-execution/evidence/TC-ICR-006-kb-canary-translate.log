@@ -1,0 +1,246 @@
+DEBUG: setup_structured_logging: Starting
+DEBUG: setup_structured_logging: Cleared handlers
+DEBUG: setup_structured_logging: Set log level
+DEBUG: setup_structured_logging: Creating base_processors list
+DEBUG: setup_structured_logging: base_processors created
+DEBUG: setup_structured_logging: DualOutputProcessor handled
+DEBUG: setup_structured_logging: Adding console renderer
+DEBUG: setup_structured_logging: Console renderer added
+DEBUG: setup_structured_logging: About to wrap stdout
+DEBUG: setup_structured_logging: stdout wrapped
+DEBUG: setup_structured_logging: About to add console_handler
+DEBUG: setup_structured_logging: console_handler added
+DEBUG: setup_structured_logging: About to configure structlog
+DEBUG: setup_structured_logging: structlog configured
+[2m2026-07-24T20:08:54.787387Z[0m [[32m[1minfo     [0m] [1mHugo Translator starting      [0m [[0m[1m[34msrc.cli[0m][0m [36mversion[0m=[35m0.1.0[0m
+Telemetry cleanup check: max_age=1h, agent=hugo-translator, dry_run=False, api=http://localhost:8765
+Telemetry API not reachable at http://localhost:8765. Skipping cleanup - stale runs will remain until next startup.
+Starting translation for site: kb.aspose.org
+No previous progress found, starting fresh...
+Creating SharedEngines from configuration
+Loaded execution mode config for 'windows_cuda' from global.yaml: {'device': 'cuda', 'enable_gpu': True, 'max_gpu_memory_percent': 50, 'max_gpu_memory_mb': None, 'poll_interval': 5.0, 'max_retries': 3, 'worker_id_prefix': 'windows-gpu', 'queue_backend': 'memory'}
+ProfileEngine initialized: config_root=config
+DEBUG: About to create LoggingEngine
+DEBUG: LoggingEngine config - level=INFO, file=None, console=True
+DEBUG: LoggingEngine.__init__ started
+DEBUG: About to call setup_structured_logging
+DEBUG: setup_structured_logging: Already configured, skipping
+DEBUG: setup_structured_logging completed
+DEBUG: About to create StructuredLogger
+DEBUG: StructuredLogger created
+LoggingEngine initialized: name=translation_system, level=INFO, log_file=None, console=True
+DEBUG: LoggingEngine created successfully
+TelemetryEngine initialized: agent=hugo-translator, enabled=True
+Loaded queue config from global.yaml: backend=memory, fallback=memory
+Loaded execution mode config for 'windows_cuda' from global.yaml: {'device': 'cuda', 'enable_gpu': True, 'max_gpu_memory_percent': 50, 'max_gpu_memory_mb': None, 'poll_interval': 5.0, 'max_retries': 3, 'worker_id_prefix': 'windows-gpu', 'queue_backend': 'memory'}
+Queue backend from execution mode 'windows_cuda': memory
+Backend selected from execution mode: memory
+MemoryQueueBackend initialized: max_queue_size=1000
+JobEngineV2 initialized: primary=memory, fallback=memory, current=memory
+JobEngine initialized: backend=memory (V2 mode with failover)
+CommitEngine initialized: enabled=True, auto_push=True, working_dir=None
+Computed max_gpu_memory_mb from percent: 8187MB (50% of 16376MB)
+psutil available for resource monitoring
+LimitingEngine initialized: cpu_max=None%, mem_min=NoneMB, gpu_mem_percent=50%, gpu_mem_max=8187MB
+HealingEngine initialized: max_retries=3, reduction_factor=0.5, min_batch_size=1
+SharedEngines created successfully
+================================================================================
+TRANSLATION CONFIGURATION
+================================================================================
+Site: kb.aspose.org
+Input: D:\onedrive\Documents\GitHub\aspose.org\content\kb.aspose.org\en\pdf\_index.md
+Output: (default from site profile)
+Target Languages: fr (1 total)
+Model: default
+Device: auto
+Load Mode: auto
+Batch Size: auto-optimized
+Force Retranslate: ENABLED (cache reads disabled)
+Cache Write Mode: auto
+Validation: ENABLED (max retries: None)
+Terminology: DISABLED
+================================================================================
+[2m2026-07-24T20:09:03.490085Z[0m [[32m[1minfo     [0m] [1mTranslation session started   [0m [[0m[1m[34mtranslation_system[0m][0m [36msite_id[0m=[35mkb.aspose.org[0m [36msource_lang[0m=[35men[0m [36mtarget_langs[0m=[35m['fr'][0m
+Validation mode: strict (CLI override)
+Initializing Translation Memory...
+C:\Users\prora\OneDrive\Documents\GitHub\hugo-translator\src\cli.py:2400: UserWarning: L2PersistentTM: sibling LMDB directory found alongside canonical 'l2.lmdb': l2_lmdb. This indicates split writes. Run scripts/tm/migrate_l2_lmdb.py to consolidate.
+  l2_persistent = L2PersistentTM(str(l2_path), max_size_mb=_l2_max_mb)
+TC-TM-02: sibling L2 LMDB dir(s) detected: l2_lmdb (canonical: data\tm\l2.lmdb). Run scripts/tm/migrate_l2_lmdb.py --apply to consolidate.
+Load pretrained SentenceTransformer: all-MiniLM-L6-v2
+L3 index initialized: 764510 entries, save_interval=100, async_save=False
+L3 Semantic TM initialized
+Initializing Model Loader...
+Loading model registries: ['config\\model_registry.yaml', 'config\\custom_ct2_registry.yaml']
+Combined registry: 51 models total
+Auto-detected device: cuda
+DEBUG CLI: device=cuda
+DEBUG CLI: max_gpu_memory_mb from hardware_config=None
+DEBUG CLI: exec_mode=windows_cuda, max_gpu_memory_percent=50
+Computed GPU memory limit from 50%: 8187MB (50% of 16376MB)
+DEBUG CLI: Computed max_gpu_memory_mb=8187
+Set GPU memory limit: 8187MB (fraction: 0.50) on device 0
+VRAM enforcement applied: 8187MB
+Optimizing for GPU runtime...
+DEBUG CLI: Creating GPUOptimizer with max_vram_mb=8187
+Using configured VRAM limit: 8187MB (detected: 16376MB)
+GPU optimization: VRAM=8187MB, model=418M, precision=fp16, batch_size=11, estimated_usage=3266MB (39.9%)
+GPU optimization enabled: batch_size=11, estimated_vram=3266MB (39.9% of 8187MB)
+GPU optimizer suggests hardware_baseline=11 for adaptive batch sizing
+Initializing Translation Engine...
+Loaded benchmarking config: path=config\benchmarking.yaml
+Production metrics recording: enabled=False
+Force retranslate enabled (cache lookup will be bypassed)
+TC-QG-004: SemanticSimilarityValidator added to production ValidationSuite (validation_mode='strict')
+Loaded batch statistics (v1.0): 9 languages tracked
+[ENABLED] Adaptive Batching: 9 languages loaded, threshold=5.0%
+  - es: batch_size=N/A
+  - he: batch_size=N/A
+  - hr: batch_size=N/A
+  - ro: batch_size=N/A
+  - sv: batch_size=N/A
+FastText model loaded successfully (176 languages)
+FastText language detection initialized
+Loaded similarity statistics: 0 learned pairs, 0 pending review, 160 tracked pairs
+Adaptive similarity tracker initialized
+[ENABLED] OOM Retry Handler: max_retries=3, reduction_factor=0.5, min_batch=1
+Wired language detector into TM for cache hit validation
+Input path: D:\onedrive\Documents\GitHub\aspose.org\content\kb.aspose.org\en\pdf\_index.md
+Initialized progress tracking for 1 files
+Translating single file: D:\onedrive\Documents\GitHub\aspose.org\content\kb.aspose.org\en\pdf\_index.md
+Parsing D:\onedrive\Documents\GitHub\aspose.org\content\kb.aspose.org\en\pdf\_index.md
+Extracted 14 segments from D:\onedrive\Documents\GitHub\aspose.org\content\kb.aspose.org\en\pdf\_index.md
+CT2-002 model_decision: model_id=m2m100_418m origin=curated pair=en->fr fallback_used=True fallback_reason=no_selector_or_no_match
+Force retranslate enabled: bypassing cache lookup for 14 segments (en -> fr)
+ContentTypeRouter: 1/14 frontmatter segments routed to LLM backend before MT batch
+[INIT] 0% | Files: 0/1 ([->]1) | Segs: 0/0 @ calculating... | Cache: 0% | ETA: calculating...
+          Current: _index.md (segment 0/14, 0%)
+OpenAICompatibleProvider initialized: base_url=https://llm.professionalize.com/v1 model=recommended
+LLMModelBackend loaded: provider=openai_compatible model=recommended
+HTTP Request: POST https://llm.professionalize.com/v1/chat/completions "HTTP/1.1 200 OK"
+LLM translation: batch=1 tokens_in=150 tokens_out=226 elapsed=6.7s
+Translating 13 new segments from en to fr
+Loading HuggingFace model models\m2m100_418m on cuda (fp16)
+Model loaded (fp16). GPU memory allocated: 927MB
+HF timing: batch=11 tokens_in=737 tokens_out=825 tokenize=3.5ms generate=1963.2ms decode=49.6ms total=2016.7ms speed_mode=True
+HF timing: batch=2 tokens_in=22 tokens_out=22 tokenize=0.5ms generate=179.6ms decode=1.2ms total=181.3ms speed_mode=True
+HTTP Request: POST https://llm.professionalize.com/v1/chat/completions "HTTP/1.1 200 OK"
+LLM translation: batch=1 tokens_in=360 tokens_out=179 elapsed=3.3s
+Dropped-placeholder fallback: professionalize_llm recovered 1 value(s) the primary model dropped: ['`CheckboxField`']
+HTTP Request: POST https://llm.professionalize.com/v1/chat/completions "HTTP/1.1 200 OK"
+LLM translation: batch=1 tokens_in=359 tokens_out=303 elapsed=5.1s
+Dropped-placeholder fallback: professionalize_llm recovered 1 value(s) the primary model dropped: ['`BorderInfo`']
+HTTP Request: POST https://llm.professionalize.com/v1/chat/completions "HTTP/1.1 200 OK"
+LLM translation: batch=1 tokens_in=332 tokens_out=149 elapsed=3.0s
+Dropped-placeholder fallback: professionalize_llm recovered 1 value(s) the primary model dropped: ['{{< sections cols="4" >}}']
+HTTP Request: POST https://llm.professionalize.com/v1/chat/completions "HTTP/1.1 200 OK"
+LLM translation: batch=1 tokens_in=332 tokens_out=149 elapsed=5.6s
+Dropped-placeholder fallback: professionalize_llm recovered 1 value(s) the primary model dropped: ['[Aspose.PDF — Enterprise Knowledge Base](https://kb.aspose.com/pdf/)']
+Using AST-based body reconstruction for translation
+[DEBUG] PlaceholderManager initialized with 7 preserve patterns
+Loaded 73 technical terms from config\terminology\technical_terms.yaml
+AST Translation: Extracting TextUnits from AST (strategy: sentence_only)
+Extracted 2 frontmatter text units
+Extracted 2 frontmatter units
+[DEBUG] Protected 1 instances in full sentence
+[DEBUG] Protected 2 instances
+AST Translation: Extracted 36 units (18 translatable, 18 protected)
+AST DIAG: 0 code block TextUnits extracted (do_not_translate=0)
+AST Translation: Reused 7 existing translations, 11 units not matched
+AST Translation: Translating 11 new units via MT (batch_size: 8, reused: 7)
+Adaptive batch sizing: fr batch_size=11 (baseline=8)
+Split 11 units into 1 batches (avg 11.0 units/batch, max 11 units or 512 tokens per batch)
+Translating batch 1/1: 11 units, ~43 tokens
+HF timing: batch=11 tokens_in=363 tokens_out=396 tokenize=2.5ms generate=721.9ms decode=13.7ms total=738.1ms speed_mode=True
+
+=== Batch Translation Statistics ===
+Total batches:             1
+Successful:                1 (100.0%)
+Fallback:                  0 (0.0%)
+  - Mapping failures:      0
+  - Language purity:       0
+  - Translation errors:    0
+Repetition detection:      
+  - Detected:              0
+  - Retry attempts:        0
+  - Retry success:         0
+  - Batch splits:          0
+  - Final fallback:        0
+Individual translations:   0
+Fallback rate:             0.0%
+====================================
+Updated adaptive stats for fr: current_batch_size=11
+AST DIAG: After batch translate: 0 code block units, 0 with content
+AST Translation: Applying translations to AST and frontmatter
+Applied 2 frontmatter translations
+AST Translation: Rendering AST to Markdown
+AST DIAG: Rendered markdown contains 0 code blocks
+AST Translation: Successfully translated 18 units (0 batches, 0 fallbacks)
+AST Translation: Successfully reconstructed document
+reconstruction_path_used site=kb.aspose.org lang=fr path=ast
+[INIT] 0% | Files: 0/1 ([->]1) | Segs: 13/0 @ calculating... | Cache: 0% | ETA: calculating...
+          Current: _index.md (segment 13/14, 93%)
+OpenAICompatibleProvider initialized: base_url=https://llm.professionalize.com/v1 model=recommended
+LLMModelBackend loaded: provider=openai_compatible model=recommended
+HTTP Request: POST https://llm.professionalize.com/v1/chat/completions "HTTP/1.1 200 OK"
+Written translated file: D:\onedrive\Documents\GitHub\aspose.org\content\kb.aspose.org\fr\pdf\_index.md
+Successfully wrote _index.md after passing all validation checks
+FastText model loaded successfully (176 languages)
+Slow L3 add_entry: 329.0ms
+Successfully translated D:\onedrive\Documents\GitHub\aspose.org\content\kb.aspose.org\en\pdf\_index.md to fr after 0 retries
+Translation completed successfully
+[INIT] 0% | Files: 1/1 ([OK]1 [->]1) | Segs: 13/0 @ calculating... | Cache: 0% | ETA: calculating...
+Cleared progress file: .translation_progress\progress_d2229004-fb2e-4e0d-9f5c-3860c781d06b.json
+Progress cleared - translation complete
+┌────────────────────────────────────────────────────────────────────────────┐
+│                            TRANSLATION COMPLETE                            │
+├────────────────────────────────────────────────────────────────────────────┤
+│  Duration:    47s                                                          │
+│  Status:      SUCCESS - [OK]1/1 files translated (100.0%)                  │
+├────────────────────────────────────────────────────────────────────────────┤
+│ LANGUAGE PROGRESS                                                          │
+├────────────────────────────────────────────────────────────────────────────┤
+│  Translated:  1/1 languages (100.0%)                                       │
+│  Completed:   fr                                                           │
+│  Work Done:   1 language outputs created                                   │
+├────────────────────────────────────────────────────────────────────────────┤
+│ FILE PROGRESS                                                              │
+├────────────────────────────────────────────────────────────────────────────┤
+│  Total Files: 1 discovered                                                 │
+│  Completed:   [OK]1 files ([OK]1 translated, 100.0%)                       │
+├────────────────────────────────────────────────────────────────────────────┤
+│ TRANSLATION PERFORMANCE                                                    │
+├────────────────────────────────────────────────────────────────────────────┤
+│  Segments:    13/0 translated (0.0%)                                       │
+│  Throughput:  0.3 seg/s, 1.3 files/min                                     │
+│  Avg Latency: 1477.9 ms/segment, 19.2s/batch                               │
+├────────────────────────────────────────────────────────────────────────────┤
+│ CACHE EFFECTIVENESS (Multi-Layer)                                          │
+├────────────────────────────────────────────────────────────────────────────┤
+│  Total Hits:  0/14 (0.0% overall hit rate)                                 │
+│  L1 (Memory): 0 hits (0.0%) - Fast in-memory cache                         │
+│  L2 (Disk):   0 hits (0.0%) - Persistent TM database                       │
+│  L3 (Fuzzy):  0 hits (0.0%) - Semantic similarity                          │
+│  Misses:      14 (100.0%) - New translations                               │
+├────────────────────────────────────────────────────────────────────────────┤
+│ ADAPTIVE BATCH TRANSLATION                                                 │
+├────────────────────────────────────────────────────────────────────────────┤
+│  Batch Calls: 1 total batches processed                                    │
+│  Adaptations: 83 batch size changes made                                   │
+│                                                                            │
+│  Per-Language Batch Sizes:                                                 │
+│    ca: 20 (baseline: 20) - No adaptation                                   │
+│    de: 48 (baseline: 20) - Increased 20x                                   │
+│    es: 50 (baseline: 20) - Increased 9x                                    │
+│    fi: 20 (baseline: 20) - No adaptation                                   │
+│    fr: 11 (baseline: 11) - No adaptation                                   │
+│    he: 39 (baseline: 20) - Increased 16x                                   │
+│    hr: 20 (baseline: 8) - Increased 8x                                     │
+│    ro: 50 (baseline: 20) - Increased 9x                                    │
+│    sr: 9 (baseline: 8) - Increased 1x                                      │
+│    sv: 50 (baseline: 20) - Increased 20x                                   │
+├────────────────────────────────────────────────────────────────────────────┤
+│ TOKEN USAGE                                                                │
+├────────────────────────────────────────────────────────────────────────────┤
+│  Input:       759 tokens sent to model                                     │
+│  Output:      847 tokens generated                                         │
+└────────────────────────────────────────────────────────────────────────────┘

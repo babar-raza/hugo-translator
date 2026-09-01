@@ -3,16 +3,19 @@ Integration tests for write gates 28-29 (HT-QUALITY-GATES-001 TC-QG-001/005).
 
 Gates tested:
   Gate 28: _gate_title_identity   (blocking: title drift on family/platform index pages)
-  Gate 29: _gate_refusal_artifact (warn-only: leaked LLM refusal/meta-commentary text)
+  Gate 29: _gate_refusal_artifact (blocking: leaked LLM refusal/meta-commentary text)
 
 Gate 28 shipped "warn" first, then was promoted to "block" (Part 21) once the
 canary confirmed 100% title match with the RC1-RC4 fixes live and the
 dropped-placeholder fallback fixed the only other residual defect found —
-see HT-QUALITY-GATES-001 plan Part 16/19/21. Gate 29 stays "warn": no
-auto-fix path exists for refusal-artifact text, so blocking it would just
-hard-stop a batch on first hit rather than fix anything. These tests pin
-real, confirmed defect shapes so a future change can't silently regress
-detection:
+see HT-QUALITY-GATES-001 plan Part 16/19/21. Gate 29 followed the same
+warn-then-block path (Part 22 / plan 1.6): the clean-sample false-positive
+check it was waiting on came from a follow-up investigation that found 6 new
+real conversational-response leaks in production, 5 of which already matched
+REFUSAL_RE and shipped anyway purely because the gate only logged — negligible
+false-positive risk relative to continuing to ship confirmed-broken pages.
+These tests pin real, confirmed defect shapes so a future change can't
+silently regress detection:
   - Gate 28's case reproduces the real title-drift found in this session's
     audit and independently re-confirmed by direct file read during
     TC-QG-005's precheck: products.aspose.org hr/cells/net/_index.md has
@@ -23,10 +26,14 @@ detection:
     scripts/quality/audit_llm_artifacts.py's discovery history (2026-07-18),
     now shared via src/translation_engine/quality/refusal_patterns.py.
 
-Also verifies the core safety property for Gate 29: a "warn"-action gate can
-NEVER set result.passed = False, even when it fires, because
-_run_content_gates() runs warn gates against a disposable WriteGateResult
-(write_gate.py's dispatch loop).
+Also verifies the dispatch loop's short-circuit behavior now that BOTH gates
+are "block": once an earlier block gate (28) has already set
+result.passed = False, a later block gate (29) in registry order is skipped
+entirely by _run_content_gates()'s `if not result.passed: continue` guard —
+it does not independently re-confirm the rejection. This is the same
+short-circuit every other pair of block gates already has; it's tested here
+explicitly because Gate 29 used to be the one gate exempt from it (as a
+"warn" gate) and that exemption is what changed.
 """
 import logging
 from pathlib import Path
@@ -196,13 +203,18 @@ class TestGateTitleIdentity:
 
 
 class TestGateRefusalArtifact:
-    def test_confirmed_refusal_phrase_in_title_is_flagged(self, caplog):
+    def test_confirmed_refusal_phrase_in_title_is_flagged_by_gate28_gate29_short_circuited(
+        self, caplog
+    ):
         """Pinned case: a documented confirmed production instance (see
         audit_llm_artifacts.py discovery history) — a refusal reply shipped
         as the title field. A refusal phrase replacing the title is also,
-        correctly, a title-identity violation — Gate 28 (blocking) rejects
-        the file too; Gate 29 (warn-only) still independently logs the
-        refusal-artifact finding in the same pass."""
+        correctly, a title-identity violation, so Gate 28 (earlier in
+        registry order) rejects the file first — the dispatch loop's block
+        short-circuit then means Gate 29 never runs on this file at all.
+        The file is still correctly rejected either way; this test pins
+        that Gate 28 alone is sufficient here and Gate 29's own log line
+        does NOT additionally appear."""
         src = "---\ntitle: Aspose.PDF FOSS for Go\n---\nbody\n"
         tr = "---\ntitle: Please provide the English text you want translated.\n---\ntijelo\n"
         gate = _make_gate()
@@ -213,10 +225,15 @@ class TestGateRefusalArtifact:
                 tr, src, "hr", output_path, source_doc=_source_doc("Aspose.PDF FOSS for Go")
             )
 
-        assert result.passed is False, "Gate 28 correctly also rejects this title drift"
-        assert any("GATE29 REFUSAL ARTIFACT" in r.message for r in caplog.records)
+        assert result.passed is False, "Gate 28 correctly rejects this title drift"
+        assert any("GATE28 TITLE DRIFT" in r.message for r in caplog.records)
+        assert not any("GATE29" in r.message for r in caplog.records), (
+            "Gate 29 is short-circuited once Gate 28 already failed the file"
+        )
 
     def test_confirmed_refusal_phrase_in_body_is_flagged(self, caplog):
+        """Title stays byte-identical here (Gate 28 passes) so this test
+        isolates Gate 29's own blocking behavior on a body-only leak."""
         src = "---\ntitle: Aspose.PDF FOSS for Go\n---\nAdd comments via `Annotation`.\n"
         tr = (
             "---\ntitle: Aspose.PDF FOSS for Go\n---\n"
@@ -230,7 +247,34 @@ class TestGateRefusalArtifact:
                 tr, src, "de", output_path, source_doc=_source_doc("Aspose.PDF FOSS for Go")
             )
 
-        assert result.passed is True
+        assert result.passed is False, "Gate 29 is blocking — must reject a refusal leak"
+        assert result.retranslate_queued is True
+        assert (output_path, "de") in result.retranslate_paths
+        assert any("GATE29 REFUSAL ARTIFACT" in r.message for r in caplog.records)
+
+    def test_conversational_shape_leak_not_in_curated_phrase_list_is_flagged(self, caplog):
+        """Real confirmed miss: this exact sentence matched NO entry in
+        REFUSAL_PHRASES and shipped untouched to
+        docs.aspose.org/no/email/net/developer-guide/features.md. Pins the
+        new CONVERSATIONAL_SHAPE_RE layer added alongside the warn->block
+        promotion specifically to close this gap."""
+        src = "---\ntitle: Aspose.PDF FOSS for Go\n---\nAdd comments via `Annotation`.\n"
+        tr = (
+            "---\ntitle: Aspose.PDF FOSS for Go\n---\n"
+            "I'm sorry, but I can't access or read any attached files. If you paste "
+            "the text you'd like translated directly into the chat, I'll be happy "
+            "to translate it for you.\n"
+        )
+        gate = _make_gate()
+        output_path = Path("/content/docs.aspose.org/no/email/net/developer-guide/features.md")
+
+        with caplog.at_level(logging.WARNING):
+            result = gate.evaluate(
+                tr, src, "no", output_path, source_doc=_source_doc("Aspose.PDF FOSS for Go")
+            )
+
+        assert result.passed is False
+        assert result.retranslate_queued is True
         assert any("GATE29 REFUSAL ARTIFACT" in r.message for r in caplog.records)
 
     def test_clean_content_is_silent(self, caplog):
@@ -272,23 +316,29 @@ class TestGateRefusalArtifact:
 
 
 # ---------------------------------------------------------------------------
-# Safety property: Gate 29 ("warn") still runs and logs even when Gate 28
-# ("block") has already rejected the same file — the dispatch loop's
-# short-circuit (`if not result.passed: continue`) only applies to
-# subsequent "block" gates, never to "warn" gates (Part 21).
+# Dispatch-loop short-circuit: now that Gates 28 AND 29 are both "block",
+# once an earlier block gate has already rejected the file, a later block
+# gate in registry order is skipped entirely
+# (`if not result.passed: continue` in _run_content_gates()'s dispatch loop).
+# This used to NOT apply to Gate 29 back when it was "warn" (Part 21); that
+# exemption is exactly what changed when it was promoted (Part 22).
 # ---------------------------------------------------------------------------
 
 
-class TestWarnGateStillRunsAfterBlockingGateFires:
-    def test_both_gates_fire_result_blocked_by_gate28_gate29_still_logs(self, caplog):
-        """Gate 28 (now blocking) rejects the title drift; Gate 29 (still
-        warn-only) independently still evaluates and logs the refusal
-        artifact in the same pass — it isn't skipped just because Gate 28
-        already failed the file."""
+class TestBlockGateShortCircuitsLaterBlockGate:
+    def test_gate28_failure_short_circuits_gate29_even_when_body_also_leaks(self, caplog):
+        """Gate 28 (earlier in registry order) rejects the title drift;
+        Gate 29 — now also "block" — is skipped by the short-circuit and
+        never independently evaluates, even though the body also contains a
+        refusal-artifact leak that would trigger it on its own. The file is
+        still correctly rejected (result.passed is False) via Gate 28 alone;
+        this test pins that Gate 29's own log line does not additionally
+        appear, documenting the new short-circuit behavior rather than
+        silently regressing to "both always fire"."""
         src = "---\ntitle: Aspose.Cells FOSS for .NET\n---\nbody\n"
         tr = (
             "---\ntitle: Please provide the English text you want translated.\n---\n"
-            "tijelo\n"
+            "Ich habe keine Ahnung, was das bedeutet.\n"
         )
         gate = _make_gate()
         output_path = Path("/content/products.aspose.org/hr/cells/net/_index.md")
@@ -301,4 +351,6 @@ class TestWarnGateStillRunsAfterBlockingGateFires:
         assert result.passed is False, "Gate 28 is blocking — must reject this title drift"
         messages = [r.message for r in caplog.records]
         assert any("GATE28" in m for m in messages)
-        assert any("GATE29" in m for m in messages)
+        assert not any("GATE29" in m for m in messages), (
+            "Gate 29 is short-circuited once an earlier block gate already failed"
+        )

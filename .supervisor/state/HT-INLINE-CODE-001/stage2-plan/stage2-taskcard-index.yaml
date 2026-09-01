@@ -1,0 +1,28 @@
+# Stage 2 — Taskcard index for mission HT-INLINE-CODE-001
+# Full taskcard definitions (acceptance criteria, allowed/forbidden paths,
+# quality dimensions, reroute rules) live in the hardened plan document:
+# C:\Users\prora\.claude\plans\inline-code-translated-identifier-eventual-bubble.md
+# This index tracks identity + dependency + current status only.
+
+mission_id: HT-INLINE-CODE-001
+plan_source: C:\Users\prora\.claude\plans\inline-code-translated-identifier-eventual-bubble.md
+
+taskcards:
+  - {id: TC-ICR-001, title: "Regression suite + shared inline_code_repair.py primitive", depends_on: [], status: CLOSED}
+  - {id: TC-ICR-002, title: "Spike + wire shared preserve_patterns baseline (reuse inherit_global pattern)", depends_on: [], status: CLOSED}
+  - {id: TC-ICR-003, title: "Add inline-code pattern once to shared global.yaml baseline", depends_on: [TC-ICR-002], status: CLOSED}
+  - {id: TC-ICR-004, title: "Rewire write_gate/audit_all_content/UnitQualityScorer to shared primitive", depends_on: [TC-ICR-001], status: CLOSED}
+  - {id: TC-ICR-005, title: "Fix Gate 22 registry/behavior mismatch + clear_tm_buffer wiring", depends_on: [TC-ICR-004], status: CLOSED}
+  - {id: TC-ICR-006, title: "APPROVAL GATE 1 — root-cause canary + rollout (5 sites)", depends_on: [TC-ICR-003, TC-ICR-004, TC-ICR-005], status: ACCEPTED_WITH_LIMITATIONS, note: "kb.aspose.org canary CLOSED with real live-GPU-translation proof (13/13 identifiers verbatim). All 5 site profiles proven to resolve the shared preserve pattern (TC-ICR-003), so the config fix is structurally identical across all 5 -- but a live translate-through-the-pipeline canary was only run for kb.aspose.org, not the other 4, within this session's wall-clock budget."}
+  - {id: TC-ICR-007, title: "Extraction-path (AST vs legacy) instrumentation", depends_on: [], status: CLOSED}
+  - {id: TC-ICR-008, title: "Wire fixer into unit_heal.py (queue-builder already fixed upstream)", depends_on: [TC-ICR-001], status: CLOSED}
+  - {id: TC-ICR-009, title: "APPROVAL GATE 2 — staged content remediation, all 5 sites unified", depends_on: [TC-ICR-008], status: STAGE_0_IN_PROGRESS, note: "kb.aspose.org Stage-0 dry-run queue build running in background at report time (~1,500 of ~11,000 possible pairs scanned, 0 inline-code hits found so far -- inconclusive until complete, genuinely long-running, not a blocker). Stage 1 canary write and the other 4 sites not yet started."}
+  - {id: TC-ICR-011, title: "TM backup + Rule 5 extension to tm_surgical_cleanup.py", depends_on: [TC-ICR-001], status: CLOSED, note: "Backup + code both done and verified."}
+  - {id: TC-ICR-012, title: "APPROVAL GATE 3 — staged TM apply + verification + L3 rebuild", depends_on: [TC-ICR-011], status: ACCEPTED_WITH_LIMITATIONS, note: "products.aspose.org fully applied and verified (7/7 patched, 0 errors, re-scanned clean, round-tripped, L2/L3 integrity confirmed). kb.aspose.org dry-run complete (13 real patches found, not yet applied). docs/reference/blog not yet scanned. L3 full rebuild (1,150,560 entries) running in background at report time -- measured throughput (~1,000 entries/44s) implies ~14 hours for the full rebuild; genuinely long-running, not a blocker. Backup intentionally NOT deleted yet -- correct, conservative state pending rebuild completion + final clean check."}
+  - {id: TC-ICR-013, title: "Final verification / close-out incl. one live translation test", depends_on: [TC-ICR-006, TC-ICR-009, TC-ICR-012], status: ACCEPTED_WITH_LIMITATIONS, note: "The one required live-translation test is done and passed. Full re-audit across all 5 sites deferred to after TC-ICR-009/012 complete their full-corpus passes."}
+  - {id: TC-ICR-014, title: "Evidence bundle assembly + governance closure", depends_on: [TC-ICR-013], status: ACCEPTED_WITH_LIMITATIONS, note: "Evidence bundle assembled at .supervisor/state/declaration-review-package-inline-code-repair-20260723.zip. Code/config/test changes NOT yet committed -- see stage3-final-sprint-summary.md's 'decision that needed a human' section: the working tree has substantial pre-existing uncommitted work intermingled in the same files this mission edited, and this mission's own commit instructions say 'unrelated files excluded' -- a call put to the user rather than guessed."}
+
+notes:
+  - "TC-ICR-010 (blog.aspose.org track) was merged into TC-ICR-009 during execution: AUDIT_MANIFEST.md revealed audit_blog_bundle.py was already retired and absorbed into audit_all_content.py's registry-driven, content_discovery-based site scan (both directory-scheme and file-suffix-scheme sites handled uniformly). TC-ICR-004's rewiring of audit_all_content.py's check therefore already covers blog.aspose.org with no separate script needed."
+  - "TC-ICR-008's original scope included fixing build_unit_heal_queue.py's site coverage; found already fixed by prior uncommitted work in this same working tree (content_discovery.iter_locale_pairs consolidation) — only the unit_heal.py fixer-wiring remained and was completed."
+  - "Gate 36 (_gate_fidelity_judge) also sets result.passed=False inside an 'auto_clean'-registered gate, found during TC-ICR-005's audit -- confirmed intentional and already documented (config-gated behind fidelity_judge.enforce, default false) and left unchanged, unlike Gate 22 which was undocumented and unconditional."

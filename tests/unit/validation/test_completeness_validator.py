@@ -349,3 +349,67 @@ class TestCompletenessValidator:
 
         # 2/3 = 66.666...
         assert result.metadata["coverage_percent"] == pytest.approx(66.666666, rel=1e-5)
+
+
+class TestTrailingSectionLoss:
+    """HT-QUALITY-GATES-001 Part 22 (plan 5.2 item 3): trailing-section
+    content loss detection -- catches the single most prevalent defect
+    confirmed this session (a dropped final "See Also"/Enterprise-link
+    section), which _check_length_ratio's 30% floor is structurally
+    incapable of seeing (a lost final section is typically 1-3% of a page).
+    """
+
+    def setup_method(self):
+        self.validator = CompletenessValidator()
+
+    def _doc(self, body: str) -> str:
+        return f"---\ntitle: Foo\n---\n{body}"
+
+    def test_surviving_link_is_silent(self):
+        src = self._doc(
+            "## Overview\nbody\n\n## See Also\n"
+            "- [Aspose.Cells — Enterprise Knowledge Base](https://kb.aspose.com/cells/)\n"
+        )
+        tr = self._doc(
+            "## Übersicht\nkörper\n\n## Siehe auch\n"
+            "- [Aspose.Cells — Wissensdatenbank](https://kb.aspose.com/cells/)\n"
+        )
+        result = self.validator.validate(src, tr, context={})
+
+        assert result.success is True
+        assert not any("Trailing section" in i.message for i in result.issues)
+
+    def test_dropped_trailing_link_section_is_flagged(self):
+        """Pinned real shape: reference.aspose.org fr/slides/cpp/ShapeFrame.md
+        kept the '## Voir aussi' heading but the [text](url) markup
+        collapsed to plain unlinked text -- heading count alone would miss
+        this; the URL-based check catches it."""
+        src = self._doc(
+            "## Overview\nbody\n\n## See Also\n"
+            "- [Aspose.Slides — Enterprise API Reference](https://reference.aspose.com/slides/)\n"
+        )
+        tr = self._doc(
+            "## Aperçu\ncorps\n\n## Voir aussi\n"
+            "Aspose.Slides - référence API d'entreprise\n"
+        )
+        result = self.validator.validate(src, tr, context={})
+
+        assert result.success is False
+        matches = [i for i in result.issues if "Trailing section" in i.message]
+        assert len(matches) == 1
+        assert matches[0].severity == ValidationSeverity.WARNING
+        assert "https://reference.aspose.com/slides/" in matches[0].details["missing_urls"]
+
+    def test_last_section_without_links_out_of_scope(self):
+        src = self._doc("## Overview\nbody\n\n## Notes\nClosing prose, no links.\n")
+        tr = self._doc("## Übersicht\nkörper\n")
+        result = self.validator.validate(src, tr, context={})
+
+        assert not any("Trailing section" in i.message for i in result.issues)
+
+    def test_no_headings_in_source_is_silent(self):
+        src = self._doc("Just a plain paragraph, no headings at all.\n")
+        tr = self._doc("Nur ein Absatz, keine Überschriften.\n")
+        result = self.validator.validate(src, tr, context={})
+
+        assert not any("Trailing section" in i.message for i in result.issues)

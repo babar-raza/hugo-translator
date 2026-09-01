@@ -1,0 +1,65 @@
+# Convergence Binding Record
+# Generated: 2026-07-24
+# Protocol: POST-PLAN AUTONOMOUS CONVERGENCE AND GOVERNED CLOSURE
+
+convergence_binding:
+  mission_id: heading-i18n-governance-20260723
+  plan_id: glittery-waddling-moth
+  plan_path: C:\Users\prora\.claude\plans\glittery-waddling-moth.md
+  plan_revision: "session-2026-07-23/24"
+
+  mission_origin: >
+    This is a NEW mission, not a reopen. It continues HT-QUALITY-GATES-001's
+    scope (heading translation is one of that mission's named gates) but
+    binds under its own mission_id per the plan's own §5, since
+    HT-QUALITY-GATES-001 and all 5 other prior missions under
+    .supervisor/state/ are already TERMINAL_CLOSED and this work
+    (the english_headings_nonlatin incident, 19,849 flagged instances) was
+    not part of any of their scopes.
+
+  binding_method_disclosed: >
+    Unlike the reference precedent (quality-regression-tmkey-router-fix-
+    20260717), this mission was NOT executed by literally re-invoking the
+    4 .supervisor/prompts/ stage prompts as separate steps. It was executed
+    directly against the plan file, which itself declares the stage
+    mapping in its own §5: §1-4 (root-cause analysis) as the Stage-1-
+    equivalent audit, §7 (taskcard set) as the Stage-2-equivalent
+    hardened plan, §8-9 (lanes, quality gates) as the Stage-3-equivalent
+    execution framework, §11 as the Stage-4-equivalent closeout. This
+    binding record exists so the mission has the SAME closure artifacts
+    (TERMINAL_CLOSED.yaml, this file, stage3-quality-evaluations.yaml) as
+    a fully-prompted mission would, without falsely claiming a literal
+    prompt-by-prompt re-invocation occurred.
+
+  prompts_directory_confirmed_present: .supervisor/prompts/
+    # prompt1-post-sprint-audit.md, prompt2-plan-hardening.md,
+    # prompt3-controlled-execution.md, prompt4-close-task.md all exist on
+    # disk (confirmed via directory listing) -- their ROLES are what this
+    # plan's own §5 maps its sections to, not literally re-run.
+
+  schemas_note: >
+    .supervisor/schemas/ does not exist on disk (referenced by all 4 stage
+    prompts' "Required Outputs" sections but never materialized in this
+    repo) -- same disclosed gap every prior mission in this repo's history
+    has noted, not unique to this one. Outputs are structured to match each
+    prompt's documented required fields in lieu of a literal JSON Schema.
+
+  scope_change_mid_mission_disclosed: >
+    The user issued an explicit, later instruction that narrowed this
+    mission's scope after execution had begun: the content repo
+    (D:\onedrive\...\aspose.org) commit step, originally part of
+    TC-HT-I18N-007's closeout_rules, was descoped -- "do not worry about
+    the files in aspose.org ... Your duty [is] to make the system stable
+    and working as planned ... you may mark it deferred." This binding
+    and the resulting TERMINAL_CLOSED.yaml reflect that later instruction
+    as controlling, not the plan document's original, broader closeout_rules
+    text for that one taskcard.
+
+  status: BOUND
+  binding_decision: >
+    Plan identity unambiguous (single plan file, read in full at mission
+    start and re-read across this mission's multiple sessions per this
+    project's own session-rules memory). Proceeding with convergence
+    lifecycle: taskcards TC-HT-I18N-001 through 009 all executed, scored
+    against the 15-dimension rubric in stage3-execution/
+    stage3-quality-evaluations.yaml, and closed per TERMINAL_CLOSED.yaml.

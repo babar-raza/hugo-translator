@@ -27,6 +27,7 @@ from ..tm.retranslate_queue import (
 )
 from ..utils.file_filters import filter_source_files
 from ..utils.file_lock import FileLock, LockError
+from ..utils.locale_policy import validate_requested_locales
 from .models import DirectoryResult, TranslationResult
 
 if TYPE_CHECKING:
@@ -79,7 +80,16 @@ class DirectoryOrchestrator:
 
         Raises:
             LockError: If another translation is already in progress for this site
+            LocalePolicyViolation: If a strict_locale_allowlist site is asked
+                to translate a locale outside its target_langs
         """
+        # Locale allowlist policy: reject any target locale outside
+        # target_langs before doing any work (lock, scan, telemetry), for
+        # sites with strict_locale_allowlist set. No-op otherwise.
+        site_profile = self._engine.config.get_site_profile(site_id)
+        if site_profile:
+            validate_requested_locales(site_profile, target_langs)
+
         # TC2: AUTO-CLEANUP: Remove stale locks older than 24 hours on startup
         lock_dir = Path(".translation_progress") / "locks"
         if lock_dir.exists():

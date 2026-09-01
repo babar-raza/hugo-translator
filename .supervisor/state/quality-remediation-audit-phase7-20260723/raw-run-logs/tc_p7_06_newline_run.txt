@@ -1,0 +1,11 @@
+Loaded 481 candidate files (site=None, family=None)
+  [WRITE] D:\onedrive\Documents\GitHub\aspose.org\content\reference.aspose.org\hr\3d\typescript\material.md -- en=5 tr=4 ratio=0.80
+  [WRITE] D:\onedrive\Documents\GitHub\aspose.org\content\reference.aspose.org\sr\3d\typescript\material.md -- en=5 tr=4 ratio=0.80
+
+Final recheck on 2 pending results...
+CONFIRMED verify failure: D:\onedrive\Documents\GitHub\aspose.org\content\reference.aspose.org\hr\3d\typescript\material.md -- EN=77 TR=197
+CONFIRMED verify failure: D:\onedrive\Documents\GitHub\aspose.org\content\reference.aspose.org\sr\3d\typescript\material.md -- EN=77 TR=197
+Wrote/appended 415 rows to reports\audit\backlog_newline_explosion.csv
+
+Mechanical (fixed): 2, no-op: 64, stale (backlog): 415, confirmed verify failures: 2
+Real mechanical/stale split observed: 14% mechanical, 86% stale

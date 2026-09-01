@@ -29,12 +29,18 @@ _md = MarkdownIt("commonmark")
 
 
 def fenced_line_mask(body: str) -> list[bool]:
-    """Return one bool per physical line of ``body``: True if inside a fenced code block."""
+    """Return one bool per physical line of ``body``: True for Markdown code.
+
+    This deliberately includes both CommonMark ``fence`` tokens and indented
+    ``code_block`` tokens.  The historical function name is retained for
+    compatibility with existing callers, but its contract is code-region
+    masking rather than backtick-fence matching.
+    """
     lines = body.splitlines()
     mask = [False] * len(lines)
     tokens = _md.parse(body)
     for tok in tokens:
-        if tok.type == "fence" and tok.map:
+        if tok.type in {"fence", "code_block"} and tok.map:
             start, end = tok.map
             for i in range(max(start, 0), min(end, len(mask))):
                 mask[i] = True
@@ -70,10 +76,10 @@ def split_fenced_segments(body: str) -> list[tuple[bool, list[str]]]:
 
 
 def get_fence_char_spans(text: str) -> list[tuple[int, int]]:
-    """Return (start, end) character-offset spans of fenced code blocks in
+    """Return (start, end) character-offset spans of Markdown code blocks in
     ``text``, merging any immediately-adjacent spans (e.g. a reopened fence
     with no prose between the close of one block and the open of the next
-    still reads as "inside a fence" for span-containment purposes).
+    still reads as "inside code" for span-containment purposes).
 
     Character-offset form is what regex-based gates need: they locate a
     finding via ``re.finditer`` over the full string and must ask "does this
@@ -109,7 +115,7 @@ def is_in_fence(pos: int, fence_spans: list[tuple[int, int]]) -> bool:
 
 
 def strip_fenced(text: str) -> str:
-    """Return ``text`` with all fenced code block content removed (spans
+    """Return ``text`` with all Markdown code block content removed (spans
     replaced with nothing), for checks that must never fire on code content.
     """
     spans = get_fence_char_spans(text)

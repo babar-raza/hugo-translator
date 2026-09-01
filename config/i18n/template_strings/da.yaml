@@ -1,0 +1,314 @@
+schema_version: 1
+locale: da
+translations:
+  heading.overview:
+    value: Oversigt
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 13622
+    corpus_agreement: override
+    rejected_variants:
+    - Oversigt over de forskellige former for støtte
+  heading.see_also:
+    value: Se også
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 1790
+    corpus_agreement: agree
+    rejected_variants:
+    - 'Se også:'
+  heading.properties:
+    value: Egenskaber
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 6500
+    corpus_agreement: agree
+  heading.methods:
+    value: Metoder
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 3448
+    corpus_agreement: override
+    rejected_variants:
+    - Metoder til at anvende
+  heading.description:
+    value: Beskrivelse
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 2572
+    corpus_agreement: override
+    rejected_variants:
+    - Egenskaber
+    - Metoder til at anvende
+    - Valuer
+  heading.values:
+    value: Værdier
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 3808
+    corpus_agreement: override
+    rejected_variants:
+    - Valuer
+  heading.enumerations:
+    value: Enumerationer
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 119
+    corpus_agreement: override
+    rejected_variants:
+    - Oplysninger om optegnelser
+  heading.accessor_methods:
+    value: Accessormetoder
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 791
+    corpus_agreement: override
+    rejected_variants:
+    - Tilbehørsmethoder
+  heading.constructors:
+    value: Konstruktorer
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 31
+    corpus_agreement: agree
+  heading.core_api:
+    value: Kerne-API
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 290
+    corpus_agreement: override
+    rejected_variants:
+    - Grafik af kernen
+    - Pakkeoplysninger
+  heading.interfaces:
+    value: Grænseflader
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 150
+    corpus_agreement: override
+    rejected_variants:
+    - Geometri og net
+    - Former
+  heading.inheritance:
+    value: Arv
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 34
+    corpus_agreement: override
+    rejected_variants:
+    - Arvelige forhold
+  heading.structs:
+    value: Strukturer
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 143
+    corpus_agreement: override
+    rejected_variants:
+    - Indbyggede primitive ting
+    - Tabeller
+  heading.examples:
+    value: Eksempler
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 35
+    corpus_agreement: agree
+  heading.classes:
+    value: Klasser
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 103
+    corpus_agreement: override
+    rejected_variants:
+    - 'Klasse:'
+  heading.type:
+    value: Type
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 52228
+    corpus_agreement: override
+    rejected_variants:
+    - '[Lægeforretning] 0'
+    - Properties
+  heading.name:
+    value: Navn
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 52195
+    corpus_agreement: override
+    rejected_variants:
+    - 'Udtrykt:'
+  heading.returns:
+    value: Returnerer
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 1363
+    corpus_agreement: override
+    rejected_variants:
+    - Tilbagebetalinger
+  heading.value:
+    value: Værdi
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 13014
+    corpus_agreement: agree
+  table.header.description:
+    value: Beskrivelse
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 122171
+    corpus_agreement: override
+    rejected_variants:
+    - 'Beskrivelse:'
+  table.header.signature:
+    value: Signatur
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 31997
+    corpus_agreement: override
+    rejected_variants:
+    - Underskrift
+  table.header.access:
+    value: Adgang
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 34671
+    corpus_agreement: override
+    rejected_variants:
+    - Tilgang til
+  table.header.property:
+    value: Egenskab
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 1958
+    corpus_agreement: override
+    rejected_variants:
+    - Ejendomme
+  table.header.method:
+    value: Metode
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 1266
+    corpus_agreement: agree
+  table.header.class:
+    value: Klasse
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 715
+    corpus_agreement: agree
+  table.header.enumeration:
+    value: Enumeration
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 525
+    corpus_agreement: override
+    rejected_variants:
+    - Oplysninger om opgørelse
+    - Klasse
+    - Modul
+  table.header.return_type:
+    value: Returtype
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 273
+    corpus_agreement: override
+    rejected_variants:
+    - Tilbagevendelsestype
+  table.access.read:
+    value: Læs
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 0
+    corpus_agreement: no_corpus_evidence
+  table.access.write:
+    value: Skriv
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 0
+    corpus_agreement: no_corpus_evidence
+  table.access.read_write:
+    value: Læs/Skriv
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 0
+    corpus_agreement: no_corpus_evidence
+  table.access.execute:
+    value: Udfør
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 0
+    corpus_agreement: no_corpus_evidence
+  table.access.create:
+    value: Opret
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 0
+    corpus_agreement: no_corpus_evidence
+  table.access.delete:
+    value: Slet
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 0
+    corpus_agreement: no_corpus_evidence
+  table.access.update:
+    value: Opdater
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 0
+    corpus_agreement: no_corpus_evidence
+  phrase.inherits_from:
+    value: 'Arver fra: {api}.'
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 3750
+    corpus_agreement: agree
+    rejected_variants:
+    - 'Inherits from: {api}.'
+  phrase.is_a_class_in:
+    value: '{api} er en klasse i Aspose.{family} FOSS for {platform}.'
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 61489
+    corpus_agreement: agree
+    rejected_variants:
+    - '{api} er en klasse i Aspose.{family} for {platform}.'
+  phrase.is_an_enum_in:
+    value: '{api} er en enum i Aspose.{family} FOSS for {platform}.'
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 13205
+    corpus_agreement: agree
+    rejected_variants:
+    - '{api} er et enum i Aspose.{family} for {platform}.'
+  phrase.is_an_interface_in:
+    value: '{api} er en grænseflade i Aspose.{family} FOSS for {platform}.'
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 5427
+    corpus_agreement: agree
+  phrase.is_a_struct_in:
+    value: '{api} er en struktur i Aspose.{family} FOSS for {platform}.'
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 873
+    corpus_agreement: agree
+  phrase.class_provides_methods:
+    value: Denne klasse leverer {n} metoder til at arbejde med {api}-objekter i {platform}-programmer.
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 23690
+    corpus_agreement: agree
+  phrase.enum_defines_values:
+    value: 'Denne enumeration definerer {n} værdier:'
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 9578
+    corpus_agreement: agree
+    rejected_variants:
+    - 'Denne opregning definerer {n} værdier:'
+  phrase.members_accessible_after_install:
+    value: Alle offentlige medlemmer er tilgængelige for enhver {platform}-applikation
+      efter installation af Aspose.{family} FOSS for {platform}-pakken.
+    reviewed_by: agent:reference-i18n-hardening-20260725/adjudication-workflow
+    reviewed_at: '2026-07-25'
+    evidence_count: 3690
+    corpus_agreement: agree

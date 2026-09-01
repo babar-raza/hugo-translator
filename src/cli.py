@@ -1570,6 +1570,10 @@ def translate_site(args: argparse.Namespace) -> int:
         from .translation_engine.progress import ProgressTracker
         from .utils.config_loader import ConfigService
         from .utils.file_filters import filter_source_files
+        from .utils.locale_policy import (
+            LocalePolicyViolation,
+            validate_requested_locales,
+        )
         from .verification.report import write_report
     except ImportError:
         from model_runtime import ModelLoader
@@ -1589,6 +1593,10 @@ def translate_site(args: argparse.Namespace) -> int:
         from translation_engine.progress import ProgressTracker
         from utils.config_loader import ConfigService
         from utils.file_filters import filter_source_files
+        from utils.locale_policy import (
+            LocalePolicyViolation,
+            validate_requested_locales,
+        )
 
     progress_tracker = None
 
@@ -1705,6 +1713,15 @@ def translate_site(args: argparse.Namespace) -> int:
 
         # Override target languages if specified
         target_langs = args.target_langs if args.target_langs else site_profile.target_langs
+
+        # Locale allowlist policy: reject any manually-requested locale
+        # outside target_langs before any work starts, for sites with
+        # strict_locale_allowlist set. No-op for other sites.
+        try:
+            validate_requested_locales(site_profile, target_langs)
+        except LocalePolicyViolation as e:
+            print(f"ERROR: {e}", file=sys.stderr)
+            return 1
 
         # P1-12: Initialize SharedEngines early for unified engine access
         shared_engines = None

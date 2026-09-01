@@ -1,0 +1,220 @@
+{
+  "pilot_design": "isolated copies of two real source/translation pairs; the actual scan() pipeline ran one configured site at a time with production profiles and target discovery",
+  "committed_revision": "12615212ec5cf083e4924903ee0732bf055749e0",
+  "baseline_revision": "1261521^",
+  "docs_broken_fence": {
+    "before": {
+      "entries": 1,
+      "issue_types": {
+        "english_headings_nonlatin": 1,
+        "heading_deficit_gate34": 1,
+        "inline_code_translated": 1
+      },
+      "records": [
+        {
+          "file_path": "C:\\Users\\prora\\AppData\\Local\\Temp\\hugo-translator-dcf-pilot-c10847a4fe5440908dd17b21636795a5\\docs.aspose.org\\vi\\cells\\typescript\\getting-started\\quickstart.md",
+          "en_path": "C:\\Users\\prora\\AppData\\Local\\Temp\\hugo-translator-dcf-pilot-c10847a4fe5440908dd17b21636795a5\\docs.aspose.org\\en\\cells\\typescript\\getting-started\\quickstart.md",
+          "locale": "vi",
+          "site_id": "docs.aspose.org",
+          "issues": [
+            {
+              "type": "english_headings_nonlatin",
+              "detail": "['See Also']",
+              "unit_indices": [],
+              "priority": 2
+            },
+            {
+              "type": "inline_code_translated",
+              "detail": "`\n\n## Load an Existing Workbook\n\nOpen an existing XLSX file and read cell values:\n\n` -> `\n\n## t?i m?t s? l?m vi?c hi?n `",
+              "unit_indices": [],
+              "priority": 2
+            },
+            {
+              "type": "heading_deficit_gate34",
+              "detail": "GATE34 HEADING DEFICIT quickstart.md: source has 6 top-level headings but translation has only 4 (-2)",
+              "unit_indices": [],
+              "priority": 4
+            }
+          ],
+          "max_priority": 2
+        }
+      ]
+    },
+    "after": {
+      "entries": 1,
+      "issue_types": {
+        "heading_deficit_gate34": 1,
+        "inline_code_translated": 1,
+        "purity_issue": 1
+      },
+      "records": [
+        {
+          "file_path": "C:\\Users\\prora\\AppData\\Local\\Temp\\hugo-translator-dcf-pilot-c10847a4fe5440908dd17b21636795a5\\docs.aspose.org\\vi\\cells\\typescript\\getting-started\\quickstart.md",
+          "en_path": "C:\\Users\\prora\\AppData\\Local\\Temp\\hugo-translator-dcf-pilot-c10847a4fe5440908dd17b21636795a5\\docs.aspose.org\\en\\cells\\typescript\\getting-started\\quickstart.md",
+          "locale": "vi",
+          "site_id": "docs.aspose.org",
+          "issues": [
+            {
+              "type": "purity_issue",
+              "detail": "14% English paras",
+              "unit_indices": [],
+              "priority": 2
+            },
+            {
+              "type": "inline_code_translated",
+              "detail": "`\n\n## Load an Existing Workbook\n\nOpen an existing XLSX file and read cell values:\n\n` -> `\n\n## t?i m?t s? l?m vi?c hi?n `",
+              "unit_indices": [],
+              "priority": 2
+            },
+            {
+              "type": "heading_deficit_gate34",
+              "detail": "GATE34 HEADING DEFICIT quickstart.md: source has 6 top-level headings but translation has only 4 (-2)",
+              "unit_indices": [],
+              "priority": 4
+            }
+          ],
+          "max_priority": 2
+        }
+      ]
+    },
+    "before_log": {
+      "warnings_or_errors": 0,
+      "retries": 0,
+      "skips": 0,
+      "errors": 0
+    },
+    "after_log": {
+      "warnings_or_errors": 0,
+      "retries": 0,
+      "skips": 0,
+      "errors": 0
+    }
+  },
+  "kb_valid_fence_control": {
+    "before": {
+      "entries": 1,
+      "issue_types": {
+        "double_period": 1,
+        "inline_code_translated": 1
+      },
+      "records": [
+        {
+          "file_path": "C:\\Users\\prora\\AppData\\Local\\Temp\\hugo-translator-dcf-pilot-c10847a4fe5440908dd17b21636795a5\\kb.aspose.org\\ar\\words\\python\\how-to-build-ldm-builder-python.md",
+          "en_path": "C:\\Users\\prora\\AppData\\Local\\Temp\\hugo-translator-dcf-pilot-c10847a4fe5440908dd17b21636795a5\\kb.aspose.org\\en\\words\\python\\how-to-build-ldm-builder-python.md",
+          "locale": "ar",
+          "site_id": "kb.aspose.org",
+          "issues": [
+            {
+              "type": "inline_code_translated",
+              "detail": "` inherits from ` -> ` ??? ?? `",
+              "unit_indices": [],
+              "priority": 2
+            },
+            {
+              "type": "double_period",
+              "detail": "",
+              "unit_indices": [],
+              "priority": 4
+            }
+          ],
+          "max_priority": 2
+        }
+      ]
+    },
+    "after": {
+      "entries": 1,
+      "issue_types": {
+        "double_period": 1,
+        "inline_code_translated": 1
+      },
+      "records": [
+        {
+          "file_path": "C:\\Users\\prora\\AppData\\Local\\Temp\\hugo-translator-dcf-pilot-c10847a4fe5440908dd17b21636795a5\\kb.aspose.org\\ar\\words\\python\\how-to-build-ldm-builder-python.md",
+          "en_path": "C:\\Users\\prora\\AppData\\Local\\Temp\\hugo-translator-dcf-pilot-c10847a4fe5440908dd17b21636795a5\\kb.aspose.org\\en\\words\\python\\how-to-build-ldm-builder-python.md",
+          "locale": "ar",
+          "site_id": "kb.aspose.org",
+          "issues": [
+            {
+              "type": "inline_code_translated",
+              "detail": "` inherits from ` -> ` ??? ?? `",
+              "unit_indices": [],
+              "priority": 2
+            },
+            {
+              "type": "double_period",
+              "detail": "",
+              "unit_indices": [],
+              "priority": 4
+            }
+          ],
+          "max_priority": 2
+        }
+      ]
+    },
+    "before_log": {
+      "warnings_or_errors": 0,
+      "retries": 0,
+      "skips": 0,
+      "errors": 0
+    },
+    "after_log": {
+      "warnings_or_errors": 0,
+      "retries": 0,
+      "skips": 0,
+      "errors": 0
+    }
+  },
+  "source_and_target_hashes_after_runs": {
+    "docs_source": {
+      "pilot_sha256": "4409303df3185db3bdacb855ab49b07c14733e7c5c2de9659ae84b9d7bc3896f",
+      "source_sha256": "4409303df3185db3bdacb855ab49b07c14733e7c5c2de9659ae84b9d7bc3896f",
+      "unchanged": true
+    },
+    "docs_target": {
+      "pilot_sha256": "26344f2d1de4c0269470d371ee987a7e308a2bcc48fd66095ad0b7df560f161a",
+      "source_sha256": "26344f2d1de4c0269470d371ee987a7e308a2bcc48fd66095ad0b7df560f161a",
+      "unchanged": true
+    },
+    "kb_source": {
+      "pilot_sha256": "df44418751976cbeb9828e37e75a60e069c29156f549082fcdd84ab54384df1f",
+      "source_sha256": "df44418751976cbeb9828e37e75a60e069c29156f549082fcdd84ab54384df1f",
+      "unchanged": true
+    },
+    "kb_target": {
+      "pilot_sha256": "81f8ac422262fdf36ec928caf3a6b1d08e04fb99658d1b5b80ab468f69ca09a2",
+      "source_sha256": "81f8ac422262fdf36ec928caf3a6b1d08e04fb99658d1b5b80ab468f69ca09a2",
+      "unchanged": true
+    }
+  },
+  "working_tree_cli_reference": {
+    "entries": 1,
+    "issue_types": {
+      "heading_deficit_gate34": 1,
+      "purity_issue": 1
+    },
+    "records": [
+      {
+        "file_path": "C:\\Users\\prora\\AppData\\Local\\Temp\\hugo-translator-dcf-pilot-c10847a4fe5440908dd17b21636795a5\\docs.aspose.org\\vi\\cells\\typescript\\getting-started\\quickstart.md",
+        "en_path": "C:\\Users\\prora\\AppData\\Local\\Temp\\hugo-translator-dcf-pilot-c10847a4fe5440908dd17b21636795a5\\docs.aspose.org\\en\\cells\\typescript\\getting-started\\quickstart.md",
+        "locale": "vi",
+        "site_id": "docs.aspose.org",
+        "issues": [
+          {
+            "type": "purity_issue",
+            "detail": "14% English paras",
+            "unit_indices": [],
+            "priority": 2
+          },
+          {
+            "type": "heading_deficit_gate34",
+            "detail": "GATE34 HEADING DEFICIT quickstart.md: source has 6 top-level headings but translation has only 4 (-2)",
+            "unit_indices": [],
+            "priority": 4
+          }
+        ],
+        "max_priority": 2
+      }
+    ]
+  },
+  "working_tree_note": "current-audit.jsonl is recorded but not used for attribution because audit_all_content.py has unrelated unstaged inline-code work."
+}

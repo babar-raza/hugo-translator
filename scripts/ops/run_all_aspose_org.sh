@@ -12,6 +12,13 @@ TIMESTAMP=$(date +%Y%m%d_%H%M%S)
 
 log() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*"; }
 
+# Read the live target_langs count for the completion threshold below,
+# instead of hardcoding it -- adapts automatically if the profile changes.
+PRODUCTS_LANG_COUNT=$("$PYTHON" -c "
+from src.utils.config_loader import ConfigService
+print(len(ConfigService('config').get_site_profile('products.aspose.org').target_langs))
+")
+
 run_site() {
     local site="$1"
     local logfile="$LOGDIR/${site}_${TIMESTAMP}.log"
@@ -47,15 +54,15 @@ if [ -f "$PRODUCTS_LOG" ]; then
         now=$(date +%s)
         age=$(( now - last_mod ))
 
-        if [ "$completed" -ge 36 ]; then
-            log "products.aspose.org complete ($completed/36 languages)"
+        if [ "$completed" -ge "$PRODUCTS_LANG_COUNT" ]; then
+            log "products.aspose.org complete ($completed/$PRODUCTS_LANG_COUNT languages)"
             break
         elif [ "$age" -gt 600 ]; then
             # Log hasn't been updated in 10 minutes — process likely done or dead
-            log "products.aspose.org log stale (${age}s since last update, $completed/36 languages). Proceeding."
+            log "products.aspose.org log stale (${age}s since last update, $completed/$PRODUCTS_LANG_COUNT languages). Proceeding."
             break
         else
-            log "products.aspose.org: $completed/36 languages done, log updated ${age}s ago. Checking again in 120s..."
+            log "products.aspose.org: $completed/$PRODUCTS_LANG_COUNT languages done, log updated ${age}s ago. Checking again in 120s..."
             sleep 120
         fi
     done

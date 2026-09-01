@@ -1,0 +1,33 @@
+============================================================
+L3 Quick Metadata Validator
+============================================================
+L3 index: ./data/tm/l3_faiss
+
+Loading metadata.pkl...
+[OK] Metadata loaded successfully
+
+Basic Statistics:
+------------------------------------------------------------
+Metadata type: <class 'list'>
+Total entries: 764,510
+
+First Entry Structure:
+------------------------------------------------------------
+Entry type: <class 'dict'>
+Fields: ['entry_id', 'site_id', 'src_lang', 'tgt_lang', 'source_text', 'translation', 'context', 'metadata']
+  - entry_id: str = kb.aspose.net:en:ar:4253103689849029171
+  - site_id: str = kb.aspose.net
+  - src_lang: str = en
+  - tgt_lang: str = ar
+  - source_text: str = Test Translation
+Traceback (most recent call last):
+  File "C:\Users\prora\OneDrive\Documents\GitHub\hugo-translator\scripts\tm\quick_validate_l3.py", line 145, in <module>
+    quick_validate(args.index_path)
+    ~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+  File "C:\Users\prora\OneDrive\Documents\GitHub\hugo-translator\scripts\tm\quick_validate_l3.py", line 62, in quick_validate
+    print(f"  - {key}: {type(value).__name__} = {val_str}")
+    ~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Python313\Lib\encodings\cp1252.py", line 19, in encode
+    return codecs.charmap_encode(input,self.errors,encoding_table)[0]
+           ~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+UnicodeEncodeError: 'charmap' codec can't encode characters in position 23-28: character maps to <undefined>

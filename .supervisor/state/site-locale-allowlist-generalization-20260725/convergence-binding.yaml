@@ -1,0 +1,153 @@
+convergence_binding:
+  mission_id: site-locale-allowlist-generalization-20260725
+  plan_id: you-are-modifying-the-lovely-cook
+  plan_path: C:\Users\prora\.claude\plans\you-are-modifying-the-lovely-cook.md
+  plan_revision: "post-plan-autonomous-convergence-2026-07-25"
+  plan_hash_sha256: 60e16bf4ffef225117b702930a49be1b9b496a474c9cc8a5e915cff68310881d
+  bound_at: "2026-07-25"
+  post_sprint_audit:
+    expected: .supervisor/prompts/prompt1-post-sprint-audit.md
+    path: .supervisor/prompts/prompt1-post-sprint-audit.md
+    hash_sha256: 263dab3dadad6845f5dd2874fe22cd860403151156cadb2dffedef5258103099
+    role_verified: true
+    role_verification_evidence: >
+      Content matches audit-mode contract exactly: Section A/B/C
+      (achievements/proof/effect), L1/L2/L3 issue taxonomy, Claim
+      Classification Matrix, Evidence Quality Verdicts, Final Verdicts
+      enum (SPRINT_ALL_GREEN_VERIFIED etc.) -- read in full, not inferred
+      from filename.
+  plan_hardening:
+    expected: .supervisor/prompts/prompt2-plan-hardening.md
+    path: .supervisor/prompts/prompt2-plan-hardening.md
+    hash_sha256: 4fe227b68c0e58e08381f89f5381bb8d29eebd89cba328ea3fb33c957c5d3d00
+    role_verified: true
+    role_verification_evidence: >
+      Content matches plan-only mode exactly: "Do not modify product/
+      source files. Do not run implementation commands. Do not commit/
+      push/publish/delete", taskcard-requirement field list, Plan
+      Verdicts enum -- read in full.
+  controlled_execution:
+    expected: .supervisor/prompts/prompt3-controlled-execution.md
+    path: .supervisor/prompts/prompt3-controlled-execution.md
+    hash_sha256: 5246d218a39a8464cdc32c542d5411d2f29ad034f3e867651c0f731e1269edd9
+    role_verified: true
+    role_verification_evidence: >
+      Content matches execution mode exactly: Phase 0-7 structure, 10
+      named lanes (Lane 0/A-I), 15-dimension quality rubric (identical to
+      the rubric already used in this mission's self_review.md) -- read
+      in full.
+  close_task:
+    expected: .supervisor/prompts/prompt4-close-task.md
+    resolved: .supervisor/prompts/prompt4-close-task.md
+    hash_sha256: 3196a5bd52bd6e037b84d602dbde8d32a8dbac31798c0947bac03784ff6ef81b
+    role_verified: true
+    role_verification_evidence: >
+      Exact filename/role match; registry PSL-PROMPT-4 confirms
+      successor_rules CLOSED->null / NOT CLOSED->PSL-PROMPT-3 as its only
+      two outcomes -- read in full, content requires commit as a CLOSED
+      precondition (this is the source of the commit-authorization
+      question resolved with the user this cycle).
+  prompt_registry_path: .supervisor/prompts/prompt-registry.yaml
+  status: CONVERGENCE_COMPLETE_ALL_GREEN_AND_TASK_CLOSED
+  closed_at: "2026-07-25"
+  close_task_genuinely_invoked: true
+  close_task_result_path: .supervisor/state/site-locale-allowlist-generalization-20260725/close_task_result.yaml
+  commit_hash: 26381afa64bb61b2ad876e2060a5560be289e955
+  terminal_closed_path: .supervisor/state/site-locale-allowlist-generalization-20260725/TERMINAL_CLOSED.yaml
+  audit_record_path: .supervisor/state/site-locale-allowlist-generalization-20260725/stage1-post-plan-convergence-audit.md
+  self_review_path: reports/agents/site-locale-allowlist-generalization-20260725/evidence_bundle/self_review.md
+  scope_summary: >
+    Refactor the Aspose.org 26-locale-contract enforcement mechanism (built
+    in a prior same-day pass) from hardcoded-to-Aspose.org code into a
+    generic, opt-in, per-site mechanism driven entirely by SiteProfile
+    config (new strict_locale_allowlist: bool field). No code changes
+    should be needed for a future site to gain the same protection --
+    only editing that site's profile YAML.
+  taskcards:
+    - TC-SLA-001
+    - TC-SLA-002
+    - TC-SLA-003
+    - TC-SLA-004
+    - TC-SLA-005
+    - TC-SLA-006
+    - TC-SLA-007
+    - TC-SLA-008
+    - TC-SLA-009
+    - TC-SLA-010
+    - TC-SLA-011
+    - TC-SLA-012
+  non_collision_declaration:
+    open_missions_checked:
+      - mission_id: HT-INLINE-CODE-001
+        bound: false
+        owned_files:
+          - src/translation_engine/write_gate.py
+          - scripts/quality/audit_all_content.py
+          - scripts/quality/unit_heal.py
+          - src/translation_engine/extractor/segment_extractor.py
+          - scripts/quality/tm_surgical_cleanup.py
+          - src/model_runtime/llm_backend.py
+          - src/tm/l2_persistent.py
+          - src/tm/l3_semantic.py
+          - src/tm/normalization.py
+        overlap_with_this_mission: none
+        verified_at_preflight: true
+      - mission_id: reference-i18n-hardening-20260725
+        bound: true
+        binding_status: BOUND
+        owned_files:
+          - config/i18n/template_strings/*
+          - src/translation_engine/terminology/classification.py
+          - scripts/quality/mine_heading_glossary.py
+          - scripts/quality/heal_english_headings_dictionary.py
+          - .github/workflows/quality_gates_tests.yml
+          - "config/site_profiles/*.aspose.org.yaml (body.preserve_patterns hunk only)"
+        overlap_with_this_mission: >
+          Shared files: the same 7 *.aspose.org.yaml profiles. This
+          mission touches only target_langs: (already set, unchanged) and
+          adds strict_locale_allowlist: true. reference-i18n-hardening
+          owns only the body.preserve_patterns hunk in those same files.
+          No line-level or key-level overlap.
+        verified_at_preflight: true
+    preflight_check_command: >
+      git status --porcelain | grep -E
+      "write_gate\.py|audit_all_content\.py|unit_heal\.py|segment_extractor\.py|
+      tm_surgical_cleanup\.py|llm_backend\.py|l2_persistent\.py|l3_semantic\.py|
+      normalization\.py|template_strings|classification\.py|mine_heading_glossary|
+      heal_english_headings_dictionary|quality_gates_tests\.yml"
+    preflight_result: "zero matches against this mission's allowed_paths"
+  commit_push_policy:
+    commits_this_mission: true
+    commit_hash: 26381afa64bb61b2ad876e2060a5560be289e955
+    commit_authorized_via: "explicit user AskUserQuestion response, post-plan-autonomous-convergence cycle, 2026-07-25"
+    push_this_mission: false
+    push_is_operator_owned: true
+    rationale: >
+      Repo-wide closeout convention (push_is_operator_owned observed
+      across every prior mission) plus this session's standing Git Safety
+      Protocol (never commit without explicit user ask). The commit
+      itself was gated behind an explicit clarifying question asked
+      during this convergence cycle's plan phase (prompt4-close-task.md
+      requires commit as a CLOSED precondition; the invoking message
+      alone did not authorize it) -- answered "authorize commit now"
+      before any commit was made. Push remains withheld; not requested.
+  rollback_scope: >
+    One local commit (26381afa64bb61b2ad876e2060a5560be289e955), not
+    pushed anywhere. Rollback (if ever needed) is git revert
+    26381afa64bb61b2ad876e2060a5560be289e955 (safe, additive revert) or
+    git reset --soft HEAD~1 if the commit is still the tip and no
+    further commits have landed on top -- never a blanket
+    checkout/clean/reset --hard, since the tree carries legitimate
+    uncommitted work from the two other open missions that must not be
+    touched.
+  self_review_rubric: >
+    15-dimension rubric from .supervisor/prompts/prompt3-controlled-execution.md
+    Phase 5 (not the stale 12-dimension TASK_BACKLOG.md rubric). Each
+    taskcard scored 1-5 per dimension; any dimension <4/5 blocks
+    acceptance until rerouted/fixed/rescored.
+  evidence_bundle_path: reports/agents/site-locale-allowlist-generalization-20260725/evidence_bundle/
+  schema_disclosure: >
+    No .supervisor/schemas/*.schema.json exists anywhere in this repo for
+    any mission to date. "Schema-conformant" here means structural
+    conformance to this plan's own field list, not JSON-Schema validation.
+    Disclosed, not hidden -- consistent with every prior mission's binding.

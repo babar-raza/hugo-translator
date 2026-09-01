@@ -36,6 +36,9 @@ logger = logging.getLogger(__name__)
 # shared with scripts/quality/audit_all_content.py's sweep (see
 # src/translation_engine/write_gate.py's GATE_ISSUE_NAMES docstring).
 from src.translation_engine.write_gate import gate_id_from_issue_name  # noqa: E402
+from src.translation_engine.quality.inline_code_repair import (  # noqa: E402
+    restore_inline_code_spans,
+)
 
 # ---------------------------------------------------------------------------
 # Unit-level translation validator
@@ -422,6 +425,18 @@ def _retranslate_unit(
             return fixed
         return None
 
+    # Inline code span translated instead of preserved (structural fix)
+    # HT-INLINE-CODE-001 TC-ICR-008: restore_inline_code_spans returns None
+    # (keep original) whenever EN/TR span counts don't match -- that case is
+    # ambiguous positional pairing, not something to guess a fix for, so it
+    # correctly falls through here exactly like the other detectors' None
+    # returns and stays queued for manual/LLM review.
+    if issue_type == "inline_code_integrity_detector":
+        fixed = restore_inline_code_spans(en_text, original_tr)
+        if fixed is not None and fixed != original_tr:
+            return fixed
+        return None
+
     # Other issue types (language_purity_detector, hallucination, etc.) require
     # model retranslation — not handled here (use heal_english_headings.py or GPU queues)
     return None
@@ -510,10 +525,11 @@ def _heal_via_gate_rerun(
     per-gate result, so the SPECIFIC gate ids this queue entry actually
     named can be checked directly.
 
-    force_accept=True mirrors safe_io.py's existing evaluator construction
-    for offline/healing contexts (detector=None already skips gates 2-5,
-    which need a real language detector and aren't meaningful for a
-    same-locale re-check here).
+    force_accept=True has no effect on run_all_content_gates() -- that
+    method only iterates GATE_REGISTRY entries with action "auto_clean",
+    "block", or "warn" (gates 9+), never the "early_return"/"no_op" gates
+    2-5 that force_accept actually gates. detector=None independently skips
+    the language-detector-dependent behavior those early gates would need.
     """
     from src.translation_engine.write_gate import WriteGateEvaluator, gate_id_from_issue_name
 

@@ -577,6 +577,44 @@ class TestValidateLlmResponse:
         reason = LLMModelBackend._validate_llm_response(response, "Do", self._prompt())
         assert reason in ("rule_header_leak", "list_marker_leak")
 
+    def test_mid_string_conversational_reply_not_anchored_at_start_is_rejected(self):
+        """HT-QUALITY-GATES-001 Part 22 (1.6): _REFUSAL_RE only matches at
+        the START of the response, so a conversational reply that doesn't
+        happen to open with a refusal phrase used to pass every check here
+        and ship as translated content. Real confirmed instance: this exact
+        sentence shipped verbatim to docs.aspose.org/no/email/net/
+        developer-guide/features.md, matching zero entries in either
+        _REFUSAL_RE or the old REFUSAL_PHRASES list."""
+        response = (
+            "I'm sorry, but I can't access or read any attached files. If you "
+            "paste the text you'd like translated directly into the chat, "
+            "I'll be happy to translate it for you."
+        )
+        reason = LLMModelBackend._validate_llm_response(response, "Do", self._prompt())
+        assert reason == "refusal"
+
+    def test_keywords_entry_conversational_question_is_rejected(self):
+        """Real confirmed instance: this exact string shipped as a raw
+        frontmatter `keywords:` list entry on
+        kb.aspose.org/uk/slides/cpp/how-to-create-presentations-cpp.md —
+        short, question-shaped, first/second-person conversational register
+        that never legitimately occurs in this corpus."""
+        response = "Could you please provide the English text you'd like translated into Ukrainian?"
+        reason = LLMModelBackend._validate_llm_response(response, "Do", self._prompt())
+        assert reason == "refusal"
+
+    def test_legitimate_translation_containing_a_question_mark_passes(self):
+        """False-positive guard: a genuine translated FAQ-style question
+        must not be rejected just because it ends in '?' — the shape
+        patterns are scoped to specific first/second-person conversational
+        markers ("could you provide", "i'm sorry", "let me know if"), not a
+        blanket question-mark check."""
+        response = "¿Cómo instalo la biblioteca?"
+        reason = LLMModelBackend._validate_llm_response(
+            response, "How do I install the library?", self._prompt()
+        )
+        assert reason is None
+
 
 class TestLlmEchoRejectIntegration:
     """End-to-end: translate() must passthrough source on an echo/refusal
@@ -658,3 +696,88 @@ class TestLlmEchoRejectIntegration:
         mock_provider.generate.return_value = ("Hola", 5, 3)
         backend.translate(["Hello"], "en", "es")
         assert 0 not in backend.last_reject_reasons
+
+
+class TestTranslateWithContextConcurrency:
+    """HT-QUALITY-GATES-001 Part 22 (root cause B, LLM prompt-context race).
+
+    ModelLoader caches ONE LLMModelBackend instance per model, shared across
+    every concurrent worker thread. translate_with_context() used to stash
+    context_hint/file_context as plain instance attributes on that shared
+    backend, read back later inside prompt-building -- two threads
+    translating different files concurrently could interleave, so file A's
+    prompt got built with file B's class context. Fixed via
+    contextvars.ContextVar, which gives each thread its own independent view.
+
+    This test proves the fix with REAL thread interleaving (not hope): a
+    barrier forces thread A to set its context, yield to thread B (which
+    sets a DIFFERENT context and completes its own generate() call), and
+    only then does thread A's own generate() call run and read the context
+    back. Before the fix, thread A's prompt would contain thread B's class
+    name.
+    """
+
+    def test_two_threads_do_not_leak_context_into_each_others_prompt(self, ollama_model_info):
+        import threading
+
+        backend = LLMModelBackend(ollama_model_info, device="api")
+        backend.loaded = True
+
+        thread_a_ready = threading.Event()
+        thread_b_done = threading.Event()
+        captured_prompts: dict[str, str] = {}
+
+        # ONE shared generate() (matching production: both threads call
+        # through the same real shared backend/provider instance) that
+        # identifies which thread is calling via threading.current_thread()
+        # -- not via reconfiguring the mock per thread, which would just add
+        # a race in the test harness itself rather than exercising the
+        # production ContextVar fix.
+        def _generate(system_prompt, user_text):
+            name = threading.current_thread().name
+            if name == "A":
+                # Yield control to thread B before reading/using context,
+                # forcing the exact interleaving the original bug needed.
+                thread_a_ready.set()
+                thread_b_done.wait(timeout=5)
+            captured_prompts[name] = system_prompt
+            if name == "B":
+                thread_b_done.set()
+            return (f"translated-by-{name}", 5, 5)
+
+        provider = MagicMock()
+        provider.generate.side_effect = _generate
+        backend._provider = provider
+
+        results = {}
+
+        def run_thread_a():
+            results["A"] = backend.translate_with_context(
+                ["desc text"], "en", "es",
+                context_hint="api_property_description",
+                file_context={"class_name": "ClassA", "product": "cells/net"},
+            )
+
+        def run_thread_b():
+            thread_a_ready.wait(timeout=5)
+            results["B"] = backend.translate_with_context(
+                ["desc text"], "en", "fr",
+                context_hint="api_property_description",
+                file_context={"class_name": "ClassB", "product": "words/python"},
+            )
+
+        t_a = threading.Thread(target=run_thread_a, name="A")
+        t_b = threading.Thread(target=run_thread_b, name="B")
+        t_a.start()
+        t_b.start()
+        t_a.join(timeout=10)
+        t_b.join(timeout=10)
+
+        assert "A" in captured_prompts and "B" in captured_prompts
+        assert "ClassA" in captured_prompts["A"]
+        assert "ClassB" not in captured_prompts["A"], (
+            "Thread A's prompt was built with Thread B's class context -- "
+            "the exact cross-file contamination this fix closes."
+        )
+        assert "ClassB" in captured_prompts["B"]
+        assert "ClassA" not in captured_prompts["B"]

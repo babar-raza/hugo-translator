@@ -1,0 +1,24 @@
+Starting audit at 22:09:14
+
+about.aspose.net: 23 EN files x 36 locales = 828 expected
+  Locales: ['ar', 'bg', 'ca', 'cs', 'da', 'de', 'el', 'es', 'fa', 'fi', 'fr', 'he', 'hi', 'hr', 'hu', 'id', 'it', 'ja', 'ko', 'lt', 'lv', 'ms', 'nl', 'no', 'pl', 'pt', 'ro', 'ru', 'sk', 'sr', 'sv', 'th', 'tr', 'uk', 'vi', 'zh']
+2026-07-25 22:09:15 [debug    ] yaml_format_success            preserved_comments=True
+
+  about.aspose.net results:
+    english_headings_nonlatin: 67
+    title_mismatch: 36
+    brand_token_missing_gate33: 16
+    dropped_trailing_link_gate35: 11
+    purity_issue: 11
+    gate41_homoglyph_in_code: 11
+    double_period: 4
+    placeholder_leak_gate30: 3
+    artifact_corruption: 3
+    refusal_artifact_gate29: 2
+    eu_hallucination: 2
+    partial_script_contamination_gate31: 1
+    title_untranslated_suspected: 1
+
+blog.aspose.net: 451 EN files x 36 locales = 16,236 expected
+  Locales: ['ar', 'bg', 'ca', 'cs', 'da', 'de', 'el', 'es', 'fa', 'fi', 'fr', 'he', 'hi', 'hr', 'hu', 'id', 'it', 'ja', 'ko', 'lt', 'lv', 'ms', 'nl', 'no', 'pl', 'pt', 'ro', 'ru', 'sk', 'sr', 'sv', 'th', 'tr', 'uk', 'vi', 'zh']
+2026-07-25 22:13:58 [debug    ] yaml_format_success            preserved_comments=True

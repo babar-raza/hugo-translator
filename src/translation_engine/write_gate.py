@@ -26,6 +26,7 @@ from ..utils.models import FrontmatterMode
 from .extractor.text_unit_extractor import is_family_platform_index
 from .fence_spans import count_fence_open_reopens, get_fence_char_spans, strip_fenced
 from .parser.hugo_parser import HugoParser
+from .quality.inline_code_repair import find_inline_code_mismatches
 from .quality.refusal_patterns import CONVERSATIONAL_SHAPE_RE, REFUSAL_RE
 from .reconstructor.yaml_formatter import YAMLFormatter
 from .terminology.classification import TemplateStringRegistry, should_protect_as_identifier
@@ -223,6 +224,7 @@ _TOP_HEADING_RE = re.compile(r"^##\s+.+$", re.MULTILINE)
 # detector" reconnaissance; see
 # C:/Users/prora/.claude/plans/no-detector-nothing-checks-pure-squid.md).
 GATE_ISSUE_NAMES: dict[int, str] = {
+    26: "code_fence_dropped",
     29: "refusal_artifact_gate29",
     30: "placeholder_leak_gate30",
     31: "partial_script_contamination_gate31",
@@ -314,6 +316,8 @@ class WriteGateResult:
     quarantine_error: str | None = None
     # Auto-clean gates (9-12, 16) set this; file_pipeline.py writes this instead of original
     cleaned_content: str | None = None
+    # Per-gate metadata only; rejected candidate text is deliberately excluded.
+    gate_results: dict[int, dict[str, Any]] = field(default_factory=dict)
 
 
 class WriteGateEvaluator:
@@ -383,7 +387,15 @@ class WriteGateEvaluator:
         (19, "_gate_code_fence_count",            "structural",  "block"),
         (20, "_gate_empty_body",                  "content",     "block"),
         (21, "_gate_shortcode_body_leak",         "structural",  "block"),
-        (22, "_gate_inline_code_integrity",       "content",     "auto_clean"),
+        # HT-INLINE-CODE-001 TC-ICR-005: was registered "auto_clean" despite
+        # its implementation being a hard block (result.passed = False) --
+        # _verify_gate_registry() only checked the method existed, never
+        # that its behavior matched the declared action. Re-registered as
+        # "block" to match reality; see _run_content_gates()'s dispatch for
+        # what actually differs (short-circuit skip once an earlier block
+        # gate has already failed -- previously this gate ran regardless
+        # and could silently overwrite an earlier gate's result.error).
+        (22, "_gate_inline_code_integrity",       "content",     "block"),
         (23, "_gate_encoding_clean",              "structural",  "block"),
         (24, "_gate_description_reverted_to_english", "content", "block"),
         (25, "_gate_code_block_content_truncated", "structural", "block"),
@@ -498,6 +510,10 @@ class WriteGateEvaluator:
         # HT-QUALITY-GATES-001 Phase 8 (Tier A #5): new detector, ships
         # "warn" pending a clean-sample false-positive check.
         (43, "_gate_block_scalar_key_leak",          "content",     "warn"),
+        # Independent-verification finding (HT-QUALITY-GATES-001 Phase 8):
+        # no SEO field anywhere had length/SERP-convention awareness. Ships
+        # "warn" pending a clean-sample false-positive check.
+        (44, "_gate_seo_length_sanity",              "content",     "warn"),
     ]
 
     def __init__(
@@ -506,11 +522,16 @@ class WriteGateEvaluator:
         similarity_tracker: SimilarityTracker | None,
         config: ConfigService | None,
         force_accept: bool = False,
+        validation_policy: str = "standard",
     ) -> None:
         self._detector = detector
         self._similarity_tracker = similarity_tracker
         self._config = config
         self._force_accept = force_accept
+        self._validation_policy = validation_policy
+        self._zero_defect = validation_policy == "zero-defect"
+        if self._zero_defect and force_accept:
+            raise ValueError("zero-defect policy prohibits force_accept")
         # Mission heading-i18n-governance-20260723 (TC-HT-I18N-004
         # completion): loaded once per evaluator instance, not per gate
         # call -- shared by Gate 9 (heading-term coverage) and Gate 11
@@ -565,6 +586,15 @@ class WriteGateEvaluator:
         detector = self._detector
 
         if detector is None:
+            if self._zero_defect:
+                result.passed = False
+                result.error = "Gate 2 unavailable: language detector is required"
+                result.gate_results[2] = {
+                    "passed": False,
+                    "action": "early_return",
+                    "error": result.error,
+                }
+                return result
             logger.warning(
                 "Language detector unavailable, skipping language validation for %s",
                 output_path.name,
@@ -607,13 +637,14 @@ class WriteGateEvaluator:
             return result
 
         # Gate 4: Final file purity (B-7.5)
-        detected_lang, confidence = detector.detect(translated_content)
         self._gate_file_purity(translated_content, target_lang, output_path, detector, result)
         if not result.passed:
             return result
 
         # Gate 5: Soft contamination queue (TC-MLD-01) — does NOT block
         self._gate_soft_contamination(target_lang, output_path, result)
+        if not result.passed:
+            return result
 
         # Gate 6: Code block count
         self._gate_code_block(source_content, translated_content, output_path, result)
@@ -642,7 +673,66 @@ class WriteGateEvaluator:
         if working != translated_content:
             result.cleaned_content = working
 
+        if result.passed and self._zero_defect:
+            for gate_id in range(2, 9):
+                result.gate_results.setdefault(
+                    gate_id,
+                    {
+                        "passed": True,
+                        "action": "no_op" if gate_id == 5 else "early_return",
+                        "error": None,
+                    },
+                )
+
         return result
+
+    def evaluate_zero_defect(
+        self,
+        *,
+        translated_content: str,
+        source_content: str,
+        target_lang: str,
+        output_path: Path,
+        source_doc: Any = None,
+        force_overwrite: bool = False,
+        site_profile: Any = None,
+        translation_stats: Any = None,
+        max_clean_rounds: int = 3,
+    ) -> WriteGateResult:
+        """Run fail-closed gates to a fixed point and return a final receipt."""
+        if not self._zero_defect:
+            raise RuntimeError("evaluate_zero_defect requires zero-defect policy")
+
+        working = translated_content
+        for _round in range(max_clean_rounds):
+            result = self.evaluate(
+                translated_content=working,
+                source_content=source_content,
+                target_lang=target_lang,
+                output_path=output_path,
+                source_doc=source_doc,
+                force_overwrite=force_overwrite,
+                site_profile=site_profile,
+                translation_stats=translation_stats,
+            )
+            if not result.passed:
+                return result
+            cleaned = result.cleaned_content if result.cleaned_content is not None else working
+            if cleaned == working:
+                expected = {gate_id for gate_id, *_ in self.GATE_REGISTRY}
+                missing = sorted(expected - set(result.gate_results))
+                if missing:
+                    result.passed = False
+                    result.error = f"Zero-defect receipt missing gates: {missing}"
+                    return result
+                result.cleaned_content = working
+                return result
+            working = cleaned
+
+        return WriteGateResult(
+            passed=False,
+            error=f"Auto-clean gates did not converge after {max_clean_rounds} rounds",
+        )
 
     # ------------------------------------------------------------------
     # Gate 2: Language mismatch (B-7.1)
@@ -661,7 +751,11 @@ class WriteGateEvaluator:
 
         try:
             detected_lang, confidence = detector.detect(translated_content)
-        except (ValueError, Exception) as e:
+        except Exception as e:
+            if self._zero_defect:
+                result.passed = False
+                result.error = f"Language detection unavailable: {e}"
+                return
             logger.warning(f"Language detection uncertain: {e}")
             return  # Uncertain → allow write
 
@@ -709,7 +803,10 @@ class WriteGateEvaluator:
 
         try:
             detected_lang, confidence = detector.detect(translated_content)
-        except (ValueError, Exception):
+        except Exception as exc:
+            if self._zero_defect:
+                result.passed = False
+                result.error = f"Overwrite gate language detection unavailable: {exc}"
             return
 
         try:
@@ -724,9 +821,17 @@ class WriteGateEvaluator:
             )
             existing_lang, existing_conf = detector.detect(existing_detection_text)
         except OSError as e:
+            if self._zero_defect:
+                result.passed = False
+                result.error = f"Could not read existing output for overwrite gate: {e}"
+                return
             logger.warning(f"Could not read existing file for comparison (allowing write): {e}")
             return
         except ValueError as e:
+            if self._zero_defect:
+                result.passed = False
+                result.error = f"Existing output language detection unavailable: {e}"
+                return
             logger.warning(f"Existing file language detection uncertain (allowing write): {e}")
             return
 
@@ -861,6 +966,11 @@ class WriteGateEvaluator:
         if _wrong_pct > _soft_threshold and _purity_override <= 0.10 and output_path is not None:
             result.contamination_queued = True
             result.retranslate_paths.append((output_path, target_lang))
+            if self._zero_defect:
+                result.passed = False
+                result.error = (
+                    f"Gate 5 soft contamination: {_wrong_pct:.1%} wrong-language paragraphs"
+                )
             logger.info(
                 f"SOFT_CONTAMINATION: {_wrong_pct:.1%} wrong-language "
                 f"paragraphs in {output_path.name} — passes purity gate "
@@ -1135,6 +1245,8 @@ class WriteGateEvaluator:
                 lambda src, w, path, res: self._gate_dash_range_collapsed(src, w, path, res),
             "_gate_seo_metadata_corruption":
                 lambda src, w, path, res: self._gate_seo_metadata_corruption(src, w, path, res),
+            "_gate_seo_length_sanity":
+                lambda src, w, path, res: self._gate_seo_length_sanity(src, w, path, res),
             "_gate_homoglyph_in_code":
                 lambda src, w, path, res: self._gate_homoglyph_in_code(src, w, path, res),
             "_gate_whole_page_language_mismatch":
@@ -1168,7 +1280,7 @@ class WriteGateEvaluator:
         )
         working = translated_content
 
-        for _, method_name, _, action in self.GATE_REGISTRY:
+        for gate_id, method_name, _, action in self.GATE_REGISTRY:
             if action not in ("auto_clean", "block", "warn"):
                 continue  # skip early_return / no_op entries (handled elsewhere)
 
@@ -1182,8 +1294,10 @@ class WriteGateEvaluator:
                 )
                 fn = lambda src, w, path, res, _m=method_name: getattr(self, _m)(src, w, path, res)  # noqa: E731
 
+            gate_result = WriteGateResult(passed=True) if self._zero_defect else result
+
             if action == "auto_clean":
-                new_working = fn(source_content, working, output_path, result)
+                new_working = fn(source_content, working, output_path, gate_result)
                 if new_working is not None:
                     working = new_working
             elif action == "warn":
@@ -1191,12 +1305,27 @@ class WriteGateEvaluator:
                 # log-only gate can never flip the real result.passed and
                 # accidentally become blocking. See HT-QUALITY-GATES-001
                 # plan Part 8 — every new gate ships log-only first.
-                warn_result = WriteGateResult(passed=True)
+                warn_result = gate_result if self._zero_defect else WriteGateResult(passed=True)
                 fn(source_content, working, output_path, warn_result)
+                gate_result = warn_result
             else:  # "block"
                 if not result.passed:
                     continue  # short-circuit: stop on first blocking failure
-                fn(source_content, working, output_path, result)
+                fn(source_content, working, output_path, gate_result)
+
+            if self._zero_defect:
+                result.gate_results[gate_id] = {
+                    "passed": gate_result.passed,
+                    "action": action,
+                    "error": gate_result.error,
+                }
+                if not gate_result.passed:
+                    result.passed = False
+                    result.error = gate_result.error or f"Gate {gate_id} failed"
+                    result.clear_tm_buffer = (
+                        result.clear_tm_buffer or gate_result.clear_tm_buffer
+                    )
+                    result.retranslate_paths.extend(gate_result.retranslate_paths)
 
         return working
 
@@ -1959,37 +2088,48 @@ class WriteGateEvaluator:
 
         Zero tolerance: any `code` span that was ASCII in English must remain
         ASCII in the translation. Only fires when EN has ≥3 inline code spans.
+
+        HT-INLINE-CODE-001 TC-ICR-004: detection delegated to the shared
+        src/translation_engine/quality/inline_code_repair.py primitive
+        (single source of truth also used by audit_all_content.py,
+        UnitQualityScorer, and audit_blog_bundle.py) instead of this gate's
+        own copy of the fence-strip/newline-exclude logic, plus a new
+        span-count-parity guard that copy never had: if EN and TR backtick
+        span counts differ, positional pairing is unreliable and this gate
+        now declines to fire rather than risk a false block on drifted
+        pairing (other structural gates -- code block count, heading
+        surplus -- independently catch genuine structural drift).
         """
         src_body = self._get_body(source_content)
         tgt_body = self._get_body(translated_content)
 
-        en_spans = _BACKTICK_SPAN_RE.findall(_FENCED_CODE_BLOCK_RE.sub("", src_body))
-        if len(en_spans) < 3:
-            return  # too few spans to fire (avoids noise on trivial files)
-
         # Strip stray leading backticks from table rows (m2m100 artifact: "` | Чтение |").
-        # These cause _BACKTICK_SPAN_RE to manufacture a cross-row "span" containing
+        # These cause the span regex to manufacture a cross-row "span" containing
         # Cyrillic table content, triggering a false positive against ASCII en_spans.
         # This is a real content fix, so it's applied to (and persisted from) the
-        # fenced body -- unlike the fence stripping below, which is comparison-only.
+        # fenced body -- unlike the fence stripping the shared primitive does
+        # internally, which is comparison-only.
         tgt_body_clean = _STRAY_TABLE_BACKTICK_RE.sub(r"\1", tgt_body)
         if tgt_body_clean != tgt_body:
             result.cleaned_content = translated_content.replace(tgt_body, tgt_body_clean, 1)
             tgt_body = tgt_body_clean
 
-        # Fenced code blocks (```...```) are excluded here -- comparison-only,
-        # never persisted -- because their triple backticks otherwise get
-        # mispaired as inline-code delimiters, corrupting every span that
-        # follows (see _FENCED_CODE_BLOCK_RE).
-        tr_spans = _BACKTICK_SPAN_RE.findall(_FENCED_CODE_BLOCK_RE.sub("", tgt_body))
-        for en_span, tr_span in zip(en_spans, tr_spans):
-            if en_span.isascii() and not tr_span.isascii():
-                result.passed = False
-                result.error = (
-                    f"Gate 21 inline code translated: `{en_span[:40]}` → `{tr_span[:40]}`"
-                )
-                logger.error("GATE21 BLOCKED %s: %s", output_path.name, result.error)
-                return
+        mismatches = find_inline_code_mismatches(src_body, tgt_body)
+        if not mismatches:
+            return  # clean, or too few spans, or count mismatch (see docstring)
+
+        first = mismatches[0]
+        result.passed = False
+        result.error = (
+            f"Gate 21 inline code translated: `{first.en_span[:40]}` → `{first.tr_span[:40]}`"
+        )
+        # HT-INLINE-CODE-001 TC-ICR-005: explicit defense-in-depth alongside
+        # file_pipeline.py's TC-11 buffer, which already gates the flush of
+        # `_tm_write_buffer` on `validation_passed` overall (this gate
+        # failing already sets that False) -- matches the existing
+        # precedent on Gates 4/8.
+        result.clear_tm_buffer = True
+        logger.error("GATE21 BLOCKED %s: %s", output_path.name, result.error)
 
     # ------------------------------------------------------------------
     # Gate 19 (TC-HDN-010): Empty body
@@ -2929,6 +3069,9 @@ class WriteGateEvaluator:
         # reference.aspose.org-shaped output_paths and would otherwise now
         # also satisfy Gate 36's high-risk classification.
         if not _cfg.get("enabled", False):
+            if self._zero_defect:
+                result.passed = False
+                result.error = "GATE36 fidelity judge is disabled under zero-defect policy"
             return translated_content
         # Registered "auto_clean" (not "block"), so the dispatch loop does not
         # short-circuit this gate when an earlier block gate already failed
@@ -2939,12 +3082,14 @@ class WriteGateEvaluator:
         # cause of the block.
         if not result.passed:
             return translated_content
-        if not self._gate36_is_high_risk(output_path, translation_stats):
+        if not self._zero_defect and not self._gate36_is_high_risk(
+            output_path, translation_stats
+        ):
             return translated_content
 
         src_body = self._get_body(source_content)
         tgt_body = self._get_body(translated_content)
-        if len(tgt_body.strip()) < self._FIDELITY_MIN_BODY_CHARS:
+        if not self._zero_defect and len(tgt_body.strip()) < self._FIDELITY_MIN_BODY_CHARS:
             return translated_content  # too short to judge meaningfully
 
         from .validation.fidelity_judge import judge_fidelity
@@ -2959,10 +3104,31 @@ class WriteGateEvaluator:
             fail_threshold=_cfg.get("block_threshold", 0.5),
         )
         if verdict is None:
+            if self._zero_defect:
+                result.passed = False
+                result.error = (
+                    f"GATE36 fidelity judge unavailable for {output_path.name}"
+                )
+                return translated_content
             logger.info(
                 "GATE36 fidelity judge unavailable/failed for %s — skipped",
                 output_path.name,
             )
+            return translated_content
+
+        if self._zero_defect:
+            result._fidelity_result = {  # type: ignore[attr-defined]
+                "score": round(verdict.score, 3),
+                "verdict": verdict.verdict,
+                "issues": verdict.issues,
+                "model": verdict.model,
+            }
+            if verdict.verdict != "pass":
+                result.passed = False
+                result.error = (
+                    f"GATE36 FIDELITY JUDGE {output_path.name}: "
+                    f"{verdict.verdict} score={verdict.score:.2f}"
+                )
             return translated_content
 
         split = _fm_parser._split_frontmatter(translated_content)
@@ -3169,6 +3335,15 @@ class WriteGateEvaluator:
         An exact match on a specific multi-digit concatenation is a narrow
         enough signature to be low-false-positive without needing to locate
         the corresponding sentence.
+
+        False-positive guard (independent-verification MINOR finding,
+        HT-QUALITY-GATES-001 Phase 8): an unrelated, coincidental digit run
+        elsewhere in the target (a product code, page number, year) can
+        happen to equal a range's concatenation even though that range was
+        translated correctly and is still intact, dash and all, somewhere
+        else in the document. Before flagging, check whether the source
+        range's intact dash-digit pattern is ALSO separately present in the
+        target -- if so, the range wasn't collapsed, so skip.
         """
         src_body = strip_fenced(self._get_body(source_content))
         tgt_body = strip_fenced(self._get_body(translated_content))
@@ -3177,8 +3352,14 @@ class WriteGateEvaluator:
         if not tgt_digit_runs:
             return
 
+        tgt_intact_ranges = {
+            (m.group(1), m.group(2)) for m in _DIGIT_DASH_DIGIT_RE.finditer(tgt_body)
+        }
+
         for m in _DIGIT_DASH_DIGIT_RE.finditer(src_body):
             num1, num2 = m.group(1), m.group(2)
+            if (num1, num2) in tgt_intact_ranges:
+                continue  # range survived intact elsewhere -- not a collapse
             collapsed = num1 + num2
             if collapsed in tgt_digit_runs:
                 result.passed = False
@@ -3199,7 +3380,14 @@ class WriteGateEvaluator:
     # HT-QUALITY-GATES-001 Phase 8 (Tier A #10)
     # ------------------------------------------------------------------
 
-    _SEO_SEPARATOR_RE = re.compile(r"[|–—]| - ")
+    # Independent-verification MINOR finding (HT-QUALITY-GATES-001 Phase 8):
+    # includes the fullwidth pipe (｜) and fullwidth hyphen-minus (－) as
+    # direct CJK-locale analogs of the already-recognized | and -- these are
+    # the same separator shapes, not new ones, so this is a conservative
+    # expansion. Broader additions (bare colon, middle dot, bullet,
+    # guillemets) are deliberately NOT included without corpus evidence --
+    # see the Phase 8 real-corpus sweep this expansion was informed by.
+    _SEO_SEPARATOR_RE = re.compile(r"[|–—｜－]| - ")
 
     def _gate_seo_metadata_corruption(
         self,
@@ -3255,6 +3443,54 @@ class WriteGateEvaluator:
                     "Tier A) %s: en=%d tgt=%d",
                     output_path.name, len(en_keywords), len(tgt_keywords),
                 )
+
+    # ------------------------------------------------------------------
+    # Gate 44: SEO title/description SERP-length sanity
+    # HT-QUALITY-GATES-001 Phase 8 (independent-verification finding):
+    # no SEO field anywhere in the pipeline (extraction, prompting,
+    # validation) has any length/SERP-convention awareness -- a short
+    # English title/description can become a much longer translation with
+    # nothing anywhere noticing. Reuses Gate 40's keyword-ballooning ratio
+    # convention (>=+2 absolute AND >=1.5x relative) rather than inventing a
+    # new heuristic. Ships "warn" pending a clean-sample false-positive
+    # check, same rollout convention as gates 31-43.
+    # ------------------------------------------------------------------
+
+    def _gate_seo_length_sanity(
+        self,
+        source_content: str,
+        translated_content: str,
+        output_path: Path,
+        result: WriteGateResult,
+    ) -> None:
+        """Flag a translated head_title/seoTitle whose character length
+        ballooned past a conservative multiple of the English value -- a
+        structural proxy for SERP-truncation risk (Google conventionally
+        truncates title tags well before 90 characters), not a semantic
+        translation-quality check.
+        """
+        for field_name in ("head_title", "seoTitle"):
+            en_value = _get_frontmatter_field(source_content, field_name)
+            if not en_value:
+                continue
+            tgt_value = _get_frontmatter_field(translated_content, field_name)
+            if not tgt_value:
+                continue  # empty/missing field is a different gate's concern
+            if len(tgt_value) >= len(en_value) + 15 and (
+                len(tgt_value) >= len(en_value) * 1.5
+            ):
+                result.passed = False
+                result.error = (
+                    f"GATE44 SEO LENGTH {output_path.name}: {field_name} grew "
+                    f"from {len(en_value)} to {len(tgt_value)} chars "
+                    f"(SERP-truncation risk): {tgt_value[:60]!r}"
+                )
+                logger.warning(
+                    "GATE44 SEO LENGTH ballooned (warn-only, Phase 8) %s: "
+                    "field=%s en_len=%d tgt_len=%d",
+                    output_path.name, field_name, len(en_value), len(tgt_value),
+                )
+                return
 
     # ------------------------------------------------------------------
     # Gate 41: homoglyph substitution in code spans/identifiers

@@ -1,0 +1,49 @@
+C:\Users\prora\OneDrive\Documents\GitHub\hugo-translator\scripts\quality\tm_surgical_cleanup.py:382: UserWarning: L2PersistentTM: sibling LMDB directory found alongside canonical 'l2.lmdb': l2_lmdb. This indicates split writes. Run scripts/tm/migrate_l2_lmdb.py to consolidate.
+  tm = L2PersistentTM(db_path=tm_path)
+TC-TM-02: sibling L2 LMDB dir(s) detected: l2_lmdb (canonical: data\tm\l2.lmdb). Run scripts/tm/migrate_l2_lmdb.py --apply to consolidate.
+TM path: data\tm\l2.lmdb
+Mode: DRY-RUN
+Max changes: 25000
+
+Scanning L2 TM (site=kb.aspose.org, locales=ALL)...
+  [PATCH] ar    | 'Yes. `Presentation` implements `AutoClos' -> 'نعم. `عرض` يطبق `AutoCloseable`. دائما ا' (inline_code_span_translated)
+  [PATCH] cs    | '`Workbook.save()` supports multiple form' -> '`Workbook.save()` podporuje více formátů' (inline_code_span_translated)
+  [PATCH] de    | "`ModuleNotFoundError: No module named 'a" -> '`ModuleNotFoundError: Kein Modul namens ' (inline_code_span_translated)
+  [CORRECT] el    | 'Overview'                                 -> 'Overview' (heading_untranslated_passthrough)
+  [PATCH] el    | 'Yes. `Presentation` implements `AutoClos' -> 'Ναι. `Προβολή` εφαρμόζει `AutoCloseable`' (inline_code_span_translated)
+  [PATCH] el    | 'Yes. `TtfFont.instantiate()` produces a ' -> 'Ναι. `TtfFont.instantiate()` παράγει ένα' (inline_code_span_translated)
+  [CORRECT] fa    | 'Overview'                                 -> 'Overview' (heading_untranslated_passthrough)
+  [PATCH] fa    | 'The `Presentation` class manages interna' -> '`کلاس Presentation` منابع XML داخلی را م' (inline_code_span_translated)
+  [DELETE] fr    | '{{< sections cols="4" >}}'                -> '{{< sections cols="4" >}}' (artifact_in_translation)
+  [CORRECT] he    | 'Overview'                                 -> 'Overview' (heading_untranslated_passthrough)
+  [CORRECT] hi    | 'Overview'                                 -> 'Overview' (heading_untranslated_passthrough)
+  [CORRECT] ko    | 'Overview'                                 -> 'Overview' (heading_untranslated_passthrough)
+  [PATCH] lt    | "`ModuleNotFoundError: No module named 'a" -> '`ModuleNotFoundError: Nėra modulo, pavad' (inline_code_span_translated)
+  [PATCH] pl    | '`Workbook.save()` supports multiple form' -> '`Workbook.save()` obsługuje wiele format' (inline_code_span_translated)
+  [PATCH] sk    | '`Workbook.save()` supports multiple form' -> '`Workbook.save()` podporuje viaceré form' (inline_code_span_translated)
+  [PATCH] sv    | 'The correct property is `.text_frame.tex' -> 'Den rätta egenskapen är `.text_frame.tex' (inline_code_span_translated)
+  [PATCH] sv    | "`ModuleNotFoundError: No module named 'a" -> '`ModuleNotFoundError: Ingen modul som he' (inline_code_span_translated)
+  [PATCH] th    | 'The `Presentation` class implements `IDi' -> '`คลาส Presentation` implements `IDisposa' (inline_code_span_translated)
+  [PATCH] vi    | 'The `Presentation` class manages interna' -> '`Lớp Presentation` quản lý các tài nguyê' (inline_code_span_translated)
+  [CORRECT] zh    | 'Overview'                                 -> 'Overview' (heading_untranslated_passthrough)
+  [OVERWRITE] es    | 'Troubleshooting'                          -> 'Resolución de problemas' (identifier_translated)
+  [OVERWRITE] th    | 'Troubleshooting'                          -> 'การแก้ปัญหา' (identifier_translated)
+  [OVERWRITE] tr    | 'Troubleshooting'                          -> 'Sorun Çözümü' (identifier_translated)
+
+============================================================
+SUMMARY
+============================================================
+Entries scanned:         124,768
+Clean entries:           124,745
+Corrupt entries found:        23
+  identifier_translated:       3
+  artifact_in_translation:     1
+  heading_term_corrupted:      0
+  heading_untranslated_passthrough:   6
+  inline_code_span_translated:      13
+Planned overwrites:            3
+Planned deletes:               1
+Planned i18n corrections:      6
+Planned inline-code patches:  13
+
+DRY-RUN complete. Run with --apply to fix entries.

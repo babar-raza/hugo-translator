@@ -1,0 +1,58 @@
+final_all_green_candidate:
+  mission_id: heading-i18n-governance-20260723
+  plan_id: glittery-waddling-moth
+  plan_path: "C:\\Users\\prora\\.claude\\plans\\glittery-waddling-moth.md"
+  plan_revision: "session-2026-07-24-formal-convergence"
+  plan_hash: 087e96cd651d62371bc7ec41870ca7ac350763140eef6ac7c968d08f38aca271
+  final_audit_path: ".supervisor/state/heading-i18n-governance-20260723/stage1-audit/stage1-issue-model.json"
+
+  material_findings: 0
+  actionable_findings: 0
+  actionable_findings_note: >
+    3 actionable findings were raised by Stage 1 (L2-001, L2-002, L2-003).
+    All 3 are now consumed: L2-001 resolved directly (prompt-registry.yaml
+    PSL-PROMPT-4 entry added). L2-002 and L2-003 converted into
+    dependency-clean, non-blocking follow-up taskcards (TC-HT-I18N-010,
+    TC-HT-I18N-011) for a future sprint, per plan §15.2/15.3/15.5 -- zero
+    actionable findings remain unconsumed for THIS mission's own closure.
+
+  unresolved_mandatory_requirements: 0
+  unresolved_mandatory_requirements_note: >
+    TC-HT-I18N-007's content-repo commit is a governed exclusion (§15.1),
+    not an unresolved mandatory requirement -- its hugo-translator-side
+    deliverable (the healer script) is VERIFIED_COMPLETE and committed.
+
+  open_mandatory_taskcards: 0
+  weakly_verified_mandatory_items: 0
+  unconsumed_findings: 0
+  rework_items: 0
+  eligible_tasks: 0
+  eligible_tasks_note: >
+    TC-HT-I18N-010/011 exist as status: PLANNED but are explicitly
+    out-of-scope-for-this-closure follow-up work (§15.5) -- not eligible
+    tasks within this mission's own dependency graph, since neither was
+    part of the original 9-taskcard scope and neither blocks any of the 9.
+
+  required_proof_gaps: 0
+  e2e_failures: 0
+  pilot_failures: 0
+  regression_failures: 0
+  regression_failures_note: >
+    3 failures exist in tests/unit/quality/ but are independently
+    verified pre-existing and unrelated (git-stash isolation in the prior
+    session, identical reproduction in this cycle's fresh re-run) -- not
+    counted as regression_failures caused by this mission's work.
+  idempotency_failures: 0
+
+  state_reconciled: true
+  state_reconciled_evidence: >
+    git log confirms all 9 mission commits present in order; git status
+    shows zero uncommitted files belonging to this mission except the one
+    Stage-2 hardening edit (prompt-registry.yaml), about to be committed
+    by Stage 4; the plan file, evidence bundle, and governance state
+    directory are mutually consistent (taskcard IDs match across all
+    three); the content repo's actual state (16,785 dirty lines, HEAD at
+    c2719766b0) matches exactly what the governed exclusion in §15.1
+    describes.
+
+  closure_prompt_authorized: true

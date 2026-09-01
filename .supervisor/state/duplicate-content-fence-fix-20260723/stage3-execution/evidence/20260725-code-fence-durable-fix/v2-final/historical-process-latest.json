@@ -1,0 +1,7 @@
+﻿{
+    "stdout":  "C:\\Users\\prora\\OneDrive\\Documents\\GitHub\\hugo-translator\\.supervisor\\state\\duplicate-content-fence-fix-20260723\\stage3-execution\\evidence\\20260725-code-fence-durable-fix\\v2-final\\historical-3599a45-full-20260725-220855.log",
+    "pid":  67324,
+    "command":  "historical audit 3599a45 read-only full scan",
+    "stderr":  "C:\\Users\\prora\\OneDrive\\Documents\\GitHub\\hugo-translator\\.supervisor\\state\\duplicate-content-fence-fix-20260723\\stage3-execution\\evidence\\20260725-code-fence-durable-fix\\v2-final\\historical-3599a45-full-20260725-220855.stderr.log",
+    "started_at":  "2026-07-25T22:08:55.5656979+05:00"
+}

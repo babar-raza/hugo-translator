@@ -1,0 +1,41 @@
+Loaded 434 candidate files (site=None, family=None)
+C:\Users\prora\OneDrive\Documents\GitHub\hugo-translator\scripts\content\fill_table_cells_from_tm.py:221: UserWarning: L2PersistentTM: sibling LMDB directory found alongside canonical 'l2.lmdb': l2_lmdb. This indicates split writes. Run scripts/tm/migrate_l2_lmdb.py to consolidate.
+  tm = L2PersistentTM(_PROJECT_ROOT / args.l2_path)
+TC-TM-02: sibling L2 LMDB dir(s) detected: l2_lmdb (canonical: C:\Users\prora\OneDrive\Documents\GitHub\hugo-translator\data\tm\l2.lmdb). Run scripts/tm/migrate_l2_lmdb.py --apply to consolidate.
+  [WRITE] D:\onedrive\Documents\GitHub\aspose.org\content\reference.aspose.org\ar\3d\net\_index.md -- filled 48, passthrough 0, still missing 84
+  [WRITE] D:\onedrive\Documents\GitHub\aspose.org\content\reference.aspose.org\fa\3d\net\_index.md -- filled 64, passthrough 0, still missing 68
+  [WRITE] D:\onedrive\Documents\GitHub\aspose.org\content\reference.aspose.org\he\3d\net\_index.md -- filled 64, passthrough 0, still missing 68
+  [WRITE] D:\onedrive\Documents\GitHub\aspose.org\content\reference.aspose.org\hi\3d\net\_index.md -- filled 51, passthrough 0, still missing 81
+  [WRITE] D:\onedrive\Documents\GitHub\aspose.org\content\reference.aspose.org\ru\3d\net\_index.md -- filled 58, passthrough 0, still missing 74
+  [WRITE] D:\onedrive\Documents\GitHub\aspose.org\content\reference.aspose.org\vi\3d\net\_index.md -- filled 42, passthrough 0, still missing 90
+  [WRITE] D:\onedrive\Documents\GitHub\aspose.org\content\reference.aspose.org\ar\cells\java\_index.md -- filled 18, passthrough 0, still missing 100
+  [WRITE] D:\onedrive\Documents\GitHub\aspose.org\content\reference.aspose.org\fa\cells\java\_index.md -- filled 89, passthrough 0, still missing 29
+  [WRITE] D:\onedrive\Documents\GitHub\aspose.org\content\reference.aspose.org\hi\cells\java\_index.md -- filled 88, passthrough 0, still missing 30
+  [WRITE] D:\onedrive\Documents\GitHub\aspose.org\content\reference.aspose.org\vi\cells\java\_index.md -- filled 88, passthrough 0, still missing 30
+  [WRITE] D:\onedrive\Documents\GitHub\aspose.org\content\reference.aspose.org\fa\note\python\_index.md -- filled 12, passthrough 0, still missing 20
+  [WRITE] D:\onedrive\Documents\GitHub\aspose.org\content\reference.aspose.org\he\note\python\_index.md -- filled 19, passthrough 0, still missing 13
+  [WRITE] D:\onedrive\Documents\GitHub\aspose.org\content\reference.aspose.org\hi\note\python\_index.md -- filled 7, passthrough 0, still missing 25
+  [WRITE] D:\onedrive\Documents\GitHub\aspose.org\content\reference.aspose.org\ar\slides\cpp\_index.md -- filled 90, passthrough 0, still missing 19
+  [WRITE] D:\onedrive\Documents\GitHub\aspose.org\content\reference.aspose.org\ru\slides\cpp\_index.md -- filled 89, passthrough 0, still missing 20
+  [WRITE] D:\onedrive\Documents\GitHub\aspose.org\content\reference.aspose.org\vi\slides\cpp\_index.md -- filled 86, passthrough 0, still missing 23
+  [WRITE] D:\onedrive\Documents\GitHub\aspose.org\content\reference.aspose.org\zh\slides\cpp\_index.md -- filled 70, passthrough 0, still missing 39
+  [WRITE] D:\onedrive\Documents\GitHub\aspose.org\content\reference.aspose.org\zh\slides\java\_index.md -- filled 92, passthrough 0, still missing 31
+  [WRITE] D:\onedrive\Documents\GitHub\aspose.org\content\reference.aspose.org\zh\slides\net\_index.md -- filled 95, passthrough 0, still missing 28
+  [WRITE] D:\onedrive\Documents\GitHub\aspose.org\content\reference.aspose.org\ar\slides\python\_index.md -- filled 139, passthrough 0, still missing 15
+  [WRITE] D:\onedrive\Documents\GitHub\aspose.org\content\reference.aspose.org\bg\slides\python\_index.md -- filled 139, passthrough 0, still missing 15
+  [WRITE] D:\onedrive\Documents\GitHub\aspose.org\content\reference.aspose.org\el\slides\python\_index.md -- filled 145, passthrough 0, still missing 9
+  [WRITE] D:\onedrive\Documents\GitHub\aspose.org\content\reference.aspose.org\fa\slides\python\_index.md -- filled 138, passthrough 0, still missing 16
+  [WRITE] D:\onedrive\Documents\GitHub\aspose.org\content\reference.aspose.org\he\slides\python\_index.md -- filled 145, passthrough 0, still missing 9
+  [WRITE] D:\onedrive\Documents\GitHub\aspose.org\content\reference.aspose.org\hi\slides\python\_index.md -- filled 121, passthrough 0, still missing 33
+  [WRITE] D:\onedrive\Documents\GitHub\aspose.org\content\reference.aspose.org\ru\slides\python\_index.md -- filled 125, passthrough 0, still missing 29
+  [WRITE] D:\onedrive\Documents\GitHub\aspose.org\content\reference.aspose.org\ar\words\python\_index.md -- filled 41, passthrough 0, still missing 40
+  [WRITE] D:\onedrive\Documents\GitHub\aspose.org\content\reference.aspose.org\bg\words\python\_index.md -- filled 41, passthrough 0, still missing 40
+  [WRITE] D:\onedrive\Documents\GitHub\aspose.org\content\reference.aspose.org\el\words\python\_index.md -- filled 64, passthrough 0, still missing 17
+  [WRITE] D:\onedrive\Documents\GitHub\aspose.org\content\reference.aspose.org\ko\words\python\_index.md -- filled 44, passthrough 0, still missing 37
+  [WRITE] D:\onedrive\Documents\GitHub\aspose.org\content\reference.aspose.org\th\words\python\_index.md -- filled 54, passthrough 0, still missing 27
+  [WRITE] D:\onedrive\Documents\GitHub\aspose.org\content\reference.aspose.org\vi\words\python\_index.md -- filled 54, passthrough 0, still missing 27
+  [WRITE] D:\onedrive\Documents\GitHub\aspose.org\content\reference.aspose.org\zh\words\python\_index.md -- filled 51, passthrough 0, still missing 30
+Wrote/appended 434 rows to reports\audit\backlog_table_desc_not_translated.csv
+
+Files changed: 33
+Cells: passthrough (no action) 0, TM-filled 2471, still missing (backlog) 7031

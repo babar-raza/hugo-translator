@@ -226,6 +226,18 @@ class SiteProfile(BaseModel):
         default=True,
         description="Whether the autonomous worker should process this site. Set to false for test/dev profiles.",
     )
+    strict_locale_allowlist: bool = Field(
+        default=False,
+        description=(
+            "When true, target_langs is enforced as this site's exact "
+            "locale allowlist everywhere a target locale is determined -- "
+            "CLI overrides, the translation engine, and quality-script "
+            "directory auto-discovery all reject or filter out any locale "
+            "not in target_langs. Sites that leave this false (default) "
+            "keep lenient behavior unchanged: any format-valid locale may "
+            "be requested regardless of target_langs."
+        ),
+    )
     family_scope: str | None = Field(
         default=None,
         description=(

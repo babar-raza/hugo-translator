@@ -548,6 +548,50 @@ class SegmentTranslator:
         translations = {}
         segments_to_translate = []
 
+        # Step 0 (reference-i18n-hardening-20260725): i18n-first short-string
+        # resolution, BEFORE TM and BEFORE force-mode bypass. This is the
+        # segment/legacy-path counterpart of the AST path's extraction-time
+        # short-circuit (text_unit_extractor.py) — it closes the gap where
+        # heading segments on this path never got an i18n lookup at all.
+        # Resolved segments are prefilled into `translations` and excluded
+        # from every step below (TM batch lookup, the TM-hit loop, the
+        # force-mode bypass, and segments_to_translate) — i18n results are
+        # therefore NEVER written to TM (stores only cover
+        # segments_to_translate), which is deliberate: TM must never cache
+        # a value that the resolver itself already serves authoritatively,
+        # or a future registry correction would be shadowed by a stale
+        # cached hit.
+        from .terminology.classification import (  # noqa: PLC0415
+            CATEGORIES_FOR_KIND,
+            get_default_registry,
+            resolve,
+        )
+
+        i18n_resolved_ids: set = set()
+        _i18n_registry = get_default_registry()
+        for _seg in segments:
+            _ctx_type = str(_seg.context.context_type) if _seg.context else ""
+            if "HEADING" not in _ctx_type:
+                continue
+            _text = getattr(_seg, "source_text", "") or ""
+            if len(_text) > 80:
+                continue
+            _resolved = resolve(
+                _text,
+                target_lang,
+                categories=CATEGORIES_FOR_KIND["heading_text"],
+                registry=_i18n_registry,
+                file=str(getattr(doc, "source_path", "")) if doc else None,
+            )
+            if _resolved.outcome == "table":
+                translations[_seg.id] = _resolved.value
+                i18n_resolved_ids.add(_seg.id)
+                stats.i18n_hits += 1
+
+        _tm_segments = (
+            [s for s in segments if s.id not in i18n_resolved_ids] if i18n_resolved_ids else segments
+        )
+
         # Create extractor instance for inline formatting restoration
         extractor = SegmentExtractor(site_profile, terminology_manager=engine.terminology_manager)
 
@@ -557,6 +601,10 @@ class SegmentTranslator:
         )
 
         # Step 1: TM lookup (unless force=True)
+        _tm_site_id = engine._tm_site_namespace(
+            site_id,
+            getattr(doc, "source_path", None),
+        )
         if not force:
             # Batch TM lookup: L1+L2 per-request, then L3 for all misses in one GPU forward pass.
             # RC-4 FIX preserved: frontmatter segments use use_semantic=False (no L3).
@@ -589,7 +637,7 @@ class SegmentTranslator:
                     else ""
                 )
                 return _TMLookupRequest(
-                    site_id=site_id,
+                    site_id=_tm_site_id,
                     src_lang=source_lang,
                     tgt_lang=target_lang,
                     text=getattr(seg, "tm_key_text", None) or seg.source_text,
@@ -597,12 +645,15 @@ class SegmentTranslator:
                     field_name=_field_name,
                 )
 
-            _fm_idx = [i for i, s in enumerate(segments) if _is_fm_seg(s)]
-            _body_idx = [i for i, s in enumerate(segments) if not _is_fm_seg(s)]
-            _tm_batch_results: list = [None] * len(segments)
+            # reference-i18n-hardening-20260725: _tm_segments excludes
+            # i18n-pre-resolved segments (Step 0 above) — they never reach
+            # TM lookup at all, on either the exact or semantic path.
+            _fm_idx = [i for i, s in enumerate(_tm_segments) if _is_fm_seg(s)]
+            _body_idx = [i for i, s in enumerate(_tm_segments) if not _is_fm_seg(s)]
+            _tm_batch_results: list = [None] * len(_tm_segments)
             if _fm_idx:
                 _fm_res = engine.tm.batch_lookup(
-                    [_make_tm_req(segments[i]) for i in _fm_idx], use_semantic=False
+                    [_make_tm_req(_tm_segments[i]) for i in _fm_idx], use_semantic=False
                 )
                 for _bi, _br in zip(_fm_idx, _fm_res):
                     _tm_batch_results[_bi] = _br
@@ -618,14 +669,14 @@ class SegmentTranslator:
                 _tm_prefs = getattr(site_profile, "tm_prefs", None)
                 _semantic_threshold = getattr(_tm_prefs, "min_similarity_score", 0.80)
                 _body_res = engine.tm.batch_lookup(
-                    [_make_tm_req(segments[i]) for i in _body_idx],
+                    [_make_tm_req(_tm_segments[i]) for i in _body_idx],
                     use_semantic=True,
                     semantic_threshold=_semantic_threshold,
                 )
                 for _bi, _br in zip(_body_idx, _body_res):
                     _tm_batch_results[_bi] = _br
 
-            for idx, segment in enumerate(segments, 1):
+            for idx, segment in enumerate(_tm_segments, 1):
                 # TMO-03: Build lookup context for override filtering
                 lookup_context = {
                     "target_lang": target_lang,
@@ -721,16 +772,19 @@ class SegmentTranslator:
                     )
 
         else:
-            # Force mode: translate everything
+            # Force mode: translate everything EXCEPT i18n-pre-resolved
+            # segments (Step 0 above already ran regardless of `force` —
+            # forcing MT on an i18n table hit would defeat the whole point
+            # of the resolver).
             logger.info(
-                f"Force retranslate enabled: bypassing cache lookup for {len(segments)} segments "
+                f"Force retranslate enabled: bypassing cache lookup for {len(_tm_segments)} segments "
                 f"({source_lang} -> {target_lang})"
             )
-            segments_to_translate = segments
+            segments_to_translate = _tm_segments
 
             progress = get_progress_tracker()
             if progress:
-                for _ in segments:
+                for _ in _tm_segments:
                     progress.cache_miss()
 
         # Step 1b (TC-HT-ROUTE-001): ContentTypeRouter — pre-translate LLM-routed
@@ -869,7 +923,7 @@ class SegmentTranslator:
                                     True if engine.cache_write_mode == "always" else force
                                 )
                                 _tm_entry_seg = dict(
-                                    site_id=site_id,
+                                    site_id=_tm_site_id,
                                     src_lang=source_lang,
                                     tgt_lang=target_lang,
                                     text=getattr(_seg, "tm_key_text", None) or _seg.source_text,
@@ -877,6 +931,12 @@ class SegmentTranslator:
                                     context=str(_seg.context) if _seg.context else None,
                                     metadata={
                                         "model": _llm_model_id_seg,
+                                        "campaign_id": (
+                                            getattr(engine, "campaign_context", {}) or {}
+                                        ).get("campaign_id"),
+                                        "config_fingerprint": (
+                                            getattr(engine, "campaign_context", {}) or {}
+                                        ).get("config_fingerprint"),
                                         "source_file": str(doc.source_path)
                                         if hasattr(doc, "source_path") and doc.source_path
                                         else None,
@@ -1036,7 +1096,7 @@ class SegmentTranslator:
                             force_update = force
 
                         _tm_entry = dict(
-                            site_id=site_id,
+                            site_id=_tm_site_id,
                             src_lang=source_lang,
                             tgt_lang=target_lang,
                             # TC-HT-TMKEY-001: same rationale as _make_tm_req above —
@@ -1047,6 +1107,12 @@ class SegmentTranslator:
                             context=str(segment.context) if segment.context else None,
                             metadata={
                                 "model": model_id,
+                                "campaign_id": (
+                                    getattr(engine, "campaign_context", {}) or {}
+                                ).get("campaign_id"),
+                                "config_fingerprint": (
+                                    getattr(engine, "campaign_context", {}) or {}
+                                ).get("config_fingerprint"),
                                 "source_file": str(doc.source_path)
                                 if hasattr(doc, "source_path") and doc.source_path
                                 else None,
@@ -1198,6 +1264,24 @@ class SegmentTranslator:
             )
 
             translated_content = str(translated_doc)
+
+        # HT-INLINE-CODE-001 TC-ICR-007: structured, machine-parseable
+        # instrumentation for which reconstruction path actually rendered
+        # this file's body. Purely observational -- does not change
+        # behavior. The AST path (TextUnitExtractor, do_not_translate-aware)
+        # and the legacy path (MarkdownReconstructor, built from
+        # SegmentExtractor's flattened segments) are known to disagree on
+        # some content-protection guarantees; this measures how often the
+        # legacy fallback actually fires in production before any future
+        # decision about changing their precedence (deliberately not
+        # decided by this instrumentation alone -- see the plan's
+        # structural-roadmap notes).
+        logger.info(
+            "reconstruction_path_used site=%s lang=%s path=%s",
+            getattr(site_profile, "site_id", "<unknown>"),
+            target_lang,
+            "ast" if use_ast else "legacy",
+        )
 
         stats.tokens_total = stats.tokens_cached + stats.tokens_input + stats.tokens_output
 

@@ -7,6 +7,8 @@ import re
 import io
 import json
 import argparse
+import hashlib
+import subprocess
 from pathlib import Path
 from collections import defaultdict
 from datetime import datetime
@@ -36,6 +38,14 @@ if str(_PROJECT_ROOT) not in sys.path:
 from src.translation_engine.write_gate import (  # noqa: E402
     WriteGateEvaluator,
     gate_issue_name as _gate_issue_name,
+)
+from src.translation_engine.fence_spans import (  # noqa: E402
+    get_fence_char_spans,
+    is_in_fence,
+    split_fenced_segments,
+)
+from src.translation_engine.quality.inline_code_repair import (  # noqa: E402
+    find_inline_code_mismatches,
 )
 from src.utils.config_loader import ConfigService  # noqa: E402
 from src.utils.content_discovery import (  # noqa: E402
@@ -70,7 +80,7 @@ _GATE_EVALUATOR = WriteGateEvaluator(
 # Gates 9-28 duplicate this script's own hand-rolled checks below (kept for
 # historical output continuity -- see AUDIT_MANIFEST.md); skip them here so
 # each concept is only reported once per file, not twice under two names.
-_HAND_IMPLEMENTED_GATE_IDS = set(range(9, 29))
+_HAND_IMPLEMENTED_GATE_IDS = set(range(9, 26)) | {27, 28}
 
 # _gate_issue_name (imported from write_gate.py above) is the canonical,
 # shared name mapping -- see that module's GATE_ISSUE_NAMES docstring.
@@ -106,6 +116,95 @@ def safe(s):
     return s.encode("ascii", errors="replace").decode("ascii")
 
 _CONFIG = ConfigService(_PROJECT_ROOT / "config")
+
+
+def get_purity_threshold(target_lang: str) -> float:
+    """Mirror the live write gate's validated per-language purity threshold."""
+    try:
+        overrides = (
+            _CONFIG.get_config()
+            .get("translation_engine", {})
+            .get("purity_threshold_overrides", {})
+        )
+        threshold = overrides.get(target_lang, 0.06)
+        if not isinstance(threshold, int | float) or not 0.0 <= threshold <= 0.50:
+            return 0.06
+        return float(threshold)
+    except Exception:
+        return 0.06
+
+
+def _sha256_file(path: Path) -> str | None:
+    try:
+        return hashlib.sha256(path.read_bytes()).hexdigest()
+    except OSError:
+        return None
+
+
+def _git_fingerprint(path: Path) -> dict[str, object]:
+    """Best-effort, bounded repository identity; failures are explicit."""
+    try:
+        sha = subprocess.run(
+            ["git", "rev-parse", "HEAD"], cwd=path, capture_output=True,
+            text=True, timeout=5, check=True,
+        ).stdout.strip()
+    except Exception as exc:
+        return {"sha": None, "dirty": None, "error": type(exc).__name__}
+    try:
+        dirty = bool(subprocess.run(
+            ["git", "status", "--porcelain"], cwd=path, capture_output=True,
+            text=True, timeout=5, check=True,
+        ).stdout.strip())
+        return {"sha": sha, "dirty": dirty}
+    except Exception as exc:
+        # A large live content checkout can make status exceed the bounded
+        # collection time. Its immutable revision remains useful evidence;
+        # report only dirty-state uncertainty instead of discarding it.
+        return {"sha": sha, "dirty": None, "status_error": type(exc).__name__}
+
+
+def audit_run_metadata(sites: list[str] | None = None) -> dict[str, object]:
+    """Metadata companion to JSONL: exact inputs without changing its schema."""
+    resolved_sites = sorted(sites if sites is not None else SITES)
+    config_files = sorted((_PROJECT_ROOT / "config").rglob("*.yaml"))
+    config_digest = hashlib.sha256()
+    for path in config_files:
+        config_digest.update(str(path.relative_to(_PROJECT_ROOT)).encode("utf-8"))
+        config_digest.update(path.read_bytes())
+    model_path = _PROJECT_ROOT / "data" / "models" / "fasttext" / "lid.176.bin"
+    content_roots: dict[str, object] = {}
+    for site in resolved_sites:
+        try:
+            profile = _CONFIG.get_site_profile(site)
+            root = _CONFIG.resolve_content_root(profile.content_roots[0])
+            content_roots[site] = {"path": str(root), "repository": _git_fingerprint(root)}
+        except Exception as exc:
+            content_roots[site] = {"path": None, "repository": {"error": type(exc).__name__}}
+    return {
+        "schema": "audit_all_content_run_metadata/v1",
+        "generated_at": datetime.now().isoformat(timespec="seconds"),
+        "sites": resolved_sites,
+        "purity_thresholds": {
+            lang: get_purity_threshold(lang)
+            for lang in sorted(NON_LATIN)
+        },
+        "config_sha256": config_digest.hexdigest(),
+        "audit_repository": _git_fingerprint(_PROJECT_ROOT),
+        "content_repositories": content_roots,
+        "fasttext_model": {
+            "path": str(model_path),
+            "sha256": _sha256_file(model_path),
+        },
+    }
+
+
+def write_audit_run_metadata(output_path: str | Path, sites: list[str] | None = None) -> Path:
+    """Write a non-JSONL sidecar to keep file-finding consumers compatible."""
+    path = Path(f"{output_path}.metadata.json")
+    path.parent.mkdir(parents=True, exist_ok=True)
+    metadata = audit_run_metadata(sites)
+    path.write_text(json.dumps(metadata, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    return path
 
 # Durable-fix (see plan: "stop treating file-suffix-layout sites as
 # exceptions"): site list and content root are now DERIVED from the
@@ -188,14 +287,11 @@ def check_english_headings_nonlatin(tr_body: str) -> list[str]:
     Python comments "# Read full text" / "# Iterate sections" inside code
     blocks were the only "headings" ever flagged).
     """
-    fence_spans = [(m.start(), m.end()) for m in re.finditer(r"```[\s\S]*?```", tr_body)]
-
-    def in_fence(pos):
-        return any(s <= pos < e for s, e in fence_spans)
+    code_spans = get_fence_char_spans(tr_body)
 
     en_heads = []
     for m in HEADING_RE.finditer(tr_body):
-        if in_fence(m.start()):
+        if is_in_fence(m.start(), code_spans):
             continue
         heading_text = m.group(2)
         if re.match(r"^[A-Za-z][A-Za-z0-9 ]{1,30}$", heading_text.strip()):
@@ -219,10 +315,10 @@ def check_purity(body, target_lang):
     before it) into the fence and drop it from consideration entirely.
     """
     paras = []
-    for chunk in re.split(r"(```[\s\S]*?```)", body):
-        if chunk.startswith("```"):
+    for is_code, lines in split_fenced_segments(body):
+        if is_code:
             continue
-        for seg in re.split(r"\n{2,}", chunk):
+        for seg in re.split(r"(?:\r?\n){2,}", "".join(lines)):
             stripped = seg.strip()
             if len(stripped) > 30:
                 paras.append(stripped)
@@ -237,7 +333,7 @@ def check_purity(body, target_lang):
         if len(words) >= 5 and EN_WORD_LINE.match(p):
             en_count += 1
     ratio = en_count / len(paras) if paras else 0
-    return ratio > 0.10, ratio
+    return ratio > get_purity_threshold(target_lang), ratio
 
 
 _LOWER_EN_WORD = re.compile(r"^[a-z]{3,}$")
@@ -277,20 +373,73 @@ def check_table_desc_not_translated(body):
 
 
 def check_code_fence_dropped(en_body, tr_body):
-    """Return (has_issue, detail) when translation has fewer code fences than source.
+    """Return the canonical live Gate 26 parity decision for audit output.
 
-    Only fires when source has ≥4 fences (≥2 code blocks), matching Gate 19.
+    The audit retains its established ``code_fence_dropped`` JSONL name but
+    delegates every fence decision to production's Gate 26 implementation.
     """
-    def count_fences(body):
-        return sum(1 for ln in body.splitlines() if ln.strip().startswith("```"))
+    gate_results, _ = _GATE_EVALUATOR.run_all_content_gates(
+        en_body, tr_body, "en", Path("audit-fence-parity.md")
+    )
+    result = gate_results[26]
+    return not result.passed, result.error or ""
 
-    src_fences = count_fences(en_body)
-    tgt_fences = count_fences(tr_body)
-    if src_fences < 4:
+
+def _non_code_text(body: str) -> str:
+    """Return all non-code segments according to the canonical parser mask."""
+    return "".join("".join(lines) for is_code, lines in split_fenced_segments(body) if not is_code)
+
+
+def check_artifact_corruption(tr_body: str) -> str | None:
+    match = NLLB_ARTIFACTS.search(_non_code_text(tr_body))
+    return match.group()[:60] if match else None
+
+
+def check_shortcode_leak(en_body: str, tr_body: str) -> bool:
+    return bool(
+        SHORTCODE_LEAK.search(_non_code_text(tr_body))
+        and not SHORTCODE_LEAK.search(_non_code_text(en_body))
+    )
+
+
+def check_eu_hallucination(en_body: str, tr_body: str) -> str | None:
+    source = _non_code_text(en_body)
+    match = EU_HALLUCINATION.search(_non_code_text(tr_body))
+    return match.group()[:50] if match and not EU_HALLUCINATION.search(source) else None
+
+
+def check_link_path_corrupted(en_body: str, tr_body: str) -> set[str]:
+    def relative_links(body: str) -> set[str]:
+        return {
+            match.group(2) for match in _LINK_RE.finditer(_non_code_text(body))
+            if match.group(2).startswith(("../", "./", "/"))
+        }
+
+    en_links = relative_links(en_body)
+    tr_links = relative_links(tr_body)
+    return tr_links - en_links if en_links and tr_links else set()
+
+
+def check_inline_code_translated(en_body: str, tr_body: str) -> tuple[bool, str]:
+    """Return (has_issue, detail) for a corrupted inline-code span (an EN
+    ASCII backtick span translated into non-ASCII text in TR).
+
+    HT-INLINE-CODE-001 TC-ICR-004: delegates to the shared
+    src/translation_engine/quality/inline_code_repair.py primitive
+    (fence-stripped, newline-excluded, span-count-parity guarded) instead
+    of a fourth independent regex reimplementation -- confirmed directly
+    against real production audit data that the naive `` `([^`]+)` ``
+    version this replaced was ~59%% false positives (a stray unpaired
+    backtick swallowing an unrelated paragraph across a line break). A
+    span-count mismatch between EN and TR is ambiguous pairing, not a
+    confirmed hit, and is intentionally not recorded here -- see
+    AUDIT_MANIFEST.md.
+    """
+    mismatches = find_inline_code_mismatches(en_body, tr_body)
+    if not mismatches:
         return False, ""
-    if tgt_fences < src_fences - 2:
-        return True, f"src={src_fences} fences, tgt={tgt_fences} fences"
-    return False, ""
+    first = mismatches[0]
+    return True, f"`{first.en_span}` -> `{first.tr_span[:30]}`"
 
 
 def check_duplicate_content(tr_body: str) -> bool:
@@ -329,12 +478,13 @@ def check_duplicate_content(tr_body: str) -> bool:
     # happens to sit right after a fence.
     occurrence_starts: dict[str, list[int]] = {}
     offset = 0
-    for chunk in re.split(r"(```[\s\S]*?```)", tr_body):
-        if chunk.startswith("```"):
+    for is_code, lines in split_fenced_segments(tr_body):
+        chunk = "".join(lines)
+        if is_code:
             offset += len(chunk)
             continue
         pos = 0
-        for seg in re.split(r"(\n{2,})", chunk):
+        for seg in re.split(r"((?:\r?\n){2,})", chunk):
             stripped = seg.strip()
             if len(stripped) > 50:
                 occurrence_starts.setdefault(stripped, []).append(offset + pos)
@@ -372,6 +522,12 @@ def scan(output_path=None, resume=False, sites=None):
                     pass
         print(f"[resume] Skipping {len(resumed_paths):,} already-processed files", flush=True)
 
+    # The JSONL stream remains file-record-only for existing consumers. Its
+    # reproducibility header is a deterministic adjacent JSON document.
+    metadata_path = None
+    if output_path:
+        metadata_path = write_audit_run_metadata(output_path, sites)
+
     # JSONL output file handle
     out_fh = None
     if output_path:
@@ -380,6 +536,8 @@ def scan(output_path=None, resume=False, sites=None):
         out_fh = open(output_path, out_mode, encoding="utf-8")
 
     print(f"Starting audit at {datetime.now().strftime('%H:%M:%S')}", flush=True)
+    if metadata_path:
+        print(f"Audit run metadata written to: {metadata_path}", flush=True)
 
     for site in (sites if sites is not None else SITES):
         try:
@@ -535,18 +693,18 @@ def scan(output_path=None, resume=False, sites=None):
                     record("title_untranslated_suspected", en_title)
 
                 # 3. NLLB/model artifact corruption anywhere in body
-                art_m = NLLB_ARTIFACTS.search(tr_body)
-                if art_m:
-                    record("artifact_corruption", art_m.group()[:60])
+                artifact = check_artifact_corruption(tr_body)
+                if artifact:
+                    record("artifact_corruption", artifact)
 
                 # 4. Shortcode leaked into output body (exclude if also in EN source)
-                if SHORTCODE_LEAK.search(tr_body) and not SHORTCODE_LEAK.search(en_body):
+                if check_shortcode_leak(en_body, tr_body):
                     record("shortcode_leak")
 
                 # 5. EU hallucination in translation but not in source
-                if EU_HALLUCINATION.search(tr_body) and not EU_HALLUCINATION.search(en_body):
-                    eu_match = EU_HALLUCINATION.search(tr_body)
-                    record("eu_hallucination", eu_match.group()[:50] if eu_match else "")
+                eu_hallucination = check_eu_hallucination(en_body, tr_body)
+                if eu_hallucination:
+                    record("eu_hallucination", eu_hallucination)
 
                 # 6. English API headings in non-Latin-script locales
                 if locale in NON_LATIN:
@@ -572,12 +730,11 @@ def scan(output_path=None, resume=False, sites=None):
                     record("newline_explosion", f"EN={en_lines} TR={tr_lines}")
 
                 # 10. Inline code translated (non-ASCII inside backticks where EN is ASCII)
-                en_spans = re.findall(r"`([^`]+)`", en_body)
-                tr_spans = re.findall(r"`([^`]+)`", tr_body)
-                for es, ts in zip(en_spans, tr_spans):
-                    if es.isascii() and not ts.isascii():
-                        record("inline_code_translated", f"`{es}` -> `{ts[:30]}`")
-                        break
+                inline_code_issue, inline_code_detail = check_inline_code_translated(
+                    en_body, tr_body
+                )
+                if inline_code_issue:
+                    record("inline_code_translated", inline_code_detail)
 
                 # 11. Double periods in body (outside code)
                 # Quick: only check outside fenced blocks
@@ -601,11 +758,6 @@ def scan(output_path=None, resume=False, sites=None):
                         record("table_desc_not_translated", tbl_detail)
 
                 # 14c. Code fence dropped (all locales)
-                if "```" in en_body:
-                    fence_issue, fence_detail = check_code_fence_dropped(en_body, tr_body)
-                    if fence_issue:
-                        record("code_fence_dropped", fence_detail)
-
                 # 14. Description hallucination (tr description > 3x EN or < 0.3x)
                 en_desc = fm_field(en_fm, "description") or ""
                 tr_desc = fm_field(tr_fm, "description") or ""
@@ -620,12 +772,9 @@ def scan(output_path=None, resume=False, sites=None):
                     record("encoding_corruption", m.group()[:30] if m else "")
 
                 # 16. Link path corrupted: relative path changed vs EN source (TC-AUD-001)
-                en_links = {m.group(2) for m in _LINK_RE.finditer(en_body) if m.group(2).startswith(("../", "./", "/"))}
-                tr_links = {m.group(2) for m in _LINK_RE.finditer(tr_body) if m.group(2).startswith(("../", "./", "/"))}
-                if en_links and tr_links and not tr_links.issubset(en_links):
-                    corrupted = tr_links - en_links
-                    if corrupted:
-                        record("link_path_corrupted", str(list(corrupted)[:2]))
+                corrupted = check_link_path_corrupted(en_body, tr_body)
+                if corrupted:
+                    record("link_path_corrupted", str(list(corrupted)[:2]))
 
                 # 17. Description YAML reverted to English (TC-AUD-001)
                 # Fires when: non-Latin locale, EN description is non-trivial prose,
@@ -769,6 +918,7 @@ _PRIORITY = {
     "gate41_homoglyph_in_code": 2,          # identifier corruption, same class as inline_code_translated
     "gate42_whole_page_language_mismatch": 1,  # wholesale wrong-language page, same class as body_identical_to_en
     "gate43_block_scalar_key_leak": 3,
+    "gate44_seo_length_sanity": 3,           # SERP-truncation risk, same class as seo_metadata_corruption
 }
 
 

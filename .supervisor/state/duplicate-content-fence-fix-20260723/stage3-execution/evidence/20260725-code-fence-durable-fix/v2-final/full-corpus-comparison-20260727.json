@@ -1,0 +1,155 @@
+{
+  "baseline": "3599a45:scripts/quality/audit_all_content.py",
+  "checks": {
+    "artifact_corruption": {
+      "after": 23,
+      "before": 23
+    },
+    "code_fence_dropped": {
+      "after": 7906,
+      "before": 3752,
+      "new_only": 4239,
+      "old_only": 85
+    },
+    "eu_hallucination": {
+      "after": 11,
+      "before": 11
+    },
+    "link_path_corrupted": {
+      "after": 298,
+      "before": 298
+    },
+    "purity_issue": {
+      "after": 3744,
+      "before": 3284,
+      "new_only": 463,
+      "old_only": 3
+    },
+    "shortcode_leak": {
+      "after": 907,
+      "before": 799,
+      "new_only": 108
+    }
+  },
+  "current": "working tree",
+  "elapsed_seconds": 1051.1,
+  "same_read": true,
+  "samples": {
+    "artifact_corruption": {
+      "new_only": [],
+      "old_only": []
+    },
+    "code_fence_dropped": {
+      "new_only": [
+        "blog.aspose.net:barcode\\aspose-barcode-1d-reader-dotnet-integration-guide\\index.bg.md",
+        "blog.aspose.net:barcode\\aspose-barcode-1d-reader-dotnet-integration-guide\\index.ca.md",
+        "blog.aspose.net:barcode\\aspose-barcode-1d-reader-dotnet-integration-guide\\index.cs.md",
+        "blog.aspose.net:barcode\\aspose-barcode-1d-reader-dotnet-integration-guide\\index.da.md",
+        "blog.aspose.net:barcode\\aspose-barcode-1d-reader-dotnet-integration-guide\\index.el.md",
+        "blog.aspose.net:barcode\\aspose-barcode-1d-reader-dotnet-integration-guide\\index.fa.md",
+        "blog.aspose.net:barcode\\aspose-barcode-1d-reader-dotnet-integration-guide\\index.fi.md",
+        "blog.aspose.net:barcode\\aspose-barcode-1d-reader-dotnet-integration-guide\\index.he.md",
+        "blog.aspose.net:barcode\\aspose-barcode-1d-reader-dotnet-integration-guide\\index.hi.md",
+        "blog.aspose.net:barcode\\aspose-barcode-1d-reader-dotnet-integration-guide\\index.hr.md",
+        "blog.aspose.net:barcode\\aspose-barcode-1d-reader-dotnet-integration-guide\\index.hu.md",
+        "blog.aspose.net:barcode\\aspose-barcode-1d-reader-dotnet-integration-guide\\index.id.md",
+        "blog.aspose.net:barcode\\aspose-barcode-1d-reader-dotnet-integration-guide\\index.it.md",
+        "blog.aspose.net:barcode\\aspose-barcode-1d-reader-dotnet-integration-guide\\index.ja.md",
+        "blog.aspose.net:barcode\\aspose-barcode-1d-reader-dotnet-integration-guide\\index.ko.md",
+        "blog.aspose.net:barcode\\aspose-barcode-1d-reader-dotnet-integration-guide\\index.lt.md",
+        "blog.aspose.net:barcode\\aspose-barcode-1d-reader-dotnet-integration-guide\\index.lv.md",
+        "blog.aspose.net:barcode\\aspose-barcode-1d-reader-dotnet-integration-guide\\index.ms.md",
+        "blog.aspose.net:barcode\\aspose-barcode-1d-reader-dotnet-integration-guide\\index.nl.md",
+        "blog.aspose.net:barcode\\aspose-barcode-1d-reader-dotnet-integration-guide\\index.no.md"
+      ],
+      "old_only": [
+        "blog.aspose.net:imaging\\customizing-frame-timing-in-gifs-csharp-dotnet\\index.pl.md",
+        "blog.aspose.net:zip\\compress-files-folders-in-zip-csharp\\index.ca.md",
+        "blog.aspose.net:zip\\compress-files-folders-in-zip-csharp\\index.cs.md",
+        "blog.aspose.net:zip\\compress-files-folders-in-zip-csharp\\index.da.md",
+        "blog.aspose.net:zip\\compress-files-folders-in-zip-csharp\\index.de.md",
+        "blog.aspose.net:zip\\compress-files-folders-in-zip-csharp\\index.el.md",
+        "blog.aspose.net:zip\\compress-files-folders-in-zip-csharp\\index.es.md",
+        "blog.aspose.net:zip\\compress-files-folders-in-zip-csharp\\index.fa.md",
+        "blog.aspose.net:zip\\compress-files-folders-in-zip-csharp\\index.fi.md",
+        "blog.aspose.net:zip\\compress-files-folders-in-zip-csharp\\index.fr.md",
+        "blog.aspose.net:zip\\compress-files-folders-in-zip-csharp\\index.he.md",
+        "blog.aspose.net:zip\\compress-files-folders-in-zip-csharp\\index.hi.md",
+        "blog.aspose.net:zip\\compress-files-folders-in-zip-csharp\\index.hr.md",
+        "blog.aspose.net:zip\\compress-files-folders-in-zip-csharp\\index.hu.md",
+        "blog.aspose.net:zip\\compress-files-folders-in-zip-csharp\\index.id.md",
+        "blog.aspose.net:zip\\compress-files-folders-in-zip-csharp\\index.it.md",
+        "blog.aspose.net:zip\\compress-files-folders-in-zip-csharp\\index.ja.md",
+        "blog.aspose.net:zip\\compress-files-folders-in-zip-csharp\\index.ko.md",
+        "blog.aspose.net:zip\\compress-files-folders-in-zip-csharp\\index.lt.md",
+        "blog.aspose.net:zip\\compress-files-folders-in-zip-csharp\\index.lv.md"
+      ]
+    },
+    "eu_hallucination": {
+      "new_only": [],
+      "old_only": []
+    },
+    "link_path_corrupted": {
+      "new_only": [],
+      "old_only": []
+    },
+    "purity_issue": {
+      "new_only": [
+        "about.aspose.net:ar\\legal\\privacy-policy.md",
+        "about.aspose.net:el\\legal\\privacy-policy.md",
+        "about.aspose.net:zh\\legal\\terms-of-use.md",
+        "blog.aspose.net:barcode\\aspose-barcode-1d-reader-dotnet-integration-guide\\index.ko.md",
+        "blog.aspose.net:barcode\\aspose-barcode-2d-reader-dotnet-csharp\\index.el.md",
+        "blog.aspose.net:barcode\\aspose-barcode-2d-reader-dotnet-csharp\\index.hi.md",
+        "blog.aspose.net:barcode\\aspose-barcode-2d-reader-dotnet-csharp\\index.ru.md",
+        "blog.aspose.net:barcode\\aspose-barcode-2d-reader-dotnet-csharp\\index.th.md",
+        "blog.aspose.net:barcode\\aspose-barcode-2d-reader-dotnet-csharp\\index.uk.md",
+        "blog.aspose.net:barcode\\aspose-barcode-2d-reader-dotnet-csharp\\index.vi.md",
+        "blog.aspose.net:barcode\\batch-qr-code-scanning-aspose-barcode-dotnet\\index.ar.md",
+        "blog.aspose.net:barcode\\batch-qr-code-scanning-aspose-barcode-dotnet\\index.el.md",
+        "blog.aspose.net:barcode\\batch-qr-code-scanning-aspose-barcode-dotnet\\index.fa.md",
+        "blog.aspose.net:barcode\\batch-qr-code-scanning-aspose-barcode-dotnet\\index.he.md",
+        "blog.aspose.net:barcode\\batch-qr-code-scanning-aspose-barcode-dotnet\\index.hi.md",
+        "blog.aspose.net:barcode\\boost-qr-code-scanning-speed-with-aspose-barcode-dotnet\\index.ko.md",
+        "blog.aspose.net:barcode\\create-itf-14-and-interleaved-2-of-5-barcodes\\index.ar.md",
+        "blog.aspose.net:barcode\\create-itf-14-and-interleaved-2-of-5-barcodes\\index.hi.md",
+        "blog.aspose.net:barcode\\decode-damaged-qr-codes-with-aspose-barcode-for-net\\index.ar.md",
+        "blog.aspose.net:barcode\\decode-damaged-qr-codes-with-aspose-barcode-for-net\\index.fa.md"
+      ],
+      "old_only": [
+        "blog.aspose.net:barcode\\barcodes-with-utf-8-encoding-dotnet-csharp\\index.bg.md",
+        "kb.aspose.net.words:bg\\how-to-create-doc-version-system-aspose.md",
+        "reference.aspose.net.words:bg\\Aspose.Words.SaveFormat.md"
+      ]
+    },
+    "shortcode_leak": {
+      "new_only": [
+        "blog.aspose.net:cells\\lock-cells-in-excel-csharp\\index.ar.md",
+        "blog.aspose.net:cells\\lock-cells-in-excel-csharp\\index.bg.md",
+        "blog.aspose.net:cells\\lock-cells-in-excel-csharp\\index.ca.md",
+        "blog.aspose.net:cells\\lock-cells-in-excel-csharp\\index.cs.md",
+        "blog.aspose.net:cells\\lock-cells-in-excel-csharp\\index.da.md",
+        "blog.aspose.net:cells\\lock-cells-in-excel-csharp\\index.de.md",
+        "blog.aspose.net:cells\\lock-cells-in-excel-csharp\\index.el.md",
+        "blog.aspose.net:cells\\lock-cells-in-excel-csharp\\index.es.md",
+        "blog.aspose.net:cells\\lock-cells-in-excel-csharp\\index.fa.md",
+        "blog.aspose.net:cells\\lock-cells-in-excel-csharp\\index.fi.md",
+        "blog.aspose.net:cells\\lock-cells-in-excel-csharp\\index.fr.md",
+        "blog.aspose.net:cells\\lock-cells-in-excel-csharp\\index.he.md",
+        "blog.aspose.net:cells\\lock-cells-in-excel-csharp\\index.hi.md",
+        "blog.aspose.net:cells\\lock-cells-in-excel-csharp\\index.hr.md",
+        "blog.aspose.net:cells\\lock-cells-in-excel-csharp\\index.hu.md",
+        "blog.aspose.net:cells\\lock-cells-in-excel-csharp\\index.id.md",
+        "blog.aspose.net:cells\\lock-cells-in-excel-csharp\\index.it.md",
+        "blog.aspose.net:cells\\lock-cells-in-excel-csharp\\index.ja.md",
+        "blog.aspose.net:cells\\lock-cells-in-excel-csharp\\index.ko.md",
+        "blog.aspose.net:cells\\lock-cells-in-excel-csharp\\index.lt.md"
+      ],
+      "old_only": []
+    }
+  },
+  "stats": {
+    "missing_targets": 68505,
+    "paired_targets": 136690
+  }
+}

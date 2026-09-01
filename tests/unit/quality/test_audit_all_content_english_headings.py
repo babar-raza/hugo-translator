@@ -13,6 +13,8 @@ files with code fences, 267 were false positives from this exact pattern,
 
 from __future__ import annotations
 
+import pytest
+
 from scripts.quality.audit_all_content import check_english_headings_nonlatin
 
 _CODE_COMMENT_FALSE_POSITIVE = (
@@ -40,6 +42,23 @@ def test_code_comment_inside_fence_not_flagged():
 def test_real_untranslated_heading_still_flagged():
     result = check_english_headings_nonlatin(_GENUINE_UNTRANSLATED_HEADING)
     assert result == ["Getting Started"]
+
+
+@pytest.mark.parametrize(
+    "body",
+    [
+        "~~~python\n# Read full text\n~~~\n",
+        "````python\n# Read full text\n```\nstill code\n````\n",
+        "    # Read full text\n    document.read()\n",
+    ],
+    ids=["tilde", "long-backtick", "indented"],
+)
+def test_all_commonmark_code_styles_exclude_english_comments(body):
+    assert check_english_headings_nonlatin(body) == []
+
+
+def test_unterminated_fence_excludes_english_comments():
+    assert check_english_headings_nonlatin("```python\n# Read full text\n") == []
 
 
 def test_real_production_sample_no_longer_flagged():

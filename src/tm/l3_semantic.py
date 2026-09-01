@@ -50,6 +50,35 @@ class SemanticMatch:
         return asdict(self)
 
 
+def load_standalone_sentence_encoder(
+    model_name: str, use_gpu: bool = False
+) -> SentenceTransformer:
+    """Load a SentenceTransformer encoder without the rest of L3SemanticTM's
+    setup (FAISS index, on-disk metadata, periodic-save machinery).
+
+    HT-QUALITY-GATES-001 Part 22 (plan 5.4 item 1): SemanticSimilarityValidator's
+    encoder used to depend entirely on a full L3SemanticTM instance existing
+    (`engine.tm.l3.encoder`), which is None whenever `skip_l3=True` -- the
+    documented production default for multi-shard GPU runs, specifically to
+    avoid GPU memory pressure from running several shards on the same card.
+    Semantic-similarity VALIDATION and semantic-memory LOOKUP are unrelated
+    capabilities that happen to share a model artifact; this function lets a
+    caller get just the encoder, decoupled from whether L3 lookups are
+    enabled at all.
+
+    Deliberately defaults to CPU (`use_gpu=False`): the embedding model
+    configured for this purpose (`l3_embedding_model` in global.yaml,
+    typically the ~1.1GB multilingual mpnet model, not the ~90MB MiniLM
+    default below) is exactly the GPU-memory cost `skip_l3=True` exists to
+    avoid -- loading it on CPU keeps the validator available everywhere
+    without reintroducing that pressure. CPU inference is slower per call,
+    which is an acceptable tradeoff for a per-file validation check (one
+    call per translated document) versus the bulk-embedding workload L3's
+    own GPU path is optimized for.
+    """
+    return SentenceTransformer(model_name, device="cuda" if use_gpu else "cpu")
+
+
 class L3SemanticTM:
     """
     Vector-based semantic translation memory.

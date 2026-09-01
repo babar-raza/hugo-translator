@@ -1,0 +1,163 @@
+issues:
+  - issue_id: L1-001
+    issue_level: L1_EXECUTION
+    title: Full GPU healing campaign was silently down for hours with no detection
+    description: >
+      .local/scheduler.py and all 5-6 child heal/shard processes stopped at
+      2026-07-17 03:57 (system reboot at 10:58 same day). This was discovered
+      only via manual reconciliation (comparing scheduler.log mtime to current
+      time), not by any automated signal.
+    status: RESOLVED
+    evidence:
+      - "scheduler.log last entry 03:57:00 vs systeminfo boot time 10:58:16"
+      - "nvidia-smi showed 0% util / 0 MiB at diagnosis time (11:12)"
+    missing_evidence: []
+    root_cause: >
+      No liveness monitor exists for the scheduler daemon itself. The
+      thermal watchdog (scripts/quality/thermal_watchdog.py) monitors GPU
+      temperature and heal-job PIDs, not "is the scheduler alive and
+      dispatching."
+    why_not_only_symptom: >
+      The immediate trigger (a reboot) is an external event outside this
+      session's control, but the multi-hour undetected downtime is a real,
+      recurring gap: nothing in the repository would have caught this without
+      a human explicitly checking.
+    affected_files: [".local/scheduler.py"]
+    affected_components: ["heal scheduler", "GPU healing campaign"]
+    affected_connection_points: ["thermal_watchdog.py (adjacent but does not cover this)"]
+    severity: HIGH
+    blocker: false
+    recurrence_risk: HIGH
+    required_fix_type: new_monitoring_capability
+    requires_plan_update: true
+    requires_taskcard: true
+    requires_system_healing: true
+    requires_reexecution: false
+    requires_governance_change: false
+    requires_evidence_repair: false
+    recommended_next_stage: PROMPT_2_TASKCARD
+    acceptance_impact: >
+      Does not block accepting DELIVERABLE 53 (the outage was found and
+      resolved before the fix was deployed, and the fix's own correctness is
+      independent of the outage). Blocks confidence in campaign continuity
+      going forward without a new taskcard.
+
+  - issue_id: L1-002
+    issue_level: L1_EXECUTION
+    title: Stall-detector crash-looped 3 jobs immediately after the outage recovery
+    description: >
+      .local/scheduler.py::_check_and_kill_stall() computed staleness purely
+      from the job's log-file mtime. After the outage, 3 jobs' log files were
+      frozen from before the reboot, so every freshly-dispatched PID for
+      those jobs was killed within ~60-90s (before it could load a model and
+      write a first log line), in an infinite dispatch/kill loop.
+    status: RESOLVED
+    evidence:
+      - "scheduler.log: STALL DETECTED review_latin_m2m / headings_nonlatin_a repeated every cycle, silence duration climbing by exactly one poll interval per cycle (1093, 1094, 1095... min)"
+      - "unified_shard_4.log confirmed writing fresh lines in real time throughout -- proves the DELIVERABLE 53 code change (same translate_to_language() path) was NOT the cause"
+      - "Post-fix: 5+ consecutive cycles, STALL DETECTED count held constant at 275 (no new occurrences), both previously-stuck jobs' logs writing fresh lines within seconds"
+    missing_evidence: []
+    root_cause: >
+      age_sec = time.time() - log_path.stat().st_mtime, with no floor at the
+      current PID's own dispatch time. Fixed by flooring at
+      max(log_mtime, lock_mtime) -- the lock file is rewritten with the new
+      PID on every dispatch (existing convention), giving a reliable
+      per-dispatch timestamp independent of the log's older history.
+    why_not_only_symptom: >
+      This is a latent bug that will recur identically on every future full
+      outage (crash, reboot, manual kill-all) unless fixed at the root, which
+      it now is. The fix generalizes beyond this specific incident.
+    affected_files: [".local/scheduler.py"]
+    affected_components: ["stall detector", "job dispatch loop"]
+    affected_connection_points: ["heal_english_headings.py (writes the lock file consumed by the fix)"]
+    severity: CRITICAL
+    blocker: false
+    recurrence_risk: LOW
+    required_fix_type: root_cause_code_fix
+    requires_plan_update: true
+    requires_taskcard: false
+    requires_system_healing: false
+    requires_reexecution: false
+    requires_governance_change: false
+    requires_evidence_repair: false
+    recommended_next_stage: NONE_ALREADY_FIXED_AND_VERIFIED
+    acceptance_impact: >
+      Fully resolved and verified live before this audit; does not block
+      acceptance.
+
+  - issue_id: L1-003
+    issue_level: L1_EXECUTION
+    title: Full-suite pytest run shows 775 failures not attributable to this session, but not root-caused either
+    description: >
+      pytest tests/ (full tree, 64 min) reported 775 failed / 6299 passed.
+      Rigorously triaged as NOT caused by this session's 2-file change (file
+      provenance, isolation re-runs, neighborhood re-run all clean), but the
+      underlying pre-existing cause (order-dependent / state-leaking tests)
+      was not investigated further -- out of scope for this mission.
+    status: OPEN
+    evidence:
+      - "git diff --stat shows only segment_extractor.py, segment_translator.py, 2 new test files, .local/scheduler.py touched"
+      - "2 sampled failures pass in isolation"
+      - "tests/unit/translation_engine/ tests/unit/tm/ tests/unit/model_runtime/ (1206 tests): 1202 pass, 4 fail, all 4 pre-existing/unrelated (torch API version mismatch, ctranslate2)"
+    missing_evidence:
+      - "Bisection identifying the specific state-leaking fixture(s) or ordering dependency"
+    root_cause: NOT_YET_DETERMINED
+    why_not_only_symptom: >
+      Undermines confidence in any future "pytest tests/ full tree" claim
+      project-wide, and could mask a real future regression inside the noise.
+    affected_files: ["tests/ (broad, unidentified subset)"]
+    affected_components: ["test suite infrastructure"]
+    affected_connection_points: []
+    severity: MEDIUM
+    blocker: false
+    recurrence_risk: MEDIUM
+    required_fix_type: investigation_required
+    requires_plan_update: true
+    requires_taskcard: true
+    requires_system_healing: false
+    requires_reexecution: false
+    requires_governance_change: false
+    requires_evidence_repair: false
+    recommended_next_stage: PROMPT_2_TASKCARD
+    acceptance_impact: >
+      Does not block accepting DELIVERABLE 53 -- the neighborhood-scoped
+      verification for THIS change is clean and sufficient. Blocks trusting
+      the full-suite command as a general-purpose gate until investigated.
+
+  - issue_id: L1-004
+    issue_level: L1_EXECUTION
+    title: Live single-file re-translation of the originally-reported corrupted files was deferred
+    description: >
+      DiffUtils.md (vi), ChartType.md (sr, java+net), BaseParagraph.md (sv) --
+      the 3 files with confirmed cross-file TM collisions that motivated this
+      fix -- have not been re-translated end-to-end against the live model to
+      visually confirm the description field now shows the correct class.
+    status: OPEN
+    evidence:
+      - "Fix validated at 3 independent levels: unit (mechanism), integration (real code path, mocked backends), and production-data (real LMDB key check confirming the exact poisoned entry and clean new-key misses)"
+    missing_evidence:
+      - "A literal before/after diff of the 3 files' description fields after live re-translation"
+    root_cause: n/a (deferred, not a defect)
+    why_not_only_symptom: n/a
+    affected_files:
+      - "vi/pdf/net/DiffUtils.md"
+      - "sr/cells/java/ChartType.md"
+      - "sr/cells/net/ChartType.md"
+      - "sv/pdf/java/BaseParagraph.md"
+    affected_components: ["reference.aspose.org content"]
+    affected_connection_points: []
+    severity: LOW
+    blocker: false
+    recurrence_risk: n/a
+    required_fix_type: verification_only_required
+    requires_plan_update: true
+    requires_taskcard: true
+    requires_system_healing: false
+    requires_reexecution: true
+    requires_governance_change: false
+    requires_evidence_repair: false
+    recommended_next_stage: PROMPT_2_TASKCARD
+    acceptance_impact: >
+      Does not block accepting DELIVERABLE 53's mechanism-level correctness
+      (proof level: end_to_end for the underlying data, not yet pilot-level
+      for the specific files). Deferred for VRAM headroom, not doubt.

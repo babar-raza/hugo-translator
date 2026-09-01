@@ -102,20 +102,64 @@ class PlaceholderManager:
         if placeholder_map:
             restored = re.sub(r'\{[A-Z][A-Z_]*[A-Z]\}+', '', restored)
 
+        # Bare-brace-wrapped-correct-value cleanup (found 2026-07-22, live in
+        # reference.aspose.org's cross_locale_dup remediation output on files
+        # like pdf/net/ColumnInfo.md): the MT model can correctly GUESS the
+        # protected value and emit it in place of "PLACEHOLDER_N" while still
+        # keeping the literal `{`/`}` it saw around the digit token -- e.g.
+        # protecting "ColumnInfo" (no backtick pattern for reference.aspose.org
+        # frontmatter -- only the bare PascalCase pattern applies, so the
+        # backticks around it stay as literal text and the braces end up
+        # sitting directly against the identifier) produces
+        # "`{PLACEHOLDER_0}` class..." -> "`{ColumnInfo}` clase..." instead of
+        # "`{PLACEHOLDER_0}`" -> "`ColumnInfo`". None of the passes above catch
+        # this: there's no digit left for the digit-anchored passes to find,
+        # and it isn't ALL-CAPS-corrupted. Directly strip a brace pair
+        # wrapping an already-correct placeholder value.
+        def _strip_wrapping_braces(text: str) -> str:
+            for original in placeholder_map.values():
+                text = re.sub(
+                    r"\{\s*" + re.escape(original) + r"\s*\}", original, text
+                )
+            return text
+
+        restored = _strip_wrapping_braces(restored)
+
         # Third pass: handle cases where NLLB completely replaced the placeholder token
         # with a "guessed" variant of the original (e.g. PropertyCollection →
         # PropertiesCollection). If the original term is absent but a close variant
         # exists in the text, replace the variant with the original.
+        #
+        # HT-QUALITY-GATES-001 Part 21: the "is original already present" guard used
+        # to be a naive substring check (`original not in restored`), which is wrong
+        # whenever `original` happens to be a PREFIX of the variant actually present
+        # -- e.g. "ColumnInfo" is a substring of "ColumnInfos", so the old guard
+        # considered it "already present" and skipped fixing "{ColumnInfos}" at all,
+        # braces and typo both left in place. A word-boundary check correctly treats
+        # "ColumnInfos" as NOT containing the standalone word "ColumnInfo".
         _PASCAL_RE = re.compile(r"\b[A-Z][A-Za-z0-9]+\b")
         for placeholder, original in placeholder_map.items():
-            if original not in restored and re.match(r"^[A-Z]", original):
-                # Find all PascalCase-ish words in restored text
-                candidates = _PASCAL_RE.findall(restored)
-                # cutoff=0.92: strict enough to avoid substituting real translated words
-                # that happen to resemble the original (e.g. PropertiesCollection ≈ PropertyCollection)
-                matches = difflib.get_close_matches(original, candidates, n=1, cutoff=0.92)
-                if matches and matches[0] != original:
-                    restored = restored.replace(matches[0], original, 1)
+            if not re.match(r"^[A-Z]", original):
+                continue
+            already_present = re.search(r"\b" + re.escape(original) + r"\b", restored)
+            if already_present:
+                continue
+            # Find all PascalCase-ish words in restored text
+            candidates = _PASCAL_RE.findall(restored)
+            # cutoff=0.92: strict enough to avoid substituting real translated words
+            # that happen to resemble the original (e.g. PropertiesCollection ≈ PropertyCollection)
+            matches = difflib.get_close_matches(original, candidates, n=1, cutoff=0.92)
+            if matches and matches[0] != original:
+                restored = restored.replace(matches[0], original, 1)
+
+        # HT-QUALITY-GATES-001 Part 21: ordering-gap fix. The fuzzy variant pass
+        # just above can turn a stray-brace-wrapped variant like "{ColumnInfos}"
+        # into "{ColumnInfo}" -- correct word, braces still wrapped -- because
+        # the exact-match brace-strip pass runs BEFORE this substitution and only
+        # catches an already-exact value; a variant (not exact) is invisible to
+        # it. Re-run the same brace-strip as a final pass so braces left behind
+        # by a just-corrected variant still get removed.
+        restored = _strip_wrapping_braces(restored)
 
         return restored
 

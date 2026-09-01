@@ -11,11 +11,12 @@ Orchestrates the complete translation workflow:
 """
 
 import logging
+import hashlib
 import os
 import re
 import time
 from pathlib import Path
-from typing import Optional
+from typing import Any, Optional
 
 from ..model_runtime import ModelLoader
 from ..observability.progress import get_progress_tracker
@@ -31,12 +32,14 @@ from ..utils.atomic_write import (
     InvalidPathError,
     ReadOnlyFilesystemError,
     atomic_write,
+    atomic_write_binary,
 )
 from ..utils.config_loader import ConfigService
 from ..utils.content_discovery import ALL_LANGUAGE_CODES as _ALL_LANGUAGE_CODES
 from ..utils.content_discovery import is_translated_filename as _is_translated_filename
 from ..utils.content_discovery import resolve_translated_path as _resolve_translated_path
 from ..utils.file_lock import FileLock
+from ..utils.locale_policy import LocalePolicyViolation, validate_requested_locales
 from ..utils.metadata_tracker import MetadataTracker
 from ..utils.metrics import calc_stats
 from .exceptions import TranslationRejectedError
@@ -130,6 +133,7 @@ class TranslationEngine:
         validation_suite: ValidationSuite | None = None,
         decision_engine: ValidationDecisionEngine | None = None,
         validation_mode: str | None = None,
+        validation_policy: str = "standard",
         enable_terminology: bool | None = None,
         terminology_mode: str | None = None,
         max_retries: int | None = None,
@@ -160,6 +164,7 @@ class TranslationEngine:
             validation_suite: Optional custom ValidationSuite instance
             decision_engine: Optional custom ValidationDecisionEngine instance
             validation_mode: Validation mode override (strict, normal, lenient)
+            validation_policy: Persistence policy (standard or zero-defect)
             enable_terminology: Enable/disable terminology preservation
             terminology_mode: Terminology mode (protect, validate, both, none)
             max_retries: Override max retry attempts
@@ -204,6 +209,7 @@ class TranslationEngine:
             validation_suite=validation_suite,
             decision_engine=decision_engine,
             validation_mode=validation_mode,
+            validation_policy=validation_policy,
             enable_terminology=enable_terminology,
             terminology_mode=terminology_mode,
             max_retries=max_retries,
@@ -886,6 +892,16 @@ class TranslationEngine:
                 result.errors.append(f"Site profile not found: {site_id}")
                 return result
 
+            # Locale allowlist policy: for sites with strict_locale_allowlist
+            # set, reject any target locale outside target_langs, regardless
+            # of caller (CLI, quality scripts, orchestrator jobs) — this is
+            # the last-line safety net. No-op for non-strict sites.
+            try:
+                validate_requested_locales(site_profile, target_langs)
+            except LocalePolicyViolation as e:
+                result.errors.append(str(e))
+                return result
+
             source_lang = site_profile.default_source_lang
 
             # Guard: reject translated files in file-based localization layouts
@@ -1486,6 +1502,127 @@ class TranslationEngine:
         stats.bytes_written_md += len(content.encode("utf-8"))
 
         logger.info(f"Written translated file: {output_path}")
+
+    def _pre_write_validation(
+        self,
+        *,
+        content: str,
+        output_path: Path,
+        source_path: Path,
+        target_lang: str,
+        site_id: str,
+        site_profile,
+    ) -> tuple[bool, list[str]]:
+        """Validate serialized candidate bytes and placement without disk I/O."""
+        errors: list[str] = []
+        try:
+            encoded = content.encode("utf-8")
+            if not encoded or not content.strip():
+                errors.append("candidate is empty")
+            if encoded.decode("utf-8") != content:
+                errors.append("candidate is not a stable UTF-8 round trip")
+            self.parser.parse_string(content)
+        except Exception as exc:
+            errors.append(f"candidate serialization/parse failed: {exc}")
+
+        try:
+            from .validation.file_placement_validator import FilePlacementValidator
+
+            validator = FilePlacementValidator(config_service=self.config)
+            placement = validator.validate(
+                str(source_path),
+                str(output_path),
+                {
+                    "source_path": source_path,
+                    "source_lang": getattr(site_profile, "default_source_lang", "en"),
+                    "target_lang": target_lang,
+                    "site_id": site_id,
+                    "site_profile": site_profile,
+                    "output_override_active": bool(self.output_dir_override),
+                },
+            )
+            for issue in placement.issues:
+                severity = getattr(getattr(issue, "severity", None), "value", "error")
+                if severity in {"error", "warning"}:
+                    errors.append(f"placement {severity}: {issue.message}")
+            if not placement.success and not errors:
+                errors.append("file placement validation failed")
+        except Exception as exc:
+            errors.append(f"file placement validator unavailable: {exc}")
+
+        return not errors, errors
+
+    def _tm_site_namespace(self, site_id: str, source_path: Path | str | None) -> str:
+        """Bind campaign TM entries to campaign, config, and source context."""
+        context = getattr(self, "campaign_context", {}) or {}
+        campaign_id = str(context.get("campaign_id") or "")
+        config_fingerprint = str(context.get("config_fingerprint") or "")
+        if not campaign_id:
+            return site_id
+        source_context = str(Path(source_path).resolve()) if source_path else ""
+        source_fingerprint = hashlib.sha256(
+            source_context.encode("utf-8")
+        ).hexdigest()[:16]
+        return (
+            f"{site_id}::campaign={campaign_id}"
+            f"::config={config_fingerprint[:16]}"
+            f"::source={source_fingerprint}"
+        )
+
+    def _write_accepted_output(self, accepted, stats: TranslationStats) -> None:
+        """Persist an AcceptedTranslation and verify its bytes immediately."""
+        from .models import AcceptedTranslation
+
+        if not isinstance(accepted, AcceptedTranslation):
+            raise TypeError("zero-defect writer requires AcceptedTranslation")
+        if accepted.validation_policy != "zero-defect":
+            raise ValueError("accepted translation has the wrong validation policy")
+        if any(not item.get("passed", False) for item in accepted.gate_results.values()):
+            raise ValueError("accepted translation contains a non-passing gate receipt")
+
+        file_existed = accepted.output_path.exists()
+        atomic_write_binary(
+            path=accepted.output_path,
+            content=accepted.content,
+            fsync=True,
+            create_parents=True,
+        )
+        if file_existed:
+            stats.md_files_updated += 1
+        else:
+            stats.md_files_added += 1
+        stats.bytes_written_md += len(accepted.content)
+        try:
+            written = accepted.output_path.read_bytes()
+        except Exception:
+            accepted.output_path.unlink(missing_ok=True)
+            raise
+        if hashlib.sha256(written).hexdigest() != accepted.output_sha256:
+            accepted.output_path.unlink(missing_ok=True)
+            raise RuntimeError(
+                f"read-back checksum mismatch for accepted output {accepted.output_path}"
+            )
+        receipt_sink = getattr(self, "campaign_context", {}).get("receipt_sink")
+        if receipt_sink is not None:
+            try:
+                receipt_sink(accepted.receipt())
+            except Exception:
+                accepted.output_path.unlink(missing_ok=True)
+                raise
+
+    def _flush_accepted_tm(self, accepted, buffered_entries: list[dict[str, Any]]) -> None:
+        """Flush deferred TM writes only for an immutable accepted candidate."""
+        from .models import AcceptedTranslation
+
+        if not isinstance(accepted, AcceptedTranslation):
+            raise TypeError("TM flush requires AcceptedTranslation")
+        if len(accepted.gate_results) != 44 or any(
+            not item.get("passed", False)
+            for item in accepted.gate_results.values()
+        ):
+            raise ValueError("TM flush requires an all-44-gates acceptance receipt")
+        for entry in buffered_entries:
+            self.tm.store(**entry)
 
     def _load_batch_purity_skip_langs(self) -> list[str]:
         """Load batch_purity_skip_langs list from config.global_config."""

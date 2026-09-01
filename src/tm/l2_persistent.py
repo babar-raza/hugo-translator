@@ -78,6 +78,13 @@ class TranslationEntry:
     context: str | None = None
     timestamp: str | None = None
     metadata: dict[str, Any] = None
+    # HT-QUALITY-GATES-001 Part 22 (root cause A): optional field scope (e.g.
+    # "description", "title"), mirroring store()'s field_name parameter.
+    # batch_store() previously had no way to receive this per-entry, so bulk
+    # TM population bypassed field-scoping entirely regardless of what the
+    # single-entry store() path already enforced. Default "" preserves the
+    # legacy unscoped key for existing callers/entries.
+    field_name: str = ""
 
     def __post_init__(self):
         """Initialize defaults."""
@@ -264,28 +271,41 @@ class L2PersistentTM:
         """
         Find exact match for text with corruption detection (T204: federated-splashing-panda).
 
-        When field_name is given, tries the scoped key first (prevents cross-field
-        contamination), then falls back to the legacy unscoped key for backward
-        compatibility with entries stored before H2 (TC-HDN-003).
+        Tries keys from most to least specific -- (field_name, context), then
+        field_name alone, then context alone, then the fully legacy unscoped
+        key -- so a lookup that supplies context only matches an entry stored
+        under that *same* context (HT-QUALITY-GATES-001 Part 22: context was
+        previously accepted end-to-end but never affected the key at all,
+        meaning two unrelated occurrences of identical text under different
+        contexts silently collided). Falling back to less-specific tiers is
+        the same backward-compatibility pattern already used for field_name.
 
         Args:
             site_id: Site identifier
             src_lang: Source language code
             tgt_lang: Target language code
             text: Source text to look up
-            context: Optional context for disambiguation
+            context: Optional context for disambiguation (e.g. "frontmatter.title")
             field_name: Optional field scope (e.g. "description", "title")
 
         Returns:
             TranslationEntry if found and valid, None otherwise
         """
-        keys_to_try: list[str]
+        ctx = context or ""
+        keys_to_try: list[str] = []
+        if field_name and ctx:
+            keys_to_try.append(
+                make_tm_key_scoped(site_id, src_lang, tgt_lang, text, field_name, ctx)
+            )
         if field_name:
-            scoped = make_tm_key_scoped(site_id, src_lang, tgt_lang, text, field_name)
-            unscoped = make_tm_key(site_id, src_lang, tgt_lang, text)
-            keys_to_try = [scoped, unscoped]  # scoped first; unscoped fallback
-        else:
-            keys_to_try = [make_tm_key(site_id, src_lang, tgt_lang, text)]
+            keys_to_try.append(
+                make_tm_key_scoped(site_id, src_lang, tgt_lang, text, field_name)
+            )
+        if ctx:
+            keys_to_try.append(
+                make_tm_key_scoped(site_id, src_lang, tgt_lang, text, context=ctx)
+            )
+        keys_to_try.append(make_tm_key(site_id, src_lang, tgt_lang, text))
 
         with self._lock:
             with self.env.begin() as txn:
@@ -382,7 +402,9 @@ class L2PersistentTM:
             )
             raise ValueError("Translation entry failed validation")
 
-        key = make_tm_key_scoped(site_id, src_lang, tgt_lang, text, field_name)
+        key = make_tm_key_scoped(
+            site_id, src_lang, tgt_lang, text, field_name, context or ""
+        )
         key_bytes = key.encode("utf-8")
 
         try:
@@ -467,11 +489,20 @@ class L2PersistentTM:
                             rejected += 1
                             continue
 
-                        key = make_tm_key(
+                        # HT-QUALITY-GATES-001 Part 22 (root cause A): use the
+                        # scoped key (falls back to the unscoped legacy format
+                        # when entry.field_name/entry.context are both "") instead
+                        # of always calling make_tm_key() directly -- this was the
+                        # gap that let bulk population bypass field/context scoping
+                        # entirely even after store()'s single-entry path was
+                        # already fixed.
+                        key = make_tm_key_scoped(
                             entry.site_id,
                             entry.src_lang,
                             entry.tgt_lang,
                             entry.source_text,
+                            entry.field_name,
+                            entry.context or "",
                         )
 
                         # Ensure timestamp is set
