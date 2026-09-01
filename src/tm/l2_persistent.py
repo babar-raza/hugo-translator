@@ -4,6 +4,7 @@ L2 Persistent Translation Memory using LMDB.
 Durable key-value store for exact translation matches across sessions.
 """
 
+import hashlib
 import json
 import logging
 import threading
@@ -37,9 +38,10 @@ def _get_fasttext_detector():
         return _fasttext_detector_instance
 
     # Within cooldown window after a load failure — skip retry
-    if _fasttext_detector_failed_at is not None and (
-        time.time() - _fasttext_detector_failed_at
-    ) < _FASTTEXT_RETRY_COOLDOWN:
+    if (
+        _fasttext_detector_failed_at is not None
+        and (time.time() - _fasttext_detector_failed_at) < _FASTTEXT_RETRY_COOLDOWN
+    ):
         return None
 
     # Attempt (re-)load
@@ -48,15 +50,14 @@ def _get_fasttext_detector():
             FastTextDetector,
         )
 
-        _fasttext_detector_instance = FastTextDetector(
-            cache_dir=Path("data/models/fasttext")
-        )
+        _fasttext_detector_instance = FastTextDetector(cache_dir=Path("data/models/fasttext"))
         _fasttext_detector_failed_at = None
         return _fasttext_detector_instance
     except Exception as e:
         logger.warning("FastText unavailable (module-level singleton): %s", e)
         _fasttext_detector_failed_at = time.time()
         return None
+
 
 # Canonical sub-directory name for the L2 LMDB database.
 # All callers must use this constant so the path is never mis-typed.
@@ -156,6 +157,7 @@ class L2PersistentTM:
 
         # Hard enforcement: reject unapproved LMDB paths at runtime
         from src.tm import lmdb_registry as _reg
+
         _reg.assert_approved_path(self.db_path)
 
         # TC-TM-02: Warn if a sibling LMDB directory exists next to the canonical
@@ -188,9 +190,7 @@ class L2PersistentTM:
                     FastTextDetector,
                 )
 
-                self._lang_detector = FastTextDetector(
-                    cache_dir=Path("data/models/fasttext")
-                )
+                self._lang_detector = FastTextDetector(cache_dir=Path("data/models/fasttext"))
             except Exception as e:
                 logger.warning("FastText unavailable for TM validation: %s", e)
                 self._lang_detector = False  # sentinel: skip detection, don't retry
@@ -516,9 +516,7 @@ class L2PersistentTM:
                             logger.error(
                                 f"JSON serialization failed in batch at index {stored}: {e}"
                             )
-                            raise RuntimeError(
-                                f"Failed to serialize entry at index {stored}: {e}"
-                            )
+                            raise RuntimeError(f"Failed to serialize entry at index {stored}: {e}")
 
                         key_bytes = key.encode("utf-8")
                         val_bytes = value_json.encode("utf-8")
@@ -571,6 +569,53 @@ class L2PersistentTM:
         with self._lock:
             with self.env.begin(write=True) as txn:
                 return txn.delete(key.encode("utf-8"))
+
+    def delete_namespace(
+        self,
+        *,
+        site_id: str,
+        src_lang: str | None = None,
+        tgt_lang: str | None = None,
+    ) -> int:
+        """Atomically remove every entry in an exact governed namespace.
+
+        Matching uses only entry metadata; translation payloads are never
+        returned or logged.  This is intended for invalidating a campaign
+        source/locale namespace after its previously accepted output loses
+        acceptance under a hardened policy.
+        """
+        if not site_id:
+            raise ValueError("delete_namespace requires an exact site_id")
+        keys: list[bytes] = []
+        with self._lock:
+            with self.env.begin() as txn:
+                cursor = txn.cursor()
+                for key, value in cursor:
+                    try:
+                        entry = json.loads(value.decode("utf-8"))
+                    except Exception as exc:
+                        raise RuntimeError(
+                            "refusing namespace deletion with an unreadable TM entry"
+                        ) from exc
+                    if entry.get("site_id") != site_id:
+                        continue
+                    if src_lang is not None and entry.get("src_lang") != src_lang:
+                        continue
+                    if tgt_lang is not None and entry.get("tgt_lang") != tgt_lang:
+                        continue
+                    keys.append(bytes(key))
+            if not keys:
+                return 0
+            with self.env.begin(write=True) as txn:
+                removed = sum(1 for key in keys if txn.delete(key))
+                if removed != len(keys):
+                    raise RuntimeError("TM namespace deletion count changed during atomic removal")
+        logger.warning(
+            "Deleted %d L2 entries from exact namespace hash=%s",
+            len(keys),
+            hashlib.sha256(site_id.encode("utf-8")).hexdigest()[:16],
+        )
+        return len(keys)
 
     def count(self) -> int:
         """
@@ -638,9 +683,7 @@ class L2PersistentTM:
                 cursor = txn.cursor()
                 for _key_bytes, value_bytes in cursor.iternext():
                     try:
-                        entry = TranslationEntry.from_dict(
-                            json.loads(value_bytes.decode("utf-8"))
-                        )
+                        entry = TranslationEntry.from_dict(json.loads(value_bytes.decode("utf-8")))
                         if site_id and entry.site_id != site_id:
                             continue
                         if tgt_lang and entry.tgt_lang != tgt_lang:

@@ -5,21 +5,97 @@ correction pass, and TM buffer lifecycle.
 """
 
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 import pytest
 
-from src.translation_engine.exceptions import TranslationRejectedError
+from src.translation_engine.exceptions import (
+    TranslationRejectedError,
+    TranslationRetryableError,
+)
 from src.translation_engine.file_pipeline import (
     FileTranslationPipeline,
     LanguageResult,
     LanguageTranslationContext,
+    verification_error_metadata,
 )
 
 
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
+
+def test_verification_error_metadata_excludes_candidate_text():
+    issue = MagicMock(
+        severity="error",
+        check_name="language_detection",
+        location="frontmatter.title",
+        message="SECRET REJECTED CANDIDATE",
+        translated_text="SECRET REJECTED CANDIDATE",
+    )
+    result = MagicMock(issues=[issue])
+
+    metadata = verification_error_metadata(result)
+
+    assert metadata == [
+        {
+            "check": "language_detection",
+            "location": "frontmatter.title",
+        }
+    ]
+    assert "SECRET" not in repr(metadata)
+
+
+def test_zero_defect_warning_block_preserves_verification_result_in_memory():
+    from src.translation_engine.validation.post_translation_validator import (
+        ValidationDecision as PostValidationDecision,
+    )
+
+    engine = _make_engine(validation_enabled=True)
+    engine.validation_policy = "zero-defect"
+    validation_result = SimpleNamespace(
+        issues=[],
+        error_count=0,
+        warning_count=0,
+        info_count=0,
+    )
+    engine.validation_suite.validate_aggregated.return_value = validation_result
+    engine.decision_engine.make_decision.return_value = SimpleNamespace(
+        decision=PostValidationDecision.ACCEPT,
+        decision_reason="accepted",
+    )
+    warning = SimpleNamespace(
+        severity="warning",
+        check_name="language_detection",
+        location="frontmatter.title",
+        message="SECRET REJECTED CANDIDATE",
+        metadata={"confidence": 0.91},
+    )
+    verification_result = SimpleNamespace(
+        passed=True,
+        issues=[warning],
+        error_count=0,
+        warning_count=1,
+        info_count=0,
+    )
+    engine._get_verification_agent.return_value.verify.return_value = verification_result
+    engine.parser.parse_string.return_value = SimpleNamespace(
+        frontmatter={"title": "Translated"},
+        body="Translated body",
+    )
+    result = _make_result()
+
+    language = FileTranslationPipeline(engine).translate_language(
+        _make_ctx(should_validate=True, should_verify=True),
+        result,
+    )
+
+    assert not language.success
+    assert result.verification_result is verification_result
+    assert result.error == ("Zero-defect verification requires zero errors and zero warnings")
+    engine._write_accepted_output.assert_not_called()
 
 
 def _make_engine(
@@ -34,6 +110,7 @@ def _make_engine(
     engine.enable_verification = False
     engine.enable_verification_fix = False
     engine._check_shutdown.return_value = False
+    engine._is_oom_error.return_value = False
     engine.dry_run = False
     engine.enable_content_hash = False
     engine.metadata_tracker = None
@@ -153,13 +230,39 @@ class TestBasicPipelineFlow:
         engine._translate_to_language.assert_called_once()
         engine._write_output.assert_called_once()
 
+    def test_campaign_feedback_is_consumed_by_next_attempt(self):
+        engine = _make_engine()
+        output = Path("/tmp/test_de.md")
+        engine._campaign_retry_feedback_by_output = {
+            str(output.resolve()): "Translate description fully into de."
+        }
+        pipeline = FileTranslationPipeline(engine)
+
+        language = pipeline.translate_language(_make_ctx(output_path=output), _make_result())
+
+        assert language.success
+        assert (
+            engine._translate_to_language.call_args.kwargs["retry_feedback"]
+            == "Translate description fully into de."
+        )
+        assert engine._campaign_retry_feedback_by_output == {}
+
     def test_write_gate_failure_blocks_write(self):
         """Write gate returns passed=False → no file written, failure result."""
         from src.translation_engine.write_gate import WriteGateResult
 
         engine = _make_engine()
         engine._write_gate.evaluate.return_value = WriteGateResult(
-            passed=False, error="Language mismatch"
+            passed=False,
+            error="SECRET REJECTED CANDIDATE",
+            gate_results={
+                2: {"passed": True, "action": "block", "error": None},
+                18: {
+                    "passed": False,
+                    "action": "block",
+                    "error": "SECRET REJECTED CANDIDATE",
+                },
+            },
         )
         pipeline = FileTranslationPipeline(engine)
         ctx = _make_ctx()
@@ -168,6 +271,11 @@ class TestBasicPipelineFlow:
         lang_result = pipeline.translate_language(ctx, result)
         assert not lang_result.success
         engine._write_output.assert_not_called()
+        assert result.rejection_gate_results == {
+            2: {"passed": True, "action": "block"},
+            18: {"passed": False, "action": "block"},
+        }
+        assert "SECRET" not in repr(result.rejection_gate_results)
 
     def test_tm_buffer_flushed_on_success(self):
         """TM write buffer entries are stored to TM after successful write."""
@@ -189,6 +297,66 @@ class TestBasicPipelineFlow:
         # TM store called for the buffer entry
         engine.tm.store.assert_called()
 
+    def test_rejection_preserves_structured_diagnostic_in_memory(self):
+        engine = _make_engine()
+        issue = SimpleNamespace(
+            validator="RepetitionDetectorValidator",
+            severity=SimpleNamespace(value="error"),
+            message="SECRET REJECTED CANDIDATE",
+            details={"count": 6, "threshold": 5},
+            location="segment_0",
+        )
+        validation_result = SimpleNamespace(issues=[issue])
+        engine._translate_to_language.side_effect = TranslationRejectedError(
+            message="Rejected",
+            file_path="/tmp/test.md",
+            validation_result=validation_result,
+            rejection_reason="RepetitionDetectorValidator SECRET REJECTED CANDIDATE",
+        )
+        result = _make_result()
+
+        language = FileTranslationPipeline(engine).translate_language(_make_ctx(), result)
+
+        assert not language.success
+        assert result.validation_result is validation_result
+        assert "RepetitionDetectorValidator" in result.error
+
+    def test_exhausted_retry_preserves_structured_diagnostic_in_memory(self):
+        engine = _make_engine()
+        issue = SimpleNamespace(
+            validator="LanguageConsistencyValidator",
+            severity=SimpleNamespace(value="warning"),
+            message="SECRET REJECTED CANDIDATE",
+            details={},
+            location="segment_0",
+        )
+        validation_result = SimpleNamespace(issues=[issue])
+        engine._translate_to_language.side_effect = TranslationRetryableError(
+            message="Retry",
+            file_path="/tmp/test.md",
+            validation_result=validation_result,
+            retry_feedback=("LanguageConsistencyValidator SECRET REJECTED CANDIDATE"),
+        )
+        result = _make_result()
+
+        language = FileTranslationPipeline(engine).translate_language(
+            _make_ctx(max_retry_attempts=0), result
+        )
+
+        assert not language.success
+        assert result.validation_result is validation_result
+        assert "LanguageConsistencyValidator" in result.error
+
+    def test_unexpected_exception_preserves_class_and_cause_in_memory(self):
+        engine = _make_engine()
+        engine._translate_to_language.side_effect = ValueError("SECRET REJECTED CANDIDATE")
+        result = _make_result()
+
+        language = FileTranslationPipeline(engine).translate_language(_make_ctx(), result)
+
+        assert not language.success
+        assert result.error == "ValueError: SECRET REJECTED CANDIDATE"
+
 
 # ---------------------------------------------------------------------------
 # Retry and feedback guard
@@ -196,6 +364,68 @@ class TestBasicPipelineFlow:
 
 
 class TestRetryAndFeedbackGuard:
+    def test_each_retry_receives_a_fresh_copy_of_the_source_document(self):
+        """Candidate construction may mutate its copy but never the source or next retry."""
+        from src.translation_engine.validation.post_translation_validator import (
+            ValidationDecision as PostValidationDecision,
+        )
+
+        engine = _make_engine(validation_enabled=True)
+        seen_titles = []
+
+        def mutate_attempt(*args, **kwargs):
+            attempt_doc = kwargs["doc"]
+            seen_titles.append(attempt_doc.frontmatter["title"])
+            attempt_doc.frontmatter["title"] = "MUTATED CANDIDATE"
+            return "---\ntitle: Translated\n---\nTranslated body"
+
+        engine._translate_to_language.side_effect = mutate_attempt
+
+        decision_retry = MagicMock(
+            decision=PostValidationDecision.RETRY,
+            retry_feedback="Try again",
+            decision_reason="First candidate rejected",
+        )
+        decision_accept = MagicMock(decision=PostValidationDecision.ACCEPT)
+        engine.decision_engine.make_decision.side_effect = [decision_retry, decision_accept]
+
+        issue = MagicMock(validator="semantic", severity=MagicMock(value="error"))
+        first_validation = MagicMock(
+            issues=[issue],
+            error_count=1,
+            warning_count=0,
+        )
+        second_validation = MagicMock(
+            issues=[],
+            error_count=0,
+            warning_count=0,
+        )
+        engine.validation_suite.validate_aggregated.side_effect = [
+            first_validation,
+            second_validation,
+        ]
+
+        source_doc = SimpleNamespace(
+            ast=[],
+            frontmatter={"title": "SOURCE TITLE"},
+            body="Source body",
+            source_path=Path("/tmp/test.md"),
+            file_path=Path("/tmp/test.md"),
+        )
+        ctx = _make_ctx(
+            doc=source_doc,
+            should_validate=True,
+            max_retry_attempts=2,
+        )
+        result = _make_result()
+        result.stats.model_used = "llm_gpt4"
+
+        lang_result = FileTranslationPipeline(engine).translate_language(ctx, result)
+
+        assert lang_result.success
+        assert seen_titles == ["SOURCE TITLE", "SOURCE TITLE"]
+        assert source_doc.frontmatter == {"title": "SOURCE TITLE"}
+
     def test_retry_on_validation_retry_decision(self):
         """RETRY decision → retry with feedback → second attempt succeeds."""
         from src.translation_engine.validation.post_translation_validator import (

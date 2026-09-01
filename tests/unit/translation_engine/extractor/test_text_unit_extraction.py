@@ -382,6 +382,16 @@ class TestProductNameDetection:
 
         assert plan2.units[0].do_not_translate == True
 
+    def test_canonical_multiword_protected_term_is_not_translated(self):
+        """AST classification uses config/terminology.yaml exact matches."""
+        extractor = TextUnitExtractor(segmentation_strategy="leaf_only")
+        para = paragraph_node([text_node("API Reference")])
+        para.assign_addresses("body.paragraph[0]")
+
+        plan = extractor.extract_from_ast([para])
+
+        assert plan.units[0].do_not_translate is True
+
     def test_camelcase_detection(self):
         """Test CamelCase identifiers are detected."""
         extractor = TextUnitExtractor(segmentation_strategy="leaf_only")

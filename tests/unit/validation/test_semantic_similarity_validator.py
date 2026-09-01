@@ -133,6 +133,22 @@ def test_no_encoder_returns_info_skip():
         SemanticSimilarityValidator._shared_encoder = original
 
 
+def test_no_encoder_fails_closed_in_zero_defect_policy():
+    original = SemanticSimilarityValidator._shared_encoder
+    SemanticSimilarityValidator._shared_encoder = None
+    try:
+        result = SemanticSimilarityValidator(encoder=None).validate(
+            LONG_TEXT,
+            LONG_TEXT,
+            context={"validation_policy": "zero-defect"},
+        )
+        assert not result.success
+        assert result.issues[0].severity == ValidationSeverity.ERROR
+        assert "unavailable" in result.issues[0].message.lower()
+    finally:
+        SemanticSimilarityValidator._shared_encoder = original
+
+
 # ---------------------------------------------------------------------------
 # set_encoder() / _get_encoder() injection
 # ---------------------------------------------------------------------------
@@ -195,3 +211,16 @@ def test_embedding_exception_fails_open():
     result = validator.validate(LONG_TEXT, LONG_TEXT)
     assert result.success  # fail open — no false positives on embedding error
     assert not any(i.severity == ValidationSeverity.ERROR for i in result.issues)
+
+
+def test_embedding_exception_fails_closed_in_zero_defect_policy():
+    enc = MagicMock()
+    enc.encode.side_effect = RuntimeError("CUDA OOM")
+    result = SemanticSimilarityValidator(encoder=enc).validate(
+        LONG_TEXT,
+        LONG_TEXT,
+        context={"validation_policy": "zero-defect"},
+    )
+    assert not result.success
+    assert result.issues[0].severity == ValidationSeverity.ERROR
+    assert result.issues[0].details == {"exception_type": "RuntimeError"}

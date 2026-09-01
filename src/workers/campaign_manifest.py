@@ -16,7 +16,6 @@ from typing import Any
 
 import yaml
 
-
 SCHEMA_VERSION = 1
 ZERO_DEFECT_POLICY = "zero-defect"
 
@@ -62,15 +61,77 @@ def git_sha(repo: Path) -> str:
     return completed.stdout.strip()
 
 
-def git_dirty_paths(repo: Path) -> list[str]:
+def git_is_ancestor(repo: Path, ancestor: str, descendant: str = "HEAD") -> bool:
     completed = subprocess.run(
-        ["git", "status", "--porcelain", "--untracked-files=all"],
+        ["git", "merge-base", "--is-ancestor", ancestor, descendant],
+        cwd=repo,
+        capture_output=True,
+        text=True,
+    )
+    return completed.returncode == 0
+
+
+def git_changed_paths(repo: Path, start: str, end: str = "HEAD") -> list[str]:
+    completed = subprocess.run(
+        ["git", "diff", "--name-only", f"{start}..{end}"],
         cwd=repo,
         check=True,
         capture_output=True,
         text=True,
     )
-    return [line[3:] for line in completed.stdout.splitlines() if line.strip()]
+    return [Path(line).as_posix() for line in completed.stdout.splitlines() if line.strip()]
+
+
+def git_dirty_paths(repo: Path) -> list[str]:
+    completed = subprocess.run(
+        ["git", "status", "--porcelain=v1", "-z", "--untracked-files=all"],
+        cwd=repo,
+        check=True,
+        capture_output=True,
+    )
+    entries = completed.stdout.decode("utf-8", errors="surrogateescape").split("\0")
+    paths: list[str] = []
+    index = 0
+    while index < len(entries):
+        entry = entries[index]
+        index += 1
+        if not entry:
+            continue
+        status = entry[:2]
+        paths.append(Path(entry[3:]).as_posix())
+        if "R" in status or "C" in status:
+            if index < len(entries) and entries[index]:
+                paths.append(Path(entries[index]).as_posix())
+            index += 1
+    return paths
+
+
+def dirty_path_fingerprints(
+    repo: Path,
+    *,
+    exclude_paths: set[str] | None = None,
+) -> dict[str, str | None]:
+    """Return a deterministic, content-addressed snapshot of dirty paths.
+
+    A direct-destination campaign may coexist with unrelated user changes.  It
+    must preserve those changes exactly rather than treating a dirty worktree as
+    permission to modify arbitrary paths.  ``None`` denotes a tracked deletion.
+    """
+    excluded = {Path(item).as_posix() for item in (exclude_paths or set())}
+    snapshot: dict[str, str | None] = {}
+    for relative in git_dirty_paths(repo):
+        normalized = Path(relative).as_posix()
+        if normalized in excluded:
+            continue
+        path = repo / normalized
+        snapshot[normalized] = sha256_file(path) if path.is_file() else None
+    return dict(sorted(snapshot.items()))
+
+
+def dirty_snapshot_fingerprint(paths: dict[str, str | None]) -> str:
+    """Fingerprint a frozen dirty baseline without storing candidate bytes."""
+    encoded = json.dumps(paths, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    return hashlib.sha256(encoded).hexdigest()
 
 
 @dataclass(frozen=True)
@@ -84,7 +145,7 @@ class CampaignSource:
     wave: int
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> "CampaignSource":
+    def from_dict(cls, data: dict[str, Any]) -> CampaignSource:
         return cls(
             site_id=str(data["site_id"]),
             family=str(data["family"]),
@@ -107,15 +168,18 @@ class CampaignManifest:
     config_fingerprint: str
     model_fingerprints: dict[str, str]
     tm_fingerprint: str
+    knowledge_fingerprints: dict[str, str]
     target_locales: tuple[str, ...]
     sources: tuple[CampaignSource, ...]
     expected_source_count: int
     expected_output_count: int
     retry_policy: dict[str, Any] = field(default_factory=dict)
     commit_policy: dict[str, Any] = field(default_factory=dict)
+    execution_policy: dict[str, Any] = field(default_factory=dict)
+    destination_baseline: dict[str, Any] = field(default_factory=dict)
 
     @classmethod
-    def load(cls, path: str | Path) -> "CampaignManifest":
+    def load(cls, path: str | Path) -> CampaignManifest:
         manifest_path = Path(path).resolve()
         if not manifest_path.is_file():
             raise CampaignManifestError(f"Campaign manifest not found: {manifest_path}")
@@ -130,19 +194,19 @@ class CampaignManifest:
                 content_repo_sha=str(raw["content_repo_sha"]),
                 translator_repo_sha=str(raw["translator_repo_sha"]),
                 config_fingerprint=str(raw["config_fingerprint"]),
-                model_fingerprints={
-                    str(k): str(v)
-                    for k, v in raw["model_fingerprints"].items()
-                },
+                model_fingerprints={str(k): str(v) for k, v in raw["model_fingerprints"].items()},
                 tm_fingerprint=str(raw["tm_fingerprint"]),
+                knowledge_fingerprints={
+                    str(k): str(v) for k, v in raw["knowledge_fingerprints"].items()
+                },
                 target_locales=tuple(str(item) for item in raw["target_locales"]),
-                sources=tuple(
-                    CampaignSource.from_dict(item) for item in raw["sources"]
-                ),
+                sources=tuple(CampaignSource.from_dict(item) for item in raw["sources"]),
                 expected_source_count=int(raw["expected_source_count"]),
                 expected_output_count=int(raw["expected_output_count"]),
                 retry_policy=dict(raw.get("retry_policy") or {}),
                 commit_policy=dict(raw.get("commit_policy") or {}),
+                execution_policy=dict(raw.get("execution_policy") or {}),
+                destination_baseline=dict(raw.get("destination_baseline") or {}),
             )
         except (KeyError, TypeError, ValueError) as exc:
             raise CampaignManifestError(f"Invalid campaign manifest: {exc}") from exc
@@ -152,17 +216,46 @@ class CampaignManifest:
     def validate_schema(self) -> None:
         errors: list[str] = []
         if self.schema_version != SCHEMA_VERSION:
-            errors.append(
-                f"schema_version={self.schema_version}, expected {SCHEMA_VERSION}"
-            )
+            errors.append(f"schema_version={self.schema_version}, expected {SCHEMA_VERSION}")
         if self.validation_policy != ZERO_DEFECT_POLICY:
             errors.append("campaign validation_policy must be zero-defect")
         if len(set(self.target_locales)) != len(self.target_locales):
             errors.append("target_locales contains duplicates")
-        if len(self.sources) != self.expected_source_count:
+        if self.retry_policy.get("primary_model") != "m2m100_418m":
+            errors.append("zero-defect campaign primary model must be m2m100_418m")
+        if self.retry_policy.get("primary_attempts") != 3:
+            errors.append("zero-defect campaign requires exactly 3 primary attempts")
+        if self.retry_policy.get("llm_escalation_attempts") != 2:
+            errors.append("zero-defect campaign requires exactly 2 LLM attempts")
+        if self.retry_policy.get("llm_model") != "professionalize_llm":
+            errors.append("zero-defect campaign LLM escalation must use professionalize_llm")
+        if self.commit_policy.get("push") is not False:
+            errors.append("zero-defect campaign commit policy must prohibit push")
+        if not isinstance(self.commit_policy.get("enabled", True), bool):
+            errors.append("campaign commit policy enabled must be boolean")
+        max_outputs = self.commit_policy.get("max_outputs_per_commit")
+        if not isinstance(max_outputs, int) or not 1 <= max_outputs <= 250:
+            errors.append("campaign commit partitions must contain 1..250 outputs")
+        max_parallel_jobs = self.execution_policy.get("max_parallel_jobs", 1)
+        if not isinstance(max_parallel_jobs, int) or not 1 <= max_parallel_jobs <= 4:
+            errors.append("campaign execution max_parallel_jobs must be 1..4")
+        if max_parallel_jobs > 1 and self.execution_policy.get("model_sharing") != "single_shared_instance":
             errors.append(
-                f"source count {len(self.sources)} != {self.expected_source_count}"
+                "parallel campaign execution requires model_sharing=single_shared_instance"
             )
+        if len(self.sources) != self.expected_source_count:
+            errors.append(f"source count {len(self.sources)} != {self.expected_source_count}")
+
+        if self.destination_baseline:
+            paths = self.destination_baseline.get("paths")
+            fingerprint = self.destination_baseline.get("fingerprint")
+            if not isinstance(paths, dict) or not all(
+                isinstance(key, str) and (value is None or isinstance(value, str))
+                for key, value in paths.items()
+            ):
+                errors.append("destination baseline paths must be a path/hash map")
+            elif fingerprint != dirty_snapshot_fingerprint(paths):
+                errors.append("destination baseline fingerprint mismatch")
 
         output_paths: set[str] = set()
         job_count = 0
@@ -172,9 +265,7 @@ class CampaignManifest:
                 errors.append(f"duplicate source path: {source.source_path}")
             source_paths.add(source.source_path)
             if set(source.outputs) != set(self.target_locales):
-                errors.append(
-                    f"{source.source_path}: output locales do not match campaign locales"
-                )
+                errors.append(f"{source.source_path}: output locales do not match campaign locales")
             for output in source.outputs.values():
                 normalized = Path(output)
                 if normalized.is_absolute() or ".." in normalized.parts:
@@ -184,9 +275,7 @@ class CampaignManifest:
                 output_paths.add(output)
                 job_count += 1
         if job_count != self.expected_output_count:
-            errors.append(
-                f"output count {job_count} != {self.expected_output_count}"
-            )
+            errors.append(f"output count {job_count} != {self.expected_output_count}")
         if errors:
             raise CampaignManifestError("; ".join(errors[:20]))
 
@@ -203,22 +292,56 @@ class CampaignManifest:
         if not content_repo.is_dir():
             errors.append(f"content repo missing: {content_repo}")
         else:
-            if git_sha(content_repo) != self.content_repo_sha:
-                errors.append("content repository SHA drift")
+            current_content_sha = git_sha(content_repo)
+            if current_content_sha != self.content_repo_sha:
+                accepted_outputs = {
+                    Path(item).as_posix() for item in (allow_existing_accepted or set())
+                }
+                if not accepted_outputs:
+                    errors.append("content repository SHA drift")
+                elif not git_is_ancestor(content_repo, self.content_repo_sha, current_content_sha):
+                    errors.append("content repository history diverged from campaign pin")
+                else:
+                    changed = set(
+                        git_changed_paths(
+                            content_repo,
+                            self.content_repo_sha,
+                            current_content_sha,
+                        )
+                    )
+                    unexpected_commits = sorted(changed - accepted_outputs)
+                    if unexpected_commits:
+                        errors.append(
+                            "content repository descendants contain "
+                            f"{len(unexpected_commits)} non-campaign paths"
+                        )
             if require_clean:
                 dirty = git_dirty_paths(content_repo)
                 allowed_dirty = {
                     Path(item).as_posix() for item in (allow_existing_accepted or set())
                 }
-                unexpected_dirty = [
-                    item
-                    for item in dirty
-                    if Path(item).as_posix() not in allowed_dirty
-                ]
-                if unexpected_dirty:
-                    errors.append(
-                        f"content repository is dirty ({len(unexpected_dirty)} unexpected paths)"
+                if self.destination_baseline:
+                    expected_dirty = {
+                        Path(key).as_posix(): value
+                        for key, value in self.destination_baseline["paths"].items()
+                    }
+                    actual_dirty = dirty_path_fingerprints(
+                        content_repo,
+                        exclude_paths=allowed_dirty,
                     )
+                    if actual_dirty != expected_dirty:
+                        errors.append(
+                            "content repository frozen dirty baseline drift "
+                            f"(expected={len(expected_dirty)}, actual={len(actual_dirty)})"
+                        )
+                else:
+                    unexpected_dirty = [
+                        item for item in dirty if Path(item).as_posix() not in allowed_dirty
+                    ]
+                    if unexpected_dirty:
+                        errors.append(
+                            f"content repository is dirty ({len(unexpected_dirty)} unexpected paths)"
+                        )
 
         translator_repo = translator_repo.resolve()
         if git_sha(translator_repo) != self.translator_repo_sha:
@@ -226,9 +349,7 @@ class CampaignManifest:
         if require_clean:
             dirty = git_dirty_paths(translator_repo)
             if dirty:
-                errors.append(
-                    f"translator repository is dirty ({len(dirty)} paths)"
-                )
+                errors.append(f"translator repository is dirty ({len(dirty)} paths)")
         registry_path = translator_repo / "config/model_registry.yaml"
         expected_registry = self.model_fingerprints.get("model_registry")
         if (
@@ -242,7 +363,7 @@ class CampaignManifest:
         # remain isolated by the campaign/config/source namespace.
         if not allow_existing_accepted:
             tm_paths = [
-                "data/tm/l2_lmdb/data.mdb",
+                "data/tm/l2.lmdb/data.mdb",
                 "data/tm/l3_faiss/index.faiss",
                 "data/tm/l3_faiss/metadata.pkl",
                 "data/tm/l3_faiss/config.json",
@@ -254,6 +375,12 @@ class CampaignManifest:
                 errors.append(str(exc))
 
         accepted = allow_existing_accepted or set()
+        for relative, expected_hash in self.knowledge_fingerprints.items():
+            knowledge_path = content_repo / relative
+            if not knowledge_path.is_file():
+                errors.append(f"knowledge artifact missing: {relative}")
+            elif sha256_file(knowledge_path) != expected_hash:
+                errors.append(f"knowledge fingerprint drift: {relative}")
         for source in self.sources:
             source_path = content_repo / source.source_path
             if not source_path.is_file():
@@ -316,9 +443,7 @@ class CampaignManifest:
             for offset in range(0, len(jobs), max_outputs):
                 part = offset // max_outputs + 1
                 yield {
-                    "shard_id": (
-                        f"w{key[0]}:{key[1]}:{key[2]}:{key[3]}:{key[4]}:{part}"
-                    ),
+                    "shard_id": (f"w{key[0]}:{key[1]}:{key[2]}:{key[3]}:{key[4]}:{part}"),
                     "wave": key[0],
                     "site_id": key[1],
                     "family": key[2],
@@ -343,5 +468,25 @@ class CampaignManifest:
 
 
 def receipt_fingerprint(receipt: dict[str, Any]) -> str:
-    encoded = json.dumps(receipt, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    # JSON object keys are strings on disk. Canonicalize in memory first so
+    # gate_results={1: ..., 2: ...} and the reloaded {"1": ..., "2": ...}
+    # produce the same ordering and fingerprint across campaign restarts.
+    canonical = json.loads(json.dumps(receipt, ensure_ascii=False))
+    encoded = json.dumps(
+        canonical,
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+    ).encode("utf-8")
+    return hashlib.sha256(encoded).hexdigest()
+
+
+def legacy_integer_gate_receipt_fingerprint(receipt: dict[str, Any]) -> str:
+    """Reproduce the pre-canonicalization signature for narrow migration."""
+    legacy = json.loads(json.dumps(receipt, ensure_ascii=False))
+    gates = legacy.get("gate_results")
+    if not isinstance(gates, dict) or not all(str(key).isdigit() for key in gates):
+        return ""
+    legacy["gate_results"] = {int(key): value for key, value in gates.items()}
+    encoded = json.dumps(legacy, sort_keys=True, separators=(",", ":")).encode("utf-8")
     return hashlib.sha256(encoded).hexdigest()

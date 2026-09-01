@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import logging
 import time
+from copy import deepcopy
 from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
@@ -32,6 +33,18 @@ if TYPE_CHECKING:
     from .engine import TranslationEngine
 
 logger = logging.getLogger(__name__)
+
+
+def verification_error_metadata(verification_result: Any) -> list[dict[str, str]]:
+    """Return diagnostic check/location pairs without candidate-derived text."""
+    return [
+        {
+            "check": str(getattr(issue, "check_name", "unknown")),
+            "location": str(getattr(issue, "location", "unknown")),
+        }
+        for issue in getattr(verification_result, "issues", [])
+        if getattr(issue, "severity", None) == "error"
+    ]
 
 
 @dataclass
@@ -137,6 +150,8 @@ class FileTranslationPipeline:
         max_retry_attempts = ctx.max_retry_attempts
         output_paths_cache = ctx.output_paths_cache
         _llm_model_override = ctx.llm_model_override
+        campaign_feedback = getattr(engine, "_campaign_retry_feedback_by_output", {})
+        retry_feedback = campaign_feedback.pop(str(output_path.resolve()), retry_feedback)
 
         lang_result = LanguageResult(success=False, retry_count=0)
 
@@ -147,12 +162,19 @@ class FileTranslationPipeline:
                 # a failed previous attempt that triggered RETRY).
                 _tm_write_buffer.clear()
 
+                # SegmentTranslator's AST renderer intentionally mutates its
+                # document while constructing a candidate. Every retry must
+                # start from the immutable parsed source, and all downstream
+                # source-side validators must continue to see that source.
+                attempt_doc = deepcopy(doc)
+                attempt_segments = deepcopy(segments)
+
                 # Translate (returns content, doesn't write yet)
                 translated_content = engine._translate_to_language(
                     site_id=site_id,
                     site_profile=site_profile,
-                    doc=doc,
-                    segments=segments,
+                    doc=attempt_doc,
+                    segments=attempt_segments,
                     source_lang=source_lang,
                     target_lang=target_lang,
                     force=force,
@@ -215,8 +237,12 @@ class FileTranslationPipeline:
                                 "source_lang": source_lang,
                                 "target_lang": target_lang,
                                 "file_path": str(file_path),
+                                "validation_policy": getattr(
+                                    engine, "validation_policy", "standard"
+                                ),
                             },
                         )
+                        result.validation_result = validation_result
 
                         # Check frontmatter language
                         _fm_issues = engine._check_frontmatter_language(
@@ -333,9 +359,15 @@ class FileTranslationPipeline:
                                                     "source_lang": source_lang,
                                                     "target_lang": target_lang,
                                                     "file_path": str(file_path),
+                                                    "validation_policy": getattr(
+                                                        engine,
+                                                        "validation_policy",
+                                                        "standard",
+                                                    ),
                                                 },
                                             )
                                         )
+                                        result.validation_result = validation_result
                                         _fm_issues = engine._check_frontmatter_language(
                                             translated_content, target_lang
                                         )
@@ -382,7 +414,9 @@ class FileTranslationPipeline:
                             _is_llm_rej = "llm" in _model_used_rej.lower()
                             if not _is_llm_rej:
                                 _critical_rej = (
-                                    engine.decision_engine._check_critical_failure(validation_result)
+                                    engine.decision_engine._check_critical_failure(
+                                        validation_result
+                                    )
                                     if validation_result is not None
                                     and hasattr(engine, "decision_engine")
                                     and engine.decision_engine is not None
@@ -404,7 +438,9 @@ class FileTranslationPipeline:
                                     _issue_summary_rej = "; ".join(
                                         f"{getattr(iss, 'validator', '?')}: "
                                         f"{str(getattr(iss, 'message', ''))[:60]}"
-                                        for iss in (validation_result.issues if validation_result else [])
+                                        for iss in (
+                                            validation_result.issues if validation_result else []
+                                        )
                                     )
                                     logger.info(
                                         f"MT backend ({_model_used_rej or 'tm/passthrough'}): non-critical REJECT, "
@@ -461,7 +497,9 @@ class FileTranslationPipeline:
                                 _issue_summary = "; ".join(
                                     f"{getattr(iss, 'validator', '?')}: "
                                     f"{str(getattr(iss, 'message', ''))[:60]}"
-                                    for iss in (validation_result.issues if validation_result else [])
+                                    for iss in (
+                                        validation_result.issues if validation_result else []
+                                    )
                                 )
                                 logger.info(
                                     f"MT backend ({_model_used or 'tm/passthrough'}): non-critical validation issues, "
@@ -477,8 +515,11 @@ class FileTranslationPipeline:
                                         getattr(iss, "validator", ""),
                                         getattr(iss, "severity", ""),
                                     )
-                                    for iss in (validation_result.issues if validation_result else [])
-                                    if getattr(getattr(iss, "severity", None), "value", "") == "error"
+                                    for iss in (
+                                        validation_result.issues if validation_result else []
+                                    )
+                                    if getattr(getattr(iss, "severity", None), "value", "")
+                                    == "error"
                                 )
                             except Exception:
                                 _current_validators = frozenset()
@@ -566,12 +607,16 @@ class FileTranslationPipeline:
                     }
                     translated_doc_parsed = engine.parser.parse_string(translated_content)
                     translated_doc_dict = {
-                        "frontmatter": translated_doc_parsed.frontmatter
-                        if hasattr(translated_doc_parsed, "frontmatter")
-                        else {},
-                        "body": str(translated_doc_parsed.body)
-                        if hasattr(translated_doc_parsed, "body")
-                        else "",
+                        "frontmatter": (
+                            translated_doc_parsed.frontmatter
+                            if hasattr(translated_doc_parsed, "frontmatter")
+                            else {}
+                        ),
+                        "body": (
+                            str(translated_doc_parsed.body)
+                            if hasattr(translated_doc_parsed, "body")
+                            else ""
+                        ),
                     }
 
                     verification_agent = engine._get_verification_agent()
@@ -583,16 +628,25 @@ class FileTranslationPipeline:
                             "source_lang": source_lang,
                             "file_path": str(file_path),
                             "site_id": site_id,
+                            "validation_policy": getattr(engine, "validation_policy", "standard"),
                         },
                     )
 
                     final_verification_result = verification_result
+                    # Preserve structured, candidate-free verification state
+                    # even when zero-defect warning promotion blocks before
+                    # the normal success bookkeeping below.
+                    result.verification_result = verification_result
 
                     if not verification_result.passed:
                         logger.warning(
                             f"Verification failed for {file_path} to {target_lang}: "
                             f"{verification_result.error_count} errors, "
                             f"{verification_result.warning_count} warnings"
+                        )
+                        logger.warning(
+                            "Verification error metadata: %s",
+                            verification_error_metadata(verification_result),
                         )
 
                         if should_fix and retry_count < max_retry_attempts:
@@ -683,26 +737,28 @@ class FileTranslationPipeline:
                 if validation_passed:
                     _zero_defect = getattr(engine, "validation_policy", "standard") == "zero-defect"
                     if _zero_defect:
-                        if not should_validate or not engine.validation_suite or not engine.decision_engine:
+                        if (
+                            not should_validate
+                            or not engine.validation_suite
+                            or not engine.decision_engine
+                        ):
                             validation_passed = False
-                            validation_error = (
-                                "Zero-defect policy requires the validation suite and decision engine"
-                            )
+                            validation_error = "Zero-defect policy requires the validation suite and decision engine"
                         elif not should_verify or final_verification_result is None:
                             validation_passed = False
-                            validation_error = (
-                                "Zero-defect policy requires completed post-translation verification"
-                            )
-                        elif getattr(final_validation_result, "error_count", 0) > 0 or getattr(
-                            final_validation_result, "warning_count", 0
-                        ) > 0:
+                            validation_error = "Zero-defect policy requires completed post-translation verification"
+                        elif (
+                            getattr(final_validation_result, "error_count", 0) > 0
+                            or getattr(final_validation_result, "warning_count", 0) > 0
+                        ):
                             validation_passed = False
                             validation_error = (
                                 "Zero-defect validation requires zero errors and zero warnings"
                             )
-                        elif getattr(final_verification_result, "error_count", 0) > 0 or getattr(
-                            final_verification_result, "warning_count", 0
-                        ) > 0:
+                        elif (
+                            getattr(final_verification_result, "error_count", 0) > 0
+                            or getattr(final_verification_result, "warning_count", 0) > 0
+                        ):
                             validation_passed = False
                             validation_error = (
                                 "Zero-defect verification requires zero errors and zero warnings"
@@ -729,6 +785,13 @@ class FileTranslationPipeline:
                     if _gate_result is not None and not _gate_result.passed:
                         validation_passed = False
                         validation_error = _gate_result.error
+                        result.rejection_gate_results = {
+                            int(gate_id): {
+                                "passed": bool(gate_result.get("passed", False)),
+                                "action": str(gate_result.get("action", "")),
+                            }
+                            for gate_id, gate_result in _gate_result.gate_results.items()
+                        }
                         if _gate_result.overwrite_blocked:
                             result.overwrite_blocked = True
                             lang_result.overwrite_blocked = True
@@ -773,55 +836,49 @@ class FileTranslationPipeline:
                                 logger.debug(f"soft contamination queue failed: {_rtq_err}")
 
                 # Apply auto-cleaned content from gates 9-12/16 (if any gate cleaned it)
-                if validation_passed and _gate_result is not None and _gate_result.cleaned_content is not None:
+                if (
+                    validation_passed
+                    and _gate_result is not None
+                    and _gate_result.cleaned_content is not None
+                ):
                     translated_content = _gate_result.cleaned_content
 
-                if validation_passed and getattr(engine, "validation_policy", "standard") == "zero-defect":
-                    pre_write_passed, pre_write_errors = engine._pre_write_validation(
-                        content=translated_content,
-                        output_path=output_path,
-                        source_path=source_path,
-                        target_lang=target_lang,
-                        site_id=site_id,
-                        site_profile=site_profile,
-                    )
-                    if not pre_write_passed:
+                if (
+                    validation_passed
+                    and getattr(engine, "validation_policy", "standard") == "zero-defect"
+                ):
+                    try:
+                        # Final-byte acceptance reruns validation,
+                        # verification, all 44 gates (including independent
+                        # fidelity), fixed-point cleaning, and placement on
+                        # the exact serialized payload.  This closes the old
+                        # gap where an auto-cleaned result could be written
+                        # without re-verifying the bytes that reached disk.
+                        _accepted_candidate = engine.accept_candidate_bytes(
+                            source_bytes=source_path.read_bytes(),
+                            candidate_bytes=translated_content.encode("utf-8"),
+                            source_path=source_path,
+                            output_path=output_path,
+                            target_lang=target_lang,
+                            site_id=site_id,
+                            model_fingerprint=str(
+                                _llm_model_override
+                                or getattr(engine, "model_id_override", "")
+                                or getattr(site_profile, "default_model", "")
+                                or ""
+                            ),
+                        )
+                    except Exception as acceptance_error:
                         validation_passed = False
-                        validation_error = "; ".join(pre_write_errors)
+                        validation_error = str(acceptance_error)
+                else:
+                    _accepted_candidate = None
 
                 # PHASE 2: WRITE (only if ALL validation passed)
                 if validation_passed:
                     try:
                         if getattr(engine, "validation_policy", "standard") == "zero-defect":
-                            from .models import AcceptedTranslation
-
-                            gate_receipt = {
-                                1: {
-                                    "passed": True,
-                                    "action": "verification",
-                                    "error": None,
-                                },
-                                **(_gate_result.gate_results if _gate_result else {}),
-                            }
-                            campaign_context = getattr(engine, "campaign_context", {})
-                            accepted = AcceptedTranslation.from_text(
-                                content=translated_content,
-                                source_content=content,
-                                source_path=source_path,
-                                output_path=output_path,
-                                target_lang=target_lang,
-                                gate_results=gate_receipt,
-                                config_fingerprint=campaign_context.get(
-                                    "config_fingerprint", ""
-                                ),
-                                model_fingerprint=str(
-                                    _llm_model_override
-                                    or getattr(engine, "model_id_override", "")
-                                    or getattr(site_profile, "default_model", "")
-                                    or ""
-                                ),
-                                campaign_id=campaign_context.get("campaign_id", ""),
-                            )
+                            accepted = _accepted_candidate
                             engine._write_accepted_output(accepted, result.stats)
                             result.acceptance_receipts[target_lang] = accepted.receipt()
                         else:
@@ -873,7 +930,11 @@ class FileTranslationPipeline:
                     # Uses existing _llm_model_override wiring (already passed to
                     # _translate_to_language() at line 161 as model_id_override).
                     _escalated = False
-                    if _llm_model_override is None and retry_count < max_retry_attempts:
+                    if (
+                        getattr(engine, "validation_policy", "standard") != "zero-defect"
+                        and _llm_model_override is None
+                        and retry_count < max_retry_attempts
+                    ):
                         try:
                             _te_cfg_esc = (
                                 engine.config.get_config().get("translation_engine", {})
@@ -881,9 +942,7 @@ class FileTranslationPipeline:
                                 else {}
                             )
                             _esc_enabled = _te_cfg_esc.get("llm_escalation_enabled", False)
-                            _esc_threshold = int(
-                                _te_cfg_esc.get("llm_escalation_after_retries", 2)
-                            )
+                            _esc_threshold = int(_te_cfg_esc.get("llm_escalation_after_retries", 2))
                             _esc_model = _te_cfg_esc.get("llm_escalation_model")
                             if _esc_enabled and _esc_model and retry_count >= _esc_threshold - 1:
                                 logger.warning(
@@ -899,6 +958,9 @@ class FileTranslationPipeline:
                             logger.debug(f"Gate-failure escalation check failed: {_esc_err}")
                     if not _escalated:
                         break  # Validation failure is deterministic (no escalation available)
+                    # Retry with the newly selected backend. Falling through
+                    # would mark a blocked, unwritten candidate as successful.
+                    continue
 
                 # File successfully written
                 result.outputs[target_lang] = output_path
@@ -1003,6 +1065,14 @@ class FileTranslationPipeline:
             except TranslationRejectedError as _rej_err:
                 # Per-locale rejection: record failure, queue for retry, continue
                 # to next locale. Do NOT re-raise.
+                # Preserve the structured validator result and rejection cause
+                # in memory so the campaign runner can emit payload-free gate
+                # fingerprints.  Previously this exception boundary discarded
+                # both, leaving autonomous hardening with only "pipeline".
+                result.validation_result = _rej_err.validation_result
+                result.error = (
+                    f"TranslationRejectedError: {_rej_err.rejection_reason or str(_rej_err)}"
+                )
                 result.errors.append(
                     f"Translation to {target_lang} rejected after {retry_count} attempts"
                 )
@@ -1036,6 +1106,8 @@ class FileTranslationPipeline:
                 if retry_count > max_retry_attempts:
                     # Per-locale rejection: max retries exceeded. Handle in-place;
                     # do NOT raise.
+                    result.validation_result = e.validation_result
+                    result.error = f"TranslationRetryableError: {e.retry_feedback or str(e)}"
                     result.errors.append(
                         f"Translation to {target_lang} rejected after {retry_count} retries"
                     )
@@ -1085,6 +1157,8 @@ class FileTranslationPipeline:
                         break
 
                 # Unexpected error - don't retry
+                result.validation_result = getattr(e, "validation_result", None)
+                result.error = f"{type(e).__name__}: {e}"
                 logger.error(f"Error translating {file_path} to {target_lang}: {e}")
                 result.errors.append(f"Translation to {target_lang} failed: {e}")
                 break

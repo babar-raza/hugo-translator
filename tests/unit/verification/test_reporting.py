@@ -164,11 +164,11 @@ class TestVerificationReporter:
         assert "### content/de/presentation-merger/_index.md" in md_output
 
         # Check summary stats
-        assert "Total Files: 1" in md_output
-        assert "Passed: 0 (0.0%)" in md_output
-        assert "Failed: 1 (100.0%)" in md_output
-        assert "Total Errors: 1" in md_output
-        assert "Total Warnings: 1" in md_output
+        assert "**Total Files**: 1" in md_output
+        assert "**Passed**: 0 (0.0%)" in md_output
+        assert "**Failed**: 1 (100.0%)" in md_output
+        assert "**Total Errors**: 1" in md_output
+        assert "**Total Warnings**: 1" in md_output
 
     def test_markdown_report_includes_issues(self, sample_results):
         """Test Markdown report includes issue details."""

@@ -4,6 +4,7 @@ Verification reporting module.
 Generates human-readable and machine-readable reports from verification results.
 Supports JSON and Markdown output formats.
 """
+
 import json
 from datetime import datetime
 from pathlib import Path
@@ -95,7 +96,7 @@ class VerificationReporter:
         files_data = []
         for file_path, result in results:
             file_data = {
-                "path": str(file_path),
+                "path": file_path.as_posix(),
                 "passed": result.passed,
                 "error_count": result.error_count,
                 "warning_count": result.warning_count,
@@ -205,7 +206,7 @@ class VerificationReporter:
 
             for file_path, result in results:
                 # File header
-                lines.append(f"### {file_path}")
+                lines.append(f"### {file_path.as_posix()}")
                 lines.append("")
 
                 # Status

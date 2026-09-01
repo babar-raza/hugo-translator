@@ -3,6 +3,7 @@ YAML frontmatter formatting for Hugo documents.
 
 Uses ruamel.yaml to preserve comments, quote styles, and literal block scalars.
 """
+import hashlib
 import re
 from io import StringIO
 from typing import Any
@@ -164,8 +165,10 @@ class YAMLFormatter:
                 logger.info(
                     "rcd_autocorrect",
                     field=field,
-                    before=original[:80],
-                    after=value[:80],
+                    before_sha256=hashlib.sha256(original.encode("utf-8")).hexdigest(),
+                    after_sha256=hashlib.sha256(value.encode("utf-8")).hexdigest(),
+                    before_length=len(original),
+                    after_length=len(value),
                 )
 
     @staticmethod

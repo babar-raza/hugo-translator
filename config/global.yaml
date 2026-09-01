@@ -52,7 +52,11 @@ tm_defaults:
   fallback_exact_only: false
   l1_cache_size: 10000
   l2_max_size_mb: 1536  # 2026-04-17: 696K entries @ 878 MB used; 1536 MiB = 658 MiB headroom. Run scripts/compact_l2_lmdb.py with workers stopped to reclaim 2 GB pre-alloc.
-  l3_embedding_model: "sentence-transformers/paraphrase-multilingual-mpnet-base-v2"
+  # Zero-defect semantic validation model. Qualified across all 25 campaign
+  # locales (minimum good-pair cosine 0.634719) and available from the pinned
+  # local Hugging Face snapshot; do not substitute the English-only L3 index
+  # encoder for cross-lingual validation.
+  l3_embedding_model: "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
   l3_index_type: "IVFFlat"  # Flat, IVFFlat, HNSW
 
   # TC-M3-LITE: L3 context gate (default disabled — enable after testing in staging)
@@ -646,6 +650,26 @@ translation_engine:
 
   require_language_detector: true  # Fail translation if language detector unavailable (prevents blind translation)
 
+  # Zero-defect retries may use a separately qualified local backend for a
+  # known short-field detector failure. This is profile/field scoped and never
+  # replaces the campaign-pinned M2M primary on a first attempt.
+  zero_defect_frontmatter_retry_models:
+    blog.aspose.org:
+      title: nllb_200_1.3b
+      seoTitle: nllb_200_1.3b
+      description: m2m100_418m
+      summary: m2m100_418m
+      de:
+        title: nllb_200_1.3b
+      cs:
+        title: nllb_200_1.3b
+      id:
+        title: nllb_200_1.3b
+      pl:
+        seoTitle: nllb_200_1.3b
+      uk:
+        title: nllb_200_1.3b
+
   max_batch_purity_failure_rate: 0.10  # Block write if >10% of batches fail language purity checks
 
   # Languages where batch-level purity checks are skipped (document-level check still enforced).
@@ -709,6 +733,12 @@ translation_engine:
   # accepted via SCRIPT_SIMILAR_LANGUAGES sr→{hr,bs} (Serbian Latin ≈ Croatian at text level).
   language_routing_overrides:
     lv: "professionalize_llm"   # Latvian: M2M100 produces Hungarian (83.1% purity failures). LLM verified 3/3 lv-detected.
+    ko: "nllb_200_1.3b"         # Korean: canary fidelity rejected all M2M/LLM attempts; route the full candidate through qualified NLLB.
+    de: "nllb_200_1.3b"         # German: M2M/LLM ladder left a required link-text unit untranslated.
+    fr: "nllb_200_1.3b"         # French: this canary source failed independent fidelity after the M2M/LLM ladder.
+    th: "nllb_200_1.3b"         # Thai: canary fidelity rejected all M2M/LLM attempts; route the full candidate through qualified NLLB.
+    tr: "nllb_200_1.3b"         # Turkish: M2M/LLM ladder left a required link-text unit untranslated.
+    vi: "nllb_200_1.3b"         # Vietnamese: canary fidelity rejected all M2M/LLM attempts; route the full candidate through qualified NLLB.
   #   sr: "professionalize_llm"   # Serbian: M2M100 produces mixed-language (67.7% failures). LLM produces Latin Serbian (hr-detected → accepted via script_similar_languages). TEMPORARILY DISABLED for heal run (NLLB used instead).
   #   fa: "professionalize_llm"   # Persian: RTL + systematic M2M100 failures (not yet verified)
   #   he: "professionalize_llm"   # Hebrew: RTL + systematic M2M100 failures (not yet verified)
@@ -765,6 +795,16 @@ translation_engine:
       - condition: {}
         preferred_model: professionalize_llm
         context_hint: frontmatter_description
+    frontmatter_seoTitle:
+      # SEO titles are short and brand-heavy; M2M can return them unchanged,
+      # which is a blocking wrong-language result in zero-defect campaigns.
+      - condition: {}
+        preferred_model: professionalize_llm
+        context_hint: frontmatter_seo_title
+    frontmatter_seo_title:
+      - condition: {}
+        preferred_model: professionalize_llm
+        context_hint: frontmatter_seo_title
     default:
       # All other units: use MT; escalate to LLM after 2 gate failures
       - condition: {}

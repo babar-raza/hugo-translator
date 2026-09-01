@@ -1,4 +1,5 @@
 """Tests for ContentTypeRouter — TC-HDN-005."""
+
 from unittest.mock import MagicMock
 
 import pytest
@@ -40,6 +41,13 @@ _CONFIG = {
             "context_hint": "frontmatter_description",
         },
     ],
+    "frontmatter_seoTitle": [
+        {
+            "condition": {},
+            "preferred_model": "professionalize_llm",
+            "context_hint": "frontmatter_seo_title",
+        },
+    ],
     "default": [
         {
             "condition": {},
@@ -77,7 +85,10 @@ class TestRoutingRules:
     def test_long_table_cell_uses_default_model(self):
         """TABLE_CELL_TEXT >60 chars → MT (null = use shard default)."""
         router = ContentTypeRouter(_CONFIG)
-        unit = _make_unit("table_cell_text", "Gets the value of this property, which controls the rendering of the element in the document.")
+        unit = _make_unit(
+            "table_cell_text",
+            "Gets the value of this property, which controls the rendering of the element in the document.",
+        )
         decision = router.route(unit)
         assert decision.model_id is None  # use MT
         assert decision.escalation_model == "professionalize_llm"
@@ -85,7 +96,9 @@ class TestRoutingRules:
     def test_prose_text_uses_mt_with_escalation(self):
         """Prose TEXT → null model, with LLM escalation on gate failure."""
         router = ContentTypeRouter(_CONFIG)
-        unit = _make_unit("text", "This is a long developer guide paragraph explaining the feature.")
+        unit = _make_unit(
+            "text", "This is a long developer guide paragraph explaining the feature."
+        )
         decision = router.route(unit)
         assert decision.model_id is None
         assert decision.escalation_model == "professionalize_llm"
@@ -179,3 +192,15 @@ class TestEscalationDecision:
         decision = router.route(unit)
         assert decision.escalation_threshold == 5
         assert decision.escalation_model == "my_llm"
+
+
+def test_frontmatter_seo_title_routes_to_llm():
+    """Brand-heavy SEO titles use the governed short-text backend."""
+    router = ContentTypeRouter(_CONFIG)
+    unit = _make_unit(
+        "text",
+        "Rust Spreadsheet Management — Sheets, Cells, Styles | Aspose.Cells FOSS",
+    )
+    decision = router.route(unit, field_name="seoTitle")
+    assert decision.model_id == "professionalize_llm"
+    assert decision.context_hint == "frontmatter_seo_title"

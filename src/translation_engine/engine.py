@@ -10,11 +10,13 @@ Orchestrates the complete translation workflow:
 6. Write output files
 """
 
+import hashlib
 import logging
 import hashlib
 import os
 import re
 import time
+import unicodedata
 from pathlib import Path
 from typing import Any, Optional
 
@@ -35,7 +37,7 @@ from ..utils.atomic_write import (
     atomic_write_binary,
 )
 from ..utils.config_loader import ConfigService
-from ..utils.content_discovery import ALL_LANGUAGE_CODES as _ALL_LANGUAGE_CODES
+from ..utils.content_discovery import ALL_LANGUAGE_CODES as _ALL_LANGUAGE_CODES  # noqa: F401
 from ..utils.content_discovery import is_translated_filename as _is_translated_filename
 from ..utils.content_discovery import resolve_translated_path as _resolve_translated_path
 from ..utils.file_lock import FileLock
@@ -57,6 +59,88 @@ from .validation.base import ValidationSeverity as _ValSeverity
 from .validation.decision_engine import ValidationDecisionEngine
 
 logger = logging.getLogger(__name__)
+
+
+_TARGET_SCRIPT_RANGES: dict[str, tuple[tuple[int, int], ...]] = {
+    "ar": ((0x0600, 0x06FF),),
+    "fa": ((0x0600, 0x06FF),),
+    "el": ((0x0370, 0x03FF),),
+    "he": ((0x0590, 0x05FF),),
+    "hi": ((0x0900, 0x097F),),
+    "ja": ((0x3040, 0x30FF), (0x3400, 0x9FFF)),
+    "ko": ((0x1100, 0x11FF), (0xAC00, 0xD7AF)),
+    "ru": ((0x0400, 0x052F),),
+    "th": ((0x0E00, 0x0E7F),),
+    "uk": ((0x0400, 0x052F),),
+    "zh": ((0x3400, 0x9FFF),),
+}
+
+_FRONTMATTER_TECHNICAL_SIGNAL_RE = re.compile(
+    r"(?<![A-Za-z0-9_])(?:"
+    r"Aspose(?:\.[A-Za-z][A-Za-z0-9]*)+|"
+    r"\.NET|C\+\+|C#|"
+    r"FOSS|SDK|API|HTTP|REST|JSON|XML|XLSX|PDF|DOCX|"
+    r"Rust|Python|Java|JavaScript|Microsoft|Office|"
+    r"[A-Za-z][A-Za-z0-9_+#-]*(?:\.[A-Za-z0-9_+#-]+)+|"
+    r"[A-Z][A-Z0-9_+#-]{1,}|"
+    r"[A-Z][a-z0-9]+(?:[A-Z][A-Za-z0-9]*)+"
+    r")(?![A-Za-z0-9_.])"
+)
+
+
+def _frontmatter_script_metrics(text: str, target_lang: str) -> dict[str, int | float]:
+    """Return payload-free script ratios for frontmatter diagnostics."""
+    letters = [character for character in text if character.isalpha()]
+    letter_count = len(letters)
+    if not letter_count:
+        return {
+            "letter_count": 0,
+            "latin_letter_ratio": 0.0,
+            "target_script_ratio": 0.0,
+        }
+    latin_count = sum(1 for character in letters if "LATIN" in unicodedata.name(character, ""))
+    ranges = _TARGET_SCRIPT_RANGES.get(target_lang, ())
+    if ranges:
+        target_count = sum(
+            1
+            for character in letters
+            if any(start <= ord(character) <= end for start, end in ranges)
+        )
+    else:
+        target_count = latin_count
+    return {
+        "letter_count": letter_count,
+        "latin_letter_ratio": latin_count / letter_count,
+        "target_script_ratio": target_count / letter_count,
+    }
+
+
+def _frontmatter_has_strong_script_evidence(text: str, target_lang: str) -> bool:
+    """Attest Chinese prose after removing governed technical tokens.
+
+    Required product, platform, API, and file-format identifiers must not
+    outvote translated prose. The remaining signal still needs enough Han
+    characters and a high script ratio, so a token Chinese word added to
+    untranslated English prose cannot pass.
+    """
+    target_base = target_lang.lower().split("-")[0]
+    if target_base != "zh":
+        return False
+    signal = _FRONTMATTER_TECHNICAL_SIGNAL_RE.sub(" ", text)
+    letters = [character for character in signal if character.isalpha()]
+    if not letters:
+        return False
+    ranges = _TARGET_SCRIPT_RANGES[target_base]
+    target_count = sum(
+        any(start <= ord(character) <= end for start, end in ranges) for character in letters
+    )
+    return target_count >= 6 and target_count / len(letters) >= 0.70
+
+
+def _frontmatter_language_signal_text(text: str) -> str:
+    """Return ordinary prose without governed technical classifier noise."""
+    stripped = _FRONTMATTER_TECHNICAL_SIGNAL_RE.sub(" ", text)
+    return re.sub(r"\s+", " ", stripped).strip()
 
 
 # _ALL_LANGUAGE_CODES and _is_translated_filename are re-exported (see imports
@@ -839,6 +923,7 @@ class TranslationEngine:
         force_overwrite: bool = False,
         validate: bool | None = None,
         trigger_type: str = "cli",
+        retry_budget_override: int | None = None,
     ) -> TranslationResult:
         """
         Translate a single Hugo markdown file.
@@ -1032,8 +1117,12 @@ class TranslationEngine:
             should_verify = self.enable_verification
             should_fix = self.enable_verification_fix and should_verify
             max_retry_attempts = (
-                self.decision_engine.max_retry_attempts if self.decision_engine else 2
+                retry_budget_override
+                if retry_budget_override is not None
+                else (self.decision_engine.max_retry_attempts if self.decision_engine else 2)
             )
+            if max_retry_attempts < 0:
+                raise ValueError("retry_budget_override must be non-negative")
 
             # CRITICAL FIX: Cache output paths to prevent path mismatch between skip check and write
             # Bug: If path calculated differently at write time, skip check tests wrong path
@@ -1552,6 +1641,231 @@ class TranslationEngine:
 
         return not errors, errors
 
+    def accept_candidate_bytes(
+        self,
+        *,
+        source_bytes: bytes,
+        candidate_bytes: bytes,
+        source_path: Path,
+        output_path: Path,
+        target_lang: str,
+        site_id: str,
+        model_fingerprint: str = "",
+    ):
+        """Revalidate immutable bytes and return an acceptance capability.
+
+        This is the non-writing counterpart of the production validation path.
+        It exists for fail-closed receipt recovery and verification: callers
+        receive an ``AcceptedTranslation`` only when the exact supplied bytes
+        pass the full validation suite, independent verification, all 44 write
+        gates (including the fidelity judge), placement checks, and the
+        fixed-point auto-clean rerun.  It never writes output or flushes TM.
+        """
+        from .models import AcceptedTranslation
+        from .reconstructor import ASTRenderer
+        from .validation.post_translation_validator import (
+            ValidationDecision as PostValidationDecision,
+        )
+
+        if self.validation_policy != "zero-defect":
+            raise RuntimeError("candidate-byte acceptance requires zero-defect policy")
+        if not isinstance(source_bytes, bytes) or not isinstance(candidate_bytes, bytes):
+            raise TypeError("candidate-byte acceptance requires immutable bytes")
+        if not self.validation_suite or not self.decision_engine:
+            raise RuntimeError("candidate-byte acceptance requires all validators")
+
+        try:
+            source_content = source_bytes.decode("utf-8", errors="strict")
+            translated_content = candidate_bytes.decode("utf-8", errors="strict")
+        except UnicodeDecodeError as exc:
+            raise ValueError("candidate-byte acceptance requires valid UTF-8") from exc
+        if translated_content.encode("utf-8") != candidate_bytes:
+            raise ValueError("candidate bytes are not a stable UTF-8 round trip")
+
+        site_profile = self.config.get_site_profile(site_id)
+        if site_profile is None:
+            raise RuntimeError(f"site profile unavailable: {site_id}")
+        source_doc = self.parser.parse_string(source_content)
+        source_doc.source_path = source_path
+        translated_doc = self.parser.parse_string(translated_content)
+
+        source_body = (
+            ASTRenderer().render_to_markdown(source_doc.ast)
+            if getattr(source_doc, "ast", None)
+            else ""
+        )
+        # Match the production file pipeline exactly: validation operates on
+        # the serialized body bytes with only the frontmatter delimiters
+        # removed, not on a parser-normalized reconstruction.
+        translated_body = translated_content
+        if translated_body.startswith("---"):
+            frontmatter_end = translated_body.find("---", 3)
+            if frontmatter_end != -1:
+                translated_body = translated_body[frontmatter_end + 3 :].lstrip("\n")
+        validation_result = self.validation_suite.validate_aggregated(
+            source_body,
+            translated_body,
+            context={
+                "source_lang": getattr(site_profile, "default_source_lang", "en"),
+                "target_lang": target_lang,
+                "file_path": str(source_path),
+                "validation_policy": "zero-defect",
+            },
+        )
+        validation_result.issues.extend(
+            self._check_frontmatter_language(translated_content, target_lang)
+        )
+        if (
+            getattr(validation_result, "error_count", 0) > 0
+            or getattr(validation_result, "warning_count", 0) > 0
+        ):
+            validators = sorted(
+                {
+                    str(getattr(issue, "validator", "unknown"))
+                    for issue in getattr(validation_result, "issues", [])
+                }
+            )
+            raise ValueError(
+                "candidate rejected by validation suite "
+                f"errors={getattr(validation_result, 'error_count', 0)} "
+                f"warnings={getattr(validation_result, 'warning_count', 0)} "
+                f"validators={','.join(validators) or 'unknown'}"
+            )
+        decision = self.decision_engine.make_decision(
+            validation_result=validation_result,
+            retry_count=0,
+            source=source_body,
+            site_id=site_id,
+            target_lang=target_lang,
+        )
+        if decision.decision != PostValidationDecision.ACCEPT:
+            raise ValueError("candidate rejected by validation decision")
+
+        verification = self._get_verification_agent().verify(
+            source_doc={
+                "frontmatter": getattr(source_doc, "frontmatter", {}),
+                "body": str(getattr(source_doc, "body", "")),
+            },
+            translated_doc={
+                "frontmatter": getattr(translated_doc, "frontmatter", {}),
+                "body": str(getattr(translated_doc, "body", "")),
+            },
+            target_lang=target_lang,
+            context={
+                "source_lang": getattr(site_profile, "default_source_lang", "en"),
+                "file_path": str(source_path),
+                "site_id": site_id,
+                "validation_policy": "zero-defect",
+            },
+        )
+        if (
+            not verification.passed
+            or getattr(verification, "error_count", 0) > 0
+            or getattr(verification, "warning_count", 0) > 0
+        ):
+            checks = sorted(
+                {
+                    str(getattr(issue, "check_name", "unknown"))
+                    for issue in getattr(verification, "issues", [])
+                }
+            )
+            locations = sorted(
+                {
+                    hashlib.sha256(
+                        str(getattr(issue, "location", "unknown")).encode("utf-8")
+                    ).hexdigest()[:16]
+                    for issue in getattr(verification, "issues", [])
+                }
+            )
+            raise ValueError(
+                "candidate rejected by independent verification "
+                f"errors={getattr(verification, 'error_count', 0)} "
+                f"warnings={getattr(verification, 'warning_count', 0)} "
+                f"checks={','.join(checks) or 'unknown'} "
+                f"location_hashes={','.join(locations) or 'none'}"
+            )
+
+        gate_result = self._write_gate.evaluate_zero_defect(
+            translated_content=translated_content,
+            source_content=source_content,
+            target_lang=target_lang,
+            output_path=output_path,
+            source_doc=source_doc,
+            # Receipt recovery validates a byte-identical existing blob.  This
+            # bypasses only Gate 3's "path already exists" condition; it does
+            # not bypass or weaken any translation-quality gate.
+            force_overwrite=True,
+            site_profile=site_profile,
+            translation_stats=TranslationStats(),
+        )
+        if not gate_result.passed:
+            failed_gates = sorted(
+                gate_id
+                for gate_id, item in gate_result.gate_results.items()
+                if not item.get("passed", False)
+            )
+            reason_hash = hashlib.sha256(
+                str(gate_result.error or "unknown").encode("utf-8")
+            ).hexdigest()[:16]
+            raise ValueError(
+                "candidate rejected by write gate "
+                f"failed_gates={','.join(map(str, failed_gates)) or 'unknown'} "
+                f"reason_sha256={reason_hash}"
+            )
+        expected_gate_ids = set(range(2, 45))
+        if set(gate_result.gate_results) != expected_gate_ids or any(
+            not item.get("passed", False) for item in gate_result.gate_results.values()
+        ):
+            raise ValueError("candidate lacks an all-pass 43-gate write receipt")
+        final_content = (
+            gate_result.cleaned_content
+            if gate_result.cleaned_content is not None
+            else translated_content
+        )
+        if final_content.encode("utf-8") != candidate_bytes:
+            raise ValueError("candidate bytes differ from fixed-point gate output")
+        fidelity = getattr(gate_result, "_fidelity_result", None)
+        if not isinstance(fidelity, dict) or fidelity.get("verdict") != "pass":
+            raise ValueError("candidate lacks an independent fidelity PASS")
+
+        pre_write_passed, pre_write_errors = self._pre_write_validation(
+            content=translated_content,
+            output_path=output_path,
+            source_path=source_path,
+            target_lang=target_lang,
+            site_id=site_id,
+            site_profile=site_profile,
+        )
+        if not pre_write_passed:
+            raise ValueError(
+                f"candidate rejected by pre-write validation ({len(pre_write_errors)} finding(s))"
+            )
+
+        gate_receipt = {
+            1: {"passed": True, "action": "verification", "error": None},
+            **gate_result.gate_results,
+        }
+        campaign_context = getattr(self, "campaign_context", {}) or {}
+        fidelity_model = str(fidelity.get("model") or "")
+        receipt_model = model_fingerprint or (
+            f"receipt-recovery:fidelity={fidelity_model}"
+            if fidelity_model
+            else "receipt-recovery:fidelity=unknown"
+        )
+        return AcceptedTranslation(
+            content=candidate_bytes,
+            source_path=source_path,
+            output_path=output_path,
+            source_sha256=hashlib.sha256(source_bytes).hexdigest(),
+            output_sha256=hashlib.sha256(candidate_bytes).hexdigest(),
+            target_lang=target_lang,
+            validation_policy="zero-defect",
+            gate_results=gate_receipt,
+            config_fingerprint=str(campaign_context.get("config_fingerprint") or ""),
+            model_fingerprint=receipt_model,
+            campaign_id=str(campaign_context.get("campaign_id") or ""),
+        )
+
     def _tm_site_namespace(self, site_id: str, source_path: Path | str | None) -> str:
         """Bind campaign TM entries to campaign, config, and source context."""
         context = getattr(self, "campaign_context", {}) or {}
@@ -1577,8 +1891,18 @@ class TranslationEngine:
             raise TypeError("zero-defect writer requires AcceptedTranslation")
         if accepted.validation_policy != "zero-defect":
             raise ValueError("accepted translation has the wrong validation policy")
-        if any(not item.get("passed", False) for item in accepted.gate_results.values()):
-            raise ValueError("accepted translation contains a non-passing gate receipt")
+        expected_gate_ids = set(range(1, 45))
+        invalid_gates = [
+            gate_id
+            for gate_id, item in accepted.gate_results.items()
+            if not isinstance(item, dict)
+            or not item.get("passed", False)
+            or str(item.get("action", "")).lower()
+            in {"warn", "warning", "skip", "skipped", "unavailable", "exception"}
+            or item.get("error") is not None
+        ]
+        if set(accepted.gate_results) != expected_gate_ids or invalid_gates:
+            raise ValueError("accepted translation contains a non-final gate receipt")
 
         file_existed = accepted.output_path.exists()
         atomic_write_binary(
@@ -1616,10 +1940,17 @@ class TranslationEngine:
 
         if not isinstance(accepted, AcceptedTranslation):
             raise TypeError("TM flush requires AcceptedTranslation")
-        if len(accepted.gate_results) != 44 or any(
-            not item.get("passed", False)
-            for item in accepted.gate_results.values()
-        ):
+        expected_gate_ids = set(range(1, 45))
+        invalid_gates = [
+            gate_id
+            for gate_id, item in accepted.gate_results.items()
+            if not isinstance(item, dict)
+            or not item.get("passed", False)
+            or str(item.get("action", "")).lower()
+            in {"warn", "warning", "skip", "skipped", "unavailable", "exception"}
+            or item.get("error") is not None
+        ]
+        if set(accepted.gate_results) != expected_gate_ids or invalid_gates:
             raise ValueError("TM flush requires an all-44-gates acceptance receipt")
         for entry in buffered_entries:
             self.tm.store(**entry)
@@ -1668,7 +1999,7 @@ class TranslationEngine:
         CONFIDENCE_THRESHOLD = 0.80
         # Regex: C++ scope resolution (mapi_message::from_file) or multiple underscored
         # identifiers — these inflate apparent English ratio in langdetect.
-        _API_IDENTIFIER_RE = _re.compile(r'[A-Za-z_]\w*::[A-Za-z_]\w*|(?:\b[a-z]+_[a-z_]+\b.*){2}')
+        _API_IDENTIFIER_RE = _re.compile(r"[A-Za-z_]\w*::[A-Za-z_]\w*|(?:\b[a-z]+_[a-z_]+\b.*){2}")
 
         issues = []
         # Extract frontmatter block
@@ -1705,6 +2036,22 @@ class TranslationEngine:
             "Event ",
             "Constructor ",
         )
+        _SIMILAR_LANG_MAP = {
+            "sr": {"hr", "bs"},  # South Slavic Latin-script
+            "hr": {"sr", "bs"},
+            "bs": {"sr", "hr"},
+            "ms": {"id"},  # Malay ↔ Indonesian
+            "id": {"ms"},
+            "uk": {"ru", "bg"},  # East Slavic Cyrillic
+            "bg": {"ru", "uk"},
+            "sk": {"cs"},  # West Slavic
+            "cs": {"sk"},
+            "zh": {"ja", "zh-cn", "zh-tw"},  # CJK — shared characters
+            "ja": {"zh", "zh-cn", "zh-tw"},
+            "no": {"da", "nb"},  # North Germanic
+            "nb": {"no", "da"},
+            "da": {"no", "nb"},
+        }
 
         for field in CHECKED_FIELDS:
             value = fm_data.get(field)
@@ -1720,30 +2067,35 @@ class TranslationEngine:
                 or _API_IDENTIFIER_RE.search(v_stripped)
             ):
                 continue
+            if _frontmatter_has_strong_script_evidence(v_stripped, target_lang):
+                continue
             try:
+                # Required product/API/platform identifiers can dominate a
+                # short, otherwise-correct Latin-script title. Accept only a
+                # strong positive target-language verdict from ordinary prose
+                # with governed technical tokens removed. If that positive
+                # attestation is absent, retain the stricter raw-text check.
+                signal_text = _frontmatter_language_signal_text(v_stripped)
+                if sum(character.isalpha() for character in signal_text) >= 6:
+                    signal_langs = _ld.detect_langs(signal_text)
+                    if signal_langs:
+                        signal_top = signal_langs[0]
+                        signal_accepted = _SIMILAR_LANG_MAP.get(target_lang, set())
+                        if (
+                            signal_top.lang == target_lang or signal_top.lang in signal_accepted
+                        ) and signal_top.prob > CONFIDENCE_THRESHOLD:
+                            continue
                 detected_langs = _ld.detect_langs(v_stripped)
                 if detected_langs:
                     top = detected_langs[0]
                     # Accept linguistically near-identical languages that share script/vocabulary space.
                     # langdetect frequently confuses these pairs on short technical text.
-                    _SIMILAR_LANG_MAP = {
-                        'sr': {'hr', 'bs'},        # South Slavic Latin-script
-                        'hr': {'sr', 'bs'},
-                        'bs': {'sr', 'hr'},
-                        'ms': {'id'},              # Malay ↔ Indonesian
-                        'id': {'ms'},
-                        'uk': {'ru', 'bg'},        # East Slavic Cyrillic
-                        'bg': {'ru', 'uk'},
-                        'sk': {'cs'},              # West Slavic
-                        'cs': {'sk'},
-                        'zh': {'ja', 'zh-cn', 'zh-tw'},  # CJK — shared characters
-                        'ja': {'zh', 'zh-cn', 'zh-tw'},
-                        'no': {'da', 'nb'},        # North Germanic
-                        'nb': {'no', 'da'},
-                        'da': {'no', 'nb'},
-                    }
                     _similar_accepted = _SIMILAR_LANG_MAP.get(target_lang, set())
-                    if top.lang != target_lang and top.lang not in _similar_accepted and top.prob > CONFIDENCE_THRESHOLD:
+                    if (
+                        top.lang != target_lang
+                        and top.lang not in _similar_accepted
+                        and top.prob > CONFIDENCE_THRESHOLD
+                    ):
                         issues.append(
                             _ValIssue(
                                 severity=_ValSeverity.ERROR,
@@ -1759,6 +2111,7 @@ class TranslationEngine:
                                     "detected_lang": top.lang,
                                     "confidence": top.prob,
                                     "expected_lang": target_lang,
+                                    **_frontmatter_script_metrics(v_stripped, target_lang),
                                 },
                             )
                         )
@@ -2264,12 +2617,12 @@ class TranslationEngine:
                 retry_count=retry_count,
                 success=success,
                 # Additional context
-                validation_passed=stats.validation_passed
-                if hasattr(stats, "validation_passed")
-                else None,
-                validation_errors=stats.validation_errors
-                if hasattr(stats, "validation_errors")
-                else 0,
+                validation_passed=(
+                    stats.validation_passed if hasattr(stats, "validation_passed") else None
+                ),
+                validation_errors=(
+                    stats.validation_errors if hasattr(stats, "validation_errors") else 0
+                ),
             )
 
             logger.debug(

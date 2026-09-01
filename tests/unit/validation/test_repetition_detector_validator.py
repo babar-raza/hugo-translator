@@ -451,6 +451,35 @@ class TestRepetitionDetectorValidator:
         assert result.success
         assert result.error_count == 0
 
+    def test_unicode_combining_marks_remain_inside_indic_words(self):
+        validator = RepetitionDetectorValidator()
+
+        assert validator._tokenize(
+            "स्प्रेडशीट प्रबंधन में"
+        ) == ["स्प्रेडशीट", "प्रबंधन", "में"]
+        assert validator._tokenize(
+            "करने के लिए"
+        ) == ["करने", "के", "लिए"]
+
+    def test_real_hindi_phrase_repetition_is_still_detected(self):
+        validator = RepetitionDetectorValidator(
+            config={
+                "ngram_threshold": 5,
+                "ngram_warning_threshold": 4,
+            }
+        )
+        translation = " ".join(
+            ["स्प्रेडशीट प्रबंधन के लिए"] * 8
+        )
+
+        result = validator.validate(source="", translation=translation)
+
+        assert result.error_count > 0
+        assert any(
+            issue.details.get("ngram") == "स्प्रेडशीट प्रबंधन के"
+            for issue in result.issues
+        )
+
 
 class TestSourceRelativeBaseline:
     """Tests for source-relative repetition thresholds (TC-01 regression suite).
@@ -509,6 +538,96 @@ class TestSourceRelativeBaseline:
         # Should detect added repetition as ERROR
         assert not result.success
         assert result.error_count > 0
+
+    def test_warning_band_tracks_configured_error_threshold(self):
+        """A raised error threshold must not retain the legacy 2x warning band."""
+        validator = RepetitionDetectorValidator(
+            config={
+                "ngram_threshold": 5,
+                "ngram_warning_threshold": 2,
+            }
+        )
+        repeated_three = " ".join(
+            ["reutilizar esta frase ahora"] * 3 + ["contenido final distinto"]
+        )
+        repeated_four = " ".join(
+            ["reutilizar esta frase ahora"] * 4 + ["contenido final distinto"]
+        )
+        repeated_five = " ".join(
+            ["reutilizar esta frase ahora"] * 5 + ["contenido final distinto"]
+        )
+
+        three = validator.validate(source="", translation=repeated_three)
+        four = validator.validate(source="", translation=repeated_four)
+        five = validator.validate(source="", translation=repeated_five)
+
+        assert three.warning_count == 0
+        assert three.error_count == 0
+        assert four.warning_count > 0
+        assert four.error_count == 0
+        assert five.error_count > 0
+
+    def test_locale_scoped_canonical_phrase_expansion_is_exempt(self):
+        validator = RepetitionDetectorValidator(
+            config={
+                "ngram_threshold": 5,
+                "localized_phrase_whitelist": {
+                    "es": ["gestión de hojas de cálculo"],
+                    "fr": ["gestion des feuilles de calcul"],
+                },
+            }
+        )
+        text = " ".join(
+            [
+                f"sección {index} gestión de hojas de cálculo detalle {index}"
+                for index in range(8)
+            ]
+        )
+
+        spanish = validator._check_ngram_repetition(
+            text,
+            "0",
+            source_ngram_ceiling=2,
+            target_lang="es",
+        )
+        french = validator._check_ngram_repetition(
+            text,
+            "0",
+            source_ngram_ceiling=2,
+            target_lang="fr",
+        )
+
+        spanish_payloads = {
+            issue.details.get("ngram") for issue in spanish
+        }
+        french_payloads = {
+            issue.details.get("ngram") for issue in french
+        }
+        assert "gestión de hojas" not in spanish_payloads
+        assert "de hojas de" not in spanish_payloads
+        assert "hojas de cálculo" not in spanish_payloads
+        assert "hojas de cálculo" in french_payloads
+
+        french_text = " ".join(
+            [
+                f"section {index} gestion des feuilles de calcul detail {index}"
+                for index in range(8)
+            ]
+        )
+        exempt_french = validator._check_ngram_repetition(
+            french_text, "1", source_ngram_ceiling=2, target_lang="fr"
+        )
+        unrelated_french = validator._check_ngram_repetition(
+            french_text, "1", source_ngram_ceiling=2, target_lang="es"
+        )
+        assert not any(
+            issue.details.get("ngram") == "gestion des feuilles"
+            for issue in exempt_french
+        )
+        assert any(
+            issue.details.get("ngram") == "gestion des feuilles"
+            for issue in unrelated_french
+        )
 
     def test_no_source_uses_fixed_threshold(self):
         """When no source is provided, fixed threshold applies unchanged."""

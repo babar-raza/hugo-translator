@@ -158,6 +158,7 @@ def test_l1_hit_skips_l2_and_l3_lookup(
         sample_lookup_params["src_lang"],
         sample_lookup_params["tgt_lang"],
         sample_lookup_params["text"],
+        "",
     )
 
     # Assert - L2 and L3 were NOT called
@@ -237,6 +238,7 @@ def test_l2_hit_skips_l3_and_promotes_to_l1(
         sample_lookup_params["tgt_lang"],
         sample_lookup_params["text"],
         l2_entry.translation,
+        "",
     )
 
     # Assert - Result indicates L2 exact hit
@@ -291,6 +293,7 @@ def test_l3_hit_promotes_to_l1_cache(
         sample_lookup_params["tgt_lang"],
         sample_lookup_params["text"],
         l3_match.translation,
+        "",
     )
 
     # Assert - Result indicates L3 semantic hit

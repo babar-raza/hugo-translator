@@ -7,6 +7,7 @@ to avoid loading a second SentenceTransformer model.
 
 Only active in strict validation mode (controlled via config/validation.yaml).
 """
+
 from __future__ import annotations
 
 import logging
@@ -83,7 +84,9 @@ class SemanticSimilarityValidator(Validator):
             encoder: A SentenceTransformer-compatible encoder with an `encode()` method.
         """
         cls._shared_encoder = encoder
-        logger.debug("SemanticSimilarityValidator: shared encoder registered (%s)", type(encoder).__name__)
+        logger.debug(
+            "SemanticSimilarityValidator: shared encoder registered (%s)", type(encoder).__name__
+        )
 
     # ------------------------------------------------------------------
     # Public interface
@@ -124,12 +127,17 @@ class SemanticSimilarityValidator(Validator):
         # Acquire encoder (lazy — don't block if unavailable)
         enc = self._get_encoder()
         if enc is None:
-            result = ValidationResult(success=True)
+            zero_defect = (context or {}).get("validation_policy") == "zero-defect"
+            result = ValidationResult(success=not zero_defect)
             result.issues.append(
                 ValidationIssue(
-                    severity=ValidationSeverity.INFO,
+                    severity=(ValidationSeverity.ERROR if zero_defect else ValidationSeverity.INFO),
                     validator=self.name,
-                    message="Skipped (no sentence encoder available)",
+                    message=(
+                        "Validator unavailable (no sentence encoder available)"
+                        if zero_defect
+                        else "Skipped (no sentence encoder available)"
+                    ),
                 )
             )
             return result
@@ -142,6 +150,18 @@ class SemanticSimilarityValidator(Validator):
             )
         except Exception as exc:
             logger.debug("SemanticSimilarityValidator: embedding failed: %s", exc)
+            if (context or {}).get("validation_policy") == "zero-defect":
+                return ValidationResult(
+                    success=False,
+                    issues=[
+                        ValidationIssue(
+                            severity=ValidationSeverity.ERROR,
+                            validator=self.name,
+                            message="Validator unavailable (embedding execution failed)",
+                            details={"exception_type": type(exc).__name__},
+                        )
+                    ],
+                )
             return ValidationResult(success=True)  # fail open
 
         result = ValidationResult(success=True)

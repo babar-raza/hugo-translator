@@ -367,6 +367,78 @@ class TestLLMModelBackend:
         # Packed: 1 call instead of 2
         assert mock_provider.generate.call_count == 1
 
+    def test_retry_feedback_is_system_context_not_source_text(self, ollama_model_info):
+        backend = LLMModelBackend(ollama_model_info, device="api")
+        backend.loaded = True
+        mock_provider = MagicMock()
+        mock_provider.generate.return_value = ("हिंदी लिंक", 10, 4)
+        backend._provider = mock_provider
+
+        result = backend.translate_with_retry_feedback(
+            ["Aspose.Cells — Enterprise Blog"],
+            "en",
+            "hi",
+            retry_feedback="Translate every link label fully into hi.",
+        )
+
+        assert result == ["हिंदी लिंक"]
+        kwargs = mock_provider.generate.call_args.kwargs
+        assert "Translate every link label fully into hi." not in kwargs["user_text"]
+        assert kwargs["user_text"].endswith("— Enterprise Blog")
+        assert "Translate every link label fully into hi." in kwargs["system_prompt"]
+
+        mock_provider.reset_mock()
+        mock_provider.generate.return_value = ("सामान्य", 8, 2)
+        backend.translate(["Normal source"], "en", "hi")
+        assert (
+            "Translate every link label fully into hi."
+            not in mock_provider.generate.call_args.kwargs["system_prompt"]
+        )
+
+    def test_context_hint_and_retry_feedback_compose(self, ollama_model_info):
+        backend = LLMModelBackend(ollama_model_info, device="api")
+        backend.loaded = True
+        mock_provider = MagicMock()
+        mock_provider.generate.return_value = ("हिंदी विवरण", 10, 4)
+        backend._provider = mock_provider
+
+        backend.translate_with_context(
+            ["Technical description"],
+            "en",
+            "hi",
+            context_hint="frontmatter_description",
+            retry_feedback="Translate description fully into hi.",
+        )
+
+        prompt = mock_provider.generate.call_args.kwargs["system_prompt"]
+        assert "technical documentation translator" in prompt
+        assert "Translate description fully into hi." in prompt
+
+    def test_packed_retry_feedback_does_not_modify_numbered_sources(self, ollama_model_info):
+        backend = LLMModelBackend(ollama_model_info, device="api")
+        backend.loaded = True
+        mock_provider = MagicMock()
+        mock_provider.generate.return_value = (
+            "<<<SEG_1>>> पहला\n<<<SEG_2>>> दूसरा",
+            20,
+            6,
+        )
+        backend._provider = mock_provider
+
+        result = backend.translate_with_retry_feedback(
+            ["First source", "Second source"],
+            "en",
+            "hi",
+            retry_feedback="Preserve every claim.",
+        )
+
+        assert result == ["पहला", "दूसरा"]
+        kwargs = mock_provider.generate.call_args.kwargs
+        assert "Preserve every claim." in kwargs["system_prompt"]
+        assert "Preserve every claim." not in kwargs["user_text"]
+        assert "<<<SEG_1>>> First source" in kwargs["user_text"]
+        assert "<<<SEG_2>>> Second source" in kwargs["user_text"]
+
     def test_translate_with_token_counts(self, ollama_model_info):
         """LLM-WASTE-FIX-3: token counts from packed call."""
         backend = LLMModelBackend(ollama_model_info, device="api")
@@ -525,9 +597,16 @@ class TestValidateLlmResponse:
     def _prompt(self):
         return LLMModelBackend(
             ModelInfo(
-                model_id="x", name="x", backend="llm", supported_pairs="all",
-                model_size_mb=0, min_ram_gb=0, optimal_device="api",
-                provider="ollama", model_name="x", base_url="http://x",
+                model_id="x",
+                name="x",
+                backend="llm",
+                supported_pairs="all",
+                model_size_mb=0,
+                min_ram_gb=0,
+                optimal_device="api",
+                provider="ollama",
+                model_name="x",
+                base_url="http://x",
             ),
             device="api",
         )._build_system_prompt("en", "es")

@@ -4,7 +4,9 @@ Language Detection Check for verification.
 Detects when translated content is not in the expected target language,
 which indicates untranslated or mixed-language content.
 """
+
 import logging
+import re
 from typing import Any
 
 from .base import VerificationCheck, VerificationIssue
@@ -61,14 +63,80 @@ class LanguageDetectionCheck(VerificationCheck):
     # Patterns that indicate technical content to skip
     SKIP_PATTERNS = [
         # Code patterns
-        "{{", "}}", "<%", "%>", "```",
+        "{{",
+        "}}",
+        "<%",
+        "%>",
+        "```",
         # URL patterns
-        "http://", "https://", "www.",
+        "http://",
+        "https://",
+        "www.",
         # File paths
-        ".exe", ".dll", ".pdf", ".docx",
+        ".exe",
+        ".dll",
+        ".pdf",
+        ".docx",
         # API references (likely to stay in English)
-        "API", "SDK", "HTTP", "REST", "JSON", "XML",
+        "API",
+        "SDK",
+        "HTTP",
+        "REST",
+        "JSON",
+        "XML",
     ]
+    ALWAYS_SKIP_PATTERNS = [
+        "{{",
+        "}}",
+        "<%",
+        "%>",
+        "```",
+        "http://",
+        "https://",
+        "www.",
+    ]
+    PROTECTED_FRONTMATTER_TREES = {
+        "evidence",
+        "grade_reasons",
+    }
+    # Language classifiers can be dominated by required ASCII product/platform
+    # tokens in an otherwise-correct short title.  For example, langdetect
+    # classifies a Korean title containing ``Aspose.Cells FOSS`` and ``Rust``
+    # as Estonian with high confidence even though the ordinary prose is
+    # Korean.  Remove only syntax-shaped identifiers and the small governed
+    # platform lexicon from the classifier input.  The untranslated-unit and
+    # terminology gates still validate those tokens independently.
+    TECHNICAL_SIGNAL_RE = re.compile(
+        r"(?<![A-Za-z0-9_])(?:"
+        r"Aspose(?:\.[A-Za-z][A-Za-z0-9]*)+|"
+        r"\.NET|C\+\+|C#|"
+        r"FOSS|SDK|API|HTTP|REST|JSON|XML|XLSX|PDF|DOCX|"
+        r"Rust|Python|Java|JavaScript|Microsoft|Office|"
+        r"[A-Za-z][A-Za-z0-9_+#-]*(?:\.[A-Za-z0-9_+#-]+)+|"
+        r"[A-Z][A-Z0-9_+#-]{1,}|"
+        r"[A-Z][a-z0-9]+(?:[A-Z][A-Za-z0-9]*)+"
+        r")(?![A-Za-z0-9_.])"
+    )
+    # ``langdetect`` is character n-gram based and consistently classifies
+    # short Korean technical titles as English when immutable product tokens
+    # (for example, ``Aspose.Cells FOSS`` and ``Rust``) are present.  Hangul
+    # is an independent, deterministic language-script signal, so use it to
+    # disambiguate that known false-positive class.  The minimum count and
+    # ratio deliberately remain high enough that adding a token Korean word
+    # to otherwise untranslated English prose cannot pass this check.
+    TARGET_SCRIPT_RANGES = {
+        "ko": (
+            (0x1100, 0x11FF),  # Hangul Jamo
+            (0x3130, 0x318F),  # Hangul Compatibility Jamo
+            (0xAC00, 0xD7AF),  # Hangul syllables
+        ),
+        "zh": (
+            (0x3400, 0x4DBF),  # CJK Unified Ideographs Extension A
+            (0x4E00, 0x9FFF),  # CJK Unified Ideographs
+        ),
+    }
+    MIN_TARGET_SCRIPT_CHARS = 6
+    MIN_TARGET_SCRIPT_RATIO = 0.30
 
     def __init__(
         self,
@@ -122,6 +190,7 @@ class LanguageDetectionCheck(VerificationCheck):
                 translated["frontmatter"],
                 target_lang,
                 "frontmatter",
+                context,
             )
             issues.extend(frontmatter_issues)
 
@@ -133,6 +202,7 @@ class LanguageDetectionCheck(VerificationCheck):
                     body,
                     target_lang,
                     "body",
+                    context,
                 )
                 if body_issues:
                     issues.extend(body_issues)
@@ -144,6 +214,7 @@ class LanguageDetectionCheck(VerificationCheck):
         data: dict[str, Any],
         target_lang: str,
         path: str,
+        context: dict[str, Any] | None = None,
     ) -> list[VerificationIssue]:
         """
         Recursively check dictionary fields for language issues.
@@ -160,10 +231,12 @@ class LanguageDetectionCheck(VerificationCheck):
 
         for key, value in data.items():
             current_path = f"{path}.{key}"
+            if path == "frontmatter" and key in self.PROTECTED_FRONTMATTER_TREES:
+                continue
 
             if isinstance(value, str):
                 if len(value) >= self.min_text_length:
-                    field_issues = self._check_text(value, target_lang, current_path)
+                    field_issues = self._check_text(value, target_lang, current_path, context)
                     issues.extend(field_issues)
 
             elif isinstance(value, list):
@@ -171,20 +244,14 @@ class LanguageDetectionCheck(VerificationCheck):
                     item_path = f"{current_path}[{idx}]"
                     if isinstance(item, str):
                         if len(item) >= self.min_text_length:
-                            item_issues = self._check_text(
-                                item, target_lang, item_path
-                            )
+                            item_issues = self._check_text(item, target_lang, item_path, context)
                             issues.extend(item_issues)
                     elif isinstance(item, dict):
-                        dict_issues = self._check_dict_fields(
-                            item, target_lang, item_path
-                        )
+                        dict_issues = self._check_dict_fields(item, target_lang, item_path, context)
                         issues.extend(dict_issues)
 
             elif isinstance(value, dict):
-                nested_issues = self._check_dict_fields(
-                    value, target_lang, current_path
-                )
+                nested_issues = self._check_dict_fields(value, target_lang, current_path, context)
                 issues.extend(nested_issues)
 
         return issues
@@ -194,6 +261,7 @@ class LanguageDetectionCheck(VerificationCheck):
         text: str,
         target_lang: str,
         location: str,
+        context: dict[str, Any] | None = None,
     ) -> list[VerificationIssue]:
         """
         Check a single text field for language issues.
@@ -211,11 +279,39 @@ class LanguageDetectionCheck(VerificationCheck):
             logger.debug(f"Skipping technical content at {location}")
             return []
 
+        # A strong, target-exclusive script signal is more reliable than
+        # langdetect for short mixed technical strings.  This is an
+        # additional positive attestation, not a skip: English-only and
+        # token-level mixed-language strings still proceed to detection and
+        # fail normally.
+        if self._has_strong_target_script_evidence(text, target_lang):
+            return []
+
+        # Required product names, file formats, and platform identifiers must
+        # not outvote the actual prose in short fields such as titles.
+        detection_text = self._language_signal_text(text)
+        if sum(1 for char in detection_text if char.isalpha()) < 2:
+            logger.debug(f"No non-technical language signal at {location}")
+            return []
+
         # Detect language
-        detected_lang, confidence = self._detect_language(text)
+        detected_lang, confidence = self._detect_language(detection_text)
 
         if detected_lang is None:
-            # Detection failed - log but don't flag as issue
+            if (context or {}).get("validation_policy") == "zero-defect":
+                return [
+                    VerificationIssue(
+                        severity="error",
+                        check_name=self.name,
+                        location=location,
+                        message="Language detector produced no verdict under zero-defect policy",
+                        metadata={
+                            "expected_lang": target_lang,
+                            "validator_unavailable": True,
+                        },
+                    )
+                ]
+            # Standard policy retains the historical graceful handling.
             logger.debug(f"Language detection failed for {location}")
             return []
 
@@ -239,6 +335,31 @@ class LanguageDetectionCheck(VerificationCheck):
                 ]
 
         return []
+
+    @classmethod
+    def _language_signal_text(cls, text: str) -> str:
+        """Return prose-only classifier input without governed technical tokens."""
+        stripped = cls.TECHNICAL_SIGNAL_RE.sub(" ", text)
+        return re.sub(r"\s+", " ", stripped).strip()
+
+    @classmethod
+    def _has_strong_target_script_evidence(cls, text: str, target_lang: str) -> bool:
+        """Return whether text has substantial target-exclusive script evidence."""
+        target_base = target_lang.lower().split("-")[0]
+        ranges = cls.TARGET_SCRIPT_RANGES.get(target_base)
+        if not ranges:
+            return False
+
+        letters = [char for char in text if char.isalpha()]
+        if not letters:
+            return False
+        target_count = sum(
+            any(start <= ord(char) <= end for start, end in ranges) for char in letters
+        )
+        return (
+            target_count >= cls.MIN_TARGET_SCRIPT_CHARS
+            and target_count / len(letters) >= cls.MIN_TARGET_SCRIPT_RATIO
+        )
 
     def _detect_language(self, text: str) -> tuple[str | None, float]:
         """
@@ -277,6 +398,8 @@ class LanguageDetectionCheck(VerificationCheck):
         """
         # Check for skip patterns
         text_upper = text.upper()
+        if any(pattern.upper() in text_upper for pattern in self.ALWAYS_SKIP_PATTERNS):
+            return True
         for pattern in self.SKIP_PATTERNS:
             if pattern.upper() in text_upper:
                 # Allow if pattern is small part of text

@@ -229,8 +229,7 @@ class TestSemanticEncoderWiring:
     """
 
     def test_uses_l3_encoder_when_l3_is_active(self):
-        """When L3 IS active, reuse its encoder -- must not load a second,
-        redundant standalone encoder."""
+        """A governed-model L3 encoder can be reused without a duplicate load."""
         from src.translation_engine.engine_builder import EngineBuilder
         from src.translation_engine.validation.semantic_similarity_validator import (
             SemanticSimilarityValidator,
@@ -238,15 +237,44 @@ class TestSemanticEncoderWiring:
 
         engine = MagicMock()
         engine.tm.l3.encoder = "the-real-l3-encoder"
-        engine.config.get_config.return_value = {}
+        engine.tm.l3.embedding_model_name = "governed-cross-lingual-model"
+        engine.config.get_config.return_value = {
+            "tm_defaults": {"l3_embedding_model": "governed-cross-lingual-model"}
+        }
 
-        with patch(
-            "src.tm.l3_semantic.load_standalone_sentence_encoder"
-        ) as mock_standalone:
+        with patch("src.tm.l3_semantic.load_standalone_sentence_encoder") as mock_standalone:
             EngineBuilder._init_tm_wiring(engine, {})
 
         mock_standalone.assert_not_called()
         assert SemanticSimilarityValidator._shared_encoder == "the-real-l3-encoder"
+
+    def test_non_governed_l3_encoder_uses_configured_standalone_model(self):
+        """An English-only TM encoder must not judge cross-lingual fidelity."""
+        from src.translation_engine.engine_builder import EngineBuilder
+        from src.translation_engine.validation.semantic_similarity_validator import (
+            SemanticSimilarityValidator,
+        )
+
+        engine = MagicMock()
+        engine.tm.l3.encoder = "english-only-encoder"
+        engine.tm.l3.embedding_model_name = "all-MiniLM-L6-v2"
+        engine.config.get_config.return_value = {
+            "tm_defaults": {
+                "l3_embedding_model": (
+                    "sentence-transformers/paraphrase-multilingual-mpnet-base-v2"
+                )
+            }
+        }
+
+        with patch("src.tm.l3_semantic.load_standalone_sentence_encoder") as mock_standalone:
+            mock_standalone.return_value = "cross-lingual-encoder"
+            EngineBuilder._init_tm_wiring(engine, {})
+
+        mock_standalone.assert_called_once_with(
+            "sentence-transformers/paraphrase-multilingual-mpnet-base-v2",
+            use_gpu=False,
+        )
+        assert SemanticSimilarityValidator._shared_encoder == "cross-lingual-encoder"
 
     def test_falls_back_to_standalone_cpu_encoder_when_l3_is_none(self):
         """The actual fix: engine.tm.l3 is None (skip_l3=True case) -- the
@@ -262,9 +290,7 @@ class TestSemanticEncoderWiring:
             "tm_defaults": {"l3_embedding_model": "test-model-name"}
         }
 
-        with patch(
-            "src.tm.l3_semantic.load_standalone_sentence_encoder"
-        ) as mock_standalone:
+        with patch("src.tm.l3_semantic.load_standalone_sentence_encoder") as mock_standalone:
             mock_standalone.return_value = "the-standalone-encoder"
             EngineBuilder._init_tm_wiring(engine, {})
 

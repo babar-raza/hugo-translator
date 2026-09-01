@@ -21,6 +21,7 @@ class TestRealtimeRepetitionDetection:
         extractor = TextUnitExtractor()
         extractor.batch_stats = {
             "total_batches": 0,
+            "total_outer_batches": 0,
             "successful_batches": 0,
             "fallback_batches": 0,
             "mapping_failures": 0,

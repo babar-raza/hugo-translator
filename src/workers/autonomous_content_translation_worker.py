@@ -10,6 +10,7 @@ Runs scheduled translation tasks on Hugo content directories with:
 """
 
 import argparse
+import hashlib
 import json
 import logging
 import os
@@ -37,6 +38,31 @@ from src.workers.window_scheduler import ScheduleConfig, WindowScheduler
 from src.workers.worker_state import record_worker_state
 
 logger = logging.getLogger(__name__)
+
+
+class _CampaignMetadataOnlyLogFilter(logging.Filter):
+    """Prevent source or rejected-candidate payloads from reaching campaign logs."""
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        try:
+            rendered = record.getMessage()
+        except Exception:
+            rendered = f"<unrenderable:{type(record.msg).__name__}>"
+        digest = hashlib.sha256(rendered.encode("utf-8", errors="replace")).hexdigest()
+        exception_name = ""
+        if record.exc_info and record.exc_info[0]:
+            exception_name = record.exc_info[0].__name__
+        record.msg = (
+            "campaign_event "
+            f"logger={record.name} function={record.funcName} "
+            f"event_sha256={digest}" + (f" exception={exception_name}" if exception_name else "")
+        )
+        record.args = ()
+        # Tracebacks can embed model responses or candidate fragments.
+        record.exc_info = None
+        record.exc_text = None
+        record.stack_info = None
+        return True
 
 
 def _emit_run_signal_safe(
@@ -172,6 +198,16 @@ def _model_selector_recommend_safe(
         return None
 
 
+def bind_campaign_content_environment(campaign) -> Path:
+    """Bind profile interpolation to the manifest's immutable content checkout."""
+    content_repo = Path(campaign.content_repo).resolve()
+    content_root = content_repo / "content"
+    if not content_root.is_dir():
+        raise ValueError(f"campaign content directory is missing: {content_root}")
+    os.environ["ASPOSE_ORG_CONTENT"] = str(content_root)
+    return content_root
+
+
 class AutonomousWorkerConfig:
     """
     Configuration for autonomous content translation worker.
@@ -207,8 +243,10 @@ class AutonomousWorkerConfig:
         device: str = "auto",
         file_timeout_seconds: int = 600,
         campaign_manifest: str | None = None,
+        campaign_shard: str | None = None,
         resume: bool = False,
         verify_only: bool = False,
+        recover_committed_receipts: bool = False,
         validation_policy: str = "standard",
     ):
         """Initialize worker configuration."""
@@ -226,8 +264,10 @@ class AutonomousWorkerConfig:
         self.device = device
         self.file_timeout_seconds = file_timeout_seconds
         self.campaign_manifest = campaign_manifest
+        self.campaign_shard = campaign_shard
         self.resume = resume
         self.verify_only = verify_only
+        self.recover_committed_receipts = recover_committed_receipts
         self.validation_policy = validation_policy
 
     @classmethod
@@ -247,8 +287,10 @@ class AutonomousWorkerConfig:
             device=args.device,
             file_timeout_seconds=args.file_timeout_seconds,
             campaign_manifest=getattr(args, "campaign_manifest", None),
+            campaign_shard=getattr(args, "campaign_shard", None),
             resume=getattr(args, "resume", False),
             verify_only=getattr(args, "verify_only", False),
+            recover_committed_receipts=getattr(args, "recover_committed_receipts", False),
             validation_policy=getattr(args, "validation_policy", "standard"),
         )
 
@@ -281,6 +323,23 @@ class AutonomousContentTranslationWorker:
     _worker_id = "content_worker"
     _worker_log_path = "data/logs/content_worker.log"
 
+    @staticmethod
+    def _l3_index_path(tm_data_dir: Path, campaign) -> Path:
+        """Keep governed campaign semantic records isolated from legacy L3."""
+        if campaign is None:
+            return tm_data_dir / "l3_faiss"
+
+        campaign_root = (Path("data") / "campaigns").resolve()
+        candidate = (campaign_root / str(campaign.campaign_id) / "tm" / "l3_faiss").resolve()
+        if not candidate.is_relative_to(campaign_root):
+            raise ValueError("campaign L3 path escapes the governed campaign root")
+        return candidate
+
+    @staticmethod
+    def _l3_save_interval(campaign) -> int:
+        """Fsync every accepted campaign addition instead of batching durability."""
+        return 1 if campaign is not None else 100
+
     def __init__(self, config: AutonomousWorkerConfig):
         """
         Initialize autonomous worker.
@@ -295,6 +354,10 @@ class AutonomousContentTranslationWorker:
         self._site_profile_cache = {}
         self._site_profile_errors = {}
         self.campaign = None
+        if config.campaign_shard:
+            shard_digest = hashlib.sha256(config.campaign_shard.encode("utf-8")).hexdigest()[:12]
+            self._worker_id = f"content_worker_campaign_{shard_digest}"
+            self._worker_log_path = f"data/logs/{self._worker_id}.log"
 
         # Generate stable run ID for this invocation (used across all sites in this run)
         self.invocation_id = str(uuid.uuid4())
@@ -326,14 +389,23 @@ class AutonomousContentTranslationWorker:
             if self.config.mode != "oneshot":
                 raise ValueError("campaign manifests are supported only in oneshot mode")
             if self.config.validation_policy != "zero-defect":
-                raise ValueError(
-                    "campaign execution requires --validation-policy zero-defect"
-                )
+                raise ValueError("campaign execution requires --validation-policy zero-defect")
             from src.workers.campaign_manifest import CampaignManifest
 
             self.campaign = CampaignManifest.load(self.config.campaign_manifest)
             if self.campaign.validation_policy != self.config.validation_policy:
                 raise ValueError("worker and campaign validation policies differ")
+            campaign_content_root = bind_campaign_content_environment(self.campaign)
+            # ConfigService loads profiles lazily. Clear any defensive cache
+            # entries so ${ASPOSE_ORG_CONTENT} is expanded only after the
+            # manifest-controlled value above has been installed.
+            self.config_service._profile_cache.clear()
+            logger.info(
+                "Campaign profile root bound to pinned checkout: %s",
+                campaign_content_root,
+            )
+        elif self.config.recover_committed_receipts:
+            raise ValueError("--recover-committed-receipts requires --campaign-manifest")
 
         # Apply VRAM enforcement if using CUDA
         if self.config.device.startswith("cuda"):
@@ -398,10 +470,17 @@ class AutonomousContentTranslationWorker:
             l3_semantic = None
             if L3SemanticTM is not None:
                 try:
+                    l3_index_path = self._l3_index_path(tm_data_dir, self.campaign)
                     l3_semantic = L3SemanticTM(
-                        index_path=tm_data_dir / "l3_faiss",
-                        use_gpu=True,  # TC-L3-002: ~80MB encoder, safe on RTX 4090; CPU fallback built-in
+                        index_path=l3_index_path,
+                        use_gpu=self.config.device.startswith("cuda"),
+                        save_interval=self._l3_save_interval(self.campaign),
                     )
+                    if self.campaign is not None:
+                        logger.info(
+                            "Campaign L3 isolated at governed namespace: %s",
+                            l3_index_path,
+                        )
                 except Exception as e:
                     logger.warning(f"L3 semantic TM not available: {e}")
 
@@ -473,20 +552,12 @@ class AutonomousContentTranslationWorker:
                 enable_content_hash_tracking=content_hash_enabled,
                 enable_validation=True,
                 validation_mode=(
-                    "strict"
-                    if self.config.validation_policy == "zero-defect"
-                    else None
+                    "strict" if self.config.validation_policy == "zero-defect" else None
                 ),
                 validation_policy=self.config.validation_policy,
-                enable_verification=(
-                    self.config.validation_policy == "zero-defect"
-                ),
-                enable_verification_fix=(
-                    self.config.validation_policy == "zero-defect"
-                ),
-                max_retries=(
-                    4 if self.config.validation_policy == "zero-defect" else None
-                ),
+                enable_verification=(self.config.validation_policy == "zero-defect"),
+                enable_verification_fix=(self.config.validation_policy == "zero-defect"),
+                max_retries=(4 if self.config.validation_policy == "zero-defect" else None),
                 save_rejected=False,
                 campaign_context=(
                     {
@@ -646,6 +717,7 @@ class AutonomousContentTranslationWorker:
         import shutil
 
         checks_passed = True
+        failure_codes: list[str] = []
 
         # 1. GPU available (if device=cuda) - Fall back to CPU if unavailable
         original_device = self.config.device
@@ -669,12 +741,18 @@ class AutonomousContentTranslationWorker:
         if not config_root.exists():
             logger.warning(f"PREFLIGHT FAIL: Config root missing: {config_root}")
             checks_passed = False
+            failure_codes.append("config_root_missing")
 
-        # 3. Disk space > 5% (check output drive, not CWD)
+        # 3. Disk space > 5% (check the actual output drive, not CWD).
+        # Campaign shards intentionally omit --site because their manifest
+        # contains multiple sites.  In that mode the pinned campaign checkout
+        # is the sole authoritative write location.
         try:
-            # Check the content root drive (where translations are written)
             disk_check_path = "."
-            if self.config_service and self.config.site:
+            campaign = getattr(self, "campaign", None)
+            if campaign is not None:
+                disk_check_path = str(Path(campaign.content_repo).resolve())
+            elif self.config_service and self.config.site:
                 try:
                     profile = self.config_service.get_site_profile(self.config.site)
                     if profile and profile.content_roots:
@@ -690,6 +768,7 @@ class AutonomousContentTranslationWorker:
                     f"PREFLIGHT FAIL: Disk space critical ({free / total * 100:.1f}% free on {disk_check_path})"
                 )
                 checks_passed = False
+                failure_codes.append("disk_space_critical")
         except Exception as e:
             logger.warning(f"PREFLIGHT WARNING: Could not check disk space: {e}")
 
@@ -714,6 +793,7 @@ class AutonomousContentTranslationWorker:
         if original_device != self.config.device:
             logger.info(f"Device fallback applied: {original_device} → {self.config.device}")
 
+        self._last_preflight_error = "preflight:" + ",".join(failure_codes) if failure_codes else ""
         return checks_passed
 
     def run(self) -> None:
@@ -774,8 +854,14 @@ class AutonomousContentTranslationWorker:
 
         if not self._preflight_check():
             logger.warning("Preflight check failed, aborting oneshot run")
-            self._record_state("preflight_failed", error="Preflight checks failed")
-            return  # Graceful exit, not sys.exit(1)
+            self._record_state(
+                "preflight_failed",
+                error=getattr(self, "_last_preflight_error", "") or "Preflight checks failed",
+            )
+            # A campaign parent must never mistake a preflight abort for an
+            # accepted shard.  This is intentionally nonzero: no candidate
+            # was written and the caller must surface the blocked shard.
+            sys.exit(1)
 
         _run_id = str(uuid.uuid4())
         _cont_active = _continuation_start_safe(
@@ -786,7 +872,7 @@ class AutonomousContentTranslationWorker:
         )
 
         try:
-            if self.campaign is not None:
+            if getattr(self, "campaign", None) is not None:
                 from src.workers.campaign_runner import CampaignRunner
 
                 runner = CampaignRunner(
@@ -794,13 +880,16 @@ class AutonomousContentTranslationWorker:
                     translation_engine=self.translation_engine,
                     translator_repo=Path.cwd(),
                 )
+                if self.config.recover_committed_receipts:
+                    runner.recover_committed_receipts()
                 summary = runner.run(
-                    resume=self.config.resume,
+                    resume=(self.config.resume or self.config.recover_committed_receipts),
                     verify_only=self.config.verify_only,
+                    shard_ids=(
+                        {self.config.campaign_shard} if self.config.campaign_shard else None
+                    ),
                 )
-                self._run_new_files = {
-                    "campaign": int(summary.get("accepted", 0))
-                }
+                self._run_new_files = {"campaign": int(summary.get("accepted", 0))}
                 self._run_rejected_files = int(summary.get("failed", 0))
                 self._run_attempted_files = (
                     self._run_new_files["campaign"] + self._run_rejected_files
@@ -1823,7 +1912,9 @@ class AutonomousContentTranslationWorker:
             logger.debug("TC-14: content_root %s not found — skipping post-run scan", content_root)
             return
 
-        script = Path(__file__).parents[2] / "scripts" / "scan_language_contamination.py"
+        script = (
+            Path(__file__).parents[2] / "scripts" / "content" / "scan_language_contamination.py"
+        )
         if not script.exists():
             logger.warning(
                 "TC-14: scan_language_contamination.py not found — skipping post-run scan"
@@ -1889,8 +1980,13 @@ class AutonomousContentTranslationWorker:
                         if self.config_service is not None
                         else None
                     )
+                    configured_langs = (
+                        getattr(site_profile, "target_langs", None) if site_profile else None
+                    )
                     allowed_langs = (
-                        set(site_profile.target_langs) if site_profile else None
+                        set(configured_langs)
+                        if isinstance(configured_langs, list | tuple | set)
+                        else None
                     )
 
                     for entry in contaminated_files:
@@ -2299,6 +2395,13 @@ Examples:
     )
 
     parser.add_argument(
+        "--campaign-shard",
+        type=str,
+        default=None,
+        help="Run only one exact shard ID from --campaign-manifest; enables isolated parallel shard workers",
+    )
+
+    parser.add_argument(
         "--resume",
         action="store_true",
         help="Resume a campaign from checksum-verified acceptance receipts",
@@ -2308,6 +2411,16 @@ Examples:
         "--verify-only",
         action="store_true",
         help="Verify the pinned campaign environment without translating",
+    )
+
+    parser.add_argument(
+        "--recover-committed-receipts",
+        action="store_true",
+        help=(
+            "Fail-closed recovery for a lost/partial ledger: revalidate exact "
+            "one-file governed commit bytes through every zero-defect gate, "
+            "then resume"
+        ),
     )
 
     parser.add_argument(
@@ -2428,19 +2541,26 @@ def main():
     _backup_count = int(_log_cfg.get("max_log_backups", 3))
     from logging.handlers import RotatingFileHandler as _RFH
 
+    _stream_handler = logging.StreamHandler()
+    _file_handler = _RFH(
+        log_path,
+        maxBytes=_max_bytes,
+        backupCount=_backup_count,
+        delay=True,
+        encoding="utf-8",
+    )
+    if args.campaign_manifest:
+        _metadata_filter = _CampaignMetadataOnlyLogFilter()
+        _stream_handler.addFilter(_metadata_filter)
+        _file_handler.addFilter(_metadata_filter)
+
     logging.basicConfig(
         level=getattr(logging, args.log_level),
         format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
         datefmt="%Y-%m-%d %H:%M:%S",
         handlers=[
-            logging.StreamHandler(),
-            _RFH(
-                log_path,
-                maxBytes=_max_bytes,
-                backupCount=_backup_count,
-                delay=True,
-                encoding="utf-8",
-            ),
+            _stream_handler,
+            _file_handler,
         ],
         force=True,
     )

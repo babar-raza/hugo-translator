@@ -151,6 +151,13 @@ class TestMigrationScript:
         except SystemExit as exc:
             return int(exc.code) if exc.code is not None else 0
 
+    def test_default_paths_are_rooted_at_repository(self):
+        from scripts.tm import migrate_l2_lmdb
+
+        expected = Path(migrate_l2_lmdb.__file__).resolve().parents[2]
+        assert migrate_l2_lmdb.repository_root() == expected
+        assert (expected / "scripts" / "tm" / "migrate_l2_lmdb.py").is_file()
+
     def test_dry_run_does_not_write(self, tmp_path: Path, capsys):
         """--dry-run must not copy any keys into the destination."""
         src = tmp_path / "l2_lmdb"

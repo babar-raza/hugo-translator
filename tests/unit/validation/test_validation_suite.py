@@ -23,6 +23,9 @@ from src.translation_engine.validation.base import (
 from src.translation_engine.validation.language_consistency_validator import (
     LanguageConsistencyValidator,
 )
+from src.translation_engine.validation.repetition_detector_validator import (
+    RepetitionDetectorValidator,
+)
 from src.translation_engine.validation.validation_suite import ValidationSuite
 
 
@@ -71,6 +74,37 @@ class TestValidationSuite:
         assert "CompletenessValidator" in validator_types
         assert "LanguageConsistencyValidator" in validator_types
         assert "ShortcodePreservationValidator" in validator_types
+
+    def test_default_suite_loads_versioned_repetition_config(
+        self, tmp_path, monkeypatch
+    ):
+        config_dir = tmp_path / "config"
+        config_dir.mkdir()
+        (config_dir / "validation.yaml").write_text(
+            """
+validators:
+  repetition_detector:
+    enabled: true
+    ngram_threshold: 7
+    localized_phrase_whitelist:
+      es:
+        - gestión de hojas de cálculo
+""",
+            encoding="utf-8",
+        )
+        monkeypatch.chdir(tmp_path)
+
+        suite = ValidationSuite()
+        repetition = next(
+            validator
+            for validator in suite.validators
+            if isinstance(validator, RepetitionDetectorValidator)
+        )
+
+        assert repetition.ngram_threshold == 7
+        assert repetition.localized_phrase_whitelist["es"] == (
+            "gestión de hojas de cálculo",
+        )
 
     def test_init_with_custom_validators(self):
         """Test initialization with custom validator list."""

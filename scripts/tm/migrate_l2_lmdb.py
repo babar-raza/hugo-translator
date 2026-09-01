@@ -27,6 +27,10 @@ except ImportError:
     sys.exit(1)
 
 
+def repository_root() -> Path:
+    return Path(__file__).resolve().parents[2]
+
+
 def migrate(src_path: Path, dst_path: Path, dry_run: bool = False) -> None:
     if not src_path.exists():
         print(f"Source does not exist: {src_path}")
@@ -133,7 +137,7 @@ def main(argv: list[str] | None = None) -> None:
     if not args.dry_run and not args.apply:
         parser.error("Specify --dry-run to preview or --apply to execute the merge.")
 
-    repo_root = Path(__file__).parent.parent
+    repo_root = repository_root()
     src = (repo_root / args.src).resolve()
     dst = (repo_root / args.dst).resolve()
 
