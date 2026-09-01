@@ -1,0 +1,177 @@
+# TERMINAL_CLOSED — Mission heading-i18n-governance-20260723
+# Session: 2026-07-23/24
+# Closed by: Claude (Sonnet 5)
+#
+# REVISED 2026-07-24 (formal convergence cycle): the closure below was
+# originally written via plan-bound-only closure (see convergence-
+# binding.yaml's binding_method_disclosed). Per explicit user instruction,
+# a full formal AUDIT -> HARDEN -> EXECUTE -> VERIFY -> close-task.md cycle
+# was then run against the actual .supervisor/prompts/ files. That cycle's
+# artifacts: convergence-binding-2026-07-24.yaml, stage1-audit/
+# stage1-issue-model.json + stage1-sprint-audit-summary.md, plan §15
+# (hardening), stage3-execution/stage3-final-sprint-summary-2026-07-24.yaml,
+# final-all-green-candidate-2026-07-24.yaml, close_task_result-2026-07-24.yaml
+# (invocation heading-i18n-governance-20260723-close-02, commit 65193de).
+# It found 3 low/medium, non-blocking findings (L2-001, resolved directly;
+# L2-002, L2-003, converted to follow-up taskcards TC-HT-I18N-010/011 for a
+# future sprint) and reconfirmed every previously-claimed test result fresh.
+# The content below is updated to reflect that cycle's outcome; nothing in
+# the underlying code/test verification changed, only the closure PROCESS
+# was formalized.
+
+terminal_closed:
+  mission_id: heading-i18n-governance-20260723
+  session_id: heading-i18n-governance-20260723
+  closed_at: "2026-07-24"
+  closed_by: "claude-sonnet-5"
+  protocol: "POST-PLAN AUTONOMOUS CONVERGENCE AND GOVERNED CLOSURE -- formally bound to .supervisor/prompts/prompt1-post-sprint-audit.md (263dab3d...), prompt2-plan-hardening.md (4fe227b6..., applied directly to the plan as §15 rather than a separate output package), prompt3-controlled-execution.md (5246d218...), prompt4-close-task.md (3196a5bd..., invocation -close-02, commit 65193de)"
+
+  origin: >
+    New mission continuing HT-QUALITY-GATES-001's scope (heading
+    translation is one of its named gates). Investigates and fixes the
+    Phase 7 Reconnaissance artifact's "English headings in non-Latin
+    locale: 19,849" finding.
+
+  audit_chain:
+    - stage: "plan §1-4 (Stage-1-equivalent root-cause audit)"
+      verdict: "root cause split into two precise exposures (unlisted single-hump terms always blocked; listed terms silently accepted on MT failure), plus 5 structural weaknesses (5 divergent identifier regexes, config fragmentation, whitelist-chasing, TM key scoping, architectural mismatch of routing template strings through MT+TM)"
+      file: "C:\\Users\\prora\\.claude\\plans\\glittery-waddling-moth.md (§1-4)"
+    - stage: "plan §7 (Stage-2-equivalent taskcard set)"
+      verdict: "9 taskcards (TC-HT-I18N-001..009) defined with allowed/forbidden paths, dependencies, quality_dimensions, stop_conditions, validation_commands"
+      file: "C:\\Users\\prora\\.claude\\plans\\glittery-waddling-moth.md (§7)"
+    - stage: "plan §8-9 (Stage-3-equivalent execution)"
+      verdict: "EXECUTION_COMPLETE_VERIFIED for 8/9 taskcards; ACCEPTED_WITH_LIMITATIONS for TC-HT-I18N-007 (content-repo commit deferred)"
+      reroute_occurred: true
+      reroute_detail: >
+        TC-HT-I18N-002 initially scored below 4/5 on test_coverage
+        (mine_heading_glossary.py's core alignment algorithm had zero
+        automated tests at original delivery). Repaired within the same
+        closure cycle: added tests/unit/scripts/test_mine_heading_glossary.py
+        (10 tests), rescored 5/5, accepted.
+      file: ".supervisor/state/heading-i18n-governance-20260723/stage3-execution/stage3-quality-evaluations.yaml"
+    - stage: "plan §11 (Stage-4-equivalent closeout, this taskcard, TC-HT-I18N-009)"
+      verdict: "CLOSED (hugo-translator scope), with TC-HT-I18N-007's content-repo commit step explicitly named DEFERRED"
+      file: "reports/agents/heading-i18n-governance-20260723/evidence_bundle/self_review.md"
+    - stage: "formal convergence cycle -- prompt1-post-sprint-audit.md"
+      verdict: "SPRINT_ACCEPTED_WITH_LIMITATIONS (3 non-blocking findings: L2-001, L2-002, L2-003)"
+      file: ".supervisor/state/heading-i18n-governance-20260723/stage1-audit/stage1-issue-model.json"
+    - stage: "formal convergence cycle -- prompt2-plan-hardening.md"
+      verdict: "PLAN_HARDENED_FROM_AUDIT_READY_FOR_EXECUTION"
+      file: "C:\\Users\\prora\\.claude\\plans\\glittery-waddling-moth.md (§15)"
+    - stage: "formal convergence cycle -- prompt3-controlled-execution.md"
+      verdict: "EXECUTION_COMPLETE_VERIFIED"
+      file: ".supervisor/state/heading-i18n-governance-20260723/stage3-execution/stage3-final-sprint-summary-2026-07-24.yaml"
+    - stage: "formal convergence cycle -- prompt4-close-task.md"
+      verdict: "CLOSED"
+      invocation_id: "heading-i18n-governance-20260723-close-02"
+      commit: "65193de"
+      file: ".supervisor/state/heading-i18n-governance-20260723/close_task_result-2026-07-24.yaml"
+
+  scope_change_mid_mission: >
+    The user gave two controlling, later instructions that changed this
+    mission's scope from the original plan text: (1) "TC-HT-I18N-004 ...
+    is too important to be deferred ... do a complete recon of the
+    system, and make appropriate decision" -- rejecting a blanket
+    defer-on-concurrent-edit-risk call, which led to a proper
+    re-investigation and, in this final session, full completion of the
+    previously-deferred engine-side unification. (2) "do not worry about
+    the files in aspose.org ... Your duty [is] to make the system stable
+    and working as planned ... you may mark it deferred" -- explicitly
+    descoping the content-repo commit (originally part of
+    TC-HT-I18N-007's closeout_rules) after repeated commit failures there
+    (Argument-list-too-long on the repo's own pre-commit hook, plus two
+    real concurrent-access incidents). Both instructions are reflected as
+    controlling in this closure, superseding the plan document's original,
+    broader text for those two specific points.
+
+  deliverables_verified:
+    - tc: TC-HT-I18N-001
+      title: "Registry + per-locale i18n resource files + canonical classifier"
+      state: VERIFIED
+      commit: "b8ecfdf"
+      proof_level: unit_tested (18 tests at delivery, golden list + schema validation + completeness lint)
+    - tc: TC-HT-I18N-002
+      title: "Mine heading glossary + candidate queues"
+      state: VERIFIED
+      commit: "14461a0, 5d17935 (test-coverage gap closure)"
+      proof_level: full_corpus_run (60,552 EN/locale pairs, zero content-repo writes) + unit_tested (10 tests added 2026-07-24)
+    - tc: TC-HT-I18N-003
+      title: "Agentic adjudication — populate registry, locale files"
+      state: VERIFIED
+      commit: "36a60b7"
+      proof_level: dual_independent_agent_review (73/78 approved, 5/78 correctly deferred as insufficient_evidence, 13/13 adversarial cross-check agreement)
+    - tc: TC-HT-I18N-004
+      title: "Wire i18n short-circuit + canonical classifier into the live engine"
+      state: VERIFIED
+      commit: "ead201d (original short-circuit), 262e3c4 (engine-side unification completion)"
+      proof_level: end_to_end_proof (real TextUnitExtractor path) + full_regression_suite (1187 passed, 4 skipped, 0 xfailed, 0 failures)
+    - tc: TC-HT-I18N-005
+      title: "Continuous unresolved single-hump term discovery log"
+      state: VERIFIED
+      commit: "74fc2ca"
+      proof_level: end_to_end_proof (real extractor path, append-only verified across two runs)
+    - tc: TC-HT-I18N-006
+      title: "Regression suite + CI single-source-of-truth lint"
+      state: VERIFIED
+      commit: "74fc2ca (original), 262e3c4 (lint hardened from name-based to content-fingerprint check, xfail flipped to real pass)"
+      proof_level: full_regression_suite + hardened_lint (15/15 in this file, 0 xfailed)
+    - tc: TC-HT-I18N-007
+      title: "Heal existing content backlog"
+      state: ACCEPTED_WITH_LIMITATIONS
+      commit: "5d17935 (hugo-translator-side script)"
+      proof_level: small_slice_hand_verified + full_scope_applied_uncommitted
+      limitation: "content-repo commit of the 16,522-file full-scope apply is DEFERRED, operator-owned (see scope_change_mid_mission above)"
+    - tc: TC-HT-I18N-008
+      title: "TM correction rule (untranslated-passthrough -> table value)"
+      state: VERIFIED
+      commit: "2518c52"
+      proof_level: end_to_end_proof (real production data/tm/l2.lmdb, 212-entry direct-query cross-check)
+    - tc: TC-HT-I18N-009
+      title: "Mission closure — evidence bundle + TERMINAL_CLOSED"
+      state: VERIFIED
+      commit: "this file + evidence bundle (reports/, gitignored, not committed by design)"
+      proof_level: this_document
+
+  test_results:
+    new_tests_this_mission_2026-07-24: "10 (mine_heading_glossary alignment) + carried classification.py/write_gate.py/tm_surgical_cleanup.py changes"
+    full_regression_command: "pytest tests/unit/translation_engine/ -q"
+    full_regression_result: "1187 passed, 4 skipped, 0 xfailed, 0 failures"
+    neighborhood_regression_command: "pytest tests/unit/scripts/ tests/unit/quality/ -q (excluding 2 pre-existing, wholly-unrelated collection errors: test_cleanup_orphaned_lmdb_temp.py and test_opus_registry_generator.py import modules that do not exist anywhere in this repo)"
+    neighborhood_regression_result: "333 passed, 16 skipped, 3 failed -- all 3 failures VERIFIED pre-existing and unrelated (reproduced identically with this session's 5 changed files stashed out via git stash, then restored; the failing tests exercise scripts/quality/{aspose,products}_org_governed_retranslate.py, never touched this session, and correlate with other already-uncommitted validation/ changes present before this session began)"
+
+  open_follow_ups:
+    - id: TC-HT-I18N-CONTENT-COMMIT-001
+      description: "Commit the full-scope 16,522-file healing already applied to the aspose.org content repo's working tree — operator-owned per explicit descoping this session, not a code/test gap"
+      formalized_as: "governed exclusion, plan §15.1"
+    - id: TC-HT-I18N-011
+      description: "text_unit_extractor.py's own _API_HEADING_TERMS/_ALWAYS_TRANSLATE_WORDS remain a deliberate, named duplicate — 4 terms (Execute/Create/Delete/Update) need registry backfill before this can be safely unified on the live hot path"
+      formalized_as: "taskcard, plan §15.3, source_issue_id L2-003"
+    - id: TC-HT-I18N-TAIL-001
+      description: "Only 6 of ~42 seeded registry terms are approved; the remaining terms (Options, Enumerations, Example, Installation, etc.) and the 515-distinct-string identifier/Track-C residual await a follow-up adjudication cycle"
+    - id: TC-HT-I18N-010
+      description: "data/discovery/unresolved_terms.jsonl is correctly populated but has no consuming tool yet to feed the next TC-HT-I18N-003-style review cycle"
+      formalized_as: "taskcard, plan §15.2, source_issue_id L2-002"
+
+  not_addressed_this_session_explicitly_out_of_scope:
+    - "The full aspose.org content-repo commit (see open_follow_ups above) — explicitly operator-owned per this session's scope change"
+    - "The ~35 remaining pending registry terms and the identifier/Track-C candidate queue (1,271 rows) — logged as a follow-up adjudication cycle per plan §7/§8's own allowance"
+    - "All other uncommitted, pre-existing work in this working tree (Gates 30-43 hardening, TM/model_runtime changes, etc.) — a different, live, concurrently-developed body of work, never this mission's scope"
+
+  plan_file: "C:\\Users\\prora\\.claude\\plans\\glittery-waddling-moth.md"
+  plan_sections_updated:
+    - "§14 (Post-execution reflection & completion plan) — added during this session, documents the rescoping and the done/partial/not-done accounting"
+    - "§15 (Stage 2 plan hardening — formal convergence cycle) — added 2026-07-24: §15.1 governed exclusion for TC-HT-I18N-007, §15.2/§15.3 new follow-up taskcards TC-HT-I18N-010/011, §15.4 L1/L3 disposition, §15.5 plan verdict"
+
+  final_status: CLOSED
+  scope_note: >
+    This closes mission heading-i18n-governance-20260723 for its actual,
+    user-redefined duty: making the hugo-translator system (code, tests,
+    engine wiring) stable and complete with respect to the
+    english_headings_nonlatin incident. All 9 taskcards are executed and
+    evidenced; 8 are fully VERIFIED and 1 (TC-HT-I18N-007) is
+    ACCEPTED_WITH_LIMITATIONS with a single, explicitly-named, operator-
+    owned outstanding item (the content-repo commit), per the user's own
+    explicit instruction that this specific item may be marked deferred
+    and is not this mission's responsibility. No commit was pushed to any
+    origin remote in either repo. This does not close HT-QUALITY-GATES-001
+    as a whole, nor any other mission's scope — only this incident.

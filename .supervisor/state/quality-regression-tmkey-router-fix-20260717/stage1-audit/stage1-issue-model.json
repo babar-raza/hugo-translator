@@ -1,0 +1,29 @@
+{
+  "mission_id": "quality-regression-tmkey-router-fix-20260717",
+  "plan_id": "sharded-wibbling-sifakis",
+  "plan_hash": "05ebf998f532eaf1edac15c920d7864730510026cb846479895278377ec6148a",
+  "audit_date": "2026-07-17",
+  "achievements": [
+    {"id": "A1", "title": "TM key fix (Option A0): tm_key_text hashes pre-protection text", "proof_level": "end_to_end_proof", "verified": true, "integrated": true, "production_ready": true},
+    {"id": "A2", "title": "ContentTypeRouter wired into segments/frontmatter path (Option A)", "proof_level": "integration_validation", "verified": true, "integrated": true, "production_ready": true},
+    {"id": "A3", "title": "Full regression suite run and rigorously triaged (775 pre-existing, 0 introduced)", "proof_level": "focused_validation", "verified": true, "integrated": null, "production_ready": null},
+    {"id": "A4", "title": "Real production LMDB validation of the exact confirmed collision", "proof_level": "end_to_end_proof", "verified": true, "integrated": null, "production_ready": null},
+    {"id": "A5", "title": "Thermal watchdog restarted (found dead since 2026-07-16 01:26)", "proof_level": "end_to_end_proof", "verified": true, "integrated": true, "production_ready": true},
+    {"id": "A6", "title": "Scheduler outage root-caused (system reboot 2026-07-17 10:58)", "proof_level": "end_to_end_proof", "verified": true, "integrated": null, "production_ready": null},
+    {"id": "A7", "title": "Scheduler relaunched with A1/A2 fixes included", "proof_level": "end_to_end_proof", "verified": true, "integrated": true, "production_ready": true},
+    {"id": "A8", "title": "Scheduler logging UnicodeEncodeError fixed", "proof_level": "end_to_end_proof", "verified": true, "integrated": true, "production_ready": true},
+    {"id": "A9", "title": "Stall-detector post-outage crash-loop bug found and fixed", "proof_level": "end_to_end_proof", "verified": true, "integrated": true, "production_ready": true}
+  ],
+  "issues": {
+    "l1_execution": ["L1-001", "L1-002", "L1-003", "L1-004"],
+    "l2_integration": ["L2-001", "L2-002", "L2-003"],
+    "l3_system_weakness": ["L3-001", "L3-002"]
+  },
+  "issues_resolved_this_session": ["L1-001", "L1-002"],
+  "issues_open_and_consumed": ["L1-003", "L1-004", "L2-001", "L2-002", "L2-003", "L3-001", "L3-002"],
+  "issues_unconsumed": [],
+  "claim_classification_matrix": "stage1-claim-classification-matrix.csv",
+  "evidence_quality_verdict": "STRONG for delivered work (A1, A2, A4, A5-A9); ADEQUATE_WITH_LIMITATIONS for the pre-existing-failure triage (A3); INSUFFICIENT/UNVERIFIED for out-of-scope items explicitly not claimed as fixed (docs/kb code-fence, BoxShape bug, Form.md staleness, full-suite test-isolation root cause)",
+  "final_verdict": "SPRINT_ACCEPTED_WITH_LIMITATIONS",
+  "recommended_next_stage": "PSL-PROMPT-2 (taskcard the deferred items only; no rework required for delivered scope), then PSL-PROMPT-3 (retrospective confirmation), then closure"
+}

@@ -1,0 +1,96 @@
+close_task_result:
+  prompt_path: .supervisor/prompts/prompt4-close-task.md
+  prompt_hash_sha256_prefix16: 3196a5bd52bd6e03
+  invocation_id: post-plan-convergence-2026-07-25
+  mission_id: site-locale-allowlist-generalization-20260725
+  plan_id: you-are-modifying-the-lovely-cook
+  plan_path: C:\Users\prora\.claude\plans\you-are-modifying-the-lovely-cook.md
+  plan_revision: "post-plan-autonomous-convergence-2026-07-25"
+  plan_hash_sha256_before_closure_amendment: 60e16bf4ffef225117b702930a49be1b9b496a474c9cc8a5e915cff68310881d
+  plan_hash_sha256_after_closure_amendment: ace917e6293d486b8b8714f2c01c3a9cac0ecd4dbbf8376b19eed256b3a9d884
+  taskcards_closed:
+    - TC-SLA-001
+    - TC-SLA-002
+    - TC-SLA-003
+    - TC-SLA-004
+    - TC-SLA-005
+    - TC-SLA-006
+    - TC-SLA-007
+    - TC-SLA-008
+    - TC-SLA-009
+    - TC-SLA-010
+    - TC-SLA-011
+    - TC-SLA-012
+  taskcards_closed_obsolete: []
+  taskcards_accepted_with_governed_exclusion: []
+  taskcards_not_closed: []
+  requirements_reconciled: true
+  queue_empty_and_valid: true
+  continuation_disabled: true
+  files_changed_this_invocation:
+    modified:
+      - config/site_profiles/blog.aspose.org.yaml
+      - config/site_profiles/docs.aspose.org.yaml
+      - config/site_profiles/kb.aspose.org.yaml
+      - config/site_profiles/products.aspose.org.yaml
+      - config/site_profiles/reference.aspose.org.yaml
+      - config/site_profiles/websites.aspose.org.yaml
+      - config/site_profiles/www.aspose.org.yaml
+      - scripts/ops/monitor_aspose_org_campaign.sh
+      - scripts/ops/run_all_aspose_org.sh
+      - scripts/quality/aspose_org_multisite_unattended.py
+      - scripts/quality/backfill_frontmatter_ids.py
+      - scripts/quality/delete_for_retranslate.py
+      - scripts/quality/heal_english_headings.py
+      - scripts/quality/surgical_retranslate.py
+      - src/cli.py
+      - src/translation_engine/directory_orchestrator.py
+      - src/translation_engine/engine.py
+      - src/utils/models.py
+    added:
+      - docs/languages/ASPOSE_ORG_LOCALE_POLICY.md
+      - docs/languages/SITE_LOCALE_ALLOWLIST_POLICY.md
+      - scripts/ops/archive_retired_locale_queue_entries.py
+      - src/utils/locale_policy.py
+      - tests/integration/test_cli_aspose_org_locale_rejection.py
+      - tests/unit/config/test_aspose_org_locale_contract.py
+      - tests/unit/config/test_strict_locale_allowlist_policy.py
+      - tests/unit/quality/test_aspose_org_locale_discovery_filters.py
+    total_count: 26
+  commits_this_invocation:
+    - hash: 26381afa64bb61b2ad876e2060a5560be289e955
+      message_subject: "feat(locale-policy): generalize Aspose.org locale allowlist to any site"
+      file_count: 26
+      author: "Babar Raza <babar.raza@aspose.com>"
+      committed_at: "2026-07-25T19:38:44+05:00"
+  commits_this_mission_full_list:
+    - 26381afa64bb61b2ad876e2060a5560be289e955
+  content_repo_commits: []
+  master_plan_sections_updated:
+    - "## Closure Record (written 2026-07-25, per governed prompt4-close-task.md)"
+  master_plan_update_note: >
+    Amended in place (appended after the existing Verification section);
+    no prior plan history overwritten. The plan already contained the
+    full context/approach from this convergence cycle, written when
+    binding began; this update adds only the closure outcome.
+  pushed_to_origin: false
+  push_is_operator_owned: true
+  verification_performed:
+    - "git status --porcelain boundary check (26 files, zero overlap with 2 other open missions) -- re-run fresh this cycle"
+    - "ruff check on all mission .py files -- 6 pre-existing findings, zero new, re-confirmed this cycle"
+    - "pytest tests/unit/translation_engine/ -q -- 1256 passed, 4 skipped (3rd identical run)"
+    - "pytest tests/unit/config/ tests/unit/quality/ tests/unit/workers/ tests/integration/test_cli_aspose_org_locale_rejection.py -q -- 695 passed, 1 skipped, same 5 pre-existing failures"
+    - "negative-control + synthetic-site generic-mechanism sweep -- 7/7 Aspose.org sites correct, synthetic strict/lenient sites correct"
+    - "git show --stat HEAD -- confirmed exactly 26 files in the commit"
+    - "post-commit git status --porcelain -- confirmed other 2 missions' ~131 lines of dirty state untouched"
+  remaining_uncommitted_evidence: false
+  evidence_bundle_path: reports/agents/site-locale-allowlist-generalization-20260725/evidence_bundle/
+  remaining_follow_ups_or_non_blockers:
+    - "scripts/quality/aspose_org_multisite_unattended.py:74 pre-existing ruff UP022 finding, unrelated, not fixed"
+    - "Old vs new queue-archive-file naming coexist -- cosmetic, not functional"
+    - ".local/unified_translate.py gitignored standalone tool still has its own hardcoded locale list -- pre-existing, unrelated to this generalization pass, already fail-closed via the generic engine guard"
+  closure_record_path: C:\Users\prora\.claude\plans\you-are-modifying-the-lovely-cook.md (## Closure Record section)
+  closure_record_valid: true
+  terminal_state_written: true
+  contradictions: []
+  verdict: CLOSED

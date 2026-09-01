@@ -1,0 +1,76 @@
+issues:
+  - issue_id: L3-001
+    issue_level: L3_SYSTEM_WEAKNESS
+    title: .supervisor governance is opt-in per message, not automatically engaged after execution
+    description: >
+      This session's DELIVERABLE 53 implementation, testing, and live deploy
+      were carried out via direct conversational autonomous execution before
+      the user separately invoked this .supervisor convergence protocol. The
+      rigor applied (multi-layer verification, honest deferral of unproven
+      claims) was self-directed, not system-enforced -- the human had to
+      explicitly ask for the governed audit/close cycle as a distinct message.
+    status: OPEN_OBSERVATION
+    evidence:
+      - "Conversation history: execution completed and reported before this convergence prompt was sent"
+    missing_evidence: []
+    root_cause: >
+      No hook or repository convention auto-triggers post-sprint audit after
+      a conversational execution turn concludes; .supervisor is a set of
+      prompt files invoked by name, not a background process.
+    why_not_only_symptom: >
+      Matches this audit's own L3 category "system required human to choose
+      next prompt" -- the framework's discipline is real but not
+      self-initiating.
+    affected_files: [".supervisor/prompts/"]
+    affected_components: ["governance framework"]
+    affected_connection_points: []
+    severity: LOW
+    blocker: false
+    recurrence_risk: HIGH
+    required_fix_type: governance_design_change
+    requires_plan_update: false
+    requires_taskcard: false
+    requires_system_healing: false
+    requires_reexecution: false
+    requires_governance_change: true
+    requires_evidence_repair: false
+    recommended_next_stage: OBSERVATION_ONLY
+    acceptance_impact: >
+      Does not block this mission's closure. Recorded as an honest structural
+      observation per the audit's required L3 category, not actioned (would
+      require a session-level hook/skill decision outside this mission's
+      authority).
+
+  - issue_id: L3-002
+    issue_level: L3_SYSTEM_WEAKNESS
+    title: No CI/pre-deploy gate specifically re-checks the TM-collision failure class
+    description: >
+      Two new unit/integration tests (10 total) now cover the specific
+      DiffUtils/PsStack-style collision mechanism, but they live only in
+      tests/unit/ and tests/unit/translation_engine/ -- there is no dedicated
+      gate in the healing campaign's own launch path (e.g. a preflight check
+      before scheduler.py dispatches) that would catch a future regression
+      of this specific mechanism before it reaches production content.
+    status: OPEN
+    evidence:
+      - "grep of .local/scheduler.py and heal_english_headings.py: no test invocation in the dispatch path"
+    missing_evidence: []
+    root_cause: >
+      No prior taskcard established "TM-key regression test must gate
+      campaign launch" as a requirement.
+    why_not_only_symptom: n/a
+    affected_files: [".local/scheduler.py"]
+    affected_components: ["heal scheduler launch path"]
+    affected_connection_points: []
+    severity: LOW
+    blocker: false
+    recurrence_risk: LOW
+    required_fix_type: new_gate
+    requires_plan_update: true
+    requires_taskcard: true
+    requires_system_healing: false
+    requires_reexecution: false
+    requires_governance_change: false
+    requires_evidence_repair: false
+    recommended_next_stage: PROMPT_2_TASKCARD
+    acceptance_impact: does not block acceptance; tracked as new taskcard.

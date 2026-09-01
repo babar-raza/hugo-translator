@@ -1,0 +1,82 @@
+close_task_result:
+  prompt_path: .supervisor/prompts/prompt4-close-task.md
+  prompt_hash: 3196a5bd52bd6e037b84d602dbde8d32a8dbac31798c0947bac03784ff6ef81b
+  invocation_id: heading-i18n-governance-20260723-close-02
+  mission_id: heading-i18n-governance-20260723
+  plan_id: glittery-waddling-moth
+  plan_revision: "session-2026-07-24-formal-convergence"
+  plan_hash: 087e96cd651d62371bc7ec41870ca7ac350763140eef6ac7c968d08f38aca271
+
+  taskcards_closed:
+    - TC-HT-I18N-001
+    - TC-HT-I18N-002
+    - TC-HT-I18N-003
+    - TC-HT-I18N-004
+    - TC-HT-I18N-005
+    - TC-HT-I18N-006
+    - TC-HT-I18N-008
+    - TC-HT-I18N-009
+
+  taskcards_accepted_with_governed_exclusion:
+    - id: TC-HT-I18N-007
+      excluded_requirement: "content-repo full-scope commit"
+      authority: "explicit user instruction; see plan §14/§15.1"
+      code_deliverable_status: VERIFIED_COMPLETE
+
+  taskcards_not_closed:
+    - {id: TC-HT-I18N-010, state: PLANNED, reason: "new follow-up taskcard from this cycle's Stage 1 audit (L2-002) -- future sprint, not this closure's scope"}
+    - {id: TC-HT-I18N-011, state: PLANNED, reason: "new follow-up taskcard from this cycle's Stage 1 audit (L2-003) -- future sprint, not this closure's scope"}
+
+  requirements_reconciled: true
+  queue_empty_and_valid: true
+  continuation_disabled: true
+
+  files_changed_this_close_task_invocation:
+    - .supervisor/prompts/prompt-registry.yaml
+
+  commits_this_invocation:
+    - hash: 65193de
+      message: "chore(governance): register prompt4-close-task.md in prompt-registry.yaml (PSL-PROMPT-4)"
+
+  commits_this_mission_full_list:
+    - {hash: b8ecfdf, taskcard: TC-HT-I18N-001}
+    - {hash: 14461a0, taskcard: TC-HT-I18N-002}
+    - {hash: 36a60b7, taskcard: TC-HT-I18N-003}
+    - {hash: ead201d, taskcard: TC-HT-I18N-004}
+    - {hash: 74fc2ca, taskcard: "TC-HT-I18N-005/006"}
+    - {hash: 2518c52, taskcard: TC-HT-I18N-008}
+    - {hash: 262e3c4, taskcard: "TC-HT-I18N-004 completion"}
+    - {hash: 5d17935, taskcard: "TC-HT-I18N-007 script + TC-HT-I18N-002 test-coverage gap closure"}
+    - {hash: 65193de, taskcard: "this close-task invocation, Stage 1 finding L2-001"}
+
+  master_plan_sections_updated:
+    - "§15 (new): Stage 2 plan hardening -- formal convergence cycle (2026-07-24)"
+    - "§15.1: TC-HT-I18N-007 content-repo commit reclassified as a governed exclusion"
+    - "§15.2: new taskcard TC-HT-I18N-010 (discovery-log consumer)"
+    - "§15.3: new taskcard TC-HT-I18N-011 (registry backfill + text_unit_extractor.py unification)"
+    - "§15.4: Stage 1 L1/L3 findings disposition"
+    - "§15.5: plan verdict PLAN_HARDENED_FROM_AUDIT_READY_FOR_EXECUTION"
+
+  pushed_to_origin: false
+  push_is_operator_owned: true
+
+  verification_performed:
+    - "pytest tests/unit/translation_engine/ -q -> 1187 passed, 4 skipped, 0 xfailed, 0 failures (re-run fresh this cycle)"
+    - "pytest tests/unit/scripts/test_mine_heading_glossary.py tests/unit/scripts/test_tm_surgical_cleanup_rule4.py tests/unit/scripts/test_frontmatter_parsing_fixes.py -q -> 32 passed"
+    - "3 pre-existing, unrelated failures in tests/unit/quality/ reconfirmed unchanged"
+    - "prompt-registry.yaml re-parsed via yaml.safe_load() after edit -- valid, PSL-PROMPT-4 present"
+    - "all 3 new YAML code blocks in plan §15 re-parsed via yaml.safe_load() -- valid"
+    - "git status filtered against the known pre-existing-dirty-file list -> zero unexplained new files after this invocation's commit"
+    - "content repo (aspose.org) re-checked: 16,785 dirty lines, HEAD at c2719766b0 -- unchanged, matches the governed exclusion's description exactly"
+
+  remaining_follow_ups_or_non_blockers:
+    - "TC-HT-I18N-010 (discovery-log consumer) -- future sprint"
+    - "TC-HT-I18N-011 (registry backfill + text_unit_extractor.py unification) -- future sprint"
+    - "TC-HT-I18N-007's content-repo commit -- operator-owned, governed exclusion, not a blocker"
+
+  closure_record_path: ".supervisor/state/heading-i18n-governance-20260723/TERMINAL_CLOSED.yaml"
+  closure_record_valid: true
+  terminal_state_written: true
+  contradictions: []
+
+  verdict: CLOSED

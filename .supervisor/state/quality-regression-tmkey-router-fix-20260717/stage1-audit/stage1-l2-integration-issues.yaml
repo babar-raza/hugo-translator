@@ -1,0 +1,106 @@
+issues:
+  - issue_id: L2-001
+    issue_level: L2_INTEGRATION
+    title: Originally-planned field_name-scoped TM key machinery (TC-HDN-003) remains dead code
+    description: >
+      make_tm_key_scoped() in src/tm/normalization.py and its field_name
+      support in L2PersistentTM.exact_lookup/store exist, but
+      TranslationMemory.lookup/store/batch_lookup (the layer segment_translator.py
+      actually calls) never accept or forward field_name. This was already true
+      before this session; today's Option A0 fix solves the CONFIRMED
+      cross-document collision via a different, narrower mechanism
+      (tm_key_text hashing the pre-protection text) that does not require this
+      machinery, reducing but not eliminating this gap's relevance.
+    status: OPEN_SUPERSEDED_IN_SCOPE
+    evidence:
+      - "grep confirms TranslationMemory.lookup/store/batch_lookup signatures have no field_name parameter"
+      - "Only real caller passing field_name is ContentTypeRouter.route(), unrelated to TM keys"
+    missing_evidence: []
+    root_cause: TC-HDN-003 (plan) was scoped but never fully wired end-to-end in an earlier session
+    why_not_only_symptom: >
+      The remaining use case this machinery would still serve (identical text
+      recurring across different FIELD TYPES, e.g. title vs. description,
+      not different documents) is real but lower-frequency than the
+      cross-document case Option A0 already fixed.
+    affected_files: ["src/tm/translation_memory.py", "src/tm/l2_persistent.py", "src/tm/normalization.py"]
+    affected_components: ["Translation Memory"]
+    affected_connection_points: ["segment_translator.py TM lookup/store call sites"]
+    severity: LOW
+    blocker: false
+    recurrence_risk: LOW
+    required_fix_type: plan_reprioritization
+    requires_plan_update: true
+    requires_taskcard: false
+    requires_system_healing: false
+    requires_reexecution: false
+    requires_governance_change: true
+    requires_evidence_repair: false
+    recommended_next_stage: PROMPT_2_PLAN_UPDATE
+    acceptance_impact: >
+      Does not block accepting DELIVERABLE 53. TC-HDN-003 should be marked
+      "scope superseded for the cross-document case; cross-field-type case
+      remains open at lower priority" in the master plan rather than left
+      implicitly still-urgent.
+
+  - issue_id: L2-002
+    issue_level: L2_INTEGRATION
+    title: No monitor covers "is the scheduler daemon itself alive and dispatching"
+    description: >
+      The thermal watchdog is a real, working monitor -- but it watches GPU
+      temperature and heal-job PIDs, not the scheduler process's own
+      liveness. L1-001's multi-hour undetected outage exists precisely
+      because no connect point covers this specific failure mode.
+    status: OPEN
+    evidence:
+      - "scripts/quality/thermal_watchdog.py reviewed: covers temp + heal/shard PID discovery only"
+    missing_evidence: []
+    root_cause: Gap was never identified as in-scope for any existing monitor
+    why_not_only_symptom: n/a
+    affected_files: [".local/scheduler.py", "scripts/quality/thermal_watchdog.py"]
+    affected_components: ["heal scheduler", "thermal watchdog"]
+    affected_connection_points: []
+    severity: MEDIUM
+    blocker: false
+    recurrence_risk: HIGH
+    required_fix_type: new_monitoring_capability
+    requires_plan_update: true
+    requires_taskcard: true
+    requires_system_healing: false
+    requires_reexecution: false
+    requires_governance_change: false
+    requires_evidence_repair: false
+    recommended_next_stage: PROMPT_2_TASKCARD
+    acceptance_impact: does not block acceptance; tracked as new taskcard.
+
+  - issue_id: L2-003
+    issue_level: L2_INTEGRATION
+    title: Sibling l2_lmdb directory warning fires on every single job start (TC-TM-02)
+    description: >
+      L2PersistentTM prints a "split writes" warning at startup for every one
+      of the 17 registered jobs, referencing scripts/tm/migrate_l2_lmdb.py as
+      the fix. Found (not caused) during this session's real-LMDB validation
+      work. Continuous re-occurrence across every process start suggests any
+      prior migration attempt did not fully resolve it, or a process keeps
+      recreating the sibling directory.
+    status: OPEN_PRE_EXISTING
+    evidence:
+      - "Identical UserWarning observed in .local/heal_review_latin_m2m.err across every dispatch this session"
+    missing_evidence:
+      - "Whether scripts/tm/migrate_l2_lmdb.py --apply has ever actually been run to completion"
+    root_cause: NOT_INVESTIGATED_THIS_SESSION
+    why_not_only_symptom: n/a
+    affected_files: ["data/tm/l2.lmdb", "data/tm/l2_lmdb (sibling)"]
+    affected_components: ["Translation Memory storage layer"]
+    affected_connection_points: ["every heal/shard job's engine startup"]
+    severity: LOW
+    blocker: false
+    recurrence_risk: MEDIUM
+    required_fix_type: investigation_required
+    requires_plan_update: true
+    requires_taskcard: true
+    requires_system_healing: false
+    requires_reexecution: false
+    requires_governance_change: false
+    requires_evidence_repair: false
+    recommended_next_stage: PROMPT_2_TASKCARD
+    acceptance_impact: does not block acceptance; pre-existing and out of this mission's scope.

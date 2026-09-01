@@ -1,0 +1,110 @@
+close_task_result:
+  mission_id: heading-i18n-governance-20260723
+  plan_id: glittery-waddling-moth
+  plan_path: C:\Users\prora\.claude\plans\glittery-waddling-moth.md
+
+  taskcards_closed:
+    - TC-HT-I18N-001
+    - TC-HT-I18N-002
+    - TC-HT-I18N-003
+    - TC-HT-I18N-004
+    - TC-HT-I18N-005
+    - TC-HT-I18N-006
+    - TC-HT-I18N-008
+    - TC-HT-I18N-009
+
+  taskcards_accepted_with_limitations:
+    - id: TC-HT-I18N-007
+      reason: >
+        Code deliverable (heal_english_headings_dictionary.py) complete
+        and verified; healing computation applied (16,522 files, 52,096
+        headings). The content-repo commit step of its closeout_rules is
+        DEFERRED, operator-owned, per explicit later user instruction --
+        not a hugo-translator-side defect. See stage3-quality-evaluations.yaml
+        for the specific dimensions scored below 4 and why.
+
+  requirements_reconciled: true
+  queue_empty_and_valid: true
+  continuation_disabled: true
+
+  files_changed_this_session_2026-07-24:
+    - src/translation_engine/terminology/classification.py
+    - tests/unit/translation_engine/test_classification.py
+    - src/translation_engine/write_gate.py
+    - scripts/quality/tm_surgical_cleanup.py
+    - scripts/quality/heal_english_headings.py
+    - scripts/quality/surgical_retranslate.py
+    - tests/unit/translation_engine/test_heading_translation_regression.py
+    - scripts/quality/heal_english_headings_dictionary.py
+    - tests/unit/scripts/test_mine_heading_glossary.py
+
+  commits_this_mission:
+    - hash: b8ecfdf
+      message: "feat(terminology): add canonical classifier + i18n template-string registry (TC-HT-I18N-001)"
+    - hash: 14461a0
+      message: "feat(quality): add heading-glossary miner + table-first classifier reorder (TC-HT-I18N-002)"
+    - hash: 36a60b7
+      message: "feat(terminology): populate i18n table via agentic adjudication (TC-HT-I18N-003)"
+    - hash: ead201d
+      message: "feat(extractor): wire i18n table short-circuit into live translation path (TC-HT-I18N-004)"
+    - hash: 74fc2ca
+      message: "test(translation_engine): heading-i18n regression suite + SSOT lint (TC-HT-I18N-005/006)"
+    - hash: 2518c52
+      message: "fix(quality): TM correction rule for untranslated heading passthroughs (TC-HT-I18N-008)"
+    - hash: 262e3c4
+      message: "feat(quality): unify identifier/heading-term detection behind classification.py (TC-HT-I18N-004 completion)"
+    - hash: 5d17935
+      message: "feat(quality): add dictionary-based English-heading healer + mining test coverage (TC-HT-I18N-007/002 closure)"
+
+  pushed_to_origin: false
+  push_is_operator_owned: true
+
+  unrelated_pre_existing_changes_preserved_not_committed:
+    # Confirmed present in the working tree before and throughout this
+    # mission; none touched, none swept into any of the 8 commits above
+    # (each commit staged explicit pathspecs, never `git add -A`).
+    - .gitignore (modified)
+    - config/global.yaml (modified)
+    - config/site_profiles/{docs,kb,products,reference}.aspose.org.yaml (modified)
+    - data/benchmark_corpus/* (deleted, 7 files)
+    - src/model_runtime/llm_backend.py (modified)
+    - src/tm/{l2_persistent,l3_semantic,normalization}.py (modified)
+    - src/translation_engine/engine_builder.py (modified)
+    - src/translation_engine/extractor/{placeholder_manager,segment_extractor}.py (modified)
+    - src/translation_engine/file_pipeline.py (modified)
+    - src/translation_engine/models.py (modified)
+    - src/translation_engine/parser/hugo_parser.py (modified)
+    - src/translation_engine/quality/refusal_patterns.py (modified)
+    - src/translation_engine/reconstructor/ast_renderer.py (modified)
+    - src/translation_engine/validation/{completeness_validator,decision_engine}.py (modified)
+    - src/translation_engine/validation/fidelity_judge.py (untracked, new)
+    - a further ~14 corresponding test files under tests/unit/ (modified/untracked)
+    - .kilo/ (untracked, unknown origin)
+    - scripts/ops/admin/fix_orchestrator_task_path.ps1, scripts/ops/startup_recovery.py (untracked)
+    # This is other, live, concurrently-developed work (the "Gates 30-43"
+    # hardening referenced in TC-HT-I18N-004's original evidence.md) --
+    # explicitly out of scope for this mission and deliberately left
+    # untouched throughout, per the user's own instruction that this
+    # mission's duty is scoped to the heading-i18n incident specifically.
+
+  content_repo_state:
+    path: "D:\\onedrive\\Documents\\GitHub\\aspose.org"
+    healing_applied: true
+    healing_committed: PARTIAL
+    detail: >
+      Small-slice apply (18 files, ja/3d family) committed successfully
+      in the content repo's own history. The full-scope apply (16,522
+      files, 52,096 headings) is applied to the working tree but NOT
+      committed -- multiple commit attempts (single 16,522-file commit,
+      then 12x1,500-file batches) failed on that repo's own
+      check_grade_downgrade.py pre-commit hook hitting Windows'
+      "Argument list too long". Per explicit user instruction, further
+      commit attempts there are out of scope for this mission and marked
+      DEFERRED / operator-owned.
+
+  closure_record_path: ".supervisor/state/heading-i18n-governance-20260723/TERMINAL_CLOSED.yaml"
+  closure_record_valid: true
+  terminal_state_written: true
+  contradictions: []
+
+  verdict: CLOSED

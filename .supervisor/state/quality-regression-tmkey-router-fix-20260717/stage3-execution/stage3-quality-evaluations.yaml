@@ -1,0 +1,104 @@
+# Retrospective quality scoring — execution already occurred earlier in this
+# session, before this .supervisor cycle was invoked. This stage confirms it
+# against the 15-dimension rubric rather than re-executing it.
+
+taskcard_scores:
+  - taskcard_id: TC-HT-TMKEY-001 (Option A0)
+    scores:
+      requirement_correctness: 5       # directly targets the code-verified root cause (Root Cause 1)
+      implementation_correctness: 5    # narrow, surgical; backward-compatible fallback (getattr default)
+      integration_completeness: 5      # both lookup and store call sites updated together
+      pipeline_compatibility: 5        # no change to what's sent to the model, only TM key derivation
+      governance_compliance: 5         # matches plan's own Option A0 spec almost exactly
+      evidence_completeness: 5         # unit tests + real production LMDB proof
+      test_coverage: 5                 # 7 tests, including the exact real-world collision cases
+      validator_coverage: 4            # covered by existing write-gate suite indirectly; no NEW gate added for this specific mechanism (see TC-HT-GATE-001)
+      repeatability: 5                 # deterministic hash function, no flakiness risk
+      idempotency: 5                   # re-running produces the same key every time
+      downstream_consumer_readiness: 5 # live campaign consuming it right now
+      agentic_consumption_quality: 4   # code comments explain the "why", but no dedicated doc page
+      rollback_safety_quality: 5       # git-revertible; old poisoned keys just become orphaned, no data loss risk
+      documentation_skill_agent_sync_quality: 4  # plan file updated extensively; no separate skill/doc sync needed
+      production_readiness: 5          # live, deployed, monitored stable
+    min_score: 4
+    accepted: true
+
+  - taskcard_id: TC-HT-ROUTE-001 (Option A)
+    scores:
+      requirement_correctness: 5
+      implementation_correctness: 5
+      integration_completeness: 5
+      pipeline_compatibility: 5
+      governance_compliance: 5
+      evidence_completeness: 5         # real end-to-end test via actual function return value
+      test_coverage: 5                 # 3 tests covering success, LLM-failure passthrough, and no-op cases
+      validator_coverage: 4
+      repeatability: 5
+      idempotency: 5
+      downstream_consumer_readiness: 4  # depends on professionalize_llm availability; graceful degrade tested, but real production LLM uptime unverified this session
+      agentic_consumption_quality: 4
+      rollback_safety_quality: 5
+      documentation_skill_agent_sync_quality: 4
+      production_readiness: 5
+    min_score: 4
+    accepted: true
+
+  - taskcard_id: infra-fix-scheduler-outage-recovery
+    scores:
+      requirement_correctness: 5
+      implementation_correctness: 5
+      integration_completeness: 5
+      pipeline_compatibility: 5
+      governance_compliance: 4        # ad hoc discovery/fix, not pre-taskcarded before being found (now retroactively taskcarded via TC-OPS-SCHED-MONITOR-001 for the monitoring gap)
+      evidence_completeness: 5
+      test_coverage: 4                # verified via live monitoring, not a unit test (the underlying issue is an ops/infra gap, not a unit-testable code path)
+      validator_coverage: 4
+      repeatability: 5
+      idempotency: 5
+      downstream_consumer_readiness: 5
+      agentic_consumption_quality: 4
+      rollback_safety_quality: 5
+      documentation_skill_agent_sync_quality: 5   # extensively documented in the plan file's execution record
+      production_readiness: 5
+    min_score: 4
+    accepted: true
+
+  - taskcard_id: infra-fix-stall-detector-crash-loop
+    scores:
+      requirement_correctness: 5
+      implementation_correctness: 5
+      integration_completeness: 5
+      pipeline_compatibility: 5
+      governance_compliance: 4
+      evidence_completeness: 5        # before/after comparison across 5+ live cycles + new regression tests
+      test_coverage: 5                # REROUTED AND REPAIRED: added tests/unit/ops/test_scheduler_stall_detection.py (4 tests) covering the fixed case, the genuine-stall negative control, the unified_shard path, and the no-lock-file backward-compat fallback
+      validator_coverage: 4
+      repeatability: 5
+      idempotency: 5
+      downstream_consumer_readiness: 5
+      agentic_consumption_quality: 4
+      rollback_safety_quality: 5
+      documentation_skill_agent_sync_quality: 5
+      production_readiness: 5
+    min_score: 4
+    accepted: true
+    reroute_history:
+      initial_scores_below_4: [test_coverage, validator_coverage]
+      reroute_reason: >
+        Fix was verified live (strong evidence) but had no regression test
+        guarding against reintroduction.
+      repair_action: >
+        Added tests/unit/ops/test_scheduler_stall_detection.py, loading
+        .local/scheduler.py via importlib (dot-prefixed ops script, not on
+        the normal import path) and exercising _check_and_kill_stall()
+        directly with controlled file mtimes via monkeypatched LOCAL +
+        os.utime, mocking psutil.Process to avoid any real process
+        interaction. 4/4 pass: (1) stale-log/fresh-lock -> not stalled
+        [the exact bug scenario], (2) stale-log/stale-lock -> genuinely
+        stalled and killed [negative control -- the fix must not disable
+        real stall detection], (3) unified_shard job path exercised via the
+        real _job_log_path() resolution, (4) no-lock-file backward
+        compatibility.
+      rescored_at: "2026-07-17"
+      verification_command: "pytest tests/unit/ops/test_scheduler_stall_detection.py -v"
+      verification_result: "4 passed in 0.67s"

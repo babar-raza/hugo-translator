@@ -1,0 +1,110 @@
+# TERMINAL_CLOSED — Mission quality-regression-tmkey-router-fix-20260717
+# Session: 2026-07-17
+# Closed by: Claude (Sonnet 5), PSL-PROMPT-4 close-task protocol
+
+terminal_closed:
+  mission_id: quality-regression-tmkey-router-fix-20260717
+  session_id: quality-regression-tmkey-router-fix-20260717
+  closed_at: "2026-07-17"
+  closed_by: "claude-sonnet-5"
+  protocol: "POST-PLAN AUTONOMOUS CONVERGENCE AND GOVERNED CLOSURE / PSL-PROMPT-4"
+
+  reopened_from: quality-protection-repair-20260712 (session quality-remediation-20260713, closed 2026-07-14)
+  reopen_reason: >
+    Same plan file (sharded-wibbling-sifakis.md), later in-scope work
+    (DELIVERABLE 52, DELIVERABLE 53) added and executed in subsequent
+    sessions after the prior closure. Prior closure's own scope
+    (TC-WGT-GATE22-FIX, TC-LLM-AVAIL-001) remains valid and unmodified.
+
+  audit_chain:
+    - stage: stage1-audit
+      verdict: SPRINT_ACCEPTED_WITH_LIMITATIONS
+      findings: 9  # L1: 4, L2: 3, L3: 2
+      findings_resolved_this_session: 2  # L1-001, L1-002
+      findings_consumed_as_taskcards: 6
+      findings_recorded_as_observation: 1  # L3-001
+      file: ".supervisor/state/quality-regression-tmkey-router-fix-20260717/stage1-audit/stage1-issue-model.json"
+    - stage: stage2-plan
+      verdict: PLAN_HARDENED_FROM_AUDIT_READY_FOR_EXECUTION
+      new_taskcards: 5
+      updated_taskcards: 1
+      file: ".supervisor/state/quality-regression-tmkey-router-fix-20260717/stage2-plan/stage2-taskcard-index.yaml"
+    - stage: stage3-execution
+      verdict: EXECUTION_COMPLETE_VERIFIED
+      reroute_occurred: true
+      reroute_detail: >
+        infra-fix-stall-detector-crash-loop initially scored below 4/5 on
+        test_coverage/validator_coverage (verified live but untested).
+        Repaired within this same cycle: added
+        tests/unit/ops/test_scheduler_stall_detection.py (4 tests),
+        rescored 5/5, accepted.
+      file: ".supervisor/state/quality-regression-tmkey-router-fix-20260717/stage3-execution/stage3-final-sprint-summary.yaml"
+
+  deliverables_verified:
+    - tc: TC-HT-TMKEY-001
+      title: "TM key derivation uses pre-placeholder-protection text (Option A0)"
+      state: VERIFIED
+      commit: "5df29fe"
+      proof_level: end_to_end_proof (real production data/tm/l2.lmdb validation)
+    - tc: TC-HT-ROUTE-001
+      title: "ContentTypeRouter wired into frontmatter/segments translation path (Option A)"
+      state: VERIFIED
+      commit: "5df29fe"
+      proof_level: integration_validation (real function return value exercised)
+    - tc: infra-fix-scheduler-outage-recovery
+      title: "Diagnosed and recovered from full campaign outage (reboot + dead watchdog)"
+      state: VERIFIED
+      commit: "n/a (.local/, gitignored)"
+      proof_level: end_to_end_proof (live monitoring)
+    - tc: infra-fix-stall-detector-crash-loop
+      title: "Fixed post-outage stall-detector crash-loop"
+      state: VERIFIED
+      commit: "27746a4 (regression test); fix itself in .local/scheduler.py, gitignored"
+      proof_level: end_to_end_proof + focused_validation (live monitoring + new regression test)
+
+  test_results:
+    new_tests_this_mission: "14 (7 TM key collision + 3 router wiring + 4 stall detection)"
+    new_tests_result: "14/14 passed"
+    full_regression_command: "pytest tests/ --continue-on-collection-errors -q"
+    full_regression_result: "775 failed, 6299 passed, 173 skipped, 21 xfailed, 35 errors -- rigorously triaged as 0 attributable to this mission (see stage1 L1-003 / TC-TEST-ISOLATION-001)"
+    neighborhood_regression_command: "pytest tests/unit/translation_engine/ tests/unit/tm/ tests/unit/model_runtime/ -q"
+    neighborhood_regression_result: "1202 passed, 4 failed (pre-existing, unrelated: torch API version mismatch, ctranslate2)"
+
+  open_follow_ups:
+    - id: TC-OPS-SCHED-MONITOR-001
+      description: "Add liveness monitoring for the scheduler daemon itself (no monitor currently covers 'is the scheduler alive and dispatching')"
+    - id: TC-TEST-ISOLATION-001
+      description: "Investigate full-suite pytest order-dependency causing 775 failures that don't reproduce in isolation"
+    - id: TC-HT-TMKEY-002
+      description: "Live re-translation validation of the 3 originally-flagged corrupted files, once VRAM allows"
+    - id: TC-TM-LMDB-CONSOLIDATE-001
+      description: "Resolve recurring sibling l2_lmdb directory warning (TC-TM-02), fires on every job start"
+    - id: TC-HT-GATE-001
+      description: "Add a TM-collision regression check to the campaign's own launch/preflight path"
+    - id: TC-HDN-003 (updated, not new)
+      description: "Cross-field-type TM key scoping remains open at lower priority; cross-document case (the confirmed bug) is now solved by TC-HT-TMKEY-001"
+
+  not_addressed_this_session_explicitly_out_of_scope:
+    - "docs.aspose.org / kb.aspose.org code-fence verification (from the user's original report)"
+    - "BoxShape.md [Condition]-style broken placeholder bug (250+ vi files, found not root-caused)"
+    - "Form.md stale-translation-after-EN-regeneration gap (found, mechanism identified, no fix designed)"
+    - "Master plan Phase 0 (comprehensive audit), remaining Phase 1 hardening, all of Phase 2 (unit-level healing) -- untouched, plan-level mission remains IN_PROGRESS"
+
+  plan_file: "C:\\Users\\prora\\.claude\\plans\\sharded-wibbling-sifakis.md"
+  plan_sections_updated:
+    - "DELIVERABLE 53 (header, Execution Record, Remaining Open Items, Tradeoffs)"
+    - "DELIVERABLE 41 (Evidence Log): 6 new entries"
+    - "DELIVERABLE 51 (Plan Hardening Change Log): 2 new entries"
+    - "Quick Navigation table"
+
+  final_status: CLOSED
+  scope_note: >
+    This closes mission quality-regression-tmkey-router-fix-20260717 only
+    (DELIVERABLE 53 + the 2 infrastructure fixes found while executing it).
+    It does NOT close the master plan (sharded-wibbling-sifakis.md) as a
+    whole -- that plan's overall mission remains IN_PROGRESS, with Phase 0
+    (comprehensive audit), most of Phase 1 (hardening), and all of Phase 2
+    (unit-level healing infrastructure) still NOT_STARTED. This matches the
+    precedent set by the prior closure (quality-remediation-20260713),
+    which also closed a scoped sub-mission against the same ever-growing
+    plan file without claiming the whole plan was complete.

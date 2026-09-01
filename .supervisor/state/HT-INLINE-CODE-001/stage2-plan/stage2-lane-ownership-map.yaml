@@ -1,0 +1,45 @@
+mission_id: HT-INLINE-CODE-001
+session_id: inline-code-repair-20260723
+lanes:
+  lane_0_coordinator:
+    owner: execution-coordinator (this session)
+    taskcards: [TC-ICR-006, TC-ICR-009, TC-ICR-012]
+    role: "Owns the 3 approval checkpoints; nothing else in this mission requires a pause"
+  lane_b_taskcard_execution:
+    owner: implementation-agent (this session)
+    taskcards: [TC-ICR-001, TC-ICR-002, TC-ICR-003, TC-ICR-004, TC-ICR-005, TC-ICR-008]
+    file_ownership_note: >
+      TC-ICR-004 and TC-ICR-005 both edit write_gate.py -- executed
+      sequentially (005 after 004), never concurrently, to avoid
+      clobbering the same file's edits.
+    status: all_closed
+  lane_c_system_healing:
+    owner: healing-agent (this session)
+    taskcards: [TC-ICR-006, TC-ICR-007, TC-ICR-009, TC-ICR-011, TC-ICR-012]
+    overlap_check: >
+      TC-ICR-009 (content, all 5 sites) and TC-ICR-011/012 (TM) touch
+      disjoint storage (content files vs. LMDB+FAISS) -- safe to run
+      concurrently, though this session sequenced TM-backup before any
+      content apply for operational clarity, not because of a real
+      conflict.
+    status: in_progress
+  lane_d_verification_qa:
+    owner: verification-agent (this session)
+    taskcards: [TC-ICR-013]
+    status: in_progress
+  lane_e_governance_evidence:
+    owner: governance-agent (this session)
+    taskcards: [TC-ICR-014]
+    status: in_progress
+  lane_g_work_ahead_repeatability:
+    owner: healing-agent
+    taskcards: [TC-ICR-009]
+    note: "Stage 0->3 runbook documented in the hardened plan as a reusable template for future unit_heal.py issue-type rollouts"
+  lane_h_quality_scoring_reroute:
+    owner: execution-coordinator
+    taskcards: all
+    note: "Applied at each taskcard's closeout per the plan's 15-dimension rubric reference"
+  lane_i_adversarial_review:
+    owner: independent-reviewer
+    taskcards: [TC-ICR-013]
+    status: pending

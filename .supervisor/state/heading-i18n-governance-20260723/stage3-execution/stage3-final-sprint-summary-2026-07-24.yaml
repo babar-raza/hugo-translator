@@ -1,0 +1,66 @@
+# Stage 3 — Controlled Execution confirmation pass, formal convergence cycle
+# Generated: 2026-07-24
+# Bound prompt: .supervisor/prompts/prompt3-controlled-execution.md (hash 5246d218...)
+
+stage3_final_sprint_summary:
+  mission_id: heading-i18n-governance-20260723
+  plan_hash_at_execution: bfb0ba4aea0d465a19c370c6c21807770edc0cf21774d0e4781cbb8840060976
+  plan_hash_after_hardening: "recomputed post-§15 edit -- see note below"
+
+  phase0_preflight:
+    repo_path: "c:\\Users\\prora\\OneDrive\\Documents\\GitHub\\hugo-translator"
+    branch: main
+    head_commit: 5d17935
+    git_status_classification:
+      owned_by_this_sprint: [".supervisor/prompts/prompt-registry.yaml"]
+      unrelated_human_or_agent_work: [".gitignore", "config/global.yaml", "config/site_profiles/*.yaml", "data/benchmark_corpus/* (deleted)", "src/model_runtime/llm_backend.py", "src/tm/*.py", "src/translation_engine/engine_builder.py", "src/translation_engine/extractor/{placeholder_manager,segment_extractor}.py", "src/translation_engine/file_pipeline.py", "src/translation_engine/models.py", "src/translation_engine/parser/hugo_parser.py", "src/translation_engine/quality/refusal_patterns.py", "src/translation_engine/reconstructor/ast_renderer.py", "src/translation_engine/validation/*.py", "~14 corresponding test files", ".kilo/", "scripts/ops/*"]
+      stale_generated: []
+      unsafe_unknown: []
+    isolation_confirmed: "verified via filtered git status diff -- only prompt-registry.yaml is new/owned by this sprint; nothing unrelated overwritten or touched"
+
+  phase1_readiness_assessment: PLAN_READY
+  phase1_reasoning: >
+    Goals unambiguous (glittery-waddling-moth.md §5 self-declares mission
+    scope); all 9 original taskcards are taskcard-driven with
+    allowed_paths/forbidden_paths/dependencies/quality_dimensions/
+    stop_conditions/validation_commands; gates present (safe_io.py,
+    WriteGateEvaluator); evidence bundle requirements defined (§11);
+    state management present (.supervisor/state/); dependencies clear
+    (§8 lane/order table); quality scoring present (15-dim rubric,
+    stage3-quality-evaluations.yaml); reroute rules present per-taskcard.
+    No plan-healing phase (Phase 2) was required.
+
+  phase3_lanes:
+    lane_0_coordinator: "this convergence cycle itself"
+    lane_a_preflight: "COMPLETE -- see phase0 above"
+    lane_b_taskcard_execution: "COMPLETE -- all 9 original taskcards executed in prior sessions; registry entry for PSL-PROMPT-4 added this cycle (Stage 2 hardening, not a taskcard)"
+    lane_c_system_healing: "COMPLETE -- TC-HT-I18N-007's healer script committed, TC-HT-I18N-002's test gap closed, both this convergence cycle's Stage-1 gap closures"
+    lane_d_verification_qa: "COMPLETE -- see phase4 below"
+    lane_e_governance_evidence_state: "COMPLETE -- this file + stage1-issue-model.json + convergence-binding-2026-07-24.yaml"
+    lane_f_docs_skills_agent_sync: "N/A this cycle -- no skill/agent doc changes required"
+    lane_g_work_ahead_repeatability: "TC-HT-I18N-010/011 recorded as follow-up work for a LATER sprint, per §15.5's explicit non-blocking classification"
+    lane_h_quality_scoring_reroute: "COMPLETE -- stage3-quality-evaluations.yaml (all 9 taskcards scored, 8 accepted >=4/5 all dimensions, 1 ACCEPTED_WITH_LIMITATIONS per governed exclusion)"
+    lane_i_independent_adversarial_review: "Performed originally for TC-HT-I18N-003 (dual-agent adjudication); this convergence cycle's own audit (Stage 1) functioned as an independent skeptical re-check of the prior session's self-reported closure, per L1-001's own finding"
+
+  phase4_verification_rerun_this_cycle:
+    command: "pytest tests/unit/translation_engine/ -q"
+    result: "1187 passed, 4 skipped, 0 xfailed, 0 failures"
+    command_2: "pytest tests/unit/scripts/test_mine_heading_glossary.py tests/unit/scripts/test_tm_surgical_cleanup_rule4.py tests/unit/scripts/test_frontmatter_parsing_fixes.py -q"
+    result_2: "32 passed"
+    command_3: "pytest tests/unit/quality/test_aspose_org_governed_retranslate.py::test_kb_verify_allows_translated_keyword_list_items tests/unit/quality/test_products_org_governed_retranslate_shards.py::test_verify_pair_rejects_material_evidence_drift tests/unit/quality/test_products_org_governed_retranslate_shards.py::test_code_block_repair_restores_source_blocks_inside_translatable_fields -q"
+    result_3: "3 failed -- reconfirmed pre-existing/unrelated (unchanged from prior session's git-stash-isolated verification)"
+    prompt_registry_yaml_reparse: "yaml.safe_load() successful, PSL-PROMPT-4 entry present"
+    plan_yaml_blocks_reparse: "all 3 new YAML code blocks in plan §15 parse cleanly via yaml.safe_load()"
+
+  phase5_quality_scoring: "unchanged from stage3-quality-evaluations.yaml (this cycle added no new taskcard scores -- TC-HT-I18N-010/011 are status: PLANNED, not yet executed, correctly unscored)"
+
+  phase6_commit_rules: "commit deferred to Stage 4 (prompt4-close-task.md), per that prompt's own role -- not performed ad hoc mid-Stage-3"
+
+  overall_verdict: EXECUTION_COMPLETE_VERIFIED
+  verdict_reasoning: >
+    No eligible mandatory task remains unexecuted within this mission's
+    scope. TC-HT-I18N-010/011 are explicitly follow-up work for a future
+    sprint (§15.5), not part of this closure's required scope. The one
+    governed exclusion (TC-HT-I18N-007's content-repo commit) is formally
+    recorded, not silently dropped. All verification re-run fresh this
+    cycle reproduces identically to the prior session's claims.

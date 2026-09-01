@@ -1,0 +1,129 @@
+# Convergence Binding Record — formal 4-prompt lifecycle re-run
+# Generated: 2026-07-24
+# Protocol: POST-PLAN AUTONOMOUS CONVERGENCE AND GOVERNED CLOSURE
+#
+# Supersedes/extends convergence-binding.yaml (the informal, plan-bound-
+# only closure written earlier the same day) with an explicit binding to
+# the actual repository-native .supervisor/prompts/ files, per direct
+# user instruction to bind and use the real prompt machinery rather than
+# a self-authored equivalent.
+
+convergence_binding:
+  mission_id: heading-i18n-governance-20260723
+  plan_id: glittery-waddling-moth
+  plan_path: "C:\\Users\\prora\\.claude\\plans\\glittery-waddling-moth.md"
+  plan_revision: "session-2026-07-24-formal-convergence"
+  plan_hash: bfb0ba4aea0d465a19c370c6c21807770edc0cf21774d0e4781cbb8840060976
+  plan_hash_pre_stage1_audit: bfb0ba4aea0d465a19c370c6c21807770edc0cf21774d0e4781cbb8840060976
+  plan_hash_post_stage2_hardening: 087e96cd651d62371bc7ec41870ca7ac350763140eef6ac7c968d08f38aca271
+  plan_hash_evolution_note: >
+    The plan hash changed once, expectedly, between Stage 1 (audit ran
+    against the pre-hardening plan) and Stage 2 (§15 hardening section
+    appended directly to the same file, same mission_id, same plan_id,
+    same taskcard IDs unchanged -- an amendment, not a new plan). No
+    further changes expected before Stage 4 close-task.
+
+  plan_selection_justification: >
+    This is the exact plan already executed across this mission's prior
+    sessions (all 9 taskcard commits b8ecfdf..5d17935 reference it by path
+    in their commit messages; the plan's own §5 self-declares
+    mission_id: heading-i18n-governance-20260723). Not selected merely
+    because it is recent -- verified by cross-referencing every mission
+    commit's message and this session's own conversation history against
+    the plan's taskcard IDs (TC-HT-I18N-001..009), which match exactly.
+
+  post_sprint_audit:
+    expected: .supervisor/prompts/prompt1-post-sprint-audit.md
+    path: .supervisor/prompts/prompt1-post-sprint-audit.md
+    hash: 263dab3dadad6845f5dd2874fe22cd860403151156cadb2dffedef5258103099
+    role_verified: true
+    role_evidence: >
+      Header "POST-SPRINT STRICT EVIDENCE AUDIT / Three-Level Issue
+      Discovery, Root-Cause Review, and Next-Stage Recommendation" —
+      matches PSL-PROMPT-1's registry description exactly. Hash identical
+      to the one recorded in the prior verified mission's binding
+      (quality-regression-tmkey-router-fix-20260717, 2026-07-17) — file
+      unchanged since.
+
+  plan_hardening:
+    expected: .supervisor/prompts/prompt2-plan-hardening.md
+    path: .supervisor/prompts/prompt2-plan-hardening.md
+    hash: 4fe227b68c0e58e08381f89f5381bb8d29eebd89cba328ea3fb33c957c5d3d00
+    role_verified: true
+    role_evidence: >
+      Header "PLAN MODE: HARDEN CURRENT PLAN FROM LATEST SPRINT AUDIT" —
+      matches PSL-PROMPT-2. Hash identical to the 2026-07-17 binding.
+
+  controlled_execution:
+    expected: .supervisor/prompts/prompt3-controlled-execution.md
+    path: .supervisor/prompts/prompt3-controlled-execution.md
+    hash: 5246d218a39a8464cdc32c542d5411d2f29ad034f3e867651c0f731e1269edd9
+    role_verified: true
+    role_evidence: >
+      Header "EXECUTION MODE: CONTROLLED TASKCARD EXECUTION" — matches
+      PSL-PROMPT-3, including the exact 15-dimension quality rubric and
+      9-lane model this mission's own closure already used. Hash identical
+      to the 2026-07-17 binding.
+
+  close_task:
+    expected: .supervisor/prompts/prompt4-close-task.md
+    resolved: .supervisor/prompts/prompt4-close-task.md
+    hash: 3196a5bd52bd6e037b84d602dbde8d32a8dbac31798c0947bac03784ff6ef81b
+    role_verified: true
+    role_evidence: >
+      "Close this task cleanly. 1. Review everything changed ... 2. Commit
+      ... 3. Update the master plan in place ... 4. Mark the task closed
+      only if ... 5. In the final response, provide: files changed, commit
+      hash(es), plan sections updated, closure status" — unambiguous
+      close-task role from content. Hash identical to the 2026-07-17
+      binding (file unchanged).
+
+  registry_gap_disclosed: >
+    prompt-registry.yaml (hash 7b08ce8cdea4e9f3febc8784a783f313995335067b85e6dad569075b3d90cf78)
+    lists PSL-PROMPT-1/2/3, PSL-LOOP-CTRL, PSL-CONTRACTS, PSL-ADAPTER, and
+    6 legacy prompts, but has NO entry for prompt4-close-task.md at all --
+    no PSL-PROMPT-4 id, no successor_rules, no validation_rules. This is a
+    real, pre-existing registry gap (not introduced by this mission),
+    already implicitly worked around by the 2026-07-17 mission's own
+    binding (which resolved close_task the same way: direct file binding
+    by content-verified role, not registry lookup). Recorded here as an
+    L2 finding (prompt/registry not synchronized) rather than silently
+    worked around again without disclosure -- see stage1-issue-model.json,
+    issue L2-001.
+
+  schemas_note: >
+    .supervisor/schemas/ does not exist on disk (referenced by all 3
+    elaborate stage prompts' "Required Outputs" sections, never
+    materialized in this repo at any point in its history, including at
+    the time of the 2026-07-13 and 2026-07-17 bindings). Outputs below are
+    structured to match each prompt's documented required FIELDS in lieu
+    of a literal JSON Schema to validate against -- same accommodation
+    every prior mission's binding has made.
+
+  do_not_select_by_recency_check: >
+    Checked .supervisor/state/ directory listing: duplicate-content-fence-
+    fix-20260723, lmdb-consolidation-20260711, quality-regression-tmkey-
+    router-fix-20260717, quality-remediation-20260709/20260713,
+    translator-producer-fix-20260714 all exist as separate, already-closed
+    mission subdirectories under different plan files. None of these is
+    more "recent" than heading-i18n-governance-20260723 in a way that
+    would make selecting a different plan reasonable -- this binding
+    targets the plan and mission actually executed across this
+    conversation's history, confirmed by direct commit-message
+    cross-reference above, not filesystem mtime.
+
+  prompt_registry:
+    path: .supervisor/prompts/prompt-registry.yaml
+    status: FOUND_AND_READ
+    gap_noted: "no PSL-PROMPT-4 / close-task entry -- see registry_gap_disclosed above"
+
+  status: BOUND_ALL_FOUR_PROMPTS_VERIFIED
+  binding_decision: >
+    All four prompts found at their expected .supervisor/prompts/ paths,
+    hash-identical to the last verified binding for this repo
+    (2026-07-17), roles verified from content rather than filename alone.
+    Plan identity unambiguous: glittery-waddling-moth.md, mission
+    heading-i18n-governance-20260723, currently at commit 5d17935 with all
+    9 taskcards (TC-HT-I18N-001..009) previously executed and evidenced.
+    Proceeding with the formal AUDIT -> HARDEN -> EXECUTE -> VERIFY ->
+    CLOSE convergence lifecycle against this exact plan and mission.

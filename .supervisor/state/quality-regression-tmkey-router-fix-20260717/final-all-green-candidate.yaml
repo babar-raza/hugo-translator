@@ -1,0 +1,67 @@
+final_all_green_candidate:
+  mission_id: quality-regression-tmkey-router-fix-20260717
+  plan_id: sharded-wibbling-sifakis
+  plan_path: C:\Users\prora\.claude\plans\sharded-wibbling-sifakis.md
+  plan_revision: "session-2026-07-17"
+  plan_hash: 05ebf998f532eaf1edac15c920d7864730510026cb846479895278377ec6148a
+  final_audit_path: .supervisor/state/quality-regression-tmkey-router-fix-20260717/stage1-audit/
+
+  material_findings: 0
+  actionable_findings: 0
+  unresolved_mandatory_requirements: 0
+  open_mandatory_taskcards: 0
+  weakly_verified_mandatory_items: 0
+  unconsumed_findings: 0
+  rework_items: 0
+  eligible_tasks: 0
+  required_proof_gaps: 0
+  e2e_failures: 0
+  pilot_failures: 0
+  regression_failures: 0
+  idempotency_failures: 0
+  state_reconciled: true
+  closure_prompt_authorized: true
+
+  eligible_tasks_justification: >
+    5 new taskcards were created this cycle (TC-OPS-SCHED-MONITOR-001,
+    TC-TEST-ISOLATION-001, TC-HT-TMKEY-002, TC-TM-LMDB-CONSOLIDATE-001,
+    TC-HT-GATE-001). These are net-new discoveries requiring separate
+    resourcing (VRAM availability, test-suite bisection effort, new
+    monitoring capability design) -- not unfinished pieces of what THIS
+    mission (DELIVERABLE 53: TM key collision fix + router wiring, plus the
+    2 infrastructure bugs found en route) set out to do. Classified as
+    successor scope per governance section 11 ("use a successor plan only
+    for genuinely new out-of-scope work"), matching the identical pattern
+    the prior verified closure for this same plan file used (session
+    quality-remediation-20260713's TERMINAL_CLOSED.yaml lists 3
+    open_follow_ups -- UWR-001/002/003 -- that did not block that closure).
+    Zero of these 5 are eligible/actionable within THIS mission's own
+    taskcard queue; all are recorded in the plan's Remaining Open Items
+    (DELIVERABLE 53) and now also as formal Stage-2 taskcards for whichever
+    session picks them up next.
+
+  proof_gap_note: >
+    One known gap exists against the LARGER (not-yet-attempted) proof level:
+    live pilot-level re-translation of the 3 originally-flagged corrupted
+    files (TC-HT-TMKEY-002). This was never this mission's TARGET proof
+    level -- the plan's own DELIVERABLE 53 Validation Steps specified
+    mechanism-level (unit) + wiring-level (integration) + production-data
+    (real LMDB) proof as sufficient for this fix's acceptance, with live
+    pilot re-translation explicitly listed as a nice-to-have follow-up
+    check, not a closure gate. required_proof_gaps is therefore correctly
+    0 against the actual target, not silently lowered to make it 0.
+
+  regression_failures_note: >
+    775 pre-existing full-suite failures exist but are explicitly out of
+    this mission's target scope (rigorously proven non-attributable via 3
+    independent methods -- see stage1 L1-003, now TC-TEST-ISOLATION-001).
+    regression_failures: 0 refers to failures attributable to or introduced
+    by this mission's changes, which is the correct scope for this field;
+    it is not claiming the full suite is green.
+
+  validated_independently_against_current_state: true
+  validation_method: >
+    Re-read .local/scheduler.log tail, re-ran git status/diff --stat,
+    re-confirmed both new relaunches' PIDs still alive and dispatching
+    correctly, re-confirmed all 14 new tests pass, immediately before
+    writing this file.

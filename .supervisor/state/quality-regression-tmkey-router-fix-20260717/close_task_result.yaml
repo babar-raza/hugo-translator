@@ -1,0 +1,64 @@
+close_task_result:
+  prompt_path: .supervisor/prompts/prompt4-close-task.md
+  prompt_hash: 3196a5bd52bd6e037b84d602dbde8d32a8dbac31798c0947bac03784ff6ef81b
+  invocation_id: quality-regression-tmkey-router-fix-20260717-close-01
+  mission_id: quality-regression-tmkey-router-fix-20260717
+  plan_id: sharded-wibbling-sifakis
+  plan_revision: "session-2026-07-17"
+  plan_hash: 05ebf998f532eaf1edac15c920d7864730510026cb846479895278377ec6148a
+
+  taskcards_closed:
+    - TC-HT-TMKEY-001
+    - TC-HT-ROUTE-001
+    - infra-fix-scheduler-outage-recovery
+    - infra-fix-stall-detector-crash-loop
+
+  taskcards_not_closed:
+    - {id: TC-OPS-SCHED-MONITOR-001, state: TODO, reason: successor scope}
+    - {id: TC-TEST-ISOLATION-001, state: TODO, reason: successor scope}
+    - {id: TC-HT-TMKEY-002, state: TODO, reason: "successor scope, resource-gated (VRAM)"}
+    - {id: TC-TM-LMDB-CONSOLIDATE-001, state: TODO, reason: successor scope}
+    - {id: TC-HT-GATE-001, state: TODO, reason: successor scope}
+
+  requirements_reconciled: true
+  queue_empty_and_valid: true
+  continuation_disabled: true
+
+  files_changed:
+    - src/translation_engine/extractor/segment_extractor.py
+    - src/translation_engine/segment_translator.py
+    - tests/unit/tm/test_tm_key_collision.py
+    - tests/unit/translation_engine/test_content_type_router_frontmatter_wiring.py
+    - tests/unit/ops/test_scheduler_stall_detection.py
+    - .local/scheduler.py  # gitignored, machine-local; not committed by design
+
+  commits:
+    - hash: 5df29fe
+      message: "fix(tm): resolve cross-file TM key collision and wire router into frontmatter path (TC-HT-TMKEY-001, TC-HT-ROUTE-001)"
+    - hash: 27746a4
+      message: "test(ops): add regression coverage for scheduler stall-detector post-outage crash-loop"
+
+  master_plan_sections_updated:
+    - "DELIVERABLE 53 header: state -> IMPLEMENTED, FOCUSED_VERIFIED, deployed live and confirmed stable"
+    - "DELIVERABLE 53 Execution Record: full narrative of Option A0/A implementation, testing, real-LMDB validation"
+    - "DELIVERABLE 53 Execution Record: outage discovery/recovery, stall-detector bug discovery/fix, .supervisor convergence cycle summary"
+    - "DELIVERABLE 53 Remaining Open Items: items 5-8 added (BoxShape bug, Form.md staleness, test-isolation debt, deferred pilot validation)"
+    - "DELIVERABLE 53 Tradeoffs/Risks: cache-invalidation cost, two new unrelated defects flagged"
+    - "DELIVERABLE 41 Plan Evidence Log: 6 new dated entries with concrete evidence"
+    - "DELIVERABLE 51 Plan Hardening Change Log: 2 new entries"
+    - "Quick Navigation table: DELIVERABLE 53 description updated"
+
+  unrelated_pre_existing_changes_preserved_not_committed:
+    - .gitignore (modified, pre-session)
+    - data/benchmark_corpus/* (deleted, pre-session)
+    - src/translation_engine/extractor/batch_stats_tracker.py (modified, pre-session, DELIVERABLE 52 work from 2026-07-16)
+    - tests/fixtures/nested_list_output_debug.md (modified, pre-session)
+    - tests/regression/test_batch_size_recovery.py (modified, pre-session, DELIVERABLE 52 work)
+    - .kilo/ (untracked, unknown origin, pre-session)
+
+  closure_record_path: .supervisor/state/quality-regression-tmkey-router-fix-20260717/TERMINAL_CLOSED.yaml
+  closure_record_valid: true
+  terminal_state_written: true
+  contradictions: []
+
+  verdict: CLOSED

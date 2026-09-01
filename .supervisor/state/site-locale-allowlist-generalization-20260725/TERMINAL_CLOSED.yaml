@@ -1,0 +1,94 @@
+state: TERMINAL_CLOSED
+mission_id: site-locale-allowlist-generalization-20260725
+closed_at: "2026-07-25"
+closed_by: claude-agent-session-post-plan-convergence
+closure_lineage: >
+  This TERMINAL_CLOSED.yaml supersedes an earlier, informal one written
+  the same day without a genuine prompt4-close-task.md invocation (no
+  commit). This version was produced by the real governed lifecycle:
+  bind (prompt1-4) -> fresh audit (prompt1 role, re-verified against
+  live repository state, not re-asserted) -> zero new findings -> commit
+  authorized by explicit user confirmation -> prompt4-close-task.md
+  invoked for real (commit + plan amendment + close_task_result.yaml).
+all_primary_taskcards_closed: true
+taskcards_closed:
+  - TC-SLA-001
+  - TC-SLA-002
+  - TC-SLA-003
+  - TC-SLA-004
+  - TC-SLA-005
+  - TC-SLA-006
+  - TC-SLA-007
+  - TC-SLA-008
+  - TC-SLA-009
+  - TC-SLA-010
+  - TC-SLA-011
+  - TC-SLA-012
+taskcards_not_closed: []
+all_actionable_findings_resolved: true
+all_deferred_formally_classified: true
+all_stage_output_contracts_satisfied: true
+all_quality_scores_above_threshold: true
+self_review_rubric: 15-dimension (prompt3-controlled-execution.md Phase 5)
+self_review_path: reports/agents/site-locale-allowlist-generalization-20260725/evidence_bundle/self_review.md
+regression_tests_unchanged: true
+regression_evidence: >
+  tests/unit/translation_engine/ -- 1256 passed, 4 skipped, identical
+  across 3 independent runs (2 in the implementation session, 1 in this
+  convergence-audit cycle). tests/unit/config/, tests/unit/quality/,
+  tests/unit/workers/, tests/integration/test_cli_aspose_org_locale_rejection.py
+  -- 695 passed, 1 skipped, same 5 pre-existing unrelated failures across
+  all runs, zero new.
+source_integrity_confirmed: true
+non_collision_verified_at_close: true
+non_collision_verification_result: "26/26 mission files, zero overlap with HT-INLINE-CODE-001 or reference-i18n-hardening-20260725, re-verified fresh this cycle"
+close_task_invocation:
+  prompt_path: .supervisor/prompts/prompt4-close-task.md
+  genuinely_invoked: true
+  close_task_result_path: .supervisor/state/site-locale-allowlist-generalization-20260725/close_task_result.yaml
+  closure_status_from_prompt4: CLOSED
+evidence_bundle_path: reports/agents/site-locale-allowlist-generalization-20260725/evidence_bundle/
+audit_record_path: .supervisor/state/site-locale-allowlist-generalization-20260725/stage1-post-plan-convergence-audit.md
+commits_this_mission:
+  - hash: 26381afa64bb61b2ad876e2060a5560be289e955
+    file_count: 26
+files_changed_this_mission:
+  modified:
+    - config/site_profiles/blog.aspose.org.yaml
+    - config/site_profiles/docs.aspose.org.yaml
+    - config/site_profiles/kb.aspose.org.yaml
+    - config/site_profiles/products.aspose.org.yaml
+    - config/site_profiles/reference.aspose.org.yaml
+    - config/site_profiles/websites.aspose.org.yaml
+    - config/site_profiles/www.aspose.org.yaml
+    - scripts/ops/monitor_aspose_org_campaign.sh
+    - scripts/ops/run_all_aspose_org.sh
+    - scripts/quality/aspose_org_multisite_unattended.py
+    - scripts/quality/backfill_frontmatter_ids.py
+    - scripts/quality/delete_for_retranslate.py
+    - scripts/quality/heal_english_headings.py
+    - scripts/quality/surgical_retranslate.py
+    - src/cli.py
+    - src/translation_engine/directory_orchestrator.py
+    - src/translation_engine/engine.py
+    - src/utils/models.py
+  new:
+    - docs/languages/ASPOSE_ORG_LOCALE_POLICY.md
+    - docs/languages/SITE_LOCALE_ALLOWLIST_POLICY.md
+    - scripts/ops/archive_retired_locale_queue_entries.py
+    - src/utils/locale_policy.py
+    - tests/integration/test_cli_aspose_org_locale_rejection.py
+    - tests/unit/config/test_aspose_org_locale_contract.py
+    - tests/unit/config/test_strict_locale_allowlist_policy.py
+    - tests/unit/quality/test_aspose_org_locale_discovery_filters.py
+pushed_to_origin: false
+push_is_operator_owned: true
+master_plan_update_note: >
+  Plan file at C:\Users\prora\.claude\plans\you-are-modifying-the-lovely-cook.md
+  amended in place with a "Closure Record" section per prompt4's own
+  requirement (amend, do not overwrite history).
+remaining_follow_ups_or_non_blockers:
+  - "scripts/quality/aspose_org_multisite_unattended.py:74 pre-existing ruff UP022 finding, unrelated, not fixed"
+  - "Old vs new queue-archive-file naming coexist -- cosmetic, not functional"
+  - ".local/unified_translate.py gitignored standalone tool still has its own hardcoded locale list -- pre-existing, unrelated, already fail-closed"
+verdict: COMPLETE

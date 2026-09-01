@@ -1,0 +1,149 @@
+taskcards:
+  - taskcard_id: TC-OPS-SCHED-MONITOR-001
+    title: Add liveness monitoring for the scheduler daemon itself
+    source_issue_ids: [L1-001, L2-002]
+    source_issue_level: L1_EXECUTION
+    why_it_matters: >
+      The 2026-07-17 outage (scheduler + all GPU jobs down 03:57-12:47, ~9
+      hours) was found only by manual reconciliation. Nothing alerts on
+      "scheduler stopped dispatching."
+    risk_addressed: silent multi-hour loss of campaign throughput after any crash/reboot
+    status: TODO
+    lane_owner: Lane C (System healing)
+    supervisor_role: infra
+    required_implementation: >
+      Extend thermal_watchdog.py (or a sibling script) to also check
+      scheduler.log's mtime against a max-staleness threshold (e.g. 5 min
+      during active hours) and either alert or auto-restart scheduler.py.
+    required_verification: "Simulate a stale scheduler.log and confirm detection within one poll interval"
+    required_evidence: ["before/after log showing detection", "unit test if logic is extracted into a testable function"]
+    quality_dimensions: ["implementation_correctness", "test_coverage", "production_readiness"]
+    reroute_rule_if_score_below_4: "return to implementation, do not mark DONE"
+    acceptance_criteria: "A killed/hung scheduler.py is detected and reported (at minimum) within 2x its own poll interval"
+    stop_conditions: ["do not auto-restart without a rate limit (avoid restart storms)"]
+    allowed_paths: ["scripts/quality/thermal_watchdog.py", ".local/scheduler.py"]
+    forbidden_paths: ["D:/onedrive/.../aspose.org/content/**"]
+    dependencies: []
+    closeout_rules: "VERIFIED only after a live simulated-outage test"
+    machine_state: NOT_STARTED
+    validation_commands: ["python scripts/quality/thermal_watchdog.py --self-test"]
+
+  - taskcard_id: TC-TEST-ISOLATION-001
+    title: Investigate full-suite pytest order-dependency / state-leak (775 failures)
+    source_issue_ids: [L1-003]
+    source_issue_level: L1_EXECUTION
+    why_it_matters: "775/7100+ tests fail only at full-suite scale; undermines trust in the one command meant to be the ultimate regression gate."
+    risk_addressed: a real future regression could hide inside pre-existing full-suite noise
+    status: TODO
+    lane_owner: Lane D (Verification/QA)
+    supervisor_role: qa
+    required_implementation: "Bisect via progressively larger directory batches or pytest-randomly/pytest-order to isolate the state-leaking fixture(s)"
+    required_verification: "Full pytest tests/ run returns to a small, explained, stable failure count"
+    required_evidence: ["bisection log", "identified fixture/module", "before/after full-suite failure count"]
+    quality_dimensions: ["repeatability", "test_coverage"]
+    reroute_rule_if_score_below_4: "continue investigation, do not close prematurely"
+    acceptance_criteria: "Root cause identified and either fixed or explicitly, narrowly documented (not a blanket 'pre-existing')"
+    stop_conditions: []
+    allowed_paths: ["tests/**"]
+    forbidden_paths: ["src/translation_engine/segment_translator.py (unless the leak is proven to originate there)"]
+    dependencies: []
+    closeout_rules: "VERIFIED only after a full-suite rerun confirms the fix"
+    machine_state: NOT_STARTED
+    validation_commands: ["pytest tests/ -p no:cacheprovider -q"]
+
+  - taskcard_id: TC-HT-TMKEY-002
+    title: Live re-translation validation of the 3 confirmed cross-file-collision files
+    source_issue_ids: [L1-004]
+    source_issue_level: L1_EXECUTION
+    why_it_matters: "Closes the one remaining proof-level gap for DELIVERABLE 53: mechanism/data-level proof exists, pilot-level proof (live model re-run) does not yet."
+    risk_addressed: unconfirmed whether live re-translation produces correct output beyond the fixed key mechanism
+    status: TODO
+    lane_owner: Lane D (Verification/QA)
+    supervisor_role: qa
+    required_implementation: "Re-queue vi/pdf/net/DiffUtils.md, sr/cells/{java,net}/ChartType.md, sv/pdf/java/BaseParagraph.md for force=True retranslation once VRAM allows"
+    required_verification: "description field of each file, post-retranslation, matches its own class -- not the previously-collided sibling"
+    required_evidence: ["before/after description field diff for all 3 (4) files"]
+    quality_dimensions: ["implementation_correctness", "production_readiness"]
+    reroute_rule_if_score_below_4: "if still wrong, reopen DELIVERABLE 53 as a defect, not a deferred item"
+    acceptance_criteria: "all 4 files show class-correct descriptions"
+    stop_conditions: []
+    allowed_paths: ["D:/onedrive/.../aspose.org/content/reference.aspose.org/{vi,sr,sv}/**"]
+    forbidden_paths: []
+    dependencies: ["VRAM headroom >= 3.5GB free"]
+    closeout_rules: "VERIFIED only after direct file read confirms correct content"
+    machine_state: NOT_STARTED
+    validation_commands: []
+
+  - taskcard_id: TC-TM-LMDB-CONSOLIDATE-001
+    title: Resolve recurring sibling l2_lmdb directory warning (TC-TM-02)
+    source_issue_ids: [L2-003]
+    source_issue_level: L2_INTEGRATION
+    why_it_matters: "Fires on every single job start across all 17 registered jobs; suggests split TM writes that could themselves cause cache inconsistency separate from the collision bug fixed today."
+    risk_addressed: potential additional TM data-integrity gap beyond the collision mechanism already fixed
+    status: TODO
+    lane_owner: Lane C (System healing)
+    supervisor_role: infra
+    required_implementation: "Determine why scripts/tm/migrate_l2_lmdb.py --apply has not resolved this, or run it if never run"
+    required_verification: "Warning no longer appears on job startup"
+    required_evidence: ["clean job-startup log", "confirmation both LMDB dirs consolidated"]
+    quality_dimensions: ["production_readiness", "governance_compliance"]
+    reroute_rule_if_score_below_4: "do not close if warning persists"
+    acceptance_criteria: "zero TC-TM-02 warnings across a full dispatch cycle"
+    stop_conditions: ["back up both LMDB dirs before any consolidation write"]
+    allowed_paths: ["data/tm/**", "scripts/tm/migrate_l2_lmdb.py"]
+    forbidden_paths: []
+    dependencies: []
+    closeout_rules: "VERIFIED only after a live job-startup log shows no warning"
+    machine_state: NOT_STARTED
+    validation_commands: ["python scripts/tm/migrate_l2_lmdb.py --dry-run"]
+
+  - taskcard_id: TC-HT-GATE-001
+    title: Add a TM-collision regression check to the campaign's own launch/preflight path
+    source_issue_ids: [L3-002]
+    source_issue_level: L3_SYSTEM_WEAKNESS
+    why_it_matters: "Unit/integration tests cover the fixed mechanism, but nothing in the actual campaign launch path re-checks it before dispatching real work."
+    risk_addressed: a future code change could silently reintroduce the collision without any campaign-level gate catching it
+    status: TODO
+    lane_owner: Lane H (Quality scoring and reroute) / Lane C
+    supervisor_role: infra
+    required_implementation: "Add a lightweight preflight check to scheduler.py (or a pre-dispatch hook) that runs the tm_key_collision regression assertions before allowing dispatch"
+    required_verification: "Preflight check fails loudly if the collision mechanism regresses"
+    required_evidence: ["preflight check passing on current code", "preflight check failing when the fix is reverted (negative control)"]
+    quality_dimensions: ["governance_compliance", "test_coverage"]
+    reroute_rule_if_score_below_4: "do not close without a negative-control test"
+    acceptance_criteria: "scheduler.py refuses to dispatch (or loudly warns) if the TM-key regression test fails"
+    stop_conditions: []
+    allowed_paths: [".local/scheduler.py", "tests/unit/tm/test_tm_key_collision.py"]
+    forbidden_paths: []
+    dependencies: []
+    closeout_rules: "VERIFIED only after both positive and negative control pass"
+    machine_state: NOT_STARTED
+    validation_commands: []
+
+updated_plan_items:
+  - taskcard_id: TC-HDN-003
+    source_issue_ids: [L2-001]
+    update: >
+      Scope note added: the cross-document collision use case (short
+      templated descriptions colliding across unrelated classes) is now
+      solved by TC-HT-TMKEY-001 (tm_key_text) as of 2026-07-17, via a
+      narrower, more direct mechanism than the originally-planned
+      field_name-scoped key. TC-HDN-003's remaining open scope is the
+      cross-field-type case only (e.g. identical text in `title` vs.
+      `description`), now lower priority than originally recorded.
+
+rejected_with_reason:
+  - source_issue_ids: [L3-001]
+    reason: >
+      "Should .supervisor auto-engage after every conversational execution
+      turn" is a session/hook/skill-level design decision outside this
+      mission's authority to unilaterally implement. Recorded as an honest
+      structural observation per the audit's L3 requirement; not actioned.
+
+ready_for_execution_verdict: PLAN_HARDENED_FROM_AUDIT_READY_FOR_EXECUTION
+hardening_score_note: >
+  No numeric hardening_score computed (registry's ">= 18" threshold
+  references a rubric not materialized in this repo's schemas/ directory,
+  which does not exist). Qualitative readiness: every actionable issue maps
+  to a taskcard, existing-item update, or reasoned rejection; no
+  actionable item is prose-only.
