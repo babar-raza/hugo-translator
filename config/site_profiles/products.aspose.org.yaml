@@ -201,7 +201,10 @@ frontmatter:
     mode: passthrough
     strategy: null
   url:
-    mode: passthrough
+    mode: ignore
+    strategy: null
+  aliases:
+    mode: ignore
     strategy: null
   slug:
     mode: passthrough
