@@ -4319,3 +4319,11 @@ All P0 shipping gate blockers verified complete as of 2026-04-25.
 - P1-4: Add ruff lint step to CI
 - P1-5: Expand CI test coverage to >7% (currently ~7% of test files)
 - GATE-09: Create more comprehensive test fixture content (5+ files per language, shortcodes, tables, code blocks)
+
+## 2026-09-01 — branch-consolidation-20260831: merged 4 long-lived branches into main, retired 13 branches
+
+**Status**: TERMINAL_CLOSED — `BRANCH_CONSOLIDATION_COMPLETE_GITLAB_PUSH_DEFERRED`
+
+Merged `remediation/audit-phase7-20260723` and `mission/blog-url-production-control-plane` (which subsumed `pilot/foss-localization-zero-defect-translator` and its `-runtime` sibling) into `main` at `827fb09`. Rescued 2 orphaned commits found past git's gc grace window (`b0f787f` → `archive/orphan-url-aliases-fix-20260727`, `fde9b44` → `candidate/prd03-qualified-20260729`, confirmed to add zero net-new value beyond current `main`). Restored an accidental `data/benchmark_corpus/` deletion and fixed the contradicting `.gitignore` line that caused it. Deleted 13 confirmed-fully-merged branches and 4 worktrees. Pushed to `origin`; `gitlab` push deferred on expired credentials (human follow-up required, see `.supervisor/state/branch-consolidation-20260831/TERMINAL_CLOSED.yaml`).
+
+25 merge-conflicted files / 60 hunks resolved with verified (not assumed) reasoning; zero required human escalation. Full evidence: `.supervisor/state/branch-consolidation-20260831/` (taskcards, `TERMINAL_CLOSED.yaml`) and `reports/agents/branch-consolidation/branch-consolidation-20260831/` (`evidence.md`, `self_review.md`, 58/60).

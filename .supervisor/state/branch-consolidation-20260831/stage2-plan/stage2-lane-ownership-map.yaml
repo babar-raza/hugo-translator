@@ -1,0 +1,51 @@
+# Lane vocabulary reused from prompts/autonomous/loop-swarm-contract.md.
+# Execution is single-agent-sequential -- git branch surgery on shared working-tree
+# state is not safely parallelizable, matching that contract's own stated design
+# ("designed for a single agent running all lanes sequentially, but structured to
+# be swarm-compatible if multiple agents are ever used"). No two lanes act
+# concurrently in this mission; overlap/file-ownership checks below are therefore
+# about sequencing discipline, not concurrent locking.
+
+coordinator:
+  owner: claude-sonnet-5 (this session)
+  responsibility: >
+    Sequences TC-BRC-001..017 in order, makes go/no-go calls at each gate,
+    owns stage2-taskcard-index.yaml and the mission TERMINAL_CLOSED.yaml.
+
+execution_lane:
+  owner: claude-sonnet-5 (this session)
+  taskcards: [TC-BRC-001, TC-BRC-002, TC-BRC-003, TC-BRC-004, TC-BRC-005,
+              TC-BRC-006, TC-BRC-008, TC-BRC-009, TC-BRC-011, TC-BRC-012,
+              TC-BRC-013, TC-BRC-014, TC-BRC-015]
+  file_ownership_note: >
+    All git working-tree/branch/remote mutations. Executed strictly
+    sequentially per the taskcard table -- e.g. TC-BRC-004/005/006 each
+    touch disjoint files (site_profiles yaml / scripts/ops / .gitignore
+    scratch entries) but are still run one at a time to keep each commit
+    atomic and independently revertible.
+
+verification_lane:
+  owner: claude-sonnet-5 (this session)
+  taskcards: [TC-BRC-007, TC-BRC-010]
+  overlap_check: >
+    Read-only (pytest, check_share_safe equivalents, check_manifest.py,
+    check_governance.py, is-ancestor checks). No file mutation, so no
+    overlap with EXECUTION lane's writes is possible even if interleaved.
+
+audit_lane:
+  owner: claude-sonnet-5 (this session)
+  taskcards: [TC-BRC-016, TC-BRC-017]
+  file_ownership_note: >
+    Sole writer of the mission's TERMINAL_CLOSED.yaml and the
+    reports/agents/branch-consolidation/branch-consolidation-20260831/
+    evidence bundle. Runs only after EXECUTION/VERIFICATION lanes close.
+
+human_operator:
+  owner: Babar Raza (prorata.net@gmail.com)
+  role: >
+    Pre-approved this mission's disposition decisions in the planning
+    session (backup-before-model-cleanup: leave alone; fde9b44: diff and
+    cherry-pick; remote sync: push + delete redundant remote branches;
+    zircon-moon: remove). Escalation path (AskUserQuestion) reserved only
+    for a genuine competing-implementation conflict in TC-BRC-009 or
+    TC-BRC-015 -- not otherwise consulted mid-run, per the approved plan.

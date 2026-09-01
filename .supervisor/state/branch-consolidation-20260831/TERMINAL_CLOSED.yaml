@@ -1,0 +1,65 @@
+state: TERMINAL_CLOSED
+mission_id: branch-consolidation-20260831
+plan_id: carefully-merge-branches-with-jolly-quasar
+plan_file: C:\Users\prora\.claude\plans\carefully-merge-branches-with-jolly-quasar.md
+closed_at: "2026-09-01"
+closed_by: claude-sonnet-5
+
+# Closure Conditions
+remediation_merged: true                    # commit 103a8c0, zero conflicts (main was strict ancestor)
+mission_merged: true                        # commit 827fb09, 25 conflicts, all resolved and verified
+pilot_subsumption_verified: true             # merge-base --is-ancestor: pilot, pilot-runtime both TRUE against main
+orphaned_commits_rescued: true               # b0f787f -> archive/orphan-url-aliases-fix-20260727; fde9b44 -> candidate/prd03-qualified-20260729
+untracked_evidence_preserved: true           # 5 mission folders (422KB) force-added, TC-BRC-002
+accidental_deletion_restored: true           # data/benchmark_corpus/, TC-BRC-003
+contradicting_gitignore_fixed: true          # /data/benchmark_corpus line removed, TC-BRC-003
+working_tree_triage_committed: true          # url/aliases fix, ops scripts, scratch cleanup -- TC-BRC-004/005/006
+merge_conflicts_all_resolved: true           # 25 files, 60 hunks, zero escalations needed (none met the genuine-competing-implementation bar)
+merged_state_test_verified: true             # 3067 passed / 8 failed (all 8 confirmed pre-existing on mission's own unmodified branch) / 17 skipped
+governance_gates_run: true                   # check_manifest.py, check_governance.py, check_share_safe.sh (targeted), check_docs_links.py (advisory)
+fully_merged_branches_deleted: true          # 13 branches, all via self-verifying git branch -d
+worktrees_retired: true                      # 4 live worktrees removed, 2 stale prd03-* records pruned
+main_pushed_to_origin: true                  # 78aed63..827fb09, fast-forward, confirmed unprotected
+main_pushed_to_gitlab: false                 # BLOCKED_EXTERNAL: authentication failed, no valid credential available to the agent
+fde9b44_reviewed: true                       # diff vs final main: zero net-new content, main is a strict superset in every differing file
+plan_marked_completed: true
+
+# Final Counts
+branches_at_mission_start: 13
+branches_deleted: 13
+worktrees_removed: 4
+stale_worktree_records_pruned: 2
+orphaned_commits_rescued: 2
+untracked_evidence_folders_preserved: 5
+merge_conflicts_resolved: 25
+merge_conflict_hunks_resolved: 60
+escalations_to_human_during_conflict_resolution: 0
+tests_passed: 3067
+tests_failed_all_preexisting: 8
+tests_skipped: 17
+cherry_picks_applied_from_fde9b44: 0
+
+# Governance Chain
+plan_file: C:\Users\prora\.claude\plans\carefully-merge-branches-with-jolly-quasar.md
+taskcard_index: .supervisor/state/branch-consolidation-20260831/stage2-plan/stage2-taskcard-index.yaml
+evidence_bundle: reports/agents/branch-consolidation/branch-consolidation-20260831/evidence.md
+self_review: reports/agents/branch-consolidation/branch-consolidation-20260831/self_review.md
+
+# Known, disclosed, non-blocking items (do not reopen on their own)
+disclosed_limitations:
+  - "gitlab push (main + 3 branch deletions) blocked on expired/missing git credentials -- genuine external-credentials gap, not resolvable by the agent. See stage2-taskcard-index.yaml TC-BRC-014 followup_required for the exact commands a human should run after refreshing gitlab.recruitize.ai credentials."
+  - "8 pre-existing test failures (test_content_type_router_frontmatter_wiring, test_ct2_converter x2, test_forced_bos_validation x2, test_aspose_org_governed_retranslate, test_products_org_governed_retranslate_shards x2) -- independently reproduced on mission's own unmodified worktree before this merge touched anything; not caused by, and out of scope to fix in, this consolidation."
+  - "backup-before-model-cleanup branch left untouched per explicit user decision -- disjoint history from a Jan 2026 rewrite, no common ancestor with main, cannot be merge-evaluated; a deliberate, permanent exception to 'delete dangling branches.'"
+  - "scripts/diagnose_model_corruption.py sits untracked at scripts/ root, flagged by check_manifest.py --strict -- confirmed untracked on every branch in this merge; pre-existing working-tree clutter, not adopted."
+  - "Personal-path references (docs/runbooks/aspose-foss-zero-defect-campaign.md, src/utils/config_loader.py, docs/runbooks/aspose-foss-zero-defect-plan-binding.yaml) and one pre-existing large tracked file (.supervisor/state/quality-remediation-audit-phase7-20260723/.../findings_detail.csv, 1.3MB) -- both pre-date this mission's merge work, non-functional, disclosed rather than fixed."
+  - "pre-commit is not installed in this environment (package absent, not just inactive) -- each commit taskcard manually replicated the specific checks .pre-commit-config.yaml defines instead. Installing it properly is a legitimate separate follow-up, out of scope here."
+  - "candidate/prd03-qualified-20260729 and archive/orphan-url-aliases-fix-20260727 are intentionally retained as permanent local archival/provenance branches, not scheduled for deletion -- they cost nothing to keep and document how those two lines of work were superseded."
+
+# Terminal Verdict
+verdict: BRANCH_CONSOLIDATION_COMPLETE_GITLAB_PUSH_DEFERRED
+successor_action: >
+  Human refreshes gitlab.recruitize.ai git credentials, then runs:
+  git push gitlab main
+  git push gitlab --delete ci/shipping-gate-verification release/phase10_isolated_20260127_112335 fix/broken-translated-content-v4
+  No code or governance follow-up required -- this is a pure remote-sync
+  completion step once credentials are available.

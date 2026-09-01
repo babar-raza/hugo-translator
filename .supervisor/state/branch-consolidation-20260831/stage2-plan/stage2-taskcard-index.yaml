@@ -1,0 +1,218 @@
+mission_id: branch-consolidation-20260831
+plan_id: carefully-merge-branches-with-jolly-quasar
+plan_file: C:\Users\prora\.claude\plans\carefully-merge-branches-with-jolly-quasar.md
+opened_at: "2026-09-01"
+opened_by: claude-sonnet-5
+purpose: >
+  Merge remediation/audit-phase7-20260723 and mission/blog-url-production-control-plane
+  (which subsumes pilot/foss-localization-zero-defect-translator and
+  pilot/foss-localization-zero-defect-translator-runtime) into main, delete branches
+  verified fully-merged, rescue two orphaned commits (b0f787f, fde9b44) found past
+  git's gc grace window, fix an accidental data deletion and a contradicting
+  .gitignore rule, and preserve untracked mission evidence -- without losing any
+  information.
+taskcards:
+  - id: TC-BRC-001
+    title: Safety net (tag main, branch b0f787f, branch fde9b44)
+    lane: EXECUTION
+    status: ACCEPTED
+  - id: TC-BRC-002
+    title: Preserve untracked .supervisor/state evidence (5 mission folders, 422KB)
+    lane: EXECUTION
+    status: ACCEPTED
+  - id: TC-BRC-003
+    title: Restore data/benchmark_corpus + remove contradicting gitignore rule
+    lane: EXECUTION
+    status: ACCEPTED
+  - id: TC-BRC-004
+    title: Commit site-profile url/aliases frontmatter fix (4 yaml files)
+    lane: EXECUTION
+    status: ACCEPTED
+  - id: TC-BRC-005
+    title: Commit ops scripts (orchestrator task path fix + startup recovery)
+    lane: EXECUTION
+    status: ACCEPTED
+  - id: TC-BRC-006
+    title: Scratch cleanup + .kilo/ gitignore entry
+    lane: EXECUTION
+    status: ACCEPTED
+  - id: TC-BRC-007
+    title: Local pre-flight verification (pytest tests/unit, tests/regression, targeted suites)
+    lane: VERIFICATION
+    status: ACCEPTED
+    evidence: >
+      Full tests/unit/ run hit a pre-existing, order-dependent transformers
+      import-pollution bug (not caused by this mission -- reproduced on the
+      exact same files in isolation and they pass cleanly, 31/31). Gated
+      instead on targeted suites: tests/unit/config/ + tests/unit/benchmarking/
+      (646 passed, 28 skipped), frontmatter suites across phase-1/validation/
+      translation_engine (66 passed, 9 skipped), tests/regression/ (122
+      passed, 1 failed -- failure traces to scripts.e2e_verify_single_file
+      missing, confirmed absent on main itself, pre-existing). Zero real
+      failures attributable to this mission's changes.
+  - id: TC-BRC-008
+    title: Build integration branch + merge remediation/audit-phase7-20260723
+    lane: EXECUTION
+    status: ACCEPTED
+    evidence: >
+      Merge commit 103a8c0, ort strategy, zero conflicts (main was a strict
+      ancestor of remediation at merge time). One incidental discovery:
+      tests/fixtures/nested_list_output_debug.md showed as modified
+      post-checkout -- traced to tests/regression/test_single_file_translation.py
+      writing translation output back into a tracked fixture file as a side
+      effect of TC-BRC-007's test run, not a real change. Discarded via git
+      restore. Disclosed as a pre-existing test-suite hygiene issue (a
+      regression test mutates tracked fixture data instead of writing to an
+      isolated temp/output path) -- out of scope to fix here.
+  - id: TC-BRC-009
+    title: Merge mission/blog-url-production-control-plane (3-way, conflict-gated)
+    lane: EXECUTION
+    status: ACCEPTED
+    evidence: >
+      25 conflicted files (.gitignore, 8 add/add campaign files, 15 content
+      conflicts, 60 total hunks across the 15). None escalated -- every
+      hunk resolved to one of: (a) pure ruff-format-style formatting with
+      byte-identical semantics (verified programmatically for the 36-entry
+      GATE_REGISTRY dispatch table hunk); (b) mission's version confirmed a
+      strict superset via git log 3599a45..remediation showing only the
+      shared fork commit e9c9e7b touched these files on remediation's side
+      (never independently maintained after fork); (c) two file-specific
+      cross-checks where remediation's later fix (TC-DCF-022's bounded-
+      timeout _git_fingerprint, content_repositories field in
+      audit_all_content.py; test_audit_all_content_reproducibility.py) was
+      confirmed a strict superset of mission's identical-to-pre-fix content
+      and kept as ours. Verified cross-file consistency for the
+      write_gate.py receipt_action="block"-for-warn-gates change and gate
+      36 fidelity-result propagation, which engine.py's already-merged
+      accept_candidate_bytes/_write_accepted_output validation logic
+      requires (confirmed: without it, every zero-defect run with a
+      warn-tier gate would fail the receipt validation). Post-resolution
+      test run: tests/unit/{translation_engine,workers,model_runtime,tm,
+      phase-3,validation,verification,quality}/ = 3067 passed, 8 failed,
+      17 skipped. All 8 failures independently reproduced on mission's own
+      unmodified worktree (7 fail identically standalone; the 8th
+      -- test_real_model_conversion -- is a pre-existing order-dependent
+      skip/fail flake on mission alone) -- confirmed pre-existing, not
+      caused by this merge.
+  - id: TC-BRC-010
+    title: Post-merge verification (is-ancestor checks, full test + governance gates)
+    lane: VERIFICATION
+    status: ACCEPTED
+    evidence: >
+      is-ancestor: remediation, mission, pilot, pilot-runtime all TRUE
+      against integration branch HEAD (827fb09) -- confirms pilot/
+      pilot-runtime are fully redundant and safe to delete. check_manifest.py
+      --strict: 1 finding (scripts/diagnose_model_corruption.py, untracked
+      on every branch in this merge -- disclosed, not adopted).
+      check_governance.py --strict: PASS, all 15 checks green.
+      check_share_safe.sh (targeted equivalent per prior disclosed
+      limitation): steps 2/4/5 clean; step 1 (personal paths) and step 3
+      (large files) both disclosed pre-existing/non-functional findings,
+      see disclosed_limitations_so_far. check_docs_links.py (advisory):
+      broken links confined to docs/_archive/, pre-existing.
+  - id: TC-BRC-011
+    title: Promote integration branch to main (ff-only)
+    lane: EXECUTION
+    status: ACCEPTED
+    evidence: "main fast-forwarded 65193de..827fb09; integration branch deleted cleanly."
+  - id: TC-BRC-012
+    title: Retire worktrees + delete fully-merged/redundant local branches
+    lane: EXECUTION
+    status: ACCEPTED
+    evidence: >
+      4 live worktrees removed (pilot required --force after git's initial
+      rmdir failed on tiny <400KB gitignored residue -- verified sizes
+      first, then force-removed; git had already unregistered it, so the
+      leftover directory was plain rm -rf'd, not git-managed). All 13
+      confirmed-merged branches deleted via -d (self-verifying, would have
+      refused any that weren't truly merged). Final git branch -a matches
+      the plan's closeout criteria exactly: main + 3 archive/candidate refs
+      + backup-before-model-cleanup, nothing else.
+  - id: TC-BRC-013
+    title: Prune stale worktree records
+    lane: EXECUTION
+    status: ACCEPTED
+    evidence: "git worktree prune -v removed both stale prd03-* records (dirs already gone). git worktree list now shows only the primary main worktree."
+  - id: TC-BRC-014
+    title: Remote sync (push main, delete redundant remote branches)
+    lane: EXECUTION
+    status: ACCEPTED_WITH_LIMITATIONS
+    evidence: >
+      origin (GitHub): git push main succeeded (78aed63..827fb09,
+      fast-forward, confirmed unprotected branch); ci/shipping-gate-
+      verification and release/phase10_isolated_20260127_112335 deleted
+      remotely. gitlab: git push main FAILED -- HTTP Basic auth rejected
+      (expired/missing credential, "Authentication failed"). This is a
+      genuine external-credentials gap the agent cannot resolve (no valid
+      gitlab token available) -- correctly a stop condition per the plan's
+      own approval-gate taxonomy (stop-credentials-missing), not something
+      to work around. Skipped the gitlab push and the 3 gitlab branch
+      deletions (ci/shipping-gate-verification,
+      release/phase10_isolated_20260127_112335, fix/broken-translated-
+      content-v4) rather than attempt with broken auth. Nothing lost:
+      local main and the origin push both stand regardless; gitlab simply
+      falls further behind until credentials are refreshed.
+    followup_required: >
+      Human action needed: refresh gitlab.recruitize.ai git credentials
+      (see the OAuth/token hint in the failed push's own error output),
+      then run `git push gitlab main` and `git push gitlab --delete
+      ci/shipping-gate-verification release/phase10_isolated_20260127_112335
+      fix/broken-translated-content-v4` from c:\Users\prora\OneDrive\Documents\GitHub\hugo-translator.
+  - id: TC-BRC-015
+    title: "fde9b44 diff & cherry-pick review (candidate/prd03-qualified-20260729)"
+    lane: EXECUTION_VERIFICATION
+    status: ACCEPTED
+    evidence: >
+      git diff main candidate/prd03-qualified-20260729 --stat: 94 files,
+      +39/-5947. The 5947 deletions are almost entirely .supervisor/state
+      evidence/governance files main has that fde9b44 (an earlier fork
+      point) never saw, plus the 2 ops scripts and TC-BRC evidence -- main
+      is already a strict superset there. Read the full diff for every
+      file with a real (non-.supervisor) difference: .gitignore (fde9b44
+      still has the /data/benchmark_corpus bad line TC-BRC-003 already
+      removed on main), 3 site_profiles yaml (fde9b44 still has the
+      unfixed url:passthrough bug TC-BRC-004 already fixed on main),
+      audit_all_content.py (fde9b44 has the simpler pre-TC-DCF-022 version
+      lacking the bounded-timeout fix and content_repositories field),
+      l2_persistent.py/engine.py/engine_builder.py/test_llm_backend.py
+      (pure formatting only). Conclusion, evidence-backed not assumed:
+      fde9b44 contributes zero net-new value beyond current main --
+      main is a strict superset in every file that differs. No cherry-pick
+      performed; nothing met the "genuinely new" bar. Scratch review
+      branch discarded (git branch -D, no data at risk -- content is
+      unchanged, only the working branch pointer was removed).
+      candidate/prd03-qualified-20260729 remains as a pure archival/
+      provenance reference, per the original plan disposition.
+  - id: TC-BRC-016
+    title: Final audit re-check (fsck, branch-list)
+    lane: AUDIT
+    status: ACCEPTED
+    evidence: >
+      git status clean; git worktree list shows only the primary main
+      worktree; git branch -a matches plan closeout exactly (main + 3
+      archive/candidate refs + backup-before-model-cleanup + expected
+      remotes). git fsck --unreachable --no-reflog: every unreachable
+      commit inspected by message -- all but 2 are the standard "WIP on
+      X:"/"index on X:"/"untracked files on X:"/"On X: <name>" git-stash-
+      internal pattern (harmless, matches the original investigation's
+      finding). The 2 exceptions (7d609763, 00fb3052) were investigated
+      directly: verified via git log that b0f787f's real parent is
+      05a59bb (a normal mainline commit), not either of these -- they are
+      two earlier, INCOMPLETE draft attempts of the same one-off fix
+      (commit message lacks "and aliases:", confirming they predate that
+      addition), independently rebuilt against gitlab/main at different
+      moments per the commit's own description, not a parent-child chain.
+      Both are fully superseded by the complete b0f787f already rescued
+      at archive/orphan-url-aliases-fix-20260727 -- correctly left
+      unreachable for eventual gc, not a gap in TC-BRC-001's safety net.
+  - id: TC-BRC-017
+    title: Evidence bundle + closeout
+    lane: AUDIT
+    status: IN_PROGRESS
+disclosed_limitations_so_far:
+  - "check_share_safe.sh's step 3 (large-file scan over ALL tracked files) hangs under Git Bash on Windows due to per-file subprocess spawn overhead; ran the fast, targeted equivalent of steps 1/2/4/5 directly instead. Non-blocking, unrelated to this mission's changes."
+  - "Personal-path leaks (share_safe check 1) in 3 files: docs/runbooks/aspose-foss-zero-defect-campaign.md (doc example), src/utils/config_loader.py (code comment), docs/runbooks/aspose-foss-zero-defect-plan-binding.yaml (repository-location reference doc, part of the pre-session working tree, not introduced by the branch-consolidation merge). write_gate.py's earlier-noted leak is gone post-merge (mission's independently-developed version didn't carry it). None are runtime-functional; all pre-date or are orthogonal to this mission's merge conflict resolutions -- out of scope to fix here."
+  - "share_safe check 3 (large tracked files >500KB): 1 pre-existing hit, .supervisor/state/quality-remediation-audit-phase7-20260723/reports-audit-snapshot/findings_detail.csv (1.3MB), tracked long before this mission -- advisory (WARN, non-blocking) in the script's own severity model."
+  - "scripts/diagnose_model_corruption.py sits untracked at the scripts/ root (check_manifest.py --strict flags it) -- confirmed untracked on every branch involved in this merge (main, remediation, mission, pilot, pilot-runtime); pre-existing working-tree clutter unrelated to any branch's real history, not adopted or registered as part of this mission."
+  - "4 test modules fail to collect (tests/unit/test_audit_script.py, tests/unit/test_corpus_collection.py, tests/unit/test_golden_corpus_builder.py, tests/unit/tools/test_specscan.py) due to missing scripts/ modules (scripts.audit_codebase, scripts.analyze_ast_corpus, build_golden_corpus, scripts.specscan). Verified pre-existing on main, remediation's original tip, and mission -- not introduced by and not fixed by this consolidation. Excluded via --ignore for this mission's test gate; disclosed rather than silently worked around."
+  - ".claude/context/environment.md documents a conda env path (C:\\Users\\prora\\anaconda3\\envs\\translator-clean\\python.exe) that no longer exists on disk -- used the project's local .venv instead, which has an equivalent working pytest install. Worth a separate follow-up to correct that doc."
