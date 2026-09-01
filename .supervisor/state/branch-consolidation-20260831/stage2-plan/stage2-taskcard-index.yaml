@@ -208,7 +208,14 @@ taskcards:
   - id: TC-BRC-017
     title: Evidence bundle + closeout
     lane: AUDIT
-    status: IN_PROGRESS
+    status: ACCEPTED
+    evidence: >
+      TERMINAL_CLOSED.yaml, evidence.md (12 sections, one per taskcard
+      group), self_review.md (12-dim rubric, 58/60, all ≥4/5) written and
+      force-added. TASK_BACKLOG.md entry added (durable, git-tracked
+      pointer). Closeout commit 730d9f2, pushed to origin
+      (827fb09..730d9f2). Mission TERMINAL_CLOSED.
+
 disclosed_limitations_so_far:
   - "check_share_safe.sh's step 3 (large-file scan over ALL tracked files) hangs under Git Bash on Windows due to per-file subprocess spawn overhead; ran the fast, targeted equivalent of steps 1/2/4/5 directly instead. Non-blocking, unrelated to this mission's changes."
   - "Personal-path leaks (share_safe check 1) in 3 files: docs/runbooks/aspose-foss-zero-defect-campaign.md (doc example), src/utils/config_loader.py (code comment), docs/runbooks/aspose-foss-zero-defect-plan-binding.yaml (repository-location reference doc, part of the pre-session working tree, not introduced by the branch-consolidation merge). write_gate.py's earlier-noted leak is gone post-merge (mission's independently-developed version didn't carry it). None are runtime-functional; all pre-date or are orthogonal to this mission's merge conflict resolutions -- out of scope to fix here."
