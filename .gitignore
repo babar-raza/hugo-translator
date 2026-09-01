@@ -357,4 +357,3 @@ scripts/inspect_cache.py
 /docs/plans
 /.local
 /.supervisor/state
-/data/benchmark_corpus
