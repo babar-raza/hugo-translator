@@ -1,0 +1,33 @@
+taskcard: TC-APT-002
+title: Full-portfolio discovery scan
+status: DONE
+executed_at: "2026-09-02"
+wake: 1
+deliverables:
+  - scripts/campaign/build_campaign_manifest.py (generalizes build_aspose_foss_pilot_manifest.py to the 6 in-scope sites; governed discovery via SiteProfile + file_filters.filter_source_files fed the 36-code registry + content_discovery.resolve_translated_path; www.aspose.org refused)
+  - config/inventory/aspose_org_profile_inventory.json (exact counts per site/family/platform, existing-target coverage per locale, excluded-locale legacy presence, plan-section-4 reconciliation)
+  - tests/unit/workers/test_build_campaign_manifest.py (9 tests)
+scan_result:
+  content_repo_sha: 338efbb6d37263a06c4d1baeaf609cb8b326025f
+  content_repo_dirty_paths: 21
+  locale_set_consistent_across_sites: true (25 codes, identical for all 6 sites)
+  sources_total: 9186
+  cells_total: 229650
+  existing_target_cells: 112584
+  missing_target_cells: 117066
+  per_site:
+    blog.aspose.org:      {sources: 184,  plan_estimate: 157,  delta: +17.2%, disposition: reconciled, note: "plan counted index.md only; governed filter also yields _index.md section pages and archive/search utility pages"}
+    docs.aspose.org:      {sources: 519,  plan_estimate: 519,  delta: 0.0, disposition: reconciled}
+    kb.aspose.org:        {sources: 367,  plan_estimate: 367,  delta: 0.0, disposition: reconciled}
+    products.aspose.org:  {sources: 59,   plan_estimate: 59,   delta: 0.0, disposition: reconciled}
+    reference.aspose.org: {sources: 8042, plan_estimate: 8042, delta: 0.0, disposition: reconciled}
+    websites.aspose.org:  {sources: 15,   plan_estimate: 15,   delta: 0.0, disposition: reconciled}
+  excluded_locale_legacy_files_total: 35161 (never touched; EXCLUDED_BY_PROFILE, plan G-15)
+decisions:
+  - config_fingerprint recipe excludes config/site_profiles/default.yaml (plan G-08 DECIDED); binds global/validation/terminology/technical_terms/aspose_terms.txt + each in-scope profile
+  - tm_fingerprint: L2 data.mdb mandatory; L3 FAISS files hashed only when present (absent on this host 2026-09-02); inputs recorded in manifest as tm_fingerprint_inputs
+  - manifest defaults: primary m2m100_418m until TC-APT-004b; commit_policy.enabled=false (the loop commits via the content repo's governed procedure, plan 19.2); max_parallel_jobs=1 until TC-APT-028
+verification:
+  - "pytest tests/unit/workers/test_build_campaign_manifest.py -> 9 passed"
+  - "live: build_campaign_manifest.py --content-repo D:/onedrive/Documents/GitHub/aspose.org -> 6 sites reconciled, 3m20s"
+acceptance: exact counts per site/family/platform reconciled against plan section 4 (no site exceeds the 20% delta threshold) -> MET

@@ -4,7 +4,7 @@
   "plan_revision": 5,
   "branch": "mission/aspose-org-full-portfolio-translation-20260901",
   "created_at": "2026-09-02T05:20:29.896922+00:00",
-  "updated_at": "2026-09-02T05:33:42.118524+00:00",
+  "updated_at": "2026-09-02T05:46:26.372531+00:00",
   "content_repo": "D:/onedrive/Documents/GitHub/aspose.org",
   "content_repo_session_ledger": {
     "AGENT_SESSION_ID": "d18689cf-ac87-4bcb-b33f-655ef2b84358",
@@ -31,7 +31,7 @@
       "blocker_type": null
     },
     "TC-APT-002": {
-      "status": "TODO",
+      "status": "DONE",
       "gate": 0,
       "title": "Full-portfolio discovery scan",
       "depends_on": [
@@ -39,9 +39,10 @@
       ],
       "owner": "loop",
       "blocking_reason": null,
-      "evidence_path": null,
+      "evidence_path": ".supervisor/state/aspose-org-full-portfolio-translation-20260901/stage3-execution/TC-APT-002.yaml",
       "commit": null,
-      "last_updated": "2026-09-02T05:20:29.896922+00:00"
+      "last_updated": "2026-09-02T05:46:26.372521+00:00",
+      "blocker_type": null
     },
     "TC-APT-003": {
       "status": "TODO",
@@ -66,8 +67,8 @@
       "owner": "loop",
       "blocking_reason": null,
       "evidence_path": ".supervisor/state/aspose-org-full-portfolio-translation-20260901/stage3-execution/TC-APT-022.yaml",
-      "commit": null,
-      "last_updated": "2026-09-02T05:33:42.109423+00:00",
+      "commit": "1056767",
+      "last_updated": "2026-09-02T05:46:26.363749+00:00",
       "blocker_type": null
     },
     "TC-APT-030": {
@@ -80,8 +81,8 @@
       "owner": "loop",
       "blocking_reason": null,
       "evidence_path": ".supervisor/state/aspose-org-full-portfolio-translation-20260901/stage3-execution/TC-APT-030.yaml",
-      "commit": null,
-      "last_updated": "2026-09-02T05:33:42.113665+00:00",
+      "commit": "2d6d0c0",
+      "last_updated": "2026-09-02T05:46:26.366840+00:00",
       "blocker_type": null
     },
     "TC-APT-029": {
@@ -92,8 +93,8 @@
       "owner": "loop",
       "blocking_reason": null,
       "evidence_path": ".supervisor/state/aspose-org-full-portfolio-translation-20260901/stage3-execution/TC-APT-029.yaml",
-      "commit": null,
-      "last_updated": "2026-09-02T05:33:42.118513+00:00",
+      "commit": "4d7356f",
+      "last_updated": "2026-09-02T05:46:26.369717+00:00",
       "blocker_type": null
     },
     "TC-APT-025": {
