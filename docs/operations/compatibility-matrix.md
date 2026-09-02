@@ -26,7 +26,7 @@
 | **Worker-CPU** | ✅ MIGRATED | Job, Profile, Telemetry | ✅ Yes | Via JobProcessor (opt-in) |
 | **Worker-GPU** | ✅ MIGRATED | Job, Profile, Telemetry | ✅ Yes | Via JobProcessor (opt-in) |
 | **FileWatcher** | ✅ MIGRATED | Via Orchestrator | ✅ Yes | Embedded in orchestrator |
-| **SweepScheduler** | ✅ MIGRATED | Via Orchestrator | ✅ Yes | Embedded in orchestrator |
+| **SweepScheduler** | 🚫 RETIRED (TC-APT-030, 2026-09-02) | Via Orchestrator (opt-in only) | ✅ Yes | mtime-only path guarded by `deprecated_execution_guard`; orchestrator default `enable_sweep_scheduler=False`; only `campaign_runner.py` (zero-defect) runs translation |
 | **JobProcessor** | ✅ MIGRATED | Job, Profile, Telemetry | ✅ Yes | USE_SHARED_ENGINES opt-in |
 | **GH Actions: Telemetry** | ✅ MIGRATED | Config/paths | ✅ Yes | Infrastructure updated |
 | **BenchmarkScheduler** | ✅ MIGRATED | Optional engines | ✅ Yes | Phase 5.3 complete |
@@ -44,7 +44,7 @@
 | **Worker-CPU** | 🔄 | 🔄 | 🔄 | 🔄 | ⏳ | ⏳ | ⏳ | ⏳ |
 | **Worker-GPU** | 🔄 | 🔄 | 🔄 | 🔄 | ⏳ | ⏳ | ⏳ | ⏳ |
 | **FileWatcher** | 🔄 | 🔄 | 🔄 | 🔄 | 🚫 | 🚫 | 🚫 | 🚫 |
-| **SweepScheduler** | 🔄 | 🔄 | 🔄 | 🔄 | 🚫 | 🚫 | 🚫 | 🚫 |
+| **SweepScheduler** | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 | 🚫 |
 | **JobProcessor** | 🔄 | 🔄 | 🔄 | 🔄 | ⏳ | ⏳ | ⏳ | ⏳ |
 
 ---
@@ -58,7 +58,7 @@
 | **Worker-CPU** | 🚫 | ✅ | ✅ | 🚫 | CPU-only enforced |
 | **Worker-GPU** | ✅ | 🚫 | 🚫 | ✅ | GPU required |
 | **FileWatcher** | ✅ | ✅ | ✅ | 🚫 | Embedded in orchestrator |
-| **SweepScheduler** | ✅ | ✅ | ✅ | 🚫 | Embedded in orchestrator |
+| **SweepScheduler** | 🚫 | 🚫 | 🚫 | 🚫 | RETIRED (TC-APT-030): requires `HT_ALLOW_DEPRECATED_EXECUTION_PATH=sweep_scheduler` for forensic use only |
 | **JobProcessor** | ✅ | ✅ | ✅ | ✅ | Adapts to device |
 
 ---
