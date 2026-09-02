@@ -4,7 +4,7 @@
   "plan_revision": 5,
   "branch": "mission/aspose-org-full-portfolio-translation-20260901",
   "created_at": "2026-09-02T05:20:29.896922+00:00",
-  "updated_at": "2026-09-02T05:46:26.372531+00:00",
+  "updated_at": "2026-09-02T06:14:56.030060+00:00",
   "content_repo": "D:/onedrive/Documents/GitHub/aspose.org",
   "content_repo_session_ledger": {
     "AGENT_SESSION_ID": "d18689cf-ac87-4bcb-b33f-655ef2b84358",
@@ -109,26 +109,28 @@
       "last_updated": "2026-09-02T05:20:29.896922+00:00"
     },
     "TC-APT-026": {
-      "status": "TODO",
+      "status": "DONE",
       "gate": 0,
       "title": "Register mission in content repo governance",
       "depends_on": [],
       "owner": "loop",
       "blocking_reason": null,
-      "evidence_path": null,
+      "evidence_path": ".supervisor/state/aspose-org-full-portfolio-translation-20260901/stage3-execution/TC-APT-026.yaml",
       "commit": null,
-      "last_updated": "2026-09-02T05:20:29.896922+00:00"
+      "last_updated": "2026-09-02T06:14:56.025449+00:00",
+      "blocker_type": null
     },
     "TC-APT-027": {
-      "status": "TODO",
+      "status": "DONE",
       "gate": 0,
       "title": "websites.aspose.org path-guard override handling (G-17)",
       "depends_on": [],
       "owner": "loop",
       "blocking_reason": null,
-      "evidence_path": null,
+      "evidence_path": ".supervisor/state/aspose-org-full-portfolio-translation-20260901/stage3-execution/TC-APT-027.yaml",
       "commit": null,
-      "last_updated": "2026-09-02T05:20:29.896922+00:00"
+      "last_updated": "2026-09-02T06:14:56.030049+00:00",
+      "blocker_type": null
     },
     "TC-APT-028": {
       "status": "TODO",
@@ -197,15 +199,16 @@
       "last_updated": "2026-09-02T05:20:29.896922+00:00"
     },
     "TC-APT-005": {
-      "status": "TODO",
+      "status": "DONE",
       "gate": 1,
       "title": "Close NLLB licensing as permanent non-use (G-02)",
       "depends_on": [],
       "owner": "loop",
       "blocking_reason": null,
-      "evidence_path": null,
+      "evidence_path": ".supervisor/state/aspose-org-full-portfolio-translation-20260901/stage3-execution/TC-APT-005.yaml",
       "commit": null,
-      "last_updated": "2026-09-02T05:20:29.896922+00:00"
+      "last_updated": "2026-09-02T06:14:56.021162+00:00",
+      "blocker_type": null
     },
     "TC-APT-007": {
       "status": "TODO",
