@@ -4,7 +4,7 @@
   "plan_revision": 5,
   "branch": "mission/aspose-org-full-portfolio-translation-20260901",
   "created_at": "2026-09-02T05:20:29.896922+00:00",
-  "updated_at": "2026-09-02T05:26:07.957720+00:00",
+  "updated_at": "2026-09-02T05:33:42.118524+00:00",
   "content_repo": "D:/onedrive/Documents/GitHub/aspose.org",
   "content_repo_session_ledger": {
     "AGENT_SESSION_ID": "d18689cf-ac87-4bcb-b33f-655ef2b84358",
@@ -26,8 +26,9 @@
       "owner": "loop",
       "blocking_reason": null,
       "evidence_path": ".supervisor/state/aspose-org-full-portfolio-translation-20260901/stage1-audit/TC-APT-001-governance-reconciliation.yaml",
-      "commit": null,
-      "last_updated": "2026-09-02T05:26:07.957720+00:00"
+      "commit": "415a179",
+      "last_updated": "2026-09-02T05:33:42.105326+00:00",
+      "blocker_type": null
     },
     "TC-APT-002": {
       "status": "TODO",
@@ -56,7 +57,7 @@
       "last_updated": "2026-09-02T05:20:29.896922+00:00"
     },
     "TC-APT-022": {
-      "status": "TODO",
+      "status": "DONE",
       "gate": 0,
       "title": "Structurally retire ungoverned execution path",
       "depends_on": [
@@ -64,12 +65,13 @@
       ],
       "owner": "loop",
       "blocking_reason": null,
-      "evidence_path": null,
+      "evidence_path": ".supervisor/state/aspose-org-full-portfolio-translation-20260901/stage3-execution/TC-APT-022.yaml",
       "commit": null,
-      "last_updated": "2026-09-02T05:20:29.896922+00:00"
+      "last_updated": "2026-09-02T05:33:42.109423+00:00",
+      "blocker_type": null
     },
     "TC-APT-030": {
-      "status": "TODO",
+      "status": "DONE",
       "gate": 0,
       "title": "Retire legacy SweepScheduler path (G-19)",
       "depends_on": [
@@ -77,20 +79,22 @@
       ],
       "owner": "loop",
       "blocking_reason": null,
-      "evidence_path": null,
+      "evidence_path": ".supervisor/state/aspose-org-full-portfolio-translation-20260901/stage3-execution/TC-APT-030.yaml",
       "commit": null,
-      "last_updated": "2026-09-02T05:20:29.896922+00:00"
+      "last_updated": "2026-09-02T05:33:42.113665+00:00",
+      "blocker_type": null
     },
     "TC-APT-029": {
-      "status": "TODO",
+      "status": "DONE",
       "gate": 0,
       "title": "Wire campaign supervision into supervisor_loop.decide()",
       "depends_on": [],
       "owner": "loop",
       "blocking_reason": null,
-      "evidence_path": null,
+      "evidence_path": ".supervisor/state/aspose-org-full-portfolio-translation-20260901/stage3-execution/TC-APT-029.yaml",
       "commit": null,
-      "last_updated": "2026-09-02T05:20:29.896922+00:00"
+      "last_updated": "2026-09-02T05:33:42.118513+00:00",
+      "blocker_type": null
     },
     "TC-APT-025": {
       "status": "TODO",

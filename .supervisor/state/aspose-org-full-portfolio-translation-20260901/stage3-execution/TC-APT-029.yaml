@@ -1,0 +1,14 @@
+taskcard: TC-APT-029
+title: Wire campaign supervision into supervisor_loop.decide() (plan 2.7 reuse)
+status: DONE
+executed_at: "2026-09-02"
+wake: 1
+changes:
+  - src/workers/mission_supervisor.py (new): derives mission-scoped task_queue.jsonl + continuation_state.json blockers from taskcard_status.json (PHASE A) or caller-supplied manifest items (PHASE B); calls supervisor_loop.inspect_state/decide/execute_decision UNMODIFIED; reports workable_pending so a BLOCK never idles the mission; set_taskcard() enforces the two BLOCKED_TRUE_EXTERNAL reasons; reads data/runtime/circuit_breaker/<model>.json (state open/unreadable -> blocker; closed/half_open -> none)
+  - src/workers/continuation_state.py: replace_blockers() (idempotent wholesale re-sync)
+  - supervisor_loop.py branching: NOT modified (verified by unchanged tests/unit/workers/test_supervisor_loop.py)
+  - does NOT route through worker_orchestrator.py preflight (scope boundary honoured)
+verification:
+  - "pytest tests/unit/workers/test_mission_supervisor.py + test_supervisor_loop.py + test_continuation_state.py + test_task_queue.py -> 80 passed"
+  - "live: python -m src.workers.mission_supervisor -> phase=A decision=proceed task=TC-APT-002"
+acceptance: unit tests feed BLOCKED_TRUE_EXTERNAL taskcard -> BLOCK, tripped circuit breaker (3 consecutive failures) -> CIRCUIT_BREAK, empty queue -> SKIP, interrupted run -> RESUME, open LLM breaker file -> BLOCK, normal -> PROCEED honouring deps -> MET; plan 21 STATE step now executes via this module
