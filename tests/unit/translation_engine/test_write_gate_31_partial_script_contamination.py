@@ -12,8 +12,9 @@ verified not to change this file's output at all). Gate 24
 ASCII; this gate catches the much more common partial case that a
 whole-field/whole-file dominant-language detector cannot see.
 
-Ships "warn" (not "block") per this registry's established rollout
-convention -- see the code comment on Gate 31's GATE_REGISTRY entry.
+Promoted "warn" -> "block" by TC-APT-010 (GATE-PROMO-001, 2026-09-02) after a
+637-file known-good sample and adversarial/negative fixture pass -- see the
+code comment on Gate 31's GATE_REGISTRY entry.
 """
 import logging
 from pathlib import Path
@@ -52,8 +53,9 @@ class TestGatePartialScriptContamination:
             result = gate.evaluate(tr, src, "he", output_path)
 
         assert any("GATE31" in r.message for r in caplog.records)
-        # warn-only: must never flip result.passed
-        assert result.passed is True
+        # TC-APT-010 (2026-09-02): promoted "warn" -> "block" -- a confirmed
+        # real defect must now actually block, including under standard policy.
+        assert result.passed is False
 
     def test_real_confirmed_spanish_closing_link_is_flagged(self, caplog):
         """Second real confirmed instance from the same file: the closing

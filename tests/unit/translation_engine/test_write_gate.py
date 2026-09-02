@@ -80,7 +80,17 @@ class TestGateLanguageMismatch:
     def test_force_accept_bypasses_final_purity_for_governed_verifier(self):
         detector = _make_detector("en", 0.95)
         gate = _make_evaluator(detector=detector, force_accept=True)
-        body = "This is a long English paragraph that would normally fail for a German target language."
+        # TC-APT-010 (2026-09-02): kept under Gate 42's own 50-char
+        # classification floor (translation_engine.write_gate's
+        # _gate_whole_page_language_mismatch: "too short to classify
+        # reliably") -- force_accept only skips gates 2-8 by this
+        # codebase's established design ("Gates 9-17: Content quality
+        # gates (unconditional -- no force_accept)"), so a body long
+        # enough for the now-block-tier Gate 42 to independently classify
+        # would legitimately still be blocked. This test isolates Gate 2's
+        # own force_accept bypass, not Gate 42's unrelated (and correctly
+        # unconditional) check.
+        body = "Short English text."
 
         r = gate.evaluate(_md(body), _md("source"), "de", Path("test.md"))
 

@@ -795,7 +795,11 @@ translation_engine:
   # has been measured (shadow mode) -- flip to true only after that canary.
   fidelity_judge:
     enabled: true
-    enforce: false  # shadow mode -- logs/writes verdict, never blocks. See Part 6 item 3.
+    enforce: true  # TC-APT-010 (2026-09-02): promoted out of shadow mode -- ~276
+    # unique high-risk-tier files got a real FAIL verdict during the gate-promotion
+    # sample run (exceeds the >=200-file shadow target); spot-checked FAILs against
+    # real source/target text were all genuine, well under the 5% false-fail bar.
+    # See data/quality/gate_promotion_log.jsonl and TC-APT-010.yaml.
     model_id: "professionalize_llm"
     warn_threshold: 0.7   # score below this (0-1) -> verdict "warn"
     block_threshold: 0.5  # score below this (0-1) -> verdict "fail" (blocks only if enforce: true)

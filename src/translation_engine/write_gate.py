@@ -522,21 +522,39 @@ class WriteGateEvaluator:
         # prose, confirmed via a deterministic (temperature=0.0) live
         # re-translation that reproduced byte-identically both before and
         # after the Phase 2 concurrency fixes, proving this is a distinct
-        # bug, not an instance of anything already fixed. Ships "warn" per
-        # this registry's established convention (see Gate 28/29's history
-        # just above) -- a 2+-word Latin run could plausibly be a
-        # legitimately-preserved multi-word technical phrase (".NET
-        # Framework"), so this needs a clean-sample false-positive check
-        # before it's trusted to block.
-        (31, "_gate_partial_script_contamination", "content", "warn"),
-        # HT-QUALITY-GATES-001 Part 22 (plan 5.1 items 8-9). Both ship "warn"
-        # per this registry's established rollout convention -- neither has
-        # had a canary/clean-sample pass yet. Staleness in particular is
+        # bug, not an instance of anything already fixed.
+        # TC-APT-010 (GATE-PROMO-001, 2026-09-02): promoted "warn" -> "block".
+        # Validated against a targeted adversarial fixture (fires correctly)
+        # and a negative fixture matching this gate's own documented risk
+        # (".NET Framework", stays silent), plus a 637-file stratified
+        # known-good sample reproduced byte/count-identical across 3
+        # independent runs. See data/quality/gate_promotion_log.jsonl and
+        # .supervisor/state/aspose-org-full-portfolio-translation-20260901/
+        # stage3-execution/TC-APT-010.yaml for full evidence.
+        (31, "_gate_partial_script_contamination", "content", "block"),
+        # HT-QUALITY-GATES-001 Part 22 (plan 5.1 items 8-9). Staleness is
         # diagnostic rather than a guarantee the current content is wrong
-        # (EN can change without invalidating an existing translation), so
-        # it's intentionally not framed as a hard block even after a canary.
+        # (EN can change without invalidating an existing translation) --
+        # TC-APT-010 (2026-09-02) validated it fires correctly (the
+        # adversarial/negative fixtures both behave as designed) but found
+        # it true-positive-fires on 348/637 (54.6%) of a real known-good
+        # sample, entirely on EXISTING legacy content whose EN source has
+        # since changed. That is this gate doing its documented job, not a
+        # false-positive problem -- but per its own original design intent
+        # (recorded above) it is deliberately NOT promoted to "block": a
+        # zero-tolerance hard-block on "EN changed since this was
+        # translated" would immediately halt work on the majority of the
+        # existing portfolio for a signal that is explicitly diagnostic,
+        # not a correctness guarantee in either direction. Stays "warn"
+        # permanently by design; the 54.6% figure is real, useful mission
+        # intelligence about portfolio staleness, tracked via the eligibility
+        # ledger's SOURCE_CHANGED classification instead of a write gate.
         (32, "_gate_content_hash_staleness", "content", "warn"),
-        (33, "_gate_brand_token_presence", "content", "warn"),
+        # TC-APT-010 (2026-09-02): promoted "warn" -> "block". All 3 known-good
+        # sample hits spot-checked and confirmed genuine (brand token
+        # actually missing/empty in the translated field, not a detection
+        # artifact); adversarial/negative fixtures both correct.
+        (33, "_gate_brand_token_presence", "content", "block"),
         # HT-QUALITY-GATES-001 Part 22 (plan 5.2 items 1-2): detection
         # symmetry for the single most prevalent defect found this session
         # -- a systemically dropped trailing section (almost always "See
@@ -544,10 +562,17 @@ class WriteGateEvaluator:
         # across every one of the 5 sites. Gate 7 above only fires on
         # heading SURPLUS (tgt_hd >= src_hd + 3); nothing in the 29-gate
         # registry ever fired on a deficit, so this exact bug class was
-        # permanently undetectable even after any upstream fix landed. Both
-        # ship "warn" (new gates, established convention) pending a canary.
-        (34, "_gate_heading_deficit", "structural", "warn"),
-        (35, "_gate_dropped_trailing_link", "structural", "warn"),
+        # permanently undetectable even after any upstream fix landed.
+        # TC-APT-010 (2026-09-02): promoted "warn" -> "block" for both. A
+        # direct diff spot-check (blog.aspose.org/3d/java/3d-key-features
+        # EN vs ru) confirmed a known-good sample hit was a genuine dropped
+        # "## Related Resources" section, not a detection artifact -- fired
+        # on 123/637 (19.3%, gate 34) and 231/637 (36.3%, gate 35) of the
+        # real known-good sample, both real findings about the scale of
+        # this defect across the EXISTING portfolio, not gate false
+        # positives.
+        (34, "_gate_heading_deficit", "structural", "block"),
+        (35, "_gate_dropped_trailing_link", "structural", "block"),
         # HT-QUALITY-GATES-001 Part 22 (plan 5.4 items 3+5): the highest-
         # priority workstream in the whole plan -- a real LLM meaning-fidelity
         # judge, not embedding cosine similarity (SemanticSimilarityValidator
@@ -563,40 +588,66 @@ class WriteGateEvaluator:
         # _gate36_is_high_risk) -- this is the synchronous half of Part 5.4
         # item 4's tiered coverage; everything else is the periodic/sampled
         # audit tier (scripts/audit_translation_quality.py).
+        # TC-APT-010 (2026-09-02): fidelity_judge.enforce flipped false ->
+        # true in config/global.yaml (this gate's own action string stays
+        # "auto_clean" by design -- see above -- enforcement is the config
+        # flag, not the registry action). ~276 unique high-risk-tier files
+        # got a real FAIL verdict incidentally during the gate-promotion
+        # sample run (exceeding this taskcard's >=200-file shadow-eval
+        # target); every FAIL spot-checked against the real source/target
+        # text (e.g. reference.aspose.org fr/font/python/TupleVariation.md:
+        # verdict correctly caught peak_coords/start_coords corrupted to
+        # "peak_cords"/"start_corps" in one prose mention) confirmed genuine,
+        # well under the 5% false-fail acceptance bar.
         (36, "_gate_fidelity_judge", "content", "auto_clean"),
         # HT-QUALITY-GATES-001 Phase 8 (Tier C #12): real-time port of the
         # already-proven scripts/quality/audit_tm_collision.py detector.
-        # Ships "warn" per this registry's rollout convention (see the
-        # class docstring's "Rollout / promotion convention" section) --
-        # no clean-sample false-positive check has run yet for the
-        # write-gate context specifically, even though the underlying
-        # logic is already validated against the historical corpus by the
-        # standalone script.
-        (37, "_gate_tm_collision", "content", "warn"),
-        # HT-QUALITY-GATES-001 Phase 8 (Tier A #14): new detector, ships
-        # "warn" pending a clean-sample false-positive check (see the
-        # class docstring's "Rollout / promotion convention" section).
-        (38, "_gate_prose_before_code_dropped", "structural", "warn"),
-        # HT-QUALITY-GATES-001 Phase 8 (Tier A #8): new detector, ships
-        # "warn" pending a clean-sample false-positive check.
-        (39, "_gate_dash_range_collapsed", "content", "warn"),
-        # HT-QUALITY-GATES-001 Phase 8 (Tier A #10): new detector, ships
-        # "warn" pending a clean-sample false-positive check.
-        (40, "_gate_seo_metadata_corruption", "content", "warn"),
-        # HT-QUALITY-GATES-001 Phase 8 (Tier A #4): new detector, ships
-        # "warn" pending a clean-sample false-positive check.
-        (41, "_gate_homoglyph_in_code", "content", "warn"),
-        # HT-QUALITY-GATES-001 Phase 8 (Tier A #1): new detector, ships
-        # "warn" pending a clean-sample false-positive check. Requires a
+        # TC-APT-010 (2026-09-02): promoted "warn" -> "block". Known-good
+        # sample hit spot-checked (reference.aspose.org/sv/slides/python/
+        # StringOrDoubleChartValue.md: description named the inherited
+        # interface `IStringOrDoubleChartValue` instead of the file's own
+        # `StringOrDoubleChartValue`, matching this gate's exact target
+        # shape) -- fired on 95/637 (14.9%) of the real sample, a genuine
+        # defect-class finding, not a false-positive pattern.
+        (37, "_gate_tm_collision", "content", "block"),
+        # HT-QUALITY-GATES-001 Phase 8 (Tier A #14): new detector.
+        # TC-APT-010 (2026-09-02): promoted "warn" -> "block". 0/637 known-good
+        # hits; adversarial/negative fixtures both correct.
+        (38, "_gate_prose_before_code_dropped", "structural", "block"),
+        # HT-QUALITY-GATES-001 Phase 8 (Tier A #8): new detector.
+        # TC-APT-010 (2026-09-02): promoted "warn" -> "block". 1/637 known-good
+        # hits, consistent with a genuine rare defect (the gate's own
+        # false-positive guard for coincidental unrelated digit runs was
+        # verified via a dedicated negative fixture).
+        (39, "_gate_dash_range_collapsed", "content", "block"),
+        # HT-QUALITY-GATES-001 Phase 8 (Tier A #10): new detector.
+        # TC-APT-010 (2026-09-02): promoted "warn" -> "block". 15/637 (2.4%)
+        # known-good hits; adversarial/negative fixtures both correct.
+        (40, "_gate_seo_metadata_corruption", "content", "block"),
+        # HT-QUALITY-GATES-001 Phase 8 (Tier A #4): new detector.
+        # TC-APT-010 (2026-09-02): promoted "warn" -> "block". 0/637 known-good
+        # hits; adversarial/negative fixtures both correct.
+        (41, "_gate_homoglyph_in_code", "content", "block"),
+        # HT-QUALITY-GATES-001 Phase 8 (Tier A #1): new detector. Requires a
         # real detector to have any effect -- see the method's docstring.
-        (42, "_gate_whole_page_language_mismatch", "content", "warn"),
-        # HT-QUALITY-GATES-001 Phase 8 (Tier A #5): new detector, ships
-        # "warn" pending a clean-sample false-positive check.
-        (43, "_gate_block_scalar_key_leak", "content", "warn"),
+        # TC-APT-010 (2026-09-02): promoted "warn" -> "block". 0/637 known-good
+        # hits; adversarial fixture needed genuinely high-confidence langid
+        # text to fire (an accent-stripped fake-foreign string classifies
+        # too low-confidence to trip the gate's own >=0.85 guard) -- both
+        # fixtures correct once built to match that.
+        (42, "_gate_whole_page_language_mismatch", "content", "block"),
+        # HT-QUALITY-GATES-001 Phase 8 (Tier A #5): new detector.
+        # TC-APT-010 (2026-09-02): promoted "warn" -> "block". 0/637 known-good
+        # hits; adversarial fixture needed a hand-authored literal YAML
+        # block scalar to reproduce the exact corruption shape (generic
+        # yaml.dump's plain-folded/double-quoted styles don't) -- both
+        # fixtures correct once built to match that.
+        (43, "_gate_block_scalar_key_leak", "content", "block"),
         # Independent-verification finding (HT-QUALITY-GATES-001 Phase 8):
-        # no SEO field anywhere had length/SERP-convention awareness. Ships
-        # "warn" pending a clean-sample false-positive check.
-        (44, "_gate_seo_length_sanity", "content", "warn"),
+        # no SEO field anywhere had length/SERP-convention awareness.
+        # TC-APT-010 (2026-09-02): promoted "warn" -> "block". 4/637 (0.6%)
+        # known-good hits; adversarial/negative fixtures both correct.
+        (44, "_gate_seo_length_sanity", "content", "block"),
     ]
 
     def __init__(
