@@ -74,7 +74,8 @@ def _config_fingerprint(translator_repo: Path) -> str:
         translator_repo / "config/validation.yaml",
         translator_repo / "config/terminology.yaml",
         translator_repo / "config/terminology/technical_terms.yaml",
-        translator_repo / "config/site_profiles/default.yaml",
+        # G-08 DECIDED (TC-APT-007, 2026-09-02): config/site_profiles/default.yaml is dead
+        # config (never read by ConfigService); hashing it only produced spurious invalidations.
     ]
     paths.extend(
         translator_repo / "config/site_profiles" / f"{site}.yaml" for site, _ in FOLDER_SURFACES

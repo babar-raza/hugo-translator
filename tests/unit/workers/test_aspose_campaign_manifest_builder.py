@@ -42,14 +42,14 @@ def test_config_fingerprint_binds_validation_and_terminology(tmp_path):
     assert after_terminology != after_validation
 
 
-def test_config_fingerprint_binds_default_profile(tmp_path):
+def test_config_fingerprint_ignores_dead_default_profile(tmp_path):
     _write_required_config(tmp_path)
     baseline = _config_fingerprint(tmp_path)
 
     default_profile = tmp_path / "config/site_profiles/default.yaml"
     default_profile.write_text("value: changed\n", encoding="utf-8")
 
-    assert _config_fingerprint(tmp_path) != baseline
+    assert _config_fingerprint(tmp_path) == baseline  # G-08 DECIDED (TC-APT-007): dead config is not a fingerprint input
 
 
 def _init_git_repo(path: Path) -> str:
