@@ -1,21 +1,21 @@
 {
   "taskcard": "TC-APT-028",
   "model_id": "professionalize_llm",
-  "started_at": "2026-09-02T06:54:52.517868+00:00",
-  "finished_at": "2026-09-02T07:08:14.372799+00:00",
+  "started_at": "2026-09-02T07:13:55.224027+00:00",
+  "finished_at": "2026-09-02T07:26:08.222909+00:00",
   "hard_stops": [],
   "preflight": {
     "api_key_env": "litellm_key",
     "api_key_resolved": true,
     "health_check": {
       "ok": true,
-      "seconds": 2.489
+      "seconds": 2.95
     },
     "canary": {
       "ok": true,
       "response_sha256": "539e20d356f59cd7132bdd8ab90b8511128f5edab73d6e88df28aab413ffd17d",
       "echo_exact": true,
-      "seconds": 1.652,
+      "seconds": 1.259,
       "error": null
     },
     "models_probe": {
@@ -44,9 +44,9 @@
         "ok": true,
         "non_empty": true,
         "placeholders_preserved": true,
-        "seconds": 4.053,
+        "seconds": 2.33,
         "input_tokens": 358,
-        "output_tokens": 261,
+        "output_tokens": 263,
         "error": null
       },
       "rtl_arabic": {
@@ -54,9 +54,9 @@
         "non_empty": true,
         "has_arabic_script": true,
         "identifier_kept": true,
-        "seconds": 2.296,
+        "seconds": 1.848,
         "input_tokens": 343,
-        "output_tokens": 122,
+        "output_tokens": 184,
         "error": null
       },
       "fenced_code": {
@@ -64,20 +64,20 @@
         "non_empty": true,
         "fence_preserved": true,
         "code_line_intact": true,
-        "seconds": 3.01,
+        "seconds": 5.517,
         "input_tokens": 360,
-        "output_tokens": 186,
+        "output_tokens": 364,
         "error": null
       },
       "long_technical_paragraph": {
         "ok": true,
         "non_empty": true,
         "not_truncated": true,
-        "length_ratio": 1.639,
+        "length_ratio": 1.557,
         "hit_max_tokens_info": "no",
-        "seconds": 59.072,
+        "seconds": 37.17,
         "input_tokens": 1183,
-        "output_tokens": 4452,
+        "output_tokens": 3166,
         "error": null
       }
     },
@@ -86,10 +86,10 @@
         {
           "words": 300,
           "ok": true,
-          "seconds": 12.995,
+          "seconds": 25.682,
           "input_tokens": 679,
-          "output_tokens": 915,
-          "length_ratio": 1.2,
+          "output_tokens": 2495,
+          "length_ratio": 1.202,
           "hit_max_tokens": false,
           "healthy": true,
           "error": null
@@ -97,10 +97,10 @@
         {
           "words": 600,
           "ok": true,
-          "seconds": 37.237,
+          "seconds": 28.74,
           "input_tokens": 1021,
-          "output_tokens": 2718,
-          "length_ratio": 1.313,
+          "output_tokens": 2607,
+          "length_ratio": 1.317,
           "hit_max_tokens": false,
           "healthy": true,
           "error": null
@@ -108,10 +108,10 @@
         {
           "words": 900,
           "ok": true,
-          "seconds": 75.101,
+          "seconds": 55.323,
           "input_tokens": 1375,
-          "output_tokens": 4928,
-          "length_ratio": 1.772,
+          "output_tokens": 5090,
+          "length_ratio": 1.486,
           "hit_max_tokens": false,
           "healthy": true,
           "error": null
@@ -119,16 +119,27 @@
         {
           "words": 1200,
           "ok": true,
-          "seconds": 51.044,
+          "seconds": 31.719,
           "input_tokens": 1716,
+          "output_tokens": 2777,
+          "length_ratio": 0.977,
+          "hit_max_tokens": false,
+          "healthy": true,
+          "error": null
+        },
+        {
+          "words": 1800,
+          "ok": true,
+          "seconds": 68.478,
+          "input_tokens": 2411,
           "output_tokens": 6000,
-          "length_ratio": 1.937,
+          "length_ratio": 1.188,
           "hit_max_tokens": true,
           "healthy": false,
           "error": null
         }
       ],
-      "max_safe_words": 900
+      "max_safe_words": 1200
     },
     "determinism": {
       "n": 10,
@@ -142,47 +153,47 @@
   "calibration": {
     "latency_by_class_seconds": {
       "short_metadata": {
-        "p50": 1.885,
-        "p95": 2.227,
-        "p99": 2.227,
+        "p50": 1.454,
+        "p95": 1.847,
+        "p99": 1.847,
         "n": 6,
-        "mean": 1.933,
+        "mean": 1.51,
         "errors": 0,
         "source_words": 6
       },
       "long_prose": {
-        "p50": 34.401,
-        "p95": 44.045,
-        "p99": 44.045,
+        "p50": 28.01,
+        "p95": 29.359,
+        "p99": 29.359,
         "n": 6,
-        "mean": 37.085,
+        "mean": 27.755,
         "errors": 0,
         "source_words": 313
       },
       "table_heavy": {
-        "p50": 2.635,
-        "p95": 5.351,
-        "p99": 5.351,
+        "p50": 2.283,
+        "p95": 4.198,
+        "p99": 4.198,
         "n": 6,
-        "mean": 3.267,
+        "mean": 2.52,
         "errors": 0,
         "source_words": 34
       },
       "placeholder_heavy": {
-        "p50": 3.049,
-        "p95": 5.337,
-        "p99": 5.337,
+        "p50": 3.427,
+        "p95": 3.701,
+        "p99": 3.701,
         "n": 6,
-        "mean": 3.486,
+        "mean": 3.427,
         "errors": 0,
         "source_words": 16
       }
     },
     "token_cost": {
       "total_input_tokens": 10428,
-      "total_output_tokens": 19096,
+      "total_output_tokens": 18709,
       "source_words": 2214,
-      "tokens_per_source_word": 13.335,
+      "tokens_per_source_word": 13.16,
       "input_tokens_per_source_word": 4.71
     },
     "concurrency_ramp": [
@@ -192,55 +203,91 @@
         "errors": 0,
         "rate_limited": 0,
         "p95_inflation_vs_level1": 1.0,
-        "p50": 13.361,
-        "p95": 29.784,
-        "p99": 29.784,
+        "p50": 11.474,
+        "p95": 13.891,
+        "p99": 13.891,
         "n": 8,
-        "mean": 15.041,
+        "mean": 12.128,
         "sample_errors": []
       },
       {
         "level": 2,
         "calls": 8,
-        "errors": 8,
+        "errors": 0,
         "rate_limited": 0,
-        "p95_inflation_vs_level1": null,
-        "p50": 0.0,
-        "p95": 0.0,
-        "p99": 0.0,
-        "n": 0,
-        "sample_errors": [
-          "LockError: Failed to acquire lock after 10.0s: data\\runtime\\circuit_breaker\\professionalize_llm.lock",
-          "LockError: Failed to acquire lock after 10.0s: data\\runtime\\circuit_breaker\\professionalize_llm.lock",
-          "LockError: Failed to acquire lock after 10.0s: data\\runtime\\circuit_breaker\\professionalize_llm.lock"
-        ]
+        "p95_inflation_vs_level1": 1.038,
+        "p50": 13.58,
+        "p95": 14.418,
+        "p99": 14.418,
+        "n": 8,
+        "mean": 12.734,
+        "sample_errors": []
+      },
+      {
+        "level": 4,
+        "calls": 8,
+        "errors": 0,
+        "rate_limited": 0,
+        "p95_inflation_vs_level1": 1.231,
+        "p50": 14.566,
+        "p95": 17.106,
+        "p99": 17.106,
+        "n": 8,
+        "mean": 14.306,
+        "sample_errors": []
+      },
+      {
+        "level": 8,
+        "calls": 8,
+        "errors": 0,
+        "rate_limited": 0,
+        "p95_inflation_vs_level1": 1.359,
+        "p50": 13.99,
+        "p95": 18.878,
+        "p99": 18.878,
+        "n": 8,
+        "mean": 14.45,
+        "sample_errors": []
+      },
+      {
+        "level": 16,
+        "calls": 8,
+        "errors": 0,
+        "rate_limited": 0,
+        "p95_inflation_vs_level1": 1.142,
+        "p50": 14.032,
+        "p95": 15.868,
+        "p99": 15.868,
+        "n": 8,
+        "mean": 13.87,
+        "sample_errors": []
       }
     ],
-    "safe_concurrency_ceiling": 1,
-    "ramp_stop_reason": "level 2: errors=8 rate_limited=0 p95_inflation=None",
+    "safe_concurrency_ceiling": 16,
+    "ramp_stop_reason": null,
     "batch_packing": {
       "pack_size": 8,
-      "packed_ok": false,
-      "packed_seconds": 10.04,
-      "packed_tokens": 0,
-      "singles_total_seconds": 80.199,
-      "singles_total_tokens": 0,
-      "singles_errors": 8,
-      "speedup_x": null
+      "packed_ok": true,
+      "packed_seconds": 5.187,
+      "packed_tokens": 754,
+      "singles_total_seconds": 23.8,
+      "singles_total_tokens": 4274,
+      "singles_errors": 0,
+      "speedup_x": 4.59
     }
   },
   "recommendations": {
-    "manifest_max_parallel_jobs_for_llm": 1,
+    "manifest_max_parallel_jobs_for_llm": 16,
     "circuit_breaker": {
       "consecutive_failure_trip": 5,
       "window_calls": 20,
       "window_failure_ratio_trip": 0.5,
-      "observed_baseline_failure_rate": 0.2,
+      "observed_baseline_failure_rate": 0.0,
       "cooldown_seconds": 60,
       "cooldown_cap_seconds": 600,
-      "per_call_timeout_seconds_suggested": 176,
-      "rationale": "observed baseline failure rate is far below the 50%/20-call window trip; 5 consecutive failures stays as the trip because a healthy endpoint showed 8 failures in 40 calibration calls"
+      "per_call_timeout_seconds_suggested": 117,
+      "rationale": "observed baseline failure rate is far below the 50%/20-call window trip; 5 consecutive failures stays as the trip because a healthy endpoint showed 0 failures in 64 calibration calls"
     },
-    "batch_packing_recommended": false
+    "batch_packing_recommended": true
   }
 }

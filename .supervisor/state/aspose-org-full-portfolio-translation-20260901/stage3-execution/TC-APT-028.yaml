@@ -1,0 +1,31 @@
+taskcard: TC-APT-028
+title: Preflight and throughput calibration for llm.professionalize.com (plan 6.0)
+status: DONE
+executed_at: "2026-09-02"
+wake: 1
+harness: scripts/campaign/llm_preflight_calibration.py (production wire path: ModelRegistry -> LLMProviderConfig -> create_provider -> hardened BaseLLMProvider.generate, production system prompts and packed-batch format); tests tests/unit/workers/test_llm_preflight_calibration.py (8)
+runs:
+  - "run 1 (preflight only, 11:20 local): zero hard stops; determinism 10/10; /models probe -> 7 ids incl. the 'recommended' alias and concrete names (qwen3-next, gpt-oss, Qwen2.5-VL-7B, experimental, ...) but NO version-locked identifier (feeds TC-APT-021); canary baseline written"
+  - "run 2 (11:27): HARD STOP on the long paragraph probe -- the probe was 40 copies of ONE sentence (~2,400 tokens); the endpoint ran away to the 6,000-token output cap (87.6 s, 0.50 length ratio). Real finding (degenerate repetition -> runaway generation) but an unrealistic probe; probes rewritten as varied prose"
+  - "run 3 (11:41): 1,800-word varied prose still hit the cap (2,411 in -> 6,000 out); calibration blocked; run stopped when a request hung ~14 min (registry timeout 300 s + SDK retries) -> harness got --timeout-seconds (default 120) and OpenAI clients max_retries=0"
+  - "run 4 (12:12): probe resized to ~2x the production per-call budget (750 words; ast_translation_max_tokens_per_batch=512 x MAX_SEGMENTS_PER_PROMPT=8) + a length-ceiling sweep; zero hard stops; but the concurrency ramp failed at level 2 with LockError on the breaker lock file -> CircuitBreaker shared a per-process FileLock across threads (TC-APT-004 defect, fixed with an in-process RLock + 16-thread test)"
+  - "run 5 (12:32, thread-safe breaker, timeout 120 s): zero hard stops; full calibration -- the authoritative report data/benchmark_corpus/results/professionalize_llm_calibration.json"
+preflight_results_run5:
+  api_key_env: litellm_key resolved (value never logged)
+  health_check: OK
+  canary: exact echo; sha 539e20d356f59cd7132bdd8ab90b8511128f5edab73d6e88df28aab413ffd17d (baseline from run 1; identical across runs)
+  representative_segments: placeholders preserved; fenced code preserved; RTL Arabic emitted with identifiers kept; 750-word technical paragraph not truncated (59 s, 1,183 in / 4,452 out tokens)
+  long_input_sweep: 300 w OK 13 s; 600 w OK 37 s; 900 w OK 75 s (4,928 out); 1,200 w -> hit the 6,000-token cap in run 4 but passed in run 5 -> conservative safe ceiling 900 words (~1,200 input tokens) per call; production batches (<=512 tokens) are far below it
+  determinism_temperature_0: 10/10 byte-identical (both runs); long outputs are NOT guaranteed identical across runs (runaway seen once on 1,200 words) -> plan 5.1 honesty requirement recorded
+calibration_results_run5:
+  latency_seconds_by_class: {short_metadata (6 w): p50 1.9 p95 2.2, table_heavy (34 w): p50 2.6 p95 5.4, placeholder_heavy (16 w): p50 3.0 p95 5.3, long_prose (313 w): p50 34.4 p95 44.0}
+  concurrency_ramp (8 calls x 120-word prose per level): {1: p95 13.9 s, 2: 14.4 (1.04x), 4: 17.1 (1.23x), 8: 18.9 (1.36x), 16: 15.9 (1.14x)}; errors 0, rate-limited 0 at every level
+  safe_concurrency_ceiling: 16 (no throttling observed up to the highest level probed)
+  token_cost: 13.16 tokens per source word total (4.71 input + 8.45 output); output/input token ratio ~1.8 -- the model is verbose; feeds plan 17 cost estimate
+  batch_packing: 8 segments packed = 5.2 s / 754 tokens vs 8 singles = 23.8 s / 4,274 tokens -> 4.59x faster, 5.7x fewer tokens -> keep packing (MAX_SEGMENTS_PER_PROMPT=8)
+  observed_failure_rate: 0.0 over 64 calibration calls (and 0 over all 5 runs' ~300 calls)
+recommendations_recorded:
+  circuit_breaker: trip 5 consecutive or >=50% of last 20 (min 10) -- unchanged (baseline failure rate 0); cooldown 60 s doubling to 600 s; per-call timeout: registry 300 s kept as the safety bound (p99 x4 = 117 s would cut legitimate 900-word calls)
+  manifest_max_parallel_jobs_for_llm: 16 measured; CampaignManifest.validate_schema still caps max_parallel_jobs at 1..4 (GPU-era single_shared_instance rule) -- raising the cap for LLM-primary manifests is part of the strategy switch in TC-APT-004b, not applied before qualification
+  per_call_input_budget: keep production batches <= ~900 words (ast_translation_max_tokens_per_batch=512 already enforces ~<=400 words); TC-APT-006 corpus must include long segments to re-verify
+acceptance: "preflight has zero hard-stop findings; calibration report fully populated (latency distribution by class, concurrency ceiling, tokens/word, determinism variance, batch packing, breaker recommendation); no campaign manifest sets professionalize_llm concurrency above 1 before this closed -> MET"

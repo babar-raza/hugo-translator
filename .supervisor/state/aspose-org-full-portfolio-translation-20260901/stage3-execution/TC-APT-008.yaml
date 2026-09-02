@@ -1,0 +1,25 @@
+taskcard: TC-APT-008
+title: TM lineage index (plan 7.5) - first-class fields, by_config_fingerprint index, read-time invalidation
+status: DONE
+executed_at: "2026-09-02"
+wake: 1
+deliverables:
+  - "src/tm/lineage.py (new): lineage_of() (first-class fields then metadata keys config_fingerprint/model/model_id/model_fingerprint), LineageDenylist (mtime-cached, thread-safe, add()/is_denied()/entries(), unreadable file keeps the last good view so denied lineage is never silently re-enabled), default_denylist() with HT_TM_LINEAGE_DENYLIST override, filter_denied() for L3 match lists"
+  - "src/tm/l2_persistent.py: TranslationEntry.config_fingerprint / .model_id (optional, dual-written, backfilled from metadata in __post_init__); from_dict ignores unknown keys (forward/backward compatible); env max_dbs=4 + by_config_fingerprint dupsort sub-database; _index_lineage on store()/batch_store(); iter_by_config_fingerprint / count_by_config_fingerprint / lineage_index_stats / rewrite_entry_lineage; exact_lookup drops denylisted entries at read time (denied_lookups counter)"
+  - "src/tm/l3_semantic.py: semantic_search filters denylisted matches (metric lineage_denied)"
+  - "scripts/tm/backfill_tm_lineage_index.py (new): one-time promotion of metadata lineage to first-class fields + index population; --dry-run; backs up L2 first unless --no-backup; idempotent"
+defect_found_and_fixed_during_the_work:
+  - "opening a named LMDB sub-database makes LMDB store the sub-db NAME as a key in the MAIN database: count()/__len__/export_iter()/delete_namespace() and the backfill all counted one phantom entry (12 TM tests failed). Fixed with the LINEAGE_DB_NAME constant and explicit skips; clear() now empties the index too. All 195 TM tests pass."
+live_store_findings_2026-09-02 (material, plan/memory were stale):
+  l2_entries: 82 (NOT the ~940K the plan and memory record). data/tm/l2.lmdb is a 4 GB sparse LMDB map with 83 keys (82 entries + the sub-db name).
+  l2_lineage: every entry has model lineage only, no config_fingerprint -> professionalize_llm 58, nllb_200_1.3b 20, m2m100_418m 4; the by_config_fingerprint index is therefore legitimately empty (0 indexed keys) after the live backfill rewrote all 82 entries with first-class fields
+  l3_faiss: data/tm/l3_faiss/ is EMPTY (no index.faiss, no metadata.pkl) -> the plan's "764,510-entry L3 purge" (G-04) has no index to purge; recorded for TC-APT-009
+  stray_sibling: data/tm/l2_lmdb/ exists (20 MB map, 0 entries, created 2026-09-02 11:42 by an unidentified process); TC-TM-02 warns about it on every open. It is empty and gitignored; NOT deleted (the mission does not delete artifacts it did not create). Recorded for the operator; scripts/tm/migrate_l2_lmdb.py --apply is the repo's own consolidation path.
+applied_invalidation:
+  - "denylisted model_id nllb_200_1.3b and nllb_200_600m (reason: CC-BY-NC-4.0 permanent non-use, TC-APT-005/G-02) -> verified live: 20 of the 82 L2 entries are now suppressed at read time, zero bytes deleted, reversible by editing data/tm/invalidated_lineage.json"
+verification:
+  - "pytest tests/unit/tm/test_tm_lineage.py -> 7 passed (lineage precedence, unknown-key tolerance, index O(matches) lookup + stats, read-time suppression and reversibility, model-id denial, unreadable-file behaviour, L3 filter, backfill dry-run/live/idempotence)"
+  - "pytest tests/contract/test_tm_002_l2_persistent.py tests/unit/tm/ -> 195 passed (no regression after the sub-db change)"
+  - "live: python -m scripts.tm.backfill_tm_lineage_index --dry-run then --no-backup -> 82 entries, 82 rewritten, 0 corrupt; re-run reports already_first_class (idempotent)"
+  - "live: exact_lookup over the real store with the NLLB denylist active -> 20 denied, 62 served"
+acceptance: "lookup of 'all entries under config X' is O(matches) via the dupsort index, verified against a synthetic fixture (30 entries / 2 fingerprints) BEFORE running on the real store; the real store was then backfilled successfully -> MET"

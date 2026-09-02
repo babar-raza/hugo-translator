@@ -50,9 +50,7 @@ class SemanticMatch:
         return asdict(self)
 
 
-def load_standalone_sentence_encoder(
-    model_name: str, use_gpu: bool = False
-) -> SentenceTransformer:
+def load_standalone_sentence_encoder(model_name: str, use_gpu: bool = False) -> SentenceTransformer:
     """Load a SentenceTransformer encoder without the rest of L3SemanticTM's
     setup (FAISS index, on-disk metadata, periodic-save machinery).
 
@@ -570,6 +568,12 @@ class L3SemanticTM:
                     if len(matches) >= k:
                         break
 
+            # TC-APT-008: read-time lineage invalidation (reversible denylist)
+            from src.tm.lineage import filter_denied
+
+            matches, dropped = filter_denied(matches)
+            if dropped:
+                self._metrics["lineage_denied"] = self._metrics.get("lineage_denied", 0) + dropped
             # BM-08: Record cache hit/miss
             if matches:
                 self._metrics["cache_hits"] += 1
@@ -1004,7 +1008,10 @@ class L3SemanticTM:
 
             logger.warning(
                 "L3 remove_entries: removing %d of %d entries, rebuilding index "
-                "(re-embeds %d survivors)", removed, len(self.metadata), len(survivors),
+                "(re-embeds %d survivors)",
+                removed,
+                len(self.metadata),
+                len(survivors),
             )
             self.rebuild_index(survivors)
             return removed

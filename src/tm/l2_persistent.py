@@ -8,7 +8,7 @@ import hashlib
 import json
 import logging
 import threading
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, fields
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -67,6 +67,11 @@ L2_DB_NAME = "l2.lmdb"
 logger = logging.getLogger(__name__)
 
 
+#: TC-APT-008: name of the lineage sub-database. LMDB stores a named sub-db under this key
+#: in the MAIN database, so every main-DB scan/count must skip it.
+LINEAGE_DB_NAME = b"by_config_fingerprint"
+
+
 @dataclass
 class TranslationEntry:
     """Translation memory entry."""
@@ -86,6 +91,9 @@ class TranslationEntry:
     # single-entry store() path already enforced. Default "" preserves the
     # legacy unscoped key for existing callers/entries.
     field_name: str = ""
+    # TC-APT-008 (plan 7.5): first-class lineage, dual-written alongside the metadata dict.
+    config_fingerprint: str | None = None
+    model_id: str | None = None
 
     def __post_init__(self):
         """Initialize defaults."""
@@ -93,6 +101,14 @@ class TranslationEntry:
             self.timestamp = datetime.now(timezone.utc).isoformat()
         if self.metadata is None:
             self.metadata = {}
+        if self.config_fingerprint is None or self.model_id is None:
+            from src.tm.lineage import lineage_of
+
+            fp, model = lineage_of(self.metadata)
+            if self.config_fingerprint is None:
+                self.config_fingerprint = fp
+            if self.model_id is None:
+                self.model_id = model
 
     def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary."""
@@ -100,8 +116,9 @@ class TranslationEntry:
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> "TranslationEntry":
-        """Create from dictionary."""
-        return cls(**data)
+        """Create from dictionary (unknown keys are ignored for forward compatibility)."""
+        known = {f.name for f in fields(cls)}
+        return cls(**{k: v for k, v in data.items() if k in known})
 
     def is_valid(self) -> bool:
         """
@@ -173,13 +190,19 @@ class L2PersistentTM:
         self.env = lmdb.open(
             str(self.db_path),
             map_size=max_size_bytes,
-            max_dbs=1,
+            max_dbs=4,  # TC-APT-008: main + by_config_fingerprint lineage index
             sync=True,  # Ensure durability
             writemap=False,  # Safer for concurrent access
         )
 
         self._lock = threading.RLock()
         self._lang_detector = None  # lazy-loaded; set externally or on first use
+        # TC-APT-008: secondary index config_fingerprint -> main key (dupsort), O(matches) lookup.
+        self._lineage_db = self.env.open_db(LINEAGE_DB_NAME, dupsort=True)
+        from src.tm.lineage import default_denylist
+
+        self._denylist = default_denylist()
+        self.denied_lookups = 0
 
     @property
     def _detector(self):
@@ -298,13 +321,9 @@ class L2PersistentTM:
                 make_tm_key_scoped(site_id, src_lang, tgt_lang, text, field_name, ctx)
             )
         if field_name:
-            keys_to_try.append(
-                make_tm_key_scoped(site_id, src_lang, tgt_lang, text, field_name)
-            )
+            keys_to_try.append(make_tm_key_scoped(site_id, src_lang, tgt_lang, text, field_name))
         if ctx:
-            keys_to_try.append(
-                make_tm_key_scoped(site_id, src_lang, tgt_lang, text, context=ctx)
-            )
+            keys_to_try.append(make_tm_key_scoped(site_id, src_lang, tgt_lang, text, context=ctx))
         keys_to_try.append(make_tm_key(site_id, src_lang, tgt_lang, text))
 
         with self._lock:
@@ -331,6 +350,18 @@ class L2PersistentTM:
                     )
                     return None
 
+                # TC-APT-008: read-time lineage invalidation (reversible denylist, never a delete)
+                if self._denylist.denies(entry):
+                    self.denied_lookups += 1
+                    logger.debug(
+                        "TM entry suppressed by lineage denylist: site=%s %s->%s fp=%s model=%s",
+                        site_id,
+                        src_lang,
+                        tgt_lang,
+                        entry.config_fingerprint,
+                        entry.model_id,
+                    )
+                    return None
                 # T204: Validate entry integrity
                 if not entry.is_valid():
                     logger.warning(
@@ -402,9 +433,7 @@ class L2PersistentTM:
             )
             raise ValueError("Translation entry failed validation")
 
-        key = make_tm_key_scoped(
-            site_id, src_lang, tgt_lang, text, field_name, context or ""
-        )
+        key = make_tm_key_scoped(site_id, src_lang, tgt_lang, text, field_name, context or "")
         key_bytes = key.encode("utf-8")
 
         try:
@@ -427,6 +456,7 @@ class L2PersistentTM:
                     # T204: Store with automatic rollback on failure
                     try:
                         txn.put(key_bytes, value_json.encode("utf-8"))
+                        self._index_lineage(txn, entry, key_bytes)
                     except lmdb.MapFullError:
                         current_mb = self.env.info()["map_size"] // (1024 * 1024)
                         new_mb = min(int(current_mb * 1.5), 8192)
@@ -551,6 +581,55 @@ class L2PersistentTM:
             logger.error(f"Batch cache write failed (integrity safeguard triggered): error={e}")
             raise
 
+    # ------------------------------------------------------------------ TC-APT-008 lineage index
+    def _index_lineage(self, txn, entry: "TranslationEntry", key_bytes: bytes) -> None:
+        """Record key under its config_fingerprint in the dupsort index (no-op without lineage)."""
+        fp = entry.config_fingerprint
+        if fp:
+            txn.put(fp.encode("utf-8"), key_bytes, db=self._lineage_db, dupdata=True)
+
+    def iter_by_config_fingerprint(self, config_fingerprint: str):
+        """Yield every entry produced under ``config_fingerprint`` -- O(matches), not O(store)."""
+        with self._lock:
+            with self.env.begin() as txn:
+                cursor = txn.cursor(db=self._lineage_db)
+                if not cursor.set_key(config_fingerprint.encode("utf-8")):
+                    return
+                for main_key in cursor.iternext_dup():
+                    raw = txn.get(main_key)
+                    if raw is None:
+                        continue
+                    try:
+                        yield TranslationEntry.from_dict(json.loads(raw.decode("utf-8")))
+                    except Exception:
+                        continue
+
+    def count_by_config_fingerprint(self, config_fingerprint: str) -> int:
+        with self._lock:
+            with self.env.begin() as txn:
+                cursor = txn.cursor(db=self._lineage_db)
+                if not cursor.set_key(config_fingerprint.encode("utf-8")):
+                    return 0
+                return cursor.count()
+
+    def lineage_index_stats(self) -> dict[str, int]:
+        """Distinct fingerprints and indexed keys (cheap: index only)."""
+        with self._lock:
+            with self.env.begin() as txn:
+                stat = txn.stat(db=self._lineage_db)
+                cursor = txn.cursor(db=self._lineage_db)
+                distinct = 0
+                if cursor.first():
+                    distinct = 1
+                    while cursor.next_nodup():
+                        distinct += 1
+                return {"indexed_keys": int(stat["entries"]), "distinct_fingerprints": distinct}
+
+    def rewrite_entry_lineage(self, txn, key_bytes: bytes, entry: "TranslationEntry") -> None:
+        """Backfill helper: rewrite one stored entry with first-class lineage and index it."""
+        txn.put(key_bytes, json.dumps(entry.to_dict()).encode("utf-8"))
+        self._index_lineage(txn, entry, key_bytes)
+
     def delete(self, site_id: str, src_lang: str, tgt_lang: str, text: str) -> bool:
         """
         Delete translation entry.
@@ -591,6 +670,8 @@ class L2PersistentTM:
             with self.env.begin() as txn:
                 cursor = txn.cursor()
                 for key, value in cursor:
+                    if key == LINEAGE_DB_NAME:
+                        continue  # TC-APT-008: sub-db name key, not a TM entry
                     try:
                         entry = json.loads(value.decode("utf-8"))
                     except Exception as exc:
@@ -621,18 +702,25 @@ class L2PersistentTM:
         """
         Get total number of entries in database.
 
+        Excludes the ``by_config_fingerprint`` sub-database's name key, which LMDB keeps in
+        the main database (TC-APT-008).
+
         Returns:
             Entry count
         """
         with self._lock:
             with self.env.begin() as txn:
-                return txn.stat()["entries"]
+                total = txn.stat()["entries"]
+                if txn.get(LINEAGE_DB_NAME) is not None:
+                    total -= 1
+                return max(total, 0)
 
     def clear(self) -> None:
-        """Delete all entries from database."""
+        """Delete all entries from database (including the TC-APT-008 lineage index)."""
         with self._lock:
             with self.env.begin(write=True) as txn:
-                # Drop and recreate the database
+                # Empty the lineage index first, then the main database.
+                txn.drop(self._lineage_db, delete=False)
                 txn.drop(self.env.open_db())
 
     def export_all(
@@ -682,6 +770,8 @@ class L2PersistentTM:
             with self.env.begin() as txn:
                 cursor = txn.cursor()
                 for _key_bytes, value_bytes in cursor.iternext():
+                    if _key_bytes == LINEAGE_DB_NAME:
+                        continue  # TC-APT-008: sub-db name key, not a TM entry
                     try:
                         entry = TranslationEntry.from_dict(json.loads(value_bytes.decode("utf-8")))
                         if site_id and entry.site_id != site_id:
