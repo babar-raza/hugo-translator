@@ -92,3 +92,28 @@ def test_two_instances_share_persisted_state(tmp_path):
     assert a.is_open() and other.is_open()  # cross-instance (multi-process) visibility
     a.reset()
     assert other.state is BreakerState.CLOSED
+
+
+def test_breaker_is_thread_safe_under_concurrent_calls(tmp_path):
+    """TC-APT-028 run-4 defect: 16 threads sharing one breaker raised LockError on the lock file."""
+    import threading
+
+    clock = {"now": 0.0}
+    b = _breaker(tmp_path, clock, consecutive_failure_trip=999)
+    errors: list[str] = []
+
+    def worker():
+        try:
+            for _ in range(25):
+                assert b.allow_request() is True
+                b.record_success()
+        except Exception as exc:  # pragma: no cover - failure path
+            errors.append(f"{type(exc).__name__}: {exc}")
+
+    threads = [threading.Thread(target=worker) for _ in range(16)]
+    for th in threads:
+        th.start()
+    for th in threads:
+        th.join()
+    assert errors == []
+    assert b.state is BreakerState.CLOSED and b.snapshot()["window"].count(1) == 20

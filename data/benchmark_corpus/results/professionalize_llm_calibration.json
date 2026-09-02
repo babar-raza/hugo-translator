@@ -1,0 +1,246 @@
+{
+  "taskcard": "TC-APT-028",
+  "model_id": "professionalize_llm",
+  "started_at": "2026-09-02T06:54:52.517868+00:00",
+  "finished_at": "2026-09-02T07:08:14.372799+00:00",
+  "hard_stops": [],
+  "preflight": {
+    "api_key_env": "litellm_key",
+    "api_key_resolved": true,
+    "health_check": {
+      "ok": true,
+      "seconds": 2.489
+    },
+    "canary": {
+      "ok": true,
+      "response_sha256": "539e20d356f59cd7132bdd8ab90b8511128f5edab73d6e88df28aab413ffd17d",
+      "echo_exact": true,
+      "seconds": 1.652,
+      "error": null
+    },
+    "models_probe": {
+      "supported": true,
+      "model_ids": [
+        "Qwen2.5-VL-7B",
+        "experimental",
+        "gpt-oss",
+        "qwen3-embedding-8b",
+        "qwen3-next",
+        "recommended",
+        "stable-diffusion-3.5-large"
+      ],
+      "count": 7,
+      "configured_alias": "recommended",
+      "alias_listed": true,
+      "version_locked_candidates": [
+        "Qwen2.5-VL-7B",
+        "qwen3-embedding-8b",
+        "qwen3-next",
+        "stable-diffusion-3.5-large"
+      ]
+    },
+    "representative_segments": {
+      "placeholder_tokens": {
+        "ok": true,
+        "non_empty": true,
+        "placeholders_preserved": true,
+        "seconds": 4.053,
+        "input_tokens": 358,
+        "output_tokens": 261,
+        "error": null
+      },
+      "rtl_arabic": {
+        "ok": true,
+        "non_empty": true,
+        "has_arabic_script": true,
+        "identifier_kept": true,
+        "seconds": 2.296,
+        "input_tokens": 343,
+        "output_tokens": 122,
+        "error": null
+      },
+      "fenced_code": {
+        "ok": true,
+        "non_empty": true,
+        "fence_preserved": true,
+        "code_line_intact": true,
+        "seconds": 3.01,
+        "input_tokens": 360,
+        "output_tokens": 186,
+        "error": null
+      },
+      "long_technical_paragraph": {
+        "ok": true,
+        "non_empty": true,
+        "not_truncated": true,
+        "length_ratio": 1.639,
+        "hit_max_tokens_info": "no",
+        "seconds": 59.072,
+        "input_tokens": 1183,
+        "output_tokens": 4452,
+        "error": null
+      }
+    },
+    "long_input_sweep": {
+      "probes": [
+        {
+          "words": 300,
+          "ok": true,
+          "seconds": 12.995,
+          "input_tokens": 679,
+          "output_tokens": 915,
+          "length_ratio": 1.2,
+          "hit_max_tokens": false,
+          "healthy": true,
+          "error": null
+        },
+        {
+          "words": 600,
+          "ok": true,
+          "seconds": 37.237,
+          "input_tokens": 1021,
+          "output_tokens": 2718,
+          "length_ratio": 1.313,
+          "hit_max_tokens": false,
+          "healthy": true,
+          "error": null
+        },
+        {
+          "words": 900,
+          "ok": true,
+          "seconds": 75.101,
+          "input_tokens": 1375,
+          "output_tokens": 4928,
+          "length_ratio": 1.772,
+          "hit_max_tokens": false,
+          "healthy": true,
+          "error": null
+        },
+        {
+          "words": 1200,
+          "ok": true,
+          "seconds": 51.044,
+          "input_tokens": 1716,
+          "output_tokens": 6000,
+          "length_ratio": 1.937,
+          "hit_max_tokens": true,
+          "healthy": false,
+          "error": null
+        }
+      ],
+      "max_safe_words": 900
+    },
+    "determinism": {
+      "n": 10,
+      "successful": 10,
+      "errors": 0,
+      "distinct_outputs": 1,
+      "byte_identical_rate": 1.0,
+      "is_deterministic": true
+    }
+  },
+  "calibration": {
+    "latency_by_class_seconds": {
+      "short_metadata": {
+        "p50": 1.885,
+        "p95": 2.227,
+        "p99": 2.227,
+        "n": 6,
+        "mean": 1.933,
+        "errors": 0,
+        "source_words": 6
+      },
+      "long_prose": {
+        "p50": 34.401,
+        "p95": 44.045,
+        "p99": 44.045,
+        "n": 6,
+        "mean": 37.085,
+        "errors": 0,
+        "source_words": 313
+      },
+      "table_heavy": {
+        "p50": 2.635,
+        "p95": 5.351,
+        "p99": 5.351,
+        "n": 6,
+        "mean": 3.267,
+        "errors": 0,
+        "source_words": 34
+      },
+      "placeholder_heavy": {
+        "p50": 3.049,
+        "p95": 5.337,
+        "p99": 5.337,
+        "n": 6,
+        "mean": 3.486,
+        "errors": 0,
+        "source_words": 16
+      }
+    },
+    "token_cost": {
+      "total_input_tokens": 10428,
+      "total_output_tokens": 19096,
+      "source_words": 2214,
+      "tokens_per_source_word": 13.335,
+      "input_tokens_per_source_word": 4.71
+    },
+    "concurrency_ramp": [
+      {
+        "level": 1,
+        "calls": 8,
+        "errors": 0,
+        "rate_limited": 0,
+        "p95_inflation_vs_level1": 1.0,
+        "p50": 13.361,
+        "p95": 29.784,
+        "p99": 29.784,
+        "n": 8,
+        "mean": 15.041,
+        "sample_errors": []
+      },
+      {
+        "level": 2,
+        "calls": 8,
+        "errors": 8,
+        "rate_limited": 0,
+        "p95_inflation_vs_level1": null,
+        "p50": 0.0,
+        "p95": 0.0,
+        "p99": 0.0,
+        "n": 0,
+        "sample_errors": [
+          "LockError: Failed to acquire lock after 10.0s: data\\runtime\\circuit_breaker\\professionalize_llm.lock",
+          "LockError: Failed to acquire lock after 10.0s: data\\runtime\\circuit_breaker\\professionalize_llm.lock",
+          "LockError: Failed to acquire lock after 10.0s: data\\runtime\\circuit_breaker\\professionalize_llm.lock"
+        ]
+      }
+    ],
+    "safe_concurrency_ceiling": 1,
+    "ramp_stop_reason": "level 2: errors=8 rate_limited=0 p95_inflation=None",
+    "batch_packing": {
+      "pack_size": 8,
+      "packed_ok": false,
+      "packed_seconds": 10.04,
+      "packed_tokens": 0,
+      "singles_total_seconds": 80.199,
+      "singles_total_tokens": 0,
+      "singles_errors": 8,
+      "speedup_x": null
+    }
+  },
+  "recommendations": {
+    "manifest_max_parallel_jobs_for_llm": 1,
+    "circuit_breaker": {
+      "consecutive_failure_trip": 5,
+      "window_calls": 20,
+      "window_failure_ratio_trip": 0.5,
+      "observed_baseline_failure_rate": 0.2,
+      "cooldown_seconds": 60,
+      "cooldown_cap_seconds": 600,
+      "per_call_timeout_seconds_suggested": 176,
+      "rationale": "observed baseline failure rate is far below the 50%/20-call window trip; 5 consecutive failures stays as the trip because a healthy endpoint showed 8 failures in 40 calibration calls"
+    },
+    "batch_packing_recommended": false
+  }
+}

@@ -72,6 +72,7 @@ dmypy.json
 data/*
 !data/benchmark_corpus/
 data/benchmark_corpus/stratified_manifest.yaml
+data/benchmark_corpus/results/*.log
 logs/
 *.lmdb
 *.lmdb-lock

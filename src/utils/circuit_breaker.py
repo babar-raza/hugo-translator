@@ -18,6 +18,7 @@ State file schema (read by ``src/workers/mission_supervisor.open_circuit_breaker
 from __future__ import annotations
 
 import json
+import threading
 import time
 from collections.abc import Callable
 from dataclasses import asdict, dataclass, field
@@ -83,6 +84,9 @@ class CircuitBreaker:
         self._lock = FileLock(
             self.state_path.with_suffix(".lock"), timeout=lock_timeout, poll_interval=0.05
         )
+        # In-process serialization: FileLock is per-process (fd + PID) and not thread-safe;
+        # threads sharing this breaker must take turns before touching the lock file.
+        self._thread_lock = threading.RLock()
 
     # ------------------------------------------------------------------ persistence
     def _load(self) -> _State:
@@ -118,7 +122,7 @@ class CircuitBreaker:
         atomic_write(self.state_path, json.dumps(asdict(st), indent=2), fsync=False)
 
     def snapshot(self) -> dict[str, Any]:
-        with self._lock:
+        with self._thread_lock, self._lock:
             st = self._load()
             self._maybe_half_open(st)
             return asdict(st)
@@ -154,7 +158,7 @@ class CircuitBreaker:
 
     def is_open(self) -> bool:
         """True while requests must be refused (open and cooldown not elapsed). Side-effect free."""
-        with self._lock:
+        with self._thread_lock, self._lock:
             st = self._load()
             if st.state != BreakerState.OPEN.value or st.opened_at is None:
                 return False
@@ -162,7 +166,7 @@ class CircuitBreaker:
 
     def allow_request(self) -> bool:
         """Gate a call. In half-open, admits at most ``half_open_max_probes`` in-flight probes."""
-        with self._lock:
+        with self._thread_lock, self._lock:
             st = self._load()
             self._maybe_half_open(st)
             if st.state == BreakerState.CLOSED.value:
@@ -177,7 +181,7 @@ class CircuitBreaker:
             return False
 
     def record_success(self) -> None:
-        with self._lock:
+        with self._thread_lock, self._lock:
             st = self._load()
             st.consecutive_failures = 0
             st.window = (st.window + [1])[-self.config.window_calls :]
@@ -188,7 +192,7 @@ class CircuitBreaker:
             self._save(st)
 
     def record_failure(self, reason: str = "") -> None:
-        with self._lock:
+        with self._thread_lock, self._lock:
             st = self._load()
             self._maybe_half_open(st)
             st.consecutive_failures += 1
@@ -214,7 +218,7 @@ class CircuitBreaker:
         ``cooldown_seconds`` defaults to the configured cap so the quarantine outlasts a
         normal trip; a later ``record_success`` (probe) or ``reset`` closes it.
         """
-        with self._lock:
+        with self._thread_lock, self._lock:
             st = self._load()
             st.trips += 1
             st.opened_at = self._clock()
@@ -229,5 +233,5 @@ class CircuitBreaker:
             self._save(st)
 
     def reset(self) -> None:
-        with self._lock:
+        with self._thread_lock, self._lock:
             self._save(_State(key=self.key, cooldown_seconds=self.config.cooldown_seconds))
