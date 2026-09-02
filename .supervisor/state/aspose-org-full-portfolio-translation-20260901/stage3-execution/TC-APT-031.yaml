@@ -1,0 +1,18 @@
+taskcard: TC-APT-031
+title: Governed replace-existing mode for the campaign runner (G-21; hard prerequisite for Gate 4)
+status: DONE
+executed_at: "2026-09-02"
+wake: 1
+design_kept: "the runner still refuses to overwrite ANY existing target that is not declared (verify_environment 'unexpected existing output'); what was missing was the governed, fingerprint-verified, manifest-declared replacement"
+changes:
+  - "src/workers/campaign_manifest.py: CampaignSource.replace_existing {locale: {expected_sha256, reason_code}} (+ replacement_for), CampaignManifest.declared_replacements(); validate_schema checks locale membership, sha256 shape, reason_code presence; verify_environment: a declared existing output passes only while its current bytes hash to expected_sha256 ('declared replacement drifted' otherwise); to_summary reports replace_existing_count"
+  - "src/workers/campaign_runner.py _run_campaign_job: declared cell -> pre-hash re-checked immediately before the job ('declared replacement pre-hash drift' if a concurrent session changed it), translate_file(force_overwrite=True) ONLY for that declared path, the untouched original is never deleted on a rejected attempt or engine crash; _append_campaign_receipt adds superseded_sha256 (signed into receipt_sha256 by CampaignLedger.append_receipt); _receipt_recovery_candidates / recover_committed_receipts treat an untouched declared original as governed provenance (not a recovery error)"
+  - "scripts/campaign/build_campaign_manifest.py: --existing replace declares every scoped cell whose target exists from the work ledger (expected_sha256 = current on-disk hash, cross-checked against the ledger's target_sha256; reason_code = ledger eligibility reason)"
+acceptance_tests: tests/unit/workers/test_campaign_replace_existing_and_dirty_scope.py
+  - "(1) undeclared existing target still refused -> test_undeclared_existing_target_is_still_refused"
+  - "(2) declared + matching pre-hash replaced and receipted with superseded_sha256 (first attempt rejected, original survives, second accepted) -> test_declared_matching_target_is_replaced_and_receipted_with_superseded_sha"
+  - "(3) declared but drifted refused (at verify) -> test_declared_drifted_target_is_refused; (at job time) -> test_undeclared_pre_hash_drift_at_job_time_is_refused"
+  - "(4) recovery accepts an untouched declared original as governed -> test_recovery_treats_untouched_declared_original_as_governed; fully rejected job leaves the original intact -> test_declared_target_survives_a_fully_rejected_job"
+verification:
+  - "pytest tests/unit/workers/test_campaign_replace_existing_and_dirty_scope.py -> 10 passed; tests/unit/workers/test_campaign_manifest.py + builder + canary suites -> 65 passed (undeclared behaviour unchanged)"
+acceptance: "regression tests prove (1)-(4) -> MET"

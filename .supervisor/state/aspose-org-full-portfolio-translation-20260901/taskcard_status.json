@@ -4,7 +4,7 @@
   "plan_revision": 5,
   "branch": "mission/aspose-org-full-portfolio-translation-20260901",
   "created_at": "2026-09-02T05:20:29.896922+00:00",
-  "updated_at": "2026-09-02T06:49:24.828364+00:00",
+  "updated_at": "2026-09-02T07:17:18.719603+00:00",
   "content_repo": "D:/onedrive/Documents/GitHub/aspose.org",
   "content_repo_session_ledger": {
     "AGENT_SESSION_ID": "d18689cf-ac87-4bcb-b33f-655ef2b84358",
@@ -268,7 +268,7 @@
       "last_updated": "2026-09-02T05:20:29.896922+00:00"
     },
     "TC-APT-031": {
-      "status": "TODO",
+      "status": "DONE",
       "gate": 2,
       "title": "Governed replace-existing mode (G-21)",
       "depends_on": [
@@ -276,20 +276,22 @@
       ],
       "owner": "loop",
       "blocking_reason": null,
-      "evidence_path": null,
+      "evidence_path": ".supervisor/state/aspose-org-full-portfolio-translation-20260901/stage3-execution/TC-APT-031.yaml",
       "commit": null,
-      "last_updated": "2026-09-02T05:20:29.896922+00:00"
+      "last_updated": "2026-09-02T07:17:18.715645+00:00",
+      "blocker_type": null
     },
     "TC-APT-032": {
-      "status": "TODO",
+      "status": "DONE",
       "gate": 2,
       "title": "Campaign-path-scoped dirty check (G-22)",
       "depends_on": [],
       "owner": "loop",
       "blocking_reason": null,
-      "evidence_path": null,
+      "evidence_path": ".supervisor/state/aspose-org-full-portfolio-translation-20260901/stage3-execution/TC-APT-032.yaml",
       "commit": null,
-      "last_updated": "2026-09-02T05:20:29.896922+00:00"
+      "last_updated": "2026-09-02T07:17:18.719592+00:00",
+      "blocker_type": null
     },
     "TC-APT-010": {
       "status": "TODO",
