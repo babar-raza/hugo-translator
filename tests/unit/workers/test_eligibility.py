@@ -243,21 +243,40 @@ def test_holds_and_denylist_loaders(tmp_path: Path):
 
 def test_source_validity_checks(tmp_path: Path):
     ok = tmp_path / "ok.md"
-    ok.write_text("---\ntitle: t\n---\nbody\n", encoding="utf-8")
+    ok.write_text("---
+title: t
+---
+body
+", encoding="utf-8")
     assert el.source_validity(ok) == {
         "source_exists": True,
         "source_readable": True,
         "source_nonempty": True,
         "source_yaml_ok": True,
     }
+    # frontmatter-only section page: the title is translatable content (blog _index.md, archive.md)
+    fm_only = tmp_path / "fm_only.md"
+    fm_only.write_text("---
+title: Section index
+---
+   
+", encoding="utf-8")
+    assert el.source_validity(fm_only)["source_nonempty"] is True
     empty = tmp_path / "empty.md"
-    empty.write_text("---\ntitle: t\n---\n   \n", encoding="utf-8")
+    empty.write_text("---
+draft: false
+---
+   
+", encoding="utf-8")
     assert el.source_validity(empty)["source_nonempty"] is False
     bad = tmp_path / "bad.md"
-    bad.write_text("---\ntitle: [unclosed\n---\nbody\n", encoding="utf-8")
+    bad.write_text("---
+title: [unclosed
+---
+body
+", encoding="utf-8")
     assert el.source_validity(bad)["source_yaml_ok"] is False
     assert el.source_validity(tmp_path / "nope.md")["source_exists"] is False
-
 
 def test_reclassify_ledger_transitions_rows(tmp_path: Path, monkeypatch):
     from types import SimpleNamespace
