@@ -17,7 +17,10 @@ from unittest.mock import MagicMock, Mock
 import pytest
 
 from src.translation_engine.extractor.text_unit import TextUnit, TextUnitKind
-from src.translation_engine.extractor.text_unit_extractor import TextUnitExtractor
+from src.translation_engine.extractor.text_unit_extractor import (
+    TextUnitExtractor,
+    _link_text_matches_url_slug,
+)
 from src.translation_engine.parser.ast_nodes import (
     ASTNode,
     NodeType,
@@ -143,6 +146,65 @@ class TestNodeTypes:
         # URL should NOT be in units
         all_text = " ".join([u.source_text for u in plan.units])
         assert "https://example.com" not in all_text
+
+    def test_link_text_matching_url_slug_is_protected(self):
+        """TC-APT-004b: a link whose visible text is the URL's own final path segment
+        (a repo/product slug) must not be sent to the model.  Found via qualification on
+        real content: 'Aspose.3D-FOSS-for-Java' in
+        content/blog.aspose.org/3d/java/3d-scene-management-java/index.md matches none of
+        the CamelCase/snake_case/version-number patterns, so under zero-defect policy's
+        zero-tolerance same-as-source gate, the model correctly leaving it unchanged was
+        raising TranslationIncomplete on every retry."""
+        extractor = TextUnitExtractor(segmentation_strategy="leaf_only")
+
+        link = ASTNode(
+            type=NodeType.LINK,
+            attrs={
+                "url": "https://github.com/aspose-3d-foss/Aspose.3D-FOSS-for-Java"
+            },
+            children=[text_node("Aspose.3D-FOSS-for-Java")],
+        )
+        para = paragraph_node([link])
+        para.assign_addresses("body.paragraph[0]")
+
+        plan = extractor.extract_from_ast([para])
+
+        assert len(plan.units) == 1
+        assert plan.units[0].do_not_translate is True
+
+    def test_link_text_not_matching_url_slug_stays_translatable(self):
+        """A link whose text is ordinary prose, not the URL's slug, must still translate --
+        the slug-matching heuristic must not become a general "protect all links" rule."""
+        extractor = TextUnitExtractor(segmentation_strategy="leaf_only")
+
+        link = ASTNode(
+            type=NodeType.LINK,
+            attrs={"url": "https://docs.aspose.org/3d/java/"},
+            children=[text_node("Developer Guide")],
+        )
+        para = paragraph_node([link])
+        para.assign_addresses("body.paragraph[0]")
+
+        plan = extractor.extract_from_ast([para])
+
+        assert len(plan.units) == 1
+        assert plan.units[0].do_not_translate is False
+
+    def test_link_text_matches_url_slug_helper(self):
+        """Direct coverage of the normalization rules the extraction test relies on."""
+        assert _link_text_matches_url_slug(
+            "Aspose.3D-FOSS-for-Java",
+            "https://github.com/aspose-3d-foss/Aspose.3D-FOSS-for-Java",
+        )
+        # trailing slash and URL-encoded space are both normalized away
+        assert _link_text_matches_url_slug(
+            "My Repo Name", "https://github.com/org/My%20Repo%20Name/"
+        )
+        # ordinary prose never matches
+        assert not _link_text_matches_url_slug("Developer Guide", "https://docs.aspose.org/3d/java/")
+        # empty inputs are inert, not a crash
+        assert not _link_text_matches_url_slug("", "https://example.com/x")
+        assert not _link_text_matches_url_slug("x", "")
 
     def test_image_alt_extraction(self):
         """Test image alt text is extracted but src is not."""

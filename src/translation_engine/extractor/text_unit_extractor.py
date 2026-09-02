@@ -11,6 +11,7 @@ import logging
 import re
 from pathlib import Path
 from typing import Any
+from urllib.parse import unquote, urlsplit
 
 from src.utils.log_sanitizer import sanitize_for_log
 
@@ -258,6 +259,29 @@ def analyze_segment_variance(segments: list[str]) -> dict[str, Any]:
             "recommendation": "default",
             "suggested_factor": 1.0,
         }
+
+
+def _link_text_matches_url_slug(text: str, url: str) -> bool:
+    """A link's visible text that is literally the URL's final path segment is an
+    identifier (a repo/product slug), not prose -- e.g. the Markdown
+
+        [Aspose.3D-FOSS-for-Java](https://github.com/aspose-3d-foss/Aspose.3D-FOSS-for-Java)
+
+    has anchor text that is neither CamelCase, snake_case nor a version number, so none of
+    ``_is_technical_identifier``'s patterns catch it, and a hyphen-tolerant heuristic would
+    be too broad (it would also swallow ordinary hyphenated English like "state-of-the-art").
+    Comparing against the URL is narrow and self-justifying: the text IS the slug.
+    """
+    if not text or not url:
+        return False
+    slug = unquote(urlsplit(url).path.rstrip("/").rsplit("/", 1)[-1])
+    if not slug:
+        return False
+
+    def _normalize(value: str) -> str:
+        return re.sub(r"[\s._-]+", "", value).casefold()
+
+    return _normalize(slug) == _normalize(text)
 
 
 class TextUnitExtractor:
@@ -1639,6 +1663,7 @@ class TextUnitExtractor:
 
     def _extract_link(self, node: ASTNode, units: list[TextUnit]) -> None:
         """Extract link text content (not URL)."""
+        url = (node.attrs.get("url", "") if node.attrs else "") or ""
         # Traverse children for link text
         for child in node.children:
             if child.type == NodeType.TEXT:
@@ -1650,7 +1675,10 @@ class TextUnitExtractor:
                         node_addr=child.node_addr,
                         kind=TextUnitKind.LINK_TEXT,
                         source_text=text,
-                        do_not_translate=self._is_non_translatable(text),
+                        do_not_translate=(
+                            self._is_non_translatable(text)
+                            or _link_text_matches_url_slug(text, url)
+                        ),
                     )
                     units.append(unit)
             else:

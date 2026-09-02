@@ -1,0 +1,41 @@
+taskcard: TC-APT-004b
+title: "professionalize_llm production qualification as portfolio-wide primary"
+status: IN_PROGRESS
+started_at: "2026-09-02"
+wake: 2
+design:
+  qualification_sample: "scripts/campaign/build_qualification_sample.py -> data/benchmark_corpus/qualification_sample.json"
+  sample_shape: "51 distinct source files (the full TC-APT-006 benchmark corpus), 155 (file, locale) cells; every one of the 25 approved locales covered (min 3, max 13 per locale); every one of the 9 content classes covered; every site's script-group breadth (rtl/cjk/cyrillic/greek/indic_thai/latin) covered"
+  harness: "scripts/campaign/run_llm_qualification.py -- builds the REAL production TranslationEngine (validation_policy=zero-defect, enable_verification/enable_verification_fix=true) against a SANDBOX content root (never the real content repo), pins model_id_override to professionalize_llm for every phase (not just escalation), forces force=True so the TM can never answer for the model, and asserts every accepted receipt's model_fingerprint actually names professionalize_llm (a circuit-breaker reroute to m2m100_418m would be a qualification FAILURE, not a silent substitution)"
+defects_found_and_fixed_during_harness_construction:
+  - finding: "content/blog.aspose.org/3d/java/3d-scene-management-java/index.md's link text 'Aspose.3D-FOSS-for-Java' (a GitHub repo slug) matched none of _is_technical_identifier's CamelCase/snake_case/version-number patterns, so under zero-defect's zero-tolerance same-as-source gate (TC-SAS-01), the model correctly leaving it untranslated was raising TranslationIncomplete on every retry -- a real defect in the extractor, not the model, that would have blocked this exact file in ANY real zero-defect campaign regardless of which backend translates it"
+    fix: "src/translation_engine/extractor/text_unit_extractor.py: new _link_text_matches_url_slug(text, url) helper -- a link's visible text that is literally the URL's own final path segment is an identifier, not prose. Narrow and self-justifying (the text IS the slug) rather than a broad hyphen-tolerant heuristic, which would have wrongly protected ordinary hyphenated English ('state-of-the-art')"
+    regression_tests: "tests/unit/translation_engine/extractor/test_text_unit_extraction.py: test_link_text_matching_url_slug_is_protected, test_link_text_not_matching_url_slug_stays_translatable, test_link_text_matches_url_slug_helper -- 59/59 passed in that file; full tests/unit/translation_engine + test_preservation_contracts.py: 1339 passed, 1 pre-existing unrelated failure (test_content_type_router_frontmatter_wiring, already routed to TC-APT-011), 4 skipped"
+  - finding: "run_llm_qualification.py's own ThreadPoolExecutor called engine.translate_file() directly from concurrent threads with no serialization -- reproduced an intermittent empty-frontmatter crash ('Frontmatter key integrity: missing YAML frontmatter delimiters') at concurrency=2 that did NOT reproduce standalone (concurrency=1). This was a harness bug, not a new production defect: src/workers/campaign_runner.py already serializes every translate_file() call behind self._model_execution_lock specifically because a real model_loader's generation call is not proven thread-safe across concurrent files"
+    fix: "run_llm_qualification.py: added the identical model_lock discipline CampaignRunner already uses, wrapping every engine.translate_file() call. Re-ran the same 2-cell case 3x after the fix with zero recurrence"
+    architecture_note_not_fixed_here: "CampaignRunner's lock fully serializes ALL translate_file calls whenever engine.model_loader is set, REGARDLESS of manifest max_parallel_jobs or TC-APT-028's measured 16-concurrency ceiling (that ceiling was measured at the raw backend/API level, bypassing the full engine pipeline). Real campaigns therefore cannot currently exploit that ceiling for file-level throughput -- worth a future taskcard (splitting the lock by phase/model, auditing extractor/renderer thread-safety), explicitly OUT OF SCOPE for TC-APT-004b (a throughput question, not a qualification-correctness one)."
+critical_finding_reordering_this_taskcard_relative_to_TC-APT-010: >
+  Direct read of write_gate.py's _run_content_gates (the REAL production dispatch
+  evaluate()/evaluate_zero_defect() use, not the offline audit-only
+  run_all_content_gates()) confirms: under validation_policy=zero-defect, warn-tier
+  gates 31-35/37-44 run against their OWN independent result object
+  (gate_result = WriteGateResult(passed=True) if self._zero_defect else result) and
+  ANY of them failing already flips the overall write to failed
+  (if not gate_result.passed: result.passed = False), REGARDLESS of the registry's
+  literal "warn" action string. This matches the plan's own framing exactly (the
+  parenthetical in TC-APT-010's plan text: "campaigns already enforce via
+  zero-defect, §2.3") -- it is confirmed, not assumed. Consequence: EVERY zero-defect
+  campaign write today, including this qualification run, is ALREADY silently gated
+  by all 13 unvalidated detectors. A false positive in any of them would misattribute
+  a gate bug as an LLM quality failure in this qualification's own results. TC-APT-010
+  was therefore started in parallel with this taskcard's live run rather than after it.
+live_run:
+  run_id: gate1-full
+  command: "python -m scripts.campaign.run_llm_qualification --content-root D:/onedrive/Documents/GitHub/aspose.org --run-id gate1-full --concurrency 4"
+  status: "RUNNING at end of wake 2 (background task bb4hpiplz) -- 155 cells, serialized via model_lock, observed ~2-3 min/cell including retries -> multi-hour run, expected to finish and be evaluated at the next wake"
+  observed_so_far: "0 occurrences of GATE31..GATE44 marker strings in the live log through the first several completed/attempted cells -- no unvalidated-gate false-positive signal yet, consistent with TC-APT-023's finding that content-level defects are rare (0.009% for gate 12) but the sample is still small"
+acceptance_bar_from_plan_6.1: "zero unresolved gate failures and zero Claude REJECT_* verdicts across the full qualification sample, reproduced on a second independent run of the same sample -- per TC-APT-023's measured 0.75 byte-identical / 0.8125 semantic-equivalence rerun rates, 'reproduced' means the SEMANTIC contract (all 44 gates pass + similarity >= threshold on both runs), not byte-identical output"
+next_steps:
+  - "let gate1-full finish; evaluate acceptance_rate, gate_failure_histogram, unexpected_model_fingerprints"
+  - "100% Claude review of the qualification sample (self-review against the plan 9.2 bundle: source+target text, structural diff, full gate_results dict, provenance) once outputs exist"
+  - "run a second independent pass over the same 155-cell sample for the reproduction requirement"
