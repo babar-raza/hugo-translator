@@ -98,6 +98,19 @@ class LanguageDetectionCheck(VerificationCheck):
     PROTECTED_FRONTMATTER_TREES = {
         "evidence",
         "grade_reasons",
+        # TC-APT-004b: found via qualification on real content --
+        # provenance.content_hash (a hex digest this mission's own
+        # fingerprinting relies on, see fingerprints.py) and the content
+        # repo's own graded_content_hash field are hash/ID metadata, never
+        # prose, but neither was in this skip set. langdetect classifies a
+        # hex string as some language with unpredictable confidence, so a
+        # zero-defect translation could be spuriously rejected for a field
+        # that was never supposed to be checked at all. Confirmed live:
+        # both fields fired on real content during TC-APT-004b's
+        # qualification run (19/25 of that run's verification failures,
+        # before this fix, were exactly this false positive).
+        "provenance",
+        "graded_content_hash",
     }
     # Language classifiers can be dominated by required ASCII product/platform
     # tokens in an otherwise-correct short title.  For example, langdetect

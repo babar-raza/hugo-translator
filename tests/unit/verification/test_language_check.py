@@ -231,6 +231,27 @@ class TestLanguageDetectionCheck:
 
         assert issues == []
 
+    def test_protected_provenance_and_graded_hash_are_skipped(self, check):
+        """TC-APT-004b: provenance.content_hash and the content repo's own
+        graded_content_hash are hash/ID metadata, never prose -- confirmed
+        via a live qualification run where both fired as false positives on
+        real content (19/25 verification failures before this fix)."""
+        translated = {
+            "frontmatter": {
+                "title": "Das ist ein ausreichend langer deutscher Titel",
+                "provenance": {
+                    "content_origin": "skill-generated",
+                    "last_mechanism": "metadata-fixer",
+                    "content_hash": "b2281ef38da5fc24e8fcdf01782a548f",
+                },
+                "graded_content_hash": "b2281ef38da5fc24e8fcdf01782a548f",
+            }
+        }
+
+        issues = check.run({}, translated, "de")
+
+        assert issues == []
+
     def test_translatable_frontmatter_remains_checked_with_evidence(self, check):
         translated = {
             "frontmatter": {
