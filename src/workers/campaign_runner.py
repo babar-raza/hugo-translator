@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import logging
 import os
 import re
 import subprocess
@@ -33,6 +34,8 @@ from .campaign_manifest import (
     receipt_fingerprint,
     sha256_file,
 )
+
+logger = logging.getLogger(__name__)
 
 
 class CampaignLedger:
@@ -1767,6 +1770,59 @@ class CampaignRunner:
             raise CampaignManifestError(f"accepted receipt path mismatch for {expected_output}")
         return True, expected_output
 
+    def _llm_identity_gate(self) -> dict[str, Any] | None:
+        """TC-APT-021: run the model-identity canary for the manifest's LLM if the cadence elapsed.
+
+        DRIFT records a review item and quarantines the model (force-opens its breaker) so
+        ``ModelLoader`` reroutes to the automatic fallback and the campaign continues (plan
+        section 21). UNAVAILABLE is recorded in the drift log, never treated as a pass.
+        Returns the check as a dict for the run summary, or None when not applicable.
+        """
+        try:
+            te_cfg = self.engine.config.get_config().get("translation_engine", {}) or {}
+        except Exception:
+            te_cfg = {}
+        cfg = te_cfg.get("llm_identity_check") or {}
+        if not cfg.get("enabled", True):
+            return None
+        llm_model = str(self.manifest.retry_policy.get("llm_model") or "")
+        if not llm_model:
+            return None
+        try:
+            registry = self.engine.model_loader.registry
+            info = registry.get_model(llm_model)
+        except (
+            Exception
+        ) as exc:  # engine double without a registry (tests) -- not a provider failure
+            logger.info("identity gate skipped: no model registry available (%s)", exc)
+            return None
+        if getattr(info, "backend", None) != "llm":
+            return None
+        from src.model_runtime import model_identity
+        from src.model_runtime.contracts import LLMProviderConfig
+        from src.model_runtime.llm_providers import create_provider
+
+        interval = float(cfg.get("interval_hours", 6))
+        if not model_identity.should_check(llm_model, interval_hours=interval):
+            last = model_identity.last_check(llm_model)
+            return {**(last or {}), "cadence": "not_due"}
+        provider = create_provider(LLMProviderConfig.from_model_info(info))
+        check = model_identity.check_identity(
+            provider,
+            llm_model,
+            quarantine_on_drift=bool(cfg.get("quarantine_on_drift", True)),
+            quarantine_seconds=float(cfg.get("quarantine_seconds", 6 * 3600)),
+        )
+        level = logger.warning if check.status != "MATCH" else logger.info
+        level(
+            "model identity check for %s: %s (%s)%s",
+            llm_model,
+            check.status,
+            check.detail,
+            " -- QUARANTINED, work reroutes to the fallback" if check.quarantined else "",
+        )
+        return {**check.__dict__, "cadence": "checked"}
+
     def _run_locked(
         self,
         *,
@@ -1778,6 +1834,9 @@ class CampaignRunner:
         if verify_only:
             self.ledger.write_summary({**summary, "status": "VERIFIED"})
             return summary
+
+        # TC-APT-021: model-identity canary before new LLM work (cadence-gated).
+        self._llm_identity_check = self._llm_identity_gate()
 
         receipts = self._validated_resume_receipts() if resume else {}
         self.engine.campaign_context.update(

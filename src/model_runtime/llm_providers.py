@@ -222,7 +222,7 @@ class OpenAIProvider(BaseLLMProvider):
                 "environment variable."
             )
 
-        self._client = openai.OpenAI(api_key=api_key)
+        self._client = openai.OpenAI(api_key=api_key, max_retries=0)
         logger.info("OpenAIProvider initialized: model=%s", config.model_name)
 
     def _generate_impl(self, system_prompt: str, user_text: str) -> tuple[str, int, int]:
@@ -324,6 +324,7 @@ class OpenAICompatibleProvider(BaseLLMProvider):
         self._client = openai.OpenAI(
             api_key=api_key,
             base_url=config.base_url,
+            max_retries=0,  # TC-APT-004: BaseLLMProvider.generate is the single retry authority
         )
         logger.info(
             "OpenAICompatibleProvider initialized: base_url=%s model=%s",

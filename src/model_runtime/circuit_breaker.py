@@ -92,7 +92,9 @@ def load_config() -> LLMResilienceConfig:
         state_dir=Path(
             os.environ.get("HT_CIRCUIT_BREAKER_DIR") or cb.get("state_dir", DEFAULT_STATE_DIR)
         ),
-        health_dir=Path(te.get("llm_health_log_dir", DEFAULT_HEALTH_DIR)),
+        health_dir=Path(
+            os.environ.get("HT_LLM_HEALTH_DIR") or te.get("llm_health_log_dir", DEFAULT_HEALTH_DIR)
+        ),
         breaker=breaker,
         retry=retry,
         fallback_model=str(te.get("llm_fallback_model", DEFAULT_FALLBACK_MODEL)),

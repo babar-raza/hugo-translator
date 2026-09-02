@@ -672,6 +672,15 @@ translation_engine:
     cooldown_cap_seconds: 600
   llm_fallback_model: m2m100_418m             # automatic reroute target when the LLM breaker is open (plan 6.1)
   llm_health_log_dir: data/runtime/llm_health  # redacted per-call telemetry (never the key value)
+  # TC-APT-021: model-identity drift detector (the endpoint exposes no version-locked id, so
+  # detection replaces pinning). Checked before new LLM campaign work when the interval elapsed;
+  # DRIFT records a review item and quarantines the model (breaker force-open -> fallback reroute).
+  llm_identity_check:
+    enabled: true
+    interval_hours: 6
+    quarantine_on_drift: true
+    quarantine_seconds: 21600
+    identity_dir: data/runtime/llm_identity
   # Quality gates (mandatory for production)
   enable_validation: true  # NEVER set to false in production - enables all quality checks
 

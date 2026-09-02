@@ -197,3 +197,21 @@ def _cleanup_test_lmdb(tmp_path: Path) -> Generator[None, None, None]:
         return
     for lmdb_dir in _find_lmdb_dirs_in(tmp_path):
         _force_delete_lmdb_dir(lmdb_dir)
+
+
+@pytest.fixture(autouse=True)
+def _isolate_llm_runtime_state(tmp_path, monkeypatch):
+    """TC-APT-004: unit tests must never write circuit-breaker/health telemetry under data/runtime.
+
+    Both env overrides are honoured by src.model_runtime.circuit_breaker.load_config(); tests
+    that call configure() explicitly still win over these.
+    """
+    monkeypatch.setenv("HT_CIRCUIT_BREAKER_DIR", str(tmp_path / "_cb"))
+    monkeypatch.setenv("HT_LLM_HEALTH_DIR", str(tmp_path / "_llm_health"))
+    try:
+        from src.model_runtime import circuit_breaker as _cb
+
+        _cb.configure(None)  # drop any cached breaker bound to another directory
+    except Exception:
+        pass
+    yield
