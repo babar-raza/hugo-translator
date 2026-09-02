@@ -30,10 +30,28 @@ critical_finding_reordering_this_taskcard_relative_to_TC-APT-010: >
   a gate bug as an LLM quality failure in this qualification's own results. TC-APT-010
   was therefore started in parallel with this taskcard's live run rather than after it.
 live_run:
-  run_id: gate1-full
-  command: "python -m scripts.campaign.run_llm_qualification --content-root D:/onedrive/Documents/GitHub/aspose.org --run-id gate1-full --concurrency 4"
-  status: "RUNNING at end of wake 2 (background task bb4hpiplz) -- 155 cells, serialized via model_lock, observed ~2-3 min/cell including retries -> multi-hour run, expected to finish and be evaluated at the next wake"
-  observed_so_far: "0 occurrences of GATE31..GATE44 marker strings in the live log through the first several completed/attempted cells -- no unvalidated-gate false-positive signal yet, consistent with TC-APT-023's finding that content-level defects are rare (0.009% for gate 12) but the sample is still small"
+  run_id_aborted: gate1-full
+  aborted_at: "wake 3, 30/155 cells done (8 accepted, ~27%), ~2h45m elapsed, TaskStop'd deliberately"
+  aborted_why: >
+    Found a second real defect while checking on this run mid-flight:
+    src/verification/checks/language_check.py's LanguageDetectionCheck ran langdetect
+    against frontmatter.provenance.content_hash and the content repo's own
+    graded_content_hash -- both hex digests, never prose. 19 of the run's 25
+    "Verification failed" events (76%) were exactly this false positive, not an LLM
+    quality issue. Fixed (PROTECTED_FRONTMATTER_TREES now includes "provenance" and
+    "graded_content_hash"; tests/unit/verification/test_language_check.py: 32/32
+    passed including the new regression test; commit 68b9119). Continuing the
+    already-running qualification against the stale, pre-fix engine build for another
+    ~10 hours would have produced an acceptance_rate corrupted by a known, already-fixed
+    bug -- for a decision this consequential (portfolio-wide primary-model promotion),
+    that is worse than the ~2h45m sunk cost of restarting clean. TC-APT-010's parallel
+    gate_promotion_run.py job was NOT affected (it calls write_gate.py's
+    run_all_content_gates() directly, which never touches LanguageDetectionCheck --
+    confirmed by grep before deciding not to restart it) and was left running.
+  run_id: gate1-full-v2
+  command: "python -m scripts.campaign.run_llm_qualification --content-root D:/onedrive/Documents/GitHub/aspose.org --run-id gate1-full-v2 --concurrency 4"
+  status: "RESTARTED clean at wake 3 (background task b3plm3ie4) against the post-fix engine build -- 155 cells, serialized via model_lock, multi-hour run expected"
+  observed_pre_restart: "0 occurrences of GATE31..GATE44 marker strings in the aborted run's log through 30 cells -- no unvalidated-write-gate false-positive signal yet (separate from the LanguageDetectionCheck defect above), consistent with TC-APT-023's finding that content-level defects are rare, but the sample was still small"
 acceptance_bar_from_plan_6.1: "zero unresolved gate failures and zero Claude REJECT_* verdicts across the full qualification sample, reproduced on a second independent run of the same sample -- per TC-APT-023's measured 0.75 byte-identical / 0.8125 semantic-equivalence rerun rates, 'reproduced' means the SEMANTIC contract (all 44 gates pass + similarity >= threshold on both runs), not byte-identical output"
 next_steps:
   - "let gate1-full finish; evaluate acceptance_rate, gate_failure_histogram, unexpected_model_fingerprints"
