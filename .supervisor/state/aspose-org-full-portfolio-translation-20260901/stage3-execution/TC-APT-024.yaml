@@ -1,0 +1,25 @@
+taskcard: TC-APT-024
+title: Wave-ordering / throughput-priority scoring (plan 17.1)
+status: DONE
+executed_at: "2026-09-02"
+wake: 1
+deliverable: src/workers/wave_ordering.py (+ CLI python -m src.workers.wave_ordering [--dry-run])
+formula_implemented: "score = w1*normalize(source_chars) + w2*(language_cost_tier/3) + w3*normalize(missing_lang_count) - w4*tm_fuzzy_hit_ratio, equal weights (1,1,1,1) pending TC-APT-006 calibration; lower score = earlier wave; waves are equal-population quantile buckets (10)"
+levers:
+  content_size: "measured source character count, min-max normalised over the actionable population (live bounds 296 .. 146,700 chars)"
+  language_cost_tier: "plan 17.1 starting heuristic, explicitly marked unvalidated -- tier 0 cs de es fr hu id it nl pl pt ro sv tr uk vi; tier 1 el ru; tier 2 ar fa he; tier 3 ja ko th zh; an unknown code scores as the heaviest tier. hi is absent from the plan's tiering and therefore falls to tier 3 -- recorded, to be revised with TC-APT-006 data rather than silently invented here"
+  missing_lang_fanout: "count of still-actionable locales for the same source (live max 25) -- finishing nearly-complete pages first"
+  tm_leverage: "MEASURED, not assumed: sources are shingled into normalised paragraph hashes (>=40 chars) and tm_fuzzy_hit_ratio is the fraction of a source's paragraphs that also occur in at least one other in-scope source. Aspose's templated family pages score near 1.0 and sort first"
+inspectability: "every cell's components (source_chars, size_norm, language_cost_tier, tier_norm, missing_lang_count, missing_norm, tm_fuzzy_hit_ratio, score) are recorded; the report carries the formula string, the weights, the bounds and the 20 extreme cells so any ordering decision can be re-derived by hand"
+live_run_2026-09-02:
+  cells_scored: 229650 (every actionable cell; EXCLUDED_BY_PROFILE and terminal states are not waved)
+  rows_updated: 206685
+  wave_distribution: 22,965 cells in each of waves 0-9 (equal-population by construction)
+  wave0_languages: cs/de/es/fr/hu/id/it/nl/pl/pt ~1,489 each -- tier-0 Latin languages, as the heuristic intends
+  last_wave_languages: ja/ko/th/zh/hi 4,577 each -- tier-3 CJK/complex segmentation last
+  earliest_cells: "content/blog.aspose.org/note/python/_index.md (561 chars, tm_fuzzy_hit_ratio 1.00, 25 missing locales) -> score 0.0018: small + fully templated, exactly the profile plan 17.1 wants first"
+  report: data/campaigns/wave_ordering_report.json
+verification:
+  - "pytest tests/unit/workers/test_wave_ordering.py -> 8 passed (each lever moves the score in the documented direction; unknown language = heaviest tier; components reproduce the score exactly; shingle ratio detects shared boilerplate (0.5/1.0/0.0 on a 3-source fixture); quantile assignment is monotone; compute_waves writes only actionable cells and is idempotent)"
+  - "live: python -m src.workers.wave_ordering over the real ledger -> 229,650 cells scored, distribution and extremes as above"
+acceptance: "a dry-run build against the real ledger produces a wave ordering that is inspectable and matches the documented scoring rationale, not an arbitrary sort -> MET"
