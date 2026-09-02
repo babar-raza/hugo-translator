@@ -233,8 +233,22 @@ def production_backends(model_ids: list[str]):
     from src.model_runtime.registry import ModelRegistry
     from src.utils.config_loader import get_global_config
 
+    raw_config = get_global_config()
+    # Use the production device the campaign worker would use: GPU when enabled and available,
+    # else CPU. Defaulting ModelLoader's device (as an earlier revision did) silently ran the
+    # m2m100 comparison leg on CPU, which is not what campaigns do.
+    hardware = raw_config.get("hardware", {}) or {}
+    device = "cpu"
+    if hardware.get("enable_gpu", True):
+        try:
+            import torch
+
+            if torch.cuda.is_available():
+                device = "cuda"
+        except Exception:
+            device = "cpu"
     registry = ModelRegistry("config/model_registry.yaml")
-    loader = ModelLoader(registry, config=get_global_config())
+    loader = ModelLoader(registry, device=device, config=raw_config)
     out = {}
     for mid in model_ids:
         t0 = time.perf_counter()
