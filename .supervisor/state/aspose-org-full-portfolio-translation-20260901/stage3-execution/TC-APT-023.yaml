@@ -1,0 +1,29 @@
+taskcard: TC-APT-023
+title: Idempotency / rerun-consistency contract and regression suite (plan 5.1 item 5)
+status: DONE
+executed_at: "2026-09-02"
+wake: 1
+contract_defined (src/workers/determinism.py):
+  statement: "given an unchanged source, an unchanged profile_fingerprint, an unchanged protection_fingerprint and a verified-unchanged model identity (TC-APT-021), two independent runs of the same job must produce output that is BYTE_IDENTICAL, or SEMANTICALLY_EQUIVALENT (all 44 gates pass on BOTH runs AND token-level similarity >= threshold), else DIVERGENT -- a contract violation to investigate"
+  precondition_is_explicit: "fingerprints_unchanged() -- the contract only binds while every fingerprint matches; a changed fingerprint is a re-baseline event, never reported as a determinism regression"
+  similarity_threshold: "0.95 PROPOSAL (SequenceMatcher over word/punctuation tokens), to be calibrated -- see the measured distribution below"
+  gate9_drift_check: "compare_with_baseline() reports drift only when fingerprints are unchanged and the semantic-equivalence rate fell more than the tolerance (default 0.05)"
+live_baseline_2026-09-02 (32 pairs: 8 real corpus segments x de/fr/ar/ja, same backend, temperature 0):
+  byte_identical_rate: 0.75
+  semantic_equivalence_rate: 0.8125
+  divergent_rate: 0.1875
+  similarity_median: 1.0
+  similarity_min: 0.2857
+  per_language: {fr: 8/8 byte-identical, de: 7/8 (1 divergent, sim 0.917), ar: 5/8 (1 divergent, sim 0.879), ja: 4/8 (4 divergent, min sim 0.286)}
+  similarity_buckets: {exactly 1.0: 24, >=0.95: 2, >=0.85: 4, <0.85: 2}
+  fingerprints: {site docs.aspose.org, profile 405c08ac..., protection 626d08f4..., model_identity 539e20d3...}
+  artifacts: data/quality/rerun_determinism_baseline.json, data/quality/rerun_determinism_run.json
+findings (recorded honestly, not smoothed):
+  - "professionalize_llm is NOT byte-deterministic on real content at temperature 0: only 75% of segment reruns are byte-identical. The TC-APT-028 preflight's 10/10 identical result came from a 12-word echo canary and does NOT generalise to production-length segments -- a measurement artifact worth stating rather than a contradiction."
+  - "Nondeterminism is strongly language-dependent: fr 0/8 divergent, de and ar 1/8 each, ja 4/8 with one pair at 0.286 similarity. CJK is the risk class, consistent with the plan's tier-3 heuristic (TC-APT-024) arrived at independently."
+  - "Implication for TC-APT-004b: the qualification's 'reproduced on a second independent run' criterion cannot mean byte-identical output for this provider. It must mean the SEMANTIC contract (all 44 gates pass on both runs and similarity >= threshold), and even then ~19% of segment pairs currently fall outside a 0.95 threshold. This is the honest limit plan 5.1 item 6 anticipated; the mission measures and bounds it rather than claiming reproducibility."
+  - "Threshold calibration data: 24/32 pairs are exactly 1.0 and 2 more clear 0.95, so 0.95 separates 'trivial rewording' from 'materially different translation' for 81% of pairs. Lowering it to 0.85 would classify 30 of 32 as equivalent. The value stays at 0.95 pending Gate-4 file-level (not segment-level) data, where whole-page similarity is expected to be higher than per-segment."
+verification:
+  - "pytest tests/regression/test_rerun_determinism.py -> 9 passed (byte-identical; near-duplicate with passing gates -> equivalent; identical-similarity but FAILING gates -> divergent; large rewrite -> divergent; measured rates; empty measurement; fingerprint precondition; baseline write + drift detection + re-baseline case; translate_twice drives one backend twice)"
+  - "live: python -m scripts.campaign.measure_rerun_determinism --write-baseline -> the numbers above, baseline recorded for the Gate-9 re-run"
+acceptance: "baseline byte-identical (0.75) and semantic-equivalence (0.8125) rates are MEASURED and RECORDED, not assumed to be 100%; the suite re-runs at Gate 9 to detect drift introduced during the mission -> MET"
