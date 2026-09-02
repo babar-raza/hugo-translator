@@ -1827,6 +1827,33 @@ class WriteGateEvaluator:
     # Gate 12: Double period detection (auto-clean)
     # ------------------------------------------------------------------
 
+    #: TC-APT-009: spans gate 12 must never rewrite (inline code, markdown link/image
+    #: targets, HTML tags, Hugo shortcodes, bare URLs, reference definitions, ../ paths).
+    _GATE12_PROTECTED_RE = re.compile(
+        # Fenced code FIRST: it contains backticks, so an inline-code alternative would
+        # otherwise consume the fence markers and expose the code to the rewrite.
+        r"```[\s\S]*?```"
+        r"|~~~[\s\S]*?~~~"
+        r"|`[^`\n]*`"
+        r"|\]\([^)\n]*\)"
+        r"|<[^>\n]+>"
+        r"|\{\{[<%][\s\S]*?[>%]\}\}"
+        r"|(?:https?|ftp)://\S+"
+        r"|^[ \t]*\[[^\]\n]+\]:[ \t]*\S+"
+        r"|(?<![\w.])\.\./\S*",
+        re.MULTILINE,
+    )
+
+    @classmethod
+    def _gate12_strip_protected(cls, text: str) -> str:
+        """Blank out every protected span (fenced code included), preserving offsets."""
+        return cls._GATE12_PROTECTED_RE.sub(lambda m: " " * len(m.group(0)), text)
+
+    @classmethod
+    def _gate12_has_prose_double_dot(cls, text: str) -> bool:
+        """True when the PROSE of ``text`` contains a bare double dot (not an ellipsis)."""
+        return bool(re.search(r"(?<!\.)\.\.(?!\.)", cls._gate12_strip_protected(text)))
+
     def _gate_double_periods(
         self,
         source_content: str,
@@ -1834,30 +1861,45 @@ class WriteGateEvaluator:
         output_path: Path,
         result: WriteGateResult,
     ) -> str:
-        """Replace .. (not ...) in body text outside code blocks."""
+        """Replace .. (not ...) in PROSE only -- never inside code, links, shortcodes or HTML.
+
+        TC-APT-009 (G-04) root-cause fix: this gate previously protected fenced code blocks
+        only, so its auto-clean could corrupt legitimate content that must keep a double dot
+        -- a relative link ``[x](../y.md)``, an inline code span, a Hugo shortcode parameter
+        ``{{< x path="../y" >}}``, an HTML attribute, or a bare URL. The audit-phase7 finding
+        "symptom-only regex fix, recurrence risk" is exactly that: the cleaner's blast radius
+        was wider than the defect it fixes. Protected spans are masked out before the
+        substitution and restored verbatim afterwards.
+        """
         body = self._get_body(translated_content)
-        # Only process if source doesn't contain ".." (don't introduce bugs)
-        if ".." in self._get_body(source_content):
+        # Bail out only when the SOURCE's own prose legitimately contains '..' (don't
+        # introduce bugs). TC-APT-009: the check is prose-scoped like the rewrite -- a
+        # source whose only '..' lives in code/links/URLs no longer disables the gate for
+        # the whole page, which is why the historical fix looked symptom-only.
+        if self._gate12_has_prose_double_dot(self._get_body(source_content)):
             return translated_content
 
-        # Split on code fences, only process non-code segments
-        segments = re.split(r"(```[\s\S]*?```)", body)
-        cleaned_segments = []
-        changed = False
-        for seg in segments:
-            if seg.startswith("```"):
-                cleaned_segments.append(seg)
-            else:
-                # Replace ".." not part of "..."
-                fixed = re.sub(r"(?<!\.)\.\.(?!\.)", ".", seg)
-                if fixed != seg:
-                    changed = True
-                cleaned_segments.append(fixed)
+        protected: list[str] = []
+
+        def _mask(match: re.Match) -> str:
+            protected.append(match.group(0))
+            return f"\x00GATE12_{len(protected) - 1}\x00"
+
+        # Mask every span whose '..' is legitimate (fenced code, inline code, link
+        # targets, HTML, shortcodes, URLs, reference definitions, ../ paths), then rewrite
+        # only what is left -- prose. ".." that is part of "..." is never touched.
+        masked = self._GATE12_PROTECTED_RE.sub(_mask, body)
+        cleaned = re.sub(r"(?<!\.)\.\.(?!\.)", ".", masked)
+        changed = cleaned != masked
+        cleaned_segments = [cleaned]
 
         if not changed:
             return translated_content
 
         cleaned_body = "".join(cleaned_segments)
+        # Restore the protected spans verbatim.
+        for index, original in enumerate(protected):
+            cleaned_body = cleaned_body.replace(f"\x00GATE12_{index}\x00", original)
         fm_prefix = translated_content[: len(translated_content) - len(body)]
         logger.info("GATE12 fixed double periods in %s", output_path.name)
         return fm_prefix + cleaned_body
