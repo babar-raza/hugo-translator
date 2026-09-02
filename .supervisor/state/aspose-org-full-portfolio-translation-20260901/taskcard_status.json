@@ -4,7 +4,7 @@
   "plan_revision": 5,
   "branch": "mission/aspose-org-full-portfolio-translation-20260901",
   "created_at": "2026-09-02T05:20:29.896922+00:00",
-  "updated_at": "2026-09-02T06:27:11.618925+00:00",
+  "updated_at": "2026-09-02T06:32:08.323699+00:00",
   "content_repo": "D:/onedrive/Documents/GitHub/aspose.org",
   "content_repo_session_ledger": {
     "AGENT_SESSION_ID": "d18689cf-ac87-4bcb-b33f-655ef2b84358",
@@ -13,8 +13,10 @@
     "dirty_files_at_start": 21
   },
   "phase": "A",
-  "current_gate": 0,
-  "gates_closed": [],
+  "current_gate": 1,
+  "gates_closed": [
+    0
+  ],
   "wake_count": 1,
   "wakes_without_state_change": 0,
   "taskcards": {
@@ -99,15 +101,16 @@
       "blocker_type": null
     },
     "TC-APT-025": {
-      "status": "TODO",
+      "status": "DONE",
       "gate": 0,
       "title": "Update content repo handoff skill docs (G-16,G-18)",
       "depends_on": [],
       "owner": "loop",
       "blocking_reason": null,
-      "evidence_path": null,
-      "commit": null,
-      "last_updated": "2026-09-02T05:20:29.896922+00:00"
+      "evidence_path": ".supervisor/state/aspose-org-full-portfolio-translation-20260901/stage3-execution/TC-APT-025.yaml",
+      "commit": "content-repo 334d86406f",
+      "last_updated": "2026-09-02T06:32:08.320248+00:00",
+      "blocker_type": null
     },
     "TC-APT-026": {
       "status": "DONE",
@@ -447,6 +450,22 @@
       "evidence_path": null,
       "commit": null,
       "last_updated": "2026-09-02T05:20:29.896922+00:00"
+    }
+  },
+  "gate_closures": {
+    "0": {
+      "closed_at": "2026-09-02T06:32:08.320264+00:00",
+      "taskcards": [
+        "TC-APT-001",
+        "TC-APT-002",
+        "TC-APT-003",
+        "TC-APT-022",
+        "TC-APT-030",
+        "TC-APT-029",
+        "TC-APT-025",
+        "TC-APT-026",
+        "TC-APT-027"
+      ]
     }
   }
 }
