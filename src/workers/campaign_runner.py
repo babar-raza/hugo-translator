@@ -19,6 +19,11 @@ import yaml
 
 from src.utils.atomic_write import atomic_write
 from src.utils.file_lock import FileLock
+from src.workers.git_provenance import (
+    GovernedProvenanceError,
+    governed_subject_pattern,
+    verify_governed_add,
+)
 
 from .campaign_manifest import (
     CampaignManifest,
@@ -582,6 +587,10 @@ class CampaignRunner:
         that commit must be after the pinned content baseline and reachable
         from the current branch, and the current bytes must equal the commit
         blob.  This deliberately excludes arbitrary pre-existing files.
+
+        TC-APT-003: the five forensic rules live in ``src/workers/git_provenance``
+        so the provenance backfill and this recovery path share ONE definition of
+        governed commit provenance (diagnostics unchanged).
         """
         candidates: list[tuple[Any, str, str, str]] = []
         for source in self.manifest.sources:
@@ -593,87 +602,24 @@ class CampaignRunner:
                     raise CampaignManifestError(
                         f"receipt recovery output is not a file: {relative}"
                     )
-                log = (
-                    subprocess.run(
-                        ["git", "log", "-1", "--format=%H%x00%s", "--", relative],
-                        cwd=self.content_repo,
-                        check=True,
-                        capture_output=True,
-                    )
-                    .stdout.decode("utf-8", errors="strict")
-                    .strip()
+                pattern = governed_subject_pattern(
+                    wave=source.wave,
+                    site_id=source.site_id,
+                    family=source.family,
+                    platform=source.platform,
+                    locale=locale,
                 )
-                if "\0" not in log:
-                    raise CampaignManifestError(
-                        f"receipt recovery path has no commit provenance: {relative}"
+                try:
+                    governed = verify_governed_add(
+                        self.content_repo,
+                        relative,
+                        subject_pattern=pattern,
+                        baseline_sha=self.manifest.content_repo_sha,
+                        current_sha256=sha256_file(output_path),
                     )
-                commit_sha, subject = log.split("\0", 1)
-                shard_prefix = (
-                    f"w{source.wave}:{source.site_id}:{source.family}:{source.platform}:{locale}:"
-                )
-                expected_subject = re.compile(
-                    rf"^content\(locale\): zero-defect shard "
-                    rf"{re.escape(shard_prefix)}[1-9][0-9]*$"
-                )
-                if not expected_subject.fullmatch(subject):
-                    raise CampaignManifestError(
-                        f"receipt recovery commit is not governed: {relative}"
-                    )
-                if (
-                    not subprocess.run(
-                        [
-                            "git",
-                            "merge-base",
-                            "--is-ancestor",
-                            self.manifest.content_repo_sha,
-                            commit_sha,
-                        ],
-                        cwd=self.content_repo,
-                        capture_output=True,
-                    ).returncode
-                    == 0
-                ):
-                    raise CampaignManifestError(
-                        f"receipt recovery commit predates pinned baseline: {relative}"
-                    )
-                if (
-                    not subprocess.run(
-                        ["git", "merge-base", "--is-ancestor", commit_sha, "HEAD"],
-                        cwd=self.content_repo,
-                        capture_output=True,
-                    ).returncode
-                    == 0
-                ):
-                    raise CampaignManifestError(
-                        f"receipt recovery commit is not reachable: {relative}"
-                    )
-                changed = subprocess.run(
-                    [
-                        "git",
-                        "diff-tree",
-                        "--no-commit-id",
-                        "--name-status",
-                        "-r",
-                        commit_sha,
-                    ],
-                    cwd=self.content_repo,
-                    check=True,
-                    capture_output=True,
-                    text=True,
-                ).stdout.splitlines()
-                if changed != [f"A\t{relative}"]:
-                    raise CampaignManifestError(
-                        f"receipt recovery requires a one-file add commit: {relative}"
-                    )
-                committed_bytes = subprocess.run(
-                    ["git", "show", f"{commit_sha}:{relative}"],
-                    cwd=self.content_repo,
-                    check=True,
-                    capture_output=True,
-                ).stdout
-                if hashlib.sha256(committed_bytes).hexdigest() != sha256_file(output_path):
-                    raise CampaignManifestError(f"receipt recovery blob drift: {relative}")
-                candidates.append((source, locale, relative, commit_sha))
+                except GovernedProvenanceError as exc:
+                    raise CampaignManifestError(str(exc)) from exc
+                candidates.append((source, locale, relative, governed.commit_sha))
         return sorted(candidates, key=lambda item: item[2])
 
     def recover_committed_receipts(self) -> dict[str, Any]:

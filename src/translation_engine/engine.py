@@ -718,7 +718,9 @@ class TranslationEngine:
         if self.enable_content_hash and self.metadata_tracker:
             try:
                 # Check if source content changed
-                fast_path = True  # Default: use fast-path mtime optimization
+                # TC-APT-003 (plan 2.7/7.1): SHA256 comparison is primary; the mtime
+                # shortcut is opt-in only and never used for zero-defect rigor.
+                fast_path = False
                 changed, reason = self.metadata_tracker.check_source_changed(
                     source_path, fast_path_mtime=fast_path
                 )
