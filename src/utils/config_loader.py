@@ -76,6 +76,15 @@ class ConfigService:
                     self._global_config = GlobalConfig(**data) if data else GlobalConfig()
             except Exception as e:
                 raise ConfigLoadError(f"Failed to load global config: {e}")
+            # TC-APT-005 (plan G-02): a licensing-blocked model must never be selectable
+            # through a routing rule. Fail loudly at load time, not silently at runtime.
+            from src.utils.model_licensing import routing_violations
+
+            violations = routing_violations(self._raw_global_config)
+            if violations:
+                raise ConfigLoadError(
+                    "global config selects a licensing-blocked model: " + "; ".join(violations)
+                )
         else:
             self._global_config = GlobalConfig()
             self._raw_global_config = {}

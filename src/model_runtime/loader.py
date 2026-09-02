@@ -1239,6 +1239,12 @@ class ModelLoader:
         Returns:
             Loaded ModelBackend instance
         """
+        # TC-APT-005 (plan G-02): NLLB-200 is licensing-blocked (CC-BY-NC-4.0) and closed as
+        # permanent non-use; refuse before touching the registry unless explicitly approved.
+        from src.utils.model_licensing import assert_model_selectable
+
+        assert_model_selectable(model_id, self.config)
+
         # Check if already loaded
         if model_id in self.loaded_models:
             return self.loaded_models[model_id]

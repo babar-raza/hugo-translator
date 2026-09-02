@@ -67,6 +67,15 @@ tm_defaults:
   l3_context_similarity_threshold: 0.50
 
 # Default model preferences
+# Model licensing gates (TC-APT-005, mission aspose-org-full-portfolio-translation-20260901).
+# Read by src/utils/model_licensing.py: ConfigService refuses NLLB routing rules and
+# ModelLoader refuses to instantiate an NLLB checkpoint while production_approved is not true.
+model_licensing:
+  nllb_200:
+    license: CC-BY-NC-4.0
+    production_approved: false   # DECIDED 2026-09-02: permanent non-use (plan section 6 / G-02)
+    decision_record: .supervisor/state/aspose-org-full-portfolio-translation-20260901/stage3-execution/TC-APT-005.yaml
+
 model_defaults:
   fallback_model: "m2m100_418m"
   device: "cuda"  # Require CUDA GPU
@@ -654,21 +663,13 @@ translation_engine:
   # known short-field detector failure. This is profile/field scoped and never
   # replaces the campaign-pinned M2M primary on a first attempt.
   zero_defect_frontmatter_retry_models:
+    # TC-APT-005: the nllb_200_1.3b title/seoTitle retry entries (blog, plus de/cs/id/pl/uk
+    # locale overrides) were removed -- NLLB is permanent non-use (plan G-02). Blocked short
+    # fields now fall through to the governed professionalize_llm escalation ladder and,
+    # under zero-defect, to Claude review rather than to an unlicensed local model.
     blog.aspose.org:
-      title: nllb_200_1.3b
-      seoTitle: nllb_200_1.3b
       description: m2m100_418m
       summary: m2m100_418m
-      de:
-        title: nllb_200_1.3b
-      cs:
-        title: nllb_200_1.3b
-      id:
-        title: nllb_200_1.3b
-      pl:
-        seoTitle: nllb_200_1.3b
-      uk:
-        title: nllb_200_1.3b
 
   max_batch_purity_failure_rate: 0.10  # Block write if >10% of batches fail language purity checks
 
@@ -733,12 +734,11 @@ translation_engine:
   # accepted via SCRIPT_SIMILAR_LANGUAGES sr→{hr,bs} (Serbian Latin ≈ Croatian at text level).
   language_routing_overrides:
     lv: "professionalize_llm"   # Latvian: M2M100 produces Hungarian (83.1% purity failures). LLM verified 3/3 lv-detected.
-    ko: "nllb_200_1.3b"         # Korean: canary fidelity rejected all M2M/LLM attempts; route the full candidate through qualified NLLB.
-    de: "nllb_200_1.3b"         # German: M2M/LLM ladder left a required link-text unit untranslated.
-    fr: "nllb_200_1.3b"         # French: this canary source failed independent fidelity after the M2M/LLM ladder.
-    th: "nllb_200_1.3b"         # Thai: canary fidelity rejected all M2M/LLM attempts; route the full candidate through qualified NLLB.
-    tr: "nllb_200_1.3b"         # Turkish: M2M/LLM ladder left a required link-text unit untranslated.
-    vi: "nllb_200_1.3b"         # Vietnamese: canary fidelity rejected all M2M/LLM attempts; route the full candidate through qualified NLLB.
+    # TC-APT-005 (2026-09-02, mission aspose-org-full-portfolio-translation-20260901, plan G-02):
+    # the former ko/de/fr/th/tr/vi -> nllb_200_1.3b overrides were REMOVED. NLLB-200 (CC-BY-NC-4.0)
+    # is permanent non-use (see model_licensing below); ConfigService refuses to load any NLLB
+    # routing rule while model_licensing.nllb_200.production_approved is not true. Persistent
+    # short-field failures now escalate through the governed professionalize_llm ladder instead.
   #   sr: "professionalize_llm"   # Serbian: M2M100 produces mixed-language (67.7% failures). LLM produces Latin Serbian (hr-detected → accepted via script_similar_languages). TEMPORARILY DISABLED for heal run (NLLB used instead).
   #   fa: "professionalize_llm"   # Persian: RTL + systematic M2M100 failures (not yet verified)
   #   he: "professionalize_llm"   # Hebrew: RTL + systematic M2M100 failures (not yet verified)
