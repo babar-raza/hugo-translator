@@ -15,7 +15,7 @@ from unittest.mock import MagicMock, patch
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 # Import after path setup
-from scripts.check_deployment_safety import (
+from scripts.quality.check_deployment_safety import (
     ApprovalReporter,
     AutomatedChecker,
     CheckItem,

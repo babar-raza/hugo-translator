@@ -15,7 +15,7 @@ import pytest
 # Add src to path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
-from scripts.benchmark_cpu_comprehensive import CPUBenchmarkRunner
+from scripts.bench.benchmark_cpu_comprehensive import CPUBenchmarkRunner
 from src.benchmarking.storage import BenchmarkDatabase
 
 
@@ -178,7 +178,7 @@ def test_cpu_benchmark_sample_with_mock(mock_corpus_file, mock_model_and_tokeniz
 
 @pytest.mark.integration
 @pytest.mark.slow
-@patch("scripts.benchmark_cpu_comprehensive.ModelLoader")
+@patch("scripts.bench.benchmark_cpu_comprehensive.ModelLoader")
 def test_cpu_benchmark_full_run_with_mocks(
     mock_loader_class, mock_corpus_file, mock_db_path, mock_model_and_tokenizer
 ):

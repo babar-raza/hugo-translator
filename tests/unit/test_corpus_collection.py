@@ -1,6 +1,6 @@
 """Test corpus collection for both localization patterns."""
 
-from scripts.analyze_ast_corpus import collect_english_files, identify_site_localization_pattern
+from scripts.analysis.analyze_ast_corpus import collect_english_files, identify_site_localization_pattern
 
 
 class TestCorpusCollection:

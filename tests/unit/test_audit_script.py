@@ -3,7 +3,7 @@
 import tempfile
 from pathlib import Path
 
-from scripts.audit_codebase import CodebaseAuditor
+from scripts.analysis.audit_codebase import CodebaseAuditor
 
 
 def test_detects_stub_function():

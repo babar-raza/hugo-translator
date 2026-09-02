@@ -1,0 +1,27 @@
+taskcard: TC-APT-006
+title: Provider probe + benchmark corpus (plan section 6 / 6.1)
+status: DONE
+executed_at: "2026-09-02"
+wake: 1
+corpus:
+  builder: scripts/campaign/build_mission_benchmark_corpus.py (deterministic, seeded, drawn from the TC-APT-003 ledger so it is the REAL portfolio, not synthetic)
+  sources: config/benchmark_corpus/aspose_org_mission_sources.json -- 51 sources stratified by site x content class (blog 11, docs 12, kb 12, products 2, reference 10, websites 4)
+  classes_covered: api_heavy 37, table_heavy 26, rtl_cjk_sensitive 26, short_metadata 12, technical_prose 11, mixed_md_html 9, placeholder_heavy 8, long_form 6, marketing 6
+  segments: data/benchmark_corpus/aspose_org_mission_segments.json -- 232 segment samples in the existing CorpusSample schema (id, text_en, domain, tokens, source_path, metadata)
+  note: "the corpus doubles as TC-APT-004b's qualification sample source (plan 6.1)"
+health_probes_2026-09-02:
+  professionalize_llm: "BaseLLMProvider.health_check() -> True (2.9 s load); hardened wrapper active"
+  m2m100_418m: "loaded on cuda (16.8 s) and translated a probe segment -> True"
+  defect_found_and_fixed: "the first comparison run loaded m2m100 on CPU because the harness let ModelLoader default its device; it now resolves cuda exactly as the campaign worker does (hardware.enable_gpu + torch.cuda.is_available). The CPU run was discarded."
+comparison_run (40 segments x 25 approved locales x 2 models = 2,000 cells, LLM concurrency 8):
+  professionalize_llm: {cells: 1000, errors: 0, empty: 0.0, same_as_source: 0.130, lang_match: 0.703, identifier_preservation: 0.861, length_ratio_median: 1.0, wall_seconds: 465, input_tokens: 79600, output_tokens: 224728}
+  m2m100_418m: {cells: 1000, errors: 0, empty: 0.0, same_as_source: 0.089, lang_match: 0.666, identifier_preservation: 0.720, length_ratio_median: 1.0, wall_seconds: 330, input_tokens: 225400, output_tokens: 179472}
+  per_language_verdict: "professionalize_llm better in 22 of 25 languages, m2m100_418m better in 3 (composite of lang-match, identifier preservation, same-as-source and error rate)"
+  by_domain: "technical_prose LLM lang_match 0.829 / ident 0.758 vs m2m100 0.767 / 0.589; short_metadata LLM 0.549 / 1.000 vs m2m100 0.542 / 0.897 -- short metadata is the weak class for BOTH models (same-as-source 0.24 LLM / 0.19 m2m100), which is expected for product-name-heavy titles and is the class the campaign's frontmatter rules already treat specially"
+  metrics_are_content_free: "errors, empty_rate, same_as_source_rate, lang_match_rate (langdetect), identifier_preservation_rate (Aspose.X / CamelCase / backtick spans / shortcodes / HTML), length_ratio_median, seconds, tokens -- no translated text is stored anywhere"
+  report: data/benchmark_corpus/results/mission_provider_comparison.json
+honest_limits:
+  - "lang_match uses langdetect on short segments, which is unreliable below ~20 words; the absolute rates (0.70 / 0.67) are therefore a comparison signal, not a quality score. The per-language verdict is a relative ranking between two models on identical inputs."
+  - "40 of the 232 segments were used to keep the run inside one wake; the remaining segments stay available for TC-APT-004b's qualification sample."
+  - "no BLEU/COMET reference scoring: the portfolio has no reference translations, so the plan's own content-free proxies are what can honestly be measured here."
+acceptance: "per-language/content-class comparison recorded in data/benchmark_corpus/results/, feeding TC-APT-004b's qualification sample -> MET"

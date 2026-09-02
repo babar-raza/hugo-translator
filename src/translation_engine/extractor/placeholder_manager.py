@@ -1,6 +1,7 @@
 """
 Placeholder management for protecting non-translatable content.
 """
+
 import difflib
 import re
 
@@ -12,6 +13,11 @@ class PlaceholderManager:
         """Initialize placeholder manager."""
         self.placeholder_map: dict[str, str] = {}
         self.counter = 0
+        # TC-APT-011: token prefix actually in use. Normally the historical
+        # "PLACEHOLDER_" so output is byte-identical to previous runs; a nonce is added
+        # only when the text itself already contains a placeholder-shaped literal, which
+        # would otherwise make masking non-bijective and corrupt the source's own text.
+        self.token_prefix = "PLACEHOLDER_"
 
     def protect(self, text: str, patterns: list[str]) -> tuple[str, dict[str, str]]:
         """
@@ -26,6 +32,7 @@ class PlaceholderManager:
         """
         self.placeholder_map = {}
         self.counter = 0
+        self.token_prefix = self._collision_free_prefix(text)
         protected_text = text
 
         for pattern in patterns:
@@ -33,11 +40,33 @@ class PlaceholderManager:
 
         return protected_text, dict(self.placeholder_map)
 
+    @staticmethod
+    def _collision_free_prefix(text: str) -> str:
+        """Token prefix that cannot already occur in ``text`` (TC-APT-011).
+
+        Returns the historical ``PLACEHOLDER_`` unless the text already contains a
+        ``{PLACEHOLDER_<digits>}`` literal, in which case a short deterministic nonce is
+        appended until no collision remains.  Restoration is driven by the returned map, so
+        callers need no change.
+        """
+        import hashlib
+        import re as _re
+
+        base = "PLACEHOLDER_"
+        if not _re.search(r"\{" + base + r"\d+\}", text):
+            return base
+        digest = hashlib.sha256(text.encode("utf-8")).hexdigest()
+        for size in (6, 10, 16, 32):
+            candidate = f"PH{digest[:size]}_"
+            if not _re.search(r"\{" + candidate + r"\d+\}", text):
+                return candidate
+        return f"PH{digest}_"  # pragma: no cover - astronomically unlikely
+
     def _apply_pattern(self, text: str, pattern: str) -> str:
         """Apply a single protection pattern."""
 
         def replace_match(match: re.Match) -> str:
-            placeholder = f"{{PLACEHOLDER_{self.counter}}}"
+            placeholder = f"{{{self.token_prefix}{self.counter}}}"
             self.placeholder_map[placeholder] = match.group(0)
             self.counter += 1
             return placeholder
@@ -100,7 +129,7 @@ class PlaceholderManager:
         # Pattern: { followed by ALL-CAPS/underscore only (no digit) followed by one or more }
         # This can only be a corrupted placeholder — valid translated content never looks like this.
         if placeholder_map:
-            restored = re.sub(r'\{[A-Z][A-Z_]*[A-Z]\}+', '', restored)
+            restored = re.sub(r"\{[A-Z][A-Z_]*[A-Z]\}+", "", restored)
 
         # Bare-brace-wrapped-correct-value cleanup (found 2026-07-22, live in
         # reference.aspose.org's cross_locale_dup remediation output on files
@@ -118,9 +147,7 @@ class PlaceholderManager:
         # wrapping an already-correct placeholder value.
         def _strip_wrapping_braces(text: str) -> str:
             for original in placeholder_map.values():
-                text = re.sub(
-                    r"\{\s*" + re.escape(original) + r"\s*\}", original, text
-                )
+                text = re.sub(r"\{\s*" + re.escape(original) + r"\s*\}", original, text)
             return text
 
         restored = _strip_wrapping_braces(restored)

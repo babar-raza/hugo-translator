@@ -28,7 +28,7 @@ import pytest
 # Add src to path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
-from scripts.e2e_verify_single_file import check_list_item_concatenation
+from scripts.e2e.e2e_verify_single_file import check_list_item_concatenation
 
 
 def test_bold_markers_not_flagged_as_concatenation():
