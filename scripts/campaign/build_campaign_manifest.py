@@ -417,8 +417,14 @@ def build_manifest(
     sites: Iterable[str],
     locales: Iterable[str] | None = None,
     max_parallel_jobs: int = 1,
+    dirty_scope: str = "campaign_paths",
+    replace_existing: dict[str, dict[str, dict[str, str]]] | None = None,
 ) -> dict[str, Any]:
     """Assemble a schema-1 zero-defect manifest (validated by ``CampaignManifest.load``).
+
+    ``dirty_scope`` (TC-APT-032) defaults to ``campaign_paths`` for this shared content repo.
+    ``replace_existing`` (TC-APT-031) maps source_path -> locale -> {expected_sha256, reason_code}
+    for cells whose target already exists and is declared for governed replacement.
 
     ``locales`` (optional) narrows every source's outputs to a subset of the portfolio set
     (e.g. a Gate-4 canary cell); the manifest's ``target_locales`` then equals that subset.
@@ -431,7 +437,12 @@ def build_manifest(
     scoped = []
     for item in sources:
         outputs = {lang: item["outputs"][lang] for lang in locales_final}
-        scoped.append({**item, "outputs": outputs})
+        entry = {**item, "outputs": outputs}
+        declared = (replace_existing or {}).get(item["source_path"]) or {}
+        entry["replace_existing"] = {
+            lang: dict(spec) for lang, spec in declared.items() if lang in outputs
+        }
+        scoped.append(entry)
     if not scoped:
         raise DiscoveryError("manifest scope selected zero sources")
     output_count = sum(len(item["outputs"]) for item in scoped)
@@ -473,10 +484,48 @@ def build_manifest(
         "execution_policy": {
             "max_parallel_jobs": max_parallel_jobs,
             "model_sharing": "single_shared_instance",
+            # TC-APT-032: only the campaign's own sources/outputs gate a run in a shared repo.
+            "dirty_scope": dirty_scope,
         },
         "destination_baseline": {},
         "sources": scoped,
     }
+
+
+def declarations_from_ledger(
+    sources: list[dict[str, Any]],
+    locales: Iterable[str],
+    ledger_path: Path,
+    *,
+    content_repo: Path,
+) -> dict[str, dict[str, dict[str, str]]]:
+    """TC-APT-031: for every scoped cell whose target exists, declare a governed replacement.
+
+    ``expected_sha256`` is the CURRENT on-disk hash (re-read now, cross-checked against the
+    ledger's ``target_sha256`` when present); ``reason_code`` is the ledger's eligibility reason.
+    """
+    from src.workers.work_ledger import WorkLedger
+
+    out: dict[str, dict[str, dict[str, str]]] = {}
+    with WorkLedger(ledger_path) as ledger:
+        for item in sources:
+            for lang in locales:
+                rel = item["outputs"].get(lang)
+                if not rel:
+                    continue
+                target = content_repo / rel
+                if not target.is_file():
+                    continue
+                current = sha256_file(target)
+                row = ledger.get_cell(item["site_id"], item["source_path"], lang)
+                reason = (row or {}).get("eligibility_reason_code") or "existing_target_undeclared"
+                if row and row.get("target_sha256") and row["target_sha256"] != current:
+                    reason = f"{reason};ledger_target_sha_stale"
+                out.setdefault(item["source_path"], {})[lang] = {
+                    "expected_sha256": current,
+                    "reason_code": reason,
+                }
+    return out
 
 
 # --------------------------------------------------------------------------- CLI
@@ -515,6 +564,16 @@ def main(argv: list[str] | None = None) -> int:
         help="narrow outputs to these locales (subset of the allowlist)",
     )
     parser.add_argument("--max-parallel-jobs", type=int, default=1)
+    parser.add_argument(
+        "--dirty-scope", choices=("campaign_paths", "frozen_baseline"), default="campaign_paths"
+    )
+    parser.add_argument(
+        "--existing",
+        choices=("refuse", "replace"),
+        default="refuse",
+        help="refuse: existing targets are a hard stop (default); replace: declare governed replacement from the work ledger",
+    )
+    parser.add_argument("--ledger", type=Path, default=Path("data/campaigns/work_ledger.sqlite3"))
     args = parser.parse_args(argv)
 
     sites = tuple(args.sites) if args.sites else IN_SCOPE_SITES
@@ -566,6 +625,14 @@ def main(argv: list[str] | None = None) -> int:
             source_list=listed,
             max_sources=args.max_sources,
         )
+        declared = None
+        if args.existing == "replace":
+            declared = declarations_from_ledger(
+                scoped,
+                args.locale or inventory["portfolio_target_langs"],
+                args.ledger,
+                content_repo=content_repo,
+            )
         manifest = build_manifest(
             content_repo=content_repo,
             translator_repo=translator_repo,
@@ -575,6 +642,8 @@ def main(argv: list[str] | None = None) -> int:
             sites={item["site_id"] for item in scoped},
             locales=args.locale,
             max_parallel_jobs=args.max_parallel_jobs,
+            dirty_scope=args.dirty_scope,
+            replace_existing=declared,
         )
         atomic_write(
             path=args.manifest_output,

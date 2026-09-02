@@ -18,6 +18,18 @@ import yaml
 
 SCHEMA_VERSION = 1
 ZERO_DEFECT_POLICY = "zero-defect"
+#: TC-APT-032: how verify_environment treats a dirty content repository.
+#:  frozen_baseline -- the historical whole-tree frozen dirty baseline (single-writer repos)
+#:  campaign_paths  -- only the manifest's own sources/outputs matter (shared repos; mission default)
+DIRTY_SCOPES = ("frozen_baseline", "campaign_paths")
+DEFAULT_DIRTY_SCOPE = "frozen_baseline"
+#: TM artifacts bound into a manifest by default (a manifest may declare its own list).
+DEFAULT_TM_FINGERPRINT_INPUTS: tuple[str, ...] = (
+    "data/tm/l2.lmdb/data.mdb",
+    "data/tm/l3_faiss/index.faiss",
+    "data/tm/l3_faiss/metadata.pkl",
+    "data/tm/l3_faiss/config.json",
+)
 
 
 class CampaignManifestError(RuntimeError):
@@ -143,6 +155,12 @@ class CampaignSource:
     source_sha256: str
     outputs: dict[str, str]
     wave: int
+    #: TC-APT-031: locale -> {expected_sha256, reason_code}. A declared cell may overwrite the
+    #: existing target ONLY while its current bytes still hash to expected_sha256.
+    replace_existing: dict[str, dict[str, str]] = field(default_factory=dict)
+
+    def replacement_for(self, locale: str) -> dict[str, str] | None:
+        return self.replace_existing.get(locale)
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> CampaignSource:
@@ -154,6 +172,10 @@ class CampaignSource:
             source_sha256=str(data["source_sha256"]),
             outputs={str(k): str(v) for k, v in data["outputs"].items()},
             wave=int(data["wave"]),
+            replace_existing={
+                str(locale): {str(k): str(v) for k, v in (spec or {}).items()}
+                for locale, spec in (data.get("replace_existing") or {}).items()
+            },
         )
 
 
@@ -177,6 +199,23 @@ class CampaignManifest:
     commit_policy: dict[str, Any] = field(default_factory=dict)
     execution_policy: dict[str, Any] = field(default_factory=dict)
     destination_baseline: dict[str, Any] = field(default_factory=dict)
+    tm_fingerprint_inputs: tuple[str, ...] = DEFAULT_TM_FINGERPRINT_INPUTS
+
+    @property
+    def dirty_scope(self) -> str:
+        return str(self.execution_policy.get("dirty_scope", DEFAULT_DIRTY_SCOPE))
+
+    def declared_replacements(self) -> dict[str, dict[str, str]]:
+        """output path -> {expected_sha256, reason_code, source_path, locale} for every declared cell."""
+        out: dict[str, dict[str, str]] = {}
+        for source in self.sources:
+            for locale, spec in source.replace_existing.items():
+                out[source.outputs[locale]] = {
+                    **spec,
+                    "source_path": source.source_path,
+                    "locale": locale,
+                }
+        return out
 
     @classmethod
     def load(cls, path: str | Path) -> CampaignManifest:
@@ -207,6 +246,10 @@ class CampaignManifest:
                 commit_policy=dict(raw.get("commit_policy") or {}),
                 execution_policy=dict(raw.get("execution_policy") or {}),
                 destination_baseline=dict(raw.get("destination_baseline") or {}),
+                tm_fingerprint_inputs=tuple(
+                    str(item)
+                    for item in (raw.get("tm_fingerprint_inputs") or DEFAULT_TM_FINGERPRINT_INPUTS)
+                ),
             )
         except (KeyError, TypeError, ValueError) as exc:
             raise CampaignManifestError(f"Invalid campaign manifest: {exc}") from exc
@@ -239,12 +282,37 @@ class CampaignManifest:
         max_parallel_jobs = self.execution_policy.get("max_parallel_jobs", 1)
         if not isinstance(max_parallel_jobs, int) or not 1 <= max_parallel_jobs <= 4:
             errors.append("campaign execution max_parallel_jobs must be 1..4")
-        if max_parallel_jobs > 1 and self.execution_policy.get("model_sharing") != "single_shared_instance":
+        if (
+            max_parallel_jobs > 1
+            and self.execution_policy.get("model_sharing") != "single_shared_instance"
+        ):
             errors.append(
                 "parallel campaign execution requires model_sharing=single_shared_instance"
             )
         if len(self.sources) != self.expected_source_count:
             errors.append(f"source count {len(self.sources)} != {self.expected_source_count}")
+        if self.dirty_scope not in DIRTY_SCOPES:
+            errors.append(f"execution_policy.dirty_scope must be one of {DIRTY_SCOPES}")
+        if not self.tm_fingerprint_inputs or not all(
+            isinstance(p, str) and p for p in self.tm_fingerprint_inputs
+        ):
+            errors.append("tm_fingerprint_inputs must be a non-empty list of paths")
+        for source in self.sources:
+            for locale, spec in source.replace_existing.items():
+                if locale not in source.outputs:
+                    errors.append(
+                        f"{source.source_path}: replace_existing locale {locale!r} is not an output"
+                    )
+                    continue
+                sha = str(spec.get("expected_sha256", ""))
+                if len(sha) != 64 or any(c not in "0123456789abcdef" for c in sha):
+                    errors.append(
+                        f"{source.source_path}[{locale}]: replace_existing.expected_sha256 is not a sha256"
+                    )
+                if not str(spec.get("reason_code", "")).strip():
+                    errors.append(
+                        f"{source.source_path}[{locale}]: replace_existing.reason_code is required"
+                    )
 
         if self.destination_baseline:
             paths = self.destination_baseline.get("paths")
@@ -293,7 +361,30 @@ class CampaignManifest:
             errors.append(f"content repo missing: {content_repo}")
         else:
             current_content_sha = git_sha(content_repo)
-            if current_content_sha != self.content_repo_sha:
+            campaign_scoped = self.dirty_scope == "campaign_paths"
+            all_outputs = {o for s in self.sources for o in s.outputs.values()}
+            all_sources = {s.source_path for s in self.sources}
+            declared = self.declared_replacements()
+            if current_content_sha != self.content_repo_sha and campaign_scoped:
+                # TC-APT-032: other sessions commit continuously in a shared repo. HEAD may move
+                # as long as the pin is an ancestor and nothing the campaign reads/writes changed
+                # outside receipts.
+                if not git_is_ancestor(content_repo, self.content_repo_sha, current_content_sha):
+                    errors.append("content repository history diverged from campaign pin")
+                else:
+                    changed = set(
+                        git_changed_paths(content_repo, self.content_repo_sha, current_content_sha)
+                    )
+                    accepted_set = {Path(i).as_posix() for i in (allow_existing_accepted or set())}
+                    changed_sources = sorted(changed & all_sources)
+                    if changed_sources:
+                        errors.append(f"campaign source changed since pin: {changed_sources[:5]}")
+                    changed_outputs = sorted((changed & all_outputs) - accepted_set - set(declared))
+                    if changed_outputs:
+                        errors.append(
+                            f"campaign output changed outside receipts: {changed_outputs[:5]}"
+                        )
+            elif current_content_sha != self.content_repo_sha:
                 accepted_outputs = {
                     Path(item).as_posix() for item in (allow_existing_accepted or set())
                 }
@@ -315,7 +406,20 @@ class CampaignManifest:
                             "content repository descendants contain "
                             f"{len(unexpected_commits)} non-campaign paths"
                         )
-            if require_clean:
+            if require_clean and campaign_scoped:
+                # TC-APT-032: only the campaign's own paths matter. Unrelated dirty paths are
+                # ignored, never staged, never committed (session-ledger scoping on the commit side).
+                dirty = {Path(item).as_posix() for item in git_dirty_paths(content_repo)}
+                accepted_set = {Path(i).as_posix() for i in (allow_existing_accepted or set())}
+                dirty_sources = sorted(dirty & all_sources)
+                if dirty_sources:
+                    errors.append(
+                        f"campaign source is dirty (translating a moving source is unsafe): {dirty_sources[:5]}"
+                    )
+                dirty_candidates = sorted((dirty & all_outputs) - accepted_set)
+                if dirty_candidates:
+                    errors.append(f"unreceipted campaign output is dirty: {dirty_candidates[:5]}")
+            elif require_clean:
                 dirty = git_dirty_paths(content_repo)
                 allowed_dirty = {
                     Path(item).as_posix() for item in (allow_existing_accepted or set())
@@ -362,12 +466,7 @@ class CampaignManifest:
         # acceptance writes mutate the same physical stores; resumed lookups
         # remain isolated by the campaign/config/source namespace.
         if not allow_existing_accepted:
-            tm_paths = [
-                "data/tm/l2.lmdb/data.mdb",
-                "data/tm/l3_faiss/index.faiss",
-                "data/tm/l3_faiss/metadata.pkl",
-                "data/tm/l3_faiss/config.json",
-            ]
+            tm_paths = list(self.tm_fingerprint_inputs)
             try:
                 if fingerprint_files(translator_repo, tm_paths) != self.tm_fingerprint:
                     errors.append("translation memory fingerprint drift")
@@ -388,9 +487,16 @@ class CampaignManifest:
                 continue
             if sha256_file(source_path) != source.source_sha256:
                 errors.append(f"source hash drift: {source.source_path}")
-            for output in source.outputs.values():
-                if output not in accepted and (content_repo / output).exists():
+            for locale, output in source.outputs.items():
+                if output in accepted or not (content_repo / output).exists():
+                    continue
+                spec = source.replacement_for(locale)
+                if spec is None:
                     errors.append(f"unexpected existing output: {output}")
+                elif sha256_file(content_repo / output) != spec.get("expected_sha256"):
+                    errors.append(
+                        f"declared replacement drifted (current bytes != expected_sha256): {output}"
+                    )
         if errors:
             raise CampaignManifestError("; ".join(errors[:20]))
 
@@ -464,6 +570,8 @@ class CampaignManifest:
             "output_count": self.expected_output_count,
             "locale_count": len(self.target_locales),
             "sources_by_surface": per_surface,
+            "dirty_scope": self.dirty_scope,
+            "replace_existing_count": sum(len(s.replace_existing) for s in self.sources),
         }
 
 

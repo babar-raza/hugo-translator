@@ -579,7 +579,22 @@ class CampaignRunner:
                 raise CampaignManifestError(
                     f"receipt {field_name} is outside content repo: {absolute}"
                 ) from exc
+        # TC-APT-031: record the bytes this accepted output superseded (auditable, revertable).
+        replacing = getattr(self.engine, "campaign_context", {}).get("replace_existing") or {}
+        superseded = replacing.get(normalized["output_path"])
+        if superseded:
+            normalized["superseded_sha256"] = superseded
         self.ledger.append_receipt(normalized)
+
+    def _unreplaced_declaration(self, source: Any, locale: str, relative: str) -> bool:
+        """TC-APT-031: True when ``relative`` is a declared replacement whose current bytes
+        still equal ``expected_sha256`` -- i.e. the pre-existing original, not yet replaced.
+        Such a file is governed provenance for recovery purposes and must never be deleted."""
+        spec = source.replacement_for(locale) if hasattr(source, "replacement_for") else None
+        if not spec:
+            return False
+        path = self.content_repo / relative
+        return path.is_file() and sha256_file(path) == spec.get("expected_sha256")
 
     def _receipt_recovery_candidates(
         self,
@@ -605,6 +620,10 @@ class CampaignRunner:
                     raise CampaignManifestError(
                         f"receipt recovery output is not a file: {relative}"
                     )
+                if self._unreplaced_declaration(source, locale, relative):
+                    # TC-APT-031: a declared, not-yet-replaced original is governed by its
+                    # manifest declaration, not by a shard commit -- not a recovery candidate.
+                    continue
                 pattern = governed_subject_pattern(
                     wave=source.wave,
                     site_id=source.site_id,
@@ -642,8 +661,9 @@ class CampaignRunner:
             existing_expected = {
                 output
                 for source in self.manifest.sources
-                for output in source.outputs.values()
+                for locale, output in source.outputs.items()
                 if (self.content_repo / output).exists()
+                and not self._unreplaced_declaration(source, locale, output)
             }
             recovered_outputs = {item[2] for item in candidates}
             if recovered_outputs != existing_expected:
@@ -1656,8 +1676,26 @@ class CampaignRunner:
         receipt = None
         result = None
         resolved_output = str(expected.resolve())
+        # TC-APT-031: governed replace-existing. An undeclared existing target is still a hard
+        # stop (verify_environment). A declared one may be overwritten only while its current
+        # bytes still hash to the declared expected_sha256 (no concurrent edit underneath).
+        declared = source.replacement_for(locale) if hasattr(source, "replacement_for") else None
+        original_sha = str(declared["expected_sha256"]) if declared else None
+        if declared:
+            if not expected.is_file():
+                raise CampaignManifestError(
+                    f"declared replacement target is missing: {expected_output}"
+                )
+            if sha256_file(expected) != original_sha:
+                raise CampaignManifestError(
+                    f"declared replacement pre-hash drift (concurrent change?): {expected_output}"
+                )
         with self._engine_campaign_state_lock:
             prior_model_override = getattr(self.engine, "model_id_override", None)
+            if declared:
+                self.engine.campaign_context.setdefault("replace_existing", {})[expected_output] = (
+                    original_sha
+                )
             llm_paths = getattr(self.engine, "_rtq_llm_output_paths", None)
             if llm_paths is None:
                 llm_paths = set()
@@ -1697,7 +1735,8 @@ class CampaignRunner:
                     "target_langs": [locale],
                     "validate": True,
                     "force": False,
-                    "force_overwrite": False,
+                    # TC-APT-031: overwrite ONLY the declared, pre-hash-verified target.
+                    "force_overwrite": bool(declared),
                     "trigger_type": "campaign",
                     "retry_budget_override": retry_budget,
                 }
@@ -1716,10 +1755,14 @@ class CampaignRunner:
                 if receipt is not None and expected.is_file():
                     break
                 if expected.exists():
-                    expected.unlink(missing_ok=True)
-                    raise CampaignManifestError(
-                        f"rejected attempt produced an unreceipted output: {expected_output}"
-                    )
+                    if declared and sha256_file(expected) == original_sha:
+                        # The untouched original survived a rejected attempt: keep it.
+                        pass
+                    else:
+                        expected.unlink(missing_ok=True)
+                        raise CampaignManifestError(
+                            f"rejected attempt produced an unreceipted output: {expected_output}"
+                        )
                 failure_gate, failure_reason = self._failure_metadata(result)
                 next_feedback = self._retry_feedback(
                     result,
@@ -1740,7 +1783,11 @@ class CampaignRunner:
         except Exception as exc:
             # An engine crash must not leave an unreceipted bytes-on-disk
             # candidate behind.  Expected output is manifest-scoped.
-            if expected.exists() and receipt is None:
+            if (
+                expected.exists()
+                and receipt is None
+                and not (declared and sha256_file(expected) == original_sha)
+            ):
                 expected.unlink(missing_ok=True)
             if isinstance(exc, CampaignManifestError):
                 raise
@@ -1759,6 +1806,10 @@ class CampaignRunner:
             with self._engine_campaign_state_lock:
                 llm_paths.discard(resolved_output)
                 feedback_by_output.pop(resolved_output, None)
+                if declared:
+                    (self.engine.campaign_context.get("replace_existing") or {}).pop(
+                        expected_output, None
+                    )
                 # Do not leak this campaign's model pin into later workers or
                 # ordinary translation calls sharing this engine instance.
                 self.engine.model_id_override = prior_model_override
