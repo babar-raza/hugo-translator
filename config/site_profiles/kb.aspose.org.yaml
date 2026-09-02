@@ -192,27 +192,8 @@ terminology:
     case_sensitive: true
     preserve_mode: both
     severity: warning
-frontmatter_translation:
-  enabled: true
-  translatable_fields:
-  - title
-  - description
-  - step1
-  - step2
-  - step3
-  - step4
-  - step5
-  protected_fields:
-  - slug
-  - productname
-  - productkey
-  - platformkey
-  - productplatform
-  - date
-  - lastmod
-  - weight
-  - draft
-  - type
+# G-09 (TC-APT-001, 2026-09-02): the former `frontmatter_translation:` block was removed here.
+# It was never a SiteProfile field (Pydantic extra=ignore dropped it silently); the `frontmatter:` map above is authoritative.
 max_parallel_files: 2
 translation_engine:
   # TC-TBL-012 / Layer 1: kb articles are short with many technical terms (function names,

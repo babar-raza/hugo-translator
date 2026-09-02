@@ -1,0 +1,443 @@
+{
+  "mission_id": "aspose-org-full-portfolio-translation-20260901",
+  "plan_path": "C:\\Users\\prora\\.claude\\plans\\hugo-translator-aspose-org-partitioned-kahn.md",
+  "plan_revision": 5,
+  "branch": "mission/aspose-org-full-portfolio-translation-20260901",
+  "created_at": "2026-09-02T05:20:29.896922+00:00",
+  "updated_at": "2026-09-02T05:26:07.957720+00:00",
+  "content_repo": "D:/onedrive/Documents/GitHub/aspose.org",
+  "content_repo_session_ledger": {
+    "AGENT_SESSION_ID": "d18689cf-ac87-4bcb-b33f-655ef2b84358",
+    "manifest": "reports/session-state/d18689cf-ac87-4bcb-b33f-655ef2b84358.json",
+    "initialized_at": "2026-09-02T05:20:29.896922+00:00",
+    "dirty_files_at_start": 21
+  },
+  "phase": "A",
+  "current_gate": 0,
+  "gates_closed": [],
+  "wake_count": 1,
+  "wakes_without_state_change": 0,
+  "taskcards": {
+    "TC-APT-001": {
+      "status": "DONE",
+      "gate": 0,
+      "title": "Governance reconciliation",
+      "depends_on": [],
+      "owner": "loop",
+      "blocking_reason": null,
+      "evidence_path": ".supervisor/state/aspose-org-full-portfolio-translation-20260901/stage1-audit/TC-APT-001-governance-reconciliation.yaml",
+      "commit": null,
+      "last_updated": "2026-09-02T05:26:07.957720+00:00"
+    },
+    "TC-APT-002": {
+      "status": "TODO",
+      "gate": 0,
+      "title": "Full-portfolio discovery scan",
+      "depends_on": [
+        "TC-APT-001"
+      ],
+      "owner": "loop",
+      "blocking_reason": null,
+      "evidence_path": null,
+      "commit": null,
+      "last_updated": "2026-09-02T05:20:29.896922+00:00"
+    },
+    "TC-APT-003": {
+      "status": "TODO",
+      "gate": 0,
+      "title": "Work ledger bootstrap",
+      "depends_on": [
+        "TC-APT-002"
+      ],
+      "owner": "loop",
+      "blocking_reason": null,
+      "evidence_path": null,
+      "commit": null,
+      "last_updated": "2026-09-02T05:20:29.896922+00:00"
+    },
+    "TC-APT-022": {
+      "status": "TODO",
+      "gate": 0,
+      "title": "Structurally retire ungoverned execution path",
+      "depends_on": [
+        "TC-APT-001"
+      ],
+      "owner": "loop",
+      "blocking_reason": null,
+      "evidence_path": null,
+      "commit": null,
+      "last_updated": "2026-09-02T05:20:29.896922+00:00"
+    },
+    "TC-APT-030": {
+      "status": "TODO",
+      "gate": 0,
+      "title": "Retire legacy SweepScheduler path (G-19)",
+      "depends_on": [
+        "TC-APT-022"
+      ],
+      "owner": "loop",
+      "blocking_reason": null,
+      "evidence_path": null,
+      "commit": null,
+      "last_updated": "2026-09-02T05:20:29.896922+00:00"
+    },
+    "TC-APT-029": {
+      "status": "TODO",
+      "gate": 0,
+      "title": "Wire campaign supervision into supervisor_loop.decide()",
+      "depends_on": [],
+      "owner": "loop",
+      "blocking_reason": null,
+      "evidence_path": null,
+      "commit": null,
+      "last_updated": "2026-09-02T05:20:29.896922+00:00"
+    },
+    "TC-APT-025": {
+      "status": "TODO",
+      "gate": 0,
+      "title": "Update content repo handoff skill docs (G-16,G-18)",
+      "depends_on": [],
+      "owner": "loop",
+      "blocking_reason": null,
+      "evidence_path": null,
+      "commit": null,
+      "last_updated": "2026-09-02T05:20:29.896922+00:00"
+    },
+    "TC-APT-026": {
+      "status": "TODO",
+      "gate": 0,
+      "title": "Register mission in content repo governance",
+      "depends_on": [],
+      "owner": "loop",
+      "blocking_reason": null,
+      "evidence_path": null,
+      "commit": null,
+      "last_updated": "2026-09-02T05:20:29.896922+00:00"
+    },
+    "TC-APT-027": {
+      "status": "TODO",
+      "gate": 0,
+      "title": "websites.aspose.org path-guard override handling (G-17)",
+      "depends_on": [],
+      "owner": "loop",
+      "blocking_reason": null,
+      "evidence_path": null,
+      "commit": null,
+      "last_updated": "2026-09-02T05:20:29.896922+00:00"
+    },
+    "TC-APT-028": {
+      "status": "TODO",
+      "gate": 1,
+      "title": "LLM preflight + throughput calibration",
+      "depends_on": [],
+      "owner": "loop",
+      "blocking_reason": null,
+      "evidence_path": null,
+      "commit": null,
+      "last_updated": "2026-09-02T05:20:29.896922+00:00"
+    },
+    "TC-APT-004": {
+      "status": "TODO",
+      "gate": 1,
+      "title": "LLM-HARDEN-001",
+      "depends_on": [
+        "TC-APT-028"
+      ],
+      "owner": "loop",
+      "blocking_reason": null,
+      "evidence_path": null,
+      "commit": null,
+      "last_updated": "2026-09-02T05:20:29.896922+00:00"
+    },
+    "TC-APT-006": {
+      "status": "TODO",
+      "gate": 1,
+      "title": "Provider probe + benchmark corpus",
+      "depends_on": [
+        "TC-APT-028",
+        "TC-APT-004"
+      ],
+      "owner": "loop",
+      "blocking_reason": null,
+      "evidence_path": null,
+      "commit": null,
+      "last_updated": "2026-09-02T05:20:29.896922+00:00"
+    },
+    "TC-APT-004b": {
+      "status": "TODO",
+      "gate": 1,
+      "title": "professionalize_llm production qualification",
+      "depends_on": [
+        "TC-APT-028",
+        "TC-APT-004",
+        "TC-APT-006"
+      ],
+      "owner": "loop",
+      "blocking_reason": null,
+      "evidence_path": null,
+      "commit": null,
+      "last_updated": "2026-09-02T05:20:29.896922+00:00"
+    },
+    "TC-APT-021": {
+      "status": "TODO",
+      "gate": 1,
+      "title": "Pin/monitor LLM model identity",
+      "depends_on": [
+        "TC-APT-028"
+      ],
+      "owner": "loop",
+      "blocking_reason": null,
+      "evidence_path": null,
+      "commit": null,
+      "last_updated": "2026-09-02T05:20:29.896922+00:00"
+    },
+    "TC-APT-005": {
+      "status": "TODO",
+      "gate": 1,
+      "title": "Close NLLB licensing as permanent non-use (G-02)",
+      "depends_on": [],
+      "owner": "loop",
+      "blocking_reason": null,
+      "evidence_path": null,
+      "commit": null,
+      "last_updated": "2026-09-02T05:20:29.896922+00:00"
+    },
+    "TC-APT-007": {
+      "status": "TODO",
+      "gate": 2,
+      "title": "Eligibility algorithm",
+      "depends_on": [
+        "TC-APT-003"
+      ],
+      "owner": "loop",
+      "blocking_reason": null,
+      "evidence_path": null,
+      "commit": null,
+      "last_updated": "2026-09-02T05:20:29.896922+00:00"
+    },
+    "TC-APT-008": {
+      "status": "TODO",
+      "gate": 2,
+      "title": "TM lineage index",
+      "depends_on": [],
+      "owner": "loop",
+      "blocking_reason": null,
+      "evidence_path": null,
+      "commit": null,
+      "last_updated": "2026-09-02T05:20:29.896922+00:00"
+    },
+    "TC-APT-009": {
+      "status": "TODO",
+      "gate": 2,
+      "title": "Close audit-phase7 items (G-04)",
+      "depends_on": [
+        "TC-APT-008",
+        "TC-APT-003"
+      ],
+      "owner": "loop",
+      "blocking_reason": null,
+      "evidence_path": null,
+      "commit": null,
+      "last_updated": "2026-09-02T05:20:29.896922+00:00"
+    },
+    "TC-APT-024": {
+      "status": "TODO",
+      "gate": 2,
+      "title": "Wave-ordering / throughput-priority scoring",
+      "depends_on": [
+        "TC-APT-003",
+        "TC-APT-007"
+      ],
+      "owner": "loop",
+      "blocking_reason": null,
+      "evidence_path": null,
+      "commit": null,
+      "last_updated": "2026-09-02T05:20:29.896922+00:00"
+    },
+    "TC-APT-031": {
+      "status": "TODO",
+      "gate": 2,
+      "title": "Governed replace-existing mode (G-21)",
+      "depends_on": [
+        "TC-APT-002"
+      ],
+      "owner": "loop",
+      "blocking_reason": null,
+      "evidence_path": null,
+      "commit": null,
+      "last_updated": "2026-09-02T05:20:29.896922+00:00"
+    },
+    "TC-APT-032": {
+      "status": "TODO",
+      "gate": 2,
+      "title": "Campaign-path-scoped dirty check (G-22)",
+      "depends_on": [],
+      "owner": "loop",
+      "blocking_reason": null,
+      "evidence_path": null,
+      "commit": null,
+      "last_updated": "2026-09-02T05:20:29.896922+00:00"
+    },
+    "TC-APT-010": {
+      "status": "TODO",
+      "gate": 3,
+      "title": "GATE-PROMO-001",
+      "depends_on": [
+        "TC-APT-011"
+      ],
+      "owner": "loop",
+      "blocking_reason": null,
+      "evidence_path": null,
+      "commit": null,
+      "last_updated": "2026-09-02T05:20:29.896922+00:00"
+    },
+    "TC-APT-011": {
+      "status": "TODO",
+      "gate": 3,
+      "title": "Preservation fixtures + test-gap closure (G-12)",
+      "depends_on": [],
+      "owner": "loop",
+      "blocking_reason": null,
+      "evidence_path": null,
+      "commit": null,
+      "last_updated": "2026-09-02T05:20:29.896922+00:00"
+    },
+    "TC-APT-023": {
+      "status": "TODO",
+      "gate": 3,
+      "title": "Rerun-determinism contract + suite",
+      "depends_on": [
+        "TC-APT-021",
+        "TC-APT-007"
+      ],
+      "owner": "loop",
+      "blocking_reason": null,
+      "evidence_path": null,
+      "commit": null,
+      "last_updated": "2026-09-02T05:20:29.896922+00:00"
+    },
+    "TC-APT-012": {
+      "status": "TODO",
+      "gate": 3,
+      "title": "Claude review protocol implementation",
+      "depends_on": [],
+      "owner": "loop",
+      "blocking_reason": null,
+      "evidence_path": null,
+      "commit": null,
+      "last_updated": "2026-09-02T05:20:29.896922+00:00"
+    },
+    "TC-APT-013": {
+      "status": "TODO",
+      "gate": 4,
+      "title": "Gate 4 canary (2 cells)",
+      "depends_on": [
+        "TC-APT-010",
+        "TC-APT-026",
+        "TC-APT-031",
+        "TC-APT-032",
+        "TC-APT-012"
+      ],
+      "owner": "loop",
+      "blocking_reason": null,
+      "evidence_path": null,
+      "commit": null,
+      "last_updated": "2026-09-02T05:20:29.896922+00:00"
+    },
+    "TC-APT-014": {
+      "status": "TODO",
+      "gate": 5,
+      "title": "Gate 5 one page all 25 languages",
+      "depends_on": [
+        "TC-APT-013"
+      ],
+      "owner": "loop",
+      "blocking_reason": null,
+      "evidence_path": null,
+      "commit": null,
+      "last_updated": "2026-09-02T05:20:29.896922+00:00"
+    },
+    "TC-APT-015": {
+      "status": "TODO",
+      "gate": 6,
+      "title": "Gate 6 one page per site",
+      "depends_on": [
+        "TC-APT-014",
+        "TC-APT-027"
+      ],
+      "owner": "loop",
+      "blocking_reason": null,
+      "evidence_path": null,
+      "commit": null,
+      "last_updated": "2026-09-02T05:20:29.896922+00:00"
+    },
+    "TC-APT-016": {
+      "status": "TODO",
+      "gate": 7,
+      "title": "Gate 7 one family/section",
+      "depends_on": [
+        "TC-APT-015"
+      ],
+      "owner": "loop",
+      "blocking_reason": null,
+      "evidence_path": null,
+      "commit": null,
+      "last_updated": "2026-09-02T05:20:29.896922+00:00"
+    },
+    "TC-APT-017": {
+      "status": "TODO",
+      "gate": 8,
+      "title": "Gate 8 controlled portfolio batches",
+      "depends_on": [
+        "TC-APT-016"
+      ],
+      "owner": "loop",
+      "blocking_reason": null,
+      "evidence_path": null,
+      "commit": null,
+      "last_updated": "2026-09-02T05:20:29.896922+00:00"
+    },
+    "TC-APT-018": {
+      "status": "TODO",
+      "gate": 9,
+      "title": "Zero-unresolved-defect reconciliation",
+      "depends_on": [
+        "TC-APT-017"
+      ],
+      "owner": "loop",
+      "blocking_reason": null,
+      "evidence_path": null,
+      "commit": null,
+      "last_updated": "2026-09-02T05:20:29.896922+00:00"
+    },
+    "TC-APT-019": {
+      "status": "TODO",
+      "gate": 10,
+      "title": "Idempotent empty-queue proof",
+      "depends_on": [
+        "TC-APT-018"
+      ],
+      "owner": "loop",
+      "blocking_reason": null,
+      "evidence_path": null,
+      "commit": null,
+      "last_updated": "2026-09-02T05:20:29.896922+00:00"
+    },
+    "TC-APT-020": {
+      "status": "TODO",
+      "gate": 11,
+      "title": "Publication-ready handoff evidence bundle",
+      "depends_on": [
+        "TC-APT-019",
+        "TC-APT-001",
+        "TC-APT-010",
+        "TC-APT-025"
+      ],
+      "owner": "loop",
+      "blocking_reason": null,
+      "evidence_path": null,
+      "commit": null,
+      "last_updated": "2026-09-02T05:20:29.896922+00:00"
+    }
+  }
+}
