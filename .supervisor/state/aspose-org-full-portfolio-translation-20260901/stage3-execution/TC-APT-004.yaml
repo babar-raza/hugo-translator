@@ -1,0 +1,31 @@
+taskcard: TC-APT-004
+title: LLM-HARDEN-001 (G-03) - typed errors, bounded retry, persisted circuit breaker, automatic fallback reroute, no silent passthrough, redacted telemetry
+status: DONE
+executed_at: "2026-09-02"
+wake: 1
+root_cause_closed: "llm_backend._translate_single_segment / _translate_packed_batch ended in `except Exception: translations[idx] = text` -- any transient provider failure was returned as if it were a valid translation (plan 2.6 / G-03)"
+changes:
+  - "src/utils/circuit_breaker.py (new, generic primitive per plan 2.7): keyed, JSON-persisted (atomic write + FileLock -> multi-process safe), closed/open/half_open, trip on N consecutive failures or failure ratio over a window, cooldown doubling to a cap, single half-open probe, unreadable state fails safe as OPEN, force_open() for quarantine (TC-APT-021)"
+  - "src/model_runtime/llm_errors.py (new): LLMError / LLMTransientError / LLMFatalError / LLMCircuitOpenError / LLMSegmentFailure, SegmentOutcome(index,text,failed,reason,attempts,model_id), classify_exception (status codes + exception names + message heuristics; unknown -> transient so it is retried but still counts against the breaker)"
+  - "src/model_runtime/circuit_breaker.py (new): breaker_for(model_id) -> data/runtime/circuit_breaker/<model_id>.json (schema read by mission_supervisor), retry_policy (3 attempts, 2/4/8 s, +/-20% jitter), fallback_model_for -> m2m100_418m, health_log -> data/runtime/llm_health/<model_id>.jsonl (refuses any secret-shaped field; records api_key_resolved as bool only), configure() for tests"
+  - "src/model_runtime/llm_providers.py: BaseLLMProvider.generate hardened -- breaker gate (LLMCircuitOpenError), typed classification, bounded retry for transient errors only, breaker record_success/record_failure per logical call, redacted health log; health_check() returns False while open without touching the provider"
+  - "src/model_runtime/contracts.py: LLMProviderConfig.model_id (from_model_info) keys the breaker"
+  - "src/model_runtime/llm_backend.py: SegmentOutcome per segment via a ContextVar accumulator (thread-isolated on the shared backend); provider failure -> failed outcome with EMPTY text (never the source) and translate_with_token_counts raises LLMSegmentFailure; LLMCircuitOpenError propagates; TC-HT-003 prompt-echo rejects stay tagged (reject:<reason>) as before"
+  - "src/model_runtime/loader.py: load_model() reroutes an LLM whose breaker is OPEN to fallback_model_for() (health_log event=rerouted, last_reroute recorded); half-open is not rerouted so the probe can close the breaker"
+  - "src/translation_engine/segment_translator.py: stats.model_used records the model actually loaded (reroute-aware)"
+  - "config/global.yaml translation_engine: llm_retry, llm_circuit_breaker (thresholds = TC-APT-028 recommendation), llm_fallback_model, llm_health_log_dir"
+  - "tests/unit/model_runtime/test_llm_backend.py: test_translate_error_fallback_to_source -> test_translate_error_fails_loudly_never_source"
+thresholds_from_TC-APT-028: "healthy endpoint showed 0 failures across ~40 preflight calls (3 live runs); trip = 5 consecutive failures or >=50% of the last 20 calls (min 10), cooldown 60 s doubling to 600 s; per-call timeout stays at the registry's 300 s"
+regression_fixture: tests/regression/test_llm_passthrough_never_silent.py (13 tests)
+  - "provider failure -> LLMSegmentFailure, failed outcome text is '' (never the source); translate() likewise"
+  - "transient x2 then success -> 3 attempts, sleeps [2.0, 4.0]; fatal (401) -> 1 attempt, no retry"
+  - "packed batch: packed call fails -> per-segment fallback -> still fails loudly (9 transport faults, 2 segments)"
+  - "breaker trips after 5 consecutive failed calls (15 transport attempts) -> LLMCircuitOpenError without touching the provider; state file open/trips=1/cooldown=60"
+  - "half-open after cooldown -> one probe -> success closes; probe failure re-opens with 120/240/480/600/600 s cooldowns"
+  - "health_check() False while open, no provider call"
+  - "ModelLoader.load_model('professionalize_llm') with open breaker -> fallback backend instantiated (LLM never), last_reroute recorded, health log event=rerouted; closed breaker -> no reroute"
+  - "health log contains api_key_resolved=true and never the key value; health_log() refuses secret-shaped fields"
+verification:
+  - "pytest tests/regression/test_llm_passthrough_never_silent.py tests/unit/utils/test_circuit_breaker.py tests/unit/model_runtime/test_llm_backend.py tests/unit/model_runtime/test_llm_backend_concurrency_stress.py -> 68+6 passed"
+  - "sweep: pytest tests/unit/model_runtime tests/unit/translation_engine/test_segment_translator.py tests/unit/translation_engine/test_content_type_router_frontmatter_wiring.py tests/regression (ignoring the 2 known-broken collection modules) -> 373 passed, 8 failed BEFORE the concurrency fix; after it the 2 concurrency tests pass; the remaining 6 (test_forced_bos_validation x2, test_ct2_converter x2, test_markdown_fidelity_bold_heading::test_verifier_integration, test_content_type_router_frontmatter_wiring::...final_translations_dict) fail identically with this taskcard's files stashed -> PRE-EXISTING, routed to TC-APT-011"
+acceptance: "fixture passes; a forced provider failure yields a job-level FAILED (LLMSegmentFailure), not a shipped same-as-source file; an open breaker reroutes load_model to the fallback (FAILED-then-REROUTED) -> MET"

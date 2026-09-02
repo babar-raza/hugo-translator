@@ -33,32 +33,32 @@ logger = logging.getLogger(__name__)
 # Applied post-decode to ALL model output (NLLB, m2m100, LLM).
 _MOJIBAKE_MAP: dict[int, str] = {
     # em-dash and en-dash
-    ord("\u00e2"): None,   # â — start of multi-char sequence; handled by str.translate below
+    ord("\u00e2"): None,  # â — start of multi-char sequence; handled by str.translate below
 }
 
 # Use str.replace() chain for multi-char sequences (str.translate is single-char only)
 _MOJIBAKE_PAIRS: list[tuple[str, str]] = [
-    ("\u00e2\u20ac\u2014", "\u2014"),   # â€" → — (em-dash)
-    ("\u00e2\u20ac\u2013", "\u2013"),   # â€" → – (en-dash)
-    ("\u00e2\u20ac\u2122", "\u2019"),   # â€™ → ' (right single quote)
-    ("\u00e2\u20ac\u0153", "\u201c"),   # â€œ → " (left double quote)
-    ("\u00e2\u20ac\u009d", "\u201d"),   # â€ → " (right double quote)
-    ("\u00e2\u20ac\u0161", "\u2018"),   # â€˜ → ' (left single quote)
-    ("\u00e2\u20ac\u00a6", "\u2026"),   # â€¦ → … (ellipsis)
-    ("\u00c3\u00a9", "\u00e9"),         # Ã© → é
-    ("\u00c3\u00a8", "\u00e8"),         # Ã¨ → è
-    ("\u00c3\u00aa", "\u00ea"),         # Ãª → ê
-    ("\u00c3\u00ab", "\u00eb"),         # Ã« → ë
-    ("\u00c3\u00a0", "\u00e0"),         # Ã  → à
-    ("\u00c3\u00a2", "\u00e2"),         # Ã¢ → â
-    ("\u00c3\u00bc", "\u00fc"),         # Ã¼ → ü
-    ("\u00c3\u00b6", "\u00f6"),         # Ã¶ → ö
-    ("\u00c3\u00a4", "\u00e4"),         # Ã¤ → ä
-    ("\u00c3\u009f", "\u00df"),         # ÃŸ → ß
-    ("\u00c3\u00b1", "\u00f1"),         # Ã± → ñ
-    ("\u00c3\u00ad", "\u00ed"),         # Ã­ → í
-    ("\u00c3\u00b3", "\u00f3"),         # Ã³ → ó
-    ("\u00c3\u00ba", "\u00fa"),         # Ãº → ú
+    ("\u00e2\u20ac\u2014", "\u2014"),  # â€" → — (em-dash)
+    ("\u00e2\u20ac\u2013", "\u2013"),  # â€" → – (en-dash)
+    ("\u00e2\u20ac\u2122", "\u2019"),  # â€™ → ' (right single quote)
+    ("\u00e2\u20ac\u0153", "\u201c"),  # â€œ → " (left double quote)
+    ("\u00e2\u20ac\u009d", "\u201d"),  # â€ → " (right double quote)
+    ("\u00e2\u20ac\u0161", "\u2018"),  # â€˜ → ' (left single quote)
+    ("\u00e2\u20ac\u00a6", "\u2026"),  # â€¦ → … (ellipsis)
+    ("\u00c3\u00a9", "\u00e9"),  # Ã© → é
+    ("\u00c3\u00a8", "\u00e8"),  # Ã¨ → è
+    ("\u00c3\u00aa", "\u00ea"),  # Ãª → ê
+    ("\u00c3\u00ab", "\u00eb"),  # Ã« → ë
+    ("\u00c3\u00a0", "\u00e0"),  # Ã  → à
+    ("\u00c3\u00a2", "\u00e2"),  # Ã¢ → â
+    ("\u00c3\u00bc", "\u00fc"),  # Ã¼ → ü
+    ("\u00c3\u00b6", "\u00f6"),  # Ã¶ → ö
+    ("\u00c3\u00a4", "\u00e4"),  # Ã¤ → ä
+    ("\u00c3\u009f", "\u00df"),  # ÃŸ → ß
+    ("\u00c3\u00b1", "\u00f1"),  # Ã± → ñ
+    ("\u00c3\u00ad", "\u00ed"),  # Ã­ → í
+    ("\u00c3\u00b3", "\u00f3"),  # Ã³ → ó
+    ("\u00c3\u00ba", "\u00fa"),  # Ãº → ú
 ]
 
 
@@ -574,15 +574,11 @@ class HuggingFaceBackend(ModelBackend):
             # NLLB-200 is trained on subtitle corpora (OpenSubtitles/OPUS) and generates
             # SSA subtitle position markers like {\pos (190,230) } appended to translations.
             # Strip these unconditionally — they are never valid translation content.
-            _NLLB_SSA_ARTIFACT_RE = re.compile(
-                r"\{\\?pos\s+\(\d+,\s*\d+\)\s*\}", re.UNICODE
-            )
+            _NLLB_SSA_ARTIFACT_RE = re.compile(r"\{\\?pos\s+\(\d+,\s*\d+\)\s*\}", re.UNICODE)
             for i, t in enumerate(translations):
                 cleaned = _NLLB_SSA_ARTIFACT_RE.sub("", t).strip()
                 if cleaned != t.strip():
-                    logger.debug(
-                        f"Stripped NLLB SSA artifact from translation[{i}]: {t[:80]!r}"
-                    )
+                    logger.debug(f"Stripped NLLB SSA artifact from translation[{i}]: {t[:80]!r}")
                 cleaned = repair_mojibake(cleaned)
                 translations[i] = cleaned
 
@@ -1212,6 +1208,8 @@ class ModelLoader:
             config: Optional config dict for hardware settings (D5)
         """
         self.registry = registry
+        # TC-APT-004: last automatic LLM->fallback reroute performed by load_model()
+        self.last_reroute: dict[str, str] | None = None
         self.device = device
         self.max_memory_mb = max_memory_mb
         self.load_mode = load_mode
@@ -1245,12 +1243,33 @@ class ModelLoader:
 
         assert_model_selectable(model_id, self.config)
 
+        # Get model info
+        model_info = self.registry.get_model(model_id)
+
+        # TC-APT-004 (plan 6.1): an LLM whose circuit breaker is OPEN is rerouted to the
+        # automatic fallback (m2m100_418m) instead of stalling the campaign. Half-open
+        # breakers are NOT rerouted: the next call is the probe that may close them.
+        self.last_reroute = None
+        if getattr(model_info, "backend", None) == "llm":
+            from .circuit_breaker import breaker_for, fallback_model_for, health_log
+
+            breaker = breaker_for(model_id)
+            fallback = fallback_model_for(model_id)
+            if breaker is not None and fallback and breaker.is_open():
+                logger.warning(
+                    "Circuit breaker OPEN for %s -> automatically rerouting to fallback %s",
+                    model_id,
+                    fallback,
+                )
+                reroute = {"from": model_id, "to": fallback, "reason": "circuit_open"}
+                health_log(model_id, event="rerouted", ok=False, to=fallback, reason="circuit_open")
+                backend = self.load_model(fallback, device)
+                self.last_reroute = reroute  # set AFTER the recursive load, which resets it
+                return backend
+
         # Check if already loaded
         if model_id in self.loaded_models:
             return self.loaded_models[model_id]
-
-        # Get model info
-        model_info = self.registry.get_model(model_id)
 
         # Determine device
         target_device = device or self.device

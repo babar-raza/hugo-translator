@@ -1184,7 +1184,8 @@ class SegmentTranslator:
 
             with engine._model_lock:
                 backend = engine.model_loader.load_model(model_id)
-            stats.model_used = model_id
+            # TC-APT-004: record the model ACTUALLY used (load_model may have rerouted an open LLM)
+            stats.model_used = getattr(getattr(backend, "model_info", None), "model_id", None) or model_id
 
             texts = [seg.source_text for seg in segments_to_translate]
 

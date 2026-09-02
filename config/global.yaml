@@ -654,6 +654,24 @@ validation_defaults:
 # Mandatory validation settings to prevent corrupted/wrong-language translations in production
 # WARNING: Disabling these settings in production will result in quality degradation
 translation_engine:
+  # TC-APT-004 LLM-HARDEN-001 (mission aspose-org-full-portfolio-translation-20260901).
+  # Thresholds per TC-APT-028 calibration (2026-09-02): healthy endpoint showed 0 failures in
+  # calibration; trip stays at 5 consecutive / 50% of last 20 calls; 60 s cooldown doubling to 10 min.
+  llm_retry:
+    attempts: 3
+    backoff_seconds: [2, 4, 8]
+    jitter: 0.2
+  llm_circuit_breaker:
+    enabled: true
+    state_dir: data/runtime/circuit_breaker   # <model_id>.json, read by mission_supervisor
+    consecutive_failure_trip: 5
+    window_calls: 20
+    window_failure_ratio_trip: 0.5
+    min_window_calls: 10
+    cooldown_seconds: 60
+    cooldown_cap_seconds: 600
+  llm_fallback_model: m2m100_418m             # automatic reroute target when the LLM breaker is open (plan 6.1)
+  llm_health_log_dir: data/runtime/llm_health  # redacted per-call telemetry (never the key value)
   # Quality gates (mandatory for production)
   enable_validation: true  # NEVER set to false in production - enables all quality checks
 

@@ -17,6 +17,13 @@ from pathlib import Path
 from typing import Any
 
 from .contracts import LLMProviderConfig
+from .llm_errors import LLMCircuitOpenError, LLMSegmentFailure, SegmentOutcome
+
+# TC-APT-004: per-call segment outcomes live in a ContextVar so concurrent calls on one
+# shared backend instance never see each other's outcomes (same pattern as _ctx_hint_var).
+_outcomes_var: contextvars.ContextVar[list | None] = contextvars.ContextVar(
+    "llm_segment_outcomes", default=None
+)
 from .llm_providers import BaseLLMProvider, create_provider
 from .loader import repair_mojibake
 from .registry import ModelInfo
@@ -169,6 +176,8 @@ class LLMModelBackend:
         # TC-HT-003: prompt-echo/refusal rejects from the most recent
         # translate_with_token_counts() call, keyed by index into `texts`.
         self.last_reject_reasons: dict[int, str] = {}
+        # TC-APT-004: truthful per-segment outcomes of the most recent call.
+        self.last_segment_outcomes: list[SegmentOutcome] = []
 
         # TC-AST-02: Configurable hallucination cap (default 4.0× input length).
         # Read from global config so it survives model reloads without restarts.
@@ -187,6 +196,17 @@ class LLMModelBackend:
         except Exception:
             self._max_hallucination_ratio = 4.0
             self._hallucination_ratio_overrides = {}
+
+    def _model_id_str(self) -> str | None:
+        return getattr(self.model_info, "model_id", None) if self.model_info is not None else None
+
+    def _record_outcome(self, idx: int, text: str, failed: bool, reason: str | None) -> None:
+        outcome = SegmentOutcome(idx, text, failed, reason, model_id=self._model_id_str())
+        bucket = _outcomes_var.get()
+        if bucket is None:
+            self.last_segment_outcomes.append(outcome)
+        else:
+            bucket.append(outcome)
 
     @property
     def _term_manager(self):
@@ -419,6 +439,8 @@ class LLMModelBackend:
         start_time = time.perf_counter()
         tm = self._term_manager
         self.last_reject_reasons = {}
+        self.last_segment_outcomes = []
+        _outcomes_token = _outcomes_var.set([])
 
         # Separate empty/whitespace-only texts (no API call needed)
         non_empty_indices = [i for i, t in enumerate(texts) if t.strip()]
@@ -459,6 +481,20 @@ class LLMModelBackend:
             total_output,
             elapsed,
         )
+
+        # TC-APT-004 / G-03: a provider failure is never a silent passthrough. Any segment
+        # that failed after retries fails the whole call loudly; the caller (retry ladder,
+        # campaign runner) sees a FAILED job, never a shipped same-as-source file.
+        outcomes = _outcomes_var.get() or []
+        _outcomes_var.reset(_outcomes_token)
+        self.last_segment_outcomes = list(outcomes)
+        failed = [o for o in self.last_segment_outcomes if o.failed]
+        if failed:
+            raise LLMSegmentFailure(
+                self.last_segment_outcomes,
+                total=len(texts),
+                circuit_open=any("LLMCircuitOpenError" in (o.reason or "") for o in failed),
+            )
 
         return translations, total_input, total_output
 
@@ -592,6 +628,7 @@ class LLMModelBackend:
                 )
                 self.last_reject_reasons[idx] = reject_reason
                 translations[idx] = text
+                self._record_outcome(idx, text, False, f"reject:{reject_reason}")
                 return inp_tokens, out_tokens
 
             # TC-AST-02 / TC-H2: Configurable hallucination cap with per-language overrides.
@@ -619,6 +656,9 @@ class LLMModelBackend:
                     )
                     self.last_reject_reasons[idx] = "hallucination_list_marker_reject"
                     translations[idx] = text
+                    self._record_outcome(
+                        idx, text, False, "reject:hallucination_list_marker_reject"
+                    )
                     return inp_tokens, out_tokens
                 logger.error(
                     "LLM hallucination detected: segment %d/%d output is %.1fx input "
@@ -657,11 +697,18 @@ class LLMModelBackend:
                 result = tm.restore(protected)
 
             translations[idx] = repair_mojibake(result)
+            self._record_outcome(idx, translations[idx], False, None)
             return inp_tokens, out_tokens
 
         except Exception as e:
-            logger.error("LLM translation failed for segment %d/%d: %s", idx + 1, total, e)
-            translations[idx] = text  # fallback to source
+            # TC-APT-004 / G-03: NO silent passthrough. The provider wrapper already retried
+            # transient errors; record a failed outcome with an EMPTY text (never the source)
+            # and let translate_with_token_counts() raise LLMSegmentFailure for the batch.
+            logger.error("LLM translation FAILED for segment %d/%d: %s", idx + 1, total, e)
+            translations[idx] = ""
+            self._record_outcome(idx, "", True, f"{type(e).__name__}: {e}"[:200])
+            if isinstance(e, LLMCircuitOpenError):
+                raise
             return 0, 0
 
     def _translate_packed_batch(
@@ -724,12 +771,14 @@ class LLMModelBackend:
                         )
                         self.last_reject_reasons[idx] = reject_reason
                         translations[idx] = texts[idx]
+                        self._record_outcome(idx, texts[idx], False, f"reject:{reject_reason}")
                         continue
 
                     if idx in protected_map:
                         protected_map[idx].protected_text = trans
                         trans = tm.restore(protected_map[idx])
                     translations[idx] = trans
+                    self._record_outcome(idx, trans, False, None)
                 return inp_tokens, out_tokens
             else:
                 # Parsing failed — fall back to per-segment calls
@@ -748,6 +797,8 @@ class LLMModelBackend:
                 return total_in, total_out
 
         except Exception as e:
+            if isinstance(e, LLMCircuitOpenError):
+                raise
             logger.error("Packed batch LLM call failed: %s. Falling back to per-segment.", e)
             total_in, total_out = 0, 0
             for idx in indices:
