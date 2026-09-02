@@ -1,0 +1,1213 @@
+{
+  "schema_version": 1,
+  "taskcard": "TC-APT-006",
+  "generated_at": "2026-09-02T06:55:48.061521+00:00",
+  "seed": 42,
+  "per_site_per_class": 2,
+  "content_repo": "D:/onedrive/Documents/GitHub/aspose.org",
+  "source_count": 51,
+  "by_site": {
+    "blog.aspose.org": 11,
+    "docs.aspose.org": 12,
+    "kb.aspose.org": 12,
+    "products.aspose.org": 2,
+    "reference.aspose.org": 10,
+    "websites.aspose.org": 4
+  },
+  "by_class": {
+    "api_heavy": 37,
+    "long_form": 6,
+    "marketing": 6,
+    "mixed_md_html": 9,
+    "placeholder_heavy": 8,
+    "rtl_cjk_sensitive": 26,
+    "short_metadata": 12,
+    "table_heavy": 26,
+    "technical_prose": 11
+  },
+  "sources": [
+    {
+      "site_id": "blog.aspose.org",
+      "family": "3d",
+      "platform": "java",
+      "source_path": "content/blog.aspose.org/3d/java/3d-scene-management-java/index.md",
+      "source_sha256": "1323a56fe34b6b0a9bf9b0fb8126d147dcba47919cafef0ba633f987fd084fef",
+      "sampled_for_classes": [
+        "api_heavy",
+        "table_heavy"
+      ],
+      "classes": [
+        "api_heavy",
+        "table_heavy"
+      ],
+      "words": 631,
+      "fences": 7,
+      "shortcodes": 1,
+      "html_tags": 0,
+      "table_rows": 7,
+      "identifier_density": 0.0681,
+      "title": "3D Scene Management in Java with Aspose.3D FOSS",
+      "description": "Learn how to create, manipulate, and export 3D scenes in Java using Aspose.3D"
+    },
+    {
+      "site_id": "blog.aspose.org",
+      "family": "3d",
+      "platform": "net",
+      "source_path": "content/blog.aspose.org/3d/net/3d-dotnet-obj-stl-gltf-library/index.md",
+      "source_sha256": "eb2a920585909e2e752703dc88e7777dd5ae625356929a18ffd3b6075ea8ddf1",
+      "sampled_for_classes": [
+        "long_form"
+      ],
+      "classes": [
+        "api_heavy",
+        "long_form",
+        "table_heavy"
+      ],
+      "words": 1594,
+      "fences": 11,
+      "shortcodes": 1,
+      "html_tags": 0,
+      "table_rows": 30,
+      "identifier_density": 0.0514,
+      "title": "Introducing Aspose.3D FOSS for .NET",
+      "description": "Aspose.3D FOSS for .NET is an open-source, MIT-licensed library for loading,"
+    },
+    {
+      "site_id": "blog.aspose.org",
+      "family": "3d",
+      "platform": "net",
+      "source_path": "content/blog.aspose.org/3d/net/introducing-3d-foss-dotnet/index.md",
+      "source_sha256": "969e044f5aec6051574e4e05090ab683ece08c75d970f4a877528c2fc598d8e4",
+      "sampled_for_classes": [
+        "long_form"
+      ],
+      "classes": [
+        "api_heavy",
+        "long_form",
+        "table_heavy"
+      ],
+      "words": 1598,
+      "fences": 11,
+      "shortcodes": 1,
+      "html_tags": 0,
+      "table_rows": 30,
+      "identifier_density": 0.0519,
+      "title": "Introducing Aspose.3D FOSS for .NET",
+      "description": "Aspose.3D FOSS for .NET is an open-source, MIT-licensed library for loading,"
+    },
+    {
+      "site_id": "blog.aspose.org",
+      "family": "cells",
+      "platform": "cpp",
+      "source_path": "content/blog.aspose.org/cells/cpp/cells-foss-model-in-cpp/index.md",
+      "source_sha256": "b6ff4a870b1551dd7fdd03fc3b58db94fc96b76114d03aa8b486bce225c08a41",
+      "sampled_for_classes": [
+        "mixed_md_html",
+        "placeholder_heavy"
+      ],
+      "classes": [
+        "api_heavy",
+        "mixed_md_html",
+        "placeholder_heavy",
+        "rtl_cjk_sensitive"
+      ],
+      "words": 1380,
+      "fences": 3,
+      "shortcodes": 0,
+      "html_tags": 10,
+      "table_rows": 3,
+      "identifier_density": 0.1623,
+      "title": "Inside the Aspose.Cells FOSS Data Model in C++",
+      "description": ">"
+    },
+    {
+      "site_id": "blog.aspose.org",
+      "family": "font",
+      "platform": "python",
+      "source_path": "content/blog.aspose.org/font/python/_index.md",
+      "source_sha256": "38b109e3fb82c3bda358ded1507456da238a9b15062a74926d55db31ddc2ebd7",
+      "sampled_for_classes": [
+        "short_metadata"
+      ],
+      "classes": [
+        "short_metadata"
+      ],
+      "words": 0,
+      "fences": 0,
+      "shortcodes": 0,
+      "html_tags": 0,
+      "table_rows": 0,
+      "identifier_density": 0.0,
+      "title": "Aspose.Font FOSS for Python",
+      "description": ""
+    },
+    {
+      "site_id": "blog.aspose.org",
+      "family": "note",
+      "platform": "python",
+      "source_path": "content/blog.aspose.org/note/python/introducing-aspose-note-foss-for-python/index.md",
+      "source_sha256": "f2318ef46f26add3db22083daa3aea22de3a2379ef5a46d312e83e5fba802112",
+      "sampled_for_classes": [
+        "placeholder_heavy"
+      ],
+      "classes": [
+        "api_heavy",
+        "placeholder_heavy",
+        "table_heavy"
+      ],
+      "words": 702,
+      "fences": 8,
+      "shortcodes": 4,
+      "html_tags": 0,
+      "table_rows": 20,
+      "identifier_density": 0.0798,
+      "title": "Introducing Aspose.Note FOSS for Python",
+      "description": "Aspose.Note FOSS for Python is now available on PyPI. Work with OneNote"
+    },
+    {
+      "site_id": "blog.aspose.org",
+      "family": "slides",
+      "platform": "python",
+      "source_path": "content/blog.aspose.org/slides/python/slides-key-features-python/index.md",
+      "source_sha256": "a334ad1b0b1d1bc66de6adcf24e824f2d964ffae6bbe467bddfb5c08a3389e9a",
+      "sampled_for_classes": [
+        "rtl_cjk_sensitive"
+      ],
+      "classes": [
+        "api_heavy",
+        "rtl_cjk_sensitive"
+      ],
+      "words": 249,
+      "fences": 6,
+      "shortcodes": 1,
+      "html_tags": 0,
+      "table_rows": 3,
+      "identifier_density": 0.0924,
+      "title": "Aspose.Slides FOSS for Python — Key Features",
+      "description": ">"
+    },
+    {
+      "site_id": "blog.aspose.org",
+      "family": "tex",
+      "platform": "python",
+      "source_path": "content/blog.aspose.org/tex/python/_index.md",
+      "source_sha256": "034ded58ca854bdb61155643693fa5d428459b32a98ab6d7478c80e3e5ca5c6f",
+      "sampled_for_classes": [
+        "api_heavy",
+        "short_metadata"
+      ],
+      "classes": [
+        "api_heavy",
+        "short_metadata"
+      ],
+      "words": 8,
+      "fences": 0,
+      "shortcodes": 0,
+      "html_tags": 0,
+      "table_rows": 0,
+      "identifier_density": 0.125,
+      "title": "Aspose.TeX FOSS for Python",
+      "description": ""
+    },
+    {
+      "site_id": "blog.aspose.org",
+      "family": "words",
+      "platform": "net",
+      "source_path": "content/blog.aspose.org/words/net/words-document-net/index.md",
+      "source_sha256": "d33e2f26fee5c7bc118609f4eed3a7e2be67be98aae9969338051746410d8492",
+      "sampled_for_classes": [
+        "technical_prose"
+      ],
+      "classes": [
+        "rtl_cjk_sensitive",
+        "table_heavy",
+        "technical_prose"
+      ],
+      "words": 1373,
+      "fences": 1,
+      "shortcodes": 0,
+      "html_tags": 0,
+      "table_rows": 9,
+      "identifier_density": 0.1151,
+      "title": "Working with the Document Object Model in Aspose.Words FOSS for .NET",
+      "description": ">"
+    },
+    {
+      "site_id": "blog.aspose.org",
+      "family": "words",
+      "platform": "net",
+      "source_path": "content/blog.aspose.org/words/net/words-word-drawing-shapes-in-net/index.md",
+      "source_sha256": "9571994fefda7fd72834b1059c8f3897430b612e9b081778aae425a3e7ce42bc",
+      "sampled_for_classes": [
+        "rtl_cjk_sensitive",
+        "technical_prose"
+      ],
+      "classes": [
+        "api_heavy",
+        "rtl_cjk_sensitive",
+        "table_heavy",
+        "technical_prose"
+      ],
+      "words": 1277,
+      "fences": 1,
+      "shortcodes": 0,
+      "html_tags": 0,
+      "table_rows": 9,
+      "identifier_density": 0.1214,
+      "title": "Working with Shapes and Drawing Objects in Aspose.Words FOSS for .NET",
+      "description": ">"
+    },
+    {
+      "site_id": "blog.aspose.org",
+      "family": "words",
+      "platform": "python",
+      "source_path": "content/blog.aspose.org/words/python/words-core-management-python/index.md",
+      "source_sha256": "9ec032b156175211f4d61fe503685e3b18eaef08be7a088d06aa561a92142bd8",
+      "sampled_for_classes": [
+        "table_heavy"
+      ],
+      "classes": [
+        "api_heavy",
+        "table_heavy"
+      ],
+      "words": 317,
+      "fences": 6,
+      "shortcodes": 1,
+      "html_tags": 0,
+      "table_rows": 8,
+      "identifier_density": 0.041,
+      "title": "Document Conversion with Aspose.Words FOSS for Python",
+      "description": "Learn how to convert Word documents from DOCX, DOC, RTF, and Markdown"
+    },
+    {
+      "site_id": "docs.aspose.org",
+      "family": "3d",
+      "platform": "net",
+      "source_path": "content/docs.aspose.org/en/3d/net/developer-guide/deformers.md",
+      "source_sha256": "247be9f97c97f6ac33fd58ce94268389b4ea9b88e77b7d66c69f0fd4a9c87aaa",
+      "sampled_for_classes": [
+        "mixed_md_html"
+      ],
+      "classes": [
+        "mixed_md_html",
+        "rtl_cjk_sensitive",
+        "table_heavy"
+      ],
+      "words": 288,
+      "fences": 2,
+      "shortcodes": 0,
+      "html_tags": 2,
+      "table_rows": 13,
+      "identifier_density": 0.0938,
+      "title": "Working with Deformers",
+      "description": ">-"
+    },
+    {
+      "site_id": "docs.aspose.org",
+      "family": "3d",
+      "platform": "python",
+      "source_path": "content/docs.aspose.org/en/3d/python/developer-guide/features.md",
+      "source_sha256": "35c183dff4514ca64d48c7219633b2e681475da65f424bca2265a2bcb997b4ee",
+      "sampled_for_classes": [
+        "long_form"
+      ],
+      "classes": [
+        "api_heavy",
+        "long_form",
+        "rtl_cjk_sensitive",
+        "table_heavy"
+      ],
+      "words": 1686,
+      "fences": 16,
+      "shortcodes": 1,
+      "html_tags": 0,
+      "table_rows": 31,
+      "identifier_density": 0.0813,
+      "title": "Features and Functionalities",
+      "description": "Comprehensive guide to Aspose.3D FOSS for Python features — format support, scene graph, mesh API, materials, math utilities, animation, load/save options, and complete Python code examples."
+    },
+    {
+      "site_id": "docs.aspose.org",
+      "family": "3d",
+      "platform": "python",
+      "source_path": "content/docs.aspose.org/en/3d/python/getting-started/_index.md",
+      "source_sha256": "03292c061470cab5f43c93bd701647e61aede003595b404a4dfbdf5e6f609448",
+      "sampled_for_classes": [
+        "technical_prose"
+      ],
+      "classes": [
+        "technical_prose"
+      ],
+      "words": 327,
+      "fences": 1,
+      "shortcodes": 1,
+      "html_tags": 0,
+      "table_rows": 0,
+      "identifier_density": 0.0336,
+      "title": "Getting Started",
+      "description": "Get up and running with Aspose.3D FOSS for Python, prerequisites, installation, and your first scene in under five minutes."
+    },
+    {
+      "site_id": "docs.aspose.org",
+      "family": "cells",
+      "platform": "go",
+      "source_path": "content/docs.aspose.org/en/cells/go/_index.md",
+      "source_sha256": "9bf1d752d58eeb375a7b8efeed2bf36b04431963570adcdac73a10f6adb3824b",
+      "sampled_for_classes": [
+        "short_metadata"
+      ],
+      "classes": [
+        "short_metadata"
+      ],
+      "words": 37,
+      "fences": 0,
+      "shortcodes": 1,
+      "html_tags": 0,
+      "table_rows": 0,
+      "identifier_density": 0.0541,
+      "title": "Aspose.Cells FOSS for Go",
+      "description": "Go documentation for Aspose.Cells FOSS: create, read, modify, and save Excel spreadsheets."
+    },
+    {
+      "site_id": "docs.aspose.org",
+      "family": "email",
+      "platform": "cpp",
+      "source_path": "content/docs.aspose.org/en/email/cpp/getting-started/installation.md",
+      "source_sha256": "3f0794ef4152ec7baa3909e46bb7d52192b94790e560cec517a1467e202e7064",
+      "sampled_for_classes": [
+        "api_heavy",
+        "table_heavy"
+      ],
+      "classes": [
+        "api_heavy",
+        "table_heavy"
+      ],
+      "words": 281,
+      "fences": 5,
+      "shortcodes": 0,
+      "html_tags": 0,
+      "table_rows": 10,
+      "identifier_density": 0.0747,
+      "title": "Installation",
+      "description": ">-"
+    },
+    {
+      "site_id": "docs.aspose.org",
+      "family": "pdf",
+      "platform": "cpp",
+      "source_path": "content/docs.aspose.org/en/pdf/cpp/developer-guide/facades-api.md",
+      "source_sha256": "f902bcc0d7122f8ffbfb6266be63535efd3d338be29ca7af6acb816b6ddf514c",
+      "sampled_for_classes": [
+        "long_form"
+      ],
+      "classes": [
+        "api_heavy",
+        "long_form",
+        "rtl_cjk_sensitive",
+        "table_heavy"
+      ],
+      "words": 2184,
+      "fences": 13,
+      "shortcodes": 0,
+      "html_tags": 0,
+      "table_rows": 45,
+      "identifier_density": 0.2111,
+      "title": "Facades API",
+      "description": ">-"
+    },
+    {
+      "site_id": "docs.aspose.org",
+      "family": "pdf",
+      "platform": "cpp",
+      "source_path": "content/docs.aspose.org/en/pdf/cpp/developer-guide/pdf-graphics.md",
+      "source_sha256": "c2d0a097cb16af78e97db0e3565d6c377fa047b5af93594cd46ee01c695eba5b",
+      "sampled_for_classes": [
+        "mixed_md_html",
+        "placeholder_heavy",
+        "rtl_cjk_sensitive"
+      ],
+      "classes": [
+        "api_heavy",
+        "mixed_md_html",
+        "placeholder_heavy",
+        "rtl_cjk_sensitive",
+        "table_heavy"
+      ],
+      "words": 1200,
+      "fences": 4,
+      "shortcodes": 0,
+      "html_tags": 5,
+      "table_rows": 21,
+      "identifier_density": 0.1817,
+      "title": "Drawing Vector Graphics on a PDF Page",
+      "description": ">-"
+    },
+    {
+      "site_id": "docs.aspose.org",
+      "family": "pdf",
+      "platform": "net",
+      "source_path": "content/docs.aspose.org/en/pdf/net/developer-guide/graphics-drawing.md",
+      "source_sha256": "aeed15af0f6544fa7f8713bdee5e9df2b34b7daa9ce25d338002ac99962c5b6d",
+      "sampled_for_classes": [
+        "rtl_cjk_sensitive"
+      ],
+      "classes": [
+        "api_heavy",
+        "rtl_cjk_sensitive",
+        "table_heavy"
+      ],
+      "words": 482,
+      "fences": 5,
+      "shortcodes": 0,
+      "html_tags": 0,
+      "table_rows": 17,
+      "identifier_density": 0.1037,
+      "title": "Graphics and Drawing",
+      "description": ">-"
+    },
+    {
+      "site_id": "docs.aspose.org",
+      "family": "slides",
+      "platform": "java",
+      "source_path": "content/docs.aspose.org/en/slides/java/_index.md",
+      "source_sha256": "aeffcb04d0d101a11c9c514bcfb92fe5fcdad26764275ab1c036a417172b35e4",
+      "sampled_for_classes": [
+        "short_metadata"
+      ],
+      "classes": [
+        "short_metadata"
+      ],
+      "words": 64,
+      "fences": 0,
+      "shortcodes": 1,
+      "html_tags": 0,
+      "table_rows": 0,
+      "identifier_density": 0.0156,
+      "title": "Aspose.Slides FOSS for Java",
+      "description": "Java documentation for Aspose.Slides FOSS: create and edit PowerPoint presentations without Microsoft Office via Maven."
+    },
+    {
+      "site_id": "docs.aspose.org",
+      "family": "slides",
+      "platform": "python",
+      "source_path": "content/docs.aspose.org/en/slides/python/getting-started/quickstart.md",
+      "source_sha256": "57323a5a1fd9b160f037e972008c84d21e37bb3d64134bfd07b2b40ee8feac60",
+      "sampled_for_classes": [
+        "api_heavy",
+        "table_heavy"
+      ],
+      "classes": [
+        "api_heavy",
+        "table_heavy"
+      ],
+      "words": 245,
+      "fences": 4,
+      "shortcodes": 1,
+      "html_tags": 0,
+      "table_rows": 5,
+      "identifier_density": 0.0694,
+      "title": "Quick Start",
+      "description": ">-"
+    },
+    {
+      "site_id": "docs.aspose.org",
+      "family": "words",
+      "platform": "net",
+      "source_path": "content/docs.aspose.org/en/words/net/developer-guide/format.md",
+      "source_sha256": "5e92723089ca80f0102ed247d50c797536ef4141f0788befab8303cf1ca97d5d",
+      "sampled_for_classes": [
+        "technical_prose"
+      ],
+      "classes": [
+        "api_heavy",
+        "rtl_cjk_sensitive",
+        "table_heavy",
+        "technical_prose"
+      ],
+      "words": 768,
+      "fences": 0,
+      "shortcodes": 0,
+      "html_tags": 1,
+      "table_rows": 13,
+      "identifier_density": 0.1745,
+      "title": "Field Result Formatting",
+      "description": ">-"
+    },
+    {
+      "site_id": "docs.aspose.org",
+      "family": "words",
+      "platform": "net",
+      "source_path": "content/docs.aspose.org/en/words/net/developer-guide/page-set.md",
+      "source_sha256": "10a8ee97f931bb78af87558c3055499e28707027f8a2d48f6e46406c366294f1",
+      "sampled_for_classes": [
+        "placeholder_heavy"
+      ],
+      "classes": [
+        "mixed_md_html",
+        "placeholder_heavy",
+        "rtl_cjk_sensitive",
+        "table_heavy",
+        "technical_prose"
+      ],
+      "words": 522,
+      "fences": 0,
+      "shortcodes": 0,
+      "html_tags": 4,
+      "table_rows": 7,
+      "identifier_density": 0.1015,
+      "title": "Working with Page Sets",
+      "description": ">-"
+    },
+    {
+      "site_id": "kb.aspose.org",
+      "family": "3d",
+      "platform": "python",
+      "source_path": "content/kb.aspose.org/en/3d/python/how-to-load-3d-models-in-python.md",
+      "source_sha256": "2f147ccf5e40e3011dfae8ccb0fb68325028ebf255f39351463a976e9f05beac",
+      "sampled_for_classes": [
+        "rtl_cjk_sensitive"
+      ],
+      "classes": [
+        "api_heavy",
+        "rtl_cjk_sensitive"
+      ],
+      "words": 699,
+      "fences": 8,
+      "shortcodes": 3,
+      "html_tags": 0,
+      "table_rows": 0,
+      "identifier_density": 0.0801,
+      "title": "How to Load 3D Models in Python",
+      "description": "Learn how to open OBJ, STL, glTF, COLLADA, and 3MF files in Python using Aspose.3D FOSS, traverse the scene graph, and read mesh geometry including vertices, polygons, and UV data."
+    },
+    {
+      "site_id": "kb.aspose.org",
+      "family": "cells",
+      "platform": "go",
+      "source_path": "content/kb.aspose.org/en/cells/go/_index.md",
+      "source_sha256": "43090e303d03ca4bbc259929e552bf8dba9db4277a3b9474c53516d3b1709064",
+      "sampled_for_classes": [
+        "short_metadata"
+      ],
+      "classes": [
+        "short_metadata"
+      ],
+      "words": 31,
+      "fences": 0,
+      "shortcodes": 1,
+      "html_tags": 0,
+      "table_rows": 0,
+      "identifier_density": 0.0323,
+      "title": "Aspose.Cells FOSS for Go",
+      "description": "Go how-to guides for Aspose.Cells FOSS: create, read, modify, and save Excel spreadsheets."
+    },
+    {
+      "site_id": "kb.aspose.org",
+      "family": "cells",
+      "platform": "java",
+      "source_path": "content/kb.aspose.org/en/cells/java/how-to-load-spreadsheet-java.md",
+      "source_sha256": "418702b176e697bde24ac9bcf859734e13a9f00c0831b262a47e2558e158330a",
+      "sampled_for_classes": [
+        "table_heavy"
+      ],
+      "classes": [
+        "api_heavy",
+        "table_heavy"
+      ],
+      "words": 348,
+      "fences": 6,
+      "shortcodes": 2,
+      "html_tags": 0,
+      "table_rows": 6,
+      "identifier_density": 0.0575,
+      "title": "How to Load a Spreadsheet in Java",
+      "description": ">-"
+    },
+    {
+      "site_id": "kb.aspose.org",
+      "family": "cells",
+      "platform": "python",
+      "source_path": "content/kb.aspose.org/en/cells/python/troubleshooting.md",
+      "source_sha256": "431f6e76705b6f9c9380a107f4ab3a5a335857e2a099d1d12951d9a16597d282",
+      "sampled_for_classes": [
+        "technical_prose"
+      ],
+      "classes": [
+        "api_heavy",
+        "rtl_cjk_sensitive",
+        "table_heavy",
+        "technical_prose"
+      ],
+      "words": 597,
+      "fences": 1,
+      "shortcodes": 0,
+      "html_tags": 0,
+      "table_rows": 8,
+      "identifier_density": 0.1206,
+      "title": "Troubleshooting Guides",
+      "description": "Common Aspose.Cells FOSS for Python errors and fixes: CSV encoding issues with `CSVHandler`, `AutoFilter` loading failures, Agile-only encryption support via `AgileEncryptionParameters`, and `CellValueHandler` cell-type parsing mismatches."
+    },
+    {
+      "site_id": "kb.aspose.org",
+      "family": "email",
+      "platform": "cpp",
+      "source_path": "content/kb.aspose.org/en/email/cpp/how-to-create-email-cpp.md",
+      "source_sha256": "f048a25fc3e90109954e6c66818ad82cc8787126266d602cf6ca2ab45c33a155",
+      "sampled_for_classes": [
+        "mixed_md_html"
+      ],
+      "classes": [
+        "api_heavy",
+        "mixed_md_html"
+      ],
+      "words": 567,
+      "fences": 12,
+      "shortcodes": 0,
+      "html_tags": 3,
+      "table_rows": 0,
+      "identifier_density": 0.0688,
+      "title": "How to Create an Email Message in C++",
+      "description": ">"
+    },
+    {
+      "site_id": "kb.aspose.org",
+      "family": "email",
+      "platform": "cpp",
+      "source_path": "content/kb.aspose.org/en/email/cpp/how-to-get-started-email-cpp.md",
+      "source_sha256": "0c639ee8940c412c6effb335568931f524c31ba13b43656a12fcbdc433394839",
+      "sampled_for_classes": [
+        "mixed_md_html",
+        "placeholder_heavy"
+      ],
+      "classes": [
+        "api_heavy",
+        "mixed_md_html",
+        "placeholder_heavy"
+      ],
+      "words": 592,
+      "fences": 5,
+      "shortcodes": 2,
+      "html_tags": 2,
+      "table_rows": 0,
+      "identifier_density": 0.0693,
+      "title": "How to Get Started with Aspose.Email FOSS for C++",
+      "description": ">"
+    },
+    {
+      "site_id": "kb.aspose.org",
+      "family": "pdf",
+      "platform": "java",
+      "source_path": "content/kb.aspose.org/en/pdf/java/faq.md",
+      "source_sha256": "e18bca73b81c430e072556a8dc4b36392333133b284f81f2a2bfe10536a4c705",
+      "sampled_for_classes": [
+        "api_heavy"
+      ],
+      "classes": [
+        "api_heavy"
+      ],
+      "words": 187,
+      "fences": 5,
+      "shortcodes": 1,
+      "html_tags": 0,
+      "table_rows": 0,
+      "identifier_density": 0.0642,
+      "title": "FAQ — Aspose.PDF FOSS for Java",
+      "description": "Frequently asked questions about Aspose.PDF FOSS for Java."
+    },
+    {
+      "site_id": "kb.aspose.org",
+      "family": "slides",
+      "platform": "cpp",
+      "source_path": "content/kb.aspose.org/en/slides/cpp/_index.md",
+      "source_sha256": "6ab1b185d90472e6ac29f8b051fe5d01ef89c060049053980fcb1be3cc71143a",
+      "sampled_for_classes": [
+        "short_metadata"
+      ],
+      "classes": [
+        "short_metadata"
+      ],
+      "words": 36,
+      "fences": 0,
+      "shortcodes": 1,
+      "html_tags": 0,
+      "table_rows": 0,
+      "identifier_density": 0.0833,
+      "title": "Aspose.Slides FOSS for C++",
+      "description": "C++ how-to guides for Aspose.Slides FOSS: create presentations, add shapes, apply formatting, and work with images without Microsoft Office."
+    },
+    {
+      "site_id": "kb.aspose.org",
+      "family": "slides",
+      "platform": "cpp",
+      "source_path": "content/kb.aspose.org/en/slides/cpp/how-to-apply-3d-effects-cpp.md",
+      "source_sha256": "46ce2543f1b734e2fde4a870b1de43a8a7f53213b0f2fd992abbc3adf73986a7",
+      "sampled_for_classes": [
+        "api_heavy",
+        "rtl_cjk_sensitive"
+      ],
+      "classes": [
+        "api_heavy",
+        "rtl_cjk_sensitive"
+      ],
+      "words": 306,
+      "fences": 8,
+      "shortcodes": 0,
+      "html_tags": 0,
+      "table_rows": 0,
+      "identifier_density": 0.1471,
+      "title": "How to Apply 3D Effects and Shadows to Shapes",
+      "description": "Apply 3D bevels, camera presets, light rigs, outer shadows, glow, and blur to PowerPoint shapes using Aspose.Slides FOSS for C++."
+    },
+    {
+      "site_id": "kb.aspose.org",
+      "family": "slides",
+      "platform": "net",
+      "source_path": "content/kb.aspose.org/en/slides/net/how-to-get-started-slides-dotnet.md",
+      "source_sha256": "25fa2ab45f9441e0617105c85436183e9aa95b335fc38895159a97e66a5806ae",
+      "sampled_for_classes": [
+        "placeholder_heavy"
+      ],
+      "classes": [
+        "api_heavy",
+        "placeholder_heavy"
+      ],
+      "words": 413,
+      "fences": 6,
+      "shortcodes": 3,
+      "html_tags": 1,
+      "table_rows": 0,
+      "identifier_density": 0.0726,
+      "title": "How to Get Started with Aspose.Slides FOSS for .NET",
+      "description": ">"
+    },
+    {
+      "site_id": "kb.aspose.org",
+      "family": "slides",
+      "platform": "python",
+      "source_path": "content/kb.aspose.org/en/slides/python/how-to-work-with-charts-python.md",
+      "source_sha256": "3e2bf6bbac52fa5ea3cc5c26d32a1617ff1bbffe812befd854d0dd5813f59c09",
+      "sampled_for_classes": [
+        "table_heavy"
+      ],
+      "classes": [
+        "table_heavy"
+      ],
+      "words": 116,
+      "fences": 1,
+      "shortcodes": 1,
+      "html_tags": 0,
+      "table_rows": 5,
+      "identifier_density": 0.0345,
+      "title": "Work With Charts Python",
+      "description": ">-"
+    },
+    {
+      "site_id": "kb.aspose.org",
+      "family": "words",
+      "platform": "net",
+      "source_path": "content/kb.aspose.org/en/words/net/how-to-work-with-charts-dotnet.md",
+      "source_sha256": "09bd9d0aeff908721dfdb19436ea0195ce9b84176ee2d5fa2535318d000d11a9",
+      "sampled_for_classes": [
+        "technical_prose"
+      ],
+      "classes": [
+        "api_heavy",
+        "rtl_cjk_sensitive",
+        "technical_prose"
+      ],
+      "words": 778,
+      "fences": 1,
+      "shortcodes": 2,
+      "html_tags": 0,
+      "table_rows": 0,
+      "identifier_density": 0.1799,
+      "title": "How to Work with Charts in .NET",
+      "description": ">"
+    },
+    {
+      "site_id": "products.aspose.org",
+      "family": "cells",
+      "platform": "",
+      "source_path": "content/products.aspose.org/en/cells/_index.md",
+      "source_sha256": "fc294d79f6b51b36bc91cf27a66739d0c441230ac0924bf8b691c508dd5599a0",
+      "sampled_for_classes": [
+        "marketing",
+        "short_metadata"
+      ],
+      "classes": [
+        "marketing",
+        "short_metadata"
+      ],
+      "words": 0,
+      "fences": 0,
+      "shortcodes": 0,
+      "html_tags": 0,
+      "table_rows": 0,
+      "identifier_density": 0.0,
+      "title": "Aspose.Cells FOSS",
+      "description": "Create, read, modify, and save Excel .xlsx workbooks — free, MIT-licensed, zero Office dependency. Available for .NET, C++, Go, Java, Python, Rust, and TypeScript."
+    },
+    {
+      "site_id": "products.aspose.org",
+      "family": "cells",
+      "platform": "typescript",
+      "source_path": "content/products.aspose.org/en/cells/typescript/_index.md",
+      "source_sha256": "5d5d4c274a86b8a5d8ce97c7d63a4fedb516bc34cff417c63ce5a553d2d25d21",
+      "sampled_for_classes": [
+        "marketing",
+        "short_metadata"
+      ],
+      "classes": [
+        "marketing",
+        "short_metadata"
+      ],
+      "words": 0,
+      "fences": 0,
+      "shortcodes": 0,
+      "html_tags": 0,
+      "table_rows": 0,
+      "identifier_density": 0.0,
+      "title": "Aspose.Cells FOSS for TypeScript",
+      "description": "|"
+    },
+    {
+      "site_id": "reference.aspose.org",
+      "family": "3d",
+      "platform": "java",
+      "source_path": "content/reference.aspose.org/en/3d/java/VertexElementFVector.md",
+      "source_sha256": "b62a6fa1d2959e8f0ae53c96e52c77a6399ba600aabd665cac5bd62f77be28bb",
+      "sampled_for_classes": [
+        "placeholder_heavy"
+      ],
+      "classes": [
+        "api_heavy",
+        "mixed_md_html",
+        "placeholder_heavy",
+        "rtl_cjk_sensitive",
+        "table_heavy",
+        "technical_prose"
+      ],
+      "words": 382,
+      "fences": 0,
+      "shortcodes": 0,
+      "html_tags": 4,
+      "table_rows": 29,
+      "identifier_density": 0.1675,
+      "title": "VertexElementFVector",
+      "description": "`VertexElementFVector` class (inherits VertexElement) with 19 methods and 6 properties"
+    },
+    {
+      "site_id": "reference.aspose.org",
+      "family": "cells",
+      "platform": "java",
+      "source_path": "content/reference.aspose.org/en/cells/java/Column.md",
+      "source_sha256": "00fcc285840d447f70b48f8c89bd2e525ae752c7a4e069b870b70a9ffd562ca2",
+      "sampled_for_classes": [
+        "technical_prose"
+      ],
+      "classes": [
+        "api_heavy",
+        "rtl_cjk_sensitive",
+        "table_heavy",
+        "technical_prose"
+      ],
+      "words": 310,
+      "fences": 0,
+      "shortcodes": 0,
+      "html_tags": 0,
+      "table_rows": 16,
+      "identifier_density": 0.1419,
+      "title": "Column",
+      "description": "`Column` class with 8 methods and 4 properties"
+    },
+    {
+      "site_id": "reference.aspose.org",
+      "family": "html",
+      "platform": "python",
+      "source_path": "content/reference.aspose.org/en/html/python/DoctypeToken.md",
+      "source_sha256": "102da92d30489d7b8e0b60751f47da092fa2bc752a1a6b967c4cebbc4bcda5c8",
+      "sampled_for_classes": [
+        "api_heavy",
+        "rtl_cjk_sensitive",
+        "table_heavy"
+      ],
+      "classes": [
+        "api_heavy",
+        "rtl_cjk_sensitive",
+        "table_heavy"
+      ],
+      "words": 124,
+      "fences": 0,
+      "shortcodes": 0,
+      "html_tags": 0,
+      "table_rows": 8,
+      "identifier_density": 0.1694,
+      "title": "DoctypeToken",
+      "description": "`DoctypeToken` class with 6 properties"
+    },
+    {
+      "site_id": "reference.aspose.org",
+      "family": "html",
+      "platform": "python",
+      "source_path": "content/reference.aspose.org/en/html/python/HTMLHtmlElement.md",
+      "source_sha256": "5d5b9c7ad12ebf97e898625027a66a5be385f398aefd0c1e69eb41f70f0991d8",
+      "sampled_for_classes": [
+        "long_form"
+      ],
+      "classes": [
+        "api_heavy",
+        "long_form",
+        "rtl_cjk_sensitive",
+        "table_heavy"
+      ],
+      "words": 2597,
+      "fences": 0,
+      "shortcodes": 0,
+      "html_tags": 1,
+      "table_rows": 151,
+      "identifier_density": 0.1683,
+      "title": "HTMLHtmlElement",
+      "description": "`HTMLHtmlElement` class (inherits HTMLElement) with 78 methods and 70 properties"
+    },
+    {
+      "site_id": "reference.aspose.org",
+      "family": "pdf",
+      "platform": "java",
+      "source_path": "content/reference.aspose.org/en/pdf/java/PdfAValidator.md",
+      "source_sha256": "9b362d84ca5980da970d214335f22de53c8761416ae5d524cc94301ef97b4041",
+      "sampled_for_classes": [
+        "mixed_md_html"
+      ],
+      "classes": [
+        "api_heavy",
+        "mixed_md_html",
+        "rtl_cjk_sensitive",
+        "table_heavy"
+      ],
+      "words": 153,
+      "fences": 0,
+      "shortcodes": 0,
+      "html_tags": 3,
+      "table_rows": 9,
+      "identifier_density": 0.098,
+      "title": "PdfAValidator",
+      "description": "`PdfAValidator` class with 4 methods and 1 property"
+    },
+    {
+      "site_id": "reference.aspose.org",
+      "family": "pdf",
+      "platform": "java",
+      "source_path": "content/reference.aspose.org/en/pdf/java/UnsupportedPageOperation.md",
+      "source_sha256": "765d174ae1525a849fdc47df39f3a81ff80df99309148de591ca85f631d1ce85",
+      "sampled_for_classes": [
+        "short_metadata"
+      ],
+      "classes": [
+        "api_heavy",
+        "rtl_cjk_sensitive",
+        "short_metadata"
+      ],
+      "words": 74,
+      "fences": 0,
+      "shortcodes": 0,
+      "html_tags": 0,
+      "table_rows": 3,
+      "identifier_density": 0.0946,
+      "title": "UnsupportedPageOperation",
+      "description": "`UnsupportedPageOperation` class (inherits RuntimeException) with 1 method"
+    },
+    {
+      "site_id": "reference.aspose.org",
+      "family": "pdf",
+      "platform": "java",
+      "source_path": "content/reference.aspose.org/en/pdf/java/XfaPageSplitter.md",
+      "source_sha256": "8ae438db5043981852626040c10619acc92906cc35b9fb88ba60e0dfe16f8e40",
+      "sampled_for_classes": [
+        "mixed_md_html",
+        "placeholder_heavy"
+      ],
+      "classes": [
+        "api_heavy",
+        "mixed_md_html",
+        "placeholder_heavy",
+        "technical_prose"
+      ],
+      "words": 363,
+      "fences": 0,
+      "shortcodes": 0,
+      "html_tags": 8,
+      "table_rows": 2,
+      "identifier_density": 0.0551,
+      "title": "XfaPageSplitter",
+      "description": "`XfaPageSplitter` class with 6 methods"
+    },
+    {
+      "site_id": "reference.aspose.org",
+      "family": "pdf",
+      "platform": "net",
+      "source_path": "content/reference.aspose.org/en/pdf/net/ResourceSavingInfo.md",
+      "source_sha256": "a40e20487a031e5063199f078f36d798b68da40fe7b654925f0ad8d03cf06c70",
+      "sampled_for_classes": [
+        "short_metadata"
+      ],
+      "classes": [
+        "api_heavy",
+        "rtl_cjk_sensitive",
+        "short_metadata"
+      ],
+      "words": 51,
+      "fences": 0,
+      "shortcodes": 0,
+      "html_tags": 0,
+      "table_rows": 3,
+      "identifier_density": 0.1176,
+      "title": "ResourceSavingInfo",
+      "description": "`ResourceSavingInfo` class with 1 property"
+    },
+    {
+      "site_id": "reference.aspose.org",
+      "family": "slides",
+      "platform": "cpp",
+      "source_path": "content/reference.aspose.org/en/slides/cpp/TextFrameFormat.md",
+      "source_sha256": "681ef0db00fcfa7e5dcdf7f538d14c4b619d285683e82325188b9fa144724942",
+      "sampled_for_classes": [
+        "api_heavy",
+        "rtl_cjk_sensitive",
+        "table_heavy",
+        "technical_prose"
+      ],
+      "classes": [
+        "api_heavy",
+        "rtl_cjk_sensitive",
+        "table_heavy",
+        "technical_prose"
+      ],
+      "words": 763,
+      "fences": 0,
+      "shortcodes": 0,
+      "html_tags": 1,
+      "table_rows": 56,
+      "identifier_density": 0.1455,
+      "title": "TextFrameFormat",
+      "description": "`TextFrameFormat` class with 46 methods and 6 properties"
+    },
+    {
+      "site_id": "reference.aspose.org",
+      "family": "slides",
+      "platform": "java",
+      "source_path": "content/reference.aspose.org/en/slides/java/Color.md",
+      "source_sha256": "b36247d090a399487591b33c337951e76416161b9230cedcd7f728d6ee325367",
+      "sampled_for_classes": [
+        "long_form"
+      ],
+      "classes": [
+        "api_heavy",
+        "long_form",
+        "rtl_cjk_sensitive",
+        "table_heavy"
+      ],
+      "words": 1706,
+      "fences": 0,
+      "shortcodes": 0,
+      "html_tags": 0,
+      "table_rows": 170,
+      "identifier_density": 0.2567,
+      "title": "Color",
+      "description": "`Color` class with 19 methods and 147 properties"
+    },
+    {
+      "site_id": "websites.aspose.org",
+      "family": "aspose",
+      "platform": "com",
+      "source_path": "content/websites.aspose.org/en/aspose/com/_index.md",
+      "source_sha256": "b6b931ef3ce00c849a04548ef24d3e238f06486fa8e2bc559b5374386d78696c",
+      "sampled_for_classes": [
+        "marketing",
+        "short_metadata"
+      ],
+      "classes": [
+        "marketing",
+        "short_metadata"
+      ],
+      "words": 0,
+      "fences": 0,
+      "shortcodes": 0,
+      "html_tags": 0,
+      "table_rows": 0,
+      "identifier_density": 0.0,
+      "title": "Aspose High Code SDKs",
+      "description": "Aspose APIs"
+    },
+    {
+      "site_id": "websites.aspose.org",
+      "family": "conholdate",
+      "platform": "app",
+      "source_path": "content/websites.aspose.org/en/conholdate/app/_index.md",
+      "source_sha256": "d6eca8f0f7b0e2fe289614d05fa4674106059dadecb0f1ea6c6debf94101185d",
+      "sampled_for_classes": [
+        "marketing",
+        "short_metadata"
+      ],
+      "classes": [
+        "marketing",
+        "short_metadata"
+      ],
+      "words": 0,
+      "fences": 0,
+      "shortcodes": 0,
+      "html_tags": 0,
+      "table_rows": 0,
+      "identifier_density": 0.0,
+      "title": "Conholdate Free Online Document Automation",
+      "description": "Translate, view, convert, edit, and merge PowerPoint, Word, Excel, OpenOffice, AutoCAD, and image files online without additional software."
+    },
+    {
+      "site_id": "websites.aspose.org",
+      "family": "groupdocs",
+      "platform": "app",
+      "source_path": "content/websites.aspose.org/en/groupdocs/app/_index.md",
+      "source_sha256": "63e0eded8b26705cd867b9025d54cef140a7db528fce62a195fc71c84a35ba9f",
+      "sampled_for_classes": [
+        "api_heavy",
+        "rtl_cjk_sensitive"
+      ],
+      "classes": [
+        "api_heavy",
+        "marketing",
+        "rtl_cjk_sensitive"
+      ],
+      "words": 1176,
+      "fences": 0,
+      "shortcodes": 0,
+      "html_tags": 0,
+      "table_rows": 0,
+      "identifier_density": 0.1573,
+      "title": "",
+      "description": ""
+    },
+    {
+      "site_id": "websites.aspose.org",
+      "family": "groupdocs",
+      "platform": "com",
+      "source_path": "content/websites.aspose.org/en/groupdocs/com/_index.md",
+      "source_sha256": "95ef780368cc190ad461e9b23f51947266ea9ae5357d05b4723dc3743716c531",
+      "sampled_for_classes": [
+        "api_heavy",
+        "rtl_cjk_sensitive"
+      ],
+      "classes": [
+        "api_heavy",
+        "marketing",
+        "rtl_cjk_sensitive"
+      ],
+      "words": 451,
+      "fences": 0,
+      "shortcodes": 0,
+      "html_tags": 0,
+      "table_rows": 0,
+      "identifier_density": 0.1286,
+      "title": "",
+      "description": ""
+    }
+  ]
+}
