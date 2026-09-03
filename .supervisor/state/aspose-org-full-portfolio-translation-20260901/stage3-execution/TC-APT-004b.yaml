@@ -48,10 +48,31 @@ live_run:
     gate_promotion_run.py job was NOT affected (it calls write_gate.py's
     run_all_content_gates() directly, which never touches LanguageDetectionCheck --
     confirmed by grep before deciding not to restart it) and was left running.
-  run_id: gate1-full-v2
-  command: "python -m scripts.campaign.run_llm_qualification --content-root D:/onedrive/Documents/GitHub/aspose.org --run-id gate1-full-v2 --concurrency 4"
-  status: "RESTARTED clean at wake 3 (background task b3plm3ie4) against the post-fix engine build -- 155 cells, serialized via model_lock, multi-hour run expected"
-  observed_pre_restart: "0 occurrences of GATE31..GATE44 marker strings in the aborted run's log through 30 cells -- no unvalidated-write-gate false-positive signal yet (separate from the LanguageDetectionCheck defect above), consistent with TC-APT-023's finding that content-level defects are rare, but the sample was still small"
+  run_id_lost_to_reboot: gate1-full-v2
+  status_at_loss: "50/155 cells done, 20 accepted (40%), ~3h35m elapsed (background task b3plm3ie4), then exited with bare code 4 and no Python traceback around 2026-09-02 21:52"
+  root_cause_of_loss: >
+    Confirmed via `Get-CimInstance Win32_OperatingSystem | LastBootUpTime`: the host
+    machine rebooted at 2026-09-03 09:18 -- overnight, ~11.5 hours after the process
+    died and well after the wake-3 ScheduleWakeup (21:02) should have fired. The whole
+    OS went away, which explains both the process death AND why the scheduled wakeup
+    never re-invoked this session (there was no session to re-invoke). Not a bug in
+    the qualification harness or this mission's own code; a genuine environment
+    interruption outside session control. All 50 completed cells' results were lost --
+    the harness only wrote results.jsonl at the very end, with no incremental
+    persistence.
+  reliability_fix: >
+    scripts/campaign/run_llm_qualification.py (commit 175b245): each job's record is
+    now appended to data/qualification/<run-id>/checkpoint.jsonl as soon as it
+    completes; a new --resume flag loads that file and skips any (source,locale) cell
+    already recorded. Verified end-to-end: a 2-cell run killed mid-second-cell left one
+    checkpointed record; --resume correctly identified it and would only re-run the
+    remaining cell. This mission has now lost a multi-hour run to interruption twice
+    (once a deliberate restart, once this reboot) -- checkpointing is a demonstrated
+    necessity, not speculative hardening.
+  run_id: gate1-full-v3
+  command: "python -m scripts.campaign.run_llm_qualification --content-root D:/onedrive/Documents/GitHub/aspose.org --run-id gate1-full-v3 --concurrency 4"
+  status: "RESTARTED clean at wake 4 (background task bdf7qvrbj), checkpointed this time -- if interrupted again, resume with the same run-id + --resume rather than starting over"
+  observed_pre_loss: "0 occurrences of GATE31..GATE44 marker strings in gate1-full-v2's log through 50 cells -- no unvalidated-write-gate false-positive signal, consistent with TC-APT-023's finding that content-level defects are rare, but the sample was still small. gate1-full-v2's 40% acceptance rate at 20 cells (vs 27% pre-verification-fix) is superseded by whatever gate1-full-v3 measures fresh, but is consistent directional evidence the language_check.py fix mattered."
 acceptance_bar_from_plan_6.1: "zero unresolved gate failures and zero Claude REJECT_* verdicts across the full qualification sample, reproduced on a second independent run of the same sample -- per TC-APT-023's measured 0.75 byte-identical / 0.8125 semantic-equivalence rerun rates, 'reproduced' means the SEMANTIC contract (all 44 gates pass + similarity >= threshold on both runs), not byte-identical output"
 next_steps:
   - "let gate1-full finish; evaluate acceptance_rate, gate_failure_histogram, unexpected_model_fingerprints"
