@@ -19,6 +19,7 @@ import pytest
 from src.translation_engine.extractor.text_unit import TextUnit, TextUnitKind
 from src.translation_engine.extractor.text_unit_extractor import (
     TextUnitExtractor,
+    _link_text_is_brand_navigation_label,
     _link_text_matches_url_slug,
 )
 from src.translation_engine.parser.ast_nodes import (
@@ -205,6 +206,56 @@ class TestNodeTypes:
         # empty inputs are inert, not a crash
         assert not _link_text_matches_url_slug("", "https://example.com/x")
         assert not _link_text_matches_url_slug("x", "")
+
+    def test_bare_url_as_link_text_is_protected(self):
+        """TC-APT-004b: `[https://x](https://x)` -- a plain reference link whose
+        visible text IS its own href -- has no natural-language content at all."""
+        extractor = TextUnitExtractor(segmentation_strategy="leaf_only")
+        url = "https://github.com/aspose-3d-foss/Aspose.3D-FOSS-for-NET"
+        link = ASTNode(type=NodeType.LINK, attrs={"url": url}, children=[text_node(url)])
+        para = paragraph_node([link])
+        para.assign_addresses("body.paragraph[0]")
+
+        plan = extractor.extract_from_ast([para])
+
+        assert len(plan.units) == 1
+        assert plan.units[0].do_not_translate is True
+
+    def test_brand_navigation_label_helper(self):
+        """TC-APT-004b: confirmed against REAL, already-shipped translations --
+        blog.aspose.org/3d/net/introducing-3d-foss-dotnet's French and German
+        versions both leave '[Aspose.3D KB]' completely untranslated, matching
+        the established site convention for these fixed navigation labels."""
+        assert _link_text_is_brand_navigation_label("Aspose.3D KB")
+        assert _link_text_is_brand_navigation_label("Aspose.3D API Reference")
+        assert _link_text_is_brand_navigation_label("Aspose.3D — Enterprise Blog")
+        assert _link_text_is_brand_navigation_label(
+            "Aspose.Slides — Enterprise API Reference"
+        )
+        assert _link_text_is_brand_navigation_label("Aspose.3D")
+        # a lowercase connector word means this is a real sentence, not a label
+        assert not _link_text_is_brand_navigation_label("Aspose.3D FOSS for Java")
+        assert not _link_text_is_brand_navigation_label(
+            "Learn more about Aspose.3D and its features"
+        )
+        # not a brand-prefixed string at all
+        assert not _link_text_is_brand_navigation_label("Developer Guide")
+        assert not _link_text_is_brand_navigation_label("")
+
+    def test_brand_navigation_label_link_is_protected(self):
+        extractor = TextUnitExtractor(segmentation_strategy="leaf_only")
+        link = ASTNode(
+            type=NodeType.LINK,
+            attrs={"url": "/kb/3d/net/"},
+            children=[text_node("Aspose.3D KB")],
+        )
+        para = paragraph_node([link])
+        para.assign_addresses("body.paragraph[0]")
+
+        plan = extractor.extract_from_ast([para])
+
+        assert len(plan.units) == 1
+        assert plan.units[0].do_not_translate is True
 
     def test_image_alt_extraction(self):
         """Test image alt text is extracted but src is not."""

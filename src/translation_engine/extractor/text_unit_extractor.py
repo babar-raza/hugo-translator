@@ -261,6 +261,43 @@ def analyze_segment_variance(segments: list[str]) -> dict[str, Any]:
         }
 
 
+_ASPOSE_BRAND_PREFIX_RE = re.compile(r"^Aspose(?:\.[A-Za-z0-9]+)+")
+_TITLE_CASE_OR_CAPS_WORD_RE = re.compile(r"^[A-Z][A-Za-z0-9]*$|^[A-Z]{2,}$")
+_LEADING_SEPARATOR_RE = re.compile(r"^[\s—–|:-]+")
+
+
+def _link_text_is_brand_navigation_label(text: str) -> bool:
+    """A link whose text is a brand token (``Aspose.3D``, ``Aspose.Slides``, ...)
+    optionally followed by short Title-Case/ALL-CAPS words -- e.g. ``Aspose.3D KB``,
+    ``Aspose.3D API Reference``, ``Aspose.Slides -- Enterprise API Reference`` -- is a
+    fixed site-navigation label, not prose. Confirmed against real, already-shipped
+    translations, not guessed: reference.aspose.org's own French and German
+    translations of blog.aspose.org/3d/net/introducing-3d-foss-dotnet/index.md both
+    leave ``[Aspose.3D KB]`` completely untranslated while translating the
+    surrounding prose -- this is the established site convention, and TC-SAS-01's
+    zero-tolerance same-as-source check was penalizing a model for correctly
+    matching it (128+ links across just blog.aspose.org use this exact "Aspose.X
+    KB"/"Aspose.X API Reference" shape, so this is a portfolio-scale pattern, not
+    an isolated case).
+
+    Deliberately narrow: only fires when EVERY word after the brand token is
+    Title-Case or ALL-CAPS (no lowercase connector words), which is what
+    distinguishes a navigation label ("Aspose.3D API Reference") from a real
+    sentence that happens to mention a product ("Aspose.3D FOSS for Java" has a
+    lowercase "for" and stays translatable prose).
+    """
+    text = text.strip()
+    if not text or len(text) > 60:
+        return False
+    match = _ASPOSE_BRAND_PREFIX_RE.match(text)
+    if not match:
+        return False
+    remainder = _LEADING_SEPARATOR_RE.sub("", text[match.end() :]).strip()
+    if not remainder:
+        return True
+    return all(_TITLE_CASE_OR_CAPS_WORD_RE.match(word) for word in remainder.split())
+
+
 def _link_text_matches_url_slug(text: str, url: str) -> bool:
     """A link's visible text that is literally the URL's final path segment is an
     identifier (a repo/product slug), not prose -- e.g. the Markdown
@@ -1678,6 +1715,7 @@ class TextUnitExtractor:
                         do_not_translate=(
                             self._is_non_translatable(text)
                             or _link_text_matches_url_slug(text, url)
+                            or _link_text_is_brand_navigation_label(text)
                         ),
                     )
                     units.append(unit)
@@ -2077,6 +2115,18 @@ class TextUnitExtractor:
             logger.debug(
                 "Punctuation-only text detected (protected)",
                 extra={"source_text": sanitize_for_log(text_stripped, 50)},
+            )
+            return True
+
+        # Strategy 0.6: the text IS a bare URL - NEVER translate. Found via
+        # TC-APT-004b qualification on real content: a link whose visible text is
+        # its own href (a common markdown pattern for a plain reference link, e.g.
+        # `[https://github.com/x/y](https://github.com/x/y)`) has no natural
+        # language content at all, but matched none of the other strategies here.
+        if re.match(r"^https?://\S+$", text_stripped):
+            logger.debug(
+                "Bare URL text detected (protected)",
+                extra={"source_text": sanitize_for_log(text_stripped, 80)},
             )
             return True
 
