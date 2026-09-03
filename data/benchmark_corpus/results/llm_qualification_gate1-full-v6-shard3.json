@@ -1,0 +1,5669 @@
+{
+  "taskcard": "TC-APT-004b",
+  "run_id": "gate1-full-v6",
+  "measured_at": "2026-09-03T15:34:42.151222+00:00",
+  "model": "professionalize_llm",
+  "concurrency": 8,
+  "sandbox": "C:\\Users\\prora\\OneDrive\\Documents\\GitHub\\hugo-translator\\data\\qualification\\gate1-full-v6\\content-shard3",
+  "cells": 39,
+  "accepted": 21,
+  "rejected": 18,
+  "acceptance_rate": 0.5385,
+  "seconds": 9016.9,
+  "unexpected_model_fingerprints": [],
+  "gate_failure_histogram": {
+    "error:no output written": 17,
+    "reject_gate_14": 1
+  },
+  "results": [
+    {
+      "site_id": "blog.aspose.org",
+      "source_path": "content/blog.aspose.org/3d/java/3d-scene-management-java/index.md",
+      "source_sha256": "1323a56fe34b6b0a9bf9b0fb8126d147dcba47919cafef0ba633f987fd084fef",
+      "target_lang": "he",
+      "classes": [
+        "api_heavy",
+        "table_heavy"
+      ],
+      "output_path": "C:\\Users\\prora\\OneDrive\\Documents\\GitHub\\hugo-translator\\data\\qualification\\gate1-full-v6\\content-shard3\\blog.aspose.org\\3d\\java\\3d-scene-management-java\\index.he.md",
+      "receipt": {
+        "campaign_id": "",
+        "source_path": "C:\\Users\\prora\\OneDrive\\Documents\\GitHub\\hugo-translator\\data\\qualification\\gate1-full-v6\\content-shard3\\blog.aspose.org\\3d\\java\\3d-scene-management-java\\index.md",
+        "output_path": "C:\\Users\\prora\\OneDrive\\Documents\\GitHub\\hugo-translator\\data\\qualification\\gate1-full-v6\\content-shard3\\blog.aspose.org\\3d\\java\\3d-scene-management-java\\index.he.md",
+        "source_sha256": "1323a56fe34b6b0a9bf9b0fb8126d147dcba47919cafef0ba633f987fd084fef",
+        "output_sha256": "4b1a7b4d8cbc15e6bf53ed273e236f5ef1b9201d2d90a4c0a9ffb06330668692",
+        "target_lang": "he",
+        "validation_policy": "zero-defect",
+        "config_fingerprint": "",
+        "model_fingerprint": "professionalize_llm",
+        "gate_results": {
+          "1": {
+            "passed": true,
+            "action": "verification",
+            "error": null
+          },
+          "9": {
+            "passed": true,
+            "action": "auto_clean",
+            "error": null
+          },
+          "10": {
+            "passed": true,
+            "action": "auto_clean",
+            "error": null
+          },
+          "11": {
+            "passed": true,
+            "action": "auto_clean",
+            "error": null
+          },
+          "12": {
+            "passed": true,
+            "action": "auto_clean",
+            "error": null
+          },
+          "13": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "14": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "15": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "16": {
+            "passed": true,
+            "action": "auto_clean",
+            "error": null
+          },
+          "17": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "18": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "19": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "20": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "21": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "22": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "23": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "24": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "25": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "26": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "27": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "28": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "29": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "30": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "31": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "32": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "33": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "34": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "35": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "36": {
+            "passed": true,
+            "action": "auto_clean",
+            "error": null
+          },
+          "37": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "38": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "39": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "40": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "41": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "42": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "43": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "44": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "2": {
+            "passed": true,
+            "action": "early_return",
+            "error": null
+          },
+          "3": {
+            "passed": true,
+            "action": "early_return",
+            "error": null
+          },
+          "4": {
+            "passed": true,
+            "action": "early_return",
+            "error": null
+          },
+          "5": {
+            "passed": true,
+            "action": "no_op",
+            "error": null
+          },
+          "6": {
+            "passed": true,
+            "action": "early_return",
+            "error": null
+          },
+          "7": {
+            "passed": true,
+            "action": "early_return",
+            "error": null
+          },
+          "8": {
+            "passed": true,
+            "action": "early_return",
+            "error": null
+          }
+        }
+      },
+      "seconds": 267.82,
+      "model_fingerprint": "professionalize_llm",
+      "gates_evaluated": 44,
+      "gate_failures": [],
+      "output_sha256": "4b1a7b4d8cbc15e6bf53ed273e236f5ef1b9201d2d90a4c0a9ffb06330668692",
+      "output_bytes": 14934,
+      "accepted": true
+    },
+    {
+      "site_id": "blog.aspose.org",
+      "source_path": "content/blog.aspose.org/3d/net/3d-dotnet-obj-stl-gltf-library/index.md",
+      "source_sha256": "eb2a920585909e2e752703dc88e7777dd5ae625356929a18ffd3b6075ea8ddf1",
+      "target_lang": "th",
+      "classes": [
+        "api_heavy",
+        "long_form",
+        "table_heavy"
+      ],
+      "output_path": null,
+      "receipt": null,
+      "seconds": 708.91,
+      "model_fingerprint": null,
+      "gates_evaluated": 0,
+      "gate_failures": [],
+      "accepted": false,
+      "error": "no output written",
+      "rejection_gates": []
+    },
+    {
+      "site_id": "blog.aspose.org",
+      "source_path": "content/blog.aspose.org/font/python/_index.md",
+      "source_sha256": "38b109e3fb82c3bda358ded1507456da238a9b15062a74926d55db31ddc2ebd7",
+      "target_lang": "hu",
+      "classes": [
+        "short_metadata"
+      ],
+      "output_path": "C:\\Users\\prora\\OneDrive\\Documents\\GitHub\\hugo-translator\\data\\qualification\\gate1-full-v6\\content-shard3\\blog.aspose.org\\font\\python\\_index.hu.md",
+      "receipt": {
+        "campaign_id": "",
+        "source_path": "C:\\Users\\prora\\OneDrive\\Documents\\GitHub\\hugo-translator\\data\\qualification\\gate1-full-v6\\content-shard3\\blog.aspose.org\\font\\python\\_index.md",
+        "output_path": "C:\\Users\\prora\\OneDrive\\Documents\\GitHub\\hugo-translator\\data\\qualification\\gate1-full-v6\\content-shard3\\blog.aspose.org\\font\\python\\_index.hu.md",
+        "source_sha256": "38b109e3fb82c3bda358ded1507456da238a9b15062a74926d55db31ddc2ebd7",
+        "output_sha256": "1109e0f1095d4e1cbf3a8e56e6be436c71ea8d8553189c8830779a65339f0046",
+        "target_lang": "hu",
+        "validation_policy": "zero-defect",
+        "config_fingerprint": "",
+        "model_fingerprint": "professionalize_llm",
+        "gate_results": {
+          "1": {
+            "passed": true,
+            "action": "verification",
+            "error": null
+          },
+          "9": {
+            "passed": true,
+            "action": "auto_clean",
+            "error": null
+          },
+          "10": {
+            "passed": true,
+            "action": "auto_clean",
+            "error": null
+          },
+          "11": {
+            "passed": true,
+            "action": "auto_clean",
+            "error": null
+          },
+          "12": {
+            "passed": true,
+            "action": "auto_clean",
+            "error": null
+          },
+          "13": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "14": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "15": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "16": {
+            "passed": true,
+            "action": "auto_clean",
+            "error": null
+          },
+          "17": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "18": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "19": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "20": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "21": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "22": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "23": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "24": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "25": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "26": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "27": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "28": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "29": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "30": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "31": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "32": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "33": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "34": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "35": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "36": {
+            "passed": true,
+            "action": "auto_clean",
+            "error": null
+          },
+          "37": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "38": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "39": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "40": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "41": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "42": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "43": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "44": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "2": {
+            "passed": true,
+            "action": "early_return",
+            "error": null
+          },
+          "3": {
+            "passed": true,
+            "action": "early_return",
+            "error": null
+          },
+          "4": {
+            "passed": true,
+            "action": "early_return",
+            "error": null
+          },
+          "5": {
+            "passed": true,
+            "action": "no_op",
+            "error": null
+          },
+          "6": {
+            "passed": true,
+            "action": "early_return",
+            "error": null
+          },
+          "7": {
+            "passed": true,
+            "action": "early_return",
+            "error": null
+          },
+          "8": {
+            "passed": true,
+            "action": "early_return",
+            "error": null
+          }
+        }
+      },
+      "seconds": 720.89,
+      "model_fingerprint": "professionalize_llm",
+      "gates_evaluated": 44,
+      "gate_failures": [],
+      "output_sha256": "1109e0f1095d4e1cbf3a8e56e6be436c71ea8d8553189c8830779a65339f0046",
+      "output_bytes": 504,
+      "accepted": true
+    },
+    {
+      "site_id": "blog.aspose.org",
+      "source_path": "content/blog.aspose.org/words/net/words-document-net/index.md",
+      "source_sha256": "d33e2f26fee5c7bc118609f4eed3a7e2be67be98aae9969338051746410d8492",
+      "target_lang": "fa",
+      "classes": [
+        "rtl_cjk_sensitive",
+        "table_heavy",
+        "technical_prose"
+      ],
+      "output_path": "C:\\Users\\prora\\OneDrive\\Documents\\GitHub\\hugo-translator\\data\\qualification\\gate1-full-v6\\content-shard3\\blog.aspose.org\\words\\net\\words-document-net\\index.fa.md",
+      "receipt": {
+        "campaign_id": "",
+        "source_path": "C:\\Users\\prora\\OneDrive\\Documents\\GitHub\\hugo-translator\\data\\qualification\\gate1-full-v6\\content-shard3\\blog.aspose.org\\words\\net\\words-document-net\\index.md",
+        "output_path": "C:\\Users\\prora\\OneDrive\\Documents\\GitHub\\hugo-translator\\data\\qualification\\gate1-full-v6\\content-shard3\\blog.aspose.org\\words\\net\\words-document-net\\index.fa.md",
+        "source_sha256": "d33e2f26fee5c7bc118609f4eed3a7e2be67be98aae9969338051746410d8492",
+        "output_sha256": "07db42ae8f592156fd506c2fbbb8de02cf02339af6cc55094181e63875d9b8ca",
+        "target_lang": "fa",
+        "validation_policy": "zero-defect",
+        "config_fingerprint": "",
+        "model_fingerprint": "professionalize_llm",
+        "gate_results": {
+          "1": {
+            "passed": true,
+            "action": "verification",
+            "error": null
+          },
+          "9": {
+            "passed": true,
+            "action": "auto_clean",
+            "error": null
+          },
+          "10": {
+            "passed": true,
+            "action": "auto_clean",
+            "error": null
+          },
+          "11": {
+            "passed": true,
+            "action": "auto_clean",
+            "error": null
+          },
+          "12": {
+            "passed": true,
+            "action": "auto_clean",
+            "error": null
+          },
+          "13": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "14": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "15": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "16": {
+            "passed": true,
+            "action": "auto_clean",
+            "error": null
+          },
+          "17": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "18": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "19": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "20": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "21": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "22": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "23": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "24": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "25": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "26": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "27": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "28": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "29": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "30": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "31": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "32": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "33": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "34": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "35": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "36": {
+            "passed": true,
+            "action": "auto_clean",
+            "error": null
+          },
+          "37": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "38": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "39": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "40": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "41": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "42": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "43": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "44": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "2": {
+            "passed": true,
+            "action": "early_return",
+            "error": null
+          },
+          "3": {
+            "passed": true,
+            "action": "early_return",
+            "error": null
+          },
+          "4": {
+            "passed": true,
+            "action": "early_return",
+            "error": null
+          },
+          "5": {
+            "passed": true,
+            "action": "no_op",
+            "error": null
+          },
+          "6": {
+            "passed": true,
+            "action": "early_return",
+            "error": null
+          },
+          "7": {
+            "passed": true,
+            "action": "early_return",
+            "error": null
+          },
+          "8": {
+            "passed": true,
+            "action": "early_return",
+            "error": null
+          }
+        }
+      },
+      "seconds": 1168.89,
+      "model_fingerprint": "professionalize_llm",
+      "gates_evaluated": 44,
+      "gate_failures": [],
+      "output_sha256": "07db42ae8f592156fd506c2fbbb8de02cf02339af6cc55094181e63875d9b8ca",
+      "output_bytes": 27962,
+      "accepted": true
+    },
+    {
+      "site_id": "blog.aspose.org",
+      "source_path": "content/blog.aspose.org/words/net/words-word-drawing-shapes-in-net/index.md",
+      "source_sha256": "9571994fefda7fd72834b1059c8f3897430b612e9b081778aae425a3e7ce42bc",
+      "target_lang": "hu",
+      "classes": [
+        "api_heavy",
+        "rtl_cjk_sensitive",
+        "table_heavy",
+        "technical_prose"
+      ],
+      "output_path": "C:\\Users\\prora\\OneDrive\\Documents\\GitHub\\hugo-translator\\data\\qualification\\gate1-full-v6\\content-shard3\\blog.aspose.org\\words\\net\\words-word-drawing-shapes-in-net\\index.hu.md",
+      "receipt": {
+        "campaign_id": "",
+        "source_path": "C:\\Users\\prora\\OneDrive\\Documents\\GitHub\\hugo-translator\\data\\qualification\\gate1-full-v6\\content-shard3\\blog.aspose.org\\words\\net\\words-word-drawing-shapes-in-net\\index.md",
+        "output_path": "C:\\Users\\prora\\OneDrive\\Documents\\GitHub\\hugo-translator\\data\\qualification\\gate1-full-v6\\content-shard3\\blog.aspose.org\\words\\net\\words-word-drawing-shapes-in-net\\index.hu.md",
+        "source_sha256": "9571994fefda7fd72834b1059c8f3897430b612e9b081778aae425a3e7ce42bc",
+        "output_sha256": "9ba3a115563a53a4ee729e44d11d4085389ee39b70cca5366a7e8184a157807c",
+        "target_lang": "hu",
+        "validation_policy": "zero-defect",
+        "config_fingerprint": "",
+        "model_fingerprint": "professionalize_llm",
+        "gate_results": {
+          "1": {
+            "passed": true,
+            "action": "verification",
+            "error": null
+          },
+          "9": {
+            "passed": true,
+            "action": "auto_clean",
+            "error": null
+          },
+          "10": {
+            "passed": true,
+            "action": "auto_clean",
+            "error": null
+          },
+          "11": {
+            "passed": true,
+            "action": "auto_clean",
+            "error": null
+          },
+          "12": {
+            "passed": true,
+            "action": "auto_clean",
+            "error": null
+          },
+          "13": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "14": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "15": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "16": {
+            "passed": true,
+            "action": "auto_clean",
+            "error": null
+          },
+          "17": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "18": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "19": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "20": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "21": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "22": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "23": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "24": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "25": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "26": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "27": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "28": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "29": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "30": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "31": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "32": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "33": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "34": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "35": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "36": {
+            "passed": true,
+            "action": "auto_clean",
+            "error": null
+          },
+          "37": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "38": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "39": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "40": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "41": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "42": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "43": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "44": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "2": {
+            "passed": true,
+            "action": "early_return",
+            "error": null
+          },
+          "3": {
+            "passed": true,
+            "action": "early_return",
+            "error": null
+          },
+          "4": {
+            "passed": true,
+            "action": "early_return",
+            "error": null
+          },
+          "5": {
+            "passed": true,
+            "action": "no_op",
+            "error": null
+          },
+          "6": {
+            "passed": true,
+            "action": "early_return",
+            "error": null
+          },
+          "7": {
+            "passed": true,
+            "action": "early_return",
+            "error": null
+          },
+          "8": {
+            "passed": true,
+            "action": "early_return",
+            "error": null
+          }
+        }
+      },
+      "seconds": 2170.53,
+      "model_fingerprint": "professionalize_llm",
+      "gates_evaluated": 44,
+      "gate_failures": [],
+      "output_sha256": "9ba3a115563a53a4ee729e44d11d4085389ee39b70cca5366a7e8184a157807c",
+      "output_bytes": 26192,
+      "accepted": true
+    },
+    {
+      "site_id": "blog.aspose.org",
+      "source_path": "content/blog.aspose.org/words/net/words-word-drawing-shapes-in-net/index.md",
+      "source_sha256": "9571994fefda7fd72834b1059c8f3897430b612e9b081778aae425a3e7ce42bc",
+      "target_lang": "ko",
+      "classes": [
+        "api_heavy",
+        "rtl_cjk_sensitive",
+        "table_heavy",
+        "technical_prose"
+      ],
+      "output_path": "C:\\Users\\prora\\OneDrive\\Documents\\GitHub\\hugo-translator\\data\\qualification\\gate1-full-v6\\content-shard3\\blog.aspose.org\\words\\net\\words-word-drawing-shapes-in-net\\index.ko.md",
+      "receipt": {
+        "campaign_id": "",
+        "source_path": "C:\\Users\\prora\\OneDrive\\Documents\\GitHub\\hugo-translator\\data\\qualification\\gate1-full-v6\\content-shard3\\blog.aspose.org\\words\\net\\words-word-drawing-shapes-in-net\\index.md",
+        "output_path": "C:\\Users\\prora\\OneDrive\\Documents\\GitHub\\hugo-translator\\data\\qualification\\gate1-full-v6\\content-shard3\\blog.aspose.org\\words\\net\\words-word-drawing-shapes-in-net\\index.ko.md",
+        "source_sha256": "9571994fefda7fd72834b1059c8f3897430b612e9b081778aae425a3e7ce42bc",
+        "output_sha256": "c83a7e5942b2ce9f45958fb0f05a4cfb87f8a91d293c642d6e0df4e2db0c9a51",
+        "target_lang": "ko",
+        "validation_policy": "zero-defect",
+        "config_fingerprint": "",
+        "model_fingerprint": "professionalize_llm",
+        "gate_results": {
+          "1": {
+            "passed": true,
+            "action": "verification",
+            "error": null
+          },
+          "9": {
+            "passed": true,
+            "action": "auto_clean",
+            "error": null
+          },
+          "10": {
+            "passed": true,
+            "action": "auto_clean",
+            "error": null
+          },
+          "11": {
+            "passed": true,
+            "action": "auto_clean",
+            "error": null
+          },
+          "12": {
+            "passed": true,
+            "action": "auto_clean",
+            "error": null
+          },
+          "13": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "14": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "15": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "16": {
+            "passed": true,
+            "action": "auto_clean",
+            "error": null
+          },
+          "17": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "18": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "19": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "20": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "21": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "22": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "23": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "24": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "25": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "26": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "27": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "28": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "29": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "30": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "31": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "32": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "33": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "34": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "35": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "36": {
+            "passed": true,
+            "action": "auto_clean",
+            "error": null
+          },
+          "37": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "38": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "39": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "40": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "41": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "42": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "43": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "44": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "2": {
+            "passed": true,
+            "action": "early_return",
+            "error": null
+          },
+          "3": {
+            "passed": true,
+            "action": "early_return",
+            "error": null
+          },
+          "4": {
+            "passed": true,
+            "action": "early_return",
+            "error": null
+          },
+          "5": {
+            "passed": true,
+            "action": "no_op",
+            "error": null
+          },
+          "6": {
+            "passed": true,
+            "action": "early_return",
+            "error": null
+          },
+          "7": {
+            "passed": true,
+            "action": "early_return",
+            "error": null
+          },
+          "8": {
+            "passed": true,
+            "action": "early_return",
+            "error": null
+          }
+        }
+      },
+      "seconds": 1661.04,
+      "model_fingerprint": "professionalize_llm",
+      "gates_evaluated": 44,
+      "gate_failures": [],
+      "output_sha256": "c83a7e5942b2ce9f45958fb0f05a4cfb87f8a91d293c642d6e0df4e2db0c9a51",
+      "output_bytes": 26245,
+      "accepted": true
+    },
+    {
+      "site_id": "blog.aspose.org",
+      "source_path": "content/blog.aspose.org/words/net/words-word-drawing-shapes-in-net/index.md",
+      "source_sha256": "9571994fefda7fd72834b1059c8f3897430b612e9b081778aae425a3e7ce42bc",
+      "target_lang": "zh",
+      "classes": [
+        "api_heavy",
+        "rtl_cjk_sensitive",
+        "table_heavy",
+        "technical_prose"
+      ],
+      "output_path": null,
+      "receipt": null,
+      "seconds": 2537.98,
+      "model_fingerprint": null,
+      "gates_evaluated": 0,
+      "gate_failures": [],
+      "accepted": false,
+      "error": "no output written",
+      "rejection_gates": []
+    },
+    {
+      "site_id": "docs.aspose.org",
+      "source_path": "content/docs.aspose.org/en/3d/python/developer-guide/features.md",
+      "source_sha256": "35c183dff4514ca64d48c7219633b2e681475da65f424bca2265a2bcb997b4ee",
+      "target_lang": "ko",
+      "classes": [
+        "api_heavy",
+        "long_form",
+        "rtl_cjk_sensitive",
+        "table_heavy"
+      ],
+      "output_path": null,
+      "receipt": null,
+      "seconds": 3041.85,
+      "model_fingerprint": null,
+      "gates_evaluated": 0,
+      "gate_failures": [],
+      "accepted": false,
+      "error": "no output written",
+      "rejection_gates": [
+        14
+      ]
+    },
+    {
+      "site_id": "docs.aspose.org",
+      "source_path": "content/docs.aspose.org/en/3d/python/getting-started/_index.md",
+      "source_sha256": "03292c061470cab5f43c93bd701647e61aede003595b404a4dfbdf5e6f609448",
+      "target_lang": "cs",
+      "classes": [
+        "technical_prose"
+      ],
+      "output_path": "C:\\Users\\prora\\OneDrive\\Documents\\GitHub\\hugo-translator\\data\\qualification\\gate1-full-v6\\content-shard3\\docs.aspose.org\\cs\\3d\\python\\getting-started\\_index.md",
+      "receipt": {
+        "campaign_id": "",
+        "source_path": "C:\\Users\\prora\\OneDrive\\Documents\\GitHub\\hugo-translator\\data\\qualification\\gate1-full-v6\\content-shard3\\docs.aspose.org\\en\\3d\\python\\getting-started\\_index.md",
+        "output_path": "C:\\Users\\prora\\OneDrive\\Documents\\GitHub\\hugo-translator\\data\\qualification\\gate1-full-v6\\content-shard3\\docs.aspose.org\\cs\\3d\\python\\getting-started\\_index.md",
+        "source_sha256": "03292c061470cab5f43c93bd701647e61aede003595b404a4dfbdf5e6f609448",
+        "output_sha256": "1472c2c9e443a13360fcf03f89b5f1c04a90c20b4b46393a6dbf7b2934acc916",
+        "target_lang": "cs",
+        "validation_policy": "zero-defect",
+        "config_fingerprint": "",
+        "model_fingerprint": "professionalize_llm",
+        "gate_results": {
+          "1": {
+            "passed": true,
+            "action": "verification",
+            "error": null
+          },
+          "9": {
+            "passed": true,
+            "action": "auto_clean",
+            "error": null
+          },
+          "10": {
+            "passed": true,
+            "action": "auto_clean",
+            "error": null
+          },
+          "11": {
+            "passed": true,
+            "action": "auto_clean",
+            "error": null
+          },
+          "12": {
+            "passed": true,
+            "action": "auto_clean",
+            "error": null
+          },
+          "13": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "14": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "15": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "16": {
+            "passed": true,
+            "action": "auto_clean",
+            "error": null
+          },
+          "17": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "18": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "19": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "20": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "21": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "22": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "23": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "24": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "25": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "26": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "27": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "28": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "29": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "30": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "31": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "32": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "33": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "34": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "35": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "36": {
+            "passed": true,
+            "action": "auto_clean",
+            "error": null
+          },
+          "37": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "38": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "39": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "40": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "41": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "42": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "43": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "44": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "2": {
+            "passed": true,
+            "action": "early_return",
+            "error": null
+          },
+          "3": {
+            "passed": true,
+            "action": "early_return",
+            "error": null
+          },
+          "4": {
+            "passed": true,
+            "action": "early_return",
+            "error": null
+          },
+          "5": {
+            "passed": true,
+            "action": "no_op",
+            "error": null
+          },
+          "6": {
+            "passed": true,
+            "action": "early_return",
+            "error": null
+          },
+          "7": {
+            "passed": true,
+            "action": "early_return",
+            "error": null
+          },
+          "8": {
+            "passed": true,
+            "action": "early_return",
+            "error": null
+          }
+        }
+      },
+      "seconds": 2932.71,
+      "model_fingerprint": "professionalize_llm",
+      "gates_evaluated": 44,
+      "gate_failures": [],
+      "output_sha256": "1472c2c9e443a13360fcf03f89b5f1c04a90c20b4b46393a6dbf7b2934acc916",
+      "output_bytes": 5065,
+      "accepted": true
+    },
+    {
+      "site_id": "docs.aspose.org",
+      "source_path": "content/docs.aspose.org/en/email/cpp/getting-started/installation.md",
+      "source_sha256": "3f0794ef4152ec7baa3909e46bb7d52192b94790e560cec517a1467e202e7064",
+      "target_lang": "pl",
+      "classes": [
+        "api_heavy",
+        "table_heavy"
+      ],
+      "output_path": "C:\\Users\\prora\\OneDrive\\Documents\\GitHub\\hugo-translator\\data\\qualification\\gate1-full-v6\\content-shard3\\docs.aspose.org\\pl\\email\\cpp\\getting-started\\installation.md",
+      "receipt": {
+        "campaign_id": "",
+        "source_path": "C:\\Users\\prora\\OneDrive\\Documents\\GitHub\\hugo-translator\\data\\qualification\\gate1-full-v6\\content-shard3\\docs.aspose.org\\en\\email\\cpp\\getting-started\\installation.md",
+        "output_path": "C:\\Users\\prora\\OneDrive\\Documents\\GitHub\\hugo-translator\\data\\qualification\\gate1-full-v6\\content-shard3\\docs.aspose.org\\pl\\email\\cpp\\getting-started\\installation.md",
+        "source_sha256": "3f0794ef4152ec7baa3909e46bb7d52192b94790e560cec517a1467e202e7064",
+        "output_sha256": "f126017ac0a7d4330497b59cd9eeeb3fca4dabaf144dddcf173cf0453dd68e1c",
+        "target_lang": "pl",
+        "validation_policy": "zero-defect",
+        "config_fingerprint": "",
+        "model_fingerprint": "professionalize_llm",
+        "gate_results": {
+          "1": {
+            "passed": true,
+            "action": "verification",
+            "error": null
+          },
+          "9": {
+            "passed": true,
+            "action": "auto_clean",
+            "error": null
+          },
+          "10": {
+            "passed": true,
+            "action": "auto_clean",
+            "error": null
+          },
+          "11": {
+            "passed": true,
+            "action": "auto_clean",
+            "error": null
+          },
+          "12": {
+            "passed": true,
+            "action": "auto_clean",
+            "error": null
+          },
+          "13": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "14": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "15": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "16": {
+            "passed": true,
+            "action": "auto_clean",
+            "error": null
+          },
+          "17": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "18": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "19": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "20": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "21": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "22": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "23": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "24": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "25": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "26": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "27": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "28": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "29": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "30": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "31": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "32": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "33": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "34": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "35": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "36": {
+            "passed": true,
+            "action": "auto_clean",
+            "error": null
+          },
+          "37": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "38": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "39": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "40": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "41": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "42": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "43": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "44": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "2": {
+            "passed": true,
+            "action": "early_return",
+            "error": null
+          },
+          "3": {
+            "passed": true,
+            "action": "early_return",
+            "error": null
+          },
+          "4": {
+            "passed": true,
+            "action": "early_return",
+            "error": null
+          },
+          "5": {
+            "passed": true,
+            "action": "no_op",
+            "error": null
+          },
+          "6": {
+            "passed": true,
+            "action": "early_return",
+            "error": null
+          },
+          "7": {
+            "passed": true,
+            "action": "early_return",
+            "error": null
+          },
+          "8": {
+            "passed": true,
+            "action": "early_return",
+            "error": null
+          }
+        }
+      },
+      "seconds": 2578.0,
+      "model_fingerprint": "professionalize_llm",
+      "gates_evaluated": 44,
+      "gate_failures": [],
+      "output_sha256": "f126017ac0a7d4330497b59cd9eeeb3fca4dabaf144dddcf173cf0453dd68e1c",
+      "output_bytes": 4198,
+      "accepted": true
+    },
+    {
+      "site_id": "docs.aspose.org",
+      "source_path": "content/docs.aspose.org/en/pdf/cpp/developer-guide/facades-api.md",
+      "source_sha256": "f902bcc0d7122f8ffbfb6266be63535efd3d338be29ca7af6acb816b6ddf514c",
+      "target_lang": "he",
+      "classes": [
+        "api_heavy",
+        "long_form",
+        "rtl_cjk_sensitive",
+        "table_heavy"
+      ],
+      "output_path": "C:\\Users\\prora\\OneDrive\\Documents\\GitHub\\hugo-translator\\data\\qualification\\gate1-full-v6\\content-shard3\\docs.aspose.org\\he\\pdf\\cpp\\developer-guide\\facades-api.md",
+      "receipt": {
+        "campaign_id": "",
+        "source_path": "C:\\Users\\prora\\OneDrive\\Documents\\GitHub\\hugo-translator\\data\\qualification\\gate1-full-v6\\content-shard3\\docs.aspose.org\\en\\pdf\\cpp\\developer-guide\\facades-api.md",
+        "output_path": "C:\\Users\\prora\\OneDrive\\Documents\\GitHub\\hugo-translator\\data\\qualification\\gate1-full-v6\\content-shard3\\docs.aspose.org\\he\\pdf\\cpp\\developer-guide\\facades-api.md",
+        "source_sha256": "f902bcc0d7122f8ffbfb6266be63535efd3d338be29ca7af6acb816b6ddf514c",
+        "output_sha256": "f4b8fea5839c64cabe91f68b0920def10079f80fc8f84eb8797fe32b627853fc",
+        "target_lang": "he",
+        "validation_policy": "zero-defect",
+        "config_fingerprint": "",
+        "model_fingerprint": "professionalize_llm",
+        "gate_results": {
+          "1": {
+            "passed": true,
+            "action": "verification",
+            "error": null
+          },
+          "9": {
+            "passed": true,
+            "action": "auto_clean",
+            "error": null
+          },
+          "10": {
+            "passed": true,
+            "action": "auto_clean",
+            "error": null
+          },
+          "11": {
+            "passed": true,
+            "action": "auto_clean",
+            "error": null
+          },
+          "12": {
+            "passed": true,
+            "action": "auto_clean",
+            "error": null
+          },
+          "13": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "14": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "15": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "16": {
+            "passed": true,
+            "action": "auto_clean",
+            "error": null
+          },
+          "17": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "18": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "19": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "20": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "21": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "22": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "23": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "24": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "25": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "26": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "27": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "28": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "29": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "30": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "31": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "32": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "33": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "34": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "35": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "36": {
+            "passed": true,
+            "action": "auto_clean",
+            "error": null
+          },
+          "37": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "38": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "39": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "40": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "41": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "42": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "43": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "44": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "2": {
+            "passed": true,
+            "action": "early_return",
+            "error": null
+          },
+          "3": {
+            "passed": true,
+            "action": "early_return",
+            "error": null
+          },
+          "4": {
+            "passed": true,
+            "action": "early_return",
+            "error": null
+          },
+          "5": {
+            "passed": true,
+            "action": "no_op",
+            "error": null
+          },
+          "6": {
+            "passed": true,
+            "action": "early_return",
+            "error": null
+          },
+          "7": {
+            "passed": true,
+            "action": "early_return",
+            "error": null
+          },
+          "8": {
+            "passed": true,
+            "action": "early_return",
+            "error": null
+          }
+        }
+      },
+      "seconds": 3295.92,
+      "model_fingerprint": "professionalize_llm",
+      "gates_evaluated": 44,
+      "gate_failures": [],
+      "output_sha256": "f4b8fea5839c64cabe91f68b0920def10079f80fc8f84eb8797fe32b627853fc",
+      "output_bytes": 35788,
+      "accepted": true
+    },
+    {
+      "site_id": "docs.aspose.org",
+      "source_path": "content/docs.aspose.org/en/pdf/cpp/developer-guide/facades-api.md",
+      "source_sha256": "f902bcc0d7122f8ffbfb6266be63535efd3d338be29ca7af6acb816b6ddf514c",
+      "target_lang": "pt",
+      "classes": [
+        "api_heavy",
+        "long_form",
+        "rtl_cjk_sensitive",
+        "table_heavy"
+      ],
+      "output_path": "C:\\Users\\prora\\OneDrive\\Documents\\GitHub\\hugo-translator\\data\\qualification\\gate1-full-v6\\content-shard3\\docs.aspose.org\\pt\\pdf\\cpp\\developer-guide\\facades-api.md",
+      "receipt": {
+        "campaign_id": "",
+        "source_path": "C:\\Users\\prora\\OneDrive\\Documents\\GitHub\\hugo-translator\\data\\qualification\\gate1-full-v6\\content-shard3\\docs.aspose.org\\en\\pdf\\cpp\\developer-guide\\facades-api.md",
+        "output_path": "C:\\Users\\prora\\OneDrive\\Documents\\GitHub\\hugo-translator\\data\\qualification\\gate1-full-v6\\content-shard3\\docs.aspose.org\\pt\\pdf\\cpp\\developer-guide\\facades-api.md",
+        "source_sha256": "f902bcc0d7122f8ffbfb6266be63535efd3d338be29ca7af6acb816b6ddf514c",
+        "output_sha256": "a1481ed039d84b4aed3d17b33a865181ba7d305424c58af48adcf2d203589e47",
+        "target_lang": "pt",
+        "validation_policy": "zero-defect",
+        "config_fingerprint": "",
+        "model_fingerprint": "professionalize_llm",
+        "gate_results": {
+          "1": {
+            "passed": true,
+            "action": "verification",
+            "error": null
+          },
+          "9": {
+            "passed": true,
+            "action": "auto_clean",
+            "error": null
+          },
+          "10": {
+            "passed": true,
+            "action": "auto_clean",
+            "error": null
+          },
+          "11": {
+            "passed": true,
+            "action": "auto_clean",
+            "error": null
+          },
+          "12": {
+            "passed": true,
+            "action": "auto_clean",
+            "error": null
+          },
+          "13": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "14": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "15": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "16": {
+            "passed": true,
+            "action": "auto_clean",
+            "error": null
+          },
+          "17": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "18": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "19": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "20": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "21": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "22": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "23": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "24": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "25": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "26": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "27": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "28": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "29": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "30": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "31": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "32": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "33": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "34": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "35": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "36": {
+            "passed": true,
+            "action": "auto_clean",
+            "error": null
+          },
+          "37": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "38": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "39": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "40": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "41": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "42": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "43": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "44": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "2": {
+            "passed": true,
+            "action": "early_return",
+            "error": null
+          },
+          "3": {
+            "passed": true,
+            "action": "early_return",
+            "error": null
+          },
+          "4": {
+            "passed": true,
+            "action": "early_return",
+            "error": null
+          },
+          "5": {
+            "passed": true,
+            "action": "no_op",
+            "error": null
+          },
+          "6": {
+            "passed": true,
+            "action": "early_return",
+            "error": null
+          },
+          "7": {
+            "passed": true,
+            "action": "early_return",
+            "error": null
+          },
+          "8": {
+            "passed": true,
+            "action": "early_return",
+            "error": null
+          }
+        }
+      },
+      "seconds": 3502.73,
+      "model_fingerprint": "professionalize_llm",
+      "gates_evaluated": 44,
+      "gate_failures": [],
+      "output_sha256": "a1481ed039d84b4aed3d17b33a865181ba7d305424c58af48adcf2d203589e47",
+      "output_bytes": 33817,
+      "accepted": true
+    },
+    {
+      "site_id": "docs.aspose.org",
+      "source_path": "content/docs.aspose.org/en/pdf/cpp/developer-guide/pdf-graphics.md",
+      "source_sha256": "c2d0a097cb16af78e97db0e3565d6c377fa047b5af93594cd46ee01c695eba5b",
+      "target_lang": "zh",
+      "classes": [
+        "api_heavy",
+        "mixed_md_html",
+        "placeholder_heavy",
+        "rtl_cjk_sensitive",
+        "table_heavy"
+      ],
+      "output_path": null,
+      "receipt": null,
+      "seconds": 3280.12,
+      "model_fingerprint": null,
+      "gates_evaluated": 0,
+      "gate_failures": [],
+      "accepted": false,
+      "error": "no output written",
+      "rejection_gates": []
+    },
+    {
+      "site_id": "docs.aspose.org",
+      "source_path": "content/docs.aspose.org/en/pdf/net/developer-guide/graphics-drawing.md",
+      "source_sha256": "aeed15af0f6544fa7f8713bdee5e9df2b34b7daa9ce25d338002ac99962c5b6d",
+      "target_lang": "ar",
+      "classes": [
+        "api_heavy",
+        "rtl_cjk_sensitive",
+        "table_heavy"
+      ],
+      "output_path": "C:\\Users\\prora\\OneDrive\\Documents\\GitHub\\hugo-translator\\data\\qualification\\gate1-full-v6\\content-shard3\\docs.aspose.org\\ar\\pdf\\net\\developer-guide\\graphics-drawing.md",
+      "receipt": {
+        "campaign_id": "",
+        "source_path": "C:\\Users\\prora\\OneDrive\\Documents\\GitHub\\hugo-translator\\data\\qualification\\gate1-full-v6\\content-shard3\\docs.aspose.org\\en\\pdf\\net\\developer-guide\\graphics-drawing.md",
+        "output_path": "C:\\Users\\prora\\OneDrive\\Documents\\GitHub\\hugo-translator\\data\\qualification\\gate1-full-v6\\content-shard3\\docs.aspose.org\\ar\\pdf\\net\\developer-guide\\graphics-drawing.md",
+        "source_sha256": "aeed15af0f6544fa7f8713bdee5e9df2b34b7daa9ce25d338002ac99962c5b6d",
+        "output_sha256": "6acb839681e474b5ab63ac32e90da03415d96fa88992e90118cfd8dc5cfbf933",
+        "target_lang": "ar",
+        "validation_policy": "zero-defect",
+        "config_fingerprint": "",
+        "model_fingerprint": "professionalize_llm",
+        "gate_results": {
+          "1": {
+            "passed": true,
+            "action": "verification",
+            "error": null
+          },
+          "9": {
+            "passed": true,
+            "action": "auto_clean",
+            "error": null
+          },
+          "10": {
+            "passed": true,
+            "action": "auto_clean",
+            "error": null
+          },
+          "11": {
+            "passed": true,
+            "action": "auto_clean",
+            "error": null
+          },
+          "12": {
+            "passed": true,
+            "action": "auto_clean",
+            "error": null
+          },
+          "13": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "14": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "15": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "16": {
+            "passed": true,
+            "action": "auto_clean",
+            "error": null
+          },
+          "17": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "18": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "19": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "20": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "21": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "22": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "23": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "24": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "25": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "26": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "27": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "28": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "29": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "30": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "31": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "32": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "33": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "34": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "35": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "36": {
+            "passed": true,
+            "action": "auto_clean",
+            "error": null
+          },
+          "37": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "38": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "39": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "40": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "41": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "42": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "43": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "44": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "2": {
+            "passed": true,
+            "action": "early_return",
+            "error": null
+          },
+          "3": {
+            "passed": true,
+            "action": "early_return",
+            "error": null
+          },
+          "4": {
+            "passed": true,
+            "action": "early_return",
+            "error": null
+          },
+          "5": {
+            "passed": true,
+            "action": "no_op",
+            "error": null
+          },
+          "6": {
+            "passed": true,
+            "action": "early_return",
+            "error": null
+          },
+          "7": {
+            "passed": true,
+            "action": "early_return",
+            "error": null
+          },
+          "8": {
+            "passed": true,
+            "action": "early_return",
+            "error": null
+          }
+        }
+      },
+      "seconds": 2908.81,
+      "model_fingerprint": "professionalize_llm",
+      "gates_evaluated": 44,
+      "gate_failures": [],
+      "output_sha256": "6acb839681e474b5ab63ac32e90da03415d96fa88992e90118cfd8dc5cfbf933",
+      "output_bytes": 10249,
+      "accepted": true
+    },
+    {
+      "site_id": "docs.aspose.org",
+      "source_path": "content/docs.aspose.org/en/pdf/net/developer-guide/graphics-drawing.md",
+      "source_sha256": "aeed15af0f6544fa7f8713bdee5e9df2b34b7daa9ce25d338002ac99962c5b6d",
+      "target_lang": "pt",
+      "classes": [
+        "api_heavy",
+        "rtl_cjk_sensitive",
+        "table_heavy"
+      ],
+      "output_path": "C:\\Users\\prora\\OneDrive\\Documents\\GitHub\\hugo-translator\\data\\qualification\\gate1-full-v6\\content-shard3\\docs.aspose.org\\pt\\pdf\\net\\developer-guide\\graphics-drawing.md",
+      "receipt": {
+        "campaign_id": "",
+        "source_path": "C:\\Users\\prora\\OneDrive\\Documents\\GitHub\\hugo-translator\\data\\qualification\\gate1-full-v6\\content-shard3\\docs.aspose.org\\en\\pdf\\net\\developer-guide\\graphics-drawing.md",
+        "output_path": "C:\\Users\\prora\\OneDrive\\Documents\\GitHub\\hugo-translator\\data\\qualification\\gate1-full-v6\\content-shard3\\docs.aspose.org\\pt\\pdf\\net\\developer-guide\\graphics-drawing.md",
+        "source_sha256": "aeed15af0f6544fa7f8713bdee5e9df2b34b7daa9ce25d338002ac99962c5b6d",
+        "output_sha256": "689b9fbb7a0579ab3ff54660f19a6713e25e5928814fbca54c867b85b9154d9f",
+        "target_lang": "pt",
+        "validation_policy": "zero-defect",
+        "config_fingerprint": "",
+        "model_fingerprint": "professionalize_llm",
+        "gate_results": {
+          "1": {
+            "passed": true,
+            "action": "verification",
+            "error": null
+          },
+          "9": {
+            "passed": true,
+            "action": "auto_clean",
+            "error": null
+          },
+          "10": {
+            "passed": true,
+            "action": "auto_clean",
+            "error": null
+          },
+          "11": {
+            "passed": true,
+            "action": "auto_clean",
+            "error": null
+          },
+          "12": {
+            "passed": true,
+            "action": "auto_clean",
+            "error": null
+          },
+          "13": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "14": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "15": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "16": {
+            "passed": true,
+            "action": "auto_clean",
+            "error": null
+          },
+          "17": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "18": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "19": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "20": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "21": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "22": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "23": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "24": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "25": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "26": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "27": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "28": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "29": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "30": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "31": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "32": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "33": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "34": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "35": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "36": {
+            "passed": true,
+            "action": "auto_clean",
+            "error": null
+          },
+          "37": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "38": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "39": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "40": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "41": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "42": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "43": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "44": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "2": {
+            "passed": true,
+            "action": "early_return",
+            "error": null
+          },
+          "3": {
+            "passed": true,
+            "action": "early_return",
+            "error": null
+          },
+          "4": {
+            "passed": true,
+            "action": "early_return",
+            "error": null
+          },
+          "5": {
+            "passed": true,
+            "action": "no_op",
+            "error": null
+          },
+          "6": {
+            "passed": true,
+            "action": "early_return",
+            "error": null
+          },
+          "7": {
+            "passed": true,
+            "action": "early_return",
+            "error": null
+          },
+          "8": {
+            "passed": true,
+            "action": "early_return",
+            "error": null
+          }
+        }
+      },
+      "seconds": 2317.71,
+      "model_fingerprint": "professionalize_llm",
+      "gates_evaluated": 44,
+      "gate_failures": [],
+      "output_sha256": "689b9fbb7a0579ab3ff54660f19a6713e25e5928814fbca54c867b85b9154d9f",
+      "output_bytes": 9664,
+      "accepted": true
+    },
+    {
+      "site_id": "docs.aspose.org",
+      "source_path": "content/docs.aspose.org/en/pdf/net/developer-guide/graphics-drawing.md",
+      "source_sha256": "aeed15af0f6544fa7f8713bdee5e9df2b34b7daa9ce25d338002ac99962c5b6d",
+      "target_lang": "ru",
+      "classes": [
+        "api_heavy",
+        "rtl_cjk_sensitive",
+        "table_heavy"
+      ],
+      "output_path": null,
+      "receipt": null,
+      "seconds": 2653.93,
+      "model_fingerprint": null,
+      "gates_evaluated": 0,
+      "gate_failures": [],
+      "accepted": false,
+      "error": "no output written",
+      "rejection_gates": []
+    },
+    {
+      "site_id": "docs.aspose.org",
+      "source_path": "content/docs.aspose.org/en/slides/java/_index.md",
+      "source_sha256": "aeffcb04d0d101a11c9c514bcfb92fe5fcdad26764275ab1c036a417172b35e4",
+      "target_lang": "ja",
+      "classes": [
+        "short_metadata"
+      ],
+      "output_path": null,
+      "receipt": null,
+      "seconds": 2190.32,
+      "model_fingerprint": null,
+      "gates_evaluated": 0,
+      "gate_failures": [],
+      "accepted": false,
+      "error": "no output written",
+      "rejection_gates": []
+    },
+    {
+      "site_id": "docs.aspose.org",
+      "source_path": "content/docs.aspose.org/en/slides/python/getting-started/quickstart.md",
+      "source_sha256": "57323a5a1fd9b160f037e972008c84d21e37bb3d64134bfd07b2b40ee8feac60",
+      "target_lang": "fa",
+      "classes": [
+        "api_heavy",
+        "table_heavy"
+      ],
+      "output_path": null,
+      "receipt": null,
+      "seconds": 2177.94,
+      "model_fingerprint": null,
+      "gates_evaluated": 0,
+      "gate_failures": [],
+      "accepted": false,
+      "error": "no output written",
+      "rejection_gates": []
+    },
+    {
+      "site_id": "kb.aspose.org",
+      "source_path": "content/kb.aspose.org/en/cells/go/_index.md",
+      "source_sha256": "43090e303d03ca4bbc259929e552bf8dba9db4277a3b9474c53516d3b1709064",
+      "target_lang": "sv",
+      "classes": [
+        "short_metadata"
+      ],
+      "output_path": null,
+      "receipt": null,
+      "seconds": 827.33,
+      "model_fingerprint": null,
+      "gates_evaluated": 0,
+      "gate_failures": [],
+      "accepted": false,
+      "error": "no output written",
+      "rejection_gates": []
+    },
+    {
+      "site_id": "kb.aspose.org",
+      "source_path": "content/kb.aspose.org/en/cells/go/_index.md",
+      "source_sha256": "43090e303d03ca4bbc259929e552bf8dba9db4277a3b9474c53516d3b1709064",
+      "target_lang": "zh",
+      "classes": [
+        "short_metadata"
+      ],
+      "output_path": null,
+      "receipt": null,
+      "seconds": 1463.06,
+      "model_fingerprint": null,
+      "gates_evaluated": 0,
+      "gate_failures": [],
+      "accepted": false,
+      "error": "no output written",
+      "rejection_gates": []
+    },
+    {
+      "site_id": "kb.aspose.org",
+      "source_path": "content/kb.aspose.org/en/cells/python/troubleshooting.md",
+      "source_sha256": "431f6e76705b6f9c9380a107f4ab3a5a335857e2a099d1d12951d9a16597d282",
+      "target_lang": "fa",
+      "classes": [
+        "api_heavy",
+        "rtl_cjk_sensitive",
+        "table_heavy",
+        "technical_prose"
+      ],
+      "output_path": null,
+      "receipt": null,
+      "seconds": 716.48,
+      "model_fingerprint": null,
+      "gates_evaluated": 0,
+      "gate_failures": [],
+      "accepted": false,
+      "error": "no output written",
+      "rejection_gates": []
+    },
+    {
+      "site_id": "kb.aspose.org",
+      "source_path": "content/kb.aspose.org/en/email/cpp/how-to-get-started-email-cpp.md",
+      "source_sha256": "0c639ee8940c412c6effb335568931f524c31ba13b43656a12fcbdc433394839",
+      "target_lang": "el",
+      "classes": [
+        "api_heavy",
+        "mixed_md_html",
+        "placeholder_heavy"
+      ],
+      "output_path": null,
+      "receipt": null,
+      "seconds": 1408.35,
+      "model_fingerprint": null,
+      "gates_evaluated": 0,
+      "gate_failures": [],
+      "accepted": false,
+      "error": "no output written",
+      "rejection_gates": []
+    },
+    {
+      "site_id": "kb.aspose.org",
+      "source_path": "content/kb.aspose.org/en/email/cpp/how-to-get-started-email-cpp.md",
+      "source_sha256": "0c639ee8940c412c6effb335568931f524c31ba13b43656a12fcbdc433394839",
+      "target_lang": "tr",
+      "classes": [
+        "api_heavy",
+        "mixed_md_html",
+        "placeholder_heavy"
+      ],
+      "output_path": "C:\\Users\\prora\\OneDrive\\Documents\\GitHub\\hugo-translator\\data\\qualification\\gate1-full-v6\\content-shard3\\kb.aspose.org\\tr\\email\\cpp\\how-to-get-started-email-cpp.md",
+      "receipt": {
+        "campaign_id": "",
+        "source_path": "C:\\Users\\prora\\OneDrive\\Documents\\GitHub\\hugo-translator\\data\\qualification\\gate1-full-v6\\content-shard3\\kb.aspose.org\\en\\email\\cpp\\how-to-get-started-email-cpp.md",
+        "output_path": "C:\\Users\\prora\\OneDrive\\Documents\\GitHub\\hugo-translator\\data\\qualification\\gate1-full-v6\\content-shard3\\kb.aspose.org\\tr\\email\\cpp\\how-to-get-started-email-cpp.md",
+        "source_sha256": "0c639ee8940c412c6effb335568931f524c31ba13b43656a12fcbdc433394839",
+        "output_sha256": "aa15f321d4f8548d21fca5a525c6c852cfd5f4baef976240c93aa78d75d90ccc",
+        "target_lang": "tr",
+        "validation_policy": "zero-defect",
+        "config_fingerprint": "",
+        "model_fingerprint": "professionalize_llm",
+        "gate_results": {
+          "1": {
+            "passed": true,
+            "action": "verification",
+            "error": null
+          },
+          "9": {
+            "passed": true,
+            "action": "auto_clean",
+            "error": null
+          },
+          "10": {
+            "passed": true,
+            "action": "auto_clean",
+            "error": null
+          },
+          "11": {
+            "passed": true,
+            "action": "auto_clean",
+            "error": null
+          },
+          "12": {
+            "passed": true,
+            "action": "auto_clean",
+            "error": null
+          },
+          "13": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "14": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "15": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "16": {
+            "passed": true,
+            "action": "auto_clean",
+            "error": null
+          },
+          "17": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "18": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "19": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "20": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "21": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "22": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "23": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "24": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "25": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "26": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "27": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "28": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "29": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "30": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "31": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "32": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "33": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "34": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "35": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "36": {
+            "passed": true,
+            "action": "auto_clean",
+            "error": null
+          },
+          "37": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "38": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "39": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "40": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "41": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "42": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "43": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "44": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "2": {
+            "passed": true,
+            "action": "early_return",
+            "error": null
+          },
+          "3": {
+            "passed": true,
+            "action": "early_return",
+            "error": null
+          },
+          "4": {
+            "passed": true,
+            "action": "early_return",
+            "error": null
+          },
+          "5": {
+            "passed": true,
+            "action": "no_op",
+            "error": null
+          },
+          "6": {
+            "passed": true,
+            "action": "early_return",
+            "error": null
+          },
+          "7": {
+            "passed": true,
+            "action": "early_return",
+            "error": null
+          },
+          "8": {
+            "passed": true,
+            "action": "early_return",
+            "error": null
+          }
+        }
+      },
+      "seconds": 1483.81,
+      "model_fingerprint": "professionalize_llm",
+      "gates_evaluated": 44,
+      "gate_failures": [],
+      "output_sha256": "aa15f321d4f8548d21fca5a525c6c852cfd5f4baef976240c93aa78d75d90ccc",
+      "output_bytes": 10492,
+      "accepted": true
+    },
+    {
+      "site_id": "kb.aspose.org",
+      "source_path": "content/kb.aspose.org/en/slides/net/how-to-get-started-slides-dotnet.md",
+      "source_sha256": "25fa2ab45f9441e0617105c85436183e9aa95b335fc38895159a97e66a5806ae",
+      "target_lang": "he",
+      "classes": [
+        "api_heavy",
+        "placeholder_heavy"
+      ],
+      "output_path": "C:\\Users\\prora\\OneDrive\\Documents\\GitHub\\hugo-translator\\data\\qualification\\gate1-full-v6\\content-shard3\\kb.aspose.org\\he\\slides\\net\\how-to-get-started-slides-dotnet.md",
+      "receipt": {
+        "campaign_id": "",
+        "source_path": "C:\\Users\\prora\\OneDrive\\Documents\\GitHub\\hugo-translator\\data\\qualification\\gate1-full-v6\\content-shard3\\kb.aspose.org\\en\\slides\\net\\how-to-get-started-slides-dotnet.md",
+        "output_path": "C:\\Users\\prora\\OneDrive\\Documents\\GitHub\\hugo-translator\\data\\qualification\\gate1-full-v6\\content-shard3\\kb.aspose.org\\he\\slides\\net\\how-to-get-started-slides-dotnet.md",
+        "source_sha256": "25fa2ab45f9441e0617105c85436183e9aa95b335fc38895159a97e66a5806ae",
+        "output_sha256": "a4389bbe39ddf78ade90513aa3b53acc59511f4119a2a841d57d3ac6fbf8d054",
+        "target_lang": "he",
+        "validation_policy": "zero-defect",
+        "config_fingerprint": "",
+        "model_fingerprint": "professionalize_llm",
+        "gate_results": {
+          "1": {
+            "passed": true,
+            "action": "verification",
+            "error": null
+          },
+          "9": {
+            "passed": true,
+            "action": "auto_clean",
+            "error": null
+          },
+          "10": {
+            "passed": true,
+            "action": "auto_clean",
+            "error": null
+          },
+          "11": {
+            "passed": true,
+            "action": "auto_clean",
+            "error": null
+          },
+          "12": {
+            "passed": true,
+            "action": "auto_clean",
+            "error": null
+          },
+          "13": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "14": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "15": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "16": {
+            "passed": true,
+            "action": "auto_clean",
+            "error": null
+          },
+          "17": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "18": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "19": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "20": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "21": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "22": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "23": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "24": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "25": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "26": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "27": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "28": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "29": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "30": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "31": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "32": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "33": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "34": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "35": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "36": {
+            "passed": true,
+            "action": "auto_clean",
+            "error": null
+          },
+          "37": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "38": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "39": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "40": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "41": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "42": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "43": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "44": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "2": {
+            "passed": true,
+            "action": "early_return",
+            "error": null
+          },
+          "3": {
+            "passed": true,
+            "action": "early_return",
+            "error": null
+          },
+          "4": {
+            "passed": true,
+            "action": "early_return",
+            "error": null
+          },
+          "5": {
+            "passed": true,
+            "action": "no_op",
+            "error": null
+          },
+          "6": {
+            "passed": true,
+            "action": "early_return",
+            "error": null
+          },
+          "7": {
+            "passed": true,
+            "action": "early_return",
+            "error": null
+          },
+          "8": {
+            "passed": true,
+            "action": "early_return",
+            "error": null
+          }
+        }
+      },
+      "seconds": 1459.36,
+      "model_fingerprint": "professionalize_llm",
+      "gates_evaluated": 44,
+      "gate_failures": [],
+      "output_sha256": "a4389bbe39ddf78ade90513aa3b53acc59511f4119a2a841d57d3ac6fbf8d054",
+      "output_bytes": 8189,
+      "accepted": true
+    },
+    {
+      "site_id": "kb.aspose.org",
+      "source_path": "content/kb.aspose.org/en/slides/net/how-to-get-started-slides-dotnet.md",
+      "source_sha256": "25fa2ab45f9441e0617105c85436183e9aa95b335fc38895159a97e66a5806ae",
+      "target_lang": "vi",
+      "classes": [
+        "api_heavy",
+        "placeholder_heavy"
+      ],
+      "output_path": "C:\\Users\\prora\\OneDrive\\Documents\\GitHub\\hugo-translator\\data\\qualification\\gate1-full-v6\\content-shard3\\kb.aspose.org\\vi\\slides\\net\\how-to-get-started-slides-dotnet.md",
+      "receipt": {
+        "campaign_id": "",
+        "source_path": "C:\\Users\\prora\\OneDrive\\Documents\\GitHub\\hugo-translator\\data\\qualification\\gate1-full-v6\\content-shard3\\kb.aspose.org\\en\\slides\\net\\how-to-get-started-slides-dotnet.md",
+        "output_path": "C:\\Users\\prora\\OneDrive\\Documents\\GitHub\\hugo-translator\\data\\qualification\\gate1-full-v6\\content-shard3\\kb.aspose.org\\vi\\slides\\net\\how-to-get-started-slides-dotnet.md",
+        "source_sha256": "25fa2ab45f9441e0617105c85436183e9aa95b335fc38895159a97e66a5806ae",
+        "output_sha256": "fca9487f9c56ac5d4f1c4cc71c21b815778e783dd26d1adc289ed76f32c1f5b5",
+        "target_lang": "vi",
+        "validation_policy": "zero-defect",
+        "config_fingerprint": "",
+        "model_fingerprint": "professionalize_llm",
+        "gate_results": {
+          "1": {
+            "passed": true,
+            "action": "verification",
+            "error": null
+          },
+          "9": {
+            "passed": true,
+            "action": "auto_clean",
+            "error": null
+          },
+          "10": {
+            "passed": true,
+            "action": "auto_clean",
+            "error": null
+          },
+          "11": {
+            "passed": true,
+            "action": "auto_clean",
+            "error": null
+          },
+          "12": {
+            "passed": true,
+            "action": "auto_clean",
+            "error": null
+          },
+          "13": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "14": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "15": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "16": {
+            "passed": true,
+            "action": "auto_clean",
+            "error": null
+          },
+          "17": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "18": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "19": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "20": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "21": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "22": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "23": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "24": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "25": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "26": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "27": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "28": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "29": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "30": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "31": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "32": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "33": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "34": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "35": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "36": {
+            "passed": true,
+            "action": "auto_clean",
+            "error": null
+          },
+          "37": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "38": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "39": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "40": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "41": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "42": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "43": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "44": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "2": {
+            "passed": true,
+            "action": "early_return",
+            "error": null
+          },
+          "3": {
+            "passed": true,
+            "action": "early_return",
+            "error": null
+          },
+          "4": {
+            "passed": true,
+            "action": "early_return",
+            "error": null
+          },
+          "5": {
+            "passed": true,
+            "action": "no_op",
+            "error": null
+          },
+          "6": {
+            "passed": true,
+            "action": "early_return",
+            "error": null
+          },
+          "7": {
+            "passed": true,
+            "action": "early_return",
+            "error": null
+          },
+          "8": {
+            "passed": true,
+            "action": "early_return",
+            "error": null
+          }
+        }
+      },
+      "seconds": 1554.19,
+      "model_fingerprint": "professionalize_llm",
+      "gates_evaluated": 44,
+      "gate_failures": [],
+      "output_sha256": "fca9487f9c56ac5d4f1c4cc71c21b815778e783dd26d1adc289ed76f32c1f5b5",
+      "output_bytes": 8223,
+      "accepted": true
+    },
+    {
+      "site_id": "kb.aspose.org",
+      "source_path": "content/kb.aspose.org/en/slides/python/how-to-work-with-charts-python.md",
+      "source_sha256": "3e2bf6bbac52fa5ea3cc5c26d32a1617ff1bbffe812befd854d0dd5813f59c09",
+      "target_lang": "ko",
+      "classes": [
+        "table_heavy"
+      ],
+      "output_path": "C:\\Users\\prora\\OneDrive\\Documents\\GitHub\\hugo-translator\\data\\qualification\\gate1-full-v6\\content-shard3\\kb.aspose.org\\ko\\slides\\python\\how-to-work-with-charts-python.md",
+      "receipt": {
+        "campaign_id": "",
+        "source_path": "C:\\Users\\prora\\OneDrive\\Documents\\GitHub\\hugo-translator\\data\\qualification\\gate1-full-v6\\content-shard3\\kb.aspose.org\\en\\slides\\python\\how-to-work-with-charts-python.md",
+        "output_path": "C:\\Users\\prora\\OneDrive\\Documents\\GitHub\\hugo-translator\\data\\qualification\\gate1-full-v6\\content-shard3\\kb.aspose.org\\ko\\slides\\python\\how-to-work-with-charts-python.md",
+        "source_sha256": "3e2bf6bbac52fa5ea3cc5c26d32a1617ff1bbffe812befd854d0dd5813f59c09",
+        "output_sha256": "ac337a2138095bf2b47ddb52cac30606d39281955099ff2c1019f78bd2976f58",
+        "target_lang": "ko",
+        "validation_policy": "zero-defect",
+        "config_fingerprint": "",
+        "model_fingerprint": "professionalize_llm",
+        "gate_results": {
+          "1": {
+            "passed": true,
+            "action": "verification",
+            "error": null
+          },
+          "9": {
+            "passed": true,
+            "action": "auto_clean",
+            "error": null
+          },
+          "10": {
+            "passed": true,
+            "action": "auto_clean",
+            "error": null
+          },
+          "11": {
+            "passed": true,
+            "action": "auto_clean",
+            "error": null
+          },
+          "12": {
+            "passed": true,
+            "action": "auto_clean",
+            "error": null
+          },
+          "13": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "14": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "15": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "16": {
+            "passed": true,
+            "action": "auto_clean",
+            "error": null
+          },
+          "17": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "18": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "19": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "20": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "21": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "22": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "23": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "24": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "25": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "26": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "27": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "28": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "29": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "30": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "31": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "32": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "33": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "34": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "35": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "36": {
+            "passed": true,
+            "action": "auto_clean",
+            "error": null
+          },
+          "37": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "38": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "39": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "40": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "41": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "42": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "43": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "44": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "2": {
+            "passed": true,
+            "action": "early_return",
+            "error": null
+          },
+          "3": {
+            "passed": true,
+            "action": "early_return",
+            "error": null
+          },
+          "4": {
+            "passed": true,
+            "action": "early_return",
+            "error": null
+          },
+          "5": {
+            "passed": true,
+            "action": "no_op",
+            "error": null
+          },
+          "6": {
+            "passed": true,
+            "action": "early_return",
+            "error": null
+          },
+          "7": {
+            "passed": true,
+            "action": "early_return",
+            "error": null
+          },
+          "8": {
+            "passed": true,
+            "action": "early_return",
+            "error": null
+          }
+        }
+      },
+      "seconds": 1528.22,
+      "model_fingerprint": "professionalize_llm",
+      "gates_evaluated": 44,
+      "gate_failures": [],
+      "output_sha256": "ac337a2138095bf2b47ddb52cac30606d39281955099ff2c1019f78bd2976f58",
+      "output_bytes": 2149,
+      "accepted": true
+    },
+    {
+      "site_id": "kb.aspose.org",
+      "source_path": "content/kb.aspose.org/en/words/net/how-to-work-with-charts-dotnet.md",
+      "source_sha256": "09bd9d0aeff908721dfdb19436ea0195ce9b84176ee2d5fa2535318d000d11a9",
+      "target_lang": "hu",
+      "classes": [
+        "api_heavy",
+        "rtl_cjk_sensitive",
+        "technical_prose"
+      ],
+      "output_path": null,
+      "receipt": null,
+      "seconds": 2759.47,
+      "model_fingerprint": null,
+      "gates_evaluated": 0,
+      "gate_failures": [],
+      "accepted": false,
+      "error": "no output written",
+      "rejection_gates": []
+    },
+    {
+      "site_id": "products.aspose.org",
+      "source_path": "content/products.aspose.org/en/cells/_index.md",
+      "source_sha256": "fc294d79f6b51b36bc91cf27a66739d0c441230ac0924bf8b691c508dd5599a0",
+      "target_lang": "ko",
+      "classes": [
+        "marketing",
+        "short_metadata"
+      ],
+      "output_path": null,
+      "receipt": null,
+      "seconds": 2901.02,
+      "model_fingerprint": null,
+      "gates_evaluated": 0,
+      "gate_failures": [],
+      "accepted": false,
+      "error": "no output written",
+      "rejection_gates": []
+    },
+    {
+      "site_id": "products.aspose.org",
+      "source_path": "content/products.aspose.org/en/cells/typescript/_index.md",
+      "source_sha256": "5d5d4c274a86b8a5d8ce97c7d63a4fedb516bc34cff417c63ce5a553d2d25d21",
+      "target_lang": "ja",
+      "classes": [
+        "marketing",
+        "short_metadata"
+      ],
+      "output_path": null,
+      "receipt": null,
+      "seconds": 2909.04,
+      "model_fingerprint": null,
+      "gates_evaluated": 0,
+      "gate_failures": [],
+      "accepted": false,
+      "error": "no output written",
+      "rejection_gates": []
+    },
+    {
+      "site_id": "reference.aspose.org",
+      "source_path": "content/reference.aspose.org/en/3d/java/VertexElementFVector.md",
+      "source_sha256": "b62a6fa1d2959e8f0ae53c96e52c77a6399ba600aabd665cac5bd62f77be28bb",
+      "target_lang": "ja",
+      "classes": [
+        "api_heavy",
+        "mixed_md_html",
+        "placeholder_heavy",
+        "rtl_cjk_sensitive",
+        "table_heavy",
+        "technical_prose"
+      ],
+      "output_path": "C:\\Users\\prora\\OneDrive\\Documents\\GitHub\\hugo-translator\\data\\qualification\\gate1-full-v6\\content-shard3\\reference.aspose.org\\ja\\3d\\java\\VertexElementFVector.md",
+      "receipt": {
+        "campaign_id": "",
+        "source_path": "C:\\Users\\prora\\OneDrive\\Documents\\GitHub\\hugo-translator\\data\\qualification\\gate1-full-v6\\content-shard3\\reference.aspose.org\\en\\3d\\java\\VertexElementFVector.md",
+        "output_path": "C:\\Users\\prora\\OneDrive\\Documents\\GitHub\\hugo-translator\\data\\qualification\\gate1-full-v6\\content-shard3\\reference.aspose.org\\ja\\3d\\java\\VertexElementFVector.md",
+        "source_sha256": "b62a6fa1d2959e8f0ae53c96e52c77a6399ba600aabd665cac5bd62f77be28bb",
+        "output_sha256": "303d858879e4e895cbd13e41e446fbf49b5880e78e9cf5085d7ebf32f09df5f2",
+        "target_lang": "ja",
+        "validation_policy": "zero-defect",
+        "config_fingerprint": "",
+        "model_fingerprint": "professionalize_llm",
+        "gate_results": {
+          "1": {
+            "passed": true,
+            "action": "verification",
+            "error": null
+          },
+          "9": {
+            "passed": true,
+            "action": "auto_clean",
+            "error": null
+          },
+          "10": {
+            "passed": true,
+            "action": "auto_clean",
+            "error": null
+          },
+          "11": {
+            "passed": true,
+            "action": "auto_clean",
+            "error": null
+          },
+          "12": {
+            "passed": true,
+            "action": "auto_clean",
+            "error": null
+          },
+          "13": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "14": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "15": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "16": {
+            "passed": true,
+            "action": "auto_clean",
+            "error": null
+          },
+          "17": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "18": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "19": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "20": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "21": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "22": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "23": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "24": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "25": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "26": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "27": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "28": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "29": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "30": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "31": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "32": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "33": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "34": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "35": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "36": {
+            "passed": true,
+            "action": "auto_clean",
+            "error": null
+          },
+          "37": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "38": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "39": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "40": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "41": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "42": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "43": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "44": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "2": {
+            "passed": true,
+            "action": "early_return",
+            "error": null
+          },
+          "3": {
+            "passed": true,
+            "action": "early_return",
+            "error": null
+          },
+          "4": {
+            "passed": true,
+            "action": "early_return",
+            "error": null
+          },
+          "5": {
+            "passed": true,
+            "action": "no_op",
+            "error": null
+          },
+          "6": {
+            "passed": true,
+            "action": "early_return",
+            "error": null
+          },
+          "7": {
+            "passed": true,
+            "action": "early_return",
+            "error": null
+          },
+          "8": {
+            "passed": true,
+            "action": "early_return",
+            "error": null
+          }
+        }
+      },
+      "seconds": 2174.31,
+      "model_fingerprint": "professionalize_llm",
+      "gates_evaluated": 44,
+      "gate_failures": [],
+      "output_sha256": "303d858879e4e895cbd13e41e446fbf49b5880e78e9cf5085d7ebf32f09df5f2",
+      "output_bytes": 7860,
+      "accepted": true
+    },
+    {
+      "site_id": "reference.aspose.org",
+      "source_path": "content/reference.aspose.org/en/cells/java/Column.md",
+      "source_sha256": "00fcc285840d447f70b48f8c89bd2e525ae752c7a4e069b870b70a9ffd562ca2",
+      "target_lang": "ko",
+      "classes": [
+        "api_heavy",
+        "rtl_cjk_sensitive",
+        "table_heavy",
+        "technical_prose"
+      ],
+      "output_path": "C:\\Users\\prora\\OneDrive\\Documents\\GitHub\\hugo-translator\\data\\qualification\\gate1-full-v6\\content-shard3\\reference.aspose.org\\ko\\cells\\java\\Column.md",
+      "receipt": {
+        "campaign_id": "",
+        "source_path": "C:\\Users\\prora\\OneDrive\\Documents\\GitHub\\hugo-translator\\data\\qualification\\gate1-full-v6\\content-shard3\\reference.aspose.org\\en\\cells\\java\\Column.md",
+        "output_path": "C:\\Users\\prora\\OneDrive\\Documents\\GitHub\\hugo-translator\\data\\qualification\\gate1-full-v6\\content-shard3\\reference.aspose.org\\ko\\cells\\java\\Column.md",
+        "source_sha256": "00fcc285840d447f70b48f8c89bd2e525ae752c7a4e069b870b70a9ffd562ca2",
+        "output_sha256": "4686e802ec274c02683d41a04a897d330ac552895162bc9ee049c92f794e11af",
+        "target_lang": "ko",
+        "validation_policy": "zero-defect",
+        "config_fingerprint": "",
+        "model_fingerprint": "professionalize_llm",
+        "gate_results": {
+          "1": {
+            "passed": true,
+            "action": "verification",
+            "error": null
+          },
+          "9": {
+            "passed": true,
+            "action": "auto_clean",
+            "error": null
+          },
+          "10": {
+            "passed": true,
+            "action": "auto_clean",
+            "error": null
+          },
+          "11": {
+            "passed": true,
+            "action": "auto_clean",
+            "error": null
+          },
+          "12": {
+            "passed": true,
+            "action": "auto_clean",
+            "error": null
+          },
+          "13": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "14": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "15": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "16": {
+            "passed": true,
+            "action": "auto_clean",
+            "error": null
+          },
+          "17": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "18": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "19": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "20": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "21": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "22": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "23": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "24": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "25": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "26": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "27": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "28": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "29": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "30": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "31": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "32": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "33": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "34": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "35": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "36": {
+            "passed": true,
+            "action": "auto_clean",
+            "error": null
+          },
+          "37": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "38": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "39": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "40": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "41": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "42": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "43": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "44": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "2": {
+            "passed": true,
+            "action": "early_return",
+            "error": null
+          },
+          "3": {
+            "passed": true,
+            "action": "early_return",
+            "error": null
+          },
+          "4": {
+            "passed": true,
+            "action": "early_return",
+            "error": null
+          },
+          "5": {
+            "passed": true,
+            "action": "no_op",
+            "error": null
+          },
+          "6": {
+            "passed": true,
+            "action": "early_return",
+            "error": null
+          },
+          "7": {
+            "passed": true,
+            "action": "early_return",
+            "error": null
+          },
+          "8": {
+            "passed": true,
+            "action": "early_return",
+            "error": null
+          }
+        }
+      },
+      "seconds": 2076.46,
+      "model_fingerprint": "professionalize_llm",
+      "gates_evaluated": 44,
+      "gate_failures": [],
+      "output_sha256": "4686e802ec274c02683d41a04a897d330ac552895162bc9ee049c92f794e11af",
+      "output_bytes": 4191,
+      "accepted": true
+    },
+    {
+      "site_id": "reference.aspose.org",
+      "source_path": "content/reference.aspose.org/en/pdf/java/PdfAValidator.md",
+      "source_sha256": "9b362d84ca5980da970d214335f22de53c8761416ae5d524cc94301ef97b4041",
+      "target_lang": "pt",
+      "classes": [
+        "api_heavy",
+        "mixed_md_html",
+        "rtl_cjk_sensitive",
+        "table_heavy"
+      ],
+      "output_path": "C:\\Users\\prora\\OneDrive\\Documents\\GitHub\\hugo-translator\\data\\qualification\\gate1-full-v6\\content-shard3\\reference.aspose.org\\pt\\pdf\\java\\PdfAValidator.md",
+      "receipt": {
+        "campaign_id": "",
+        "source_path": "C:\\Users\\prora\\OneDrive\\Documents\\GitHub\\hugo-translator\\data\\qualification\\gate1-full-v6\\content-shard3\\reference.aspose.org\\en\\pdf\\java\\PdfAValidator.md",
+        "output_path": "C:\\Users\\prora\\OneDrive\\Documents\\GitHub\\hugo-translator\\data\\qualification\\gate1-full-v6\\content-shard3\\reference.aspose.org\\pt\\pdf\\java\\PdfAValidator.md",
+        "source_sha256": "9b362d84ca5980da970d214335f22de53c8761416ae5d524cc94301ef97b4041",
+        "output_sha256": "a0ff38bb23583ee01350ef3841649832a06ff2f4e9a9f594898b6e47986bda25",
+        "target_lang": "pt",
+        "validation_policy": "zero-defect",
+        "config_fingerprint": "",
+        "model_fingerprint": "professionalize_llm",
+        "gate_results": {
+          "1": {
+            "passed": true,
+            "action": "verification",
+            "error": null
+          },
+          "9": {
+            "passed": true,
+            "action": "auto_clean",
+            "error": null
+          },
+          "10": {
+            "passed": true,
+            "action": "auto_clean",
+            "error": null
+          },
+          "11": {
+            "passed": true,
+            "action": "auto_clean",
+            "error": null
+          },
+          "12": {
+            "passed": true,
+            "action": "auto_clean",
+            "error": null
+          },
+          "13": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "14": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "15": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "16": {
+            "passed": true,
+            "action": "auto_clean",
+            "error": null
+          },
+          "17": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "18": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "19": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "20": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "21": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "22": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "23": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "24": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "25": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "26": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "27": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "28": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "29": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "30": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "31": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "32": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "33": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "34": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "35": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "36": {
+            "passed": true,
+            "action": "auto_clean",
+            "error": null
+          },
+          "37": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "38": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "39": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "40": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "41": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "42": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "43": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "44": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "2": {
+            "passed": true,
+            "action": "early_return",
+            "error": null
+          },
+          "3": {
+            "passed": true,
+            "action": "early_return",
+            "error": null
+          },
+          "4": {
+            "passed": true,
+            "action": "early_return",
+            "error": null
+          },
+          "5": {
+            "passed": true,
+            "action": "no_op",
+            "error": null
+          },
+          "6": {
+            "passed": true,
+            "action": "early_return",
+            "error": null
+          },
+          "7": {
+            "passed": true,
+            "action": "early_return",
+            "error": null
+          },
+          "8": {
+            "passed": true,
+            "action": "early_return",
+            "error": null
+          }
+        }
+      },
+      "seconds": 1976.28,
+      "model_fingerprint": "professionalize_llm",
+      "gates_evaluated": 44,
+      "gate_failures": [],
+      "output_sha256": "a0ff38bb23583ee01350ef3841649832a06ff2f4e9a9f594898b6e47986bda25",
+      "output_bytes": 3044,
+      "accepted": true
+    },
+    {
+      "site_id": "reference.aspose.org",
+      "source_path": "content/reference.aspose.org/en/pdf/java/UnsupportedPageOperation.md",
+      "source_sha256": "765d174ae1525a849fdc47df39f3a81ff80df99309148de591ca85f631d1ce85",
+      "target_lang": "ar",
+      "classes": [
+        "api_heavy",
+        "rtl_cjk_sensitive",
+        "short_metadata"
+      ],
+      "output_path": "C:\\Users\\prora\\OneDrive\\Documents\\GitHub\\hugo-translator\\data\\qualification\\gate1-full-v6\\content-shard3\\reference.aspose.org\\ar\\pdf\\java\\UnsupportedPageOperation.md",
+      "receipt": {
+        "campaign_id": "",
+        "source_path": "C:\\Users\\prora\\OneDrive\\Documents\\GitHub\\hugo-translator\\data\\qualification\\gate1-full-v6\\content-shard3\\reference.aspose.org\\en\\pdf\\java\\UnsupportedPageOperation.md",
+        "output_path": "C:\\Users\\prora\\OneDrive\\Documents\\GitHub\\hugo-translator\\data\\qualification\\gate1-full-v6\\content-shard3\\reference.aspose.org\\ar\\pdf\\java\\UnsupportedPageOperation.md",
+        "source_sha256": "765d174ae1525a849fdc47df39f3a81ff80df99309148de591ca85f631d1ce85",
+        "output_sha256": "9bc1c31416a99c4aa39b37d00e4400f56e0dc298d4a1ace8265b95621fc5cb96",
+        "target_lang": "ar",
+        "validation_policy": "zero-defect",
+        "config_fingerprint": "",
+        "model_fingerprint": "professionalize_llm",
+        "gate_results": {
+          "1": {
+            "passed": true,
+            "action": "verification",
+            "error": null
+          },
+          "9": {
+            "passed": true,
+            "action": "auto_clean",
+            "error": null
+          },
+          "10": {
+            "passed": true,
+            "action": "auto_clean",
+            "error": null
+          },
+          "11": {
+            "passed": true,
+            "action": "auto_clean",
+            "error": null
+          },
+          "12": {
+            "passed": true,
+            "action": "auto_clean",
+            "error": null
+          },
+          "13": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "14": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "15": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "16": {
+            "passed": true,
+            "action": "auto_clean",
+            "error": null
+          },
+          "17": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "18": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "19": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "20": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "21": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "22": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "23": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "24": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "25": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "26": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "27": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "28": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "29": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "30": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "31": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "32": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "33": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "34": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "35": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "36": {
+            "passed": true,
+            "action": "auto_clean",
+            "error": null
+          },
+          "37": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "38": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "39": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "40": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "41": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "42": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "43": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "44": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "2": {
+            "passed": true,
+            "action": "early_return",
+            "error": null
+          },
+          "3": {
+            "passed": true,
+            "action": "early_return",
+            "error": null
+          },
+          "4": {
+            "passed": true,
+            "action": "early_return",
+            "error": null
+          },
+          "5": {
+            "passed": true,
+            "action": "no_op",
+            "error": null
+          },
+          "6": {
+            "passed": true,
+            "action": "early_return",
+            "error": null
+          },
+          "7": {
+            "passed": true,
+            "action": "early_return",
+            "error": null
+          },
+          "8": {
+            "passed": true,
+            "action": "early_return",
+            "error": null
+          }
+        }
+      },
+      "seconds": 1895.15,
+      "model_fingerprint": "professionalize_llm",
+      "gates_evaluated": 44,
+      "gate_failures": [],
+      "output_sha256": "9bc1c31416a99c4aa39b37d00e4400f56e0dc298d4a1ace8265b95621fc5cb96",
+      "output_bytes": 1937,
+      "accepted": true
+    },
+    {
+      "site_id": "reference.aspose.org",
+      "source_path": "content/reference.aspose.org/en/pdf/java/XfaPageSplitter.md",
+      "source_sha256": "8ae438db5043981852626040c10619acc92906cc35b9fb88ba60e0dfe16f8e40",
+      "target_lang": "ja",
+      "classes": [
+        "api_heavy",
+        "mixed_md_html",
+        "placeholder_heavy",
+        "technical_prose"
+      ],
+      "output_path": "C:\\Users\\prora\\OneDrive\\Documents\\GitHub\\hugo-translator\\data\\qualification\\gate1-full-v6\\content-shard3\\reference.aspose.org\\ja\\pdf\\java\\XfaPageSplitter.md",
+      "receipt": {
+        "campaign_id": "",
+        "source_path": "C:\\Users\\prora\\OneDrive\\Documents\\GitHub\\hugo-translator\\data\\qualification\\gate1-full-v6\\content-shard3\\reference.aspose.org\\en\\pdf\\java\\XfaPageSplitter.md",
+        "output_path": "C:\\Users\\prora\\OneDrive\\Documents\\GitHub\\hugo-translator\\data\\qualification\\gate1-full-v6\\content-shard3\\reference.aspose.org\\ja\\pdf\\java\\XfaPageSplitter.md",
+        "source_sha256": "8ae438db5043981852626040c10619acc92906cc35b9fb88ba60e0dfe16f8e40",
+        "output_sha256": "7f1bf5dbee6122d2b3fb6815fddc936f52154381d22b3ba17e3a32de365a771f",
+        "target_lang": "ja",
+        "validation_policy": "zero-defect",
+        "config_fingerprint": "",
+        "model_fingerprint": "professionalize_llm",
+        "gate_results": {
+          "1": {
+            "passed": true,
+            "action": "verification",
+            "error": null
+          },
+          "9": {
+            "passed": true,
+            "action": "auto_clean",
+            "error": null
+          },
+          "10": {
+            "passed": true,
+            "action": "auto_clean",
+            "error": null
+          },
+          "11": {
+            "passed": true,
+            "action": "auto_clean",
+            "error": null
+          },
+          "12": {
+            "passed": true,
+            "action": "auto_clean",
+            "error": null
+          },
+          "13": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "14": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "15": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "16": {
+            "passed": true,
+            "action": "auto_clean",
+            "error": null
+          },
+          "17": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "18": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "19": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "20": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "21": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "22": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "23": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "24": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "25": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "26": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "27": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "28": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "29": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "30": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "31": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "32": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "33": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "34": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "35": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "36": {
+            "passed": true,
+            "action": "auto_clean",
+            "error": null
+          },
+          "37": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "38": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "39": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "40": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "41": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "42": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "43": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "44": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "2": {
+            "passed": true,
+            "action": "early_return",
+            "error": null
+          },
+          "3": {
+            "passed": true,
+            "action": "early_return",
+            "error": null
+          },
+          "4": {
+            "passed": true,
+            "action": "early_return",
+            "error": null
+          },
+          "5": {
+            "passed": true,
+            "action": "no_op",
+            "error": null
+          },
+          "6": {
+            "passed": true,
+            "action": "early_return",
+            "error": null
+          },
+          "7": {
+            "passed": true,
+            "action": "early_return",
+            "error": null
+          },
+          "8": {
+            "passed": true,
+            "action": "early_return",
+            "error": null
+          }
+        }
+      },
+      "seconds": 1936.16,
+      "model_fingerprint": "professionalize_llm",
+      "gates_evaluated": 44,
+      "gate_failures": [],
+      "output_sha256": "7f1bf5dbee6122d2b3fb6815fddc936f52154381d22b3ba17e3a32de365a771f",
+      "output_bytes": 5856,
+      "accepted": true
+    },
+    {
+      "site_id": "reference.aspose.org",
+      "source_path": "content/reference.aspose.org/en/pdf/net/ResourceSavingInfo.md",
+      "source_sha256": "a40e20487a031e5063199f078f36d798b68da40fe7b654925f0ad8d03cf06c70",
+      "target_lang": "fa",
+      "classes": [
+        "api_heavy",
+        "rtl_cjk_sensitive",
+        "short_metadata"
+      ],
+      "output_path": "C:\\Users\\prora\\OneDrive\\Documents\\GitHub\\hugo-translator\\data\\qualification\\gate1-full-v6\\content-shard3\\reference.aspose.org\\fa\\pdf\\net\\ResourceSavingInfo.md",
+      "receipt": {
+        "campaign_id": "",
+        "source_path": "C:\\Users\\prora\\OneDrive\\Documents\\GitHub\\hugo-translator\\data\\qualification\\gate1-full-v6\\content-shard3\\reference.aspose.org\\en\\pdf\\net\\ResourceSavingInfo.md",
+        "output_path": "C:\\Users\\prora\\OneDrive\\Documents\\GitHub\\hugo-translator\\data\\qualification\\gate1-full-v6\\content-shard3\\reference.aspose.org\\fa\\pdf\\net\\ResourceSavingInfo.md",
+        "source_sha256": "a40e20487a031e5063199f078f36d798b68da40fe7b654925f0ad8d03cf06c70",
+        "output_sha256": "682698fea4569b76c01c31106e109befdae6ece98e70c0f188925522598b976e",
+        "target_lang": "fa",
+        "validation_policy": "zero-defect",
+        "config_fingerprint": "",
+        "model_fingerprint": "professionalize_llm",
+        "gate_results": {
+          "1": {
+            "passed": true,
+            "action": "verification",
+            "error": null
+          },
+          "9": {
+            "passed": true,
+            "action": "auto_clean",
+            "error": null
+          },
+          "10": {
+            "passed": true,
+            "action": "auto_clean",
+            "error": null
+          },
+          "11": {
+            "passed": true,
+            "action": "auto_clean",
+            "error": null
+          },
+          "12": {
+            "passed": true,
+            "action": "auto_clean",
+            "error": null
+          },
+          "13": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "14": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "15": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "16": {
+            "passed": true,
+            "action": "auto_clean",
+            "error": null
+          },
+          "17": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "18": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "19": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "20": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "21": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "22": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "23": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "24": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "25": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "26": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "27": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "28": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "29": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "30": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "31": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "32": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "33": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "34": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "35": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "36": {
+            "passed": true,
+            "action": "auto_clean",
+            "error": null
+          },
+          "37": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "38": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "39": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "40": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "41": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "42": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "43": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "44": {
+            "passed": true,
+            "action": "block",
+            "error": null
+          },
+          "2": {
+            "passed": true,
+            "action": "early_return",
+            "error": null
+          },
+          "3": {
+            "passed": true,
+            "action": "early_return",
+            "error": null
+          },
+          "4": {
+            "passed": true,
+            "action": "early_return",
+            "error": null
+          },
+          "5": {
+            "passed": true,
+            "action": "no_op",
+            "error": null
+          },
+          "6": {
+            "passed": true,
+            "action": "early_return",
+            "error": null
+          },
+          "7": {
+            "passed": true,
+            "action": "early_return",
+            "error": null
+          },
+          "8": {
+            "passed": true,
+            "action": "early_return",
+            "error": null
+          }
+        }
+      },
+      "seconds": 718.18,
+      "model_fingerprint": "professionalize_llm",
+      "gates_evaluated": 44,
+      "gate_failures": [],
+      "output_sha256": "682698fea4569b76c01c31106e109befdae6ece98e70c0f188925522598b976e",
+      "output_bytes": 1872,
+      "accepted": true
+    },
+    {
+      "site_id": "reference.aspose.org",
+      "source_path": "content/reference.aspose.org/en/pdf/net/ResourceSavingInfo.md",
+      "source_sha256": "a40e20487a031e5063199f078f36d798b68da40fe7b654925f0ad8d03cf06c70",
+      "target_lang": "sv",
+      "classes": [
+        "api_heavy",
+        "rtl_cjk_sensitive",
+        "short_metadata"
+      ],
+      "output_path": null,
+      "receipt": null,
+      "seconds": 572.77,
+      "model_fingerprint": null,
+      "gates_evaluated": 0,
+      "gate_failures": [],
+      "accepted": false,
+      "error": "no output written",
+      "rejection_gates": []
+    },
+    {
+      "site_id": "websites.aspose.org",
+      "source_path": "content/websites.aspose.org/en/aspose/com/_index.md",
+      "source_sha256": "b6b931ef3ce00c849a04548ef24d3e238f06486fa8e2bc559b5374386d78696c",
+      "target_lang": "ru",
+      "classes": [
+        "marketing",
+        "short_metadata"
+      ],
+      "output_path": null,
+      "receipt": null,
+      "seconds": 424.64,
+      "model_fingerprint": null,
+      "gates_evaluated": 0,
+      "gate_failures": [],
+      "accepted": false,
+      "error": "no output written",
+      "rejection_gates": []
+    },
+    {
+      "site_id": "websites.aspose.org",
+      "source_path": "content/websites.aspose.org/en/groupdocs/app/_index.md",
+      "source_sha256": "63e0eded8b26705cd867b9025d54cef140a7db528fce62a195fc71c84a35ba9f",
+      "target_lang": "ja",
+      "classes": [
+        "api_heavy",
+        "marketing",
+        "rtl_cjk_sensitive"
+      ],
+      "output_path": null,
+      "receipt": null,
+      "seconds": 340.7,
+      "model_fingerprint": null,
+      "gates_evaluated": 0,
+      "gate_failures": [],
+      "accepted": false,
+      "error": "no output written",
+      "rejection_gates": []
+    },
+    {
+      "site_id": "websites.aspose.org",
+      "source_path": "content/websites.aspose.org/en/groupdocs/app/_index.md",
+      "source_sha256": "63e0eded8b26705cd867b9025d54cef140a7db528fce62a195fc71c84a35ba9f",
+      "target_lang": "sv",
+      "classes": [
+        "api_heavy",
+        "marketing",
+        "rtl_cjk_sensitive"
+      ],
+      "output_path": null,
+      "receipt": null,
+      "seconds": 264.72,
+      "model_fingerprint": null,
+      "gates_evaluated": 0,
+      "gate_failures": [],
+      "accepted": false,
+      "error": "no output written",
+      "rejection_gates": []
+    }
+  ]
+}
