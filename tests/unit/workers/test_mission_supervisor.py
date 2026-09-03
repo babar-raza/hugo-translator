@@ -233,3 +233,48 @@ class TestStatusGuards:
     def test_missing_status_file_is_rejected(self, mission_dir):
         with pytest.raises(ms.MissionStatusError):
             ms.load_status(mission_dir)
+
+
+class TestOutputInvariant:
+    """TC-APT-033 (plan revision 6, section 0): committed/eligible cells is
+    the mission's real progress metric, and Track B is capped at half a
+    wake's time while Track A has eligible work."""
+
+    def test_track_b_capped_at_half_when_track_a_has_eligible_cells(self):
+        assert ms.track_b_budget_ok(300, 1000, track_a_has_eligible_cells=True)
+        assert ms.track_b_budget_ok(500, 1000, track_a_has_eligible_cells=True)
+        assert not ms.track_b_budget_ok(501, 1000, track_a_has_eligible_cells=True)
+
+    def test_track_b_unbounded_once_track_a_is_empty(self):
+        assert ms.track_b_budget_ok(1000, 1000, track_a_has_eligible_cells=False)
+
+    def test_zero_wake_seconds_never_blocks(self):
+        assert ms.track_b_budget_ok(0, 0, track_a_has_eligible_cells=True)
+
+    def test_record_cells_committed_accumulates(self, mission_dir):
+        _write(mission_dir, _status({"TC-APT-013": {"status": "DONE"}}))
+        assert ms.record_cells_committed(mission_dir, 2) == 2
+        assert ms.record_cells_committed(mission_dir, 3) == 5
+        status = ms.load_status(mission_dir)
+        assert status["cells_committed_total"] == 5
+
+    def test_output_invariant_summary_progress_ratio(self, mission_dir, tmp_path):
+        _write(mission_dir, _status({"TC-APT-013": {"status": "DONE"}}))
+        ms.record_cells_committed(mission_dir, 1)
+        empty_ledger = tmp_path / "no_ledger.sqlite3"
+
+        summary = ms.output_invariant_summary(
+            mission_dir,
+            ledger_path=empty_ledger,
+            cells_committed_this_wake=1,
+            track_b_seconds=100,
+            wake_seconds=1000,
+        )
+
+        assert summary["cells_committed_this_wake"] == 1
+        assert summary["cells_committed_total"] == 1
+        # a missing ledger file counts zero eligible cells, not an error
+        assert summary["cells_eligible_total"] == 0
+        assert summary["progress"] == 1.0
+        assert summary["track_b_time_share"] == 0.1
+        assert summary["track_b_budget_ok"] is True

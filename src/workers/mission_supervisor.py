@@ -339,6 +339,85 @@ def wake(
     }
 
 
+#: TC-APT-033 (plan revision 6, section 0): the "wrong progress metric" root
+#: cause -- 30/33 taskcards DONE read as 91% while 0 cells had shipped.
+#: Progress is committed/eligible cells, not taskcards. These are the
+#: page_language_work states representing real, actionable-now Track A
+#: work (excludes UNKNOWN_PROVENANCE, which needs section 7.4's sampling
+#: gate first, and the non-actionable/terminal states).
+ACTIONABLE_ELIGIBILITY_STATES: tuple[str, ...] = (
+    "MISSING_TRANSLATION",
+    "SOURCE_CHANGED",
+    "PROFILE_CHANGED",
+    "PROTECTION_RULE_CHANGED",
+    "MODEL_OR_PROMPT_INVALIDATED",
+)
+
+DEFAULT_LEDGER_PATH = Path("data/campaigns/work_ledger.sqlite3")
+
+
+def cells_eligible_total(ledger_path: Path = DEFAULT_LEDGER_PATH) -> int:
+    """Count of page_language_work rows in an actionable-now state."""
+    if not ledger_path.is_file():
+        return 0
+    from src.workers.work_ledger import WorkLedger
+
+    with WorkLedger(ledger_path) as ledger:
+        counts = ledger.counts_by_state()
+    return sum(counts.get(state, 0) for state in ACTIONABLE_ELIGIBILITY_STATES)
+
+
+def record_cells_committed(mission_dir: Path, n: int) -> int:
+    """Persist this wake's newly-committed cell count into the mission-scoped
+    running total (taskcard_status.json's own field, since the ledger's
+    UP_TO_DATE state does not distinguish mission-committed output from
+    pre-existing legacy content). Returns the new running total."""
+    path = status_path(mission_dir)
+    status = load_status(mission_dir)
+    total = int(status.get("cells_committed_total", 0)) + int(n)
+    status["cells_committed_total"] = total
+    path.write_text(json.dumps(status, indent=2), encoding="utf-8")
+    return total
+
+
+def track_b_budget_ok(
+    track_b_seconds: float, wake_seconds: float, *, track_a_has_eligible_cells: bool
+) -> bool:
+    """Section 21 output invariant: Track B may use at most 50% of a wake's
+    working time while Track A still has eligible cells -- when Track A is
+    genuinely empty, Track B may use the whole wake."""
+    if not track_a_has_eligible_cells:
+        return True
+    if wake_seconds <= 0:
+        return True
+    return (track_b_seconds / wake_seconds) <= 0.5
+
+
+def output_invariant_summary(
+    mission_dir: Path = DEFAULT_MISSION_DIR,
+    *,
+    ledger_path: Path = DEFAULT_LEDGER_PATH,
+    cells_committed_this_wake: int = 0,
+    track_b_seconds: float = 0.0,
+    wake_seconds: float = 0.0,
+) -> dict[str, Any]:
+    """TC-APT-033's fields for the wake summary (section 21 REPORT step)."""
+    status = load_status(mission_dir)
+    total_committed = int(status.get("cells_committed_total", 0))
+    eligible = cells_eligible_total(ledger_path)
+    progress = round(total_committed / (total_committed + eligible), 4) if (total_committed + eligible) else 0.0
+    return {
+        "cells_committed_this_wake": cells_committed_this_wake,
+        "cells_committed_total": total_committed,
+        "cells_eligible_total": eligible,
+        "progress": progress,
+        "track_b_time_share": round(track_b_seconds / wake_seconds, 4) if wake_seconds else 0.0,
+        "track_b_budget_ok": track_b_budget_ok(
+            track_b_seconds, wake_seconds, track_a_has_eligible_cells=eligible > 0
+        ),
+    }
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Mission supervisor wake (TC-APT-029)")
     parser.add_argument("--mission-dir", type=Path, default=DEFAULT_MISSION_DIR)
