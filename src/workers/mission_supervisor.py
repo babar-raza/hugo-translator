@@ -68,7 +68,13 @@ PHASE_A_TASKCARDS: tuple[str, ...] = (
     "TC-APT-028",
     "TC-APT-004",
     "TC-APT-006",
-    "TC-APT-004b",
+    # TC-APT-004b deliberately excluded (plan revision 6, section 0): the
+    # original design made PHASE B wait for this taskcard, serializing every
+    # translation output behind the slowest, most fragile task. It is now
+    # Track B qualification work (never gates Track A) -- gate 4's actual
+    # blockers (TC-APT-010/026/031/032) are independent of it. Root cause
+    # verified live: 30/33 taskcards DONE, four qualification restarts, zero
+    # content(locale) commits.
     "TC-APT-021",
     "TC-APT-007",
     "TC-APT-008",
