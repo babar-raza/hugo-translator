@@ -2234,7 +2234,21 @@ class TextUnitExtractor:
         # Requires 4+ chars total to avoid false-positive on common 3-char words (Use, The, For, See).
         # Changed from r"^[A-Z][a-z]+(?:[A-Z][a-z]+)+$" which required 2+ components
         # and incorrectly allowed translation of single-word API class names.
-        if re.match(r"^[A-Z][a-z0-9]{3,}(?:[A-Z][a-z0-9]*)*$", text):
+        #
+        # TC-APT-013 (Gate 4 canary): "PbrMaterial" -- a real API class name, confirmed
+        # by direct extraction from a real source file -- failed BOTH branches: as a
+        # single segment it's only 11 chars total but the {3,} floor applies to the
+        # FIRST segment alone ("Pbr" has just 2 lowercase chars after "P"), and the
+        # multi-segment case inherited that same per-segment floor. A second
+        # alternative drops the per-segment minimum once there are 2+ capitalized
+        # segments: the second internal capital is itself strong-enough signal (no
+        # ordinary English word has one), so short segments like "Pbr", "Rgb", "Io",
+        # or a single letter ("X"/"Y" axis prefixes, common in this 3D-graphics
+        # domain) are legitimate there without risking the 3-char-word false positive
+        # the {3,} floor exists to prevent for single-segment text.
+        if re.match(
+            r"^[A-Z][a-z0-9]{3,}(?:[A-Z][a-z0-9]*)*$|^(?:[A-Z][a-z0-9]*){2,}$", text
+        ):
             return True
 
         # PascalCase.With.Dots — full match required; no trailing words/spaces

@@ -271,6 +271,25 @@ class TestNodeTypes:
         assert len(plan.units) == 1
         assert plan.units[0].do_not_translate is True
 
+    def test_short_first_segment_pascalcase_heading_is_protected(self):
+        """TC-APT-013: the ACTUAL root cause behind the Gate 4 canary's repeated
+        TC-SAS-01 failure -- "PbrMaterial", a real API class name from a real
+        source file. sha256('PbrMaterial')[:16] == the exact fingerprint the
+        campaign run reported (verified directly, not assumed -- an earlier,
+        unverified guess at "Scene Graph" was wrong and is a separate, still-
+        valid fix, not this one). "Pbr" has only 2 lowercase chars after "P",
+        below the single-segment {3,} floor -- but a second capitalized
+        segment ("Material") is itself strong-enough technical-identifier
+        signal that the floor should not apply."""
+        extractor = TextUnitExtractor(segmentation_strategy="leaf_only")
+        heading = heading_node(level=3, children=[text_node("PbrMaterial")])
+        heading.assign_addresses("body.heading[0]")
+
+        plan = extractor.extract_from_ast([heading])
+
+        assert len(plan.units) == 1
+        assert plan.units[0].do_not_translate is True
+
     def test_image_alt_extraction(self):
         """Test image alt text is extracted but src is not."""
         extractor = TextUnitExtractor(segmentation_strategy="leaf_only")
