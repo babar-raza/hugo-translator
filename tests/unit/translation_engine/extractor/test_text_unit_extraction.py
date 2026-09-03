@@ -257,6 +257,20 @@ class TestNodeTypes:
         assert len(plan.units) == 1
         assert plan.units[0].do_not_translate is True
 
+    def test_confirmed_fixed_technical_heading_is_protected(self):
+        """TC-APT-013: 'Scene Graph' recurred as the identical TC-SAS-01
+        same-as-source fingerprint across two unrelated real source files in
+        the Gate 4 canary -- confirmed against already-shipped nl/no/ru
+        translations, which all keep '### Scene Graph' verbatim."""
+        extractor = TextUnitExtractor(segmentation_strategy="leaf_only")
+        heading = heading_node(level=3, children=[text_node("Scene Graph")])
+        heading.assign_addresses("body.heading[0]")
+
+        plan = extractor.extract_from_ast([heading])
+
+        assert len(plan.units) == 1
+        assert plan.units[0].do_not_translate is True
+
     def test_image_alt_extraction(self):
         """Test image alt text is extracted but src is not."""
         extractor = TextUnitExtractor(segmentation_strategy="leaf_only")

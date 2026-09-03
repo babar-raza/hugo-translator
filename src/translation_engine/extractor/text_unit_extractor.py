@@ -298,6 +298,11 @@ def _link_text_is_brand_navigation_label(text: str) -> bool:
     return all(_TITLE_CASE_OR_CAPS_WORD_RE.match(word) for word in remainder.split())
 
 
+#: See the code comment at the call site in _is_non_translatable for the
+#: evidence backing this set.
+_CONFIRMED_FIXED_TECHNICAL_HEADINGS = {"Scene Graph"}
+
+
 def _link_text_matches_url_slug(text: str, url: str) -> bool:
     """A link's visible text that is literally the URL's final path segment is an
     identifier (a repo/product slug), not prose -- e.g. the Markdown
@@ -2183,6 +2188,24 @@ class TextUnitExtractor:
             registry=self._template_registry,
         ):
             return False
+
+        # Strategy 1.5: confirmed fixed technical-domain headings. Found via
+        # TC-APT-013's Gate 4 canary run: "Scene Graph" recurred as the SAME
+        # same-as-source TC-SAS-01 fingerprint across two unrelated real
+        # source files (both m2m100 and professionalize_llm consistently
+        # left it unchanged, all 5 retry attempts). CONFIRMED, not assumed,
+        # against already-shipped translations: blog.aspose.org's own nl/no/
+        # ru versions of two different 3D posts all keep "### Scene Graph"
+        # verbatim -- including ru, where an untranslated English heading
+        # would be maximally visible if it were a defect. Matches "Aspose.X
+        # KB"-style navigation labels' lesson: the model reproducing the
+        # site's own established convention is correct, not a failure.
+        # Deliberately a small, explicit, evidence-backed set rather than a
+        # general "known compound technical term" heuristic (which would
+        # risk silently protecting real translatable prose with no comparable
+        # evidence behind it).
+        if text_stripped in _CONFIRMED_FIXED_TECHNICAL_HEADINGS:
+            return True
 
         # Strategy 2: Heuristic-based detection
         if self._is_technical_identifier(text_stripped):
