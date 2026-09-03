@@ -199,6 +199,30 @@ def run_job(engine, model_lock: threading.Lock | None, entry: dict, locale: str)
     return record
 
 
+def _job_key(entry: dict, locale: str) -> str:
+    return f"{entry['source_path']}::{locale}"
+
+
+def _load_checkpoint(checkpoint_path: Path) -> dict[str, dict]:
+    """Records already completed by a prior (possibly interrupted) run of this
+    run-id, keyed by (source_path, locale). A multi-hour run has now been cut
+    off mid-flight twice in this mission (once deliberately, once by an
+    overnight machine reboot neither this script nor the session could see
+    coming) -- resuming from what already completed, rather than re-running
+    the whole sample from zero, is the difference between losing minutes and
+    losing hours each time that happens again."""
+    if not checkpoint_path.is_file():
+        return {}
+    records: dict[str, dict] = {}
+    for line in checkpoint_path.read_text(encoding="utf-8").splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        record = json.loads(line)
+        records[f"{record['source_path']}::{record['target_lang']}"] = record
+    return records
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="TC-APT-004b LLM qualification run")
     parser.add_argument(
@@ -210,23 +234,41 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--concurrency", type=int, default=8)
     parser.add_argument("--limit", type=int, default=0, help="0 = the whole sample")
     parser.add_argument("--out", type=Path, default=None)
+    parser.add_argument(
+        "--resume",
+        action="store_true",
+        help="skip cells already recorded in this run-id's checkpoint file",
+    )
     args = parser.parse_args(argv)
 
     translator_repo = Path.cwd().resolve()
     sample = json.loads(args.sample.read_text(encoding="utf-8"))
     sandbox = (args.sandbox or Path("data/qualification") / args.run_id / "content").resolve()
-    if sandbox.exists():
-        shutil.rmtree(sandbox)
+    checkpoint_path = Path("data/qualification") / args.run_id / "checkpoint.jsonl"
+
+    resumed: dict[str, dict] = {}
+    if args.resume:
+        resumed = _load_checkpoint(checkpoint_path)
+        print(f"[{args.run_id}] resuming: {len(resumed)} cells already checkpointed")
+    else:
+        if sandbox.exists():
+            shutil.rmtree(sandbox)
+        checkpoint_path.parent.mkdir(parents=True, exist_ok=True)
+        checkpoint_path.unlink(missing_ok=True)
     sandbox.mkdir(parents=True, exist_ok=True)
 
     staged = stage_sandbox(sample, args.content_root.resolve(), sandbox)
-    jobs = [(entry, loc) for entry in staged for loc in entry["locales"]]
+    all_jobs = [(entry, loc) for entry in staged for loc in entry["locales"]]
     if args.limit:
-        jobs = jobs[: args.limit]
-    print(f"[{args.run_id}] staged {len(staged)} sources, {len(jobs)} cells -> {sandbox}")
+        all_jobs = all_jobs[: args.limit]
+    jobs = [(e, loc) for e, loc in all_jobs if _job_key(e, loc) not in resumed]
+    print(
+        f"[{args.run_id}] staged {len(staged)} sources, {len(all_jobs)} cells "
+        f"({len(jobs)} remaining) -> {sandbox}"
+    )
 
     tm_dir = (Path('data/qualification') / args.run_id / 'tm').resolve()
-    if tm_dir.exists():
+    if not args.resume and tm_dir.exists():
         shutil.rmtree(tm_dir)
     engine = build_engine(sandbox, translator_repo, tm_dir)
     # See run_job()'s docstring comment: this reproduces CampaignRunner's full
@@ -234,22 +276,27 @@ def main(argv: list[str] | None = None) -> int:
     # QUEUED, not how many run the model concurrently -- matching what a real
     # zero-defect campaign actually does today, not an idealized parallel run.
     model_lock = threading.Lock()
-    records: list[dict] = []
+    checkpoint_lock = threading.Lock()
+    records: list[dict] = list(resumed.values())
     started = time.perf_counter()
-    with ThreadPoolExecutor(max_workers=max(1, args.concurrency)) as pool:
-        futures = {
-            pool.submit(run_job, engine, model_lock, e, loc): (e, loc) for e, loc in jobs
-        }
-        for done, future in enumerate(as_completed(futures), 1):
-            record = future.result()
-            records.append(record)
-            if done % 10 == 0 or done == len(jobs):
-                accepted = sum(1 for r in records if r.get("accepted"))
-                print(
-                    f"  {done}/{len(jobs)} accepted={accepted} "
-                    f"elapsed={time.perf_counter() - started:.0f}s",
-                    flush=True,
-                )
+    if jobs:
+        with ThreadPoolExecutor(max_workers=max(1, args.concurrency)) as pool:
+            futures = {
+                pool.submit(run_job, engine, model_lock, e, loc): (e, loc) for e, loc in jobs
+            }
+            for done, future in enumerate(as_completed(futures), 1):
+                record = future.result()
+                records.append(record)
+                with checkpoint_lock:
+                    with checkpoint_path.open("a", encoding="utf-8") as fh:
+                        fh.write(json.dumps(record, ensure_ascii=False, default=str) + "\n")
+                if done % 10 == 0 or done == len(jobs):
+                    accepted = sum(1 for r in records if r.get("accepted"))
+                    print(
+                        f"  {done}/{len(jobs)} accepted={accepted} "
+                        f"elapsed={time.perf_counter() - started:.0f}s",
+                        flush=True,
+                    )
 
     accepted = [r for r in records if r.get("accepted")]
     rejected = [r for r in records if not r.get("accepted")]
