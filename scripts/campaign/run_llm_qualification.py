@@ -203,6 +203,18 @@ def _job_key(entry: dict, locale: str) -> str:
     return f"{entry['source_path']}::{locale}"
 
 
+def _shard_owns(key: str, shard_index: int, shard_count: int) -> bool:
+    """Deterministic, cross-process-stable ownership test (a stable hash of the
+    job's OWN key, not its position in a list) so N sibling processes launched
+    against the same --run-id partition the job set with no two ever able to
+    claim the same cell, regardless of timing or how many have already
+    checkpointed -- unlike Python's built-in hash(), salted per-process by
+    PYTHONHASHSEED, sha256 gives every shard the identical answer for the
+    identical key."""
+    digest = hashlib.sha256(key.encode("utf-8")).hexdigest()
+    return int(digest, 16) % shard_count == shard_index
+
+
 def _load_checkpoint(checkpoint_path: Path) -> dict[str, dict]:
     """Records already completed by a prior (possibly interrupted) run of this
     run-id, keyed by (source_path, locale). A multi-hour run has now been cut
@@ -239,12 +251,29 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="skip cells already recorded in this run-id's checkpoint file",
     )
+    parser.add_argument(
+        "--shard-count",
+        type=int,
+        default=1,
+        help="run N sibling processes against the same --run-id, each with a distinct "
+        "--shard-index, to translate concurrently -- see _shard_owns() for why this is "
+        "safe (independent process state sidesteps the thread-safety hazard "
+        "documented in run_job(), and hash-based ownership makes two shards claiming "
+        "the same cell impossible regardless of start timing)",
+    )
+    parser.add_argument("--shard-index", type=int, default=0)
     args = parser.parse_args(argv)
+    if not 0 <= args.shard_index < args.shard_count:
+        raise SystemExit(f"--shard-index must be in [0, {args.shard_count})")
 
     translator_repo = Path.cwd().resolve()
     sample = json.loads(args.sample.read_text(encoding="utf-8"))
-    sandbox = (args.sandbox or Path("data/qualification") / args.run_id / "content").resolve()
-    checkpoint_path = Path("data/qualification") / args.run_id / "checkpoint.jsonl"
+    run_dir = Path("data/qualification") / args.run_id
+    shard_suffix = f"-shard{args.shard_index}" if args.shard_count > 1 else ""
+    sandbox = (args.sandbox or run_dir / f"content{shard_suffix}").resolve()
+    # Shared across every shard so --resume and final aggregation both see the
+    # whole run's progress regardless of which shard produced each record.
+    checkpoint_path = run_dir / "checkpoint.jsonl"
 
     resumed: dict[str, dict] = {}
     if args.resume:
@@ -254,20 +283,26 @@ def main(argv: list[str] | None = None) -> int:
         if sandbox.exists():
             shutil.rmtree(sandbox)
         checkpoint_path.parent.mkdir(parents=True, exist_ok=True)
-        checkpoint_path.unlink(missing_ok=True)
+        if args.shard_count == 1 or args.shard_index == 0:
+            checkpoint_path.unlink(missing_ok=True)
     sandbox.mkdir(parents=True, exist_ok=True)
 
     staged = stage_sandbox(sample, args.content_root.resolve(), sandbox)
     all_jobs = [(entry, loc) for entry in staged for loc in entry["locales"]]
     if args.limit:
         all_jobs = all_jobs[: args.limit]
-    jobs = [(e, loc) for e, loc in all_jobs if _job_key(e, loc) not in resumed]
+    jobs = [
+        (e, loc)
+        for e, loc in all_jobs
+        if _job_key(e, loc) not in resumed
+        and (args.shard_count == 1 or _shard_owns(_job_key(e, loc), args.shard_index, args.shard_count))
+    ]
     print(
-        f"[{args.run_id}] staged {len(staged)} sources, {len(all_jobs)} cells "
-        f"({len(jobs)} remaining) -> {sandbox}"
+        f"[{args.run_id}{shard_suffix}] staged {len(staged)} sources, {len(all_jobs)} cells "
+        f"total ({len(jobs)} owned by this shard) -> {sandbox}"
     )
 
-    tm_dir = (Path('data/qualification') / args.run_id / 'tm').resolve()
+    tm_dir = (run_dir / f"tm{shard_suffix}").resolve()
     if not args.resume and tm_dir.exists():
         shutil.rmtree(tm_dir)
     engine = build_engine(sandbox, translator_repo, tm_dir)
@@ -323,7 +358,9 @@ def main(argv: list[str] | None = None) -> int:
         "gate_failure_histogram": _histogram(records),
         "results": sorted(records, key=lambda r: (r["source_path"], r["target_lang"])),
     }
-    out = args.out or Path(f"data/benchmark_corpus/results/llm_qualification_{args.run_id}.json")
+    out = args.out or Path(
+        f"data/benchmark_corpus/results/llm_qualification_{args.run_id}{shard_suffix}.json"
+    )
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(json.dumps(payload, indent=2, ensure_ascii=False), encoding="utf-8")
     print(json.dumps({k: v for k, v in payload.items() if k != "results"}, indent=2))
