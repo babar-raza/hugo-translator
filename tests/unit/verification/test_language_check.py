@@ -252,6 +252,27 @@ class TestLanguageDetectionCheck:
 
         assert issues == []
 
+    def test_keywords_short_technical_phrases_are_skipped(self, check):
+        """TC-APT-004b (2026-09-03): a hand-written, unambiguously CORRECT German
+        translation of a real kb.aspose.org keyword -- confirmed via direct
+        classifier probe to be detected as English at confidence 0.9999967799308401.
+        keywords ARE meant to be translated (unlike evidence/provenance above); this
+        specific classifier is just unreliable on short, product/platform-token-dense
+        SEO slugs, confirmed independent of translation quality."""
+        translated = {
+            "frontmatter": {
+                "title": "Diagramm zu einem Word-Dokument in dotnet hinzufuegen",
+                "keywords": [
+                    "Diagrammformat Word-Dokument csharp",
+                    "Diagrammlegende ausblenden dotnet",
+                ],
+            }
+        }
+
+        issues = check.run({}, translated, "de")
+
+        assert issues == []
+
     def test_translatable_frontmatter_remains_checked_with_evidence(self, check):
         translated = {
             "frontmatter": {

@@ -111,6 +111,31 @@ class LanguageDetectionCheck(VerificationCheck):
         # before this fix, were exactly this false positive).
         "provenance",
         "graded_content_hash",
+        # TC-APT-004b (2026-09-03): found via the full-sample qualification run --
+        # 734 language_detection flags on frontmatter.keywords[N] across just 51
+        # verification-failure events, heavily concentrated on Latin-script target
+        # locales (es/nl/th: 0% acceptance; it/ro/sv/pl: <=25%), vs. much better
+        # results on non-Latin-script locales (he/ko: ~54%) -- the locale skew
+        # itself was the tell, since a script-based false positive would hit
+        # Latin-script targets hardest and non-Latin targets least.
+        #
+        # Unlike evidence/provenance/graded_content_hash above, keywords ARE
+        # meant to be translated -- this is not "never check it," it's that
+        # THIS classifier (langdetect, char-n-gram based) is unreliable on
+        # keywords' actual shape: short (real content: "add chart word document
+        # dotnet", "format chart word document csharp"), multi-word SEO slugs
+        # dense with product/platform tokens, not prose sentences. Confirmed
+        # directly, not inferred from the model's output: a HAND-WRITTEN,
+        # unambiguously correct German translation of a real keyword
+        # ("Diagrammformat Word-Dokument csharp") was classified as English at
+        # confidence 0.9999967799308401 -- TECHNICAL_SIGNAL_RE stripping doesn't
+        # touch it ("csharp"/"Word-Dokument" aren't in that pattern), so this is
+        # the underlying classifier failing on short mixed text, not a stripping
+        # gap a smarter regex could close. No write gate (9-44) independently
+        # checks keyword translation either, so this is a real coverage gap
+        # left open, not a defect masked by a redundant check elsewhere --
+        # recorded honestly rather than silently accepted.
+        "keywords",
     }
     # Language classifiers can be dominated by required ASCII product/platform
     # tokens in an otherwise-correct short title.  For example, langdetect
