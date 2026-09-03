@@ -72,6 +72,21 @@ live_run:
   run_id: gate1-full-v3
   command: "python -m scripts.campaign.run_llm_qualification --content-root D:/onedrive/Documents/GitHub/aspose.org --run-id gate1-full-v3 --concurrency 4"
   status: "RESTARTED clean at wake 4 (background task bdf7qvrbj), checkpointed this time -- if interrupted again, resume with the same run-id + --resume rather than starting over"
+  parallelized_at_operator_request: >
+    Operator flagged the ~10-13h single-process wall-clock as too slow and asked to speed
+    it up (2026-09-03). Per plan 21's autonomous-resolution authority this was a real
+    tradeoff decision (skip qualification vs. shrink the sample vs. parallelize safely),
+    so it was put to the operator via AskUserQuestion rather than decided unilaterally --
+    chose "parallelize" (full validation kept, no sample-size cut, no skipping ahead to
+    real content). Implemented as N independent OS processes (commit a9c516a,
+    --shard-count/--shard-index) rather than raising in-process concurrency, since an
+    earlier finding in this same taskcard already proved the shared engine pipeline isn't
+    thread-safe across concurrent files. Ownership is a stable sha256 hash of each job's
+    own key, verified disjoint+complete across all 155 real sample cells before use.
+    Single-process run stopped at 37/155 cells (checkpoint preserved); resumed as 4
+    shards (background tasks bg0fe9ft3/bl5vexz14/bhwfgnjzz/bi1ui0v20), each --resume
+    against the same shared checkpoint file, expected ~4x wall-clock reduction (~2.5-3h
+    for the remaining 118 cells instead of ~10h).
   observed_pre_loss: "0 occurrences of GATE31..GATE44 marker strings in gate1-full-v2's log through 50 cells -- no unvalidated-write-gate false-positive signal, consistent with TC-APT-023's finding that content-level defects are rare, but the sample was still small. gate1-full-v2's 40% acceptance rate at 20 cells (vs 27% pre-verification-fix) is superseded by whatever gate1-full-v3 measures fresh, but is consistent directional evidence the language_check.py fix mattered."
 acceptance_bar_from_plan_6.1: "zero unresolved gate failures and zero Claude REJECT_* verdicts across the full qualification sample, reproduced on a second independent run of the same sample -- per TC-APT-023's measured 0.75 byte-identical / 0.8125 semantic-equivalence rerun rates, 'reproduced' means the SEMANTIC contract (all 44 gates pass + similarity >= threshold on both runs), not byte-identical output"
 next_steps:
