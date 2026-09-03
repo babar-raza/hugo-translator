@@ -133,6 +133,46 @@ run_gate1-full-v3_complete_and_third_defect_found:
     html/python/DoctypeToken.md for both nl and ro (2 occurrences, same file) --
     lower apparent volume than the keywords bug, not chased further this wake;
     worth a look if it recurs in gate1-full-v4's results.
+run_gate1-full-v4_complete_and_fourth_defect_found:
+  result: >
+    155/155 checkpointed, 0 duplicates, ~2h13m wall-clock (14:46-16:59). Raw:
+    52/155 accepted (33.6%) -- essentially UNCHANGED from v3's 32.9% despite the
+    keywords fix, which was the signal to keep digging rather than conclude the
+    fix "didn't matter" or that this is simply the model's true ceiling.
+  investigation: >
+    Per-content-class breakdown (not visible in the flat accept/reject numbers)
+    showed the real story: marketing 0/20 (0%), short_metadata 3/38 (8%),
+    long_form 1/18 (6%) vs. 30-44% everywhere else -- too stark to be model
+    variance. Re-aggregated all 4 shard logs (1139 lines): language_detection
+    flags barely dropped (734 -> 666) but moved almost entirely to a NEW field --
+    frontmatter.products.list[N].text (630/666, ~95%) -- a nested marketing-page
+    structure (websites.aspose.org's `products: [{name, list: [{text, link}]}]`),
+    real content example: "AI Paraphrasing Tool - Document Paraphraser". Checked
+    with the same rigor as keywords (hand-crafted correct translations run
+    directly through the checker) but did NOT reproduce a clean false positive
+    this time -- so, unlike keywords, this was NOT fixed; recorded as open,
+    possibly a genuine model-quality issue on this content class, not blanket-
+    protected without real evidence.
+    Separately, frontmatter_segment_not_applied jumped 2 -> 44 occurrences (22
+    raised ValueErrors) -- traced to a genuine bug in THIS HARNESS, not the
+    engine: engine.model_id_override alone doesn't reach
+    segment_translator.py's _retry_original_frontmatter_value() check, which
+    reads a SEPARATE parameter derived from engine._rtq_llm_output_paths (the
+    WS-COMP-4 LLM-escalation queue CampaignRunner populates for its own use_llm
+    phases). This harness never populated that queue, so the check treated
+    every job's stale legacy-segment map as authoritative even though every job
+    ran professionalize_llm -- a harness gap a real professionalize_llm-primary
+    campaign (which wires the queue correctly) would not actually hit.
+  fix: "scripts/campaign/run_llm_qualification.py (commit f6265aa):
+    _register_llm_escalation_path() populates engine._rtq_llm_output_paths with
+    each job's expected output path before every translate_file() call, the
+    same way CampaignRunner does. Smoke-tested directly on the exact previously
+    -failing file (reference.aspose.org/en/html/python/DoctypeToken.md, nl):
+    was frontmatter_segment_not_applied, now accepts cleanly."
+  restart: "Restarted clean as gate1-full-v5 (4 shards: bbfg25ldo/bkpmcu66f/
+    bw62k4a9s/bq2dm101a) with both this fix and the keywords fix in place --
+    fourth restart of this taskcard's qualification run, each driven by a
+    real, confirmed, distinct defect."
   observed_pre_loss: "0 occurrences of GATE31..GATE44 marker strings in gate1-full-v2's log through 50 cells -- no unvalidated-write-gate false-positive signal, consistent with TC-APT-023's finding that content-level defects are rare, but the sample was still small. gate1-full-v2's 40% acceptance rate at 20 cells (vs 27% pre-verification-fix) is superseded by whatever gate1-full-v3 measures fresh, but is consistent directional evidence the language_check.py fix mattered."
 acceptance_bar_from_plan_6.1: "zero unresolved gate failures and zero Claude REJECT_* verdicts across the full qualification sample, reproduced on a second independent run of the same sample -- per TC-APT-023's measured 0.75 byte-identical / 0.8125 semantic-equivalence rerun rates, 'reproduced' means the SEMANTIC contract (all 44 gates pass + similarity >= threshold on both runs), not byte-identical output"
 next_steps:
