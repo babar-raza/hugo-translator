@@ -173,6 +173,54 @@ run_gate1-full-v4_complete_and_fourth_defect_found:
     bw62k4a9s/bq2dm101a) with both this fix and the keywords fix in place --
     fourth restart of this taskcard's qualification run, each driven by a
     real, confirmed, distinct defect."
+first_principles_pass_and_final_restart:
+  trigger: >
+    Operator flagged the risk explicitly: "do you think the machinery is
+    consuming the product" -- fair critique, since two of four fixes so far
+    were in this taskcard's OWN harness code, and the accept rate had barely
+    moved (32.9% -> 33.6%) across two confirmed-real verification fixes.
+    Operator then asked for first-principles thinking before any further
+    restart, not more reactive bug-hunting.
+  method: >
+    Instead of restarting v5 again to re-read an aggregate percentage,
+    extracted every recurring TC-SAS-01 unit_fingerprint (kind:sha256[:16]:len)
+    from the accumulated shard logs and matched each hash back to its actual
+    real source text (the hash+length pair is reversible against a known
+    corpus -- computed sha256(candidate)[:16] for every link/heading/paragraph
+    in the 51 sample files and matched on hash+length). This is the concrete
+    difference between "guess and restart" and "diagnose then fix": every
+    claim below is checked against real content, not inferred from behavior.
+  findings: >
+    Two structural, portfolio-scale patterns, not isolated cells: (1) link
+    text that IS its own href (no natural-language content at all -- matched
+    zero existing non-translatable strategies); (2) brand-navigation labels
+    ("Aspose.3D KB", "Aspose.3D API Reference", "Aspose.3D -- Enterprise
+    Blog"). For (2), CONFIRMED against real, already-shipped content, not
+    guessed: blog.aspose.org/3d/net/introducing-3d-foss-dotnet's own French
+    and German translations both leave "[Aspose.3D KB]" completely
+    untranslated while translating the surrounding prose -- the model
+    matching this IS the established site convention, and TC-SAS-01 was
+    penalizing it for being correct. `grep -c` across just blog.aspose.org
+    found 128+ links using this exact shape (153 files) -- this protects a
+    meaningful slice of the REAL 229,650-cell portfolio once execution
+    starts, not just this qualification sample.
+  fix: "src/translation_engine/extractor/text_unit_extractor.py (commit
+    5412dc7): _link_text_is_brand_navigation_label() (deliberately narrow --
+    only fires when every word after the Aspose.X token is Title-Case/
+    ALL-CAPS, so real prose mentioning a product with lowercase connector
+    words stays translatable) plus a bare-URL-as-link-text check. Broader
+    sweep re-run for safety: tests/unit/translation_engine +
+    test_preservation_contracts.py -> 1342 passed, 1 pre-existing unrelated
+    failure (already routed to TC-APT-011)."
+  restart_and_commitment: >
+    Stopped v5 at 46/155 (~30%) and restarted clean as gate1-full-v6 (4
+    shards: b3jearjny/bnc0rtpkw/b49epjptc/b05hsoqax) -- the fifth restart of
+    this taskcard's qualification run. Per the operator's own concern about
+    the machinery consuming the product: this is the LAST restart planned.
+    v6's result gets analyzed and reported as-is, including honest treatment
+    of the same-as-source zero-tolerance POLICY (not just remaining bugs) as
+    a first-class candidate explanation if the accept rate still doesn't
+    clear the plan's bar after this fix -- not chased with a sixth run.
   observed_pre_loss: "0 occurrences of GATE31..GATE44 marker strings in gate1-full-v2's log through 50 cells -- no unvalidated-write-gate false-positive signal, consistent with TC-APT-023's finding that content-level defects are rare, but the sample was still small. gate1-full-v2's 40% acceptance rate at 20 cells (vs 27% pre-verification-fix) is superseded by whatever gate1-full-v3 measures fresh, but is consistent directional evidence the language_check.py fix mattered."
 acceptance_bar_from_plan_6.1: "zero unresolved gate failures and zero Claude REJECT_* verdicts across the full qualification sample, reproduced on a second independent run of the same sample -- per TC-APT-023's measured 0.75 byte-identical / 0.8125 semantic-equivalence rerun rates, 'reproduced' means the SEMANTIC contract (all 44 gates pass + similarity >= threshold on both runs), not byte-identical output"
 next_steps:
