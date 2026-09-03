@@ -1979,12 +1979,26 @@ class TextUnitExtractor:
         formatting_types = {
             NodeType.STRONG,
             NodeType.EMPHASIS,
-            NodeType.CODE_SPAN,
             NodeType.LINK,
             NodeType.IMAGE,
             # INLINE_HTML intentionally excluded: shortcodes are self-contained leaf nodes
             # that _collect_text_from_node handles via node.raw. Excluding them allows
             # full-sentence extraction so placeholder_manager can protect inline shortcodes.
+            #
+            # CODE_SPAN intentionally excluded (TC-APT-013 Gate 4 canary, confirmed by direct
+            # code read + two failed real-content reviews): forcing leaf-level extraction
+            # splits a sentence into independent fragments at each code-span boundary, and
+            # each fragment is translated with no knowledge of the others -- the observed
+            # failure mode was grammatically incomplete German (dropped finite verbs, wrong
+            # case/gender, garbled word order) exactly at fragment seams around `Code.Spans`.
+            # _collect_text_from_node already reconstructs the literal `` `code` `` markdown
+            # for CODE_SPAN nodes, and HT-INLINE-CODE-001/TC-ICR-002/TC-ICR-003's global
+            # body.preserve_patterns entry (`` `[^`\n]+` ``, config/global.yaml) already
+            # placeholder-protects exactly that substring before the full-sentence text is
+            # sent to the model -- the same mechanism this exclusion already relies on for
+            # INLINE_HTML above. STRONG/EMPHASIS/LINK/IMAGE stay in this set: no matching
+            # preserve_pattern protects `**bold**`/`*em*`/`[text](url)` syntax today, so
+            # leaf-level extraction is still the safe choice for those.
         }
 
         # Check children
@@ -2054,9 +2068,15 @@ class TextUnitExtractor:
 
     def _has_technical_content(self, node: ASTNode) -> bool:
         """Check if node contains code, URLs, or technical identifiers."""
-        # Check for code nodes
+        # Check for code nodes. CODE_SPAN deliberately excluded here too (see the
+        # matching exclusion + full rationale in _has_inline_formatting, TC-APT-013):
+        # preserve_patterns already placeholder-protects `` `code` `` spans within a
+        # full-sentence unit, so forcing leaf-level fallback for CODE_SPAN alone only
+        # loses sentence-level grammatical coherence without buying any safety. Full
+        # CODE_BLOCK stays a fallback trigger -- it isn't markdown-reconstructable as
+        # inline text the same way.
         for child in node.children:
-            if child.type in (NodeType.CODE_SPAN, NodeType.CODE_BLOCK):
+            if child.type is NodeType.CODE_BLOCK:
                 return True
 
             # Check for links (URLs are technical)

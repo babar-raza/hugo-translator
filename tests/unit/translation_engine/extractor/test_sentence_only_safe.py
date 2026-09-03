@@ -16,10 +16,11 @@ class TestSentenceOnlySafeBehavior:
     """
     Test that sentence_only behaves safely (sentence_only_when_safe).
 
-    After SHORTCODE-007 fix:
+    After SHORTCODE-007 fix (and TC-APT-013's code-span exclusion):
     - Plain paragraphs → extracted as full sentence
-    - Paragraphs with shortcodes → leaf-level extraction
-    - Paragraphs with bold/links/code → leaf-level extraction
+    - Paragraphs with shortcodes or inline code → extracted as full sentence
+      (protected downstream by placeholder_manager)
+    - Paragraphs with bold/links → leaf-level extraction
     """
 
     @pytest.fixture
@@ -130,9 +131,60 @@ See [documentation](https://example.com) for details.
         translatable_units = [u for u in plan.units if not u.do_not_translate]
         assert len(translatable_units) >= 2, "Link should trigger leaf-level extraction"
 
-    def test_paragraph_with_code_uses_leaf_extraction(self, parser, extractor_sentence_only):
+    def test_paragraph_with_code_extracts_as_full_sentence(self, parser):
         """
-        Paragraph with inline code should use leaf-level extraction.
+        Paragraph with inline code is extracted as a single full-sentence unit,
+        with the code span placeholder-protected (TC-APT-013 Gate 4 canary).
+
+        Design: CODE_SPAN is intentionally excluded from _has_inline_formatting
+        (and from _has_technical_content's adaptive-strategy check) so that
+        sentence_only/adaptive extract the full sentence instead of leaf-level
+        fragments. Splitting a sentence into independent fragments at each code
+        span boundary was the confirmed root cause of grammatically incomplete
+        translations (dropped verbs, wrong case/gender at fragment seams) found
+        on two real canary cells -- each fragment was translated with no
+        knowledge of the others. The code span itself is protected via the same
+        `` `[^`\\n]+` `` preserve_pattern the production config always merges in
+        (config/global.yaml body.preserve_patterns, HT-INLINE-CODE-001).
+        """
+        extractor = TextUnitExtractor(
+            segmentation_strategy="sentence_only", preserve_patterns=[r"`[^`\n]+`"]
+        )
+        markdown = """---
+title: Test
+---
+
+Use `SaveFormat.Pdf` for output.
+"""
+
+        doc = parser.parse_string(markdown)
+        plan = extractor.extract_from_ast(doc.ast, doc.frontmatter)
+
+        body_units = [
+            u for u in plan.units if not u.do_not_translate and u.node_addr.startswith("body.")
+        ]
+        assert len(body_units) == 1, (
+            f"Expected 1 full-sentence body unit, got {len(body_units)}: "
+            f"{[u.source_text for u in body_units]}"
+        )
+        unit = body_units[0]
+        assert "Use" in unit.source_text and "for output" in unit.source_text
+        assert "`SaveFormat.Pdf`" not in unit.source_text, (
+            "Code span should be replaced by a placeholder, not sent to the model verbatim"
+        )
+        placeholder_map = unit.metadata.get("placeholder_map") or {}
+        assert placeholder_map, "Code span must be placeholder-protected"
+        assert "`SaveFormat.Pdf`" in list(placeholder_map.values()), (
+            "Placeholder map must restore the exact original code span"
+        )
+
+    def test_paragraph_with_only_code_still_leaf_when_unprotected(self, parser, extractor_sentence_only):
+        """
+        Without a matching preserve_pattern configured (this fixture uses []),
+        the code span is not placeholder-protected -- confirms the safety of
+        the full-sentence path depends on preserve_patterns being wired, which
+        production always does (config/global.yaml's body.preserve_patterns
+        baseline is unconditionally merged into every site profile).
         """
         markdown = """---
 title: Test
@@ -144,8 +196,11 @@ Use `SaveFormat.Pdf` for output.
         doc = parser.parse_string(markdown)
         plan = extractor_sentence_only.extract_from_ast(doc.ast, doc.frontmatter)
 
-        translatable_units = [u for u in plan.units if not u.do_not_translate]
-        assert len(translatable_units) >= 2, "Inline code should trigger leaf-level extraction"
+        body_units = [
+            u for u in plan.units if not u.do_not_translate and u.node_addr.startswith("body.")
+        ]
+        assert len(body_units) == 1
+        assert "`SaveFormat.Pdf`" in body_units[0].source_text
 
     def test_multiple_shortcodes_extracted_as_full_sentence(self, parser, extractor_sentence_only):
         """
