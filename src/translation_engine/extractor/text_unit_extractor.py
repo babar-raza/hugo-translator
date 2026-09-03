@@ -2083,11 +2083,25 @@ class TextUnitExtractor:
             if child.type == NodeType.LINK:
                 return True
 
-            # Check text for technical patterns
-            if child.type == NodeType.TEXT and child.raw:
-                text = child.raw.strip()
-                if self._is_technical_identifier(text):
-                    return True
+            # Deliberately NOT checking child.type == TEXT fragments against
+            # _is_technical_identifier here (TC-APT-013, confirmed by direct-read
+            # review of real content): that regex is anchored (^...$) and designed
+            # to classify a text node whose ENTIRE content is a standalone
+            # identifier -- appropriate at the leaf/do_not_translate level. Applied
+            # here to a mere fragment of a longer sentence (e.g. the plain-text run
+            # before a paragraph's first code span or link), it cannot distinguish
+            # a real identifier from an ordinary capitalized English word of 4+
+            # letters -- practically every sentence-initial word looks the same
+            # shape. A real case: "Call `Annotation.Flatten()` to burn ... into the
+            # page content." -- "Call" (an imperative verb, not an identifier)
+            # matched, forcing this whole sentence to leaf-level fallback and
+            # reproducing the exact dropped-verb/incomplete-sentence defect this
+            # taskcard's CODE_SPAN exclusion (above) was written to fix. The
+            # asymmetry favors leaving this out: full-sentence extraction with the
+            # fragment's plain text is very unlikely to actually mistranslate a
+            # genuine bare identifier fragment sitting next to a protected code
+            # span, in contrast to the confirmed, portfolio-relevant grammar
+            # breakage caused by leaf-splitting a sentence that shouldn't be split.
 
             # Recursively check nested children
             if self._has_technical_content(child):

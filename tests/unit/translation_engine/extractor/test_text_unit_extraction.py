@@ -487,19 +487,47 @@ class TestSmartSegmentation:
         assert len(plan.units) == 2
         assert [u.source_text for u in plan.units] == ["Text with", "bold"]
 
-    def test_adaptive_mode_technical_paragraph(self):
-        """Test adaptive mode uses leaf-level for technical content."""
-        extractor = TextUnitExtractor(segmentation_strategy="adaptive")
+    def test_adaptive_mode_code_only_paragraph_extracts_as_full_sentence(self):
+        """
+        Adaptive mode extracts a paragraph containing only a code span (plus
+        plain text) as a single full-sentence unit, not leaf-level fragments
+        (TC-APT-013).
 
-        # Create paragraph with code
+        Superseded the old expectation (leaf-level, 3 units): CODE_SPAN was
+        removed from both _has_inline_formatting and _has_technical_content's
+        fallback triggers. The plain-text fragment "Call" preceding the code
+        span is NOT itself grounds for leaf fallback either -- confirmed by
+        direct-read review of real content, a single capitalized word right
+        before a code span (an ordinary sentence-initial verb, "Call") is
+        indistinguishable by shape from a genuine bare identifier, and
+        _is_technical_identifier's anchored regex was never meant to classify
+        sentence fragments -- only whole standalone text nodes. Leaf-splitting
+        this exact shape of paragraph was the confirmed root cause of dropped
+        verbs / incomplete sentences in real translations.
+        """
+        extractor = TextUnitExtractor(
+            segmentation_strategy="adaptive", preserve_patterns=[r"`[^`\n]+`"]
+        )
+
         code = ASTNode(type=NodeType.CODE_SPAN, raw="code()")
         para = paragraph_node([text_node("Call "), code, text_node(" here")])
         para.assign_addresses("body.paragraph[0]")
 
         plan = extractor.extract_from_ast([para])
 
-        # Should use leaf-level extraction (3 units)
-        assert len(plan.units) == 3
+        body_units = [u for u in plan.units if u.node_addr.startswith("body.")]
+        assert len(body_units) == 1, (
+            f"Expected 1 full-sentence unit, got {len(body_units)}: "
+            f"{[u.source_text for u in body_units]}"
+        )
+        unit = body_units[0]
+        assert "Call" in unit.source_text and "here" in unit.source_text
+        assert "`code()`" not in unit.source_text, (
+            "Code span should be placeholder-protected, not sent verbatim"
+        )
+        placeholder_map = unit.metadata.get("placeholder_map") or {}
+        assert placeholder_map, "Code span must be placeholder-protected"
+        assert "`code()`" in list(placeholder_map.values())
 
 
 class TestProductNameDetection:
