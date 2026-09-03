@@ -4,7 +4,7 @@
   "plan_revision": 6,
   "branch": "mission/aspose-org-full-portfolio-translation-20260901",
   "created_at": "2026-09-02T05:20:29.896922+00:00",
-  "updated_at": "2026-09-03T15:48:39+00:00",
+  "updated_at": "2026-09-03T17:00:37+00:00",
   "content_repo": "D:/onedrive/Documents/GitHub/aspose.org",
   "content_repo_session_ledger": {
     "AGENT_SESSION_ID": "d18689cf-ac87-4bcb-b33f-655ef2b84358",
@@ -355,7 +355,7 @@
       "blocker_type": null
     },
     "TC-APT-013": {
-      "status": "IN_PROGRESS",
+      "status": "DONE",
       "gate": 4,
       "title": "Gate 4 canary (2 cells)",
       "depends_on": [
@@ -366,10 +366,13 @@
         "TC-APT-012"
       ],
       "owner": "loop",
-      "blocking_reason": "attempt 4: java replace_existing cell translated+accepted by gates but Claude review REJECTED (dropped-verb/incomplete-sentence defects, 4 locations); reverted, TM purged (54 entries), see data/summaries/fp-gate4-canary-java-reject-TC-APT-013.json; opened TC-APT-035; selecting a smaller existing-target cell next per \u00a717.1 size-first ordering",
-      "evidence_path": null,
-      "commit": null,
-      "last_updated": "2026-09-03T15:48:39+00:00",
+      "blocking_reason": null,
+      "evidence_path": "data/summaries/fp-gate4-canary-java-reject-TC-APT-013.json",
+      "commit": [
+        "b46b08f583b13a9276d82d35bb5c21ea14b8869d",
+        "2b0a05079b"
+      ],
+      "last_updated": "2026-09-03T17:00:37+00:00",
       "blocker_type": null
     },
     "TC-APT-014": {
@@ -523,5 +526,5 @@
     }
   },
   "last_wake_summary": "data/summaries/aspose-org-wake-001-20260902.json",
-  "cells_committed_total": 1
+  "cells_committed_total": 2
 }
