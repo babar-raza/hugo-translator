@@ -87,6 +87,52 @@ live_run:
     shards (background tasks bg0fe9ft3/bl5vexz14/bhwfgnjzz/bi1ui0v20), each --resume
     against the same shared checkpoint file, expected ~4x wall-clock reduction (~2.5-3h
     for the remaining 118 cells instead of ~10h).
+run_gate1-full-v3_complete_and_third_defect_found:
+  result: "155/155 checkpointed, 0 duplicate/collision cells across shards (sharding
+    correctness verified), total wall-clock ~1h54m (12:47-14:41) vs the original
+    ~10-13h single-process estimate. Raw aggregate: 51/155 accepted (32.9%),
+    104/155 rejected (67.1%) -- far short of the plan's 'zero unresolved gate
+    failures' bar."
+  root_cause_investigation: >
+    Before accepting 32.9% as the real number, checked WHY: aggregated all 4 shard
+    logs (779 lines) and found 734 occurrences of `'check': 'language_detection'`
+    in verification-error metadata across only 51 verification-failure events, almost
+    all on `frontmatter.keywords[N]`. The locale breakdown was the tell before I even
+    looked at logs: Latin-script targets catastrophic (es/nl/th: 0% accepted; it 25%,
+    ro 17%, sv 25%, pl 20%) vs. much better non-Latin-script results (he 54%, ko 54%,
+    ar 33%) -- exactly the pattern a script-based false positive produces, since
+    correctly-translated non-Latin text is unambiguous evidence to a classifier
+    regardless of embedded Latin technical tokens, while a Latin-script translation
+    has to compete character-by-character against the embedded technical tokens.
+    CONFIRMED, not inferred: ran a hand-written, unambiguously CORRECT German
+    translation of a real kb.aspose.org keyword ("Diagrammformat Word-Dokument
+    csharp") directly through LanguageDetectionCheck -- classified as English at
+    confidence 0.9999967799308401. TECHNICAL_SIGNAL_RE stripping doesn't even touch
+    that string; this is langdetect itself failing on short, product/platform-token
+    -dense SEO slugs, independent of what the model actually produced.
+  fix: "src/verification/checks/language_check.py (commit 45c4f9e): added
+    'keywords' to PROTECTED_FRONTMATTER_TREES, third field added to that set this
+    taskcard (after provenance, graded_content_hash). Unlike those two, keywords ARE
+    meant to be translated -- this is a disclosed classifier-reliability gap for
+    this field's shape, not a 'never check it' decision; no write gate (9-44)
+    independently covers keyword translation, recorded honestly as open rather than
+    silently accepted. Regression test uses the exact hand-verified false-positive
+    string. tests/unit/verification: 83/83 passed."
+  restart_decision: >
+    Given the fix's dominant apparent contribution (734 flags vs. 104 total
+    rejections) and that a parallelized restart now costs ~2h not ~10h, restarted
+    clean as gate1-full-v4 (4 shards: bdfyqhx04/b72nfaqx7/bzcnpaa79/bgm1asy9b) rather
+    than report a number known to be contaminated by a fixed false positive. This is
+    the third restart of this taskcard's qualification run (v2: verification
+    content_hash bug; v3->v4: this keywords bug) -- each was driven by a real,
+    confirmed defect found DURING qualification, which is qualification doing
+    exactly its job: this taskcard exists to find defects before they reach real
+    content, not just to produce a number.
+  not_yet_investigated: >
+    "frontmatter_segment_not_applied" ValueError seen on reference.aspose.org/en/
+    html/python/DoctypeToken.md for both nl and ro (2 occurrences, same file) --
+    lower apparent volume than the keywords bug, not chased further this wake;
+    worth a look if it recurs in gate1-full-v4's results.
   observed_pre_loss: "0 occurrences of GATE31..GATE44 marker strings in gate1-full-v2's log through 50 cells -- no unvalidated-write-gate false-positive signal, consistent with TC-APT-023's finding that content-level defects are rare, but the sample was still small. gate1-full-v2's 40% acceptance rate at 20 cells (vs 27% pre-verification-fix) is superseded by whatever gate1-full-v3 measures fresh, but is consistent directional evidence the language_check.py fix mattered."
 acceptance_bar_from_plan_6.1: "zero unresolved gate failures and zero Claude REJECT_* verdicts across the full qualification sample, reproduced on a second independent run of the same sample -- per TC-APT-023's measured 0.75 byte-identical / 0.8125 semantic-equivalence rerun rates, 'reproduced' means the SEMANTIC contract (all 44 gates pass + similarity >= threshold on both runs), not byte-identical output"
 next_steps:
