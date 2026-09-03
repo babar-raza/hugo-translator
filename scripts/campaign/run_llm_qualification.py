@@ -121,6 +121,33 @@ def build_engine(sandbox: Path, translator_repo: Path, tm_dir: Path):
     return engine
 
 
+def _register_llm_escalation_path(engine, entry: dict, locale: str) -> None:
+    """Found via the completed qualification run: engine.model_id_override alone
+    does not reach segment_translator.py's frontmatter-placement check.  That
+    check reads a SEPARATE ``model_id_override`` parameter threaded from
+    file_pipeline.py's own ``_llm_model_override``, which is derived from
+    ``engine._rtq_llm_output_paths`` membership (the "WS-COMP-4 LLM escalation"
+    queue CampaignRunner populates for its own use_llm phases) -- this harness
+    never touched that queue, so ``_retry_original_frontmatter_value()`` saw
+    ``model_id_override=None`` even though every job WAS running
+    professionalize_llm, and treated the run's legacy segment-translation map
+    as still authoritative. That produced 44 spurious
+    ``frontmatter_segment_not_applied`` rejections in gate1-full-v4's 155-cell
+    sample -- a harness gap, not a defect a real professionalize_llm-primary
+    campaign (which wires this queue correctly) would actually hit. Populating
+    the queue the same way CampaignRunner does before every call closes that
+    gap so this harness's rejection rate reflects the model, not a shortcut in
+    how this script drives the engine.
+    """
+    profile = engine.config.get_site_profile(entry["site_id"])
+    output_path = engine._get_output_path(Path(entry["sandbox_path"]), locale, profile)
+    llm_paths = getattr(engine, "_rtq_llm_output_paths", None)
+    if llm_paths is None:
+        llm_paths = set()
+        engine._rtq_llm_output_paths = llm_paths
+    llm_paths.add(str(output_path.resolve()))
+
+
 def run_job(engine, model_lock: threading.Lock | None, entry: dict, locale: str) -> dict:
     started = time.perf_counter()
     record: dict[str, Any] = {
@@ -141,6 +168,7 @@ def run_job(engine, model_lock: threading.Lock | None, entry: dict, locale: str)
         # lock was added here (concurrency=2 reproduced it, concurrency=1 did not).
         if model_lock is not None:
             with model_lock:
+                _register_llm_escalation_path(engine, entry, locale)
                 result = engine.translate_file(
                     entry["site_id"],
                     Path(entry["sandbox_path"]),
@@ -150,6 +178,7 @@ def run_job(engine, model_lock: threading.Lock | None, entry: dict, locale: str)
                     trigger_type="campaign",
                 )
         else:
+            _register_llm_escalation_path(engine, entry, locale)
             result = engine.translate_file(
                 entry["site_id"],
                 Path(entry["sandbox_path"]),
