@@ -1734,7 +1734,22 @@ class CampaignRunner:
                 translate_kwargs = {
                     "target_langs": [locale],
                     "validate": True,
-                    "force": False,
+                    # TC-APT-031/TC-APT-013: for a declared replace_existing cell, force=True
+                    # too, not just force_overwrite. engine.translate_file()'s own
+                    # _should_skip_translation runs BEFORE force_overwrite is ever consulted --
+                    # it skips retranslation outright whenever the target already exists, is
+                    # non-empty, and (mtime OR content-hash, whichever check fires) looks
+                    # "already up to date" relative to the source -- exactly the state a
+                    # replace_existing target is in by definition (unchanged source, existing
+                    # target). Confirmed directly: a real replace_existing run silently no-opped
+                    # (TranslationStats new=0, tm_hits=0, ~0.02s) with force=False despite a
+                    # correct force_overwrite=True declaration; force=True on the same call
+                    # produced a genuine translation. Leaving force=False for undeclared
+                    # (MISSING_TRANSLATION) cells is unchanged and correct -- there is no
+                    # existing target to skip past there. Portfolio-relevant: every declared
+                    # replace_existing cell (112,584 in TC-APT-031's remit) was at risk of this
+                    # same silent no-op depending on filesystem mtime ordering, which this fixes.
+                    "force": bool(declared),
                     # TC-APT-031: overwrite ONLY the declared, pre-hash-verified target.
                     "force_overwrite": bool(declared),
                     "trigger_type": "campaign",
