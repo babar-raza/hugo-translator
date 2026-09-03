@@ -4,7 +4,7 @@
   "plan_revision": 6,
   "branch": "mission/aspose-org-full-portfolio-translation-20260901",
   "created_at": "2026-09-02T05:20:29.896922+00:00",
-  "updated_at": "2026-09-03T14:42:43.179786+00:00",
+  "updated_at": "2026-09-03T14:58:49.023675+00:00",
   "content_repo": "D:/onedrive/Documents/GitHub/aspose.org",
   "content_repo_session_ledger": {
     "AGENT_SESSION_ID": "d18689cf-ac87-4bcb-b33f-655ef2b84358",
@@ -355,7 +355,7 @@
       "blocker_type": null
     },
     "TC-APT-013": {
-      "status": "TODO",
+      "status": "IN_PROGRESS",
       "gate": 4,
       "title": "Gate 4 canary (2 cells)",
       "depends_on": [
@@ -366,10 +366,11 @@
         "TC-APT-012"
       ],
       "owner": "loop",
-      "blocking_reason": null,
+      "blocking_reason": "attempt 2 failed (shard abort-on-failure + one cell content issue); see data/summaries/fp-gate4-canary-TC-APT-013.json; attempt 3 in progress with isolated shard_ids",
       "evidence_path": null,
       "commit": null,
-      "last_updated": "2026-09-02T05:20:29.896922+00:00"
+      "last_updated": "2026-09-03T14:58:49.023675+00:00",
+      "blocker_type": null
     },
     "TC-APT-014": {
       "status": "TODO",

@@ -85,6 +85,13 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument("--ledger-root", type=Path, default=Path("data/campaigns"))
     parser.add_argument("--resume", action="store_true")
+    parser.add_argument(
+        "--shard-id",
+        action="append",
+        default=None,
+        help="run only this shard (repeatable) -- isolates one cell's failure from "
+        "others in the same manifest; see data/summaries/fp-gate4-canary-TC-APT-013.json",
+    )
     args = parser.parse_args(argv)
 
     translator_repo = Path.cwd().resolve()
@@ -106,7 +113,8 @@ def main(argv: list[str] | None = None) -> int:
         translator_repo=translator_repo,
         ledger_root=args.ledger_root,
     )
-    result = runner.run(resume=args.resume)
+    shard_ids = set(args.shard_id) if args.shard_id else None
+    result = runner.run(resume=args.resume, shard_ids=shard_ids)
     print(json.dumps(result, indent=2, default=str))
     return 0
 

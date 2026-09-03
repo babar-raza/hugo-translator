@@ -1,0 +1,36 @@
+{
+  "run_id": "gate4-canary",
+  "step": "TC-APT-013-attempt2",
+  "created_at": "2026-09-03T19:52:00+00:00",
+  "goal": "Land Gate 4's two-cell canary: one MISSING_TRANSLATION cell and one existing-target cell (TC-APT-031 replace_existing), each accepted, Claude-reviewed, and committed to the content repo's local main -- proving the whole write->receipt->review->commit chain on real files.",
+  "assumptions": [
+    {
+      "assumption": "CampaignRunner.run() processes every shard in a manifest even if one shard's jobs all fail.",
+      "status": "FALSIFIED",
+      "evidence": "Direct traceback: campaign_runner.py:1953 raises CampaignManifestError('shard blocked: w0:blog.aspose.org:3d:java:de:1 failures=1') and this propagates out of run(), aborting before the sibling shard (3d:net) is ever attempted."
+    },
+    {
+      "assumption": "content/blog.aspose.org/3d/java/introducing-3d-foss-java/index.md will pass m2m100_418m zero-defect translation to de cleanly (it was picked only for having a genuine existing target, not vetted for translatability).",
+      "status": "FALSIFIED",
+      "evidence": "3 consecutive TranslationIncomplete/TC-SAS-01 exceptions across m2m100's 3 primary attempts, same-as-source ratio 1.3-2.6%, short (11-18 char) recurring unit fingerprints across attempts."
+    },
+    {
+      "assumption": "The two chosen cells fall in the same campaign shard and can only be run together.",
+      "status": "FALSIFIED (in the good direction)",
+      "evidence": "Direct read of campaign_manifest.py:520-559: shards are keyed by (wave, site_id, family, platform, locale). The two cells differ on platform (java vs net) -> two distinct shard_ids, each independently addressable via run(shard_ids={...})."
+    }
+  ],
+  "root_cause": "Two independent problems, not one: (1) campaign_runner.py's run() aborts the whole call on the first shard failure rather than continuing to unaffected shards -- a structural gap matching exactly what plan section 0 named as the disease this redesign exists to cure, now confirmed at the shard level too, not just the qualification-run level. (2) The specific existing-target file chosen for the replace_existing canary has real content m2m100 cannot fully translate under zero-defect's zero-tolerance same-as-source check.",
+  "approaches_considered": [
+    {
+      "approach": "Run each shard in isolation via CampaignRunner.run(shard_ids={...}) so one cell's exhausted retries cannot block the other from being attempted or shipped.",
+      "chosen": true
+    },
+    {
+      "approach": "This step is unnecessary as scoped: swap the replace_existing canary to a different existing-target cell that doesn't hit this specific content issue, rather than debugging this file.",
+      "chosen": "fallback, if the isolated LLM-escalation attempt on this file also fails"
+    }
+  ],
+  "chosen_approach": "Run shard w0:blog.aspose.org:3d:net:de:1 (the MISSING_TRANSLATION cell) alone first -- falsifiable expected outcome: it accepts on m2m100 and produces a receipt, since it has zero prior same-as-source signal in this session. Then run shard w0:blog.aspose.org:3d:java:de:1 alone -- its manifest already grants 2 professionalize_llm escalation attempts per retry_policy after m2m100's 3 primary attempts are exhausted (not yet used, since run() aborted before reaching them); if LLM escalation also fails, swap to a different existing-target cell for the canary rather than a 4th blind retry on this same file.",
+  "regression_control_for_future": "campaign_runner.py's shard-level abort-on-first-failure (line ~1953) is a real design gap worth its own regression fixture and taskcard: one shard's exhausted retries should not prevent sibling shards in the same run() call from being attempted. Flagged, not fixed in this wake -- out of scope for landing the canary itself."
+}
