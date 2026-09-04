@@ -207,6 +207,20 @@ class TestNodeTypes:
         # empty inputs are inert, not a crash
         assert not _link_text_matches_url_slug("", "https://example.com/x")
         assert not _link_text_matches_url_slug("x", "")
+        # TC-APT-014 Gate 5 (introducing-words-foss-net): a natural, space-separated
+        # nav link text must NOT match its own URL's hyphen-separated slug just
+        # because stripping both hyphens and spaces would make them equal -- that
+        # silently excluded "Getting Started" / "Developer Guide" / "API Reference"
+        # from translation in every reviewed language (ar/cs/el/es).
+        assert not _link_text_matches_url_slug(
+            "Getting Started", "https://docs.aspose.org/words/net/getting-started/"
+        )
+        assert not _link_text_matches_url_slug(
+            "Developer Guide", "https://docs.aspose.org/words/net/developer-guide/"
+        )
+        assert not _link_text_matches_url_slug(
+            "API Reference", "https://reference.aspose.org/words/net/api-reference/"
+        )
 
     def test_link_text_is_schemeless_bare_url_helper(self):
         """TC-APT-014 Gate 5: `[github.com/x/y](https://github.com/x/y)` -- visible

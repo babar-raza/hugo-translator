@@ -337,6 +337,17 @@ def _link_text_matches_url_slug(text: str, url: str) -> bool:
     ``_is_technical_identifier``'s patterns catch it, and a hyphen-tolerant heuristic would
     be too broad (it would also swallow ordinary hyphenated English like "state-of-the-art").
     Comparing against the URL is narrow and self-justifying: the text IS the slug.
+
+    Found via TC-APT-014 Gate 5 (introducing-words-foss-net, 2026-09-04): the normalizer
+    used to also strip whitespace, so ordinary Title Case navigation link text like
+    "Getting Started" and "Developer Guide" normalized identically to their own URL's
+    hyphenated slug ("getting-started", "developer-guide") and got silently excluded from
+    translation in every reviewed language (ar/cs/el/es all reproduced it). A real slug/
+    identifier never contains a natural space -- that is exactly what distinguishes it from
+    human-readable link text that merely happens to share the same words as its URL's slug.
+    Whitespace is deliberately NOT stripped here so a spaced multi-word text can only match
+    a spaceless slug if it collapses to one token on its own (e.g. hyphens/dots removed),
+    not by conflating " " with "-".
     """
     if not text or not url:
         return False
@@ -345,7 +356,7 @@ def _link_text_matches_url_slug(text: str, url: str) -> bool:
         return False
 
     def _normalize(value: str) -> str:
-        return re.sub(r"[\s._-]+", "", value).casefold()
+        return re.sub(r"[._-]+", "", value).casefold()
 
     return _normalize(slug) == _normalize(text)
 
