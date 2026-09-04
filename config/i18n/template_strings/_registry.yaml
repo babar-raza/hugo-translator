@@ -475,3 +475,15 @@ entries:
   status: pending
   first_seen_incident: TC-APT-014-gate5-pdf-foss-typescript
   evidence_count: 1
+- id: heading.tables
+  en: Tables
+  category: section_heading
+  status: pending
+  first_seen_incident: TC-APT-014-gate5-cells-foss-go
+  evidence_count: 1
+- id: heading.pictures
+  en: Pictures
+  category: section_heading
+  status: pending
+  first_seen_incident: TC-APT-014-gate5-cells-foss-go
+  evidence_count: 1
