@@ -4,7 +4,7 @@ repository on branch `mission/aspose-org-full-portfolio-translation-20260901`. R
 bounded iteration of the loop below, then yield. Every iteration starts from the files, never from
 memory of a previous iteration.
 
-`loop_prompt_version: 8.2 (2026-09-04)`
+`loop_prompt_version: 9.0 (2026-09-04)`
 
 ## 0. On reload — before anything else
 
@@ -88,8 +88,11 @@ Track A — ship translated pages:
   `dirty_scope: campaign_paths`, `replace_existing` declared for every existing-target cell.
 
 Track B — harden, in this order, each item exactly per its plan §11 fields:
-TC-APT-038 (gate-close semantics, heal queue, per-language quarantine) → TC-APT-039 (split
-primary routing, cross-model retry on review reject, production-review qualification ledger) →
+TC-APT-041 (per-job commit isolation and shard/run continuation in `campaign_runner.py` — do
+FIRST, highest leverage: this is why batches have been shrinking `9→7→1→2→2` languages instead of
+one 25-language manifest per call) → TC-APT-038 (gate-close semantics, heal queue, per-language
+quarantine) → TC-APT-039 (split primary routing, cross-model retry on review reject,
+production-review qualification ledger) →
 TC-APT-040 (short-field language-detection, Devanagari `।.` punctuation, CJK fidelity-judge
 inspection) → TC-APT-036 (bold/link leaf-splitting) → TC-APT-035 (TM write buffering on reject) →
 TC-APT-034/004b per cell (integration suite first; a passing cell flips to LLM-primary for new
@@ -98,9 +101,17 @@ surface. Implement, test, execute the acceptance criterion, mark DONE, commit to
 
 ## 4. Implement (at most ~90 minutes of wall clock per iteration)
 
-1. Build the manifest for the selected scope and run `campaign_runner.py` (Gate-5 runner:
-   `scripts/campaign/run_gate5_batch.py`, generalized by TC-APT-038). It writes receipt-backed files
-   directly into `content/<site>/<lang>/…`; nothing else writes there.
+1. Build ONE manifest for the FULL selected scope (a whole Tier-1a page's 25 languages; a whole
+   family/site batch at Gate 7-8) and run `campaign_runner.py` (Gate-5 runner:
+   `scripts/campaign/run_gate5_batch.py`, generalized by TC-APT-038) in a single `run()` call. It
+   writes receipt-backed files directly into `content/<site>/<lang>/…`; nothing else writes there.
+   **Per-file retry, not whole-campaign retry (plan §0.2/G-29, TC-APT-041)**: a job that fails
+   never blocks its siblings from committing, and never aborts the run for other shards/pages —
+   once TC-APT-041 is DONE, do not hand-split into small per-language batches to work around a
+   failing cell; submit the full scope once and let the runner isolate the failure itself. Until
+   TC-APT-041 reads DONE in `taskcard_status.json`, the runner still aborts a shard's commit and
+   the whole `run()` call on any single job failure — continue the current workaround (small,
+   hand-constructed batches, one call per attempt) only until that taskcard lands.
 2. Review (plan §9): Block-Queue receipts (gate ids 31–35, 37–44, `llm_provider_failure`) at
    batch-size 1 first; Accepted-Sample-Queue per §9.1; a (language, class) cell reaches stratified
    sampling only after 50 consecutive clean accepted cells. A review that cannot complete is
@@ -183,3 +194,4 @@ most 3 minutes out — never longer**, regardless of how long the current step i
 - 2026-09-04: content repo `skills/`, `.claude/`, `.agents/`, `.kilocode/` are FORBIDDEN prefixes (override token per commit); skill docs must use venv python (`enforce_venv_python.py --check`); skill mirrors must match canonical (`sync_skills.py --check`).
 - 2026-09-04: `data/tm/l2.lmdb` shows a one-time "fingerprint drift" error on the first campaign run after any write-mode touch — rebuild the manifest and retry once.
 - 2026-09-04: pilot receipts (30,325) exist nowhere on this host; L3 FAISS index absent — every existing target is `UNKNOWN_PROVENANCE`; only L2 exists.
+- 2026-09-04: `campaign_runner.py::_run_locked` only commits a shard if it had zero job failures, then raises and aborts the whole `run()` call — this, not policy, is why Gate 5's batches shrank `9→7→1→2→2` languages. `_commit_verified_outputs` was confirmed to already scope strictly to checksum-receipted paths, so committing a shard's passing jobs regardless of its failures is safe. Fix is TC-APT-041 (plan G-29/§0.2). Its commit-message template also hardcodes `Co-authored-by: Codex <noreply@openai.com>` — fix alongside.
