@@ -353,6 +353,40 @@ class TestNodeTypes:
         assert len(plan.units) == 1
         assert plan.units[0].do_not_translate is True
 
+    def test_registry_covered_single_word_heading_is_translate_eligible(self):
+        """TC-APT-014 Gate 5 (introducing-words-foss-net) / TC-APT-049: '### Charts'
+        was silently left untranslated in 4 of 5 reviewed languages because
+        _is_technical_identifier's single-segment PascalCase pattern cannot
+        distinguish an ordinary capitalized English word from a genuine
+        single-word API identifier by shape alone -- it matches both
+        identically. Fixed via the SAME i18n registry override mechanism
+        already used for "Overview"/"Value"/"Type" etc. (config/i18n/
+        template_strings/_registry.yaml), not a regex change, so the
+        PbrMaterial/Scene-Graph protections above are untouched."""
+        extractor = TextUnitExtractor(segmentation_strategy="leaf_only")
+        heading = heading_node(level=3, children=[text_node("Charts")])
+        heading.assign_addresses("body.heading[0]")
+
+        plan = extractor.extract_from_ast([heading])
+
+        assert len(plan.units) == 1
+        assert plan.units[0].do_not_translate is False
+
+    def test_unregistered_single_word_heading_still_protected(self):
+        """The fix above is a targeted registry addition, not a regex
+        loosening -- a single-word heading with NO registry entry must still
+        be protected exactly as before (this is what PbrMaterial/Scene Graph
+        already prove for their own shapes; this covers the plain
+        single-segment PascalCase case those two don't)."""
+        extractor = TextUnitExtractor(segmentation_strategy="leaf_only")
+        heading = heading_node(level=3, children=[text_node("Camera")])
+        heading.assign_addresses("body.heading[0]")
+
+        plan = extractor.extract_from_ast([heading])
+
+        assert len(plan.units) == 1
+        assert plan.units[0].do_not_translate is True
+
     def test_image_alt_extraction(self):
         """Test image alt text is extracted but src is not."""
         extractor = TextUnitExtractor(segmentation_strategy="leaf_only")

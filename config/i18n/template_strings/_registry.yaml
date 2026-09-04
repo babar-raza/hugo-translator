@@ -451,3 +451,21 @@ entries:
   placeholders:
   - platform
   - family
+- id: heading.charts
+  en: Charts
+  category: section_heading
+  status: pending
+  first_seen_incident: TC-APT-014-gate5-words-foss-net
+  evidence_count: 1
+- id: heading.format
+  en: Format
+  category: table_header
+  status: pending
+  first_seen_incident: TC-APT-014-gate5-words-foss-net
+  evidence_count: 1
+- id: heading.extension
+  en: Extension
+  category: table_header
+  status: pending
+  first_seen_incident: TC-APT-014-gate5-words-foss-net
+  evidence_count: 1
