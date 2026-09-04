@@ -613,8 +613,8 @@
       "title": "Recurrence escalation: force Track-B fix once a root_cause_class recurs across 2+ pages, closing the self-healing convergence gap",
       "depends_on": [],
       "owner": "hugo-translator-db",
-      "blocking_reason": "Operator found heal_queue.jsonl at 67 open tickets, 0 resolved -- the loop kept documenting the same recurring defects (TC-APT-040, TC-APT-042) across new pages instead of fixing them, because Track A always has an untried page and nothing converted accumulated evidence into pressure. Implemented as a mandatory RECURRENCE ESCALATION rule in project/loop-prompt.md v10.0 SS3: before opening a new Track-A page, count heal_queue.jsonl open tickets by root_cause_class; 2+ page-confirmed occurrences with an unimplemented taskcard blocks new Track-A work. Also documented in plan revision 12 SS0.5. Messaged the active session (hugo-translator-ea) to act on it immediately for TC-APT-040/042 rather than wait for a natural re-read.",
-      "evidence_path": "project/loop-prompt.md (v10.0, commit 5311579); plan SS0.5 revision 12",
+      "blocking_reason": "Operator found heal_queue.jsonl at 67 open tickets, 0 resolved -- the loop kept documenting the same recurring defects (TC-APT-040, TC-APT-042) across new pages instead of fixing them, because Track A always has an untried page and nothing converted accumulated evidence into pressure. Implemented as a mandatory RECURRENCE ESCALATION rule in project/loop-prompt.md v10.0 §3: before opening a new Track-A page, count heal_queue.jsonl open tickets by root_cause_class; 2+ page-confirmed occurrences with an unimplemented taskcard blocks new Track-A work. Also documented in plan revision 12 §0.5. Messaged the active session (hugo-translator-ea) to act on it immediately for TC-APT-040/042 rather than wait for a natural re-read.",
+      "evidence_path": "project/loop-prompt.md (v10.0, commit 5311579); plan §0.5 revision 12",
       "commit": "5311579",
       "last_updated": "2026-09-04T18:15:29.216416+00:00",
       "blocker_type": null
